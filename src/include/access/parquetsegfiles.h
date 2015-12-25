@@ -30,12 +30,11 @@
 #include "utils/rel.h"
 #include "utils/tqual.h"
 
-#define Natts_pg_parquetseg					5
+#define Natts_pg_parquetseg					4
 #define Anum_pg_parquetseg_segno			1
 #define Anum_pg_parquetseg_eof				2
 #define Anum_pg_parquetseg_tupcount			3
 #define Anum_pg_parquetseg_eofuncompressed	4
-#define Anum_pg_parquetseg_content			5
 
 #define InvalidFileSegNumber			-1
 #define InvalidUncompressedEof			-1
@@ -50,8 +49,7 @@
 { -1, {"segno"}, 				23, -1, 4, 1, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0 }, \
 { -1, {"eof"},					701, -1, 8, 2, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
 { -1, {"tupcount"},				701, -1, 8, 3, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
-{ -1, {"eofuncompressed"},		701, -1, 8, 5, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
-{ -1, {"contentid"},			23, -1, 4, 21, 0, -1, -1, true, 'p', 'i', true, false, false, true, 0 }
+{ -1, {"eofuncompressed"},		701, -1, 8, 5, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }
 
 /*
  * pg_parquetseg_nnnnnn table values for FormData_pg_class.
@@ -69,7 +67,6 @@ typedef struct ParquetFileSegInfo {
 	TupleVisibilitySummary tupleVisibilitySummary;
 
 	int segno; /* the file segment number */
-	int content; /* content id of this tuple */
 	int64 tupcount; /* total number of tuples in this fileseg */
 	ItemPointerData sequence_tid; /* tid for the unique sequence number for this fileseg */
 

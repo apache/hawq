@@ -14,13 +14,12 @@
 #include "utils/tqual.h"
 #include "catalog/pg_appendonly.h"
 
-#define Natts_pg_aoseg					6
+#define Natts_pg_aoseg					5
 #define Anum_pg_aoseg_segno				1
 #define Anum_pg_aoseg_eof				2
 #define Anum_pg_aoseg_tupcount			3
 #define Anum_pg_aoseg_varblockcount		4
 #define Anum_pg_aoseg_eofuncompressed	5
-#define Anum_pg_aoseg_content			6
 
 #define InvalidFileSegNumber			-1
 #define InvalidUncompressedEof			-1
@@ -38,8 +37,7 @@
 { -1, {"eof"},					701, -1, 8, 2, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
 { -1, {"tupcount"},				701, -1, 8, 3, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
 { -1, {"varblockcount"},		701, -1, 8, 4, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
-{ -1, {"eofuncompressed"},		701, -1, 8, 5, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }, \
-{ -1, {"contentid"},			23, -1, 4, 21, 0, -1, -1, true, 'p', 'i', true, false, false, true, 0 }
+{ -1, {"eofuncompressed"},		701, -1, 8, 5, 0, -1, -1, true, 'p', 'd', false, false, false, true, 0 }
 
 /*
  * pg_aoseg_nnnnnn table values for FormData_pg_class.
@@ -64,7 +62,6 @@ typedef struct FileSegInfo
 	TupleVisibilitySummary	tupleVisibilitySummary;
 
 	int			segno;			/* the file segment number */
-	int			content;		/* content id of this tuple */
 	int64		tupcount;		/* total number of tuples in this fileseg */
 	int64		varblockcount;	/* total number of varblocks in this fileseg */	
 	ItemPointerData  sequence_tid;     /* tid for the unique sequence number for this fileseg */

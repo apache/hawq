@@ -1768,7 +1768,6 @@ AORelLookupSegfileStatus(int segno, AORelHashEntry entry)
 
 struct SegFileMap
 {
-    int32	contentid;
     int64	eof;
     bool	ok;
 };
@@ -1801,7 +1800,6 @@ GetSegmentFileLengthMapping(Relation rel, Oid segrelid, int segno, int *totalseg
 
             for (i = 0; i < *totalsegs; ++i)
             {
-                retval[i].contentid = fsinfo[i]->content;
                 retval[i].eof = fsinfo[i]->eof;
                 retval[i].ok = false;
             }
@@ -1826,7 +1824,6 @@ GetSegmentFileLengthMapping(Relation rel, Oid segrelid, int segno, int *totalseg
 
             for (i = 0; i < *totalsegs; ++i)
             {
-                retval[i].contentid = fsinfo[i]->content;
                 retval[i].eof = fsinfo[i]->eof;
                 retval[i].ok = false;
             }
