@@ -56,13 +56,6 @@
 #define errtable_rawbytes 8   
 
 /*
- * If the 1st 1000 rows got rejected (ALL of them) - there's no point
- * in resuming the load. Better if we abort even if REJECT LIMIT is more
- * than 1000.
- */
-#define FIRST_1000_BAD(sreh) ((sreh->processed == 1000 && sreh->rejectcount >= 1000) ? (true) : (false))
-
-/*
  * In cases of invalid csv input data we end up with not being able to parse the
  * data, resulting in very large data rows. In copy.c we throw an error ("line
  * too long") and continue to try and parse. In some cases this is enough to 
