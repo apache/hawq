@@ -4135,7 +4135,6 @@ void refreshAvailableNodeCount(void)
 	ListCell *cell 		= NULL;
 	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &allsegs);
 
-	int oldcount = PRESPOOL->AvailNodeCount;
 	PRESPOOL->AvailNodeCount = 0;
 	foreach(cell, allsegs)
 	{

@@ -105,7 +105,6 @@ struct ConnectionTrackData
 
 	int						Progress;		/* The processing progress.		  */
 	bool			    	ResponseSent;
-
 	int64_t					SessionID;
 
 	int32_t					SegMemoryMB;
@@ -167,6 +166,7 @@ typedef struct ConnectionTrackManagerData  ConnectionTrackManagerData;
 /* Initialize connection track manager. */
 void initializeConnectionTrackManager(void);
 
+void createEmptyConnectionTrack(ConnectionTrack *track);
 /* Use connection id. */
 int useConnectionID(int32_t *connid);
 /* Return connection id. */
@@ -194,6 +194,12 @@ void freeSegPreferredHostInfo(ConnectionTrack track);
 
 void setAllAllocatedResourceInConnectionTracksOld(void);
 
+void copyAllocWaitingConnectionTrack(ConnectionTrack source,
+									 ConnectionTrack target);
+
+void copyResourceQuotaConnectionTrack(ConnectionTrack source,
+									  ConnectionTrack target);
+
 void dumpConnectionTracks(const char *filename);
 
 /* Build response message into Connection Track instance. */
@@ -203,4 +209,10 @@ void buildResponseIntoConnTrack(ConnectionTrack  conntrack,
 								uint8_t  		 mark1,
 								uint8_t  		 mark2,
 								uint16_t 		 messageid);
+
+void setConnectionTrackMessageBuffer(ConnectionTrack  track,
+									 char 			 *content,
+									 int 			  size);
+
+void freeUsedConnectionTrack(ConnectionTrack track);
 #endif /*DYNAMIC_RESOURCE_MANAGEMENT_CONNECTION_TRACK_H*/

@@ -334,6 +334,4 @@ int  initializeSocketServer_RMSEG(void);
 int  MainHandlerLoop_RMSEG(void);
 int  MainHandler_RMSEGDummyLoop(void);
 
-#define ELOG_ERRBUF_MESSAGE(level,buffer) elog((level), "%s", (buffer));
-
 #endif //DYNAMIC_RESOURCE_MANAGEMENT_H

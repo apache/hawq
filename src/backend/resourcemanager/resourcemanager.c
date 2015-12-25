@@ -1628,7 +1628,7 @@ void notifyPostmasterResManagerStarted(SIGNAL_ARGS)
  * queues[out]		: list of DynResourceQueue
  * users[out]		: list of UserInfo
  */
-int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
+int addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 {
 	static char	  errorbuf[1024];
 	int			  res			= FUNC_RETURN_OK;

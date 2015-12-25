@@ -22,13 +22,6 @@
 #include "communication/rmcomm_MessageHandler.h"
 #include "communication/rmcomm_QD_RM_Protocol.h"
 
-void createEmptyConnectionTrack(ConnectionTrack *track);
-void freeUsedConnectionTrack(ConnectionTrack track);
-
-void setConnectionTrackMessageBuffer(ConnectionTrack  track,
-									 char 			 *content,
-									 int 			  size);
-
 /* Initialize connection track manager. */
 void initializeConnectionTrackManager(void)
 {
@@ -101,51 +94,58 @@ void createEmptyConnectionTrack(ConnectionTrack *track)
 	/* Create new entry in connection track. */
 	(*track) = rm_palloc0(PCONTEXT, sizeof(ConnectionTrackData));
 
-	(*track)->ConnID 		 			= INVALID_CONNID;
-	(*track)->SessionID					= -1;
-	(*track)->RegisterTime   			= 0;
 	(*track)->ConnectTime	 			= 0;
-	(*track)->ResAllocTime	 			= 0;
+	(*track)->RegisterTime   			= 0;
 	(*track)->ResRequestTime 			= 0;
+	(*track)->ResAllocTime	 			= 0;
 	(*track)->LastActTime	 			= 0;
 	(*track)->HeadQueueTime				= 0;
+
 	(*track)->ClientAddrLen  			= 0;
 	(*track)->ClientSocket   			= 0;
-	(*track)->MessageID	     	 		= 0;
+
+	(*track)->MessageSize	 	 		= 0;
 	(*track)->MessageMark1   	 		= 0;
 	(*track)->MessageMark2   	 		= 0;
-	(*track)->MessageSize	 	 		= 0;
+	(*track)->MessageID	     	 		= 0;
+	initializeSelfMaintainBuffer(&((*track)->MessageBuff), PCONTEXT);
 	(*track)->MessageReceiveTime 		= 0;
+
+	(*track)->ConnID 		 			= INVALID_CONNID;
+	(*track)->QueueID			 		= 0;
 	(*track)->Progress		 	 		= CONN_PP_INFO_NOTSET;
 	(*track)->ResponseSent	 	 		= false;
-	(*track)->SegCore		 	 		= -1.0;
+	(*track)->SessionID					= -1;
+
 	(*track)->SegMemoryMB	 	 		= -1;
+	(*track)->SegCore		 	 		= -1.0;
 	(*track)->SegIOBytes				= 0;
 	(*track)->SegNum			 		= -1;
 	(*track)->SegNumMin					= -1;
 	(*track)->SegNumActual				= -1;
+	(*track)->SegNumEqual				= 0;
+	(*track)->SegPreferredHostCount 	= 0;
+	(*track)->SegPreferredHostNames 	= NULL;
+	(*track)->SegPreferredScanSizeMB 	= NULL;
+	(*track)->SliceSize					= 0;
+	(*track)->IOBytes					= 0;
 	(*track)->MaxSegCountFixed			= 0;
 	(*track)->MinSegCountFixed			= 0;
 	(*track)->VSegLimitPerSeg			= -1;
 	(*track)->VSegLimit					= -1;
 	(*track)->StatVSegMemoryMB			= 0;
 	(*track)->StatNVSeg					= 0;
-	(*track)->SegNumEqual				= 0;
-	(*track)->SliceSize					= 0;
-	(*track)->IOBytes					= 0;
-	(*track)->QueueID			 		= 0;
-	(*track)->User				 		= NULL;
-	(*track)->QueueTrack		 		= NULL;
-	(*track)->SegPreferredHostCount 	= 0;
-	(*track)->SegPreferredHostNames 	= NULL;
-	(*track)->SegPreferredScanSizeMB 	= NULL;
-	(*track)->isOld						= false;
-	(*track)->troubledByFragment		= false;
-	(*track)->troubledByFragmentTimestamp = 0;
-	(*track)->CommBuffer				= NULL;
 	(*track)->Resource					= NULL;
 
-	initializeSelfMaintainBuffer(&((*track)->MessageBuff), PCONTEXT);
+	(*track)->QueueTrack		 		= NULL;
+	(*track)->User				 		= NULL;
+
+	(*track)->isOld						= false;
+
+	(*track)->troubledByFragment		= false;
+	(*track)->troubledByFragmentTimestamp = 0;
+
+	(*track)->CommBuffer				= NULL;
 }
 
 void freeUsedConnectionTrack(ConnectionTrack track)
@@ -719,4 +719,89 @@ void buildResponseIntoConnTrack(ConnectionTrack      conntrack,
 	conntrack->MessageSize  = size;
 	conntrack->ResponseSent = false;
 	setConnectionTrackMessageBuffer(conntrack, content, size);
+}
+
+void copyAllocWaitingConnectionTrack(ConnectionTrack source,
+									 ConnectionTrack target)
+{
+	target->ConnectTime					= source->ConnectTime;
+	target->RegisterTime   				= source->RegisterTime;
+	target->ResRequestTime 				= source->ResRequestTime;
+	target->ResAllocTime	 			= 0;
+	target->LastActTime	 				= source->LastActTime;
+	target->HeadQueueTime				= source->HeadQueueTime;
+
+	memcpy(&(target->ClientAddr),
+		   &(source->ClientAddr),
+		   sizeof(struct sockaddr_in));
+	target->ClientAddrLen  				= source->ClientAddrLen;
+	target->ClientSocket   				= source->ClientSocket;
+	memcpy(target->ClientAddrDotStr,
+		   source->ClientAddrDotStr,
+		   sizeof(target->ClientAddrDotStr));
+	target->ClientAddrPort				= source->ClientAddrPort;
+
+	target->MessageSize	 	 			= source->MessageSize;
+	target->MessageMark1   	 			= source->MessageMark1;
+	target->MessageMark2   	 			= source->MessageMark2;
+	target->MessageID	     	 		= source->MessageID;
+	appendSelfMaintainBuffer(&(target->MessageBuff),
+							 SMBUFF_CONTENT(&(source->MessageBuff)),
+							 getSMBContentSize(&(source->MessageBuff)));
+	target->MessageReceiveTime 			= source->MessageReceiveTime;
+
+	target->ConnID 		 				= source->ConnID;
+	memcpy(target->UserID, source->UserID, sizeof(target->UserID));
+	target->QueueID			 			= source->QueueID;
+
+	target->Progress		 	 		= source->Progress;
+	target->ResponseSent	 	 		= source->ResponseSent;
+	target->SessionID					= source->SessionID;
+
+	target->SegMemoryMB	 	 			= -1;
+	target->SegCore		 	 			= -1.0;
+	target->SegIOBytes					= 0;
+	target->SegNum			 			= -1;
+	target->SegNumMin					= -1;
+	target->SegNumActual				= -1;
+	target->SegNumEqual					= 0;
+	target->SegPreferredHostCount 		= source->SegPreferredHostCount;
+	target->SegPreferredHostNames 		= NULL;
+	target->SegPreferredScanSizeMB 		= NULL;
+	target->SliceSize					= source->SliceSize;
+	target->IOBytes						= source->IOBytes;
+	target->MaxSegCountFixed			= source->MaxSegCountFixed;
+	target->MinSegCountFixed			= source->MinSegCountFixed;
+	target->VSegLimitPerSeg				= source->VSegLimitPerSeg;
+	target->VSegLimit					= source->VSegLimit;
+	target->StatVSegMemoryMB			= source->StatVSegMemoryMB;
+	target->StatNVSeg					= source->StatNVSeg;
+	target->Resource					= NULL;
+
+	target->QueueTrack		 			= source->QueueTrack;
+	target->User				 		= source->User;
+
+	target->isOld						= false;
+
+	target->troubledByFragment		= false;
+	target->troubledByFragmentTimestamp = 0;
+
+	target->CommBuffer				= NULL;
+
+	/*
+	 * We have copied the resource request content, so we can call this API to
+	 * build up preferred host list.
+	 */
+	buildSegPreferredHostInfo(target);
+}
+
+void copyResourceQuotaConnectionTrack(ConnectionTrack source,
+									  ConnectionTrack target)
+{
+	target->SegMemoryMB		= source->SegMemoryMB;
+	target->SegCore			= source->SegCore;
+	target->SegIOBytes		= source->SegIOBytes;
+	target->SegNum			= source->SegNum;
+	target->SegNumMin		= source->SegNumMin;
+	target->SegNumEqual		= source->SegNumEqual;
 }

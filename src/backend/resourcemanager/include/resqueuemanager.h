@@ -81,7 +81,7 @@ enum RESOURCE_QUEUE_TABLE_ATTR_INDEX {
 	RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER,
 	RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA,
 	RSQ_TBL_ATTR_ALLOCATION_POLICY,
-	RSQ_TBL_ATTR_RESORUCE_OVERCOMMIT_FACTOR,
+	RSQ_TBL_ATTR_RESOURCE_OVERCOMMIT_FACTOR,
 	RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT,
 	RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT,
 	RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT_PERSEG,
@@ -142,7 +142,7 @@ struct DynResourceQueueData {
     double				ClusterMemoryPer;		/* Specified percentage exp.  */
     double				ClusterVCorePer;		/* Specified percentage exp.  */
 
-    char                Name[72];				/* Expect maximum 64 bytes.   */
+    char                Name[64];				/* Expect maximum 64 bytes.   */
 };
 
 typedef struct DynResourceQueueData *DynResourceQueue;
@@ -194,6 +194,10 @@ struct DynResourceQueueTrackData {
 	int					  NumOfRunningQueries;  /* Number of running queries. */
 
 	ResqueueDeadLockDetectorData DLDetector;	/* Deadlock detector.         */
+
+	DynResourceQueueTrack	ShadowQueueTrack;	/* The shadow instance for
+												   saving temporary status when
+												   altering this queue.		  */
 };
 
 /**
@@ -366,12 +370,13 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 								  char 				*errorbuf,
 								  int   			 errorbufsize);
 
-int updateResourceQueueAttributes(List 			 	*attributes,
-								  DynResourceQueue 	 queue,
-								  char 				*errorbuf,
-								  int   			 errorbufsize);
+int updateResourceQueueAttributesInShadow(List 			 		*attributes,
+								  	  	  DynResourceQueueTrack	 queue,
+										  char					*errorbuf,
+										  int					 errorbufsize);
 
-void freeDynResourceQueueTrack(DynResourceQueueTrack track);
+void shallowFreeResourceQueueTrack(DynResourceQueueTrack track);
+void deepFreeResourceQueueTrack(DynResourceQueueTrack track);
 
 int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 											   char				*errorbuf,
@@ -492,6 +497,36 @@ void resetAllDeadLockDetector(void);
 
 /* Set forced number of GRM containers to return before dispatching. */
 void setForcedReturnGRMContainerCount(void);
+
+int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize);
+
+void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack);
+
+int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
+								   ConnectionTrack		 conntrack);
+
+void buildQueueTrackShadows(DynResourceQueueTrack	toaltertrack,
+							List 				  **qhavingshadow);
+void buildQueueTrackShadow(DynResourceQueueTrack toaltertrack);
+
+void cleanupQueueTrackShadows(List **qhavingshadow);
+
+int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
+													  char *errorbuf,
+													  int	errorbufsize);
+
+int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetrack,
+												   char 				 *errorbuf,
+												   int					  errorbufsize);
+
+int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack);
+
+void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow);
+
+void cancelQueryRequestToBreakDeadLockInShadow(DynResourceQueueTrack shadowtrack,
+											   DQueueNode			 iter,
+											   uint32_t				 expmemorymb,
+											   uint32_t				 availmemorymb);
 
 /* Dump resource queue status to file system. */
 void dumpResourceQueueStatus(const char *filename);

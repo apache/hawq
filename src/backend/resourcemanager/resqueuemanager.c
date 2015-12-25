@@ -90,8 +90,6 @@ static char USRTBLAttrNames[USR_TBL_ATTR_COUNT]
 };
 
 /* Internal functions. */
-int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
-								   ConnectionTrack		 conntrack);
 
 /*------------------------------------------
  * The resource quota calculation functions.
@@ -115,8 +113,6 @@ int32_t max(int32_t a, int32_t b);
 computeQueryQuotaByPolicy AllocationPolicy[RSQ_ALLOCATION_POLICY_COUNT] = {
 	computeQueryQuota_EVEN
 };
-
-int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize);
 
 /*------------------------------------------
  * The resource distribution functions.
@@ -163,13 +159,15 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 								  int32_t 		memmb,
 								  double 		core);
 
-void buildTimeoutResponseForQueuedRequest(ConnectionTrack conntrack,
-										  uint32_t 		  reason,
-										  char			 *errorbuf);
+void buildAcquireResourceErrorResponseAndSend(ConnectionTrack  conntrack,
+										  	  int 		  	   errorcode,
+											  char			  *errorbuf);
+
+void buildAcquireResourceErrorResponse(ConnectionTrack	conntrack,
+									   int				errorcode,
+									   char			   *errorbuf);
 
 RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact);
-
-void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack);
 /*----------------------------------------------------------------------------*/
 /*                    RESOURCE QUEUE MANAGER EXTERNAL APIs                    */
 /*----------------------------------------------------------------------------*/
@@ -295,7 +293,8 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 			snprintf(errorbuf, errorbufsize,
 					 "not defined DDL attribute name %s",
 					 property->Key.Str);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			elog(WARNING, "Resource manager failed parsing attribute, %s",
+						  errorbuf);
 			return RMDDL_WRONG_ATTRNAME;
 		}
 
@@ -314,7 +313,8 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 				snprintf(errorbuf, errorbufsize,
 						 "cannot recognize parent resource queue name %s.",
 						 property->Val.Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				elog(WARNING, "Resource manager failed parsing attribute, %s",
+							  errorbuf);
 				return RMDDL_WRONG_ATTRVALUE;
 			}
 			Assert( parentque != NULL );
@@ -376,7 +376,7 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
  * This function parses the attributes and translate into DynResourceQueue
  * struct's attributes. This functions does not generate logs higher than
  * WARNING, the concrete error is also saved in error buffer to make the caller
- * able to pass back the message to remote process.
+ * able to pass back the message to client.
  */
 int parseResourceQueueAttributes( List 			 	*attributes,
 								  DynResourceQueue 	 queue,
@@ -554,23 +554,23 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 			}
 			break;
 
-		case RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR:
+		case RSQ_TBL_ATTR_RESOURCE_OVERCOMMIT_FACTOR:
 			res = SimpleStringToDouble(attrvalue, &(queue->ResourceOvercommit));
 			break;
 
-		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT:
+		case RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT:
 			res = SimpleStringToInt32(attrvalue, &(queue->NVSegUpperLimit));
 			break;
 
-		case RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT:
+		case RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT:
 			res = SimpleStringToInt32(attrvalue, &(queue->NVSegLowerLimit));
 			break;
 
-		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG:
+		case RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT_PERSEG:
 			res = SimpleStringToDouble(attrvalue, &(queue->NVSegUpperLimitPerSeg));
 			break;
 
-		case RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG:
+		case RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT_PERSEG:
 			res = SimpleStringToDouble(attrvalue, &(queue->NVSegLowerLimitPerSeg));
 			break;
 
@@ -637,13 +637,15 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 			if ( errorbuf[0] == '\0' )
 			{
 				snprintf(errorbuf, errorbufsize,
-						 "wrong resource queue attribute setting. %s=%s",
+						 "wrong resource queue attribute setting %s=%s",
 						 loadcatalog ?
 							 RSQTBLAttrNames[attrindex] :
 							 RSQDDLAttrNames[attrindex],
 						 attrvalue->Str);
 			}
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			elog(WARNING, "Resource manager failed to parse resource queue "
+						  "attribute, %s",
+						  errorbuf);
 			return res;
 		}
 	}
@@ -665,7 +667,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 				 loadcatalog?
 					 RSQTBLAttrNames[RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER] :
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER]);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		elog(WARNING, "%s", errorbuf);
 		return res;
 	}
 
@@ -677,7 +679,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 				 loadcatalog ?
 					 RSQTBLAttrNames[RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER] :
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER]);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		elog(WARNING, "%s", errorbuf);
 		return res;
 	}
 
@@ -693,7 +695,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 				 loadcatalog ?
 					 RSQTBLAttrNames[RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER] :
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER]);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		elog(WARNING, "%s", errorbuf);
 		return res;
 	}
 
@@ -715,22 +717,23 @@ int parseResourceQueueAttributes( List 			 	*attributes,
  * able to pass back the message to remote process.
  *
  */
-int updateResourceQueueAttributes(List 			 	*attributes,
-								  DynResourceQueue 	 queue,
-								  char 				*errorbuf,
-								  int   			 errorbufsize)
+int updateResourceQueueAttributesInShadow(List 			 		*attributes,
+								  	  	  DynResourceQueueTrack	 queue,
+										  char					*errorbuf,
+										  int					 errorbufsize)
 {
-	int			  res 		 		= FUNC_RETURN_OK;
-	int 		  attrindex 	 	= -1;
-	int			  percentage_change = 0;
-	int			  value_change		= 0;
+	int			  			res				  = FUNC_RETURN_OK;
+	ListCell 			   *cell 			  = NULL;
+	int 		  			attrindex		  = -1;
+	int			  			percentage_change = 0;
+	int			  			value_change	  = 0;
+	DynResourceQueue		shadowqueinfo	  = NULL;
 
-	SimpStringPtr attrname  		= NULL;
-	SimpStringPtr attrvalue 		= NULL;
+	SimpStringPtr			attrname		  = NULL;
+	SimpStringPtr			attrvalue		  = NULL;
 
 	Assert(queue != NULL);
-
-	ListCell *cell = NULL;
+	shadowqueinfo = queue->ShadowQueueTrack->QueueInfo;
 
 	/* Go through each property content. */
 	foreach(cell, attributes)
@@ -744,7 +747,10 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 
 		if ( SimpleStringEmpty(attrvalue) )
 		{
-			elog(DEBUG3, "No value for attribute %s.", attrname->Str);
+			elog(WARNING, "No value set for attribute %s when updating resource "
+						  "queue %s, ignore it",
+						  attrname->Str,
+						  queue->QueueInfo->Name);
 			continue;
 		}
 
@@ -754,7 +760,9 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 			snprintf(errorbuf, errorbufsize,
 					 "cannot recognize resource queue attribute %s",
 					 attrname->Str);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			elog(WARNING, "Cannot update resource queue %s attribute, %s",
+						  queue->QueueInfo->Name,
+						  errorbuf);
 			return res;
 		}
 
@@ -765,32 +773,33 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 		{
 		case RSQ_TBL_ATTR_OID:
 			res = RESQUEMGR_WRONG_ATTRNAME;
-			snprintf(errorbuf, errorbufsize, "cannot alter resource queue OID ");
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			snprintf(errorbuf, errorbufsize, "cannot alter resource queue OID");
+			elog(WARNING, "Cannot update resource queue %s attribute, %s",
+						  queue->QueueInfo->Name,
+						  errorbuf);
 			return res;
 
 		case RSQ_TBL_ATTR_PARENT:
 			res = RESQUEMGR_WRONG_ATTRNAME;
-			snprintf(errorbuf, errorbufsize, "cannot alter resource queue parent name");
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			snprintf(errorbuf, errorbufsize,
+					 "cannot alter resource queue parent name");
+			elog(WARNING, "Cannot update resource queue %s attribute, %s",
+						  queue->QueueInfo->Name,
+						  errorbuf);
 			return res;
 		case RSQ_TBL_ATTR_NAME:
 			break;
 
 		case RSQ_TBL_ATTR_ACTIVE_STATMENTS:
-			res = SimpleStringToInt32(attrvalue, &(queue->ParallelCount));
-			if ( res != FUNC_RETURN_OK )
+			res = SimpleStringToInt32(attrvalue, &(shadowqueinfo->ParallelCount));
+			if ( res == FUNC_RETURN_OK )
 			{
-				snprintf(errorbuf, errorbufsize,
-						 "active statements %s is not valid",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
+				elog(RMLOG, "Resource manager updated %s %d in shadow "
+							"of resource queue %s.",
+							RSQTBLAttrNames[RSQ_TBL_ATTR_ACTIVE_STATMENTS],
+							shadowqueinfo->ParallelCount,
+							queue->QueueInfo->Name);
 			}
-
-			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-						 "updated active statements %d",
-						 queue->ParallelCount);
 			break;
 
 		case RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER:
@@ -799,13 +808,22 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 				percentage_change += 1;
 				int8_t inputval = 0;
 				res = SimpleStringToPercentage(attrvalue, &inputval);
-				queue->ClusterMemoryPer = inputval;
+				shadowqueinfo->ClusterMemoryPer = inputval;
+
+				if ( res == FUNC_RETURN_OK )
+				{
+					elog(RMLOG, "Resource manager updated %s %lf.0%% in shadow "
+								"of resource queue %s.",
+								RSQTBLAttrNames[RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER],
+								shadowqueinfo->ClusterMemoryPer,
+								queue->QueueInfo->Name);
+				}
 			}
 			else
 			{
 				value_change  += 1;
 				res = SimpleStringToStorageSizeMB(attrvalue,
-												  &(queue->ClusterMemoryMB));
+												  &(shadowqueinfo->ClusterMemoryMB));
 			}
 			break;
 
@@ -815,21 +833,30 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 				percentage_change += 1;
 				int8_t inputval = 0;
 				res = SimpleStringToPercentage(attrvalue, &inputval);
-				queue->ClusterVCorePer = inputval;
+				shadowqueinfo->ClusterVCorePer = inputval;
+
+				if ( res == FUNC_RETURN_OK )
+				{
+					elog(RMLOG, "Resource manager updated %s %lf.0%% in shadow "
+								"of resource queue %s.",
+								RSQTBLAttrNames[RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER],
+								shadowqueinfo->ClusterVCorePer,
+								queue->QueueInfo->Name);
+				}
 			}
 			else
 			{
 				value_change  += 1;
 				res = SimpleStringToDouble(attrvalue,
-										   &(queue->ClusterVCore));
+										   &(shadowqueinfo->ClusterVCore));
 			}
 			break;
 
 		case RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA:
 			/* Decide it is a memory quota or core quota. */
 			if ( SimpleStringStartWith(
-						attrvalue,
-						RESOURCE_QUEUE_SEG_RES_QUOTA_MEM) == FUNC_RETURN_OK )
+					 attrvalue,
+					 RESOURCE_QUEUE_SEG_RES_QUOTA_MEM) == FUNC_RETURN_OK )
 			{
 				SimpString valuestr;
 				setSimpleStringRef(
@@ -839,17 +866,20 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 
 				res = SimpleStringToStorageSizeMB(
 						&valuestr,
-						&(queue->SegResourceQuotaMemoryMB));
-
-				queue->SegResourceQuotaVCore = -1;
-				elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-							 "updated segment resource quota %d MB",
-							 queue->SegResourceQuotaMemoryMB);
-
+						&(shadowqueinfo->SegResourceQuotaMemoryMB));
+				if ( res == FUNC_RETURN_OK )
+				{
+					shadowqueinfo->SegResourceQuotaVCore = -1;
+					elog(RMLOG, "Resource manager updated %s memory quota %d MB "
+								"in shadow of resource queue %s.",
+								RSQTBLAttrNames[RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA],
+								shadowqueinfo->SegResourceQuotaMemoryMB,
+								queue->QueueInfo->Name);
+				}
 			}
 			else if ( SimpleStringStartWith(
-							attrvalue,
-							RESOURCE_QUEUE_SEG_RES_QUOTA_CORE) == FUNC_RETURN_OK )
+						  attrvalue,
+						  RESOURCE_QUEUE_SEG_RES_QUOTA_CORE) == FUNC_RETURN_OK )
 			{
 				SimpString valuestr;
 				setSimpleStringRef(
@@ -858,121 +888,106 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 					attrvalue->Len-sizeof(RESOURCE_QUEUE_SEG_RES_QUOTA_CORE)+1);
 
 				res = SimpleStringToDouble(&valuestr,
-						   	   	   	   	   &(queue->SegResourceQuotaVCore));
-
-				queue->SegResourceQuotaMemoryMB = -1;
-				elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-							 "updated segment resource quota %lf CORE",
-							 queue->SegResourceQuotaVCore);
-			}
-			else
-			{
-				snprintf(errorbuf, errorbufsize,
-						 "virtual segment resource quota limit %s is not valid",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
+						   	   	   	   	   &(shadowqueinfo->SegResourceQuotaVCore));
+				if ( res == FUNC_RETURN_OK )
+				{
+					shadowqueinfo->SegResourceQuotaMemoryMB = -1;
+					elog(RMLOG, "Resource manager updated %s vcore quota %lf "
+								"in shadow of resource queue %s.",
+								RSQTBLAttrNames[RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA],
+								shadowqueinfo->SegResourceQuotaVCore,
+								queue->QueueInfo->Name);
+				}
 			}
 			break;
 
-		case RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR:
-			res = SimpleStringToDouble(attrvalue, &(queue->ResourceOvercommit));
-			if ( res != FUNC_RETURN_OK )
+		case RSQ_TBL_ATTR_RESOURCE_OVERCOMMIT_FACTOR:
+			res = SimpleStringToDouble(attrvalue,
+									   &(shadowqueinfo->ResourceOvercommit));
+			if ( res == FUNC_RETURN_OK )
 			{
-				snprintf(errorbuf, errorbufsize,
-						 "resource overcommit factor %s is not valid",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
+				elog(RMLOG, "Resource manager updated %s %lf in shadow of "
+							"resource queue %s.",
+							RSQTBLAttrNames[RSQ_TBL_ATTR_RESOURCE_OVERCOMMIT_FACTOR],
+							shadowqueinfo->ResourceOvercommit,
+							queue->QueueInfo->Name);
 			}
-			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-						 "updated Resource upper limit factor %lf",
-						 queue->ResourceOvercommit);
 			break;
 
 		case RSQ_TBL_ATTR_ALLOCATION_POLICY:
-			res = SimpleStringToMapIndexInt8(
-						attrvalue,
-						(char *)RSQDDLValueAllocationPolicy,
-						RSQ_ALLOCATION_POLICY_COUNT,
-						sizeof(RSQDDLValueAllocationPolicy[0]),
-						&(queue->AllocatePolicy));
-			if ( res != FUNC_RETURN_OK )
+			res = SimpleStringToMapIndexInt8(attrvalue,
+											 (char *)RSQDDLValueAllocationPolicy,
+											 RSQ_ALLOCATION_POLICY_COUNT,
+											 sizeof(RSQDDLValueAllocationPolicy[0]),
+											 &(shadowqueinfo->AllocatePolicy));
+			if ( res == FUNC_RETURN_OK )
 			{
-				snprintf(errorbuf, errorbufsize,
-						 "allocation policy %s is not valid",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
+				elog(RMLOG, "Resource manager updated %s %s index %d in shadow of "
+							"resource queue %s.",
+							RSQTBLAttrNames[RSQ_TBL_ATTR_ALLOCATION_POLICY],
+							RSQDDLValueAllocationPolicy[shadowqueinfo->AllocatePolicy],
+							shadowqueinfo->AllocatePolicy,
+							queue->QueueInfo->Name);
 			}
 			break;
 
-		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT:
-			res = SimpleStringToInt32(attrvalue, &(queue->NVSegUpperLimit));
-			if ( res != FUNC_RETURN_OK )
+		case RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT:
+			res = SimpleStringToInt32(attrvalue,
+									  &(shadowqueinfo->NVSegUpperLimit));
+			if ( res == FUNC_RETURN_OK )
 			{
-				snprintf(errorbuf, errorbufsize,
-						 "number of virtual segment upper limit %s is not valid",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
+				elog(RMLOG, "Resource manager updated %s %d in shadow of "
+							"resource queue %s.",
+							RSQTBLAttrNames[RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT],
+							shadowqueinfo->NVSegUpperLimit,
+							queue->QueueInfo->Name);
 			}
-
-			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-						 "updated virtual segment size upper limit %d",
-						 queue->NVSegUpperLimit);
 			break;
-		case RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT:
-			res = SimpleStringToInt32(attrvalue, &(queue->NVSegLowerLimit));
-			if ( res != FUNC_RETURN_OK )
+		case RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT:
+			res = SimpleStringToInt32(attrvalue,
+									  &(shadowqueinfo->NVSegLowerLimit));
+			if ( res == FUNC_RETURN_OK )
 			{
-				snprintf(errorbuf, errorbufsize,
-						 "number of virtual segment lower limit %s is not valid",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
+				elog(RMLOG, "Resource manager updated %s %d in shadow of "
+							"resource queue %s.",
+							RSQTBLAttrNames[RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT],
+							shadowqueinfo->NVSegLowerLimit,
+							queue->QueueInfo->Name);
 			}
-
-			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-						 "updated virtual segment size lower limit %d",
-						 queue->NVSegLowerLimit);
 			break;
-		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG:
-			res = SimpleStringToDouble(attrvalue, &(queue->NVSegUpperLimitPerSeg));
-			if ( res != FUNC_RETURN_OK )
+		case RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT_PERSEG:
+			res = SimpleStringToDouble(attrvalue,
+									   &(shadowqueinfo->NVSegUpperLimitPerSeg));
+			if ( res == FUNC_RETURN_OK )
 			{
-				snprintf(errorbuf, errorbufsize,
-						 "number of virtual segment upper limit per segment %s is not valid",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
+				elog(RMLOG, "Resource manager updated %s %lf in shadow of "
+							"resource queue %s.",
+							RSQTBLAttrNames[RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
+							shadowqueinfo->NVSegUpperLimitPerSeg,
+							queue->QueueInfo->Name);
 			}
-
-			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-						 "updated virtual segment size upper limit per segment %lf",
-						 queue->NVSegUpperLimitPerSeg);
 			break;
-		case RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG:
-			res = SimpleStringToDouble(attrvalue, &(queue->NVSegLowerLimitPerSeg));
-			if ( res != FUNC_RETURN_OK )
+		case RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT_PERSEG:
+			res = SimpleStringToDouble(attrvalue,
+									   &(shadowqueinfo->NVSegLowerLimitPerSeg));
+			if ( res == FUNC_RETURN_OK )
 			{
-				snprintf(errorbuf, errorbufsize,
-						 "number of virtual segment lower limit per segment %s is not valid",
-						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
-				return res;
+				elog(RMLOG, "Resource manager updated %s %lf in shadow of "
+							"resource queue %s.",
+							RSQTBLAttrNames[RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
+							shadowqueinfo->NVSegLowerLimitPerSeg,
+							queue->QueueInfo->Name);
 			}
-
-			elog(DEBUG3, "Resource manager updateResourceQueueAttributes() "
-						 "updated virtual segment size lower limit per segment %lf",
-						 queue->NVSegLowerLimitPerSeg);
 			break;
-
 		case RSQ_TBL_ATTR_STATUS:
 			res = RESQUEMGR_WRONG_ATTRNAME;
 			snprintf(errorbuf, errorbufsize,
-					 "can not alter resource queue status");
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+					 "can not alter %s",
+					 RSQTBLAttrNames[RSQ_TBL_ATTR_STATUS]);
+			elog(WARNING, "Resource manager failed to update resource queue "
+						  "attribute in shadow of resource queue %s, %s",
+						  queue->QueueInfo->Name,
+						  errorbuf);
 			return res;
 
 		case RSQ_TBL_ATTR_CREATION_TIME:
@@ -987,9 +1002,13 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 		{
 			res = RESQUEMGR_WRONG_ATTR;
 			snprintf(errorbuf, errorbufsize,
-					 "wrong to parse resource queue attribute setting. %s=%s",
-					 attrname->Str, attrvalue->Str);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+					 "failed to recognize attribute setting %s=%s",
+					 attrname->Str,
+					 attrvalue->Str);
+			elog(WARNING, "Resource manager failed to update resource queue "
+						  "attribute in shadow of resource queue %s, %s",
+						  queue->QueueInfo->Name,
+						  errorbuf);
 			return res;
 		}
 	}
@@ -998,42 +1017,53 @@ int updateResourceQueueAttributes(List 			 	*attributes,
 	 * Memory and Core resource must be specified and they must use the same way
 	 * to express the resource.
 	 */
-	if ( RESQUEUE_IS_PERCENT(queue) )
+	if ( RESQUEUE_IS_PERCENT(shadowqueinfo) )
 	{
 		if (value_change == 1)
 		{
 			res = RESQUEMGR_INCONSISTENT_RESOURCE_EXP;
 			snprintf(errorbuf, errorbufsize,
-					 "MEMORY_LIMIT_CLUSTER and CORE_LIMIT_CLUSTER "
-					 "must use the same way to express resource limit");
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+					 "%s and %s must use the same way to express resource limit",
+					 RSQTBLAttrNames[RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER],
+					 RSQTBLAttrNames[RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER]);
+			elog(WARNING, "Resource manager failed to update the shadow of "
+						  "resource queue %s, %s",
+						  queue->QueueInfo->Name,
+						  errorbuf);
 			return res;
 		}
 		if (value_change == 2)
 		{
-			queue->Status ^= RESOURCE_QUEUE_STATUS_EXPRESS_PERCENT;
+			shadowqueinfo->Status ^= RESOURCE_QUEUE_STATUS_EXPRESS_PERCENT;
 		}
 	}
 	else
 	{
-		if (value_change == 1)
+		if (percentage_change == 1)
 		{
 			res = RESQUEMGR_INCONSISTENT_RESOURCE_EXP;
 			snprintf(errorbuf, errorbufsize,
-					 "MEMORY_LIMIT_CLUSTER and CORE_LIMIT_CLUSTER "
-					 "must use the same way to express resource limit");
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+					 "%s and %s must use the same way to express resource limit",
+					 RSQTBLAttrNames[RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER],
+					 RSQTBLAttrNames[RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER]);
+			elog(WARNING, "Resource manager failed to update the shadow of "
+						  "resource queue %s, %s",
+						  queue->QueueInfo->Name,
+						  errorbuf);
 			return res;
 		}
-		if (value_change == 2)
+		if (percentage_change == 2)
 		{
-			queue->Status |= RESOURCE_QUEUE_STATUS_EXPRESS_PERCENT;
+			shadowqueinfo->Status |= RESOURCE_QUEUE_STATUS_EXPRESS_PERCENT;
 		}
 	}
 	return res;
 }
 
-
+#define ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue,errorbuf)				   \
+		elog(WARNING, "Resource manager cannot complete resource queue %s, %s",\
+					  (queue)->Name,										   \
+					  (errorbuf));
 /*
  * This is one API for checking if new resource queue definition is valid to be
  * created.This functions does not generate logs higher than WARNING, the error
@@ -1066,7 +1096,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 		snprintf(errorbuf, errorbufsize,
 				 "attribute %s must be specified",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_PARENT]);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 		return res;
 	}
 
@@ -1083,7 +1113,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 			snprintf(errorbuf, errorbufsize,
 					 "%s cannot have children resource queues",
 					 RESOURCE_QUEUE_DEFAULT_QUEUE_NAME);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1094,7 +1124,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 			snprintf(errorbuf, errorbufsize,
 					 "%s has at least one role assigned",
 					 parenttrack->QueueInfo->Name);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 	}
@@ -1134,7 +1164,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 			snprintf(errorbuf, errorbufsize,
 					 "%s must be set",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER]);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1144,7 +1174,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 			snprintf(errorbuf, errorbufsize,
 					 "%s must be set",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER]);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1161,7 +1191,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 					 "wrong value = %.0lf%%",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
 					 queue->ClusterVCorePer);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1173,7 +1203,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 					 "wrong value = %.0lf%%",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
 					 queue->ClusterMemoryPer);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1194,7 +1224,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 					 queue->ClusterMemoryPer,
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
 					 queue->ClusterVCorePer);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1227,7 +1257,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 							 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
 							 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
 							 queue->ClusterMemoryPer);
-					ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+					ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 					return res;
 				}
 			}
@@ -1245,7 +1275,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 			snprintf(errorbuf, errorbufsize,
 					 "%s must be set",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER]);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1255,7 +1285,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 			snprintf(errorbuf, errorbufsize,
 					 "%s must be set",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER]);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1272,7 +1302,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 					 "wrong value = %f",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
 					 queue->ClusterVCore);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 
@@ -1284,7 +1314,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 					 "wrong value = %dMB",
 					 RSQTBLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
 					 queue->ClusterMemoryMB);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 	}
@@ -1307,7 +1337,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 			snprintf(errorbuf, errorbufsize,
 					 "%s must be greater than 0",
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_VSEG_RESOURCE_QUOTA]);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 	}
@@ -1320,7 +1350,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 			snprintf(errorbuf, errorbufsize,
 					 "%s must be greater than 0.0",
 					 RSQTBLAttrNames[RSQ_DDL_ATTR_VSEG_RESOURCE_QUOTA]);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
 		}
 	}
@@ -1348,7 +1378,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR],
 				 MINIMUM_RESQUEUE_OVERCOMMIT_N,
 				 queue->ResourceOvercommit);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 		return res;
 	}
 
@@ -1363,7 +1393,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT],
 				 MINIMUM_RESQUEUE_NVSEG_UPPER_LIMIT_N,
 				 queue->NVSegUpperLimit);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 		return res;
 	}
 
@@ -1375,7 +1405,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT],
 				 MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT_N,
 				 queue->NVSegLowerLimit);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 		return res;
 	}
 
@@ -1388,7 +1418,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 				 "%s is less than %s",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT],
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT]);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 		return res;
 	}
 
@@ -1403,7 +1433,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
 				 MINIMUM_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT_N,
 				 queue->NVSegUpperLimitPerSeg);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 		return res;
 	}
 
@@ -1415,7 +1445,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
 				 MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N,
 				 queue->NVSegLowerLimitPerSeg);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 		return res;
 	}
 
@@ -1428,13 +1458,17 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 				 "%s is less than %s",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG]);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 		return res;
 	}
-
 	return res;
 }
 
+#define ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue,errorbuf)			   \
+		elog(WARNING, "Resource manager cannot create resource queue track "   \
+					  "instance for queue %s, %s",  						   \
+					  (queue)->Name,										   \
+					  (errorbuf));
 /**
  * Create queue definition and tracker in the resource queue manager.
  *
@@ -1480,7 +1514,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 			snprintf(errorbuf, errorbufsize,
 					 "duplicate queue ID " INT64_FORMAT" for new resource queue",
 					 queue->OID);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 			goto exit;
 		}
     }
@@ -1490,7 +1524,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 	{
 		res = RESQUEMGR_NO_QUENAME;
 		snprintf(errorbuf, errorbufsize, "unset queue name string");
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 		goto exit;
 	}
 
@@ -1500,7 +1534,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 		snprintf(errorbuf, errorbufsize,
 				 "duplicate queue name %s for creating resource queue.",
 			     queue->Name);
-		ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+		ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 		goto exit;
 	}
 
@@ -1528,7 +1562,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 				res = RESQUEMGR_WRONG_PARENT_QUEUE;
 				snprintf( errorbuf, errorbufsize,
 						  "the parent queue cannot be pg_default");
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 				goto exit;
 			}
 
@@ -1538,7 +1572,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 				res = RESQUEMGR_WRONG_PARENT_QUEUE;
 				snprintf( errorbuf, errorbufsize,
 						  "the parent queue of pg_default must be pg_root");
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 				goto exit;
 			}
 
@@ -1549,7 +1583,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 				snprintf( errorbuf, errorbufsize,
 						  "the parent queue %s has active connections",
 						  parenttrack->QueueInfo->Name);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 				goto exit;
 			}
 		}
@@ -1559,7 +1593,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 			snprintf(errorbuf, errorbufsize,
 					 "no expected parent queue " INT64_FORMAT,
 					 queue->ParentOID);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 			goto exit;
 		}
 
@@ -1625,7 +1659,7 @@ exit:
 	if ( res != FUNC_RETURN_OK )
 	{
 		/* Free resource queue track instance. */
-		freeDynResourceQueueTrack(newqueuetrack);
+		shallowFreeResourceQueueTrack(newqueuetrack);
 		*track = NULL;
 	}
 	return res;
@@ -1686,8 +1720,7 @@ int dropQueueAndTrack( DynResourceQueueTrack track,
 	MEMORY_CONTEXT_SWITCH_BACK
 
 	rm_pfree(PCONTEXT, track->QueueInfo);
-
-	freeDynResourceQueueTrack(track);
+	shallowFreeResourceQueueTrack(track);
 	return res;
 }
 
@@ -2165,9 +2198,9 @@ void cancelResourceAllocRequest(ConnectionTrack conntrack, char *errorbuf)
 	/* Unlock session in deadlock */
 	unlockSessionResource(&(queuetrack->DLDetector), conntrack->SessionID);
 
-	buildTimeoutResponseForQueuedRequest(conntrack,
-										 RESQUEMGR_NORESOURCE_TIMEOUT,
-										 errorbuf);
+	buildAcquireResourceErrorResponseAndSend(conntrack,
+										 	 RESQUEMGR_NORESOURCE_TIMEOUT,
+											 errorbuf);
 }
 
 /* Acquire resource from queue. */
@@ -2397,7 +2430,7 @@ int returnResourceToResQueMgr(ConnectionTrack conntrack)
 		if ( conntrack->SessionID >= 0 ) {
 			DynResourceQueueTrack quetrack = (DynResourceQueueTrack)
 											 (conntrack->QueueTrack);
-			minusSessionInUserResource(&(quetrack->DLDetector),
+			minusSessionInUseResource(&(quetrack->DLDetector),
 									   conntrack->SessionID,
 									   conntrack->SegMemoryMB * conntrack->SegNumActual,
 									   conntrack->SegCore     * conntrack->SegNumActual);
@@ -2434,21 +2467,25 @@ void refreshResourceQueuePercentageCapacity(void)
 	uint32_t mem  = 0;
 	uint32_t core = 0;
 
-	if ( PQUEMGR->RootTrack != NULL ) {
-
-		if ( DRMGlobalInstance->ImpType == YARN_LIBYARN ) {
+	if ( PQUEMGR->RootTrack != NULL )
+	{
+		if ( DRMGlobalInstance->ImpType == YARN_LIBYARN )
+		{
 			mem  = PRESPOOL->GRMTotal.MemoryMB * PQUEMGR->GRMQueueMaxCapacity;
 			core = PRESPOOL->GRMTotal.Core     * PQUEMGR->GRMQueueMaxCapacity;
 		}
-		else if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 ) {
+		else if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
+		{
 			mem  = PRESPOOL->FTSTotal.MemoryMB;
 			core = PRESPOOL->FTSTotal.Core;
 		}
-		else {
+		else
+		{
 			Assert(false);
 		}
 	}
-	else {
+	else
+	{
 		return;
 	}
 
@@ -2631,6 +2668,10 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 	}
 }
 
+#define ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)					   \
+		elog(WARNING, "Resource queue cannot parse role attribute, %s",  	   \
+					  (errorbuf));
+
 /**
  * This function parses the attributes and translate into UserInfo structure's
  * attributes. This functions does not generate logs higher than WARNING, the
@@ -2680,7 +2721,7 @@ int parseUserAttributes( List 	 	*attributes,
 			snprintf(errorbuf, errorbufsize,
 					 "cannot recognize resource queue attribute %s",
 					 attrname->Str);
-			ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+			ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 			return res;
 		}
 
@@ -2694,7 +2735,7 @@ int parseUserAttributes( List 	 	*attributes,
 			{
 				res = RESQUEMGR_DUPLICATE_USERID;
 				snprintf(errorbuf, errorbufsize, "duplicate user oid %s", attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
 			}
 			user->OID = useroid;
@@ -2708,7 +2749,7 @@ int parseUserAttributes( List 	 	*attributes,
 			{
 				res = RESQUEMGR_DUPLICATE_USERID;
 				snprintf(errorbuf, errorbufsize, "duplicate user name %s", attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
 			}
 
@@ -2725,7 +2766,7 @@ int parseUserAttributes( List 	 	*attributes,
 				snprintf(errorbuf, errorbufsize,
 						 "wrong target resource queue oid %s",
 						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
 			}
 			/* The target queue must exist. */
@@ -2737,7 +2778,7 @@ int parseUserAttributes( List 	 	*attributes,
 				snprintf(errorbuf, errorbufsize,
 						 "cannot find target resource queue %s",
 						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
 			}
 			Assert(exist && track != NULL);
@@ -2758,7 +2799,7 @@ int parseUserAttributes( List 	 	*attributes,
 				snprintf(errorbuf, errorbufsize,
 						 "Wrong user issuper setting %s",
 						 attrvalue->Str);
-				ELOG_ERRBUF_MESSAGE(WARNING, errorbuf)
+				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
 			}
 			user->isSuperUser = issuper ? 1 : 0;
@@ -2955,7 +2996,8 @@ void dispatchResourceToQueries(void)
 									(1.0 * track->TotalUsed.MemoryMB / allmemory);
 
 			/* If the queue is overusing resource, keep it. */
-			if ( actweight > expweight )
+			if ( actweight > expweight ||
+				 track->TotalUsed.MemoryMB > track->ClusterMemoryMaxMB )
 			{
 				resetResourceBundleData(&(track->TotalAllocated),
 										track->TotalUsed.MemoryMB,
@@ -3236,13 +3278,30 @@ DynResourceQueueTrack createDynResourceQueueTrack(DynResourceQueue queue)
  * active connection information saved, the connection with the other tracker
  * instance has be cut.
  */
-void freeDynResourceQueueTrack(DynResourceQueueTrack track)
+void shallowFreeResourceQueueTrack(DynResourceQueueTrack track)
 {
 	Assert( list_length(track->ChildrenTracks) == 0 );
-	Assert( track->CurConnCounter == 0 );
 	Assert( track->QueryResRequests.NodeCount == 0 );
 	cleanDQueue(&(track->QueryResRequests));
 	rm_pfree(PCONTEXT, track);
+}
+
+void deepFreeResourceQueueTrack(DynResourceQueueTrack track)
+{
+	Assert( list_length(track->ChildrenTracks) == 0 );
+	Assert( track->ParentTrack == NULL );
+
+	resetResourceDeadLockDetector(&(track->DLDetector));
+
+	while(track->QueryResRequests.NodeCount > 0)
+	{
+		ConnectionTrack conn = (ConnectionTrack)
+							   (removeDQueueHeadNode(&(track->QueryResRequests)));
+		freeUsedConnectionTrack(conn);
+	}
+
+	rm_pfree(PCONTEXT, track->QueueInfo);
+	shallowFreeResourceQueueTrack(track);
 }
 
 int getRSQTBLAttributeNameIndex(SimpStringPtr attrname)
@@ -3542,10 +3601,14 @@ int computeQueryQuota_EVEN(DynResourceQueueTrack	track,
 int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
 								   ConnectionTrack		 conntrack)
 {
-	insertDQueueTailNode(&(queuetrack->QueryResRequests), conntrack);
+	DynResourceQueueTrack queue = queuetrack->ShadowQueueTrack == NULL ?
+								  queuetrack :
+								  queuetrack->ShadowQueueTrack;
+
+	insertDQueueTailNode(&(queue->QueryResRequests), conntrack);
 
 	/* Add resource request counter. */
-	addResourceBundleData(&(queuetrack->TotalRequest),
+	addResourceBundleData(&(queue->TotalRequest),
 						  conntrack->SegMemoryMB * conntrack->SegNum,
 						  conntrack->SegCore * conntrack->SegNum);
 
@@ -3553,25 +3616,29 @@ int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
 	 * Set session tracker and make its corresponding session in-use resource
 	 * locked.
 	 */
-	createAndLockSessionResource(&(queuetrack->DLDetector), conntrack->SessionID);
+	createAndLockSessionResource(&(queue->DLDetector), conntrack->SessionID);
 
-	if ( queuetrack->DLDetector.LockedTotalMemoryMB > 0 )
+	/* The following logic is triggered only when it is not in a shadow. */
+	if ( queue == queuetrack )
 	{
-		PQUEMGR->ForcedReturnGRMContainerCount = 0;
-		elog(LOG, "Locking resource and stop forced GRM container breathe out.");
-	}
+		if ( queue->DLDetector.LockedTotal.MemoryMB > 0 )
+		{
+			PQUEMGR->ForcedReturnGRMContainerCount = 0;
+			elog(LOG, "Locking resource and stop forced GRM container breathe out.");
+		}
 
-	/*
-	 * If this causes the queue to be busy, refresh the limits and weights of
-	 * each memory/core ratio tracker.
-	 */
-	if ( !queuetrack->isBusy )
-	{
-		queuetrack->isBusy = true;
-		refreshMemoryCoreRatioLimits();
-		refreshMemoryCoreRatioWaterMark();
+		/*
+		 * If this causes the queue to be busy, refresh the limits and weights
+		 * of each memory/core ratio tracker.
+		 */
+		if ( !queue->isBusy )
+		{
+			queue->isBusy = true;
+			refreshMemoryCoreRatioLimits();
+			refreshMemoryCoreRatioWaterMark();
+		}
+		PQUEMGR->toRunQueryDispatch = true;
 	}
-	PQUEMGR->toRunQueryDispatch = true;
 	return FUNC_RETURN_OK;
 }
 
@@ -3590,16 +3657,43 @@ void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
 	{
 		DynResourceQueueTrack track = lfirst(cell);
 
-		if ( RESQUEUE_IS_PERCENT(track->QueueInfo) && RESQUEUE_IS_LEAF(track->QueueInfo) )
-		{
+		/* If this resource queue track has a shadow, the shadow is updated. */
+		track = track->ShadowQueueTrack == NULL ? track : track->ShadowQueueTrack;
 
+		if ( RESQUEUE_IS_PERCENT(track->QueueInfo) &&
+			 RESQUEUE_IS_LEAF(track->QueueInfo) )
+		{
 			track->ClusterMemoryActPer = track->QueueInfo->ClusterMemoryPer;
 			track->ClusterVCoreActPer  = track->QueueInfo->ClusterVCorePer;
-			DynResourceQueueTrack ptrack = track->ParentTrack;
-			while( ptrack != NULL && RESQUEUE_IS_PERCENT(ptrack->QueueInfo))
+
+			/* If track references a shadow, we should find back the real parent. */
+			DynResourceQueueTrack ptrack =
+				(track->ParentTrack == NULL && list_length(track->ChildrenTracks) == 0 )?
+				track->ShadowQueueTrack->ParentTrack :
+				track->ParentTrack;
+
+			while( ptrack != NULL )
 			{
-				track->ClusterMemoryActPer *= (ptrack->QueueInfo->ClusterMemoryPer / 100);
-				track->ClusterVCoreActPer  *= (ptrack->QueueInfo->ClusterVCorePer / 100);
+				/*
+				 * If the queue track has a shadow, we should calculate based on
+				 * the data in the shadow instance.
+				 */
+				DynResourceQueueTrack ptrackcalc = ptrack->ShadowQueueTrack == NULL ?
+												   ptrack :
+												   ptrack->ShadowQueueTrack;
+
+				if ( !RESQUEUE_IS_PERCENT(ptrackcalc->QueueInfo) )
+				{
+					break;
+				}
+
+				track->ClusterMemoryActPer = track->ClusterMemoryActPer *
+											 ptrackcalc->QueueInfo->ClusterMemoryPer /
+											 100;
+				track->ClusterVCoreActPer  = track->ClusterVCoreActPer *
+											 ptrackcalc->QueueInfo->ClusterVCorePer /
+											 100;
+
 				ptrack = ptrack->ParentTrack;
 			}
 
@@ -3684,6 +3778,9 @@ void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
 	foreach(cell, PQUEMGR->Queues)
 	{
 		DynResourceQueueTrack track = lfirst(cell);
+
+		track = track->ShadowQueueTrack == NULL ? track : track->ShadowQueueTrack;
+
 		if ( !(RESQUEUE_IS_LEAF(track->QueueInfo)) )
 		{
 			continue;
@@ -4359,9 +4456,9 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 {
 	static char errorbuf[ERRORMESSAGE_SIZE];
 	uint32_t availmemorymb = track->ClusterMemoryMaxMB -
-						     track->DLDetector.LockedTotalMemoryMB;
+						     track->DLDetector.LockedTotal.MemoryMB;
 	double   availcore     = track->ClusterVCoreMax -
-						     track->DLDetector.LockedTotalCore;
+						     track->DLDetector.LockedTotal.Core;
 
 	ConnectionTrack firstreq = (ConnectionTrack)
 							   getDQueueHeadNodeData(&(track->QueryResRequests));
@@ -4380,19 +4477,23 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 		return;
 	}
 
-	while((availmemorymb < expmemorymb ||
-		   availcore     < expcore) &&
-		  track->QueryResRequests.NodeCount > 0 ) {
+	while((availmemorymb < expmemorymb || availcore < expcore) &&
+		  track->QueryResRequests.NodeCount > 0 )
+	{
 		DQueueNode tail = getDQueueContainerTail(&(track->QueryResRequests));
 		SessionTrack strack = NULL;
-		while(tail != NULL) {
+		while(tail != NULL)
+		{
 			strack = findSession(&(track->DLDetector),
 								 ((ConnectionTrack)(tail->Data))->SessionID);
-			if ( strack != NULL && strack->InUseTotalMemoryMB > 0 )
+			if ( strack != NULL && strack->InUseTotal.MemoryMB > 0 )
+			{
 				break;
+			}
 			tail = tail->Prev;
 		}
-		if ( tail != NULL ) {
+		if ( tail != NULL )
+		{
 			ConnectionTrack canceltrack = (ConnectionTrack)
 										  removeDQueueNode(&(track->QueryResRequests),
 												  	  	   tail);
@@ -4402,36 +4503,21 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 					 canceltrack->SessionID);
 
 			Assert(canceltrack != NULL);
-			availmemorymb += strack->InUseTotalMemoryMB;
-			availcore     += strack->InUseTotalCore;
+			availmemorymb += strack->InUseTotal.MemoryMB;
+			availcore     += strack->InUseTotal.Core;
 
 			/* Unlock the resource. */
 			unlockSessionResource(&(track->DLDetector), canceltrack->SessionID);
 
 			/* Cancel this request. */
-			RPCResponseAcquireResourceFromRMERRORData errresponse;
-			errresponse.Result   = RESQUEMGR_DEADLOCK_DETECTED;
-			errresponse.Reserved = 0;
-
-			SelfMaintainBufferData responsedata;
-			initializeSelfMaintainBuffer(&responsedata, PCONTEXT);
-			appendSMBVar(&responsedata, errresponse);
-			appendSMBStr(&responsedata, errorbuf);
-			appendSelfMaintainBufferTill64bitAligned(&responsedata);
-
-			buildResponseIntoConnTrack(canceltrack,
-									   SMBUFF_CONTENT(&responsedata),
-									   getSMBContentSize(&responsedata),
-									   canceltrack->MessageMark1,
-									   canceltrack->MessageMark2,
-									   RESPONSE_QD_ACQUIRE_RESOURCE);
-			destroySelfMaintainBuffer(&responsedata);
+			buildAcquireResourceErrorResponse(canceltrack,
+											  RESQUEMGR_DEADLOCK_DETECTED,
+											  errorbuf);
 
 			transformConnectionTrackProgress(canceltrack,
 											 CONN_PP_RESOURCE_QUEUE_ALLOC_FAIL);
 
 			canceltrack->ResponseSent = false;
-
 			MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 			PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, canceltrack);
 			MEMORY_CONTEXT_SWITCH_BACK
@@ -4585,11 +4671,13 @@ void timeoutQueuedRequest(void)
 					 "resource request is timed out due to no available cluster");
 
 			elog(WARNING, "ConnID %d. %s", ct->ConnID, errorbuf);
+
 			/* Build timeout response. */
-			buildTimeoutResponseForQueuedRequest(ct,
-												 RESQUEMGR_NOCLUSTER_TIMEOUT,
-												 errorbuf);
 			transformConnectionTrackProgress(ct, CONN_PP_TIMEOUT_FAIL);
+			buildAcquireResourceErrorResponseAndSend(ct,
+												 	 RESQUEMGR_NOCLUSTER_TIMEOUT,
+													 errorbuf);
+
 		}
 		else
 		{
@@ -4732,32 +4820,40 @@ void timeoutQueuedRequest(void)
 	MEMORY_CONTEXT_SWITCH_BACK
 }
 
-void buildTimeoutResponseForQueuedRequest(ConnectionTrack conntrack,
-										  uint32_t 		  reason,
-										  char			 *errorbuf)
+void buildAcquireResourceErrorResponseAndSend(ConnectionTrack  conntrack,
+										  	  int 		  	   errorcode,
+											  char			  *errorbuf)
+{
+	buildAcquireResourceErrorResponse(conntrack, errorcode, errorbuf);
+
+	conntrack->ResponseSent = false;
+	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+	PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conntrack);
+	MEMORY_CONTEXT_SWITCH_BACK
+}
+
+void buildAcquireResourceErrorResponse(ConnectionTrack	conntrack,
+									   int				errorcode,
+									   char			   *errorbuf)
 {
 	SelfMaintainBufferData responsedata;
 	initializeSelfMaintainBuffer(&responsedata, PCONTEXT);
 
 	RPCResponseAcquireResourceFromRMERRORData response;
-	response.Result   = reason;
+	response.Result   = errorcode;
 	response.Reserved = 0;
 
 	appendSMBVar(&responsedata, response);
 	appendSMBStr(&responsedata, errorbuf);
 	appendSelfMaintainBufferTill64bitAligned(&responsedata);
 
-	buildResponseIntoConnTrack( conntrack,
-								SMBUFF_CONTENT(&responsedata),
-								getSMBContentSize(&responsedata),
-								conntrack->MessageMark1,
-								conntrack->MessageMark2,
-								RESPONSE_QD_ACQUIRE_RESOURCE);
+	buildResponseIntoConnTrack(conntrack,
+							   SMBUFF_CONTENT(&responsedata),
+							   getSMBContentSize(&responsedata),
+							   conntrack->MessageMark1,
+							   conntrack->MessageMark2,
+							   RESPONSE_QD_ACQUIRE_RESOURCE);
 	destroySelfMaintainBuffer(&responsedata);
-	conntrack->ResponseSent = false;
-	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-	PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conntrack);
-	MEMORY_CONTEXT_SWITCH_BACK
 }
 
 bool isAllResourceQueueIdle(void)
@@ -4798,7 +4894,7 @@ void setForcedReturnGRMContainerCount(void)
 	{
 		DynResourceQueueTrack quetrack = lfirst(cell);
 
-		if ( quetrack->DLDetector.LockedTotalMemoryMB > 0 )
+		if ( quetrack->DLDetector.LockedTotal.MemoryMB > 0 )
 		{
 			elog(LOG, "Queue %s has potential resource deadlock, skip breathe.",
 					  quetrack->QueueInfo->Name);
@@ -4845,6 +4941,530 @@ void setForcedReturnGRMContainerCount(void)
 	PQUEMGR->ForcedReturnGRMContainerCount = toretctnsize;
 	PQUEMGR->GRMQueueCurCapacity		   = PQUEMGR->GRMQueueCapacity;
 	PQUEMGR->GRMQueueResourceTight 		   = false;
+}
+
+void buildQueueTrackShadows(DynResourceQueueTrack	toaltertrack,
+							List 				  **qhavingshadow)
+{
+	/*--------------------------------------------------------------------------
+	 * Iteratively go through each descendant including the queue to be altered.
+	 * the queue to be altered should have a shadow, the all the descendant
+	 * queue having query running or queued should have a shadow. We care only
+	 * the busy queues, if the queue is not in busy status, no need to build
+	 * shadow to care of the status, we just need to alter the original instance
+	 * directly.
+	 *--------------------------------------------------------------------------
+	 */
+
+	Assert(qhavingshadow != NULL);
+
+	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+
+	List *q = NULL;
+	q = lappend(q, toaltertrack);
+	while( list_length(q) > 0 )
+	{
+		/* Pop the first one in the queue. */
+		DynResourceQueueTrack curtrack = (DynResourceQueueTrack)linitial(q);
+		q = list_delete_first(q);
+
+		elog(DEBUG5, "Resource manager checks queue %s for building shadow "
+					 "instance.",
+					 curtrack->QueueInfo->Name);
+
+		/*
+		 * Add the queue to alter and descendant in use leaf queues to the
+		 * result list.
+		 */
+		if( (curtrack == toaltertrack) ||
+			(curtrack->isBusy && list_length(curtrack->ChildrenTracks) == 0) )
+		{
+			*qhavingshadow = lappend(*qhavingshadow, curtrack);
+			buildQueueTrackShadow(curtrack);
+
+			elog(RMLOG, "Resource queue %s has shadow instance built.",
+					  	curtrack->QueueInfo->Name);
+		}
+
+		/* Add children queue tracks into the queue. */
+		ListCell *cell = NULL;
+		foreach(cell, curtrack->ChildrenTracks)
+		{
+			q = lappend(q, lfirst(cell));
+		}
+	}
+
+	MEMORY_CONTEXT_SWITCH_BACK
+}
+
+void buildQueueTrackShadow(DynResourceQueueTrack toaltertrack)
+{
+	Assert(toaltertrack!= NULL);
+	/* It is not acceptable to have another shadow already created. */
+	Assert(toaltertrack->ShadowQueueTrack == NULL);
+	/* Create shadow instance and build up reference. */
+	toaltertrack->ShadowQueueTrack = rm_palloc0(PCONTEXT,
+												sizeof(DynResourceQueueTrackData));
+	DynResourceQueueTrack shadowtrack = toaltertrack->ShadowQueueTrack;
+	shadowtrack->QueueInfo = rm_palloc0(PCONTEXT, sizeof(DynResourceQueueData));
+	memcpy(shadowtrack->QueueInfo,
+		   toaltertrack->QueueInfo,
+		   sizeof(DynResourceQueueData));
+	shadowtrack->ShadowQueueTrack = toaltertrack;
+
+	/* Shadow resource queue track does not hold tree structure. */
+	shadowtrack->ParentTrack = NULL;
+	shadowtrack->ChildrenTracks = NULL;
+
+	shadowtrack->ClusterMemoryActPer	= toaltertrack->ClusterMemoryActPer;
+	shadowtrack->ClusterMemoryMaxMB		= toaltertrack->ClusterMemoryMaxMB;
+	shadowtrack->ClusterMemoryMaxPer	= toaltertrack->ClusterMemoryMaxPer;
+
+	shadowtrack->ClusterVCoreActPer		= toaltertrack->ClusterVCoreActPer;
+	shadowtrack->ClusterVCoreMax		= toaltertrack->ClusterVCoreMax;
+	shadowtrack->ClusterVCoreMaxPer		= toaltertrack->ClusterVCoreMaxPer;
+
+	shadowtrack->ClusterSegNumber		= toaltertrack->ClusterSegNumber;
+	shadowtrack->ClusterSegNumberMax	= toaltertrack->ClusterSegNumberMax;
+
+	shadowtrack->CurConnCounter			= toaltertrack->CurConnCounter;
+	shadowtrack->NumOfRunningQueries	= toaltertrack->NumOfRunningQueries;
+
+	shadowtrack->MemCoreRatio			= toaltertrack->MemCoreRatio;
+	shadowtrack->RatioIndex				= toaltertrack->RatioIndex;
+
+	shadowtrack->trackedMemCoreRatio	= toaltertrack->trackedMemCoreRatio;
+	shadowtrack->isBusy					= toaltertrack->isBusy;
+
+	initializeResqueueDeadLockDetector(&(shadowtrack->DLDetector), shadowtrack);
+
+	initializeDQueue(&(shadowtrack->QueryResRequests), PCONTEXT);
+
+	resetResourceBundleDataByBundle(&(shadowtrack->TotalUsed),
+									&(toaltertrack->TotalUsed));
+	resetResourceBundleDataByBundle(&(shadowtrack->TotalAllocated),
+									&(toaltertrack->TotalAllocated));
+
+	resetResourceBundleData(&(shadowtrack->TotalRequest), 0, 0.0, 0);
+	shadowtrack->expectMoreResource		= false;
+	shadowtrack->pauseAllocation		= false;
+	shadowtrack->troubledByFragment		= false;
+}
+
+void cleanupQueueTrackShadows(List **qhavingshadow)
+{
+	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+	while(list_length(*qhavingshadow) > 0)
+	{
+		DynResourceQueueTrack track = (DynResourceQueueTrack)
+									  linitial(*qhavingshadow);
+		*qhavingshadow = list_delete_first(*qhavingshadow);
+		DynResourceQueueTrack shadowtrack = track->ShadowQueueTrack;
+		deepFreeResourceQueueTrack(shadowtrack);
+		track->ShadowQueueTrack = NULL;
+	}
+	MEMORY_CONTEXT_SWITCH_BACK
+}
+
+int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
+													  char *errorbuf,
+													  int	errorbufsize)
+{
+	int res = FUNC_RETURN_OK;
+
+	ListCell *cell = NULL;
+	foreach(cell, quehavingshadow)
+	{
+		DynResourceQueueTrack quetrack = (DynResourceQueueTrack)lfirst(cell);
+		res = rebuildResourceQueueTrackDynamicStatusInShadow(quetrack,
+															 errorbuf,
+															 errorbufsize);
+		if ( res != FUNC_RETURN_OK )
+		{
+			elog(WARNING, "Resource manager failed to rebuild resource queue %s "
+						  "dynamic status in its shadow to reflect altered "
+						  "resource queues.",
+						  quetrack->QueueInfo->Name);
+			return res;
+		}
+		else
+		{
+			elog(LOG, "Resource manager passed rebuilding resource queue %s "
+					  "dynamic status in its shadow.",
+					  quetrack->QueueInfo->Name);
+		}
+
+		res = detectAndDealWithDeadLockInShadow(quetrack);
+		if ( res != FUNC_RETURN_OK )
+		{
+			elog(WARNING, "Resource manager failed to rebuild resource queue %s "
+						  "dynamic status to reflect altered resource queues due "
+						  "to the deadlock issue introduced by altering resource "
+						  "queue.",
+						  quetrack->QueueInfo->Name);
+			return res;
+		}
+		else
+		{
+			elog(LOG, "Resource manager passed detecting deadlock issues in the "
+					  "shadow of resource queue %s",
+					  quetrack->QueueInfo->Name);
+		}
+	}
+
+	elog(LOG, "Resource manager finished rebuilding resource queues' dynamic status");
+	return FUNC_RETURN_OK;
+}
+
+int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetrack,
+												   char 				 *errorbuf,
+												   int					  errorbufsize)
+{
+	int res = FUNC_RETURN_OK;
+
+	elog(LOG, "Rebuild resource queue %s dynamic status in its shadow.",
+			  quetrack->QueueInfo->Name);
+
+	DynResourceQueueTrack shadowtrack = quetrack->ShadowQueueTrack;
+	/* Get deadlock detector ready in the shadow instance. */
+	copyResourceDeadLockDetectorWithoutLocking(&(quetrack->DLDetector),
+											   &(shadowtrack->DLDetector));
+
+	/* Go through all queued query resource requests, recalculate the request. */
+	DQUEUE_LOOP_BEGIN(&(quetrack->QueryResRequests), iter, ConnectionTrack, conn)
+
+		ConnectionTrack newconn = NULL;
+		createEmptyConnectionTrack(&newconn);
+		/* Process only requests waiting here. */
+		Assert(conn->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT);
+		copyAllocWaitingConnectionTrack(conn, newconn);
+		/* Make new connection track referencing the shadow instance */
+		newconn->QueueTrack = shadowtrack;
+		/*
+		 * Calculate the resource request again based on new resource queue
+		 * definition, i.e. the attributes updated in the shadow instance.
+		 */
+		res = computeQueryQuota(newconn, errorbuf, errorbufsize);
+
+		if ( res == FUNC_RETURN_OK )
+		{
+			if ( newconn->StatNVSeg == 0 )
+			{
+				/*--------------------------------------------------------------
+				 * Adjust the number of virtual segments again based on
+				 * NVSEG_*_LIMITs and NVSEG_*_LIMIT_PERSEGs. This adjustment
+				 * must succeed.
+				 *--------------------------------------------------------------
+				 */
+				adjustResourceExpectsByQueueNVSegLimits(newconn);
+
+				elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
+						  "( MIN %d ) resource after adjusting based on queue NVSEG "
+						  "limits.",
+						  newconn->ConnID,
+						  newconn->SegMemoryMB,
+						  newconn->SegCore,
+						  newconn->SegNum,
+						  newconn->SegNumMin);
+			}
+
+			/* Add request to the resource queue and return. */
+			addQueryResourceRequestToQueue(quetrack, newconn);
+		}
+		else
+		{
+			/*------------------------------------------------------------------
+			 * Here we find the request unable to be adjusted based on new
+			 * resource queue resource limits. If we force resource manager to
+			 * cancel the request, we will cancel this request and generate
+			 * error message as response. If we dont, the rebuilding phase should
+			 * be stopped, all shadows are removed, then ALTER RESOURCE QUEUE
+			 * statement is canceled.
+			 *------------------------------------------------------------------
+			 */
+			elog(WARNING, "ConnID %d. %s", newconn->ConnID, errorbuf);
+
+			if ( rm_force_alterqueue_cancel_queued_request )
+			{
+				buildAcquireResourceErrorResponse(newconn, res, errorbuf);
+				transformConnectionTrackProgress(newconn,
+												 CONN_PP_RESOURCE_ACQUIRE_FAIL);
+				/*
+				 * We still add this failed connection track into the shadow
+				 * instance, we will remove them later.
+				 */
+				insertDQueueTailNode(&(shadowtrack->QueryResRequests), newconn);
+			}
+			else
+			{
+				elog(WARNING, "Resource manager finds conflict between at least "
+							  "one queued query resource and new definition of "
+							  "resource queue %s",
+							  quetrack->QueueInfo->Name);
+				return RESQUEMGR_ALTERQUEUE_CONFILICT;
+			}
+		}
+	DQUEUE_LOOP_END
+
+	elog(LOG, "Finished rebuilding resource queue %s dynamic status in its shadow.",
+			  quetrack->QueueInfo->Name);
+
+	return FUNC_RETURN_OK;
+}
+
+int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack)
+{
+	Assert(quetrack != NULL);
+	Assert(quetrack->ShadowQueueTrack != NULL);
+	DynResourceQueueTrack shadowtrack = quetrack->ShadowQueueTrack;
+
+	elog(DEBUG3, "Deadlock detector has %d MB in use, %d MB locked",
+				 shadowtrack->DLDetector.InUseTotal.MemoryMB,
+				 shadowtrack->DLDetector.LockedTotal.MemoryMB);
+
+	/* Assume more available resource unlocked queued requests. */
+	uint32_t pavailmemorymb = 0;
+
+	/* Go through all queued query resource requests, recalculate the request. */
+	DQUEUE_LOOP_BEGIN(&(shadowtrack->QueryResRequests), iter, ConnectionTrack, conn)
+
+		/* Maybe there are some connection track has FAIL status. */
+		if ( conn->Progress != CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT )
+		{
+			continue;
+		}
+
+		/* Check if this connection has deadlock issue. */
+		uint32_t expmemorymb   = conn->SegMemoryMB * conn->SegNumMin;
+		uint32_t availmemorymb = shadowtrack->ClusterMemoryMaxMB -
+								 shadowtrack->DLDetector.LockedTotal.MemoryMB +
+								 pavailmemorymb;
+
+		/*----------------------------------------------------------------------
+		 * If the queue already uses more resource than its maximum capability,
+		 * we cannot count the resource available more than maximum possible
+		 * limit.
+		 *----------------------------------------------------------------------
+		 */
+		availmemorymb = availmemorymb > shadowtrack->ClusterMemoryMaxMB ?
+						shadowtrack->ClusterMemoryMaxMB :
+						availmemorymb;
+
+		if ( expmemorymb > availmemorymb )
+		{
+			/* We encounter a deadlock issue. */
+			if ( rm_force_alterqueue_cancel_queued_request )
+			{
+				cancelQueryRequestToBreakDeadLockInShadow(shadowtrack,
+														  iter,
+														  expmemorymb,
+														  availmemorymb);
+			}
+			else
+			{
+				elog(WARNING, "Resource manager finds at least one deadlock issue"
+							  "due to new definition of resource queue %s",
+							  quetrack->QueueInfo->Name);
+				return RESQUEMGR_ALTERQUEUE_CONFILICT;
+			}
+		}
+
+		/*----------------------------------------------------------------------
+		 * When we try next request in the queue, we should assume the previous
+		 * sessions can release resource. This works because we assume that the
+		 * sessions waiting for resource allocation have unique session id values.
+		 *----------------------------------------------------------------------
+		 */
+		SessionTrack strack = findSession(&(shadowtrack->DLDetector),
+										  conn->SessionID);
+		if ( strack != NULL )
+		{
+			pavailmemorymb += strack->InUseTotal.MemoryMB;
+		}
+
+	DQUEUE_LOOP_END
+
+	return FUNC_RETURN_OK;
+}
+
+void cancelQueryRequestToBreakDeadLockInShadow(DynResourceQueueTrack shadowtrack,
+											   DQueueNode			 iter,
+											   uint32_t				 expmemorymb,
+											   uint32_t				 availmemorymb)
+{
+	static char errorbuf[ERRORMESSAGE_SIZE];
+	DQueueNode tailiter = getDQueueContainerTail(&(shadowtrack->QueryResRequests));
+
+	elog(DEBUG3, "ConnID %d. Try to deal with deadlock issue.",
+				 ((ConnectionTrack)(iter->Data))->ConnID);
+
+	/*--------------------------------------------------------------------------
+	 * Loop to try all subsequent requests.
+	 *
+	 * NOTE: If canceling all subsequent requests, we still can not satisfy this
+	 * request we cancel current requests.
+	 *--------------------------------------------------------------------------
+	 */
+	while((availmemorymb < expmemorymb) && tailiter != iter->Prev)
+	{
+		ConnectionTrack	curconn	= (ConnectionTrack)(tailiter->Data);
+
+		if ( curconn->Progress != CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT )
+		{
+			tailiter = tailiter->Prev;
+			continue;
+		}
+
+		SessionTrack 	strack	= NULL;
+		strack = findSession(&(shadowtrack->DLDetector), curconn->SessionID);
+		if ( strack != NULL )
+		{
+			/* This session has locked resource, cancel it to release resource. */
+			snprintf(errorbuf, sizeof(errorbuf),
+					 "session "INT64_FORMAT" deadlock is detected",
+					 curconn->SessionID);
+
+			elog(WARNING, "ConnID %d, %s", curconn->ConnID, errorbuf);
+
+			availmemorymb += strack->InUseTotal.MemoryMB;
+
+			availmemorymb = availmemorymb > shadowtrack->ClusterMemoryMaxMB ?
+							shadowtrack->ClusterMemoryMaxMB :
+							availmemorymb;
+
+			/* Unlock the resource. */
+			unlockSessionResource(&(shadowtrack->DLDetector), curconn->SessionID);
+
+			/* Cancel this request. */
+			buildAcquireResourceErrorResponse(curconn,
+											  RESQUEMGR_DEADLOCK_DETECTED,
+											  errorbuf);
+
+			transformConnectionTrackProgress(curconn,
+											 CONN_PP_RESOURCE_QUEUE_ALLOC_FAIL);
+		}
+		tailiter = tailiter->Prev;
+	}
+}
+
+void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
+{
+	ListCell *cell = NULL;
+	foreach(cell, quehavingshadow)
+	{
+		DynResourceQueueTrack quetrack = (DynResourceQueueTrack)lfirst(cell);
+		DynResourceQueueTrack shadowtrack = quetrack->ShadowQueueTrack;
+
+		/* Update resource queue info. */
+		memcpy(quetrack->QueueInfo,
+			   shadowtrack->QueueInfo,
+			   sizeof(DynResourceQueueData));
+
+		/* Update resource queue track info. */
+		quetrack->ClusterMemoryActPer	= shadowtrack->ClusterMemoryActPer;
+		quetrack->ClusterMemoryMaxMB	= shadowtrack->ClusterMemoryMaxMB;
+		quetrack->ClusterMemoryMaxPer	= shadowtrack->ClusterMemoryMaxPer;
+
+		quetrack->ClusterVCoreActPer	= shadowtrack->ClusterVCoreActPer;
+		quetrack->ClusterVCoreMax		= shadowtrack->ClusterVCoreMax;
+		quetrack->ClusterVCoreMaxPer	= shadowtrack->ClusterVCoreMaxPer;
+
+		quetrack->ClusterSegNumber		= shadowtrack->ClusterSegNumber;
+		quetrack->ClusterSegNumberMax	= shadowtrack->ClusterSegNumberMax;
+
+		quetrack->CurConnCounter		= shadowtrack->CurConnCounter;
+		quetrack->NumOfRunningQueries	= shadowtrack->NumOfRunningQueries;
+
+		quetrack->MemCoreRatio			= shadowtrack->MemCoreRatio;
+		quetrack->RatioIndex			= shadowtrack->RatioIndex;
+
+		quetrack->trackedMemCoreRatio	= shadowtrack->trackedMemCoreRatio;
+		quetrack->isBusy				= shadowtrack->isBusy;
+
+		/* The deadlock detector should use the new one completely. */
+		resetResourceDeadLockDetector(&(quetrack->DLDetector));
+		copyResourceDeadLockDetectorWithoutLocking(&(quetrack->DLDetector),
+												   &(shadowtrack->DLDetector));
+
+		resetResourceBundleDataByBundle(&(quetrack->TotalUsed),
+										&(shadowtrack->TotalUsed));
+		resetResourceBundleDataByBundle(&(quetrack->TotalAllocated),
+										&(shadowtrack->TotalAllocated));
+
+		resetResourceBundleData(&(shadowtrack->TotalRequest), 0, 0.0, 0);
+
+		quetrack->expectMoreResource	= false;
+		quetrack->pauseAllocation 		= false;
+		quetrack->troubledByFragment	= false;
+
+		if ( quetrack->TotalUsed.MemoryMB > quetrack->ClusterMemoryMaxMB )
+		{
+			quetrack->pauseAllocation = true;
+		}
+
+		/*
+		 * Update queued resource requests. We should lock resource again and
+		 * handle the failed requests if there are some found in the queue.
+		 * The canceled requests should have the error message sent out.
+		 */
+
+		DQueueNode shadowiter = shadowtrack->QueryResRequests.Head;
+		DQueueNode iter = quetrack->QueryResRequests.Head;
+		while(iter != NULL)
+		{
+			ConnectionTrack conn = (ConnectionTrack)(iter->Data);
+			ConnectionTrack shadowconn = (ConnectionTrack)(shadowiter->Data);
+			if ( shadowconn->Progress != CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT )
+			{
+				/* Remove failed connection track and adjust iterator */
+				DQueueNode nextiter = iter->Next;
+				removeDQueueNode(&(quetrack->QueryResRequests), iter);
+				iter = nextiter;
+
+				/* Set fail status of this connection track. */
+				conn->Progress = shadowconn->Progress;
+
+				/* Get built error message. */
+				conn->MessageID    = shadowconn->MessageID;
+				conn->MessageMark1 = shadowconn->MessageMark1;
+				conn->MessageMark2 = shadowconn->MessageMark2;
+				conn->MessageSize  = shadowconn->MessageSize;
+
+				setConnectionTrackMessageBuffer(
+					conn,
+					SMBUFF_CONTENT(&(shadowconn->MessageBuff)),
+					getSMBContentSize(&(shadowconn->MessageBuff)));
+
+				/* Send out the message. */
+				conn->ResponseSent = false;
+				MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+				PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conn);
+				MEMORY_CONTEXT_SWITCH_BACK
+
+				/* Recycle connection track instance. */
+				quetrack->CurConnCounter--;
+				if ( quetrack->CurConnCounter == 0 )
+				{
+					quetrack->isBusy = false;
+					refreshMemoryCoreRatioLimits();
+					refreshMemoryCoreRatioWaterMark();
+				}
+			}
+			else
+			{
+				/* Get updated resource quota. */
+				copyResourceQuotaConnectionTrack(shadowconn, conn);
+
+				/* Lock corresponding sessions. */
+				createAndLockSessionResource(&(quetrack->DLDetector),
+											 conn->SessionID);
+
+				/* Adjust iterator. */
+				iter = iter->Next;
+			}
+			shadowiter = shadowiter->Next;
+		}
+	}
 }
 
 void dumpResourceQueueStatus(const char *filename)

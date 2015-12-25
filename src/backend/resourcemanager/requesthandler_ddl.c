@@ -35,6 +35,8 @@
 #include "gp-libpq-fe.h"
 #include "gp-libpq-int.h"
 
+#include "conntrack.h"
+
 int updateResqueueCatalog(int					 action,
 					      DynResourceQueueTrack  queuetrack,
 						  List					*rsqattr);
@@ -87,19 +89,17 @@ const char* PG_Resqueue_Column_Names[Natts_pg_resqueue] = {
  */
 bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 {
+	static char 			errorbuf[ERRORMESSAGE_SIZE];
 	int      				res		 		= FUNC_RETURN_OK;
 	uint32_t				ddlres   		= FUNC_RETURN_OK;
 	ConnectionTrack        *conntrack       = (ConnectionTrack *)arg;
 	DynResourceQueueTrack 	newtrack 		= NULL;
 	DynResourceQueueTrack   todroptrack		= NULL;
-	DynResourceQueueTrack   toupdatetrack	= NULL;
 	SelfMaintainBufferData  responsebuff;
-	static char 			errorbuf[1024] 	= "";
 	bool					exist 			= false;
 	List 				   *fineattr		= NULL;
 	List 				   *rsqattr			= NULL;
 	DynResourceQueue 		newqueue 		= NULL;
-	DynResourceQueue        oldqueue        = NULL;
 
 	/* Check context and retrieve the connection track based on connection id.*/
 	RPCRequestHeadManipulateResQueue request = (RPCRequestHeadManipulateResQueue)
@@ -177,8 +177,9 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	foreach(cell, rsqattr)
 	{
 		KVProperty attribute = lfirst(cell);
-		elog(DEBUG3, "Resource manager received DDL Request: %s=%s",
-				     attribute->Key.Str, attribute->Val.Str);
+		elog(RMLOG, "Resource manager received DDL Request: %s=%s",
+				    attribute->Key.Str,
+					attribute->Val.Str);
 	}
 
 	/* Shallow parse the 'withlist' attributes. */
@@ -189,7 +190,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	if (res != FUNC_RETURN_OK)
 	{
 		ddlres = res;
-		elog(WARNING, "Cannot recognize DDL attribute because %s", errorbuf);
+		elog(WARNING, "Cannot recognize DDL attribute, %s", errorbuf);
 		goto senderr;
 	}
 
@@ -197,8 +198,9 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	foreach(cell, fineattr)
 	{
 		KVProperty attribute = lfirst(cell);
-		elog(LOG, "DDL parsed request: %s=%s", attribute->Key.Str, attribute->Val.Str);
-
+		elog(RMLOG, "DDL parsed request: %s=%s",
+				    attribute->Key.Str,
+				    attribute->Val.Str);
 	}
 
 	/* Add into resource queue hierarchy to validate the request. */
@@ -285,6 +287,41 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			break;
 
 		case MANIPULATE_RESQUEUE_ALTER:
+		{
+			/*------------------------------------------------------------------
+			 * The strategy of altering one resource queue is, firstly, we always
+			 * allow user to alter a resource queue no matter whether it is busy,
+			 * no matter whether it has busy descendant resource queues. This is
+			 * for the practicality of managing resource queues.
+			 *
+			 * The challenge is that, if we have one resource queue capacity
+			 * limits, or active statement limit or resource quota or NVSEG*
+			 * limits changed, the queued query resource requests' actual
+			 * resource requests should be recalculated, which may cause some
+			 * conflicts, for example, some requests require more resource than
+			 * the queue capacity limits, some requests encounter deadlock issue.
+			 *
+			 * The idea for altering a queue is :
+			 * STEP 1. Guarantee the ALTER RESOURCE QUQUE statement is valid to
+			 * 		   be processed for practical altering;
+			 * STEP 2. Making shadow instances for all resource queue track
+			 * 		   instances potentially having definition changed or
+			 * 		   queued resource requests changed;
+			 * STEP 3. Try to do all altering related updates in shadows;
+			 * STEP 4. Update catalog if the altering can be performed without
+			 * 		   logical errors;
+			 * STEP 5. Update resource queue track status based on the shadows;
+			 * STEP 6. Remove shadows to clean up the resource queue track tree.
+			 *
+			 * In case we can not complete the whole altering procedure, we will
+			 * only need to clean up the shadows to cleanup the resource queue
+			 * track tree.
+			 *------------------------------------------------------------------
+			 */
+
+			/* STEP 1. */
+			DynResourceQueueTrack	toaltertrack  = NULL;
+			List 				   *qhavingshadow = NULL;
 			newqueue = rm_palloc0(PCONTEXT, sizeof(DynResourceQueueData));
 			res = parseResourceQueueAttributes(fineattr,
 											   newqueue,
@@ -296,91 +333,113 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				rm_pfree(PCONTEXT, newqueue);
 				ddlres = res;
-				elog(WARNING, "Resource manager can not alter resource queue "
-							  "with its attributes because %s",
+				elog(WARNING, "Resource manager cannot alter resource queue %s, %s",
+							  nameattr->Val.Str,
 							  errorbuf);
 				goto senderr;
 			}
 			rm_pfree(PCONTEXT, newqueue);
+			newqueue = NULL;
 
-			toupdatetrack = getQueueTrackByQueueName((char *)(nameattr->Val.Str),
+			toaltertrack = getQueueTrackByQueueName((char *)(nameattr->Val.Str),
 					   	   	   	   	   	   	   	   	nameattr->Val.Len,
 					   	   	   	   	   	   	   	   	&exist);
-			if (!exist || toupdatetrack == NULL)
+			if (!exist || toaltertrack == NULL)
 			{
 				ddlres = RESQUEMGR_NO_QUENAME;
 				snprintf(errorbuf, sizeof(errorbuf), "the queue doesn't exist");
-				elog(WARNING, ERRORPOS_FORMAT
-					 "Resource manager can not alter resource queue %s because %s",
-				     ERRREPORTPOS,
-				     nameattr->Val.Str,
-				     errorbuf);
+				elog(WARNING, "Resource manager cannot alter resource queue %s, %s",
+							  nameattr->Val.Str,
+							  errorbuf);
 				goto senderr;
 			}
-			newqueue = toupdatetrack->QueueInfo;
-			oldqueue = (DynResourceQueue)
-					   rm_palloc0(PCONTEXT,
-								  sizeof(DynResourceQueueData));
-			memcpy(oldqueue, newqueue, sizeof(DynResourceQueueData));
 
-			res = updateResourceQueueAttributes(fineattr,
-												newqueue,
-												errorbuf,
-												sizeof(errorbuf));
+			/* STEP 2. Build all necessary shadow resource queue track instance. */
+			buildQueueTrackShadows(toaltertrack, &qhavingshadow);
+
+			/* STEP 3. Update resource queue attribute in shadow instance. */
+			res = updateResourceQueueAttributesInShadow(fineattr,
+														toaltertrack,
+														errorbuf,
+														sizeof(errorbuf));
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, ERRORPOS_FORMAT
-					 "HAWQ RM Can not alter resource queue with its attributes "
-					 "because %s",
-					 ERRREPORTPOS,
-					 errorbuf);
-				/* If fail in updating catalog table, revert previous updates */
-				memcpy(newqueue, oldqueue, sizeof(DynResourceQueueData));
-				rm_pfree(PCONTEXT, oldqueue);
+				elog(WARNING, "Resource manager cannot update resource queue with "
+							  "its attributes, %s",
+							  errorbuf);
+				cleanupQueueTrackShadows(&qhavingshadow);
 				goto senderr;
 			}
 
-			res = checkAndCompleteNewResourceQueueAttributes(newqueue,
-															 errorbuf,
-															 sizeof(errorbuf));
+			res = checkAndCompleteNewResourceQueueAttributes(
+					  toaltertrack->ShadowQueueTrack->QueueInfo,
+					  errorbuf,
+					  sizeof(errorbuf));
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, ERRORPOS_FORMAT
-					 "HAWQ RM Can not complete resource queue's attributes "
-					 "because %s",
-					 ERRREPORTPOS,
-					 errorbuf);
-				/* If fail in updating catalog table, revert previous updates */
-				memcpy(newqueue, oldqueue, sizeof(DynResourceQueueData));
-				rm_pfree(PCONTEXT, oldqueue);
+				elog(WARNING, "Resource manager cannot complete resource queue "
+							  "attributes, %s",
+							  errorbuf);
+				cleanupQueueTrackShadows(&qhavingshadow);
 				goto senderr;
 			}
 
+			/*
+			 * Refresh actual capacity of the resource queue, the change is
+			 * expected to be updated in the shadow instances.
+			 */
+			refreshResourceQueuePercentageCapacity();
+
+			/*------------------------------------------------------------------
+			 * Till now, we expect the input for altering a resource queue is
+			 * valid, and we have built the necessary shadows for those queues
+			 * whose dynamic status are possible to be updated, including queued
+			 * query resource requests and corresponding deadlock detector status.
+			 *
+			 * If we force resource manager to cancel queued resource request,
+			 * the queued resource requests impossible to be satisfied due to
+			 * queue capacity shrinking or deadlock detection are canceled at
+			 * once.
+			 *
+			 * If we do not, ALTER RESOURCE QUEUE statement is cancelled. res
+			 * has error code returned in this function.
+			 *------------------------------------------------------------------
+			 */
+
+			res = rebuildAllResourceQueueTrackDynamicStatusInShadow(qhavingshadow,
+																	errorbuf,
+																	sizeof(errorbuf));
+			if ( res != FUNC_RETURN_OK )
+			{
+				ddlres = res;
+				elog(WARNING, "Can not apply alter resource queue changes, %s",
+							  errorbuf);
+				cleanupQueueTrackShadows(&qhavingshadow);
+				goto senderr;
+			}
+
+			/* STEP 4. Update catalog. */
 			res = updateResqueueCatalog(request->ManipulateAction,
-										toupdatetrack,
+										toaltertrack,
 										rsqattr);
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, ERRORPOS_FORMAT
-					 "Cannot alter resource queue changes in pg_resqueue.",
-					 ERRREPORTPOS);
-
-				/* If fail in updating catalog table, revert previous updates */
-				memcpy(newqueue, oldqueue, sizeof(DynResourceQueueData));
-				rm_pfree(PCONTEXT, oldqueue);
+				elog(WARNING, "Cannot alter resource queue changes in pg_resqueue.");
+				cleanupQueueTrackShadows(&qhavingshadow);
 				goto senderr;
 			}
 
-			if(oldqueue)
-			{
-				rm_pfree(PCONTEXT, oldqueue);
-			}
+			/* STEP 5. Update resource queue tracks referencing corresponding
+			 * 		   shadows. */
+			applyResourceQueueTrackChangesFromShadows(qhavingshadow);
 
+			/* STEP 6. Clean up. */
+			cleanupQueueTrackShadows(&qhavingshadow);
 			break;
-
+		}
 		case MANIPULATE_RESQUEUE_DROP:
 			todroptrack = getQueueTrackByQueueName((char *)(nameattr->Val.Str),
 												   nameattr->Val.Len,
@@ -535,6 +594,7 @@ senderr:
 		return true;
 	}
 }
+
 
 bool handleRMDDLRequestManipulateRole(void **arg)
 {
