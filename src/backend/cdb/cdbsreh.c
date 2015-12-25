@@ -581,10 +581,6 @@ bool IsRejectLimitReached(CdbSreh *cdbsreh)
 {
 	bool	limit_reached = false;
 	
-	/* special case: check for the case that we are rejecting every single row */
-	if(FIRST_1000_BAD(cdbsreh))
-		return true;
-	
 	/* special case: check for un-parsable csv format errors */
 	if(CSV_IS_UNPARSABLE(cdbsreh))
 		return true;
