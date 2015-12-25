@@ -108,7 +108,6 @@ InsertInitialSegnoEntry(AppendOnlyEntry *aoEntry, int segno)
 	values[Anum_pg_aoseg_varblockcount - 1] = Float8GetDatum(0);
 	values[Anum_pg_aoseg_eof - 1] = Float8GetDatum(0);
 	values[Anum_pg_aoseg_eofuncompressed - 1] = Float8GetDatum(0);
-	values[Anum_pg_aoseg_content - 1] = Int32GetDatum(-1);
 
 	/*
 	 * form the tuple and insert it
@@ -250,7 +249,6 @@ GetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry, Snapshot appendOnly
 	fsinfo->eof = (int64)DatumGetFloat8(eof);
 	fsinfo->tupcount = (int64)DatumGetFloat8(tupcount);
 	fsinfo->varblockcount = (int64)DatumGetFloat8(varbcount);
-	fsinfo->content = MASTER_CONTENT_ID;
 
 	ItemPointerSetInvalid(&fsinfo->sequence_tid);
 
@@ -335,12 +333,6 @@ aoFileSegInfoCmp(const void *left, const void *right)
 	FileSegInfo *leftSegInfo = *((FileSegInfo **)left);
 	FileSegInfo *rightSegInfo = *((FileSegInfo **)right);
 	
-	if (leftSegInfo->content < rightSegInfo->content)
-		return -1;
-
-	if (leftSegInfo->content > rightSegInfo->content)
-		return 1;
-
 	if (leftSegInfo->segno < rightSegInfo->segno)
 		return -1;
 	
@@ -370,8 +362,7 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 					eof,
 					eof_uncompressed,
 					tupcount,
-					varblockcount,
-					content;
+					varblockcount;
 	bool			isNull;
 
 	pg_aoseg_dsc = RelationGetDescr(pg_aoseg_rel);
@@ -382,9 +373,6 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 	 */
 	allseginfo = (FileSegInfo **) palloc0(sizeof(FileSegInfo*) * seginfo_slot_no);
 	seginfo_no = 0;
-
-	ScanKeyInit(&key[numOfKey++], (AttrNumber) Anum_pg_aoseg_content,
-			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(MASTER_CONTENT_ID));
 
 	if(expectedSegno>=0)
 	{
@@ -441,8 +429,6 @@ FileSegInfo **GetAllFileSegInfo_pg_aoseg_rel(
 		else
 			oneseginfo->eof_uncompressed = (int64)DatumGetFloat8(eof);
 
-		content = fastgetattr(tuple, Anum_pg_aoseg_content, pg_aoseg_dsc, &isNull);
-		oneseginfo->content = DatumGetInt32(content);
 		seginfo_no++;
 		oneseginfo = NULL;
 		CHECK_FOR_INTERRUPTS();

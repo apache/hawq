@@ -157,8 +157,6 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 		TupleDescInitEntry(tupdesc,
 				(AttrNumber) Anum_pg_aoseg_eofuncompressed,
 				"eofuncompressed", FLOAT8OID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_aoseg_content,
-				"content", INT4OID, -1, 0);
 	}
 	else
 	{
@@ -183,8 +181,6 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 		TupleDescInitEntry(tupdesc,
 				(AttrNumber) Anum_pg_parquetseg_eofuncompressed,
 				"eofuncompressed", FLOAT8OID, -1, 0);
-		TupleDescInitEntry(tupdesc, (AttrNumber) Anum_pg_parquetseg_content,
-				"content", INT4OID, -1, 0);
 	}
 
 	/*
@@ -224,12 +220,8 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 	 * Create unique index on segno.
 	 */
 	indexInfo = makeNode(IndexInfo);
-	indexInfo->ii_NumIndexAttrs = 2;
+	indexInfo->ii_NumIndexAttrs = 1;
 	indexInfo->ii_KeyAttrNumbers[0] = 1;
-	if (RelationIsAoRows(rel))
-		indexInfo->ii_KeyAttrNumbers[1] = Anum_pg_aoseg_content;
-	else
-		indexInfo->ii_KeyAttrNumbers[1] = Anum_pg_parquetseg_content;
 	indexInfo->ii_Expressions = NIL;
 	indexInfo->ii_ExpressionsState = NIL;
 	indexInfo->ii_Predicate = NIL;
