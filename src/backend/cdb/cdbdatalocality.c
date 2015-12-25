@@ -4111,8 +4111,13 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			minTargetSegmentNumber = enforce_virtual_segment_number;
 		}
 		uint64_t before_rm_allocate_resource = gettime_microsec();
+
+		/* cost is use by RM to balance workload between hosts. the cost is at least one block size*/
+		int64 mincost = min_cost_for_each_query;
+		mincost <<= 20;
+		int64 queryCost = context.total_size < mincost ? mincost : context.total_size;
 		if (QRL_NONE != resourceLife) {
-			resource = AllocateResource(QRL_ONCE, sliceNum, context.total_size,
+			resource = AllocateResource(QRL_ONCE, sliceNum, queryCost,
 					maxTargetSegmentNumber, minTargetSegmentNumber,
 					context.host_context.hostnameVolInfos, context.host_context.size);
 		}

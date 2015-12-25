@@ -1219,6 +1219,7 @@ extern int     rm_nresqueue_limit;
 extern int max_filecount_notto_split_segment;
 extern int min_datasize_to_combine_segment;
 extern int datalocality_algorithm_version;
+extern int min_cost_for_each_query;
 
 typedef enum
 {
