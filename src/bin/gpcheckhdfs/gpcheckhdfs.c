@@ -28,8 +28,6 @@
  *
  * It uses libhdfs to communicate with HDFS.
  *
- * Copyright (c) 2014, Greenplum inc
- *
  *-------------------------------------------------------------------------
  */
 #include <stdio.h>
