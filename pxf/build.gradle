@@ -66,7 +66,7 @@ subprojects { subProject ->
             "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
             "-Xlint:-fallthrough", "-Xlint:-deprecation", "-Xlint:-unchecked", "-Xlint:-options"
     ]
-
+		
     repositories {
         // mavenCentral without https:
         maven { url 'http://repo1.maven.org/maven2' }
@@ -334,6 +334,29 @@ project('pxf-hive') {
 
         link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
     }
+}
+
+project('pxf-json') {
+	dependencies {
+		compile(project(':pxf-hdfs'))
+		compile "org.apache.commons:commons-lang3:3.0"
+
+		testCompile 'pl.pragmatists:JUnitParams:1.0.2'
+		configurations {
+			// Remove hive-exec from unit tests as it causes VerifyError
+			testRuntime.exclude module: 'hive-exec'
+		}
+	}
+
+	ospackage {
+		requires('pxf-hdfs', project.version, GREATER | EQUAL)
+
+		from(jar.outputs.files) {
+			into "/usr/lib/pxf-${project.version}"
+		}
+
+		link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+	}
 }
 
 project('pxf-hbase') {
