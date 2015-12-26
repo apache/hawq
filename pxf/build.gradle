@@ -36,13 +36,8 @@ buildscript {
 
     dependencies {
         classpath "com.netflix.nebula:gradle-ospackage-plugin:2.2.6"
-<<<<<<< 7ca995b6cdf80e4441b9ebbe31b3213c3d924cdc
         classpath "de.undercouch:gradle-download-task:2.1.0"
     }   
-=======
-        classpath "de.undercouch:gradle-download-task:1.2"
-    }
->>>>>>> HAWQ-178: Address all comments. Remove redundant code
 }
 
 // Hadoop distribution (can be phd or hdp) - needed to set correct classpaths
@@ -71,7 +66,7 @@ subprojects { subProject ->
             "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
             "-Xlint:-fallthrough", "-Xlint:-deprecation", "-Xlint:-unchecked", "-Xlint:-options"
     ]
-
+		
     repositories {
         // mavenCentral without https:
         maven { url 'http://repo1.maven.org/maven2' }
