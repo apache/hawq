@@ -1,9 +1,23 @@
 #!/usr/bin/perl
 #
-# $Header: //gpsql/feature/hd2.0/private-lili/src/include/catalog/calico.pl#2 $
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
 #
-# copyright (c) 2011, 2012, 2013
-# Author: Jeffrey I Cohen
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+# $Header: //gpsql/feature/hd2.0/private-lili/src/include/catalog/calico.pl#2 $
 #
 # SLZY_HDR_END
 
@@ -175,11 +189,9 @@ Need to restructure the catalog to eliminate bloat.
 
 =head1 AUTHORS
 
-Jeffrey I Cohen
+Apache HAWQ
 
-Copyright (c) 2011, 2012, 2013 Greenplum.  All rights reserved.  
-
-Address bug reports and comments to: jcohen@greenplum.com
+Address bug reports and comments to: dev@hawq.incubator.apache.org
 
 =cut
 # SLZY_POD_HDR_END
@@ -3425,9 +3437,22 @@ sub more_header
  * catquery.c
  *	  general catalog table access methods (internal api)
  *
- * Copyright (c) 2011,2012,2013 Greenplum inc
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  *
  *-------------------------------------------------------------------------
  */

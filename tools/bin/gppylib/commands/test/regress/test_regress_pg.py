@@ -16,8 +16,6 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-# Copyright (c) Greenplum Inc 2008. All Rights Reserved. 
-#
 # Unit Testing of pg commands
 #
 
