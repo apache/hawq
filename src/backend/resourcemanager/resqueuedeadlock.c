@@ -20,6 +20,7 @@
 #include "resqueuedeadlock.h"
 #include "dynrm.h"
 #include "utils/simplestring.h"
+#include "resqueuemanager.h"
 
 void initializeResqueueDeadLockDetector(ResqueueDeadLockDetector detector,
 										void                    *queuetrack)
@@ -32,10 +33,9 @@ void initializeResqueueDeadLockDetector(ResqueueDeadLockDetector detector,
 						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
 						HASHTABLE_KEYTYPE_CHARARRAY,
 						NULL);
-	detector->InUseTotalCore      = 0;
-	detector->InUseTotalMemoryMB  = 0;
-	detector->LockedTotalCore     = 0;
-	detector->LockedTotalMemoryMB = 0;
+
+	resetResourceBundleData(&(detector->InUseTotal), 0, 0.0, 0);
+	resetResourceBundleData(&(detector->LockedTotal), 0, 0.0, 0);
 }
 
 int addSessionInUseResource(ResqueueDeadLockDetector detector,
@@ -56,19 +56,16 @@ int addSessionInUseResource(ResqueueDeadLockDetector detector,
 	SessionTrack sessiontrack = (SessionTrack)(pair->Value);
 	Assert( sessiontrack != NULL );
 	Assert( !sessiontrack->Locked );
-	sessiontrack->InUseTotalMemoryMB += memorymb;
-	sessiontrack->InUseTotalCore     += core;
-
-	detector->InUseTotalMemoryMB += memorymb;
-	detector->InUseTotalCore     += core;
+	addResourceBundleData(&(sessiontrack->InUseTotal), memorymb, core);
+	addResourceBundleData(&(detector->InUseTotal), memorymb, core);
 
 	return FUNC_RETURN_OK;
 }
 
-int minusSessionInUserResource(ResqueueDeadLockDetector detector,
-							   int64_t 					sessionid,
-							   uint32_t 				memorymb,
-							   double 					core)
+int minusSessionInUseResource(ResqueueDeadLockDetector	detector,
+							  int64_t					sessionid,
+							  uint32_t 					memorymb,
+							  double 					core)
 {
 	/* Build key */
 	SimpArray key;
@@ -80,49 +77,25 @@ int minusSessionInUserResource(ResqueueDeadLockDetector detector,
 		return RESQUEMGR_NO_SESSIONID;
 	}
 
-	detector->InUseTotalMemoryMB -= memorymb;
-	detector->InUseTotalCore     -= core;
+	minusResourceBundleData(&(detector->InUseTotal), memorymb, core);
 
 	SessionTrack sessiontrack = (SessionTrack)(pair->Value);
 	Assert( sessiontrack != NULL );
 
-	sessiontrack->InUseTotalMemoryMB -= memorymb;
-	sessiontrack->InUseTotalCore     -= core;
+	minusResourceBundleData(&(sessiontrack->InUseTotal), memorymb, core);
 
-	Assert(detector->InUseTotalCore >= 0 && detector->InUseTotalMemoryMB >= 0);
-	Assert(sessiontrack->InUseTotalCore >= 0 && sessiontrack->InUseTotalMemoryMB >= 0);
+	Assert(detector->InUseTotal.Core >= 0.0 &&
+		   detector->InUseTotal.MemoryMB >= 0);
+	Assert(sessiontrack->InUseTotal.Core >= 0.0 &&
+		   sessiontrack->InUseTotal.MemoryMB >= 0);
 
 	/* If the session has no resource used, remove the session tracker. */
-	if ( sessiontrack->InUseTotalMemoryMB == 0 &&
-		 sessiontrack->InUseTotalCore == 0	) {
+	if ( sessiontrack->InUseTotal.MemoryMB == 0 &&
+		 sessiontrack->InUseTotal.Core == 0.0 )
+	{
 		rm_pfree(PCONTEXT, sessiontrack);
-		/* Remove from hash table. */
 		removeHASHTABLENode(&(detector->Sessions), &key);
 	}
-
-	return FUNC_RETURN_OK;
-}
-
-int removeSession(ResqueueDeadLockDetector detector, int64_t sessionid)
-{
-	/* Build key */
-	SimpArray key;
-	setSimpleArrayRef(&key, (char *)&sessionid, sizeof(int64_t));
-
-	/* Check if the session id exists. */
-	PAIR pair = getHASHTABLENode(&(detector->Sessions), &key);
-	if ( pair == NULL ) {
-		return RESQUEMGR_NO_SESSIONID;
-	}
-
-	SessionTrack sessiontrack = (SessionTrack)(pair->Value);
-	detector->InUseTotalMemoryMB -= sessiontrack->InUseTotalMemoryMB;
-	detector->InUseTotalCore     -= sessiontrack->InUseTotalCore;
-
-	rm_pfree(PCONTEXT, sessiontrack);
-
-	/* Remove from hash table. */
-	removeHASHTABLENode(&(detector->Sessions), &key);
 
 	return FUNC_RETURN_OK;
 }
@@ -138,28 +111,30 @@ void createAndLockSessionResource(ResqueueDeadLockDetector detector,
 
 	/* Check if the session id exists. */
 	PAIR pair = getHASHTABLENode(&(detector->Sessions), &key);
-	if ( pair == NULL ) {
+	if ( pair == NULL )
+	{
 		curstrack = (SessionTrack)rm_palloc0(PCONTEXT, sizeof(SessionTrackData));
-		curstrack->SessionID 		  = sessionid;
-		curstrack->InUseTotalCore     = 0;
-		curstrack->InUseTotalMemoryMB = 0;
-		curstrack->Locked			  = false;
+		curstrack->SessionID = sessionid;
+		curstrack->Locked	 = false;
+		resetResourceBundleData(&(curstrack->InUseTotal), 0, 0.0, 0);
+
 		/* Add to the detector. */
 		setHASHTABLENode(&(detector->Sessions), &key, curstrack, false);
 	}
-	else {
+	else
+	{
 		curstrack = (SessionTrack)(pair->Value);
 	}
 
 	Assert( curstrack != NULL );
 	Assert( !curstrack->Locked );
 	curstrack->Locked = true;
-	detector->LockedTotalCore     += curstrack->InUseTotalCore;
-	detector->LockedTotalMemoryMB += curstrack->InUseTotalMemoryMB;
+	addResourceBundleDataByBundle(&(detector->LockedTotal),
+								  &(curstrack->InUseTotal));
 
-	elog(DEBUG3, "Locked session "INT64_FORMAT "Left %d MB",
-				 sessionid,
-				 detector->LockedTotalMemoryMB);
+	elog(RMLOG, "Locked session "INT64_FORMAT" Locked %d MB",
+				sessionid,
+				detector->LockedTotal.MemoryMB);
 }
 
 void unlockSessionResource(ResqueueDeadLockDetector detector,
@@ -172,20 +147,22 @@ void unlockSessionResource(ResqueueDeadLockDetector detector,
 	/* Check if the session id exists. */
 	PAIR pair = getHASHTABLENode(&(detector->Sessions), &key);
 
-	if ( pair != NULL ) {
+	if ( pair != NULL )
+	{
 		SessionTrack sessiontrack = (SessionTrack)(pair->Value);
 		Assert(sessiontrack != NULL);
 		Assert(sessiontrack->Locked);
-		detector->LockedTotalCore     -= sessiontrack->InUseTotalCore;
-		detector->LockedTotalMemoryMB -= sessiontrack->InUseTotalMemoryMB;
+		minusResourceBundleDataByBundle(&(detector->LockedTotal),
+									    &(sessiontrack->InUseTotal));
 		sessiontrack->Locked = false;
 
-		elog(DEBUG3, "Unlocked session "INT64_FORMAT "Left %d MB",
+		elog(DEBUG3, "Unlocked session "INT64_FORMAT " Locked %d MB",
 					 sessionid,
-					 detector->LockedTotalMemoryMB);
+					 detector->LockedTotal.MemoryMB);
 	}
 
-	Assert(detector->LockedTotalCore >= 0 && detector->LockedTotalMemoryMB >= 0);
+	Assert(detector->LockedTotal.Core >= 0.0 &&
+		   detector->LockedTotal.MemoryMB >= 0);
 }
 
 SessionTrack findSession(ResqueueDeadLockDetector detector,
@@ -197,7 +174,8 @@ SessionTrack findSession(ResqueueDeadLockDetector detector,
 
 	/* Check if the session id exists. */
 	PAIR pair = getHASHTABLENode(&(detector->Sessions), &key);
-	if ( pair != NULL ) {
+	if ( pair != NULL )
+	{
 		return (SessionTrack)(pair->Value);
 	}
 	return NULL;
@@ -216,8 +194,34 @@ void resetResourceDeadLockDetector(ResqueueDeadLockDetector detector)
 	freePAIRRefList(&(PCONTRACK->Connections), &allss);
 	clearHASHTABLE(&(detector->Sessions));
 
-	detector->InUseTotalMemoryMB 	= 0;
-	detector->InUseTotalCore		= 0.0;
-	detector->LockedTotalMemoryMB	= 0;
-	detector->LockedTotalCore		= 0.0;
+	resetResourceBundleData(&(detector->InUseTotal), 0, 0.0, 0);
+	resetResourceBundleData(&(detector->LockedTotal), 0, 0.0, 0);
+}
+
+void copyResourceDeadLockDetectorWithoutLocking(ResqueueDeadLockDetector source,
+												ResqueueDeadLockDetector target)
+{
+	Assert(source != NULL);
+	Assert(target != NULL);
+	resetResourceDeadLockDetector(target);
+	target->ResqueueTrack = source->ResqueueTrack;
+	addResourceBundleDataByBundle(&(target->InUseTotal), &(source->InUseTotal));
+
+	List 	 *allss = NULL;
+	ListCell *cell	= NULL;
+	getAllPAIRRefIntoList(&(source->Sessions), &allss);
+	foreach(cell, allss)
+	{
+		SessionTrack strack = (SessionTrack)(((PAIR)lfirst(cell))->Value);
+		SessionTrack newstrack = rm_palloc0(PCONTEXT, sizeof(SessionTrackData));
+		newstrack->SessionID = strack->SessionID;
+		newstrack->Locked	 = false;
+		resetResourceBundleData(&(newstrack->InUseTotal), 0, 0.0, 0);
+		addResourceBundleDataByBundle(&(newstrack->InUseTotal),
+									  &(strack->InUseTotal));
+		/* Add to the detector. */
+		SimpArray key;
+		setSimpleArrayRef(&key, (char *)&(newstrack->SessionID), sizeof(int64_t));
+		setHASHTABLENode(&(target->Sessions), &key, newstrack, false);
+	}
 }

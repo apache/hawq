@@ -20,9 +20,10 @@
 #ifndef DYNAMIC_RESOURCE_MANAGEMENT_RESOURCE_QUEUE_DEADLOCK_DETECTOR_H
 #define DYNAMIC_RESOURCE_MANAGEMENT_RESOURCE_QUEUE_DEADLOCK_DETECTOR_H
 #include "envswitch.h"
+#include "rmcommon.h"
 #include "utils/hashtable.h"
 
-/******************************************************************************
+/*------------------------------------------------------------------------------
  *
  * +------------------------------+                         +------------------+
  * | ResqueueDeadLockDetectorData |---hashlist ref (1:N)--->| SessionTrackData |
@@ -39,7 +40,7 @@
  * quota plus locked resource can not be more than the maximum limit of this
  * resource queue.
  *
- * -----------------------------------------------------------------------------
+ *------------------------------------------------------------------------------
  * resource negotiation actions that updates this detector.
  *
  * Register connection : No action.
@@ -74,14 +75,14 @@
  * 							   Minus resource usage in the session, the session
  * 							   maybe locked or not locked.
  *
- ******************************************************************************/
+ *------------------------------------------------------------------------------
+ */
 
 struct SessionTrackData
 {
-	int64_t			SessionID;
-	uint32_t		InUseTotalMemoryMB;
-	double      	InUseTotalCore;
-	bool			Locked;
+	int64_t				SessionID;
+	ResourceBundleData 	InUseTotal;
+	bool				Locked;
 };
 
 typedef struct SessionTrackData  SessionTrackData;
@@ -89,12 +90,10 @@ typedef struct SessionTrackData *SessionTrack;
 
 struct ResqueueDeadLockDetectorData
 {
-	HASHTABLEData	Sessions;			/* Hash of SessionTrack. */
-	uint32_t		InUseTotalMemoryMB;
-	double			InUseTotalCore;
-	uint32_t		LockedTotalMemoryMB;
-	double			LockedTotalCore;
-	void           *ResqueueTrack;
+	HASHTABLEData		Sessions;					/* Hash of SessionTrack. */
+	ResourceBundleData	InUseTotal;
+	ResourceBundleData	LockedTotal;
+	void			   *ResqueueTrack;
 };
 
 typedef struct ResqueueDeadLockDetectorData  ResqueueDeadLockDetectorData;
@@ -106,17 +105,16 @@ void initializeResqueueDeadLockDetector(ResqueueDeadLockDetector detector,
 int createSession(ResqueueDeadLockDetector detector,
 				  int64_t 				   sessionid,
 				  SessionTrack			  *sessiontrack);
-int removeSession(ResqueueDeadLockDetector detector, int64_t sessionid);
 
 int addSessionInUseResource(ResqueueDeadLockDetector detector,
 							int64_t 				 sessionid,
 							uint32_t 				 memorymb,
 							double 					 core);
 
-int minusSessionInUserResource(ResqueueDeadLockDetector detector,
-							   int64_t 					sessionid,
-							   uint32_t 				memorymb,
-							   double 					core);
+int minusSessionInUseResource(ResqueueDeadLockDetector	detector,
+							  int64_t					sessionid,
+							  uint32_t 					memorymb,
+							  double 					core);
 
 void createAndLockSessionResource(ResqueueDeadLockDetector detector,
 								  int64_t 				   sessionid);
@@ -128,4 +126,7 @@ SessionTrack findSession(ResqueueDeadLockDetector detector,
 						 int64_t 				  sessionid);
 
 void resetResourceDeadLockDetector(ResqueueDeadLockDetector detector);
+
+void copyResourceDeadLockDetectorWithoutLocking(ResqueueDeadLockDetector source,
+												ResqueueDeadLockDetector target);
 #endif /* DYNAMIC_RESOURCE_MANAGEMENT_RESOURCE_QUEUE_DEADLOCK_DETECTOR_H */

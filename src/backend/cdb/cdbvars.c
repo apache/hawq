@@ -325,6 +325,7 @@ int		rm_stmt_nvseg;
 
 int		rm_min_resource_perseg;
 bool	rm_force_fifo_queue;
+bool	rm_force_alterqueue_cancel_queued_request;
 
 bool	rm_session_lease_heartbeat_enable;
 int     rm_session_lease_timeout; 			/* How many seconds to wait before

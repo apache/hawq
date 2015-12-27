@@ -1196,6 +1196,7 @@ extern int	   rm_nvseg_variance_among_seg_limit;
 extern int	   rm_container_batch_limit;
 extern char   *rm_resourcepool_test_filename;
 extern bool	   rm_force_fifo_queue;
+extern bool	   rm_force_alterqueue_cancel_queued_request;
 
 extern bool	   rm_enforce_cpu_enable;
 extern bool    rm_enforce_blkio_enable;

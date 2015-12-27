@@ -4404,6 +4404,15 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"hawq_rm_force_alterqueue_cancel_queued_request", PGC_POSTMASTER, RESOURCES_MGM,
+		 gettext_noop("force to cancel a query resource request when altering a resource queue."),
+		 NULL
+		},
+		&rm_force_alterqueue_cancel_queued_request,
+		true, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_session_lease_heartbeat_enable", PGC_USERSET, RESOURCES_MGM,
 		 gettext_noop("enable or disable session lease heartbeat for test."),
 		 NULL
