@@ -5201,6 +5201,7 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 							  "one queued query resource and new definition of "
 							  "resource queue %s",
 							  quetrack->QueueInfo->Name);
+				freeUsedConnectionTrack(newconn);
 				return RESQUEMGR_ALTERQUEUE_CONFILICT;
 			}
 		}
