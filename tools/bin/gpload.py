@@ -1663,7 +1663,7 @@ class gpload:
                         self.log(self.ERROR, 'cannot find greenplum environment ' +
                                     'file: environment misconfigured')
 
-                    cmd = 'source %s ; exec ' % srcfile
+                    cmd = '. %s ; exec ' % srcfile
                     cmd += ' '.join(popenList)
                     needshell = True
 

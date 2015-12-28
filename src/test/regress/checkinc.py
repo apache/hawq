@@ -1,6 +1,15 @@
 #!/usr/bin/env python
 
 import sys, os, re, subprocess
+try:
+    import sysconfig
+    multiarch_triplet = sysconfig.get_config_var('MULTIARCH')
+except ImportError:
+    try:
+        import distutils.sysconfig
+        multiarch_triplet = distutils.sysconfig.get_config_var('MULTIARCH')
+    except ImportError:
+        multiarch_triplet = ''
 
 bindir = ''
 if os.path.exists('../../bin/pg_config'):
@@ -102,8 +111,13 @@ for f in keys:
         if os.path.exists(os.path.join(inc,i)):
             continue
 
-        # 2. It might be a system include
+        # 2.1 It might be a generic system include
         if os.path.exists(os.path.join('/usr/include',i)):
+            continue
+
+        # 2.2 It might be a multiarch system include
+        if multiarch_triplet and \
+          os.path.exists(os.path.join('/usr/include',multiarch_triplet,i)):
             continue
 
         # 3. It might not have been well qualified

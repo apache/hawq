@@ -424,7 +424,7 @@ def collectHDFS():
     libhdfs3_site_file = os.environ.get("LIBHDFS3_CONF")
 
     # collect java heap size config
-    p = subprocess.Popen("source %s; echo $JAVA_HEAP_MAX" % hadoop_config_file, shell = True,
+    p = subprocess.Popen(". %s; echo $JAVA_HEAP_MAX" % hadoop_config_file, shell = True,
             stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     result = p.communicate()
 
@@ -435,7 +435,7 @@ def collectHDFS():
         data.max_heap_size = int(re.sub(r'[^\d]+', '', result[0]))
 
     # collect possible namenode/datanode heap size config
-    p = subprocess.Popen("source %s && echo $HADOOP_NAMENODE_OPTS | tr ' ' '\\n' | grep Xmx | tail -n 1" % hadoop_env_file, shell = True,
+    p = subprocess.Popen(". %s && echo $HADOOP_NAMENODE_OPTS | tr ' ' '\\n' | grep Xmx | tail -n 1" % hadoop_env_file, shell = True,
             stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     result = p.communicate()
 
@@ -445,7 +445,7 @@ def collectHDFS():
         data.namenode_heap_size = int(re.sub(r'[^\d]+', '', result[0]))
 
     # collect possible namenode/datanode heap size config
-    p = subprocess.Popen("source %s && echo $HADOOP_DATANODE_OPTS | tr ' ' '\\n' | grep Xmx | tail -n 1" % hadoop_env_file, shell = True,
+    p = subprocess.Popen(". %s && echo $HADOOP_DATANODE_OPTS | tr ' ' '\\n' | grep Xmx | tail -n 1" % hadoop_env_file, shell = True,
             stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     result = p.communicate()
 
