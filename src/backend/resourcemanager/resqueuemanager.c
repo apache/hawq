@@ -135,8 +135,12 @@ void returnAllocatedResourceToLeafQueue(DynResourceQueueTrack 	track,
 								    	int32_t 				memorymb,
 								    	double					core);
 
+/* Refresh resource queue resource capacity based on updated cluster info. */
+void refreshResourceQueuePercentageCapacity(bool queuechanged);
+
 void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
-													uint32_t clustercore);
+													uint32_t clustercore,
+													bool	 queuechanged);
 
 /* Internal APIs for maintaining memory/core ratio trackers. */
 int32_t addResourceQueueRatio(DynResourceQueueTrack track);
@@ -2457,8 +2461,32 @@ int returnResourceToResQueMgr(ConnectionTrack conntrack)
 	return res;
 }
 
+void refreshResourceQueueCapacity(bool queuechanged)
+{
+	static char errorbuf[ERRORMESSAGE_SIZE];
+	List *qhavingshadow = NULL;
+
+	/* STEP 1. Build all necessary shadow resource queue track instances. */
+	buildQueueTrackShadows(PQUEMGR->RootTrack, &qhavingshadow);
+
+	/* STEP 2. Refresh resource queue capacities. */
+	refreshResourceQueuePercentageCapacity(queuechanged);
+
+	/* STEP 3. Rebuild queued resource requests. */
+	rebuildAllResourceQueueTrackDynamicStatusInShadow(qhavingshadow,
+													  queuechanged,
+													  errorbuf,
+													  sizeof(errorbuf));
+
+	/* STEP 4. Apply changes from resource queue shadows. */
+	applyResourceQueueTrackChangesFromShadows(qhavingshadow);
+
+	/* STEP 5. Clean up. */
+	cleanupQueueTrackShadows(&qhavingshadow);
+}
+
 /* Refresh actual resource queue capacity. */
-void refreshResourceQueuePercentageCapacity(void)
+void refreshResourceQueuePercentageCapacity(bool queuechanged)
 {
 	/*
 	 * Decide The actual capacity. This is necessary because there maybe some
@@ -2507,7 +2535,7 @@ void refreshResourceQueuePercentageCapacity(void)
 	elog(DEBUG3, "HAWQ RM :: Use cluster (%d MB, %d CORE) resources as whole.",
 				mem, core);
 
-	refreshResourceQueuePercentageCapacityInternal(mem, core);
+	refreshResourceQueuePercentageCapacityInternal(mem, core, queuechanged);
 
 	/*
 	 * After freshing resource queue capacity, it is necessary to try to dispatch
@@ -3646,16 +3674,29 @@ int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
  * Update the overall resource queue percentage capacity.
  */
 void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
-													uint32_t clustercore)
+													uint32_t clustercore,
+													bool	 queuechanged)
 {
+	static uint32_t prevclustermemmb = 0;
+	static uint32_t prevclustercore  = 0;
+
+	if ( (!queuechanged) &&
+		 (prevclustermemmb == clustermemmb && prevclustercore  == clustercore) )
+	{
+		elog(DEBUG3, "Resource manager skips updating resource queue capacities "
+					 "because the total resource quota does not change.");
+		return;
+	}
+
 	/*
-	 * STEP 1. Decide the limit ranges of memory and core, decide the memory/core
-	 * 		   ratio.
+	 * STEP 1. Decide the limit ranges of memory and core, decide the
+	 * 		   memory/core ratio.
 	 */
 	ListCell *cell = NULL;
 	foreach(cell, PQUEMGR->Queues)
 	{
-		DynResourceQueueTrack track = lfirst(cell);
+		DynResourceQueueTrack track     = lfirst(cell);
+		DynResourceQueueTrack origtrack = track;
 
 		/* If this resource queue track has a shadow, the shadow is updated. */
 		track = track->ShadowQueueTrack == NULL ? track : track->ShadowQueueTrack;
@@ -3763,7 +3804,7 @@ void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
 			if ( !track->trackedMemCoreRatio )
 			{
 				track->MemCoreRatio = tmpratio;
-				addResourceQueueRatio(track);
+				addResourceQueueRatio(origtrack);
 			}
 		}
 	}
@@ -4085,11 +4126,19 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 	int segcounter = 0;
 	int segmincounter = 0;
 
+	elog(DEBUG3, "Resource queue %s expects full parallel count %d, "
+				 "current running count %d.",
+				 track->QueueInfo->Name,
+				 track->QueueInfo->ParallelCount,
+				 track->NumOfRunningQueries);
+
 	DQUEUE_LOOP_BEGIN(&(track->QueryResRequests), iter, ConnectionTrack, conntrack)
 		/* Consider concurrency no more than defined parallel count. */
 		/* TODO: Consider more here... */
 		if ( counter + track->NumOfRunningQueries >= track->QueueInfo->ParallelCount )
 		{
+			elog(RMLOG, "Parallel count limit is encountered, to run %d more",
+						counter);
 			break;
 		}
 
@@ -4100,6 +4149,10 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 		/* Check if the minimum segment requirement is met. */
 		if ( segmincounter + equalsegnummin > availsegnum )
 		{
+			elog(RMLOG, "Resource allocated is up, available vseg num %d, "
+						"to run %d more",
+						availsegnum,
+						counter);
 			break;
 		}
 
@@ -5067,6 +5120,7 @@ void cleanupQueueTrackShadows(List **qhavingshadow)
 }
 
 int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
+													  bool  queuechanged,
 													  char *errorbuf,
 													  int	errorbufsize)
 {
@@ -5077,6 +5131,7 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 	{
 		DynResourceQueueTrack quetrack = (DynResourceQueueTrack)lfirst(cell);
 		res = rebuildResourceQueueTrackDynamicStatusInShadow(quetrack,
+															 queuechanged,
 															 errorbuf,
 															 errorbufsize);
 		if ( res != FUNC_RETURN_OK )
@@ -5094,7 +5149,7 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 					  quetrack->QueueInfo->Name);
 		}
 
-		res = detectAndDealWithDeadLockInShadow(quetrack);
+		res = detectAndDealWithDeadLockInShadow(quetrack, queuechanged);
 		if ( res != FUNC_RETURN_OK )
 		{
 			elog(WARNING, "Resource manager failed to rebuild resource queue %s "
@@ -5117,6 +5172,7 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 }
 
 int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetrack,
+												   bool					  queuechanged,
 												   char 				 *errorbuf,
 												   int					  errorbufsize)
 {
@@ -5184,7 +5240,7 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 			 */
 			elog(WARNING, "ConnID %d. %s", newconn->ConnID, errorbuf);
 
-			if ( rm_force_alterqueue_cancel_queued_request )
+			if ( !queuechanged || rm_force_alterqueue_cancel_queued_request )
 			{
 				buildAcquireResourceErrorResponse(newconn, res, errorbuf);
 				transformConnectionTrackProgress(newconn,
@@ -5213,7 +5269,8 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 	return FUNC_RETURN_OK;
 }
 
-int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack)
+int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack,
+									  bool					queuechanged)
 {
 	Assert(quetrack != NULL);
 	Assert(quetrack->ShadowQueueTrack != NULL);
@@ -5254,7 +5311,7 @@ int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack)
 		if ( expmemorymb > availmemorymb )
 		{
 			/* We encounter a deadlock issue. */
-			if ( rm_force_alterqueue_cancel_queued_request )
+			if ( !queuechanged || rm_force_alterqueue_cancel_queued_request )
 			{
 				cancelQueryRequestToBreakDeadLockInShadow(shadowtrack,
 														  iter,

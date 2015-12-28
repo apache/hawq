@@ -692,7 +692,7 @@ int handleRB2RM_ClusterReport(void)
 									  PQUEMGR->GRMQueueMaxCapacity;
 	PQUEMGR->GRMQueueResourceTight 	= response.ResourceTight > 0 ? true : false;
 
-	refreshResourceQueuePercentageCapacity();
+	refreshResourceQueueCapacity(false);
 
     PRESPOOL->LastUpdateTime = gettime_microsec();
 

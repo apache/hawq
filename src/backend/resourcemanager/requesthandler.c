@@ -738,7 +738,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	}
 
 	/* Refresh resource queue capacities. */
-	refreshResourceQueuePercentageCapacity();
+	refreshResourceQueueCapacity(false);
 	/* Recalculate all memory/core ratio instances' limits. */
 	refreshMemoryCoreRatioLimits();
 	/* Refresh memory/core ratio level water mark. */
@@ -1003,7 +1003,7 @@ bool handleRMRequestSegmentIsDown(void **arg)
 		hostname = hostname + strlen(hostname) + 1; /* Try next */
 	}
 
-	refreshResourceQueuePercentageCapacity();
+	refreshResourceQueueCapacity(false);
 
 	RPCResponseSegmentIsDownData response;
 	response.Result   = res;

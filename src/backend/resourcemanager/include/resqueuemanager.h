@@ -344,8 +344,8 @@ typedef struct DynResourceQueueManagerData  DynResourceQueueManagerData;
 void initializeResourceQueueManager(void);
 /* collect resource queues' resource usage status from bottom up. */
 void refreshMemoryCoreRatioLevelUsage(uint64_t curmicrosec);
-/* Refresh resource queue resource capacity based on updated cluster info. */
-void refreshResourceQueuePercentageCapacity(void);
+/* Refresh reosurce queue resource capacity and adjusts all queued requests. */
+void refreshResourceQueueCapacity(bool queuechanged);
 /* Dispatch resource to the queuing queries. */
 void dispatchResourceToQueries(void);
 /* Time out the resource allocated whose QD owner does not have chance to return. */
@@ -512,14 +512,17 @@ void buildQueueTrackShadow(DynResourceQueueTrack toaltertrack);
 void cleanupQueueTrackShadows(List **qhavingshadow);
 
 int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
+													  bool  queuechanged,
 													  char *errorbuf,
 													  int	errorbufsize);
 
 int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetrack,
+												   bool					  queuechanged,
 												   char 				 *errorbuf,
 												   int					  errorbufsize);
 
-int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack);
+int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack,
+									  bool					queuechanged);
 
 void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow);
 
