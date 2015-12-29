@@ -393,7 +393,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			 * Refresh actual capacity of the resource queue, the change is
 			 * expected to be updated in the shadow instances.
 			 */
-			refreshResourceQueueCapacity(true);
+			refreshResourceQueuePercentageCapacity(true);
 
 			/*------------------------------------------------------------------
 			 * Till now, we expect the input for altering a resource queue is
