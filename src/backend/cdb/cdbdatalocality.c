@@ -3991,19 +3991,24 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		/*generate hostname-volumn pair to help RM to choose a host with
 		 *maximum data locality(only when the vseg number less than host number)
 		 */
-		context.host_context.size = context.dds_context.size;
-		MemoryContextSwitchTo(context.datalocality_memorycontext);
-		context.host_context.hostnameVolInfos = (HostnameVolumnInfo *) palloc(
-				sizeof(HostnameVolumnInfo) * context.host_context.size);
-		for (int i = 0; i < context.host_context.size; i++) {
-			MemSet(&(context.host_context.hostnameVolInfos[i].hostname), 0,
-					HOSTNAME_MAX_LENGTH);
-			strncpy(context.host_context.hostnameVolInfos[i].hostname,
-					context.dds_context.volInfos[i].hashEntry->key.hostname,
-					HOSTNAME_MAX_LENGTH-1);
-			context.host_context.hostnameVolInfos[i].datavolumn = context.dds_context.volInfos[i].datavolumn;
+		if(enable_prefer_list_to_rm){
+			context.host_context.size = context.dds_context.size;
+			MemoryContextSwitchTo(context.datalocality_memorycontext);
+			context.host_context.hostnameVolInfos = (HostnameVolumnInfo *) palloc(
+					sizeof(HostnameVolumnInfo) * context.host_context.size);
+			for (int i = 0; i < context.host_context.size; i++) {
+				MemSet(&(context.host_context.hostnameVolInfos[i].hostname), 0,
+						HOSTNAME_MAX_LENGTH);
+				strncpy(context.host_context.hostnameVolInfos[i].hostname,
+						context.dds_context.volInfos[i].hashEntry->key.hostname,
+						HOSTNAME_MAX_LENGTH-1);
+				context.host_context.hostnameVolInfos[i].datavolumn = context.dds_context.volInfos[i].datavolumn;
+			}
+			MemoryContextSwitchTo(context.old_memorycontext);
+		}else{
+			context.host_context.size = 0;
+			context.host_context.hostnameVolInfos = NULL;
 		}
-		MemoryContextSwitchTo(context.old_memorycontext);
 
 		/* determine the random table segment number by the following 4 steps*/
 		/* Step1 we expect one split(block) processed by one virtual segment*/

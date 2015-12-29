@@ -158,7 +158,6 @@ GetParquetFileSegInfo(Relation parentrel, AppendOnlyEntry *aoEntry,
 	fsinfo->segno = segno;
 	fsinfo->eof = (int64) DatumGetFloat8(eof);
 	fsinfo->tupcount = (int64) DatumGetFloat8(tupcount);
-	fsinfo->content = -1;
 
 	ItemPointerSetInvalid(&fsinfo->sequence_tid);
 
@@ -222,7 +221,6 @@ void InsertInitialParquetSegnoEntry(AppendOnlyEntry *aoEntry, int segno) {
 	values[Anum_pg_parquetseg_tupcount - 1] = Float8GetDatum(0);
 	values[Anum_pg_parquetseg_eof - 1] = Float8GetDatum(0);
 	values[Anum_pg_parquetseg_eofuncompressed - 1] = Float8GetDatum(0);
-	values[Anum_pg_parquetseg_content - 1] = Int32GetDatum(-1);
 
 	/*
 	 * form the tuple and insert it
@@ -543,8 +541,7 @@ ParquetFileSegInfo **GetAllParquetFileSegInfo_pg_paqseg_rel(
 	Datum			segno,
 					eof,
 					eof_uncompressed,
-					tupcount,
-					content;
+					tupcount;
 	bool			isNull;
 
 	pg_parquetseg_dsc = RelationGetDescr(pg_parquetseg_rel);
@@ -555,9 +552,6 @@ ParquetFileSegInfo **GetAllParquetFileSegInfo_pg_paqseg_rel(
 	 */
 	allseginfo = (ParquetFileSegInfo **) palloc0(sizeof(ParquetFileSegInfo*) * seginfo_slot_no);
 	seginfo_no = 0;
-
-	ScanKeyInit(&key[numOfKey++], (AttrNumber) Anum_pg_parquetseg_content,
-			BTEqualStrategyNumber, F_INT4EQ, Int32GetDatum(-1));
 
 	if(expectedSegno>=0){
 		ScanKeyInit(&key[numOfKey++], (AttrNumber) Anum_pg_parquetseg_segno,
@@ -609,12 +603,8 @@ ParquetFileSegInfo **GetAllParquetFileSegInfo_pg_paqseg_rel(
 		else
 			oneseginfo->eof_uncompressed = (int64)DatumGetFloat8(eof);
 
-		content = fastgetattr(tuple, Anum_pg_parquetseg_content, pg_parquetseg_dsc, &isNull);
-		oneseginfo->content = DatumGetInt32(content);
-
 		if (Debug_appendonly_print_scan)
-			elog(LOG,"Parquet found existing contentid %d segno %d with eof " INT64_FORMAT " for table '%s' out of total %d segs",
-				oneseginfo->content,
+			elog(LOG,"Parquet found existing segno %d with eof " INT64_FORMAT " for table '%s' out of total %d segs",
 				oneseginfo->segno,
 				oneseginfo->eof,
 				relationName,
@@ -656,12 +646,6 @@ parquetFileSegInfoCmp(const void *left, const void *right)
 {
 	ParquetFileSegInfo *leftSegInfo = *((ParquetFileSegInfo **)left);
 	ParquetFileSegInfo *rightSegInfo = *((ParquetFileSegInfo **)right);
-
-	if (leftSegInfo->content < rightSegInfo->content)
-		return -1;
-
-	if (leftSegInfo->content > rightSegInfo->content)
-		return 1;
 
 	if (leftSegInfo->segno < rightSegInfo->segno)
 		return -1;

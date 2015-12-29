@@ -1,8 +1,6 @@
 The PXF extensions library for HAWQ
 ===================================
 
-Copyright © 2014 Pivotal Software, Inc. All Rights reserved.
-
 Table of Contents
 =================
 

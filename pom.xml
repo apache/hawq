@@ -41,13 +41,10 @@
               -->
               <exclude>**/*.md</exclude>
               <exclude>**/*.in</exclude>
-              <exclude>**/*.mk</exclude>
-              <exclude>**/*.mak</exclude>
               <exclude>**/*.md5</exclude>
               <exclude>**/*.json</exclude>
               <exclude>**/*.ans</exclude>
               <exclude>**/*.sql</exclude>
-              <exclude>**/*.yaml</exclude>
               <exclude>**/*.out</exclude>
               <exclude>**/*.po</exclude>
               <exclude>**/*.map</exclude>
@@ -59,22 +56,19 @@
               <exclude>**/*.csv</exclude>
               <exclude>**/*.pm</exclude>
               <exclude>**/*.1</exclude>
-              <exclude>**/*.m4</exclude>
               <exclude>**/*.sample</exclude>
               <exclude>configure</exclude>
               <exclude>config/*</exclude>
               <exclude>*version</exclude>
               <exclude>**/*.pgc</exclude>
-              <exclude>**/*.rc</exclude>
-              <exclude>**/*.f</exclude>
               <exclude>**/*.cnf</exclude>
               <exclude>**/*.stx</exclude>
               <exclude>**/*.gdb</exclude>
               <exclude>**/__init__.py</exclude>
-              <exclude>**/Makefile*</exclude>
               <exclude>README-PostgreSQL</exclude>
               <exclude>contrib/gp_sparse_vector/bugs</exclude>
               <exclude>contrib/hawq-hadoop/hawq-mapreduce-tool/src/test/resources/dataset</exclude>
+              <exclude>contrib/hawq-hadoop/**/*.yaml</exclude>
               <exclude>contrib/gp_sparse_vector/*output</exclude>
               <exclude>contrib/gp_sparse_vector/README*</exclude>
               <exclude>contrib/orafce/*</exclude>
@@ -88,170 +82,11 @@
               <exclude>depends/libyarn/gmock/COPYING</exclude>
               <exclude>depends/libyarn/gtest/**/*.cc</exclude>
               <exclude>depends/libyarn/gtest/**/*.h</exclude>
-              <exclude>depends/libyarn/releng/**</exclude>
               <exclude>depends/libyarn/**/Makefile</exclude>
               <exclude>doc/**/*.sgml</exclude>
               <exclude>pxf/*.gradle</exclude>
               <exclude>pxf/gradlew</exclude>
-              <exclude>pxf/**/*.classpath</exclude>
-              <exclude>src/backend/access/appendonly/aomd.c</exclude>
-              <exclude>src/backend/access/appendonly/aosegfiles.c</exclude>
-              <exclude>src/backend/access/appendonly/appendonlyam.c</exclude>
-              <exclude>src/backend/access/appendonly/appendonlywriter.c</exclude>
-              <exclude>src/backend/access/bitmap/*.c</exclude>
-              <exclude>src/backend/access/common/**/*.c</exclude>	
-              <exclude>src/backend/access/external/url.i</exclude>
-              <exclude>src/backend/access/gin/*.c</exclude>
-              <exclude>src/backend/access/gist/*.c</exclude>
-              <exclude>src/backend/access/hash/*.c</exclude>
-              <exclude>src/backend/access/heap/*.c</exclude>
-              <exclude>src/backend/access/index/*.*</exclude>
-              <exclude>src/backend/access/nbtree/*.c</exclude>
-              <exclude>src/backend/access/transam/**/*.c</exclude>
-              <exclude>src/backend/access/catalog/**/*.*</exclude>
-              <exclude>src/backend/bootstrap/*</exclude>
-              <exclude>src/backend/catalog/aclchk.c</exclude>
-              <exclude>src/backend/catalog/aoseg.c</exclude>
-              <exclude>src/backend/catalog/caql/gram.y</exclude>
-              <exclude>src/backend/catalog/caql/scan.l</exclude>
-              <exclude>src/backend/catalog/catalog.c</exclude>
-              <exclude>src/backend/catalog/dependency.c</exclude>
-              <exclude>src/backend/catalog/genbki.sh</exclude>
-              <exclude>src/backend/catalog/heap.c</exclude>
-              <exclude>src/backend/catalog/index.c</exclude>
-              <exclude>src/backend/catalog/indexing.c</exclude>
-              <exclude>src/backend/catalog/namespace.c</exclude>
-              <exclude>src/backend/catalog/pg_aggregate.c</exclude>
-              <exclude>src/backend/catalog/pg_appendonly.c</exclude>
-              <exclude>src/backend/catalog/pg_attribute_encoding.c</exclude>
-              <exclude>src/backend/catalog/pg_compression.c</exclude>
-              <exclude>src/backend/catalog/pg_constraint.c</exclude>
-              <exclude>src/backend/catalog/pg_conversion.c</exclude>
-              <exclude>src/backend/catalog/pg_depend.c</exclude>
-              <exclude>src/backend/catalog/pg_extprotocol.c</exclude>
-              <exclude>src/backend/catalog/pg_exttable.c</exclude>
-              <exclude>src/backend/catalog/pg_filesystem.c</exclude>
-              <exclude>src/backend/catalog/pg_largeobject.c</exclude>
-              <exclude>src/backend/catalog/pg_namespace.c</exclude>
-              <exclude>src/backend/catalog/pg_operator.c</exclude>
-              <exclude>src/backend/catalog/pg_proc.c</exclude>
-              <exclude>src/backend/catalog/pg_proc_callback.c</exclude>
-              <exclude>src/backend/catalog/pg_shdepend.c</exclude>
-              <exclude>src/backend/catalog/pg_type.c</exclude>
-              <exclude>src/backend/catalog/quicklz_compression.c</exclude>
-              <exclude>src/backend/catalog/toasting.c</exclude>
-              <exclude>src/backend/commands/**/*.c</exclude>
-              <exclude>src/backend/executor/execAmi.c</exclude>
-              <exclude>src/backend/executor/execBitmapAOScan.c</exclude>
-              <exclude>src/backend/executor/execBitmapHeapScan.c</exclude>
-              <exclude>src/backend/executor/execBitmapTableScan.c</exclude>
-              <exclude>src/backend/executor/execGrouping.c</exclude>
-              <exclude>src/backend/executor/execHeapScan.c</exclude>
-              <exclude>src/backend/executor/execHHashagg.c</exclude>
-              <exclude>src/backend/executor/execJunk.c</exclude>
-              <exclude>src/backend/executor/execMain.c</exclude>
-              <exclude>src/backend/executor/execProcnode.c</exclude>
-              <exclude>src/backend/executor/execQual.c</exclude>
-              <exclude>src/backend/executor/execScan.c</exclude>
-              <exclude>src/backend/executor/execTuples.c</exclude>
-              <exclude>src/backend/executor/execUtils.c</exclude>
-              <exclude>src/backend/executor/functions.c</exclude>
-              <exclude>src/backend/executor/instrument.c</exclude>
-              <exclude>src/backend/executor/nodeAgg.c</exclude>
-              <exclude>src/backend/executor/nodeAppend.c</exclude>
-              <exclude>src/backend/executor/nodeAppendOnlyscan.c</exclude>
-              <exclude>src/backend/executor/nodeBitmapAnd.c</exclude>
-              <exclude>src/backend/executor/nodeBitmapAppendOnlyscan.c</exclude>
-              <exclude>src/backend/executor/nodeBitmapHeapscan.c</exclude>
-              <exclude>src/backend/executor/nodeBitmapIndexscan.c</exclude>
-              <exclude>src/backend/executor/nodeBitmapOr.c</exclude>
-              <exclude>src/backend/executor/nodeBitmapTableScan.c</exclude>
-              <exclude>src/backend/executor/nodeFunctionscan.c</exclude>
-              <exclude>src/backend/executor/nodeHash.c</exclude>
-              <exclude>src/backend/executor/nodeHashjoin.c</exclude>
-              <exclude>src/backend/executor/nodeIndexscan.c</exclude>
-              <exclude>src/backend/executor/nodeLimit.c</exclude>
-              <exclude>src/backend/executor/nodeMaterial.c</exclude>
-              <exclude>src/backend/executor/nodeMergejoin.c</exclude>
-              <exclude>src/backend/executor/nodeNestloop.c</exclude>
-              <exclude>src/backend/executor/nodeResult.c</exclude>
-              <exclude>src/backend/executor/nodeSeqscan.c</exclude>
-              <exclude>src/backend/executor/nodeSetOp.c</exclude>
-              <exclude>src/backend/executor/nodeShareInputScan.c</exclude>
-              <exclude>src/backend/executor/nodeSort.c</exclude>
-              <exclude>src/backend/executor/nodeSubplan.c</exclude>
-              <exclude>src/backend/executor/nodeSubqueryscan.c</exclude>
-              <exclude>src/backend/executor/nodeTableFunction.c</exclude>
-              <exclude>src/backend/executor/nodeTidscan.c</exclude>
-              <exclude>src/backend/executor/nodeUnique.c</exclude>
-              <exclude>src/backend/executor/nodeValuesscan.c</exclude>
-              <exclude>src/backend/executor/spi.c</exclude>
-              <exclude>src/backend/executor/test/*</exclude>
-              <exclude>src/backend/executor/tstoreReceiver.c</exclude>
-              <exclude>src/backend/foreign/foreign.c</exclude>
-              <exclude>src/backend/gp_libpq_fe/**/*.c</exclude>
-              <exclude>src/backend/gp_libpq_fe/**/*.h</exclude>
-              <exclude>src/backend/gpopt/library.ver</exclude>
-              <exclude>src/backend/lib/*.c</exclude>
-              <exclude>src/backend/libgppc/lib/Doxyfile</exclude>
-              <exclude>src/backend/libgppc/lib/package/libgppc.spec</exclude>
-              <exclude>src/backend/executor/**/.c</exclude>
-              <exclude>src/backend/libpq/**/*</exclude>
-              <exclude>src/backend/main/main.c</exclude>
-              <exclude>src/backend/nodes/**/*</exclude>
-              <exclude>src/backend/optimizer/**/*</exclude>
-              <exclude>src/backend/parser/*</exclude>
-              <exclude>src/backend/port/**/*</exclude>
-              <exclude>src/backend/postmaster/**/*</exclude>
-              <exclude>src/backend/regex/*</exclude>
-              <exclude>src/backend/rewrite/*.c</exclude>
-              <exclude>src/backend/storage/file/README_QUICKLZ</exclude>
-              <exclude>src/backend/storage/buffer/*.c</exclude>
-              <exclude>src/backend/storage/ipc/*.c</exclude>
-              <exclude>src/backend/storage/file/buffile.c</exclude>
-              <exclude>src/backend/storage/file/fd.c</exclude>
-              <exclude>src/backend/storage/file/filesystem.c</exclude>
-              <exclude>src/backend/storage/file/pipe.c</exclude>
-              <exclude>src/backend/storage/freespace/*.c</exclude>
-              <exclude>src/backend/storage/l*/*.c</exclude>
-              <exclude>src/backend/storage/page/*.c</exclude>
-              <exclude>src/backend/storage/smgr/*.c</exclude>
-              <exclude>src/backend/tcop/**/*.c</exclude>
-              <exclude>src/backend/utils/adt/*</exclude>
-              <exclude>src/backend/utils/cache/**/*</exclude>
-              <exclude>src/backend/utils/error/assert.c</exclude>
-              <exclude>src/backend/utils/error/debugbreak.c</exclude>
-              <exclude>src/backend/utils/error/debugutils.c</exclude>
-              <exclude>src/backend/utils/error/elog.c</exclude>
-              <exclude>src/backend/utils/fmgr/*</exclude>
-              <exclude>src/backend/utils/Gen*</exclude>
-              <exclude>src/backend/utils/gp/*</exclude>
-              <exclude>src/backend/utils/hash/*</exclude>
-              <exclude>src/backend/utils/init/*</exclude>
-              <exclude>src/backend/utils/time/*</exclude>
-              <exclude>src/backend/utils/misc/check_guc</exclude>
-              <exclude>src/backend/utils/misc/etc/gpcheck.cnf</exclude>
-              <exclude>src/backend/utils/misc/etc/slaves</exclude>
-              <exclude>src/backend/utils/misc/guc-file.l</exclude>
-              <exclude>src/backend/utils/misc/guc.c</exclude>
-              <exclude>src/backend/utils/misc/help_config.c</exclude>
-              <exclude>src/backend/utils/misc/pg_rusage.c</exclude>
-              <exclude>src/backend/utils/misc/ps_status.c</exclude>
-              <exclude>src/backend/utils/misc/simex.c</exclude>
-              <exclude>src/backend/utils/misc/superuser.c</exclude>
-              <exclude>src/backend/utils/misc/tzparser.c</exclude>
-              <exclude>src/backend/utils/misc/uriparser.c</exclude>
-              <exclude>src/backend/utils/mmgr/aset.c</exclude>
-              <exclude>src/backend/utils/mmgr/asetDirect.c</exclude>
-              <exclude>src/backend/utils/mmgr/mcxt.c</exclude>
-              <exclude>src/backend/utils/mmgr/portalmem.c</exclude>
-              <exclude>src/backend/utils/probes.d</exclude>
-              <exclude>src/backend/utils/resowner/resowner.c</exclude>
-              <exclude>src/backend/utils/resscheduler/**/*</exclude>
-              <exclude>src/backend/utils/resscheduler/*</exclude>
-              <exclude>src/backend/utils/mb/**/*</exclude>
-              <exclude>src/backend/utils/sort/**/*</exclude>
-              <exclude>src/backend/utils/test/*</exclude>		 
+              <exclude>pxf/**/*.classpath</exclude>	 
               <exclude>src/bin/gp_workfile_mgr/*</exclude>
               <exclude>src/bin/gpfdist/src/gpfdist/glob.c</exclude>
               <exclude>src/bin/pgbench/*</exclude>
@@ -264,244 +99,29 @@
               <exclude>src/bin/psql/**/*</exclude>
               <exclude>src/bin/scripts/*.c</exclude>
               <exclude>src/DEVELOPERS</exclude>
-              <exclude>src/include/c.h</exclude>
-              <exclude>src/include/getaddrinfo.h</exclude>
-              <exclude>src/include/getopt_long.h</exclude>
-              <exclude>src/include/pg_config.h.win32</exclude>
-              <exclude>src/include/port.h</exclude>
-              <exclude>src/include/portability/instr_time.h</exclude>
-              <exclude>src/include/tablefuncapi.h</exclude>
-              <exclude>src/include/access/aosegfiles.h</exclude>
-              <exclude>src/include/access/appendonlytid.h</exclude>
-              <exclude>src/include/access/appendonlywriter.h</exclude>
-              <exclude>src/include/access/attnum.h</exclude>
-              <exclude>src/include/access/bitmap.h</exclude>
-              <exclude>src/include/access/cdbdistributedxidmap.h</exclude>
-              <exclude>src/include/access/clog.h</exclude>
-              <exclude>src/include/access/extprotocol.h</exclude>
-              <exclude>src/include/access/fileam.h</exclude>
-              <exclude>src/include/access/formatter.h</exclude>
-              <exclude>src/include/access/genam.h</exclude>
-              <exclude>src/include/access/gin.h</exclude>
-              <exclude>src/include/access/gist.h</exclude>
-              <exclude>src/include/access/gist_private.h</exclude>
-              <exclude>src/include/access/gistscan.h</exclude>
-              <exclude>src/include/access/ha_config.h</exclude>
-              <exclude>src/include/access/hash.h</exclude>
-              <exclude>src/include/access/hd_work_mgr.h</exclude>
-              <exclude>src/include/access/heapam.h</exclude>
-              <exclude>src/include/access/hio.h</exclude>
-              <exclude>src/include/access/htup.h</exclude>
-              <exclude>src/include/access/itup.h</exclude>
-              <exclude>src/include/access/libchurl.h</exclude>
-              <exclude>src/include/access/memtup.h</exclude>
-              <exclude>src/include/access/multixact.h</exclude>
-              <exclude>src/include/access/nbtree.h</exclude>
-              <exclude>src/include/access/parquetmetadata_c++/MetadataInterface.h</exclude>
-              <exclude>src/include/access/persistentendxactrec.h</exclude>
-              <exclude>src/include/access/persistentfilesysobjname.h</exclude>
-              <exclude>src/include/access/printtup.h</exclude>
-              <exclude>src/include/access/pxfanalyze.h</exclude>
-              <exclude>src/include/access/pxfcomutils.h</exclude>
-              <exclude>src/include/access/pxffilters.h</exclude>
-              <exclude>src/include/access/pxfheaders.h</exclude>
-              <exclude>src/include/access/pxfmasterapi.h</exclude>
-              <exclude>src/include/access/pxfuriparser.h</exclude>
-              <exclude>src/include/access/pxfutils.h</exclude>
+              <exclude>src/backend/access/index/caql.files</exclude>
+              <exclude>src/backend/gpopt/library.ver</exclude>
+              <exclude>src/backend/libgppc/lib/Doxyfile</exclude>
+              <exclude>src/backend/libgppc/lib/package/libgppc.spec</exclude>
+              <exclude>src/backend/port/beos/*.c</exclude>
+              <exclude>src/backend/port/tas/*.s</exclude>
+              <exclude>src/backend/regex/re_syntax.n</exclude>
+              <exclude>src/backend/storage/file/README_QUICKLZ</exclude>
+              <exclude>src/backend/utils/mb/conversion_procs/regress_epilogue</exclude>
+              <exclude>src/backend/utils/mb/conversion_procs/regress_prolog</exclude>
+              <exclude>src/backend/utils/mb/Unicode/ISO10646-GB18030.TXT</exclude>
+              <exclude>src/backend/utils/misc/check_guc</exclude>
+              <exclude>src/backend/utils/misc/etc/slaves</exclude>
               <exclude>src/include/access/README.caql_usage</exclude>
-              <exclude>src/include/access/reloptions.h</exclude>
-              <exclude>src/include/access/relscan.h</exclude>
-              <exclude>src/include/access/rmgr.h</exclude>
-              <exclude>src/include/access/sdir.h</exclude>
-              <exclude>src/include/access/skey.h</exclude>
-              <exclude>src/include/access/slru.h</exclude>
-              <exclude>src/include/access/subtrans.h</exclude>
-              <exclude>src/include/access/sysattr.h</exclude>
-              <exclude>src/include/access/transam.h</exclude>
-              <exclude>src/include/access/tupdesc.h</exclude>
-              <exclude>src/include/access/tupmacs.h</exclude>
-              <exclude>src/include/access/tuptoaster.h</exclude>
-              <exclude>src/include/access/twophase.h</exclude>
-              <exclude>src/include/access/twophase_rmgr.h</exclude>
-              <exclude>src/include/access/url.h</exclude>
-              <exclude>src/include/access/valid.h</exclude>
-              <exclude>src/include/access/xact.h</exclude>
-              <exclude>src/include/access/xlog.h</exclude>
-              <exclude>src/include/access/xlog_internal.h</exclude>
-              <exclude>src/include/access/xlogdefs.h</exclude>
-              <exclude>src/include/access/xlogmm.h</exclude>
-              <exclude>src/include/access/xlogutils.h</exclude>
-              <exclude>src/include/bootstrap/bootstrap.h</exclude>
-              <exclude>src/include/catalog/calico.pl</exclude>
-              <exclude>src/include/catalog/caqltrack.pl</exclude>
-              <exclude>src/include/catalog/caqluniqdef.pl</exclude>
-              <exclude>src/include/catalog/pablopcatso.pl</exclude>
-              <exclude>src/include/catalog/catalog.h</exclude>
-              <exclude>src/include/catalog/catullus.pl</exclude>
-              <exclude>src/include/catalog/catversion.h</exclude>
-              <exclude>src/include/catalog/dependency.h</exclude>
-              <exclude>src/include/catalog/duplicate_oids</exclude>
-              <exclude>src/include/catalog/genbki.h</exclude>
-              <exclude>src/include/catalog/heap.h</exclude>
-              <exclude>src/include/catalog/index.h</exclude>
-              <exclude>src/include/catalog/indexing.h</exclude>
-              <exclude>src/include/catalog/namespace.h</exclude>
-              <exclude>src/include/catalog/pg_aggregate.h</exclude>
-              <exclude>src/include/catalog/pg_am.h</exclude>
-              <exclude>src/include/catalog/pg_amop.h</exclude>
-              <exclude>src/include/catalog/pg_amproc.h</exclude>
-              <exclude>src/include/catalog/pg_attrdef.h</exclude>
-              <exclude>src/include/catalog/pg_attribute.h</exclude>
-              <exclude>src/include/catalog/pg_attribute_encoding.h</exclude>
-              <exclude>src/include/catalog/pg_auth_members.h</exclude>
-              <exclude>src/include/catalog/pg_auth_time_constraint.h</exclude>
-              <exclude>src/include/catalog/pg_authid.h</exclude>
-              <exclude>src/include/catalog/pg_autovacuum.h</exclude>
-              <exclude>src/include/catalog/pg_cast.h</exclude>
-              <exclude>src/include/catalog/pg_class.h</exclude>
-              <exclude>src/include/catalog/pg_compression.h</exclude>
-              <exclude>src/include/catalog/pg_constraint.h</exclude>
-              <exclude>src/include/catalog/pg_control.h</exclude>
-              <exclude>src/include/catalog/pg_conversion.h</exclude>
-              <exclude>src/include/catalog/pg_database.h</exclude>
-              <exclude>src/include/catalog/pg_depend.h</exclude>
-              <exclude>src/include/catalog/pg_description.h</exclude>
-              <exclude>src/include/catalog/pg_exttable.h</exclude>
-              <exclude>src/include/catalog/pg_filespace.h</exclude>
-              <exclude>src/include/catalog/pg_filespace_entry.h</exclude>
-              <exclude>src/include/catalog/pg_filesystem.h</exclude>
-              <exclude>src/include/catalog/pg_foreign_data_wrapper.h</exclude>
-              <exclude>src/include/catalog/pg_foreign_server.h</exclude>
-              <exclude>src/include/catalog/pg_foreign_table.h</exclude>
-              <exclude>src/include/catalog/pg_index.h</exclude>
-              <exclude>src/include/catalog/pg_inherits.h</exclude>
-              <exclude>src/include/catalog/pg_language.h</exclude>
-              <exclude>src/include/catalog/pg_largeobject.h</exclude>
-              <exclude>src/include/catalog/pg_listener.h</exclude>
-              <exclude>src/include/catalog/pg_namespace.h</exclude>
-              <exclude>src/include/catalog/pg_opclass.h</exclude>
-              <exclude>src/include/catalog/pg_operator.h</exclude>
-              <exclude>src/include/catalog/pg_partition_encoding.h</exclude>
-              <exclude>src/include/catalog/pg_pltemplate.h</exclude>
-              <exclude>src/include/catalog/pg_proc.h</exclude>
-              <exclude>src/include/catalog/pg_proc_callback.h</exclude>
-              <exclude>src/include/catalog/pg_remote_credentials.h</exclude>
-              <exclude>src/include/catalog/pg_resqueue.h</exclude>
-              <exclude>src/include/catalog/pg_rewrite.h</exclude>
-              <exclude>src/include/catalog/pg_shdepend.h</exclude>
-              <exclude>src/include/catalog/pg_shdescription.h</exclude>
-              <exclude>src/include/catalog/pg_statistic.h</exclude>
-              <exclude>src/include/catalog/pg_tablespace.h</exclude>
-              <exclude>src/include/catalog/pg_tidycat.h</exclude>
-              <exclude>src/include/catalog/pg_trigger.h</exclude>
-              <exclude>src/include/catalog/pg_type.h</exclude>
-              <exclude>src/include/catalog/pg_type_encoding.h</exclude>
-              <exclude>src/include/catalog/pg_user_mapping.h</exclude>
-              <exclude>src/include/catalog/pg_window.h</exclude>
               <exclude>src/include/catalog/README.add_catalog_function</exclude>
               <exclude>src/include/catalog/README.tidycat</exclude>
-              <exclude>src/include/catalog/sleazy.pl</exclude>
-              <exclude>src/include/catalog/tidycat.pl</exclude>
-              <exclude>src/include/catalog/toasting.h</exclude>
-              <exclude>src/include/catalog/unused_oids</exclude>
-              <exclude>src/include/cdb/cdbappendonlyam.h</exclude>
-              <exclude>src/include/cdb/cdbgroup.h</exclude>
-              <exclude>src/include/cdb/cdblink.h</exclude>
-              <exclude>src/include/commands/alter.h</exclude>
-              <exclude>src/include/commands/analyzeutils.h</exclude>
-              <exclude>src/include/commands/async.h</exclude>
-              <exclude>src/include/commands/cluster.h</exclude>
-              <exclude>src/include/commands/comment.h</exclude>
-              <exclude>src/include/commands/conversioncmds.h</exclude>
-              <exclude>src/include/commands/copy.h</exclude>
-              <exclude>src/include/commands/dbcommands.h</exclude>
-              <exclude>src/include/commands/defrem.h</exclude>
-              <exclude>src/include/commands/explain.h</exclude>
-              <exclude>src/include/commands/extprotocolcmds.h</exclude>
-              <exclude>src/include/commands/filesystemcmds.h</exclude>
-              <exclude>src/include/commands/lockcmds.h</exclude>
-              <exclude>src/include/commands/portalcmds.h</exclude>
-              <exclude>src/include/commands/prepare.h</exclude>
-              <exclude>src/include/commands/proclang.h</exclude>
-              <exclude>src/include/commands/queue.h</exclude>
-              <exclude>src/include/commands/schemacmds.h</exclude>
-              <exclude>src/include/commands/sequence.h</exclude>
-              <exclude>src/include/commands/tablecmds.h</exclude>
-              <exclude>src/include/commands/tablespace.h</exclude>
-              <exclude>src/include/commands/trigger.h</exclude>
-              <exclude>src/include/commands/typecmds.h</exclude>
-              <exclude>src/include/commands/user.h</exclude>
-              <exclude>src/include/commands/vacuum.h</exclude>
-              <exclude>src/include/commands/variable.h</exclude>
-              <exclude>src/include/commands/version.h</exclude>
-              <exclude>src/include/commands/view.h</exclude>
-              <exclude>src/include/executor/execdebug.h</exclude>
-              <exclude>src/include/executor/execdefs.h</exclude>
-              <exclude>src/include/executor/execdesc.h</exclude>
-              <exclude>src/include/executor/execHHashagg.h</exclude>
-              <exclude>src/include/executor/executor.h</exclude>
-              <exclude>src/include/executor/functions.h</exclude>
-              <exclude>src/include/executor/hashjoin.h</exclude>
-              <exclude>src/include/executor/instrument.h</exclude>
-              <exclude>src/include/executor/nodeAgg.h</exclude>
-              <exclude>src/include/executor/nodeAppend.h</exclude>
-              <exclude>src/include/executor/nodeAppendOnlyscan.h</exclude>
-              <exclude>src/include/executor/nodeBitmapAnd.h</exclude>
-              <exclude>src/include/executor/nodeBitmapAppendOnlyscan.h</exclude>
-              <exclude>src/include/executor/nodeBitmapHeapscan.h</exclude>
-              <exclude>src/include/executor/nodeBitmapIndexscan.h</exclude>
-              <exclude>src/include/executor/nodeBitmapOr.h</exclude>
-              <exclude>src/include/executor/nodeBitmapTableScan.h</exclude>
-              <exclude>src/include/executor/nodeFunctionscan.h</exclude>
-              <exclude>src/include/executor/nodeHash.h</exclude>
-              <exclude>src/include/executor/nodeHashjoin.h</exclude>
-              <exclude>src/include/executor/nodeIndexscan.h</exclude>
-              <exclude>src/include/executor/nodeLimit.h</exclude>
-              <exclude>src/include/executor/nodeMaterial.h</exclude>
-              <exclude>src/include/executor/nodeMergejoin.h</exclude>
-              <exclude>src/include/executor/nodeMotion.h</exclude>
-              <exclude>src/include/executor/nodeNestloop.h</exclude>
-              <exclude>src/include/executor/nodeResult.h</exclude>
-              <exclude>src/include/executor/nodeSeqscan.h</exclude>
-              <exclude>src/include/executor/nodeSetOp.h</exclude>
-              <exclude>src/include/executor/nodeShareInputScan.h</exclude>
-              <exclude>src/include/executor/nodeSort.h</exclude>
-              <exclude>src/include/executor/nodeSubplan.h</exclude>
-              <exclude>src/include/executor/nodeSubqueryscan.h</exclude>
-              <exclude>src/include/executor/nodeTidscan.h</exclude>
-              <exclude>src/include/executor/nodeUnique.h</exclude>
-              <exclude>src/include/executor/nodeValuesscan.h</exclude>
-              <exclude>src/include/executor/spi.h</exclude>
-              <exclude>src/include/executor/spi_priv.h</exclude>
-              <exclude>src/include/executor/tstoreReceiver.h</exclude>
-              <exclude>src/include/executor/tuptable.h</exclude>
-              <exclude>src/include/fmgr.h</exclude>
-              <exclude>src/include/foreign/foreign.h</exclude>
-              <exclude>src/include/fstream/*.h</exclude>
-              <exclude>src/include/funcapi.h</exclude>
-              <exclude>src/include/lib/*.h</exclude>
-              <exclude>src/include/libpq/*.h</exclude>
-              <exclude>src/include/mb/pg_wchar.h</exclude>
-              <exclude>src/include/miscadmin.h</exclude>		
-              <exclude>src/include/nodes/*.h</exclude>
-              <exclude>src/include/optimizer/*.h</exclude>
-              <exclude>src/include/parser/*.h</exclude>
-              <exclude>src/include/parser/*.py</exclude>
-              <exclude>src/include/port/**/*.h</exclude>
-              <exclude>src/include/pg*.h</exclude>
-              <exclude>src/include/postgres*.h</exclude>
-              <exclude>src/include/postmaster/*.h</exclude>
-              <exclude>src/include/regex/*.h</exclude>
-              <exclude>src/include/rewrite/*.h</exclude>
-              <exclude>src/include/rusagestub.h</exclude>
-              <exclude>src/include/storage/*.h</exclude>
-              <exclude>src/include/tcop/*.h</exclude>
-              <exclude>src/include/utils/*.h</exclude>
+              <exclude>src/include/pg_config.h.win32</exclude>
               <exclude>src/interfaces/**/*</exclude>
               <exclude>src/tools/**/*</exclude>
               <exclude>src/tutorial/*</exclude>
               <exclude>src/pl/**/*</exclude>
               <exclude>src/port/*</exclude>
+              <exclude>src/**/Makefile*</exclude>
               <exclude>src/template/*</exclude>
               <exclude>src/test/**/*</exclude>
               <exclude>src/timezone/**/*</exclude>
@@ -513,6 +133,24 @@
               <exclude>tools/bin/postgresql_conf_gp_additions</exclude>
               <exclude>tools/doc/**/*</exclude>
             </excludes>
+            <licenses>
+              <license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
+                <licenseFamilyName>PostgreSQL License</licenseFamilyName>
+                <licenseFamilyCategory>PGSQL</licenseFamilyCategory>
+                <patterns>
+                  <pattern>$PostgreSQL:</pattern>
+                  <pattern>PostgreSQL Global Development Group</pattern>
+                </patterns>
+            </license>
+            </licenses>
+            <licenseFamilies>
+              <licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+                <familyName>PostgreSQL License</familyName>
+              </licenseFamily>
+              <licenseFamily implementation="org.apache.rat.license.SimpleLicenseFamily">
+                <familyName>Apache License Version 2.0</familyName>
+              </licenseFamily>
+            </licenseFamilies>
           </configuration>
         </plugin>
       </plugins>

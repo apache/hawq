@@ -491,7 +491,6 @@ static void DatabaseInfo_AddExtraSegmentFile(
 
 static void DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
 	DbInfoRel 				*dbInfoRel,
-	int4					contentid,
 	int32 					segmentFileNum,
 	int64					logicalEof)
 {
@@ -1103,7 +1102,6 @@ DatabaseInfo_HandleAppendOnly(
 				{
 					DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
 															dbInfoRel,
-															aoSegfileArray[i]->content,
 															aoSegfileArray[i]->segno,
 															aoSegfileArray[i]->eof);
 				}
