@@ -20,12 +20,11 @@ package org.apache.hawq.pxf.plugins.json;
  */
 
 import java.io.IOException;
+import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
 import org.apache.hawq.pxf.api.ReadResolver;
@@ -33,9 +32,7 @@ import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
-import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.map.ObjectMapper;
 
 /**
  * This JSON resolver for PXF will decode a given object from the {@link JsonAccessor} into a row for HAWQ. It will
@@ -44,100 +41,125 @@ import org.codehaus.jackson.map.ObjectMapper;
  */
 public class JsonResolver extends Plugin implements ReadResolver {
 
-	private static final Log LOG = LogFactory.getLog(JsonResolver.class);
-
-	private ArrayList<OneField> oneFieldList;
-	private ColumnDescriptorCache[] columnDescriptorCache;
-	private ObjectMapper mapper;
-
-	/**
-	 * Row with empty fields. Returned in case of broken or malformed json records.
-	 */
-	private final List<OneField> emptyRow;
+	private ArrayList<OneField> list = new ArrayList<OneField>();
 
 	public JsonResolver(InputData inputData) throws Exception {
 		super(inputData);
-		oneFieldList = new ArrayList<OneField>();
-		mapper = new ObjectMapper(new JsonFactory());
-
-		// Precompute the column metadata. The metadata is used for mapping column names to json nodes.
-		columnDescriptorCache = new ColumnDescriptorCache[inputData.getColumns()];
-		for (int i = 0; i < inputData.getColumns(); ++i) {
-			ColumnDescriptor cd = inputData.getColumn(i);
-			columnDescriptorCache[i] = new ColumnDescriptorCache(cd);
-		}
-
-		emptyRow = createEmptyRow();
 	}
 
 	@Override
 	public List<OneField> getFields(OneRow row) throws Exception {
-		oneFieldList.clear();
+		list.clear();
 
-		String jsonRecordAsText = row.getData().toString();
+		// key is a Text object
+		JsonNode root = JsonInputFormat.decodeLineToJsonNode(row.getKey().toString());
 
-		JsonNode root = decodeLineToJsonNode(jsonRecordAsText);
+		// if we weren't given a null object
+		if (root != null) {
+			// Iterate through the column definition and fetch our JSON data
+			for (int i = 0; i < inputData.getColumns(); ++i) {
 
-		if (root == null) {
-			LOG.warn("Return empty-fields row due to invalid JSON: " + jsonRecordAsText);
-			return emptyRow;
-		}
+				// Get the current column description
+				ColumnDescriptor cd = inputData.getColumn(i);
+				DataType columnType = DataType.get(cd.columnTypeCode());
 
-		// Iterate through the column definition and fetch our JSON data
-		for (ColumnDescriptorCache columnMetadata : columnDescriptorCache) {
+				// Get the JSON projections from the column name
+				// For example, "user.name" turns into ["user","name"]
+				String[] projs = cd.columnName().split("\\.");
 
-			JsonNode node = getChildJsonNode(root, columnMetadata.getNormalizedProjections());
+				// Move down the JSON path to the final name
+				JsonNode node = getPriorJsonNode(root, projs);
 
-			// If this node is null or missing, add a null value here
-			if (node == null || node.isMissingNode()) {
-				addNullField(columnMetadata.getColumnType());
-			} else if (columnMetadata.isArray()) {
 				// If this column is an array index, ex. "tweet.hashtags[0]"
-				if (node.isArray()) {
-					// If the JSON node is an array, then add it to our list
-					addFieldFromJsonArray(columnMetadata.getColumnType(), node, columnMetadata.getArrayNodeIndex());
+				if (isArrayIndex(projs)) {
+
+					// Get the node name and index
+					String nodeName = getArrayName(projs);
+					int arrayIndex = getArrayIndex(projs);
+
+					// Move to the array node
+					node = node.get(nodeName);
+
+					// If this node is null or missing, add a null value here
+					if (node == null || node.isMissingNode()) {
+						addNullField(columnType);
+					} else if (node.isArray()) {
+						// If the JSON node is an array, then add it to our list
+						addFieldFromJsonArray(columnType, node, arrayIndex);
+					} else {
+						throw new InvalidParameterException(nodeName + " is not an array node");
+					}
 				} else {
-					throw new IllegalStateException(columnMetadata.getColumnName() + " is not an array node");
+					// This column is not an array type
+					// Move to the final node
+					node = node.get(projs[projs.length - 1]);
+
+					// If this node is null or missing, add a null value here
+					if (node == null || node.isMissingNode()) {
+						addNullField(columnType);
+					} else {
+						// Else, add the value to the record
+						addFieldFromJsonNode(columnType, node);
+					}
 				}
-			} else {
-				// This column is not an array type
-				// Add the value to the record
-				addFieldFromJsonNode(columnMetadata.getColumnType(), node);
 			}
 		}
 
-		return oneFieldList;
+		return list;
 	}
 
 	/**
-	 * @return Returns a row comprised of typed, empty fields. Used as a result of broken/malformed json records.
-	 */
-	private List<OneField> createEmptyRow() {
-		ArrayList<OneField> emptyFieldList = new ArrayList<OneField>();
-		for (ColumnDescriptorCache column : columnDescriptorCache) {
-			emptyFieldList.add(new OneField(column.getColumnType().getOID(), null));
-		}
-		return emptyFieldList;
-	}
-
-	/**
-	 * Iterates down the root node to the child JSON node defined by the projs path.
+	 * Iterates down the root node to the prior JSON node. This node is used
 	 * 
 	 * @param root
-	 *            node to to start the traversal from.
 	 * @param projs
-	 *            defines the path from the root to the desired child node.
-	 * @return Returns the child node defined by the root and projs path.
+	 * @return
 	 */
-	private JsonNode getChildJsonNode(JsonNode root, String[] projs) {
+	private JsonNode getPriorJsonNode(JsonNode root, String[] projs) {
 
 		// Iterate through all the tokens to the desired JSON node
 		JsonNode node = root;
-		for (int j = 0; j < projs.length; ++j) {
+		for (int j = 0; j < projs.length - 1; ++j) {
 			node = node.path(projs[j]);
 		}
 
 		return node;
+	}
+
+	/**
+	 * Gets a boolean value indicating if this column is an array index column
+	 * 
+	 * @param projs
+	 *            The array of JSON projections
+	 * @throws ArrayIndexOutOfBoundsException
+	 */
+	private boolean isArrayIndex(String[] projs) {
+		return projs[projs.length - 1].contains("[") && projs[projs.length - 1].contains("]");
+	}
+
+	/**
+	 * Gets the node name from the given String array of JSON projections, parsed from the ColumnDescriptor's
+	 * 
+	 * @param projs
+	 *            The array of JSON projections
+	 * @return The name
+	 * @throws ArrayIndexOutOfBoundsException
+	 */
+	private String getArrayName(String[] projs) {
+		return projs[projs.length - 1].replaceAll("\\[[0-9]+\\]", "");
+	}
+
+	/**
+	 * Gets the array index from the given String array of JSON projections, parsed from the ColumnDescriptor's name
+	 * 
+	 * @param projs
+	 *            The array of JSON projections
+	 * @return The index
+	 * @throws ArrayIndexOutOfBoundsException
+	 */
+	private int getArrayIndex(String[] projs) {
+		return Integer.parseInt(projs[projs.length - 1].substring(projs[projs.length - 1].indexOf('[') + 1,
+				projs[projs.length - 1].length() - 1));
 	}
 
 	/**
@@ -167,7 +189,8 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			++count;
 		}
 
-		// if we reached the end of the array without adding a field, add null
+		// if we reached the end of the array without adding a
+		// field, add null
 		if (!added) {
 			addNullField(type);
 		}
@@ -196,6 +219,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			case BOOLEAN:
 				oneField.val = val.asBoolean();
 				break;
+			case BPCHAR:
 			case CHAR:
 				oneField.val = val.asText().charAt(0);
 				break;
@@ -203,18 +227,13 @@ public class JsonResolver extends Plugin implements ReadResolver {
 				oneField.val = val.asText().getBytes();
 				break;
 			case FLOAT8:
-			    oneField.val = val.asDouble();
-			    break;
 			case REAL:
-				oneField.val = (float)val.asDouble();
+				oneField.val = val.asDouble();
 				break;
 			case INTEGER:
-			    oneField.val = val.asInt();
-			    break;
 			case SMALLINT:
-				oneField.val = (short)val.asInt();
+				oneField.val = val.asInt();
 				break;
-			case BPCHAR:
 			case TEXT:
 			case VARCHAR:
 				oneField.val = val.asText();
@@ -224,7 +243,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			}
 		}
 
-		oneFieldList.add(oneField);
+		list.add(oneField);
 	}
 
 	/**
@@ -234,23 +253,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 *            The {@link DataType} type
 	 */
 	private void addNullField(DataType type) {
-		oneFieldList.add(new OneField(type.getOID(), null));
-	}
 
-	/**
-	 * Converts the input line parameter into {@link JsonNode} instance.
-	 * 
-	 * @param line
-	 *            JSON text
-	 * @return Returns a {@link JsonNode} that represents the input line or null for invalid json.
-	 */
-	private JsonNode decodeLineToJsonNode(String line) {
-
-		try {
-			return mapper.readTree(line);
-		} catch (Exception e) {
-			LOG.error("Failed to parse JSON object", e);
-			return null;
-		}
+		list.add(new OneField(type.getOID(), null));
 	}
 }

@@ -19,66 +19,48 @@ package org.apache.hawq.pxf.plugins.json;
  * under the License.
  */
 
-import static org.apache.commons.lang3.StringUtils.isEmpty;
-
 import java.io.IOException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.LineRecordReader;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.HdfsSplittableDataAccessor;
 
 /**
  * This JSON accessor for PXF will read JSON data and pass it to a {@link JsonResolver}.
  * 
- * This accessor supports a single JSON record per line, or a multi-line JSON records if the <b>IDENTIFIER</b> parameter
- * is set.
- * 
- * When provided the <b>IDENTIFIER</b> indicates the member name used to determine the encapsulating json object to
- * return.
+ * This accessor supports a single JSON record per line, or a more "pretty print" format.
  */
 public class JsonAccessor extends HdfsSplittableDataAccessor {
 
 	public static final String IDENTIFIER_PARAM = "IDENTIFIER";
-	public static final String RECORD_MAX_LENGTH_PARAM = "MAXLENGTH";
+	public static final String ONERECORDPERLINE_PARAM = "ONERECORDPERLINE";
 
-	/**
-	 * If provided indicates the member name which will be used to determine the encapsulating json object to return.
-	 */
 	private String identifier = "";
-
-	/**
-	 * Optional parameter that allows to define the max length of a json record. Records that exceed the allowed length
-	 * are skipped. This parameter is applied only for the multi-line json records (e.g. when the IDENTIFIER is
-	 * provided).
-	 */
-	private int maxRecordLength = Integer.MAX_VALUE;
+	private boolean oneRecordPerLine = true;
 
 	public JsonAccessor(InputData inputData) throws Exception {
-		// Because HdfsSplittableDataAccessor doesn't use the InputFormat we set it to null.
-		super(inputData, null);
+		super(inputData, new JsonInputFormat());
 
-		if (!isEmpty(inputData.getUserProperty(IDENTIFIER_PARAM))) {
-
+		if (!StringUtils.isEmpty(inputData.getUserProperty(IDENTIFIER_PARAM))) {
 			identifier = inputData.getUserProperty(IDENTIFIER_PARAM);
+		}
 
-			// If the member identifier is set then check if a record max length is defined as well.
-			if (!isEmpty(inputData.getUserProperty(RECORD_MAX_LENGTH_PARAM))) {
-				maxRecordLength = Integer.valueOf(inputData.getUserProperty(RECORD_MAX_LENGTH_PARAM));
-			}
+		if (!StringUtils.isEmpty(inputData.getUserProperty(ONERECORDPERLINE_PARAM))) {
+			oneRecordPerLine = Boolean.parseBoolean(inputData.getUserProperty(ONERECORDPERLINE_PARAM));
 		}
 	}
 
 	@Override
 	protected Object getReader(JobConf conf, InputSplit split) throws IOException {
-		if (!isEmpty(identifier)) {
-			conf.set(JsonRecordReader.RECORD_MEMBER_IDENTIFIER, identifier);
-			conf.setInt(JsonRecordReader.RECORD_MAX_LENGTH, maxRecordLength);
-			return new JsonRecordReader(conf, (FileSplit) split);
+		conf.set(JsonInputFormat.RECORD_IDENTIFIER, identifier);
+
+		if (oneRecordPerLine) {
+			return new JsonInputFormat.SimpleJsonRecordReader(conf, (FileSplit) split);
 		} else {
-			return new LineRecordReader(conf, (FileSplit) split);
+			return new JsonInputFormat.JsonRecordReader(conf, (FileSplit) split);
 		}
 	}
 }
