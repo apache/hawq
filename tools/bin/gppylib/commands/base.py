@@ -697,11 +697,19 @@ class Command:
 
     def run(self,validateAfter=False):
         faultPoint = os.getenv('GP_COMMAND_FAULT_POINT')
+        print "### DEBUG: ENV[GP_COMMAND_FAULT_POINT] = %s" % (faultPoint if faultPoint else "None")
+        print "### DEBUG: self.name = %s" % ("SomeName" if self.name else "None")
         if not faultPoint or (self.name and not self.name.startswith(faultPoint)):
+            print "### DEBUG: EXECUTE name = %s" % ("SomeName" if self.name else "None")
+            print "### DEBUG: EXECUTE cmdStr = %s" % ("SomeCmdStr" if self.cmdStr else "None")
+            print "### DEBUG: EXECUTE context = %s" % ("SomeExecContext" if self.exec_context else "None")
+            print "### DEBUG: EXECUTE remoteHost = %s" % ("SomeRemoteHost" if self.remoteHost else "None")
             self.exec_context.execute(self)
         else:
             # simulate error
+            print "### DEBUG: CommandResult"
             self.results = CommandResult(1,'Fault Injection','Fault Injection' ,False,True)
+            print self.results
         
         if validateAfter:
             self.validate()
