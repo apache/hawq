@@ -1,4 +1,23 @@
-package org.apache.hawq.plugins.json;
+package org.apache.hawq.pxf.plugins.json;
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 import java.io.IOException;
 import java.security.InvalidParameterException;
@@ -15,13 +34,10 @@ import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 import org.codehaus.jackson.JsonNode;
 
-
-
 /**
- * This JSON resolver for PXF will decode a given object from the
- * {@link JsonAccessor} into a row for HAWQ. It will decode this data into a
- * JsonNode and walk the tree for each column. It supports normal value mapping
- * via projections and JSON array indexing.
+ * This JSON resolver for PXF will decode a given object from the {@link JsonAccessor} into a row for HAWQ. It will
+ * decode this data into a JsonNode and walk the tree for each column. It supports normal value mapping via projections
+ * and JSON array indexing.
  */
 public class JsonResolver extends Plugin implements ReadResolver {
 
@@ -36,8 +52,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 		list.clear();
 
 		// key is a Text object
-		JsonNode root = JsonInputFormat.decodeLineToJsonNode(row.getKey()
-				.toString());
+		JsonNode root = JsonInputFormat.decodeLineToJsonNode(row.getKey().toString());
 
 		// if we weren't given a null object
 		if (root != null) {
@@ -72,8 +87,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 						// If the JSON node is an array, then add it to our list
 						addFieldFromJsonArray(columnType, node, arrayIndex);
 					} else {
-						throw new InvalidParameterException(nodeName
-								+ " is not an array node");
+						throw new InvalidParameterException(nodeName + " is not an array node");
 					}
 				} else {
 					// This column is not an array type
@@ -120,13 +134,11 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 * @throws ArrayIndexOutOfBoundsException
 	 */
 	private boolean isArrayIndex(String[] projs) {
-		return projs[projs.length - 1].contains("[")
-				&& projs[projs.length - 1].contains("]");
+		return projs[projs.length - 1].contains("[") && projs[projs.length - 1].contains("]");
 	}
 
 	/**
-	 * Gets the node name from the given String array of JSON projections,
-	 * parsed from the ColumnDescriptor's
+	 * Gets the node name from the given String array of JSON projections, parsed from the ColumnDescriptor's
 	 * 
 	 * @param projs
 	 *            The array of JSON projections
@@ -138,8 +150,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	}
 
 	/**
-	 * Gets the array index from the given String array of JSON projections,
-	 * parsed from the ColumnDescriptor's name
+	 * Gets the array index from the given String array of JSON projections, parsed from the ColumnDescriptor's name
 	 * 
 	 * @param projs
 	 *            The array of JSON projections
@@ -147,14 +158,12 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 * @throws ArrayIndexOutOfBoundsException
 	 */
 	private int getArrayIndex(String[] projs) {
-		return Integer.parseInt(projs[projs.length - 1].substring(
-				projs[projs.length - 1].indexOf('[') + 1,
+		return Integer.parseInt(projs[projs.length - 1].substring(projs[projs.length - 1].indexOf('[') + 1,
 				projs[projs.length - 1].length() - 1));
 	}
 
 	/**
-	 * Iterates through the given JSON node to the proper index and adds the
-	 * field of corresponding type
+	 * Iterates through the given JSON node to the proper index and adds the field of corresponding type
 	 * 
 	 * @param type
 	 *            The {@link DataType} type
@@ -164,13 +173,11 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 *            The array index to iterate to
 	 * @throws IOException
 	 */
-	private void addFieldFromJsonArray(DataType type, JsonNode node, int index)
-			throws IOException {
+	private void addFieldFromJsonArray(DataType type, JsonNode node, int index) throws IOException {
 
 		int count = 0;
 		boolean added = false;
-		for (Iterator<JsonNode> arrayNodes = node.getElements(); arrayNodes
-				.hasNext();) {
+		for (Iterator<JsonNode> arrayNodes = node.getElements(); arrayNodes.hasNext();) {
 			JsonNode arrayNode = arrayNodes.next();
 
 			if (count == index) {
@@ -190,8 +197,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	}
 
 	/**
-	 * Adds a field from a given JSON node value based on the {@link DataType}
-	 * type.
+	 * Adds a field from a given JSON node value based on the {@link DataType} type.
 	 * 
 	 * @param type
 	 *            The DataType type
@@ -199,8 +205,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 *            The JSON node to extract the value.
 	 * @throws IOException
 	 */
-	private void addFieldFromJsonNode(DataType type, JsonNode val)
-			throws IOException {
+	private void addFieldFromJsonNode(DataType type, JsonNode val) throws IOException {
 		OneField oneField = new OneField();
 		oneField.type = type.getOID();
 
@@ -209,29 +214,29 @@ public class JsonResolver extends Plugin implements ReadResolver {
 		} else {
 			switch (type) {
 			case BIGINT:
-				oneField.val = val.getValueAsLong();
+				oneField.val = val.asLong();
 				break;
 			case BOOLEAN:
-				oneField.val = val.getValueAsBoolean();
+				oneField.val = val.asBoolean();
 				break;
 			case BPCHAR:
 			case CHAR:
-				oneField.val = val.getValueAsText().charAt(0);
+				oneField.val = val.asText().charAt(0);
 				break;
 			case BYTEA:
-				oneField.val = val.getValueAsText().getBytes();
+				oneField.val = val.asText().getBytes();
 				break;
 			case FLOAT8:
 			case REAL:
-				oneField.val = val.getValueAsDouble();
+				oneField.val = val.asDouble();
 				break;
 			case INTEGER:
 			case SMALLINT:
-				oneField.val = val.getValueAsInt();
+				oneField.val = val.asInt();
 				break;
 			case TEXT:
 			case VARCHAR:
-				oneField.val = val.getValueAsText();
+				oneField.val = val.asText();
 				break;
 			default:
 				throw new IOException("Unsupported type " + type);

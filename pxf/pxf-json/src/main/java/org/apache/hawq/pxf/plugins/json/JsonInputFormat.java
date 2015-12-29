@@ -1,4 +1,23 @@
-package org.apache.hawq.plugins.json;
+package org.apache.hawq.pxf.plugins.json;
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -34,8 +53,8 @@ public class JsonInputFormat extends FileInputFormat<Text, NullWritable> {
 	public static final String RECORD_IDENTIFIER = "json.input.format.record.identifier";
 
 	@Override
-	public RecordReader<Text, NullWritable> getRecordReader(InputSplit split,
-			JobConf conf, Reporter reporter) throws IOException {
+	public RecordReader<Text, NullWritable> getRecordReader(InputSplit split, JobConf conf, Reporter reporter)
+			throws IOException {
 
 		if (conf.getBoolean(ONE_RECORD_PER_LINE, false)) {
 
@@ -45,15 +64,13 @@ public class JsonInputFormat extends FileInputFormat<Text, NullWritable> {
 		}
 	}
 
-	public static class SimpleJsonRecordReader implements
-			RecordReader<Text, NullWritable> {
+	public static class SimpleJsonRecordReader implements RecordReader<Text, NullWritable> {
 
 		private LineRecordReader rdr = null;
 		private LongWritable key = new LongWritable();
 		private Text value = new Text();
 
-		public SimpleJsonRecordReader(Configuration conf, FileSplit split)
-				throws IOException {
+		public SimpleJsonRecordReader(Configuration conf, FileSplit split) throws IOException {
 			rdr = new LineRecordReader(conf, split);
 		}
 
@@ -93,8 +110,7 @@ public class JsonInputFormat extends FileInputFormat<Text, NullWritable> {
 		}
 	}
 
-	public static class JsonRecordReader implements
-			RecordReader<Text, NullWritable> {
+	public static class JsonRecordReader implements RecordReader<Text, NullWritable> {
 
 		private Logger LOG = Logger.getLogger(JsonRecordReader.class);
 
@@ -104,19 +120,15 @@ public class JsonInputFormat extends FileInputFormat<Text, NullWritable> {
 		private String identifier = null;
 		private Logger log = Logger.getLogger(JsonRecordReader.class);
 
-		public JsonRecordReader(JobConf conf, FileSplit split)
-				throws IOException {
-			log.info("JsonRecordReader constructor called.  Conf is " + conf
-					+ ". Split is " + split);
+		public JsonRecordReader(JobConf conf, FileSplit split) throws IOException {
+			log.info("JsonRecordReader constructor called.  Conf is " + conf + ". Split is " + split);
 			this.identifier = conf.get(RECORD_IDENTIFIER);
 			log.info("Identifier is " + this.identifier);
 
 			if (this.identifier == null || identifier.isEmpty()) {
-				throw new InvalidParameterException(
-						JsonInputFormat.RECORD_IDENTIFIER + " is not set.");
+				throw new InvalidParameterException(JsonInputFormat.RECORD_IDENTIFIER + " is not set.");
 			} else {
-				LOG.info("Initializing JsonRecordReader with identifier "
-						+ identifier);
+				LOG.info("Initializing JsonRecordReader with identifier " + identifier);
 			}
 
 			// get relevant data
@@ -137,8 +149,7 @@ public class JsonInputFormat extends FileInputFormat<Text, NullWritable> {
 				strm.seek(start);
 			}
 
-			rdr = new JsonStreamReader(identifier,
-					new BufferedInputStream(strm));
+			rdr = new JsonStreamReader(identifier, new BufferedInputStream(strm));
 
 			log.info("Reader is " + rdr);
 		}
