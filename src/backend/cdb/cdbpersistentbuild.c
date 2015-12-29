@@ -303,6 +303,13 @@ static void PersistentBuild_PopulateGpRelationNode(
 				     dbInfoRel->relname);
 			}*/
 
+            //rebuild gp_persistent_relation_node for AO tables
+            PersistentRelation_AddCreated(
+                &relFileNode,
+                &persistentTid,
+                &persistentSerialNum,
+                false);
+
 			/*
 			 * Merge physical file existence and ao[cs]seg catalog logical EOFs .
 			 */
