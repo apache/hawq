@@ -1222,6 +1222,8 @@ extern int min_datasize_to_combine_segment;
 extern int datalocality_algorithm_version;
 extern int min_cost_for_each_query;
 
+extern bool enable_prefer_list_to_rm;
+
 typedef enum
 {
 	HASH_TO_RANDOM_BASEDON_DATALOCALITY = 0,

@@ -4155,6 +4155,16 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"enable_prefer_list_to_rm;", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Sets whether enable data locality prefer list passed to rm"),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&enable_prefer_list_to_rm,
+		true, NULL, NULL
+	},
+
+	{
 		{"datalocality_remedy_enable", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Sets whether enable data locality remedy when nonlocal read"),
 			NULL,
