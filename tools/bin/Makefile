@@ -125,9 +125,6 @@ install: all
 	for files in `find * -maxdepth 0 -type f | grep -x -v -E "${SKIP_INSTALL}"`; do ${INSTALL_SCRIPT} $${files} ${bindir}; done
 	${MAKE} -C gppylib $@
 	${MAKE} -C hawqpylib $@
-	${MAKE} -C ext $@
-	# for dirs in `find hawqpylib -type d` ; do ${INSTALL_SCRIPT} -d ${bindir}/hawqpylib/$${dirs}; done
-	# for files in `find hawqpylib -type f` ; do ${INSTALL_SCRIPT} $${files} ${bindir}/hawqpylib/; done
 	${INSTALL_SCRIPT} -d ${bindir}/lib
 	for files in `find lib -type f`; do ${INSTALL_SCRIPT} $${files} ${bindir}/lib; done
 	unset LIBPATH; ./generate-greenplum-path.sh $(prefix) > ${prefix}/greenplum_path.sh
