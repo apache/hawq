@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.service;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -35,14 +34,14 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.apache.hawq.pxf.api.Fragment;
 
 /**
- * Class for serializing fragments metadata in JSON format.
- * The class implements {@link StreamingOutput} so the serialization will be
- * done in a stream and not in one bulk, this in order to avoid running
- * out of memory when processing a lot of fragments.
+ * Class for serializing fragments metadata in JSON format. The class implements
+ * {@link StreamingOutput} so the serialization will be done in a stream and not
+ * in one bulk, this in order to avoid running out of memory when processing a
+ * lot of fragments.
  */
 public class FragmentsResponse implements StreamingOutput {
 
-    private static Log Log = LogFactory.getLog(FragmentsResponse.class);
+    private static final Log Log = LogFactory.getLog(FragmentsResponse.class);
 
     private List<Fragment> fragments;
 
@@ -56,10 +55,17 @@ public class FragmentsResponse implements StreamingOutput {
     }
 
     /**
-     * Serializes a fragments list in JSON,
-     * To be used as the result string for HAWQ.
-     * An example result is as follows:
-     * &lt;code&gt;{"PXFFragments":[{"replicas":["sdw1.corp.emc.com","sdw3.corp.emc.com","sdw8.corp.emc.com"],"sourceName":"text2.csv", "index":"0", "metadata":"&lt;base64 metadata for fragment&gt;", "userData":"&lt;data_specific_to_third_party_fragmenter&gt;"},{"replicas":["sdw2.corp.emc.com","sdw4.corp.emc.com","sdw5.corp.emc.com"],"sourceName":"text_data.csv","index":"0","metadata":"&lt;base64 metadata for fragment&gt;","userData":"&lt;data_specific_to_third_party_fragmenter&gt;"}]}&lt;/code&gt;
+     * Serializes a fragments list in JSON, To be used as the result string for
+     * HAWQ. An example result is as follows:
+     * <code>{"PXFFragments":[{"replicas":
+     * ["sdw1.corp.emc.com","sdw3.corp.emc.com","sdw8.corp.emc.com"],
+     * "sourceName":"text2.csv", "index":"0","metadata":"&lt;base64 metadata for fragment&gt;",
+     * "userData":"&lt;data_specific_to_third_party_fragmenter&gt;"
+     * },{"replicas":["sdw2.corp.emc.com","sdw4.corp.emc.com","sdw5.corp.emc.com"
+     * ],"sourceName":"text_data.csv","index":"0","metadata":
+     * "&lt;base64 metadata for fragment&gt;"
+     * ,"userData":"&lt;data_specific_to_third_party_fragmenter&gt;"
+     * }]}</code>
      */
     @Override
     public void write(OutputStream output) throws IOException,

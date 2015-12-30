@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.utilities;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.service.utilities;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -34,7 +33,7 @@ import org.apache.hawq.pxf.api.Fragment;
  */
 public class AnalyzeUtils {
 
-    private static Log Log = LogFactory.getLog(AnalyzeUtils.class);
+    private static final Log LOG = LogFactory.getLog(AnalyzeUtils.class);
 
     /**
      * In case pxf_max_fragments parameter is declared, make sure not to get
@@ -57,7 +56,7 @@ public class AnalyzeUtils {
             return fragments;
         }
 
-        Log.debug("fragments list has " + listSize
+        LOG.debug("fragments list has " + listSize
                 + " fragments, maxFragments = " + maxSize);
 
         bitSet = generateSamplingBitSet(listSize, maxSize);
@@ -88,7 +87,7 @@ public class AnalyzeUtils {
         }
 
         if (sampleSize >= poolSize) {
-            Log.debug("sampling bit map has " + poolSize + " elements (100%)");
+            LOG.debug("sampling bit map has " + poolSize + " elements (100%)");
             bitSet.set(0, poolSize);
             return bitSet;
         }
@@ -116,7 +115,7 @@ public class AnalyzeUtils {
             }
         }
 
-        Log.debug("sampling bit map has " + chosen + " elements:"
+        LOG.debug("sampling bit map has " + chosen + " elements:"
                 + bitSet.toString());
 
         return bitSet;

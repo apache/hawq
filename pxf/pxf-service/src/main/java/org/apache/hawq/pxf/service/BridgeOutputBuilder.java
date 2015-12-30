@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.service;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import org.apache.hawq.pxf.api.BadRecordException;
 import org.apache.hawq.pxf.api.OneField;
@@ -281,13 +280,13 @@ public class BridgeOutputBuilder {
     /**
      * Breaks raw bytes into lines. Used only for sampling.
      *
-     * When sampling a data source, we have to make sure that
-     * we deal with actual rows (lines) and not bigger chunks of
-     * data such as used by LineBreakAccessor for performance.
-     * The input byte array is broken into lines, each one stored in
-     * the outputList. In case the read data doesn't end with a line delimiter,
-     * which can happen when reading chunks of bytes, the partial line is
-     * stored separately, and is being completed when reading the next chunk of data.
+     * When sampling a data source, we have to make sure that we deal with
+     * actual rows (lines) and not bigger chunks of data such as used by
+     * LineBreakAccessor for performance. The input byte array is broken into
+     * lines, each one stored in the outputList. In case the read data doesn't
+     * end with a line delimiter, which can happen when reading chunks of bytes,
+     * the partial line is stored separately, and is being completed when
+     * reading the next chunk of data.
      *
      * @param val input raw data to break into lines
      */

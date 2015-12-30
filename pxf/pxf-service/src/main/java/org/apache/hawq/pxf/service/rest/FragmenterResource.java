@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.rest;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.service.rest;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
@@ -56,7 +55,7 @@ import java.util.Map;
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Fragmenter/")
 public class FragmenterResource extends RestResource {
-    private static Log Log = LogFactory.getLog(FragmenterResource.class);
+    private static final Log LOG = LogFactory.getLog(FragmenterResource.class);
 
     /**
      * The function is called when
@@ -119,8 +118,8 @@ public class FragmenterResource extends RestResource {
 
         FragmentsStats fragmentsStats = fragmenter.getFragmentsStats();
         String response = FragmentsStats.dataToJSON(fragmentsStats);
-        if (Log.isDebugEnabled()) {
-            Log.debug(FragmentsStats.dataToString(fragmentsStats, path));
+        if (LOG.isDebugEnabled()) {
+            LOG.debug(FragmentsStats.dataToString(fragmentsStats, path));
         }
 
         return Response.ok(response, MediaType.APPLICATION_JSON_TYPE).build();
@@ -130,14 +129,14 @@ public class FragmenterResource extends RestResource {
                                          final HttpHeaders headers,
                                          final String path) throws Exception {
 
-        if (Log.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
             StringBuilder startMsg = new StringBuilder(
                     "FRAGMENTER started for path \"" + path + "\"");
             for (String header : headers.getRequestHeaders().keySet()) {
                 startMsg.append(" Header: ").append(header).append(" Value: ").append(
                         headers.getRequestHeader(header));
             }
-            Log.debug(startMsg);
+            LOG.debug(startMsg);
         }
 
         /* Convert headers into a case-insensitive regular map */

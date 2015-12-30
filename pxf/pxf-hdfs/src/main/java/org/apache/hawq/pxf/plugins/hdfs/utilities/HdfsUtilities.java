@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.plugins.hdfs.utilities;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -49,7 +49,7 @@ import java.util.List;
  * HdfsUtilities class exposes helper methods for PXF classes.
  */
 public class HdfsUtilities {
-    private static Log Log = LogFactory.getLog(HdfsUtilities.class);
+    private static final Log LOG = LogFactory.getLog(HdfsUtilities.class);
     private static Configuration config = new Configuration();
     private static CompressionCodecFactory factory = new CompressionCodecFactory(
             config);
@@ -107,7 +107,7 @@ public class HdfsUtilities {
         if (codec != null) {
             codecClass = codec.getClass();
         }
-        Log.debug((codecClass == null ? "No codec" : "Codec " + codecClass)
+        LOG.debug((codecClass == null ? "No codec" : "Codec " + codecClass)
                 + " was found for file " + path);
         return codecClass;
     }
@@ -191,7 +191,7 @@ public class HdfsUtilities {
             FileSplit fileSplit = new FileSplit(new Path(
                     inputData.getDataSource()), start, end, hosts);
 
-            Log.debug("parsed file split: path " + inputData.getDataSource()
+            LOG.debug("parsed file split: path " + inputData.getDataSource()
                     + ", start " + start + ", end " + end + ", hosts "
                     + ArrayUtils.toString(hosts));
 
