@@ -77,7 +77,7 @@ TROUBLE_VALUES=[
                 ]
 
 description = ("""
-Reads GPDB log file(s), extracts log entries which meet
+Reads HAWQ log file(s), extracts log entries which meet
 all the criteria you specify, and writes them to output
 file(s) or standard output.
 """)
@@ -148,7 +148,7 @@ def parseargs():
     optgrp.add_option('-d', '--duration', type='duration', metavar='[h][:m[:s]]',
                       help='duration from beginning to end')
     optgrp.add_option('--prunefiles', action='store_true', default=False, 
-                        help="Discard files based on filename of the form gpdb-%Y-%m-%d_%H%M%S.csv")
+                        help="Discard files based on filename of the form hawq-%Y-%m-%d_%H%M%S.csv")
     parser.add_option_group(optgrp)
 
     optgrp = OptionGroup(parser, 'Pattern and string matching',
@@ -251,7 +251,7 @@ def openInputFile(ifn, options):
         ifn = os.path.abspath(ifn)
         # In case a master or segment instance's data directory name
         # was given, append '.log' to get the instance's log file name
-        # (gpdb convention).
+        # (hawq convention).
         if (os.path.isdir(ifn)):
             ifn += '.log'
         zname = os.path.split(ifn)[1]
@@ -436,7 +436,7 @@ try:
             fileIn, inputFilesToClose, ifn, zname = openInputFile(ifn, options)
             
             # if we can skip the whole file, let's do so
-            if zname.startswith('gpdb') and zname.endswith('.csv'):
+            if zname.startswith('hawq') and zname.endswith('.csv'):
                 goodFormat = True
                 try:
                    # try format YYYY-MM-DD_HHMMSS
