@@ -4597,13 +4597,6 @@ CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_n
 									extdesc->on_clause = lappend(extdesc->on_clause, 
 										   				   		 makeDefElem("all", (Node *)makeInteger(TRUE)));
 								}
-								else if(n->iswritable)
-								{
-									ereport(ERROR,
-											(errcode(ERRCODE_SYNTAX_ERROR),
-									 		 errmsg("ON clause may not be used with a writable external table"),
-									 		 errOmitLocation(true)));							
-								}
 							}
 
 							if(n->sreh && n->iswritable)

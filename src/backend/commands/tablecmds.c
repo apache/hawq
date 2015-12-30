@@ -370,7 +370,7 @@ static void update_ri_trigger_args(Oid relid,
 					   bool fk_scan,
 					   bool update_relname);
 static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool iswritable);
-static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num);
+static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, bool iswritable);
 static char transformFormatType(char *formatname);
 static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols, bool iswritable);
 
@@ -954,7 +954,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 			break;
 
 		case EXTTBL_TYPE_EXECUTE:
-			locationExec = transformExecOnClause(exttypeDesc->on_clause, &preferred_segment_num);
+			locationExec = transformExecOnClause(exttypeDesc->on_clause, &preferred_segment_num, iswritable);
 			if (createStmt->policy)
 			{
 			  createStmt->policy->bucketnum = preferred_segment_num;
@@ -17595,7 +17595,7 @@ static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool i
 
 }
 
-static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num)
+static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, bool iswritable)
 {
 	ArrayBuildState *astate;
 	Datum		result;
@@ -17666,6 +17666,12 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num)
 		}
 		else if (strcmp(defel->defname, "master") == 0)
 		{
+			if(iswritable){
+			  ereport(ERROR,
+	 	      (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			    errmsg("the ON master syntax for writable external tables is deprecated"),
+		      errOmitLocation(true)));
+			}
 			/* result: "MASTER_ONLY" */
 			exec_location_str = (char *) palloc(11 + 1);
 			exec_location_str = "MASTER_ONLY";
@@ -17673,6 +17679,12 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num)
 		}
 		else if (strcmp(defel->defname, "segment") == 0)
 		{
+			if(iswritable){
+			  ereport(ERROR,
+				  (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+			    errmsg("the ON segment syntax for writable external tables is deprecated"),
+	        errOmitLocation(true)));
+			}
 			/* result: "SEGMENT_ID:<segid>" */
 			value_int = intVal(defel->arg);
 			exec_location_str = (char *) palloc(10 + 1 + 8 + 1);

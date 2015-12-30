@@ -669,7 +669,7 @@ HINT:  use the gpfdist protocol or COPY FROM instead
 create writable external table wet_neg1(a text, b text) location('gpfdist://@hostname@:7070/wet.out', 'gpfdist://@hostname@:7070/wet.out') format 'text';
 ERROR:  location uri "gpfdist://@hostname@:7070/wet.out" appears more than once
 create writable external web table wet_pos5(a text, b text) execute 'some command' on segment 0 format 'text';
-ERROR:  ON clause may not be used with a writable external table
+ERROR:  the ON segment syntax for writable        external tables is deprecated
 --
 -- SELECT from WET (negative)
 --
