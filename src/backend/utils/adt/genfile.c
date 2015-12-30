@@ -476,22 +476,22 @@ pg_logdir_ls(PG_FUNCTION_ARGS)
 	FuncCallContext *funcctx;
 	struct dirent *de;
 	directory_fctx *fctx;
-    bool prefix_is_gpdb = true;
+    bool prefix_is_hawq = true;
 
 	if (!superuser())
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 (errmsg("only superuser can list the log directory"))));
 
-	if (strcmp(Log_filename, "gpdb-%Y-%m-%d_%H%M%S.csv") != 0 &&
-        strcmp(Log_filename, "gpdb-%Y-%m-%d_%H%M%S.log") != 0 &&
+	if (strcmp(Log_filename, "hawq-%Y-%m-%d_%H%M%S.csv") != 0 &&
+        strcmp(Log_filename, "hawq-%Y-%m-%d_%H%M%S.log") != 0 &&
         strcmp(Log_filename, "postgresql-%Y-%m-%d_%H%M%S.log") != 0 )
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 (errmsg("the log_filename parameter must equal 'gpdb-%%Y-%%m-%%d_%%H%%M%%S.csv'"))));
+				 (errmsg("the log_filename parameter must equal 'hawq-%%Y-%%m-%%d_%%H%%M%%S.csv'"))));
 
-    if (strncmp(Log_filename, "gpdb", 4) != 0)
-        prefix_is_gpdb = false;
+    if (strncmp(Log_filename, "hawq", 4) != 0)
+        prefix_is_hawq = false;
 
 	if (SRF_IS_FIRSTCALL())
 	{
@@ -541,14 +541,14 @@ pg_logdir_ls(PG_FUNCTION_ARGS)
 		int			tz = 0;
 		struct pg_tm date;
 
-        if (prefix_is_gpdb)
+        if (prefix_is_hawq)
         {
             int end = 17;
             /*
-		     * Default format: gpdb-YYYY-MM-DD_HHMMSS.log or gpdb-YYYY-MM-DD_HHMMSS.csv
+		     * Default format: hawq-YYYY-MM-DD_HHMMSS.log or hawq-YYYY-MM-DD_HHMMSS.csv
 		     */
 		    if (strlen(de->d_name) != 26
-			    || strncmp(de->d_name, "gpdb-", 5) != 0
+			    || strncmp(de->d_name, "hawq-", 5) != 0
 			    || de->d_name[15] != '_'
 			    || (strcmp(de->d_name + 22, ".log") != 0 && strcmp(de->d_name + 22, ".csv") != 0))
             {
@@ -558,7 +558,7 @@ pg_logdir_ls(PG_FUNCTION_ARGS)
                  */
              
                 if (strlen(de->d_name) != 26
-			    || strncmp(de->d_name, "gpdb-", 5) != 0
+			    || strncmp(de->d_name, "hawq-", 5) != 0
 			    || de->d_name[15] != '_'
 			    || (strcmp(de->d_name + 22, ".log") != 0 && strcmp(de->d_name + 22, ".csv") != 0))
                     continue;

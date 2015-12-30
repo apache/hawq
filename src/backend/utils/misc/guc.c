@@ -7456,7 +7456,7 @@ static struct config_string ConfigureNamesString[] =
 			GUC_SUPERUSER_ONLY | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&Log_filename,
-		"gpdb-%Y-%m-%d_%H%M%S.csv", NULL, NULL
+		"hawq-%Y-%m-%d_%H%M%S.csv", NULL, NULL
 	},
 
 	{
