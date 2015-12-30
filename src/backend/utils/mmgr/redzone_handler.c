@@ -48,7 +48,7 @@ extern int32 VmemTracker_ConvertVmemMBToChunks(int mb);
 #define INVALID_SESSION_ID -1
 
 /* The runaway detector activates if the used vmem exceeds this percentage of the vmem quota */
-int	runaway_detector_activation_percent = 80;
+int	runaway_detector_activation_percent = 95;
 
 /* The last number of chunks for segment vmem quota */
 static int lastSegmentVmemQuotaChunks = -1;

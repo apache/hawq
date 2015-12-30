@@ -5923,7 +5923,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL,
 		},
 		&runaway_detector_activation_percent,
-		90, 0, 100, NULL, NULL
+		95, 0, 100, NULL, NULL
 	},
 
 	{
