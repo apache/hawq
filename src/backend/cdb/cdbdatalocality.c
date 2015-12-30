@@ -307,6 +307,8 @@ typedef struct split_to_segment_mapping_context {
 	int64 total_size; /* total data size for all relations */
 	int64 total_split_count;
 	int64 total_file_count;
+
+	int64 total_metadata_logic_len;
 } split_to_segment_mapping_context;
 
 typedef struct vseg_list{
@@ -342,6 +344,8 @@ static List *get_virtual_segments(QueryResource *resource);
 
 static List *run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, QueryResource ** resourcePtr,
 		split_to_segment_mapping_context *context);
+
+static void double_check_hdfs_metadata_logic_length(BlockLocation * locations,int block_num,int64 logic_len);
 
 static void AOGetSegFileDataLocation(Relation relation,
 		AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
@@ -537,7 +541,7 @@ static void init_datalocality_context(split_to_segment_mapping_context *context)
 	context->total_size = 0;
 	context->total_split_count = 0;
 	context->total_file_count = 0;
-
+	context->total_metadata_logic_len = 0;
 	return;
 }
 
@@ -1045,6 +1049,20 @@ update_data_dist_stat(split_to_segment_mapping_context *context,
 }
 
 /*
+ * check hdfs file length equals to pg_aoseg file logic length
+ */
+static void double_check_hdfs_metadata_logic_length(BlockLocation * locations,int block_num,int64 logic_len) {
+	//double check hdfs file length equals to pg_aoseg logic length
+	int64 hdfs_file_len = 0;
+	for(int i=0;i<block_num;i++) {
+		hdfs_file_len += locations[i].length;
+	}
+	if(logic_len != hdfs_file_len) {
+		elog(ERROR, "hdfs file length does not equal to metadata logic length!");
+	}
+}
+
+/*
  * AOGetSegFileDataLocation: fetch the data location of the
  * segment files of the AO relation.
  */
@@ -1254,6 +1272,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 					NULL));
 			int64 logic_len = (int64) DatumGetFloat8(
 					fastgetattr(tuple, Anum_pg_aoseg_eof, pg_aoseg_dsc, NULL));
+			context->total_metadata_logic_len += logic_len;
 			bool isRelationHash = true;
 			if (targetPolicy->nattrs == 0) {
 				isRelationHash = false;
@@ -1269,6 +1288,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 				if ((locations != NULL) && (block_num > 0)) {
 					Block_Host_Index * host_index = update_data_dist_stat(context,
 							locations, block_num);
+					double_check_hdfs_metadata_logic_length(locations, block_num, logic_len);
 
 					file = (Relation_File *) palloc(sizeof(Relation_File));
 					file->segno = segno;
@@ -1344,6 +1364,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 				if ((locations != NULL) && (block_num > 0)) {
 					Block_Host_Index * host_index = update_data_dist_stat(context,
 							locations, block_num);
+					double_check_hdfs_metadata_logic_length(locations, block_num, logic_len);
 					// fake data locality
 					if (debug_fake_datalocality) {
 						for (int k = 0; k < block_num; k++) {
@@ -1426,7 +1447,7 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 				fastgetattr(tuple, Anum_pg_parquetseg_segno, pg_parquetseg_dsc, NULL));
 		int64 logic_len = (int64) DatumGetFloat8(
 				fastgetattr(tuple, Anum_pg_parquetseg_eof, pg_parquetseg_dsc, NULL));
-
+		context->total_metadata_logic_len += logic_len;
 		bool isRelationHash = true;
 		if (targetPolicy->nattrs == 0) {
 			isRelationHash = false;
@@ -1455,6 +1476,8 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 				int64 offset = 0;
 				Block_Host_Index * host_index = update_data_dist_stat(context,
 						locations, block_num);
+
+				double_check_hdfs_metadata_logic_length(locations, block_num, logic_len);
 
 				file = (Relation_File *) palloc(sizeof(Relation_File));
 				file->segno = segno;
@@ -1508,6 +1531,8 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 			if ((locations != NULL) && (block_num > 0)) {
 				Block_Host_Index * host_index = update_data_dist_stat(context,
 						locations, block_num);
+
+				double_check_hdfs_metadata_logic_length(locations, block_num, logic_len);
 
 				file->block_num = block_num;
 				file->locations = locations;
@@ -3464,6 +3489,7 @@ static void combine_all_splits(Detailed_File_Split **splits,
 			sizeof(Detailed_File_Split) * assignment_context->total_split_num);
 	int total_split_index = 0;
 	bool nonLocalExist = false;
+	int64 splitTotalLength = 0;
 	/* go through all splits again. combine all splits to Detailed_File_Split structure*/
 	foreach(lc, context->chsl_context.relations)
 	{
@@ -3555,8 +3581,12 @@ static void combine_all_splits(Detailed_File_Split **splits,
 				(*splits)[total_split_index].length = rel_file->splits[i].length;
 				(*splits)[total_split_index].logiceof = rel_file->logic_len;
 				total_split_index++;
+				splitTotalLength += rel_file->splits[i].length;
 			}
 		}
+	}
+	if(context->total_metadata_logic_len != splitTotalLength){
+		elog(ERROR, "total split length does not equal to metadata total logic length!");
 	}
 }
 
