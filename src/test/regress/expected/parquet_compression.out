@@ -145,4 +145,4 @@ Select count(*) from parquet_gzip_2;
      1
 (1 row)
 
-alter resource queue pg_default with ( vseg_resource_quota='mem:128mb');
+alter resource queue pg_default with ( vseg_resource_quota='mem:256mb');
