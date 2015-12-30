@@ -1403,9 +1403,9 @@ extern Datum gp_metadata_cache_info(PG_FUNCTION_ARGS)
 /*
  *  Metadata Cache UDF
  *
- *  Get entry info in the metadata cache
+ *  Put entry into the metadata cache
  */
-extern Datum gp_metadata_cache_putentry_fortest(PG_FUNCTION_ARGS)
+extern Datum gp_metadata_cache_put_entry_for_test(PG_FUNCTION_ARGS)
 {
     Oid tablespace_oid = PG_GETARG_OID(0);
     Oid database_oid = PG_GETARG_OID(1);

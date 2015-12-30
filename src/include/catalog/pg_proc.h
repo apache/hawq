@@ -10399,8 +10399,8 @@ DESCR("Get metadata cache current entry number");
 DATA(insert OID = 8084 ( gp_metadata_cache_current_block_num  PGNSP PGUID 12 f f t f s 0 20 f "" _null_ _null_ _null_ gp_metadata_cache_current_block_num - _null_ n ));
 DESCR("Get metadata cache current block number");
 
-/* gp_metadata_cache_putentry_fortest => text */
-DATA(insert OID = 8085 ( gp_metadata_cache_putentry_fortest  PGNSP PGUID 12 f f t f s 5 25 f "26 26 26 23 23" _null_ _null_ _null_ gp_metadata_cache_putentry_fortest - _null_ n ));
+/* gp_metadata_cache_put_entry_for_test => text */
+DATA(insert OID = 8085 ( gp_metadata_cache_put_entry_for_test  PGNSP PGUID 12 f f t f s 5 25 f "26 26 26 23 23" _null_ _null_ _null_ gp_metadata_cache_put_entry_for_test - _null_ n ));
 DESCR("Put entries into metadata cache");
 
 /* gp_metadata_cache_exists => bool*/ 
