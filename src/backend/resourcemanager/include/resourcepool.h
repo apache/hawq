@@ -518,7 +518,7 @@ void initializeResourcePoolManager(void);
  * Add new host into the cluster. New segment will be registered, existing
  * segment maybe updated based on latest information passed in.
  */
-int addHAWQSegWithSegStat(SegStat segstat);
+int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged);
 
 /* Update existing host's grm capacity information. */
 int updateHAWQSegWithGRMSegStat( SegStat segstat);

@@ -731,18 +731,22 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	newsegstat->GRMAvailable 	= RESOURCE_SEG_STATUS_UNSET;
 	newsegstat->FTSAvailable 	= RESOURCE_SEG_STATUS_AVAILABLE;
 
-	if ( addHAWQSegWithSegStat(newsegstat) != FUNC_RETURN_OK )
+	bool capstatchanged = false;
+	if ( addHAWQSegWithSegStat(newsegstat, &capstatchanged) != FUNC_RETURN_OK )
 	{
-		/* Should be a duplciate host. */
+		/* Should be a duplicate host. */
 		rm_pfree(PCONTEXT, newsegstat);
 	}
 
-	/* Refresh resource queue capacities. */
-	refreshResourceQueueCapacity(false);
-	/* Recalculate all memory/core ratio instances' limits. */
-	refreshMemoryCoreRatioLimits();
-	/* Refresh memory/core ratio level water mark. */
-	refreshMemoryCoreRatioWaterMark();
+	if ( capstatchanged )
+	{
+		/* Refresh resource queue capacities. */
+		refreshResourceQueueCapacity(false);
+		/* Recalculate all memory/core ratio instances' limits. */
+		refreshMemoryCoreRatioLimits();
+		/* Refresh memory/core ratio level water mark. */
+		refreshMemoryCoreRatioWaterMark();
+	}
 
 	/* Send the response. */
 	RPCResponseIMAliveData response;

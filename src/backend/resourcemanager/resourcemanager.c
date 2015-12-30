@@ -2780,8 +2780,10 @@ int  loadHostInformationIntoResourcePool(void)
         		  segreport.Buffer);
         destroySelfMaintainBuffer(&segreport);
 
-        res = addHAWQSegWithSegStat(segstat);
-        if ( res != FUNC_RETURN_OK ) {
+        bool capstatchanged = false;
+        res = addHAWQSegWithSegStat(segstat, capstatchanged);
+        if ( res != FUNC_RETURN_OK )
+        {
             elog(WARNING, "Resource manager failed to add machine from file.");
             rm_pfree(PCONTEXT, segstat);
         }
