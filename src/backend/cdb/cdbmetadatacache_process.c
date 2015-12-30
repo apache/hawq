@@ -443,7 +443,7 @@ ProcessMetadataCacheCheck()
             DestroyHdfsFileInfo(file_info);
             total_remove_files++;
 
-            double cache_entry_ratio = hash_get_num_entries(MetadataCache) / metadata_cache_max_hdfs_file_num;
+            double cache_entry_ratio = (hash_get_num_entries(MetadataCache) * 1.0) / metadata_cache_max_hdfs_file_num;
 
             if (((FREE_BLOCK_NUM * 1.0) / metadata_cache_block_capacity) >= metadata_cache_free_block_normal_ratio
             		&& cache_entry_ratio < metadata_cache_reduce_ratio)
