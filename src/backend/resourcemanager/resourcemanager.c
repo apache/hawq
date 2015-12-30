@@ -2781,7 +2781,7 @@ int  loadHostInformationIntoResourcePool(void)
         destroySelfMaintainBuffer(&segreport);
 
         bool capstatchanged = false;
-        res = addHAWQSegWithSegStat(segstat, capstatchanged);
+        res = addHAWQSegWithSegStat(segstat, &capstatchanged);
         if ( res != FUNC_RETURN_OK )
         {
             elog(WARNING, "Resource manager failed to add machine from file.");
