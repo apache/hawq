@@ -1400,3 +1400,56 @@ extern Datum gp_metadata_cache_info(PG_FUNCTION_ARGS)
     PG_RETURN_TEXT_P(cstring_to_text(message));    
 }
 
+/*
+ *  Metadata Cache UDF
+ *
+ *  Get entry info in the metadata cache
+ */
+extern Datum gp_metadata_cache_putentry_fortest(PG_FUNCTION_ARGS)
+{
+    Oid tablespace_oid = PG_GETARG_OID(0);
+    Oid database_oid = PG_GETARG_OID(1);
+    Oid relation_oid = PG_GETARG_OID(2);
+    int4 start = PG_GETARG_INT32(3);
+    int4 end = PG_GETARG_INT32(4);
+
+    LWLockAcquire(MetadataCacheLock, LW_EXCLUSIVE);
+
+    int i;
+    int4 stop = (start -end) / 10;
+    int4 current = 0;
+    int4 success = 0;
+    for(i=start;i<end;i++)
+    {
+    	MetadataCacheKey key;
+    	key.tablespace_oid = tablespace_oid;
+    	key.database_oid = database_oid;
+    	key.relation_oid = relation_oid;
+    	key.segno = i;
+
+    	bool found;
+    	MetadataCacheEntry *entry = (MetadataCacheEntry *)hash_search(MetadataCache, (void *)&key, HASH_ENTER_NULL, &found);
+        entry->file_size = 134217728;
+        entry->block_num = 1;
+
+        AllocMetadataBlock(entry->block_num, &entry->first_block_id, &entry->last_block_id);
+
+    	if(entry != NULL)
+    	{
+    		current++;
+    		success++;
+    	}
+    	if(current == stop)
+    	{
+    		current = 0;
+    		LWLockRelease(MetadataCacheLock);
+    		pg_usleep(1 * USECS_PER_SEC);
+    	    LWLockAcquire(MetadataCacheLock, LW_EXCLUSIVE);
+    	}
+    }
+    LWLockRelease(MetadataCacheLock);
+
+    char message[1024] = {0};
+    snprintf(message, 1024, "Metadata cache successed putting %d entries. Failed putting %d entries.", success, end - start - success);
+    PG_RETURN_TEXT_P(cstring_to_text(message));
+}
