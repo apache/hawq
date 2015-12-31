@@ -55,7 +55,7 @@ public class ClusterNodesResource {
      * Then, it packs the results in JSON format and writes to the HTTP response
      * stream. Response Examples:<br>
      * <ol>
-     * When there are no datanodes - getDataNodeStats returns an empty array
+     * <li>When there are no datanodes - getDataNodeStats returns an empty array
      * <code>{"regions":[]}</code></li>
      * <li>When there are datanodes
      * <code>{"regions":[{"host":"1.2.3.1","port":50075},{"host":"1.2.3.2","port"
