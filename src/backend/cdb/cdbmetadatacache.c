@@ -698,10 +698,14 @@ BlockLocation *GetHdfsFileBlockLocations(const HdfsFileInfo *file_info, uint64_t
         } 
         else 
         {
+            /*
             // Cache Hit Partly
             if (cache_entry->block_num <= 1)
             {
                 // only one file, re-fetch 
+            */
+            
+                // re-fetch file's all block locations, because hdfs will get incorrect result when fetch partly
                 LWLockRelease(MetadataCacheLock); 
         
                 LWLockAcquire(MetadataCacheLock, LW_EXCLUSIVE);
@@ -710,6 +714,7 @@ BlockLocation *GetHdfsFileBlockLocations(const HdfsFileInfo *file_info, uint64_t
                 
                 locations = GetHdfsFileBlockLocationsNoCache(file_info, filesize, block_num);
                 *hit_ratio = 0;
+            /*
             }
             else
             {
@@ -718,6 +723,7 @@ BlockLocation *GetHdfsFileBlockLocations(const HdfsFileInfo *file_info, uint64_t
                 // fetch extra hdfs block locations and append to cache
                 locations = AppendHdfsFileBlockLocationsToCache(file_info, cache_entry, filesize, block_num, hit_ratio);
             }
+            */
         }
     }
     
