@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.plugins.hdfs.utilities;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -26,19 +26,20 @@ import org.apache.hadoop.io.*;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.core.classloader.annotations.SuppressStaticInitializationFor;
 import org.powermock.modules.junit4.PowerMockRunner;
+import org.powermock.reflect.Whitebox;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @RunWith(PowerMockRunner.class)
+@SuppressStaticInitializationFor("RecordkeyAdapter")
 @PrepareForTest({RecordkeyAdapter.class, LogFactory.class})
 public class RecordkeyAdapterTest {
-    Log Log;
+    Log LOG;
     RecordkeyAdapter recordkeyAdapter;
 
     /**
@@ -159,16 +160,15 @@ public class RecordkeyAdapterTest {
     }
 
     private void mockLog() {
-        PowerMockito.mockStatic(LogFactory.class);
-        Log = mock(Log.class);
-        when(LogFactory.getLog(RecordkeyAdapter.class)).thenReturn(Log);
+        LOG = mock(Log.class);
+        Whitebox.setInternalState(RecordkeyAdapter.class, LOG);
     }
 
     private void verifyLog(String msg) {
-        Mockito.verify(Log).debug(msg);
+        Mockito.verify(LOG).debug(msg);
     }
 
     private void verifyLogOnlyOnce() {
-        Mockito.verify(Log, Mockito.times(1)).debug(Mockito.any());
+        Mockito.verify(LOG, Mockito.times(1)).debug(Mockito.any());
     }
 }

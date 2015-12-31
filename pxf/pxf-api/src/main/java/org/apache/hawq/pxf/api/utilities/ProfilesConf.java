@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.api.utilities;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -41,8 +41,9 @@ import static org.apache.hawq.pxf.api.utilities.ProfileConfException.MessageForm
  * It exposes a public static method getProfilePluginsMap(String plugin) which returns the requested profile plugins
  */
 public enum ProfilesConf {
-    INSTANCE;
-    private Log log = LogFactory.getLog(ProfilesConf.class);
+    INSTANCE; // enum singleton
+    // not necessary to declare LOG as static final, because this is a singleton
+    private Log LOG = LogFactory.getLog(ProfilesConf.class);
     private Map<String, Map<String, String>> profilesMap;
     private final static String EXTERNAL_PROFILES = "pxf-profiles.xml";
     private final static String INTERNAL_PROFILES = "pxf-profiles-default.xml";
@@ -59,7 +60,7 @@ public enum ProfilesConf {
         if (profilesMap.isEmpty()) {
             throw new ProfileConfException(PROFILES_FILE_NOT_FOUND, EXTERNAL_PROFILES);
         }
-        log.info("PXF profiles loaded: " + profilesMap.keySet());
+        LOG.info("PXF profiles loaded: " + profilesMap.keySet());
     }
 
     /**
@@ -88,7 +89,7 @@ public enum ProfilesConf {
     private void loadConf(String fileName, boolean isMandatory) {
         URL url = getClassLoader().getResource(fileName);
         if (url == null) {
-            log.warn(fileName + " not found in the classpath");
+            LOG.warn(fileName + " not found in the classpath");
             if (isMandatory) {
                 throw new ProfileConfException(PROFILES_FILE_NOT_FOUND, fileName);
             }
@@ -105,14 +106,14 @@ public enum ProfilesConf {
     private void loadMap(XMLConfiguration conf) {
         String[] profileNames = conf.getStringArray("profile.name");
         if (profileNames.length == 0) {
-            log.warn("Profile file: " + conf.getFileName() + " is empty");
+            LOG.warn("Profile file: " + conf.getFileName() + " is empty");
             return;
         }
         Map<String, Map<String, String>> profileMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (int profileIdx = 0; profileIdx < profileNames.length; profileIdx++) {
             String profileName = profileNames[profileIdx];
             if (profileMap.containsKey(profileName)) {
-                log.warn("Duplicate profile definition found in " + conf.getFileName() + " for: " + profileName);
+                LOG.warn("Duplicate profile definition found in " + conf.getFileName() + " for: " + profileName);
                 continue;
             }
             Configuration profileSubset = conf.subset("profile(" + profileIdx + ").plugins");
