@@ -34,19 +34,18 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.io.IOException;
 
-/*
+/**
  * Class enhances the API of the HBASE rest server.
  * Example for querying API getClusterNodesInfo from a web client
- * curl "http://localhost:50070/pxf/v2/HadoopCluster/getNodesInfo"
+ * <code>curl "http://localhost:51200/pxf/v2/HadoopCluster/getNodesInfo"</code>
  * /pxf/ is made part of the path when there is a webapp by that name in tcServer.
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/HadoopCluster/")
 public class ClusterNodesResource {
     private static final Log LOG = LogFactory.getLog(ClusterNodesResource.class);
 
-    public ClusterNodesResource() throws IOException {
+    public ClusterNodesResource() {
     }
 
     /**
