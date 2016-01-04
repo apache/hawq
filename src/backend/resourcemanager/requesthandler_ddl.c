@@ -284,6 +284,9 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				goto senderr;
 			}
 
+			/* Refresh resource queue capacity. */
+			refreshResourceQueueCapacity(true);
+
 			break;
 
 		case MANIPULATE_RESQUEUE_ALTER:
@@ -390,7 +393,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			 * Refresh actual capacity of the resource queue, the change is
 			 * expected to be updated in the shadow instances.
 			 */
-			refreshResourceQueuePercentageCapacity();
+			refreshResourceQueuePercentageCapacity(true);
 
 			/*------------------------------------------------------------------
 			 * Till now, we expect the input for altering a resource queue is
@@ -410,6 +413,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 
 			res = rebuildAllResourceQueueTrackDynamicStatusInShadow(qhavingshadow,
 																	errorbuf,
+																	true,
 																	sizeof(errorbuf));
 			if ( res != FUNC_RETURN_OK )
 			{
@@ -534,8 +538,6 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			Assert(false);
 		}
 
-	/* Refresh resource queue capacity. */
-	refreshResourceQueuePercentageCapacity();
 	/* Recalculate all memory/core ratio instances' limits. */
 	refreshMemoryCoreRatioLimits();
 	/* Refresh memory/core ratio level water mark. */

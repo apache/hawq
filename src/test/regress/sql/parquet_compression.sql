@@ -122,4 +122,4 @@ insert into parquet_gzip_2 values(12,array_to_string(ARRAY(SELECT chr((65 + roun
 
 Select count(*) from parquet_gzip_2;
 
-alter resource queue pg_default with ( vseg_resource_quota='mem:128mb');
+alter resource queue pg_default with ( vseg_resource_quota='mem:256mb');

@@ -216,9 +216,8 @@ void copyResourceDeadLockDetectorWithoutLocking(ResqueueDeadLockDetector source,
 		SessionTrack newstrack = rm_palloc0(PCONTEXT, sizeof(SessionTrackData));
 		newstrack->SessionID = strack->SessionID;
 		newstrack->Locked	 = false;
-		resetResourceBundleData(&(newstrack->InUseTotal), 0, 0.0, 0);
-		addResourceBundleDataByBundle(&(newstrack->InUseTotal),
-									  &(strack->InUseTotal));
+		resetResourceBundleDataByBundle(&(newstrack->InUseTotal),
+										&(strack->InUseTotal));
 		/* Add to the detector. */
 		SimpArray key;
 		setSimpleArrayRef(&key, (char *)&(newstrack->SessionID), sizeof(int64_t));

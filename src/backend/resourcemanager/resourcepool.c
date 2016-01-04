@@ -592,7 +592,7 @@ cleanup:
  * one segment in resource pool. If the host exists, update based on the latest
  * information.
  */
-int addHAWQSegWithSegStat(SegStat segstat)
+int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 {
 	Assert(segstat != NULL);
 
@@ -644,6 +644,7 @@ int addHAWQSegWithSegStat(SegStat segstat)
     /* CASE 1. It is a new host. */
 	if ( res != FUNC_RETURN_OK )
 	{
+		*capstatchanged = true;
 		/* Create machine information and corresponding resource information. */
 		segresource = createSegResource(segstat);
 
@@ -747,12 +748,16 @@ int addHAWQSegWithSegStat(SegStat segstat)
 			setSegResHAWQAvailability(segresource, RESOURCE_SEG_STATUS_AVAILABLE);
 			if (Gp_role != GP_ROLE_UTILITY)
 			{
-				update_segment_status(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_UP);
+				update_segment_status(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET,
+									  SEGMENT_STATUS_UP);
 			}
 
 			elog(LOG, "Resource manager sets segment %s(%d) up from down.",
 					  GET_SEGRESOURCE_HOSTNAME(segresource),
 					  segid);
+
+			/* The segment is up again, its capacity should be considered again. */
+			*capstatchanged = true;
 		}
 
 		/* The machine should be up. Update port number. */
@@ -792,6 +797,8 @@ int addHAWQSegWithSegStat(SegStat segstat)
 			segcapchanged =
 				oldftsmem  != segresource->Stat->FTSTotalMemoryMB ||
 				oldftscore != segresource->Stat->FTSTotalCore;
+
+			*capstatchanged = segcapchanged;
 		}
 
 		/* update the status of this node */
@@ -804,7 +811,8 @@ int addHAWQSegWithSegStat(SegStat segstat)
 	 * The expectation is that more than 50% cluster nodes has the same memory/
 	 * core ratio which is selected as the cluster memory/core ratio.
 	 */
-	if ( segcapchanged ) {
+	if ( segcapchanged )
+	{
 		uint32_t curratio = 0;
 		if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
 		{

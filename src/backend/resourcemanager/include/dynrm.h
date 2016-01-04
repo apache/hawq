@@ -293,9 +293,9 @@ int refreshGlobalRMClusterInformation(void);
 #define HAWQDRM_CONFFILE_YARN_QUEUE 				"hawq_rm_yarn_queue_name"
 #define HAWQDRM_CONFFILE_YARN_APP_NAME  			"hawq_rm_yarn_app_name"
 
-#define HAWQDRM_CONFFILE_SVRTYPE_VAL_YARN  		"yarn"
-#define HAWQDRM_CONFFILE_SVRTYPE_VAL_MESOS 		"mesos"
-#define HAWQDRM_CONFFILE_SVRTYPE_VAL_NONE		"none"
+#define HAWQDRM_CONFFILE_SVRTYPE_VAL_YARN  			"yarn"
+#define HAWQDRM_CONFFILE_SVRTYPE_VAL_MESOS 			"mesos"
+#define HAWQDRM_CONFFILE_SVRTYPE_VAL_NONE			"none"
 
 
 int  createDRMMemoryContext(void);
@@ -322,7 +322,7 @@ int  addResourceQueueAndUserFromProperties(List *queueprops, List *userprops);
 void moveResourceBrokerLogToSysLog(void);
 
 int  MainHandlerLoop(void);
-void  sendResponseToClients(void);
+void sendResponseToClients(void);
 
 void updateStatusOfAllNodes(void);
 

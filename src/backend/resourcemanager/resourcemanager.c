@@ -2612,6 +2612,7 @@ void updateStatusOfAllNodes() {
 	SegResource node = NULL;
 	uint64_t curtime = 0;
 
+	bool changedstatus = false;
 	curtime = gettime_microsec();
 	for(uint32_t idx = 0; idx < PRESPOOL->SegmentIDCounter; idx++) {
 	    node = getSegResource(idx);
@@ -2632,11 +2633,16 @@ void updateStatusOfAllNodes() {
         		update_segment_status(idx + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
         	}
 
-        	elog(LOG, "Resource manager sets host %s from up to down.",
-        			  GET_SEGRESOURCE_HOSTNAME(node));
+        	elog(WARNING, "Resource manager sets host %s from up to down.",
+        			  	  GET_SEGRESOURCE_HOSTNAME(node));
 
-        	refreshResourceQueuePercentageCapacity();
+        	changedstatus = true;
         }
+	}
+
+	if ( changedstatus )
+	{
+		refreshResourceQueueCapacity(false);
 	}
 
 	validateResourcePoolStatus(true);
@@ -2774,8 +2780,10 @@ int  loadHostInformationIntoResourcePool(void)
         		  segreport.Buffer);
         destroySelfMaintainBuffer(&segreport);
 
-        res = addHAWQSegWithSegStat(segstat);
-        if ( res != FUNC_RETURN_OK ) {
+        bool capstatchanged = false;
+        res = addHAWQSegWithSegStat(segstat, &capstatchanged);
+        if ( res != FUNC_RETURN_OK )
+        {
             elog(WARNING, "Resource manager failed to add machine from file.");
             rm_pfree(PCONTEXT, segstat);
         }
@@ -2798,7 +2806,7 @@ int  loadHostInformationIntoResourcePool(void)
     }
 
 	/* Refresh resource queue capacities. */
-	refreshResourceQueuePercentageCapacity();
+    refreshResourceQueueCapacity(false);
 	/* Recalculate all memory/core ratio instances' limits. */
 	refreshMemoryCoreRatioLimits();
 	/* Refresh memory/core ratio level water mark. */
