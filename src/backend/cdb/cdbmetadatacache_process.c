@@ -409,9 +409,9 @@ ProcessMetadataCacheCheck()
     RelFileNode rnode;
     HdfsFileInfo *file_info;
 
-    double free_block_ratio = (FREE_BLOCK_NUM * 1.0) / metadata_cache_block_capacity;
+    double free_block_ratio = ((double)FREE_BLOCK_NUM) / metadata_cache_block_capacity;
     long cache_entry_num = hash_get_num_entries(MetadataCache);
-    double cache_entry_ratio = (cache_entry_num * 1.0) / metadata_cache_max_hdfs_file_num;
+    double cache_entry_ratio = ((double)cache_entry_num) / metadata_cache_max_hdfs_file_num;
 
     elog(DEBUG1, "[MetadataCache] ProcessMetadataCacheCheck free_block_ratio:%f", free_block_ratio);
 
@@ -443,9 +443,9 @@ ProcessMetadataCacheCheck()
             DestroyHdfsFileInfo(file_info);
             total_remove_files++;
 
-            double cache_entry_ratio = hash_get_num_entries(MetadataCache) / metadata_cache_max_hdfs_file_num;
+            double cache_entry_ratio = ((double)hash_get_num_entries(MetadataCache)) / metadata_cache_max_hdfs_file_num;
 
-            if (((FREE_BLOCK_NUM * 1.0) / metadata_cache_block_capacity) >= metadata_cache_free_block_normal_ratio
+            if ((((double)FREE_BLOCK_NUM) / metadata_cache_block_capacity) >= metadata_cache_free_block_normal_ratio
             		&& cache_entry_ratio < metadata_cache_reduce_ratio)
             {
                 break;
