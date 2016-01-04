@@ -7,3 +7,4 @@
 8082,gp_metadata_cache_exists,11,10,12,f,f,t,f,s,4,16,f,"26 26 26 23",,,,gp_metadata_cache_exists,-,,n
 8083,gp_metadata_cache_info,11,10,12,f,f,t,f,s,4,25,f,"26 26 26 23",,,,gp_metadata_cache_info,-,,n
 8084,gp_metadata_cache_current_block_num,11,10,12,f,f,t,f,s,0,20,f,"",,,,gp_metadata_cache_current_block_num,-,,n
+8085,gp_metadata_cache_put_entry_for_test,11,10,12,f,f,t,f,s,5,25,f,"26 26 26 23 23",,,,gp_metadata_cache_put_entry_for_test,-,,n
