@@ -771,7 +771,7 @@ gpfs_hdfs_freefileinfo(PG_FUNCTION_ARGS)
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
 	}
-	if (numEntries <= 0) {
+	if (numEntries < 0) {
 		elog(WARNING, "get hdfsFileInfo numEntries invalid in gpfs_hdfs_freefileinfo");
 		retval = -1;
 		errno = EINVAL;
