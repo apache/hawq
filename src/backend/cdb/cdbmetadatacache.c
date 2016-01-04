@@ -1435,16 +1435,18 @@ extern Datum gp_metadata_cache_put_entry_for_test(PG_FUNCTION_ARGS)
 
     	bool found;
     	MetadataCacheEntry *entry = (MetadataCacheEntry *)hash_search(MetadataCache, (void *)&key, HASH_ENTER_NULL, &found);
+        if(entry == NULL)
+        {
+            continue;
+        }
         entry->file_size = 134217728;
         entry->block_num = 1;
 
         AllocMetadataBlock(entry->block_num, &entry->first_block_id, &entry->last_block_id);
 
-    	if(entry != NULL)
-    	{
-    		current++;
-    		success++;
-    	}
+    	current++;
+    	success++;
+
     	if(current == stop)
     	{
     		current = 0;
