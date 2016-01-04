@@ -6339,7 +6339,7 @@ static struct config_int ConfigureNamesInt[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&rm_allocation_policy,
-		1, 0, 10, NULL, NULL
+		0, 0, 0, NULL, NULL
 	},
 
     {
@@ -6476,6 +6476,17 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&rm_nvseg_variance_among_seg_limit,
 		1, 0, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_nvseg_variance_amon_seg_respool_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("the variance of vseg number in each segment that resource manager "
+						 "should tolerate at most in resource pool when choosing segments "
+						 "based on data locality reference."),
+			NULL
+		},
+		&rm_nvseg_variance_among_seg_respool_limit,
+		2, 0, 65535, NULL, NULL
 	},
 
 	{
@@ -6869,6 +6880,51 @@ static struct config_real ConfigureNamesReal[] =
 		},
 		&rm_enforce_core_vpratio,
 		1.0, 0.0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_regularize_io_max",PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("Set the maximum io workload limit for regularize the workload of one segment."),
+			NULL
+		},
+		&rm_regularize_io_max,
+		137438953472.0 /* 128gb */, 0.0, DBL_MAX, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_regularize_nvseg_max",PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("Set the maximum number of virtual segments for regularize the workload of one segment."),
+			NULL
+		},
+		&rm_regularize_nvseg_max,
+		300.0, 0.0, DBL_MAX, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_regularize_io_factor",PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("Set the factor of io workload in combined workload of a segment."),
+			NULL
+		},
+		&rm_regularize_io_factor,
+		1.0, 0.0, DBL_MAX, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_regularize_usage_factor",PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("Set the factor of resource usage in combined workload of a segment."),
+			NULL
+		},
+		&rm_regularize_usage_factor,
+		1.0, 0.0, DBL_MAX, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_regularize_nvseg_factor",PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("Set the factor of number of virtual segments in combined workload of a segment."),
+			NULL
+		},
+		&rm_regularize_nvseg_factor,
+		1.0, 0.0, DBL_MAX, NULL, NULL
 	},
 
 	{

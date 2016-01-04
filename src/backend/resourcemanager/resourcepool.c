@@ -29,10 +29,10 @@
 
 void addSegResourceAvailIndex(SegResource segres);
 void addSegResourceAllocIndex(SegResource segres);
-void addSegResourceIOBytesWorkloadIndex(SegResource segres);
+void addSegResourceCombinedWorkloadIndex(SegResource segres);
 int  reorderSegResourceAvailIndex(SegResource segres, uint32_t ratio);
 int  reorderSegResourceAllocIndex(SegResource segres, uint32_t ratio);
-int  reorderSegResourceIOBytesWorkloadIndex(SegResource segres);
+int  reorderSegResourceCombinedWorkloadIndex(SegResource segres);
 
 int allocateResourceFromSegment(SegResource 	segres,
 							 	GRMContainerSet ctns,
@@ -45,7 +45,8 @@ int recycleResourceToSegment(SegResource	 segres,
 							 int32_t		 memory,
 							 double			 core,
 							 int64_t		 iobytes,
-							 int32_t		 slicesize);
+							 int32_t		 slicesize,
+							 int32_t		 nvseg);
 
 int getSegIDByHostNameInternal(HASHTABLE   hashtable,
 							   const char *hostname,
@@ -71,7 +72,7 @@ void refreshSlavesFileHostSize(FILE *fp);
 /* Functions for BBST indices. */
 int __DRM_NODERESPOOL_comp_ratioFree(void *arg, void *val1, void *val2);
 int __DRM_NODERESPOOL_comp_ratioAlloc(void *arg, void *val1, void *val2);
-int __DRM_NODERESPOOL_comp_iobytes(void *arg, void *val1, void *val2);
+int __DRM_NODERESPOOL_comp_combine(void *arg, void *val1, void *val2);
 
 /*
  * The balanced BST index comparing function. The segment containing most
@@ -139,20 +140,50 @@ int __DRM_NODERESPOOL_comp_ratioAlloc(void *arg, void *val1, void *val2)
 
 /*
  * The balanced BST index comparing function. The segment containing fewest
- * io bytes workload is ordered at the left most, the segment not in available
+ * combined workload is ordered at the left most, the segment not in available
  * status is treated always the minimum.
  */
-int __DRM_NODERESPOOL_comp_iobytes(void *arg, void *val1, void *val2)
+int __DRM_NODERESPOOL_comp_combine(void *arg, void *val1, void *val2)
 {
 	SegResource 	node1 	= (SegResource) val1;
 	SegResource 	node2 	= (SegResource) val2;
 
-	int64_t v1 = IS_SEGRESOURCE_USABLE(node1) ? node1->IOBytesWorkload : INT32_MIN;
-	int64_t v2 = IS_SEGRESOURCE_USABLE(node2) ? node2->IOBytesWorkload : INT32_MIN;
+	double v1 = IS_SEGRESOURCE_USABLE(node1) ? 1 : -1;
+	double v2 = IS_SEGRESOURCE_USABLE(node2) ? 1 : -1;
+
+	if ( v1 > 0 )
+	{
+		double fact1 = node1->IOBytesWorkload > rm_regularize_io_max ?
+					   1.0 :
+					   (1.0 * node1->IOBytesWorkload / rm_regularize_io_max);
+		double fact2 = 1.0 -
+					   1.0 * node1->Available.MemoryMB / node1->Allocated.MemoryMB;
+		double fact3 = 1.0 * node1->NVSeg / rm_regularize_nvseg_max;
+
+		v1 = fact1 * rm_regularize_io_factor +
+			 fact2 * rm_regularize_usage_factor +
+			 fact3 * rm_regularize_nvseg_factor;
+	}
+
+	if ( v2 > 0 )
+	{
+		double fact1 = node2->IOBytesWorkload > rm_regularize_io_max ?
+					   1.0 :
+					   (1.0 * node2->IOBytesWorkload / rm_regularize_io_max);
+		double fact2 = 1.0 -
+					   1.0 * node2->Available.MemoryMB / node2->Allocated.MemoryMB;
+		double fact3 = 1.0 * node2->NVSeg / rm_regularize_nvseg_max;
+
+		v2 = fact1 * rm_regularize_io_factor +
+			 fact2 * rm_regularize_usage_factor +
+			 fact3 * rm_regularize_nvseg_factor;
+	}
 
 	/* Expect the minimum one is at the left most. */
 	return v1>v2 ? 1 : ( v1==v2 ? 0 : -1);
 }
+
+
 
 int  getSegInfoHostAddrStr (SegInfo seginfo, int addrindex, AddressString *addr)
 {
@@ -301,10 +332,10 @@ void initializeResourcePoolManager(void)
     	PRESPOOL->OrderedSegResAllocByRatio[i] = NULL;
     }
 
-	initializeBBST(&(PRESPOOL->OrderedIOBytesWorkload),
+	initializeBBST(&(PRESPOOL->OrderedCombinedWorkload),
 				   PCONTEXT,
 				   NULL,
-				   __DRM_NODERESPOOL_comp_iobytes);
+				   __DRM_NODERESPOOL_comp_combine);
 
 	initializeHASHTABLE(&(PRESPOOL->HDFSHostNameIndexed),
 						PCONTEXT,
@@ -351,8 +382,7 @@ void initializeResourcePoolManager(void)
 	{
 		PRESPOOL->allocateResFuncs[i] = NULL;
 	}
-	PRESPOOL->allocateResFuncs[0] = allocateResourceFromResourcePoolIOBytes;
-	PRESPOOL->allocateResFuncs[1] = allocateResourceFromResourcePoolIOBytes2;
+	PRESPOOL->allocateResFuncs[0] = allocateResourceFromResourcePoolIOBytes2;
 
 
 	PRESPOOL->SlavesFileTimestamp = 0;
@@ -727,7 +757,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		}
 
 		/* Add this node into the io bytes workload BBST structure. */
-		addSegResourceIOBytesWorkloadIndex(segresource);
+		addSegResourceCombinedWorkloadIndex(segresource);
 		/* Add this node into the alloc/avail resource ordered indices. */
 		addSegResourceAvailIndex(segresource);
 		addSegResourceAllocIndex(segresource);
@@ -1079,6 +1109,7 @@ SegResource createSegResource(SegStat segstat)
 
 	res->IOBytesWorkload = 0;
 	res->SliceWorkload   = 0;
+	res->NVSeg			 = 0;
 	res->Stat     		 = segstat;
 	res->LastUpdateTime  = gettime_microsec();
 	res->Stat->FTSAvailable = RESOURCE_SEG_STATUS_UNSET;
@@ -1775,401 +1806,6 @@ int allocateResourceFromResourcePool(int32_t 	nodecount,
 															   vsegiobytes);
 }
 
-int allocateResourceFromResourcePoolIOBytes(int32_t 	nodecount,
-										    int32_t		minnodecount,
-										    uint32_t 	memory,
-										    double 		core,
-										    int64_t		iobytes,
-										    int32_t   	slicesize,
-											int32_t		vseglimitpseg,
-										    int 		preferredcount,
-										    char 	  **preferredhostname,
-										    int64_t    *preferredscansize,
-										    bool		fixnodecount,
-										    List 	  **vsegcounters,
-										    int32_t    *totalvsegcount,
-										    int64_t    *vsegiobytes)
-{
-	int 			res			  		= FUNC_RETURN_OK;
-	uint32_t 		ratio 		  		= memory/core;
-	BBST			nodetree	  		= &(PRESPOOL->OrderedIOBytesWorkload);
-	BBSTNode		leftnode	  		= NULL;
-	SegResource		segresource   		= NULL;
-	List 		   *tmplist				= NULL;
-	int32_t			segid		  		= SEGSTAT_ID_INVALID;
-	GRMContainerSet containerset  		= NULL;
-	int				nodecountleft 		= nodecount;
-	int				impossiblecount   	= 0;
-	bool			skipchosenmachine 	= true;
-	int 			fullcount 			= nodetree->NodeIndex->NodeCount;
-
-	/* This hash saves all selected hosts containing at least one segment.    */
-	HASHTABLEData	vsegcnttbl;
-
-	initializeHASHTABLE(&vsegcnttbl,
-						PCONTEXT,
-						HASHTABLE_SLOT_VOLUME_DEFAULT,
-						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
-						HASHTABLE_KEYTYPE_UINT32,
-						NULL);
-	/*
-	 *--------------------------------------------------------------------------
-	 * stage 1 allocate based on locality, only 1 segment allocated in one host.
-	 *--------------------------------------------------------------------------
-	 */
-	int clustersize = PRESPOOL->AvailNodeCount;
-	if ( nodecount < clustersize )
-	{
-		elog(DEBUG5, "Resource manager tries to find host based on locality data.");
-
-		for ( uint32_t i = 0 ; i < preferredcount ; ++i )
-		{
-			/*
-			 * Get machine identified by HDFS host name. The HDFS host names does
-			 * not have to be a YARN or HAWQ FTS recognized host name. Therefore,
-			 * getNodeIDByHDFSHostName() is responsible to find one mapped HAWQ
-			 * FTS unified host.
-			 */
-			res = getSegIDByHDFSHostName(preferredhostname[i],
-										 strlen(preferredhostname[i]),
-										 &segid);
-			if ( res != FUNC_RETURN_OK )
-			{
-				/* Can not find the machine, skip this machine. */
-				elog(LOG, "Resource manager failed to resolve HDFS host identified "
-						  "by %s. This host is skipped temporarily.",
-						  preferredhostname[i]);
-				continue;
-			}
-
-			/* Get the resource counter of this host. */
-			segresource = getSegResource(segid);
-
-			if (!IS_SEGRESOURCE_USABLE(segresource))
-			{
-				elog(DEBUG3, "Segment %s has unavailable status:"
-						  "RUAlivePending: %d, Available :%d.",
-						  preferredhostname[i],
-						  segresource->RUAlivePending,
-						  segresource->Stat->FTSAvailable);
-				continue;
-			}
-
-			/* Get the allocated resource of this host with specified ratio */
-			res = getGRMContainerSet(segresource, ratio, &containerset);
-			if ( res != FUNC_RETURN_OK )
-			{
-				/* This machine does not have the resource with matching ratio.*/
-				elog(DEBUG3, "Segment %s does not contain expected "
-						  "resource of %d MB per core. This host is skipped.",
-						  preferredhostname[i],
-						  ratio);
-				continue;
-			}
-
-			/* Decide how many segments can be allocated based on locality data.*/
-			int segcountact = containerset == NULL ?
-							  0 :
-							  containerset->Available.MemoryMB / memory;
-			if ( segcountact == 0 )
-			{
-				elog(DEBUG3, "Segment %s does not have more resource to allocate. "
-							 "This segment is skipped.",
-							 preferredhostname[i]);
-				continue;
-			}
-
-			/*
-			 * We expect only 1 segment working in this preferred host. Therefore,
-			 * we check one virtual segment containing slicesize slices.
-			 *
-			 * NOTE: In this loop we always try to find segments not breaking
-			 * 		 slice limit. Because we will gothrough all segments later
-			 * 		 if not enough segments are found in this loop.
-			 */
-			if ( segresource->SliceWorkload + slicesize > rm_nslice_perseg_limit )
-			{
-				elog(DEBUG3, "Segment %s contains %d slices working now, it can "
-							 "not afford %d more slices.",
-							 preferredhostname[i],
-							 segresource->SliceWorkload,
-							 slicesize);
-				continue;
-			}
-
-			elog(DEBUG3, "Resource manager chooses segment %s to allocate vseg.",
-						 GET_SEGRESOURCE_HOSTNAME(segresource));
-
-			/* Allocate resource from selected host. */
-			allocateResourceFromSegment(segresource,
-									 	containerset,
-										memory,
-										core,
-										slicesize);
-
-			/* Reorder the changed host. */
-			reorderSegResourceAvailIndex(segresource, ratio);
-
-			/* Track the mapping from host information to hdfs host name index.*/
-			VSegmentCounterInternal vsegcnt = createVSegmentCounter(i, segresource);
-
-			setHASHTABLENode(&vsegcnttbl,
-							 TYPCONVERT(void *, segresource->Stat->ID),
-							 TYPCONVERT(void *, vsegcnt),
-							 false);
-
-			/* Check if we have gotten expected number of segments. */
-			nodecountleft--;
-			if ( nodecountleft == 0 )
-			{
-				break;
-			}
-		}
-	}
-
-	elog(DEBUG3, "After choosing vseg based on locality, %d vsegs allocated, "
-				 "expect %d vsegs.",
-				 nodecount-nodecountleft,
-				 nodecount);
-
-	/*
-	 *--------------------------------------------------------------------------
-	 * stage 2 allocate based on io workload.
-	 *--------------------------------------------------------------------------
-	 */
-	while( nodecountleft > 0 &&
-		   PRESPOOL->OrderedIOBytesWorkload.Root != NULL &&
-		   impossiblecount < fullcount )
-	{
-		VSegmentCounterInternal curhost     = NULL;
-		bool 				    skipcurrent = false;
-
-		/* Get and remove the host having largest available resource. */
-		leftnode = getLeftMostNode(nodetree);
-		removeBBSTNode(nodetree, &leftnode);
-		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-		tmplist= lappend(tmplist, leftnode);
-		MEMORY_CONTEXT_SWITCH_BACK
-
-		/* If in current loop we should skip chosen machines, check and skip. */
-		SegResource currresinfo = (SegResource)(leftnode->Data);
-
-		elog(DEBUG5, "Try segment %s to allocate resource by round-robin.",
-					 GET_SEGRESOURCE_HOSTNAME(currresinfo));
-
-		if ( !IS_SEGRESOURCE_USABLE(currresinfo) )
-		{
-			impossiblecount++;
-			skipcurrent = true;
-			elog(DEBUG5, "Segment %s is not resource usable, status %d pending %d",
-						 GET_SEGRESOURCE_HOSTNAME(currresinfo),
-						 currresinfo->Stat->FTSAvailable,
-						 currresinfo->RUAlivePending?1:0);
-		}
-		else
-		{
-			PAIR pair = getHASHTABLENode(&vsegcnttbl,
-										 TYPCONVERT(void *,
-													currresinfo->Stat->ID));
-			if ( pair != NULL )
-			{
-				Assert(!currresinfo->RUAlivePending);
-				Assert(IS_SEGSTAT_FTSAVAILABLE(currresinfo->Stat));
-
-				curhost = (VSegmentCounterInternal)(pair->Value);
-				/* Host should not break vseg num limit. */
-				if ( !fixnodecount && curhost->VSegmentCount >= vseglimitpseg )
-				{
-					impossiblecount++;
-					skipcurrent = true;
-					elog(DEBUG5, "Segment %s can not container more vsegs for "
-								 "current statement, allocated %d vsegs.",
-								 GET_SEGRESOURCE_HOSTNAME(curhost->Resource),
-								 curhost->VSegmentCount);
-				}
-
-				if ( !skipcurrent && skipchosenmachine )
-				{
-					impossiblecount++;
-					skipcurrent = true;
-					elog(DEBUG5, "Segment %s is skipped temporarily.",
-								 GET_SEGRESOURCE_HOSTNAME(curhost->Resource));
-				}
-			}
-		}
-
-		if ( !skipcurrent )
-		{
-			/* Try to allocate resource in the selected host. */
-			SegResource curres = (SegResource)(leftnode->Data);
-
-			res = getGRMContainerSet(curres, ratio, &containerset);
-
-			if ( res != FUNC_RETURN_OK )
-			{
-				/* This machine does not have the resource with matching ratio.
-				 * In fact should never occur. */
-				impossiblecount++;
-				elog(DEBUG5, "Segment %s does not contain resource of %d MBPCORE",
-							 GET_SEGRESOURCE_HOSTNAME(curres),
-							 ratio);
-			}
-			else
-			{
-
-				if ( curres->SliceWorkload + slicesize > rm_nslice_perseg_limit )
-				{
-					elog(LOG, "Segment %s contains %d slices working now, "
-							  "it can not afford %d more slices.",
-							  GET_SEGRESOURCE_HOSTNAME(curres),
-							  curres->SliceWorkload,
-							  slicesize);
-					impossiblecount++;
-				}
-
-				else if ( containerset != NULL &&
-						  containerset->Available.MemoryMB >= memory &&
-					      containerset->Available.Core     >= core )
-				{
-					elog(DEBUG3, "Resource manager chooses host %s to allocate vseg.",
-								 GET_SEGRESOURCE_HOSTNAME(curres));
-
-					/* Allocate resource. */
-					allocateResourceFromSegment(curres,
-											 	containerset,
-												memory,
-												core,
-												slicesize);
-					/* Reorder the changed host. */
-					reorderSegResourceAvailIndex(curres, ratio);
-
-					/*
-					 * Check if the selected host has hdfs host name passed in.
-					 * If true we just simply add the counter, otherwise, we
-					 * create a new segment counter instance.
-					 */
-					if ( curhost != NULL )
-					{
-						curhost->VSegmentCount++;
-					}
-					else
-					{
-						uint32_t hdfsnameindex = preferredcount;
-						int32_t  syncid		   = SEGSTAT_ID_INVALID;
-
-						for ( uint32_t k = 0 ; k < preferredcount ; ++k )
-						{
-							res=getSegIDByHDFSHostName(preferredhostname[k],
-									  	  	  	  	   strlen(preferredhostname[k]),
-													   &syncid);
-							if(syncid == curres->Stat->ID)
-							{
-								hdfsnameindex = k;
-								break;
-							}
-						}
-
-						VSegmentCounterInternal vsegcnt =
-							createVSegmentCounter(hdfsnameindex, curres);
-
-						if (hdfsnameindex == preferredcount)
-						{
-							if (debug_print_split_alloc_result)
-							{
-								elog(LOG, "Segment %s mismatched HDFS host name.",
-										  GET_SEGRESOURCE_HOSTNAME(vsegcnt->Resource));
-							}
-						}
-
-						setHASHTABLENode(&vsegcnttbl,
-										 TYPCONVERT(void *, curres->Stat->ID),
-										 TYPCONVERT(void *, vsegcnt),
-										 false);
-					}
-					nodecountleft--;
-					impossiblecount = 0;
-				}
-				else
-				{
-					elog(DEBUG5, "Segment %s does not contain enough resource of "
-								 "%d MBPCORE",
-								 GET_SEGRESOURCE_HOSTNAME(curres),
-								 ratio);
-					impossiblecount++;
-				}
-			}
-		}
-
-		if ( impossiblecount >= fullcount )
-		{
-			if ( skipchosenmachine )
-			{
-				impossiblecount = 0;
-			}
-			skipchosenmachine = false;
-		}
-
- 		/*
- 		 * If the tree goes to 0 nodes, we have to insert all nodes saved in
- 		 * tmplist back to the tree to make them ordered naturally again.
- 		 */
-		if ( nodetree->Root == NULL )
-		{
-			while( list_length(tmplist) > 0 )
-			{
-				MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-				insertBBSTNode(nodetree, (BBSTNode)(lfirst(list_head(tmplist))));
-				tmplist = list_delete_first(tmplist);
-				MEMORY_CONTEXT_SWITCH_BACK
-			}
-		}
-	}
-
-	/*
-	 * Insert all nodes saved in tmplist back to the tree to restore the resource
-	 * tree for the next time.
-	 */
-	while( list_length(tmplist) > 0 )
-	{
-		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-		insertBBSTNode(nodetree, (BBSTNode)(lfirst(list_head(tmplist))));
-		tmplist = list_delete_first(tmplist);
-		MEMORY_CONTEXT_SWITCH_BACK
-	}
-
-	/* STEP 3. Refresh io bytes workload. */
-	*vsegiobytes = (nodecount - nodecountleft) > 0 ?
-					iobytes / (nodecount - nodecountleft) :
-					0;
-
-	List 	 *vsegcntlist = NULL;
-	ListCell *cell		  = NULL;
-	getAllPAIRRefIntoList(&vsegcnttbl, &vsegcntlist);
-	foreach(cell, vsegcntlist)
-	{
-		VSegmentCounterInternal vsegcounter = (VSegmentCounterInternal)
-											  ((PAIR)(lfirst(cell)))->Value;
-		vsegcounter->Resource->IOBytesWorkload +=
-									(*vsegiobytes) * vsegcounter->VSegmentCount;
-		reorderSegResourceIOBytesWorkloadIndex(vsegcounter->Resource);
-	}
-
-    /* STEP 4. Build result. */
-	foreach(cell, vsegcntlist)
-	{
-		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-			(*vsegcounters) = lappend((*vsegcounters),
-									  ((PAIR)(lfirst(cell)))->Value);
-		MEMORY_CONTEXT_SWITCH_BACK
-	}
-	freePAIRRefList(&vsegcnttbl, &vsegcntlist);
-	cleanHASHTABLE(&vsegcnttbl);
-	*totalvsegcount = nodecount - nodecountleft;
-
-	validateResourcePoolStatus(false);
-	return FUNC_RETURN_OK;
-}
-
 int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 										     int32_t	 minnodecount,
 										     uint32_t 	 memory,
@@ -2187,7 +1823,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 {
 	int 			res			  		= FUNC_RETURN_OK;
 	uint32_t 		ratio 		  		= memory/core;
-	BBST			nodetree	  		= &(PRESPOOL->OrderedIOBytesWorkload);
+	BBST			nodetree	  		= &(PRESPOOL->OrderedCombinedWorkload);
 	BBSTNode		leftnode	  		= NULL;
 	SegResource		segresource   		= NULL;
 	List 		   *tmplist				= NULL;
@@ -2318,6 +1954,91 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 		}
 	}
 
+	/*--------------------------------------------------------------------------
+	 * Check if the nvseg variance limit is broken. We check this only when there
+	 * are some virtual segments allocated based on passed in data locality
+	 * reference, if the limit is broken, the virtual segments already allocated
+	 * are returned.
+	 *--------------------------------------------------------------------------
+	 */
+	if ( nodecountleft != nodecount )
+	{
+		int minnvseg = INT32_MAX;
+		int maxnvseg = 0;
+
+		/* Go through all segments. */
+		List 	 *ressegl	 = NULL;
+		ListCell *cell		 = NULL;
+		getAllPAIRRefIntoList(&(PRESPOOL->Segments), &ressegl);
+
+		foreach(cell, ressegl)
+		{
+			PAIR pair = (PAIR)lfirst(cell);
+			SegResource segres = (SegResource)(pair->Value);
+			int nvseg = segres->NVSeg;
+
+			/*
+			 * If current nvseg counter list has this host referenced, we should
+			 * add the additional 1.
+			 */
+			PAIR pair2 = getHASHTABLENode(&vsegcnttbl,
+										  TYPCONVERT(void *,
+													 segres->Stat->ID));
+			nvseg = pair2 == NULL ? nvseg : nvseg + 1;
+
+			minnvseg = minnvseg < nvseg ? minnvseg : nvseg;
+			maxnvseg = maxnvseg > nvseg ? maxnvseg : nvseg;
+		}
+
+		freePAIRRefList(&(PRESPOOL->Segments), &ressegl);
+		Assert(minnvseg <= maxnvseg);
+
+		//if ( maxnvseg - minnvseg > rm_nvseg_variance_among_seg_respool_limit )
+		{
+			elog(WARNING, "Reject virtual segment allocation based on data "
+						  "locality information. After tentative allocation "
+						  "maximum number of virtual segments in one segment is "
+						  "%d minimum number of virtual segments in one segment "
+						  "is %d, tolerated difference limit is %d.",
+						  maxnvseg,
+						  minnvseg,
+						  rm_nvseg_variance_among_seg_respool_limit);
+
+			/* Return the allocated resource. */
+			List 	 *vsegcntlist = NULL;
+			ListCell *cell		  = NULL;
+			getAllPAIRRefIntoList(&vsegcnttbl, &vsegcntlist);
+			foreach(cell, vsegcntlist)
+			{
+				VSegmentCounterInternal vsegcounter = (VSegmentCounterInternal)
+													  ((PAIR)(lfirst(cell)))->Value;
+				GRMContainerSet ctns = NULL;
+				int res2 = getGRMContainerSet(vsegcounter->Resource, ratio, &ctns);
+				Assert(res2 == FUNC_RETURN_OK);
+
+				res2 = recycleResourceToSegment(vsegcounter->Resource,
+										 	 	ctns,
+												memory,
+												core,
+												0,
+												slicesize,
+												1);
+				Assert(res2 == FUNC_RETURN_OK);
+
+				/* Free the counter instance. */
+				rm_pfree(PCONTEXT, vsegcounter);
+
+				/* Reorder the changed host. */
+				reorderSegResourceAvailIndex(segresource, ratio);
+			}
+			freePAIRRefList(&vsegcnttbl, &vsegcntlist);
+
+			/* Clear the content in the virtual segment counter hashtable. */
+			clearHASHTABLE(&vsegcnttbl);
+		}
+	}
+
+
 	elog(RMLOG, "After choosing vseg based on locality, %d vsegs allocated, "
 				"expect %d vsegs.",
 				nodecount-nodecountleft,
@@ -2325,7 +2046,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 
 	/*
 	 *--------------------------------------------------------------------------
-	 * stage 2 allocate based on io workload.
+	 * stage 2 allocate based on combined workload.
 	 *--------------------------------------------------------------------------
 	 */
 
@@ -2519,7 +2240,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 											  ((PAIR)(lfirst(cell)))->Value;
 		vsegcounter->Resource->IOBytesWorkload +=
 									(*vsegiobytes) * vsegcounter->VSegmentCount;
-		reorderSegResourceIOBytesWorkloadIndex(vsegcounter->Resource);
+		reorderSegResourceCombinedWorkloadIndex(vsegcounter->Resource);
 	}
 
     /* STEP 4. Build result. */
@@ -2574,11 +2295,12 @@ int returnResourceToResourcePool(int 		memory,
 										   memory      * vsegcnt->VSegmentCount,
 										   core        * vsegcnt->VSegmentCount,
 										   vsegiobytes * vsegcnt->VSegmentCount,
-										   slicesize   * vsegcnt->VSegmentCount);
+										   slicesize   * vsegcnt->VSegmentCount,
+										   vsegcnt->VSegmentCount);
 
 			res = reorderSegResourceAvailIndex(segres, ratio);
 			Assert(res == FUNC_RETURN_OK);
-			res = reorderSegResourceIOBytesWorkloadIndex(segres);
+			res = reorderSegResourceCombinedWorkloadIndex(segres);
 			Assert(res == FUNC_RETURN_OK);
 		}
 		else
@@ -2636,6 +2358,7 @@ int allocateResourceFromSegment(SegResource 	segres,
 	minusResourceBundleData(&(segres->Available), memory, core);
 
 	segres->SliceWorkload	+= slicesize;
+	segres->NVSeg			+= 1;
 
 	elog(DEBUG3, "HAWQ RM :: allocated resource from machine %s by "
 				 "(%d MB, %lf CORE) for %d slices. "
@@ -2658,10 +2381,12 @@ int recycleResourceToSegment(SegResource	 segres,
 							 int32_t		 memory,
 							 double			 core,
 							 int64_t		 iobytes,
-							 int32_t		 slicesize)
+							 int32_t		 slicesize,
+							 int32_t		 nvseg)
 {
 	segres->IOBytesWorkload -= iobytes;
 	segres->SliceWorkload   -= slicesize;
+	segres->NVSeg			-= nvseg;
 
 	if ( ctns != NULL )
 	{
@@ -2753,11 +2478,11 @@ void addSegResourceAllocIndex(SegResource segres)
 	}
 }
 
-void addSegResourceIOBytesWorkloadIndex(SegResource segres)
+void addSegResourceCombinedWorkloadIndex(SegResource segres)
 {
 	/* Add the node */
-	int res = insertBBSTNode(&(PRESPOOL->OrderedIOBytesWorkload),
-						 	 createBBSTNode(&(PRESPOOL->OrderedIOBytesWorkload),
+	int res = insertBBSTNode(&(PRESPOOL->OrderedCombinedWorkload),
+						 	 createBBSTNode(&(PRESPOOL->OrderedCombinedWorkload),
 						 			 	 	segres));
 	if (res != FUNC_RETURN_OK)
 	{
@@ -2796,24 +2521,24 @@ int reorderSegResourceAllocIndex(SegResource segres, uint32_t ratio)
 	return reorderBBSTNodeData(tree, segres);
 }
 
-int reorderSegResourceIOBytesWorkloadIndex(SegResource segres)
+int reorderSegResourceCombinedWorkloadIndex(SegResource segres)
 {
 	int 	 res 	= FUNC_RETURN_OK;
 	BBSTNode node	= NULL;
 
 	/* Reorder the node */
-	node = getBBSTNode(&(PRESPOOL->OrderedIOBytesWorkload), segres);
+	node = getBBSTNode(&(PRESPOOL->OrderedCombinedWorkload), segres);
 	if ( node == NULL )
 	{
 		return RESOURCEPOOL_INTERNAL_NO_HOST_INDEX;
 	}
 
-	res = removeBBSTNode(&(PRESPOOL->OrderedIOBytesWorkload), &node);
+	res = removeBBSTNode(&(PRESPOOL->OrderedCombinedWorkload), &node);
 	if ( res != FUNC_RETURN_OK )
 	{
 		return RESOURCEPOOL_INTERNAL_NO_HOST_INDEX;
 	}
-	res = insertBBSTNode(&(PRESPOOL->OrderedIOBytesWorkload), node);
+	res = insertBBSTNode(&(PRESPOOL->OrderedCombinedWorkload), node);
 
 	if ( res == UTIL_BBST_DUPLICATE_VALUE )
 	{
