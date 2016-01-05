@@ -158,7 +158,9 @@ int __DRM_NODERESPOOL_comp_combine(void *arg, void *val1, void *val2)
 					   (1.0 * node1->IOBytesWorkload / rm_regularize_io_max);
 		double fact2 = 1.0 -
 					   1.0 * node1->Available.MemoryMB / node1->Allocated.MemoryMB;
-		double fact3 = 1.0 * node1->NVSeg / rm_regularize_nvseg_max;
+		double fact3 = node1->NVSeg > rm_regularize_nvseg_max ?
+					   1.0 :
+					   1.0 * node1->NVSeg / rm_regularize_nvseg_max;
 
 		v1 = fact1 * rm_regularize_io_factor +
 			 fact2 * rm_regularize_usage_factor +
@@ -172,7 +174,9 @@ int __DRM_NODERESPOOL_comp_combine(void *arg, void *val1, void *val2)
 					   (1.0 * node2->IOBytesWorkload / rm_regularize_io_max);
 		double fact2 = 1.0 -
 					   1.0 * node2->Available.MemoryMB / node2->Allocated.MemoryMB;
-		double fact3 = 1.0 * node2->NVSeg / rm_regularize_nvseg_max;
+		double fact3 = node2->NVSeg > rm_regularize_nvseg_max ?
+					   1.0 :
+					   1.0 * node2->NVSeg / rm_regularize_nvseg_max;
 
 		v2 = fact1 * rm_regularize_io_factor +
 			 fact2 * rm_regularize_usage_factor +
