@@ -91,7 +91,7 @@ fi
 
 #setup PYTHONPATH
 cat <<EOF
-PYTHONPATH=\$GPHOME/lib/python:\$PYTHONPATH
+PYTHONPATH=\$GPHOME/lib/python:\$GPHOME/lib/python/pygresql:\$PYTHONPATH
 EOF
 
 # openssl configuration file path

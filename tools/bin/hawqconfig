@@ -20,7 +20,7 @@ import os, sys, re
 from optparse import Option, OptionParser
 from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml
 from gppylib.db import dbconn
-from pygresql.pg import DatabaseError
+from pg import DatabaseError
 
 def parseargs():
     parser = OptionParser(usage="HAWQ config options.")
