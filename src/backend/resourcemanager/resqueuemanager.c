@@ -5225,7 +5225,7 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 			}
 
 			/* Add request to the resource queue and return. */
-			addQueryResourceRequestToQueue(shadowtrack, newconn);
+			addQueryResourceRequestToQueue(quetrack, newconn);
 		}
 		else
 		{
