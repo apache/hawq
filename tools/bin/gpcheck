@@ -27,7 +27,7 @@ try:
     from gppylib.commands.base import WorkerPool, Command, REMOTE
     from gppylib.gpcheckutil import HostType, hosttype_str
     from pgdb import DatabaseError
-    from import pg
+    import pg
 
 except ImportError, e:    
     sys.exit('Cannot import modules.  Please check that you have sourced greenplum_path.sh.  Detail: ' + str(e))
