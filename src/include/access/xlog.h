@@ -18,6 +18,7 @@
 #include "lib/stringinfo.h"
 #include "storage/buf.h"
 #include "utils/pg_crc.h"
+#include "port/pg_crc32c.h"
 #include "utils/relcache.h"
 #include "utils/segadmin.h"
 #include "cdb/cdbpublic.h"
