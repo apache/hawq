@@ -155,7 +155,7 @@ void BufferedReadSetFile(
 	bufferedRead->haveTemporaryLimitInEffect = false;
 	bufferedRead->temporaryLimitFileLen = 0;
 
-    int32 real_fileLen = fileLen - bufferedRead->largeReadPosition; 
+    int64 real_fileLen = fileLen - bufferedRead->largeReadPosition;
 	if (real_fileLen > 0)
 	{
 		/*
