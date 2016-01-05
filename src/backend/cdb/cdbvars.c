@@ -360,7 +360,7 @@ char	*rm_enforce_cgrp_mnt_pnt;
 char	*rm_enforce_cgrp_hier_name;
 double	rm_enforce_cpu_weight;
 double	rm_enforce_core_vpratio;
-int	rm_enforce_cleanup_period;
+int		rm_enforce_cleanup_period;
 
 int	rm_allocation_policy;
 
@@ -369,6 +369,14 @@ char   *rm_seg_tmp_dirs;
 
 int     rm_log_level;
 int     rm_nresqueue_limit;
+
+double	rm_regularize_io_max;
+double	rm_regularize_nvseg_max;
+double	rm_regularize_io_factor;
+double	rm_regularize_usage_factor;
+double	rm_regularize_nvseg_factor;
+
+int		rm_nvseg_variance_among_seg_respool_limit;
 
 /* Greenplum Database Experimental Feature GUCs */
 int         gp_distinct_grouping_sets_threshold = 32;

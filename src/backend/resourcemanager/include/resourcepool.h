@@ -263,6 +263,7 @@ struct SegResourceData {
 
 	int64_t			IOBytesWorkload; /* Accumulated io bytes number.      	  */
 	int				SliceWorkload;	 /* Accumulated slice number.             */
+	int				NVSeg;			 /* Accumulated vseg number.			  */
 
 	uint64_t        LastUpdateTime;  /* Update it when master receives IMAlive
 										message from segment,                 */
@@ -410,7 +411,7 @@ struct ResourcePoolData {
 	/*
 	 * The index to help finding the nodes having fewest io bytes number accumulated.
 	 */
-	BBSTData		OrderedIOBytesWorkload;
+	BBSTData		OrderedCombinedWorkload;
 
 	/*
 	 * This is for caching all resolved hdfs hostnames which are mapped to one
@@ -561,21 +562,6 @@ typedef struct VSegmentCounterInternalData  VSegmentCounterInternalData;
 typedef struct VSegmentCounterInternalData *VSegmentCounterInternal;
 
 void freeVSegmentConterList(List **list);
-
-int allocateResourceFromResourcePoolIOBytes(int32_t 	nodecount,
-										    int32_t		minnodecount,
-										    uint32_t 	memory,
-										    double 		core,
-										    int64_t		iobytes,
-										    int32_t   	slicesize,
-											int32_t		vseglimitpseg,
-										    int 		preferredcount,
-										    char 	  **preferredhostname,
-										    int64_t    *preferredscansize,
-										    bool		fixnodecount,
-										    List 	  **vsegcounters,
-										    int32_t    *totalvsegcount,
-										    int64_t    *vsegiobytes);
 
 int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 										     int32_t	 minnodecount,

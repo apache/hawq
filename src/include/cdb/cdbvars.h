@@ -1217,6 +1217,14 @@ extern char   *rm_seg_tmp_dirs;
 extern int     rm_log_level;
 extern int     rm_nresqueue_limit;
 
+extern double  rm_regularize_io_max;
+extern double  rm_regularize_nvseg_max;
+extern double  rm_regularize_io_factor;
+extern double  rm_regularize_usage_factor;
+extern double  rm_regularize_nvseg_factor;
+
+extern int	   rm_nvseg_variance_among_seg_respool_limit;
+
 extern int max_filecount_notto_split_segment;
 extern int min_datasize_to_combine_segment;
 extern int datalocality_algorithm_version;
