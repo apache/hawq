@@ -110,11 +110,11 @@ subprojects { subProject ->
     //buildRpm
     ospackage {
         summary = 'The PXF extensions library for HAWQ'
-        vendor = 'Pivotal'
+        vendor = project.vendor
         release = buildNumber()
         version = subProject.version.split('-')[0];
         os = LINUX
-        license = "ASL 2.0"
+        license = project.license
         obsoletes('gpxf')
         user = 'root'
         permissionGroup = 'root'
@@ -389,11 +389,11 @@ task tomcatRpm(type: Rpm) {
     ospackage {
         packageName 'apache-tomcat'
         summary = 'Apache Tomcat RPM'
-        vendor = 'Pivotal'
+        vendor = project.vendor
         release = buildNumber()
         version = tomcatVersion
         os = LINUX
-        license = "ASL 2.0"
+        license = project.license
         user = 'root'
         permissionGroup = 'root'
 
