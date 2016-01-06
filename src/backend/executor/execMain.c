@@ -109,6 +109,8 @@
 #include "cdb/cdbquerycontextdispatching.h"
 #include "optimizer/prep.h"
 
+#include "resourcemanager/dynrm.h"
+
 extern bool		filesystem_support_truncate;
 
 typedef struct evalPlanQual
@@ -440,8 +442,22 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
              * resource queues.
              */
             if (queryDesc->plannedstmt->query_mem > 0) {
+
+                uint64 memAvailableBytes = 0;
+
+                /* With resouce manager in NONE mode, we assign memory quota for operators normally */
+                if ( strcasecmp(rm_global_rm_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_NONE) == 0 )
+                {
+                    memAvailableBytes = queryDesc->plannedstmt->query_mem;
+                }
+                /* With resouce manager in YARN/MESOS mode, we assign memory quota for operators conservatively */
+                else
+                {
+                    memAvailableBytes = queryDesc->plannedstmt->query_mem * hawq_re_memory_quota_allocation_ratio;
+                }
+
                 PolicyEagerFreeAssignOperatorMemoryKB(queryDesc->plannedstmt,
-                                                      queryDesc->plannedstmt->query_mem);
+                                                      memAvailableBytes);
 
             }
         }

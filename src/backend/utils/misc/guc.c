@@ -6956,6 +6956,16 @@ static struct config_real ConfigureNamesReal[] =
 		3.0, 1.0, 100.0, NULL, NULL
 	},
 
+	{
+		{"hawq_re_memory_quota_allocation_ratio", PGC_USERSET, RESOURCES_MEM,
+			gettext_noop("Sets the ratio for memory quota allocation during query optimization."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&hawq_re_memory_quota_allocation_ratio,
+		0.5, 0.0, 1.0, NULL, NULL
+	},
+
 /* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, 0.0, 0.0, 0.0, NULL, NULL

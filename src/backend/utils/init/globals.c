@@ -150,4 +150,5 @@ int hawq_re_memory_overcommit_max = 8192;
 #else
 int hawq_re_memory_overcommit_max = 8192;
 #endif
+double hawq_re_memory_quota_allocation_ratio = 0.5;
 int gp_vmem_protect_gang_cache_limit = 500;
