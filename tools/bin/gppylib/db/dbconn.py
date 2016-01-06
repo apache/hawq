@@ -24,7 +24,7 @@ import os
 import stat
 
 try: 
-    from pygresql import pgdb
+    import pgdb
     from gppylib.commands.unix import UserId
 
 except ImportError, e:

@@ -49,7 +49,7 @@ except ImportError:
     sys.exit(2)
 
 try:
-    from pygresql import pg
+    import pg
 except Exception, e:
     errorMsg = "gpload was unable to import The PyGreSQL Python module (pg.py) - %s\n" % str(e)
     sys.stderr.write(str(errorMsg))
