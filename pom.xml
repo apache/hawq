@@ -34,13 +34,106 @@
           <version>0.11</version>
           <configuration>
             <excludes>
-              <!-- 
-                  This file defines the exclusion list for Apache RAT.
-                  Source files from 3rd party, like Postgres, gtest, gmock, orafce, pgcrypto, pljava, 
-                  will not be checked.
+              <!-- stream benchmark under BSD-like license with a few exceptions around benchmarking results -->
+              <exclude>tools/bin/src/stream/*</exclude> 
+
+              <!-- PyGreSQL an open-source Python module that interfaces to a PostgreSQL database under the Python license -->
+              <exclude>tools/bin/pythonSrc/PyGreSQL-4.0/**</exclude>
+
+              <!-- BSD license -->
+              <exclude>depends/libyarn/CMake/FindBoost.cmake</exclude>
+              <exclude>depends/libyarn/CMake/FindGSasl.cmake</exclude>
+              <exclude>depends/libyarn/CMake/FindKERBEROS.cmake</exclude>
+              <exclude>src/bin/gpfdist/src/gpfdist/glob.c</exclude>
+              <exclude>src/bin/gpfdist/src/gpfdist/include/glob.h</exclude>
+              <exclude>src/include/port/win32_msvc/glob.h</exclude>
+              <exclude>src/include/port/win32_msvc/bzlib.h</exclude>
+              
+              <!-- Google BSD license -->
+              <exclude>depends/libyarn/gmock/**</exclude>
+              <exclude>depends/libyarn/gtest/**</exclude>
+
+              <!-- Oraface Project BSD license https://github.com/orafce -->
+              <exclude>contrib/orafce/*</exclude>
+
+              <!-- pg8000 DB-API 2.0 compatible Pure-Python interface to the PostgreSQL database engine, BSD license -->
+              <exclude>tools/bin/ext/pg8000/*</exclude>
+
+              <!-- figleaf is a Python code coverage analysis tool, BSD license -->
+              <exclude>tools/bin/ext/figleaf/**</exclude>
+
+              <!-- Pexpect a Python module for spawning child applications and controlling them automatically, BSD license -->
+              <exclude>tools/bin/lib/pexpect.py</exclude>
+
+              <!-- These files came from PostgreSQL but they don't have markers to identify that -->
+              <exclude>aclocal.m4</exclude>
+              <exclude>GNUmakefile.in</exclude>
+              <exclude>configure.in</exclude> 
+              <exclude>configure</exclude>
+              <exclude>Makefile</exclude>
+              <exclude>config/*</exclude> <!-- This one is tricky since it is actually GPL -->
+              <exclude>src/makefiles/*</exclude>
+              <exclude>contrib/pgcrypto/**/*</exclude>
+              <exclude>src/DEVELOPERS</exclude>
+              <exclude>src/backend/catalog/Makefile</exclude>
+              <exclude>src/backend/port/beos/*.c</exclude>
+              <exclude>src/backend/port/tas/*.s</exclude>
+              <exclude>src/backend/regex/re_syntax.n</exclude>
+              <exclude>src/backend/utils/mb/conversion_procs/regress_epilogue</exclude>
+              <exclude>src/backend/utils/mb/conversion_procs/regress_prolog</exclude>
+              <exclude>src/backend/utils/mb/Unicode/ISO10646-GB18030.TXT</exclude>
+              <exclude>src/backend/utils/misc/check_guc</exclude>
+              <exclude>src/backend/port/hpux/tas.c.template</exclude>
+              <exclude>src/backend/utils/mb/conversion_procs/proc.mk</exclude>
+              <exclude>src/include/pg_config.h.win32</exclude>
+              <exclude>src/bin/scripts/common.h</exclude>
+              <exclude>src/include/pg_config.h.in</exclude>
+              <exclude>src/bin/initdb/*</exclude>
+              <exclude>src/bin/initlocation/*</exclude>
+              <exclude>src/bin/ipcclean/*</exclude>
+              <exclude>src/bin/pg_*/**/*</exclude>
+              <exclude>src/bin/psql/**/*</exclude>
+              <exclude>src/bin/scripts/*.c</exclude>
+              <exclude>src/interfaces/**/*</exclude>
+              <exclude>src/tools/**/*</exclude>
+              <exclude>src/tutorial/*</exclude>
+              <exclude>src/pl/**/*</exclude>
+              <exclude>src/port/*</exclude>
+              <exclude>src/template/*</exclude>
+              <exclude>src/test/**/*</exclude>
+              <exclude>src/timezone/**/*</exclude>
+              <exclude>doc/src/sgml/fixrtf</exclude>
+              <exclude>doc/**/*.sgml</exclude>
+
+              <!-- Following files are licensed to ASF via the initial HAWQ SGA,
+                   however it is tricky to maintain headers in them -->
+              <exclude>depends/libyarn/test/data/*</exclude>
+
+              <exclude>contrib/gp_sparse_vector/bugs</exclude>
+              <exclude>contrib/gp_sparse_vector/*output</exclude>
+              <exclude>contrib/hawq-hadoop/hawq-mapreduce-tool/src/test/resources/dataset</exclude>
+              <exclude>contrib/hawq-hadoop/**/*.yaml</exclude>
+
+              <exclude>src/backend/access/index/caql.files</exclude>
+              <exclude>src/backend/gpopt/library.ver</exclude>
+              <exclude>src/backend/libgppc/lib/Doxyfile</exclude>
+              <exclude>src/backend/libgppc/lib/package/libgppc.spec</exclude>
+              <exclude>src/backend/libgppc/lib/package/gppkg_spec.yml.source.in</exclude>
+              <exclude>src/backend/utils/misc/etc/slaves</exclude>
+
+              <exclude>tools/bin/.rcfile</exclude>
+              <exclude>tools/bin/postgresql_conf_gp_additions</exclude>
+              <exclude>tools/doc/**/*</exclude>
+              <exclude>tools/demo/gpfdist_transform/*.yaml</exclude>
+              <exclude>tools/bin/gppylib/operations/madlib_depcheck/changelist.yaml</exclude>
+
+              <!-- Finally we exclude a few file types (based on extension) for which comments are 
+                   tough to maintain. Note that this is a combination of files licensed to ASF and
+                   files that came from PostgreSQL and other projects (under compatible licenses).
+                   You may need to engage in software archaeology to find out the origins of these.
               -->
+              <exclude>.git/**</exclude>
               <exclude>**/*.md</exclude>
-              <exclude>**/*.in</exclude>
               <exclude>**/*.md5</exclude>
               <exclude>**/*.json</exclude>
               <exclude>**/*.ans</exclude>
@@ -57,81 +150,13 @@
               <exclude>**/*.pm</exclude>
               <exclude>**/*.1</exclude>
               <exclude>**/*.sample</exclude>
-              <exclude>configure</exclude>
-              <exclude>config/*</exclude>
-              <exclude>*version</exclude>
               <exclude>**/*.pgc</exclude>
               <exclude>**/*.cnf</exclude>
               <exclude>**/*.stx</exclude>
               <exclude>**/*.gdb</exclude>
               <exclude>**/__init__.py</exclude>
-              <exclude>README-PostgreSQL</exclude>
-              <exclude>contrib/gp_sparse_vector/bugs</exclude>
-              <exclude>contrib/hawq-hadoop/hawq-mapreduce-tool/src/test/resources/dataset</exclude>
-              <exclude>contrib/hawq-hadoop/**/*.yaml</exclude>
-              <exclude>contrib/gp_sparse_vector/*output</exclude>
-              <exclude>contrib/gp_sparse_vector/README*</exclude>
-              <exclude>contrib/orafce/*</exclude>
-              <exclude>contrib/pgcrypto/**/*</exclude>
-              <exclude>doc/src/sgml/fixrtf</exclude>
-              <exclude>depends/libyarn/bootstrap</exclude>
-              <exclude>depends/libyarn/**/*.cmake</exclude>
-              <exclude>depends/libyarn/**/*.txt</exclude>
-              <exclude>depends/libyarn/gmock/**/*.cc</exclude>
-              <exclude>depends/libyarn/gmock/**/*.h</exclude>
-              <exclude>depends/libyarn/gmock/COPYING</exclude>
-              <exclude>depends/libyarn/gtest/**/*.cc</exclude>
-              <exclude>depends/libyarn/gtest/**/*.h</exclude>
-              <exclude>depends/libyarn/**/Makefile</exclude>
-              <exclude>doc/**/*.sgml</exclude>
-              <exclude>pxf/*.gradle</exclude>
-              <exclude>pxf/gradlew</exclude>
+              <exclude>**/*README*</exclude>
               <exclude>pxf/**/*.classpath</exclude>	 
-              <exclude>src/bin/gp_workfile_mgr/*</exclude>
-              <exclude>src/bin/gpfdist/src/gpfdist/glob.c</exclude>
-              <exclude>src/bin/pgbench/*</exclude>
-              <exclude>src/bin/scripts/common.h</exclude>
-              <exclude>src/bin/gpfdist/**/include/glob.*</exclude>
-              <exclude>src/bin/gpfusion/*</exclude>
-              <exclude>src/bin/gpupgrade/*</exclude>
-              <exclude>src/bin/i*/**/*</exclude>
-              <exclude>src/bin/pg_*/**/*</exclude>
-              <exclude>src/bin/psql/**/*</exclude>
-              <exclude>src/bin/scripts/*.c</exclude>
-              <exclude>src/DEVELOPERS</exclude>
-              <exclude>src/backend/access/index/caql.files</exclude>
-              <exclude>src/backend/gpopt/library.ver</exclude>
-              <exclude>src/backend/libgppc/lib/Doxyfile</exclude>
-              <exclude>src/backend/libgppc/lib/package/libgppc.spec</exclude>
-              <exclude>src/backend/port/beos/*.c</exclude>
-              <exclude>src/backend/port/tas/*.s</exclude>
-              <exclude>src/backend/regex/re_syntax.n</exclude>
-              <exclude>src/backend/storage/file/README_QUICKLZ</exclude>
-              <exclude>src/backend/utils/mb/conversion_procs/regress_epilogue</exclude>
-              <exclude>src/backend/utils/mb/conversion_procs/regress_prolog</exclude>
-              <exclude>src/backend/utils/mb/Unicode/ISO10646-GB18030.TXT</exclude>
-              <exclude>src/backend/utils/misc/check_guc</exclude>
-              <exclude>src/backend/utils/misc/etc/slaves</exclude>
-              <exclude>src/include/access/README.caql_usage</exclude>
-              <exclude>src/include/catalog/README.add_catalog_function</exclude>
-              <exclude>src/include/catalog/README.tidycat</exclude>
-              <exclude>src/include/pg_config.h.win32</exclude>
-              <exclude>src/interfaces/**/*</exclude>
-              <exclude>src/tools/**/*</exclude>
-              <exclude>src/tutorial/*</exclude>
-              <exclude>src/pl/**/*</exclude>
-              <exclude>src/port/*</exclude>
-              <exclude>src/**/Makefile*</exclude>
-              <exclude>src/template/*</exclude>
-              <exclude>src/test/**/*</exclude>
-              <exclude>src/timezone/**/*</exclude>
-              <exclude>tools/bin/pythonSrc/**/*</exclude>
-              <exclude>tools/bin/ext/pg8000/*</exclude>
-              <exclude>tools/bin/.rcfile</exclude>
-              <exclude>tools/bin/diskqual.ksh</exclude>
-              <exclude>tools/bin/ext/figleaf/figleaf2html</exclude>
-              <exclude>tools/bin/postgresql_conf_gp_additions</exclude>
-              <exclude>tools/doc/**/*</exclude>
             </excludes>
             <licenses>
               <license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">
@@ -155,5 +180,20 @@
         </plugin>
       </plugins>
     </pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.rat</groupId>
+          <artifactId>apache-rat-plugin</artifactId>
+          <version>0.11</version>
+          <executions>
+            <execution>
+              <phase>verify</phase>
+              <goals>
+                <goal>check</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
   </build>
 </project>
