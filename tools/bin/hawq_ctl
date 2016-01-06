@@ -26,6 +26,7 @@ try:
     import threading
     import Queue
     import signal
+    import getpass
     from optparse import OptionParser
     from gppylib.gplog import setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
     from gppylib.commands.unix import getLocalHostname, getUserName
@@ -788,7 +789,7 @@ def get_args():
     source_hawq_env = "source %s/greenplum_path.sh" % opts.GPHOME 
 
     if opts.user == "":
-        opts.user = os.getenv('USER')
+        opts.user = getpass.getuser()
     if opts.user == "root":
         logger.error("'root' user is not allowed")
         sys.exit()
