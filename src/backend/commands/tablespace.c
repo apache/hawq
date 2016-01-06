@@ -60,6 +60,7 @@
 #include "catalog/indexing.h"
 #include "catalog/pg_filespace.h"
 #include "catalog/pg_tablespace.h"
+#include "catalog/pg_database.h"
 #include "catalog/pg_type.h"
 #include "cdb/cdbmirroredflatfile.h"
 #include "commands/comment.h"
@@ -275,7 +276,7 @@ void
 RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 {
 	char	    *tablespacename;
-	Relation	 rel;
+	Relation	 rel, rel1;
 	HeapTuple	 tuple;
 	cqContext					 cqc;
 	cqContext					*pcqCtx;
@@ -361,9 +362,55 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 	 * Check for any databases or relations defined in this tablespace, this 
 	 * is logically the same as checkSharedDependencies, however we don't 
 	 * actually track these in pg_shdepend, instead we lookup this information 
-	 * in the gp_persistent_database/relation_node tables.
+	 * in the related catalog. The reason why we don't based on the persistent
+     * table (gp_persistent_database/relation_node) is:
+     * it will has concurrency problem because there is no 2-phrase-lock
+     * for persistent table.
 	 */
-	/* ... */
+
+	/*
+	 * Check for any databases defined in this tablespace
+	 */
+	rel1 = heap_open(DatabaseRelationId, AccessShareLock);
+
+	pcqCtx = caql_addrel(cqclr(&cqc), rel1); 
+
+	tuple = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_database "
+				 " WHERE dat2tablespace = :1 ", 
+				ObjectIdGetDatum(tablespaceoid)));
+
+	if (HeapTupleIsValid(tuple))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("tablespace \"%s\" is not empty: existing database.", tablespacename)));
+
+	}
+    heap_close(rel1, AccessShareLock);
+    
+	/*
+	 * Check for any databases defined in this tablespace
+	 */
+	rel1 = heap_open(RelationRelationId, AccessShareLock);
+
+	pcqCtx = caql_addrel(cqclr(&cqc), rel1); 
+
+	tuple = caql_getfirst(
+			pcqCtx,
+			cql("SELECT * FROM pg_class "
+				 " WHERE reltablespace = :1 ", 
+				ObjectIdGetDatum(tablespaceoid)));
+
+	if (HeapTupleIsValid(tuple))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("tablespace \"%s\" is not empty: existing table.", tablespacename)));
+
+	}
+    heap_close(rel1, AccessShareLock);
 
 	/*
 	 * Remove the pg_tablespace tuple (this will roll back if we fail below)
