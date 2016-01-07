@@ -702,8 +702,7 @@ class Command:
         else:
             # simulate error
             self.results = CommandResult(1,'Fault Injection','Fault Injection' ,False,True)
-            print self.results
-        
+
         if validateAfter:
             self.validate()
         pass
