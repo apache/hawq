@@ -56,18 +56,18 @@ if [ -h \${GPHOME}/../hawq ]; then
 fi
 EOF
 
-# OSX does not need JAVA_HOME 
+# OSX does NOT have DYLD_LIBRARY_PATH, add it
 if [ "${PLAT}" = "Darwin" ] ; then
-cat << EOF
-PATH=\$GPHOME/bin:\$GPHOME/ext/python/bin:\$PATH
-DYLD_LIBRARY_PATH=\$GPHOME/lib:\$GPHOME/ext/python/lib:\$DYLD_LIBRARY_PATH
+cat <<EOF
+PATH=\$GPHOME/bin:\$PATH
+DYLD_LIBRARY_PATH=\$GPHOME/lib:\$DYLD_LIBRARY_PATH
 EOF
 fi
 
-# Solaris needs amd64 in PATH for java to work
-if [ "${PLAT}" = "SunOS" ] ; then
+# OSX does NOT need ext/python/bin/ path
+if [ "${PLAT}" = "Darwin" ] ; then
 cat <<EOF
-PATH=\$GPHOME/bin:\$GPHOME/ext/python/bin:\$PATH
+PATH=\$GPHOME/bin:\$PATH
 EOF
 else
 cat <<EOF
@@ -75,7 +75,7 @@ PATH=\$GPHOME/bin:\$GPHOME/ext/python/bin:\$PATH
 EOF
 fi
 
-# OS X does not have LD_LIBRARY_PATH
+# OSX does NOT have LD_LIBRARY_PATH, add it
 if [ "${PLAT}" != "Darwin" ] ; then
     #Solaris needs /usr/sfw/lib in order for groupsession to work and /usr/local/lib for readline for Python 
     if [ "${PLAT}" = "SunOS" ] ; then
@@ -90,9 +90,16 @@ EOF
 fi
 
 #setup PYTHONPATH
+# OSX does NOT need pygresql/ path
+if [ "${PLAT}" = "Darwin" ] ; then
+cat <<EOF
+PYTHONPATH=\$GPHOME/lib/python:\$PYTHONPATH
+EOF
+else
 cat <<EOF
 PYTHONPATH=\$GPHOME/lib/python:\$GPHOME/lib/python/pygresql:\$PYTHONPATH
 EOF
+fi
 
 # openssl configuration file path
 cat <<EOF
