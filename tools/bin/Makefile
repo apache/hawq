@@ -43,8 +43,6 @@ all: stream
 #
 
 
-NETPERF_DIR=netperf-2.4.3
-
 #
 #  STREAM
 #
@@ -111,13 +109,9 @@ clean :
 	rm -rf $(PYLIB_SRC)/$(PYCHECKER_DIR)
 	rm -rf $(PYLIB_SRC)/$(UNITTEST2_DIR)
 	rm -rf $(STREAM_DIR)/stream lib/stream  
-	if [ -f $(SRC)/src/$(NETPERF_DIR)/Makefile ]; then \
-		(cd $(SRC)/src/$(NETPERF_DIR) && $(MAKE) clean) \
-	fi
 	rm -rf *.pyc lib/*.pyc
 
 distclean: clean
-	rm -rf $(NETPERF_DIR)    
 
 SKIP_INSTALL=.epydoc.config|.gitignore|.p4ignore|.rcfile|Makefile|generate-greenplum-path.sh
 install: all
