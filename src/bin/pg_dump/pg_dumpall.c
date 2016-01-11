@@ -1243,7 +1243,6 @@ dumpFilespaces(PGconn *conn)
 
 			if (j > 0)
 				appendPQExpBuffer(buf, ",\n");
-			appendPQExpBuffer(buf, "  %s: ", dbid);
 			appendStringLiteralConn(buf, location, conn);
 		}
 		PQclear(entries);
