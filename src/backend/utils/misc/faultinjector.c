@@ -44,6 +44,7 @@
 #include "cdb/cdbfilerep.h"
 #include "cdb/cdbresynchronizechangetracking.h"
 #include "postmaster/service.h"
+#include "postmaster/identity.h"
 #include "storage/spin.h"
 #include "storage/shmem.h"
 #include "utils/faultinjector.h"
@@ -1054,19 +1055,23 @@ FaultInjector_NewHashEntry(
 		case FaultInBackgroundWriterMain:
 			
 			/* SEGMENT */
+			if(!AmIMaster())
 			{
 				LockRelease();
 				status = STATUS_ERROR;
 				ereport(WARNING,
-						(errmsg("could not insert fault injection entry into table, segment not in primary role"
+						(errmsg("could not insert fault injection entry into table, "
+								"This kind of fault injection should be sent to master. "
 								"fault name:'%s' fault type:'%s' ",
 								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
 								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
 				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
-						 "could not insert fault injection, segment not in primary role");
+						 "could not insert fault injection. "
+						 "This kind of fault injection should be sent to master. "
+						 "Please use \"-r master\"");
 				
 				goto exit;
-			}			
+			}
 			break;
 		
 		case FaultBeforePendingDeleteRelationEntry:
@@ -1084,17 +1089,20 @@ FaultInjector_NewHashEntry(
 		case SegmentProbeResponse:
 			
 			/* SEGMENT */
+			if(!AmIMaster())
 			{
 				LockRelease();
 				status = STATUS_ERROR;
 				ereport(WARNING,
 						(errmsg("could not insert fault injection entry into table, "
-								"segment not in primary or mirror role, "
+								"This kind of fault injection should be sent to master. "
 								"fault name:'%s' fault type:'%s' ",
 								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
 								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
 				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
-						 "could not insert fault injection, segment not in primary or mirror role");
+						 "could not insert fault injection. "
+						 "This kind of fault injection should be sent to master. "
+						 "Please use \"-r master\"");
 				
 				goto exit;
 			}			
@@ -1109,17 +1117,20 @@ FaultInjector_NewHashEntry(
 		case OptTaskAllocateStringBuffer:
 			
 			/* TODO: MASTER ONLY */
+			if(!AmIMaster())
 			{
 				LockRelease();
 				status = STATUS_ERROR;
 				ereport(WARNING,
 						(errmsg("could not insert fault injection entry into table, "
-								"segment not in master role, "
+								"This kind of fault injection should be sent to master. "
 								"fault name:'%s' fault type:'%s' ",
 								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
 								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
 				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
-						 "could not insert fault injection, segment not in master role");
+						 "could not insert fault injection. "
+						 "This kind of fault injection should be sent to master. "
+						 "Please use \"-r master\"");
 				
 				goto exit;
 			}			
@@ -1136,6 +1147,7 @@ FaultInjector_NewHashEntry(
 		case RunawayCleanup:
 			
 			/* MASTER OR SEGMENT */
+			if(AmIStandby())
 			{
 				LockRelease();
 				status = STATUS_ERROR;
@@ -1146,7 +1158,7 @@ FaultInjector_NewHashEntry(
 								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
 								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
 				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
-						 "could not insert fault injection, segment not in primary or master role");
+						 "could not insert fault injection, segment not in master or segment role");
 				
 				goto exit;
 			}			
