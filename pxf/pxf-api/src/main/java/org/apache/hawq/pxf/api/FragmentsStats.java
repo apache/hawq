@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.api;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.api;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -37,7 +36,7 @@ public class FragmentsStats {
      */
     public static final long DEFAULT_FRAGMENT_SIZE = 67108864L;
 
-    private static Log Log = LogFactory.getLog(FragmentsStats.class);
+    private static final Log LOG = LogFactory.getLog(FragmentsStats.class);
 
     // number of fragments
     private long fragmentsNumber;
@@ -139,8 +138,7 @@ public class FragmentsStats {
     /**
      * Given a {@link FragmentsStats}, serialize it in JSON to be used as the
      * result string for HAWQ. An example result is as follows:
-     * <code>{"PXFFragmentsStats":{"fragmentsNumber"
-     * :3,"firstFragmentSize":67108864,"totalSize":200000000}}</code>
+     * <code>{"PXFFragmentsStats":{"fragmentsNumber":3,"firstFragmentSize":{"size"=67108864,"unit":"B"},"totalSize":{"size"=200000000,"unit"="B"}}}</code>
      *
      * @param stats the data to be serialized
      * @return the result in json format

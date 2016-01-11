@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.plugins.hive;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.plugins.hive;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;
@@ -55,8 +54,7 @@ import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 
 /**
- * Fragmenter class for HIVE tables.
- * <br>
+ * Fragmenter class for HIVE tables. <br>
  * Given a Hive table and its partitions divide the data into fragments (here a
  * data fragment is actually a HDFS file block) and return a list of them. Each
  * data fragment will contain the following information:
@@ -469,6 +467,7 @@ public class HiveDataFragmenter extends Fragmenter {
      */
     @Override
     public FragmentsStats getFragmentsStats() throws Exception {
-        throw new UnsupportedOperationException("ANALYZE for Hive plugin is not supported");
+        throw new UnsupportedOperationException(
+                "ANALYZE for Hive plugin is not supported");
     }
 }

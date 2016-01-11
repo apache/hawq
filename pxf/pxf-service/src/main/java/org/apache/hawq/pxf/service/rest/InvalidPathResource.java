@@ -56,7 +56,7 @@ public class InvalidPathResource {
     @Context
     UriInfo rootUri;
 
-    private static final Log Log = LogFactory.getLog(InvalidPathResource.class);
+    private static final Log LOG = LogFactory.getLog(InvalidPathResource.class);
     // Set of retired endpoints
     private final ImmutableSet<String> retiredEndPoints = ImmutableSet.of(
             "Analyzer");
@@ -127,7 +127,7 @@ public class InvalidPathResource {
         String version = pathSegments.get(0).getPath();
         String endPoint = (pathSegments.size() > 1) ? pathSegments.get(1).getPath() : null;
 
-        Log.debug("REST request: " + rootUri.getAbsolutePath() + ". " +
+        LOG.debug("REST request: " + rootUri.getAbsolutePath() + ". " +
                 "Version " + version + ", supported version is " + Version.PXF_PROTOCOL_VERSION);
 
         if(version.equals(Version.PXF_PROTOCOL_VERSION)) { // api with correct version but incorrect path

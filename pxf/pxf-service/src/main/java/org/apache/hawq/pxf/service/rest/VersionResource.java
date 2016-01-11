@@ -47,7 +47,7 @@ class Version {
 @Path("/ProtocolVersion")
 public class VersionResource {
 
-    private static final Log Log = LogFactory.getLog(VersionResource.class);
+    private static final Log LOG = LogFactory.getLog(VersionResource.class);
 
     public VersionResource() {
     }

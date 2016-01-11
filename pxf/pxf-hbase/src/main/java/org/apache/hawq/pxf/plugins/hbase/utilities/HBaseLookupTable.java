@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.plugins.hbase.utilities;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.plugins.hbase.utilities;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.logging.Log;
@@ -36,19 +35,23 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * HBaseLookupTable will load a table's lookup information
- * from HBase pxflookup table if exists.<br>
- * This table holds mappings between HAWQ column names (key) and HBase column names (value).<br>
- * E.g. for an HBase table "hbase_table", mappings between HAWQ column names and HBase column names,
- * when <code>"hawq1"</code> is mapped to <code>"cf1:hbase1"</code> and
- * <code>"hawq2"</code> is mapped to <code>"cf1:hbase2"</code>, will be:<br>
+ * HBaseLookupTable will load a table's lookup information from HBase pxflookup
+ * table if exists.<br>
+ * This table holds mappings between HAWQ column names (key) and HBase column
+ * names (value).<br>
+ * E.g. for an HBase table "hbase_table", mappings between HAWQ column names and
+ * HBase column names, when <code>"hawq1"</code> is mapped to
+ * <code>"cf1:hbase1"</code> and <code>"hawq2"</code> is mapped to
+ * <code>"cf1:hbase2"</code>, will be:<br>
+ *
  * <pre>
  * 	ROW                     COLUMN+CELL
  *  hbase_table             column=mapping:hawq1, value=cf1:hbase1
  *  hbase_table             column=mapping:hawq2, value=cf1:hbase2
  * </pre>
  *
- * Data is returned as a map of string and byte array from {@link #getMappings(String)}.
+ * Data is returned as a map of string and byte array from
+ * {@link #getMappings(String)}.
  * <p>
  * Once created, {@link #close()} MUST be called to cleanup resources.
  */
@@ -65,8 +68,8 @@ public class HBaseLookupTable implements Closeable {
     private Table lookupTable;
 
     /**
-     * Constructs a connector to HBase lookup table.
-     * Requires calling {@link #close()} to close {@link HBaseAdmin} instance.
+     * Constructs a connector to HBase lookup table. Requires calling
+     * {@link #close()} to close {@link HBaseAdmin} instance.
      *
      * @param conf HBase configuration
      * @throws IOException when initializing HBaseAdmin fails
@@ -76,14 +79,14 @@ public class HBaseLookupTable implements Closeable {
         connection = ConnectionFactory.createConnection(hbaseConfiguration);
         admin = connection.getAdmin();
         ClusterStatus cs = admin.getClusterStatus();
-        LOG.debug("HBase cluster has " + cs.getServersSize() + " region servers " +
-                "(" + cs.getDeadServers() + " dead)");
+        LOG.debug("HBase cluster has " + cs.getServersSize()
+                + " region servers " + "(" + cs.getDeadServers() + " dead)");
     }
 
     /**
      * Returns mappings for given table name between its HAWQ column names and
-     * HBase column names.
-     * If lookup table doesn't exist or no mappings for the table exist, returns null.
+     * HBase column names. If lookup table doesn't exist or no mappings for the
+     * table exist, returns null.
      * <p>
      * All HAWQ column names are returns in low case.
      *
@@ -119,12 +122,12 @@ public class HBaseLookupTable implements Closeable {
      * @return whether lookup table is valid
      */
     private boolean lookupTableValid() throws IOException {
-        return (HBaseUtilities.isTableAvailable(admin, LOOKUPTABLENAME) &&
-                lookupHasCorrectStructure());
+        return (HBaseUtilities.isTableAvailable(admin, LOOKUPTABLENAME) && lookupHasCorrectStructure());
     }
 
     /**
-     * Returns true if {@link #LOOKUPTABLENAME} has {@value #LOOKUPCOLUMNFAMILY} family.
+     * Returns true if {@link #LOOKUPTABLENAME} has {@value #LOOKUPCOLUMNFAMILY}
+     * family.
      *
      * @return whether lookup has expected column family name
      */
@@ -145,22 +148,21 @@ public class HBaseLookupTable implements Closeable {
     }
 
     /**
-     * Returns true if lookup table has no relevant mappings.
-     * Should be called after {@link #loadMappingMap(String)}.
+     * Returns true if lookup table has no relevant mappings. Should be called
+     * after {@link #loadMappingMap(String)}.
      */
     private boolean tableHasNoMappings() {
         return MapUtils.isEmpty(rawTableMapping);
     }
 
     /**
-     * Returns a map of mappings between HAWQ and HBase column names,
-     * with the HAWQ column values in lower case.
+     * Returns a map of mappings between HAWQ and HBase column names, with the
+     * HAWQ column values in lower case.
      */
     private Map<String, byte[]> lowerCaseMappings() {
         Map<String, byte[]> lowCaseKeys = new HashMap<String, byte[]>();
         for (Map.Entry<byte[], byte[]> entry : rawTableMapping.entrySet()) {
-            lowCaseKeys.put(lowerCase(entry.getKey()),
-                    entry.getValue());
+            lowCaseKeys.put(lowerCase(entry.getKey()), entry.getValue());
         }
 
         return lowCaseKeys;
@@ -174,8 +176,9 @@ public class HBaseLookupTable implements Closeable {
     }
 
     /**
-     * Loads mappings for given table name from the lookup table {@link #LOOKUPTABLENAME}.
-     * The table name should be in the row key, and the family name should be {@link #LOOKUPCOLUMNFAMILY}.
+     * Loads mappings for given table name from the lookup table
+     * {@link #LOOKUPTABLENAME}. The table name should be in the row key, and
+     * the family name should be {@link #LOOKUPCOLUMNFAMILY}.
      *
      * @param tableName HBase table name
      * @throws IOException when HBase operations fail
@@ -188,8 +191,9 @@ public class HBaseLookupTable implements Closeable {
 
         row = lookupTable.get(lookupRow);
         rawTableMapping = row.getFamilyMap(LOOKUPCOLUMNFAMILY);
-        LOG.debug("lookup table mapping for " + tableName +
-                " has " + (rawTableMapping == null ? 0 : rawTableMapping.size()) + " entries");
+        LOG.debug("lookup table mapping for " + tableName + " has "
+                + (rawTableMapping == null ? 0 : rawTableMapping.size())
+                + " entries");
     }
 
     private void closeLookupTable() throws IOException {

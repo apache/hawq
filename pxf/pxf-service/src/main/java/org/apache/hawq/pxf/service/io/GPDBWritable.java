@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.io;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -46,7 +46,7 @@ public class GPDBWritable implements Writable {
      * For var length type, col val is <4 byte length><payload val>
 	 */
 
-    private static Log Log = LogFactory.getLog(GPDBWritable.class);
+    private static final Log LOG = LogFactory.getLog(GPDBWritable.class);
     private static final int EOF = -1;
 
     /*
@@ -156,11 +156,11 @@ public class GPDBWritable implements Writable {
         try {
             pktlen = in.readInt();
         } catch (EOFException e) {
-            Log.debug("Reached end of stream (EOFException)");
+            LOG.debug("Reached end of stream (EOFException)");
             return EOF;
         }
         if (pktlen == EOF) {
-            Log.debug("Reached end of stream (returned -1)");
+            LOG.debug("Reached end of stream (returned -1)");
         }
 
         return pktlen;

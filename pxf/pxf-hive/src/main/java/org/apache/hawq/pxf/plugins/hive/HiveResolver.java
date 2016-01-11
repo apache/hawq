@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.plugins.hive;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.plugins.hive;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import org.apache.hawq.pxf.api.*;
 import org.apache.hawq.pxf.api.io.DataType;
@@ -144,7 +143,10 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 : input.getUserProperty("MAPKEY_DELIM");
     }
 
-    /* Gets and init the deserializer for the records of this Hive data fragment. */
+    /*
+     * Gets and init the deserializer for the records of this Hive data
+     * fragment.
+     */
     void initSerde(InputData inputData) throws Exception {
         Properties serdeProperties;
 
@@ -588,10 +590,9 @@ public class HiveResolver extends Plugin implements ReadResolver {
 
         String userDelim = input.getUserProperty("DELIMITER");
 
-	if (userDelim == null) {
-            throw new IllegalArgumentException(
-                    "DELIMITER is a required option" ) ;
-	}
+        if (userDelim == null) {
+            throw new IllegalArgumentException("DELIMITER is a required option");
+        }
 
         final int VALID_LENGTH = 1;
         final int VALID_LENGTH_HEX = 4;

@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.service;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import org.apache.hawq.pxf.api.BadRecordException;
 import org.apache.hawq.pxf.api.OneRow;
@@ -51,7 +50,7 @@ public class ReadBridge implements Bridge {
     BridgeOutputBuilder outputBuilder = null;
     LinkedList<Writable> outputQueue = null;
 
-    private static final Log Log = LogFactory.getLog(ReadBridge.class);
+    private static final Log LOG = LogFactory.getLog(ReadBridge.class);
 
     /**
      * C'tor - set the implementation of the bridge.
@@ -94,7 +93,7 @@ public class ReadBridge implements Bridge {
                     fileAccessor.closeForRead();
                     output = outputBuilder.getPartialLine();
                     if (output != null) {
-                        Log.warn("A partial record in the end of the fragment");
+                        LOG.warn("A partial record in the end of the fragment");
                     }
                     // if there is a partial line, return it now, otherwise it
                     // will return null
@@ -121,10 +120,10 @@ public class ReadBridge implements Bridge {
                 row_info = onerow.toString();
             }
             if (ex.getCause() != null) {
-                Log.debug("BadRecordException " + ex.getCause().toString()
+                LOG.debug("BadRecordException " + ex.getCause().toString()
                         + ": " + row_info);
             } else {
-                Log.debug(ex.toString() + ": " + row_info);
+                LOG.debug(ex.toString() + ": " + row_info);
             }
             output = outputBuilder.getErrorOutput(ex);
         } catch (Exception ex) {
@@ -174,7 +173,7 @@ public class ReadBridge implements Bridge {
     public boolean isThreadSafe() {
         boolean result = ((Plugin) fileAccessor).isThreadSafe()
                 && ((Plugin) fieldsResolver).isThreadSafe();
-        Log.debug("Bridge is " + (result ? "" : "not ") + "thread safe");
+        LOG.debug("Bridge is " + (result ? "" : "not ") + "thread safe");
         return result;
     }
 }

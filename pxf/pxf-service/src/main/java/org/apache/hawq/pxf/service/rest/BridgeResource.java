@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.rest;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.service.rest;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -55,7 +54,7 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Bridge/")
 public class BridgeResource extends RestResource {
 
-    private static Log Log = LogFactory.getLog(BridgeResource.class);
+    private static final Log LOG = LogFactory.getLog(BridgeResource.class);
     /**
      * Lock is needed here in the case of a non-thread-safe plugin. Using
      * synchronized methods is not enough because the bridge work is called by
@@ -91,7 +90,7 @@ public class BridgeResource extends RestResource {
         // Convert headers into a regular map
         Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
 
-        Log.debug("started with parameters: " + params);
+        LOG.debug("started with parameters: " + params);
 
         ProtocolData protData = new ProtocolData(params);
         SecuredHDFS.verifyToken(protData, servletContext);
@@ -105,7 +104,7 @@ public class BridgeResource extends RestResource {
         String dataDir = protData.getDataSource();
         // THREAD-SAFE parameter has precedence
         boolean isThreadSafe = protData.isThreadSafe() && bridge.isThreadSafe();
-        Log.debug("Request for " + dataDir + " will be handled "
+        LOG.debug("Request for " + dataDir + " will be handled "
                 + (isThreadSafe ? "without" : "with") + " synchronization");
 
         return readResponse(bridge, protData, isThreadSafe);
@@ -136,24 +135,24 @@ public class BridgeResource extends RestResource {
 
                     Writable record;
                     DataOutputStream dos = new DataOutputStream(out);
-                    Log.debug("Starting streaming fragment " + fragment
+                    LOG.debug("Starting streaming fragment " + fragment
                             + " of resource " + dataDir);
                     while ((record = bridge.getNext()) != null) {
                         record.write(dos);
                         ++recordCount;
                     }
-                    Log.debug("Finished streaming fragment " + fragment
+                    LOG.debug("Finished streaming fragment " + fragment
                             + " of resource " + dataDir + ", " + recordCount
                             + " records.");
                 } catch (ClientAbortException e) {
                     // Occurs whenever client (HAWQ) decides the end the
                     // connection
-                    Log.error("Remote connection closed by HAWQ", e);
+                    LOG.error("Remote connection closed by HAWQ", e);
                 } catch (Exception e) {
-                    Log.error("Exception thrown when streaming", e);
+                    LOG.error("Exception thrown when streaming", e);
                     throw new IOException(e.getMessage());
                 } finally {
-                    Log.debug("Stopped streaming fragment " + fragment
+                    LOG.debug("Stopped streaming fragment " + fragment
                             + " of resource " + dataDir + ", " + recordCount
                             + " records.");
                     if (!threadSafe) {
@@ -172,9 +171,9 @@ public class BridgeResource extends RestResource {
      * @param path path for the request, used for logging.
      */
     private void lock(String path) {
-        Log.trace("Locking BridgeResource for " + path);
+        LOG.trace("Locking BridgeResource for " + path);
         BRIDGE_LOCK.lock();
-        Log.trace("Locked BridgeResource for " + path);
+        LOG.trace("Locked BridgeResource for " + path);
     }
 
     /**
@@ -183,8 +182,8 @@ public class BridgeResource extends RestResource {
      * @param path path for the request, used for logging.
      */
     private void unlock(String path) {
-        Log.trace("Unlocking BridgeResource for " + path);
+        LOG.trace("Unlocking BridgeResource for " + path);
         BRIDGE_LOCK.unlock();
-        Log.trace("Unlocked BridgeResource for " + path);
+        LOG.trace("Unlocked BridgeResource for " + path);
     }
 }

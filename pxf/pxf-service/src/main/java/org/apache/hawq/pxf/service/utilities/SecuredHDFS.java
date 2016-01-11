@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.utilities;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,7 +18,6 @@ package org.apache.hawq.pxf.service.utilities;
  * specific language governing permissions and limitations
  * under the License.
  */
-
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -34,18 +33,20 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 
-/*
- * The class handles security functions for handling
- * secured HDFS
+/**
+ * The class handles security functions for handling secured HDFS
  */
 public class SecuredHDFS {
     private static final Log LOG = LogFactory.getLog(SecuredHDFS.class);
 
-    /*
+    /**
      * The function will get the token information from parameters and call
      * SecuredHDFS to verify the token.
      *
      * All token properties will be deserialized from string to a Token object
+     *
+     * @param protData input parameters
+     * @param context servlet context which contains the NN address
      *
      * @throws SecurityException Thrown when authentication fails
      */
@@ -65,16 +66,16 @@ public class SecuredHDFS {
         }
     }
 
-    /*
+    /**
      * The function will verify the token with NameNode if available and will
      * create a UserGroupInformation.
      *
      * Code in this function is copied from JspHelper.getTokenUGI
      *
      * @param identifier Delegation token identifier
-     *
      * @param password Delegation token password
-     *
+     * @param kind the kind of token
+     * @param service the service for this token
      * @param servletContext Jetty servlet context which contains the NN address
      *
      * @throws SecurityException Thrown when authentication fails

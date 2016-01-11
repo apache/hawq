@@ -19,7 +19,6 @@ package org.apache.hawq.pxf.service.utilities;
  * under the License.
  */
 
-
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
@@ -138,11 +137,10 @@ public class Utilities {
     }
 
     /**
-     * Replaces any non-alpha-numeric character with a '.'.
-     * This measure is used to prevent cross-site scripting (XSS)
-     * when an input string might include code or script. By removing
-     * all special characters and returning a censured string to the user
-     * this threat is avoided.
+     * Replaces any non-alpha-numeric character with a '.'. This measure is used
+     * to prevent cross-site scripting (XSS) when an input string might include
+     * code or script. By removing all special characters and returning a
+     * censured string to the user this threat is avoided.
      *
      * @param input string to be masked
      * @return masked string
