@@ -646,7 +646,6 @@ int MainHandlerLoop(void)
         if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 &&
 			 PQUEMGR->toRunQueryDispatch &&
 			 PQUEMGR->ForcedReturnGRMContainerCount == 0 &&
-			 PRESPOOL->AddPendingContainerCount == 0 &&
 			 PRESPOOL->SlavesHostCount > 0 )
         {
     		dispatchResourceToQueries();
