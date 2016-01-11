@@ -412,8 +412,8 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			 */
 
 			res = rebuildAllResourceQueueTrackDynamicStatusInShadow(qhavingshadow,
-																	errorbuf,
 																	true,
+																	errorbuf,
 																	sizeof(errorbuf));
 			if ( res != FUNC_RETURN_OK )
 			{
