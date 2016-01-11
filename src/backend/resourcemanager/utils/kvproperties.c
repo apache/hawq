@@ -487,7 +487,7 @@ KVProperty createPropertyInt32(MCTYPE  		  context,
 {
 	KVProperty result = createPropertyEmpty(context);
 	buildDottedPropertyNameString(&(result->Key), tag1, tag2, index);
-	SimpleStringSetInt8(&(result->Val), value);
+	SimpleStringSetInt32(&(result->Val), value);
 	return result;
 }
 
