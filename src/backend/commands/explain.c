@@ -500,17 +500,15 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
 	else
 		eflags = EXEC_FLAG_EXPLAIN_ONLY;
 
-    if (gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE)
-    {
-		if (superuser())
-		{
-			queryDesc->plannedstmt->query_mem = ResourceQueueGetSuperuserQueryMemoryLimit();			
-		}
-		else
-		{
-			queryDesc->plannedstmt->query_mem = ResourceQueueGetSuperuserQueryMemoryLimit();
-		}
-    }
+	if ( queryDesc->resource != NULL )
+	{
+		queryDesc->plannedstmt->query_mem = queryDesc->resource->segment_memory_mb;
+		queryDesc->plannedstmt->query_mem *= 1024L * 1024L;
+	}
+	else
+	{
+		queryDesc->plannedstmt->query_mem = statement_mem * 1024;
+	}
 
 	/* call ExecutorStart to prepare the plan for execution */
 	ExecutorStart(queryDesc, eflags);

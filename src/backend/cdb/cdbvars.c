@@ -1204,59 +1204,11 @@ gpvars_assign_gp_hash_index(bool newval, bool doit, GucSource source)
 }
 
 /*
- * gpvars_assign_gp_resqueue_memory_policy
- * gpvars_show_gp_resqueue_memory_policy
- */
-const char *
-gpvars_assign_gp_resqueue_memory_policy(const char *newval, bool doit, GucSource source __attribute__((unused)) )
-{
-	ResQueueMemoryPolicy newtype = RESQUEUE_MEMORY_POLICY_NONE;
-
-	if (newval == NULL || newval[0] == 0 ||
-		!pg_strcasecmp("none", newval))
-		newtype = RESQUEUE_MEMORY_POLICY_NONE;
-	else if (!pg_strcasecmp("auto", newval))
-		newtype = RESQUEUE_MEMORY_POLICY_AUTO;
-	else if (!pg_strcasecmp("eager_free", newval))
-		newtype = RESQUEUE_MEMORY_POLICY_EAGER_FREE;
-	else
-		elog(ERROR, "unknown resource queue memory policy: current policy is '%s'", gpvars_show_gp_resqueue_memory_policy());
-
-	if (doit)
-	{
-		gp_resqueue_memory_policy = newtype;
-	}
-
-	return newval;
-}
-
-const char *
-gpvars_show_gp_resqueue_memory_policy(void)
-{
-	switch(gp_resqueue_memory_policy)
-	{
-		case RESQUEUE_MEMORY_POLICY_NONE:
-			return "none";
-		case RESQUEUE_MEMORY_POLICY_AUTO:
-			return "auto";
-		case RESQUEUE_MEMORY_POLICY_EAGER_FREE:
-			return "eager_free";
-		default:
-			return "none";
-	}
-}
-
-/*
  * gpvars_assign_statement_mem
  */
 bool
 gpvars_assign_statement_mem(int newval, bool doit, GucSource source __attribute__((unused)) )
 {
-	if (newval >= max_statement_mem)
-	{
-		elog(ERROR, "Invalid input for statement_mem. Must be less than max_statement_mem (%d kB).", max_statement_mem);
-	}
-
 	if (doit)
 	{
 		statement_mem = newval;

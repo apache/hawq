@@ -2194,19 +2194,17 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
        appendStringInfoChar(str, '\n');
     }
     
-    if (gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE)
-    {
-        appendStringInfoString(str, "Statement statistics:\n");
-        appendStringInfo(str, "  Memory used: %.0fK bytes", ceil((double) stmt->query_mem / 1024.0));
+    appendStringInfoString(str, "Statement statistics:\n");
+    appendStringInfo(str, "  Memory used: %.0fK bytes", ceil((double) stmt->query_mem / 1024.0));
         
-        if (showstatctx->workmemwanted_max > 0)
-        {
-            appendStringInfo(str, "\n  Memory wanted: %.0fK bytes", 
-            		(double) PolicyAutoStatementMemForNoSpillKB(stmt, (uint64) showstatctx->workmemwanted_max / 1024L));        	
-        }
-        
-        appendStringInfoChar(str, '\n');
-    }
+    if (showstatctx->workmemwanted_max > 0)
+	{
+		appendStringInfo(str, "\n  Memory wanted: %.0fK bytes",
+				(double) StatementMemForNoSpillKB(stmt, (uint64) showstatctx->workmemwanted_max / 1024L));
+	}
+
+	appendStringInfoChar(str, '\n');
+
 }                               /* cdbexplain_showExecStatsEnd */
 
 static int

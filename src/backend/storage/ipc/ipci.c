@@ -389,10 +389,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		ShmemBackendArrayAllocation();
 #endif
 	
-	if (gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE)
-	{
-		SPI_InitMemoryReservation();
-	}
+	SPI_InitMemoryReservation();
 	
 	/*
 	 * Now give loadable modules a chance to set up their shmem allocations

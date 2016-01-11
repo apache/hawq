@@ -271,10 +271,7 @@ ExecInitFunctionScan(FunctionScan *node, EState *estate, int eflags)
 
 	initGpmonPktForFunctionScan((Plan *)node, &scanstate->ss.ps.gpmon_pkt, estate);
 	
-	if (gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE)
-	{
-		SPI_ReserveMemory(((Plan *)node)->operatorMemKB * 1024L);
-	}
+	SPI_ReserveMemory(((Plan *)node)->operatorMemKB * 1024L);
 
 	return scanstate;
 }

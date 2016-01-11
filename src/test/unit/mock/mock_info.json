@@ -11033,33 +11033,7 @@
                 "source"
             ], 
             "return": "char*"
-        }, 
-        "gpvars_assign_gp_resqueue_memory_policy": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h", 
-            "parameter": [
-                "newval", 
-                "doit", 
-                "source"
-            ], 
-            "return": "char*"
-        }, 
-        "gpvars_assign_statement_mem": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h", 
-            "parameter": [
-                "newval", 
-                "doit", 
-                "source"
-            ], 
-            "return": "bool"
-        }, 
-        "gpvars_show_gp_autostats_mode": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h", 
-            "parameter": [], 
-            "return": "char*"
-        }, 
+        },  
         "gpvars_show_gp_autostats_mode_in_functions": {
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h", 
@@ -14547,10 +14521,6 @@
         "max_prepared_xacts": {
             "filename": "src/backend/access/transam/twophase.c", 
             "header filename": "src/include/access/twophase.h"
-        }, 
-        "max_statement_mem": {
-            "filename": "src/backend/tcop/postgres.c", 
-            "header filename": "src/include/miscadmin.h"
         }, 
         "max_work_mem": {
             "filename": "src/backend/tcop/postgres.c", 

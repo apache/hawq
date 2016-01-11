@@ -46,9 +46,9 @@
 #include "utils/resscheduler.h"
 
 /**
- * Policy Auto. This contains information that will be used by Policy AUTO 
+ * This contains information that will be used memory quota assignment.
  */
-typedef struct PolicyAutoContext
+typedef struct MemQuotaContext
 {
 	plan_tree_base_prefix base; /* Required prefix for plan_tree_walker/mutator */
 	uint64 numNonMemIntensiveOperators; /* number of non-blocking operators */
@@ -59,13 +59,12 @@ typedef struct PolicyAutoContext
 
 	/* hash table of root Oids of parquet tables for Planner's plan */
 	HTAB * parquetRootOids;
-} PolicyAutoContext;
+} MemQuotaContext;
 
 /**
  * Forward declarations.
  */
-static bool PolicyAutoPrelimWalker(Node *node, PolicyAutoContext *context);
-static bool	PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context);
+static bool PrelimWalker(Node *node, MemQuotaContext *context);
 static bool IsAggMemoryIntensive(Agg *agg);
 static bool IsMemoryIntensiveOperator(Node *node, PlannedStmt *stmt);
 static bool IsParquetScanOperator(Node *node, PlannedStmt *stmt);
@@ -139,12 +138,8 @@ typedef struct PolicyEagerFreeContext
 /**
  * GUCs
  */
-char                		*gp_resqueue_memory_policy_str = NULL;
-ResQueueMemoryPolicy		gp_resqueue_memory_policy = RESQUEUE_MEMORY_POLICY_NONE;
-bool						gp_log_resqueue_memory = false;
-int							gp_resqueue_memory_policy_auto_fixed_mem;
-const int					gp_resqueue_memory_log_level=NOTICE;
-bool						gp_resqueue_print_operator_memory_limits = false;
+int		gp_resqueue_memory_policy_auto_fixed_mem;
+bool	gp_resqueue_print_operator_memory_limits;
 
 /**
  * create a HTAB for Oids
@@ -707,7 +702,7 @@ IsRootOperatorInGroup(Node *node)
  * in a plan.
  */
 
-static bool PolicyAutoPrelimWalker(Node *node, PolicyAutoContext *context)
+static bool PrelimWalker(Node *node, MemQuotaContext *context)
 {
 	if (node == NULL)
 	{
@@ -751,139 +746,22 @@ static bool PolicyAutoPrelimWalker(Node *node, PolicyAutoContext *context)
 			context->numNonMemIntensiveOperators++;
 		}
 	}
-	return plan_tree_walker(node, PolicyAutoPrelimWalker, context);
+	return plan_tree_walker(node, PrelimWalker, context);
 }
 
-/**
- * This walker assigns specific amount of memory to each operator in a plan.
- * It allocates a fixed size to each non-memory intensive operator and distributes
- * the rest among memory intensive operators.
- */
-static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
-{
-	const uint64 nonMemIntenseOpMemKB = (uint64) gp_resqueue_memory_policy_auto_fixed_mem;
-
-	if (node == NULL)
-	{
-		return false;
-	}
-	
-	Assert(node);
-	Assert(context);
-	
-	if (is_plan_node(node))
-	{
-		Plan *planNode = (Plan *) node;
-		
-		/**
-		 * If the operator is not a memory intensive operator, give it fixed amount of memory.
-		 */
-		if (IsParquetScanOperator(node, context->plannedStmt) || IsParquetInsertOperator(node, context->plannedStmt))
-		{
-			/* do nothing as we already assigned the memory to the operator */
-		}
-		else if (!IsMemoryIntensiveOperator(node, context->plannedStmt))
-		{
-			planNode->operatorMemKB = nonMemIntenseOpMemKB;
-		}
-		else
-		{
-			planNode->operatorMemKB = (uint64) ( (double) context->queryMemKB 
-					- (double) context->numNonMemIntensiveOperators * nonMemIntenseOpMemKB
-					- (double) context->parquetOpReservedMemKB)
-					/ context->numMemIntensiveOperators;
-		}
-
-		Assert(planNode->operatorMemKB > 0);
-
-		if (gp_log_resqueue_memory)
-		{
-			elog(gp_resqueue_memory_log_level, "assigning plan node memory = %dKB", (int )planNode->operatorMemKB);
-		}
-	}
-	return plan_tree_walker(node, PolicyAutoAssignWalker, context);
-}
-
-/**
- * Main entry point for memory quota policy AUTO. It counts how many operators
- * there are in a plan. It walks the plan again and allocates a fixed amount to every non-memory intensive operators.
- * It distributes the rest of the memory available to other operators.
- */
- void PolicyAutoAssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableBytes)
-{
-	 PolicyAutoContext ctx;
-	 exec_init_plan_tree_base(&ctx.base, stmt);
-	 ctx.queryMemKB = (uint64) (memAvailableBytes / 1024);
-	 ctx.numMemIntensiveOperators = 0;
-	 ctx.numNonMemIntensiveOperators = 0;
-	 ctx.parquetOpReservedMemKB = 0;
-	 ctx.plannedStmt = stmt;
-	 ctx.parquetRootOids = NULL;
-	 
-	 /* If it is a planner's plan for parquet insert, we need to reserve
-	  * the memory before traversing the plan nodes. Because unlike ORCA,
-	  * insert is not in the plan nodes. So we compute the memory required
-	  * for parquet table insert and subtract it from the available query memory.
-	  */
-	 if (PLANGEN_PLANNER == stmt->planGen && CMD_INSERT == stmt->commandType)
-	 {
-		 uint64 memRequiredForParquetInsert = MemoryReservedForParquetInsertForPlannerPlan(stmt);
-		 uint64 memRequiredForParquetInsertKB = (uint64) ( (double) memRequiredForParquetInsert / 1024);
-		 if (ctx.queryMemKB <= memRequiredForParquetInsertKB)
-		 {
-			 ereport(ERROR,
-			         (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-			          errmsg("insufficient memory reserved for statement"),
-			          errhint("Increase statement memory for parquet table insert.")));
-		 }
-		 ctx.queryMemKB -= memRequiredForParquetInsertKB;
-	 }
-
-
-#ifdef USE_ASSERT_CHECKING
-	 bool result = 
-#endif
-			 PolicyAutoPrelimWalker((Node *) stmt->planTree, &ctx);
-	 
-	 Assert(!result);
-	 
-	 if (ctx.queryMemKB <= ctx.numNonMemIntensiveOperators * gp_resqueue_memory_policy_auto_fixed_mem + ctx.parquetOpReservedMemKB)
-	 {
-		 if (ctx.parquetOpReservedMemKB > 0)
-		 {
-			 ereport(ERROR,
-			         (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-			          errmsg("insufficient memory reserved for statement"),
-			          errhint("Increase statement memory or reduce the number of Parquet tables to be scanned.")));
-		 }
-		 else
-		 {
-			 ereport(ERROR,
-					 (errcode(ERRCODE_INSUFFICIENT_RESOURCES),
-					  errmsg("insufficient memory reserved for statement")));
-		 }
-	 }
-	 
-#ifdef USE_ASSERT_CHECKING
-	 result = 
-#endif			 
-			 PolicyAutoAssignWalker((Node *) stmt->planTree, &ctx);
-	 
-	 Assert(!result);
-}
  
 /**
- * What should be query mem such that memory intensive operators get a certain minimum amount of memory.
- * Return value is in KB.
+ * What should be query mem such that memory intensive operators get a certain
+ * minimum amount of memory. Return value is in KB.
  */
- uint64 PolicyAutoStatementMemForNoSpillKB(PlannedStmt *stmt, uint64 minOperatorMemKB)
+ uint64 StatementMemForNoSpillKB(PlannedStmt *stmt, uint64 minOperatorMemKB)
  {
 	 Assert(stmt);
 	 Assert(minOperatorMemKB > 0);
 	 
 	 const uint64 nonMemIntenseOpMemKB = (uint64) gp_resqueue_memory_policy_auto_fixed_mem;
 
-	 PolicyAutoContext ctx;
+	 MemQuotaContext ctx;
 	 exec_init_plan_tree_base(&ctx.base, stmt);
 	 ctx.queryMemKB = (uint64) (stmt->query_mem / 1024);
 	 ctx.numMemIntensiveOperators = 0;
@@ -895,7 +773,7 @@ static bool PolicyAutoAssignWalker(Node *node, PolicyAutoContext *context)
 #ifdef USE_ASSERT_CHECKING
 	 bool result = 
 #endif
-			 PolicyAutoPrelimWalker((Node *) stmt->planTree, &ctx);
+			 	   PrelimWalker((Node *) stmt->planTree, &ctx);
 	 
 	 Assert(!result);
 	 Assert(ctx.numMemIntensiveOperators + ctx.numNonMemIntensiveOperators > 0);
@@ -1456,7 +1334,7 @@ PolicyEagerFreeAssignWalker(Node *node, PolicyEagerFreeContext *context)
 }
 
 /*
- * PolicyEagerFreeAssignOperatorMemoryKB
+ * AssignOperatorMemoryKB
  *    Main entry point for memory quota OPTIMIZE. This function distributes the memory
  * among all operators in a more optimized way than the AUTO policy.
  *
@@ -1464,7 +1342,7 @@ PolicyEagerFreeAssignWalker(Node *node, PolicyEagerFreeContext *context)
  * and distributes the memory accordingly.
  */
 void
-PolicyEagerFreeAssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableBytes)
+AssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableBytes)
 {
 	PolicyEagerFreeContext ctx;
 	exec_init_plan_tree_base(&ctx.base, stmt);
@@ -1535,15 +1413,6 @@ PolicyEagerFreeAssignOperatorMemoryKB(PlannedStmt *stmt, uint64 memAvailableByte
 		PolicyEagerFreeAssignWalker((Node *) stmt->planTree, &ctx);
 	 
 	Assert(!result);
-}
-
-/**
- * How much memory should superuser queries get?
- */
-uint64 ResourceQueueGetSuperuserQueryMemoryLimit(void)
-{
-	Assert(superuser());
-	return (uint64) statement_mem * 1024L;
 }
 
 

@@ -456,9 +456,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                     memAvailableBytes = queryDesc->plannedstmt->query_mem * hawq_re_memory_quota_allocation_ratio;
                 }
 
-                PolicyEagerFreeAssignOperatorMemoryKB(queryDesc->plannedstmt,
-                                                      memAvailableBytes);
-
+                AssignOperatorMemoryKB(queryDesc->plannedstmt, memAvailableBytes);
             }
         }
         
