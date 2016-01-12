@@ -120,16 +120,6 @@ typedef struct AppendOnlyStorageWrite
 			 * The number of blocks written since the beginning of the segment file.
 			 */
 
-	bool	isFirstRowNumSet;
-			/*
-			 * When true, the first row number for the next block has
-			 * been explicitly set and will be stored in the Append-Only
-			 * Storage Header.
-			 */
-
-	int64	firstRowNum;
-			/* Explicitly set first row number for the next block. */
-
 	int64   lastWriteBeginPosition;
 			/* The beginning of the write buffer for the last write. */
 
@@ -509,16 +499,6 @@ extern void AppendOnlyStorageWrite_Content(
  * AppendOnlyStorageWrite_HeaderLen routine should be called afterwards to get the
  * new overhead length.
  */
-
-
-/*
- * Set the first row value for the next Append-Only Storage
- * Block to be written.  Only applies to the next block.
- */
-extern void AppendOnlyStorageWrite_SetFirstRowNum(
-	AppendOnlyStorageWrite		*storageWrite,
-	int64						firstRowNum);
-
 
 extern char *AppendOnlyStorageWrite_ContextStr(
 	AppendOnlyStorageWrite		*storageWrite);

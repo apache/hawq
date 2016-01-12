@@ -1392,7 +1392,6 @@ cdbpath_dedup_fixup_walker(Path *path, void *context)
 		case T_ParquetScan:
 		case T_IndexScan:
 		case T_BitmapHeapScan:
-		case T_BitmapAppendOnlyScan:
 		case T_BitmapTableScan:
 		case T_TidScan:
 		case T_SubqueryScan:

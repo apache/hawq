@@ -610,12 +610,6 @@ pqParseInput3(PGconn *conn)
 							if (pqGetInt64(&(sendback[i].uncompressed_eof[j]), conn))
 										return;
 						}
-
-						/*
-						 * 10, get fast sequence.
-						 */
-						if (pqGetInt64(&(sendback[i].nextFastSequence), conn))
-								return;
 					}
 				}
 					break;

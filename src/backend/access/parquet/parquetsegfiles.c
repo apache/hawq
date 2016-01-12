@@ -35,7 +35,6 @@
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
-#include "catalog/gp_fastsequence.h"
 #include "catalog/pg_appendonly.h"
 #include "cdb/cdbvars.h"
 #include "executor/spi.h"
@@ -191,12 +190,8 @@ void InsertInitialParquetSegnoEntry(AppendOnlyEntry *aoEntry, int segno) {
 	int natts = 0;
 	bool *nulls;
 	Datum *values;
-	ItemPointerData tid;
 
 	Assert(aoEntry != NULL);
-
-	InsertFastSequenceEntry(aoEntry->segrelid, (int64) segno, 0,
-			&tid);
 
 	if (segno == 0)
 	{

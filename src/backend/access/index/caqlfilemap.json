@@ -152,9 +152,6 @@
    "functions.c" : [
       "pg_proc"
    ],
-   "gp_fastsequence.c" : [
-      "gp_fastsequence"
-   ],
    "heap.c" : [
       "pg_attrdef",
       "pg_attribute",

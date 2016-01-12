@@ -166,7 +166,6 @@ GetContentIdsFromPlanForSingleRelation(List *rtable, Plan *plan, int rangeTableI
 	InitDirectDispatchCalculationInfo(&result);
 
 	if ( nodeTag((Node*)plan) == T_BitmapHeapScan ||
-		 nodeTag((Node*)plan) == T_BitmapAppendOnlyScan ||
 		 nodeTag((Node*)plan) == T_BitmapTableScan)
 	{
 		/* do not assert for bitmap heap scan --> it can have a child which is an index scan */
@@ -471,7 +470,6 @@ AssignContentIdsToPlanData_Walker(Node *node, void *context)
 				/* no change to dispatchInfo --> just iterate children */
 				break;
 			case T_BitmapHeapScan:
-			case T_BitmapAppendOnlyScan:
 			case T_BitmapTableScan:
 				/* no change to dispatchInfo --> just iterate children */
 				break;

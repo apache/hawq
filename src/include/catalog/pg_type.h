@@ -721,9 +721,6 @@ DATA(insert OID = 6444 ( gp_san_configuration	    PGNSP PGUID -1 f c t \054 5035
 /* relation id: 5039 - gp_fault_strategy 20101104 */
 DATA(insert OID = 6443 ( gp_fault_strategy	    PGNSP PGUID -1 f c t \054 5039 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
 #define GP_FAULT_STRATEGY_RELTYPE_OID 6443
-/* relation id: 5043 - gp_fastsequence 20101104 */
-DATA(insert OID = 6453 ( gp_fastsequence	    PGNSP PGUID -1 f c t \054 5043 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
-#define GP_FASTSEQUENCE_RELTYPE_OID 6453
 /* relation id: 5096 - gp_global_sequence 20101104 */
 DATA(insert OID = 6995 ( gp_global_sequence	    PGNSP PGUID -1 f c t \054 5096 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
 #define GP_GLOBAL_SEQUENCE_RELTYPE_OID 6995

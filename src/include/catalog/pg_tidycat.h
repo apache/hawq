@@ -27,7 +27,6 @@
 
 
 #include "catalog/gp_configuration.h"
-#include "catalog/gp_fastsequence.h"
 #include "catalog/gp_global_sequence.h"
 #include "catalog/gp_id.h"
 #include "catalog/gp_master_mirroring.h"

@@ -4176,9 +4176,6 @@ _outNode(StringInfo str, void *obj)
 			case T_BitmapHeapScan:
 				_outBitmapHeapScan(str, obj);
 				break;
-			case T_BitmapAppendOnlyScan:
-				_outBitmapAppendOnlyScan(str, obj);
-				break;
 			case T_BitmapTableScan:
 				_outBitmapTableScan(str, obj);
 				break;

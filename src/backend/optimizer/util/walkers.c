@@ -928,7 +928,6 @@ plan_tree_walker(Node *node,
 		case T_DynamicTableScan:
 		case T_ParquetScan:
 		case T_BitmapHeapScan:
-		case T_BitmapAppendOnlyScan:
 		case T_BitmapTableScan:
 		case T_FunctionScan:
 		case T_TableFunctionScan:

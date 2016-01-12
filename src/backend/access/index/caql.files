@@ -4,7 +4,6 @@
 ../../../..//src/backend/catalog/caql/caqlanalyze.c
 ../../../..//src/backend/catalog/caql/test/caqlanalyze_test.c
 ../../../..//src/backend/catalog/dependency.c
-../../../..//src/backend/catalog/gp_fastsequence.c
 ../../../..//src/backend/catalog/heap.c
 ../../../..//src/backend/catalog/index.c
 ../../../..//src/backend/catalog/namespace.c

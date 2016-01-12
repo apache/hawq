@@ -696,9 +696,6 @@ int32 AppendOnlyStorageWrite_CompleteHeaderLen(
 		completeHeaderLen += (AoHeader_LongSize - AoHeader_RegularSize);
 	}
 
-	if (storageWrite->isFirstRowNumSet)
-		completeHeaderLen += sizeof(int64);
-
 	return completeHeaderLen;
 }
 
@@ -717,9 +714,6 @@ static int32 AppendOnlyStorageWrite_LargeContentHeaderLen(
 	Assert(storageWrite->isActive);
 
 	completeHeaderLen = storageWrite->regularHeaderLen;
-
-	if (storageWrite->isFirstRowNumSet)
-		completeHeaderLen += sizeof(int64);
 
 	// UNDONE: Right alignment?
 
@@ -1300,9 +1294,9 @@ AppendOnlyStorageWrite_CompressAppend(
 			AppendOnlyStorageFormat_MakeSmallContentHeader(
 										header,
 										storageWrite->storageAttributes.checksum,
-										storageWrite->isFirstRowNumSet,
+										false,
 										storageWrite->storageAttributes.version,
-										storageWrite->firstRowNum,
+										1,
 										executorBlockKind,
 										itemCount,
 										sourceLen,
@@ -1316,9 +1310,9 @@ AppendOnlyStorageWrite_CompressAppend(
 			AppendOnlyStorageFormat_MakeBulkDenseContentHeader(
 										header,
 										storageWrite->storageAttributes.checksum,
-										storageWrite->isFirstRowNumSet,
+										false,
 										storageWrite->storageAttributes.version,
-										storageWrite->firstRowNum,
+										1,
 										executorBlockKind,
 										itemCount,
 										sourceLen,
@@ -1382,9 +1376,9 @@ AppendOnlyStorageWrite_CompressAppend(
 		AppendOnlyStorageFormat_MakeSmallContentHeader(
 								header,
 								storageWrite->storageAttributes.checksum,
-								storageWrite->isFirstRowNumSet,
+								false,
 								storageWrite->storageAttributes.version,
-								storageWrite->firstRowNum,
+								1,
 								executorBlockKind,
 								itemCount,
 								sourceLen,
@@ -1457,7 +1451,7 @@ void AppendOnlyStorageWrite_FinishBuffer(
 			 contentLen,
 			 storageWrite->maxBufferLen,
 			 storageWrite->currentCompleteHeaderLen,
-			 (storageWrite->isFirstRowNumSet ? "true" : "false"));
+			 (false ? "true" : "false"));
 
 
 	headerOffsetInFile = BufferedAppendCurrentBufferPosition(&storageWrite->bufferedAppend);
@@ -1489,9 +1483,9 @@ void AppendOnlyStorageWrite_FinishBuffer(
 			AppendOnlyStorageFormat_MakeSmallContentHeader(
 									nonCompressedHeader,
 									storageWrite->storageAttributes.checksum,
-									storageWrite->isFirstRowNumSet,
+									false,
 									storageWrite->storageAttributes.version,
-									storageWrite->firstRowNum,
+									1,
 									executorBlockKind,
 									rowCount,
 									contentLen,
@@ -1505,9 +1499,9 @@ void AppendOnlyStorageWrite_FinishBuffer(
 			AppendOnlyStorageFormat_MakeNonBulkDenseContentHeader(
 										nonCompressedHeader,
 										storageWrite->storageAttributes.checksum,
-										storageWrite->isFirstRowNumSet,
+										false,
 										storageWrite->storageAttributes.version,
-										storageWrite->firstRowNum,
+										1,
 										executorBlockKind,
 										rowCount,
 										contentLen);
@@ -1621,7 +1615,6 @@ void AppendOnlyStorageWrite_FinishBuffer(
 
 	Assert(storageWrite->currentCompleteHeaderLen == 0);
 	storageWrite->currentBuffer = NULL;
-	storageWrite->isFirstRowNumSet = false;
 }
 
 /*
@@ -1644,12 +1637,6 @@ void AppendOnlyStorageWrite_CancelLastBuffer(
 	}
 
 	storageWrite->currentCompleteHeaderLen = 0;
-
-	/*
-	 * Since we don't know if AppendOnlyStorageWrite_Content will be called next or
-	 * the writer is doing something else, let's turn off the firstRowNum flag.
-	 */
-	storageWrite->isFirstRowNumSet = false;
 }
 
 // -----------------------------------------------------------------------------
@@ -1818,9 +1805,9 @@ void AppendOnlyStorageWrite_Content(
 		AppendOnlyStorageFormat_MakeLargeContentHeader(
 								largeContentHeader,
 								storageWrite->storageAttributes.checksum,
-								storageWrite->isFirstRowNumSet,
+								false,
 								storageWrite->storageAttributes.version,
-								storageWrite->firstRowNum,
+								1,
 								executorBlockKind,
 								rowCount,
 								contentLen);
@@ -1832,11 +1819,6 @@ void AppendOnlyStorageWrite_Content(
 
 		// Declare it finished.
 		storageWrite->currentCompleteHeaderLen = 0;
-
-		/*
-		 * Now write the fragments as type Block.
-		 */
-		storageWrite->isFirstRowNumSet = false;	// Not written with fragments.
 
 		smallContentHeaderLen = 
 				AppendOnlyStorageWrite_CompleteHeaderLen(
@@ -1927,30 +1909,6 @@ void AppendOnlyStorageWrite_Content(
 		}
 	}
 
-	storageWrite->isFirstRowNumSet = false;
-
 	// Verify we have no buffer allocated.
 	Assert(storageWrite->currentCompleteHeaderLen == 0);
-}
-
-// -----------------------------------------------------------------------------
-// Optional: Set First Row Number
-// -----------------------------------------------------------------------------
-
-/*
- * Set the first row value for the next Append-Only Storage
- * Block to be written.  Only applies to the next block.
- */
-void AppendOnlyStorageWrite_SetFirstRowNum(
-	AppendOnlyStorageWrite		*storageWrite,
-	int64						firstRowNum)
-{
-
-	Assert(storageWrite != NULL);
-	Assert(storageWrite->isActive);
-
-	// UNDONE: Range check firstRowNum
-
-	storageWrite->isFirstRowNumSet = true;
-	storageWrite->firstRowNum = firstRowNum;
 }

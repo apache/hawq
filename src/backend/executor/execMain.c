@@ -65,7 +65,6 @@
 #include "catalog/namespace.h"
 #include "catalog/toasting.h"
 #include "catalog/aoseg.h"
-#include "catalog/aoblkdir.h"
 #include "catalog/catalog.h"
 #include "catalog/pg_attribute_encoding.h"
 #include "catalog/pg_type.h"

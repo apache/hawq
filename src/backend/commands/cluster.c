@@ -50,7 +50,6 @@
 #include "catalog/pg_type.h"
 #include "catalog/toasting.h"
 #include "catalog/aoseg.h"
-#include "catalog/aoblkdir.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/cluster.h"
 #include "commands/tablecmds.h"
@@ -856,12 +855,6 @@ make_new_heap(Oid OIDOldHeap, const char *NewName, Oid NewTableSpace,
 									  toastComptypeOid, is_part);
 	AlterTableCreateAoSegTableWithOid(OIDNewHeap, aOid, aiOid,
 									  aosegComptypeOid, is_part);
-
-    if ( createAoBlockDirectory )
-    {
-	    AlterTableCreateAoBlkdirTableWithOid(OIDNewHeap, blkdirOid, blkdirIdxOid,
-										 aoblkdirComptypeOid, is_part);
-    }
 
 	cloneAttributeEncoding(OIDOldHeap,
 						   OIDNewHeap,

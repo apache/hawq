@@ -918,7 +918,6 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	List	*indexOidList = NIL;
 	ListCell	*lc = NULL;
 	StringInfoData location;
-	StringInfoData err_msg;
 	
 	initStringInfo(&location);
 	relationOid		= RelationGetRelid(relation);

@@ -56,7 +56,6 @@
 #include "cdb/cdbappendonlystoragelayer.h"
 #include "cdb/cdbappendonlystorageread.h"
 #include "cdb/cdbappendonlystoragewrite.h"
-#include "cdb/cdbappendonlyblockdirectory.h"
 
 #include "cdb/cdbquerycontextdispatching.h"
 
@@ -85,14 +84,11 @@ typedef struct AppendOnlyInsertDescData
 	float8			insertCount;
 	float8			varblockCount;
 	int64           rowCount; /* total row count before insert */
-	int64           numSequences; /* total number of available sequences */
-	int64           lastSequence; /* last used sequence */
 	BlockNumber		cur_segno;
 	AppendOnlyEntry *aoEntry;
 	FileSegInfo     *fsInfo;
 	VarBlockMaker	varBlockMaker;
 	int64			bufferCount;
-	int64			blockFirstRowNum;
 	bool			shouldCompress;
 	bool			usingChecksum;
 	bool			useNoToast;
@@ -121,10 +117,6 @@ typedef struct AppendOnlyInsertDescData
 	AppendOnlyStorageWrite		storageWrite;
 
 	uint8			*nonCompressedData;
-
-	/* The block directory for the appendonly relation. */
-	AppendOnlyBlockDirectory blockDirectory;
-
 
 	QueryContextDispatchingSendBack sendback;
 
@@ -214,105 +206,12 @@ typedef struct AppendOnlyScanDescData
 
 	AppendOnlyEntry		*aoEntry;
 	
-	/*
-	 * The block directory info.
-	 *
-	 * For AO tables that are upgraded from pre-3.4 release, the block directory 
-	 * built during the first index creation.
-	 */
-	bool buildBlockDirectory; /* Indicate whether to build block directory while scanning */
-	AppendOnlyBlockDirectory *blockDirectory;
-
 	List *splits;
 
 	bool toCloseFile;
 }	AppendOnlyScanDescData;
 
 typedef AppendOnlyScanDescData *AppendOnlyScanDesc;
-
-/*
- * Statistics on the latest fetch.
- */
-typedef struct AppendOnlyFetchDetail
-{
-	int64		rangeFileOffset;
-	int64		rangeFirstRowNum;
-	int64		rangeAfterFileOffset;
-	int64		rangeLastRowNum;
-					/*
-					 * The range covered by the Block Directory.
-					 */
-	
-	int64		skipBlockCount;
-					/*
-					 * Number of blocks skipped since the previous block processed in
-					 * the range.
-					 */
-	
-	int64		blockFileOffset;
-	int32		blockOverallLen;
-	int64		blockFirstRowNum;
-	int64		blockLastRowNum;
-	bool		isCompressed;
-	bool		isLargeContent;
-					/*
-					 * The last block processed.
-					 */
-
-} AppendOnlyFetchDetail;
-
-
-/*
- * Used for fetch individual tuples from specified by TID of append only relations 
- * using the AO Block Directory, BufferedRead and VarBlocks
- */
-typedef struct AppendOnlyFetchDescData
-{
-	Relation		relation;
-	Snapshot		appendOnlyMetaDataSnapshot;
-
-	MemoryContext	initContext;
-
-	AppendOnlyStorageAttributes	storageAttributes;
-	AppendOnlyStorageRead		storageRead;
-
-	char						*title;
-				/*
-				 * A phrase that better describes the purpose of the this open.
-				 *
-				 * We manage the storage for this.
-				 */
-
-
-	int				totalSegfiles;
-	FileSegInfo 	**segmentFileInfo;
-
-	AppendOnlyEntry *aoEntry;
-
-	char			*segmentFileName;
-	int				segmentFileNameMaxLen;
-
-	int32			usableBlockSize;
-
-	AppendOnlyBlockDirectory	blockDirectory;
-
-	AppendOnlyExecutorReadBlock executorReadBlock;
-
-	CurrentSegmentFile currentSegmentFile;
-	
-	int64		scanNextFileOffset;
-	int64		scanNextRowNum;
-
-	int64		scanAfterFileOffset;
-	int64		scanLastRowNum;
-
-	CurrentBlock currentBlock;
-
-	int64	skipBlockCount;
-
-}	AppendOnlyFetchDescData;
-
-typedef AppendOnlyFetchDescData *AppendOnlyFetchDesc;
 
 /* ----------------
  *		function prototypes for appendonly access method
@@ -328,17 +227,6 @@ extern void appendonly_endscan(AppendOnlyScanDesc scan);
 extern MemTuple appendonly_getnext(AppendOnlyScanDesc scan, 
 									ScanDirection direction,
 									TupleTableSlot *slot);
-extern AppendOnlyFetchDesc appendonly_fetch_init(
-	Relation 	relation,
-	Snapshot 	appendOnlyMetaDataSnapshot);
-extern bool appendonly_fetch(
-	AppendOnlyFetchDesc aoFetchDesc,
-	AOTupleId *aoTid,
-	TupleTableSlot *slot);
-extern void appendonly_fetch_detail(
-	AppendOnlyFetchDesc aoFetchDesc, 
-	AppendOnlyFetchDetail *aoFetchDetail);
-extern void appendonly_fetch_finish(AppendOnlyFetchDesc aoFetchDesc);
 extern AppendOnlyInsertDesc appendonly_insert_init(Relation rel, ResultRelSegFileInfo *segfileinfo);
 extern void appendonly_insert(
 		AppendOnlyInsertDesc aoInsertDesc, 

@@ -33,7 +33,6 @@
 #include "catalog/pg_appendonly.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_proc.h"
-#include "catalog/gp_fastsequence.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "catalog/catquery.h"
@@ -704,9 +703,6 @@ RemoveAppendonlyEntry(Oid relid)
 		aosegrelid = DatumGetObjectId(datum);
 		Assert(OidIsValid(aosegrelid));
 	}
-
-	/* Piggyback here to remove gp_fastsequence entries */
-	RemoveFastSequenceEntry(aosegrelid);
 
 	/*
 	 * Delete the appendonly table entry from the catalog (pg_appendonly).

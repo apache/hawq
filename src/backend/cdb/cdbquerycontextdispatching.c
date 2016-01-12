@@ -36,8 +36,6 @@
 #include "catalog/aoseg.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
-#include "catalog/gp_fastsequence.h"
-#include "catalog/gp_fastsequence.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_aggregate.h"
@@ -55,7 +53,6 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_tablespace.h"
-#include "catalog/gp_fastsequence.h"
 #include "catalog/toasting.h"
 #include "cdb/cdbdispatchedtablespaceinfo.h"
 #include "cdb/cdbfilesystemcredential.h"
@@ -1385,49 +1382,6 @@ static void
 prepareDispatchedCatalogFastSequence(QueryContextInfo *cxt, Oid relid,
 									 List *segnos)
 {
-    QueryContextDispatchingHashKey hkey;
-    QueryContextDispatchingHashEntry *hentry = NULL;
-    bool found;
-
-    SysScanDesc scanDesc;
-    HeapTuple tuple;
-    Datum contentid;
-    ScanKeyData scanKeys[1];
-    Relation fast_seq_rel;
-
-    hkey.objid = relid;
-    hkey.type = RelationType;
-    hentry = hash_search(cxt->htab, &hkey, HASH_FIND, &found);
-    Assert(found);
-    Assert(hentry);
-
-    fast_seq_rel = heap_open(FastSequenceRelationId, AccessShareLock);
-
-    ScanKeyInit(&scanKeys[0], Anum_gp_fastsequence_objid, BTEqualStrategyNumber,
-            F_OIDEQ, ObjectIdGetDatum(hentry->aoseg_relid));
-
-    scanDesc = systable_beginscan(fast_seq_rel, InvalidOid, FALSE,
-            SnapshotNow, 1, scanKeys);
-
-    while (HeapTupleIsValid(tuple = systable_getnext(scanDesc)))
-    {
-    		int i;
-    		Datum segno;
-        contentid = heap_getattr(tuple, Anum_gp_fastsequence_contentid,
-                RelationGetDescr(fast_seq_rel), NULL);
-        segno = heap_getattr(tuple, Anum_gp_fastsequence_objmod,
-        			RelationGetDescr(fast_seq_rel), NULL);
-        i = list_find_int(segnos, DatumGetInt32(segno));
-        if (i != -1)
-        {
-        		AddTupleToContextInfo(cxt, FastSequenceRelationId, "gp_fastsequence",
-        				tuple, DatumGetInt32(contentid));
-        }
-    }
-
-    systable_endscan(scanDesc);
-
-    heap_close(fast_seq_rel, AccessShareLock);
 }
 
 /*
@@ -2815,9 +2769,6 @@ UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback)
 				sendback->eof[0], sendback->uncompressed_eof[0], sendback->insertCount);
 	}
 
-	ItemPointerData tid;
-	InsertFastSequenceEntry(aoEntry->segrelid, sendback->segno,
-			sendback->nextFastSequence, &tid);
 	heap_close(rel, AccessShareLock);
 
 	/*
@@ -2882,10 +2833,6 @@ AddSendbackChangedCatalogContent(StringInfo buf,
 		pq_sendint64(buf, sendback->uncompressed_eof[i]);
 	}
 
-	/*
-	 * 10, send next fast sequence.
-	 */
-	pq_sendint64(buf, sendback->nextFastSequence);
 }
 
 

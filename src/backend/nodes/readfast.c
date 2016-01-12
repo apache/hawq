@@ -3195,19 +3195,6 @@ _readBitmapHeapScan(const char ** str)
 	READ_DONE();
 }
 
-static BitmapAppendOnlyScan *
-_readBitmapAppendOnlyScan(const char ** str)
-{
-	READ_LOCALS(BitmapAppendOnlyScan);
-
-	readScanInfo(str, (Scan *)local_node);
-
-	READ_NODE_FIELD(bitmapqualorig);
-	READ_BOOL_FIELD(isAORow);
-
-	READ_DONE();
-}
-
 static BitmapTableScan *
 _readBitmapTableScan(const char ** str)
 {
@@ -4267,9 +4254,6 @@ readNodeBinary(const char ** str)
 				break;
 			case T_BitmapHeapScan:
 				return_value = _readBitmapHeapScan(str);
-				break;
-			case T_BitmapAppendOnlyScan:
-				return_value = _readBitmapAppendOnlyScan(str);
 				break;
 			case T_BitmapTableScan:
 				return_value = _readBitmapTableScan(str);

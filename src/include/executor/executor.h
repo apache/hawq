@@ -366,22 +366,6 @@ extern void BitmapHeapScanEnd(ScanState *scanState);
 extern void BitmapHeapScanReScan(ScanState *scanState);
 
 /*
- * prototypes from functions in execBitmapAOScan.c
- */
-extern TupleTableSlot *BitmapAOScanNext(ScanState *scanState);
-extern void BitmapAOScanBegin(ScanState *scanState);
-extern void BitmapAOScanEnd(ScanState *scanState);
-extern void BitmapAOScanReScan(ScanState *scanState);
-
-/*
- * prototypes from functions in execBitmapParquetScan.c
- */
-extern TupleTableSlot *BitmapParquetScanNext(ScanState *scanState);
-extern void BitmapParquetScanBegin(ScanState *scanState);
-extern void BitmapParquetScanEnd(ScanState *scanState);
-extern void BitmapParquetScanReScan(ScanState *scanState);
-
-/*
  * prototypes from functions in execBitmapTableScan.c
  */
 extern void initGpmonPktForBitmapTableScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate);

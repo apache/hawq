@@ -47,7 +47,6 @@
 #include "catalog/gp_configuration.h"
 #include "catalog/gp_persistent.h"
 #include "catalog/gp_global_sequence.h"
-#include "catalog/gp_fastsequence.h"
 #include "catalog/gp_san_config.h"
 #include "catalog/gp_segment_config.h"
 #include "catalog/gp_verification_history.h"
@@ -316,10 +315,6 @@ Boot_CreateStmt:
 /* relation id: 5039 - gp_fault_strategy 20101104 */
 							case GpFaultStrategyRelationId:
 								typid = GP_FAULT_STRATEGY_RELTYPE_OID;
-								break;
-/* relation id: 5043 - gp_fastsequence 20101104 */
-							case FastSequenceRelationId:
-								typid = GP_FASTSEQUENCE_RELTYPE_OID;
 								break;
 /* relation id: 5096 - gp_global_sequence 20101104 */
 							case GpGlobalSequenceRelationId:

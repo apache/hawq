@@ -157,9 +157,6 @@ create_bitmap_scan_path(char relstorage,
 		case RELSTORAGE_HEAP:
 			path = (Path *)create_bitmap_heap_path(root, rel, bitmapqual, outer_rel);
 			break;
-		case RELSTORAGE_AOROWS:
-			path = (Path *)create_bitmap_appendonly_path(root, rel, bitmapqual, outer_rel, true);
-			break;
 		default:
 			elog(ERROR, "unrecognized relstorage type %d for using bitmap scan path",
 				 relstorage);

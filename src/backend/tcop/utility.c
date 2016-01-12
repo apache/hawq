@@ -23,7 +23,6 @@
 #include "catalog/namespace.h"
 #include "catalog/toasting.h"
 #include "catalog/aoseg.h"
-#include "catalog/aoblkdir.h"
 #include "commands/alter.h"
 #include "commands/async.h"
 #include "commands/cluster.h"
@@ -944,13 +943,6 @@ ProcessUtility(Node *parsetree,
 							((CreateStmt *) parsetree)->oidInfo.aosegIndexOid,
 							&(((CreateStmt *) parsetree)->oidInfo.aosegComptypeOid),
 							((CreateStmt *) parsetree)->is_part_child);
-
-					if (((CreateStmt *)parsetree)->buildAoBlkdir)
-						AlterTableCreateAoBlkdirTableWithOid(relOid,
-							((CreateStmt *) parsetree)->oidInfo.aoblkdirOid,
-							((CreateStmt *) parsetree)->oidInfo.aoblkdirIndexOid,
-							&(((CreateStmt *) parsetree)->oidInfo.aoblkdirComptypeOid),
-							((CreateStmt *)parsetree)->is_part_child);
 				}
 				CommandCounterIncrement();
 				/*
