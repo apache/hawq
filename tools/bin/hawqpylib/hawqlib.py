@@ -89,12 +89,18 @@ class HawqXMLParser:
     def get_all_values(self):
         with open(self.xml_file) as f:
             xmldoc = minidom.parse(f)
+
         for node in xmldoc.getElementsByTagName('property'):
             name, value = (node.getElementsByTagName('name')[0].childNodes[0].data.encode('ascii'),
                            node.getElementsByTagName('value')[0].childNodes[0].data.encode('ascii'))
             if value == '':
                 value == 'None'
             self.hawq_dict[name] = value
+
+        if 'hawq_standby_address_host' in self.hawq_dict:
+            if self.hawq_dict['hawq_standby_address_host'].lower() in ['none', '', 'localhost']:
+                del self.hawq_dict['hawq_standby_address_host']
+
         return None
 
     def get_xml_doc(self):
