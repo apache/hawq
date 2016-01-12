@@ -415,22 +415,7 @@ plan_tree_mutator(Node *node,
 				return (Node *) newbmheapscan;
 			}
 			break;
-		
-
-		case T_BitmapAppendOnlyScan:
-			{
-				BitmapAppendOnlyScan  *bmappendonlyscan = (BitmapAppendOnlyScan *) node;
-				BitmapAppendOnlyScan  *newbmappendonlyscan;
-
-				FLATCOPY(newbmappendonlyscan, bmappendonlyscan, BitmapAppendOnlyScan);
-				SCANMUTATE(newbmappendonlyscan, bmappendonlyscan);
 				
-				MUTATE(newbmappendonlyscan->bitmapqualorig, bmappendonlyscan->bitmapqualorig, List *);
-	
-				return (Node *) newbmappendonlyscan;
-			}
-			break;
-		
 		case T_BitmapTableScan:
 			{
 				BitmapTableScan  *bmtablescan = (BitmapTableScan *) node;

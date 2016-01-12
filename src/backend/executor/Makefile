@@ -17,13 +17,13 @@ override CPPFLAGS := -I$(top_srcdir)/src/backend/gp_libpq_fe $(CPPFLAGS)
 OBJS = execAmi.o execGrouping.o execHHashagg.o execJunk.o execMain.o \
        execProcnode.o execQual.o execScan.o execTuples.o execGpmon.o \
        execUtils.o execWorkfile.o execHeapScan.o execAOScan.o execParquetScan.o\
-       execBitmapTableScan.o execBitmapHeapScan.o execBitmapAOScan.o execBitmapParquetScan.o execDynamicScan.o \
+       execBitmapTableScan.o execBitmapHeapScan.o execDynamicScan.o \
        execIndexscan.o \
        functions.o \
        instrument.o \
        nodeAppend.o nodeAgg.o \
        nodeBitmapAnd.o nodeBitmapOr.o \
-       nodeBitmapAppendOnlyscan.o nodeBitmapHeapscan.o nodeBitmapIndexscan.o nodeBitmapTableScan.o \
+       nodeBitmapHeapscan.o nodeBitmapIndexscan.o nodeBitmapTableScan.o \
        nodeExternalscan.o \
        nodeFunctionscan.o \
        nodeHash.o nodeHashjoin.o \

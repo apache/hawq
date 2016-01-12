@@ -78,7 +78,6 @@
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
-#include "catalog/gp_fastsequence.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbanalyze.h"

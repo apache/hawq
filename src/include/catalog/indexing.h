@@ -209,9 +209,6 @@ DECLARE_UNIQUE_INDEX(gp_policy_localoid_index, 6103, on gp_distribution_policy u
 DECLARE_UNIQUE_INDEX(pg_appendonly_relid_index, 5007, on pg_appendonly using btree(relid oid_ops));
 #define AppendOnlyRelidIndexId  5007
 
-DECLARE_UNIQUE_INDEX(gp_fastsequence_objid_objmod_contentid_index, 6067, on gp_fastsequence using btree(objid oid_ops, objmod  int8_ops, contentid int4_ops));
-#define FastSequenceObjidObjmodContentidIndexId 6067
-
 DECLARE_UNIQUE_INDEX(pg_appendonly_alter_column_relid_index, 5031, on pg_appendonly_alter_column using btree(relid oid_ops, changenum int4_ops));
 #define AppendOnlyAlterColumnRelidIndexId  5031
 

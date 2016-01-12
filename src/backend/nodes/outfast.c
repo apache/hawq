@@ -689,17 +689,6 @@ _outBitmapHeapScan(StringInfo str, BitmapHeapScan *node)
 }
 
 static void
-_outBitmapAppendOnlyScan(StringInfo str, BitmapAppendOnlyScan *node)
-{
-	WRITE_NODE_TYPE("BITMAPAPPENDONLYSCAN");
-
-	_outScanInfo(str, (Scan *) node);
-
-	WRITE_LIST_FIELD(bitmapqualorig);
-	WRITE_BOOL_FIELD(isAORow);
-}
-
-static void
 _outBitmapTableScan(StringInfo str, BitmapTableScan *node)
 {
 	WRITE_NODE_TYPE("BITMAPTABLESCAN");
@@ -3996,9 +3985,6 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_BitmapHeapScan:
 				_outBitmapHeapScan(str, obj);
-				break;
-			case T_BitmapAppendOnlyScan:
-				_outBitmapAppendOnlyScan(str, obj);
 				break;
 			case T_BitmapTableScan:
 				_outBitmapTableScan(str, obj);

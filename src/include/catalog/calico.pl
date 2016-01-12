@@ -3519,8 +3519,6 @@ sub more_header
 #include "catalog/gp_segment_config.h"
 #include "catalog/gp_san_config.h"
 
-#include "catalog/gp_fastsequence.h"
-
 #include "catalog/gp_master_mirroring.h"
 #include "catalog/gp_persistent.h"
 #include "catalog/gp_global_sequence.h"
@@ -5075,7 +5073,6 @@ sub get_builtin_object_check_case_str()
 {
 	my $str = "";
 	my @clist = ("GpPolicyRelationId, FormData_gp_policy *, localoid",
-				 "FastSequenceRelationId, Form_gp_fastsequence, objid",
 				 "AggregateRelationId, Form_pg_aggregate, aggfnoid",
 				 "AccessMethodOperatorRelationId, Form_pg_amop, amopclaid",
 				 "AccessMethodProcedureRelationId, Form_pg_amproc, amopclaid",

@@ -46,7 +46,6 @@
 #include "executor/nodeTidscan.h"
 #include "executor/nodeUnique.h"
 #include "executor/nodeValuesscan.h"
-#include "executor/nodeBitmapAppendOnlyscan.h"
 #include "executor/nodeWindow.h"
 #include "executor/nodeShareInputScan.h"
 
@@ -186,10 +185,6 @@ ExecReScan(PlanState *node, ExprContext *exprCtxt)
 
 		case T_ValuesScanState:
 			ExecValuesReScan((ValuesScanState *) node, exprCtxt);
-			break;
-
-		case T_BitmapAppendOnlyScanState:
-			ExecBitmapAppendOnlyReScan((BitmapAppendOnlyScanState *) node, exprCtxt);
 			break;
 
 		case T_NestLoopState:
@@ -640,11 +635,7 @@ ExecEagerFree(PlanState *node)
 		case T_BitmapHeapScanState:
 			ExecEagerFreeBitmapHeapScan((BitmapHeapScanState *)node);
 			break;
-			
-		case T_BitmapAppendOnlyScanState:
-			ExecEagerFreeBitmapAppendOnlyScan((BitmapAppendOnlyScanState *)node);
-			break;
-			
+
 		case T_BitmapTableScanState:
 			ExecEagerFreeBitmapTableScan((BitmapTableScanState *)node);
 			break;
@@ -788,7 +779,6 @@ ExecEagerFreeChildNodes(PlanState *node, bool subplanDone)
 		case T_ExternalScanState:
 		case T_IndexScanState:
 		case T_BitmapHeapScanState:
-		case T_BitmapAppendOnlyScanState:
 		case T_FunctionScanState:
 		case T_MaterialState:
 		case T_SortState:

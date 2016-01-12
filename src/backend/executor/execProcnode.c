@@ -109,7 +109,6 @@
 #include "executor/nodeBitmapIndexscan.h"
 #include "executor/nodeBitmapTableScan.h"
 #include "executor/nodeBitmapOr.h"
-#include "executor/nodeBitmapAppendOnlyscan.h"
 #include "executor/nodeExternalscan.h"
 #include "executor/nodeTableScan.h"
 #include "executor/nodeDML.h"
@@ -265,8 +264,7 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	 */
 	if (force_bitmap_table_scan)
 	{
-		if (IsA(node, BitmapHeapScan) ||
-				IsA(node, BitmapAppendOnlyScan))
+		if (IsA(node, BitmapHeapScan))
 		{
 			node->type = T_BitmapTableScan;
 		}
@@ -413,17 +411,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 			{
 			result = (PlanState *) ExecInitBitmapHeapScan((BitmapHeapScan *) node,
 														  estate, eflags);
-			}
-			END_MEMORY_ACCOUNT();
-			break;
-
-		case T_BitmapAppendOnlyScan:
-			curMemoryAccount = CREATE_EXECUTOR_MEMORY_ACCOUNT(isAlienPlanNode, node, BitmapAppendOnlyScan);
-
-			START_MEMORY_ACCOUNT(curMemoryAccount);
-			{
-			result = (PlanState *) ExecInitBitmapAppendOnlyScan((BitmapAppendOnlyScan*) node,
-														        estate, eflags);
 			}
 			END_MEMORY_ACCOUNT();
 			break;
@@ -842,7 +829,6 @@ ExecProcNode(PlanState *node)
 		&&Exec_Jmp_DynamicIndexScan,
 		&&Exec_Jmp_BitmapIndexScan,
 		&&Exec_Jmp_BitmapHeapScan,
-		&&Exec_Jmp_BitmapAppendOnlyScan,
 		&&Exec_Jmp_BitmapTableScan,
 		&&Exec_Jmp_TidScan,
 		&&Exec_Jmp_SubqueryScan,
@@ -943,10 +929,6 @@ Exec_Jmp_BitmapIndexScan:
 
 Exec_Jmp_BitmapHeapScan:
 	result = ExecBitmapHeapScan((BitmapHeapScanState *) node);
-	goto Exec_Jmp_Done;
-
-Exec_Jmp_BitmapAppendOnlyScan:
-	result = ExecBitmapAppendOnlyScan((BitmapAppendOnlyScanState *) node);
 	goto Exec_Jmp_Done;
 
 Exec_Jmp_BitmapTableScan:
@@ -1369,9 +1351,6 @@ ExecCountSlotsNode(Plan *node)
 
 		case T_BitmapHeapScan:
 			return ExecCountSlotsBitmapHeapScan((BitmapHeapScan *) node);
-
-		case T_BitmapAppendOnlyScan:
-			return ExecCountSlotsBitmapAppendOnlyScan((BitmapAppendOnlyScan*) node);
 			
 		case T_BitmapTableScan:
 			return ExecCountSlotsBitmapTableScan((BitmapTableScan *) node);
@@ -1647,10 +1626,6 @@ ExecEndNode(PlanState *node)
 
 		case T_BitmapHeapScanState:
 			ExecEndBitmapHeapScan((BitmapHeapScanState *) node);
-			break;
-
-		case T_BitmapAppendOnlyScanState:
-			ExecEndBitmapAppendOnlyScan((BitmapAppendOnlyScanState *) node);
 			break;
 
 		case T_BitmapTableScanState:

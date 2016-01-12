@@ -62,7 +62,6 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
-#include "catalog/aoblkdir.h"
 #include "commands/tablecmds.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
@@ -1822,7 +1821,6 @@ IndexBuildAppendOnlyRowScan(Relation parentRelation,
 	double reltuples = 0;
 	Datum		values[INDEX_MAX_KEYS];
 	bool		isnull[INDEX_MAX_KEYS];
-	AppendOnlyBlockDirectory *blockDirectory = NULL;
 	
 	Assert(estate->es_per_tuple_exprcontext != NULL);
 	econtext = estate->es_per_tuple_exprcontext;
@@ -1836,39 +1834,6 @@ IndexBuildAppendOnlyRowScan(Relation parentRelation,
 								  snapshot,
 								  0,
 								  NULL);
-
-	if (!OidIsValid(aoscan->aoEntry->blkdirrelid) ||
-		!OidIsValid(aoscan->aoEntry->blkdiridxid))
-	{
-		IndexInfoOpaque *opaque;
-
-		if (indexInfo->ii_Concurrent)
-			ereport(ERROR,
-					(errcode(ERRCODE_GP_COMMAND_ERROR),
-					 errmsg("Cannot create index concurrently. Create an index non-concurrently "
-					        "before creating an index concurrently in an appendonly table.")));
-		
-		/* Obtain the oids from IndexInfo. */
-		Assert(indexInfo->opaque != NULL);
-
-		opaque = (IndexInfoOpaque *)indexInfo->opaque;
-		
-		Assert(OidIsValid(opaque->blkdirRelOid) && OidIsValid(opaque->blkdirIdxOid));
-		AlterTableCreateAoBlkdirTableWithOid(RelationGetRelid(parentRelation),
-											 opaque->blkdirRelOid,
-											 opaque->blkdirIdxOid,
-											 &opaque->blkdirComptypeOid,
-											 false);
-
-		/* Update blkdirrelid, blkdiridxid in aoEntry with new values */
-		aoscan->aoEntry->blkdirrelid = opaque->blkdirRelOid;
-		aoscan->aoEntry->blkdiridxid = opaque->blkdirIdxOid;
-		
-		aoscan->buildBlockDirectory = true;
-		aoscan->blockDirectory =
-			(AppendOnlyBlockDirectory *)palloc0(sizeof(AppendOnlyBlockDirectory));
-		blockDirectory = aoscan->blockDirectory;
-	}
 	
 	while (appendonly_getnext(aoscan, ForwardScanDirection, slot) != NULL)
 	{
@@ -1908,10 +1873,7 @@ IndexBuildAppendOnlyRowScan(Relation parentRelation,
 	}
 	
 	appendonly_endscan(aoscan);
-	
-	if (blockDirectory != NULL)
-		pfree(blockDirectory);
-	
+
 	return reltuples;
 }
 

@@ -62,20 +62,6 @@ getBitmapTableScanMethod(TableType tableType)
 		{
 			&BitmapHeapScanNext, &BitmapHeapScanBegin, &BitmapHeapScanEnd,
 			&BitmapHeapScanReScan, &MarkRestrNotAllowed, &MarkRestrNotAllowed
-		},
-		{
-			&BitmapAOScanNext, &BitmapAOScanBegin, &BitmapAOScanEnd,
-			&BitmapAOScanReScan, &MarkRestrNotAllowed, &MarkRestrNotAllowed
-		},
-		{
-			/* The same set of methods serve both AO and AOCO scans */
-			&BitmapAOScanNext, &BitmapAOScanBegin, &BitmapAOScanEnd,
-			&BitmapAOScanReScan, &MarkRestrNotAllowed, &MarkRestrNotAllowed
-		},
-		{
-			/* The same set of methods serve both AO and AOCO scans */
-			&BitmapParquetScanNext, &BitmapParquetScanBegin, &BitmapParquetScanEnd,
-			&BitmapParquetScanReScan, &MarkRestrNotAllowed, &MarkRestrNotAllowed
 		}
 	};
 

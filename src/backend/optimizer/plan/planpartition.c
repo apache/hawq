@@ -781,7 +781,6 @@ AdjustVarnoWalker(Node *node, AdjustVarnoContext *ctx)
 		case T_IndexScan:
 		case T_BitmapIndexScan:
 		case T_BitmapHeapScan:
-		case T_BitmapAppendOnlyScan:
 		case T_BitmapTableScan:
 		case T_TidScan:
 		case T_FunctionScan:

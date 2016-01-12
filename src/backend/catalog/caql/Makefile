@@ -37,7 +37,6 @@ CAQL_CQL_SRCS := $(addprefix $(top_srcdir)/src/backend/,\
 	access/heap/heapam.c \
 	catalog/aclchk.c \
 	catalog/dependency.c \
-	catalog/gp_fastsequence.c \
 	catalog/heap.c \
 	catalog/index.c \
 	catalog/namespace.c \

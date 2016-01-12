@@ -587,28 +587,6 @@ _copyBitmapHeapScan(BitmapHeapScan *from)
 }
 
 /*
- * _copyBitmapAppendOnlyScan
- */
-static BitmapAppendOnlyScan *
-_copyBitmapAppendOnlyScan(BitmapAppendOnlyScan *from)
-{
-	BitmapAppendOnlyScan *newnode = makeNode(BitmapAppendOnlyScan);
-
-	/*
-	 * copy node superclass fields
-	 */
-	CopyScanFields((Scan *) from, (Scan *) newnode);
-
-	/*
-	 * copy remainder of node
-	 */
-	COPY_NODE_FIELD(bitmapqualorig);
-	COPY_SCALAR_FIELD(isAORow);
-
-	return newnode;
-}
-
-/*
  * _copyBitmapTableScan
  */
 static BitmapTableScan *
@@ -4448,9 +4426,6 @@ copyObject(void *from)
 			break;
 		case T_BitmapHeapScan:
 			retval = _copyBitmapHeapScan(from);
-			break;
-		case T_BitmapAppendOnlyScan:
-			retval = _copyBitmapAppendOnlyScan(from);
 			break;
 		case T_BitmapTableScan:
 			retval = _copyBitmapTableScan(from);

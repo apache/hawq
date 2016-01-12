@@ -88,8 +88,3 @@ NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as
 HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
 INSERT INTO mpp14758 select * from generate_series(1,10);
 ABORT;
-SELECT * from gp_fastsequence where objid not in (select oid from pg_class);
- objid | objmod | last_sequence | contentid 
--------+--------+---------------+-----------
-(0 rows)
-

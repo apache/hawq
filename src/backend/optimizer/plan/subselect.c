@@ -1193,11 +1193,6 @@ finalize_plan(PlannerInfo *root, Plan *plan, List *rtable,
 							  &context);
 			break;
 
-		case T_BitmapAppendOnlyScan:
-			finalize_primnode((Node *) ((BitmapAppendOnlyScan *) plan)->bitmapqualorig,
-							  &context);
-			break;
-
 		case T_BitmapTableScan:
 			finalize_primnode((Node *) ((BitmapTableScan *) plan)->bitmapqualorig,
 							  &context);

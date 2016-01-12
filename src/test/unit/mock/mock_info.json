@@ -2833,28 +2833,6 @@
             "parameter": [], 
             "return": "Oid"
         }, 
-        "GetFastSequences": {
-            "filename": "src/backend/catalog/gp_fastsequence.c", 
-            "header filename": "src/include/catalog/gp_fastsequence.h", 
-            "parameter": [
-                "objid", 
-                "objmod", 
-                "minSequence", 
-                "numSequences", 
-                "tid"
-            ], 
-            "return": "int64"
-        }, 
-        "GetFastSequencesByTid": {
-            "filename": "src/backend/catalog/gp_fastsequence.c", 
-            "header filename": "src/include/catalog/gp_fastsequence.h", 
-            "parameter": [
-                "tid", 
-                "minSequence", 
-                "numSequences"
-            ], 
-            "return": "int64"
-        }, 
         "GetFreeIndexPage": {
             "filename": "src/backend/storage/freespace/freespace.c", 
             "header filename": "src/include/storage/freespace.h", 
@@ -3501,17 +3479,6 @@
                 "segidxid", 
                 "blkdirrelid", 
                 "blkdiridxid"
-            ], 
-            "return": "void"
-        }, 
-        "InsertFastSequenceEntry": {
-            "filename": "src/backend/catalog/gp_fastsequence.c", 
-            "header filename": "src/include/catalog/gp_fastsequence.h", 
-            "parameter": [
-                "objid", 
-                "objmod", 
-                "lastSequence", 
-                "tid"
             ], 
             "return": "void"
         }, 
@@ -7050,14 +7017,6 @@
             "header filename": "src/include/catalog/pg_attribute_encoding.h", 
             "parameter": [
                 "relid"
-            ], 
-            "return": "void"
-        }, 
-        "RemoveFastSequenceEntry": {
-            "filename": "src/backend/catalog/gp_fastsequence.c", 
-            "header filename": "src/include/catalog/gp_fastsequence.h", 
-            "parameter": [
-                "objid"
             ], 
             "return": "void"
         }, 

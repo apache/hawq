@@ -71,4 +71,3 @@ BEGIN;
 CREATE TABLE mpp14758(a int) with (appendonly=true);
 INSERT INTO mpp14758 select * from generate_series(1,10);
 ABORT;
-SELECT * from gp_fastsequence where objid not in (select oid from pg_class);

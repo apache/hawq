@@ -162,51 +162,6 @@ top:
 }
 
 /*
- * _bt_ao_check_unique -- Check for violation of unique index constraint
- *  for AO tables.
- *
- * Returns InvalidTransactionId if there is no conflict, else an xact ID
- * we must wait for to see if it commits a conflicting tuple.	If an actual
- * conflict is detected, no return --- just ereport().
- */
-static TransactionId
-_bt_ao_check_unique(Relation rel, Relation aoRel, ItemPointer tid)
-{
-	TransactionId xwait = InvalidTransactionId;
-	
-	Assert(RelationIsAoRows(aoRel));
-	
-	if (RelationIsAoRows(aoRel))
-	{
-		AppendOnlyFetchDesc aoFetchDesc =
-			appendonly_fetch_init(aoRel, SnapshotDirty);
-
-		if (appendonly_fetch(aoFetchDesc, (AOTupleId*)tid, NULL))
-		{
-			xwait =
-				(TransactionIdIsValid(SnapshotDirty->xmin)) ?
-				SnapshotDirty->xmin : SnapshotDirty->xmax;
-
-			/*
-			 * If this tuple is not being updated by other transaction,
-			 * then we have a definite conflict. Ereport here.
-			 */
-			if (!TransactionIdIsValid(xwait))
-				ereport(ERROR,
-						(errcode(ERRCODE_UNIQUE_VIOLATION),
-						 errmsg("duplicate key violates unique constraint \"%s\"",
-								RelationGetRelationName(rel)),
-						 errOmitLocation(true)));
-		}
-	
-		appendonly_fetch_finish(aoFetchDesc);
-		pfree(aoFetchDesc);
-	}
-	
-	return xwait;
-}
-
-/*
  *	_bt_check_unique() -- Check for violation of unique index constraint
  *
  * Returns InvalidTransactionId if there is no conflict, else an xact ID
@@ -288,16 +243,6 @@ _bt_check_unique(Relation rel, IndexTuple itup, Relation heapRel,
 				 * If the parent relation is an AO/CO table, we have to find out
 				 * if this tuple is actually in the table.
 				 */
-				if (RelationIsAoRows(heapRel))
-				{
-					TransactionId xwait =
-						_bt_ao_check_unique(rel, heapRel, &curitup->t_tid);
-
-					if (TransactionIdIsValid(xwait))
-						return xwait;
-				}
-					
-				else
 				{
 					htup.t_self = curitup->t_tid;
 					if (heap_fetch(heapRel, SnapshotDirty, &htup, &hbuffer,

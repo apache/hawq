@@ -254,9 +254,6 @@ pathnode_walk_kids(Path            *path,
             case T_BitmapHeapScan:
                     v = pathnode_walk_node(((BitmapHeapPath *)path)->bitmapqual, walker, context);
                     break;
-			case T_BitmapAppendOnlyScan:
-					v = pathnode_walk_node(((BitmapAppendOnlyPath *)path)->bitmapqual, walker, context);
-					break;
             case T_BitmapAnd:
                     v = pathnode_walk_list(((BitmapAndPath *)path)->bitmapquals, walker, context);
                     break;
@@ -1368,73 +1365,6 @@ create_bitmap_heap_path(PlannerInfo *root,
 	}
 
 	cost_bitmap_heap_scan(&pathnode->path, root, rel, bitmapqual, outer_rel);
-
-	return pathnode;
-}
-
-/*
- * create_bitmap_appendonly_path
- *	  Creates a path node for a bitmap Append-Only row table scan.
- *
- * 'bitmapqual' is a tree of IndexPath, BitmapAndPath, and BitmapOrPath nodes.
- *
- * If this is a join inner indexscan path, 'outer_rel' is the outer relation,
- * and all the component IndexPaths should have been costed accordingly.
- *
- * NOTE: This is mostly the same as the create_bitmap_heap_path routine.
- */
-BitmapAppendOnlyPath *
-create_bitmap_appendonly_path(PlannerInfo *root,
-							  RelOptInfo *rel,
-							  Path *bitmapqual,
-							  RelOptInfo *outer_rel,
-							  bool isAORow)
-{
-	BitmapAppendOnlyPath *pathnode = makeNode(BitmapAppendOnlyPath);
-
-	pathnode->path.pathtype = T_BitmapAppendOnlyScan;
-	pathnode->path.parent = rel;
-	pathnode->path.pathkeys = NIL;		/* always unordered */
-
-    /* Distribution is same as the base table. */
-    pathnode->path.locus = cdbpathlocus_from_baserel(root, rel);
-    pathnode->path.motionHazard = false;
-    pathnode->path.rescannable = true;
-
-	pathnode->bitmapqual = bitmapqual;
-	pathnode->isjoininner = (outer_rel != NULL);
-	pathnode->isAORow = isAORow;
-
-	if (pathnode->isjoininner)
-	{
-		/*
-		 * We must compute the estimated number of output rows for the
-		 * indexscan.  This is less than rel->rows because of the additional
-		 * selectivity of the join clauses.  We make use of the selectivity
-		 * estimated for the bitmap to do this; this isn't really quite right
-		 * since there may be restriction conditions not included in the
-		 * bitmap ...
-		 */
-		Cost		indexTotalCost;
-		Selectivity indexSelectivity;
-
-		cost_bitmap_tree_node(bitmapqual, &indexTotalCost, &indexSelectivity);
-		pathnode->rows = rel->tuples * indexSelectivity;
-		if (pathnode->rows > rel->rows)
-			pathnode->rows = rel->rows;
-		/* Like costsize.c, force estimate to be at least one row */
-		pathnode->rows = clamp_row_est(pathnode->rows);
-	}
-	else
-	{
-		/*
-		 * The number of rows is the same as the parent rel's estimate, since
-		 * this isn't a join inner indexscan.
-		 */
-		pathnode->rows = rel->rows;
-	}
-
-	cost_bitmap_appendonly_scan(&pathnode->path, root, rel, bitmapqual, outer_rel);
 
 	return pathnode;
 }

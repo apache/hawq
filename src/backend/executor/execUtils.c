@@ -2341,7 +2341,6 @@ void (*initGpmonPktFuncs[])(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *e
 	&initGpmonPktForDynamicIndexScan, /* T_DynamicIndexScan */
 	&initGpmonPktForBitmapIndexScan, /* T_BitmapIndexScan */
 	&initGpmonPktForBitmapHeapScan, /* T_BitmapHeapScan */
-	&initGpmonPktForBitmapAppendOnlyScan, /* T_BitmapAppendOnlyScan */
 	&initGpmonPktForBitmapTableScan, /* T_BitmapTableScan */
 	&initGpmonPktForTidScan, /* T_TidScan */
 	&initGpmonPktForSubqueryScan, /* T_SubqueryScan */
@@ -2480,7 +2479,6 @@ sendInitGpmonPkts(Plan *node, EState *estate)
 
 		case T_Result:
 		case T_BitmapHeapScan:
-		case T_BitmapAppendOnlyScan:
 		case T_BitmapTableScan:
 		case T_ShareInputScan:
 		case T_Material:

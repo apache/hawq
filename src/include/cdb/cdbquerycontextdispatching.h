@@ -90,8 +90,6 @@ struct QueryContextDispatchingSendBackData
 	int32 numfiles;
 	int64 *eof;
 	int64 *uncompressed_eof;
-
-	int64 nextFastSequence;
 };
 typedef struct QueryContextDispatchingSendBackData * QueryContextDispatchingSendBack;
 

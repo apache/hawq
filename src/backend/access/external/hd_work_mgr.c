@@ -242,8 +242,6 @@ static void assign_pxf_port_to_fragments(int remote_rest_port, List *fragments)
 PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel)
 {
 	ClientContext client_context; /* holds the communication info */
-	char *analyzer = NULL;
-	char *profile = NULL;
 	PxfInputData inputData = {0};
 	PxfFragmentStatsElem *result = NULL;
 
