@@ -82,7 +82,6 @@ extern "C" {
 #include "utils/selfuncs.h"
 #include "postmaster/identity.h"
 #include "utils/faultinjector.h"
-#include "utils/mdver.h"
 
 extern
 Query *preprocess_query_optimizer(Query *pquery, ParamListInfo boundParams);

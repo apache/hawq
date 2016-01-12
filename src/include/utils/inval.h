@@ -16,7 +16,6 @@
 
 #include "access/htup.h"
 #include "utils/rel.h"
-#include "utils/mdver.h"
 
 typedef void (*CacheCallbackFunction) (Datum arg, Oid relid);
 
@@ -56,8 +55,6 @@ extern void inval_twophase_postcommit(TransactionId xid, uint16 info,
 						  void *recdata, uint32 len);
 
 extern void ResetSystemCaches(void);
-
-extern void CacheAddVersioningEvent(mdver_event *mdev);
 
 /* Enum for system cache invalidation mode */
 typedef enum SysCacheFlushForce

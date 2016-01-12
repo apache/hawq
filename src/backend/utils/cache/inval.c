@@ -94,7 +94,6 @@
 #include "storage/sinval.h"
 #include "storage/smgr.h"
 #include "utils/inval.h"
-#include "utils/mdver.h"
 #include "utils/memutils.h"
 #include "utils/relcache.h"
 #include "utils/simex.h"
@@ -167,9 +166,6 @@ typedef struct TransInvalidationInfo
 	/* init file must be invalidated? */
 	bool		RelcacheInitFileInval;
 
-	/* Metadata Versioning: Local Metadata Version cache/hashtable */
-	mdver_local_mdvsn *local_mdvsn;
-
 } TransInvalidationInfo;
 
 /*
@@ -201,9 +197,6 @@ static int	cache_callback_count = 0;
 
 static void PersistInvalidationMessage(SharedInvalidationMessage *msg);
 static void PrepareForRelcacheInvalidation(Oid relid, HeapTuple tuple);
-static bool MdVer_IsRedundantNukeEvent(InvalidationListHeader *hdr, mdver_event *mdev);
-static void MdVer_PreProcessInvalidMsgs(InvalidationListHeader *dest,
-				InvalidationListHeader *src);
 /* ----------------------------------------------------------------
  *				Invalidation list support functions
  *
@@ -373,68 +366,6 @@ AddCatcacheInvalidationMessage(InvalidationListHeader *hdr,
 #ifdef MD_VERSIONING_INSTRUMENTATION
 	elog(gp_mdversioning_loglevel, "Invalidation: TYPE=CATCACHE CACHEID=%d ACTION=%d", id, action);
 #endif
-}
-
-/* 
- * Add a Metadata Versioning versioning event entry to a message list
- *   hdr: The list to be added to
- *   mdev: The event to be added
- */
-static void
-AddVersioningEventMessage(InvalidationListHeader *hdr, mdver_event *mdev)
-{
-	Assert(NULL != hdr);
-	Assert(NULL != mdev);
-
-	/* Check for last event in the queue. If we're trying to add a nuke, and it's already nuke, skip it */
-	if (MdVer_IsRedundantNukeEvent(hdr, mdev))
-	{
-		return;
-	}
-
-	SharedInvalidationMessage msg;
-	msg.ve.id = SHAREDVERSIONINGMSG_ID;
-	msg.ve.local = true;
-	msg.ve.verEvent = *mdev;
-	AddInvalidationMessage(&hdr->velist, &msg);
-}
-
-/*
- * Detect if adding a Metadata Versioning Nuke event to the event list is redundant.
- * A Nuke message is redundant if the last message in the list is already a Nuke.
- */
-static bool
-MdVer_IsRedundantNukeEvent(InvalidationListHeader *hdr, mdver_event *mdev)
-{
-	Assert(NULL != hdr);
-	Assert(NULL != mdev);
-
-	if (!mdver_is_nuke_event(mdev)) {
-		return false;
-	}
-
-	InvalidationChunk *chunk = hdr->velist;
-	if (NULL == chunk)
-	{
-		/* Destination is empty */
-		return false;
-	}
-
-	/* Find last chunk of destination list */
-	while (chunk->next != NULL)
-	{
-		chunk = chunk->next;
-	}
-
-	/* Get the last event from the last chunk. Then check if it's a NUKE */
-	SharedInvalidationMessage *last_message = &chunk->msgs[chunk->nitems - 1];
-	Assert(last_message->id == SHAREDVERSIONINGMSG_ID);
-	mdver_event *last_event = &(last_message->ve.verEvent);
-	if (mdver_is_nuke_event(last_event)) {
-		return true;
-	}
-
-	return false;
 }
 
 /*
@@ -691,10 +622,6 @@ LocalExecuteInvalidationMessage(SharedInvalidationMessage *msg)
 		smgrclosenode(msg->sm.rnode);
 		break;
 
-	case SHAREDVERSIONINGMSG_ID:
-		mdver_localhandler_new_event(msg);
-		break;
-
 	default:
 #ifdef USE_ASSERT_CHECKING
 		elog(NOTICE, "invalid SI message: %s", si_to_str(msg));
@@ -721,12 +648,6 @@ InvalidateSystemCaches(void)
 
 	ResetCatalogCaches();
 	RelationCacheInvalidate();	/* gets smgr cache too */
-
-	mdver_local_mdvsn *local_mdvsn = GetCurrentLocalMDVSN();
-	if (NULL != local_mdvsn && mdver_enabled())
-	{
-		mdver_local_mdvsn_nuke(local_mdvsn);
-	}
 
 	for (i = 0; i < cache_callback_count; i++)
 	{
@@ -971,16 +892,6 @@ AtStart_Inval(void)
 							   sizeof(TransInvalidationInfo));
 	transInvalInfo->my_level = GetCurrentTransactionNestLevel();
 
-	if (mdver_enabled())
-	{
-		/*
-		 * Since we create the TransInvalidationInfo in the TopTransactionContext,
-		 * we should create the local mdvsn in the same context as well.
-		 */
-		MemoryContext oldcxt = MemoryContextSwitchTo(TopTransactionContext);
-		transInvalInfo->local_mdvsn = mdver_create_local_mdvsn(transInvalInfo->my_level);
-		MemoryContextSwitchTo(oldcxt);
-	}
 }
 
 /*
@@ -1048,17 +959,6 @@ AtSubStart_Inval(void)
 							   sizeof(TransInvalidationInfo));
 	myInfo->parent = transInvalInfo;
 	myInfo->my_level = GetCurrentTransactionNestLevel();
-
-	if (mdver_enabled())
-	{
-		/*
-		 * Since we create the TransInvalidationInfo in the TopTransactionContext,
-		 * we should create the local mdvsn in the same context as well.
-		 */
-		MemoryContext oldcxt = MemoryContextSwitchTo(TopTransactionContext);
-		myInfo->local_mdvsn = mdver_create_local_mdvsn(myInfo->my_level);
-		MemoryContextSwitchTo(oldcxt);
-	}
 
 	transInvalInfo = myInfo;
 
@@ -1164,14 +1064,6 @@ AtEOXact_Inval(bool isCommit)
 
 		ProcessInvalidationMessages(&transInvalInfo->PriorCmdInvalidMsgs,
 									LocalExecuteInvalidationMessage);
-
-		/* TODO gcaragea 05/07/2014: Add support for aborting transactions (MPP-23505) */
-
-		if (mdver_enabled())
-		{
-			mdver_destroy_local_mdvsn(transInvalInfo->local_mdvsn, transInvalInfo->my_level);
-			transInvalInfo->local_mdvsn = NULL;
-		}
 	}
 
 	transInvalInfo = NULL;
@@ -1221,12 +1113,6 @@ AtEOSubXact_Inval(bool isCommit)
 		/* Pop the transaction state stack */
 		transInvalInfo = myInfo->parent;
 
-		if (mdver_enabled())
-		{
-			mdver_destroy_local_mdvsn(myInfo->local_mdvsn, myInfo->my_level);
-			myInfo->local_mdvsn = NULL;
-		}
-
 		/* Need not free anything else explicitly */
 		pfree(myInfo);
 	}
@@ -1241,17 +1127,9 @@ AtEOSubXact_Inval(bool isCommit)
 		/* Pop the transaction state stack */
 		transInvalInfo = myInfo->parent;
 
-		if (mdver_enabled())
-		{
-			mdver_destroy_local_mdvsn(myInfo->local_mdvsn, myInfo->my_level);
-			myInfo->local_mdvsn = NULL;
-		}
-
 		/* Need not free anything else explicitly */
 		pfree(myInfo);
 	}
-
-	elog(gp_mdversioning_loglevel, "In AtEOSubXact_Inval. Freeing subxact MDVSN");
 
 }
 
@@ -1281,9 +1159,6 @@ CommandEndInvalidationMessages(void)
 	if (transInvalInfo == NULL)
 		return;
 
-	MdVer_PreProcessInvalidMsgs(&transInvalInfo->PriorCmdInvalidMsgs,
-			   &transInvalInfo->CurrentCmdInvalidMsgs);
-
 	ProcessInvalidationMessages(&transInvalInfo->CurrentCmdInvalidMsgs,
 								LocalExecuteInvalidationMessage);
 	AppendInvalidationMessages(&transInvalInfo->PriorCmdInvalidMsgs,
@@ -1299,24 +1174,6 @@ void
 CacheInvalidateHeapTuple(Relation relation, HeapTuple tuple, SysCacheInvalidateAction action)
 {
 	PrepareForTupleInvalidation(relation, tuple, action);
-}
-
-/*
- * CacheAddVersioningEvent
- * 		Register a new versioning event for propagation at the end of
- * 		command. A copy of the event is added to the queue.
- */
-void
-CacheAddVersioningEvent(mdver_event *mdev)
-{
-	if (transInvalInfo == NULL)
-	{
-		return;
-	}
-
-	AddVersioningEventMessage(
-			&transInvalInfo->CurrentCmdInvalidMsgs,
-			mdev);
 }
 
 /*
@@ -1447,108 +1304,3 @@ CacheRegisterRelcacheCallback(CacheCallbackFunction func,
 
 	++cache_callback_count;
 }
-
-/*
- * Returns the Local Metadata Version cache handler corresponding
- * to the current subtransaction nesting level.
- */
-mdver_local_mdvsn *
-GetCurrentLocalMDVSN(void)
-{
-
-	if (NULL != transInvalInfo)
-	{
-		return transInvalInfo->local_mdvsn;
-	}
-
-	return NULL;
-}
-
-/*
- * When moving messages from the Current Command Invalidation Queue (CVQ) to the
- *   Prior Command Invalidation Queue (XVQ), pre-process the event queue to
- *   eliminate any events that will have no effect.
- *   If a versioning event is followed by a nuke event, it will have no effect.
- *   Moreover, when a nuke event is moved to XVQ, everything prior in XVQ will
- *   also have no effect.
- *   Therefore we look for Nuke events in CVQ. Find the last one (in the order
- *   of creation), then move all messages from then on to XVQ, overwriting XVQ.
- */
-static void
-MdVer_PreProcessInvalidMsgs(InvalidationListHeader *dest,
-						   InvalidationListHeader *src)
-{
-
-	/* Go through src from first until last. Keep track of last nuke found
-	 * If nuke found, then:
-	 *  -- move msgs from nuke onward from cvq to svq
-	 *     -- move msgs to the beginning of first chunk
-	 *     -- make the first chunk of cvq to be the firs chunk of svq
-	 *  -- at this point, make cvq null, we already moved everything
-	 */
-
-	InvalidationChunk *chunk = src->velist;
-	if (NULL == chunk)
-	{
-		/* Source is empty */
-		return;
-	}
-
-	/* Find chunk and index of the last nuke message */
-	InvalidationChunk *last_good_chunk = NULL;
-	int last_good_index = -1;
-	while (NULL != chunk)
-	{
-		for (int i = 0; i < chunk->nitems; i++)
-		{
-			SharedInvalidationMessage *crt_message = &chunk->msgs[i];
-			Assert(crt_message->id == SHAREDVERSIONINGMSG_ID);
-			mdver_event *crt_event = &(crt_message->ve.verEvent);
-			if (mdver_is_nuke_event(crt_event))
-			{
-				last_good_chunk = chunk;
-				last_good_index = i;
-			}
-		}
-		chunk = chunk->next;
-	}
-
-
-	if (NULL != last_good_chunk) {
-		/* Found a nuke, and we have the chunk and index saved */
-		Assert(last_good_index >= 0);
-
-		/* 1. Free up previous chunks from src, as we'll discard them */
-		InvalidationChunk *src_chunk = src->velist;
-		while (src_chunk != last_good_chunk) {
-			InvalidationChunk *next_chunk = src_chunk->next;
-			pfree(src_chunk);
-			src_chunk = next_chunk;
-		}
-		src->velist = last_good_chunk;
-
-		/* 1. Move messages to the beginning of the chunk */
-		for (int i = last_good_index; i < last_good_chunk->nitems; i++)
-		{
-			last_good_chunk->msgs[i - last_good_index] = last_good_chunk->msgs[i];
-		}
-		/* 2. Update nitems value */
-		last_good_chunk->nitems = last_good_chunk->nitems - last_good_index;
-
-		/* Free up all the chunks from dest */
-		InvalidationChunk *dest_chunk = dest->velist;
-		while (NULL != dest_chunk) {
-			InvalidationChunk *next_chunk = dest_chunk->next;
-			pfree(dest_chunk);
-			dest_chunk = next_chunk;
-		}
-
-		/* Move messages from src to overwrite dest */
-		dest->velist = last_good_chunk;
-
-		/* Set src to NULL as we're done with the transfer */
-		src->velist = NULL;
-	}
-}
-
-
