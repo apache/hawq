@@ -63,7 +63,6 @@
 #include "executor/spi.h"
 #include "utils/workfile_mgr.h"
 #include "cdb/cdbmetadatacache.h"
-#include "utils/mdver.h"
 #include "utils/session_state.h"
 
 shmem_startup_hook_type shmem_startup_hook = NULL;
@@ -137,15 +136,6 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		if (Gp_role == GP_ROLE_DISPATCH)
 		{
 			size = add_size(size, AppendOnlyWriterShmemSize());
-		}
-
-		/*
-		 * On the master and standby master, we also allocate the
-		 * Global Metadata Versioning shared cache
-		 */
-		if (AmIMaster()||AmIStandby())
-		{
-			size = add_size(size, mdver_shmem_size());
 		}
 
 		size = add_size(size, ProcGlobalShmemSize());
@@ -371,14 +361,6 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	workfile_mgr_cache_init();
 
 	FSCredShmemInit();
-	/*
-	 * On the master and standby master, we also allocate the
-	 * Global Metadata Versioning shared cache
-	 */
-	if (AmIMaster() || AmIStandby())
-	{
-		mdver_shmem_init();
-	}
 
 #ifdef EXEC_BACKEND
 

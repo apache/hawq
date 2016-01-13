@@ -34,7 +34,6 @@
 #include "utils/rel.h"
 #include "utils/resowner.h"
 #include "utils/syscache.h"
-#include "utils/mdver.h"
 #include "utils/guc.h"
 
 /* #define CACHEDEBUG */	/* turns DEBUG elogs on */ 
@@ -1679,9 +1678,6 @@ PrepareToInvalidateCacheTuple(Relation relation,
 	Assert(CCacheHdr != NULL);
 
 	reloid = RelationGetRelid(relation);
-
-	/* Add corresponding Metadata versioning events for this action */
-	mdver_dt_catcache_inval(relation, tuple, action);
 
 	/* ----------------
 	 *	for each cache

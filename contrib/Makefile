@@ -8,7 +8,6 @@ WANTED_DIRS = \
 		orafce \
 		extprotocol \
 		gp_cancel_query \
-		gp_mdver \
 		hawq-hadoop
 
 # Missing:

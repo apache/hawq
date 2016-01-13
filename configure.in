@@ -507,11 +507,6 @@ PGAC_ARG_BOOL(enable, debugntuplestore, no, [  --enable-ntuplestore      enable 
                          [Define to 1 to build with debug_ntuplestore. (--enable-ntuplestore)])])
 
 
-# Enable metadata versioning instrumentation
-PGAC_ARG_BOOL(enable, mdverinstrumentation, no, [  --enable-mdverinstrumentation      enable metadata versioning instrumentation],
-              [AC_DEFINE([MD_VERSIONING_INSTRUMENTATION], 1,
-                         [Define to 1 to build with metadata versioning instrumentation. (--enable-mdverinstrumentation)])])
-
 #
 # Enable testing utilities
 #

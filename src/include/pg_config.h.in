@@ -707,10 +707,6 @@
 /* Define as the maximum alignment requirement of any C data type. */
 #undef MAXIMUM_ALIGNOF
 
-/* Define to 1 to build with metadata versioning instrumentation.
-   (--enable-mdverinstrumentation) */
-#undef MD_VERSIONING_INSTRUMENTATION
-
 /* Define bytes to use libc memset(). */
 #undef MEMSET_LOOP_LIMIT
 

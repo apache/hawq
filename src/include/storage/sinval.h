@@ -16,8 +16,6 @@
 
 #include "storage/itemptr.h"
 #include "storage/relfilenode.h"
-#include "utils/mdver.h"
-
 
 /*
  * We currently support three types of shared-invalidation messages: one that
@@ -75,28 +73,12 @@ typedef struct
 	RelFileNode rnode;			/* physical file ID */
 } SharedInvalSmgrMsg;
 
-/*
- * TODO gcaragea 03/26/2014: Investigate if there is any impact on performance
- * or memory footprint from adding the versioning event to the
- * SharedInvalidationMessage union (MPP-23070)
- */
-
-#define SHAREDVERSIONINGMSG_ID (-3)
-
-typedef struct
-{
-	int32		id;				/* type field --- must be first */
-	bool local;					/* true for events that were generated locally */
-	mdver_event verEvent;		/* versioning event information */
-} SharedVersioningMsg;
-
 typedef union
 {
 	int32		id;				/* type field --- must be first */
 	SharedInvalCatcacheMsg cc;
 	SharedInvalRelcacheMsg rc;
 	SharedInvalSmgrMsg sm;
-	SharedVersioningMsg ve;
 } SharedInvalidationMessage;
 
 
@@ -109,10 +91,6 @@ extern void SendSharedInvalidMessages(SharedInvalidationMessage *msgs,
 extern void ReceiveSharedInvalidMessages(
 					  void (*invalFunction) (SharedInvalidationMessage *msg),
 							 void (*resetFunction) (void));
-
-extern void mdver_globalhandler_new_event(SharedInvalidationMessage *messages, int n);
-
-extern void mdver_localhandler_new_event(SharedInvalidationMessage *msg);
 
 /* signal handler for catchup events (PROCSIG_CATCHUP_INTERRUPT) */
 extern void HandleCatchupInterrupt(void);

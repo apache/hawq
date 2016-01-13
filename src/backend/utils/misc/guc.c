@@ -520,7 +520,6 @@ static char *log_min_error_statement_str;
 static char *log_destination_string;
 static char *gp_log_format_string;
 static char *gp_workfile_caching_loglevel_str;
-static char *gp_mdversioning_loglevel_str;
 static char *gp_sessionstate_loglevel_str;
 static char *explain_memory_verbosity_str;
 
@@ -1164,16 +1163,6 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&gp_workfile_caching,
 		false, NULL, NULL
-	},
-	{
-		{"gp_metadata_versioning", PGC_SUSET, QUERY_TUNING_OTHER,
-			gettext_noop("Enable metadata versioning"),
-			gettext_noop("When enabled, catalog objects are versioned"
-					     "and their version is changed only when updated"),
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&gp_metadata_versioning,
-		false, &assign_gp_metadata_versioning, NULL
 	},
 	{
 		{"force_bitmap_table_scan", PGC_USERSET, DEVELOPER_OPTIONS,
@@ -3490,7 +3479,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_release_mdcache,
-		true, &assign_optimizer_release_mdcache, NULL
+		true, NULL, NULL
 	},
 
 	{
@@ -7166,19 +7155,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&gp_workfile_caching_loglevel_str,
 		"debug1", assign_gp_workfile_caching_loglevel, NULL
-	},
-
-	{
-		{"gp_mdversioning_loglevel", PGC_SUSET, DEVELOPER_OPTIONS,
-			gettext_noop("Sets the logging level for metadata versioning debugging messages"),
-			gettext_noop("Valid values are DEBUG5, DEBUG4, DEBUG3, DEBUG2, "
-						 "DEBUG1, LOG, NOTICE, WARNING, and ERROR. Each level includes all the "
-						 "levels that follow it. The later the level, the fewer messages are "
-						 "sent."),
-			GUC_GPDB_ADDOPT | GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&gp_mdversioning_loglevel_str,
-		"debug1", assign_gp_mdversioning_loglevel, NULL
 	},
 
 	{
@@ -12642,13 +12618,6 @@ assign_client_min_messages(const char *newval, bool doit, GucSource source)
 }
 
 static const char *
-assign_gp_mdversioning_loglevel(const char *newval,
-						bool doit, GucSource source)
-{
-	return (assign_msglvl(&gp_mdversioning_loglevel, newval, doit, source));
-}
-
-static const char *
 assign_gp_sessionstate_loglevel(const char *newval,
 						bool doit, GucSource source)
 {
@@ -13256,52 +13225,6 @@ assign_transaction_read_only(bool newval, bool doit, GucSource source)
 	return true;
 }
 
-
-/*
- * Validate that if we disable releasing the MD Cache after each query,
- *   we must have MD Versioning turned on.
- */
-static bool
-assign_optimizer_release_mdcache(bool newval, bool doit, GucSource source)
-{
-	 /*
-	  * We want to avoid reaching the following state:
-	  *  - optimizer_release_mdcache = off
-	  *  - gp_metadata_versioning = off
-	  * Other states are fine.
-	  */
-	if (!newval && !gp_metadata_versioning)
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("cannot set optimizer_release_mdcache to off when gp_metadata_versioning is off")));
-		return false;
-	}
-	return true;
-}
-
-/*
- * Validate that if we disable MD Versioning, we are releasing the MD Cache
- *   after each query.
- */
-static bool
-assign_gp_metadata_versioning(bool newval, bool doit, GucSource source)
-{
-	 /*
-	  * We want to avoid reaching the following state:
-	  *  - optimizer_release_mdcache = off
-	  *  - gp_metadata_versioning = off
-	  * Other states are fine.
-	  */
-	if (!newval && !optimizer_release_mdcache)
-	{
-		ereport(ERROR,
-				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-				 errmsg("cannot set gp_metadata_versioning to off when optimizer_release_mdcache is off")));
-		return false;
-	}
-	return true;
-}
 
 static const char *
 assign_canonical_path(const char *newval, bool doit, GucSource source)
