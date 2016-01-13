@@ -1509,7 +1509,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	    				  createPropertyFloat(
 	    					  PCONTEXT,
 							  "queue",
-	 						  getRSQTBLAttributeName(RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR),
+	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_RESOURCE_OVERCOMMIT_FACTOR),
 							  &i,
 							  resource_overcommit));
 
