@@ -259,7 +259,6 @@ extern bool gp_temporary_files_filespace_repair;
 extern bool gp_perfmon_print_packet_info;
 extern bool gp_plpgsql_clear_cache_always;
 extern bool gp_disable_catalog_access_on_segment;
-extern int gp_mdversioning_loglevel;
 
 extern bool gp_called_by_pgdump;
 

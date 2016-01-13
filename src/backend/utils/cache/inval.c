@@ -362,10 +362,6 @@ AddCatcacheInvalidationMessage(InvalidationListHeader *hdr,
 	msg.cc.dbId = dbId;
 	msg.cc.hashValue = hashValue;
 	AddInvalidationMessage(&hdr->cclist, &msg);
-	
-#ifdef MD_VERSIONING_INSTRUMENTATION
-	elog(gp_mdversioning_loglevel, "Invalidation: TYPE=CATCACHE CACHEID=%d ACTION=%d", id, action);
-#endif
 }
 
 /*
@@ -389,11 +385,6 @@ AddRelcacheInvalidationMessage(InvalidationListHeader *hdr,
 	msg.rc.dbId = dbId;
 	msg.rc.relId = relId;
 	AddInvalidationMessage(&hdr->rclist, &msg);
-
-
-#ifdef MD_VERSIONING_INSTRUMENTATION
-	elog(gp_mdversioning_loglevel, "Invalidation: TYPE=RELCACHE RELID=%d", relId);
-#endif	
 }
 
 /*
@@ -415,9 +406,6 @@ AddSmgrInvalidationMessage(InvalidationListHeader *hdr,
 	msg.sm.id = SHAREDINVALSMGR_ID;
 	msg.sm.rnode = rnode;
 	AddInvalidationMessage(&hdr->rclist, &msg);
-#ifdef MD_VERSIONING_INSTRUMENTATION
-	elog(gp_mdversioning_loglevel, "Invalidation: TYPE=SMGR RELID=%d", rnode.relNode);
-#endif	
 }
 
 /*
