@@ -646,7 +646,6 @@ int MainHandlerLoop(void)
         if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 &&
 			 PQUEMGR->toRunQueryDispatch &&
 			 PQUEMGR->ForcedReturnGRMContainerCount == 0 &&
-			 PRESPOOL->AddPendingContainerCount == 0 &&
 			 PRESPOOL->SlavesHostCount > 0 )
         {
     		dispatchResourceToQueries();
@@ -1510,7 +1509,7 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	    				  createPropertyFloat(
 	    					  PCONTEXT,
 							  "queue",
-	 						  getRSQTBLAttributeName(RSQ_DDL_ATTR_RESOURCE_OVERCOMMIT_FACTOR),
+	 						  getRSQTBLAttributeName(RSQ_TBL_ATTR_RESOURCE_OVERCOMMIT_FACTOR),
 							  &i,
 							  resource_overcommit));
 
