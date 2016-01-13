@@ -47,6 +47,34 @@ void port_to_str(char **port, int new_port)
 }
 
 /*
+ * dfs_url_to_address
+ *
+ * expected format of dfs_url is "address/path"
+ * parse the address part into address.
+ * address needs to be freed by the caller.
+ */
+void dfs_url_to_address(const char* dfs_url, char** address)
+{
+	if (!dfs_url || strcmp(dfs_url, "") == 0)
+	{
+		elog(ERROR, "dfs_url needs to be of the form host:port/path. Configured value is empty");
+	}
+	if (!address)
+	{
+		elog(ERROR, "unexpected internal error in pxfutils.c");
+	}
+	/* parse dfs_url to get host and port part */
+	char* address_end = strchr(dfs_url, '/');
+	if (!address_end)
+	{
+		elog(ERROR, "dfs_url needs to be of the form host:port/path. Configured value is %s",
+			 dfs_url);
+	}
+	int hostportlen = address_end - dfs_url;
+	*address = pnstrdup(dfs_url, hostportlen); /* To be freed */
+}
+
+/*
  * call_rest
  *
  * Creates the REST message and sends it to the PXF service located on

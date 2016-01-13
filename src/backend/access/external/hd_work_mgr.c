@@ -909,15 +909,15 @@ static void init_client_context(ClientContext *client_context)
 static void generate_delegation_token(PxfInputData *inputData)
 {
 	StringInfoData hdfs_uri;
+	char* dfs_address = NULL;
 
 	if (!enable_secure_filesystem)
 		return;
 
+	dfs_url_to_address(dfs_url, &dfs_address);
+
 	initStringInfo(&hdfs_uri);
-    if (inputData->gphduri->ha_nodes)
-        appendStringInfo(&hdfs_uri, "hdfs://%s/", inputData->gphduri->ha_nodes->nameservice);
-    else
-        appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", inputData->gphduri->host);
+	appendStringInfo(&hdfs_uri, "hdfs://%s/", dfs_address);
 
     elog(DEBUG2, "about to acquire delegation token for %s", hdfs_uri.data);
 
@@ -929,6 +929,7 @@ static void generate_delegation_token(PxfInputData *inputData)
 	if (inputData->token->hdfs_token == NULL)
 		elog(ERROR, "Failed to acquire a delegation token for uri %s", hdfs_uri.data);
 
+	pfree(dfs_address);
 	pfree(hdfs_uri.data);
 }
 

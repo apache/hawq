@@ -2883,19 +2883,19 @@ static char* GetExtTableFirstLocation(Datum *array)
 static void AddFileSystemCredentialForPxfTable(char *uri)
 {
 	StringInfoData hdfs_uri;
+	char* dfs_address = NULL;
+
+	dfs_url_to_address(dfs_url, dfs_address);
 
 	initStringInfo(&hdfs_uri);
-	GPHDUri *gphd_uri = parseGPHDUri(uri);
-    if (gphd_uri->ha_nodes)
-        appendStringInfo(&hdfs_uri, "hdfs://%s/", gphd_uri->ha_nodes->nameservice);
-    else
-        appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", gphd_uri->host);
+
+	appendStringInfo(&hdfs_uri, "hdfs://%s/", dfs_address);
 
     elog(DEBUG2, "about to acquire delegation token for %s", hdfs_uri.data);
 
 	prepareDispatchedCatalogFileSystemCredential(hdfs_uri.data);
 
-	freeGPHDUri(gphd_uri);
+	pfree(dfs_address);
 	pfree(hdfs_uri.data);
 }
 
