@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -50,7 +50,7 @@ void
 test__dfs_url_to_address__negative_empty(void **state)
 {
 	test_negative_dfs_url_to_address("",
-				"dfs_url needs to be of the form host:port/path. Configured value is empty");
+			"dfs_url needs to be of the form host:port/path. Configured value is empty");
 }
 
 void
@@ -83,8 +83,8 @@ test_negative_dfs_url_to_address(char* input, char* err_msg)
 	PG_END_TRY();
 }
 
-int 
-main(int argc, char* argv[]) 
+int
+main(int argc, char* argv[])
 {
 	cmockery_parse_arguments(argc, argv);
 

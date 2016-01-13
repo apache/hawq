@@ -81,7 +81,7 @@ pxfanalyze_REAL_OBJS=$(COMMON_REAL_OBJS) \
 	$(top_srcdir)/src/backend/utils/adt/ruleutils.o \
 	$(top_srcdir)/src/backend/parser/kwlookup.o \
 	$(top_srcdir)/src/backend/utils/mb/encnames.o    
-pxfutils_REAL_OBJS=$(COMMON_REAL_OBJS) 
+pxfutils_REAL_OBJS=$(COMMON_REAL_OBJS)
 
 include ../../../../Makefile.mock
 

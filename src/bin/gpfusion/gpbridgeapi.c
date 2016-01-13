@@ -473,7 +473,6 @@ void build_uri_for_write(gphadoop_context* context, PxfServer* rest_server )
 					 rest_server->host, rest_server->port,
 					 PXF_SERVICE_PREFIX, PXF_VERSION, context->write_file_name.data);
 	elog(DEBUG2, "pxf: uri %s with file name for write: %s", context->uri.data, context->write_file_name.data);
-
 }
 
 size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
