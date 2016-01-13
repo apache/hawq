@@ -50,7 +50,6 @@
 #include "commands/user.h"
 #include "commands/vacuum.h"
 #include "commands/view.h"
-#include "utils/mdver.h"
 #include "miscadmin.h"
 #include "postmaster/checkpoint.h"
 #include "rewrite/rewriteDefine.h"
@@ -832,12 +831,6 @@ ProcessUtility(Node *parsetree,
 							char	   *name = NULL;
 
 							RequireTransactionChain((void *) stmt, "SAVEPOINT");
-
-							/* TODO gcaragea 3/4/2015: Remove this check when support for subtransactions is added to Metadata Versioning */
-							if (mdver_enabled())
-							{
-								elog(ERROR, "Subtransactions are not supported when metadata versioning is enabled");
-							}
 
 							foreach(cell, stmt->options)
 							{

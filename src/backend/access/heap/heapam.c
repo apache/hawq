@@ -2136,13 +2136,6 @@ heap_insert(Relation relation, HeapTuple tup, CommandId cid,
 
 	Insist(RelationIsHeap(relation));
 
-#ifdef MD_VERSIONING_INSTRUMENTATION
-	if (IsSystemRelation(relation))
-	{
-		elog(gp_mdversioning_loglevel, "CatalogDML: ACTION=INSERT RELATION=%s", relation->rd_rel->relname.data);
-	}
-#endif
-
 	// Fetch gp_persistent_relation_node information that will be added to XLOG record.
 	RelationFetchGpRelationNodeForXLog(relation);
 
@@ -2410,13 +2403,6 @@ heap_delete(Relation relation, ItemPointer tid,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("Append-only tables are not updatable. Operation not permitted."),
 				 errOmitLocation(true)));
-
-#ifdef MD_VERSIONING_INSTRUMENTATION
-	if (IsSystemRelation(relation))
-	{
-		elog(gp_mdversioning_loglevel, "CatalogDML: ACTION=DELETE RELATION=%s", relation->rd_rel->relname.data);
-	}
-#endif
 
 	// Fetch gp_persistent_relation_node information that will be added to XLOG record.
 	RelationFetchGpRelationNodeForXLog(relation);
@@ -3232,13 +3218,6 @@ simple_heap_update(Relation relation, ItemPointer otid, HeapTuple tup)
 	ItemPointerData update_ctid;
 	TransactionId update_xmax;
 
-#ifdef MD_VERSIONING_INSTRUMENTATION
-	if (IsSystemRelation(relation))
-	{
-		elog(gp_mdversioning_loglevel, "CatalogDML: ACTION=UPDATE RELATION=%s", relation->rd_rel->relname.data);
-	}
-#endif
-
 	MIRROREDLOCK_BUFMGR_VERIFY_NO_LOCK_LEAK_ENTER;
 
 	result = heap_update_internal(
@@ -3815,13 +3794,6 @@ heap_inplace_update_internal(Relation relation, HeapTuple tuple, TransactionId x
 	 * to XLOG record.
 	 */
 	RelationFetchGpRelationNodeForXLog(relation);
-
-#ifdef MD_VERSIONING_INSTRUMENTATION	
-	if (IsSystemRelation(relation))
-	{
-		elog(gp_mdversioning_loglevel, "CatalogDML: ACTION=INPLACE_UPDATE RELATION=%s", relation->rd_rel->relname.data);
-	}
-#endif
 
 	// -------- MirroredLock ----------
 	MIRROREDLOCK_BUFMGR_LOCK;

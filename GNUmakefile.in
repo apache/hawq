@@ -18,7 +18,6 @@ all:
 	$(MAKE) -C contrib/orafce all
 	$(MAKE) -C contrib/gp_cancel_query all
 	$(MAKE) -C contrib/hawq-hadoop all
-	$(MAKE) -C contrib/gp_mdver all
 	$(MAKE) -C tools all
 	@echo "All of HAWQ successfully made. Ready to install."
 
@@ -32,7 +31,6 @@ install:
 	$(MAKE) -C contrib/orafce $@
 	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
-	$(MAKE) -C contrib/gp_mdver $@
 	$(MAKE) -C tools $@
 	@echo "HAWQ installation complete."
 
@@ -46,7 +44,6 @@ installdirs uninstall:
 	$(MAKE) -C contrib/orafce $@
 	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
-	$(MAKE) -C contrib/gp_mdver $@	
 
 distprep:
 #	$(MAKE) -C doc $@
@@ -67,7 +64,6 @@ clean:
 	$(MAKE) -C contrib/orafce $@
 	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
-	$(MAKE) -C contrib/gp_mdver $@	
 	$(MAKE) -C tools $@
 # Garbage from autoconf:
 	@rm -rf autom4te.cache/

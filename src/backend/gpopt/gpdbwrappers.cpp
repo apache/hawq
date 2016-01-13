@@ -215,10 +215,6 @@
 #define ALLOW_GetActiveRelType
 #define ALLOW_GetActiveQueryResource
 
-#define ALLOW_mdver_request_version
-#define ALLOW_mdver_enabled
-
-
 #include "gpopt/utils/gpdbdefs.h"
 
 #include "gpos/base.h"
@@ -3113,22 +3109,6 @@ gpdb::UlLeafPartitions
 	GP_WRAP_END;
 
 	return 0;
-}
-
-void
-gpdb::MdVerRequestVersion
-	(
-	Oid key,
-	uint64 *ddl_version,
-	uint64 *dml_version
-	)
-{
-	GP_WRAP_START;
-	{
-		mdver_request_version(key, ddl_version, dml_version);
-		return;
-	}
-	GP_WRAP_END;
 }
 
 // EOF

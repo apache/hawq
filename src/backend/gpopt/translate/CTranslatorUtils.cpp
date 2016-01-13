@@ -40,7 +40,6 @@
 #include "catalog/pg_trigger.h"
 #include "optimizer/walkers.h"
 #include "utils/rel.h"
-#include "utils/mdver.h"
 
 #define GPDB_NEXTVAL 1574
 #define GPDB_CURRVAL 1575
@@ -345,8 +344,8 @@ CTranslatorUtils::PmdidWithVersion
 	OID oidObj
 	)
 {
-	ULLONG ullDDLv = INVALID_MD_VERSION;
-	ULLONG ullDMLv = INVALID_MD_VERSION;
+	ULONG ullDDLv = 0;
+	ULONG ullDMLv = 0;
 
 	if (InvalidOid == oidObj)
 	{
@@ -354,21 +353,16 @@ CTranslatorUtils::PmdidWithVersion
 		ullDDLv = 0;
 		ullDMLv = 0;
 	}
-	else if (FBuiltinObject(oidObj))
+	else
 	{
 		/*
-		 * Built-in types, functions etc get default value 1.0
+		 * All valid objects get 1.0 as the version
 		 */
 		ullDDLv = 1;
 		ullDMLv = 0;
 	}
-	else
-	{
-		gpdb::MdVerRequestVersion(oidObj, &ullDDLv, &ullDMLv);
-	}
 
-	// TODO: gcaragea - Feb 6, 2015; Refactor CMDIdGPDB to eliminate need for casting
-	return GPOS_NEW(pmp) CMDIdGPDB(oidObj, (ULONG) ullDDLv, (ULONG) ullDMLv);
+	return GPOS_NEW(pmp) CMDIdGPDB(oidObj, ullDDLv, ullDMLv);
 }
 
 

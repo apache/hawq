@@ -367,14 +367,6 @@ SIInsertDataEntries(SharedInvalidationMessage *data, int n)
 	 * SICleanupQueue every so often.
 	 */
 
-	/*
-	 * Pass messages through the MD Global VE Handler component
-	 * TODO gcaragea 3/28/2014: Figure out locking once we start doing cache
-	 *  look-ups for reconciliation (MPP-22928)
-	 *
-	 */
-	mdver_globalhandler_new_event(data, n);
-
 	while (n > 0)
 	{
 		int			nthistime = Min(n, WRITE_QUANTUM);
