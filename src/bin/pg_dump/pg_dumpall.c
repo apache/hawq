@@ -990,7 +990,7 @@ dumpRoleMembership(PGconn *conn)
 }
 
 /*
- * Dump role time constraints. 
+ * Dump role time constraints.
  *
  * Note: we expect dumpRoles already created all the roles, but there are
  * no time constraints yet.
@@ -1017,7 +1017,7 @@ dumpRoleConstraints(PGconn *conn)
 		char		*end_day 	= PQgetvalue(res, i, 3);
 		char 		*end_time 	= PQgetvalue(res, i, 4);
 
-		fprintf(OPF, "ALTER ROLE %s DENY BETWEEN DAY %s TIME '%s' AND DAY %s TIME '%s';\n", 
+		fprintf(OPF, "ALTER ROLE %s DENY BETWEEN DAY %s TIME '%s' AND DAY %s TIME '%s';\n",
 				fmtId(rolname), start_day, start_time, end_day, end_time);
 	}
 
@@ -1238,7 +1238,6 @@ dumpFilespaces(PGconn *conn)
 		/* append the filespace location information to output */
 		for (j = 0; j < PQntuples(entries); j++)
 		{
-			char	   *dbid = PQgetvalue(entries, j, 0);
 			char	   *location = PQgetvalue(entries, j, 1);
 
 			if (j > 0)
@@ -1300,7 +1299,7 @@ dumpTablespaces(PGconn *conn)
 	 * --gp-syntax or --no-gp-syntax.
 	 */
 	if (server_version < 80214)
-	{							
+	{
 		/* Filespaces were introduced in GP 4.0 (server_version 8.2.14) */
 		return;
 	}
