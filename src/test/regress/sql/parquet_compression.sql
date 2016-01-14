@@ -20,7 +20,6 @@ drop table parquet_snappy_part_unc;
 drop table parquet_gzip_2;
 
 alter resource queue pg_default with ( vseg_resource_quota='mem:4gb');
---set statement_mem='1999MB';
 --end_ignore
 
 --Datatypes covered: text,bytea,varchar,bit varying

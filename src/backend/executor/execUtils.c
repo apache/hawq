@@ -2308,10 +2308,7 @@ void mppExecutorCleanup(QueryDesc *queryDesc)
 	/**
 	 * Since there was an error, clean up the function scan stack.
 	 */
-	if (gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE)
-	{
-		SPI_InitMemoryReservation();
-	}
+	SPI_InitMemoryReservation();
 }
 
 void

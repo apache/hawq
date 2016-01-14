@@ -3339,17 +3339,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-
-		{"gp_log_resqueue_memory", PGC_USERSET, LOGGING_WHAT,
-			gettext_noop("Prints out messages related to resource queue's memory management."),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
-		},
-		&gp_log_resqueue_memory,
-		false, NULL, NULL
-	},
-
-	{
 		{"gp_resqueue_print_operator_memory_limits", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Prints out the memory limit for operators (in explain) assigned by resource queue's "
 						 "memory management."),
@@ -4835,8 +4824,8 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"statement_mem", PGC_USERSET, RESOURCES_MEM,
-			gettext_noop("Sets the memory to be reserved for a statement."),
+		{"default_statement_mem", PGC_USERSET, RESOURCES_MEM,
+			gettext_noop("Sets the default memory to be reserved for a statement."),
 			NULL,
 			GUC_UNIT_KB | GUC_GPDB_ADDOPT
 		},
@@ -4847,16 +4836,6 @@ static struct config_int ConfigureNamesInt[] =
 #else
 		128000, 1000, INT_MAX, gpvars_assign_statement_mem, NULL
 #endif
-	},
-
-	{
-		{"max_statement_mem", PGC_SUSET, RESOURCES_MEM,
-		 	gettext_noop("Sets the maximum value for statement_mem setting."),
-		 	NULL,
-			GUC_UNIT_KB | GUC_GPDB_ADDOPT
-		},
-		&max_statement_mem,
-		2048000, 32768, INT_MAX, NULL, NULL
 	},
 
 	{
@@ -7935,15 +7914,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&pljava_classpath,
 		"", NULL, NULL
-	},
-
-	{
-		{"gp_resqueue_memory_policy", PGC_SUSET, RESOURCES_MGM,
-			gettext_noop("Sets the policy for memory allocation of queries."),
-			gettext_noop("Valid values are NONE, AUTO, EAGER_FREE.")
-		},
-		&gp_resqueue_memory_policy_str,
-		"none", gpvars_assign_gp_resqueue_memory_policy, gpvars_show_gp_resqueue_memory_policy
 	},
 
 	{

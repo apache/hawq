@@ -2134,12 +2134,11 @@ _SPI_pquery(QueryDesc * queryDesc, bool fire_triggers, long tcount)
 		ResetUsage();
 #endif
 	
-	if (gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE
-			&& superuser())
+	if (superuser())
 	{
 		if (!SPI_IsMemoryReserved())
 		{
-			queryDesc->plannedstmt->query_mem = ResourceQueueGetSuperuserQueryMemoryLimit();                		
+			queryDesc->plannedstmt->query_mem = statement_mem * 1024L;
 		}
 		else
 		{
@@ -2446,7 +2445,6 @@ static uint64 SPIMemReserved = 0;
  */
 void SPI_InitMemoryReservation(void)
 {
-	Assert(gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE);
 	SPIMemReserved = (uint64) statement_mem * 1024L;;
 }
 
@@ -2458,16 +2456,10 @@ void SPI_InitMemoryReservation(void)
  */
 void SPI_ReserveMemory(uint64 mem_reserved)
 {
-	Assert(gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE);
 	if (mem_reserved > 0
-			&& (SPIMemReserved == 0 || mem_reserved < SPIMemReserved))
+		&& (SPIMemReserved == 0 || mem_reserved < SPIMemReserved))
 	{
 		SPIMemReserved = mem_reserved;
-	}
-
-	if (gp_log_resqueue_memory)
-	{
-		elog(gp_resqueue_memory_log_level, "SPI memory reservation %d", (int) SPIMemReserved);
 	}
 }
 
@@ -2477,7 +2469,6 @@ void SPI_ReserveMemory(uint64 mem_reserved)
  */
 uint64 SPI_GetMemoryReservation(void)
 {
-	Assert(gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE);
 	return SPIMemReserved;
 }
 
@@ -2486,7 +2477,6 @@ uint64 SPI_GetMemoryReservation(void)
  */
 bool SPI_IsMemoryReserved(void)
 {
-	Assert(gp_resqueue_memory_policy != RESQUEUE_MEMORY_POLICY_NONE);
 	return (SPIMemReserved == 0);
 }
 

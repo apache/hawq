@@ -1097,9 +1097,6 @@ extern bool gpvars_assign_gp_hash_index(bool newval, bool doit, GucSource source
 /* wire off SET WITH() for alter table distributed by */
 extern bool gp_disable_atsdb_set_with;
 
-extern const char *gpvars_assign_gp_resqueue_memory_policy(const char *newval, bool doit, GucSource source __attribute__((unused)) );
-extern const char *gpvars_show_gp_resqueue_memory_policy(void);
-
 extern bool gpvars_assign_statement_mem(int newval, bool doit, GucSource source __attribute__((unused)) );
 
 extern void increment_command_count(void);
