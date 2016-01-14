@@ -277,9 +277,9 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 {
 	char	    *tablespacename;
 	Relation	 rel, rel1;
-	HeapTuple	 tuple;
-	cqContext					 cqc;
-	cqContext					*pcqCtx;
+	HeapTuple	 tuple, tuple1;
+	cqContext					 cqc, cqc1;
+	cqContext					*pcqCtx, *pcqCtx1;
 	Oid			 tablespaceoid;
 	int32        count,
 				 count2;
@@ -373,15 +373,15 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 	 */
 	rel1 = heap_open(DatabaseRelationId, AccessShareLock);
 
-	pcqCtx = caql_addrel(cqclr(&cqc), rel1); 
+	pcqCtx1 = caql_addrel(cqclr(&cqc1), rel1);
 
-	tuple = caql_getfirst(
-			pcqCtx,
+	tuple1 = caql_getfirst(
+			pcqCtx1,
 			cql("SELECT * FROM pg_database "
 				 " WHERE dat2tablespace = :1 ", 
 				ObjectIdGetDatum(tablespaceoid)));
 
-	if (HeapTupleIsValid(tuple))
+	if (HeapTupleIsValid(tuple1))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
@@ -395,15 +395,15 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 	 */
 	rel1 = heap_open(RelationRelationId, AccessShareLock);
 
-	pcqCtx = caql_addrel(cqclr(&cqc), rel1); 
+	pcqCtx1 = caql_addrel(cqclr(&cqc1), rel1);
 
-	tuple = caql_getfirst(
-			pcqCtx,
+	tuple1 = caql_getfirst(
+			pcqCtx1,
 			cql("SELECT * FROM pg_class "
 				 " WHERE reltablespace = :1 ", 
 				ObjectIdGetDatum(tablespaceoid)));
 
-	if (HeapTupleIsValid(tuple))
+	if (HeapTupleIsValid(tuple1))
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
