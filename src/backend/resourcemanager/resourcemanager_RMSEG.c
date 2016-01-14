@@ -160,6 +160,12 @@ int MainHandlerLoop_RMSEG(void)
 
 	while( DRMGlobalInstance->ResManagerMainKeepRun ) {
 
+		if (!PostmasterIsAlive(true)) {
+			DRMGlobalInstance->ResManagerMainKeepRun = false;
+			elog(LOG, "Postmaster is not alive, resource manager exits");
+			break;
+		}
+
 		/* PART1. Handle socket server inputs. */
 		res = processAllCommFileDescs();
 		if ( res != FUNC_RETURN_OK ) {
