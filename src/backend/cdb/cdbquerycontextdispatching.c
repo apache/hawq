@@ -2885,7 +2885,10 @@ static void AddFileSystemCredentialForPxfTable(char *uri)
 	StringInfoData hdfs_uri;
 	char* dfs_address = NULL;
 
-	dfs_url_to_address(dfs_url, dfs_address);
+	if (!enable_secure_filesystem)
+		return;
+
+	dfs_url_to_address(dfs_url, &dfs_address);
 
 	initStringInfo(&hdfs_uri);
 
