@@ -60,6 +60,7 @@
 #include "catalog/indexing.h"
 #include "catalog/pg_filespace.h"
 #include "catalog/pg_tablespace.h"
+#include "catalog/pg_database.h"
 #include "catalog/pg_type.h"
 #include "cdb/cdbmirroredflatfile.h"
 #include "commands/comment.h"
@@ -89,7 +90,7 @@
 char	   *default_tablespace = NULL;
 
 
-static bool remove_tablespace_directories(Oid tablespaceoid, bool redo, 
+static bool remove_tablespace_directories(Oid tablespaceoid, bool redo,
 										  char *location);
 /*
  * Create a table space
@@ -128,7 +129,7 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 		ownerId = get_roleid_checked(stmt->owner);
 	else
 		ownerId = GetUserId();
-		
+
 	/*
 	 * Disallow creation of tablespaces named "pg_xxx"; we reserve this
 	 * namespace for system purposes.
@@ -144,7 +145,7 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 	}
 
 	/*
-	 * Check the specified filespace 
+	 * Check the specified filespace
 	 */
 	filespaceRel = heap_open(FileSpaceRelationId, RowShareLock);
 	filespaceoid = get_filespace_oid(filespaceRel, stmt->filespacename);
@@ -154,20 +155,20 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("filespace \"%s\" does not exist",
 						stmt->filespacename)));
-	
-	/* 
+
+	/*
 	 * Filespace pg_system is reserved for system use:
 	 *   - Used for pg_global and pg_default tablespaces only
-	 * 
+	 *
 	 * Directory layout is slightly different for the system filespace.
 	 * Instead of having subdirectories for individual tablespaces instead
 	 * the two system tablespaces have specific locations within it:
 	 *	   pg_global  :	$PG_SYSTEM/global/relfilenode
 	 *	   pg_default : $PG_SYSTEM/base/dboid/relfilenode
 	 *
-	 * In other words PG_SYSTEM points to the segments "datadir", or in 
+	 * In other words PG_SYSTEM points to the segments "datadir", or in
 	 * postgres vocabulary $PGDATA.
-	 * 
+	 *
 	 */
 	if (filespaceoid == SYSTEMFILESPACE_OID && !IsBootstrapProcessingMode())
 		ereport(ERROR,
@@ -239,13 +240,13 @@ CreateTableSpace(CreateTableSpaceStmt *stmt)
 										&persistentSerialNum);
 
 	/*
-	 * Record dependency on owner 
+	 * Record dependency on owner
 	 *
 	 * We do not record the dependency on pg_filespace because we do not track
-	 * dependencies between shared objects.  Additionally the pg_tablespace 
+	 * dependencies between shared objects.  Additionally the pg_tablespace
 	 * table itself contains the foreign key back to pg_filespace and can be
-	 * used to fulfill the same purpose that an entry in pg_shdepend would. 
-	 */	 
+	 * used to fulfill the same purpose that an entry in pg_shdepend would.
+	 */
 	recordDependencyOnOwner(TableSpaceRelationId, tablespaceoid, ownerId);
 
 	/*
@@ -275,24 +276,24 @@ void
 RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 {
 	char	    *tablespacename;
-	Relation	 rel;
-	HeapTuple	 tuple;
-	cqContext					 cqc;
-	cqContext					*pcqCtx;
+	Relation	 rel, rel1;
+	HeapTuple	 tuple, tuple1;
+	cqContext					 cqc, cqc1;
+	cqContext					*pcqCtx, *pcqCtx1;
 	Oid			 tablespaceoid;
 	int32        count,
 				 count2;
-	RelFileNode  relfilenode;	
+	RelFileNode  relfilenode;
 	DbDirNode 	 dbDirNode;
 	PersistentFileSysState persistentState;
 	ItemPointerData persistentTid;
 	int64 		 persistentSerialNum;
-	
+
 
 	/* don't call this in a transaction block */
 	// PreventTransactionChain((void *) stmt, "DROP TABLESPACE");
 
-	/* 
+	/*
 	 * General DROP (object) syntax allows fully qualified names, but
 	 * tablespaces are global objects that do not live in schemas, so
 	 * it is a syntax error if a fully qualified name was given.
@@ -314,13 +315,13 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 	 */
 	rel = heap_open(TableSpaceRelationId, RowExclusiveLock);
 
-	pcqCtx = caql_addrel(cqclr(&cqc), rel); 
+	pcqCtx = caql_addrel(cqclr(&cqc), rel);
 
 	tuple = caql_getfirst(
 			pcqCtx,
 			cql("SELECT * FROM pg_tablespace "
 				 " WHERE spcname = :1 "
-				 " FOR UPDATE ", 
+				 " FOR UPDATE ",
 				CStringGetDatum(tablespacename)));
 
 	if (!HeapTupleIsValid(tuple))
@@ -357,13 +358,56 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 		aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_TABLESPACE,
 					   tablespacename);
 
-	/* 
-	 * Check for any databases or relations defined in this tablespace, this 
-	 * is logically the same as checkSharedDependencies, however we don't 
-	 * actually track these in pg_shdepend, instead we lookup this information 
+	/*
+	 * Check for any databases or relations defined in this tablespace, this
+	 * is logically the same as checkSharedDependencies, however we don't
+	 * actually track these in pg_shdepend, instead we lookup this information
 	 * in the gp_persistent_database/relation_node tables.
 	 */
-	/* ... */
+
+	/*
+	 * Check for any databases defined in this tablespace
+	 */
+	rel1 = heap_open(DatabaseRelationId, AccessShareLock);
+
+	pcqCtx1 = caql_addrel(cqclr(&cqc1), rel1);
+
+	tuple1 = caql_getfirst(
+			pcqCtx1,
+			cql("SELECT * FROM pg_database "
+				 " WHERE dat2tablespace = :1 ",
+				ObjectIdGetDatum(tablespaceoid)));
+
+	if (HeapTupleIsValid(tuple1))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("tablespace \"%s\" is not empty: existing database.", tablespacename)));
+
+	}
+    heap_close(rel1, AccessShareLock);
+
+	/*
+	 * Check for any databases defined in this tablespace
+	 */
+	rel1 = heap_open(RelationRelationId, AccessShareLock);
+
+	pcqCtx1 = caql_addrel(cqclr(&cqc1), rel1);
+
+	tuple1 = caql_getfirst(
+			pcqCtx1,
+			cql("SELECT * FROM pg_class "
+				 " WHERE reltablespace = :1 ",
+				ObjectIdGetDatum(tablespaceoid)));
+
+	if (HeapTupleIsValid(tuple1))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("tablespace \"%s\" is not empty: existing table.", tablespacename)));
+
+	}
+    heap_close(rel1, AccessShareLock);
 
 	/*
 	 * Remove the pg_tablespace tuple (this will roll back if we fail below)
@@ -384,16 +428,16 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 	deleteSharedDependencyRecordsFor(TableSpaceRelationId, tablespaceoid);
 
 	/* MPP-6929: metadata tracking */
-	MetaTrackDropObject(TableSpaceRelationId, 
+	MetaTrackDropObject(TableSpaceRelationId,
 						tablespaceoid);
 
 	/*
-	 * Acquire TablespaceCreateLock to ensure that no 
+	 * Acquire TablespaceCreateLock to ensure that no
 	 * MirroredFileSysObj_JustInTimeDbDirCreate is running concurrently.
 	 */
 	LWLockAcquire(TablespaceCreateLock, LW_EXCLUSIVE);
 
-	/* 
+	/*
 	 * Check for any relations still defined in the tablespace.
 	 */
 	PersistentRelation_CheckTablespace(tablespaceoid, &count, &relfilenode);
@@ -407,9 +451,9 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 
 	/*
 	 * Schedule the removal the physical infrastructure.
-	 * 
+	 *
 	 * Note: This only schedules the delete, the delete won't actually occur
-	 * until after the transaction has comitted.  This should however do 
+	 * until after the transaction has comitted.  This should however do
 	 * everything it can to assure that the delete will occur sucessfully,
 	 * e.g. check permissions etc.
 	 */
@@ -435,7 +479,7 @@ RemoveTableSpace(List *names, DropBehavior behavior, bool missing_ok)
 		 */
         if (persistentState != PersistentFileSysState_Created)
             continue;
-    
+
         MirroredFileSysObj_ScheduleDropDbDir(
                                         &dbDirNode,
                                         &persistentTid,
@@ -488,16 +532,16 @@ remove_tablespace_directories(Oid tablespaceoid, bool redo, char *phys)
 	location = (char *) palloc(10 + 10 + 1);
 	sprintf(location, "pg_tblspc/%u", tablespaceoid);
 
-	/* 
+	/*
 	 * If the tablespace location has been removed previously, then we are done.
-	 * 
+	 *
 	 */
 	if (stat(location, &st) < 0)
 	{
 		ereport(WARNING,
 				(errmsg("directory linked to \"%s\" does not exist", location)
 				 ));
-				
+
 		return true;
 	}
 
@@ -608,13 +652,13 @@ remove_tablespace_directories(Oid tablespaceoid, bool redo, char *phys)
  	tempstr = palloc(MAXPGPATH);
 
 	sprintf(tempstr,"%s",phys);
-	
+
 	if (rmdir(tempstr) < 0)
 		ereport(ERROR,
 				(errcode_for_file_access(),
 				 errmsg("could not remove subdirectory \"%s\": %m",
 						tempstr)));
-	
+
 	pfree(tempstr);
 
 	return true;
@@ -698,7 +742,7 @@ set_short_version(const char *path, DbDirNode *dbDirNode, bool mirror)
 					(errcode_for_file_access(),
 					 errmsg("could not write to file \"%s\": %m",
 							fullname)));
-			
+
 		FileClose(version_file);
 
 		pfree(fullname);
@@ -758,7 +802,7 @@ RenameTableSpace(const char *oldname, const char *newname)
 			pcqCtx,
 			cql("SELECT * FROM pg_tablespace "
 				" WHERE spcname = :1 "
-				" FOR UPDATE ", 
+				" FOR UPDATE ",
 				CStringGetDatum(oldname)));
 
 	if (!HeapTupleIsValid(newtuple))
@@ -833,7 +877,7 @@ AlterTableSpaceOwner(const char *name, Oid newOwnerId)
 			pcqCtx,
 			cql("SELECT * FROM pg_tablespace "
 				" WHERE spcname = :1 "
-				" FOR UPDATE ", 
+				" FOR UPDATE ",
 				CStringGetDatum(name)));
 
 	if (!HeapTupleIsValid(tup))
@@ -1018,7 +1062,7 @@ get_tablespace_oid(const char *tablespacename)
 	else
 		tsoid = InvalidOid;
 
-	/* 
+	/*
 	 * Anything that needs to lookup a tablespace name must need a lock
 	 * on the tablespace for the duration of its transaction, otherwise
 	 * there is nothing preventing it from being dropped.
@@ -1031,7 +1075,7 @@ get_tablespace_oid(const char *tablespacename)
 		TransactionId	update_xmax;
 
 		/*
-		 * Unfortunately locking of objects other than relations doesn't 
+		 * Unfortunately locking of objects other than relations doesn't
 		 * really work, the work around is to lock the tuple in pg_tablespace
 		 * to prevent drops from getting the exclusive lock they need.
 		 */
@@ -1052,7 +1096,7 @@ get_tablespace_oid(const char *tablespacename)
 			case HeapTupleBeingUpdated:
 				Assert(false);  /* Not possible with LockTupleWait */
 				/* fallthrough */
-		   
+
 			case HeapTupleUpdated:
 				ereport(ERROR,
 						(errcode(ERRCODE_T_R_SERIALIZATION_FAILURE),
@@ -1229,13 +1273,13 @@ tblspc_redo(XLogRecPtr beginLoc, XLogRecPtr lsn, XLogRecord *record)
 	 	sublocation = palloc(MAXPGPATH);
 
 		sprintf(sublocation,"%s",location);
-	
+
 		if (mkdir(sublocation, 0700) != 0)
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not create subdirectory \"%s\": %m",
 							sublocation)));
-	
+
 		/* Create or re-create the PG_VERSION file in the target directory */
 		set_short_version(sublocation, NULL, false);
 
@@ -1306,7 +1350,7 @@ RejectAccessTablespace(Oid reltablespace, char *msg)
 	if (!OidIsValid(reltablespace))
 		return;
 
-	if (is_tablespace_shared_master(reltablespace))		
+	if (is_tablespace_shared_master(reltablespace))
 		ereport(ERROR,
 				(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
  				 errmsg(msg, get_tablespace_name(reltablespace)),
