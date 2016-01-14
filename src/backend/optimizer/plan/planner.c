@@ -289,7 +289,7 @@ planner(Query *parse, int cursorOptions,
   ppResult->saResult = initResult;
   ppResult->stmt =NULL;
 	static int plannerLevel = 0;
-	static bool resourceNegotiateDone = false;
+	bool resourceNegotiateDone = false;
 	QueryResource *savedQueryResource = GetActiveQueryResource();;
 	SetActiveRelType(NIL);
 
@@ -329,7 +329,7 @@ planner(Query *parse, int cursorOptions,
 	  PG_END_TRY();
 	}
 	SetActiveRelType(NIL);
-	if (plannerLevel == 1)
+	if (plannerLevel >= 1)
 	{
 	  resourceNegotiateDone = true;
 	  gp_segments_for_planner = ppResult->saResult.planner_segments;
@@ -422,7 +422,6 @@ planner(Query *parse, int cursorOptions,
 	  /*
 	   * some cleanup work here.
 	   */
-	  resourceNegotiateDone = false;
 	  plannerLevel = 0;
   	  optimizer_segments = optimizer_segments_saved_value;
 	  if (savedQueryResource)
@@ -443,9 +442,8 @@ planner(Query *parse, int cursorOptions,
 	}
 	PG_END_TRY();
 
-	if (plannerLevel == 1)
+	if (plannerLevel >= 1)
 	{
-		resourceNegotiateDone = false;
 		if (savedQueryResource)
 		{
 			gp_segments_for_planner = list_length(savedQueryResource->segments);
