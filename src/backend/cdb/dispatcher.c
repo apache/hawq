@@ -755,7 +755,7 @@ dispatcher_split_logical_tasks_for_query_desc(DispatchData *data)
 								 list_length(data->sliceTable->slices));
 
 	data->job.used_slices_num = slice_num;
-	data->job.all_slices_num = slice_num;
+	data->job.all_slices_num = list_length(data->sliceTable->slices);
 
 	data->job.slices = palloc0(data->job.used_slices_num * sizeof(DispatchSlice));
 	for (i = 0; i < data->job.used_slices_num; i++)
