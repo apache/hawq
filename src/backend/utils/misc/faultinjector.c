@@ -1047,7 +1047,7 @@ FaultInjector_NewHashEntry(
 							FaultInjectorTypeEnumToString[entry->faultInjectorType])));
 			snprintf(entry->bufOutput, sizeof(entry->bufOutput),
 					 "This kind of fault injection has not been supported yet. "
-					 "Please use \"-r master\"");
+					 "Please check faultname");
 
 			goto exit;
 
