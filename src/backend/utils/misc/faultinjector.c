@@ -44,6 +44,7 @@
 #include "cdb/cdbfilerep.h"
 #include "cdb/cdbresynchronizechangetracking.h"
 #include "postmaster/service.h"
+#include "postmaster/identity.h"
 #include "storage/spin.h"
 #include "storage/shmem.h"
 #include "utils/faultinjector.h"
@@ -1001,7 +1002,7 @@ FaultInjector_NewHashEntry(
 	{
 		case ChangeTrackingDisable:
 		case FileRepConsumerVerification:
-		case StartPrepareTx:
+
 		case FileRepResync:
 		case FileRepResyncInProgress:
 		case FileRepResyncWorker:
@@ -1014,16 +1015,12 @@ FaultInjector_NewHashEntry(
 		case FileRepTransitionToInSyncMarkCompleted:
 		case FileRepTransitionToInSyncBeforeCheckpoint:
 		case FileRepTransitionToChangeTracking:
-		case TransactionCommitPass1FromCreatePendingToCreated:
-		case TransactionCommitPass1FromDropInMemoryToDropPending:
-		case TransactionCommitPass1FromAbortingCreateNeededToAbortingCreate:
-		case TransactionAbortPass1FromCreatePendingToAbortingCreate:
-		case TransactionAbortPass1FromAbortingCreateNeededToAbortingCreate:
-		case TransactionCommitPass2FromDropInMemoryToDropPending:
-		case TransactionCommitPass2FromAbortingCreateNeededToAbortingCreate:
-		case TransactionAbortPass2FromCreatePendingToAbortingCreate:
-		case TransactionAbortPass2FromAbortingCreateNeededToAbortingCreate:
-			
+		case FileRepConsumer:
+		case FileRepSender:
+		case FileRepReceiver:
+		case FileRepFlush:
+		/* Ashwin */
+		case FileRepChangeTrackingCompacting:
 		case FinishPreparedTransactionCommitPass1FromCreatePendingToCreated:
 		case FinishPreparedTransactionCommitPass2FromCreatePendingToCreated:
 			
@@ -1040,86 +1037,85 @@ FaultInjector_NewHashEntry(
 		case FinishPreparedTransactionAbortPass2AbortingCreateNeeded:
 		case TwoPhaseTransactionCommitPrepared:
 		case TwoPhaseTransactionAbortPrepared:
-		case ExecSortMKSortMergeRuns:
-		
+			/* This kind of fault injection has not been supported yet. */
+			LockRelease();
+			status = STATUS_ERROR;
+			ereport(WARNING,
+					(errmsg("This kind of fault injection has not been supported yet. "
+							"fault name:'%s' fault type:'%s' ",
+							FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
+							FaultInjectorTypeEnumToString[entry->faultInjectorType])));
+			snprintf(entry->bufOutput, sizeof(entry->bufOutput),
+					 "This kind of fault injection has not been supported yet. "
+					 "Please use \"-r master\"");
+
+			goto exit;
+
 //		case SubtransactionFlushToFile:
 //		case SubtransactionReadFromFile:
 //		case SubtransactionRelease:
 //		case SubtransactionRollback:
-		/* Ashwin */
-		case FileRepChangeTrackingCompacting:
-
-		/* We do not use vmem on master. Therefore, we only attempt large palloc on segments. */
-		case MultiExecHashLargeVmem:
-		case FaultInBackgroundWriterMain:
-			
-			/* SEGMENT */
-			{
-				LockRelease();
-				status = STATUS_ERROR;
-				ereport(WARNING,
-						(errmsg("could not insert fault injection entry into table, segment not in primary role"
-								"fault name:'%s' fault type:'%s' ",
-								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
-								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
-				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
-						 "could not insert fault injection, segment not in primary role");
-				
-				goto exit;
-			}			
-			break;
-		
+		case StartPrepareTx:
+		case TransactionCommitPass1FromCreatePendingToCreated:
+		case TransactionCommitPass1FromDropInMemoryToDropPending:
+		case TransactionCommitPass1FromAbortingCreateNeededToAbortingCreate:
+		case TransactionAbortPass1FromCreatePendingToAbortingCreate:
+		case TransactionAbortPass1FromAbortingCreateNeededToAbortingCreate:
+		case TransactionCommitPass2FromDropInMemoryToDropPending:
+		case TransactionCommitPass2FromAbortingCreateNeededToAbortingCreate:
+		case TransactionAbortPass2FromCreatePendingToAbortingCreate:
+		case TransactionAbortPass2FromAbortingCreateNeededToAbortingCreate:
 		case FaultBeforePendingDeleteRelationEntry:
 		case FaultBeforePendingDeleteDatabaseEntry:
 		case FaultBeforePendingDeleteTablespaceEntry:
-		case FaultBeforePendingDeleteFilespaceEntry:	
-		case FileRepConsumer:
-		case FileRepSender:
-		case FileRepReceiver:
-		case FileRepFlush:
-		case Postmaster:
-		case PgControl:
-		case PgXlog:
-		case SegmentTransitionRequest:
-		case SegmentProbeResponse:
-			
-			/* SEGMENT */
-			{
-				LockRelease();
-				status = STATUS_ERROR;
-				ereport(WARNING,
-						(errmsg("could not insert fault injection entry into table, "
-								"segment not in primary or mirror role, "
-								"fault name:'%s' fault type:'%s' ",
-								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
-								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
-				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
-						 "could not insert fault injection, segment not in primary or mirror role");
-				
-				goto exit;
-			}			
-			break;
-			
+		case FaultBeforePendingDeleteFilespaceEntry:
 		case TransactionAbortAfterDistributedPrepared:
 		case DtmBroadcastPrepare:
 		case DtmBroadcastCommitPrepared:
 		case DtmBroadcastAbortPrepared:
-		case DtmXLogDistributedCommit:			
+		case DtmXLogDistributedCommit:
 		case AnalyzeSubxactError:
 		case OptTaskAllocateStringBuffer:
-			
-			/* TODO: MASTER ONLY */
+
+			/* These faults are designed for master. */
+			if(!AmIMaster())
 			{
 				LockRelease();
 				status = STATUS_ERROR;
 				ereport(WARNING,
 						(errmsg("could not insert fault injection entry into table, "
-								"segment not in master role, "
+								"This kind of fault injection should be sent to master. "
 								"fault name:'%s' fault type:'%s' ",
 								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
 								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
 				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
-						 "could not insert fault injection, segment not in master role");
+						 "could not insert fault injection. "
+						 "This kind of fault injection should be sent to master. "
+						 "Please use \"-r master\"");
+				
+				goto exit;
+			}
+			break;
+		
+		case SegmentTransitionRequest:
+		case SegmentProbeResponse:
+		/* We do not use vmem on master. Therefore, we only attempt large palloc on segments. */
+		case MultiExecHashLargeVmem:
+			/* SEGMENT */
+			if(!AmISegment())
+			{
+				LockRelease();
+				status = STATUS_ERROR;
+				ereport(WARNING,
+						(errmsg("could not insert fault injection entry into table, "
+								"This kind of fault injection should be sent to segment. "
+								"fault name:'%s' fault type:'%s' ",
+								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
+								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
+				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
+						 "could not insert fault injection. "
+						 "This kind of fault injection should be sent to segment. "
+						 "Please use \"-r primary\"");
 				
 				goto exit;
 			}			
@@ -1136,6 +1132,7 @@ FaultInjector_NewHashEntry(
 		case RunawayCleanup:
 			
 			/* MASTER OR SEGMENT */
+			if(AmIStandby())
 			{
 				LockRelease();
 				status = STATUS_ERROR;
@@ -1146,7 +1143,7 @@ FaultInjector_NewHashEntry(
 								FaultInjectorIdentifierEnumToString[entry->faultInjectorIdentifier],
 								FaultInjectorTypeEnumToString[entry->faultInjectorType])));
 				snprintf(entry->bufOutput, sizeof(entry->bufOutput), 
-						 "could not insert fault injection, segment not in primary or master role");
+						 "could not insert fault injection, segment not in master or segment role");
 				
 				goto exit;
 			}			

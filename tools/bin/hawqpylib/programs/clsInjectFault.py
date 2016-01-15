@@ -136,7 +136,6 @@ class HAWQInjectFaultProgram:
         #
         # prune gpArray according to filter settings
         #
-        hawqdbs = [hdb for hdb in hawqdbs if hdb.isSegment()]
         if targetHost is not None and targetHost != "ALL":
             hawqdbs = [hdb for hdb in hawqdbs if hdb.getHostName() == targetHost]
 
