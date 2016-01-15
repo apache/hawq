@@ -514,15 +514,11 @@ class HAWQArray:
                                       sc.hostname,
                                       sc.address,
                                       sc.port,
-                                      fs.oid,
                                       CASE
                                           WHEN sc.registration_order <= 0 THEN '%s'
                                           ELSE '%s'
                                       END AS datadir
-                               FROM pg_catalog.gp_segment_configuration sc,
-                                    pg_catalog.pg_filespace fs,
-                                    pg_catalog.pg_filespace_entry fse
-                               WHERE fse.fsefsoid = fs.oid
+                               FROM pg_catalog.gp_segment_configuration sc
                                ORDER BY sc.registration_order;''' %
                                (master_data_directory, segment_data_directory))
 
@@ -556,7 +552,7 @@ class HAWQArray:
 
             # Extract fields from the row
             (registration_order, role, status, hostname, 
-             address, port, fsoid, datadir) = row
+             address, port, datadir) = row
 
             # In GPSQL, only master maintain the filespace information.
             # if registration_order != MASTER_REGISTRATION_ORDER and \
