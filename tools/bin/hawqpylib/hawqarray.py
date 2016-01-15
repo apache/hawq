@@ -514,14 +514,11 @@ class HAWQArray:
                                       sc.hostname,
                                       sc.address,
                                       sc.port,
-
                                       CASE
                                           WHEN sc.registration_order <= 0 THEN '%s'
                                           ELSE '%s'
                                       END AS datadir
                                FROM pg_catalog.gp_segment_configuration sc
-
-
                                ORDER BY sc.registration_order;''' %
                                (master_data_directory, segment_data_directory))
 

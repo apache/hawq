@@ -1002,7 +1002,6 @@ FaultInjector_NewHashEntry(
 	{
 		case ChangeTrackingDisable:
 		case FileRepConsumerVerification:
-
 		case FileRepResync:
 		case FileRepResyncInProgress:
 		case FileRepResyncWorker:
@@ -1023,16 +1022,12 @@ FaultInjector_NewHashEntry(
 		case FileRepChangeTrackingCompacting:
 		case FinishPreparedTransactionCommitPass1FromCreatePendingToCreated:
 		case FinishPreparedTransactionCommitPass2FromCreatePendingToCreated:
-			
 		case FinishPreparedTransactionCommitPass1FromDropInMemoryToDropPending:
 		case FinishPreparedTransactionCommitPass2FromDropInMemoryToDropPending:
-			
 		case FinishPreparedTransactionCommitPass1AbortingCreateNeeded:
 		case FinishPreparedTransactionCommitPass2AbortingCreateNeeded:
-			
 		case FinishPreparedTransactionAbortPass1FromCreatePendingToAbortingCreate:
 //		case FinishPreparedTransactionAbortPass2FromCreatePendingToAbortingCreate:
-			
 		case FinishPreparedTransactionAbortPass1AbortingCreateNeeded:
 		case FinishPreparedTransactionAbortPass2AbortingCreateNeeded:
 		case TwoPhaseTransactionCommitPrepared:
@@ -1048,7 +1043,6 @@ FaultInjector_NewHashEntry(
 			snprintf(entry->bufOutput, sizeof(entry->bufOutput),
 					 "This kind of fault injection has not been supported yet. "
 					 "Please check faultname");
-
 			goto exit;
 
 //		case SubtransactionFlushToFile:
