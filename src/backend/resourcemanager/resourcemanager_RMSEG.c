@@ -26,6 +26,7 @@
 #include "communication/rmcomm_MessageServer.h"
 #include "communication/rmcomm_RMSEG2RM.h"
 #include "resourceenforcer/resourceenforcer.h"
+#include "cdb/cdbtmpdir.h"
 
 int ResManagerMainSegment2ndPhase(void)
 {
@@ -60,7 +61,7 @@ int ResManagerMainSegment2ndPhase(void)
 	 */
 	initCGroupThreads();
 
-	InitFileAccess();
+	//InitFileAccess();
 
 	/*
 	 * Notify postmaster that HAWQ RM is ready. Ignore the possible problem that
@@ -151,6 +152,7 @@ int  initializeSocketServer_RMSEG(void)
 }
 #define SEGMENT_HEARTBEAT_INTERVAL (3LL * 1000000LL)
 #define SEGMENT_HOSTCHECK_INTERVAL (5LL * 1000000LL)
+#define SEGMENT_TMPDIRCHECK_INTERVAL (10 * 60LL * 1000000LL)
 int MainHandlerLoop_RMSEG(void)
 {
 	int 		res 	  = FUNC_RETURN_OK;
@@ -189,6 +191,12 @@ int MainHandlerLoop_RMSEG(void)
 			 SEGMENT_HOSTCHECK_INTERVAL ) {
 			refreshLocalHostInstance();
 			checkLocalPostmasterStatus();
+		}
+
+		if ( curtime - DRMGlobalInstance->TmpDirLastCheckTime >
+			SEGMENT_TMPDIRCHECK_INTERVAL ) {
+			checkTmpDirStatus();
+			DRMGlobalInstance->TmpDirLastCheckTime = gettime_microsec();
 		}
 
 		if ( DRMGlobalInstance->SendIMAlive ) {

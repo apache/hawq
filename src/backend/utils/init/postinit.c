@@ -441,8 +441,8 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
         }
         else
         {
-            getLocalTmpDirFromMasterConfig(gp_session_id);
-            elog(LOG, "getLocalTmpDirFromMasterConfig session_id:%d tmpdir:%s", gp_session_id, LocalTempPath);
+            getMasterLocalTmpDirFromShmem(gp_session_id);
+            elog(LOG, "getMasterLocalTmpDirFromShmem session_id:%d tmpdir:%s", gp_session_id, LocalTempPath);
         }
 
     }

@@ -246,8 +246,8 @@ int ResManagerMain(int argc, char *argv[])
 
 	elog(DEBUG5, "HAWQ RM :: Passed initializing core data structure.");
 
-    /**************************************************************************/
-    /* STEP 4. INIT for making RM process access catalog by CAQL etc.         */
+	/**************************************************************************/
+	/* STEP 4. INIT for making RM process access catalog by CAQL etc.         */
 	/**************************************************************************/
 	/* BLOCK signal behavior. Only another specific thread has the capability to
 	 * process the signal. */
@@ -263,45 +263,42 @@ int ResManagerMain(int argc, char *argv[])
 	pqsignal(SIGTTIN, SIG_IGN);
 	pqsignal(SIGTTOU, SIG_IGN);
 
-	/* Only master side needs the access to catalog. */
-    if ( DRMGlobalInstance->Role == START_RM_ROLE_MASTER ) {
+	CurrentResourceOwner = ResourceOwnerCreate(NULL, "Resource Manager");
 
-		CurrentResourceOwner = ResourceOwnerCreate(NULL, "Resource Manager");
+	BaseInit();
+	InitProcess();
+	InitBufferPoolBackend();
+	InitXLOGAccess();
 
-		BaseInit();
-		InitProcess();
-		InitBufferPoolBackend();
-		InitXLOGAccess();
+	SetProcessingMode(NormalProcessing);
 
-		SetProcessingMode(NormalProcessing);
+	MyDatabaseId = TemplateDbOid;
+	MyDatabaseTableSpace = DEFAULTTABLESPACE_OID;
+	if (!FindMyDatabase(probeDatabase, &MyDatabaseId, &MyDatabaseTableSpace))
+		ereport(FATAL, (errcode(ERRCODE_UNDEFINED_DATABASE),
+			errmsg("database 'postgres' does not exist")));
 
-		MyDatabaseId = TemplateDbOid;
-		MyDatabaseTableSpace = DEFAULTTABLESPACE_OID;
-		if (!FindMyDatabase(probeDatabase, &MyDatabaseId, &MyDatabaseTableSpace))
-			ereport(FATAL, (errcode(ERRCODE_UNDEFINED_DATABASE),
-				errmsg("database 'postgres' does not exist")));
+	char *fullpath = GetDatabasePath(MyDatabaseId, MyDatabaseTableSpace);
 
-		char *fullpath = GetDatabasePath(MyDatabaseId, MyDatabaseTableSpace);
+	SetDatabasePath(fullpath);
 
-		SetDatabasePath(fullpath);
+	InitProcessPhase2();
 
-		InitProcessPhase2();
+	MyBackendId = InvalidBackendId;
 
-		MyBackendId = InvalidBackendId;
+	SharedInvalBackendInit(false);
 
-		SharedInvalBackendInit(false);
+	if (MyBackendId > MaxBackends || MyBackendId <= 0)
+		elog(FATAL, "bad backend id: %d", MyBackendId);
 
-		if (MyBackendId > MaxBackends || MyBackendId <= 0)
-			elog(FATAL, "bad backend id: %d", MyBackendId);
+	InitBufferPoolBackend();
+	RelationCacheInitialize();
+	InitCatalogCache();
+	RelationCacheInitializePhase2();
 
-		InitBufferPoolBackend();
-		RelationCacheInitialize();
-		InitCatalogCache();
-		RelationCacheInitializePhase2();
-    }
-    /* END: INIT for making RM process access catalog by caql etc.            */
-    /**************************************************************************/
-    PG_SETMASK(&UnBlockSig);
+	/* END: INIT for making RM process access catalog by caql etc.            */
+	/**************************************************************************/
+	PG_SETMASK(&UnBlockSig);
 
     /* Save process fork mode. */
 	DRMGlobalInstance->ThisPID	 = getpid();
@@ -486,7 +483,10 @@ int ResManagerMainServer2ndPhase(void)
                            DRMGlobalInstance->SocketLocalHostName.Str,
                            DRMGlobalInstance->SocketLocalHostName.Str,
                            PostPortNumber,
-                           SEGMENT_ROLE_MASTER_CONFIG);
+                           SEGMENT_ROLE_MASTER_CONFIG,
+                           SEGMENT_STATUS_UP,
+                           0,
+                           "");
 
 	/* Load queue and user definition as no DDL now. */
 	res = loadAllQueueAndUser();
@@ -813,6 +813,7 @@ int initializeDRMInstance(MCTYPE context)
 
 	DRMGlobalInstance->LocalHostLastUpdateTime	= 0;
 	DRMGlobalInstance->HeartBeatLastSentTime    = 0;
+	DRMGlobalInstance->TmpDirLastCheckTime      = 0;
 	DRMGlobalInstance->LocalHostStat			= NULL;
 
 	initializeDQueue(&(DRMGlobalInstance->LocalHostTempDirectoriesForQD),   context);
@@ -2765,12 +2766,11 @@ int  loadHostInformationIntoResourcePool(void)
         segstat->FTSTotalCore      = DRMGlobalInstance->SegmentCore;
         segstat->GRMTotalMemoryMB  = 0;
         segstat->GRMTotalCore      = 0;
-        segstat->Reserved[0]       = 0;
-        segstat->Reserved[1] 	   = 0;
+        segstat->FailedTmpDirNum   = 0;
 
         memcpy((char *)segstat + offsetof(SegStatData, Info),
-          	   seginfobuff.Buffer,
-			   seginfobuff.Cursor+1);
+                seginfobuff.Buffer,
+                seginfobuff.Cursor+1);
 
         SelfMaintainBufferData segreport;
         initializeSelfMaintainBuffer(&segreport,PCONTEXT);

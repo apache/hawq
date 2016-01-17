@@ -414,8 +414,8 @@ SetupProcessIdentity(const char *str)
         }
         else
         {
-            getLocalTmpDirFromSegmentConfig(gp_session_id, gp_command_count, GetQEIndex());
-            elog(DEBUG1, "getLocalTmpDirFromSegmentConfig session_id:%d command_id:%d qeidx:%d tmpdir:%s", gp_session_id, gp_command_count, GetQEIndex(), LocalTempPath);
+            getSegmentLocalTmpDirFromShmem(gp_session_id, gp_command_count, GetQEIndex());
+            elog(DEBUG1, "getSegmentLocalTmpDirFromShmem session_id:%d command_id:%d qeidx:%d tmpdir:%s", gp_session_id, gp_command_count, GetQEIndex(), LocalTempPath);
         }
     }
 

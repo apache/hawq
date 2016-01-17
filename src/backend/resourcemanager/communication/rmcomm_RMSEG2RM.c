@@ -22,7 +22,7 @@
 #include "communication/rmcomm_MessageHandler.h"
 #include "communication/rmcomm_RMSEG_RM_Protocol.h"
 #include "dynrm.h"
-
+#include "cdb/cdbtmpdir.h"
 #include "utils/memutilities.h"
 #include "utils/simplestring.h"
 #include "utils/linkedlist.h"
@@ -107,9 +107,6 @@ int sendIMAlive(int  *errorcode,
 				int	  errorbufsize)
 {
 	int 				res 					= FUNC_RETURN_OK;
-
-	uint16_t			dummyTempDirCount 		= 0;
-	uint16_t			dummyTempDirBrokenCount = 0;
 	AsyncCommBuffer		newcommbuffer			= NULL;
 
 	Assert( DRMGlobalInstance->LocalHostStat != NULL );
@@ -119,8 +116,8 @@ int sendIMAlive(int  *errorcode,
 	initializeSelfMaintainBuffer(&tosend, PCONTEXT);
 
 	RPCRequestHeadIMAliveData requesthead;
-	requesthead.TmpDirCount 	  = dummyTempDirCount;
-	requesthead.TmpDirBrokenCount = dummyTempDirBrokenCount;
+	requesthead.TmpDirCount 	  = TmpDirNum;
+	requesthead.TmpDirBrokenCount = DRMGlobalInstance->LocalHostStat->FailedTmpDirNum;
 	requesthead.Reserved		  = 0;
 
 	appendSMBVar(&tosend, requesthead);
@@ -146,8 +143,8 @@ int sendIMAlive(int  *errorcode,
 
 	res = registerAsyncConnectionFileDesc(NULL,
 										  DRMGlobalInstance->SendToStandby?
-											  standby_addr_host:
-											  master_addr_host,
+										  standby_addr_host:
+										  master_addr_host,
 										  rm_master_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,

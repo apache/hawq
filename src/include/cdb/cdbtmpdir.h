@@ -19,8 +19,27 @@
 
 #ifndef CDBTMPDIR_H
 #define CDBTMPDIR_H
+#include "c.h"
 
-void getLocalTmpDirFromMasterConfig(int session_id);
-void getLocalTmpDirFromSegmentConfig(int session_id, int command_id, int qeidx);
+#define MAX_TMP_DIR_LEN    8192
+
+typedef struct TmpDirInfo
+{
+    bool available;
+    char path[MAX_TMP_DIR_LEN];
+} TmpDirInfo;
+
+extern int32_t TmpDirNum;
+
+Size TmpDirInfoArrayShmemSize(void);
+void TmpDirInfoArrayShmemInit(void);
+char* GetTmpDirPathFromArray(int64_t idx);
+bool DestroyTmpDirInfoArray(TmpDirInfo *info);
+bool CheckTmpDirAvailable(char *path);
+void destroyTmpDirList(List *list);
+void checkTmpDirStatus(void);
+
+void getMasterLocalTmpDirFromShmem(int session_id);
+void getSegmentLocalTmpDirFromShmem(int session_id, int command_id, int qeidx);
 
 #endif

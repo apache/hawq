@@ -52,6 +52,9 @@ char *buildCGroupNameString(int64 masterStartTime, uint32 connId);
  */
 int refreshLocalHostInstance(void)
 {
+	SimpString failedTmpDirStr;
+	initSimpleString(&failedTmpDirStr, PCONTEXT);
+
 	/* Get local host name. */
 	SimpString hostname;
 	initSimpleString(&hostname, PCONTEXT);
@@ -67,6 +70,33 @@ int refreshLocalHostInstance(void)
 		elog(DEBUG3, "Segment resource manager reads local host address %s",
 					 addr->Address + 4);
 	DQUEUE_LOOP_END
+
+	/* Get a list of failed temporary directory */
+	List* failedTmpDir = getFailedTmpDirList();
+	uint16_t failedTmpDirNum = list_length(failedTmpDir);
+	if (failedTmpDirNum > 0)
+	{
+		SelfMaintainBufferData buf;
+		initializeSelfMaintainBuffer(&buf, PCONTEXT);
+		uint16_t idx = 0;
+		ListCell *lc = NULL;
+		foreach(lc, failedTmpDir)
+		{
+			elog(LOG, "Get a failed temporary directory list for IMAlive message: %s",
+					  (char *)lfirst(lc));
+			appendSelfMaintainBuffer(&buf, (char *)lfirst(lc), strlen((char*)lfirst(lc)));
+			if (idx != failedTmpDirNum -1)
+			{
+				appendSelfMaintainBuffer(&buf, ",", 1);
+			}
+			idx++;
+		}
+		static char zeropad = '\0';
+		appendSMBVar(&buf, zeropad);
+		setSimpleStringNoLen(&failedTmpDirStr, buf.Buffer);
+		elog(LOG, "Segment resource manager build failed tmp list string:%s", failedTmpDirStr.Str);
+		destroySelfMaintainBuffer(&buf);
+	}
 
 	bool shouldupdate = false;
 	if ( DRMGlobalInstance->LocalHostStat == NULL )
@@ -115,6 +145,27 @@ int refreshLocalHostInstance(void)
 				}
 			DQUEUE_LOOP_END
 		}
+
+		/* Check if the failed temporary directory are changed. */
+		if( !shouldupdate &&
+				DRMGlobalInstance->LocalHostStat->FailedTmpDirNum != failedTmpDirNum)
+		{
+			elog(LOG, "Segment resource manager changes number of failed "
+					  "temporary from %d to %d.",
+					  DRMGlobalInstance->LocalHostStat->FailedTmpDirNum,
+					  failedTmpDirNum);
+			shouldupdate = true;
+		}
+
+		if ( !shouldupdate && failedTmpDirNum != 0 )
+		{
+			if (strcmp(GET_SEGINFO_FAILEDTMPDIR(info), failedTmpDirStr.Str) != 0)
+			{
+				elog(LOG, "Segment resource manager finds failed temporary directory change "
+						  "from %s to %s", GET_SEGINFO_FAILEDTMPDIR(info), failedTmpDirStr.Str);
+				shouldupdate = true;
+			}
+		}
 	}
 
 	if ( shouldupdate )
@@ -134,8 +185,7 @@ int refreshLocalHostInstance(void)
 		RMSEG_INBUILDHOST->GRMAvailable    = RESOURCE_SEG_STATUS_UNSET;
 		RMSEG_INBUILDHOST->FTSAvailable    = RESOURCE_SEG_STATUS_AVAILABLE;
 		RMSEG_INBUILDHOST->ID				= SEGSTAT_ID_INVALID;
-		RMSEG_INBUILDHOST->Reserved[0] 		= 0;
-		RMSEG_INBUILDHOST->Reserved[1] 		= 0;
+		RMSEG_INBUILDHOST->FailedTmpDirNum  = failedTmpDirNum;
 
 		RMSEG_INBUILDHOST->Info.master	= 0;			 /* I'm a segment. 	  */
 		RMSEG_INBUILDHOST->Info.standby	= 0;			 /* I'm a segment. 	  */
@@ -182,6 +232,23 @@ int refreshLocalHostInstance(void)
 		RMSEG_INBUILDHOST->Info.GRMRackNameLen 	  = 0;
 		RMSEG_INBUILDHOST->Info.GRMRackNameOffset = 0;
 
+		/* add failed temporary directory */
+		if (failedTmpDirNum == 0)
+		{
+			RMSEG_INBUILDHOST->Info.FailedTmpDirOffset = 0;
+			RMSEG_INBUILDHOST->Info.FailedTmpDirLen = 0;
+		}
+		else
+		{
+			RMSEG_INBUILDHOST->Info.FailedTmpDirOffset = localsegstat.Cursor + 1 -
+					 									 offsetof(SegStatData, Info);
+			appendSelfMaintainBuffer(&localsegstat, failedTmpDirStr.Str, failedTmpDirStr.Len+1);
+			appendSelfMaintainBufferTill64bitAligned(&localsegstat);
+			RMSEG_INBUILDHOST->Info.FailedTmpDirLen = failedTmpDirStr.Len;
+			elog(LOG, "Segment resource manager builds tmp dir:%s",
+					  GET_SEGINFO_FAILEDTMPDIR(&RMSEG_INBUILDHOST->Info));
+		}
+
 		/* get total size of this machine id. */
 		RMSEG_INBUILDHOST->Info.Size = localsegstat.Cursor + 1 - offsetof(SegStatData, Info);
 
@@ -214,6 +281,8 @@ int refreshLocalHostInstance(void)
 	DQUEUE_LOOP_END
 	removeAllDQueueNodes(&addresses);
 	cleanDQueue(&addresses);
+	destroyTmpDirList(failedTmpDir);
+	freeSimpleStringContent(&failedTmpDirStr);
 
 	return FUNC_RETURN_OK;
 }

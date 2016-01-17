@@ -592,7 +592,8 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	SelfMaintainBufferData machinereport;
 	initializeSelfMaintainBuffer(&machinereport,PCONTEXT);
 	SegStat segstat = (SegStat)(SMBUFF_CONTENT(&(conntrack->MessageBuff)) +
-  	  	    					sizeof(RPCRequestHeadIMAliveData));
+								sizeof(RPCRequestHeadIMAliveData));
+
 	generateSegStatReport(segstat, &machinereport);
 
 	elog(RMLOG, "Resource manager received segment machine information, %s",
@@ -702,6 +703,25 @@ bool handleRMSEGRequestIMAlive(void **arg)
 
 	newseginfoptr = SMBUFF_HEAD(SegInfo, &(newseginfo));
 	newseginfoptr->HostNameLen = strlen(fts_client_host->h_name);
+	appendSelfMaintainBufferTill64bitAligned(&newseginfo);
+
+	/* fill in failed temporary directory string */
+	if (fts_client_seginfo->FailedTmpDirLen != 0)
+	{
+		newseginfoptr->FailedTmpDirOffset = getSMBContentSize(&newseginfo);
+		newseginfoptr->FailedTmpDirLen = strlen(GET_SEGINFO_FAILEDTMPDIR(fts_client_seginfo));
+		appendSMBStr(&newseginfo, GET_SEGINFO_FAILEDTMPDIR(fts_client_seginfo));
+		elog(RMLOG, "Resource manager received IMAlive message, "
+					"failed temporary directory:%s",
+					GET_SEGINFO_FAILEDTMPDIR(fts_client_seginfo));
+		appendSelfMaintainBufferTill64bitAligned(&newseginfo);
+	}
+	else
+	{
+		newseginfoptr->FailedTmpDirOffset = 0;
+		newseginfoptr->FailedTmpDirLen = 0;
+	}
+
 	newseginfoptr->Size      = getSMBContentSize(&newseginfo);
 	/* reported by segment, set GRM host/rack as NULL */
 	newseginfoptr->GRMHostNameLen = 0;
@@ -729,7 +749,36 @@ bool handleRMSEGRequestIMAlive(void **arg)
 
 	newsegstat->ID 				= SEGSTAT_ID_INVALID;
 	newsegstat->GRMAvailable 	= RESOURCE_SEG_STATUS_UNSET;
-	newsegstat->FTSAvailable 	= RESOURCE_SEG_STATUS_AVAILABLE;
+
+	RPCRequestHeadIMAlive header = SMBUFF_HEAD(RPCRequestHeadIMAlive,
+												&(conntrack->MessageBuff));
+	newsegstat->FailedTmpDirNum = header->TmpDirBrokenCount;
+
+	/*
+	 * Check if the number of failed temporary directory on this segment
+	 * exceeds the value of rm_segdown_tmpdir_limit, if exceeds, master consider
+	 * this segment as down, even it has heart-beat report.
+	 *
+	 * Notes: If the number of temporary directory is not greater than
+	 * 		  rm_segdown_tmpdir_limit, this guc value is treated as 0.
+	 * 		  which means if one temporary directory is failed, this segment
+	 * 		  is considered as down.
+	 */
+	uint32_t failedTmpDirLimit = header->TmpDirCount <= rm_segdown_tmpdir_limit ?
+									0 : rm_segdown_tmpdir_limit;
+	if (newsegstat->FailedTmpDirNum <= failedTmpDirLimit)
+	{
+		newsegstat->FTSAvailable = RESOURCE_SEG_STATUS_AVAILABLE;
+	}
+	else
+	{
+		elog(RMLOG, "Resource manager finds the number of failed temporary directory:%d "
+					"exceeds the guc rm_segdown_tmpdir_limit:%d, "
+					"so mark this segment unavailable.",
+					newsegstat->FailedTmpDirNum,
+					rm_segdown_tmpdir_limit);
+		newsegstat->FTSAvailable = RESOURCE_SEG_STATUS_UNAVAILABLE;
+	}
 
 	bool capstatchanged = false;
 	if ( addHAWQSegWithSegStat(newsegstat, &capstatchanged) != FUNC_RETURN_OK )

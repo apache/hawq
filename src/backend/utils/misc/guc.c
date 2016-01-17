@@ -6434,6 +6434,16 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"hawq_rm_segdown_tmpdir_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("resource manager considers a segment as down if the number of "
+						 "failed temporary directory on this segment is greater than this limit value."),
+			NULL
+		},
+		&rm_segdown_tmpdir_limit,
+		2, 0, 65535, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_nvseg_variance_amon_seg_limit", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("the variance of vseg number in each segment that resource manager should tolerate at most."),
 			NULL
