@@ -957,7 +957,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 				*  if the length of new failed temporary directory exceeds the old one,
 				*  we need to repalloc SegInfoData
 				*/
-				elog(RMLOG, "Master resource manager is gonna set segment %s(%d)'s "
+				elog(RMLOG, "Master resource manager is going to set segment %s(%d)'s "
 							"failed temporary directory from '%s' to '%s'",
 							GET_SEGRESOURCE_HOSTNAME(segresource),
 							segid,

@@ -755,28 +755,19 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	newsegstat->FailedTmpDirNum = header->TmpDirBrokenCount;
 
 	/*
-	 * Check if the number of failed temporary directory on this segment
-	 * exceeds the value of rm_segdown_tmpdir_limit, if exceeds, master consider
-	 * this segment as down, even it has heart-beat report.
-	 *
-	 * Notes: If the number of temporary directory is not greater than
-	 * 		  rm_segdown_tmpdir_limit, this guc value is treated as 0.
-	 * 		  which means if one temporary directory is failed, this segment
-	 * 		  is considered as down.
+	 * Check if the there is any failed temporary directory on this segment.
+	 * if has, master considers this segment as down, even it has heart-beat report.
 	 */
-	uint32_t failedTmpDirLimit = header->TmpDirCount <= rm_segdown_tmpdir_limit ?
-									0 : rm_segdown_tmpdir_limit;
-	if (newsegstat->FailedTmpDirNum <= failedTmpDirLimit)
+	if (newsegstat->FailedTmpDirNum == 0)
 	{
 		newsegstat->FTSAvailable = RESOURCE_SEG_STATUS_AVAILABLE;
 	}
 	else
 	{
-		elog(RMLOG, "Resource manager finds the number of failed temporary directory:%d "
-					"exceeds the guc rm_segdown_tmpdir_limit:%d, "
+		elog(RMLOG, "Resource manager finds there is %d failed temporary directories "
+					"on this segment, "
 					"so mark this segment unavailable.",
-					newsegstat->FailedTmpDirNum,
-					rm_segdown_tmpdir_limit);
+					newsegstat->FailedTmpDirNum);
 		newsegstat->FTSAvailable = RESOURCE_SEG_STATUS_UNAVAILABLE;
 	}
 

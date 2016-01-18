@@ -1188,7 +1188,6 @@ extern int	   rm_session_lease_heartbeat_interval;
 extern int	   rm_nocluster_timeout;
 extern int	   rm_tolerate_nseg_limit;
 extern int	   rm_rejectrequest_nseg_limit;
-extern int	   rm_segdown_tmpdir_limit;
 extern int	   rm_nvseg_variance_among_seg_limit;
 extern int	   rm_container_batch_limit;
 extern char   *rm_resourcepool_test_filename;

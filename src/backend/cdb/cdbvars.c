@@ -349,7 +349,6 @@ int		rm_nocluster_timeout;				/* How many seconds to wait before
 
 int		rm_tolerate_nseg_limit;
 int		rm_rejectrequest_nseg_limit;
-int		rm_segdown_tmpdir_limit;
 int		rm_nvseg_variance_among_seg_limit;
 int		rm_container_batch_limit;
 

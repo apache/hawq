@@ -269,31 +269,19 @@ char* GetTmpDirPathFromArray(int64_t idx)
     Insist(idx >=0 && idx <= TmpDirNum-1);
 
     LWLockAcquire(TmpDirInfoLock, LW_SHARED);
-    for (int cnt = 0; cnt < TmpDirNum; cnt++, idx++)
+
+    if (TmpDirInfoArray[idx].available)
     {
-        if (TmpDirInfoArray[idx].available)
-        {
-            LWLockRelease(TmpDirInfoLock);
-            return TmpDirInfoArray[idx].path;
-        }
-        else
-        {
-            if (idx == TmpDirNum-1)
-            {
-                /* start to look up the first element */
-                idx = 0;
-            }
-            if (cnt == TmpDirNum-1)
-            {
-                /* all the temp dir are failed */
-                ereport(FATAL,
-                        (errcode(ERRCODE_CDB_INTERNAL_ERROR),
-                        errmsg("Failed to find a valid temporary directory")));
-                break;
-            }
-        }
+        LWLockRelease(TmpDirInfoLock);
+        return TmpDirInfoArray[idx].path;
     }
-    LWLockRelease(TmpDirInfoLock);
+    else
+    {
+        LWLockRelease(TmpDirInfoLock);
+        ereport(FATAL,
+                (errcode(ERRCODE_CDB_INTERNAL_ERROR),
+                errmsg("Temporary directory:%s is failed", TmpDirInfoArray[idx].path)));
+    }
     return NULL;
 }
 
