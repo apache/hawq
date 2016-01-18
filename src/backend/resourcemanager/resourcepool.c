@@ -1310,6 +1310,25 @@ void setAllSegResourceGRMUnavailable(void)
 	freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
 }
 
+int getAllSegResourceFTSAvailableNumber(void)
+{
+	int cnt = 0;
+	List *allsegres = NULL;
+	ListCell *cell = NULL;
+	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &allsegres);
+
+	foreach(cell, allsegres)
+	{
+		SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
+		if (segres->Stat->FTSAvailable == RESOURCE_SEG_STATUS_AVAILABLE)
+		{
+			cnt++;
+		}
+	}
+	freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
+	return cnt;
+}
+
 /*
  * Check index to get host id based on host name string.
  */
@@ -3889,12 +3908,13 @@ void validateResourcePoolStatus(bool refquemgr)
 			Assert( availtree != NULL );
 			traverseBBSTMidOrder(availtree, &line);
 
-			if ( line.NodeCount != PRESPOOL->Segments.NodeCount )
+			int availableCnt = getAllSegResourceFTSAvailableNumber();
+			if ( line.NodeCount != availableCnt )
 			{
 				elog(ERROR, "HAWQ RM Validation. The available resource ordered index "
 							"contains %d nodes, expect %d nodes.",
 							line.NodeCount,
-							PRESPOOL->Segments.NodeCount);
+							availableCnt);
 			}
 
 			SegResource prevres = NULL;
