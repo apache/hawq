@@ -450,16 +450,13 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 												   &exist);
 			if (!exist || todroptrack == NULL )
 			{
-				/* already check before send RPC to RM */
-				Assert(exist);
 				ddlres = RESQUEMGR_NO_QUENAME;
 				snprintf(errorbuf, sizeof(errorbuf),
-						"The queue doesn't exist");
-				elog(WARNING, ERRORPOS_FORMAT
-					 "Resource manager can not drop resource queue %s because %s",
-					 ERRREPORTPOS,
-					 nameattr->Val.Str,
-					 errorbuf);
+						 "resource queue %s doesn't exist",
+						 nameattr->Val.Str);
+				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+							  nameattr->Val.Str,
+							  errorbuf);
 				goto senderr;
 			}
 
@@ -469,11 +466,21 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				snprintf(errorbuf, sizeof(errorbuf),
 						 "resource queue %s is a branch queue",
 						 todroptrack->QueueInfo->Name);
-				elog(WARNING, ERRORPOS_FORMAT
-					 "Resource manager can not drop resource queue %s because %s.",
-					 ERRREPORTPOS,
-					 nameattr->Val.Str,
-					 errorbuf);
+				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+							  nameattr->Val.Str,
+							  errorbuf);
+				goto senderr;
+			}
+
+			if ( todroptrack->isBusy ||
+				 todroptrack->QueryResRequests.NodeCount > 0 )
+			{
+				ddlres = RESQUEMGR_IN_USE;
+				snprintf(errorbuf, sizeof(errorbuf), "resource queue %s is busy",
+						 todroptrack->QueueInfo->Name);
+				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+							  nameattr->Val.Str,
+							  errorbuf);
 				goto senderr;
 			}
 
@@ -483,12 +490,10 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				Assert(todroptrack->QueueInfo->OID != DEFAULTRESQUEUE_OID);
 				ddlres = RESQUEMGR_IN_USE;
 				snprintf(errorbuf, sizeof(errorbuf),
-						"pg_default as system queue cannot be dropped.");
-				elog(WARNING, ERRORPOS_FORMAT
-					 "Resource manager can not drop resource queue %s because %s",
-					 ERRREPORTPOS,
-					 nameattr->Val.Str,
-					 errorbuf);
+						"pg_default as system queue cannot be dropped");
+				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+							  nameattr->Val.Str,
+							  errorbuf);
 				goto senderr;
 			}
 
@@ -499,11 +504,9 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				ddlres = RESQUEMGR_IN_USE;
 				snprintf(errorbuf, sizeof(errorbuf),
 						"pg_root as system queue cannot be dropped.");
-				elog(WARNING, ERRORPOS_FORMAT
-					 "Resource manager can not drop resource queue %s because %s",
-					 ERRREPORTPOS,
-					 nameattr->Val.Str,
-					 errorbuf);
+				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+							  nameattr->Val.Str,
+							  errorbuf);
 				goto senderr;
 			}
 
@@ -514,12 +517,10 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				ddlres = res;
 				snprintf(errorbuf, sizeof(errorbuf),
-						 "Cannot update resource queue changes in pg_resqueue");
-				elog(WARNING, ERRORPOS_FORMAT
-					 "Resource manager cannot drop resource queue %s because %s",
-					 ERRREPORTPOS,
-					 nameattr->Val.Str,
-					 errorbuf);
+						 "cannot update resource queue changes in pg_resqueue");
+				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+							  nameattr->Val.Str,
+							  errorbuf);
 				goto senderr;
 			}
 
@@ -527,7 +528,8 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, "Resource manager can not dropQueueAndTrack because %s",
+				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+							  nameattr->Val.Str,
 						      errorbuf);
 				goto senderr;
 			}
