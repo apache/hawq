@@ -3963,12 +3963,13 @@ void validateResourcePoolStatus(bool refquemgr)
 			Assert( alloctree != NULL );
 			traverseBBSTMidOrder(alloctree, &line);
 
-			if ( line.NodeCount != PRESPOOL->Segments.NodeCount )
+			int availableCnt = getAllSegResourceFTSAvailableNumber();
+			if ( line.NodeCount !=  availableCnt )
 			{
 				elog(ERROR, "HAWQ RM Validation. The allocated resource ordered index "
 							"contains %d nodes, expect %d nodes.",
 							line.NodeCount,
-							PRESPOOL->Segments.NodeCount);
+							availableCnt);
 			}
 
 			SegResource prevres = NULL;
