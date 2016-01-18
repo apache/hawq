@@ -495,7 +495,7 @@ emit_mmxlog_fs_record(mm_fs_obj_type type, Oid filespace,
 	xlrec.database = database;
 	xlrec.relfilenode = relfilenode;
 	xlrec.segnum = segnum;
-	xlrec.shared = is_filespace_shared(filespace);
+	xlrec.shared = (SYSTEMFILESPACE_OID!=filespace); //cannot call is_filespace_shared(filespace); here, it will cause deadlock with PersistentObjLock
     xlrec.persistentTid = *persistentTid;
     xlrec.persistentSerialNum = persistentSerialNum;
 
