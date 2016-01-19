@@ -2869,10 +2869,11 @@ static char* GetExtTableFirstLocation(Datum *array)
 }
 
 /* 
- * Using host from uri, dispatch HDFS credentials to 
+ * Using HAWQ's HDFS location, dispatch HDFS credentials to
  * segments.
  *
- * The function uses a hdfs uri in the form hdfs://host:port/path where
+ * The function uses a hdfs uri in the form hdfs://host:port/path
+ * or hdfs://nameservice/path where
  * this value is taken from pg_filespace_entry which is populated
  * based on hawq-site.xml's hawq_dfs_url entry.
  *

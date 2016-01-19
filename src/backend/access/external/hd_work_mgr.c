@@ -900,7 +900,8 @@ static void init_client_context(ClientContext *client_context)
  * is created. We cannot use that token because hd_work_mgr.c code gets 
  * executed before a portal is created.
  *
- * The function uses a hdfs uri in the form of hdfs://host:port/path.
+ * The function uses a hdfs uri in the form of hdfs://host:port/path
+ * or hdfs://nameservice/path.
  * This value is taken from pg_filespace_entry which is populated
  * based on hawq-site.xml's hawq_dfs_url entry.
  */
