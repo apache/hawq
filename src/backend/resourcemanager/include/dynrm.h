@@ -120,6 +120,7 @@ bool handleRMRequestQuotaControl(void **arg);
 
 int refreshLocalHostInstance(void);
 void checkLocalPostmasterStatus(void);
+void checkTmpDirStatus(void);
 /*-----------------------------------------------------------------------------
  * Dynamic resource manager overall APIs
  *----------------------------------------------------------------------------*/
@@ -218,6 +219,7 @@ struct DynRMGlobalData{
     
     uint64_t				 LocalHostLastUpdateTime;
     uint64_t				 HeartBeatLastSentTime;
+    uint64_t				 TmpDirLastCheckTime;
     int32_t					 SegmentMemoryMB;
     double					 SegmentCore;
     /*------------------------------------------------------------------------*/

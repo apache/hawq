@@ -67,6 +67,8 @@ struct SegInfoData {
 	uint32_t		GRMRackNameOffset;
 	uint32_t		GRMRackNameLen;
 	uint32_t		HostAddrCount;
+	uint32_t		FailedTmpDirOffset;
+	uint32_t		FailedTmpDirLen;
 	uint8_t			master;
 	uint8_t			standby;
 	uint8_t			alive;
@@ -93,6 +95,12 @@ typedef struct SegInfoData  SegInfoData;
  */
 #define GET_SEGINFO_GRMHOSTNAME(seginfo) 										   \
 		((char *)(seginfo) + ((seginfo)->GRMHostNameOffset))
+
+/*
+ * Extract failed temporary string from SegInfo instance.
+ */
+#define GET_SEGINFO_FAILEDTMPDIR(seginfo) 										   \
+		((char *)(seginfo) + ((seginfo)->FailedTmpDirOffset))
 
 /*
  * Macros for getting segment address content from SegInfo instance.
@@ -135,17 +143,14 @@ void  generateSegInfoReport(SegInfo seginfo, SelfMaintainBuffer buff);
 
 struct SegStatData {
 	int32_t			ID;					/* Internal ID.						  */
+	uint16_t		FailedTmpDirNum;	/* Failed temporary directory number */
 	uint8_t			FTSAvailable;		/* If it is available now.			  */
 	uint8_t			GRMAvailable;		/* If it is global resource available.*/
-	uint8_t			Reserved[2];
 
 	uint32_t		FTSTotalMemoryMB;		/* FTS reports memory capacity.   */
 	uint32_t		FTSTotalCore;			/* FTS reports core capacity.	  */
 	uint32_t		GRMTotalMemoryMB;		/* GRM reports memory capacity.	  */
 	uint32_t		GRMTotalCore;			/* GRM reports core capacity. 	  */
-
-											/* 64-bit aligned.				  */
-
 	SegInfoData		Info;					/* 64-bit aligned.				  */
 };
 
@@ -628,6 +633,8 @@ int getOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree);
 
 void setAllSegResourceGRMUnavailable(void);
 
+int getAllSegResourceFTSAvailableNumber(void);
+
 struct RB_GRMContainerStatData
 {
 	int64_t		ContainerID;
@@ -657,12 +664,20 @@ void checkSlavesFile(void);
 void cleanup_segment_config(void);
 /* update a segment's status in gp_segment_configuration table */
 void update_segment_status(int32_t id, char status);
+/* update a segment's status and failed temporary directory
+ * in gp_segment_configuration table
+ */
+void update_segment_failed_tmpdir
+(int32_t id, char status, int32_t failedNum, char* failedTmpDir);
 /* Add a new entry into gp_segment_configuration table*/
 void add_segment_config_row(int32_t 	 id,
 							char		*hostname,
 							char		*address,
 							uint32_t 	 port,
-							char 		 role);
+							char 		 role,
+							char		 status,
+							uint32_t	 failed_tmpdir_num,
+							char*		 failed_tmpdir);
 
 /*
  * In resource pool, segment's id starts from 0, however in gp_segment_configuration table,

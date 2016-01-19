@@ -277,6 +277,8 @@ gp_add_master_standby(PG_FUNCTION_ARGS)
 	values[Anum_gp_segment_configuration_port - 1] = Int32GetDatum(master->port);
 	values[Anum_gp_segment_configuration_hostname - 1] = PG_GETARG_DATUM(0);
 	values[Anum_gp_segment_configuration_address - 1] = PG_GETARG_DATUM(1);
+	nulls[Anum_gp_segment_configuration_failed_tmpdir_num - 1] = true;
+	nulls[Anum_gp_segment_configuration_failed_tmpdir - 1] = true;
 
 	tuple = caql_form_tuple(pcqCtx, values, nulls);
 
