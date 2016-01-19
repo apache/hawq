@@ -714,8 +714,9 @@ void add_segment_config_row(int32_t id,
 	}
 
 	elog(LOG, "Add a new row into segment configuration catalog table,"
-			  "registration order:%d, role:%c, status:%c, port:%d, hostname:%s, address:%s",
-			  id, role, status, port, hostname, address);
+			  "registration order:%d, role:%c, status:%c, port:%d, "
+			  "hostname:%s, address:%s, failed_tmpdir_num:%d, failed_tmpdir:%s",
+			  id, role, status, port, hostname, address, failed_tmpdir_num, failed_tmpdir);
 
 cleanup:
 	if(sql)
