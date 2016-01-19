@@ -84,7 +84,7 @@ static int GetTmpDirNumber(char* szTmpDir)
         if (szTmpDir[i] == ',' || i == strlen(szTmpDir))
         {
             /* in case two commas are written together */
-            if (i-idx > 1)
+            if (i-idx > 1 && i-idx <= MAX_TMP_DIR_LEN)
             {
                 tmpdir = (char *)palloc0(i-idx);
                 strncpy(tmpdir, szTmpDir+idx+1, i-idx-1);
@@ -154,9 +154,12 @@ void TmpDirInfoArrayShmemInit(void)
         int32_t i = 0;
         MemSet(TmpDirInfoArray, 0, TmpDirNum*sizeof(TmpDirInfo));
         foreach(lc, tmpDirList) {
-            TmpDirInfoArray[i].available = true;
-            strncpy(TmpDirInfoArray[i].path, (char*)lfirst(lc), strlen((char*)lfirst(lc)));
-            i++;
+            if (strlen((char*)lfirst(lc)) < MAX_TMP_DIR_LEN)
+            {
+                strncpy(TmpDirInfoArray[i].path, (char*)lfirst(lc), strlen((char*)lfirst(lc)));
+                TmpDirInfoArray[i].available = true;
+                i++;
+            }
         }
 
         if (tmpDirList)
@@ -207,8 +210,7 @@ bool CheckTmpDirAvailable(char *path)
     }
 
 _exit:
-    if (fname != NULL)
-        pfree(fname);
+    pfree(fname);
     if (tmp != NULL)
         fclose(tmp);
     return ret;
@@ -298,7 +300,8 @@ void getSegmentLocalTmpDirFromShmem(int session_id, int command_id, int qeidx)
     }
     else
     {
-        int64_t key = (session_id << 32) + command_id + qeidx;
+        int64_t session_key = session_id;
+        int64_t key = (session_key << 32) + command_id + qeidx;
         LocalTempPath = GetTmpDirPathFromArray(key % TmpDirNum);
     }
 }
