@@ -497,7 +497,9 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
  * The function will get the cached delegation token
  * for remote host and add it to inputData
  * 
- * We get the NN location from dfs_url.
+ * The function uses a hdfs uri in the form of hdfs://host:port/path.
+ * This value is taken from pg_filespace_entry which is populated
+ * based on hawq-site.xml's hawq_dfs_url entry.
  * Both regular and HA cases are handled the same way,
  * where a nameservice is parsed by HdfsParsePath()@fd.c
  */

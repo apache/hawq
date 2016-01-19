@@ -900,11 +900,9 @@ static void init_client_context(ClientContext *client_context)
  * is created. We cannot use that token because hd_work_mgr.c code gets 
  * executed before a portal is created.
  *
- * The function uses a hdfs uri in the form of hdfs://host:port/
- * where port is 8020. In the case of HA the function uses the form
- * hdfs://nameservice/
- *
- * TODO 8020 is hard-coded. Must find the NameNode port somehow.
+ * The function uses a hdfs uri in the form of hdfs://host:port/path.
+ * This value is taken from pg_filespace_entry which is populated
+ * based on hawq-site.xml's hawq_dfs_url entry.
  */
 static void generate_delegation_token(PxfInputData *inputData)
 {
@@ -914,7 +912,6 @@ static void generate_delegation_token(PxfInputData *inputData)
 		return;
 
 	get_hdfs_location_from_filespace(&dfs_address);
-	//dfs_url_to_address(dfs_url, &dfs_address);
 
     elog(DEBUG2, "about to acquire delegation token for %s", dfs_address);
 

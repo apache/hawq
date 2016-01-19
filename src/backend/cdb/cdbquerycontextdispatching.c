@@ -2872,13 +2872,12 @@ static char* GetExtTableFirstLocation(Datum *array)
  * Using host from uri, dispatch HDFS credentials to 
  * segments.
  *
- * The function uses a hdfs uri in the form hdfs://host:port/ where
- * port is hard-coded 8020. For HA the function uses hdfs://nameservice/
+ * The function uses a hdfs uri in the form hdfs://host:port/path where
+ * this value is taken from pg_filespace_entry which is populated
+ * based on hawq-site.xml's hawq_dfs_url entry.
  *
  * prepareDispatchedCatalogFileSystemCredential will store the token
- * using port == 0 in HA case (otherwise the supplied port)
- *
- * TODO Get HDFS port from someplace else, currently hard coded
+ * using port == 0 in HA case (otherwise the supplied port).
  */
 static void AddFileSystemCredentialForPxfTable(char *uri)
 {
