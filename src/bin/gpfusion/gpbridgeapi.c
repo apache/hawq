@@ -505,21 +505,17 @@ void add_delegation_token(PxfInputData *inputData)
 {
 	PxfHdfsTokenData *token = NULL;
 	char* dfs_address = NULL;
-    StringInfoData uri;
 
 	if (!enable_secure_filesystem)
 		return;
 
 	token = palloc0(sizeof(PxfHdfsTokenData));
 
-	dfs_url_to_address(dfs_url, &dfs_address);
+	get_hdfs_location_from_filespace(&dfs_address);
 
     elog(DEBUG2, "locating token for %s", dfs_address);
 
-	initStringInfo(&uri);
-	appendStringInfo(&uri, "hdfs://%s", dfs_address);
-
-	token->hdfs_token = find_filesystem_credential_with_uri(uri.data);
+	token->hdfs_token = find_filesystem_credential_with_uri(dfs_address);
 
 	if (token->hdfs_token == NULL)
 		elog(ERROR, "failed to find delegation token for %s", dfs_address);
@@ -528,7 +524,6 @@ void add_delegation_token(PxfInputData *inputData)
 	inputData->token = token;
 
 	pfree(dfs_address);
-	pfree(uri.data);
 }
 
 void free_token_resources(PxfInputData *inputData)

@@ -42,6 +42,8 @@ void port_to_str(char** port, int new_port);
 /* parse the address part of dfs_url */
 void dfs_url_to_address(const char* dfs_url, char** address);
 
+void get_hdfs_location_from_filespace(char** path);
+
 /* Parse the REST message and issue the libchurl call */
 void call_rest(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);
 

@@ -2882,24 +2882,18 @@ static char* GetExtTableFirstLocation(Datum *array)
  */
 static void AddFileSystemCredentialForPxfTable(char *uri)
 {
-	StringInfoData hdfs_uri;
 	char* dfs_address = NULL;
 
 	if (!enable_secure_filesystem)
 		return;
 
-	dfs_url_to_address(dfs_url, &dfs_address);
+	get_hdfs_location_from_filespace(&dfs_address);
 
-	initStringInfo(&hdfs_uri);
+    elog(DEBUG2, "about to acquire delegation token for %s", dfs_address);
 
-	appendStringInfo(&hdfs_uri, "hdfs://%s/", dfs_address);
-
-    elog(DEBUG2, "about to acquire delegation token for %s", hdfs_uri.data);
-
-	prepareDispatchedCatalogFileSystemCredential(hdfs_uri.data);
+	prepareDispatchedCatalogFileSystemCredential(dfs_address);
 
 	pfree(dfs_address);
-	pfree(hdfs_uri.data);
 }
 
 List *

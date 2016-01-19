@@ -18,6 +18,11 @@
  */
 
 #include "access/pxfutils.h"
+
+#include "catalog/catalog.h"
+#include "catalog/pg_tablespace.h"
+#include "commands/dbcommands.h"
+#include "miscadmin.h"
 #include "utils/builtins.h"
 
 /* Wrapper for libchurl */
@@ -72,6 +77,18 @@ void dfs_url_to_address(const char* dfs_url, char** address)
 	}
 	int hostportlen = address_end - dfs_url;
 	*address = pnstrdup(dfs_url, hostportlen); /* To be freed */
+}
+
+void get_hdfs_location_from_filespace(char** path)
+{
+	Assert(NULL != path);
+	Oid dtsoid = get_database_dts(MyDatabaseId);
+	GetFilespacePathForTablespace(dtsoid, path);
+
+	Assert(NULL != *path);
+	Assert(strlen(*path) < FilespaceLocationBlankPaddedWithNullTermLen);
+
+	elog(DEBUG2, "found hdfs location is %s", *path);
 }
 
 /*

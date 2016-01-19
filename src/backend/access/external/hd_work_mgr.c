@@ -908,29 +908,25 @@ static void init_client_context(ClientContext *client_context)
  */
 static void generate_delegation_token(PxfInputData *inputData)
 {
-	StringInfoData hdfs_uri;
 	char* dfs_address = NULL;
 
 	if (!enable_secure_filesystem)
 		return;
 
-	dfs_url_to_address(dfs_url, &dfs_address);
+	get_hdfs_location_from_filespace(&dfs_address);
+	//dfs_url_to_address(dfs_url, &dfs_address);
 
-	initStringInfo(&hdfs_uri);
-	appendStringInfo(&hdfs_uri, "hdfs://%s/", dfs_address);
-
-    elog(DEBUG2, "about to acquire delegation token for %s", hdfs_uri.data);
+    elog(DEBUG2, "about to acquire delegation token for %s", dfs_address);
 
 	inputData->token = palloc0(sizeof(PxfHdfsTokenData));
 
-	inputData->token->hdfs_token = HdfsGetDelegationToken(hdfs_uri.data, 
+	inputData->token->hdfs_token = HdfsGetDelegationToken(dfs_address,
 														  &inputData->token->hdfs_handle);
 
 	if (inputData->token->hdfs_token == NULL)
-		elog(ERROR, "Failed to acquire a delegation token for uri %s", hdfs_uri.data);
+		elog(ERROR, "Failed to acquire a delegation token for uri %s", dfs_address);
 
 	pfree(dfs_address);
-	pfree(hdfs_uri.data);
 }
 
 /*
