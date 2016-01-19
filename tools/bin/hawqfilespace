@@ -35,6 +35,10 @@ Execution Options:
   -c | --config FILE         configuration file
   -o | --output DIRECTORY    output directory for config file
 
+Move Options:
+  --movefilespace FILESPACE | default move filespace to new location on distributed file system
+  --location <dfslocation>    new location which the filespace will be moved to
+
 '''
 # ============================================================================
 __version__ = '$Revision$'
@@ -68,6 +72,7 @@ try:
     from getpass import getpass
     from gppylib.parseutils import line_reader, parse_fspacename, parse_dfs_url, parse_fspacesys, parse_fspacereplica, parse_gpfilespace_line, \
         canonicalize_address
+    from gppylib.operations.filespace import MoveFilespaceError, MoveFileSpaceLocation, CheckSuperUser
 
 except ImportError, e:
     sys.exit('Error: unable to import module: ' + str(e))
@@ -146,6 +151,8 @@ def ParseOptions():
                       action='store_false', help=optparse.SUPPRESS_HELP)
     parser.add_option('-q', '--quiet',
                       action='store_true', help=optparse.SUPPRESS_HELP)
+    parser.add_option('--movefilespace')
+    parser.add_option('--location')
 
     (options, args) = parser.parse_args()
 
@@ -215,6 +222,21 @@ def getstring(prompt, question=False, default=""):
         sys.exit(1)
 
 # ============================================================================
+# ============================================================================
+def getbool(prompt, question, default):
+    '''
+    getbool(prompt, question, default)
+
+    Prompts the user for input (yes|no), returns True/False
+    '''
+    while True:
+        value = getstring(prompt, question, default).lower()
+        if value in ("y", "ye", "yes"):
+            return True
+        elif value in ("n", "no"):
+            return False
+
+
 def getdir(prompt, hosts=[], primary=None, shared=False, fsysn=None, db=None):
     '''
     getdir(prompt, hosts)
@@ -694,12 +716,89 @@ if __name__ == '__main__':
     else:
         opt.password = None
 
-    gpf = GPFilespace(opt)
+
     try:
-        gpf.Setup()
-        if opt.config == None:
-            gpf.generate_config()
+        if opt.movefilespace:
+            logger.debug("Start filespace move")
+            logger.info("""
+A tablespace requires a file system location to store its database
+files. A filespace is a collection of file system locations for all components
+in a HAWQ system.
+Once a filespace is created, it can be used by one or more tablespaces.
+
+""")
+            if opt.movefilespace == 'default':
+                opt.movefilespace = "dfs_system"
+
+            if opt.location is None or len(opt.location) == 0:
+                usage()
+                logger.error("Target location is not set");
+                sys.exit(1)
+
+            logger.warn('PLEASE STOP DATABASE AND BACKUP MASTER DATA DIRECTORY IN CASE OF LOSING DATA!')
+
+            question = "I understand the risk and already backuped master data directory?  (Y|N)"
+            if not getbool("> ", question, "N"):
+                raise KeyboardInterrupt()
+
+            MoveFileSpaceLocation(opt.movefilespace, opt.location, opt.username, opt.password).run()
+
+            logger.info("Move filespace successfully.")
+            logger.info("IF STANDBY MASTER IS CONFIGURED, PLEASE REMOVE IT AND INITIALIZE A NEW ONE!")
         else:
-            gpf.execute_config()
-    finally:
-        gpf.cleanup()
+            gpf = GPFilespace(opt)
+            try:
+                gpf.Setup()
+                if opt.config == None:
+                    gpf.generate_config()
+                else:
+                    gpf.execute_config()
+            finally:
+                gpf.cleanup()
+
+    except MoveFilespaceError, e:
+        logger.error(e)
+        sys.exit(1)
+    # An expected error
+    except GPError, e:
+        try:
+            # Cast to unicode using UTF-8 to work around issues with the
+            # logging module:
+            #    logger.error("퀙퀠퀩퀘ㄲㄸㅉㅃ12ㅁavb")  => UnicodeDecodeError
+            err = unicode(str(e), 'UTF-8')
+            logger.error(err)
+            logger.debug("exit(1)")
+        except BaseException, e:
+            sys.stderr.write("[Error] %s\n" % str(e))
+            sys.stderr.write(traceback.format_exc())
+            sys.stderr.flush()
+        sys.exit(1)
+
+    # User cancelation
+    except KeyboardInterrupt, e:
+        try:
+            logger.info('[Cancelled]')
+        except BaseException, e:
+            sys.stderr.write("error %s\n" % str(e))
+        sys.exit(1)
+
+    # Let SystemExit exceptions through
+    except SystemExit, e:
+        try:
+            logger.debug('exit(%s)' % str(e))
+        except BaseException, e:
+            sys.stderr.write("error %s\n" % str(e))
+        raise e
+
+    # Catch anything else - shouldn't ever occur
+    except BaseException, e:
+        try:
+            err = '[%s]: "%s"' % (type(e).__name__,  unicode(str(e), 'UTF-8'))
+            logger.error(err)
+            logger.debug(traceback.format_exc())
+            logger.debug("exit(1)")
+
+            sys.stderr.write('[Error] See "%s" for details\n' % get_logfile())
+        except BaseException, e:
+            sys.stderr.write("error %s\n" % str(e))
+        sys.exit(1)

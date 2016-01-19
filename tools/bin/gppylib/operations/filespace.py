@@ -33,6 +33,8 @@ from gppylib.operations import Operation
 from gppylib.operations.utils import RemoteOperation, ParallelOperation
 from gppylib.operations.unix import CheckFile, CheckDir, ListFiles
 from gppylib.gparray import GpArray
+from hawqpylib.hawqarray import HAWQArray
+from hawqpylib.hawqlib import local_ssh, HawqXMLParser, parse_hosts_file
 
 logger = gplog.get_default_logger()
 
@@ -940,28 +942,28 @@ class MoveFileSpaceLocation(Operation):
         self.dburl = dbconn.DbURL(username=self.user, password=self.pswd)
     
     def start_master_only(self):
-        logger.info('Starting Database in master only mode')
-        cmd = GpStart('Start Database in master only mode', masterOnly=True, upgrade=True)
-        cmd.run()
-        if cmd.get_results().rc != 0:
-            logger.error('Failed to start Greenplum Database in master only mode.')
-            cmd.validate()
+        logger.info('Starting Database in upgrade mode')
+        cmd = 'hawq start master -U upgrade'
+        result = local_ssh(cmd, logger)
+        if result != 0:
+            logger.error("Failed to start HAWQ Database in upgrade mode")
+        return result
 
     def stop_master_only(self):
-        logger.info('Stopping Database in master only mode')
-        cmd = GpStop('Stop Database in master only mode', masterOnly=True)
-        cmd.run()
-        if cmd.get_results().rc != 0:
-            logger.error('Failed to stop Greenplum Database in master only mode.')
-            cmd.validate()
+        logger.info('Stopping HAWQ master')
+        cmd = 'hawq stop master -a'
+        result = local_ssh(cmd, logger)
+        if result != 0:
+            logger.error("Failed to stop HAWQ master")
+        return result
 
     def stop_database(self):
-        logger.info('Stopping Greenplum Database')
-        cmd = GpStop('Stop Greenplum Databse')
-        cmd.run()
-        if cmd.get_results().rc != 0:
-            logger.error('Failed to stop Greenplum Database.')
-            cmd.validate()
+        logger.info('Stopping HAWQ cluster')
+        cmd = 'hawq stop cluster -a'
+        result = local_ssh(cmd, logger)
+        if result != 0:
+            logger.error("Failed to stop HAWQ master")
+        return result
 
     def check_database_stopped(self):
         try:
@@ -997,102 +999,40 @@ class MoveFileSpaceLocation(Operation):
             self.fsoid =  filespace[0]
             filespaceRow.close()
             
-            #get segments dbid
-            segmentsDbidRows = dbconn.execSQL(conn, '''
-                            SELECT dbid, content
-                            FROM gp_segment_configuration
-                            WHERE content != -1
-                            ''' )
-            
-            if segmentsDbidRows.rowcount == 0:
-                logger.error('No segment is configured')
-                return None
-            
-            segconf = {}
-            for row in segmentsDbidRows:
-                segconf[row[0]] = row[1]
-                
-            segdbids = segconf.keys()
-                        
-            #get segments prefix and verify consistency of filespace entries
-            entryRows = dbconn.execSQL(conn, '''
-                            SELECT fselocation, fsedbid
-                            FROM pg_filespace_entry 
-                            WHERE fsefsoid = %d and fsedbid in (%s);
-                        ''' % (self.fsoid, ','.join(str(x) for x in segdbids)))
-
-            segmentLocation = []
-            
-            if entryRows.rowcount == 0:
-                logger.error('Cannot get filespace entry for filespace "%s"' % self.fsname)
-                return None
-            
-            targetDbids = []
-            for row in entryRows:
-                segmentLocation.append(row[0]);
-                targetDbids.append(row[1])
-            
-            entryRows.close()
-
-            prefixs = [os.path.split(loc)[1] for loc in segmentLocation]
-            self.prefix = os.path.commonprefix(prefixs)
-            
-            if len(self.prefix) == 0:
-                logger.error('Cannot get segments prefix for filespace "%s"' % self.fsname)
-                return None
-            
-            schemes = [urlparse.urlparse(loc).scheme for loc in segmentLocation]
-            
-            if len(set(schemes)) != 1:
-                logger.warn('The scheme of segment are not consistent')
-                
-            targetScheme = urlparse.urlparse(self.location).scheme
-            
-            if len(targetScheme) == 0:
-                logger.error('Target location: "%s" is not a valid url' % self.location)
-                return None
-            
-            if targetScheme not in set(schemes):
-                logger.error("Target location's scheme: \"%s\" does not match file system requirement", targetScheme)
-                return None
-            
             #remove last slash
             if self.location[-1] is '/':
                 self.location = self.location[:-1]
                 
             queries = []
             #generate sql for pg_filespace_entry
-            for dbid in targetDbids:
-                uri = '%s/%s%d' % (self.location, self.prefix, segconf[dbid])
-                queries.append('''
-                        UPDATE pg_filespace_entry 
-                        SET fselocation = '%s' 
-                        WHERE fsefsoid = %d 
-                        AND fsedbid = %d;
-                        ''' %(uri, self.fsoid, dbid))
+            uri = self.location
+            queries.append('''
+                    UPDATE pg_filespace_entry 
+                    SET fselocation = '%s' 
+                    WHERE fsefsoid = %d; 
+                    ''' %(uri, self.fsoid))
             
             #get gp_persistent_filespace
             rows = dbconn.execSQL(conn, '''
-                        SELECT contentid, location_1
+                        SELECT location
                         FROM gp_persistent_filespace_node 
-                        WHERE filespace_oid = %d and contentid <> -1
+                        WHERE filespace_oid = %d;
                     ''' % self.fsoid)
             
             #generate sql for gp_persistent_filespace
             for row in rows:
-                uri = '%s/%s%d' % (self.location, self.prefix, row[0])
+                uri = '%s' % (self.location)
                 
-                paddinglen = len(row[1])
+                paddinglen = len(row[0])
                 if len(uri) > paddinglen:
                     logger.error('target location "%s" is too long' % self.location)
                     return None
                 
                 queries.append('''
                         UPDATE gp_persistent_filespace_node 
-                        SET location_1 = '%s' 
-                        WHERE filespace_oid = %d 
-                        AND contentid = %d;
-                        ''' %(uri.ljust(paddinglen), self.fsoid, row[0]))
+                        SET location = '%s' 
+                        WHERE filespace_oid = %d; 
+                        ''' %(uri.ljust(paddinglen), self.fsoid))
             
             return queries
         
