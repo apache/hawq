@@ -528,8 +528,8 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow);
 
 void cancelQueryRequestToBreakDeadLockInShadow(DynResourceQueueTrack shadowtrack,
 											   DQueueNode			 iter,
-											   uint32_t				 expmemorymb,
-											   uint32_t				 availmemorymb);
+											   int32_t				 expmemorymb,
+											   int32_t				 availmemorymb);
 
 /* Dump resource queue status to file system. */
 void dumpResourceQueueStatus(const char *filename);

@@ -2968,6 +2968,9 @@ void dispatchResourceToQueries(void)
 {
 	bool 		hasresourceallocated = false;
 	bool 		hasrequest 		  	 = false;
+
+	elog(DEBUG3, "Resource manager tries to dispatch resource to queries.");
+
 	/*
 	 *--------------------------------------------------------------------------
 	 * STEP 1. Re-balance resource among different mem/core ratio trackers. After
@@ -2991,6 +2994,14 @@ void dispatchResourceToQueries(void)
 		if ( (mctrack->ClusterMemoryMaxMB == 0 || mctrack->ClusterVCoreMax == 0) ||
 			 (mctrack->TotalAllocated.MemoryMB == 0 && mctrack->TotalAllocated.Core == 0) )
 		{
+			elog(DEBUG3, "Resource manager skipped memory core ratio index %d, "
+						 "memory max limit %d MB, %lf CORE, "
+						 "total allocated %d MB, %lf CORE",
+						 i,
+						 mctrack->ClusterMemoryMaxMB,
+						 mctrack->ClusterVCoreMax,
+						 mctrack->TotalAllocated.MemoryMB,
+						 mctrack->TotalAllocated.Core);
 			continue;
 		}
 
@@ -3014,6 +3025,8 @@ void dispatchResourceToQueries(void)
 			/* Ignore the queues not in use. */
 			if ( !track->isBusy )
 			{
+				elog(DEBUG3, "Resource manager skips idle resource queue %s",
+							 track->QueueInfo->Name);
 				continue;
 			}
 
@@ -3043,6 +3056,10 @@ void dispatchResourceToQueries(void)
 							 expweight,
 							 track->TotalUsed.MemoryMB,
 							 track->TotalUsed.Core);
+
+				/* We still need to handle the resource queue dead lock here. */
+				detectAndDealWithDeadLock(track);
+
 			}
 			else
 			{
@@ -3834,7 +3851,7 @@ void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
 		}
 		else
 		{
-			track->ClusterVCoreMax = track->ClusterMemoryMaxMB / track->MemCoreRatio;
+			track->ClusterVCoreMax = 1.0 * track->ClusterMemoryMaxMB / track->MemCoreRatio;
 		}
 
 		/* Decide cluster segment resource quota. */
@@ -3948,6 +3965,9 @@ void dispatchResourceToQueriesInOneQueue(DynResourceQueueTrack track)
 {
 	int			policy			= 0;
 	Assert( track != NULL );
+
+	elog(DEBUG3, "Resource manager dispatch resource in queue %s",
+				 track->QueueInfo->Name);
 
 	if ( track->QueryResRequests.NodeCount > 0 )
 	{
@@ -4168,7 +4188,6 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 
 	if ( counter == 0 )
 	{
-		/* TODO:: Maybe too conservative. */
 		detectAndDealWithDeadLock(track);
 		return FUNC_RETURN_OK; /* Expect requests are processed in next loop. */
 	}
@@ -5186,6 +5205,10 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 	copyResourceDeadLockDetectorWithoutLocking(&(quetrack->DLDetector),
 											   &(shadowtrack->DLDetector));
 
+	elog(DEBUG3, "Deadlock detector in shadow has %d MB in use %d MB locked.",
+				 shadowtrack->DLDetector.InUseTotal.MemoryMB,
+				 quetrack->DLDetector.LockedTotal.MemoryMB);
+
 	/* Go through all queued query resource requests, recalculate the request. */
 	DQUEUE_LOOP_BEGIN(&(quetrack->QueryResRequests), iter, ConnectionTrack, conn)
 
@@ -5263,6 +5286,11 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 		}
 	DQUEUE_LOOP_END
 
+	elog(DEBUG3, "Deadlock detector in shadow has %d MB in use %d MB locked "
+				 "after rebuilding.",
+				 shadowtrack->DLDetector.InUseTotal.MemoryMB,
+				 shadowtrack->DLDetector.LockedTotal.MemoryMB);
+
 	elog(LOG, "Finished rebuilding resource queue %s dynamic status in its shadow.",
 			  quetrack->QueueInfo->Name);
 
@@ -5276,12 +5304,12 @@ int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack,
 	Assert(quetrack->ShadowQueueTrack != NULL);
 	DynResourceQueueTrack shadowtrack = quetrack->ShadowQueueTrack;
 
-	elog(DEBUG3, "Deadlock detector has %d MB in use, %d MB locked",
+	elog(DEBUG3, "Deadlock detector in shadow has %d MB in use, %d MB locked",
 				 shadowtrack->DLDetector.InUseTotal.MemoryMB,
 				 shadowtrack->DLDetector.LockedTotal.MemoryMB);
 
 	/* Assume more available resource unlocked queued requests. */
-	uint32_t pavailmemorymb = 0;
+	int32_t pavailmemorymb = 0;
 
 	/* Go through all queued query resource requests, recalculate the request. */
 	DQUEUE_LOOP_BEGIN(&(shadowtrack->QueryResRequests), iter, ConnectionTrack, conn)
@@ -5293,10 +5321,10 @@ int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack,
 		}
 
 		/* Check if this connection has deadlock issue. */
-		uint32_t expmemorymb   = conn->SegMemoryMB * conn->SegNumMin;
-		uint32_t availmemorymb = shadowtrack->ClusterMemoryMaxMB -
-								 shadowtrack->DLDetector.LockedTotal.MemoryMB +
-								 pavailmemorymb;
+		int32_t expmemorymb   = conn->SegMemoryMB * conn->SegNumMin;
+		int32_t availmemorymb = shadowtrack->ClusterMemoryMaxMB -
+								shadowtrack->DLDetector.LockedTotal.MemoryMB +
+								pavailmemorymb;
 
 		/*----------------------------------------------------------------------
 		 * If the queue already uses more resource than its maximum capability,
@@ -5308,6 +5336,7 @@ int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack,
 						shadowtrack->ClusterMemoryMaxMB :
 						availmemorymb;
 
+		/* NOTE: availmemorymb maybe less than 0. */
 		if ( expmemorymb > availmemorymb )
 		{
 			/* We encounter a deadlock issue. */
@@ -5347,8 +5376,8 @@ int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack,
 
 void cancelQueryRequestToBreakDeadLockInShadow(DynResourceQueueTrack shadowtrack,
 											   DQueueNode			 iter,
-											   uint32_t				 expmemorymb,
-											   uint32_t				 availmemorymb)
+											   int32_t				 expmemorymb,
+											   int32_t				 availmemorymb)
 {
 	static char errorbuf[ERRORMESSAGE_SIZE];
 	DQueueNode tailiter = getDQueueContainerTail(&(shadowtrack->QueryResRequests));
@@ -5441,8 +5470,8 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
 
 		/* The deadlock detector should use the new one completely. */
 		resetResourceDeadLockDetector(&(quetrack->DLDetector));
-		copyResourceDeadLockDetectorWithoutLocking(&(quetrack->DLDetector),
-												   &(shadowtrack->DLDetector));
+		copyResourceDeadLockDetectorWithoutLocking(&(shadowtrack->DLDetector),
+												   &(quetrack->DLDetector));
 
 		resetResourceBundleDataByBundle(&(quetrack->TotalUsed),
 										&(shadowtrack->TotalUsed));
@@ -5498,15 +5527,6 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
 				MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 				PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conn);
 				MEMORY_CONTEXT_SWITCH_BACK
-
-				/* Recycle connection track instance. */
-				quetrack->CurConnCounter--;
-				if ( quetrack->CurConnCounter == 0 )
-				{
-					quetrack->isBusy = false;
-					refreshMemoryCoreRatioLimits();
-					refreshMemoryCoreRatioWaterMark();
-				}
 			}
 			else
 			{
