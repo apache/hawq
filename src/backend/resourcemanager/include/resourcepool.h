@@ -633,8 +633,6 @@ int getOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree);
 
 void setAllSegResourceGRMUnavailable(void);
 
-int getAllSegResourceFTSAvailableNumber(void);
-
 struct RB_GRMContainerStatData
 {
 	int64_t		ContainerID;

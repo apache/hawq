@@ -714,8 +714,9 @@ void add_segment_config_row(int32_t id,
 	}
 
 	elog(LOG, "Add a new row into segment configuration catalog table,"
-			  "registration order:%d, role:%c, status:%c, port:%d, hostname:%s, address:%s",
-			  id, role, status, port, hostname, address);
+			  "registration order:%d, role:%c, status:%c, port:%d, "
+			  "hostname:%s, address:%s, failed_tmpdir_num:%d, failed_tmpdir:%s",
+			  id, role, status, port, hostname, address, failed_tmpdir_num, failed_tmpdir);
 
 cleanup:
 	if(sql)
@@ -873,14 +874,14 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 
 		if (segresource->Stat->FTSAvailable == RESOURCE_SEG_STATUS_AVAILABLE)
 		{
-			/* Add this node into the io bytes workload BBST structure. */
-			addSegResourceCombinedWorkloadIndex(segresource);
-			/* Add this node into the alloc/avail resource ordered indices. */
-			addSegResourceAvailIndex(segresource);
-			addSegResourceAllocIndex(segresource);
 			segcapchanged = true;
-			*capstatchanged = true;
 		}
+		/* Add this node into the io bytes workload BBST structure. */
+		addSegResourceCombinedWorkloadIndex(segresource);
+		/* Add this node into the alloc/avail resource ordered indices. */
+		addSegResourceAvailIndex(segresource);
+		addSegResourceAllocIndex(segresource);
+		*capstatchanged = true;
 
 		res = FUNC_RETURN_OK;
 	}
@@ -1308,25 +1309,6 @@ void setAllSegResourceGRMUnavailable(void)
 		setSegResGLOBAvailability(segres, RESOURCE_SEG_STATUS_UNAVAILABLE);
 	}
 	freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
-}
-
-int getAllSegResourceFTSAvailableNumber(void)
-{
-	int cnt = 0;
-	List *allsegres = NULL;
-	ListCell *cell = NULL;
-	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &allsegres);
-
-	foreach(cell, allsegres)
-	{
-		SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
-		if (segres->Stat->FTSAvailable == RESOURCE_SEG_STATUS_AVAILABLE)
-		{
-			cnt++;
-		}
-	}
-	freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
-	return cnt;
 }
 
 /*
@@ -3908,13 +3890,12 @@ void validateResourcePoolStatus(bool refquemgr)
 			Assert( availtree != NULL );
 			traverseBBSTMidOrder(availtree, &line);
 
-			int availableCnt = getAllSegResourceFTSAvailableNumber();
-			if ( line.NodeCount != availableCnt )
+			if ( line.NodeCount != PRESPOOL->Segments.NodeCount )
 			{
 				elog(ERROR, "HAWQ RM Validation. The available resource ordered index "
 							"contains %d nodes, expect %d nodes.",
 							line.NodeCount,
-							availableCnt);
+							PRESPOOL->Segments.NodeCount);
 			}
 
 			SegResource prevres = NULL;
@@ -3963,13 +3944,12 @@ void validateResourcePoolStatus(bool refquemgr)
 			Assert( alloctree != NULL );
 			traverseBBSTMidOrder(alloctree, &line);
 
-			int availableCnt = getAllSegResourceFTSAvailableNumber();
-			if ( line.NodeCount !=  availableCnt )
+			if ( line.NodeCount != PRESPOOL->Segments.NodeCount )
 			{
 				elog(ERROR, "HAWQ RM Validation. The allocated resource ordered index "
 							"contains %d nodes, expect %d nodes.",
 							line.NodeCount,
-							availableCnt);
+							PRESPOOL->Segments.NodeCount);
 			}
 
 			SegResource prevres = NULL;
