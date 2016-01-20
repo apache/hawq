@@ -59,6 +59,13 @@ int addSessionInUseResource(ResqueueDeadLockDetector detector,
 	addResourceBundleData(&(sessiontrack->InUseTotal), memorymb, core);
 	addResourceBundleData(&(detector->InUseTotal), memorymb, core);
 
+	elog(DEBUG3, "Deadlock detector adds in-use %d MB from session "INT64_FORMAT", "
+				 "has %d MB in use %d MB locked.",
+				 memorymb,
+				 sessionid,
+				 detector->InUseTotal.MemoryMB,
+				 detector->LockedTotal.MemoryMB);
+
 	return FUNC_RETURN_OK;
 }
 
@@ -97,6 +104,13 @@ int minusSessionInUseResource(ResqueueDeadLockDetector	detector,
 		removeHASHTABLENode(&(detector->Sessions), &key);
 	}
 
+	elog(DEBUG3, "Deadlock detector reduces in-use %d MB from session "INT64_FORMAT", "
+				 "has %d MB in use %d MB locked.",
+				 memorymb,
+				 sessionid,
+				 detector->InUseTotal.MemoryMB,
+				 detector->LockedTotal.MemoryMB);
+
 	return FUNC_RETURN_OK;
 }
 
@@ -132,9 +146,11 @@ void createAndLockSessionResource(ResqueueDeadLockDetector detector,
 	addResourceBundleDataByBundle(&(detector->LockedTotal),
 								  &(curstrack->InUseTotal));
 
-	elog(RMLOG, "Locked session "INT64_FORMAT" Locked %d MB",
-				sessionid,
-				detector->LockedTotal.MemoryMB);
+	elog(DEBUG3, "Deadlock detector locked session "INT64_FORMAT
+				 ", has %d MB in use %d MB locked",
+				 sessionid,
+				 detector->InUseTotal.MemoryMB,
+				 detector->LockedTotal.MemoryMB);
 }
 
 void unlockSessionResource(ResqueueDeadLockDetector detector,
@@ -156,9 +172,11 @@ void unlockSessionResource(ResqueueDeadLockDetector detector,
 									    &(sessiontrack->InUseTotal));
 		sessiontrack->Locked = false;
 
-		elog(DEBUG3, "Unlocked session "INT64_FORMAT " Locked %d MB",
-					 sessionid,
-					 detector->LockedTotal.MemoryMB);
+		elog(DEBUG3, "Deadlock detector unlocked session "INT64_FORMAT
+						 ", has %d MB in use %d MB locked",
+						 sessionid,
+						 detector->InUseTotal.MemoryMB,
+						 detector->LockedTotal.MemoryMB);
 	}
 
 	Assert(detector->LockedTotal.Core >= 0.0 &&
