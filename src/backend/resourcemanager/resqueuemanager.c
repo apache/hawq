@@ -2173,6 +2173,7 @@ void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout)
 	track->CurConnCounter--;
 	if ( track->CurConnCounter == 0 )
 	{
+		elog(RMLOG, "Resource queue %s becomes idle.", track->QueueInfo->Name);
 		track->isBusy = false;
 		refreshMemoryCoreRatioLimits();
 		refreshMemoryCoreRatioWaterMark();
@@ -4593,6 +4594,18 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 			MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 			PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, canceltrack);
 			MEMORY_CONTEXT_SWITCH_BACK
+
+			/* Recycle connection track instance. */
+			Assert(track->CurConnCounter > 0);
+			track->CurConnCounter--;
+			if ( track->CurConnCounter == 0 )
+			{
+				elog(RMLOG, "Resource queue %s becomes idle after deadlock checking.",
+							track->QueueInfo->Name);
+				track->isBusy = false;
+				refreshMemoryCoreRatioLimits();
+				refreshMemoryCoreRatioWaterMark();
+			}
 		}
 	}
 }
@@ -5527,6 +5540,19 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
 				MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 				PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conn);
 				MEMORY_CONTEXT_SWITCH_BACK
+
+				/* Recycle connection track instance. */
+				Assert(quetrack->CurConnCounter > 0);
+				quetrack->CurConnCounter--;
+				if ( quetrack->CurConnCounter == 0 )
+				{
+					elog(RMLOG, "Resource queue %s becomes idle after applying "
+								"change from its shadow.",
+								quetrack->QueueInfo->Name);
+					quetrack->isBusy = false;
+					refreshMemoryCoreRatioLimits();
+					refreshMemoryCoreRatioWaterMark();
+				}
 			}
 			else
 			{
