@@ -728,8 +728,11 @@ AppendOnlyStorageRead_PositionToNextBlock(
 	 * Determine the maximum boundary of the block.
 	 * UNDONE: When we have a block directory, we will tighten the limit down.
 	 */
-	fileRemainderLen = storageRead->bufferedRead.fileLen -
-		               *headerOffsetInFile;
+	if (isUseSplitLen)
+		fileRemainderLen = storageRead->bufferedRead.splitLen - *headerOffsetInFile;
+	else
+		fileRemainderLen = storageRead->bufferedRead.fileLen - *headerOffsetInFile;
+
 	if (storageRead->maxBufferLen > fileRemainderLen)
 		*blockLimitLen = (int32)fileRemainderLen;
 	else
