@@ -2325,6 +2325,13 @@ CommitTransaction(void)
 	 * We don't need to worry about inconsistent states between them. So no
 	 * CHECKPOINT_START_LOCK any more.
 	 */
+#ifdef FAULT_INJECTOR
+	FaultInjector_InjectFaultIfSet(
+			Checkpoint,
+			DDLNotSpecified,
+			"",	// databaseName
+			""); // tableName
+#endif
 
 	/* Prevent cancel/die interrupt while cleaning up */
 	HOLD_INTERRUPTS();
@@ -2813,7 +2820,13 @@ AbortTransaction(void)
 	 * We don't need to worry about inconsistent states between them. So no
 	 * CHECKPOINT_START_LOCK any more.
 	 */
-
+#ifdef FAULT_INJECTOR
+	FaultInjector_InjectFaultIfSet(
+			Checkpoint,
+			DDLNotSpecified,
+			"",	// databaseName
+			""); // tableName
+#endif
 	/*
 	 * Advertise the fact that we aborted in pg_clog (assuming that we got as
 	 * far as assigning an XID to advertise).
