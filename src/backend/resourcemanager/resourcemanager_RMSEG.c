@@ -293,7 +293,7 @@ void checkAndBuildFailedTmpDirList()
 		{
 			char *failedDir = pstrdup(value->Str);
 			DRMGlobalInstance->LocalHostFailedTmpDirList =
-					&lappend(DRMGlobalInstance->LocalHostFailedTmpDirList, failedDir);
+					lappend(DRMGlobalInstance->LocalHostFailedTmpDirList, failedDir);
 		}
 	DQUEUE_LOOP_END
 
