@@ -22,7 +22,6 @@
 #include "communication/rmcomm_MessageHandler.h"
 #include "communication/rmcomm_RMSEG_RM_Protocol.h"
 #include "dynrm.h"
-#include "cdb/cdbtmpdir.h"
 #include "utils/memutilities.h"
 #include "utils/simplestring.h"
 #include "utils/linkedlist.h"
@@ -116,7 +115,7 @@ int sendIMAlive(int  *errorcode,
 	initializeSelfMaintainBuffer(&tosend, PCONTEXT);
 
 	RPCRequestHeadIMAliveData requesthead;
-	requesthead.TmpDirCount 	  = TmpDirNum;
+	requesthead.TmpDirCount 	  = getDQueueLength(&DRMGlobalInstance->LocalHostTempDirectories);
 	requesthead.TmpDirBrokenCount = DRMGlobalInstance->LocalHostStat->FailedTmpDirNum;
 	requesthead.Reserved		  = 0;
 

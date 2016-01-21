@@ -61,7 +61,7 @@ int ResManagerMainSegment2ndPhase(void)
 	 */
 	initCGroupThreads();
 
-	//InitFileAccess();
+	InitFileAccess();
 
 	/*
 	 * Notify postmaster that HAWQ RM is ready. Ignore the possible problem that
@@ -183,6 +183,12 @@ int MainHandlerLoop_RMSEG(void)
 		/* PART2. Handle all BE submitted requests. */
 		processSubmittedRequests();
 
+		if ( curtime - DRMGlobalInstance->TmpDirLastCheckTime >
+			SEGMENT_TMPDIRCHECK_INTERVAL ) {
+			checkAndBuildFailedTmpDirList();
+			DRMGlobalInstance->TmpDirLastCheckTime = gettime_microsec();
+		}
+
 		/* PART3. Fresh local host info and send IMAlive message to resource
 		 * 		  manager server.											  */
 		curtime = gettime_microsec();
@@ -191,12 +197,6 @@ int MainHandlerLoop_RMSEG(void)
 			 SEGMENT_HOSTCHECK_INTERVAL ) {
 			refreshLocalHostInstance();
 			checkLocalPostmasterStatus();
-		}
-
-		if ( curtime - DRMGlobalInstance->TmpDirLastCheckTime >
-			SEGMENT_TMPDIRCHECK_INTERVAL ) {
-			checkTmpDirStatus();
-			DRMGlobalInstance->TmpDirLastCheckTime = gettime_microsec();
 		}
 
 		if ( DRMGlobalInstance->SendIMAlive ) {
@@ -231,4 +231,71 @@ int MainHandler_RMSEGDummyLoop(void)
 	elog(RMLOG, "Dummy resource manager main event handler exits.");
 
 	return FUNC_RETURN_OK;
+}
+
+/*
+ *  Check if this temporary directory is OK to read or write.
+ *  If not, it's probably due to disk error.
+ */
+bool CheckTmpDirAvailable(char *path)
+{
+	FILE  *tmp = NULL;
+	bool  ret = true;
+	char* fname = NULL;
+	char* testfile = "/checktmpdir.log";
+
+	/* write some bytes to a file to check if
+	 * this temporary directory is OK.
+	 */
+	fname = palloc0(strlen(path) + strlen(testfile) + 1);
+	strncpy(fname, path, strlen(path));
+	strncpy(fname + strlen(path), testfile, strlen(testfile));
+	tmp = fopen(fname, "w");
+	if (tmp == NULL)
+	{
+		elog(LOG, "Can't open file:%s when check temporary directory", fname);
+		ret = false;
+		goto _exit;
+	}
+
+	if (fseek(tmp, 0, SEEK_SET) != 0)
+	{
+		elog(LOG, "Can't seek file:%s when check temporary directory", fname);
+		ret = false;
+		goto _exit;
+	}
+
+	if (strlen("test") != fwrite("test", 1, strlen("test"), tmp))
+	{
+		elog(LOG, "Can't write file:%s when check temporary directory", fname);
+		ret = false;
+		goto _exit;
+	}
+
+	_exit:
+	pfree(fname);
+	if (tmp != NULL)
+		fclose(tmp);
+	return ret;
+}
+
+/*
+ * Check the status of each temporary directory kept,
+ * set to false if it is not available.
+ */
+void checkAndBuildFailedTmpDirList()
+{
+	destroyTmpDirList(DRMGlobalInstance->LocalHostFailedTmpDirList);
+	DRMGlobalInstance->LocalHostFailedTmpDirList = NULL;
+
+	DQUEUE_LOOP_BEGIN(&DRMGlobalInstance->LocalHostTempDirectories, iter, SimpStringPtr, value)
+		if (!CheckTmpDirAvailable(value->Str))
+		{
+			char *failedDir = pstrdup(value->Str);
+			DRMGlobalInstance->LocalHostFailedTmpDirList =
+					&lappend(DRMGlobalInstance->LocalHostFailedTmpDirList, failedDir);
+		}
+	DQUEUE_LOOP_END
+
+	elog(LOG, "checkAndBuildFailedTmpDirList finish!");
 }

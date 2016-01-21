@@ -263,39 +263,40 @@ int ResManagerMain(int argc, char *argv[])
 	pqsignal(SIGTTIN, SIG_IGN);
 	pqsignal(SIGTTOU, SIG_IGN);
 
-	CurrentResourceOwner = ResourceOwnerCreate(NULL, "Resource Manager");
+	if ( DRMGlobalInstance->Role == START_RM_ROLE_MASTER ) {
+		CurrentResourceOwner = ResourceOwnerCreate(NULL, "Resource Manager");
 
-	BaseInit();
-	InitProcess();
-	InitBufferPoolBackend();
-	InitXLOGAccess();
+		BaseInit();
+		InitProcess();
+		InitBufferPoolBackend();
+		InitXLOGAccess();
 
-	SetProcessingMode(NormalProcessing);
+		SetProcessingMode(NormalProcessing);
 
-	MyDatabaseId = TemplateDbOid;
-	MyDatabaseTableSpace = DEFAULTTABLESPACE_OID;
-	if (!FindMyDatabase(probeDatabase, &MyDatabaseId, &MyDatabaseTableSpace))
-		ereport(FATAL, (errcode(ERRCODE_UNDEFINED_DATABASE),
-			errmsg("database 'postgres' does not exist")));
+		MyDatabaseId = TemplateDbOid;
+		MyDatabaseTableSpace = DEFAULTTABLESPACE_OID;
+		if (!FindMyDatabase(probeDatabase, &MyDatabaseId, &MyDatabaseTableSpace))
+			ereport(FATAL, (errcode(ERRCODE_UNDEFINED_DATABASE),
+				errmsg("database 'postgres' does not exist")));
 
-	char *fullpath = GetDatabasePath(MyDatabaseId, MyDatabaseTableSpace);
+		char *fullpath = GetDatabasePath(MyDatabaseId, MyDatabaseTableSpace);
 
-	SetDatabasePath(fullpath);
+		SetDatabasePath(fullpath);
 
-	InitProcessPhase2();
+		InitProcessPhase2();
 
-	MyBackendId = InvalidBackendId;
+		MyBackendId = InvalidBackendId;
 
-	SharedInvalBackendInit(false);
+		SharedInvalBackendInit(false);
 
-	if (MyBackendId > MaxBackends || MyBackendId <= 0)
-		elog(FATAL, "bad backend id: %d", MyBackendId);
+		if (MyBackendId > MaxBackends || MyBackendId <= 0)
+			elog(FATAL, "bad backend id: %d", MyBackendId);
 
-	InitBufferPoolBackend();
-	RelationCacheInitialize();
-	InitCatalogCache();
-	RelationCacheInitializePhase2();
-
+		InitBufferPoolBackend();
+		RelationCacheInitialize();
+		InitCatalogCache();
+		RelationCacheInitializePhase2();
+	}
 	/* END: INIT for making RM process access catalog by caql etc.            */
 	/**************************************************************************/
 	PG_SETMASK(&UnBlockSig);
@@ -821,6 +822,7 @@ int initializeDRMInstance(MCTYPE context)
 	
     initializeDQueue(&(DRMGlobalInstance->LocalHostTempDirectories),   context);
     DRMGlobalInstance->NextLocalHostTempDirIdx = -1;
+    DRMGlobalInstance->LocalHostFailedTmpDirList = NULL;
 
     HASHCTL ctl;
     ctl.keysize                                 = sizeof(TmpDirKey);
@@ -1066,6 +1068,8 @@ int  loadDynamicResourceManagerConfigure(void)
 	DQUEUE_LOOP_BEGIN(&DRMGlobalInstance->LocalHostTempDirectories, iter, SimpStringPtr, value)
 		elog(LOG, "HAWQ Segment RM :: Temporary directory %s", value->Str);
 	DQUEUE_LOOP_END
+
+	checkAndBuildFailedTmpDirList();
 
 	/****** Resource enforcement GUCs begins ******/
 

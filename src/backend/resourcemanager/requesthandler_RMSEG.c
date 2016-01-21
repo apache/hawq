@@ -72,15 +72,15 @@ int refreshLocalHostInstance(void)
 	DQUEUE_LOOP_END
 
 	/* Get a list of failed temporary directory */
-	List* failedTmpDir = getFailedTmpDirList();
-	uint16_t failedTmpDirNum = list_length(failedTmpDir);
+	uint16_t failedTmpDirNum =
+								list_length(&DRMGlobalInstance->LocalHostFailedTmpDirList);
 	if (failedTmpDirNum > 0)
 	{
 		SelfMaintainBufferData buf;
 		initializeSelfMaintainBuffer(&buf, PCONTEXT);
 		uint16_t idx = 0;
 		ListCell *lc = NULL;
-		foreach(lc, failedTmpDir)
+		foreach(lc, &DRMGlobalInstance->LocalHostFailedTmpDirList)
 		{
 			elog(LOG, "Get a failed temporary directory list for IMAlive message: %s",
 					  (char *)lfirst(lc));
@@ -281,7 +281,6 @@ int refreshLocalHostInstance(void)
 	DQUEUE_LOOP_END
 	removeAllDQueueNodes(&addresses);
 	cleanDQueue(&addresses);
-	destroyTmpDirList(failedTmpDir);
 	freeSimpleStringContent(&failedTmpDirStr);
 
 	return FUNC_RETURN_OK;
