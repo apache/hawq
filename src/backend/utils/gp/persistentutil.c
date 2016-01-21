@@ -212,7 +212,7 @@ Datum
 gp_update_global_sequence_entry(PG_FUNCTION_ARGS)
 {
 	ItemPointer			tid;
-	int8				sequenceVal;
+	int64				sequenceVal;
 	GpGlobalSequence    sequence;
 
 	/* Must be super user */
