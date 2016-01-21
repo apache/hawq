@@ -280,8 +280,8 @@ bool CheckTmpDirAvailable(char *path)
 }
 
 /*
- * Check the status of each temporary directory kept,
- * set to false if it is not available.
+ * Check the status of each temporary directory,
+ * and build a list of failed temporary directories.
  */
 void checkAndBuildFailedTmpDirList()
 {
