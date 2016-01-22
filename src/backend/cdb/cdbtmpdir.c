@@ -75,8 +75,8 @@ void getLocalTmpDirFromMasterConfig(int session_id)
     if (tmpdirs != NULL )
     {
         LocalTempPath = pstrdup((char *)lfirst(list_nth_cell(tmpdirs, gp_session_id % list_length(tmpdirs))));
+        destroyTmpDirList(tmpdirs);
     }
-    destroyTmpDirList(tmpdirs);
 }
 
 void getLocalTmpDirFromSegmentConfig(int session_id, int command_id, int qeidx)
@@ -97,8 +97,8 @@ void getLocalTmpDirFromSegmentConfig(int session_id, int command_id, int qeidx)
         if (tmpdirs != NULL )
         {
             LocalTempPath = pstrdup((char *)lfirst(list_nth_cell(tmpdirs, key % list_length(tmpdirs))));
+            destroyTmpDirList(tmpdirs);
         }
-        destroyTmpDirList(tmpdirs);
     }
 }
 
