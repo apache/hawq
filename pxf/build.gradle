@@ -17,6 +17,8 @@
  * under the License.
  */
 
+import org.apache.tools.ant.filters.ReplaceTokens
+
 buildscript {
     repositories {
         // mavenCentral without https:
@@ -122,6 +124,47 @@ subprojects { subProject ->
 }
 
 project('pxf-service') {
+
+// Copy existing sources and replace any occurrences of @tokenName@ with desired values
+    task generateSources {
+        doFirst {
+            copy {
+                from('src/main/java') {
+                    include '**/*.java'
+                    filter(ReplaceTokens,
+                        tokens:['pxfProtocolVersion': project.pxfProtocolVersion ])}
+                into "tmp/generatedSources"
+            }
+        }
+    }
+
+// Call cleanup taskAfter Java code compilation
+    compileJava.doLast {
+        tasks.cleanGeneratedSources.execute()
+    }
+
+// Delete "tmp" directory under current project directory
+// rm -r pxf-service/tmp
+    task cleanGeneratedSources() {
+        doFirst {
+            delete "tmp"
+        }
+    }
+
+// Call generateSources task before Java compilation
+    gradle.projectsEvaluated {
+        compileJava.dependsOn(generateSources)
+    }
+
+// Use custom sources directory with generated sources
+    sourceSets {
+        main {
+            java {
+                srcDirs = ["tmp/generatedSources"]
+            }
+        }
+    }
+
     apply plugin: 'war'
     tasks.war {
         archiveName = 'pxf.war'
@@ -137,7 +180,6 @@ project('pxf-service') {
             }
         }
     }
-
     dependencies {
         compile(project(':pxf-api'))
         compile 'com.sun.jersey:jersey-core:1.9'
