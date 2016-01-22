@@ -118,6 +118,7 @@ int sendIMAlive(int  *errorcode,
 	requesthead.TmpDirCount 	  = getDQueueLength(&DRMGlobalInstance->LocalHostTempDirectories);
 	requesthead.TmpDirBrokenCount = DRMGlobalInstance->LocalHostStat->FailedTmpDirNum;
 	requesthead.Reserved		  = 0;
+	requesthead.RMStartTimestamp  = DRMGlobalInstance->ResourceManagerStartTime;
 
 	appendSMBVar(&tosend, requesthead);
 	appendSelfMaintainBuffer(&tosend,

@@ -893,6 +893,28 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 	else {
 		segresource = getSegResource(segid);
 		Assert(segresource != NULL);
+		uint8_t oldStatus = segresource->Stat->FTSAvailable;
+		bool statusChanged = oldStatus != segstat->FTSAvailable;
+
+		/* Check if RM process is restarted in this segment */
+		if (segresource->Stat->RMStartTimestamp != segstat->RMStartTimestamp)
+		{
+			/*
+			 * This segment's RM process has restarted,
+			 * we should clean up old status, so mark it down.
+			 */
+			if (oldStatus == RESOURCE_SEG_STATUS_AVAILABLE && !statusChanged)
+			{
+				segstat->FTSAvailable = RESOURCE_SEG_STATUS_UNAVAILABLE;
+				statusChanged = true;
+			}
+			segresource->Stat->RMStartTimestamp = segstat->RMStartTimestamp;
+			elog(LOG, "Master RM finds segment:%s 's RM process has restarted. "
+					  "old status:%d, new status:%d",
+					  GET_SEGRESOURCE_HOSTNAME(segresource),
+					  oldStatus,
+					  segstat->FTSAvailable);
+		}
 
 		/* Check if temporary directory path is changed */
 		bool tmpDirChanged = false;
@@ -921,8 +943,6 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		 * Either the FTSAvailable or the failed temporary directory
 		 * of this segment is changed.
 		 */
-		uint8_t oldStatus = segresource->Stat->FTSAvailable;
-		bool statusChanged = oldStatus != segstat->FTSAvailable;
 		if (statusChanged || tmpDirChanged)
 		{
 			if (statusChanged && !tmpDirChanged)
@@ -1089,6 +1109,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		segresource->LastUpdateTime = gettime_microsec();
 		res = RESOURCEPOOL_DUPLICATE_HOST;
 	}
+
 
 	/*
 	 * If host capacity is changed, update the cluster level memory/core ratio.

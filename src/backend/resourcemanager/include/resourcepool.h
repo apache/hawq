@@ -151,6 +151,7 @@ struct SegStatData {
 	uint32_t		FTSTotalCore;			/* FTS reports core capacity.	  */
 	uint32_t		GRMTotalMemoryMB;		/* GRM reports memory capacity.	  */
 	uint32_t		GRMTotalCore;			/* GRM reports core capacity. 	  */
+	uint64_t		RMStartTimestamp;		/* RM process reset timestamp */
 	SegInfoData		Info;					/* 64-bit aligned.				  */
 };
 
