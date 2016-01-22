@@ -174,7 +174,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
             size = add_size(size, MetadataCache_ShmemSize());
             elog(LOG, "Metadata Cache Share Memory Size : %lu", MetadataCache_ShmemSize());
         }
-        size = add_size(size, TmpDirInfoArrayShmemSize());
+
 		
 #ifdef FAULT_INJECTOR
 		size = add_size(size, FaultInjector_ShmemSize());
@@ -295,7 +295,6 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
     {
         MetadataCache_ShmemInit();
     }
-    TmpDirInfoArrayShmemInit();
 
 	if (!IsUnderPostmaster)
 	{

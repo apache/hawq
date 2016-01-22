@@ -120,7 +120,7 @@ bool handleRMRequestQuotaControl(void **arg);
 
 int refreshLocalHostInstance(void);
 void checkLocalPostmasterStatus(void);
-void checkTmpDirStatus(void);
+
 /*-----------------------------------------------------------------------------
  * Dynamic resource manager overall APIs
  *----------------------------------------------------------------------------*/
@@ -208,10 +208,11 @@ struct DynRMGlobalData{
     /*------------------------------------------------------------------------*/
     SegStat 				 LocalHostStat;
     
-    DQueueData				 LocalHostTempDirectoriesForQD;      
+    DQueueData				 LocalHostTempDirectoriesForQD;
     int                      NextLocalHostTempDirIdxForQD;
     
     DQueueData				 LocalHostTempDirectories;
+    List*                    LocalHostFailedTmpDirList;
     int                      NextLocalHostTempDirIdx;
     HTAB                     *LocalTmpDirTable;
     int                      TmpDirTableCapacity;
