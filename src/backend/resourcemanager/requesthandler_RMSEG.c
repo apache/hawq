@@ -73,14 +73,14 @@ int refreshLocalHostInstance(void)
 
 	/* Get a list of failed temporary directory */
 	uint16_t failedTmpDirNum =
-								list_length(&DRMGlobalInstance->LocalHostFailedTmpDirList);
+								list_length(DRMGlobalInstance->LocalHostFailedTmpDirList);
 	if (failedTmpDirNum > 0)
 	{
 		SelfMaintainBufferData buf;
 		initializeSelfMaintainBuffer(&buf, PCONTEXT);
 		uint16_t idx = 0;
 		ListCell *lc = NULL;
-		foreach(lc, &DRMGlobalInstance->LocalHostFailedTmpDirList)
+		foreach(lc, DRMGlobalInstance->LocalHostFailedTmpDirList)
 		{
 			elog(LOG, "Get a failed temporary directory list for IMAlive message: %s",
 					  (char *)lfirst(lc));
