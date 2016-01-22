@@ -160,6 +160,7 @@ int MainHandlerLoop_RMSEG(void)
 	int			errorcode = FUNC_RETURN_OK;
 	char		errorbuf[1024];
 
+	DRMGlobalInstance->ResourceManagerStartTime = gettime_microsec();
 	while( DRMGlobalInstance->ResManagerMainKeepRun ) {
 
 		if (!PostmasterIsAlive(true)) {
