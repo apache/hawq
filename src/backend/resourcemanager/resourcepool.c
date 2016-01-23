@@ -954,12 +954,12 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 											SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN);
 				}
 
+				setSegResHAWQAvailability(segresource, segstat->FTSAvailable);
 				/*
 				 * Segment is set from up to down, return resource.
 				 */
 				if (oldStatus == RESOURCE_SEG_STATUS_AVAILABLE)
 				{
-					/* The segment is up again, its capacity should be considered again. */
 					*capstatchanged = true;
 					returnAllGRMResourceFromSegment(segresource);
 				}
