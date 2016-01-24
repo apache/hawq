@@ -94,6 +94,9 @@ bool isCleanGRMResourceStatus(void);
 
 void RB_clearResource(List **ctnl);
 
+void RB_freePreferedHostsForGRMContainers(void);
+void RB_updateSegmentsHavingNoExpectedGRMContainers(HASHTABLE segments);
+
 /* Error message */
 extern bool				ResourceManagerIsForked;
 #endif /* HAWQ_RESOURCE_MANAGER_RESOURCE_BROKER_API_H */

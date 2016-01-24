@@ -567,6 +567,8 @@ int MainHandlerLoop(void)
 			/* Refresh resource queue resource usage and request quota. */
 			refreshMemoryCoreRatioLevelUsage(gettime_microsec());
 
+			resetAllSegmentsGRMContainerFailAllocCount();
+
 			/* Check if can resume using new available global resource manager.*/
 			if ( cleanedAllGRMContainers() )
 			{
@@ -2268,15 +2270,6 @@ int generateAllocRequestToBroker(void)
 							reqcore);
 			}
 		}
-
-		/* Free preferred host list. */
-		foreach(cell, preferred)
-		{
-			PAIR pair = (PAIR)lfirst(cell);
-			rm_pfree(PCONTEXT, pair->Value);
-			rm_pfree(PCONTEXT, pair);
-		}
-		list_free(preferred);
 	}
 
 	return res;
