@@ -263,7 +263,7 @@ void RB_updateSegmentsHavingNoExpectedGRMContainers(HASHTABLE segments)
 			segres->GRMContainerFailAllocCount++;
 
 			elog(WARNING, "Resource manager detects segment %s hasn't gotten "
-						  "expected global quantity of resource containers for "
+						  "expected quantity of global resource containers for "
 						  "%d times.",
 						  GET_SEGRESOURCE_HOSTNAME(segres),
 						  segres->GRMContainerFailAllocCount);
