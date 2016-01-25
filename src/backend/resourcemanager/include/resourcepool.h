@@ -281,6 +281,7 @@ struct SegResourceData {
 
 	/* Total GRM container size. */
 	int				GRMContainerCount;
+	int				GRMContainerFailAllocCount;
 
 	/*
 	 * When resource manager has resource allocated from resource broker, the
@@ -632,6 +633,8 @@ int getOrderedResourceAvailTreeIndexByRatio(uint32_t ratio, BBST *tree);
 int getOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree);
 
 void setAllSegResourceGRMUnavailable(void);
+
+void resetAllSegmentsGRMContainerFailAllocCount(void);
 
 struct RB_GRMContainerStatData
 {

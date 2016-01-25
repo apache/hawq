@@ -33,6 +33,8 @@ int handleRB2RM_AllocatedResource(void);
 int handleRB2RM_ReturnedResource(void);
 int handleRB2RM_ContainerReport(void);
 void buildToReturnNotTrackedGRMContainers(RB_GRMContainerStat ctnstats, int size);
+
+void freeResourceBundle(void *resbundle);
 /*
  *------------------------------------------------------------------------------
  * Global variables.
@@ -787,7 +789,7 @@ int handleRB2RM_AllocatedResource(void)
 			return RESBROK_PIPE_ERROR;
 		}
 
-		/* Build result and add into the resource pool. */
+		/* Build result and add into the resource pool as a pending container. */
 		char *phostname     = buffer;
 		for ( int i = 0 ; i < response.ContainerCount ; ++i )
 		{
@@ -815,13 +817,10 @@ int handleRB2RM_AllocatedResource(void)
 	/* We always update resource broker work time stamp here. */
 	DRMGlobalInstance->ResBrokerAppTimeStamp = response.SystemStartTimestamp;
 
-	while( list_length(newcontainers) > 0 )
+	ListCell *cell = NULL;
+	foreach(cell, newcontainers)
 	{
-		GRMContainer newcontainer = (GRMContainer)
-									lfirst(list_head(newcontainers));
-		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-		newcontainers = list_delete_first(newcontainers);
-		MEMORY_CONTEXT_SWITCH_BACK
+		GRMContainer newcontainer = (GRMContainer)lfirst(cell);
 
 		if ( isCleanGRMResourceStatus() )
 		{
@@ -853,13 +852,77 @@ int handleRB2RM_AllocatedResource(void)
 		response.Core     * (response.ExpectedContainerCount - acceptedcount),
 		response.Result == FUNC_RETURN_OK);
 
-	elog(LOG, "Accepted (%d MB, %d CORE) x %d from resource broker, "
-			  "Expected %d containers, skipped %d containers.",
+	elog(LOG, "Resource manager accepted YARN containers (%d MB, %d CORE) x %d "
+			  "from resource broker, expected %d containers, skipped %d containers.",
 			  response.MemoryMB,
 			  response.Core,
 			  acceptedcount,
 			  response.ExpectedContainerCount,
 			  response.ContainerCount - acceptedcount);
+
+	/*
+	 * Buildup hash table for updating each segment if it can not have expected
+	 * resources allocated.
+	 */
+	HASHTABLEData	seghavingres;
+
+	initializeHASHTABLE(&seghavingres,
+						PCONTEXT,
+						HASHTABLE_SLOT_VOLUME_DEFAULT,
+						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
+						HASHTABLE_KEYTYPE_VOIDPT,
+						freeResourceBundle);
+
+	while( list_length(newcontainers) > 0 )
+	{
+		GRMContainer newcontainer = (GRMContainer)
+									lfirst(list_head(newcontainers));
+		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+		newcontainers = list_delete_first(newcontainers);
+		MEMORY_CONTEXT_SWITCH_BACK
+
+		if ( isCleanGRMResourceStatus() )
+		{
+			continue;
+		}
+
+		int32_t segid = -1;
+		int res = getSegIDByGRMHostName(newcontainer->HostName,
+										strlen(newcontainer->HostName),
+										&segid);
+		if ( res != FUNC_RETURN_OK )
+		{
+			elog(WARNING, "Resource manager finds not recognized YARN "
+						  "container on host %s, container id is "INT64_FORMAT,
+						  newcontainer->HostName,
+						  newcontainer->ID);
+			continue;
+		}
+
+		SegResource 	segres	   = getSegResource(segid);
+		PAIR			oldsegpair = getHASHTABLENode(&seghavingres, segres);
+		ResourceBundle	resbundle  = NULL;
+		if ( oldsegpair != NULL )
+		{
+			resbundle = (ResourceBundle)(oldsegpair->Value);
+		}
+		else
+		{
+			resbundle = rm_palloc0(PCONTEXT, sizeof(ResourceBundleData));
+			resbundle->MemoryMB = 0;
+			resbundle->Core     = 0;
+			setHASHTABLENode(&seghavingres, segres, resbundle, false);
+		}
+		addResourceBundleData(resbundle,
+							  newcontainer->MemoryMB,
+							  newcontainer->Core);
+	}
+
+	if ( !isCleanGRMResourceStatus() )
+	{
+		RB_updateSegmentsHavingNoExpectedGRMContainers(&seghavingres);
+	}
+	cleanHASHTABLE(&seghavingres);
 
 	if ( containerids != NULL )
 	{
@@ -870,6 +933,11 @@ int handleRB2RM_AllocatedResource(void)
     	rm_pfree(PCONTEXT, buffer);
     }
 	return response.Result;
+}
+
+void freeResourceBundle(void *resbundle)
+{
+	rm_pfree(PCONTEXT, resbundle);
 }
 
 int handleRB2RM_ReturnedResource(void)

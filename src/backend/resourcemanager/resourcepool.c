@@ -1311,6 +1311,20 @@ void setAllSegResourceGRMUnavailable(void)
 	freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
 }
 
+void resetAllSegmentsGRMContainerFailAllocCount(void)
+{
+	List 	 *allsegres = NULL;
+	ListCell *cell		= NULL;
+	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &allsegres);
+
+	foreach(cell, allsegres)
+	{
+		SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
+		segres->GRMContainerFailAllocCount = 0;
+	}
+	freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
+}
+
 /*
  * Check index to get host id based on host name string.
  */
@@ -1379,8 +1393,8 @@ SegResource createSegResource(SegStat segstat)
 	resetResourceBundleData(&(res->DecPending), 0, 0.0, 0);
 	resetResourceBundleData(&(res->OldInuse)  , 0, 0.0, 0);
 
-	res->GRMContainerCount = 0;
-
+	res->GRMContainerCount 			= 0;
+	res->GRMContainerFailAllocCount	= 0;
 	return res;
 }
 
