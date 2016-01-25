@@ -896,7 +896,14 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		uint8_t oldStatus = segresource->Stat->FTSAvailable;
 		bool statusChanged = oldStatus != segstat->FTSAvailable;
 
-		/* Check if RM process is restarted in this segment */
+		/*
+		 * Check if RM process is restarted in this segment.
+		 * If the latest reported RM process startup timestamp doesn't
+		 * match the previous, master RM consider segment's RM process
+		 * has restarted.
+		 * In rare case, the system's time is reset and segment's RM process
+		 * happen to get a same timestamp with previous one.
+		 */
 		if (segresource->Stat->RMStartTimestamp != segstat->RMStartTimestamp)
 		{
 			/*
