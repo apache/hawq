@@ -522,7 +522,7 @@ int LibYarnClient::allocateResources(string &jobId,
 			if (allocatedNumOnce <= 0) {
 				LOG(WARNING, "LibYarnClient:: fail to allocate from YARN RM, try again");
 				retry--;
-				if(retry == 0) {
+				if(retry == 0 && allocatedNumTotal == 0) {
 					/* If failed, just return to Resource Broker to handle*/
 					pthread_mutex_unlock(&heartbeatLock);
 					LOG(WARNING,"LibYarnClient:: fail to allocate from YARN RM after retry several times");
