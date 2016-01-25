@@ -162,7 +162,7 @@ int refreshLocalHostInstance(void)
 			if (strcmp(GET_SEGINFO_FAILEDTMPDIR(info), failedTmpDirStr.Str) != 0)
 			{
 				elog(LOG, "Segment resource manager finds failed temporary directory change "
-						  "from %s to %s", GET_SEGINFO_FAILEDTMPDIR(info), failedTmpDirStr.Str);
+						  "from '%s' to '%s'", GET_SEGINFO_FAILEDTMPDIR(info), failedTmpDirStr.Str);
 				shouldupdate = true;
 			}
 		}

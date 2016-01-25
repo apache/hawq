@@ -747,12 +747,13 @@ bool handleRMSEGRequestIMAlive(void **arg)
 
 	destroySelfMaintainBuffer(&newseginfo);
 
-	newsegstat->ID 				= SEGSTAT_ID_INVALID;
-	newsegstat->GRMAvailable 	= RESOURCE_SEG_STATUS_UNSET;
+	newsegstat->ID 				 = SEGSTAT_ID_INVALID;
+	newsegstat->GRMAvailable 	 = RESOURCE_SEG_STATUS_UNSET;
 
 	RPCRequestHeadIMAlive header = SMBUFF_HEAD(RPCRequestHeadIMAlive,
 												&(conntrack->MessageBuff));
-	newsegstat->FailedTmpDirNum = header->TmpDirBrokenCount;
+	newsegstat->FailedTmpDirNum  = header->TmpDirBrokenCount;
+	newsegstat->RMStartTimestamp = header->RMStartTimestamp;
 
 	/*
 	 * Check if the there is any failed temporary directory on this segment.

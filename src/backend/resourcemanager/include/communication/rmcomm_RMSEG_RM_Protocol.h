@@ -46,6 +46,7 @@ RPC_PROTOCOL_STRUCT_BEGIN(RPCRequestHeadIMAlive)
 	uint16_t	TmpDirCount;
 	uint16_t	TmpDirBrokenCount;
 	uint32_t	Reserved;
+	uint64_t	RMStartTimestamp;
 RPC_PROTOCOL_STRUCT_END(RPCRequestHeadIMAlive)
 
 RPC_PROTOCOL_STRUCT_BEGIN(RPCResponseIMAlive)
