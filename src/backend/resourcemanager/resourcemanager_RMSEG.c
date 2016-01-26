@@ -150,9 +150,7 @@ int  initializeSocketServer_RMSEG(void)
 	return res;
 
 }
-#define SEGMENT_HEARTBEAT_INTERVAL (3LL * 1000000LL)
-#define SEGMENT_HOSTCHECK_INTERVAL (5LL * 1000000LL)
-#define SEGMENT_TMPDIRCHECK_INTERVAL (5 * 60LL * 1000000LL)
+
 int MainHandlerLoop_RMSEG(void)
 {
 	int 		res 	  = FUNC_RETURN_OK;
@@ -185,7 +183,8 @@ int MainHandlerLoop_RMSEG(void)
 		processSubmittedRequests();
 
 		if ( curtime - DRMGlobalInstance->TmpDirLastCheckTime >
-			SEGMENT_TMPDIRCHECK_INTERVAL ) {
+			1000000LL * rm_segment_tmpdir_detect_interval )
+		{
 			checkAndBuildFailedTmpDirList();
 			DRMGlobalInstance->TmpDirLastCheckTime = gettime_microsec();
 		}
@@ -195,15 +194,18 @@ int MainHandlerLoop_RMSEG(void)
 		curtime = gettime_microsec();
 		if ( DRMGlobalInstance->LocalHostStat == NULL ||
 			 curtime - DRMGlobalInstance->LocalHostLastUpdateTime >
-			 SEGMENT_HOSTCHECK_INTERVAL ) {
+			 1000000LL * rm_segment_config_refresh_interval )
+		{
 			refreshLocalHostInstance();
 			checkLocalPostmasterStatus();
 		}
 
-		if ( DRMGlobalInstance->SendIMAlive ) {
+		if ( DRMGlobalInstance->SendIMAlive )
+		{
 			 if (DRMGlobalInstance->LocalHostStat != NULL &&
 			     curtime - DRMGlobalInstance->HeartBeatLastSentTime >
-			     SEGMENT_HEARTBEAT_INTERVAL ) {
+				 1000000LL * rm_segment_heartbeat_interval )
+			 {
 				 sendIMAlive(&errorcode, errorbuf, sizeof(errorbuf));
 				 DRMGlobalInstance->HeartBeatLastSentTime = gettime_microsec();
 			 }
@@ -284,8 +286,9 @@ bool CheckTmpDirAvailable(char *path)
  * Check the status of each temporary directory,
  * and build a list of failed temporary directories.
  */
-void checkAndBuildFailedTmpDirList()
+void checkAndBuildFailedTmpDirList(void)
 {
+	uint64_t starttime = gettime_microsec();
 	destroyTmpDirList(DRMGlobalInstance->LocalHostFailedTmpDirList);
 	DRMGlobalInstance->LocalHostFailedTmpDirList = NULL;
 
@@ -297,6 +300,8 @@ void checkAndBuildFailedTmpDirList()
 					lappend(DRMGlobalInstance->LocalHostFailedTmpDirList, failedDir);
 		}
 	DQUEUE_LOOP_END
-
-	elog(LOG, "checkAndBuildFailedTmpDirList finish!");
+	uint64_t endtime = gettime_microsec();
+	elog(LOG, "checkAndBuildFailedTmpDirList finished checking temporary "
+			  "directory, which costs " UINT64_FORMAT " us",
+			  endtime - starttime);
 }

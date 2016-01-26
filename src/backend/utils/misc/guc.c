@@ -6393,6 +6393,16 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"hawq_rm_segment_heartbeat_timeout", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("timeout for setting one segment down that having no heart-beat "
+						 "successfully received by resource manager."),
+			NULL
+		},
+		&rm_segment_heartbeat_timeout,
+		300, 1, 65535, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_session_lease_heartbeat_interval", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("interval for sending heart-beat to resource manager to keep "
 						 "resource context alive."),
@@ -6410,6 +6420,34 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&rm_request_timeoutcheck_interval,
 		1, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_segment_heartbeat_interval", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("interval for sending heart-beat to resource manager to keep "
+						 "segment alive and to present latest segment status."),
+			NULL
+		},
+		&rm_segment_heartbeat_interval,
+		30, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_segment_tmpdir_detect_interval", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("interval for detecting segment local temporary directories."),
+			NULL
+		},
+		&rm_segment_tmpdir_detect_interval,
+		300, 60, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_segment_config_refresh_interval", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("interval for refreshing segment local host config."),
+			NULL
+		},
+		&rm_segment_config_refresh_interval,
+		30, 5, 65535, NULL, NULL
 	},
 
 	{

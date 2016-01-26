@@ -337,4 +337,5 @@ int  initializeSocketServer_RMSEG(void);
 int  MainHandlerLoop_RMSEG(void);
 int  MainHandler_RMSEGDummyLoop(void);
 
+void checkAndBuildFailedTmpDirList(void);
 #endif //DYNAMIC_RESOURCE_MANAGEMENT_H
