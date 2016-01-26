@@ -613,7 +613,8 @@ int MainHandlerLoop(void)
         uint64_t curtime = gettime_microsec();
 		if ((rm_resourcepool_test_filename == NULL ||
 			rm_resourcepool_test_filename[0] == '\0') &&
-			(curtime - PRESPOOL->LastCheckTime > 10LL * SEGMENT_HEARTBEAT_INTERVAL))
+			(curtime - PRESPOOL->LastCheckTime >
+        	 1000000LL * rm_segment_heartbeat_timeout))
 		{
 			updateStatusOfAllNodes();
 			PRESPOOL->LastCheckTime = curtime;
@@ -2605,17 +2606,21 @@ void sendResponseToClients(void)
  * Check and set the nodes down that are not updated by IMAlive heart-beat for a
  * long time.
  */
-void updateStatusOfAllNodes() {
+void updateStatusOfAllNodes()
+{
 	SegResource node = NULL;
 	uint64_t curtime = 0;
 
 	bool changedstatus = false;
 	curtime = gettime_microsec();
-	for(uint32_t idx = 0; idx < PRESPOOL->SegmentIDCounter; idx++) {
+	for(uint32_t idx = 0; idx < PRESPOOL->SegmentIDCounter; idx++)
+	{
 	    node = getSegResource(idx);
         if (node != NULL &&
-            curtime - node->LastUpdateTime > 10LL * SEGMENT_HEARTBEAT_INTERVAL &&
-			IS_SEGSTAT_FTSAVAILABLE(node->Stat) ) {
+            (curtime - node->LastUpdateTime >
+			 1000000LL * rm_segment_heartbeat_timeout) &&
+			IS_SEGSTAT_FTSAVAILABLE(node->Stat) )
+        {
         	/*
         	 * This call makes resource manager able to adjust queue and mem/core
         	 * trackers' capacity.

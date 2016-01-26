@@ -713,6 +713,7 @@ int registerAsyncConnectionFileDesc(const char				*sockpath,
 				   fd,
 				   errno);
 		 close(fd);
+		 res = UTIL_NETWORK_FAIL_CONNECT;
 	}
 
 exit:

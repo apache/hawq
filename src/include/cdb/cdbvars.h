@@ -1183,8 +1183,13 @@ extern bool    rm_session_lease_heartbeat_enable;
 
 extern int 	   rm_resource_allocation_timeout;
 extern int	   rm_resource_timeout;
+extern int	   rm_segment_heartbeat_timeout;
 extern int	   rm_request_timeoutcheck_interval;
 extern int	   rm_session_lease_heartbeat_interval;
+extern int	   rm_segment_heartbeat_interval;
+extern int	   rm_segment_config_refresh_interval;
+extern int	   rm_segment_tmpdir_detect_interval;
+
 extern int	   rm_nocluster_timeout;
 extern int	   rm_tolerate_nseg_limit;
 extern int	   rm_rejectrequest_nseg_limit;

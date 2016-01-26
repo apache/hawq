@@ -346,7 +346,21 @@ int		rm_session_lease_heartbeat_interval;/* How many seconds to wait before
 int		rm_nocluster_timeout;				/* How many seconds to wait before
 											   getting enough number of available
 											   segments registered. */
-
+int		rm_segment_heartbeat_interval;		/* How many seconds to wait before
+											   sending another heart-beat to
+											   from a segment to resource
+											   manager. */
+int		rm_segment_heartbeat_timeout;		/* How many seconds to wait before
+											   setting down a segment that does
+											   not have heart-beat sent
+											   successfully to resource
+											   manager. */
+int		rm_segment_config_refresh_interval; /* How many seconds to wait before
+ 	 	 	 	 	 	 	 	 	 	 	   another refreshing local segment
+ 	 	 	 	 	 	 	 	 	 	 	   configuration. */
+int		rm_segment_tmpdir_detect_interval;	/* How many seconds to wait before
+											   another detecting local temporary
+											   directories. */
 int		rm_tolerate_nseg_limit;
 int		rm_rejectrequest_nseg_limit;
 int		rm_nvseg_variance_among_seg_limit;
