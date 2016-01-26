@@ -2142,8 +2142,10 @@ int registerConnectionByUserID(ConnectionTrack  conntrack,
 
 	transformConnectionTrackProgress(conntrack, CONN_PP_REGISTER_DONE);
 
-	elog(LOG, "ConnID %d. Connection is registered.", conntrack->ConnID);
-
+	elog(DEBUG3, "Resource queue %s has %d connections after registering "
+				 "connection.",
+				 queuetrack->QueueInfo->Name,
+				 queuetrack->CurConnCounter);
 exit:
 	if ( res != FUNC_RETURN_OK )
 	{
@@ -2170,6 +2172,11 @@ void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout)
 		transformConnectionTrackProgress(conntrack, CONN_PP_TIMEOUT_FAIL);
 	}
 
+	elog(DEBUG3, "Resource queue %s has %d connections before returning "
+				 "connection ConnID %d.",
+				 track->QueueInfo->Name,
+				 track->CurConnCounter,
+				 conntrack->ConnID);
 	track->CurConnCounter--;
 	if ( track->CurConnCounter == 0 )
 	{
@@ -2215,6 +2222,9 @@ int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
 {
 	int						res			= FUNC_RETURN_OK;
 	DynResourceQueueTrack	queuetrack	= conntrack->QueueTrack;
+
+	elog(LOG, "ConnID %d. Expect query resource for session "INT64_FORMAT,
+			  conntrack->SessionID);
 
 	/* Call quota logic to make decision of resource for current query. */
 	res = computeQueryQuota(conntrack, errorbuf, errorbufsize);
@@ -4597,6 +4607,13 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 
 			/* Recycle connection track instance. */
 			Assert(track->CurConnCounter > 0);
+
+			elog(DEBUG3, "Resource queue %s has %d connections before removing "
+						 "deadlocked connection ConnID %d.",
+						 track->QueueInfo->Name,
+						 track->CurConnCounter,
+						 canceltrack->ConnID);
+
 			track->CurConnCounter--;
 			if ( track->CurConnCounter == 0 )
 			{
@@ -5543,6 +5560,14 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
 
 				/* Recycle connection track instance. */
 				Assert(quetrack->CurConnCounter > 0);
+
+				elog(DEBUG3, "Resource queue %s has %d connections before handling "
+							 "deadlocked connection ConnID %d detected from a "
+							 "shadow.",
+							 quetrack->QueueInfo->Name,
+							 quetrack->CurConnCounter,
+							 conn->ConnID);
+
 				quetrack->CurConnCounter--;
 				if ( quetrack->CurConnCounter == 0 )
 				{
