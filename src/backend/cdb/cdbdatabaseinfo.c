@@ -1037,7 +1037,7 @@ DatabaseInfo_HandleAppendOnly(
 		if (dbInfoRel == NULL)
 			break;
 	
-		if (dbInfoRel->relstorage == RELSTORAGE_AOROWS)
+		if (dbInfoRel->relstorage == RELSTORAGE_AOROWS || dbInfoRel->relstorage == RELSTORAGE_PARQUET)
 		{
 			AppendOnlyEntry 	*aoEntry;
 			DbInfoRel 			*aosegDbInfoRel;
@@ -1076,38 +1076,35 @@ DatabaseInfo_HandleAppendOnly(
 												aoEntry->segrelid);
 			Assert(aosegDbInfoRel != NULL);
 
-			if (dbInfoRel->relstorage == RELSTORAGE_AOROWS)
+			FileSegInfo **aoSegfileArray;
+			int totalAoSegFiles;
+
+			Relation pg_aoseg_rel;
+
+			pg_aoseg_rel =
+					DirectOpen_PgAoSegOpenDynamic(
+										aoEntry->segrelid,
+										MyDatabaseTableSpace,
+										info->database,
+										aosegDbInfoRel->relfilenodeOid);
+
+			aoSegfileArray =
+					GetAllFileSegInfo_pg_aoseg_rel(
+											dbInfoRel->relname,
+											aoEntry,
+											pg_aoseg_rel,
+											SnapshotNow,
+											-1,
+											&totalAoSegFiles);
+			for (i = 0; i < totalAoSegFiles; i++)
 			{
-				FileSegInfo **aoSegfileArray;
-				int totalAoSegFiles;
+				DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
+														dbInfoRel,
+														aoSegfileArray[i]->segno,
+														aoSegfileArray[i]->eof);
+			}
 
-				Relation pg_aoseg_rel;
-
-				pg_aoseg_rel = 
-						DirectOpen_PgAoSegOpenDynamic(
-											aoEntry->segrelid,
-											MyDatabaseTableSpace,
-											info->database,
-											aosegDbInfoRel->relfilenodeOid);
-				
-				aoSegfileArray = 
-						GetAllFileSegInfo_pg_aoseg_rel(
-												dbInfoRel->relname, 
-												aoEntry,
-												pg_aoseg_rel,
-												SnapshotNow, 
-                                                -1,
-												&totalAoSegFiles);
-				for (i = 0; i < totalAoSegFiles; i++)
-				{
-					DatabaseInfo_AddAppendOnlyCatalogSegmentInfo(
-															dbInfoRel,
-															aoSegfileArray[i]->segno,
-															aoSegfileArray[i]->eof);
-				}
-
-				DirectOpen_PgAoSegClose(pg_aoseg_rel);
-			}			
+			DirectOpen_PgAoSegClose(pg_aoseg_rel);
 		}
 	}
 }
