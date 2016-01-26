@@ -244,6 +244,7 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 					  GET_SEGRESOURCE_HOSTNAME(segres));
 
 			refreshResourceQueueCapacity(false);
+			refreshActualMinGRMContainerPerSeg();
 		}
 		else {
 			elog(DEBUG3, "Resource manager find host %s is down already.",
@@ -293,6 +294,7 @@ void sentRUAliveError(AsyncCommMessageHandlerContext context)
 				  GET_SEGRESOURCE_HOSTNAME(segres));
 
 		refreshResourceQueueCapacity(false);
+		refreshActualMinGRMContainerPerSeg();
 	}
 }
 

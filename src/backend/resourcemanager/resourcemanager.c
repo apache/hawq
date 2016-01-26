@@ -2645,6 +2645,7 @@ void updateStatusOfAllNodes()
 	if ( changedstatus )
 	{
 		refreshResourceQueueCapacity(false);
+		refreshActualMinGRMContainerPerSeg();
 	}
 
 	validateResourcePoolStatus(true);
@@ -2808,6 +2809,7 @@ int  loadHostInformationIntoResourcePool(void)
 
 	/* Refresh resource queue capacities. */
     refreshResourceQueueCapacity(false);
+    refreshActualMinGRMContainerPerSeg();
 	/* Recalculate all memory/core ratio instances' limits. */
 	refreshMemoryCoreRatioLimits();
 	/* Refresh memory/core ratio level water mark. */
