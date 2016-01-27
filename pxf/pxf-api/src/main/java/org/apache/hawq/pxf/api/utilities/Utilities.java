@@ -1,4 +1,4 @@
-package org.apache.hawq.pxf.service.utilities;
+package org.apache.hawq.pxf.api.utilities;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -25,7 +25,6 @@ import java.lang.reflect.InvocationTargetException;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hawq.pxf.api.utilities.InputData;
 
 /**
  * Utilities class exposes helper method for PXF classes

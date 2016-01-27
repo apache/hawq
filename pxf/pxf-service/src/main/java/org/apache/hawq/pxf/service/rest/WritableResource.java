@@ -37,11 +37,11 @@ import javax.ws.rs.core.Response;
 import org.apache.catalina.connector.ClientAbortException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.service.Bridge;
 import org.apache.hawq.pxf.service.WriteBridge;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
 import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
-import org.apache.hawq.pxf.service.utilities.Utilities;
 
 /*
  * Running this resource manually:

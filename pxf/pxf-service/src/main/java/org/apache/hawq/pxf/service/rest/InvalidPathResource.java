@@ -22,9 +22,10 @@ package org.apache.hawq.pxf.service.rest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hawq.pxf.service.utilities.Utilities;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 
 import com.google.common.collect.ImmutableSet;
+
 import java.util.Arrays;
 import java.util.List;
 

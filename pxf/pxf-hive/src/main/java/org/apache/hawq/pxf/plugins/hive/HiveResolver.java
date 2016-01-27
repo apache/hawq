@@ -23,9 +23,8 @@ import org.apache.hawq.pxf.api.*;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
-import org.apache.hawq.pxf.service.utilities.Utilities;
-
 import org.apache.commons.lang.CharUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;

@@ -1,4 +1,4 @@
-package org.apache.hawq.pxf.service.utilities;
+package org.apache.hawq.pxf.api.utilities;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;

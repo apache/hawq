@@ -23,9 +23,9 @@ package org.apache.hawq.pxf.service;
 import org.apache.hawq.pxf.api.*;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.service.io.Writable;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
-import org.apache.hawq.pxf.service.utilities.Utilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 

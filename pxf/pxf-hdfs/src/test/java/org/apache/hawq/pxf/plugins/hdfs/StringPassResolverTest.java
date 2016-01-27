@@ -24,36 +24,22 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
-import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
-import org.apache.hawq.pxf.api.OutputFormat;
-import org.apache.hawq.pxf.service.BridgeInputBuilder;
-import org.apache.hawq.pxf.service.io.Text;
-import org.apache.hawq.pxf.service.utilities.ProtocolData;
+import org.apache.hawq.pxf.api.io.DataType;
+import org.apache.hawq.pxf.api.utilities.InputData;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
 
-@RunWith(PowerMockRunner.class)
-@PrepareForTest({
-        Text.class,
-        BridgeInputBuilder.class,
-        ProtocolData.class,
-        LogFactory.class })
 public class StringPassResolverTest {
-    ProtocolData mockProtocolData;
+    InputData mockInputData;
 
     @Test
     /*
-     * Test the setFields method: small \n terminated input
+     * Test the setFields method: small input
      */
     public void testSetFields() throws Exception {
         StringPassResolver resolver = buildResolver();
@@ -68,84 +54,31 @@ public class StringPassResolverTest {
                 (int) 'o',
                 (int) '\n' };
 
-        DataInputStream inputStream = new DataInputStream(
-                new ByteArrayInputStream(data));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(
-                mockProtocolData);
-        List<OneField> record = inputBuilder.makeInput(inputStream);
+        List<OneField> record = Collections.singletonList(new OneField(DataType.BYTEA.getOID(),
+                Arrays.copyOfRange(data, 0, 5)));
 
         OneRow oneRow = resolver.setFields(record);
         verifyOneRow(oneRow, Arrays.copyOfRange(data, 0, 5));
 
-        record = inputBuilder.makeInput(inputStream);
+        record = Collections.singletonList(new OneField(DataType.BYTEA.getOID(),
+                Arrays.copyOfRange(data, 5, 8)));
+
         oneRow = resolver.setFields(record);
         verifyOneRow(oneRow, Arrays.copyOfRange(data, 5, 8));
     }
 
     @Test
     /*
-     * Test the setFields method: input > buffer size, \n terminated
+     * Test the setFields method: empty byte array
      */
-    public void testSetFieldsBigArray() throws Exception {
-
-        StringPassResolver resolver = buildResolver();
-
-        byte[] bigArray = new byte[2000];
-        for (int i = 0; i < 1999; ++i) {
-            bigArray[i] = (byte) (i % 10 + 30);
-        }
-        bigArray[1999] = (byte) '\n';
-
-        DataInputStream inputStream = new DataInputStream(
-                new ByteArrayInputStream(bigArray));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(
-                mockProtocolData);
-        List<OneField> record = inputBuilder.makeInput(inputStream);
-
-        OneRow oneRow = resolver.setFields(record);
-
-        verifyOneRow(oneRow, bigArray);
-    }
-
-    @Test
-    /*
-     * Test the setFields method: input > buffer size, no \n
-     */
-    public void testSetFieldsBigArrayNoNewLine() throws Exception {
-
-        StringPassResolver resolver = buildResolver();
-
-        byte[] bigArray = new byte[2000];
-        for (int i = 0; i < 2000; ++i) {
-            bigArray[i] = (byte) (i % 10 + 60);
-        }
-
-        DataInputStream inputStream = new DataInputStream(
-                new ByteArrayInputStream(bigArray));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(
-                mockProtocolData);
-        List<OneField> record = inputBuilder.makeInput(inputStream);
-
-        OneRow oneRow = resolver.setFields(record);
-
-        verifyOneRow(oneRow, bigArray);
-    }
-
-    @Test
-    /*
-     * Test the setFields method: empty stream (returns -1)
-     */
-    public void testSetFieldsEmptyStream() throws Exception {
+    public void testSetFieldsEmptyByteArray() throws Exception {
 
         StringPassResolver resolver = buildResolver();
 
         byte[] empty = new byte[0];
 
-        DataInputStream inputStream = new DataInputStream(
-                new ByteArrayInputStream(empty));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(
-                mockProtocolData);
-        List<OneField> record = inputBuilder.makeInput(inputStream);
+        List<OneField> record = Collections.singletonList(new OneField(DataType.BYTEA.getOID(),
+                                                          empty));
 
         OneRow oneRow = resolver.setFields(record);
 
@@ -156,12 +89,8 @@ public class StringPassResolverTest {
      * helpers functions
      */
     private StringPassResolver buildResolver() throws Exception {
-
-        mockProtocolData = mock(ProtocolData.class);
-        PowerMockito.when(mockProtocolData.outputFormat()).thenReturn(
-                OutputFormat.TEXT);
-
-        return new StringPassResolver(mockProtocolData);
+        mockInputData = mock(InputData.class);
+        return new StringPassResolver(mockInputData);
     }
 
     private void verifyOneRow(OneRow oneRow, byte[] expected) {
