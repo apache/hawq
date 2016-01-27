@@ -6955,7 +6955,7 @@ static struct config_real ConfigureNamesReal[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&net_disk_ratio,
-		1.0, 1.0, 100.0, NULL, NULL
+		1.01, 1.0, 100.0, NULL, NULL
 	},
 
 	{
