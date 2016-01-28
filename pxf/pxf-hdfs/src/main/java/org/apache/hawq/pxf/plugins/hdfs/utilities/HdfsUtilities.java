@@ -20,10 +20,10 @@ package org.apache.hawq.pxf.plugins.hdfs.utilities;
  */
 
 
-import org.apache.hawq.pxf.service.utilities.Utilities;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.generic.GenericDatumReader;

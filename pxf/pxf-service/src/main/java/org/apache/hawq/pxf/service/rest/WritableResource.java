@@ -37,11 +37,11 @@ import javax.ws.rs.core.Response;
 import org.apache.catalina.connector.ClientAbortException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.service.Bridge;
 import org.apache.hawq.pxf.service.WriteBridge;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
 import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
-import org.apache.hawq.pxf.service.utilities.Utilities;
 
 /*
  * Running this resource manually:
@@ -150,11 +150,11 @@ public class WritableResource extends RestResource{
         // Open the output file
         bridge.beginIteration();
 
-        DataInputStream dataStream = new DataInputStream(inputStream);
-
         long totalWritten = 0;
 
-        try {
+        // dataStream will close automatically in the end of the try.
+        // inputStream is closed by dataStream.close().
+        try (DataInputStream dataStream = new DataInputStream(inputStream)) {
             while (bridge.setNext(dataStream)) {
                 ++totalWritten;
             }
@@ -163,8 +163,6 @@ public class WritableResource extends RestResource{
         } catch (Exception ex) {
             LOG.debug("totalWritten so far " + totalWritten + " to " + path);
             throw ex;
-        } finally {
-            inputStream.close();
         }
 
         String censuredPath = Utilities.maskNonPrintables(path);

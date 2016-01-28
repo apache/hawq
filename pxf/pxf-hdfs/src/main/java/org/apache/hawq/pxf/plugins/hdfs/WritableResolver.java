@@ -24,9 +24,9 @@ import org.apache.hawq.pxf.api.*;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.RecordkeyAdapter;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.DataSchemaException;
-import org.apache.hawq.pxf.service.utilities.Utilities;
 
 import static org.apache.hawq.pxf.plugins.hdfs.utilities.DataSchemaException.MessageFmt.*;
 

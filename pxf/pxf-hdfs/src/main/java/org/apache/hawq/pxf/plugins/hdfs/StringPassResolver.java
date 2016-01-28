@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.plugins.hdfs;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -35,8 +35,8 @@ import static org.apache.hawq.pxf.api.io.DataType.VARCHAR;
 
 /**
  * StringPassResolver handles "deserialization" and serialization of
- * String records. StringPassResolver implements IReadResolver and
- * IWriteResolver interfaces. Returns strings as-is.
+ * String records. StringPassResolver implements {@link ReadResolver} and
+ * {@link WriteResolver} interfaces. Returns strings as-is.
  */
 public class StringPassResolver extends Plugin implements ReadResolver, WriteResolver {
     // for write

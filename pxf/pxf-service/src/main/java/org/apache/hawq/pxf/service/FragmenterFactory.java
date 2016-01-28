@@ -22,7 +22,7 @@ package org.apache.hawq.pxf.service;
 
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.hawq.pxf.service.utilities.Utilities;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 
 /**
  * Factory class for creation of {@link Fragmenter} objects. The actual {@link Fragmenter} object is "hidden" behind
