@@ -258,6 +258,8 @@ void initializeResourceQueueManager(void)
     {
     	PQUEMGR->hasResourceProblem[i] = false;
     }
+
+    PQUEMGR->ActualMinGRMContainerPerSeg = rm_min_resource_perseg;
 }
 
 /*
@@ -2472,6 +2474,77 @@ int returnResourceToResQueMgr(ConnectionTrack conntrack)
 	return res;
 }
 
+void refreshActualMinGRMContainerPerSeg(void)
+{
+	/*--------------------------------------------------------------------------
+	 * There are 3 limits should be considered, the actual water level is the
+	 * least value of the 3 limits : resource queue normal capacity caused mean
+	 * GRM container number, minimum value of all segments' maximum GRM container
+	 * numbers, user setting saved in guc.
+	 *
+	 *--------------------------------------------------------------------------
+	 */
+
+	/* STEP 1. go through each segment to get segment maximum capacity. */
+	int minctncount = INT32_MAX;
+	int normalctncount = INT32_MAX;
+	if ( DRMGlobalInstance->ImpType != NONE_HAWQ2 )
+	{
+		List 	 *allsegres = NULL;
+		ListCell *cell		= NULL;
+		getAllPAIRRefIntoList(&(PRESPOOL->Segments), &allsegres);
+
+		foreach(cell, allsegres)
+		{
+			SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
+			if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
+				 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat) )
+			{
+				continue;
+			}
+
+			if ( segres->Stat->GRMTotalCore < minctncount )
+			{
+				minctncount = segres->Stat->GRMTotalCore;
+			}
+		}
+		freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
+
+		elog(RMLOG, "Resource manager finds minimum global resource manager "
+					"container count can contained by all segments is %d",
+					minctncount);
+
+		/* STEP 2. check the queue normal capacity introduced water level. */
+		if ( PRESPOOL->AvailNodeCount > 0 &&
+			 PQUEMGR->GRMQueueCapacity > 0 &&
+			 PRESPOOL->GRMTotalHavingNoHAWQNode.Core > 0 )
+		{
+			normalctncount = trunc(PRESPOOL->GRMTotalHavingNoHAWQNode.Core *
+								   PQUEMGR->GRMQueueCapacity /
+								   PRESPOOL->AvailNodeCount);
+
+			elog(RMLOG, "Resource manager calculates normal global resource "
+						"manager container count based on target queue capacity "
+						"is %d",
+						normalctncount);
+		}
+	}
+
+	/* STEP 3. Get final water level result. */
+	int oldval = PQUEMGR->ActualMinGRMContainerPerSeg;
+	int newval = minctncount < normalctncount ? minctncount : normalctncount;
+	newval = newval < rm_min_resource_perseg ? newval : rm_min_resource_perseg;
+
+	if ( newval != oldval )
+	{
+		elog(WARNING, "Resource manager adjusts minimum global resource manager "
+					  "container count in each segment from %d to %d.",
+					  oldval,
+					  newval);
+	}
+	PQUEMGR->ActualMinGRMContainerPerSeg = newval;
+}
+
 void refreshResourceQueueCapacity(bool queuechanged)
 {
 	static char errorbuf[ERRORMESSAGE_SIZE];
@@ -2510,8 +2583,10 @@ void refreshResourceQueuePercentageCapacity(bool queuechanged)
 	{
 		if ( DRMGlobalInstance->ImpType == YARN_LIBYARN )
 		{
-			mem  = PRESPOOL->GRMTotal.MemoryMB * PQUEMGR->GRMQueueMaxCapacity;
-			core = PRESPOOL->GRMTotal.Core     * PQUEMGR->GRMQueueMaxCapacity;
+			mem  = PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB *
+				   PQUEMGR->GRMQueueMaxCapacity;
+			core = PRESPOOL->GRMTotalHavingNoHAWQNode.Core     *
+				   PQUEMGR->GRMQueueMaxCapacity;
 		}
 		else if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
 		{

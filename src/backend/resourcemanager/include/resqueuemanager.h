@@ -329,6 +329,8 @@ struct DynResourceQueueManagerData {
     int						 ForcedReturnGRMContainerCount;
     bool					 toRunQueryDispatch;
     bool	 				 hasResourceProblem[RESPROBLEM_COUNT];
+
+    int						 ActualMinGRMContainerPerSeg;
 };
 typedef struct DynResourceQueueManagerData *DynResourceQueueManager;
 typedef struct DynResourceQueueManagerData  DynResourceQueueManagerData;
@@ -344,8 +346,10 @@ typedef struct DynResourceQueueManagerData  DynResourceQueueManagerData;
 void initializeResourceQueueManager(void);
 /* collect resource queues' resource usage status from bottom up. */
 void refreshMemoryCoreRatioLevelUsage(uint64_t curmicrosec);
-/* Refresh reosurce queue resource capacity and adjusts all queued requests. */
+/* Refresh resource queue resource capacity and adjusts all queued requests. */
 void refreshResourceQueueCapacity(bool queuechanged);
+/* Refresh actual minimum GRM container water level. */
+void refreshActualMinGRMContainerPerSeg(void);
 /* Dispatch resource to the queuing queries. */
 void dispatchResourceToQueries(void);
 /* Time out the resource allocated whose QD owner does not have chance to return. */

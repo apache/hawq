@@ -390,6 +390,7 @@ struct ResourcePoolData {
 	 */
 	ResourceBundleData FTSTotal;
 	ResourceBundleData GRMTotal;
+	ResourceBundleData GRMTotalHavingNoHAWQNode;
 
     uint64_t LastUpdateTime; /* Last time the GRM cluster report is gotten.   */
     uint64_t LastRequestTime;/* Last time the GRM cluster report is sent.     */

@@ -649,12 +649,21 @@ int handleRB2RM_ClusterReport(void)
 	setAllSegResourceGRMUnavailable();
 
 	/*
-	 * Start to update resource pool content.
+	 * Start to update resource pool content. The YARN cluster total size is
+	 * also counted the same time.
 	 */
+
+	resetResourceBundleData(&(PRESPOOL->GRMTotalHavingNoHAWQNode), 0, 0.0, 0);
+
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 	while( list_length(segstats) > 0 )
 	{
 		SegStat segstat = (SegStat)lfirst(list_head(segstats));
+
+		addResourceBundleData(&(PRESPOOL->GRMTotalHavingNoHAWQNode),
+							  segstat->GRMTotalMemoryMB,
+							  segstat->GRMTotalCore);
+
 		res = updateHAWQSegWithGRMSegStat(segstat);
 		if ( res == FUNC_RETURN_OK )
 		{
@@ -676,6 +685,14 @@ int handleRB2RM_ClusterReport(void)
 	}
 	MEMORY_CONTEXT_SWITCH_BACK
 
+	elog(LOG, "Resource manager YARN resource broker counted HAWQ cluster now "
+			  "having (%d MB, %lf CORE) in a YARN cluster of total resource "
+			  "(%d MB, %lf CORE).",
+			  PRESPOOL->GRMTotal.MemoryMB,
+			  PRESPOOL->GRMTotal.Core,
+			  PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB,
+			  PRESPOOL->GRMTotalHavingNoHAWQNode.Core);
+
 	/*
 	 * If the segment is not GRM available, RM should return all containers
 	 * located upon them.
@@ -695,6 +712,7 @@ int handleRB2RM_ClusterReport(void)
 	PQUEMGR->GRMQueueResourceTight 	= response.ResourceTight > 0 ? true : false;
 
 	refreshResourceQueueCapacity(false);
+	refreshActualMinGRMContainerPerSeg();
 
     PRESPOOL->LastUpdateTime = gettime_microsec();
 
