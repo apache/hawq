@@ -4628,7 +4628,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&SegMaxBackends,
-		1600, 80, MAX_MAX_BACKENDS, NULL, NULL
+		4800, 240, MAX_MAX_BACKENDS, NULL, NULL
 	},
 
 	{
