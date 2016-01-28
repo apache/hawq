@@ -269,7 +269,7 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 
 	PG_TRY();
 	{
-		analyzeStmt(stmt, relids);
+		analyzeStmt(stmt, relids, target_seg_num);
 		gp_autostats_mode = autostatvalBackup;
 		gp_autostats_mode_in_functions = autostatInFunctionsvalBackup;
 		optimizer = optimizerBackup;
@@ -304,7 +304,7 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
  * 	vacstmt - Vacuum statement.
  * 	relids  - Usually NULL except when called by autovacuum.
  */
-void analyzeStmt(VacuumStmt *stmt, List *relids)
+void analyzeStmt(VacuumStmt *stmt, List *relids, int target_seg_num)
 {
 	List	   			  	*lRelOids = NIL;
 	MemoryContext			callerContext = NULL;
@@ -478,13 +478,14 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 		MemoryContextSwitchTo(analyzeStatementContext);
 	}
 
+	/**
+	 * We open relations with appropreciate locks
+	 */
+	List *candidateRelations = NIL;
 	foreach (le1, lRelOids)
 	{
 		Oid				candidateOid	  = InvalidOid;
 		Relation		candidateRelation = NULL;
-		bool			bTemp;
-
-		bTemp = false;
 
 		Assert(analyzeStatementContext == CurrentMemoryContext);
 
@@ -502,6 +503,49 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 		candidateOid = lfirst_oid(le1);
 		candidateRelation =
 				try_relation_open(candidateOid, ShareUpdateExclusiveLock, false);
+
+		if (candidateRelation)
+		{
+			candidateRelations = lappend(candidateRelations, candidateRelation);
+		}
+		else
+		{
+			elog(ERROR, "Cannot open and lock relation %s for analyze",
+			            RelationGetRelationName(candidateRelation));
+		}
+	}
+
+	/**
+	 * We allocate query resource for analyze
+	 */
+	QueryResource *resource = AllocateResource(QRL_ONCE, 1, 0, target_seg_num, target_seg_num, NULL, 0);
+	QueryResource *savedResource = NULL;
+
+	savedResource = GetActiveQueryResource();
+	SetActiveQueryResource(resource);
+
+	/**
+	 * We do actual analyze 
+	 */
+	foreach (le1, candidateRelations)
+	{
+		Relation        candidateRelation = NULL;
+		bool			bTemp = false;
+
+		Assert(analyzeStatementContext == CurrentMemoryContext);
+
+		if (bUseOwnXacts)
+		{
+			/**
+			 * We use a different transaction per relation so that we
+			 * may release locks on relations as soon as possible.
+			 */
+			StartTransactionCommand();
+			ActiveSnapshot = CopySnapshot(GetTransactionSnapshot());
+			MemoryContextSwitchTo(analyzeStatementContext);
+		}
+
+		candidateRelation = (Relation)lfirst(le1);
 
 		if (candidateRelation)
 		{
@@ -709,6 +753,13 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 			MemoryContextSwitchTo(analyzeStatementContext);
 		}
 	}
+
+	/**
+	 * We now free query resource
+	 */
+	FreeResource(resource);
+	UnsetActiveQueryResource();
+	SetActiveQueryResource(savedResource);
 
 	if (bUseOwnXacts)
 	{
