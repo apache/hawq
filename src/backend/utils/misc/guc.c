@@ -4617,6 +4617,20 @@ static struct config_int ConfigureNamesInt[] =
 		200, 10, MAX_MAX_BACKENDS, NULL, NULL
 	},
 
+	/*
+	 * When HAWQ has one master and one segment deployed together in one physical
+	 * machine, we can not separately set different max connection count. Thus,
+	 * we introduce this guc for segment setting only.
+	 */
+	{
+		{"seg_max_connections", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
+			gettext_noop("Sets the maximum number of concurrent connections in a segment."),
+			NULL
+		},
+		&SegMaxBackends,
+		4800, 240, MAX_MAX_BACKENDS, NULL, NULL
+	},
+
 	{
 		{"superuser_reserved_connections", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
 			gettext_noop("Sets the number of connection slots reserved for superusers."),

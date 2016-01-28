@@ -3763,7 +3763,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 	volatile bool send_ready_for_query = true;
 	int			topErrCode;
 
-
 	MemoryAccount *postgresMainMemoryAccount = NULL;
 
     /*
@@ -4143,6 +4142,20 @@ PostgresMain(int argc, char *argv[], const char *username)
          * CDB: Moved this up from below for use in error message headers.
          */
 	    PgStartTime = GetCurrentTimestamp();
+	}
+
+	/*
+	 * Overwrite MaxBackends in case it is a segment.
+	 */
+	if ( !AmIMaster() && !IsUnderPostmaster)
+	{
+		char segmaxconns[32];
+		elog(LOG, "Update segment max_connections to %d", SegMaxBackends);
+		snprintf(segmaxconns, sizeof(segmaxconns), "%d", SegMaxBackends);
+		SetConfigOption("max_connections",
+						segmaxconns,
+						PGC_POSTMASTER,
+						PGC_S_OVERRIDE);
 	}
 
 	if (PostAuthDelay)

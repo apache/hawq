@@ -1071,7 +1071,22 @@ PostmasterMain(int argc, char *argv[])
 	 * postgresql.conf for the first time.
 	 */
 	if (!SelectConfigFiles(userDoption, progname))
+
 		ExitPostmaster(2);
+
+	/*
+	 * Overwrite MaxBackends in case it is a segment.
+	 */
+	if ( !AmIMaster() && !IsUnderPostmaster)
+	{
+		char segmaxconns[32];
+		elog(LOG, "Update segment max_connections to %d", SegMaxBackends);
+		snprintf(segmaxconns, sizeof(segmaxconns), "%d", SegMaxBackends);
+		SetConfigOption("max_connections",
+						segmaxconns,
+						PGC_POSTMASTER,
+						PGC_S_OVERRIDE);
+	}
 
 	/*
 	 * CDB/MPP/GPDB: Set the processor affinity (may be a no-op on
