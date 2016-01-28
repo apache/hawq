@@ -150,11 +150,11 @@ public class WritableResource extends RestResource{
         // Open the output file
         bridge.beginIteration();
 
-        DataInputStream dataStream = new DataInputStream(inputStream);
-
         long totalWritten = 0;
 
-        try {
+        // dataStream will close automatically in the end of the try.
+        // inputStream is closed by dataStream.close().
+        try (DataInputStream dataStream = new DataInputStream(inputStream)) {
             while (bridge.setNext(dataStream)) {
                 ++totalWritten;
             }
@@ -163,8 +163,6 @@ public class WritableResource extends RestResource{
         } catch (Exception ex) {
             LOG.debug("totalWritten so far " + totalWritten + " to " + path);
             throw ex;
-        } finally {
-            inputStream.close();
         }
 
         String censuredPath = Utilities.maskNonPrintables(path);

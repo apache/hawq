@@ -26,6 +26,7 @@ import static org.mockito.Mockito.mock;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -33,7 +34,7 @@ import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
-import org.junit.Before;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;
@@ -42,6 +43,8 @@ import org.powermock.modules.junit4.PowerMockRunner;
 @RunWith(PowerMockRunner.class)
 public class BridgeInputBuilderTest {
     ProtocolData mockProtocolData;
+    BridgeInputBuilder inputBuilder;
+    DataInputStream inputStream;
 
     @Test
     /*
@@ -59,10 +62,8 @@ public class BridgeInputBuilderTest {
                 (int) 'o',
                 (int) '\n' };
 
-        DataInputStream inputStream = new DataInputStream(
-                new ByteArrayInputStream(data));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(
-                mockProtocolData);
+        prepareInput(data);
+
         List<OneField> record = inputBuilder.makeInput(inputStream);
 
         verifyRecord(record, Arrays.copyOfRange(data, 0, 5));
@@ -83,10 +84,8 @@ public class BridgeInputBuilderTest {
         }
         bigArray[1999] = (byte) '\n';
 
-        DataInputStream inputStream = new DataInputStream(
-                new ByteArrayInputStream(bigArray));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(
-                mockProtocolData);
+        prepareInput(bigArray);
+
         List<OneField> record = inputBuilder.makeInput(inputStream);
 
         verifyRecord(record, bigArray);
@@ -103,10 +102,8 @@ public class BridgeInputBuilderTest {
             bigArray[i] = (byte) (i % 10 + 60);
         }
 
-        DataInputStream inputStream = new DataInputStream(
-                new ByteArrayInputStream(bigArray));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(
-                mockProtocolData);
+        prepareInput(bigArray);
+
         List<OneField> record = inputBuilder.makeInput(inputStream);
 
         verifyRecord(record, bigArray);
@@ -120,10 +117,8 @@ public class BridgeInputBuilderTest {
 
         byte[] empty = new byte[0];
 
-        DataInputStream inputStream = new DataInputStream(
-                new ByteArrayInputStream(empty));
-        BridgeInputBuilder inputBuilder = new BridgeInputBuilder(
-                mockProtocolData);
+        prepareInput(empty);
+
         List<OneField> record = inputBuilder.makeInput(inputStream);
 
         verifyRecord(record, empty);
@@ -133,11 +128,21 @@ public class BridgeInputBuilderTest {
      * helpers functions
      */
 
-    @Before
-    public void mockProtocolData() {
+    @After
+    public void cleanUp() throws IOException {
+        if (inputStream != null) {
+            inputStream.close();
+        }
+    }
+
+    private void prepareInput(byte[] data) throws Exception {
         mockProtocolData = mock(ProtocolData.class);
         PowerMockito.when(mockProtocolData.outputFormat()).thenReturn(
                 OutputFormat.TEXT);
+        inputBuilder = new BridgeInputBuilder(
+                mockProtocolData);
+        inputStream = new DataInputStream(
+                new ByteArrayInputStream(data));
     }
 
     private void verifyRecord(List<OneField> record, byte[] expected) {
