@@ -89,12 +89,12 @@ AssignSingleAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_ha
 	 */
 	if (RELSTORAGE_AOROWS == storageChar)
 	{
-		splits = AOGetAllSegFileSplits(aoEntry, ActiveSnapshot);
+		splits = AOGetAllSegFileSplits(aoEntry, SnapshotSelf);
 	}
 	else
 	{
 		Assert(RELSTORAGE_PARQUET == storageChar);
-		splits = ParquetGetAllSegFileSplits(aoEntry, ActiveSnapshot);
+		splits = ParquetGetAllSegFileSplits(aoEntry, SnapshotSelf);
 	}
 
 	/*
