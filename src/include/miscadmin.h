@@ -194,6 +194,7 @@ extern PGDLLIMPORT char *DataDir;
 
 extern PGDLLIMPORT int NBuffers;
 extern int	MaxBackends;
+extern int	SegMaxBackends;
 extern int	MaxConnections;
 extern int gp_workfile_max_entries;
 extern int gp_mdver_max_entries;
