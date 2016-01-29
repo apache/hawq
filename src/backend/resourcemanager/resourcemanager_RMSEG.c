@@ -256,7 +256,9 @@ bool CheckTmpDirAvailable(char *path)
 	tmp = fopen(fname, "w");
 	if (tmp == NULL)
 	{
-		elog(LOG, "Can't open file:%s when check temporary directory", fname);
+		elog(LOG, "Can't open file:%s when check temporary directory: %s",
+				  fname,
+				  strerror(errno));
 		ret = false;
 	}
 
