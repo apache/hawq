@@ -247,7 +247,7 @@ bool CheckTmpDirAvailable(char *path)
 	char* fname = NULL;
 	char* testfile = "/checktmpdir.log";
 
-	/* write some bytes to a file to check if
+	/* open a file to check if
 	 * this temporary directory is OK.
 	 */
 	fname = palloc0(strlen(path) + strlen(testfile) + 1);
@@ -256,26 +256,12 @@ bool CheckTmpDirAvailable(char *path)
 	tmp = fopen(fname, "w");
 	if (tmp == NULL)
 	{
-		elog(LOG, "Can't open file:%s when check temporary directory", fname);
+		elog(LOG, "Can't open file:%s when check temporary directory: %s",
+				  fname,
+				  strerror(errno));
 		ret = false;
-		goto _exit;
 	}
 
-	if (fseek(tmp, 0, SEEK_SET) != 0)
-	{
-		elog(LOG, "Can't seek file:%s when check temporary directory", fname);
-		ret = false;
-		goto _exit;
-	}
-
-	if (strlen("test") != fwrite("test", 1, strlen("test"), tmp))
-	{
-		elog(LOG, "Can't write file:%s when check temporary directory", fname);
-		ret = false;
-		goto _exit;
-	}
-
-	_exit:
 	pfree(fname);
 	if (tmp != NULL)
 		fclose(tmp);
