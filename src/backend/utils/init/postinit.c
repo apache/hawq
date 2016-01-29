@@ -368,6 +368,22 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	char		dbname[NAMEDATALEN];
 
 	/*
+	 * User is not supposed to connect to hcatalog database,
+	 * because it's reserved for HCatalog integration feature
+	 */
+	if (!bootstrap)
+	{
+		if (strcmp(in_dbname, HcatalogDbName) == 0)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_DATABASE),
+					errmsg("\"%s\" database is only for system use",
+					HcatalogDbName)));
+		}
+	}
+
+
+	/*
 	 * Set up the global variables holding database id and path.  But note we
 	 * won't actually try to touch the database just yet.
 	 *

@@ -184,6 +184,10 @@ CREATE DATABASE <replaceable class="PARAMETER">name</replaceable>
    connection <quote>slot</> remains for the database, it is possible that
    both will fail.  Also, the limit is not enforced against superusers.
   </para>
+
+  <para>
+   User can not create database named "hcatalog", because it's reserved for HCatalog integration feature.
+  </para>
  </refsect1>
 
  <refsect1>
