@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.service.rest;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.ResponseBuilder;
@@ -33,7 +34,25 @@ import org.apache.commons.logging.LogFactory;
  * version e.g. {@code ...pxf/v14/Bridge}
  */
 class Version {
-    final static String PXF_PROTOCOL_VERSION = "v14";
+    /**
+     * Constant which holds current protocol version. Getting replaced with
+     * actual value on build stage, using pxfProtocolVersion parameter from
+     * gradle.properties
+     */
+    final static String PXF_PROTOCOL_VERSION = "@pxfProtocolVersion@";
+
+    public Version() {
+    }
+
+    public String version;
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
 }
 
 /**
@@ -58,11 +77,12 @@ public class VersionResource {
      * @return response with the PXF protocol version
      */
     @GET
+    @Produces("application/json")
     public Response getProtocolVersion() {
 
         ResponseBuilder b = Response.ok();
-        b.entity("PXF protocol version " + Version.PXF_PROTOCOL_VERSION);
-        b.type(MediaType.TEXT_PLAIN_TYPE);
+        b.entity("{ \"version\": \"" + Version.PXF_PROTOCOL_VERSION + "\"}");
+        b.type(MediaType.APPLICATION_JSON_TYPE);
         return b.build();
     }
 }

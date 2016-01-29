@@ -22,6 +22,8 @@ package org.apache.hawq.pxf.service.rest;
 
 import static org.junit.Assert.assertEquals;
 
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import org.junit.Test;
@@ -36,7 +38,10 @@ public class VersionResourceTest {
 
         assertEquals(Response.Status.OK,
                 Response.Status.fromStatusCode(result.getStatus()));
-        assertEquals("PXF protocol version " + Version.PXF_PROTOCOL_VERSION,
+        assertEquals(
+                "{ \"version\": \"" + Version.PXF_PROTOCOL_VERSION + "\"}",
                 result.getEntity().toString());
+        assertEquals(result.getMetadata().get(HttpHeaders.CONTENT_TYPE).get(0),
+                MediaType.APPLICATION_JSON_TYPE);
     }
 }
