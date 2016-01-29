@@ -45,7 +45,7 @@ List *initTmpDirList(List *list, char *szTmpDir)
                 tmpdir = (char *)palloc0(i-idx);
                 strncpy(tmpdir, szTmpDir+idx+1, i-idx-1);
                 tmpDirNum++;
-                elog(LOG, "Get a temporary directory:%s", tmpdir);
+                elog(DEBUG5, "Get a temporary directory:%s", tmpdir);
                 list = lappend(list, tmpdir);
             }
             idx = i;
