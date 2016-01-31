@@ -306,7 +306,7 @@ class HawqInit:
 
         master_cmd = self._get_master_init_cmd()
         logger.info("Start to init master node: '%s'" % self.master_host_name)
-        check_return_code(local_ssh(master_cmd), logger, "Master init failed, exit", \
+        check_return_code(local_ssh(master_cmd, logger), logger, "Master init failed, exit", \
                           "Master init successfully")
         if self.standby_host_name.lower() not in ('', 'none'):
             check_return_code(self._init_standby(), logger, \
@@ -508,16 +508,6 @@ class HawqStart:
             logger.info("Segments started successfully")
         return node_init.return_flag
 
-    def _check_master_running(self):
-        logger.info("Check if master is running")
-    def _check_standby_running(self):
-        logger.info("Check if standby master is running")
-    def _check_version(self):
-        logger.info("Check hawq version")
-    def _recovery_startup(self):
-        logger.info("Do recovery master start")
-    def _remove_postmaster_tmpfile(self, port):
-        logger.info("Delete postmaster temporary file")
 
     def run(self):
         if self.node_type == "master":
@@ -980,7 +970,7 @@ def create_parser():
                       choices=['smart', 'immediate', 'fast'],
                       dest="stop_mode",
                       default="smart",
-                      help="HAWQ stop mode: smart/fast/immediatly")
+                      help="HAWQ stop mode: smart/fast/immediate")
     parser.add_option("-v", "--verbose",
                       action="store_true",
                       dest="verbose",
@@ -1004,14 +994,10 @@ def create_parser():
                       dest="parallel_processses",
                       default="60",
                       help="Sets the max parallel processes")
-    parser.add_option("-V", "--version",
-                      dest="hawq_version",
-                      default="dev",
-                      help="Show HAWQ version")
     parser.add_option("--user",
                       dest="user",
                       default="",
-                      help="Sets hawq user")
+                      help="Sets HAWQ user")
     parser.add_option("-u", "--reload",
                       dest="hawq_reload",
                       action="store_true",

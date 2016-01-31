@@ -28,10 +28,41 @@ ${SOURCE_PATH}
 
 host_name=`${HOSTNAME}`
 
-if [ -f /etc/redhat-release ]; then
-    os_version=`${CAT} /etc/redhat-release | ${AWK} '{print substr($7,0,1)}'`
+lowercase(){
+    echo "$1" | sed "y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/"
+}
+
+OS=`lowercase \`uname\``
+
+if [ "${OS}" = "darwin" ]; then
+    OS=mac
+    distro_based_on='Mac'
+    distro_name=`sw_vers -productName`
+    distro_version=`sw_vers -productVersion`
+    distro_major_version=`echo $distro_version |awk -F '.' '{print $1}'`
 else
-    os_version='other'
+    if [ "${OS}" = "linux" ] ; then
+        if [ -f /etc/redhat-release ] ; then
+            distro_based_on='RedHat'
+            distro_name=`cat /etc/redhat-release |sed s/\ release.*//`
+            psuedo_name=`cat /etc/redhat-release | sed s/.*\(// | sed s/\)//`
+            distro_version=`cat /etc/redhat-release | sed s/.*release\ // | sed s/\ .*//`
+            distro_major_version=`echo $distro_version | awk -F '.' '{print $1}'`
+        elif [ -f /etc/SuSE-release ] ; then
+            distro_based_on='SuSe'
+            distro_name=`cat /etc/SuSE-release |sed s/\ release.*//`
+            psuedo_name=`cat /etc/SuSE-release | tr "\n" ' '| sed s/VERSION.*//`
+            distro_version=`cat /etc/SuSE-release | tr "\n" ' ' | sed s/.*=\ //`
+            distro_major_version=`echo $distro_version |awk -F '.' '{print $1}'`
+        elif [ -f /etc/debian_version ] ; then
+            distro_based_on='Debian'
+            distro_name=`cat /etc/lsb-release | grep '^DISTRIB_ID' | awk -F=  '{ print $2 }'`
+            psuedo_name=`cat /etc/lsb-release | grep '^DISTRIB_CODENAME' | awk -F=  '{ print $2 }'`
+            distro_version=`cat /etc/lsb-release | grep '^DISTRIB_RELEASE' | awk -F=  '{ print $2 }'`
+            distro_major_version=`echo $distro_version |awk -F '.' '{print $1}'`
+        fi
+    fi
+
 fi
 
 mgmt_config_file=${GPHOME}/etc/_mgmt_config
@@ -54,25 +85,45 @@ else
    ${ECHO} "hawq init object should be one of master/standby/segment"
    exit 1
 fi
+
 master_max_connections=${max_connections}
 segment_max_connections=${max_connections}
 master_ip_address_all=""
 standby_ip_address_all=""
-if [ "${os_version}" = "7" ];then
-    master_ip_address_all=`${SSH} ${master_host_name} "${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print \\$2}'"`
-    if [ "${standby_host_name}" != "" ] && [ "${standby_host_name}" != "None" ] \
-        && [ "${standby_host_name}" != "none" ] && [ "${standby_host_name}" != "NONE" ];then
-        standby_ip_address_all=`${SSH} ${standby_host_name} "${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print \\$2}'"`
+standby_host_lowercase=`lowercase "${standby_host_name}"`
+
+get_all_ip_address() {
+    if [ "${distro_based_on}" = "RedHat" ] && [ "${distro_major_version}" -ge 7 ]; then
+        cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print \$2}'"
+    elif [ "${distro_based_on}" = "Mac" ] && [ "${distro_version:0:5}" = "10.11" ]; then
+        cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print \$2}'"
+    else
+        cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' |${AWK} '/inet addr/{print substr(\$2,6)}'"
     fi
-    segment_ip_address_all=`${IFCONFIG} | ${GREP} -v '127.0.0' | ${AWK} '/inet addr/{print substr($2,6)}'`
-else
-    master_ip_address_all=`${SSH} ${master_host_name} "${IFCONFIG} |${GREP} -v '127.0.0' |${AWK} '/inet addr/{print substr(\\$2,6)}'"`
-    if [ "${standby_host_name}" != "" ] && [ "${standby_host_name}" != "None" ] \
-        && [ "${standby_host_name}" != "none" ] && [ "${standby_host_name}" != "NONE" ];then
-        standby_ip_address_all=`${SSH} ${standby_host_name} "${IFCONFIG} |${GREP} -v '127.0.0' |${AWK} '/inet addr/{print substr(\\$2,6)}'"`
+
+    master_ip_address_all=`${SSH} ${master_host_name} "${cmd_str}"`
+    if [ -z ${master_ip_address_all} ];then
+        ${ECHO} "Failed to get master ip addresses"
+        exit 1
     fi
-    segment_ip_address_all=`${IFCONFIG} | ${GREP} -v '127.0.0' | ${AWK} '/inet addr/{print substr($2,6)}'`
-fi
+
+    if [ "${standby_host_lowercase}" != "none" ] && [ -n "${standby_host_lowercase}" ];then
+        standby_ip_address_all=`${SSH} ${standby_host_name} "${cmd_str}"`
+        if [ -z ${standby_ip_address_all} ];then
+            ${ECHO} "Failed to get standby ip addresses"
+            exit 1
+        fi
+    fi
+
+    segment_ip_address_all=`${SSH} localhost "${cmd_str}"`
+
+    if [ -z ${segment_ip_address_all} ];then
+        ${ECHO} "Failed to get segment ip addresses"
+        exit 1
+    fi
+}
+
+get_all_ip_address
 
 PG_HBA=pg_hba.conf
 TMP_PG_HBA=/tmp/pg_hba_conf_master.$$
@@ -152,6 +203,14 @@ LOAD_GP_TOOLKIT () {
     return $RETVAL
 }
 
+get_master_ipv6_addresses() {
+    if [ "${distro_based_on}" = "Mac" ] && [ "${distro_version:0:5}" = "10.11" ]; then
+        MASTER_IPV6_LOCAL_ADDRESS_ALL=(`${IFCONFIG} | ${GREP} inet6 | ${AWK} '{print $2}' | cut -d'%' -f1`)
+    else
+        MASTER_IPV6_LOCAL_ADDRESS_ALL=(`ip -6 address show |${GREP} inet6|${AWK} '{print $2}' |cut -d'/' -f1`)
+    fi
+}
+
 update_master_pg_hba(){
     # Updatepg_hba.conf for master.
     ${CAT} ${hawq_data_directory}/${PG_HBA} |${GREP} '^#' > ${TMP_PG_HBA}
@@ -160,7 +219,7 @@ update_master_pg_hba(){
     ${ECHO} "local    all         $USER         ident" >> ${hawq_data_directory}/${PG_HBA}
     # ${ECHO} "[INFO]:-Setting local host access"
     ${ECHO} "host     all         $USER         127.0.0.1/28    trust" >> ${hawq_data_directory}/${PG_HBA}
-    MASTER_IPV6_LOCAL_ADDRESS_ALL=(`/sbin/ip -6 address show |${GREP} inet6|${AWK} '{print $2}' |cut -d'/' -f1`)
+    get_master_ipv6_addresses
     MASTER_HBA_IP_ADDRESS=(`${ECHO} ${master_ip_address_all[@]} ${MASTER_IPV6_LOCAL_ADDRESS_ALL[@]} ${standby_ip_address_all[@]}|tr ' ' '\n'|sort -u|tr '\n' ' '`)
     for ip_address in ${MASTER_HBA_IP_ADDRESS[@]}; do
         CIDR_MASTER_IP=$(GET_CIDRADDR ${ip_address})
