@@ -131,7 +131,7 @@ under the License.
         </plugins>
     </profile>
 	<profile>
-		<name>JSON</name>
+		<name>Json</name>
 		<description>A profile for JSON data, one JSON record per line
 		</description>
 		<plugins>
@@ -140,16 +140,4 @@ under the License.
 			<resolver>org.apache.hawq.pxf.plugins.json.JsonResolver</resolver>
 		</plugins>
 	</profile>
-	<profile>
-		<name>JSON-PP</name>
-		<description>A profile for JSON data, where a single JSON record spans
-			multiple lines. Must specify the IDENTIFIER parameter in DDL.
-		</description>
-		<plugins>
-			<fragmenter>org.apache.hawq.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
-			<accessor>org.apache.hawq.pxf.plugins.json.JsonAccessor</accessor>
-			<resolver>org.apache.hawq.pxf.plugins.json.JsonResolver</resolver>
-			<onerecordperline>false</onerecordperline>
-		</plugins>
-	</profile>    
 </profiles>

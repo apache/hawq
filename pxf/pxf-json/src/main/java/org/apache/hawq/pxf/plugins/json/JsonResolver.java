@@ -24,6 +24,8 @@ import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
@@ -41,6 +43,8 @@ import org.codehaus.jackson.JsonNode;
  */
 public class JsonResolver extends Plugin implements ReadResolver {
 
+	private static Pattern ARRAY_PROJECTION_PATTERN = Pattern.compile("(.*)\\[([0-9]+)\\]");
+
 	private ArrayList<OneField> list = new ArrayList<OneField>();
 
 	public JsonResolver(InputData inputData) throws Exception {
@@ -52,7 +56,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 		list.clear();
 
 		// key is a Text object
-		JsonNode root = JsonInputFormat.decodeLineToJsonNode(row.getKey().toString());
+		JsonNode root = JsonUtil.decodeLineToJsonNode(row.getData().toString());
 
 		// if we weren't given a null object
 		if (root != null) {
@@ -134,7 +138,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 * @throws ArrayIndexOutOfBoundsException
 	 */
 	private boolean isArrayIndex(String[] projs) {
-		return projs[projs.length - 1].contains("[") && projs[projs.length - 1].contains("]");
+		return getMatchGroup(projs[projs.length - 1], 1) != null;
 	}
 
 	/**
@@ -146,7 +150,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 * @throws ArrayIndexOutOfBoundsException
 	 */
 	private String getArrayName(String[] projs) {
-		return projs[projs.length - 1].replaceAll("\\[[0-9]+\\]", "");
+		return getMatchGroup(projs[projs.length - 1], 1);
 	}
 
 	/**
@@ -158,8 +162,27 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 * @throws ArrayIndexOutOfBoundsException
 	 */
 	private int getArrayIndex(String[] projs) {
-		return Integer.parseInt(projs[projs.length - 1].substring(projs[projs.length - 1].indexOf('[') + 1,
-				projs[projs.length - 1].length() - 1));
+		return Integer.parseInt(getMatchGroup(projs[projs.length - 1], 2));
+	}
+
+	/**
+	 * Extracts the array name or array index. E.g. getMatchGroup("myarray[666]", 1) returns "myarray" and
+	 * getMatchGroup("myarray[666]", 2) returns "666". If the text is not an array expression function returns NULL.
+	 * 
+	 * @param text
+	 *            expression to evaluate
+	 * @param groupId
+	 *            in case of array text expression, groupId=1 will refer the array name and groupId=2 refers the array
+	 *            index.
+	 * @return If text is an array expression, return the name or the index of the array. If text is not an array
+	 *         expression return NULL.
+	 */
+	private String getMatchGroup(String text, int groupId) {
+		Matcher matcher = ARRAY_PROJECTION_PATTERN.matcher(text);
+		if (matcher.matches()) {
+			return matcher.group(groupId);
+		}
+		return null;
 	}
 
 	/**
@@ -219,7 +242,6 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			case BOOLEAN:
 				oneField.val = val.asBoolean();
 				break;
-			case BPCHAR:
 			case CHAR:
 				oneField.val = val.asText().charAt(0);
 				break;
@@ -234,6 +256,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			case SMALLINT:
 				oneField.val = val.asInt();
 				break;
+			case BPCHAR:
 			case TEXT:
 			case VARCHAR:
 				oneField.val = val.asText();
@@ -253,7 +276,6 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 *            The {@link DataType} type
 	 */
 	private void addNullField(DataType type) {
-
 		list.add(new OneField(type.getOID(), null));
 	}
 }
