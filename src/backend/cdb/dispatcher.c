@@ -1490,7 +1490,11 @@ dispatch_free_result(DispatchDataResult *result)
 	if (!result)
 		return;
 
-	pfree(result->errbuf.data);
+	if(result->errbuf.data)
+	{
+		pfree(result->errbuf.data);
+		result->errbuf.data = NULL;
+	}
 	dispmgt_free_takeoved_segment_conns(result->segment_conns);
 }
 
