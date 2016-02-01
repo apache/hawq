@@ -7741,16 +7741,6 @@ static struct config_string ConfigureNamesString[] =
 		"dispatch", assign_gp_role, show_gp_role
 	},
 
-    {
-       {"gp_fault_action", PGC_POSTMASTER, DEFUNCT_OPTIONS,
-		gettext_noop("Sets the fault action for fault tolerance management."),
-		gettext_noop("Valid values are CONTINUE, READONLY, and SHUTDOWN."),
-		GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-       },
-       &gp_fault_action_string,
-       "continue", NULL, NULL
-    },
-
 	{
 		{"gp_log_gang", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Sets the verbosity of logged messages pertaining to worker process creation and management."),
