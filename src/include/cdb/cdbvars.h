@@ -388,8 +388,6 @@ extern const char *show_gp_connections_per_thread(void);
  */
 extern int32 gp_subtrans_warn_limit;
 
-extern char *gp_fault_action_string;	/* Use by guc.c as user defined fault
-										 * action */
 extern bool gp_set_read_only;
 extern const char *role_to_string(GpRoleValue role);
 

@@ -504,9 +504,6 @@ class HAWQArray:
             master_data_directory  = hawq_site.get_value_from_name('hawq_master_directory')
             segment_data_directory = hawq_site.get_value_from_name('hawq_segment_directory')
 
-            # strategy_rows = dbconn.execSQL(conn, "show gp_fault_action")
-            strategy_rows = []
-
             config_rows = dbconn.execSQL(conn, '''
                                SELECT sc.registration_order,
                                       sc.role,

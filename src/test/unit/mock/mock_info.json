@@ -13837,10 +13837,6 @@
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h"
         }, 
-        "gp_fault_action_string": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h"
-        }, 
         "gp_filerep_tcp_keepalives_count": {
             "filename": "src/backend/utils/misc/guc.c", 
             "header filename": "src/include/utils/guc.h"
