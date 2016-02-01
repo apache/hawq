@@ -116,7 +116,7 @@ int			maintenance_work_mem = 65536;
 /* Primary determinants of sizes of shared-memory structures: */
 int			NBuffers = 4096;
 int			MaxBackends = 200;
-int			SegMaxBackends = 4800;
+int			SegMaxBackends = 1280;
 
 int			gp_workfile_max_entries = 8192; /* Number of unique entries we can hold in the workfile directory */
 
