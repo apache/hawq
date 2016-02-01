@@ -17,9 +17,9 @@
 # under the License.
 
 """
-gpcheckperf -- Check the hardware for Greenplum Database
+hawq checkperf -- Check the hardware for Greenplum Database
 
-Usage: gpcheckperf <options>
+Usage: hawq checkperf <options>
 
     --version  : print version information
     -d segdir  : where segdir is a directory on which to test I/O performance. 
@@ -360,14 +360,14 @@ def runSetup():
 		     +"        verify PATH variables on the hosts")
 
 	#mkdir cperf
-	if GV.opt['-v']: print '[Info] making gpcheckperf directory on all hosts ... '
+	if GV.opt['-v']: print '[Info] making hawq checkperf directory on all hosts ... '
 	dirs = ''
 	for d in GV.opt['-d']: dirs = '%s %s/gpcheckperf_$USER' % (dirs, d)
 
         cmd = 'rm -rf %s ; mkdir -p %s' % (dirs, dirs)
 	(ok, out) = gpssh(cmd)
 	if not ok: 
-	    sys.exit("[Error] unable to make gpcheckperf directory. \n"
+	    sys.exit("[Error] unable to make hawq checkperf directory. \n"
 		   + "        command failed: " + cmd)
 
     except:

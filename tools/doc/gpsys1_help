@@ -69,4 +69,4 @@ gpsys1
 SEE ALSO
 *****************************************************
 
-gpcheckperf
+hawq checkperf

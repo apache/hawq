@@ -104,6 +104,9 @@ def main():
     elif hawq_command == "check":
         cmd = "%s; gpcheck %s" % (source_hawq_env, sub_args)
         result = local_ssh(cmd)
+    elif hawq_command == "checkperf":
+        cmd = "%s; gpcheckperf %s" % (source_hawq_env, sub_args)
+        result = local_ssh(cmd)
     elif hawq_command == "load":
         cmd = "%s; gpload %s" % (source_hawq_env, sub_args)
         result = local_ssh(cmd)

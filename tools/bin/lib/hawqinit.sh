@@ -102,14 +102,14 @@ get_all_ip_address() {
     fi
 
     master_ip_address_all=`${SSH} ${master_host_name} "${cmd_str}"`
-    if [ -z ${master_ip_address_all} ];then
+    if [ -z "${master_ip_address_all}" ];then
         ${ECHO} "Failed to get master ip addresses"
         exit 1
     fi
 
     if [ "${standby_host_lowercase}" != "none" ] && [ -n "${standby_host_lowercase}" ];then
         standby_ip_address_all=`${SSH} ${standby_host_name} "${cmd_str}"`
-        if [ -z ${standby_ip_address_all} ];then
+        if [ -z "${standby_ip_address_all}" ];then
             ${ECHO} "Failed to get standby ip addresses"
             exit 1
         fi
@@ -117,7 +117,7 @@ get_all_ip_address() {
 
     segment_ip_address_all=`${SSH} localhost "${cmd_str}"`
 
-    if [ -z ${segment_ip_address_all} ];then
+    if [ -z "${segment_ip_address_all}" ];then
         ${ECHO} "Failed to get segment ip addresses"
         exit 1
     fi

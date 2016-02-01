@@ -1,4 +1,4 @@
-COMMAND NAME: gpcheckperf
+COMMAND NAME: hawq checkperf
 
 Verifies the baseline hardware performance of the specified hosts.
 
@@ -6,27 +6,27 @@ Verifies the baseline hardware performance of the specified hosts.
 SYNOPSIS
 *****************************************************
 
-gpcheckperf -d <test_directory> [-d <test_directory> ...] 
-       {-f <hostfile_gpcheckperf> | -h <hostname> [-h <hostname> ...]} 
+hawq checkperf -d <test_directory> [-d <test_directory> ...] 
+       {-f <hostfile_checkperf> | -h <hostname> [-h <hostname> ...]} 
        [-r ds] [-B <block_size>] [-S <file_size>] [-D] [-v|-V]
 
 
-gpcheckperf -d <temp_directory>
+hawq checkperf -d <temp_directory>
         {-f <hostfile_gpchecknet> | -h <hostname> [-h <hostname> ...]} 
         [ -r n|N|M [--duration <time>] [--netperf] ] [-D] [-v|-V]
 
 
-gpcheckperf -? 
+hawq checkperf -? 
 
 
-gpcheckperf --version
+hawq checkperf --version
 
 
 *****************************************************
 DESCRIPTION
 *****************************************************
 
-The gpcheckperf utility starts a session on the specified hosts 
+The hawq checkperf utility starts a session on the specified hosts 
 and runs the following performance tests:
 
 * Disk I/O Test (dd test) - To test the sequential throughput 
@@ -74,17 +74,17 @@ network interfaces configured on different subnets, run the network
 test once for each subnet.
 
 You must also specify at least one test directory (with -d). 
-The user who runs gpcheckperf must have write access to the 
+The user who runs hawq checkperf must have write access to the 
 specified test directories on all remote hosts. For the disk 
 I/O test, the test directories should correspond to your segment 
 data directories (primary and/or mirrors). For the memory bandwidth
 and network tests, a temporary directory is required for the test 
 program files.
 
-Before using gpcheckperf, you must have a trusted host setup between
+Before using hawq checkperf, you must have a trusted host setup between
  the hosts involved in the performance test. Use the utility 
 gpssh-exkeys to update the known host files and exchange public 
-keys between hosts. Note that gpcheckperf calls to gpssh and gpscp,
+keys between hosts. Note that hawq checkperf calls to gpssh and gpscp,
 so these HAWQ utilities must also be in your $PATH.
 
 *****************************************************
@@ -126,7 +126,7 @@ OPTIONS
  minutes (m), hours (h), or days (d). The default is 15 seconds.
 
 
--f <hostfile_gpcheckperf>
+-f <hostfile_checkperf>
 
  For the disk I/O and stream tests, specifies the name of a file that 
  contains one host name per host that will participate in the performance 
@@ -185,7 +185,7 @@ OPTIONS
  Specifies the total file size to be used for the disk I/O test for 
  all directories specified with -d. file_size should equal two times 
  total RAM on the host. If not specified, the default is calculated 
- at two times the total RAM on the host where gpcheckperf is executed. 
+ at two times the total RAM on the host where hawq checkperf is executed. 
  This ensures that the test is truly testing disk I/O and not using 
  the memory cache. You can specify sizing in KB, MB, or GB.
 
@@ -215,22 +215,22 @@ EXAMPLES
 Run the disk I/O and memory bandwidth tests on all the hosts 
 in the file host_file using the test directory of /data1 and /data2:
 
-$ gpcheckperf -f hostfile_gpcheckperf -d /data1 -d /data2 -r ds
+$ hawq checkperf -f hostfile_checkperf -d /data1 -d /data2 -r ds
 
 
 Run only the disk I/O test on the hosts named sdw1 and sdw2 
 using the test directory of /data1. Show individual host 
 results and run in verbose mode:
 
-$ gpcheckperf -h sdw1 -h sdw2 -d /data1 -r d -D -v
+$ hawq checkperf -h sdw1 -h sdw2 -d /data1 -r d -D -v
 
 
 Run the parallel network test using the test directory of /tmp, 
 where host_file_subnet* specifies all network interface host 
 names within the same subnet:
 
-$ gpcheckperf -f hostfile_gpchecknet_ic1 -r N -d /tmp
-$ gpcheckperf -f hostfile_gpchecknet_ic2 -r N -d /tmp
+$ hawq checkperf -f hostfile_gpchecknet_ic1 -r N -d /tmp
+$ hawq checkperf -f hostfile_gpchecknet_ic2 -r N -d /tmp
 
 
 Run the same test as above, but use netperf instead of the 
@@ -238,13 +238,13 @@ HAWQ network test (note that netperf must be installed
 in $GPHOME/bin/lib on all HAWQ hosts):
 
 
-$ gpcheckperf -f hostfile_gpchecknet_ic1 -r N --netperf -d /tmp
-$ gpcheckperf -f hostfile_gpchecknet_ic2 -r N --netperf -d /tmp
+$ hawq checkperf -f hostfile_gpchecknet_ic1 -r N --netperf -d /tmp
+$ hawq checkperf -f hostfile_gpchecknet_ic2 -r N --netperf -d /tmp
 
 
 *****************************************************
 SEE ALSO
 *****************************************************
 
-gpssh, gpscp, gpcheck
+hawq ssh, hawq scp, hawq check
 

@@ -136,6 +136,6 @@ View collected HAWQ platform settings:
 SEE ALSO
 *****************************************************
 
-gpcheckperf
+hawq checkperf
 
 

@@ -36,6 +36,7 @@ The most commonly used hawq "commands" are:
    ssh           Provides ssh access to multiple hosts at once.
    ssh-exkeys    Exchanges SSH public keys between hosts.
    check         Verifies and validates HAWQ settings.
+   checkperf     Verifies the baseline hardware performance of hosts.
 
 See 'hawq <command> help' for more information on a specific command.
 """
