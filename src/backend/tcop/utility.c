@@ -1714,32 +1714,6 @@ ProcessUtility(Node *parsetree,
 							 (int) stmt->kind);
 						break;
 				}
-
-				if (Gp_role == GP_ROLE_DISPATCH)
-				{
-					if (stmt->kind != OBJECT_DATABASE)
-						dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
-					else
-					{
-						/*
-						 * REINDEX DATABASE must be dispatched different, because it can't
-						 * be in a user transaction
-						 */
-						StringInfoData buffer;
-
-						initStringInfo(&buffer);
-
-						/* MPP-1832: REINDEX SYSTEM generates sets
-						 * kind to OBJECT_DATABASE, but sets do_user
-						 * to false */
-						if (!stmt->do_user)
-							appendStringInfo(&buffer, "REINDEX SYSTEM \"%s\"", stmt->name);
-						else
-							appendStringInfo(&buffer, "REINDEX DATABASE \"%s\"", stmt->name);
-
-						dispatch_statement_string(buffer.data, NULL, 0, NULL, NULL, false);
-					}
-				}
 			}
 			break;
 
