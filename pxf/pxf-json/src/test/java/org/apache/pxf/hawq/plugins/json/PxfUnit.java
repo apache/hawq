@@ -89,6 +89,8 @@ public abstract class PxfUnit {
 		}
 
 		assertOutput(input, outputLines);
+		
+		rdr.close();
 	}
 
 	/**

@@ -24,7 +24,9 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import org.apache.hawq.pxf.plugins.json.JsonStreamReader;
-import org.junit.Assert;
+import org.junit.After;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -39,15 +41,24 @@ public class JsonStreamReaderTest {
 		rdr = new JsonStreamReader("menuitem", new FileInputStream(FILE));
 	}
 
+	@After
+	public void after() throws IOException {
+		rdr.close();
+	}
+
 	@Test
 	public void testReadRecords() throws IOException {
-		int count = 0;
-		String record = null;
-		while ((record = rdr.getJsonRecord()) != null) {
-			++count;
-			System.out.println(record);
-		}
+		assertEquals("{\"key1\":\"Foo\"}", rdr.getJsonRecord());
+		assertEquals("{\"key1\":\"Bar\"}", rdr.getJsonRecord());
+		assertEquals("{\"key1\":\"Baz\"}", rdr.getJsonRecord());
+		assertEquals(null, rdr.getJsonRecord());
+	}
 
-		Assert.assertEquals(3, count);
+	@Test
+	public void testReadMalfomredJson() throws IOException {
+		JsonStreamReader rdr2 = new JsonStreamReader("menuitem", new FileInputStream("src/test/resources/sample-malformed.json"));
+		assertEquals("{\"key1\":\"Foo\"}", rdr2.getJsonRecord());
+		assertNotEquals("{\"key1\":\"Bar\"}", rdr2.getJsonRecord());
+		rdr2.close();
 	}
 }
