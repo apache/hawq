@@ -3449,7 +3449,6 @@ void timeoutIdleGRMResourceToRBByRatio(int 		 ratioindex,
 			elog(LOG, "Resource manager decides to return container "INT64_FORMAT" in host %s",
 					  retcont->ID,
 					  retcont->HostName);
-			validateResourcePoolStatus(false);
 		}
 		else
 		{
@@ -3472,6 +3471,8 @@ void timeoutIdleGRMResourceToRBByRatio(int 		 ratioindex,
 	{
 		insertBBSTNode(tree, (BBSTNode)removeDQueueHeadNode(&tempskipnodes));
 	}
+
+	validateResourcePoolStatus(false);
 }
 
 bool hasSegmentGRMCapacityNotUpdated(void)
