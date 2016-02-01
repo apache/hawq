@@ -95,7 +95,7 @@ standby_host_lowercase=`lowercase "${standby_host_name}"`
 get_all_ip_address() {
     if [ "${distro_based_on}" = "RedHat" ] && [ "${distro_major_version}" -ge 7 ]; then
         cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print \$2}'"
-    elif [ "${distro_based_on}" = "Mac" ] && [ "${distro_version:0:5}" = "10.11" ]; then
+    elif [ "${distro_based_on}" = "Mac" ]; then
         cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print \$2}'"
     else
         cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' |${AWK} '/inet addr/{print substr(\$2,6)}'"
