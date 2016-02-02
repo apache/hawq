@@ -775,8 +775,6 @@ relationId == AuthIdRelationId ||
 relationId == GpMasterMirroringRelationId || 
 /* relation id: 5035 - gp_san_configuration 20101104 */
 relationId == GpSanConfigRelationId || 
-/* relation id: 5039 - gp_fault_strategy 20101104 */
-relationId == GpFaultStrategyRelationId || 
 /* relation id: 5000 - gp_configuration 20101104 */
 relationId == GpConfigurationRelationId || 
 /* relation id: 5006 - gp_configuration_history 20101104 */

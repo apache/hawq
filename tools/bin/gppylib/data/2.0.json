@@ -280,34 +280,6 @@
          "text" : "with (camelcase=GpPolicy, oid=false, relid=5002, content=MASTER_ONLY)"
       }
    },
-   "gp_fault_strategy" : {
-      "CamelCaseRelationId" : "GpFaultStrategyRelationId",
-      "UppercaseReltypeOid" : "GP_FAULT_STRATEGY_RELTYPE_OID",
-      "colh" : {
-         "fault_strategy" : "char"
-      },
-      "cols" : [
-         {
-            "colname" : "fault_strategy",
-            "ctype" : "char",
-            "precomment" : "\n**TK_BLANK_LINE**",
-            "sqltype" : "quoted_char"
-         }
-      ],
-      "filename" : "gp_san_config.h",
-      "relid_comment_tag" : "/* relation id: 5039 - gp_fault_strategy */\n",
-      "tabdef_text" : "\n   CREATE TABLE gp_fault_strategy\n   with (camelcase=GpFaultStrategy, shared=true, oid=false, relid=5039, reltype_oid=6443, content=MASTER_ONLY)\n   (\n   fault_strategy \"char\"\n   )",
-      "with" : {
-         "bootstrap" : 0,
-         "camelcase" : "GpFaultStrategy",
-         "content" : "MASTER_ONLY",
-         "oid" : "",
-         "relid" : "5039",
-         "reltype_oid" : "6443",
-         "shared" : "1",
-         "text" : "with (camelcase=GpFaultStrategy, shared=true, oid=false, relid=5039, reltype_oid=6443, content=MASTER_ONLY)"
-      }
-   },
    "gp_global_sequence" : {
       "CamelCaseRelationId" : "GpGlobalSequenceRelationId",
       "UppercaseReltypeOid" : "GP_GLOBAL_SEQUENCE_RELTYPE_OID",

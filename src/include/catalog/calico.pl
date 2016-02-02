@@ -3878,7 +3878,6 @@ static void caql_lockwell(cqContext		*pCtx,
 
 //	SET_LOCKTAG_RELATION(tag, dbid, relid);
 	/* use gp_san_configuration for now */
-	SET_LOCKTAG_RELATION(tag, dbid, GpFaultStrategyRelationId);
 
 	Oid keyoid = hashoid;
 
