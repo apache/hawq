@@ -1494,6 +1494,7 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 		reorderSegResourceAvailIndex(segres, ratio);
 		reorderSegResourceAllocIndex(segres, ratio);
 	}
+	reorderSegResourceCombinedWorkloadIndex(segres);
 
 	elog(LOG, "Host %s is set availability %d. Cluster currently has %d available nodes.",
 			  GET_SEGRESOURCE_HOSTNAME(segres),
@@ -1771,6 +1772,7 @@ void addGRMContainerToResPool(GRMContainer container)
 
 	reorderSegResourceAvailIndex(segresource, ratio);
 	reorderSegResourceAllocIndex(segresource, ratio);
+	reorderSegResourceCombinedWorkloadIndex(segresource);
 
 	elog(LOG, "Resource manager added resource container into resource pool "
 			  "(%d MB, %d CORE) at %s (%d:%.*s)",
@@ -1780,35 +1782,6 @@ void addGRMContainerToResPool(GRMContainer container)
 			  segresource->Stat->ID,
 			  segresource->Stat->Info.HostNameLen,
 			  GET_SEGRESOURCE_HOSTNAME(segresource));
-}
-
-void dropGRMContainerFromResPool(GRMContainer ctn)
-{
-	minusResourceBundleData(&(ctn->Resource->Allocated), ctn->MemoryMB, ctn->Core);
-	minusResourceBundleData(&(ctn->Resource->Available), ctn->MemoryMB, ctn->Core);
-
-	Assert( ctn->Resource->Allocated.MemoryMB >= 0 );
-	Assert( ctn->Resource->Allocated.Core >= 0     );
-	Assert( ctn->Resource->Available.MemoryMB >= 0 );
-	Assert( ctn->Resource->Available.Core >= 0     );
-
-	Assert( ctn->Resource->Allocated.MemoryMB >= 0 );
-	Assert( ctn->Resource->Allocated.Core >= 0     );
-	Assert( ctn->Resource->Available.MemoryMB >= 0 );
-	Assert( ctn->Resource->Available.Core >= 0     );
-
-	uint32_t ratio = trunc(ctn->MemoryMB / ctn->Core);
-	reorderSegResourceAllocIndex(ctn->Resource, ratio);
-	reorderSegResourceAvailIndex(ctn->Resource, ratio);
-
-	elog(LOG, "Resource manager dropped resource container from resource pool "
-			  "(%d MB, %d CORE) at %s (%d:%.*s)",
-			  ctn->MemoryMB,
-			  ctn->Core,
-			  ctn->HostName,
-			  ctn->Resource->Stat->ID,
-			  ctn->Resource->Stat->Info.HostNameLen,
-			  GET_SEGRESOURCE_HOSTNAME(ctn->Resource));
 }
 
 void addGRMContainerToToBeKicked(GRMContainer ctn)
@@ -2991,6 +2964,7 @@ void returnAllGRMResourceFromSegment(SegResource segres)
 		reorderSegResourceAllocIndex(segres, PQUEMGR->RatioReverseIndex[i]);
 		reorderSegResourceAvailIndex(segres, PQUEMGR->RatioReverseIndex[i]);
 	}
+	reorderSegResourceCombinedWorkloadIndex(segres);
 
 	Assert(segres->Allocated.MemoryMB == 0);
 	Assert(segres->Allocated.Core == 0.0);
@@ -3078,6 +3052,7 @@ void dropAllGRMContainersFromSegment(SegResource segres)
 		reorderSegResourceAllocIndex(segres, PQUEMGR->RatioReverseIndex[i]);
 		reorderSegResourceAvailIndex(segres, PQUEMGR->RatioReverseIndex[i]);
 	}
+	reorderSegResourceCombinedWorkloadIndex(segres);
 
 	elog(LOG, "Resource manager cleared %u containers, old in-use resource "
 				  "is set (%d MB, %lf CORE)",
@@ -3443,6 +3418,7 @@ void timeoutIdleGRMResourceToRBByRatio(int 		 ratioindex,
 
 			reorderSegResourceAllocIndex(resource, ratio);
 			reorderSegResourceAvailIndex(resource, ratio);
+			reorderSegResourceCombinedWorkloadIndex(resource);
 
 			addGRMContainerToToBeKicked(retcont);
 			(*realretcontnum)++;
@@ -3548,6 +3524,7 @@ bool setSegResRUAlivePending( SegResource segres, bool pending)
 		reorderSegResourceAllocIndex(segres, ratio);
 		reorderSegResourceAvailIndex(segres, ratio);
 	}
+	reorderSegResourceCombinedWorkloadIndex(segres);
 	return res;
 }
 
@@ -3605,6 +3582,7 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 	{
 		SegResource segres = getSegResource(i);
 		Assert(segres != NULL);
+		bool segreschanged = false;
 
 		for( int ridx = 0 ; ridx < PQUEMGR->RatioCount ; ++ridx )
 		{
@@ -3671,6 +3649,9 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 								  "it is not treated active in YARN");
 
 					minusResourceFromReourceManager(ctn->MemoryMB, ctn->Core);
+
+					segreschanged = true;
+
 					validateResourcePoolStatus(true);
 				}
 				else
@@ -3687,6 +3668,10 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 					cell = lnext(cell);
 				}
 			}
+		}
+		if ( segreschanged )
+		{
+			reorderSegResourceCombinedWorkloadIndex(segres);
 		}
 	}
 	MEMORY_CONTEXT_SWITCH_BACK

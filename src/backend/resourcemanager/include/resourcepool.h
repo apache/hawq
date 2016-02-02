@@ -546,7 +546,6 @@ SegResource getSegResource(int32_t id);
 int  addGRMContainerToToBeAccepted(GRMContainer ctn);
 void GRMContainerToAccepted(GRMContainer ctn);
 void addGRMContainerToResPool(GRMContainer ctn);
-void dropGRMContainerFromResPool(GRMContainer ctn);
 
 void addGRMContainerToToBeKicked(GRMContainer ctn);
 void addGRMContainerToKicked(GRMContainer ctn);
