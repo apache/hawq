@@ -81,7 +81,14 @@ public class PartitionedJsonParser {
 	private static final EnumSet<JsonLexerState> inStringStates = EnumSet.of(JsonLexerState.INSIDE_STRING,
 			JsonLexerState.STRING_ESCAPE);
 
-	public String nextObjectContainingMember(String member) throws IOException {
+	/**
+	 * @param memberName
+	 *            Indicates the member name used to determine the encapsulating object to return.
+	 * @return Returns next json object that contains a member attribute with name: memberName. Returns null if no such
+	 *         object is found or the end of the stream is reached.
+	 * @throws IOException
+	 */
+	public String nextObjectContainingMember(String memberName) throws IOException {
 
 		if (endOfStream) {
 			return null;
@@ -117,7 +124,7 @@ public class PartitionedJsonParser {
 				} else if (inStringStates.contains(lexer.getState())) {
 					// we're still inside a string, so keep appending to our buffer
 					currentString.append(c);
-				} else if (lexer.getState() == JsonLexerState.END_STRING && member.equals(currentString.toString())) {
+				} else if (lexer.getState() == JsonLexerState.END_STRING && memberName.equals(currentString.toString())) {
 
 					if (objectStack.size() > 0) {
 						// we hit the end of the string and it matched the member name (yay)
