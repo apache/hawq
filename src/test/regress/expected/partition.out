@@ -5528,7 +5528,6 @@ locktype from
 pg_locks l left outer join pg_class c on (l.relation = c.oid),
 pg_database d where relation is not null and l.database = d.oid and 
 l.gp_segment_id = -1 and
-relname != 'gp_fault_strategy' and
 d.datname = current_database() order by 1, 3, 2;
 -- end_ignore
 -- Partitioned table with toast table

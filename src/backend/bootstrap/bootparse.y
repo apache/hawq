@@ -312,10 +312,6 @@ Boot_CreateStmt:
 							case GpSanConfigRelationId:
 								typid = GP_SAN_CONFIGURATION_RELTYPE_OID;
 								break;
-/* relation id: 5039 - gp_fault_strategy 20101104 */
-							case GpFaultStrategyRelationId:
-								typid = GP_FAULT_STRATEGY_RELTYPE_OID;
-								break;
 /* relation id: 5096 - gp_global_sequence 20101104 */
 							case GpGlobalSequenceRelationId:
 								typid = GP_GLOBAL_SEQUENCE_RELTYPE_OID;

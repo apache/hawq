@@ -171,16 +171,11 @@ class GpConfigurationProviderUsingHAWQCatalog(GpConfigurationProvider) :
             originalSeg = update.dbsegmap.get(seg.getRegistrationOrder())
             self.__updateSystemConfigUpdateSegment(conn, hawqArray, seg, originalSeg, textForConfigTable)
 
-        # apply update to fault strategy
-        if hawqArray.getStrategyAsLoadedFromDb() != hawqArray.getFaultStrategy():
-            self.__updateSystemConfigFaultStrategy(conn, hawqArray)
-
         # commit changes
         logger.debug("Committing configuration table changes")
         dbconn.execSQL(conn, "COMMIT")
         conn.close()
 
-        hawqArray.setStrategyAsLoadedFromDb( [hawqArray.getFaultStrategy()])
         hawqArray.setSegmentsAsLoadedFromDb([seg.copy() for seg in hawqArray.getDbList()])
 
 
@@ -276,28 +271,14 @@ class GpConfigurationProviderUsingHAWQCatalog(GpConfigurationProvider) :
         # update mode and status
         # when adding a mirror, the replication port may change as well
         #
-        if hawqArray.getFaultStrategy() == hawqarray.FAULT_STRATEGY_NONE:
-            what = "%s: segment hostname and address"
-            self.__updateSegmentAddress(conn, seg)
-        else:
-            what = "%s: segment mode and status"
-            self.__updateSegmentModeStatus(conn, seg)
+        what = "%s: segment hostname and address"
+        self.__updateSegmentAddress(conn, seg)
 
         if seg.getReplicationPort() != originalSeg.getReplicationPort():
             what = "%s: segment mode, status, and replication port"
             self.__updateSegmentReplicationPort(conn, seg)
 
         self.__insertConfigHistory(conn, seg.getRegistrationOrder(), what % textForConfigTable)
-
-
-    def __updateSystemConfigFaultStrategy(self, conn, hawqArray):
-        """
-        Update the fault strategy.
-        """
-        fs  = hawqArray.getFaultStrategy()
-        sql = "UPDATE gp_fault_strategy\n SET fault_strategy = " + self.__toSqlCharValue(fs) + "\n"
-        logger.debug(sql)
-        dbconn.executeUpdateOrInsert(conn, sql, 1)
 
 
     def __callSegmentRemoveMirror(self, conn, seg):

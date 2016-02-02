@@ -752,8 +752,6 @@ cq_lookup (str, len)
 
       {"SELECT oid FROM pg_namespace  WHERE nspname = :1 ", 345, 138, 0, 0, 0, 0, ObjectIdAttributeNumber},
 
-      {"SELECT * FROM gp_fault_strategy ", 97, 53, 0, 0, 0, 0, InvalidAttrNumber},
-
       {"SELECT * FROM pg_depend  WHERE refclassid = :1  AND refobjid = :2  AND refobjsubid = :3  FOR UPDATE ", 160, 110, 0, 0, 1, 0, InvalidAttrNumber},
 
       {"SELECT * FROM pg_largeobject  WHERE loid = :1  ORDER BY loid, pageno ", 191, 136, 0, 0, 0, 0, InvalidAttrNumber},
@@ -4805,63 +4803,6 @@ caql_basic_fn_52(cqContext *pCtx, cq_list *pcql, bool bLockEntireTable)
 				   FastSequenceObjidObjmodContentidIndexId,
 				   pCtx->cq_useidxOK,
 				   pCtx->cq_snapshot, 3, pCtx->cq_scanKeys);
-
-
-	return (scan);
-}
-
-/* base query: select * from gp_fault_strategy  */
-/* index: *None*  */
-/* clients: 1		i/u/d: 0/0/0 
- *   /src/backend/fts/fts.c: 1
- */
-/* foreign key tables: *None*
- */
-static
-SysScanDesc
-caql_basic_fn_53(cqContext *pCtx, cq_list *pcql, bool bLockEntireTable)
-{
-	SysScanDesc  scan;
-	
-	Relation	rel;
-
-
-	Assert (!pCtx->cq_usesyscache);
-	pCtx->cq_usesyscache = false; /* complain in debug, work in production */
-
-	pCtx->cq_relationId = GpFaultStrategyRelationId;
-
-	if (!pCtx->cq_externrel)
-	{
-		
-		{
-			pCtx->cq_heap_rel = heap_open(pCtx->cq_relationId, 
-										  pCtx->cq_lockmode);
-			pCtx->cq_tupdesc  = RelationGetDescr(pCtx->cq_heap_rel);
-		}
-	}
-	else
-	{
-		/* make sure the supplied relation matches the caql */
-		if (RelationIsValid(pCtx->cq_heap_rel))
-		{
-			Assert(GpFaultStrategyRelationId == 
-				   RelationGetRelid(pCtx->cq_heap_rel));
-			pCtx->cq_tupdesc  = RelationGetDescr(pCtx->cq_heap_rel);
-		}
-
-	}		
-
-	rel = pCtx->cq_heap_rel;
-
-	if (pCtx->cq_usesyscache) return NULL; /* XXX XXX: don't init scan */
-
-	
-
-	scan = systable_beginscan(rel,
-				   InvalidOid,
-				   false,
-				   pCtx->cq_snapshot, 0, pCtx->cq_scanKeys);
 
 
 	return (scan);
@@ -17845,9 +17786,6 @@ cqContext *caql_switch(struct caql_hash_cookie *pchn,
 			break;
 		case 52: /* select * from gp_fastsequence where objid = :1 and objmod = :2 and contentid = :3 */
 			pCtx->cq_sysScan = caql_basic_fn_52(pCtx, pcql, false);
-			break;
-		case 53: /* select * from gp_fault_strategy */
-			pCtx->cq_sysScan = caql_basic_fn_53(pCtx, pcql, false);
 			break;
 		case 54: /* select * from gp_segment_configuration */
 			pCtx->cq_sysScan = caql_basic_fn_54(pCtx, pcql, false);
