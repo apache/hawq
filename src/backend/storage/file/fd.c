@@ -632,32 +632,54 @@ LruDelete(File file)
 	if (vfdP->seekPos == INT64CONST(-1))
 		elog(ERROR, "could not get the current position of file \"%s\": %m", vfdP->fileName);
 
-	/* close the file */
-	if (IsLocalPath(VfdCache[file].fileName))
-	{
-		if (close(vfdP->fd))
-			elog(ERROR, "could not close file \"%s\": %m", vfdP->fileName);
-	}
+	/* Need to firstly remove file description from VfdCache before closing file,
+     * So that if we failed to close the file, the metadata is clean, we don't need to re-close this file. 
+     * otherwise it will crashed if at this time it received die/cancel signal.
+     */
+	size_t tmp_length = vfdP->hProtocol?strlen(vfdP->hProtocol) + 1:1;
+	char protocol[tmp_length];
+	if(tmp_length>1)
+		StrNCpy(protocol, vfdP->hProtocol, tmp_length);
 	else
-	{
-		if (HdfsCloseFile(VfdCache[file].hProtocol, VfdCache[file].hFS,
-				VfdCache[file].hFile))
-		{
-			ereport(WARNING,
-				(errcode(ERRCODE_IO_ERROR),
-						errmsg("could not close file \"%s\": %m", vfdP->fileName),
-						errdetail("%s", HdfsGetLastError())));
-		}
-	}
+		protocol[tmp_length-1]='\0';
+
+	tmp_length = VfdCache[file].fileName?strlen(VfdCache[file].fileName) + 1:1;
+	char filename[tmp_length];
+	if(tmp_length>1)
+		StrNCpy(filename, VfdCache[file].fileName, tmp_length);
+	else
+		filename[tmp_length-1]='\0';
+
+	int fd = vfdP->fd;
+	hdfsFS hfs= vfdP->hFS;
+	hdfsFile hfd = vfdP->hFile;
 
 	--nfile;
 	vfdP->fd = VFD_CLOSED;
 	vfdP->hFS = NULL;
 	vfdP->hFile = NULL;
+
 	if (vfdP->hProtocol)
 	{
 		free(vfdP->hProtocol);
 		vfdP->hProtocol = NULL;
+	}
+
+	/* close the file */
+	if (IsLocalPath(filename))
+	{
+		if (close(fd))
+			elog(ERROR, "could not close file \"%s\": %m", filename);
+	}
+	else
+	{
+		if (HdfsCloseFile(protocol, hfs, hfd))
+		{
+			ereport(WARNING,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("could not close file \"%s\": %m", filename),
+						errdetail("%s", HdfsGetLastError())));
+		}
 	}
 }
 
