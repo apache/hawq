@@ -26,6 +26,7 @@ import java.io.InputStreamReader;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
 
 /**
  * Reads a JSON stream and sequentially extracts all JSON objects identified by the <b>identifier</b> parameter. Returns
@@ -52,6 +53,11 @@ public class JsonStreamReader extends BufferedReader {
 	 */
 	public JsonStreamReader(String identifier, InputStream inputStream) {
 		super(new InputStreamReader(inputStream));
+
+		if (isEmpty(identifier)) {
+			throw new java.lang.IllegalArgumentException("The X-GP-IDENTIFIER paramter is not set!");
+		}
+
 		this.identifier = identifier;
 	}
 

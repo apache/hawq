@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hdfs.web.JsonUtil;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
 import org.apache.hawq.pxf.api.ReadResolver;
@@ -34,7 +37,9 @@ import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
+import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonNode;
+import org.codehaus.jackson.map.ObjectMapper;
 
 /**
  * This JSON resolver for PXF will decode a given object from the {@link JsonAccessor} into a row for HAWQ. It will
@@ -43,11 +48,16 @@ import org.codehaus.jackson.JsonNode;
  */
 public class JsonResolver extends Plugin implements ReadResolver {
 
+	private static final Log LOG = LogFactory.getLog(JsonResolver.class);
+
 	private static Pattern ARRAY_PROJECTION_PATTERN = Pattern.compile("(.*)\\[([0-9]+)\\]");
 	private static int ARRAY_NAME_GROUPID = 1;
 	private static int ARRAY_INDEX_GROUPID = 2;
 
 	private ArrayList<OneField> list = new ArrayList<OneField>();
+
+	private static JsonFactory factory = new JsonFactory();
+	private static ObjectMapper mapper = new ObjectMapper(factory);
 
 	public JsonResolver(InputData inputData) throws Exception {
 		super(inputData);
@@ -57,8 +67,10 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	public List<OneField> getFields(OneRow row) throws Exception {
 		list.clear();
 
+		String jsonText = row.getData().toString();
+
 		// key is a Text object
-		JsonNode root = JsonUtil.decodeLineToJsonNode(row.getData().toString());
+		JsonNode root = decodeLineToJsonNode(jsonText);
 
 		// if we weren't given a null object
 		if (root != null) {
@@ -109,6 +121,8 @@ public class JsonResolver extends Plugin implements ReadResolver {
 					}
 				}
 			}
+		} else {
+			LOG.error("Skip non parsable JSON object:" + jsonText);
 		}
 
 		return list;
@@ -282,4 +296,22 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	private void addNullField(DataType type) {
 		list.add(new OneField(type.getOID(), null));
 	}
+
+	/**
+	 * Converts the input line parameter into {@link JsonNode} instance.
+	 * 
+	 * @param line
+	 *            JSON text
+	 * @return Returns a {@link JsonNode} that represents the input line or null for invalid json.
+	 */
+	private static synchronized JsonNode decodeLineToJsonNode(String line) {
+
+		try {
+			return mapper.readTree(line);
+		} catch (Exception e) {
+			LOG.warn("Failed to convert the line into JSON object", e);
+			return null;
+		}
+	}
+
 }
