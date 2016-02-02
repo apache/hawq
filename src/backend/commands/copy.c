@@ -6243,9 +6243,12 @@ copy_in_error_callback(void *arg)
 			line_start = copy_of_line_buf.data;
 			lineno_delim = memchr(line_start, COPY_METADATA_DELIM, Min(32, cstate->line_buf.len));
 
-			value_len = lineno_delim - line_start + 1;
-			copy_of_line_buf.data += value_len; /* advance beyond line_buf_converted */
-			copy_of_line_buf.len -= value_len;		
+			if (lineno_delim)
+			{
+				value_len = lineno_delim - line_start + 1;
+				copy_of_line_buf.data += value_len; /* advance beyond line_buf_converted */
+				copy_of_line_buf.len -= value_len;
+			}
 		}
 	}
 
