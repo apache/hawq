@@ -53,18 +53,18 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	private static int ARRAY_NAME_GROUPID = 1;
 	private static int ARRAY_INDEX_GROUPID = 2;
 
-	private ArrayList<OneField> list = new ArrayList<OneField>();
-
-	private static JsonFactory factory = new JsonFactory();
-	private static ObjectMapper mapper = new ObjectMapper(factory);
+	private ArrayList<OneField> oneFieldList;
+	private ObjectMapper mapper;
 
 	public JsonResolver(InputData inputData) throws Exception {
 		super(inputData);
+		oneFieldList = new ArrayList<OneField>();
+		mapper = new ObjectMapper(new JsonFactory());
 	}
 
 	@Override
 	public List<OneField> getFields(OneRow row) throws Exception {
-		list.clear();
+		oneFieldList.clear();
 
 		String jsonText = row.getData().toString();
 
@@ -124,7 +124,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			LOG.error("Skip non parsable JSON object:" + jsonText);
 		}
 
-		return list;
+		return oneFieldList;
 	}
 
 	/**
@@ -283,7 +283,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			}
 		}
 
-		list.add(oneField);
+		oneFieldList.add(oneField);
 	}
 
 	/**
@@ -293,7 +293,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 *            The {@link DataType} type
 	 */
 	private void addNullField(DataType type) {
-		list.add(new OneField(type.getOID(), null));
+		oneFieldList.add(new OneField(type.getOID(), null));
 	}
 
 	/**
@@ -303,7 +303,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 *            JSON text
 	 * @return Returns a {@link JsonNode} that represents the input line or null for invalid json.
 	 */
-	private static synchronized JsonNode decodeLineToJsonNode(String line) {
+	private JsonNode decodeLineToJsonNode(String line) {
 
 		try {
 			return mapper.readTree(line);
