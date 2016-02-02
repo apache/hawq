@@ -300,23 +300,29 @@ bool handleRMSEGRequestRUAlive(void **arg)
 	sprintf(conninfo,
 			"options='-c gp_session_role=UTILITY' dbname=template1 port=%d connect_timeout=60",
 			seg_addr_port);
-	while (retry > 0) {
+	while (retry > 0)
+	{
 		retry--;
 		conn = PQconnectdb(conninfo);
-		if ((libpqres = PQstatus(conn)) != CONNECTION_OK) {
-			if (retry == 0) {
+		if ((libpqres = PQstatus(conn)) != CONNECTION_OK)
+		{
+			if (retry == 0)
+			{
 				elog(LOG, "Segment's postmaster is down, PQconnectdb result : %d, %s",
 						  libpqres,
 						  PQerrorMessage(conn));
 				/* Don't send IMAlive anymore */
 				DRMGlobalInstance->SendIMAlive = false;
 			}
-			else {
+			else
+			{
+				PQfinish(conn);
 				pg_usleep(500000);
 				continue;
 			}
 		}
-		else {
+		else
+		{
 			elog(DEBUG3, "Segment's postmaster is healthy.");
 			break;
 		}
