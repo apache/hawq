@@ -256,20 +256,14 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	GpAutoStatsModeValue autostatInFunctionsvalBackup = gp_autostats_mode_in_functions;
 	bool optimizerBackup = optimizer;
 	int target_seg_num = (preferred_seg_num > 0) ? preferred_seg_num : GetUtilPartitionNum();
-	QueryResource *resource = AllocateResource(QRL_ONCE, 1, 0, target_seg_num, target_seg_num, NULL, 0);
-	QueryResource *savedResource = NULL;
 
 	gp_autostats_mode = GP_AUTOSTATS_NONE;
 	gp_autostats_mode_in_functions = GP_AUTOSTATS_NONE;
 	optimizer = false;
 
-
-	savedResource = GetActiveQueryResource();
-	SetActiveQueryResource(resource);
-
 	PG_TRY();
 	{
-		analyzeStmt(stmt, relids);
+		analyzeStmt(stmt, relids, target_seg_num);
 		gp_autostats_mode = autostatvalBackup;
 		gp_autostats_mode_in_functions = autostatInFunctionsvalBackup;
 		optimizer = optimizerBackup;
@@ -281,17 +275,10 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		gp_autostats_mode = autostatvalBackup;
 		gp_autostats_mode_in_functions = autostatInFunctionsvalBackup;
 		optimizer = optimizerBackup;
-		FreeResource(resource);
-	  UnsetActiveQueryResource();
-	  SetActiveQueryResource(savedResource);
 		/* Carry on with error handling. */
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
-
-	FreeResource(resource);
-  UnsetActiveQueryResource();
-  SetActiveQueryResource(savedResource);
 
 	Assert(gp_autostats_mode == autostatvalBackup);
 	Assert(gp_autostats_mode_in_functions == autostatInFunctionsvalBackup);
@@ -304,7 +291,7 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
  * 	vacstmt - Vacuum statement.
  * 	relids  - Usually NULL except when called by autovacuum.
  */
-void analyzeStmt(VacuumStmt *stmt, List *relids)
+void analyzeStmt(VacuumStmt *stmt, List *relids, int target_seg_num)
 {
 	List	   			  	*lRelOids = NIL;
 	MemoryContext			callerContext = NULL;
@@ -478,13 +465,14 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 		MemoryContextSwitchTo(analyzeStatementContext);
 	}
 
+	/**
+	 * We open relations with appropreciate locks
+	 */
+	List *candidateRelations = NIL;
 	foreach (le1, lRelOids)
 	{
 		Oid				candidateOid	  = InvalidOid;
 		Relation		candidateRelation = NULL;
-		bool			bTemp;
-
-		bTemp = false;
 
 		Assert(analyzeStatementContext == CurrentMemoryContext);
 
@@ -505,210 +493,274 @@ void analyzeStmt(VacuumStmt *stmt, List *relids)
 
 		if (candidateRelation)
 		{
-			/**
-			 * We got a lock on the relation. Good!
-			 */
-			if (analyzePermitted(RelationGetRelid(candidateRelation)))
-			{
-				StringInfoData ext_uri;
-
-				/*
-				 * We have permission to ANALYZE.
-				 */
-
-				/* MPP-7576: don't track internal namespace tables */
-				switch (candidateRelation->rd_rel->relnamespace)
-				{
-					case PG_CATALOG_NAMESPACE:
-						/* MPP-7773: don't track objects in system namespace
-						 * if modifying system tables (eg during upgrade)
-						 */
-						if (allowSystemTableModsDDL)
-							bTemp = true;
-						break;
-
-					case PG_TOAST_NAMESPACE:
-					case PG_BITMAPINDEX_NAMESPACE:
-					case PG_AOSEGMENT_NAMESPACE:
-						bTemp = true;
-						break;
-					default:
-						break;
-				}
-
-				/* MPP-7572: Don't track metadata if table in any
-				 * temporary namespace
-				 */
-				if (!bTemp)
-					bTemp = isAnyTempNamespace(
-							candidateRelation->rd_rel->relnamespace);
-
-				initStringInfo(&ext_uri);
-
-				if (candidateRelation->rd_rel->relkind != RELKIND_RELATION)
-				{
-					/**
-					 * Is the relation the right kind?
-					 */
-					ereport(WARNING,
-							(errmsg("skipping \"%s\" --- cannot analyze indexes, views, external tables or special system tables",
-									RelationGetRelationName(candidateRelation))));
-					relation_close(candidateRelation, ShareUpdateExclusiveLock);
-				}
-				else if (isOtherTempNamespace(RelationGetNamespace(candidateRelation)))
-				{
-					/* Silently ignore tables that are temp tables of other backends. */
-					relation_close(candidateRelation, ShareUpdateExclusiveLock);
-				}
-				else if (RelationIsExternalPxfReadOnly(candidateRelation, &ext_uri) &&
-						 !pxf_enable_stat_collection)
-				{
-					/* PXF supports ANALYZE, but only when the GUC is on */
-					ereport(WARNING,
-							(errmsg("skipping \"%s\" --- analyze for PXF tables is turned off by 'pxf_enable_stat_collection'",
-									RelationGetRelationName(candidateRelation))));
-					relation_close(candidateRelation, ShareUpdateExclusiveLock);
-				}
-				else
-				{
-					List 		*lAttNames = NIL;
-
-					/* Switch to per relation context */
-					MemoryContextSwitchTo(analyzeRelationContext);
-
-					if (stmt->va_cols)
-					{
-						/**
-						 * Column names have been provided. Should have specified relation name as well.
-						 */
-						Assert(stmt->relation && "Column names specified but not relation name");
-						lAttNames = buildExplicitAttributeNames(RelationGetRelid(candidateRelation), stmt);
-					}
-					else
-					{
-						lAttNames = analyzableAttributes(candidateRelation);
-					}
-
-					/* Start a sub-transaction for each analyzed table */
-					MemoryContext oldcontext = CurrentMemoryContext;
-					ResourceOwner oldowner = CurrentResourceOwner;
-					BeginInternalSubTransaction(NULL);
-					MemoryContextSwitchTo(oldcontext);
-
-					PG_TRY();
-					{
-						analyzeRelation(candidateRelation, lAttNames, stmt->rootonly);
-
-#ifdef FAULT_INJECTOR
-						FaultInjector_InjectFaultIfSet(
-								AnalyzeSubxactError,
-								DDLNotSpecified,
-								"",  /* databaseName */
-								""); /* tableName */
-#endif /* FAULT_INJECTOR */
-
-						ReleaseCurrentSubTransaction();
-						MemoryContextSwitchTo(oldcontext);
-						CurrentResourceOwner = oldowner;
-						successCount += 1;
-					}
-					PG_CATCH();
-					{
-						ErrorData  *edata;
-
-						/* Save error info */
-						MemoryContextSwitchTo(oldcontext);
-						edata = CopyErrorData();
-						FlushErrorState();
-
-						elog(WARNING, "skipping \"%s\" --- error returned: %s",
-							 RelationGetRelationName(candidateRelation),
-							 edata->message);
-						failCount += 1;
-						appendStringInfo(&failNames, "%s", failCount == 1 ? "(" : ", ");
-						appendStringInfo(&failNames, "%s", RelationGetRelationName(candidateRelation));
-
-
-						/* rollback this table's sub-transaction */
-						RollbackAndReleaseCurrentSubTransaction();
-						MemoryContextSwitchTo(oldcontext);
-						CurrentResourceOwner = oldowner;
-
-						/* Cancel from user should result in canceling ANALYZE, not just this table */
-						if (edata->sqlerrcode == ERRCODE_QUERY_CANCELED)
-						{
-							ReThrowError(edata);
-						}
-						else
-						{
-							/* release error state */
-							FreeErrorData(edata);
-						}
-					}
-					PG_END_TRY();
-
-					/* Switch back to statement context and reset relation context */
-					MemoryContextSwitchTo(analyzeStatementContext);
-					MemoryContextResetAndDeleteChildren(analyzeRelationContext);
-
-					/*
-					 * Close source relation now, but keep lock so
-					 * that no one deletes it before we commit.  (If
-					 * someone did, they'd fail to clean up the
-					 * entries we made in pg_statistic.  Also,
-					 * releasing the lock before commit would expose
-					 * us to concurrent-update failures.)
-					 */
-
-					relation_close(candidateRelation, NoLock);
-
-					/* MPP-6929: metadata tracking */
-					if (!bTemp && (Gp_role == GP_ROLE_DISPATCH))
-					{
-						char *asubtype = "";
-
-						if (IsAutoVacuumProcess())
-							asubtype = "AUTO";
-
-						MetaTrackUpdObject(RelationRelationId,
-								RelationGetRelid(candidateRelation),
-								GetUserId(),
-								"ANALYZE",
-								asubtype
-						);
-					}
-				}
-			}
-			else
-			{
-				/**
-				 * We don't have permissions to ANALYZE the relation. Print warning and move on
-				 * to the next relation.
-				 */
-				ereport(WARNING,
-						(errmsg("Skipping \"%s\" --- only table or database owner can analyze it",
-								RelationGetRelationName(candidateRelation))));
-				relation_close(candidateRelation, ShareUpdateExclusiveLock);
-			} /* if (analyzePermitted(RelationGetRelid(candidateRelation))) */
+			candidateRelations = lappend(candidateRelations, candidateRelation);
 		}
 		else
 		{
-			/*
-			 * Relation may have been dropped out from under us.
-			 * TODO: should we print a warning here? Do we print it during
-			 * ANALYZE DB or AutoVacuum?
-			 */
-		} /* if (candidateRelation) */
-
-		if (bUseOwnXacts)
-		{
-			/**
-			 * We commit the transaction so that locks on the relation may be released.
-			 */
-			CommitTransactionCommand();
-			MemoryContextSwitchTo(analyzeStatementContext);
+			elog(ERROR, "Cannot open and lock relation %s for analyze",
+			            RelationGetRelationName(candidateRelation));
 		}
 	}
+
+	/**
+	 * We allocate query resource for analyze
+	 */
+	QueryResource *resource = AllocateResource(QRL_ONCE, 1, 0, target_seg_num, target_seg_num, NULL, 0);
+	QueryResource *savedResource = NULL;
+
+	savedResource = GetActiveQueryResource();
+	SetActiveQueryResource(resource);
+
+	/**
+	 * We do actual analyze 
+	 */
+	PG_TRY();
+	{
+		foreach (le1, candidateRelations)
+		{
+			Relation        candidateRelation = NULL;
+			bool			bTemp = false;
+
+			Assert(analyzeStatementContext == CurrentMemoryContext);
+
+			if (bUseOwnXacts)
+			{
+				/**
+				 * We use a different transaction per relation so that we
+				 * may release locks on relations as soon as possible.
+				 */
+				StartTransactionCommand();
+				ActiveSnapshot = CopySnapshot(GetTransactionSnapshot());
+				MemoryContextSwitchTo(analyzeStatementContext);
+			}
+
+			candidateRelation = (Relation)lfirst(le1);
+
+			if (candidateRelation)
+			{
+				/**
+				 * We got a lock on the relation. Good!
+				 */
+				if (analyzePermitted(RelationGetRelid(candidateRelation)))
+				{
+					StringInfoData ext_uri;
+
+					/*
+					 * We have permission to ANALYZE.
+					 */
+
+					/* MPP-7576: don't track internal namespace tables */
+					switch (candidateRelation->rd_rel->relnamespace)
+					{
+						case PG_CATALOG_NAMESPACE:
+							/* MPP-7773: don't track objects in system namespace
+							 * if modifying system tables (eg during upgrade)
+							 */
+							if (allowSystemTableModsDDL)
+								bTemp = true;
+							break;
+
+						case PG_TOAST_NAMESPACE:
+						case PG_BITMAPINDEX_NAMESPACE:
+						case PG_AOSEGMENT_NAMESPACE:
+							bTemp = true;
+							break;
+						default:
+							break;
+					}
+
+					/* MPP-7572: Don't track metadata if table in any
+					 * temporary namespace
+					 */
+					if (!bTemp)
+						bTemp = isAnyTempNamespace(
+								candidateRelation->rd_rel->relnamespace);
+
+					initStringInfo(&ext_uri);
+
+					if (candidateRelation->rd_rel->relkind != RELKIND_RELATION)
+					{
+						/**
+						 * Is the relation the right kind?
+						 */
+						ereport(WARNING,
+								(errmsg("skipping \"%s\" --- cannot analyze indexes, views, external tables or special system tables",
+										RelationGetRelationName(candidateRelation))));
+						relation_close(candidateRelation, ShareUpdateExclusiveLock);
+					}
+					else if (isOtherTempNamespace(RelationGetNamespace(candidateRelation)))
+					{
+						/* Silently ignore tables that are temp tables of other backends. */
+						relation_close(candidateRelation, ShareUpdateExclusiveLock);
+					}
+					else if (RelationIsExternalPxfReadOnly(candidateRelation, &ext_uri) &&
+							 !pxf_enable_stat_collection)
+					{
+						/* PXF supports ANALYZE, but only when the GUC is on */
+						ereport(WARNING,
+								(errmsg("skipping \"%s\" --- analyze for PXF tables is turned off by 'pxf_enable_stat_collection'",
+										RelationGetRelationName(candidateRelation))));
+						relation_close(candidateRelation, ShareUpdateExclusiveLock);
+					}
+					else
+					{
+						List 		*lAttNames = NIL;
+
+						/* Switch to per relation context */
+						MemoryContextSwitchTo(analyzeRelationContext);
+
+						if (stmt->va_cols)
+						{
+							/**
+							 * Column names have been provided. Should have specified relation name as well.
+							 */
+							Assert(stmt->relation && "Column names specified but not relation name");
+							lAttNames = buildExplicitAttributeNames(RelationGetRelid(candidateRelation), stmt);
+						}
+						else
+						{
+							lAttNames = analyzableAttributes(candidateRelation);
+						}
+
+						/* Start a sub-transaction for each analyzed table */
+						MemoryContext oldcontext = CurrentMemoryContext;
+						ResourceOwner oldowner = CurrentResourceOwner;
+						BeginInternalSubTransaction(NULL);
+						MemoryContextSwitchTo(oldcontext);
+
+						PG_TRY();
+						{
+							analyzeRelation(candidateRelation, lAttNames, stmt->rootonly);
+
+#ifdef FAULT_INJECTOR
+							FaultInjector_InjectFaultIfSet(
+									AnalyzeSubxactError,
+									DDLNotSpecified,
+									"",  /* databaseName */
+									""); /* tableName */
+#endif /* FAULT_INJECTOR */
+
+							ReleaseCurrentSubTransaction();
+							MemoryContextSwitchTo(oldcontext);
+							CurrentResourceOwner = oldowner;
+							successCount += 1;
+						}
+						PG_CATCH();
+						{
+							ErrorData  *edata;
+
+							/* Save error info */
+							MemoryContextSwitchTo(oldcontext);
+							edata = CopyErrorData();
+							FlushErrorState();
+
+							elog(WARNING, "skipping \"%s\" --- error returned: %s",
+								 RelationGetRelationName(candidateRelation),
+								 edata->message);
+							failCount += 1;
+							appendStringInfo(&failNames, "%s", failCount == 1 ? "(" : ", ");
+							appendStringInfo(&failNames, "%s", RelationGetRelationName(candidateRelation));
+
+
+							/* rollback this table's sub-transaction */
+							RollbackAndReleaseCurrentSubTransaction();
+							MemoryContextSwitchTo(oldcontext);
+							CurrentResourceOwner = oldowner;
+
+							/* Cancel from user should result in canceling ANALYZE, not just this table */
+							if (edata->sqlerrcode == ERRCODE_QUERY_CANCELED)
+							{
+								ReThrowError(edata);
+							}
+							else
+							{
+								/* release error state */
+								FreeErrorData(edata);
+							}
+						}
+						PG_END_TRY();
+
+						/* Switch back to statement context and reset relation context */
+						MemoryContextSwitchTo(analyzeStatementContext);
+						MemoryContextResetAndDeleteChildren(analyzeRelationContext);
+
+						/*
+						 * Close source relation now, but keep lock so
+						 * that no one deletes it before we commit.  (If
+						 * someone did, they'd fail to clean up the
+						 * entries we made in pg_statistic.  Also,
+						 * releasing the lock before commit would expose
+						 * us to concurrent-update failures.)
+						 */
+
+						relation_close(candidateRelation, NoLock);
+
+						/* MPP-6929: metadata tracking */
+						if (!bTemp && (Gp_role == GP_ROLE_DISPATCH))
+						{
+							char *asubtype = "";
+
+							if (IsAutoVacuumProcess())
+								asubtype = "AUTO";
+
+							MetaTrackUpdObject(RelationRelationId,
+									RelationGetRelid(candidateRelation),
+									GetUserId(),
+									"ANALYZE",
+									asubtype
+							);
+						}
+					}
+				}
+				else
+				{
+					/**
+					 * We don't have permissions to ANALYZE the relation. Print warning and move on
+					 * to the next relation.
+					 */
+					ereport(WARNING,
+							(errmsg("Skipping \"%s\" --- only table or database owner can analyze it",
+									RelationGetRelationName(candidateRelation))));
+					relation_close(candidateRelation, ShareUpdateExclusiveLock);
+				} /* if (analyzePermitted(RelationGetRelid(candidateRelation))) */
+			}
+			else
+			{
+				/*
+				 * Relation may have been dropped out from under us.
+				 * TODO: should we print a warning here? Do we print it during
+				 * ANALYZE DB or AutoVacuum?
+				 */
+			} /* if (candidateRelation) */
+
+			if (bUseOwnXacts)
+			{
+				/**
+				 * We commit the transaction so that locks on the relation may be released.
+				 */
+				CommitTransactionCommand();
+				MemoryContextSwitchTo(analyzeStatementContext);
+			}
+		}
+
+	} /* End of try */
+	/* Clean up in case of error. */
+	PG_CATCH();
+	{
+		FreeResource(resource);
+		UnsetActiveQueryResource();
+		SetActiveQueryResource(savedResource);
+		/* Carry on with error handling. */
+		PG_RE_THROW();
+	}
+	PG_END_TRY();
+
+	/**
+	 * We now free query resource
+	 */
+	FreeResource(resource);
+	UnsetActiveQueryResource();
+	SetActiveQueryResource(savedResource);
 
 	if (bUseOwnXacts)
 	{
