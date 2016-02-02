@@ -44,6 +44,8 @@ import org.codehaus.jackson.JsonNode;
 public class JsonResolver extends Plugin implements ReadResolver {
 
 	private static Pattern ARRAY_PROJECTION_PATTERN = Pattern.compile("(.*)\\[([0-9]+)\\]");
+	private static int ARRAY_NAME_GROUPID = 1;
+	private static int ARRAY_INDEX_GROUPID = 2;
 
 	private ArrayList<OneField> list = new ArrayList<OneField>();
 
@@ -113,11 +115,13 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	}
 
 	/**
-	 * Iterates down the root node to the prior JSON node. This node is used
+	 * Iterates down the root node to the child JSON node defined by the projs path.
 	 * 
 	 * @param root
+	 *            node to to start the traversal from.
 	 * @param projs
-	 * @return
+	 *            defines the path from the root to the desired child node.
+	 * @return Returns the child node defined by the root and projs path.
 	 */
 	private JsonNode getPriorJsonNode(JsonNode root, String[] projs) {
 
@@ -138,7 +142,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 * @throws ArrayIndexOutOfBoundsException
 	 */
 	private boolean isArrayIndex(String[] projs) {
-		return getMatchGroup(projs[projs.length - 1], 1) != null;
+		return getMatchGroup(projs[projs.length - 1], ARRAY_NAME_GROUPID) != null;
 	}
 
 	/**
@@ -150,7 +154,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 * @throws ArrayIndexOutOfBoundsException
 	 */
 	private String getArrayName(String[] projs) {
-		return getMatchGroup(projs[projs.length - 1], 1);
+		return getMatchGroup(projs[projs.length - 1], ARRAY_NAME_GROUPID);
 	}
 
 	/**
@@ -162,7 +166,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 * @throws ArrayIndexOutOfBoundsException
 	 */
 	private int getArrayIndex(String[] projs) {
-		return Integer.parseInt(getMatchGroup(projs[projs.length - 1], 2));
+		return Integer.parseInt(getMatchGroup(projs[projs.length - 1], ARRAY_INDEX_GROUPID));
 	}
 
 	/**

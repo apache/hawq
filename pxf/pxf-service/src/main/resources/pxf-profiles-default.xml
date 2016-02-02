@@ -130,14 +130,13 @@ under the License.
             <resolver>org.apache.hawq.pxf.plugins.gemfirexd.GemFireXDResolver</resolver>
         </plugins>
     </profile>
-	<profile>
-		<name>Json</name>
-		<description>A profile for JSON data, one JSON record per line
-		</description>
-		<plugins>
-			<fragmenter>org.apache.hawq.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
-			<accessor>org.apache.hawq.pxf.plugins.json.JsonAccessor</accessor>
-			<resolver>org.apache.hawq.pxf.plugins.json.JsonResolver</resolver>
-		</plugins>
-	</profile>
+    <profile>
+        <name>Json</name>
+        <description>A profile for JSON data, one JSON record per line</description>
+        <plugins>
+            <fragmenter>org.apache.hawq.pxf.plugins.hdfs.HdfsDataFragmenter</fragmenter>
+            <accessor>org.apache.hawq.pxf.plugins.json.JsonAccessor</accessor>
+            <resolver>org.apache.hawq.pxf.plugins.json.JsonResolver</resolver>
+        </plugins>
+    </profile>
 </profiles>

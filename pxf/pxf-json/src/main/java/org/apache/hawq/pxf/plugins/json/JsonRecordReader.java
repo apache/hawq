@@ -59,12 +59,12 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 	 * @throws IOException
 	 */
 	public JsonRecordReader(JobConf conf, FileSplit split) throws IOException {
-		LOG.debug("JsonRecordReader constructor called.  Conf is " + conf + ". Split is " + split);
+		LOG.debug("Conf is " + conf + ". Split is " + split);
+
 		this.identifier = conf.get(RECORD_IDENTIFIER);
-		LOG.debug("Identifier is " + this.identifier);
 
 		if (isEmpty(this.identifier)) {
-			throw new InvalidParameterException(RECORD_IDENTIFIER + " is not set.");
+			throw new InvalidParameterException(" The X-GP-IDENTIFIER paramter is not set.");
 		} else {
 			LOG.debug("Initializing JsonRecordReader with identifier " + identifier);
 		}
