@@ -1695,6 +1695,26 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 	if(cstate->cdbsreh)
 		destroyCdbSreh(cstate->cdbsreh);
 
+	/**
+	 * Query resource allocation for COPY probably contains four parts:
+	 *     1) query resource for COPY itself
+	 *     2) query resource for AO/Parquet segment file on HDFS
+	 *     3) query resource for ANALYZE
+	 *     4) query resource for several SPI for ANALYZE
+	 * Query resource in 2 inherits from 1, and that in 4 inherits from 3.
+	 *
+	 * To prevent query resource "deadlock" that many concurrent
+	 * COPY transactions hold query resource in 1 and 2, and thus
+	 * makes some COPY transactions pending to get query resource
+	 * for 3 and 4, here we return query resource for 1 and 2 as
+	 * soon as possible.
+	 */
+	if (cstate->resource)
+	{
+		FreeResource(cstate->resource);
+		cstate->resource = NULL;
+	}
+
 	/* Clean up storage (probably not really necessary) */
 	processed = cstate->processed;
 
@@ -1724,8 +1744,6 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		
 	pfree(cstate->attribute_buf.data);
 	pfree(cstate->line_buf.data);
-	if (cstate->resource)
-		FreeResource(cstate->resource);
 
 	pfree(cstate);
 	return processed;
