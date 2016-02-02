@@ -64,7 +64,7 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 		this.identifier = conf.get(RECORD_IDENTIFIER);
 
 		if (isEmpty(this.identifier)) {
-			throw new InvalidParameterException("The X-GP-IDENTIFIER paramter is not set.");
+			throw new InvalidParameterException("The IDENTIFIER parameter is not set.");
 		} else {
 			LOG.debug("Initializing JsonRecordReader with identifier " + identifier);
 		}
@@ -77,19 +77,16 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 		start = split.getStart();
 		end = start + split.getLength();
 		toRead = end - start;
+
 		LOG.debug("FileSystem is " + FileSystem.get(conf));
 
 		FSDataInputStream strm = FileSystem.get(conf).open(file);
-
-		LOG.debug("Retrieved file stream ");
 
 		if (start != 0) {
 			strm.seek(start);
 		}
 
 		streamReader = new JsonStreamReader(identifier, new BufferedInputStream(strm));
-
-		LOG.debug("Reader is " + streamReader);
 	}
 
 	/*
