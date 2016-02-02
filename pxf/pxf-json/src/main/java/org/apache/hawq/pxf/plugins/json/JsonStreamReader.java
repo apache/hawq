@@ -24,12 +24,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
- * Reads a JSON stream and sequentially extracts all JSON objects identified by the <b>identifier</> parameter. Returns
+ * Reads a JSON stream and sequentially extracts all JSON objects identified by the <b>identifier</b> parameter. Returns
  * null when there are no more objects to read.
  *
  */
 public class JsonStreamReader extends BufferedReader {
+
+	private static final Log LOG = LogFactory.getLog(JsonStreamReader.class);
 
 	private static char START_BRACE = '{';
 	private static char END_BRACE = '}';
@@ -52,7 +57,7 @@ public class JsonStreamReader extends BufferedReader {
 
 	/**
 	 * @return Returns next JSON object identified by the {@link JsonStreamReader#identifier} parameter or Null if no
-	 *         more object are available.
+	 *         more objects are available.
 	 * @throws IOException
 	 */
 	public String getJsonRecord() throws IOException {
@@ -92,6 +97,9 @@ public class JsonStreamReader extends BufferedReader {
 		if (foundRecord && numBraces == 0) {
 			return bldr.toString();
 		} else {
+			if (bldr.length() > 0) {
+				LOG.error("Incomplete JSON object starting with: " + bldr.toString());
+			}
 			return null;
 		}
 	}

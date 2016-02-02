@@ -1,4 +1,4 @@
-package org.apache.pxf.hawq.plugins.json;
+package org.apache.hawq.pxf.plugins.json;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
