@@ -103,10 +103,6 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 	@Override
 	public boolean next(LongWritable key, Text value) throws IOException {
 
-		if (pos >= end) {
-			return false;
-		}
-
 		while (pos < end) {
 
 			String json = parser.nextObjectContainingMember(jsonMemberName);
