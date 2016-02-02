@@ -150,11 +150,11 @@ public class JsonLexer {
 			}
 			break;
 		}
-		case BEGIN_STRING: {
+		case BEGIN_STRING:
+		case INSIDE_STRING: {
 			state = JsonLexerState.INSIDE_STRING;
 			// we will now enter the STRING state below
-		}
-		case INSIDE_STRING: {
+
 			switch (c) {
 			// end-string
 			case '"':
