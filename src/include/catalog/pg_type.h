@@ -464,10 +464,10 @@ DESCR("geometric circle '(center,radius)'");
 #define CIRCLEOID		718
 DATA(insert OID = 719 (	_circle	   PGNSP PGUID -1 f b t \054 0	718 array_in array_out array_recv array_send - d x f 0 -1 0 _null_ _null_ ));
 
-DATA(insert OID = 790 (	money	   PGNSP PGUID 4 f b t \054 0	0 cash_in cash_out cash_recv cash_send - i p f 0 -1 0 _null_ _null_ ));
+DATA(insert OID = 790 (	money	   PGNSP PGUID 8 f b t \054 0	0 cash_in cash_out cash_recv cash_send - d p f 0 -1 0 _null_ _null_ ));
 DESCR("monetary amounts, $d,ddd.cc");
 #define CASHOID 790
-DATA(insert OID = 791 (	_money	   PGNSP PGUID -1 f b t \054 0	790 array_in array_out array_recv array_send - i x f 0 -1 0 _null_ _null_ ));
+DATA(insert OID = 791 (	_money	   PGNSP PGUID -1 f b t \054 0  790 array_in array_out array_recv array_send - d x f 0 -1 0 _null_ _null_ ));
 
 
 /*  OIDS 800 - 899  */
