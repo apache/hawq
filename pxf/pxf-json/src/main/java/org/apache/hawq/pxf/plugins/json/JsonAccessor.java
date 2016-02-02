@@ -19,9 +19,10 @@ package org.apache.hawq.pxf.plugins.json;
  * under the License.
  */
 
+import static org.apache.commons.lang3.StringUtils.isEmpty;
+
 import java.io.IOException;
 
-import static org.apache.commons.lang3.StringUtils.isEmpty;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
@@ -38,20 +39,34 @@ public class JsonAccessor extends HdfsSplittableDataAccessor {
 
 	public static final String IDENTIFIER_PARAM = "IDENTIFIER";
 
+	public static final String RECORD_MAX_LENGTH_PARAM = "MAXLENGTH";
+
+	/**
+	 * If provided indicates the member name which will be used to determine the encapsulating json object to return.
+	 */
 	private String identifier = "";
+
+	private int maxRecordLength = Integer.MAX_VALUE;
 
 	public JsonAccessor(InputData inputData) throws Exception {
 		super(inputData, null);
 
 		if (!isEmpty(inputData.getUserProperty(IDENTIFIER_PARAM))) {
+
 			identifier = inputData.getUserProperty(IDENTIFIER_PARAM);
+
+			// If the member identifier is set check if the record max length is defined as well
+			if (!isEmpty(inputData.getUserProperty(RECORD_MAX_LENGTH_PARAM))) {
+				maxRecordLength = Integer.valueOf(inputData.getUserProperty(RECORD_MAX_LENGTH_PARAM));
+			}
 		}
 	}
 
 	@Override
 	protected Object getReader(JobConf conf, InputSplit split) throws IOException {
 		if (!isEmpty(identifier)) {
-			conf.set(JsonRecordReader.RECORD_IDENTIFIER, identifier);
+			conf.set(JsonRecordReader.RECORD_MEMBER_IDENTIFIER, identifier);
+			conf.setInt(JsonRecordReader.RECORD_MAX_LENGTH, maxRecordLength);
 			return new JsonRecordReader(conf, (FileSplit) split);
 		} else {
 			return new LineRecordReader(conf, (FileSplit) split);

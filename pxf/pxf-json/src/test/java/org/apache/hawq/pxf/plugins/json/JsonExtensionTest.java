@@ -100,8 +100,7 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test
 	public void testWellFormedJson() throws Exception {
 
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "record"));
-		extraParams.add(new Pair<String, String>("ONERECORDPERLINE", "false"));
+		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
 
 		List<String> output = new ArrayList<String>();
 
@@ -116,12 +115,11 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test
 	public void testWellFormedJsonWithDelete() throws Exception {
 
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "record"));
-		extraParams.add(new Pair<String, String>("ONERECORDPERLINE", "false"));
+		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
 
 		List<String> output = new ArrayList<String>();
 
-		output.add(",,,,,,");
+		//output.add(",,,,,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547123646465,text2,patronusdeadly,,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547136233472,text3,NoSecrets_Vagas,,,");

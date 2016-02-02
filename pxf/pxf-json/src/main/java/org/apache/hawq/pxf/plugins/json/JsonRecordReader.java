@@ -19,11 +19,8 @@ package org.apache.hawq.pxf.plugins.json;
  * under the License.
  */
 
-import static org.apache.commons.lang3.StringUtils.isEmpty;
-
-import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.security.InvalidParameterException;
+import java.io.InputStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,61 +29,72 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hawq.pxf.api.Fragment;
+import org.apache.hawq.pxf.plugins.json.parser.PartitionedJsonParser;
 
 /**
- * {@link RecordReader} implementation that can read multiline JSON objects.
+ * Multi-line json object reader. JsonRecordReader uses a member name (set by the <b>IDENTIFIER</b> PXF parameter) to
+ * determine the encapsulating object to extract and read.
+ * 
+ * JsonRecordReader supports compressed input files as well.
+ * 
+ * As a safe guard set the optional <b>MAXLENGTH</b> parameter to limit the max size of a record.
  */
 public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 
 	private static final Log LOG = LogFactory.getLog(JsonRecordReader.class);
 
-	public static final String RECORD_IDENTIFIER = "json.input.format.record.identifier";
+	public static final String RECORD_MEMBER_IDENTIFIER = "json.input.format.record.identifier";
+	public static final String RECORD_MAX_LENGTH = "multilinejsonrecordreader.maxlength";
 
-	private JsonStreamReader streamReader = null;
-	private long start = 0, end = 0;
-	private float toRead = 0;
-	private String identifier = null;
+	private CompressionCodecFactory compressionCodecs = null;
+	private long start;
+	private long pos;
+	private long end;
+	private int maxObjectLength;
+	private InputStream is;
+	private PartitionedJsonParser parser;
+	private final String jsonMemberName;
 
 	/**
+	 * Create new multi-line json object reader.
+	 * 
 	 * @param conf
 	 *            Hadoop context
 	 * @param split
-	 *            HDFS Split as defined by the {@link Fragment}.
+	 *            HDFS split to start the reading from
 	 * @throws IOException
 	 */
 	public JsonRecordReader(JobConf conf, FileSplit split) throws IOException {
-		LOG.debug("Conf is " + conf + ". Split is " + split);
 
-		this.identifier = conf.get(RECORD_IDENTIFIER);
-
-		if (isEmpty(this.identifier)) {
-			throw new InvalidParameterException("The IDENTIFIER parameter is not set.");
-		} else {
-			LOG.debug("Initializing JsonRecordReader with identifier " + identifier);
-		}
-
-		// get relevant data
-		Path file = split.getPath();
-
-		LOG.debug("File is " + file);
+		this.jsonMemberName = conf.get(RECORD_MEMBER_IDENTIFIER);
+		this.maxObjectLength = conf.getInt(RECORD_MAX_LENGTH, Integer.MAX_VALUE);
 
 		start = split.getStart();
 		end = start + split.getLength();
-		toRead = end - start;
+		final Path file = split.getPath();
+		compressionCodecs = new CompressionCodecFactory(conf);
+		final CompressionCodec codec = compressionCodecs.getCodec(file);
 
-		LOG.debug("FileSystem is " + FileSystem.get(conf));
-
-		FSDataInputStream strm = FileSystem.get(conf).open(file);
-
-		if (start != 0) {
-			strm.seek(start);
+		// open the file and seek to the start of the split
+		FileSystem fs = file.getFileSystem(conf);
+		FSDataInputStream fileIn = fs.open(split.getPath());
+		if (codec != null) {
+			is = codec.createInputStream(fileIn);
+			start = 0;
+			end = Long.MAX_VALUE;
+		} else {
+			if (start != 0) {
+				fileIn.seek(start);
+			}
+			is = fileIn;
 		}
-
-		streamReader = new JsonStreamReader(identifier, new BufferedInputStream(strm));
+		parser = new PartitionedJsonParser(is);
+		this.pos = start;
 	}
 
 	/*
@@ -95,13 +103,31 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 	@Override
 	public boolean next(LongWritable key, Text value) throws IOException {
 
-		// Exit condition (end of block/file)
-		if (streamReader.getBytesRead() < (end - start)) {
+		if (pos >= end) {
+			return false;
+		}
 
-			String record = streamReader.getJsonRecord();
-			if (record != null) {
-				key.set(streamReader.getBytesRead());
-				value.set(record);
+		while (pos < end) {
+
+			String json = parser.nextObjectContainingMember(jsonMemberName);
+			pos = start + parser.getBytesRead();
+
+			if (json == null) {
+				return false;
+			}
+
+			long jsonStart = pos - json.length();
+
+			// if the "begin-object" position is after the end of our split, we should ignore it
+			if (jsonStart >= end) {
+				return false;
+			}
+
+			if (json.length() > maxObjectLength) {
+				LOG.info("Skipped JSON object of size " + json.length() + " at pos " + jsonStart);
+			} else {
+				key.set(jsonStart);
+				value.set(json);
 				return true;
 			}
 		}
@@ -125,20 +151,19 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 		return new Text();
 	}
 
-	/*
-	 * {@inheritDoc}
-	 */
 	@Override
 	public long getPos() throws IOException {
-		return start + streamReader.getBytesRead();
+		return pos;
 	}
 
 	/*
 	 * {@inheritDoc}
 	 */
 	@Override
-	public void close() throws IOException {
-		streamReader.close();
+	public synchronized void close() throws IOException {
+		if (is != null) {
+			is.close();
+		}
 	}
 
 	/*
@@ -146,6 +171,10 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 	 */
 	@Override
 	public float getProgress() throws IOException {
-		return (float) streamReader.getBytesRead() / toRead;
+		if (start == end) {
+			return 0.0f;
+		} else {
+			return Math.min(1.0f, (pos - start) / (float) (end - start));
+		}
 	}
 }
