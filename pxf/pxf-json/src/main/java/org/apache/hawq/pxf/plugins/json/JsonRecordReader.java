@@ -64,7 +64,7 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 		this.identifier = conf.get(RECORD_IDENTIFIER);
 
 		if (isEmpty(this.identifier)) {
-			throw new InvalidParameterException(" The X-GP-IDENTIFIER paramter is not set.");
+			throw new InvalidParameterException("The X-GP-IDENTIFIER paramter is not set.");
 		} else {
 			LOG.debug("Initializing JsonRecordReader with identifier " + identifier);
 		}
@@ -98,30 +98,18 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 	@Override
 	public boolean next(LongWritable key, Text value) throws IOException {
 
-		boolean retval = false;
-		boolean keepGoing = false;
-		do {
-			// Exit condition (end of block/file)
-			if (streamReader.getBytesRead() >= (end - start)) {
-				return false;
-			}
+		// Exit condition (end of block/file)
+		if (streamReader.getBytesRead() < (end - start)) {
 
-			keepGoing = false;
 			String record = streamReader.getJsonRecord();
 			if (record != null) {
-				if (JsonUtil.decodeLineToJsonNode(record) == null) {
-					LOG.error("Unable to parse JSON string.  Skipping. DEBUG to see");
-					LOG.debug(record);
-					keepGoing = true;
-				} else {
-					key.set(streamReader.getBytesRead());
-					value.set(record);
-					retval = true;
-				}
+				key.set(streamReader.getBytesRead());
+				value.set(record);
+				return true;
 			}
-		} while (keepGoing);
+		}
 
-		return retval;
+		return false;
 	}
 
 	/*
