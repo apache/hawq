@@ -382,6 +382,17 @@ cleanup_filesystem_credentials(Portal portal)
 		}
 		else
 		{
+			/**
+			 * this case happened for the command "set enable_secure_filesystem to true;"
+			 * enable_secure_filesystem is true but credentials did not allocated"
+			 */
+			if (portal->filesystem_credentials == NULL &&
+				portal->filesystem_credentials_memory == NULL)
+				return;
+
+			Assert(portal->filesystem_credentials != NULL &&
+				portal->filesystem_credentials_memory != NULL);
+
 			/*
 			 * Master is responsible for cancel all file system credentials
 			 */
