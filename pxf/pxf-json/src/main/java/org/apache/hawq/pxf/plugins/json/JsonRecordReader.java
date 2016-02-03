@@ -120,7 +120,7 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 			}
 
 			if (json.length() > maxObjectLength) {
-				LOG.info("Skipped JSON object of size " + json.length() + " at pos " + jsonStart);
+				LOG.warn("Skipped JSON object of size " + json.length() + " at pos " + jsonStart);
 			} else {
 				key.set(jsonStart);
 				value.set(json);

@@ -33,12 +33,15 @@ import org.apache.hawq.pxf.plugins.hdfs.HdfsSplittableDataAccessor;
 /**
  * This JSON accessor for PXF will read JSON data and pass it to a {@link JsonResolver}.
  * 
- * This accessor supports a single JSON record per line, or a more "pretty print" format.
+ * This accessor supports a single JSON record per line, or a multi-line JSON records if the <b>IDENTIFIER</b> parameter
+ * is set.
+ * 
+ * When provided the <b>IDENTIFIER</b> indicates the member name used to determine the encapsulating json object to
+ * return.
  */
 public class JsonAccessor extends HdfsSplittableDataAccessor {
 
 	public static final String IDENTIFIER_PARAM = "IDENTIFIER";
-
 	public static final String RECORD_MAX_LENGTH_PARAM = "MAXLENGTH";
 
 	/**
@@ -46,16 +49,22 @@ public class JsonAccessor extends HdfsSplittableDataAccessor {
 	 */
 	private String identifier = "";
 
+	/**
+	 * Optional parameter that allows to define the max length of a json record. Records that exceed the allowed length
+	 * are skipped. This parameter is applied only for the multi-line json records (e.g. when the IDENTIFIER is
+	 * provided).
+	 */
 	private int maxRecordLength = Integer.MAX_VALUE;
 
 	public JsonAccessor(InputData inputData) throws Exception {
+		// Because HdfsSplittableDataAccessor doesn't use the InputFormat we set it to null.
 		super(inputData, null);
 
 		if (!isEmpty(inputData.getUserProperty(IDENTIFIER_PARAM))) {
 
 			identifier = inputData.getUserProperty(IDENTIFIER_PARAM);
 
-			// If the member identifier is set check if the record max length is defined as well
+			// If the member identifier is set then check if a record max length is defined as well.
 			if (!isEmpty(inputData.getUserProperty(RECORD_MAX_LENGTH_PARAM))) {
 				maxRecordLength = Integer.valueOf(inputData.getUserProperty(RECORD_MAX_LENGTH_PARAM));
 			}

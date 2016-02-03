@@ -20,12 +20,9 @@ package org.apache.hawq.pxf.plugins.json;
  */
 
 import java.io.IOException;
-import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -49,79 +46,77 @@ public class JsonResolver extends Plugin implements ReadResolver {
 
 	private static final Log LOG = LogFactory.getLog(JsonResolver.class);
 
-	private static Pattern ARRAY_PROJECTION_PATTERN = Pattern.compile("(.*)\\[([0-9]+)\\]");
-	private static int ARRAY_NAME_GROUPID = 1;
-	private static int ARRAY_INDEX_GROUPID = 2;
-
 	private ArrayList<OneField> oneFieldList;
+	private ColumnDescriptorCache[] columnDescriptorCache;
 	private ObjectMapper mapper;
 
 	public JsonResolver(InputData inputData) throws Exception {
 		super(inputData);
 		oneFieldList = new ArrayList<OneField>();
 		mapper = new ObjectMapper(new JsonFactory());
+
+		// Pre-generate all column structure attributes concerning the JSON to column value resolution.
+		columnDescriptorCache = new ColumnDescriptorCache[inputData.getColumns()];
+		for (int i = 0; i < inputData.getColumns(); ++i) {
+			ColumnDescriptor cd = inputData.getColumn(i);
+			columnDescriptorCache[i] = new ColumnDescriptorCache(cd);
+		}
 	}
 
 	@Override
 	public List<OneField> getFields(OneRow row) throws Exception {
 		oneFieldList.clear();
 
-		String jsonText = row.getData().toString();
+		String jsonRecordAsText = row.getData().toString();
 
-		// key is a Text object
-		JsonNode root = decodeLineToJsonNode(jsonText);
+		JsonNode root = decodeLineToJsonNode(jsonRecordAsText);
 
-		// if we weren't given a null object
-		if (root != null) {
-			// Iterate through the column definition and fetch our JSON data
-			for (int i = 0; i < inputData.getColumns(); ++i) {
+		if (root == null) {
+			LOG.warn("Return null-fields row due to invalid JSON:" + jsonRecordAsText);
+		}
 
-				// Get the current column description
-				ColumnDescriptor cd = inputData.getColumn(i);
-				DataType columnType = DataType.get(cd.columnTypeCode());
+		// Iterate through the column definition and fetch our JSON data
+		for (ColumnDescriptorCache column : columnDescriptorCache) {
 
-				// Get the JSON projections from the column name
-				// For example, "user.name" turns into ["user","name"]
-				String[] projs = cd.columnName().split("\\.");
+			// Get the current column description
+
+			if (root == null) {
+				// Return empty (e.g. null) filed in case of malformed json.
+				addNullField(column.getColumnType());
+			} else {
 
 				// Move down the JSON path to the final name
-				JsonNode node = getPriorJsonNode(root, projs);
+				JsonNode node = getPriorJsonNode(root, column.getProjections());
 
 				// If this column is an array index, ex. "tweet.hashtags[0]"
-				if (isArrayIndex(projs)) {
-
-					// Get the node name and index
-					String nodeName = getArrayName(projs);
-					int arrayIndex = getArrayIndex(projs);
+				if (column.isArrayName()) {
 
 					// Move to the array node
-					node = node.get(nodeName);
+					node = node.get(column.getArrayNodeName());
 
 					// If this node is null or missing, add a null value here
 					if (node == null || node.isMissingNode()) {
-						addNullField(columnType);
+						addNullField(column.getColumnType());
 					} else if (node.isArray()) {
 						// If the JSON node is an array, then add it to our list
-						addFieldFromJsonArray(columnType, node, arrayIndex);
+						addFieldFromJsonArray(column.getColumnType(), node, column.getArrayIndex());
 					} else {
-						throw new InvalidParameterException(nodeName + " is not an array node");
+						throw new IllegalStateException(column.getArrayNodeName() + " is not an array node");
 					}
 				} else {
 					// This column is not an array type
 					// Move to the final node
-					node = node.get(projs[projs.length - 1]);
+					node = node.get(column.getLastProjection());
 
 					// If this node is null or missing, add a null value here
 					if (node == null || node.isMissingNode()) {
-						addNullField(columnType);
+						addNullField(column.getColumnType());
 					} else {
 						// Else, add the value to the record
-						addFieldFromJsonNode(columnType, node);
+						addFieldFromJsonNode(column.getColumnType(), node);
 					}
 				}
 			}
-		} else {
-			LOG.error("Skip non parsable JSON object:" + jsonText);
 		}
 
 		return oneFieldList;
@@ -145,61 +140,6 @@ public class JsonResolver extends Plugin implements ReadResolver {
 		}
 
 		return node;
-	}
-
-	/**
-	 * Gets a boolean value indicating if this column is an array index column
-	 * 
-	 * @param projs
-	 *            The array of JSON projections
-	 * @throws ArrayIndexOutOfBoundsException
-	 */
-	private boolean isArrayIndex(String[] projs) {
-		return getMatchGroup(projs[projs.length - 1], ARRAY_NAME_GROUPID) != null;
-	}
-
-	/**
-	 * Gets the node name from the given String array of JSON projections, parsed from the ColumnDescriptor's
-	 * 
-	 * @param projs
-	 *            The array of JSON projections
-	 * @return The name
-	 * @throws ArrayIndexOutOfBoundsException
-	 */
-	private String getArrayName(String[] projs) {
-		return getMatchGroup(projs[projs.length - 1], ARRAY_NAME_GROUPID);
-	}
-
-	/**
-	 * Gets the array index from the given String array of JSON projections, parsed from the ColumnDescriptor's name
-	 * 
-	 * @param projs
-	 *            The array of JSON projections
-	 * @return The index
-	 * @throws ArrayIndexOutOfBoundsException
-	 */
-	private int getArrayIndex(String[] projs) {
-		return Integer.parseInt(getMatchGroup(projs[projs.length - 1], ARRAY_INDEX_GROUPID));
-	}
-
-	/**
-	 * Extracts the array name or array index. E.g. getMatchGroup("myarray[666]", 1) returns "myarray" and
-	 * getMatchGroup("myarray[666]", 2) returns "666". If the text is not an array expression function returns NULL.
-	 * 
-	 * @param text
-	 *            expression to evaluate
-	 * @param groupId
-	 *            in case of array text expression, groupId=1 will refer the array name and groupId=2 refers the array
-	 *            index.
-	 * @return If text is an array expression, return the name or the index of the array. If text is not an array
-	 *         expression return NULL.
-	 */
-	private String getMatchGroup(String text, int groupId) {
-		Matcher matcher = ARRAY_PROJECTION_PATTERN.matcher(text);
-		if (matcher.matches()) {
-			return matcher.group(groupId);
-		}
-		return null;
 	}
 
 	/**
@@ -308,9 +248,8 @@ public class JsonResolver extends Plugin implements ReadResolver {
 		try {
 			return mapper.readTree(line);
 		} catch (Exception e) {
-			LOG.warn("Failed to convert the line into JSON object", e);
+			LOG.error("Failed to pars JSON object", e);
 			return null;
 		}
 	}
-
 }
