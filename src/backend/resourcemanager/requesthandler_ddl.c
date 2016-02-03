@@ -357,6 +357,42 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				goto senderr;
 			}
 
+			/*
+			 * If the target resource queue is a branch queue, only queue
+			 * capacity limits are alterable.
+			 */
+			if ( list_length(toaltertrack->ChildrenTracks) > 0 )
+			{
+				ListCell *cell = NULL;
+				foreach(cell, fineattr)
+				{
+					KVProperty attribute = lfirst(cell);
+					if ( SimpleStringComp(
+							 &(attribute->Key),
+							 RSQTBLAttrNames[RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER]) != 0 &&
+						 SimpleStringComp(
+							 &(attribute->Key),
+							 RSQTBLAttrNames[RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER]) != 0 &&
+						 SimpleStringComp(
+							 &(attribute->Key),
+							 RSQTBLAttrNames[RSQ_TBL_ATTR_NAME]) != 0	 )
+					{
+						ddlres = RESQUEMGR_ALTERQUEUE_NOTALLOWED;
+						snprintf(errorbuf, sizeof(errorbuf),
+								 "user can only alter branch resource queue %s "
+								 "attributes %s and %s",
+								 nameattr->Val.Str,
+								 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
+								 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER]);
+						elog(WARNING, "Resource manager cannot alter resource "
+									  "queue %s, %s",
+									  nameattr->Val.Str,
+									  errorbuf);
+						goto senderr;
+					}
+				}
+			}
+
 			/* STEP 2. Build all necessary shadow resource queue track instance. */
 			buildQueueTrackShadows(toaltertrack, &qhavingshadow);
 
@@ -1075,13 +1111,6 @@ int buildUpdateActionForPGResqueue(DynResourceQueue   queue,
 	const char *curtimestr = timestamptz_to_str(curtime);
 	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(updvalues, curtimestr, Anum_pg_resqueue_updatetime);
 
-	/* status */
-	char statusstr[256];
-	statusstr[0] = '\0';
-	if ( RESQUEUE_IS_BRANCH(queue) )
-		strcat(statusstr, "branch");
-
-	ADD_PG_RESQUEUE_COLVALUE_CONSTSTR(updvalues, statusstr, Anum_pg_resqueue_status);
 	return res;
 }
 

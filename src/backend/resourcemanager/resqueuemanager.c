@@ -48,8 +48,8 @@ char RSQDDLAttrNames[RSQ_DDL_ATTR_COUNT]
 /*
  * The attribute names for expressing one complete resource queue definition.
  */
-static char RSQTBLAttrNames[RSQ_TBL_ATTR_COUNT]
-						   [RESOURCE_QUEUE_TBL_COLNAME_LENGTH_MAX+1] = {
+char RSQTBLAttrNames[RSQ_TBL_ATTR_COUNT]
+					 [RESOURCE_QUEUE_TBL_COLNAME_LENGTH_MAX+1] = {
 	"parentoid",
 	"activestats",
 	"memorylimit",
@@ -134,9 +134,6 @@ DynResourceQueueTrack createDynResourceQueueTrack(DynResourceQueue queue);
 void returnAllocatedResourceToLeafQueue(DynResourceQueueTrack 	track,
 								    	int32_t 				memorymb,
 								    	double					core);
-
-/* Refresh resource queue resource capacity based on updated cluster info. */
-void refreshResourceQueuePercentageCapacity(bool queuechanged);
 
 void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
 													uint32_t clustercore,
