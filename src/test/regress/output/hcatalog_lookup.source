@@ -266,6 +266,28 @@ select pg_catalog.pg_database_size('hcatalog');
 ERROR:  database hcatalog (OID 6120) is reserved (SOMEFILE:SOMEFUNC)
 select pg_catalog.pg_database_size(6120);
 ERROR:  database hcatalog (OID 6120) is reserved (SOMEFILE:SOMEFUNC)
+--positive test: should be able to create table named "hcatalog"
+CREATE TABLE hcatalog(a int);
+--negative test: cannot create database named "hcatalog"
+CREATE DATABASE hcatalog;
+ERROR:  "hcatalog" is a reserved name for HCatalog integration feature
+--allow renaming schemas and databases
+SET gp_called_by_pgdump = true;
+--negative test: cannot rename existing database to "hcatalog"
+ALTER DATABASE regression RENAME TO hcatalog;
+ERROR:  "hcatalog" is a reserved name for HCatalog integration feature
+--positive test: can rename existing schema to "hcatalog"
+CREATE SCHEMA test_schema3;
+ALTER SCHEMA test_schema3 RENAME to hcatalog;
+--positive test: can rename schema "hcatalog"
+ALTER SCHEMA hcatalog RENAME to hcatalog1;
+--positive test: should be able to create schema named "hcatalog"
+CREATE SCHEMA hcatalog;
+--negative test: cannot create a database using "hcatalog" as a template
+CREATE DATABASE hcatalog2 TEMPLATE hcatalog;
+ERROR:  copy non template database is not supported
+--restrict renaming schemas and databases
+SET gp_called_by_pgdump = false;
 -- cleanup
 DROP schema test_schema cascade;
 NOTICE:  drop cascades to append only table test_schema.r
@@ -286,6 +308,8 @@ NOTICE:  drop cascades to append only table test_schema.tt
 NOTICE:  drop cascades to append only table test_schema.t
 NOTICE:  drop cascades to append only table test_schema.r
 DROP schema test_schema2 cascade;
+DROP schema hcatalog cascade;
+DROP schema hcatalog1 cascade;
 select nspname,nspdboid from pg_namespace where nspname='test_schema';
  nspname | nspdboid 
 ---------+----------
@@ -295,5 +319,9 @@ DROP FUNCTION convert_to_hcatalog_schema(text);
 DROP FUNCTION convert_to_internal_schema(text);
 DROP FUNCTION trigger_func();
 DROP USER newuser;
+DROP TABLE hcatalog;
 -- disable GUC
 SET hcatalog_enable = false;
+--negative test: cannot connect to "hcatalog" database
+\connect hcatalog;
+\connect: FATAL:  "hcatalog" database is only for system use

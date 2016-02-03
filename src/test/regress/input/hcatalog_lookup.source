@@ -138,16 +138,50 @@ alter table test_schema.p exchange partition p1 with table hcatalog.test_schema.
 select pg_catalog.pg_database_size('hcatalog');
 select pg_catalog.pg_database_size(6120);
 
+--positive test: should be able to create table named "hcatalog"
+CREATE TABLE hcatalog(a int);
+
+--negative test: cannot create database named "hcatalog"
+CREATE DATABASE hcatalog;
+
+--allow renaming schemas and databases
+SET gp_called_by_pgdump = true;
+
+--negative test: cannot rename existing database to "hcatalog"
+ALTER DATABASE regression RENAME TO hcatalog;
+
+--positive test: can rename existing schema to "hcatalog"
+CREATE SCHEMA test_schema3;
+ALTER SCHEMA test_schema3 RENAME to hcatalog;
+
+--positive test: can rename schema "hcatalog"
+ALTER SCHEMA hcatalog RENAME to hcatalog1;
+
+--positive test: should be able to create schema named "hcatalog"
+CREATE SCHEMA hcatalog;
+
+--negative test: cannot create a database using "hcatalog" as a template
+CREATE DATABASE hcatalog2 TEMPLATE hcatalog;
+
+--restrict renaming schemas and databases
+SET gp_called_by_pgdump = false;
+
 -- cleanup
 DROP schema test_schema cascade;
 SELECT convert_to_internal_schema('test_schema');
 DROP schema test_schema cascade;
 DROP schema test_schema2 cascade;
+DROP schema hcatalog cascade;
+DROP schema hcatalog1 cascade;
 select nspname,nspdboid from pg_namespace where nspname='test_schema';
 
 DROP FUNCTION convert_to_hcatalog_schema(text);
 DROP FUNCTION convert_to_internal_schema(text);
 DROP FUNCTION trigger_func();
 DROP USER newuser;
+DROP TABLE hcatalog;
 -- disable GUC
 SET hcatalog_enable = false;
+
+--negative test: cannot connect to "hcatalog" database
+\connect hcatalog;

@@ -154,6 +154,16 @@ ALTER DATABASE <replaceable class="PARAMETER">name</replaceable> OWNER TO <repla
    User-specific settings override database-specific
    ones if there is a conflict.
   </para>
+
+  <para>
+   Currently RENAME TO is supported only when called by pgdump utility.
+  </para>
+  <para>
+   User can not use "hcatalog" as a name for database, because it's reserved for HCatalog integration feature.
+  </para>
+  <para>
+   User can not rename "hcatalog" database, because it's reserved for HCatalog integration feature.
+  </para>
  </refsect1>
 
  <refsect1>

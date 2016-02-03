@@ -329,6 +329,8 @@ exit:
 	freeSimpleStringContent(&currentNameString);
 	freeSimpleStringContent(&currentValueString);
 
+	xmlFreeTextReader(reader);
+
 	xmlCleanupParser();
 
 	return res;

@@ -306,7 +306,8 @@ class HawqInit:
 
         master_cmd = self._get_master_init_cmd()
         logger.info("Start to init master node: '%s'" % self.master_host_name)
-        check_return_code(local_ssh(master_cmd, logger), logger, "Master init failed, exit", \
+        check_return_code(local_ssh(master_cmd, logger, warning = True), logger, \
+                          "Master init failed, exit", \
                           "Master init successfully")
         if self.standby_host_name.lower() not in ('', 'none'):
             check_return_code(self._init_standby(), logger, \
@@ -345,7 +346,7 @@ class HawqInit:
             check_return_code(self.set_vsegment_num_per_node())
             logger.info("Start to init master")
             cmd = self._get_master_init_cmd()
-            check_return_code(local_ssh(cmd, logger), logger, \
+            check_return_code(local_ssh(cmd, logger, warning = True), logger, \
                               "Master init failed, exit", "Master init successfully")
         elif self.node_type == "standby" and self.remove_standby is True:
             logger.info("Try to remove standby master")
@@ -366,7 +367,8 @@ class HawqInit:
 
         elif self.node_type == "segment":
             cmd = self._get_segment_init_cmd()
-            check_return_code(local_ssh(cmd, logger), logger, "Segment init failed, exit", \
+            check_return_code(local_ssh(cmd, logger, warning = True), logger, \
+                              "Segment init failed, exit", \
                               "Segment init successfully")
 
         elif self.node_type == "cluster":
