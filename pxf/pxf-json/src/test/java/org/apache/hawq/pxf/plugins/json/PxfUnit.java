@@ -32,6 +32,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -61,6 +63,8 @@ import org.junit.Assert;
  */
 public abstract class PxfUnit {
 
+	private static final Log LOG = LogFactory.getLog(PxfUnit.class);
+
 	private static JsonFactory factory = new JsonFactory();
 	private static ObjectMapper mapper = new ObjectMapper(factory);
 
@@ -89,7 +93,7 @@ public abstract class PxfUnit {
 		}
 
 		assertOutput(input, outputLines);
-		
+
 		rdr.close();
 	}
 
@@ -427,7 +431,7 @@ public abstract class PxfUnit {
 				if (expectedOutput.get(i).equals(actualOutput.get(j))) {
 					match = true;
 					if (i != j) {
-						System.err.println("Expected (" + expectedOutput.get(i) + ") matched (" + actualOutput.get(j)
+						LOG.error("Expected (" + expectedOutput.get(i) + ") matched (" + actualOutput.get(j)
 								+ ") but in wrong place.  " + j + " instead of " + i);
 						error = true;
 					}
@@ -437,7 +441,7 @@ public abstract class PxfUnit {
 			}
 
 			if (!match) {
-				System.err.println("Missing expected output: (" + expectedOutput.get(i) + ")");
+				LOG.error("Missing expected output: (" + expectedOutput.get(i) + ")");
 				error = true;
 			}
 		}
@@ -452,7 +456,7 @@ public abstract class PxfUnit {
 			}
 
 			if (!match) {
-				System.err.println("Received unexpected output: (" + actualOutput.get(i) + ")");
+				LOG.error("Received unexpected output: (" + actualOutput.get(i) + ")");
 				error = true;
 			}
 		}
@@ -482,7 +486,7 @@ public abstract class PxfUnit {
 			}
 
 			if (!match) {
-				System.err.println("Missing expected output: (" + expectedOutput.get(i) + ")");
+				LOG.error("Missing expected output: (" + expectedOutput.get(i) + ")");
 				error = true;
 			}
 		}
@@ -497,7 +501,7 @@ public abstract class PxfUnit {
 			}
 
 			if (!match) {
-				System.err.println("Received unexpected output: (" + actualOutput.get(i) + ")");
+				LOG.error("Received unexpected output: (" + actualOutput.get(i) + ")");
 				error = true;
 			}
 		}

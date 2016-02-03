@@ -32,14 +32,16 @@ import org.apache.hawq.pxf.plugins.hdfs.HdfsDataFragmenter;
 import org.apache.hawq.pxf.plugins.json.JsonAccessor;
 import org.apache.hawq.pxf.plugins.json.JsonResolver;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 public class JsonExtensionTest extends PxfUnit {
 
-	private static List<Pair<String, DataType>> columnDefs = null;
-	private static List<Pair<String, String>> extraParams = new ArrayList<Pair<String, String>>();
+	private List<Pair<String, DataType>> columnDefs = null;
+	private List<Pair<String, String>> extraParams = new ArrayList<Pair<String, String>>();
 
-	static {
+	@Before
+	public void before() {
 
 		columnDefs = new ArrayList<Pair<String, DataType>>();
 
@@ -54,7 +56,120 @@ public class JsonExtensionTest extends PxfUnit {
 
 	@After
 	public void cleanup() throws Exception {
+		columnDefs.clear();
 		extraParams.clear();
+	}
+
+	@Test
+	public void testCompressedMultilineJsonFile() throws Exception {
+
+		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
+
+		List<String> output = new ArrayList<String>();
+
+		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
+		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547123646465,text2,patronusdeadly,,,");
+		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547136233472,text3,NoSecrets_Vagas,,,");
+
+		super.assertOutput(new Path(System.getProperty("user.dir") + File.separator
+				+ "src/test/resources/tweets.tar.gz"), output);
+	}
+
+	@Test
+	public void testMaxRecordLength() throws Exception {
+
+		// variable-size-objects.json contains 3 json objects but only 2 of them fit in the 27 byte length limitation
+
+		extraParams.add(new Pair<String, String>("IDENTIFIER", "key666"));
+		extraParams.add(new Pair<String, String>("MAXLENGTH", "27"));
+
+		columnDefs.clear();
+		columnDefs.add(new Pair<String, DataType>("key666", DataType.TEXT));
+
+		List<String> output = new ArrayList<String>();
+
+		output.add("small object1");
+		// skip the large object2 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+		output.add("small object3");
+
+		super.assertOutput(new Path(System.getProperty("user.dir") + File.separator
+				+ "src/test/resources/variable-size-objects.json"), output);
+	}
+
+	@Test
+	public void testDataTypes() throws Exception {
+
+		// TDOO: The BYTEA type is not tested!!! Current oneField.val = val.asText().getBytes(); convention is
+		// disputable!
+
+		extraParams.clear();
+		extraParams.add(new Pair<String, String>("IDENTIFIER", "bintType"));
+
+		columnDefs.clear();
+		columnDefs.add(new Pair<String, DataType>("bintType", DataType.BIGINT));
+		columnDefs.add(new Pair<String, DataType>("booleanType", DataType.BOOLEAN));
+		columnDefs.add(new Pair<String, DataType>("charType", DataType.CHAR));
+		// columnDefs.add(new Pair<String, DataType>("byteaType", DataType.BYTEA));
+		columnDefs.add(new Pair<String, DataType>("float8Type", DataType.FLOAT8));
+		columnDefs.add(new Pair<String, DataType>("realType", DataType.REAL));
+		columnDefs.add(new Pair<String, DataType>("integerType", DataType.INTEGER));
+		columnDefs.add(new Pair<String, DataType>("smallintType", DataType.SMALLINT));
+		columnDefs.add(new Pair<String, DataType>("bpcharType", DataType.BPCHAR));
+		columnDefs.add(new Pair<String, DataType>("varcharType", DataType.VARCHAR));
+		columnDefs.add(new Pair<String, DataType>("text", DataType.TEXT));
+
+		List<String> output = new ArrayList<String>();
+
+		output.add("666,true,x,3.14,3.15,999,777,bpcharType,varcharType,");
+
+		super.assertOutput(new Path(System.getProperty("user.dir") + File.separator
+				+ "src/test/resources/datatypes-test.json"), output);
+	}
+
+	@Test(expected = IllegalStateException.class)
+	public void testMissingArrayJsonAttribute() throws Exception {
+
+		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
+
+		columnDefs.clear();
+
+		columnDefs.add(new Pair<String, DataType>("created_at", DataType.TEXT));
+		// User is not an array! An attempt to access it should throw an exception!
+		columnDefs.add(new Pair<String, DataType>("user[0]", DataType.TEXT));
+
+		List<String> output = new ArrayList<String>();
+
+		super.assertOutput(new Path(System.getProperty("user.dir") + File.separator
+				+ "src/test/resources/tweets-with-missing-text-attribtute.json"), output);
+	}
+
+	@Test
+	public void testMissingJsonAttribute() throws Exception {
+
+		List<String> output = new ArrayList<String>();
+
+		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
+
+		// Missing attributes are substituted by an empty field
+		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,,SpreadButter,tweetCongress,,");
+
+		super.assertOutput(new Path(System.getProperty("user.dir") + File.separator
+				+ "src/test/resources/tweets-with-missing-text-attribtute.json"), output);
+	}
+
+	@Test
+	public void testMalformedJsonObject() throws Exception {
+
+		List<String> output = new ArrayList<String>();
+
+		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
+
+		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
+		output.add(",,,,,,"); // Expected: malformed json records are transformed into empty rows
+		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547136233472,text3,NoSecrets_Vagas,,,");
+
+		super.assertOutput(new Path(System.getProperty("user.dir") + File.separator
+				+ "src/test/resources/tweets-broken.json"), output);
 	}
 
 	@Test
@@ -119,7 +234,7 @@ public class JsonExtensionTest extends PxfUnit {
 
 		List<String> output = new ArrayList<String>();
 
-		//output.add(",,,,,,");
+		// output.add(",,,,,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547123646465,text2,patronusdeadly,,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547136233472,text3,NoSecrets_Vagas,,,");
