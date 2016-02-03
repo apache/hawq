@@ -848,11 +848,18 @@ createdb(CreatedbStmt *stmt)
 	 * Check for db name conflict.	This is just to give a more friendly error
 	 * message than "unique index violation".  There's a race condition but
 	 * we're willing to accept the less friendly message in that case.
+	 * Also check that user is not trying to use "hcatalog" as a database name,
+	 * because it's already reserved for HCatalog integration feature.
 	 */
 	if (OidIsValid(get_database_oid(dbname)))
-		ereport(ERROR,
-				(errcode(ERRCODE_DUPLICATE_DATABASE),
-				 errmsg("database \"%s\" already exists", dbname)));
+			if (strcmp(dbname, HcatalogDbName) == 0)
+				ereport(ERROR,
+						(errcode(ERRCODE_RESERVED_NAME),
+						 errmsg("\"%s\" is a reserved name for HCatalog integration feature", HcatalogDbName)));
+			else
+				ereport(ERROR,
+						(errcode(ERRCODE_DUPLICATE_DATABASE),
+						errmsg("database \"%s\" already exists", dbname)));
 
 	/*
 	 * Select an OID for the new database, checking that it doesn't have
@@ -1533,6 +1540,15 @@ RenameDatabase(const char *oldname, const char *newname)
 	cqContext	cqc;
 	cqContext  *pcqCtx;
 
+
+	/*
+	 * Make sure "hcatalog" is not used as new name, because it's reserved for
+	 * HCatalog integration feature
+	 */
+	if (strcmp(newname, HcatalogDbName) == 0)
+		ereport(ERROR,
+				(errcode(ERRCODE_RESERVED_NAME),
+				errmsg("\"%s\" is a reserved name for HCatalog integration feature", HcatalogDbName)));
 	/*
 	 * Look up the target database's OID, and get exclusive lock on it. We
 	 * need this for the same reasons as DROP DATABASE.
@@ -1555,6 +1571,13 @@ RenameDatabase(const char *oldname, const char *newname)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("current database may not be renamed")));
+	/*
+	 * "hcatalog" database cannot be renamed
+	 */
+	if (db_id == HcatalogDbOid)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				errmsg("permission denied to ALTER DATABASE \"%s\" is reserved for system use", HcatalogDbName)));
 
 	/*
 	 * Make sure the database does not have active sessions.  This is the same
