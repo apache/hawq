@@ -106,7 +106,7 @@ list<ResourceRequest> LibYarnClient::getAskRequests() {
 
 void* heartbeatFunc(void* args) {
 	int failcounter = 0;
-
+	int retry = 2;
 	LibYarnClient *client = (LibYarnClient*)args;
 
 	while (client->keepRun) {
@@ -119,13 +119,14 @@ void* heartbeatFunc(void* args) {
 						 "is not correctly executed with exception raised. %s",
 						 e.msg());
 			failcounter++;
-			if ( failcounter > 0 ) {
+			if ( failcounter > retry ) {
 				// In case retry too many times with errors/exceptions, this
 				// thread will return. LibYarn has to re-register application
 				// and start the heartbeat thread again.
 				LOG(WARNING, "LibYarnClient::heartbeatFunc, there are too many "
 						     "failures raised. This heart-beat thread exits now.");
 				client->keepRun = false;
+				break;
 			}
 		}
 		usleep((client->heartbeatInterval) * 1000);
