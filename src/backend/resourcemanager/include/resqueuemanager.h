@@ -504,7 +504,9 @@ void setForcedReturnGRMContainerCount(void);
 
 int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize);
 
-void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack);
+int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
+											char			*errorbuf,
+											int			 	 errorbufsize);
 
 int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
 								   ConnectionTrack		 conntrack);

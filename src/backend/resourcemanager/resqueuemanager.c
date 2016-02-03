@@ -2226,6 +2226,7 @@ int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
 	DynResourceQueueTrack	queuetrack	= conntrack->QueueTrack;
 
 	elog(LOG, "ConnID %d. Expect query resource for session "INT64_FORMAT,
+			  conntrack->ConnID,
 			  conntrack->SessionID);
 
 	/* Call quota logic to make decision of resource for current query. */
@@ -2241,16 +2242,27 @@ int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
 			 * succeed.
 			 *------------------------------------------------------------------
 			 */
-			adjustResourceExpectsByQueueNVSegLimits(conntrack);
-
-			elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
-					  "( MIN %d ) resource after adjusting based on queue NVSEG "
-					  "limits.",
-					  conntrack->ConnID,
-					  conntrack->SegMemoryMB,
-					  conntrack->SegCore,
-					  conntrack->SegNum,
-					  conntrack->SegNumMin);
+			res = adjustResourceExpectsByQueueNVSegLimits(conntrack,
+														  errorbuf,
+														  errorbufsize);
+			if ( res == FUNC_RETURN_OK )
+			{
+				elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) "
+						  "x %d ( MIN %d ) resource after adjusting based on "
+						  "queue NVSEG limits.",
+						  conntrack->ConnID,
+						  conntrack->SegMemoryMB,
+						  conntrack->SegCore,
+						  conntrack->SegNum,
+						  conntrack->SegNumMin);
+			}
+			else
+			{
+				elog(WARNING, "ConnID %d. %s", conntrack->ConnID, errorbuf);
+				transformConnectionTrackProgress(conntrack,
+												 CONN_PP_RESOURCE_ACQUIRE_FAIL);
+				return res;
+			}
 		}
 
 		/* Add request to the resource queue and return. */
@@ -2335,27 +2347,38 @@ int acquireResourceQuotaFromResQueMgr(ConnectionTrack	conntrack,
 			 * succeed.
 			 *------------------------------------------------------------------
 			 */
-			adjustResourceExpectsByQueueNVSegLimits(conntrack);
+			res = adjustResourceExpectsByQueueNVSegLimits(conntrack,
+														  errorbuf,
+														  errorbufsize);
 
-			elog(LOG, "ConnID %d. Query resource quota expects (%d MB, %lf CORE) x %d "
-					  "( MIN %d ) resource after adjusting based on queue NVSEG "
-					  "limits.",
-					  conntrack->ConnID,
-					  conntrack->SegMemoryMB,
-					  conntrack->SegCore,
-					  conntrack->SegNum,
-					  conntrack->SegNumMin);
+			if ( res == FUNC_RETURN_OK )
+			{
+				elog(LOG, "ConnID %d. Query resource quota expects (%d MB, %lf CORE) "
+						  "x %d ( MIN %d ) resource after adjusting based on queue "
+						  "NVSEG limits.",
+						  conntrack->ConnID,
+						  conntrack->SegMemoryMB,
+						  conntrack->SegCore,
+						  conntrack->SegNum,
+						  conntrack->SegNumMin);
+			}
+			else
+			{
+				elog(WARNING, "ConnID %d. %s", conntrack->ConnID, errorbuf);
+				return res;
+			}
 		}
 	}
 	else
 	{
-		elog(WARNING, "ConnID %d. Not accepted resource quota request.",
-					  conntrack->ConnID);
+		elog(WARNING, "ConnID %d. %s", conntrack->ConnID, errorbuf);
 	}
 	return res;
 }
 
-void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack)
+int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
+											char			*errorbuf,
+											int			 	 errorbufsize)
 {
 	DynResourceQueueTrack queuetrack = conntrack->QueueTrack;
 	DynResourceQueue	  queue		 = queuetrack->QueueInfo;
@@ -2363,6 +2386,58 @@ void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack)
 
 	if ( queue->NVSegLowerLimit > MINIMUM_RESQUEUE_NVSEG_LOWER_LIMIT_N )
 	{
+		/*----------------------------------------------------------------------
+		 * Check if there are some conflicts between NVSEG_LOWER_LIMIT and
+		 * resource upper limits.
+		 *----------------------------------------------------------------------
+		 */
+		if ( queue->NVSegLowerLimit > conntrack->VSegLimit )
+		{
+			snprintf(errorbuf, errorbufsize,
+					 "queue %s's limit %s=%d is greater than maximum number of "
+					 "virtual segments in cluster %d, check queue definition and "
+					 "guc variable hawq_rm_nvseg_perquery_limit",
+					 queue->Name,
+					 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT],
+					 queue->NVSegLowerLimit,
+					 conntrack->VSegLimit);
+			return RESQUEMGR_WRONG_NVSEG_LIMIT_LOWER;
+		}
+
+		if ( conntrack->MinSegCountFixed != conntrack->MaxSegCountFixed )
+		{
+			int limit = conntrack->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
+			if ( queue->NVSegLowerLimit > limit )
+			{
+				snprintf(errorbuf, errorbufsize,
+						 "queue %s's limit %s=%d is greater than maximum number "
+						 "of virtual segments in cluster %d, there are %d available "
+						 "segments, each segment has %d maximum virtual segments, "
+						 "check queue definition and guc variable "
+						 "rm_nvseg_perquery_perseg_limit",
+						 queue->Name,
+						 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT],
+						 queue->NVSegLowerLimit,
+						 limit,
+						 PRESPOOL->AvailNodeCount,
+						 conntrack->VSegLimitPerSeg);
+				return RESQUEMGR_WRONG_NVSEG_LIMIT_LOWER;
+			}
+		}
+
+		if ( queue->NVSegLowerLimit > queuetrack->ClusterSegNumberMax )
+		{
+			snprintf(errorbuf, errorbufsize,
+					 "queue %s's limit %s=%d is greater than queue maximum "
+					 "number of virtual segments %d, check queue definition",
+					 queue->Name,
+					 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT],
+					 queue->NVSegLowerLimit,
+					 queuetrack->ClusterSegNumberMax);
+			return RESQUEMGR_WRONG_NVSEG_LIMIT_LOWER;
+		}
+
+
 		if ( conntrack->SegNum >= queue->NVSegLowerLimit &&
 			 conntrack->SegNumMin < queue->NVSegLowerLimit )
 		{
@@ -2376,9 +2451,69 @@ void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack)
 	else if ( queue->NVSegLowerLimitPerSeg >
 			  MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N )
 	{
-		int minnvseg = ceil(queuetrack->QueueInfo->NVSegLowerLimitPerSeg *
-							PRESPOOL->AvailNodeCount);
-		if ( conntrack->SegNum >= minnvseg && conntrack->SegNumMin < minnvseg )
+		/*----------------------------------------------------------------------
+		 * Check if there are some conflicts between NVSEG_LOWER_PERSEG_LIMIT
+		 * and resource upper limits.
+		 *----------------------------------------------------------------------
+		 */
+		int minnvseg = ceil(queue->NVSegLowerLimitPerSeg * PRESPOOL->AvailNodeCount);
+		if ( minnvseg > conntrack->VSegLimit )
+		{
+			snprintf(errorbuf, errorbufsize,
+					 "queue %s's limit %s=%lf requires minimum %d virtual "
+					 "segments in cluster having %d available segments, it is "
+					 "greater than maximum number of virtual segments in cluster "
+					 "%d, check queue definition and guc variable "
+					 "hawq_rm_nvseg_perquery_perseg_limit",
+					 queue->Name,
+					 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
+					 queue->NVSegLowerLimitPerSeg,
+					 minnvseg,
+					 PRESPOOL->AvailNodeCount,
+					 conntrack->VSegLimit);
+			return RESQUEMGR_WRONG_NVSEG_PERSEG_LIMIT_LOWER;
+		}
+
+		if ( conntrack->MinSegCountFixed != conntrack->MaxSegCountFixed )
+		{
+			int limit = conntrack->VSegLimitPerSeg * PRESPOOL->AvailNodeCount;
+			if ( minnvseg > limit )
+			{
+				snprintf(errorbuf, errorbufsize,
+						 "queue %s's limit %s=%lf requires minimum %d virtual "
+						 "segments in cluster having %d available segments, it "
+						 "is greater than maximum number of virtual segments in "
+						 "cluster %d, each segment has %d maximum virtual "
+						 "segments, check queue definition and guc variable "
+						 "hawq_rm_nvseg_perquery_perseg_limit",
+						 queue->Name,
+						 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
+						 queue->NVSegLowerLimitPerSeg,
+						 minnvseg,
+						 PRESPOOL->AvailNodeCount,
+						 limit,
+						 conntrack->VSegLimitPerSeg);
+				return RESQUEMGR_WRONG_NVSEG_PERSEG_LIMIT_LOWER;
+			}
+		}
+
+		if ( minnvseg > queuetrack->ClusterSegNumberMax )
+		{
+			snprintf(errorbuf, errorbufsize,
+					 "queue %s's limit %s=%lf requires minimum %d virtual "
+					 "segments in cluster having %d available segments, it is "
+					 "greater than queue maximum number of virtual segments %d, "
+					 "check queue definition",
+					 queue->Name,
+					 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
+					 queue->NVSegLowerLimitPerSeg,
+					 minnvseg,
+					 PRESPOOL->AvailNodeCount,
+					 queuetrack->ClusterSegNumberMax);
+			return RESQUEMGR_WRONG_NVSEG_PERSEG_LIMIT_LOWER;
+		}
+
+		if ( conntrack->SegNumMin < minnvseg )
 		{
 			conntrack->SegNumMin = minnvseg;
 			adjusted =true;
@@ -2428,6 +2563,8 @@ void adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack conntrack)
 					conntrack->ConnID,
 					conntrack->SegNumMin);
 	}
+
+	return FUNC_RETURN_OK;
 }
 
 /* Resource is returned from query to resource queue. */
@@ -5340,18 +5477,26 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 				 * must succeed.
 				 *--------------------------------------------------------------
 				 */
-				adjustResourceExpectsByQueueNVSegLimits(newconn);
+				res = adjustResourceExpectsByQueueNVSegLimits(newconn,
+															  errorbuf,
+															  errorbufsize);
 
-				elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
-						  "( MIN %d ) resource after adjusting based on queue NVSEG "
-						  "limits.",
-						  newconn->ConnID,
-						  newconn->SegMemoryMB,
-						  newconn->SegCore,
-						  newconn->SegNum,
-						  newconn->SegNumMin);
+				if (res == FUNC_RETURN_OK )
+				{
+					elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) "
+							  "x %d ( MIN %d ) resource after adjusting based on "
+							  "queue NVSEG limits.",
+							  newconn->ConnID,
+							  newconn->SegMemoryMB,
+							  newconn->SegCore,
+							  newconn->SegNum,
+							  newconn->SegNumMin);
+				}
 			}
+		}
 
+		if ( res == FUNC_RETURN_OK )
+		{
 			/* Add request to the resource queue and return. */
 			addQueryResourceRequestToQueue(quetrack, newconn);
 		}
