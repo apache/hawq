@@ -97,6 +97,7 @@ enum RESOURCE_QUEUE_TABLE_ATTR_INDEX {
 	RSQ_TBL_ATTR_COUNT
 };
 
+extern char RSQTBLAttrNames[RSQ_TBL_ATTR_COUNT][RESOURCE_QUEUE_TBL_COLNAME_LENGTH_MAX+1];
 /*
  * The attributes for expressing one complete role/user definition.
  */
@@ -534,6 +535,9 @@ void cancelQueryRequestToBreakDeadLockInShadow(DynResourceQueueTrack shadowtrack
 											   DQueueNode			 iter,
 											   int32_t				 expmemorymb,
 											   int32_t				 availmemorymb);
+
+/* Refresh resource queue resource capacity based on updated cluster info. */
+void refreshResourceQueuePercentageCapacity(bool queuechanged);
 
 /* Dump resource queue status to file system. */
 void dumpResourceQueueStatus(const char *filename);
