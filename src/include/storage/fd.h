@@ -82,7 +82,7 @@ extern bool	enable_secure_filesystem;
 
 /* access local file system */
 extern File LocalPathNameOpenFile(FileName fileName, int fileFlags, int fileMode);
-extern void LocalFileClose(File file);
+extern void LocalFileClose(File file, bool canReportError);
 extern int LocalFileRead(File file, char *buffer, int amount);
 extern int LocalFileWrite(File file, const char *buffer, int amount);
 extern int64 LocalFileSeek(File file, int64 offset, int whence);
