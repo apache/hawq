@@ -81,7 +81,7 @@ bfz_string_to_compression(const char *string)
 static void
 bfz_close_callback(XactEvent event, void *arg)
 {
-	bfz_close(arg, false);
+	bfz_close(arg, false, (event!=XACT_EVENT_ABORT));
 }
 
 #define BFZ_CHECKSUM_EQ(c1, c2) EQ_CRC32(c1, c2)
@@ -438,7 +438,7 @@ bfz_create_internal(bfz_t *bfz_handle, const char *fileName, bool open_existing,
 }
 
 void
-bfz_close(bfz_t * thiz, bool unreg)
+bfz_close(bfz_t * thiz, bool unreg, bool canReportError)
 {
 	if (unreg)
 		UnregisterXactCallbackOnce(bfz_close_callback, thiz);
@@ -461,7 +461,7 @@ bfz_close(bfz_t * thiz, bool unreg)
 	if (thiz->del_on_close && thiz->filename != NULL)
 	{
 		if (unlink(thiz->filename))
-			ereport(ERROR,
+			ereport(canReportError?ERROR:WARNING,
 					(errcode(ERRCODE_IO_ERROR),
 					errmsg("could not close temporary file %s: %m", thiz->filename)));
 		pfree(thiz->filename);

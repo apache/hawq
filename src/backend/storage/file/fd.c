@@ -1209,7 +1209,7 @@ OpenNamedFile(const char   *fileName,
  * close a file when done with it
  */
 void
-LocalFileClose(File file)
+LocalFileClose(File file, bool canReportError)
 {
 	Vfd		   *vfdP;
 
@@ -1227,7 +1227,7 @@ LocalFileClose(File file)
 
 		/* close the file */
 		if (gp_retry_close(vfdP->fd))
-			elog(ERROR, "could not close file \"%s\": %m",
+			elog(canReportError?ERROR:WARNING, "could not close file \"%s\": %m",
 				 vfdP->fileName);
 
 		--nfile;
@@ -2130,7 +2130,7 @@ CleanupTempFiles(bool isProcExit)
 			{
 				AssertImply( (fdstate & FD_TEMPORARY), VfdCache[i].fileName != NULL);
 				if (IsLocalPath(VfdCache[i].fileName))
-					LocalFileClose(i);
+					LocalFileClose(i, false);
 				else
 					HdfsFileClose(i, false);
 			}
@@ -2725,14 +2725,10 @@ HdfsFileClose(File file, bool canReportError)
 
 	if (retval == -1)
 	{
-		/* do not disconnect. */
-		if (canReportError)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_IO_ERROR),
-							errmsg("could not close file %d : (%s) errno %d", file, fileName, errno),
-							errdetail("%s", HdfsGetLastError())));
-		}
+		ereport(canReportError?ERROR:WARNING,
+				(errcode(ERRCODE_IO_ERROR),
+						errmsg("could not close file %d : (%s) errno %d", file, fileName, errno),
+						errdetail("%s", HdfsGetLastError())));
 	}
 }
 
@@ -3160,7 +3156,7 @@ PathNameOpenFile(FileName fileName, int fileFlags, int fileMode) {
 void
 FileClose(File file) {
 	if (IsLocalPath(VfdCache[file].fileName))
-		LocalFileClose(file);
+		LocalFileClose(file, true);
 	else
 		HdfsFileClose(file, true);
 }
