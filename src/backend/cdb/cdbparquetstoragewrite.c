@@ -653,7 +653,6 @@ mappingHAWQType(int hawqTypeID)
 
 	case HAWQ_TYPE_INT2:
 	case HAWQ_TYPE_INT4:
-	case HAWQ_TYPE_MONEY:
 	case HAWQ_TYPE_DATE:
 		return INT32;
 
@@ -661,6 +660,7 @@ mappingHAWQType(int hawqTypeID)
 	case HAWQ_TYPE_TIME:
 	case HAWQ_TYPE_TIMESTAMPTZ:
 	case HAWQ_TYPE_TIMESTAMP:
+	case HAWQ_TYPE_MONEY:
 		return INT64;
 
 	case HAWQ_TYPE_FLOAT4:
@@ -1274,13 +1274,18 @@ encodePlain(Datum data,
 		memcpy(dst_ptr, &val, len);
 		return len;
 	}
+
+
+	/*----------------------------------------------------------------
+	 * Type mapped to 8-bytes INT64/DOUBLE in Parquet
+	 *----------------------------------------------------------------*/
 	case HAWQ_TYPE_MONEY:
 	{
 		/*
-		 * Although money is represented as int32 internally,
+		 * Although money is represented as int64 internally,
 		 * it's passed by reference.
 		 */
-		len = 4;
+		len = 8;
 		if (!ensureBufferCapacity(current_page, len, pageSizeLimit))
 		{
 			return ENCODE_OUTOF_PAGE;
@@ -1293,11 +1298,7 @@ encodePlain(Datum data,
 		memcpy(dst_ptr, cash_p, len);
 		return len;
 	}
-
-
-	/*----------------------------------------------------------------
-	 * Type mapped to 8-bytes INT64/DOUBLE in Parquet
-	 *----------------------------------------------------------------*/
+	
 	case HAWQ_TYPE_INT8:
 	{
 		len = 8;
