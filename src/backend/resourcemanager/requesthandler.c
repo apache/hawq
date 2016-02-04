@@ -427,7 +427,7 @@ bool handleRMRequestAcquireResource(void **arg)
 	/* Get preferred nodes. */
 	buildSegPreferredHostInfo((*conntrack));
 
-	elog(RMLOG, "ConnID %d. Session ID " INT64_FORMAT
+	elog(RMLOG, "ConnID %d. Session ID " INT64_FORMAT " "
 				"Scanning "INT64_FORMAT" io bytes "
 				"by %d slices with %d preferred segments. "
 				"Expect %d vseg (MIN %d). "
