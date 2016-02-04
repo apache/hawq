@@ -88,38 +88,24 @@ fi
 
 master_max_connections=${max_connections}
 segment_max_connections=${max_connections}
-master_ip_address_all=""
-standby_ip_address_all=""
 standby_host_lowercase=`lowercase "${standby_host_name}"`
 
 get_all_ip_address() {
     if [ "${distro_based_on}" = "RedHat" ] && [ "${distro_major_version}" -ge 7 ]; then
         cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print \$2}'"
+        if [ "${object_type}" = 'segment' ]; then
+            segment_ip_address_all=`${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print $2}'`
+        fi
     elif [ "${distro_based_on}" = "Mac" ]; then
         cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print \$2}'"
+        if [ "${object_type}" = 'segment' ]; then
+            segment_ip_address_all=`${IFCONFIG} |${GREP} -v '127.0.0' | ${GREP} 'inet '|${AWK} '{print $2}'`
+        fi
     else
         cmd_str="${IFCONFIG} |${GREP} -v '127.0.0' |${AWK} '/inet addr/{print substr(\$2,6)}'"
-    fi
-
-    master_ip_address_all=`${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} "${cmd_str}"`
-    if [ -z "${master_ip_address_all}" ];then
-        ${ECHO} "Failed to get master ip addresses"
-        exit 1
-    fi
-
-    if [ "${standby_host_lowercase}" != "none" ] && [ -n "${standby_host_lowercase}" ];then
-        standby_ip_address_all=`${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${standby_host_name} "${cmd_str}"`
-        if [ -z "${standby_ip_address_all}" ];then
-            ${ECHO} "Failed to get standby ip addresses"
-            exit 1
+        if [ "${object_type}" = 'segment' ]; then
+            segment_ip_address_all=`${IFCONFIG} |${GREP} -v '127.0.0' |${AWK} '/inet addr/{print substr(\$2,6)}'`
         fi
-    fi
-
-    segment_ip_address_all=`${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@localhost "${cmd_str}"`
-
-    if [ -z "${segment_ip_address_all}" ];then
-        ${ECHO} "Failed to get segment ip addresses"
-        exit 1
     fi
 }
 
