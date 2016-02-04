@@ -40,6 +40,25 @@ typedef struct QueryExecutorIterator
 	int		executor_id;
 } QueryExecutorIterator;
 
+/*
+ * QueryExecutorTeam/QueryExecutorGroup
+ */
+typedef struct QueryExecutorGroup {
+	struct QueryExecutorTeam	*team;		/* Reference to the parent */
+	int						query_executor_num;
+
+	struct QueryExecutor	**query_executors;
+	struct pollfd			*fds;
+} QueryExecutorGroup;
+
+typedef struct QueryExecutorTeam {
+	/* Must same with thread_num. */
+	int						query_executor_group_num;
+	QueryExecutorGroup		*query_executor_groups;
+
+	/* Reference to other data structure */
+	struct DispatchData 	*refDispatchData;
+} QueryExecutorTeam;
 
 /* Iterate all of executors in all groups. */
 extern void dispmgt_init_query_executor_iterator(struct QueryExecutorTeam *team,

@@ -197,6 +197,7 @@ typedef struct DispatchStatement {
 
 /* Global states: DO NOT add global state unless you have to. */
 static MemoryContext	DispatchDataContext;
+static int	            DispatchInitCount = -1;
 
 
 /* Static function */
@@ -368,6 +369,9 @@ fillSliceVector(SliceTable *sliceTbl, int rootIdx, sliceVec *sliceVector, int sl
 static void
 aggregateQueryResource(QueryResource *queryRes)
 {
+	MemoryContext	old;
+	old = MemoryContextSwitchTo(DispatchDataContext);
+
 	if (queryRes &&
 		queryRes->segments &&
 		(list_length(queryRes->segments) > 0))
@@ -407,21 +411,26 @@ aggregateQueryResource(QueryResource *queryRes)
 			queryRes->segment_vcore_agg[i++] = nseg;
 		}
 	}
+
+	MemoryContextSwitchTo(old);
 }
 
 static void
 dispatch_init_env(void)
 {
-	if (DispatchDataContext)
+	++DispatchInitCount;
+	if (DispatchDataContext) {
+		if (DispatchInitCount == 0)
+			MemoryContextResetAndDeleteChildren(DispatchDataContext);
 		return;
-
+	}
 	DispatchDataContext = AllocSetContextCreate(TopMemoryContext,
 			"Dispatch Data Context",
 			ALLOCSET_DEFAULT_MINSIZE,
 			ALLOCSET_DEFAULT_INITSIZE,
 			ALLOCSET_DEFAULT_MAXSIZE);
 
-	executormgr_setup_env(DispatchDataContext);
+	executormgr_setup_env(TopMemoryContext);
 }
 
 
@@ -740,6 +749,9 @@ prepare_dispatch_statement_node(struct DispatchData *data,
 static void
 dispatcher_split_logical_tasks_for_query_desc(DispatchData *data)
 {
+	MemoryContext	old;
+	old = MemoryContextSwitchTo(DispatchDataContext);
+
 	sliceVec	*sliceVector = NULL;
 	int			i;
 	int			slice_num;
@@ -839,6 +851,8 @@ dispatcher_split_logical_tasks_for_query_desc(DispatchData *data)
 	}
 
 	pfree(sliceVector);
+
+	MemoryContextSwitchTo(old);
 }
 
 /*
@@ -847,6 +861,7 @@ dispatcher_split_logical_tasks_for_query_desc(DispatchData *data)
 static void
 dispatcher_split_logical_tasks_for_statemet_or_node(DispatchData *data)
 {
+	MemoryContext	old;
 	int 	i;
 	int		segment_num, segment_num_entrydb;
 
@@ -857,6 +872,8 @@ dispatcher_split_logical_tasks_for_statemet_or_node(DispatchData *data)
 	{
 		return;
 	}
+
+	old = MemoryContextSwitchTo(DispatchDataContext);
 
 	data->job.used_slices_num = segment_num_entrydb + 1;
 	data->job.all_slices_num = segment_num_entrydb + 1;
@@ -899,6 +916,8 @@ dispatcher_split_logical_tasks_for_statemet_or_node(DispatchData *data)
     task->id.init = true;
   }
 	data->pQueryParms->primary_gang_id = -1;
+
+	MemoryContextSwitchTo(old);
 }
 
 /*
@@ -1266,6 +1285,74 @@ dispatch_wait(DispatchData *data)
   }
 }
 
+/*
+ * free_dispatch_data
+ *	free the DispatchData allocated resource
+ */
+void free_dispatch_data(struct DispatchData *data) {
+	if (data->pQueryParms) {
+		pfree(data->pQueryParms);
+		data->pQueryParms = NULL;
+	}
+	if (data->job.slices) {
+		for (int i = 0; i < data->job.used_slices_num; ++i) {
+			if (data->job.slices[i].tasks) {
+				pfree(data->job.slices[i].tasks);
+				data->job.slices[i].tasks = NULL;
+			}
+		}
+		pfree(data->job.slices);
+		data->job.slices = NULL;
+	}
+	if (data->query_executor_team) {
+		QueryExecutorGroup *qeGrp = data->query_executor_team->query_executor_groups;
+		if (qeGrp) {
+			if (qeGrp->fds) {
+				pfree(qeGrp->fds);
+				qeGrp->fds = NULL;
+			}
+			for (int j = 0; j < qeGrp->query_executor_num; ++j) {
+				pfree(qeGrp->query_executors[j]);
+				qeGrp->query_executors[j] = NULL;
+			}
+		}
+		pfree(data->query_executor_team);
+		data->query_executor_team = NULL;
+	}
+	pfree(data);
+}
+
+/*
+ * dispatch_end_env
+ * accompanied with dispatch_init_env
+ */
+void dispatch_end_env(struct DispatchData *data) {
+	Assert(data != NULL);
+
+	--DispatchInitCount;
+
+	cdbdisp_destroyDispatchResults(data->results);
+	data->results = NULL;
+	dispatcher_set_state_done(data);
+
+	PG_TRY();
+	{
+		dispatcher_unbind_executor(data);
+		if (data->resource_is_mine)
+		{
+			FreeResource(data->resource);
+			data->resource_is_mine = false;
+		}
+	}
+	PG_CATCH();
+	{
+		free_dispatch_data(data);
+		PG_RE_THROW();
+	}
+	PG_END_TRY();
+	free_dispatch_data(data);
+}
+
 /* 
  * dispatch_cleanup
  *	Cleanup the workermgr. Report error if something happended on executors.
@@ -1273,6 +1360,10 @@ dispatch_wait(DispatchData *data)
 void
 dispatch_cleanup(DispatchData *data)
 {
+	/* to avoid duplicate dispatch cleanup */
+	if (data == NULL) return;
+	if (dispatcher_is_state_done(data)) return;
+
 	/*
 	 * We should not get here when dispatcher hit an exception. But
 	 * executors may have some troubles.
@@ -1285,24 +1376,7 @@ dispatch_cleanup(DispatchData *data)
 		return;	/* should not hit */
 	}
 	
-	if (dispatcher_is_state_done(data))
-		return;
-
-	/*
-	 * dispatch_throw_error needs to access error information, free here is safe.
-	 */
-	dispatcher_unbind_executor(data);
-	if (data->resource_is_mine)
-	{
-		FreeResource(data->resource);
-		data->resource_is_mine = false;
-	}
-
-	cdbdisp_destroyDispatchResults(data->results);
-	data->results = NULL;
-	dispatcher_set_state_done(data);
-	
-	pfree(data);
+	dispatch_end_env(data);
 }
 
 /*
@@ -1365,28 +1439,8 @@ dispatch_catch_error(DispatchData *data)
 		{}						/* nop; fall thru */
 		PG_END_TRY();
 	}
-	else
-	{
-		/*
-		 * Discard any remaining results from QEs; don't confuse matters by
-		 * throwing a new error.  Any results of interest presumably should
-		 * have been examined before raising the error that the caller is
-		 * currently handling.
-		 */
-		dispatcher_set_state_done(data);
-		cdbdisp_destroyDispatchResults(data->results);
-		data->results = NULL;
-	}
 
-	/*
-	 * dispatch_throw_error needs access error information, so return them here.
-	 */
-	dispatcher_unbind_executor(data);
-	if (data->resource_is_mine)
-	{
-		FreeResource(data->resource);
-		data->resource_is_mine = false;
-	}
+	dispatch_end_env(data);
 }
 
 void
@@ -1528,13 +1582,16 @@ dispatcher_fill_query_param(const char *strCommand,
 {
 	DispatchCommandQueryParms	*queryParms;
 	Segment		*master = NULL;
+	MemoryContext	old;
 
 	if (resource)
 	{
 	  master = resource->master;
 	}
 
+	old = MemoryContextSwitchTo(DispatchDataContext);
 	queryParms = palloc0(sizeof(*queryParms));
+	MemoryContextSwitchTo(old);
 
 	queryParms->strCommand = strCommand;
 	queryParms->strCommandlen = strCommand ? strlen(strCommand) + 1 : 0;
@@ -1644,6 +1701,9 @@ dispatch_get_task_identity(DispatchTask *task)
 static bool
 dispatch_collect_executors_error(DispatchData *data)
 {
+	MemoryContext	old;
+	old = MemoryContextSwitchTo(DispatchDataContext);
+
 	QueryExecutorIterator	iterator;
 	struct QueryExecutor	*executor;
 	bool ret = false;
@@ -1669,6 +1729,9 @@ dispatch_collect_executors_error(DispatchData *data)
 	  pfree(errHostName[i]);
 	}
 	pfree(errHostName);
+
+	MemoryContextSwitchTo(old);
+
 	return ret;
 }
 
@@ -1682,26 +1745,11 @@ dispatch_throw_error(DispatchData *data)
 	initStringInfo(&buf);
 	cdbdisp_dumpDispatchResults(data->results, &buf, false);
 
-	cdbdisp_destroyDispatchResults(data->results);
-	data->results = NULL;
-	/* Error was consumed, mark it done to prevent error check again. */
-	dispatcher_set_state_done(data);
-
 	/* Too bad, our gang got an error. */
 	PG_TRY();
 	{
-		/*
-		 * No one needs the error information here.
-		 */
-		dispatcher_unbind_executor(data);
-		if (data->resource_is_mine)
-		{
-			FreeResource(data->resource);
-			data->resource_is_mine = false;
-		}
-
 		ereport(ERROR, (errcode(errorcode),
-                        errOmitLocation(true),
+						errOmitLocation(true),
 						errmsg("%s", buf.data)));
 	}
 	PG_CATCH();

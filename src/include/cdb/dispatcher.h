@@ -84,5 +84,8 @@ extern void dispatcher_print_statistics(StringInfo buf, struct DispatchData *dat
 extern ProcessIdentity *dispatch_get_task_identity(struct DispatchTask *task);
 extern struct DispatchCommandQueryParms *dispatcher_get_QueryParms(struct DispatchData *data);
 
+void dispatch_end_env(struct DispatchData *data);
+void free_dispatch_data(struct DispatchData *data);
+
 #endif	/* DISPATCHER_H */
 
