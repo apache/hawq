@@ -486,7 +486,7 @@ decodePlain(Datum *value, uint8_t **buffer, int hawqTypeID)
 			 * should be a pointer, see cash.c
 			 */
 			(*value) = PointerGetDatum(*buffer);
-			(*buffer) += 4;
+			(*buffer) += 8;
 			break;
 		}
 
