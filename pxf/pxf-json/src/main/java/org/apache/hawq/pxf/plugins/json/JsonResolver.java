@@ -50,17 +50,24 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	private ColumnDescriptorCache[] columnDescriptorCache;
 	private ObjectMapper mapper;
 
+	/**
+	 * Row with empty fields. Returned in case of broken or malformed json records.
+	 */
+	private final List<OneField> emptyRow;
+
 	public JsonResolver(InputData inputData) throws Exception {
 		super(inputData);
 		oneFieldList = new ArrayList<OneField>();
 		mapper = new ObjectMapper(new JsonFactory());
 
-		// Pre-generate all column structure attributes concerning the JSON to column value resolution.
+		// Precompute the column metadata. The metadata is used for mapping column names to json nodes.
 		columnDescriptorCache = new ColumnDescriptorCache[inputData.getColumns()];
 		for (int i = 0; i < inputData.getColumns(); ++i) {
 			ColumnDescriptor cd = inputData.getColumn(i);
 			columnDescriptorCache[i] = new ColumnDescriptorCache(cd);
 		}
+
+		emptyRow = createEmptyRow();
 	}
 
 	@Override
@@ -72,54 +79,45 @@ public class JsonResolver extends Plugin implements ReadResolver {
 		JsonNode root = decodeLineToJsonNode(jsonRecordAsText);
 
 		if (root == null) {
-			LOG.warn("Return null-fields row due to invalid JSON:" + jsonRecordAsText);
+			LOG.warn("Return empty-fields row due to invalid JSON: " + jsonRecordAsText);
+			return emptyRow;
 		}
 
 		// Iterate through the column definition and fetch our JSON data
-		for (ColumnDescriptorCache column : columnDescriptorCache) {
+		for (ColumnDescriptorCache columnMetadata : columnDescriptorCache) {
 
-			// Get the current column description
+			JsonNode node = getChildJsonNode(root, columnMetadata.getNormalizedProjections());
 
-			if (root == null) {
-				// Return empty (e.g. null) filed in case of malformed json.
-				addNullField(column.getColumnType());
-			} else {
-
-				// Move down the JSON path to the final name
-				JsonNode node = getPriorJsonNode(root, column.getProjections());
-
+			// If this node is null or missing, add a null value here
+			if (node == null || node.isMissingNode()) {
+				addNullField(columnMetadata.getColumnType());
+			} else if (columnMetadata.isArray()) {
 				// If this column is an array index, ex. "tweet.hashtags[0]"
-				if (column.isArrayName()) {
-
-					// Move to the array node
-					node = node.get(column.getArrayNodeName());
-
-					// If this node is null or missing, add a null value here
-					if (node == null || node.isMissingNode()) {
-						addNullField(column.getColumnType());
-					} else if (node.isArray()) {
-						// If the JSON node is an array, then add it to our list
-						addFieldFromJsonArray(column.getColumnType(), node, column.getArrayIndex());
-					} else {
-						throw new IllegalStateException(column.getArrayNodeName() + " is not an array node");
-					}
+				if (node.isArray()) {
+					// If the JSON node is an array, then add it to our list
+					addFieldFromJsonArray(columnMetadata.getColumnType(), node, columnMetadata.getArrayNodeIndex());
 				} else {
-					// This column is not an array type
-					// Move to the final node
-					node = node.get(column.getLastProjection());
-
-					// If this node is null or missing, add a null value here
-					if (node == null || node.isMissingNode()) {
-						addNullField(column.getColumnType());
-					} else {
-						// Else, add the value to the record
-						addFieldFromJsonNode(column.getColumnType(), node);
-					}
+					throw new IllegalStateException(columnMetadata.getColumnName() + " is not an array node");
 				}
+			} else {
+				// This column is not an array type
+				// Add the value to the record
+				addFieldFromJsonNode(columnMetadata.getColumnType(), node);
 			}
 		}
 
 		return oneFieldList;
+	}
+
+	/**
+	 * @return Returns a row comprised of typed, empty fields. Used as a result of broken/malformed json records.
+	 */
+	private List<OneField> createEmptyRow() {
+		ArrayList<OneField> emptyFieldList = new ArrayList<OneField>();
+		for (ColumnDescriptorCache column : columnDescriptorCache) {
+			emptyFieldList.add(new OneField(column.getColumnType().getOID(), null));
+		}
+		return emptyFieldList;
 	}
 
 	/**
@@ -131,11 +129,11 @@ public class JsonResolver extends Plugin implements ReadResolver {
 	 *            defines the path from the root to the desired child node.
 	 * @return Returns the child node defined by the root and projs path.
 	 */
-	private JsonNode getPriorJsonNode(JsonNode root, String[] projs) {
+	private JsonNode getChildJsonNode(JsonNode root, String[] projs) {
 
 		// Iterate through all the tokens to the desired JSON node
 		JsonNode node = root;
-		for (int j = 0; j < projs.length - 1; ++j) {
+		for (int j = 0; j < projs.length; ++j) {
 			node = node.path(projs[j]);
 		}
 
@@ -169,8 +167,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			++count;
 		}
 
-		// if we reached the end of the array without adding a
-		// field, add null
+		// if we reached the end of the array without adding a field, add null
 		if (!added) {
 			addNullField(type);
 		}

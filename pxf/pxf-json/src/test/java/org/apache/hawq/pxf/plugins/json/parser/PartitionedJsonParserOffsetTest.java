@@ -46,6 +46,7 @@ public class PartitionedJsonParserOffsetTest {
 		assertNotNull(result);
 		assertEquals(54, parser.getBytesRead());
 		assertEquals(28, parser.getBytesRead() - result.length());
+		jsonInputStream.close();
 	}
 
 	public InputStream createFromString(String s) {

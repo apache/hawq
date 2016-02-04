@@ -31,7 +31,7 @@ import org.apache.hawq.pxf.plugins.json.parser.JsonLexer.JsonLexerState;
 
 /**
  * A simple parser that can support reading JSON objects from a random point in JSON text. It reads from the supplied
- * stream (which is assumed to be positioned at any arbitrary position inside some JSON text) until it find the first
+ * stream (which is assumed to be positioned at any arbitrary position inside some JSON text) until it finds the first
  * JSON begin-object "{". From this point on it will keep reading JSON objects until it finds one containing a member
  * string that the user supplies.
  * <p/>
@@ -39,11 +39,13 @@ import org.apache.hawq.pxf.plugins.json.parser.JsonLexer.JsonLexerState;
  */
 public class PartitionedJsonParser {
 
+	private static final char BACKSLASH = '\\';
+	private static final char START_BRACE = '{';
 	private static final int EOF = -1;
 	private final InputStreamReader inputStreamReader;
 	private final JsonLexer lexer;
 	private long bytesRead = 0;
-	private boolean endOfStream;
+	private boolean endOfStream = false;
 
 	public PartitionedJsonParser(InputStream is) {
 		this.lexer = new JsonLexer();
@@ -60,7 +62,7 @@ public class PartitionedJsonParser {
 		while ((i = inputStreamReader.read()) != EOF) {
 			char c = (char) i;
 			bytesRead++;
-			if (c == '{' && prev != '\\') {
+			if (c == START_BRACE && prev != BACKSLASH) {
 				lexer.setState(JsonLexer.JsonLexerState.BEGIN_OBJECT);
 				return true;
 			}
@@ -105,7 +107,7 @@ public class PartitionedJsonParser {
 		if (!scanToFirstBeginObject()) {
 			return null;
 		}
-		currentObject.append("{");
+		currentObject.append(START_BRACE);
 		objectStack.add(0);
 
 		while ((i = inputStreamReader.read()) != EOF) {
@@ -135,7 +137,7 @@ public class PartitionedJsonParser {
 					// we are searching and found a '{', so we reset the current object string
 					if (objectStack.size() == 0) {
 						currentObject.setLength(0);
-						currentObject.append("{");
+						currentObject.append(START_BRACE);
 					}
 					objectStack.add(currentObject.length() - 1);
 				} else if (lexer.getState() == JsonLexerState.END_OBJECT) {

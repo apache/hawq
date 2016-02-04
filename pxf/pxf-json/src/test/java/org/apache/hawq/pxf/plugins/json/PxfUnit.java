@@ -145,6 +145,7 @@ public abstract class PxfUnit {
 		}
 
 		assertUnorderedOutput(input, outputLines);
+		rdr.close();
 	}
 
 	/**
@@ -398,17 +399,10 @@ public abstract class PxfUnit {
 	}
 
 	private JsonNode decodeLineToJsonNode(String line) {
-
 		try {
 			return mapper.readTree(line);
-		} catch (JsonParseException e) {
-			e.printStackTrace();
-			return null;
-		} catch (JsonMappingException e) {
-			e.printStackTrace();
-			return null;
-		} catch (IOException e) {
-			e.printStackTrace();
+		} catch (Exception e) {
+			LOG.warn(e);
 			return null;
 		}
 	}
