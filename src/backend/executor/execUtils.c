@@ -2279,6 +2279,7 @@ void mppExecutorCleanup(QueryDesc *queryDesc)
 			ExecSquelchNode(queryDesc->planstate);
 
 		dispatch_catch_error(estate->dispatch_data);
+		estate->dispatch_data = NULL;
 	}
 
 	/* Clean up the interconnect. */

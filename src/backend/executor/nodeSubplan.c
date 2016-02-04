@@ -1367,8 +1367,10 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 		 * Wait for them to finish and clean up the dispatching structures.
          * Replace current error info with QE error info if more interesting.
 		 */
-        if (shouldDispatch && queryDesc && queryDesc->estate && queryDesc->estate->dispatch_data)
+        if (shouldDispatch && queryDesc && queryDesc->estate && queryDesc->estate->dispatch_data) {
 			dispatch_catch_error(queryDesc->estate->dispatch_data);
+			queryDesc->estate->dispatch_data = NULL;
+        }
 		
 		/* teardown the sequence server */
 		TeardownSequenceServer();

@@ -47,27 +47,6 @@ typedef enum DispMgtConstant {
 	DISPMGT_POLL_TIME = 2 * 1000,
 } DispMgtConstant;
 
-
-/*
- * QueryExecutorTeam/QueryExecutorGroup
- */
-typedef struct QueryExecutorGroup {
-	struct QueryExecutorTeam	*team;		/* Reference to the parent */
-	int						query_executor_num;
-
-	struct QueryExecutor	**query_executors;
-	struct pollfd			*fds;
-} QueryExecutorGroup;
-
-typedef struct QueryExecutorTeam {
-	/* Must same with thread_num. */
-	int						query_executor_group_num;
-	QueryExecutorGroup		*query_executor_groups;
-
-	/* Reference to other data structure */
-	struct DispatchData 	*refDispatchData;
-} QueryExecutorTeam;
-
 /*
  * QueryExecutorInGroupIterator/QueryExecutorGroupIterator
  */
