@@ -70,6 +70,7 @@ class HawqInit:
         self.lock = threading.Lock()
         self._get_config()
         self._write_config()
+        self._get_ips()
 
     def _get_config(self):
         check_items = ('hawq_master_address_host', 'hawq_master_address_port',
@@ -150,6 +151,15 @@ class HawqInit:
         if 'hawq_standby_address_host' in self.hawq_dict:
             with open(configFile, 'a') as f: 
                 f.write("standby_host_name=%s\n" % self.standby_host_name)
+
+
+    def _get_ips(self):
+        cmd = "%s/bin/lib/get_ip_addresses_of_host.sh %s master_ip_address_all" % (self.GPHOME, self.master_host_name)
+        local_ssh(cmd, logger)
+        if self.standby_host_name.lower() not in ('', 'none'):
+            cmd = "%s/bin/lib/get_ip_addresses_of_host.sh %s standby_ip_address_all" % (self.GPHOME, self.standby_host_name)
+            local_ssh(cmd, logger)
+
 
     def check_hdfs_path(self):
         cmd = "%s/bin/gpcheckhdfs hdfs %s %s %s" % \
