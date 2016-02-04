@@ -37,8 +37,10 @@ import org.junit.Test;
 
 public class JsonExtensionTest extends PxfUnit {
 
+	private static final String IDENTIFIER = JsonAccessor.IDENTIFIER_PARAM;
 	private List<Pair<String, DataType>> columnDefs = null;
 	private List<Pair<String, String>> extraParams = new ArrayList<Pair<String, String>>();
+	private List<String> output = new ArrayList<String>();
 
 	@Before
 	public void before() {
@@ -52,20 +54,20 @@ public class JsonExtensionTest extends PxfUnit {
 		columnDefs.add(new Pair<String, DataType>("entities.hashtags[0]", DataType.TEXT));
 		columnDefs.add(new Pair<String, DataType>("coordinates.coordinates[0]", DataType.FLOAT8));
 		columnDefs.add(new Pair<String, DataType>("coordinates.coordinates[1]", DataType.FLOAT8));
+
+		output.clear();
+		extraParams.clear();
 	}
 
 	@After
 	public void cleanup() throws Exception {
 		columnDefs.clear();
-		extraParams.clear();
 	}
 
 	@Test
 	public void testCompressedMultilineJsonFile() throws Exception {
 
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
-
-		List<String> output = new ArrayList<String>();
+		extraParams.add(new Pair<String, String>(IDENTIFIER, "created_at"));
 
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547123646465,text2,patronusdeadly,,,");
@@ -80,13 +82,11 @@ public class JsonExtensionTest extends PxfUnit {
 
 		// variable-size-objects.json contains 3 json objects but only 2 of them fit in the 27 byte length limitation
 
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "key666"));
+		extraParams.add(new Pair<String, String>(IDENTIFIER, "key666"));
 		extraParams.add(new Pair<String, String>("MAXLENGTH", "27"));
 
 		columnDefs.clear();
 		columnDefs.add(new Pair<String, DataType>("key666", DataType.TEXT));
-
-		List<String> output = new ArrayList<String>();
 
 		output.add("small object1");
 		// skip the large object2 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -99,28 +99,31 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test
 	public void testDataTypes() throws Exception {
 
-		// TDOO: The BYTEA type is not tested!!! Current oneField.val = val.asText().getBytes(); convention is
-		// disputable!
+		// TDOO: The BYTEA type is not tested. The implementation (val.asText().getBytes()) returns an array reference
+		// and it is not clear whether this is the desired behavior.
+		//
+		// For the time being avoid using BYTEA type!!!
 
-		extraParams.clear();
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "bintType"));
+		// This test also verifies that the order of the columns in the table definition agnostic to the order of the
+		// json attributes.
+
+		extraParams.add(new Pair<String, String>(IDENTIFIER, "bintType"));
 
 		columnDefs.clear();
-		columnDefs.add(new Pair<String, DataType>("bintType", DataType.BIGINT));
-		columnDefs.add(new Pair<String, DataType>("booleanType", DataType.BOOLEAN));
-		columnDefs.add(new Pair<String, DataType>("charType", DataType.CHAR));
-		// columnDefs.add(new Pair<String, DataType>("byteaType", DataType.BYTEA));
-		columnDefs.add(new Pair<String, DataType>("float8Type", DataType.FLOAT8));
-		columnDefs.add(new Pair<String, DataType>("realType", DataType.REAL));
-		columnDefs.add(new Pair<String, DataType>("integerType", DataType.INTEGER));
-		columnDefs.add(new Pair<String, DataType>("smallintType", DataType.SMALLINT));
-		columnDefs.add(new Pair<String, DataType>("bpcharType", DataType.BPCHAR));
-		columnDefs.add(new Pair<String, DataType>("varcharType", DataType.VARCHAR));
+
 		columnDefs.add(new Pair<String, DataType>("text", DataType.TEXT));
+		columnDefs.add(new Pair<String, DataType>("varcharType", DataType.VARCHAR));
+		columnDefs.add(new Pair<String, DataType>("bpcharType", DataType.BPCHAR));
+		columnDefs.add(new Pair<String, DataType>("smallintType", DataType.SMALLINT));
+		columnDefs.add(new Pair<String, DataType>("integerType", DataType.INTEGER));
+		columnDefs.add(new Pair<String, DataType>("realType", DataType.REAL));
+		columnDefs.add(new Pair<String, DataType>("float8Type", DataType.FLOAT8));
+		// The DataType.BYTEA type is left out for further validation.
+		columnDefs.add(new Pair<String, DataType>("charType", DataType.CHAR));
+		columnDefs.add(new Pair<String, DataType>("booleanType", DataType.BOOLEAN));
+		columnDefs.add(new Pair<String, DataType>("bintType", DataType.BIGINT));
 
-		List<String> output = new ArrayList<String>();
-
-		output.add("666,true,x,3.14,3.15,999,777,bpcharType,varcharType,");
+		output.add(",varcharType,bpcharType,777,999,3.15,3.14,x,true,666");
 
 		super.assertOutput(new Path(System.getProperty("user.dir") + File.separator
 				+ "src/test/resources/datatypes-test.json"), output);
@@ -129,15 +132,13 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test(expected = IllegalStateException.class)
 	public void testMissingArrayJsonAttribute() throws Exception {
 
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
+		extraParams.add(new Pair<String, String>(IDENTIFIER, "created_at"));
 
 		columnDefs.clear();
 
 		columnDefs.add(new Pair<String, DataType>("created_at", DataType.TEXT));
 		// User is not an array! An attempt to access it should throw an exception!
 		columnDefs.add(new Pair<String, DataType>("user[0]", DataType.TEXT));
-
-		List<String> output = new ArrayList<String>();
 
 		super.assertOutput(new Path(System.getProperty("user.dir") + File.separator
 				+ "src/test/resources/tweets-with-missing-text-attribtute.json"), output);
@@ -146,9 +147,7 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test
 	public void testMissingJsonAttribute() throws Exception {
 
-		List<String> output = new ArrayList<String>();
-
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
+		extraParams.add(new Pair<String, String>(IDENTIFIER, "created_at"));
 
 		// Missing attributes are substituted by an empty field
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,,SpreadButter,tweetCongress,,");
@@ -160,9 +159,7 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test
 	public void testMalformedJsonObject() throws Exception {
 
-		List<String> output = new ArrayList<String>();
-
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
+		extraParams.add(new Pair<String, String>(IDENTIFIER, "created_at"));
 
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
 		output.add(",,,,,,"); // Expected: malformed json records are transformed into empty rows
@@ -174,8 +171,6 @@ public class JsonExtensionTest extends PxfUnit {
 
 	@Test
 	public void testSmallTweets() throws Exception {
-
-		List<String> output = new ArrayList<String>();
 
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547123646465,text2,patronusdeadly,,,");
@@ -189,8 +184,6 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test
 	public void testTweetsWithNull() throws Exception {
 
-		List<String> output = new ArrayList<String>();
-
 		output.add("Fri Jun 07 22:45:02 +0000 2013,,text1,SpreadButter,tweetCongress,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,,text2,patronusdeadly,,,");
 
@@ -200,8 +193,6 @@ public class JsonExtensionTest extends PxfUnit {
 
 	@Test
 	public void testSmallTweetsWithDelete() throws Exception {
-
-		List<String> output = new ArrayList<String>();
 
 		output.add(",,,,,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
@@ -215,9 +206,7 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test
 	public void testWellFormedJson() throws Exception {
 
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
-
-		List<String> output = new ArrayList<String>();
+		extraParams.add(new Pair<String, String>(IDENTIFIER, "created_at"));
 
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547123646465,text2,patronusdeadly,,,");
@@ -230,11 +219,8 @@ public class JsonExtensionTest extends PxfUnit {
 	@Test
 	public void testWellFormedJsonWithDelete() throws Exception {
 
-		extraParams.add(new Pair<String, String>("IDENTIFIER", "created_at"));
+		extraParams.add(new Pair<String, String>(IDENTIFIER, "created_at"));
 
-		List<String> output = new ArrayList<String>();
-
-		// output.add(",,,,,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547123646465,text2,patronusdeadly,,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547136233472,text3,NoSecrets_Vagas,,,");
@@ -245,8 +231,6 @@ public class JsonExtensionTest extends PxfUnit {
 
 	@Test
 	public void testMultipleFiles() throws Exception {
-
-		List<String> output = new ArrayList<String>();
 
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547115253761,text1,SpreadButter,tweetCongress,,");
 		output.add("Fri Jun 07 22:45:02 +0000 2013,343136547123646465,text2,patronusdeadly,,,");
