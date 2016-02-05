@@ -245,7 +245,7 @@ public class JsonResolver extends Plugin implements ReadResolver {
 		try {
 			return mapper.readTree(line);
 		} catch (Exception e) {
-			LOG.error("Failed to pars JSON object", e);
+			LOG.error("Failed to parse JSON object", e);
 			return null;
 		}
 	}
