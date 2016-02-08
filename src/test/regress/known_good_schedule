@@ -76,6 +76,7 @@ ignore: triggers
 ignore: create_misc
 test: create_aggregate
 test: aggregate_with_groupingsets
+test: nested_case_null
 ignore: create_operator
 ignore: create_index
 ignore: drop_if_exists
