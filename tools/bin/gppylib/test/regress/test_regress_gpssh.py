@@ -18,7 +18,7 @@
 
 import os, signal, time, re
 import unittest2 as unittest
-import psi.process, subprocess
+import psutil, subprocess
 
 class GpsshTestCase(unittest.TestCase):
 
@@ -28,7 +28,7 @@ class GpsshTestCase(unittest.TestCase):
         euid = os.getuid()
         count = 0
 
-        for p in psi.process.ProcessTable().values():
+        for p in psutil.process.ProcessTable().values():
             if p.euid != euid:
                 continue
             if not re.search('ssh', p.command):

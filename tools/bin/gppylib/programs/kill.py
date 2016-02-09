@@ -24,7 +24,7 @@ from gppylib.gpparseopts import OptParser, OptChecker
 from gppylib.mainUtils import addStandardLoggingAndHelpOptions, ProgramArgumentValidationException
 from gppylib.commands.unix import kill_sequence, check_pid 
 from gppylib.operations.package import dereference_symlink
-from psi.process import Process, NoSuchProcessError
+from psutil import Process, NoSuchProcessError
 
 logger = gplog.get_default_logger()
 
