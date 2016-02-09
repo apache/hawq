@@ -77,7 +77,7 @@ def main():
 
     cluster_type_list = ('cluster', 'segment', 'master', 'standby', 'allsegments')
     cluster_init_list = ('cluster', 'segment', 'master', 'standby')
-    source_hawq_env = "source %s/greenplum_path.sh" % hawq_home
+    source_hawq_env = ". %s/greenplum_path.sh" % hawq_home
 
     if len(sys.argv) > 2:
         hawq_command = sys.argv[1]

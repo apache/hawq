@@ -1038,7 +1038,7 @@ def get_args():
     logger.info("GPHOME is set to:")
     logger.info(opts.GPHOME)
     global source_hawq_env
-    source_hawq_env = "source %s/greenplum_path.sh" % opts.GPHOME 
+    source_hawq_env = ". %s/greenplum_path.sh" % opts.GPHOME 
 
     if opts.user == "":
         opts.user = getpass.getuser()
