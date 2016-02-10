@@ -35,6 +35,7 @@ test: int8
 test: oid
 test: float4
 ignore: float8
+test: money
 ignore: bit
 ignore: numeric
 ignore: strings
