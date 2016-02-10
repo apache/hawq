@@ -11,6 +11,7 @@ test: int8
 test: oid
 test: float4
 test: float8
+test: money
 test: bit
 test: numeric
 test: strings
