@@ -1495,18 +1495,34 @@ LookupInternalNamespaceId(const char *nspname)
 Oid
 LookupNamespaceId(const char *nspname, Oid dboid)
 {
-    if(gp_upgrade_mode){
+
+	/* check for pg_temp alias */
+	if (NSPDBOID_CURRENT == dboid && strcmp(nspname, "pg_temp") == 0)
+	{
+		if (TempNamespaceValid(true))
+			return myTempNamespace;
+		/*
+		 * Since this is used only for looking up existing objects, there
+		 * is no point in trying to initialize the temp namespace here;
+		 * and doing so might create problems for some callers.
+		 * Just fall through and give the "does not exist" error.
+		 */
+	}
+
+    if(gp_upgrade_mode)
+    {
         // This code is only need at hawq2.0 upgrade, in this case the old pg_namespace doesn't 
         // have column nspdboid, so we report error in else clause
-        if(ObjectIdGetDatum(dboid)==NSPDBOID_CURRENT){
+        if(ObjectIdGetDatum(dboid)==NSPDBOID_CURRENT)
+        {
             return caql_getoid(
 			NULL,
 			cql("SELECT oid FROM pg_namespace "
 				" WHERE nspname = :1",
 				CStringGetDatum((char *) nspname)));
-        }else{
-            elog(ERROR, "Upgrade cann't process the namespace: %s in dbid: %i", nspname, dboid);
         }
+        else
+        	elog(ERROR, "Upgrade cann't process the namespace: %s in dbid: %i", nspname, dboid);
     }
 	return caql_getoid(
 			NULL,
@@ -1529,21 +1545,6 @@ LookupExplicitNamespace(const char *nspname, Oid dboid)
 	
 	Oid			namespaceId;
 	AclResult	aclresult;
-
-	/* check for pg_temp alias */
-	if (NSPDBOID_CURRENT == dboid && strcmp(nspname, "pg_temp") == 0)
-	{
-		if (TempNamespaceValid(true))
-		{
-			return myTempNamespace;
-		}
-		/*
-		 * Since this is used only for looking up existing objects, there
-		 * is no point in trying to initialize the temp namespace here;
-		 * and doing so might create problems for some callers.
-		 * Just fall through and give the "does not exist" error.
-		 */
-	}
 
 	namespaceId = LookupNamespaceId(nspname, dboid);
 
