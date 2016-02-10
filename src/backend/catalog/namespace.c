@@ -1496,18 +1496,18 @@ Oid
 LookupNamespaceId(const char *nspname, Oid dboid)
 {
 
-	/* check for pg_temp alias */
-	if (NSPDBOID_CURRENT == dboid && strcmp(nspname, "pg_temp") == 0)
-	{
-		if (TempNamespaceValid(true))
-			return myTempNamespace;
-		/*
-		 * Since this is used only for looking up existing objects, there
-		 * is no point in trying to initialize the temp namespace here;
-		 * and doing so might create problems for some callers.
-		 * Just fall through and give the "does not exist" error.
-		 */
-	}
+    /* check for pg_temp alias */
+    if (NSPDBOID_CURRENT == dboid && strcmp(nspname, "pg_temp") == 0)
+    {
+        if (TempNamespaceValid(true))
+            return myTempNamespace;
+        /*
+         * Since this is used only for looking up existing objects, there
+         * is no point in trying to initialize the temp namespace here;
+         * and doing so might create problems for some callers.
+         * Just fall through and give the "does not exist" error.
+         */
+    }
 
     if(gp_upgrade_mode)
     {
@@ -1522,7 +1522,7 @@ LookupNamespaceId(const char *nspname, Oid dboid)
 				CStringGetDatum((char *) nspname)));
         }
         else
-        	elog(ERROR, "Upgrade cann't process the namespace: %s in dbid: %i", nspname, dboid);
+        	elog(ERROR, "Upgrade cannot process the namespace: %s in dbid: %i", nspname, dboid);
     }
 	return caql_getoid(
 			NULL,
