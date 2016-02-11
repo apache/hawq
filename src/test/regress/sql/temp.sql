@@ -151,3 +151,8 @@ select * from whereami;
 -- select pg_temp.whoami();
 
 drop table public.whereami;
+
+create temp table temptest (row integer, count integer);
+insert into temptest values (1, 10), (2, 20), (3, 30);
+select avg(temptest.count) from temptest;
+select case when pg_temp.temptest.count = 30 then 30 when pg_temp.temptest.count = 20 then 20 else 10 end from pg_temp.temptest;
