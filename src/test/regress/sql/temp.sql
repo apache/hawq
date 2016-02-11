@@ -152,7 +152,12 @@ select * from whereami;
 
 drop table public.whereami;
 
-create temp table temptest (row integer, count integer);
-insert into temptest values (1, 10), (2, 20), (3, 30);
-select avg(temptest.count) from temptest;
-select case when pg_temp.temptest.count = 30 then 30 when pg_temp.temptest.count = 20 then 20 else 10 end from pg_temp.temptest;
+-- Test querying column using pg_temp schema
+create table pg_temp.test (row integer, count integer);
+insert into pg_temp.test values (1, 10), (2, 20), (3, 30);
+select avg(pg_temp.test.count) from pg_temp.test;
+select avg(test.count) from pg_temp.test;
+select avg(count) from pg_temp.test;
+
+select case when pg_temp.test.count = 30 then 30 when pg_temp.test.count = 20 then 20 else 10 end from pg_temp.test;
+
