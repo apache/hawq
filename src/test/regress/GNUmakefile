@@ -143,7 +143,7 @@ installcheck-parallel: all upg2-setup ugpart-setup
 	$(pg_regress_call)  --psqldir=$(PSQLDIR) --schedule=$(srcdir)/parallel_schedule --srcdir=$(abs_srcdir)
 
 installcheck-good: all ./current_good_schedule upg2-setup ugpart-setup
-	$(pg_regress_call)  --psqldir=$(PSQLDIR) --schedule=./current_good_schedule --srcdir=$(abs_srcdir)
+	$(pg_regress_call)  --psqldir=$(PSQLDIR) --schedule=./current_good_schedule --srcdir=$(abs_srcdir) --expected-statuses-file=expected_statuses
 
 installcheck-goh: all ./goh_schedule upg2-setup ugpart-setup
 	$(pg_regress_call)  --psqldir=$(PSQLDIR) --schedule=./goh_schedule --srcdir=$(abs_srcdir) --tablespace=hdfs_ts

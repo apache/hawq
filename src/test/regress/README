@@ -290,3 +290,21 @@ float8/i.86-.*-openbsd=float8-small-is-zero
    variant that seems to work best. Therefore it is safest to use this
    mechanism only for variant results that you are willing to consider
    equally valid in all contexts.
+
+                          Negative status codes
+   Most of regression tests are expected to exit with code 0, but regression test
+   framework also supports non-0 exit codes. All non-0 expected codes should be included in
+   expected statuses file, which is "src/test/regress/expected_status" by default or could be
+   overridden by cli argument "expected-statuses-file".
+
+   For example:
+
+   ./pg_regress --expected-statuses-file=/tmp/expected_statuses
+
+   Format of expected statuses file:
+
+   test_name:exit_code
+
+   Max line length is 1024 characters.
+   Test will be marked as failed if actual and expected exit codes doesn't correspond even if output
+   was expected.
