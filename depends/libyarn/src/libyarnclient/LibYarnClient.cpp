@@ -649,7 +649,7 @@ int LibYarnClient::releaseResources(string &jobId,int64_t releaseContainerIds[],
         //3) blacklistRequestBlank
         ResourceBlacklistRequest blacklistRequestBlank;
         //4) progress
-        float progress = 1.0;
+        float progress = 0.5;
 
         LOG(INFO, "LibYarnClient::releaseResource, release size:%d",releases.size());
         AllocateResponse response = amrmClientAlias->allocate(asksBlank, releases,
