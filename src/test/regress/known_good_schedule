@@ -202,8 +202,6 @@ ignore: percentile
 ignore: resource_queue_function
 ignore: gp_optimizer
 ignore: co_nestloop_idxscan
-ignore: madlib_array_ops
-test: madlib_svec_test
 test: agg_derived_win
 ignore: orca_udfs
 #

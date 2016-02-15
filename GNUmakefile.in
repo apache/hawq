@@ -14,7 +14,6 @@ all:
 	$(MAKE) -C config all
 	$(MAKE) -C contrib/formatter_fixedwidth all
 	$(MAKE) -C contrib/extprotocol all	
-	$(MAKE) -C contrib/gp_sparse_vector all
 	$(MAKE) -C contrib/orafce all
 	$(MAKE) -C contrib/gp_cancel_query all
 	$(MAKE) -C contrib/hawq-hadoop all
@@ -27,7 +26,6 @@ install:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/extprotocol $@
-	$(MAKE) -C contrib/gp_sparse_vector $@
 	$(MAKE) -C contrib/orafce $@
 	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
@@ -40,7 +38,6 @@ installdirs uninstall:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/extprotocol $@
-	$(MAKE) -C contrib/gp_sparse_vector $@
 	$(MAKE) -C contrib/orafce $@
 	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
@@ -60,7 +57,6 @@ clean:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
 	$(MAKE) -C contrib/extprotocol $@
-	$(MAKE) -C contrib/gp_sparse_vector $@
 	$(MAKE) -C contrib/orafce $@
 	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
