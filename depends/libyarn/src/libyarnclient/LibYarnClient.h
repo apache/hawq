@@ -49,7 +49,7 @@ namespace libyarn {
 				string &am_tracking_url, int heartbeatInterval);
 
 #ifdef MOCKTEST
-		LibYarnClient(string &rmHost, string &rmPort, string &schedHost,
+		LibYarnClient(string &user, string &rmHost, string &rmPort, string &schedHost,
 				string &schedPort, string &amHost, int32_t amPort,
 				string &am_tracking_url, int heartbeatInterval,Mock::TestLibYarnClientStub *stub);
 #endif
@@ -103,7 +103,9 @@ namespace libyarn {
 
 		bool isJobHealthy();
 
-		list<ResourceRequest> getAskRequests();
+		list<ResourceRequest>& getAskRequests();
+
+		void clearAskRequests();
 
 	private:
 		void dummyAllocate();

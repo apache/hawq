@@ -149,7 +149,7 @@ enum LocalResourceVisibilityProto {
 
 enum LocalResourceTypeProto {
   ARCHIVE = 1;
-  FILE = 2;
+  FILETYPE = 2;
   PATTERN = 3;
 }
 

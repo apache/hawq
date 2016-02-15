@@ -70,6 +70,11 @@ ApplicationMaster::ApplicationMaster(string &schedHost, string &schedPort,
     currentAppMasterProto = 0;
 }
 
+ApplicationMaster::ApplicationMaster(ApplicationMasterProtocol *rmclient){
+    appMasterProtos.push_back(std::shared_ptr<ApplicationMasterProtocol>(rmclient));
+    currentAppMasterProto = 0;
+}
+
 ApplicationMaster::~ApplicationMaster() {
 }
 

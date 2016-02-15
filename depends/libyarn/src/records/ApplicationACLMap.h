@@ -42,7 +42,7 @@ public:
 
 	ApplicationACLMapProto& getProto();
 
-	void setAccessType(ApplicationAccessType &accessType);
+	void setAccessType(ApplicationAccessType accessType);
 	ApplicationAccessType getAccessType();
 
 	void setAcl(string &acl);

@@ -36,7 +36,7 @@ ApplicationACLMapProto& ApplicationACLMap::getProto() {
 	return appAclProto;
 }
 
-void ApplicationACLMap::setAccessType(ApplicationAccessType &accessType) {
+void ApplicationACLMap::setAccessType(ApplicationAccessType accessType) {
 	appAclProto.set_accesstype((ApplicationAccessTypeProto) accessType);
 }
 

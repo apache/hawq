@@ -42,7 +42,7 @@ void StartContainerResponse::setServicesMetaData(list<StringBytesMap> datas) {
 	}
 }
 
-list<StringBytesMap> StartContainerResponse::getSerivcesMetaData() {
+list<StringBytesMap> StartContainerResponse::getServicesMetaData() {
 	list<StringBytesMap> maps;
 	int size = responseProto.services_meta_data_size();
 	for (int i = 0; i < size; i++) {

@@ -87,9 +87,9 @@ private:
 class RMInfo {
 
 public:
-	RMInfo();
+    RMInfo();
 
-	RMInfo(string &rmHost, string &rmPort) : host(rmHost), port(rmPort){};
+    RMInfo(string &rmHost, string &rmPort) : host(rmHost), port(rmPort){};
 
     const std::string & getHost() const {
         return host;
@@ -107,16 +107,18 @@ public:
         port = rmPort;
     }
 
-	static std::vector<RMInfo> getHARMInfo(const Yarn::Config & conf, const char* name);
+    static std::vector<RMInfo> getHARMInfo(const Yarn::Config & conf, const char* name);
 
 private:
-	std::string host;
-	std::string port;
+    std::string host;
+    std::string port;
 };
 
 class ApplicationClient {
 public:
     ApplicationClient(string &user, string &host, string &port);
+
+    ApplicationClient(ApplicationClientProtocol *appclient);
 
     virtual ~ApplicationClient();
 

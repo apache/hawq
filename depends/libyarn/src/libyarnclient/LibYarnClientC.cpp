@@ -126,7 +126,7 @@ extern "C" {
 			LibYarnClient *client;
 	};
 
-	LibYarnClient_t* getLibYarnClinetT(LibYarnClient *libyarnClient){
+	LibYarnClient_t* getLibYarnClientT(LibYarnClient *libyarnClient){
 		LibYarnClient_t *client = new LibYarnClient_t(libyarnClient);
 		return client;
 	}
