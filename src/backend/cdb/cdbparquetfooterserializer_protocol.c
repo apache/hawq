@@ -54,6 +54,7 @@ void initCompactProtocol(CompactProtocol *protocol, File fileHandler,
 	protocol->lastFieldArrSize = 0;
 
 	/*seek to file handler to footerIndex, and initialize cdbbufferprocessor*/
+	Assert(protocol->footerProcessor == NULL && "memory leak?");
 	protocol->footerProcessor = createParquetFooterBuffer
 			(fileHandler, fileName, footerLength,
 					PARQUET_FOOTER_BUFFER_CAPACITY_DEFAULT, mode);
@@ -69,6 +70,7 @@ void freeCompactProtocol(CompactProtocol *protocol) {
 
 	/* clear the buffer*/
 	freeParquetFooterBuffer(protocol->footerProcessor);
+	protocol->footerProcessor = NULL;
 }
 
 /**

@@ -60,6 +60,7 @@ void writeParquetFooter(File dataFile,
 
 	footerLen = (uint32_t)endSerializeFooter(footer_read_protocol, footer_write_protocol,
 			filePathName, dataFile, parquetMetadata, previous_rowgroup_count);
+	Assert(*footer_read_protocol == NULL && *footer_write_protocol == NULL);
 
 	*fileLen += footerLen;
 	*fileLen_uncompressed += footerLen;
