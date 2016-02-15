@@ -105,6 +105,7 @@ list<ResourceRequest>& LibYarnClient::getAskRequests() {
 }
 
 void LibYarnClient::clearAskRequests() {
+	LOG(INFO, "LibYarnClient::clear ask requests.");
 	askRequests.clear();
 }
 
