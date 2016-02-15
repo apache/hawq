@@ -504,24 +504,16 @@ AORelRemoveHashEntry(Oid relid, bool checkIsStale)
 	int old_next = 0;
 	Insist(Gp_role == GP_ROLE_DISPATCH);
 
-    if(checkIsStale)
-    {
-        aoentry = (AORelHashEntryData *)hash_search(AppendOnlyHash,
-                (void *) &relid,
-                HASH_FIND,
-                &found);
-        Insist(NULL!=aoentry && aoentry ->staleTid==GetTopTransactionId());
-    }
-
 	aoentry = (AORelHashEntryData *)hash_search(AppendOnlyHash,
-						  (void *) &relid,
-						  HASH_REMOVE,
-						  &found);
+							  (void *) &relid,
+							  HASH_FIND,
+							  &found);
 
-	if (aoentry == NULL)
-	{
+	if(checkIsStale)
+		Insist(NULL!=aoentry && aoentry->staleTid==GetTopTransactionId());
+
+	if (found == false)
 		return false;
-	}
 
 	/* Release all segment file statuses used by this relation. */
 	next = aoentry->head_rel_segfile.next;
@@ -533,6 +525,11 @@ AORelRemoveHashEntry(Oid relid, bool checkIsStale)
 		AORelPutSegfileStatus(old_next);
 	}
 	aoentry->head_rel_segfile.next = NEXT_END_OF_LIST;
+
+	aoentry = (AORelHashEntryData *)hash_search(AppendOnlyHash,
+							  (void *) &relid,
+							  HASH_REMOVE,
+							  &found);
 
 	if (Debug_appendonly_print_segfile_choice)
 	{
