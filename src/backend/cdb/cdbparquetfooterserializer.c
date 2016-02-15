@@ -162,13 +162,17 @@ void initDeserializeFooter(
 		CompactProtocol **footerProtocol)
 {
 	/*Initialize the footer protocol*/
+	Assert(*footerProtocol == NULL && "memory leak?");
 	*footerProtocol =
 			(struct CompactProtocol *)palloc0(sizeof(struct CompactProtocol));
 
 	initCompactProtocol(*footerProtocol, file, fileName, footerLength, PARQUET_FOOTER_BUFFERMODE_READ);
 
-	*parquetMetadata =
-			(struct ParquetMetadata_4C*) palloc0(sizeof(struct ParquetMetadata_4C));
+	if (*parquetMetadata == NULL)
+	{
+		*parquetMetadata =
+				(struct ParquetMetadata_4C*) palloc0(sizeof(struct ParquetMetadata_4C));
+	}
 
 	readParquetFileMetadata(parquetMetadata, *footerProtocol);
 }
@@ -952,6 +956,7 @@ endDeserializerFooter(
 	}
 
 	freeFooterProtocol(*prot);
+	*prot = NULL;
 }
 
 void freeFooterProtocol(CompactProtocol *protocol) {
@@ -1347,6 +1352,9 @@ endSerializeFooter(
 	/*free the compact write protocol*/
 	freeCompactProtocol(*write_prot);
 	pfree(*write_prot);
+	*write_prot = NULL;
+
+	Assert(*read_prot == NULL);
 
 	return footerLength;
 }
