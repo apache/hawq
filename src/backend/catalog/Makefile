@@ -32,7 +32,7 @@ include $(top_srcdir)/src/backend/common.mk
 
 
 cdb_init.sql: cdb_schema.sql filesystem.sql
-	cat $(call vpathsearch,cdb_schema.sql) $(call vpathsearch,cdb_external_extensions.sql) $(call vpathsearch,filesystem.sql) $(call vpathsearch,madlib.sql) > cdb_init.sql
+	cat $(call vpathsearch,cdb_schema.sql) $(call vpathsearch,cdb_external_extensions.sql) $(call vpathsearch,filesystem.sql) > cdb_init.sql
 
 cdb_schema.sql: cdb_schema.in
 			sed -e 's,@pkglibdir@,$(pkglibdir),g' \

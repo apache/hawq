@@ -103,8 +103,6 @@
                    however it is tricky to maintain headers in them -->
               <exclude>depends/libyarn/test/data/*</exclude>
 
-              <exclude>contrib/gp_sparse_vector/bugs</exclude>
-              <exclude>contrib/gp_sparse_vector/*output</exclude>
               <exclude>contrib/hawq-hadoop/hawq-mapreduce-tool/src/test/resources/dataset</exclude>
               <exclude>contrib/hawq-hadoop/**/*.yaml</exclude>
 
