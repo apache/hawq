@@ -95,6 +95,14 @@ ApplicationClient::ApplicationClient(string &user, string &host, string &port) {
     currentAppClientProto = 0;
 }
 
+/*
+ * Used for unittest
+ */
+ApplicationClient::ApplicationClient(ApplicationClientProtocol *appclient){
+    appClientProtos.push_back(std::shared_ptr<ApplicationClientProtocol>(appclient));
+    currentAppClientProto = 0;
+}
+
 ApplicationClient::~ApplicationClient() {
 }
 
@@ -238,7 +246,7 @@ list<ContainerReport> ApplicationClient::getContainers(ApplicationAttemptId &app
     response = appClientProto->getContainers(request);
     RESOURCEMANAGER_HA_RETRY_END();
 
-    return response.getcontainersReportList();
+    return response.getContainersReportList();
 }
 
 list<NodeReport> ApplicationClient::getClusterNodes(list<NodeState> &states) {

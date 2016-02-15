@@ -50,13 +50,13 @@ LibYarnClient::LibYarnClient(string &user, string &rmHost, string &rmPort,
 		nmClient = (void*) new ContainerManagement();
 }
 #ifdef MOCKTEST
-LibYarnClient::LibYarnClient(string &rmHost, string &rmPort, string &schedHost,
+LibYarnClient::LibYarnClient(string &user,string &rmHost, string &rmPort, string &schedHost,
 		string &schedPort, string &amHost, int32_t amPort,
 		string &am_tracking_url, int heartbeatInterval,Mock::TestLibYarnClientStub *stub):
-		schedHost(schedHost), schedPort(schedPort), amHost(amHost),
+		amUser(user),schedHost(schedHost), schedPort(schedPort), amHost(amHost),
 		amPort(amPort), am_tracking_url(am_tracking_url),
-		heartbeatInterval(heartbeatInterval),clientJobId(""),response_id(1),
-		keepRun(false){
+		heartbeatInterval(heartbeatInterval),clientJobId(""),
+		keepRun(false), needHeartbeatAlive(false){
 		pthread_mutex_init( &(heartbeatLock), NULL );
 		libyarnStub = stub;
 		appClient = (void*) libyarnStub->getApplicationClient();
@@ -100,8 +100,12 @@ bool LibYarnClient::isJobHealthy() {
 	return keepRun;
 }
 
-list<ResourceRequest> LibYarnClient::getAskRequests() {
+list<ResourceRequest>& LibYarnClient::getAskRequests() {
 	return askRequests;
+}
+
+void LibYarnClient::clearAskRequests() {
+	askRequests.clear();
 }
 
 void* heartbeatFunc(void* args) {
@@ -120,9 +124,10 @@ void* heartbeatFunc(void* args) {
 						 e.msg());
 			failcounter++;
 			if ( failcounter > retry ) {
-				// In case retry too many times with errors/exceptions, this
-				// thread will return. LibYarn has to re-register application
-				// and start the heartbeat thread again.
+				/* In case retry too many times with errors/exceptions, this
+				 * thread will return. LibYarn has to re-register application
+				 * and start the heartbeat thread again.
+				 */
 				LOG(WARNING, "LibYarnClient::heartbeatFunc, there are too many "
 						     "failures raised. This heart-beat thread exits now.");
 				client->keepRun = false;
@@ -410,7 +415,6 @@ int LibYarnClient::addContainerRequests(string &jobId, Resource &capability, int
 		throw std::invalid_argument("The jobId is wrong, check the jobId argument");
 	}
 
-	list<ResourceRequest> ask = this->getAskRequests();
 	map<string, int32_t> inferredRacks;
 
 	try {
@@ -501,13 +505,12 @@ int LibYarnClient::allocateResources(string &jobId,
         blacklistRequest.setBlacklistAdditions(blackListAdditions);
         blacklistRequest.setBlacklistRemovals(blackListRemovals);
         float progress = 0.5;
-        list<ResourceRequest> ask = this->getAskRequests();
 
         LOG(INFO,"LibYarnClient::allocate, ask: container number:%d,", num_containers);
 
 		while (retry > 0) {
 			LOG(INFO,"LibYarnClient::allocate with response id : %d", response_id);
-			AllocateResponse response = amrmClientAlias->allocate(ask, releasesBlank,
+			AllocateResponse response = amrmClientAlias->allocate(this->askRequests, releasesBlank,
 								blacklistRequest, response_id, progress);
 			response_id = response.getResponseId();
 			LOG(INFO,"LibYarnClient::allocate returned response id : %d", response_id);
@@ -517,7 +520,7 @@ int LibYarnClient::allocateResources(string &jobId,
 				oss << (*it).getNodeId().getHost() << ":" << (*it).getNodeId().getPort();
 				nmTokenCache[oss.str()] = (*it).getToken();
 			}
-			ask.clear();
+			this->clearAskRequests();
 			list<Container> allocatedContainerOnce = response.getAllocatedContainers();
 			allocatedNumOnce = allocatedContainerOnce.size();
 			if (allocatedNumOnce <= 0) {

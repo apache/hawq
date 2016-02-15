@@ -42,8 +42,8 @@ public:
 
 	GetContainersResponseProto& getProto();
 
-	list<ContainerReport> getcontainersReportList();
-	void setcontainersReportList(list<ContainerReport> &containersReport);
+	list<ContainerReport> getContainersReportList();
+	void setContainersReportList(list<ContainerReport> &containersReport);
 
 private:
 	GetContainersResponseProto responseProto;

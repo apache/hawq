@@ -37,8 +37,8 @@ GetClusterNodesResponseProto& GetClusterNodesResponse::getProto() {
 
 void GetClusterNodesResponse::setNodeReports(list<NodeReport> reports) {
 	for (list<NodeReport>::iterator it = reports.begin(); it != reports.end(); it++) {
-		GetClusterNodesResponseProto *proto = new GetClusterNodesResponseProto();
-		proto->CopyFrom((*it).getProto());
+		NodeReportProto *reportProto = responseProto.add_nodereports();
+		reportProto->CopyFrom((*it).getProto());
 	}
 }
 

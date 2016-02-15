@@ -49,6 +49,8 @@ public:
 
     virtual ~ApplicationMaster();
 
+    ApplicationMaster(ApplicationMasterProtocol *rmclient);
+
     virtual RegisterApplicationMasterResponse registerApplicationMaster(string &amHost,
             int32_t amPort, string &am_tracking_url);
 

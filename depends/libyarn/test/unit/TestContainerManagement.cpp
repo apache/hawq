@@ -45,15 +45,49 @@ TEST(TestContainerManagement,TestStartContainer){
 	Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
 	Yarn::Internal::RpcAuth rpcAuth(user, Yarn::Internal::AuthMethod::SIMPLE);
 	MockContainerManagementProtocol *protocol =new MockContainerManagementProtocol(nmHost,nmPort,tokenService,sessionConfig,rpcAuth);
-	StartContainersResponseProto responseProto;
-	EXPECT_CALL(*protocol, startContainers(_)).Times(AnyNumber()).WillOnce(Return(StartContainersResponse(responseProto)));
+	
+	StringBytesMap map;
+	string key("key");
+	string value("value");
+	map.setKey(key);
+	map.setValue(value);
+	list<StringBytesMap> maps;
+	maps.push_back(map);
+	ContainerId containerId;
+	containerId.setId(501);
+	list<ContainerId> containerIds;
+	containerIds.push_back(containerId);
+	ContainerExceptionMap exceptionMap;
+	exceptionMap.setContainerId(containerId);
+	SerializedException exception;
+	string message("message");
+	string trace("trace");
+	string className("className");
+	exception.setMessage(message);
+	exception.setTrace(trace);
+	exception.setClassName(className);
+	SerializedException cause;
+	string message2("message2");
+	cause.setMessage(message2);
+	exception.setCause(cause);
+	exceptionMap.setSerializedException(exception);
+	list<ContainerExceptionMap> exceptionMaps;
+	exceptionMaps.push_back(exceptionMap);
+	StartContainersResponse response;
+	response.setServicesMetaData(maps);
+	response.setSucceededRequests(containerIds);
+	response.setFailedRequests(exceptionMaps);
+	EXPECT_CALL(*protocol, startContainers(_)).Times(AnyNumber()).WillOnce(Return(response));
 	client.stub = &stub;
 	EXPECT_CALL(stub, getContainerManagementProtocol()).Times(AnyNumber()).WillOnce(Return(protocol));
 
 	Container container;
 	StartContainerRequest request;
 	libyarn::Token nmToken;
-	client.startContainer(container,request,nmToken);
+	StartContainerResponse ret = client.startContainer(container,request,nmToken);
+	list<StringBytesMap>::iterator itMap = ret.getServicesMetaData().begin();
+	//EXPECT_EQ(itMap->getKey(), "key");
+	//EXPECT_EQ(itMap->getValue(), "value");
 }
 
 TEST(TestContainerManagement,TestStopContainer){
@@ -67,6 +101,7 @@ TEST(TestContainerManagement,TestStopContainer){
 	Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
 	Yarn::Internal::RpcAuth rpcAuth(user, Yarn::Internal::AuthMethod::SIMPLE);
 	MockContainerManagementProtocol *protocol =new MockContainerManagementProtocol(nmHost,nmPort,tokenService,sessionConfig,rpcAuth);
+
 	StopContainersResponseProto stopResponseProto;
 	EXPECT_CALL(*protocol, stopContainers(_)).Times(AnyNumber()).WillOnce(Return(StopContainersResponse(stopResponseProto)));
 	client.stub = &stub;
@@ -88,14 +123,22 @@ TEST(TestContainerManagement,TestGetContainerStatus){
 	Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
 	Yarn::Internal::RpcAuth rpcAuth(user, Yarn::Internal::AuthMethod::SIMPLE);
 	MockContainerManagementProtocol *protocol =new MockContainerManagementProtocol(nmHost,nmPort,tokenService,sessionConfig,rpcAuth);
-	GetContainerStatusesResponseProto getResponseProto;
-	EXPECT_CALL(*protocol, getContainerStatuses(_)).Times(AnyNumber()).WillOnce(Return(GetContainerStatusesResponse(getResponseProto)));
+	
+	GetContainerStatusesResponse getResponse;
+	ContainerId containerId;
+	containerId.setId(501);
+	ContainerStatus status;
+	status.setContainerId(containerId);
+	list<ContainerStatus> statuses;
+	statuses.push_back(status);
+	getResponse.setContainerStatuses(statuses);
+	EXPECT_CALL(*protocol, getContainerStatuses(_)).Times(AnyNumber()).WillOnce(Return(getResponse));
 	client.stub = &stub;
 	EXPECT_CALL(stub, getContainerManagementProtocol()).Times(AnyNumber()).WillOnce(Return(protocol));
 
 	Container container;
 	libyarn::Token nmToken;
-	ContainerStatus status = client.getContainerStatus(container,nmToken);
-	EXPECT_EQ(status.getContainerId().getId(),0);
+	ContainerStatus retStatus = client.getContainerStatus(container,nmToken);
+	EXPECT_EQ(status.getContainerId().getId(), 501);
 }
 

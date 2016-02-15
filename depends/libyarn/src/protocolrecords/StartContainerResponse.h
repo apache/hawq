@@ -43,7 +43,7 @@ public:
 	StartContainerResponseProto& getProto();
 
 	void setServicesMetaData(list<StringBytesMap> datas);
-	list<StringBytesMap> getSerivcesMetaData();
+	list<StringBytesMap> getServicesMetaData();
 
 private:
 	StartContainerResponseProto responseProto;

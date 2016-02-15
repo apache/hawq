@@ -132,7 +132,7 @@ void ContainerManagement::stopContainer(Container &container, Token &nmToken) {
 	string port(oss.str());
 
 	LOG(INFO,
-			"ContainerManagement::startContainer, is going to connect to NM [%s:%s] to stop container",
+			"ContainerManagement::stopContainer, is going to connect to NM [%s:%s] to stop container",
 			host.c_str(), port.c_str());
 
 	UserInfo user = UserInfo::LocalUser();

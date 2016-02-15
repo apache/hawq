@@ -37,7 +37,7 @@ GetContainersResponseProto& GetContainersResponse::getProto() {
 	return responseProto;
 }
 
-list<ContainerReport> GetContainersResponse::getcontainersReportList() {
+list<ContainerReport> GetContainersResponse::getContainersReportList() {
 	list<ContainerReport> reportList;
 	for (int i = 0; i < responseProto.containers_size(); i++) {
 		ContainerReportProto reportProto = responseProto.containers(i);
@@ -46,7 +46,7 @@ list<ContainerReport> GetContainersResponse::getcontainersReportList() {
 	return reportList;
 }
 
-void GetContainersResponse::setcontainersReportList(
+void GetContainersResponse::setContainersReportList(
 		list<ContainerReport> &containersReport) {
 	list<ContainerReport>::iterator it = containersReport.begin();
 	for (; it != containersReport.end(); it++) {
