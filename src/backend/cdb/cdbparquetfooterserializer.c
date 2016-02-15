@@ -167,8 +167,8 @@ void initDeserializeFooter(
 
 	initCompactProtocol(*footerProtocol, file, fileName, footerLength, PARQUET_FOOTER_BUFFERMODE_READ);
 
-	*parquetMetadata =
-			(struct ParquetMetadata_4C*) palloc0(sizeof(struct ParquetMetadata_4C));
+//	*parquetMetadata =
+//			(struct ParquetMetadata_4C*) palloc0(sizeof(struct ParquetMetadata_4C));
 
 	readParquetFileMetadata(parquetMetadata, *footerProtocol);
 }

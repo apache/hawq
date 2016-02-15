@@ -583,8 +583,8 @@ ParquetInsertDesc parquet_insert_init(Relation rel, ResultRelSegFileInfo *segfil
 	parquetInsertDesc->aoEntry = aoentry;
 	parquetInsertDesc->insertCount = 0;
 
-	parquetInsertDesc->parquetMetadata = (struct ParquetMetadata_4C *)
-			palloc0(sizeof(struct ParquetMetadata_4C));
+//	parquetInsertDesc->parquetMetadata = (struct ParquetMetadata_4C *)
+//			palloc0(sizeof(struct ParquetMetadata_4C));
 	/*SHOULD CALL OPEN METADATA FILE HERE, AND GET parquetMetadata INFO*/
 
 	initStringInfo(&titleBuf);

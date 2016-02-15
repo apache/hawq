@@ -111,6 +111,9 @@ bool readParquetFooter(File fileHandler, ParquetMetadata *parquetMetadata,
 
 	DetectHostEndian();
 
+  *parquetMetadata = (struct ParquetMetadata_4C *)
+      palloc0(sizeof(struct ParquetMetadata_4C));
+
 	/* if file size is 0, means there's no data in file, return false*/
 	if (eof == 0)
 		return false;
