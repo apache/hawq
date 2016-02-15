@@ -317,6 +317,12 @@ get_sortgrouplist_exprs(List *sortClauses, List *targetList)
 		SortClause *sortcl = (SortClause *) lfirst(l);
 		Node	   *sortexpr;
 
+		/*
+		 * if GroupClause in grouping sets is null,
+		 * there is no need to build the referenced targetlist expr
+		 */
+		if (sortcl == NULL) continue;
+
 		sortexpr = get_sortgroupclause_expr(sortcl, targetList);
 		result = lappend(result, sortexpr);
 	}
