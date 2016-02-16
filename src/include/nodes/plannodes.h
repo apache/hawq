@@ -197,6 +197,7 @@ typedef struct PlannedStmt
 		QueryContextInfo * contextdisp; /* query context for dispatching */
 
 		struct QueryResource *resource;
+		struct QueryResourceParameters *resource_parameters;
 		int	planner_segments;
 
     /* The overall memory consumption account (i.e., outside of an operator) */

@@ -77,6 +77,20 @@ typedef struct HostnameVolumnInfo
 	int64 datavolumn;
 } HostnameVolumnInfo;
 
+/*
+ * structure for query resource parameters
+ */
+typedef struct QueryResourceParameters
+{
+	QueryResourceLife  life;
+	int32              slice_size;
+	int64_t            iobytes;
+	int                max_target_segment_num;
+	int                min_target_segment_num;
+	HostnameVolumnInfo *vol_info;
+	int                vol_info_size;
+} QueryResourceParameters;
+
 /* ----------------
  *		query descriptor:
  *

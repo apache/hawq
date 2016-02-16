@@ -1806,7 +1806,24 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
 				 * Get copy of the queryTree and the plan since this may be modified further down.
 				 */
 				queryTree = copyObject(queryTree);
-				stmt = copyObject(stmt); 
+
+				QueryResource **pQueryResource = &(stmt->resource);
+				if ( (Gp_role == GP_ROLE_DISPATCH) &&
+				     (stmt->resource == NULL) &&
+				     (stmt->resource_parameters != NULL) )
+				{
+					stmt->resource = AllocateResource(stmt->resource_parameters->life,
+					                                  stmt->resource_parameters->slice_size,
+					                                  stmt->resource_parameters->iobytes,
+					                                  stmt->resource_parameters->max_target_segment_num,
+					                                  stmt->resource_parameters->min_target_segment_num,
+					                                  stmt->resource_parameters->vol_info,
+					                                  stmt->resource_parameters->vol_info_size);
+					pQueryResource = &(stmt->resource);
+				}
+
+				stmt = copyObject(stmt);
+				*pQueryResource = NULL;
 				
 				_SPI_current->processed = 0;
 				_SPI_current->lastoid = InvalidOid;

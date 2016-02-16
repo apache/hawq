@@ -41,6 +41,7 @@
 typedef struct SplitAllocResult
 {
   QueryResource *resource;
+  QueryResourceParameters *resource_parameters;
   List *alloc_results;
   int planner_segments;
   List *relsType;// relation type after datalocality changing
@@ -63,6 +64,22 @@ typedef struct VirtualSegmentNode
 	NodeTag type;
 	char *hostname;
 } VirtualSegmentNode;
+
+/*
+ * saveQueryResourceParameters: save QueryResourceParameters
+ * in prepare statement along with query plan so that the query
+ * resource can be re-allocated during multiple executions of
+ * the plan
+ */
+void saveQueryResourceParameters(
+		QueryResourceParameters	*resource_parameters,
+		QueryResourceLife       life,
+		int32                   slice_size,
+		int64_t                 iobytes,
+		int                     max_target_segment_num,
+		int                     min_target_segment_num,
+		HostnameVolumnInfo      *vol_info,
+		int                     vol_info_size);
 
 /*
  * calculate_planner_segment_num: based on the parse tree,
