@@ -4502,7 +4502,7 @@ static struct config_int ConfigureNamesInt[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&default_segment_num,
-		2, 1, INT_MAX, NULL, NULL
+		8, 1, INT_MAX, NULL, NULL
 	},
 	{
 		{"enforce_virtual_segment_number", PGC_USERSET, QUERY_TUNING_OTHER,
