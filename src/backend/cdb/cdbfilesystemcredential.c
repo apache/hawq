@@ -36,11 +36,12 @@
 #include "lib/stringinfo.h"
 #include "libpq/auth.h"
 #include "libpq/pqformat.h"
+#include "miscadmin.h"
 #include "storage/fd.h"
+#include "tcop/pquery.h"
 #include "utils/hsearch.h"
 #include "utils/memutils.h"
 #include "utils/portal.h"
-#include "tcop/pquery.h"
 
 int server_ticket_renew_interval = 43200000; /* millisecond */
 char *krb5_ccname = "/tmp/postgres.ccname";
@@ -287,6 +288,11 @@ add_filesystem_credential(const char * uri)
 		 * because all credentials are being removed from HDFS when
 		 * we end the transaction, and this entry doesn't have a valid
 		 * credential yet.
+		 *
+		 * In some case fatal error will happen and NO exception will be thrown.
+		 * Transaction will abort immediate and we do not know the status of delegation
+		 * token. So initialize token in the hash entry to NULL and check it when canceling
+		 * token.
 		 */
 		PG_TRY();
 		{
@@ -295,6 +301,9 @@ add_filesystem_credential(const char * uri)
 							currentFilesystemCredentials, &key, HASH_ENTER, NULL);
 
 			Assert(NULL != entry);
+
+			entry->credential = NULL;
+			entry->fs = NULL;
 
 			while (true)
 			{
@@ -314,6 +323,7 @@ add_filesystem_credential(const char * uri)
 				elog(DEBUG5, "failed to getting credentials for %s://%s:%d, retrying...",
 					 key.protocol, key.host, key.port);
 
+				CHECK_FOR_INTERRUPTS();
 				pg_usleep(cdb_randint(0, 5) * 1000000L);
 			}
 		}
@@ -345,7 +355,8 @@ cancel_filesystem_credential(struct FileSystemCredential *entry)
 			(struct FileSystemCredentialKey*) entry;
 	Insist(strcasecmp(key->protocol, "hdfs") == 0);
 
-	HdfsCancelDelegationToken(entry->fs, entry->credential);
+	if (NULL != entry->credential)
+		HdfsCancelDelegationToken(entry->fs, entry->credential);
 }
 
 static void
