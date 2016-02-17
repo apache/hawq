@@ -3833,7 +3833,7 @@ RecordIsValid(XLogRecord *record, XLogRecPtr recptr, int emode)
 	 */
 
 	/* First the rmgr data */
-    INIT_CRC32C(crc);
+	INIT_CRC32C(crc);
 	COMP_CRC32C(crc, XLogRecGetData(record), len);
 
 	/* Add in the backup blocks, if any */
@@ -4916,8 +4916,8 @@ WriteControlFile(void)
 	StrNCpy(ControlFile->lc_ctype, localeptr, LOCALE_NAME_BUFLEN);
 
 	/* Contents are protected with a CRC */
-    INIT_CRC32C(ControlFile->crc);
- 	COMP_CRC32C(ControlFile->crc,
+	INIT_CRC32C(ControlFile->crc);
+	COMP_CRC32C(ControlFile->crc,
 			   (char *) ControlFile,
 			   offsetof(ControlFileData, crc));
 	FIN_CRC32C(ControlFile->crc);
@@ -5002,7 +5002,7 @@ ReadControlFile(void)
 
 	/* Now check the CRC. */
 	INIT_CRC32C(crc);
- 	COMP_CRC32C(crc,
+	COMP_CRC32C(crc,
 			   (char *) ControlFile,
 			   offsetof(ControlFileData, crc));
 	FIN_CRC32C(crc);
@@ -5169,7 +5169,7 @@ UpdateControlFile(void)
 	MirroredFlatFileOpen	mirroredOpen;
 
 	INIT_CRC32C(ControlFile->crc);
- 	COMP_CRC32C(ControlFile->crc,
+	COMP_CRC32C(ControlFile->crc,
 				   (char *) ControlFile,
 				   offsetof(ControlFileData, crc));
 	FIN_CRC32C(ControlFile->crc);

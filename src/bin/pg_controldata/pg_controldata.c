@@ -129,9 +129,9 @@ main(int argc, char *argv[])
 	close(fd);
 
 	/* Check the CRC. */
-    INIT_CRC32C(crc);
- 	COMP_CRC32C(crc, &ControlFile, offsetof(ControlFileData, crc));
- 	FIN_CRC32C(crc);
+	INIT_CRC32C(crc);
+	COMP_CRC32C(crc, &ControlFile, offsetof(ControlFileData, crc));
+	FIN_CRC32C(crc);
 
 	if (!EQ_LEGACY_CRC32(crc, ControlFile.crc))
 	{
