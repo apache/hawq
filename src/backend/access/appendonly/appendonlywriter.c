@@ -77,7 +77,7 @@ static AORelHashEntry AppendOnlyRelHashNew(Oid relid, bool *exists);
 static AORelHashEntry AORelGetHashEntry(Oid relid);
 static AORelHashEntry AORelLookupHashEntry(Oid relid);
 static bool AORelCreateHashEntry(Oid relid);
-static int AORelGetSegfileStatus(void);
+static int AORelGetSegfileStatus(AORelHashEntry currentEntry);
 static void AORelPutSegfileStatus(int old_status);
 static AOSegfileStatus *AORelLookupSegfileStatus(int segno, AORelHashEntry entry);
 static bool CheckSegFileForWriteIfNeeded(AORelHashEntryData *aoentry, AOSegfileStatus * segfilesstatus);
@@ -417,11 +417,17 @@ AORelCreateHashEntry(Oid relid)
 		for (i = 0 ; i < total_segfiles; i++)
 		{
 			AOSegfileStatus *status;
-			int id = AORelGetSegfileStatus();
+			int id = AORelGetSegfileStatus(aoHashEntry);
 			/* TODO: we need to release this aoHashEntry here */
 			if (id == NEXT_END_OF_LIST)
 			{
 				pfree(allfsinfoParquet);
+
+				ereport(ERROR, (errmsg("cannot open more than %d "
+				      "append-only table segment "
+				      "files cocurrently",
+				      MaxAORelSegFileStatus)));
+
 				return false;
 			}
 			status = &AOSegfileStatusPool[id];
@@ -446,11 +452,17 @@ AORelCreateHashEntry(Oid relid)
 		for (i = 0 ; i < total_segfiles; i++)
 		{
 			AOSegfileStatus *status;
-			int id = AORelGetSegfileStatus();
+			int id = AORelGetSegfileStatus(aoHashEntry);
 			/* TODO: we need to release this aoHashEntry here */
 			if (id == NEXT_END_OF_LIST)
 			{
 				pfree(allfsinfo);
+
+				ereport(ERROR, (errmsg("cannot open more than %d "
+				      "append-only table segment "
+				      "files cocurrently",
+				      MaxAORelSegFileStatus)));
+
 				return false;
 			}
 			status = &AOSegfileStatusPool[id];
@@ -540,6 +552,7 @@ AORelRemoveHashEntry(Oid relid, bool checkIsStale)
 	}
 
 	AppendOnlyWriter->num_existing_aorels--;
+	Assert(AppendOnlyWriter->num_existing_aorels >= 0);
 
 	return true;
 }
@@ -1128,7 +1141,7 @@ List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num,
                 //generate new segment_num to make sure that in keepHash mode, all segment node has at least one segfile is writable
                 for(int i= 1; i<= segment_num; i++)
                 {
-                    int new_status = AORelGetSegfileStatus();
+                    int new_status = AORelGetSegfileStatus(aoentry);
                     if (new_status == NEXT_END_OF_LIST)
                     {
                         LWLockRelease(AOSegFileLock);
@@ -1688,7 +1701,7 @@ void ValidateAppendOnlyMetaDataSnapshot(
 }
 
 static bool
-AORelFreeSegfileStatus()
+AORelFreeSegfileStatus(AORelHashEntry currentEntry)
 {
   HASH_SEQ_STATUS status;
   AORelHashEntryData  *hentry;
@@ -1700,7 +1713,8 @@ AORelFreeSegfileStatus()
 
   while ((hentry = (AORelHashEntryData *) hash_seq_search(&status)) != NULL)
   {
-    if(hentry->txns_using_rel == 0 && InvalidTransactionId==hentry->staleTid)
+    if(hentry->txns_using_rel == 0 && InvalidTransactionId==hentry->staleTid
+    		&& hentry != currentEntry)
     {
       if (Debug_appendonly_print_segfile_choice)
       {
@@ -1721,14 +1735,14 @@ AORelFreeSegfileStatus()
 }
 
 static int
-AORelGetSegfileStatus(void)
+AORelGetSegfileStatus(AORelHashEntry currentEntry)
 {
 	int result;
 
 
 	while (AppendOnlyWriter->num_existing_segfilestatus + 1 > MaxAORelSegFileStatus)
 	{
-	  bool freedOne = AORelFreeSegfileStatus();
+	  bool freedOne = AORelFreeSegfileStatus(currentEntry);
 	  if (!freedOne)
 	  {
 	    return NEXT_END_OF_LIST;
