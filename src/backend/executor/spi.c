@@ -1795,36 +1795,42 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
 			foreach(query_list_item, query_list)
 			{
 				Query	   *queryTree = (Query *) lfirst(query_list_item);
-				PlannedStmt *stmt;
+				PlannedStmt *originalStmt;
 				QueryDesc  *qdesc;
 				DestReceiver *dest;
 
-				stmt = (PlannedStmt*)lfirst(plan_list_item);
+				originalStmt = (PlannedStmt*)lfirst(plan_list_item);
 				plan_list_item = lnext(plan_list_item);
 
 				/*
 				 * Get copy of the queryTree and the plan since this may be modified further down.
 				 */
 				queryTree = copyObject(queryTree);
+				PlannedStmt *stmt = copyObject(originalStmt);
 
-				QueryResource **pQueryResource = &(stmt->resource);
-				if ( (Gp_role == GP_ROLE_DISPATCH) &&
-				     (stmt->resource == NULL) &&
-				     (stmt->resource_parameters != NULL) )
+				/*
+				 * We only allocate resource for multiple executions of queries, NOT for utility commands.
+				 * SELECT/INSERT are supported at present.
+				 */
+				if( (queryTree->commandType == CMD_SELECT) ||
+				    (queryTree->commandType == CMD_INSERT) )
 				{
-					stmt->resource = AllocateResource(stmt->resource_parameters->life,
-					                                  stmt->resource_parameters->slice_size,
-					                                  stmt->resource_parameters->iobytes,
-					                                  stmt->resource_parameters->max_target_segment_num,
-					                                  stmt->resource_parameters->min_target_segment_num,
-					                                  stmt->resource_parameters->vol_info,
-					                                  stmt->resource_parameters->vol_info_size);
-					pQueryResource = &(stmt->resource);
+					if ( (Gp_role == GP_ROLE_DISPATCH) &&
+					     (stmt->resource == NULL) &&
+					     (stmt->resource_parameters != NULL) )
+					{
+						stmt->resource = AllocateResource(stmt->resource_parameters->life,
+						                        stmt->resource_parameters->slice_size,
+						                        stmt->resource_parameters->iobytes,
+						                        stmt->resource_parameters->max_target_segment_num,
+						                        stmt->resource_parameters->min_target_segment_num,
+						                        stmt->resource_parameters->vol_info,
+						                        stmt->resource_parameters->vol_info_size);
+					}
+
+					originalStmt->resource = NULL;
 				}
 
-				stmt = copyObject(stmt);
-				*pQueryResource = NULL;
-				
 				_SPI_current->processed = 0;
 				_SPI_current->lastoid = InvalidOid;
 				_SPI_current->tuptable = NULL;
