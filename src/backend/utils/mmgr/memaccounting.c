@@ -420,7 +420,10 @@ MemoryAccounting_GetAccountName(MemoryAccount *memoryAccount)
 			return "X_BitmapTableScan";
 		case MEMORY_OWNER_TYPE_Exec_PartitionSelector:
 			return "X_PartitionSelector";
+		case MEMORY_OWNER_TYPE_Resource_Negotiator:
+			return "X_ResourceNegotiator";
 		default:
+			elog(LOG,"missing account ownerType number is %d",memoryAccount->ownerType);
 			Assert(false);
 			break;
 	}
