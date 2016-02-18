@@ -91,8 +91,8 @@ static int	port = -1;
 static char *user = NULL;
 static char *srcdir = NULL;
 static _stringlist *extraroles = NULL;
-static char *initfile = "./init_file";
-static char *expected_statuses_file = "expected_statuses";
+char *initfile = NULL;
+char *expected_statuses_file = NULL;
 
 /* internal variables */
 static const char *progname;
@@ -575,7 +575,7 @@ load_expected_statuses(char *filename)
 	f = fopen(filename, "r");
 	if (!f)
 	{
-		fprintf(stderr, _("could not open file with expected statuses for reading: \n"));
+		fprintf(stderr, _("could not open file with expected statuses for reading: %s\n"), filename);
 		exit_nicely(2);
 	}
 
@@ -780,6 +780,8 @@ doputenv(const char *var, const char *val)
 
 	sprintf(s, "%s=%s", var, val);
 	putenv(s);
+
+	free(s);
 }
 
 /*
@@ -844,6 +846,8 @@ initialize_environment(void)
 		new_pgoptions = malloc(strlen(old_pgoptions) + strlen(my_pgoptions) + 12);
 		sprintf(new_pgoptions, "PGOPTIONS=%s %s", old_pgoptions, my_pgoptions);
 		putenv(new_pgoptions);
+
+		free(new_pgoptions);
 	}
 
 	{
@@ -892,6 +896,7 @@ initialize_environment(void)
 	convert_sourcefiles();
 	load_resultmap();
 	load_expected_statuses(expected_statuses_file);
+	free(expected_statuses_file);
 }
 
 /*
@@ -982,6 +987,7 @@ spawn_process(const char *cmdline)
 		execl(shellprog, shellprog, "-c", cmdline2, (char *) NULL);
 		fprintf(stderr, _("%s: could not exec \"%s\": %s\n"),
 				progname, shellprog, strerror(errno));
+		free(cmdline2);
 		exit(1);				/* not exit_nicely here... */
 	}
 	/* in parent */
@@ -1057,6 +1063,7 @@ spawn_process(const char *cmdline)
 
 	cmdline2 = malloc(strlen(cmdline) + 8);
 	sprintf(cmdline2, "cmd /c %s", cmdline);
+	free(cmdline2);
 
 #ifndef __CYGWIN__
 	AddUserToTokenDacl(restrictedToken);
@@ -1276,6 +1283,7 @@ results_differ(const char *testname, const char *resultsfile, const char *defaul
 
 	  snprintf(m_pretty_diff_opts, sizeof(m_pretty_diff_opts),
 			   "%s --gpd_init %s", pretty_diff_opts, initfile);
+	  free(initfile);
 	}
 	else
 	{
@@ -2072,12 +2080,6 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 	hostname = "localhost";
 #endif
 
-	/*
-	 * We call the initialization function here because that way we can set
-	 * default parameters and let them be overwritten by the commandline.
-	 */
-	ifunc();
-
 	while ((c = getopt_long(argc, argv, "hV", long_options, &option_index)) != -1)
 	{
 		switch (c)
@@ -2095,13 +2097,13 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 				 * before we add the specified one.
 				 */
 				free_stringlist(&dblist);
-				split_to_stringlist(strdup(optarg), ", ", &dblist);
+				split_to_stringlist(optarg, ", ", &dblist);
 				break;
 			case 2:
 				debug = true;
 				break;
 			case 3:
-				inputdir = strdup(optarg);
+				inputdir = optarg;
 				break;
 			case 4:
 				add_stringlist_item(&loadlanguage, optarg);
@@ -2110,10 +2112,10 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 				max_connections = atoi(optarg);
 				break;
 			case 6:
-				encoding = strdup(optarg);
+				encoding = optarg;
 				break;
 			case 7:
-				outputdir = strdup(optarg);
+				outputdir = optarg;
 				break;
 			case 8:
 				add_stringlist_item(&schedulelist, optarg);
@@ -2122,7 +2124,7 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 				nolocale = true;
 				break;
 			case 11:
-				top_builddir = strdup(optarg);
+				top_builddir = optarg;
 				break;
 			case 12:
 				{
@@ -2134,30 +2136,30 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 				}
 				break;
 			case 13:
-				hostname = strdup(optarg);
+				hostname = optarg;
 				break;
 			case 14:
 				port = atoi(optarg);
 				break;
 			case 15:
-				user = strdup(optarg);
+				user = optarg;
 				break;
 			case 16:
 				/* "--psqldir=" should mean to use PATH */
 				if (strlen(optarg))
-					psqldir = strdup(optarg);
+					psqldir = optarg;
 				break;
 			case 17:
-				srcdir = strdup(optarg);
+				srcdir = optarg;
 				break;
 			case 18:
-				split_to_stringlist(strdup(optarg), ", ", &extraroles);
+				split_to_stringlist(optarg, ", ", &extraroles);
 				break;
 			case 19:
-				initfile = strdup(optarg);
+				initfile = optarg;
 				break;
 			case 20:
-				expected_statuses_file = strdup(optarg);
+				expected_statuses_file = optarg;
 				break;
 			default:
 				/* getopt_long already emitted a complaint */
@@ -2175,6 +2177,11 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 		add_stringlist_item(&extra_tests, argv[optind]);
 		optind++;
 	}
+
+	/*
+	 * Set default values if user didn't pass arguments
+	 */
+	ifunc();
 
 	/*
 	 * Initialization
