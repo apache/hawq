@@ -4514,15 +4514,6 @@ static struct config_int ConfigureNamesInt[] =
 		0, 0, INT_MAX, NULL, NULL
 	},
 	{
-		{"debug_fix_vseg_num", PGC_USERSET, QUERY_TUNING_OTHER,
-			gettext_noop("Sets fixed vseg number for debug"),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&debug_fix_vseg_num,
-		0, 0, INT_MAX, NULL, NULL
-	},
-	{
 		{"appendonly_split_write_size_mb", PGC_USERSET, QUERY_TUNING_OTHER,
 			gettext_noop("Sets the size (MB) of an appendonly table split when inserting records"),
 			NULL,
