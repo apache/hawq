@@ -130,7 +130,7 @@ main(int argc, char *argv[])
 						break;
 					}
 				}
-				
+
 				if (!found)
 				{
 					printf(_("\n\"%s\" is not a valid version to "
@@ -147,7 +147,7 @@ main(int argc, char *argv[])
 		DataDir = argv[argno];
 	else
 		DataDir = getenv("PGDATA");
-	
+
 	if (DataDir == NULL)
 	{
 		fprintf(stderr, _("%s: no data directory specified\n"), progname);
@@ -219,14 +219,14 @@ main(int argc, char *argv[])
 			close(fd);
 			return 0;
 		}
-		
+
 		printf(_("New catalog version number: %u\n"), tover);
 
 		ControlFile.catalog_version_no = tover;
 
 		/* recalcualte the CRC. */
 		INIT_CRC32C(crc);
-		COMP_CRC32C(crc, &ToControlFile, offsetof(ControlFileData, crc));
+		COMP_CRC32C(crc, &ControlFile, offsetof(ControlFileData, crc));
 		FIN_CRC32C(crc);
 
 		/*
