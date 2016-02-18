@@ -261,7 +261,6 @@ bool prefer_datalocality_to_iobalance;
 bool balance_on_partition_table_level;
 bool balance_on_whole_query_level;
 bool output_hdfs_block_location;
-int debug_fix_vseg_num;
 int max_filecount_notto_split_segment;
 int min_datasize_to_combine_segment;
 int datalocality_algorithm_version;
