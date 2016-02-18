@@ -41,6 +41,14 @@ typedef struct _resultmap
 	struct _resultmap *next;
 }	_resultmap;
 
+/*linked list of statuses for tests*/
+typedef struct _statuslist
+{
+	char		*test;
+	int			status;
+	struct		_statuslist *next;
+} _statuslist;
+
 /*
  * Values obtained from pg_config_paths.h and Makefile.
  * In non-temp_install mode, the only thing we need is the location of psql,
@@ -84,15 +92,15 @@ static char *user = NULL;
 static char *srcdir = NULL;
 static _stringlist *extraroles = NULL;
 static char *initfile = "./init_file";
-static char *tablespace = "";
+static char *expected_statuses_file = "expected_statuses";
 
 /* internal variables */
 static const char *progname;
 static char *logfilename;
 static FILE *logfile;
 static char *difffilename;
-
 static _resultmap *resultmap = NULL;
+static _statuslist *expected_statuses = NULL;
 
 static int	success_count = 0;
 static int	fail_count = 0;
@@ -122,6 +130,11 @@ psql_command(const char *database, const char *query,...)
 /* This extension allows gcc to check the format string for consistency with
    the supplied arguments. */
 __attribute__((format(printf, 2, 3)));
+static void
+log_child_exit(int exitstatus, int expected_status);
+
+static bool
+is_status_expected(int exit_status, int expected_status);
 
 #ifdef WIN32
 typedef BOOL (WINAPI * __CreateRestrictedToken) (HANDLE, DWORD, DWORD, PSID_AND_ATTRIBUTES, DWORD, PLUID_AND_ATTRIBUTES, DWORD, PSID_AND_ATTRIBUTES, PHANDLE);
@@ -188,6 +201,21 @@ free_stringlist(_stringlist ** listhead)
 	if ((*listhead)->next != NULL)
 		free_stringlist(&((*listhead)->next));
 	free((*listhead)->str);
+	free(*listhead);
+	*listhead = NULL;
+}
+
+/*
+ * Free a statuslist.
+ */
+static void
+free_statuslist(_statuslist ** listhead)
+{
+	if (listhead == NULL || *listhead == NULL)
+		return;
+	if ((*listhead)->next != NULL)
+		free_statuslist(&((*listhead)->next));
+	free((*listhead)->test);
 	free(*listhead);
 	*listhead = NULL;
 }
@@ -342,7 +370,7 @@ string_matches_pattern(const char *str, const char *pattern)
 }
 
 /*
- * Replace all occurances of a string in a string with a different string.
+ * Replace all occurrences of a string in a string with a different string.
  * NOTE: Assumes there is enough room in the target buffer!
  */
 void
@@ -529,6 +557,78 @@ convert_sourcefiles(void)
 }
 
 /*
+ * Load expected statuses from given file name.
+ * Line format is
+ * 	test_name:expected_return_code
+ */
+static void
+load_expected_statuses(char *filename)
+{
+	char		buf[MAXPGPATH];
+	FILE		*f;
+	int			i;
+	int			status;
+	int			sep_index;
+	char		*sep_ptr;
+	bool		line_valid;
+
+	f = fopen(filename, "r");
+	if (!f)
+	{
+		fprintf(stderr, _("could not open file with expected statuses for reading: \n"));
+		exit_nicely(2);
+	}
+
+	while (fgets(buf, sizeof(buf), f))
+	{
+
+		i = strlen(buf);
+		while (i > 0 && isspace((unsigned char) buf[i - 1]))
+			buf[--i] = '\0';
+
+		sep_ptr = strchr(buf, ':');
+
+		if (sep_ptr == NULL)
+		{
+			fprintf(stderr, _("incorrect expected statuses entry: %s\n"), buf);
+			exit_nicely(2);
+		}
+
+		sep_index = sep_ptr - buf;
+
+		char test[sep_index+1];
+		memset(test, 0, sizeof(test));
+
+		strncpy(test, buf, sep_index);
+		test[sep_index+1] = '\0';
+
+		char status_str[strlen(buf)-sep_index];
+		memset(status_str, 0, sizeof(status_str));
+
+		strncpy(status_str, buf + sep_index +1, strlen(buf));
+		status_str[sep_index+1] = '\0';
+
+		line_valid = (sscanf(status_str, "%d", (int *) (&status)) == 1);
+
+		if (!line_valid)
+		{
+			fprintf(stderr, _("incorrect expected statuses entry: %s\n"), buf);
+			exit_nicely(2);
+		}
+
+		_statuslist *entry = malloc(sizeof(_statuslist));
+
+		entry->test = strdup(test);
+		entry->status = status;
+		entry->next = expected_statuses;
+		expected_statuses = entry;
+
+	}
+
+	fclose(f);
+}
+
+/*
  * Scan resultmap file to find which platform-specific expected files to use.
  *
  * The format of each line of the file is
@@ -618,6 +718,27 @@ load_resultmap(void)
 	}
 	fclose(f);
 }
+
+/*
+ * Get expected status for given test
+ */
+static
+const int
+get_expected_status(const char *test)
+{
+	_statuslist		*es;
+
+	for (es = expected_statuses; es != NULL; es = es->next)
+	{
+		if (strcmp(test, es->test) == 0)
+		{
+			return es->status;
+		}
+	}
+
+	return 0; //default value
+}
+
 
 /*
  * Check in resultmap if we should be looking at a different file
@@ -770,6 +891,7 @@ initialize_environment(void)
 
 	convert_sourcefiles();
 	load_resultmap();
+	load_expected_statuses(expected_statuses_file);
 }
 
 /*
@@ -1333,32 +1455,73 @@ wait_for_tests(PID_TYPE * pids, int *statuses, char **names, int num_tests)
 }
 
 /*
- * report nonzero exit code from a test process
+ * Print test status depending on differences, actual, expected statuses
+ *
+ * output_diff true if expected and actual output are different
+ * actual_status exit code of given test
+ * expected_status expected exit code of given test
+ * elapsed_secs how much seconds test took to complete
  */
 static void
-log_child_failure(int exitstatus)
+print_test_status(bool output_diff, int actual_status, int expected_status, double elapsed_secs)
 {
-	if (WIFEXITED(exitstatus))
-		status(_(" (test process exited with exit code %d)"),
-			   WEXITSTATUS(exitstatus));
-	else if (WIFSIGNALED(exitstatus))
+
+	if (!output_diff && is_status_expected(actual_status, expected_status))
 	{
-#if defined(WIN32)
-		status(_(" (test process was terminated by exception 0x%X)"),
-			   WTERMSIG(exitstatus));
-#elif defined(HAVE_DECL_SYS_SIGLIST) && HAVE_DECL_SYS_SIGLIST
-		status(_(" (test process was terminated by signal %d: %s)"),
-			   WTERMSIG(exitstatus),
-			   WTERMSIG(exitstatus) < NSIG ?
-			   sys_siglist[WTERMSIG(exitstatus)] : "(unknown))");
-#else
-		status(_(" (test process was terminated by signal %d)"),
-			   WTERMSIG(exitstatus));
-#endif
+		status(_("ok"));
+		status(_(" (%.2f sec)"), elapsed_secs);
+		success_count++;
+	} else
+	{
+		status(_("FAILED"));
+		status(_(" (%.2f sec)"), elapsed_secs);
+		fail_count++;
+		log_child_exit(actual_status, expected_status);
 	}
-	else
-		status(_(" (test process exited with unrecognized status %d)"),
-			   exitstatus);
+
+	status_end();
+}
+
+/*
+ * Returns true if actual exit code was expected
+ */
+static bool
+is_status_expected(int exit_status, int expected_status)
+{
+	return (WEXITSTATUS(exit_status) == expected_status);
+}
+
+
+/*
+ * Report unexpected exit code or termination by signal for test process
+ */
+static void
+log_child_exit(int exitstatus, int expected_status)
+{
+	if (!is_status_expected(exitstatus, expected_status))
+	{
+		if (WIFEXITED(exitstatus))
+			status(_(" (test process exited with unexpected exit code %d, but was expected exit code %d)"),
+				WEXITSTATUS(exitstatus), expected_status);
+		else if (WIFSIGNALED(exitstatus))
+		{
+	#if defined(WIN32)
+			status(_(" (test process was terminated by exception 0x%X)"),
+				   WTERMSIG(exitstatus));
+	#elif defined(HAVE_DECL_SYS_SIGLIST) && HAVE_DECL_SYS_SIGLIST
+			status(_(" (test process was terminated by signal %d: %s)"),
+				   WTERMSIG(exitstatus),
+				   WTERMSIG(exitstatus) < NSIG ?
+				   sys_siglist[WTERMSIG(exitstatus)] : "(unknown))");
+	#else
+			status(_(" (test process was terminated by signal %d)"),
+				   WTERMSIG(exitstatus));
+	#endif
+		}
+		else
+			status(_(" (test process exited with unrecognized status %d)"),
+				   exitstatus);
+	}
 }
 
 /*
@@ -1374,7 +1537,6 @@ run_schedule(const char *schedule, test_function tfunc)
 	_stringlist *tags[MAX_PARALLEL_TESTS];
 	PID_TYPE	pids[MAX_PARALLEL_TESTS];
 	int			statuses[MAX_PARALLEL_TESTS];
-	_stringlist *ignorelist = NULL;
 	char		scbuf[1024];
 	FILE	   *scf;
 	int			line_num = 0;
@@ -1399,7 +1561,7 @@ run_schedule(const char *schedule, test_function tfunc)
 		bool		inword;
 		int			i;
 		struct timeval start_time, end_time;
-		double		diff_secs;
+		double		elapsed_secs;
 
 		line_num++;
 
@@ -1434,8 +1596,6 @@ run_schedule(const char *schedule, test_function tfunc)
 				c = test;
 				while (*c && isspace((unsigned char) *c))
 						c++;
-				add_stringlist_item(&ignorelist, c);
-
 				/*
 				 * Note: ignore: lines do not run the test, they just
 				 * say that failure of this test when run later on is
@@ -1451,7 +1611,6 @@ run_schedule(const char *schedule, test_function tfunc)
 			c = scbuf + 8;
 			while (*c && isspace((unsigned char) *c))
 				c++;
-			add_stringlist_item(&ignorelist, c);
 
 			/*
 			 * Note: ignore: lines do not run the test, they just say that
@@ -1545,9 +1704,9 @@ run_schedule(const char *schedule, test_function tfunc)
 		}
 		gettimeofday(&end_time, NULL);
 
-		diff_secs = (end_time.tv_usec - start_time.tv_usec);
-		diff_secs /= 1000000;
-		diff_secs += end_time.tv_sec - start_time.tv_sec;
+		elapsed_secs = (end_time.tv_usec - start_time.tv_usec);
+		elapsed_secs /= 1000000;
+		elapsed_secs += end_time.tv_sec - start_time.tv_sec;
 
 		/* Check results for all tests */
 		for (i = 0; i < num_tests; i++)
@@ -1585,42 +1744,9 @@ run_schedule(const char *schedule, test_function tfunc)
 				differ |= newdiff;
 			}
 
-			if (differ)
-			{
-				bool		ignore = false;
-				_stringlist *sl;
+			int expected_status = get_expected_status(test);
 
-				for (sl = ignorelist; sl != NULL; sl = sl->next)
-				{
-					if (strcmp(tests[i], sl->str) == 0)
-					{
-						ignore = true;
-						break;
-					}
-				}
-				if (ignore)
-				{
-					status(_("failed (ignored)"));
-					fail_ignore_count++;
-				}
-				else
-				{
-					status(_("FAILED"));
-    				status(_(" (%.2f sec)"), diff_secs);
-					fail_count++;
-				}
-			}
-			else
-			{
-				status(_("ok"));
-				status(_(" (%.2f sec)"), diff_secs);
-				success_count++;
-			}
-
-			if (statuses[i] != 0)
-				log_child_failure(statuses[i]);
-
-			status_end();
+			print_test_status(differ, statuses[i], expected_status, elapsed_secs);
 		}
 	}
 
@@ -1642,10 +1768,17 @@ run_single_test(const char *test, test_function tfunc)
 			   *el,
 			   *tl;
 	bool		differ = false;
+	struct timeval start_time, end_time;
+	double		elapsed_secs;
 
 	status(_("test %-20s ... "), test);
+
+	gettimeofday(&start_time, NULL);
+
 	pid = (tfunc) (test, &resultfiles, &expectfiles, &tags);
 	wait_for_tests(&pid, &exit_status, NULL, 1);
+
+	gettimeofday(&end_time, NULL);
 
 	/*
 	 * Advance over all three lists simultaneously.
@@ -1672,19 +1805,13 @@ run_single_test(const char *test, test_function tfunc)
 		differ |= newdiff;
 	}
 
-	if (differ)
-	{
-		status(_("FAILED"));
-		fail_count++;
-	}
-	else
-	{
-		status(_("ok"));
-		success_count++;
-	}
+	elapsed_secs = (end_time.tv_usec - start_time.tv_usec);
+	elapsed_secs /= 1000000;
+	elapsed_secs += end_time.tv_sec - start_time.tv_sec;
 
-	if (exit_status != 0)
-		log_child_failure(exit_status);
+	int expected_status = get_expected_status(test);
+
+	print_test_status(differ, exit_status, expected_status, elapsed_secs);
 
 	status_end();
 }
@@ -1890,6 +2017,7 @@ help(void)
 	printf(_("                            (can be used multiple times to concatenate)\n"));
 	printf(_("  --srcdir=DIR              absolute path to source directory (for VPATH builds)\n"));
     printf(_(" --init-file=GPD_INIT_FILE  init file to be used for gpdiff\n"));
+    printf(_(" --expected-statuses-file=EXPECTED_STATUSES_FILE  file to read expected return codes for each test\n"));
 	printf(_("\n"));
 	printf(_("Options for using an existing installation:\n"));
 	printf(_("  --host=HOST               use postmaster running on HOST\n"));
@@ -1931,8 +2059,8 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 		{"psqldir", required_argument, NULL, 16},
 		{"srcdir", required_argument, NULL, 17},
 		{"create-role", required_argument, NULL, 18},
-        	{"init-file", required_argument, NULL, 19},
-		{"tablespace", required_argument, NULL, 19},
+		{"init-file", required_argument, NULL, 19},
+		{"expected-statuses-file", required_argument, NULL, 20},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -2025,20 +2153,13 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 			case 18:
 				split_to_stringlist(strdup(optarg), ", ", &extraroles);
 				break;
-                        case 19:
-                	        initfile = strdup(optarg);
-                        break;
-                        case 20:
-			        tablespace = malloc(11 + strlen(optarg) + 1);
-			        if (!tablespace)
-			        {
-			        	fprintf(stderr, _("out of memory.\n"));
-			        	exit_nicely(2);
-			        }
-			        snprintf(tablespace, 11 + strlen(optarg) + 1,
-						"TABLESPACE %s", optarg);
-		        break;
-            		default:
+			case 19:
+				initfile = strdup(optarg);
+				break;
+			case 20:
+				expected_statuses_file = strdup(optarg);
+				break;
+			default:
 				/* getopt_long already emitted a complaint */
 				fprintf(stderr, _("\nTry \"%s -h\" for more information.\n"),
 						progname);
@@ -2105,6 +2226,7 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 		run_single_test(sl->str, tfunc);
 	}
 
+	free_statuslist(&expected_statuses);
 	fclose(logfile);
 
 	/*
