@@ -4004,12 +4004,20 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	/*
 	 * Initialize QueryResourceParameters in QD
 	 *
-	 * We use TopMemoryContext here so that the QueryResourceParameter
-	 * can be available in the session. Thus, it can be used in multiple
-	 * "EXECUTION"s of the prepared statement (i.e., "PREPARE", "BIND",
-	 * "EXECUTION"
+	 * We use CacheMemoryContext/TopMemoryContext here so that the
+	 * QueryResourceParameter can be available in the session. Thus,
+	 * it can be used in multiple "EXECUTION"s of the prepared
+	 * statement (i.e., "PREPARE", "BIND", "EXECUTION").
 	 */
-	MemoryContext oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+	MemoryContext oldcontext = NULL;
+	if ( CacheMemoryContext != NULL )
+	{
+		oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
+	}
+	else
+	{
+		oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+	}
 	resource_parameters = (QueryResourceParameters *)palloc(sizeof(QueryResourceParameters));
 	MemoryContextSwitchTo(oldcontext);
 
