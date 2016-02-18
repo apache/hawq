@@ -435,7 +435,6 @@ task tomcatRpm(type: Rpm) {
         packageName 'apache-tomcat'
         summary = 'Apache Tomcat RPM'
         vendor = project.vendor
-        release = buildNumber()
         version = tomcatVersion
         os = LINUX
         license = project.license
