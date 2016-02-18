@@ -38,6 +38,8 @@ extern char *datadir;
 extern char *host_platform;
 
 extern _stringlist *dblist;
+extern char *initfile;
+extern char *expected_statuses_file;
 extern bool debug;
 extern char *inputdir;
 extern char *outputdir;
