@@ -36,7 +36,7 @@ buildscript {
     
     dependencies {
         classpath "com.netflix.nebula:gradle-ospackage-plugin:2.2.6"
-        classpath "de.undercouch:gradle-download-task:1.2"
+        classpath "de.undercouch:gradle-download-task:2.1.0"
     }   
 }
 
@@ -352,7 +352,7 @@ def buildNumber() {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.10'
+    gradleVersion = '2.11'
 }
 
 def distSubprojects = subprojects - project(':pxf-api')
@@ -391,6 +391,7 @@ task rpm(type: Copy, dependsOn: [subprojects.build, distSubprojects.buildRpm]) {
 // tomcat 
 def tomcatName = "apache-tomcat-${tomcatVersion}"
 def tomcatTargetDir = "tomcat/build/"
+
     
 task tomcatGet << {
     
@@ -434,7 +435,6 @@ task tomcatRpm(type: Rpm) {
         packageName 'apache-tomcat'
         summary = 'Apache Tomcat RPM'
         vendor = project.vendor
-        release = buildNumber()
         version = tomcatVersion
         os = LINUX
         license = project.license
