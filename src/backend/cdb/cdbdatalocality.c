@@ -454,6 +454,33 @@ static Relation_File** change_file_order_based_on_continuity(
 
 static int64 set_maximum_segment_volumn_parameter(Relation_Data *rel_data,
 		int host_num, double* maxSizePerSegment);
+
+/*
+ * saveQueryResourceParameters: save QueryResourceParameters
+ * in prepare statement along with query plan so that the query
+ * resource can be re-allocated during multiple executions of
+ * the plan
+ */
+void saveQueryResourceParameters(
+		QueryResourceParameters	*resource_parameters,
+		QueryResourceLife       life,
+		int32                   slice_size,
+		int64_t                 iobytes,
+		int                     max_target_segment_num,
+		int                     min_target_segment_num,
+		HostnameVolumnInfo      *vol_info,
+		int                     vol_info_size)
+
+{
+	resource_parameters->life = life;
+	resource_parameters->slice_size = slice_size;
+	resource_parameters->iobytes = iobytes;
+	resource_parameters->max_target_segment_num = max_target_segment_num;
+	resource_parameters->min_target_segment_num = min_target_segment_num;
+	resource_parameters->vol_info = vol_info;
+	resource_parameters->vol_info_size = vol_info_size;
+}
+
 /*
  * Setup /cleanup the memory context for this run
  * of data locality algorithm.
@@ -1892,7 +1919,7 @@ search_map_node(List *result, Oid rel_oid, int host_num,
 
 static List *
 post_process_assign_result(Split_Assignment_Result *assign_result) {
-	List *final_result = NULL;
+	List *final_result = NIL;
 	int i;
 
 	for (i = 0; i < assign_result->host_num; i++) {
@@ -3934,16 +3961,22 @@ static void cleanup_allocation_algorithm(
 SplitAllocResult *
 calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum) {
-	SplitAllocResult *result;
+	SplitAllocResult *result = NULL;
 	QueryResource *resource = NULL;
-	List *virtual_segments;
-	List *alloc_result;
+	QueryResourceParameters *resource_parameters = NULL;
+
+	List *virtual_segments = NIL;
+	List *alloc_result = NIL;
 	split_to_segment_mapping_context context;
 
 	int planner_segments = -1; /*virtual segments number for explain statement */
 
 	result = (SplitAllocResult *) palloc(sizeof(SplitAllocResult));
+	result->resource = NULL;
+	result->resource_parameters = NULL;
+	result->alloc_results = NIL;
 	result->relsType = NIL;
+	result->planner_segments = -1;
 	result->datalocalityInfo = makeStringInfo();
 
 	/* fake data locality */
@@ -3955,8 +3988,9 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		}
 	}
 
-	if ((Gp_role != GP_ROLE_DISPATCH)) {
+	if (Gp_role != GP_ROLE_DISPATCH) {
 		result->resource = NULL;
+		result->resource_parameters = NULL;
 		result->alloc_results = NIL;
 		result->relsType = NIL;
 		result->planner_segments = -1;
@@ -3966,6 +4000,26 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	init_datalocality_memory_context();
 
 	init_datalocality_context(&context);
+
+	/*
+	 * Initialize QueryResourceParameters in QD
+	 *
+	 * We use CacheMemoryContext/TopMemoryContext here so that the
+	 * QueryResourceParameter can be available in the session. Thus,
+	 * it can be used in multiple "EXECUTION"s of the prepared
+	 * statement (i.e., "PREPARE", "BIND", "EXECUTION").
+	 */
+	MemoryContext oldcontext = NULL;
+	if ( CacheMemoryContext != NULL )
+	{
+		oldcontext = MemoryContextSwitchTo(CacheMemoryContext);
+	}
+	else
+	{
+		oldcontext = MemoryContextSwitchTo(TopMemoryContext);
+	}
+	resource_parameters = (QueryResourceParameters *)palloc(sizeof(QueryResourceParameters));
+	MemoryContextSwitchTo(oldcontext);
 
 	collect_range_tables(query, fullRangeTable, &(context.rtc_context));
 
@@ -4007,6 +4061,18 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	/*use inherit resource*/
 	if (resourceLife == QRL_INHERIT) {
 		resource = AllocateResource(resourceLife, sliceNum, 0, 0, 0, NULL, 0);
+
+		saveQueryResourceParameters(
+		        resource_parameters,  /* resource_parameters */
+		        resourceLife,         /* life */
+		        sliceNum,             /* slice_size */
+		        0,                    /* iobytes */
+		        0,                    /* max_target_segment_num */
+		        0,                    /* min_target_segment_num */
+		        NULL,                 /* vol_info */
+		        0                     /* vol_info_size */ 
+		        );
+
 		if (resource != NULL) {
 			if ((context.keep_hash)
 					&& (list_length(resource->segments) != context.hashSegNum)) {
@@ -4155,6 +4221,18 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			resource = AllocateResource(QRL_ONCE, sliceNum, queryCost,
 					maxTargetSegmentNumber, minTargetSegmentNumber,
 					context.host_context.hostnameVolInfos, context.host_context.size);
+
+			saveQueryResourceParameters(
+			        resource_parameters,                   /* resource_parameters */
+			        QRL_ONCE,                              /* life */
+			        sliceNum,                              /* slice_size */
+			        queryCost,                             /* iobytes */
+			        maxTargetSegmentNumber,                /* max_target_segment_num */
+			        minTargetSegmentNumber,                /* min_target_segment_num */
+			        context.host_context.hostnameVolInfos, /* vol_info */
+			        context.host_context.size              /* vol_info_size */
+			        );
+			
 		}
 		/* for explain statement, we doesn't allocate resource physically*/
 		else {
@@ -4172,7 +4250,9 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 		if (resource == NULL) {
 			result->resource = NULL;
+			result->resource_parameters = NULL;
 			result->alloc_results = NIL;
+			result->relsType = NIL;
 			result->planner_segments = planner_segments;
 			return result;
 		}
@@ -4209,6 +4289,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	alloc_result = run_allocation_algorithm(result, virtual_segments, &resource, &context);
 
 	result->resource = resource;
+	result->resource_parameters = resource_parameters;
 	result->alloc_results = alloc_result;
 	result->planner_segments = list_length(resource->segments);
 

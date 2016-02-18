@@ -216,7 +216,13 @@ _copyPlannedStmt(PlannedStmt *from)
 	COPY_SCALAR_FIELD(backoff_weight);
 	COPY_SCALAR_FIELD(query_mem);
 
-	COPY_SCALAR_FIELD(resource); // ?? What does this mean?
+	/*
+	 * A shallow copy of PlannedStmt that only copies the
+	 * reference of query resource and its parameters
+	 */
+	COPY_SCALAR_FIELD(resource);
+	COPY_SCALAR_FIELD(resource_parameters);
+
 	COPY_SCALAR_FIELD(planner_segments);
 
 	return newnode;

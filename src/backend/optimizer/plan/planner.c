@@ -285,12 +285,12 @@ planner(Query *parse, int cursorOptions,
 	PlannedStmt *result = NULL;
 	instr_time	starttime, endtime;
 	ResourceNegotiatorResult *ppResult = (ResourceNegotiatorResult *) palloc(sizeof(ResourceNegotiatorResult));
-  SplitAllocResult initResult={NULL, NULL, -1};
-  ppResult->saResult = initResult;
-  ppResult->stmt =NULL;
+	SplitAllocResult initResult = {NULL, NULL, NIL, -1, NIL, NULL};
+	ppResult->saResult = initResult;
+	ppResult->stmt = NULL;
 	static int plannerLevel = 0;
 	bool resourceNegotiateDone = false;
-	QueryResource *savedQueryResource = GetActiveQueryResource();;
+	QueryResource *savedQueryResource = GetActiveQueryResource();
 	SetActiveRelType(NIL);
 
 	bool isDispatchParallel = false;
@@ -455,6 +455,7 @@ planner(Query *parse, int cursorOptions,
 		SetActiveQueryResource(savedQueryResource);
 
 		result->resource = ppResult->saResult.resource;
+		result->resource_parameters = ppResult->saResult.resource_parameters;
 		result->scantable_splits = ppResult->saResult.alloc_results;
 		result->planner_segments = ppResult->saResult.planner_segments;
 		result->datalocalityInfo = ppResult->saResult.datalocalityInfo;
