@@ -28,6 +28,7 @@
 
 #include "c.h"
 #include "utils/pg_crc.h"
+#include "port/pg_crc32c.h"
 
 /*
  * Small Content.

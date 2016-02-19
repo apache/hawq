@@ -130,7 +130,7 @@ main(int argc, char *argv[])
 						break;
 					}
 				}
-				
+
 				if (!found)
 				{
 					printf(_("\n\"%s\" is not a valid version to "
@@ -147,7 +147,7 @@ main(int argc, char *argv[])
 		DataDir = argv[argno];
 	else
 		DataDir = getenv("PGDATA");
-	
+
 	if (DataDir == NULL)
 	{
 		fprintf(stderr, _("%s: no data directory specified\n"), progname);
@@ -174,19 +174,20 @@ main(int argc, char *argv[])
 	}
 
 	/* Check the CRC. */
-	crc = crc32c(crc32cInit(), &ControlFile, offsetof(ControlFileData, crc));
-	crc32cFinish(crc);
+	INIT_CRC32C(crc);
+ 	COMP_CRC32C(crc, &ControlFile, offsetof(ControlFileData, crc));
+ 	FIN_CRC32C(crc);
 
-	if (!EQ_CRC32(crc, ControlFile.crc))
+	if (!EQ_LEGACY_CRC32(crc, ControlFile.crc))
 	{
 		/* Check the CRC using old algorithm. */
-		INIT_CRC32(crc);
-		COMP_CRC32(crc,
+		INIT_LEGACY_CRC32(crc);
+		COMP_LEGACY_CRC32(crc,
 				   (char *) &ControlFile,
 				   offsetof(ControlFileData, crc));
-		FIN_CRC32(crc);
+		FIN_LEGACY_CRC32(crc);
 
-		if (!EQ_CRC32(crc, ControlFile.crc))
+		if (!EQ_LEGACY_CRC32(crc, ControlFile.crc))
 			printf(_("WARNING: Calculated CRC checksum does not match value stored in file.\n"
 					 "Either the file is corrupt, or it has a different layout than this program\n"
 					 "is expecting.  The results below are untrustworthy.\n\n"));
@@ -218,20 +219,22 @@ main(int argc, char *argv[])
 			close(fd);
 			return 0;
 		}
-		
+
 		printf(_("New catalog version number: %u\n"), tover);
 
 		ControlFile.catalog_version_no = tover;
 
 		/* recalcualte the CRC. */
-		crc = crc32c(crc32cInit(), &ControlFile, offsetof(ControlFileData, crc));
-		crc32cFinish(crc);
+		INIT_CRC32C(crc);
+		COMP_CRC32C(crc, &ControlFile, offsetof(ControlFileData, crc));
+		FIN_CRC32C(crc);
+
 		/*
-		INIT_CRC32(crc);
-		COMP_CRC32(crc,
+		INIT_LEGACY_CRC32(crc);
+		COMP_LEGACY_CRC32(crc,
 				   (char *) &ControlFile,
 				   offsetof(ControlFileData, crc));
-		FIN_CRC32(crc);
+		FIN_LEGACY_CRC32(crc);
 		*/
 		ControlFile.crc = crc;
 

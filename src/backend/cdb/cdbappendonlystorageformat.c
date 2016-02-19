@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -29,6 +29,7 @@
 #include "cdb/cdbappendonlystorage.h"
 #include "cdb/cdbappendonlystorageformat.h"
 #include "utils/pg_crc.h"
+#include "port/pg_crc32c.h"
 #include "utils/guc.h"
 
 static pg_crc32
@@ -37,20 +38,20 @@ AppendOnlyStorageFormat_ComputeHeaderChecksum(
 	int32			headerLen)
 {
 	pg_crc32	crc;
-	
+
 	Assert(headerPtr != NULL);
 
-	INIT_CRC32(crc);
+	INIT_CRC32C(crc);
 
-	/* 
+	/*
 	 * Compute CRC of the header. The header length does not include the
 	 * header checksum.
 	 */
-	COMP_CRC32(crc, 
-	           headerPtr, 
+	COMP_CRC32C(crc,
+	           headerPtr,
 	           headerLen);
+	FIN_CRC32C(crc);
 
-	/* BUG: This routine does not return a correct CRC32, since it never calls FIN_CRC32 */
 	return crc;
 }
 
@@ -62,7 +63,7 @@ AppendOnlyStorageFormat_ComputeBlockChecksum(
 {
 	int32		dataOffset;
 	pg_crc32	crc;
-	
+
 	Assert(headerPtr != NULL);
 
 	/*
@@ -71,19 +72,19 @@ AppendOnlyStorageFormat_ComputeBlockChecksum(
 	 */
 	dataOffset = headerLen + sizeof(pg_crc32);
 
-	INIT_CRC32(crc);
+	INIT_CRC32C(crc);
 
 	/* Compute CRC of the header. */
-	COMP_CRC32(crc, 
-	           headerPtr + dataOffset, 
+	COMP_CRC32C(crc,
+	           headerPtr + dataOffset,
 	           overallBlockLen - dataOffset);
+	FIN_CRC32C(crc);
 
-	/* BUG: This routine does not return a correct CRC32, since it never calls FIN_CRC32 */
 	return crc;
 }
 
 
-int32 
+int32
 AppendOnlyStorageFormat_RegularHeaderLenNeeded(
 	bool			usingChecksum)
 {
@@ -98,7 +99,7 @@ AppendOnlyStorageFormat_AddFirstRowNum(
 	int64			firstRowNum)
 {
 	AOSmallContentHeader 	*blockHeader = (AOSmallContentHeader*)headerPtr;
-	
+
 	int32		offsetToFirstRowNum;
 	int64		*firstRowNumPtr;
 
@@ -110,13 +111,13 @@ AppendOnlyStorageFormat_AddFirstRowNum(
 	{
 		offsetToFirstRowNum = AoHeader_LongSize;
 	}
-	
-	if (usingChecksums) 
+
+	if (usingChecksums)
 		offsetToFirstRowNum += 2 * sizeof(pg_crc32); // Header and Block checksums.
-				
+
 	firstRowNumPtr = (int64*)&headerPtr[offsetToFirstRowNum];
 	*firstRowNumPtr = firstRowNum;
-	
+
 	if (Debug_appendonly_print_storage_headers)
 		elog(LOG,
 			 "Append-Only storage first row number header result: block_bytes_0_3 0x%X, block_bytes_4_7 0x%X, "
@@ -151,7 +152,7 @@ AppendOnlyStorageFormat_AddBlockHeaderChecksums(
 
 	firstHeaderLen = AoHeader_RegularSize;
 	firstHeaderAndBlockChecksumLen = firstHeaderLen + sizeof(pg_crc32);	// Block checksum.
-				
+
 	offset = firstHeaderAndBlockChecksumLen +
 			 sizeof(pg_crc32);		// Header checksum.
 	if (AoHeader_IsLong(headerKind))
@@ -171,15 +172,15 @@ AppendOnlyStorageFormat_AddBlockHeaderChecksums(
 					  AOStorage_RoundUp(
 	                        (isCompressed ? compressedLength : dataLength),
 	                        version);
-	
+
 	/*
-	 * Calculate Block checksum first since it is included in the 
+	 * Calculate Block checksum first since it is included in the
 	 * header checksum.
 	 */
 	blockChecksumPtr = (pg_crc32*)&headerPtr[firstHeaderLen];
 	*blockChecksumPtr = AppendOnlyStorageFormat_ComputeBlockChecksum(
 													headerPtr,
-													firstHeaderAndBlockChecksumLen, 
+													firstHeaderAndBlockChecksumLen,
 													overallBlockLen);
 	/*
 	 * Now the Header checksum after the header and block checksum.
@@ -188,7 +189,7 @@ AppendOnlyStorageFormat_AddBlockHeaderChecksums(
 	*headerChecksumPtr = AppendOnlyStorageFormat_ComputeHeaderChecksum(
 															headerPtr,
 															firstHeaderAndBlockChecksumLen);
-	
+
 	if (Debug_appendonly_print_storage_headers)
 	{
 		switch (headerKind)
@@ -211,7 +212,7 @@ AppendOnlyStorageFormat_AddBlockHeaderChecksums(
 					AOBulkDenseContentHeader	*bulkDenseHeader = (AOBulkDenseContentHeader*)headerPtr;
 					AOBulkDenseContentHeaderExt	*bulkDenseHeaderExt;
 
-					bulkDenseHeaderExt = 
+					bulkDenseHeaderExt =
 							(AOBulkDenseContentHeaderExt*)
 									(headerPtr + extHeaderOffset);
 
@@ -229,10 +230,10 @@ AppendOnlyStorageFormat_AddBlockHeaderChecksums(
 						 overallBlockLen);
 					break;
 				}
-				
+
 			default:
 				ereport(ERROR,
-						(errmsg("Unexpected Append-Only header kind %d", 
+						(errmsg("Unexpected Append-Only header kind %d",
 								headerKind)));
 				break;
 		}
@@ -256,7 +257,7 @@ AppendOnlyStorageFormat_MakeSmallContentHeader(
 	bool			isCompressed;
 
 	Assert(headerPtr != NULL);
-	
+
 	blockHeader = (AOSmallContentHeader*)headerPtr;
 
 	if (Debug_appendonly_print_storage_headers)
@@ -269,16 +270,16 @@ AppendOnlyStorageFormat_MakeSmallContentHeader(
 			 rowCount,
 			 dataLength,
 			 compressedLength);
-	
+
 	/* Zero out whole header */
 	AOSmallContentHeaderInit_Init(blockHeader);
-	
+
 	AOSmallContentHeaderInit_headerKind(blockHeader,AoHeaderKind_SmallContent);
 	AOSmallContentHeaderInit_executorBlockKind(blockHeader,executorKind);
 	AOSmallContentHeaderInit_rowCount(blockHeader,rowCount);
 	AOSmallContentHeaderInit_dataLength(blockHeader,dataLength);
 	AOSmallContentHeaderInit_hasFirstRowNum(blockHeader,hasFirstRowNum);
-	
+
 	isCompressed = (compressedLength > 0);
 	if (isCompressed)
 		AOSmallContentHeaderInit_compressedLength(blockHeader,compressedLength);
@@ -301,7 +302,7 @@ AppendOnlyStorageFormat_MakeSmallContentHeader(
 											usingChecksums,
 											firstRowNum);
 	}
-	
+
 	if (usingChecksums)
 	{
 		AppendOnlyStorageFormat_AddBlockHeaderChecksums(
@@ -357,12 +358,12 @@ AppendOnlyStorageFormat_SmallContentHeaderStr(
 
 	executorBlockKind  = 	AOSmallContentHeaderGet_executorBlockKind(blockHeader);
 	rowCount = 				AOSmallContentHeaderGet_rowCount(blockHeader);
-	
-	wholeHeaderLen =		headerLen + 
+
+	wholeHeaderLen =		headerLen +
 							(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
-	
+
 	dataLength =			AOSmallContentHeaderGet_dataLength(blockHeader);
-	
+
 	compressedLength =		AOSmallContentHeaderGet_compressedLength(blockHeader);
 
 	overallBlockLen =		wholeHeaderLen +
@@ -374,9 +375,9 @@ AppendOnlyStorageFormat_SmallContentHeaderStr(
 	{
 		blockChecksumPtr = (pg_crc32*)&headerPtr[headerLen];
 		blockChecksum = *blockChecksumPtr;
-		
+
 		headerLen += sizeof(pg_crc32);
-		
+
 		headerChecksumPtr = (pg_crc32*)&headerPtr[headerLen];
 		headerChecksum = *headerChecksumPtr;
 	}
@@ -461,21 +462,21 @@ AppendOnlyStorageFormat_LargeContentHeaderStr(
 
 	executorBlockKind  = 	AOLargeContentHeaderGet_executorBlockKind(blockHeader);
 	rowCount = 				AOLargeContentHeaderGet_largeRowCount(blockHeader);
-	
-	wholeHeaderLen =		headerLen + 
+
+	wholeHeaderLen =		headerLen +
 							(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
-	
+
 	largeContentLength =	AOLargeContentHeaderGet_largeContentLength(blockHeader);
-	
+
 	overallBlockLen =		wholeHeaderLen;	// No data with this kind of header.
 
 	if (usingChecksums)
 	{
 		blockChecksumPtr = (pg_crc32*)&headerPtr[headerLen];
 		blockChecksum = *blockChecksumPtr;
-		
+
 		headerLen += sizeof(pg_crc32);
-		
+
 		headerChecksumPtr = (pg_crc32*)&headerPtr[headerLen];
 		headerChecksum = *headerChecksumPtr;
 	}
@@ -559,12 +560,12 @@ AppendOnlyStorageFormat_NonBulkDenseContentHeaderStr(
 
 	executorBlockKind  = 	AONonBulkDenseContentHeaderGet_executorBlockKind(blockHeader);
 	rowCount = 				AONonBulkDenseContentHeaderGet_largeRowCount(blockHeader);
-	
-	wholeHeaderLen =		headerLen + 
+
+	wholeHeaderLen =		headerLen +
 							(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
-	
+
 	dataLength =			AONonBulkDenseContentHeaderGet_dataLength(blockHeader);
-	
+
 	overallBlockLen =		wholeHeaderLen +
 	                        AOStorage_RoundUp(
 			                        	dataLength,
@@ -574,9 +575,9 @@ AppendOnlyStorageFormat_NonBulkDenseContentHeaderStr(
 	{
 		blockChecksumPtr = (pg_crc32*)&headerPtr[headerLen];
 		blockChecksum = *blockChecksumPtr;
-		
+
 		headerLen += sizeof(pg_crc32);
-		
+
 		headerChecksumPtr = (pg_crc32*)&headerPtr[headerLen];
 		headerChecksum = *headerChecksumPtr;
 	}
@@ -666,9 +667,9 @@ AppendOnlyStorageFormat_BulkDenseContentHeaderStr(
 	extHeaderLen = AoHeader_RegularSize;
 
 	executorBlockKind  = 	AOBulkDenseContentHeaderGet_executorBlockKind(blockHeader);
-	
-	firstHeaderAndChecksumsLen =		
-							firstHeaderLen + 
+
+	firstHeaderAndChecksumsLen =
+							firstHeaderLen +
 							(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 
 	/*
@@ -676,9 +677,9 @@ AppendOnlyStorageFormat_BulkDenseContentHeaderStr(
 	 */
 	extHeader = (AOBulkDenseContentHeaderExt*)(headerPtr + firstHeaderAndChecksumsLen);
 	rowCount = 				AOBulkDenseContentHeaderExtGet_largeRowCount(extHeader);
-	
+
 	dataLength =			AOBulkDenseContentHeaderGet_dataLength(blockHeader);
-	
+
 	compressedLength =		AOBulkDenseContentHeaderGet_compressedLength(blockHeader);
 
 	overallBlockLen =		firstHeaderAndChecksumsLen +
@@ -692,7 +693,7 @@ AppendOnlyStorageFormat_BulkDenseContentHeaderStr(
 	{
 		blockChecksumPtr = (pg_crc32*)&headerPtr[firstHeaderLen];
 		blockChecksum = *blockChecksumPtr;
-		
+
 		headerChecksumPtr = (pg_crc32*)&headerPtr[firstHeaderLen + sizeof(pg_crc32)];
 		headerChecksum = *headerChecksumPtr;
 	}
@@ -795,7 +796,7 @@ AppendOnlyStorageFormat_BlockHeaderStr(
 	default:
 		{
 			StringInfoData buf;
-			
+
 			initStringInfo(&buf);
 			appendStringInfo(
 				&buf,
@@ -961,9 +962,9 @@ errdetail_appendonly_storage_content_header(
 		return errdetail_appendonly_storage_bulkdensecontent_header(header, usingChecksum, version);
 
 	default:
-		return errdetail( 
+		return errdetail(
 					 "Append-Only storage header kind %d unknown",
-					 aoHeaderKind);	
+					 aoHeaderKind);
 	}
 }
 
@@ -982,7 +983,7 @@ AppendOnlyStorageFormat_MakeLargeContentHeader(
 	AOLargeContentHeader 	*largeContentHeader;
 
 	Assert(headerPtr != NULL);
-	
+
 	largeContentHeader = (AOLargeContentHeader*)headerPtr;
 
 	if (Debug_appendonly_print_storage_headers)
@@ -993,10 +994,10 @@ AppendOnlyStorageFormat_MakeLargeContentHeader(
 			 executorKind,
 			 largeRowCount,
 			 largeContentLength);
-	
+
 	/* Zero out whole header */
 	AOLargeContentHeaderInit_Init(largeContentHeader);
-	
+
 	AOLargeContentHeaderInit_headerKind(largeContentHeader,AoHeaderKind_LargeContent);
 	AOLargeContentHeaderInit_executorBlockKind(largeContentHeader,executorKind);
 	AOLargeContentHeaderInit_largeRowCount(largeContentHeader,largeRowCount);
@@ -1021,7 +1022,7 @@ AppendOnlyStorageFormat_MakeLargeContentHeader(
 											usingChecksums,
 											firstRowNum);
 	}
-	
+
 	if (usingChecksums)
 	{
 		// UNDONE: Set 2nd checksum to 0 when there is no content???
@@ -1057,7 +1058,7 @@ AppendOnlyStorageFormat_MakeNonBulkDenseContentHeader(
 	AONonBulkDenseContentHeader 	*blockHeader;
 
 	Assert(headerPtr != NULL);
-	
+
 	blockHeader = (AONonBulkDenseContentHeader*)headerPtr;
 
 	if (Debug_appendonly_print_storage_headers)
@@ -1069,16 +1070,16 @@ AppendOnlyStorageFormat_MakeNonBulkDenseContentHeader(
 			 executorKind,
 			 rowCount,
 			 dataLength);
-	
+
 	/* Zero out whole header */
 	AONonBulkDenseContentHeaderInit_Init(blockHeader);
-	
+
 	AONonBulkDenseContentHeaderInit_headerKind(blockHeader,AoHeaderKind_NonBulkDenseContent);
 	AONonBulkDenseContentHeaderInit_executorBlockKind(blockHeader,executorKind);
 	AONonBulkDenseContentHeaderInit_largeRowCount(blockHeader,rowCount);
 	AONonBulkDenseContentHeaderInit_dataLength(blockHeader,dataLength);
 	AONonBulkDenseContentHeaderInit_hasFirstRowNum(blockHeader,hasFirstRowNum);
-	
+
 	/*
 	 * Add the optional firstRowNum.
 	 *
@@ -1097,7 +1098,7 @@ AppendOnlyStorageFormat_MakeNonBulkDenseContentHeader(
 											usingChecksums,
 											firstRowNum);
 	}
-	
+
 	if (usingChecksums)
 	{
 		AppendOnlyStorageFormat_AddBlockHeaderChecksums(
@@ -1139,10 +1140,10 @@ AppendOnlyStorageFormat_MakeBulkDenseContentHeader(
 	bool			isCompressed;
 
 	Assert(headerPtr != NULL);
-	
+
 	blockHeader = (AOBulkDenseContentHeader*)headerPtr;
-	firstHeaderAndChecksumsLen =		
-							AoHeader_RegularSize + 
+	firstHeaderAndChecksumsLen =
+							AoHeader_RegularSize +
 							(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 
 	/*
@@ -1160,15 +1161,15 @@ AppendOnlyStorageFormat_MakeBulkDenseContentHeader(
 			 rowCount,
 			 dataLength,
 			 compressedLength);
-	
+
 	/* Zero out whole header */
 	AOBulkDenseContentHeaderInit_Init(blockHeader);
-	
+
 	AOBulkDenseContentHeaderInit_headerKind(blockHeader,AoHeaderKind_BulkDenseContent);
 	AOBulkDenseContentHeaderInit_executorBlockKind(blockHeader,executorKind);
 	AOBulkDenseContentHeaderInit_dataLength(blockHeader,dataLength);
 	AOBulkDenseContentHeaderInit_hasFirstRowNum(blockHeader,hasFirstRowNum);
-	
+
 	isCompressed = (compressedLength > 0);
 	if (isCompressed)
 		AOBulkDenseContentHeaderInit_compressedLength(blockHeader,compressedLength);
@@ -1176,7 +1177,7 @@ AppendOnlyStorageFormat_MakeBulkDenseContentHeader(
 	/* Zero out whole extension */
 	AOBulkDenseContentHeaderExtInit_Init(extHeader);
 	AOBulkDenseContentHeaderExtInit_largeRowCount(extHeader,rowCount);
-	
+
 	/*
 	 * Add the optional firstRowNum.
 	 *
@@ -1195,7 +1196,7 @@ AppendOnlyStorageFormat_MakeBulkDenseContentHeader(
 											usingChecksums,
 											firstRowNum);
 	}
-	
+
 	if (usingChecksums)
 	{
 		AppendOnlyStorageFormat_AddBlockHeaderChecksums(
@@ -1361,10 +1362,10 @@ AppendOnlyStorageFormat_GetHeaderInfo(
 				MAX_AOHEADER_CHECK_ERROR_STR,
 				"Append-only storage header is invalid -- first 32 bits are all zeroes (header_bytes_0_3 0x%08x, header_bytes_4_7 0x%08x)",
 			    header->header_bytes_0_3, header->header_bytes_4_7);
-		
+
 		Assert(snprintfResult >= 0);
 		Assert(snprintfResult < MAX_AOHEADER_CHECK_ERROR_STR);
-		
+
 		return AOHeaderCheckFirst32BitsAllZeroes;
 	}
 
@@ -1376,10 +1377,10 @@ AppendOnlyStorageFormat_GetHeaderInfo(
 				MAX_AOHEADER_CHECK_ERROR_STR,
 				"Append-only storage header is invalid -- reserved bit 0 of the header is not zero (header_bytes_0_3 0x%08x, header_bytes_4_7 0x%08x)",
 			    header->header_bytes_0_3, header->header_bytes_4_7);
-		
+
 		Assert(snprintfResult >= 0);
 		Assert(snprintfResult < MAX_AOHEADER_CHECK_ERROR_STR);
-		
+
 		return AOHeaderCheckReservedBit0Not0;
 	}
 
@@ -1393,10 +1394,10 @@ AppendOnlyStorageFormat_GetHeaderInfo(
 				MAX_AOHEADER_CHECK_ERROR_STR,
 				"Append-only storage header is invalid -- invalid value 0 (none) for header kind (header_bytes_0_3 0x%08x, header_bytes_4_7 0x%08x)",
 			    header->header_bytes_0_3, header->header_bytes_4_7);
-		
+
 		Assert(snprintfResult >= 0);
 		Assert(snprintfResult < MAX_AOHEADER_CHECK_ERROR_STR);
-		
+
 		return AOHeaderCheckInvalidHeaderKindNone;
 	}
 
@@ -1409,10 +1410,10 @@ AppendOnlyStorageFormat_GetHeaderInfo(
 				"Append-only storage header is invalid -- invalid header kind value %d (header_bytes_0_3 0x%08x, header_bytes_4_7 0x%08x)",
 				(int)*headerKind,
 			    header->header_bytes_0_3, header->header_bytes_4_7);
-		
+
 		Assert(snprintfResult >= 0);
 		Assert(snprintfResult < MAX_AOHEADER_CHECK_ERROR_STR);
-		
+
 		return AOHeaderCheckInvalidHeaderKind;
 	}
 
@@ -1424,22 +1425,22 @@ AppendOnlyStorageFormat_GetHeaderInfo(
 
 			blockHeader = (AOSmallContentHeader*)headerPtr;
 
-			*actualHeaderLen = 
-						AoHeader_RegularSize+ 
+			*actualHeaderLen =
+						AoHeader_RegularSize+
 						(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 			if (AOSmallContentHeaderGet_hasFirstRowNum(blockHeader))
 				(*actualHeaderLen) += sizeof(int64);
 		}
 		break;
-		
+
 	case AoHeaderKind_LargeContent:
 		{
 			AOLargeContentHeader	*largeContentHeader;
 
 			largeContentHeader = (AOLargeContentHeader*)headerPtr;
 
-			*actualHeaderLen = 
-						AoHeader_RegularSize + 
+			*actualHeaderLen =
+						AoHeader_RegularSize +
 						(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 			if (AOLargeContentHeaderGet_hasFirstRowNum(largeContentHeader))
 				(*actualHeaderLen) += sizeof(int64);
@@ -1452,8 +1453,8 @@ AppendOnlyStorageFormat_GetHeaderInfo(
 
 			denseContentHeader = (AONonBulkDenseContentHeader*)headerPtr;
 
-			*actualHeaderLen = 
-						AoHeader_RegularSize + 
+			*actualHeaderLen =
+						AoHeader_RegularSize +
 						(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 			if (AONonBulkDenseContentHeaderGet_hasFirstRowNum(denseContentHeader))
 				(*actualHeaderLen) += sizeof(int64);
@@ -1466,20 +1467,20 @@ AppendOnlyStorageFormat_GetHeaderInfo(
 
 			blockHeader = (AOBulkDenseContentHeader*)headerPtr;
 
-			*actualHeaderLen = 
-						AoHeader_LongSize + 
+			*actualHeaderLen =
+						AoHeader_LongSize +
 						(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 			if (AOBulkDenseContentHeaderGet_hasFirstRowNum(blockHeader))
 				(*actualHeaderLen) += sizeof(int64);
 		}
 		break;
-		
+
 	default:
-		elog(ERROR, "Unexpected Append-Only header kind %d", 
+		elog(ERROR, "Unexpected Append-Only header kind %d",
 			 *headerKind);
 		break;
-	}	
-	
+	}
+
 	return AOHeaderCheckOk;
 }
 
@@ -1509,9 +1510,9 @@ AppendOnlyStorageFormat_GetSmallContentHeaderInfo(
 
 	*executorBlockKind = 	AOSmallContentHeaderGet_executorBlockKind(blockHeader);
 	*hasFirstRowNum	=		AOSmallContentHeaderGet_hasFirstRowNum(blockHeader);
-	*rowCount = 			AOSmallContentHeaderGet_rowCount(blockHeader);	
+	*rowCount = 			AOSmallContentHeaderGet_rowCount(blockHeader);
 
-	*offset =				AoHeader_RegularSize + 
+	*offset =				AoHeader_RegularSize +
 							(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 	if (*hasFirstRowNum)
 	{
@@ -1519,17 +1520,17 @@ AppendOnlyStorageFormat_GetSmallContentHeaderInfo(
 
 		firstRowNumPtr = (int64*)&headerPtr[*offset];
 		*firstRowNum = *firstRowNumPtr;
-		
+
 		(*offset) += sizeof(int64);
 	}
 	else
 		*firstRowNum = INT64CONST(-1);
-	
+
 	if (*offset != headerLen)
 		elog(ERROR, "Content offset %d doesn't equal header length parameter %d",
 		     *offset,
 		     headerLen);
-	
+
 	*uncompressedLen =	AOSmallContentHeaderGet_dataLength(blockHeader);
 	*compressedLen = 	AOSmallContentHeaderGet_compressedLength(blockHeader);
 	if (*compressedLen == 0)
@@ -1557,7 +1558,7 @@ AppendOnlyStorageFormat_GetSmallContentHeaderInfo(
 			return AOHeaderCheckInvalidCompressedLen;
 		}
 	}
-	
+
 	*overallBlockLen =		*offset +
 	                        AOStorage_RoundUp(length, version);
 
@@ -1640,8 +1641,8 @@ AppendOnlyStorageFormat_GetLargeContentHeaderInfo(
 			    largeContentHeader->largecontent_bytes_0_3, largeContentHeader->largecontent_bytes_4_7);
 		return AOHeaderCheckLargeContentLenIsZero;
 	}
-	
-	offset = AoHeader_RegularSize + 
+
+	offset = AoHeader_RegularSize +
 			 (usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 	if (*hasFirstRowNum)
 	{
@@ -1649,7 +1650,7 @@ AppendOnlyStorageFormat_GetLargeContentHeaderInfo(
 
 		firstRowNumPtr = (int64*)&headerPtr[offset];
 		*firstRowNum = *firstRowNumPtr;
-		
+
 		offset += sizeof(int64);
 	}
 	else
@@ -1686,9 +1687,9 @@ AppendOnlyStorageFormat_GetNonBulkDenseContentHeaderInfo(
 
 	*executorBlockKind = 	AONonBulkDenseContentHeaderGet_executorBlockKind(blockHeader);
 	*hasFirstRowNum	=		AONonBulkDenseContentHeaderGet_hasFirstRowNum(blockHeader);
-	*rowCount = 			AONonBulkDenseContentHeaderGet_largeRowCount(blockHeader);	
+	*rowCount = 			AONonBulkDenseContentHeaderGet_largeRowCount(blockHeader);
 
-	*offset =				AoHeader_RegularSize + 
+	*offset =				AoHeader_RegularSize +
 							(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 	if (*hasFirstRowNum)
 	{
@@ -1696,19 +1697,19 @@ AppendOnlyStorageFormat_GetNonBulkDenseContentHeaderInfo(
 
 		firstRowNumPtr = (int64*)&headerPtr[*offset];
 		*firstRowNum = *firstRowNumPtr;
-		
+
 		(*offset) += sizeof(int64);
 	}
 	else
 		*firstRowNum = INT64CONST(-1);
-	
+
 	if (*offset != headerLen)
 		elog(ERROR, "Content offset %d doesn't equal header length parameter %d",
 		     *offset,
 		     headerLen);
-	
+
 	*uncompressedLen =	AONonBulkDenseContentHeaderGet_dataLength(blockHeader);
-	
+
 	*overallBlockLen =		*offset +
 	                        AOStorage_RoundUp(*uncompressedLen, version);
 
@@ -1722,7 +1723,7 @@ AppendOnlyStorageFormat_GetNonBulkDenseContentHeaderInfo(
 			    blockHeader->nonbulkdensecontent_bytes_0_3, blockHeader->nonbulkdensecontent_bytes_4_7);
 		return AOHeaderCheckInvalidOverallBlockLen;
 	}
-	
+
 	return AOHeaderCheckOk;
 }
 
@@ -1752,8 +1753,8 @@ AppendOnlyStorageFormat_GetBulkDenseContentHeaderInfo(
 	Assert(headerPtr != NULL);
 
 	blockHeader = (AOBulkDenseContentHeader*)headerPtr;
-	firstHeaderAndChecksumsLen =		
-							AoHeader_RegularSize + 
+	firstHeaderAndChecksumsLen =
+							AoHeader_RegularSize +
 							(usingChecksums ? 2 * sizeof(pg_crc32) : 0);
 	/*
 	 * The extension header is in the data portion with first row number.
@@ -1765,7 +1766,7 @@ AppendOnlyStorageFormat_GetBulkDenseContentHeaderInfo(
 	*executorBlockKind = 	AOBulkDenseContentHeaderGet_executorBlockKind(blockHeader);
 	*hasFirstRowNum	=		AOBulkDenseContentHeaderGet_hasFirstRowNum(blockHeader);
 
-	*rowCount = 			AOBulkDenseContentHeaderExtGet_largeRowCount(extHeader);	
+	*rowCount = 			AOBulkDenseContentHeaderExtGet_largeRowCount(extHeader);
 
 	if (*hasFirstRowNum)
 	{
@@ -1773,17 +1774,17 @@ AppendOnlyStorageFormat_GetBulkDenseContentHeaderInfo(
 
 		firstRowNumPtr = (int64*)&headerPtr[*offset];
 		*firstRowNum = *firstRowNumPtr;
-		
+
 		(*offset) += sizeof(int64);
 	}
 	else
 		*firstRowNum = INT64CONST(-1);
-	
+
 	if (*offset != headerLen)
 		elog(ERROR, "Content offset %d doesn't equal header length parameter %d",
 		     *offset,
 		     headerLen);
-	
+
 	*uncompressedLen =	AOBulkDenseContentHeaderGet_dataLength(blockHeader);
 	*compressedLen = 	AOBulkDenseContentHeaderGet_compressedLength(blockHeader);
 	if (*compressedLen == 0)
@@ -1813,7 +1814,7 @@ AppendOnlyStorageFormat_GetBulkDenseContentHeaderInfo(
 			return AOHeaderCheckInvalidCompressedLen;
 		}
 	}
-	
+
 	*overallBlockLen =		*offset +
 	                        AOStorage_RoundUp(length, version);
 
@@ -1829,7 +1830,7 @@ AppendOnlyStorageFormat_GetBulkDenseContentHeaderInfo(
 			    extHeader->bulkdensecontent_ext_bytes_0_3, extHeader->bulkdensecontent_ext_bytes_4_7);
 		return AOHeaderCheckInvalidOverallBlockLen;
 	}
-	
+
 	return AOHeaderCheckOk;
 }
 
@@ -1843,7 +1844,7 @@ AppendOnlyStorageFormat_VerifyHeaderChecksum(
 	int32			firstHeaderAndBlockChecksumLen;
 
 	pg_crc32	*headerChecksumPtr;
-	
+
 	Assert(headerPtr != NULL);
 	Assert(storedChecksum != NULL);
 	Assert(computedChecksum != NULL);
@@ -1856,12 +1857,12 @@ AppendOnlyStorageFormat_VerifyHeaderChecksum(
 	 */
 	headerChecksumPtr = (pg_crc32*)&headerPtr[firstHeaderAndBlockChecksumLen];
 	*storedChecksum = *headerChecksumPtr;
-	
+
 	*computedChecksum = AppendOnlyStorageFormat_ComputeHeaderChecksum(
 														headerPtr,
 														firstHeaderAndBlockChecksumLen);
 
-	return (*storedChecksum == *computedChecksum);	
+	return (*storedChecksum == *computedChecksum);
 }
 
 bool
@@ -1874,7 +1875,7 @@ AppendOnlyStorageFormat_VerifyBlockChecksum(
 	int32			firstHeaderLen;
 
 	pg_crc32	*blockChecksumPtr;
-	
+
 	Assert(headerPtr != NULL);
 	Assert(storedChecksum != NULL);
 	Assert(computedChecksum != NULL);
@@ -1886,11 +1887,11 @@ AppendOnlyStorageFormat_VerifyBlockChecksum(
 	 */
 	blockChecksumPtr = (pg_crc32*)&headerPtr[firstHeaderLen];
 	*storedChecksum = *blockChecksumPtr;
-	
+
 	*computedChecksum = AppendOnlyStorageFormat_ComputeBlockChecksum(
 														headerPtr,
 														firstHeaderLen + sizeof(pg_crc32),
 														overallBlockLen);
 
-	return (*storedChecksum == *computedChecksum);	
+	return (*storedChecksum == *computedChecksum);
 }

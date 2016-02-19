@@ -703,7 +703,6 @@ backend/utils/fmgr/funcapi.c
 backend/utils/gp/persistentutil.c
 backend/utils/gp/segadmin.c
 backend/utils/gpmon/gpmon.c
-backend/utils/hash/crc32c.c
 backend/utils/hash/dynahash.c
 backend/utils/hash/hashfn.c
 backend/utils/hash/pg_crc.c
