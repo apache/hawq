@@ -423,6 +423,7 @@ MemoryAccounting_GetAccountName(MemoryAccount *memoryAccount)
 		case MEMORY_OWNER_TYPE_Resource_Negotiator:
 			return "X_ResourceNegotiator";
 		default:
+			elog(LOG,"missing account ownerType number is %d",memoryAccount->ownerType);
 			Assert(false);
 			break;
 	}
