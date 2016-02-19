@@ -361,6 +361,14 @@ executormgr_cancel(QueryExecutor *executor)
 	return success;
 }
 
+static bool
+executormgr_validate_conn(PGconn *conn)
+{
+  if (conn == NULL)
+    return false;
+  return dispatch_validate_conn(conn->sock);
+}
+
 /*
  * executormgr_is_dispatchable
  *	Return the true iff executor can receive query.
@@ -379,7 +387,7 @@ executormgr_is_dispatchable(QueryExecutor *executor)
 			return false;
 	}
 
-	if (PQstatus(conn) == CONNECTION_BAD)
+	if (!executormgr_validate_conn(conn) || PQstatus(conn) == CONNECTION_BAD)
 	{
 		write_log("function executormgr_is_dispatchable meets error, connection is bad.");
 		executormgr_catch_error(executor);
@@ -388,9 +396,6 @@ executormgr_is_dispatchable(QueryExecutor *executor)
 
 	return true;
 }
-
-
-
 
 /*
  * executormgr_dispatch_and_run
@@ -670,21 +675,30 @@ executormgr_free_takeovered_segment_conn(SegmentDatabaseDescriptor *desc)
 }
 
 static SegmentDatabaseDescriptor *
-executormgr_allocate_any_executor(bool is_writer)
+executormgr_allocate_any_executor(bool is_writer, bool is_entrydb)
 {
-	return poolmgr_get_random_item(executor_cache.pool);
-}	
-
-static SegmentDatabaseDescriptor *
-executormgr_allocate_executor_on_entrydb(bool is_writer)
-{
-  return poolmgr_get_random_item(executor_cache.entrydb_pool);
+  // get executor from pool and check whether the connection is valid, keep
+  // running until finding a valid one or the pool becomes NULL
+  struct PoolMgrState *executor_pool =
+      is_entrydb ? executor_cache.entrydb_pool : executor_cache.pool;
+  SegmentDatabaseDescriptor *desc = poolmgr_get_random_item(executor_pool);
+  while (desc != NULL && !executormgr_validate_conn(desc->conn)) {
+    desc = poolmgr_get_random_item(executor_pool);
+  }
+  return desc;
 }
 
 static SegmentDatabaseDescriptor *
 executormgr_allocate_executor_by_name(const char *name, bool is_writer)
 {
-	return poolmgr_get_item_by_name(executor_cache.pool, name);
+  // get executor from pool and check whether the connection is valid, keep
+  // running until finding a valid one or the pool becomes NULL
+  SegmentDatabaseDescriptor *desc =
+      poolmgr_get_item_by_name(executor_cache.pool, name);
+  while (desc != NULL && !executormgr_validate_conn(desc->conn)) {
+    desc = poolmgr_get_item_by_name(executor_cache.pool, name);
+  }
+  return desc;
 }	
 
 /*
@@ -697,9 +711,9 @@ executormgr_allocate_executor(Segment *segment, bool is_writer, bool is_entrydb)
 	SegmentDatabaseDescriptor *ret;
 
 	if (is_entrydb || (segment != NULL && segment->master))
-	  ret = executormgr_allocate_executor_on_entrydb(is_writer);
+	  ret = executormgr_allocate_any_executor(is_writer, true);
 	else if (segment == NULL)
-		ret = executormgr_allocate_any_executor(is_writer);
+		ret = executormgr_allocate_any_executor(is_writer, false);
 	else
 		ret = executormgr_allocate_executor_by_name(GetSegmentHashKey(segment), is_writer);
 	if (!ret)
