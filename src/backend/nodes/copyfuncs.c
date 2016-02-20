@@ -52,6 +52,7 @@
 #include "cdb/cdbgang.h"
 #include "cdb/cdbdatalocality.h"
 #include "nodes/nodeFuncs.h"
+#include "executor/execdesc.h"
 
 /*
  * Macros to simplify copying of different kinds of fields.  Use these
@@ -168,6 +169,32 @@ CopyLogicalIndexInfo(const LogicalIndexInfo *from, LogicalIndexInfo *newnode)
 }
 
 /*
+ * _copyQueryResourceParameters
+ */
+static QueryResourceParameters *
+_copyQueryResourceParameters(QueryResourceParameters *from)
+{
+	QueryResourceParameters *newnode = makeNode(QueryResourceParameters);
+
+	COPY_SCALAR_FIELD(life);
+	COPY_SCALAR_FIELD(slice_size);
+	COPY_SCALAR_FIELD(iobytes);
+	COPY_SCALAR_FIELD(max_target_segment_num);
+	COPY_SCALAR_FIELD(min_target_segment_num);
+	if (from->vol_info_size > 0)
+	{
+		COPY_POINTER_FIELD(vol_info, sizeof(HostnameVolumnInfo) * (from->vol_info_size));
+	}
+	else
+	{
+		newnode->vol_info = NULL;
+	}
+	COPY_SCALAR_FIELD(vol_info_size);
+
+	return newnode;
+}
+
+/*
  * _copyPlannedStmt 
  */
 static PlannedStmt *
@@ -217,11 +244,27 @@ _copyPlannedStmt(PlannedStmt *from)
 	COPY_SCALAR_FIELD(query_mem);
 
 	/*
-	 * A shallow copy of PlannedStmt that only copies the
-	 * reference of query resource and its parameters
+	 * Query resource is allocated every time a query/plan is
+	 * executed. So, here we only do a shallow copy of query
+	 * resource in planned statement.
 	 */
 	COPY_SCALAR_FIELD(resource);
-	COPY_SCALAR_FIELD(resource_parameters);
+	/*
+	 * A (prepared) plan might be executed multiple times. To
+	 * prevent memory leakage, here we do a deep copy of query
+	 * resource parameters so that its lifetime is exactly the
+	 * same as planned statement. Thus, we can re-allocate query
+	 * resource for each of the multiple executions of the (prepared)
+	 * plan.
+	 */
+	if (from->resource_parameters)
+	{
+		newnode->resource_parameters = _copyQueryResourceParameters(from->resource_parameters);
+	}
+	else
+	{
+		newnode->resource_parameters = NULL;
+	}
 
 	COPY_SCALAR_FIELD(planner_segments);
 
@@ -5166,6 +5209,10 @@ copyObject(void *from)
 			break;
 		case T_DenyLoginPoint:
 			retval = _copyDenyLoginPoint(from);
+			break;
+
+		case T_QueryResourceParameters:
+			retval = _copyQueryResourceParameters(from);
 			break;
 
 		case T_CaQLSelect:
