@@ -6868,7 +6868,7 @@ static struct config_real ConfigureNamesReal[] =
 			NULL
 		},
 		&rm_seg_core_use,
-		1.0, 1.0, INT_MAX, NULL, NULL
+		16.0, 1.0, INT_MAX, NULL, NULL
 	},
 
 	{
@@ -8087,7 +8087,7 @@ static struct config_string ConfigureNamesString[] =
 			NULL
 		},
 		&rm_seg_memory_use,
-		"", NULL, NULL
+		"64GB", NULL, NULL
 	},
 
     {
