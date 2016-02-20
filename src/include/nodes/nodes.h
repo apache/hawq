@@ -515,19 +515,20 @@ typedef enum NodeTag
 	T_FileSystemFunctionData,   /* in storage/filesystem.h */
 	T_PartitionConstraints,     /* in executor/nodePartitionSelector.h */
 	T_SelectedParts,            /* in executor/nodePartitionSelector.h */
-	
-    	/* CDB: tags for random other stuff */
-    	T_CdbExplain_StatHdr = 950,             /* in cdb/cdbexplain.c */
 
-    	/* gpsql: tags for query context dispatching */
-    	T_QueryContextInfo = 1000,
+	/* CDB: tags for random other stuff */
+	T_CdbExplain_StatHdr = 950,             /* in cdb/cdbexplain.c */
 
-    	/* tags for describing the query resource should occupied in segment*/
-    	T_QueryResource = 1050,
+	/* gpsql: tags for query context dispatching */
+	T_QueryContextInfo = 1000,
 
-    	/*
-    	 * TAGS FOR CAQL PARSER
-     	*/
+	/* tags for describing the query resource should occupied in segment*/
+	T_QueryResource = 1050,
+	T_QueryResourceParameters,
+
+	/*
+	 * TAGS FOR CAQL PARSER
+	 */
 	T_CaQLSelect = 2000,
 	T_CaQLInsert,
 	T_CaQLDelete,

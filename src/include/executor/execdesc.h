@@ -82,6 +82,8 @@ typedef struct HostnameVolumnInfo
  */
 typedef struct QueryResourceParameters
 {
+	NodeTag            type;
+
 	QueryResourceLife  life;
 	int32              slice_size;
 	int64_t            iobytes;
