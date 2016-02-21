@@ -323,6 +323,14 @@ get_sortgrouplist_exprs(List *sortClauses, List *targetList)
 		 */
 		if (sortcl == NULL) continue;
 
+		/*
+		 * tleSortGroupRef in SortClause and ressortgroupref in TargetEntry
+		 * may be zero at the sametime, which means no reference by
+		 * sort/group clause. Should avoid calling get_sortgroupclause_expr
+		 * in this situation.
+		 */
+		if (sortcl->tleSortGroupRef == 0) continue;
+
 		sortexpr = get_sortgroupclause_expr(sortcl, targetList);
 		result = lappend(result, sortexpr);
 	}
