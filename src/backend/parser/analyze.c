@@ -2817,7 +2817,15 @@ transformDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 					policy->bucketnum = GetRelOpt_bucket_num_fromOptions(options, -1);
 
 				if (policy->bucketnum == -1)
+				{
 					policy->bucketnum = oldTablePolicy->bucketnum;
+				}
+				else if (policy->bucketnum != oldTablePolicy->bucketnum)
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+							 errmsg("cannot create partition table with child partitions having different bucketnum.")));
+				}
 
 				if (!bQuiet)
 					elog(NOTICE, "Table has parent, setting distribution columns "
@@ -2986,6 +2994,24 @@ transformDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 
 	*policyp = policy;
 
+	if (cxt && cxt->inhRelations)
+	{
+		ListCell   *entry;
+
+		foreach(entry, cxt->inhRelations)
+		{
+			RangeVar   *parent = (RangeVar *) lfirst(entry);
+			Oid			relId = RangeVarGetRelid(parent, false, false /*allowHcatalog*/);
+			GpPolicy  *oldTablePolicy = GpPolicyFetch(CurrentMemoryContext, relId);
+
+			if (policy->bucketnum != oldTablePolicy->bucketnum)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+						 errmsg("cannot create partition table with child partitions having different bucketnum.")));
+			}
+		}
+	}
 
 	if (cxt && cxt->pkey)		/* Primary key	specified.	Make sure
 								 * distribution columns match */
@@ -7443,7 +7469,17 @@ make_child_node(CreateStmt *stmt, CreateStmtContext *cxt, char *relname,
 
 		/* Options */
 		if ( psa_apc->arg1 )
+		{
 			child_tab_stmt->options = (List *)psa_apc->arg1;
+			int child_bucketnum = GetRelOpt_bucket_num_fromOptions(child_tab_stmt->options, -1);
+			int bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->options, -1);
+
+			if (child_bucketnum != bucketnum)
+				ereport(ERROR,
+						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+						 errmsg("cannot create partition table with child partitions having different bucketnum.")));
+		}
+
 		/* Tablespace from parent (input CreateStmt)... */
 		if ( psa_apc->arg2 && *strVal(psa_apc->arg2) )
 			child_tab_stmt->tablespacename = strVal(psa_apc->arg2);
@@ -8218,6 +8254,35 @@ transformPartitionBy(ParseState *pstate, CreateStmtContext *cxt,
 					pWithList = list_delete_cell(pWithList, def_lc, prev_lc);
 					((AlterPartitionCmd *)pStoreAttr)->arg1 =
 							(Node *)pWithList;
+					break;
+				}
+				prev_lc = def_lc;
+			} /* end foreach */
+
+			prev_lc = NULL;
+			foreach(def_lc, pWithList)
+			{
+				DefElem *pDef = (DefElem *)lfirst(def_lc);
+
+				/* get the bucketnum from the WITH, then remove this
+				 * element from the list */
+				if (0 == strcmp(pDef->defname, "bucketnum"))
+				{
+					if (!IsA(pDef->arg, Integer))
+						ereport(ERROR,
+								(errcode(ERRCODE_SYNTAX_ERROR),
+								 errmsg("invalid bucketnum specification")));
+
+					int64 bucketnum = defGetInt64(pDef);
+					pWithList = list_delete_cell(pWithList, def_lc, prev_lc);
+					((AlterPartitionCmd *)pStoreAttr)->arg1 =
+							(Node *)pWithList;
+					if (bucketnum != policy->bucketnum)
+					{
+						ereport(ERROR,
+								(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+								 errmsg("cannot create partition table with child partitions having different bucketnum.")));
+					}
 					break;
 				}
 				prev_lc = def_lc;
