@@ -7471,8 +7471,8 @@ make_child_node(CreateStmt *stmt, CreateStmtContext *cxt, char *relname,
 		if ( psa_apc->arg1 )
 		{
 			child_tab_stmt->options = (List *)psa_apc->arg1;
-			int child_bucketnum = GetRelOpt_bucket_num_fromOptions(child_tab_stmt->options, -1);
-			int bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->options, -1);
+			int bucketnum = stmt->policy->bucketnum;
+			int child_bucketnum = GetRelOpt_bucket_num_fromOptions(child_tab_stmt->options, bucketnum);
 
 			if (child_bucketnum != bucketnum)
 				ereport(ERROR,
@@ -8254,35 +8254,6 @@ transformPartitionBy(ParseState *pstate, CreateStmtContext *cxt,
 					pWithList = list_delete_cell(pWithList, def_lc, prev_lc);
 					((AlterPartitionCmd *)pStoreAttr)->arg1 =
 							(Node *)pWithList;
-					break;
-				}
-				prev_lc = def_lc;
-			} /* end foreach */
-
-			prev_lc = NULL;
-			foreach(def_lc, pWithList)
-			{
-				DefElem *pDef = (DefElem *)lfirst(def_lc);
-
-				/* get the bucketnum from the WITH, then remove this
-				 * element from the list */
-				if (0 == strcmp(pDef->defname, "bucketnum"))
-				{
-					if (!IsA(pDef->arg, Integer))
-						ereport(ERROR,
-								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("invalid bucketnum specification")));
-
-					int64 bucketnum = defGetInt64(pDef);
-					pWithList = list_delete_cell(pWithList, def_lc, prev_lc);
-					((AlterPartitionCmd *)pStoreAttr)->arg1 =
-							(Node *)pWithList;
-					if (bucketnum != policy->bucketnum)
-					{
-						ereport(ERROR,
-								(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-								 errmsg("cannot create partition table with child partitions having different bucketnum.")));
-					}
 					break;
 				}
 				prev_lc = def_lc;
