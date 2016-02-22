@@ -435,9 +435,8 @@ struct ResourcePoolData {
 	 */
 	HASHTABLEData	GRMHostNameIndexed;
 
-	/* The cluster level memory/core ratio. */
-	uint32_t		MemCoreRatio;
-	uint32_t		MemCoreRatioMajorityCounter;
+	/* The fixed cluster level memory to core ratio. */
+	uint32_t		ClusterMemoryCoreRatio;
 
 	/*
 	 * GRM Container life-cycle management.
@@ -655,6 +654,14 @@ int getClusterGRMContainerSize(void);
 void refreshAvailableNodeCount(void);
 
 void checkSlavesFile(void);
+
+void fixClusterMemoryCoreRatio(void);
+void adjustSegmentCapacity(SegResource segres);
+void adjustSegmentStatFTSCapacity(SegStat segstat);
+void adjustSegmentStatGRMCapacity(SegStat segstat);
+void adjustSegmentCapacityForNone(SegResource segres);
+void adjustSegmentCapacityForGRM(SegResource segres);
+void adjustMemoryCoreValue(uint32_t *memorymb, uint32_t *core);
 
 /*
  *------------------------------------------------------------------------------

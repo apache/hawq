@@ -85,4 +85,9 @@
 #include "utils/memutilities.h"	/* Memory context and manipulation wrapper   */
 
 #define RMLOG rm_log_level
+
+#ifndef UINT32_MAX
+#define UINT32_MAX             (4294967295U)
+#endif
+
 #endif //ENVIRONMENT_SWITCH_H

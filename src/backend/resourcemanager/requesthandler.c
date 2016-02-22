@@ -344,6 +344,17 @@ bool handleRMRequestAcquireResource(void **arg)
 		return false;
 	}
 
+	/*
+	 * If resource queue has no concrete capacity set yet, no need to handle
+	 * the request.
+	 */
+	if ( PQUEMGR->RootTrack->QueueInfo->ClusterMemoryMB <= 0 )
+	{
+		elog(DEBUG3, "Resource manager defers the resource request because the "
+					 "resource queues have no valid resource capacities yet.");
+		return false;
+	}
+
 	RPCRequestHeadAcquireResourceFromRM request =
 		SMBUFF_HEAD(RPCRequestHeadAcquireResourceFromRM,
 					&((*conntrack)->MessageBuff));

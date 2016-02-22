@@ -2684,6 +2684,24 @@ void refreshResourceQueueCapacity(bool queuechanged)
 	static char errorbuf[ERRORMESSAGE_SIZE];
 	List *qhavingshadow = NULL;
 
+	/*
+	 * If the cluster level memory to core ratio is not fixed based on FTS heart-
+	 * beat or GRM cluster report, try to fix it firstly, if unfortunately, this
+	 * ratio cannot be fixed, skip refreshing queue capacity temporarily.
+	 *
+	 * NOTE, once this ratio is fixed, it is not changed again until restart
+	 * master.
+	 *
+	 */
+	if ( PRESPOOL->ClusterMemoryCoreRatio <= 0 )
+	{
+		fixClusterMemoryCoreRatio();
+		if ( PRESPOOL->ClusterMemoryCoreRatio <= 0 )
+		{
+			return;
+		}
+	}
+
 	/* STEP 1. Build all necessary shadow resource queue track instances. */
 	buildQueueTrackShadows(PQUEMGR->RootTrack, &qhavingshadow);
 
@@ -2721,6 +2739,7 @@ void refreshResourceQueuePercentageCapacity(bool queuechanged)
 				   PQUEMGR->GRMQueueMaxCapacity;
 			core = PRESPOOL->GRMTotalHavingNoHAWQNode.Core     *
 				   PQUEMGR->GRMQueueMaxCapacity;
+
 		}
 		else if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
 		{
@@ -2737,20 +2756,11 @@ void refreshResourceQueuePercentageCapacity(bool queuechanged)
 		return;
 	}
 
-	/* Logic to ensure the cluster total resource follows memory core ratio. */
-	if ( PRESPOOL->MemCoreRatio > 0 && core > 0 && mem > 0 ) {
-		/* Cluster has more memory resource */
-		if ( mem > PRESPOOL->MemCoreRatio * core) {
-			mem = core * PRESPOOL->MemCoreRatio;
-		}
-		/* Cluster has more core resource */
-		else {
-			core = trunc(mem * 1.0 / PRESPOOL->MemCoreRatio);
-		}
-	}
-	else {
-		return;
-	}
+	/*
+	 * If we use global resource manager to manage resource, the total capacity
+	 * might not follow the cluster memory to core ratio.
+	 */
+	adjustMemoryCoreValue(&mem, &core);
 
 	elog(DEBUG3, "HAWQ RM :: Use cluster (%d MB, %d CORE) resources as whole.",
 				mem, core);
@@ -5193,7 +5203,10 @@ void resetAllDeadLockDetector(void)
 
 void getIdleResourceRequest(int32_t *mem, double *core)
 {
-	*mem  = PRESPOOL->MemCoreRatio * PRESPOOL->AvailNodeCount * rm_min_resource_perseg;
+	Assert(PRESPOOL->ClusterMemoryCoreRatio > 0);
+	*mem  = PRESPOOL->ClusterMemoryCoreRatio *
+			PRESPOOL->AvailNodeCount *
+			rm_min_resource_perseg;
 	*core = 1.0 * PRESPOOL->AvailNodeCount * rm_min_resource_perseg;
 }
 
