@@ -182,7 +182,7 @@ typedef struct ResourceDistRowData *ResourceDistRow;
 
 DQueue buildResourceDistRowData(MCTYPE 				context,
 								int 				resourceid,
-								HostnameVolumnInfo *volinfo,
+								HostnameVolumeInfo *volinfo,
 								int 				infosize);
 
 /*
@@ -676,7 +676,7 @@ int acquireResourceFromRM(int 		  		  index,
 						  int			  	  sessionid,
 						  int			  	  slice_size,
 						  int64_t			  iobytes,
-						  HostnameVolumnInfo *preferred_nodes,
+						  HostnameVolumeInfo *preferred_nodes,
 						  int				  preferred_nodes_size,
 						  uint32_t    		  max_seg_count_fix,
 						  uint32_t			  min_seg_count_fix,
@@ -732,7 +732,7 @@ int acquireResourceFromRM(int 		  		  index,
     /* Send each host scan size in MB. */
     for ( int i = 0 ; i < nodecount ; ++i )
     {
-        appendSMBVar(sendbuffer,preferred_nodes[i].datavolumn);
+        appendSMBVar(sendbuffer,preferred_nodes[i].datavolume);
     }
 
     /********** STEP3. Preferred node host names ******************************/
@@ -801,7 +801,7 @@ int acquireResourceFromRM(int 		  		  index,
 			int hnameidx = 0;
 			for ( int i = 0 ; i < nodecount ; ++i )
 			{
-				HostnameVolumnInfo *info = &preferred_nodes[i];
+				HostnameVolumeInfo *info = &preferred_nodes[i];
 				int hostnamelen = strlen(info->hostname);
 				curcontext->QD_HdfsHostNames[hnameidx] =
 						(char *)rm_palloc0(QD2RM_CommContext, hostnamelen + 1);
@@ -1838,7 +1838,7 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 
 		/* Build locality array. */
 		int infosize = 0;
-		HostnameVolumnInfo  *volinfo = NULL;
+		HostnameVolumeInfo  *volinfo = NULL;
 		int toksize  = 0;
 		SimpStringPtr tokens = NULL;
 		SimpleStringTokens(&locality, ',', &tokens, &toksize);
@@ -1846,13 +1846,13 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 		{
 			infosize = toksize / 2;
 			volinfo = rm_palloc(funcctx->multi_call_memory_ctx,
-								sizeof(HostnameVolumnInfo) * infosize);
+								sizeof(HostnameVolumeInfo) * infosize);
 			for ( int i = 0 ; i < infosize ; ++i )
 			{
 				SimpStringPtr token1 = &(tokens[(i<<1)]);
 				SimpStringPtr token2 = &(tokens[(i<<1)+1]);
 				strcpy(volinfo[i].hostname, token1->Str);
-				SimpleStringToInt64(token2, &(volinfo[i].datavolumn));
+				SimpleStringToInt64(token2, &(volinfo[i].datavolume));
 			}
 		}
 		freeSimpleStringTokens(&locality, &tokens, toksize);
@@ -1965,7 +1965,7 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 
 DQueue buildResourceDistRowData(MCTYPE 				context,
 								int 				resourceid,
-								HostnameVolumnInfo *volinfo,
+								HostnameVolumeInfo *volinfo,
 								int 				infosize)
 {
 	QDResourceContext rescontext = NULL;
@@ -2009,7 +2009,7 @@ DQueue buildResourceDistRowData(MCTYPE 				context,
 
 			for ( int j = 0 ; j < infosize ; ++j ) {
 				if ( strcmp(volinfo[j].hostname, newrow->mappedname) == 0 ) {
-					newrow->splitcount = volinfo[j].datavolumn;
+					newrow->splitcount = volinfo[j].datavolume;
 					break;
 				}
 			}
@@ -2526,7 +2526,7 @@ int runTestActionScript(List *actions, const char *filename)
 				char outfilename[512];
 
 
-				HostnameVolumnInfo  *volinfo = NULL;
+				HostnameVolumeInfo  *volinfo = NULL;
 				ListCell *cell 	  = NULL;
 
 				outfilename[0] = '\0';
@@ -2564,13 +2564,13 @@ int runTestActionScript(List *actions, const char *filename)
 						{
 							infosize = toksize / 2;
 							volinfo = rm_palloc(QD2RM_CommContext,
-												sizeof(HostnameVolumnInfo) * infosize);
+												sizeof(HostnameVolumeInfo) * infosize);
 							for ( int i = 0 ; i < infosize ; ++i )
 							{
 								SimpStringPtr token1 = &(tokens[(i<<1)]);
 								SimpStringPtr token2 = &(tokens[(i<<1)+1]);
 								strcpy(volinfo[i].hostname, token1->Str);
-								SimpleStringToInt64(token2, &(volinfo[i].datavolumn));
+								SimpleStringToInt64(token2, &(volinfo[i].datavolume));
 								elog(LOG, "locality data host %s with %s splits.",
 										  token1->Str,
 										  token2->Str);

@@ -183,7 +183,7 @@ _copyQueryResourceParameters(QueryResourceParameters *from)
 	COPY_SCALAR_FIELD(min_target_segment_num);
 	if (from->vol_info_size > 0)
 	{
-		COPY_POINTER_FIELD(vol_info, sizeof(HostnameVolumnInfo) * (from->vol_info_size));
+		COPY_POINTER_FIELD(vol_info, sizeof(HostnameVolumeInfo) * (from->vol_info_size));
 	}
 	else
 	{

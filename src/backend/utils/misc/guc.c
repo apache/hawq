@@ -6955,7 +6955,7 @@ static struct config_real ConfigureNamesReal[] =
 	},
 	{
 		{"net_disk_ratio", PGC_USERSET, DEVELOPER_OPTIONS,
-			gettext_noop("Sets the scan volumn ratio of disk against network."),
+			gettext_noop("Sets the scan volume ratio of disk against network."),
 	        NULL,
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
