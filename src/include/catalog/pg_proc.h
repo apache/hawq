@@ -2251,6 +2251,18 @@ DESCR("multiply");
 DATA(insert OID = 867 ( cash_div_int2  PGNSP PGUID 12 f f t f i 2 790 f "790 21" _null_ _null_ _null_ cash_div_int2 - _null_ n ));
 DESCR("divide");
 
+/* int8_mul_cash(int8, money) => money */ 
+DATA(insert OID = 8104 ( int8_mul_cash  PGNSP PGUID 12 f f t f i 2 790 f "20 790" _null_ _null_ _null_ int8_mul_cash - _null_ n ));
+DESCR("multiply");
+
+/* cash_mul_int8(money, int8) => money */ 
+DATA(insert OID = 8105 ( cash_mul_int8  PGNSP PGUID 12 f f t f i 2 790 f "790 20" _null_ _null_ _null_ cash_mul_int8 - _null_ n ));
+DESCR("multiply");
+
+/* cash_div_int8(money, int8) => money */ 
+DATA(insert OID = 8106 ( cash_div_int8  PGNSP PGUID 12 f f t f i 2 790 f "790 20" _null_ _null_ _null_ cash_div_int8 - _null_ n ));
+DESCR("divide");
+
 /* cash_in(cstring) => money */ 
 DATA(insert OID = 886 ( cash_in  PGNSP PGUID 12 f f t f i 1 790 f "2275" _null_ _null_ _null_ cash_in - _null_ n ));
 DESCR("I/O");

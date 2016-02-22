@@ -651,7 +651,7 @@ Datum
 cash_mul_int4(PG_FUNCTION_ARGS)
 {
 	Cash		c = PG_GETARG_CASH(0);
-	int64		i = PG_GETARG_INT64(1);
+	int32		i = PG_GETARG_INT64(1);
 	Cash		result;
 
 	result = c * i;
@@ -682,7 +682,7 @@ Datum
 cash_div_int4(PG_FUNCTION_ARGS)
 {
 	Cash		c = PG_GETARG_CASH(0);
-	int64		i = PG_GETARG_INT64(1);
+	int32		i = PG_GETARG_INT64(1);
 	Cash		result;
 
 	if (i == 0)
