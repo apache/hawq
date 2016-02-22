@@ -392,6 +392,7 @@ GenerateMetadataCacheRefreshList()
             MetadataCacheRefreshList = lappend(MetadataCacheRefreshList, refresh_info);
             if (list_length(MetadataCacheRefreshList) >= metadata_cache_refresh_max_num)
             {
+                hash_seq_term(&hstat);
                 break;
             }
         }

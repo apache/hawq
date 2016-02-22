@@ -209,6 +209,18 @@ TargetEntry *
 get_sortgroupclause_tle(SortClause *sortClause,
 						List *targetList)
 {
+    TargetEntry *ret = get_sortgroupclause_tle_internal(sortClause, targetList);
+    if (NULL == ret) {
+	    elog(ERROR, "ORDER/GROUP BY expression not found in targetlist");
+    }
+	
+	return NULL;				/* keep compiler quiet */
+}
+
+TargetEntry *
+get_sortgroupclause_tle_internal(SortClause *sortClause,
+						List *targetList)
+{
 	Index		refnumber = sortClause->tleSortGroupRef;
 	ListCell   *l;
 
@@ -220,9 +232,9 @@ get_sortgroupclause_tle(SortClause *sortClause,
 			return tle;
 	}
 
-	elog(ERROR, "ORDER/GROUP BY expression not found in targetlist");
 	return NULL;				/* keep compiler quiet */
 }
+
 
 /*
  * get_sortgroupclauses_tles
