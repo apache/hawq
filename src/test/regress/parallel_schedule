@@ -1,6 +1,6 @@
 # $PostgreSQL: pgsql/src/test/regress/serial_schedule,v 1.33 2006/08/30 23:34:22 tgl Exp $
 # This should probably be in an order similar to parallel_schedule.
-test: boolean char name varchar text int2 int4 int8 oid float4 float8 bit numeric
+test: boolean char name varchar text int2 int4 int8 oid float4 float8 money bit numeric
 
 test: strings
 test: numerology
