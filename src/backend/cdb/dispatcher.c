@@ -1803,3 +1803,40 @@ dispatcher_print_statistics(StringInfo buf, DispatchData *data)
 			INSTR_TIME_GET_MILLISEC(data->time_total_free) / data->num_of_dispatched);
 }
 
+
+
+/*
+ * Check the connection from the dispatcher to verify that it is still there.
+ * Return true if the dispatcher connection is still alive.
+ */
+bool dispatch_validate_conn(pgsocket sock)
+{
+  ssize_t   ret;
+  char    buf;
+
+  if (sock < 0)
+    return false;
+
+#ifndef WIN32
+    ret = recv(sock, &buf, 1, MSG_PEEK|MSG_DONTWAIT);
+#else
+    ret = recv(sock, &buf, 1, MSG_PEEK|MSG_PARTIAL);
+#endif
+
+  if (ret == 0) /* socket has been closed. EOF */
+    return false;
+
+  if (ret > 0) /* data waiting on socket, it must be OK. */
+    return true;
+
+  if (ret == -1) /* error, or would be block. */
+  {
+    if (errno == EAGAIN || errno == EINPROGRESS || errno == EWOULDBLOCK)
+      return true; /* connection intact, no data available */
+    else
+      return false;
+  }
+  /* not reached */
+
+  return true;
+}
