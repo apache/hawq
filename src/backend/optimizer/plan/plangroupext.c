@@ -1868,10 +1868,10 @@ convert_gs_to_rollups(AttrNumber *grpColIdx,
 		 */
 		sc.tleSortGroupRef = no+1;
 		tle = get_sortgroupclause_tle_internal(&sc, tlist);
-        if (NULL == tle) 
-        {
-            continue;
-        }
+        	if (NULL == tle) 
+        	{
+            		continue;
+        	}
 
 		foreach (sub_lc, sub_tlist)
 		{
