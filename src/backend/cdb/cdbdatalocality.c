@@ -88,11 +88,11 @@ typedef struct range_table_collector_context {
  * structure containing information about how much a
  * host holds.
  */
-typedef struct HostDataVolumnInfo {
+typedef struct HostDataVolumeInfo {
 	HostnameIndexEntry *hashEntry;
-	int64 datavolumn;
+	int64 datavolume;
 	int occur_count;
-} HostDataVolumnInfo;
+} HostDataVolumeInfo;
 
 /*
  * structure for data distribution statistics.
@@ -100,7 +100,7 @@ typedef struct HostDataVolumnInfo {
 typedef struct data_dist_stat_context {
 	int size;
 	int max_size;
-	HostDataVolumnInfo *volInfos;
+	HostDataVolumeInfo *volInfos;
 } data_dist_stat_context;
 
 /*
@@ -275,10 +275,10 @@ typedef struct Split_Assignment_Result {
 /*
  * structure for host data statistics.
  */
-typedef struct hostname_volumn_stat_context {
+typedef struct hostname_volume_stat_context {
 	int size;
-	HostnameVolumnInfo *hostnameVolInfos;
-} hostname_volumn_stat_context;
+	HostnameVolumeInfo *hostnameVolInfos;
+} hostname_volume_stat_context;
 
 /*
  * structure for tracking the whole procedure
@@ -289,7 +289,7 @@ typedef struct split_to_segment_mapping_context {
 	range_table_collector_context rtc_context;
 	data_dist_stat_context dds_context;
 	collect_hdfs_split_location_context chsl_context;
-	hostname_volumn_stat_context host_context;
+	hostname_volume_stat_context host_context;
 	HTAB *hostname_map;
 	bool keep_hash;
 	int prefer_segment_num;
@@ -369,7 +369,7 @@ static Block_Host_Index * update_data_dist_stat(
 		split_to_segment_mapping_context *context, BlockLocation *locations,
 		int block_num);
 
-static HostDataVolumnInfo *search_host_in_stat_context(
+static HostDataVolumeInfo *search_host_in_stat_context(
 		split_to_segment_mapping_context *context, char *hostname);
 
 static bool IsAggFunction(char* funcName);
@@ -452,7 +452,7 @@ static Relation_File** change_file_order_based_on_continuity(
 		Relation_Data *rel_data, TargetSegmentIDMap* idMap, int host_num,
 		int* fileCount, Relation_Assignment_Context *assignment_context);
 
-static int64 set_maximum_segment_volumn_parameter(Relation_Data *rel_data,
+static int64 set_maximum_segment_volume_parameter(Relation_Data *rel_data,
 		int host_num, double* maxSizePerSegment);
 
 /*
@@ -468,7 +468,7 @@ void saveQueryResourceParameters(
 		int64_t                 iobytes,
 		int                     max_target_segment_num,
 		int                     min_target_segment_num,
-		HostnameVolumnInfo      *vol_info,
+		HostnameVolumeInfo      *vol_info,
 		int                     vol_info_size)
 
 {
@@ -540,10 +540,10 @@ static void init_datalocality_context(split_to_segment_mapping_context *context)
 		context->dds_context.size = 0;
 		context->dds_context.max_size = 4;
 		MemoryContextSwitchTo(context->datalocality_memorycontext);
-		context->dds_context.volInfos = (HostDataVolumnInfo *) palloc(
-				sizeof(HostDataVolumnInfo) * context->dds_context.max_size);
+		context->dds_context.volInfos = (HostDataVolumeInfo *) palloc(
+				sizeof(HostDataVolumeInfo) * context->dds_context.max_size);
 		MemSet(context->dds_context.volInfos, 0,
-				sizeof(HostDataVolumnInfo) * context->dds_context.max_size);
+				sizeof(HostDataVolumeInfo) * context->dds_context.max_size);
 		MemoryContextSwitchTo(context->old_memorycontext);
 	}
 
@@ -939,7 +939,7 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
  * search_host_in_stat_context: search a host name in the statistic
  * context; if not found, create a new one.
  */
-static HostDataVolumnInfo *
+static HostDataVolumeInfo *
 search_host_in_stat_context(split_to_segment_mapping_context *context,
 		char *hostname) {
 	HostnameIndexKey key;
@@ -956,16 +956,16 @@ search_host_in_stat_context(split_to_segment_mapping_context *context,
 		if (context->dds_context.size >= context->dds_context.max_size) {
 			int offset = context->dds_context.max_size;
 			context->dds_context.max_size <<= 1;
-			context->dds_context.volInfos = (HostDataVolumnInfo *) repalloc(
+			context->dds_context.volInfos = (HostDataVolumeInfo *) repalloc(
 					context->dds_context.volInfos,
-					sizeof(HostDataVolumnInfo) * context->dds_context.max_size);
+					sizeof(HostDataVolumeInfo) * context->dds_context.max_size);
 			MemSet(context->dds_context.volInfos + offset, 0,
-					sizeof(HostDataVolumnInfo)
+					sizeof(HostDataVolumeInfo)
 							* (context->dds_context.max_size - offset));
 		}
 		entry->index = context->dds_context.size++;
 		context->dds_context.volInfos[entry->index].hashEntry = entry;
-		context->dds_context.volInfos[entry->index].datavolumn = 0;
+		context->dds_context.volInfos[entry->index].datavolume = 0;
 		context->dds_context.volInfos[entry->index].occur_count = 0;
 	}
 
@@ -1056,8 +1056,8 @@ update_data_dist_stat(split_to_segment_mapping_context *context,
 
 		for (j = 0; j < locations[i].numOfNodes; j++) {
 			char *hostname = pstrdup(locations[i].hosts[j]); /* locations[i].hosts[j]; */
-			HostDataVolumnInfo *info = search_host_in_stat_context(context, hostname);
-			info->datavolumn += locations[i].length;
+			HostDataVolumeInfo *info = search_host_in_stat_context(context, hostname);
+			info->datavolume += locations[i].length;
 			hostIDs[i].hostIndextoSort[j].index = info->hashEntry->index;
 			hostIDs[i].hostIndextoSort[j].hostname = hostname;
 			if (output_hdfs_block_location) {
@@ -1604,7 +1604,7 @@ static int select_random_host_algorithm(Relation_Assignment_Context *context,
 		Block_Host_Index **hostID, int fileindex, Oid partition_parent_oid, bool* isLocality) {
 
 	*isLocality = false;
-	bool isExceedVolumn = false;
+	bool isExceedVolume = false;
 	bool isExceedWholeSize =false;
 	bool isExceedPartitionTableSize =false;
 	//step1
@@ -1623,7 +1623,7 @@ static int select_random_host_algorithm(Relation_Assignment_Context *context,
 		foreach(lc, val)
 		{
 			int j = lfirst_int(lc);
-			isExceedVolumn = splitsize + context->vols[j] > maxExtendedSizePerSegment;
+			isExceedVolume = splitsize + context->vols[j] > maxExtendedSizePerSegment;
 			isExceedWholeSize = balance_on_whole_query_level
 					&& splitsize + context->totalvols_with_penalty[j]
 							> context->avg_size_of_whole_query;
@@ -1643,7 +1643,7 @@ static int select_random_host_algorithm(Relation_Assignment_Context *context,
 				continue;
 			}
 			if ((!isExceedWholeSize || context->totalvols_with_penalty[j] == 0)
-					&& (!isExceedVolumn || context->vols[j] == 0)
+					&& (!isExceedVolume || context->vols[j] == 0)
 					&& (!isExceedPartitionTableSize || (*partitionvols_with_penalty)[j] ==0)) {
 				{
 					*isLocality = true;
@@ -1676,7 +1676,7 @@ static int select_random_host_algorithm(Relation_Assignment_Context *context,
 	minvols = INT64_MAX;
 	bool isFound = false;
 	for (int j = 0; j < context->virtual_segment_num; j++) {
-		isExceedVolumn = net_disk_ratio * splitsize + context->vols[j]
+		isExceedVolume = net_disk_ratio * splitsize + context->vols[j]
 				> maxExtendedSizePerSegment;
 		isExceedWholeSize = balance_on_whole_query_level
 				&& net_disk_ratio * splitsize + context->totalvols_with_penalty[j]
@@ -1693,7 +1693,7 @@ static int select_random_host_algorithm(Relation_Assignment_Context *context,
 			isExceedPartitionTableSize = false;
 		}
 		if ((!isExceedWholeSize || context->totalvols_with_penalty[j] == 0)
-				&& (!isExceedVolumn || context->vols[j] == 0)
+				&& (!isExceedVolume || context->vols[j] == 0)
 				&& (!isExceedPartitionTableSize || (*partitionvols_with_penalty)[j] ==0)) {
 			isFound = true;
 			if (minvols > context->vols[j]) {
@@ -2324,7 +2324,7 @@ static void allocation_preparation(List *hosts, TargetSegmentIDMap* idMap,
 	{
 		VirtualSegmentNode *vsn = (VirtualSegmentNode *) lfirst(lc);
 
-		HostDataVolumnInfo *hdvInfo = search_host_in_stat_context(context,
+		HostDataVolumeInfo *hdvInfo = search_host_in_stat_context(context,
 				vsn->hostname);
 		idMap->global_IDs[i] = hdvInfo->hashEntry->index;
 
@@ -2498,12 +2498,12 @@ static Relation_File** change_file_order_based_on_continuity(
 }
 
 /*
- *set_maximum_segment_volumn_parameter
+ *set_maximum_segment_volume_parameter
  */
-static int64 set_maximum_segment_volumn_parameter(Relation_Data *rel_data,
+static int64 set_maximum_segment_volume_parameter(Relation_Data *rel_data,
 		int vseg_num, double *maxSizePerSegment) {
-	int64 maxSizePerSegmentDiffBigVolumn = 0;
-	int64 maxSizePerSegmentDiffSmallVolumn = 0;
+	int64 maxSizePerSegmentDiffBigVolume = 0;
+	int64 maxSizePerSegmentDiffSmallVolume = 0;
 	int64 maxSizePerSegmentDiffScalar = 0;
 	*maxSizePerSegment = rel_data->total_size / (double) vseg_num;
 	ListCell* lc_file;
@@ -2518,28 +2518,28 @@ static int64 set_maximum_segment_volumn_parameter(Relation_Data *rel_data,
 			}
 		}
 	}
-	double bigVolumnRatio = 0.001;
-	double smallVolumnRatio = 0.05;
-	maxSizePerSegmentDiffBigVolumn = *maxSizePerSegment * bigVolumnRatio;
-	maxSizePerSegmentDiffSmallVolumn = totalRelLastBlockSize / (double) vseg_num
-			* smallVolumnRatio;
+	double bigVolumeRatio = 0.001;
+	double smallVolumeRatio = 0.05;
+	maxSizePerSegmentDiffBigVolume = *maxSizePerSegment * bigVolumeRatio;
+	maxSizePerSegmentDiffSmallVolume = totalRelLastBlockSize / (double) vseg_num
+			* smallVolumeRatio;
 	maxSizePerSegmentDiffScalar = 32 << 20;
 
-	// when curSize > maxSizePerSegment, we allow some segments exceed the average volumns.
+	// when curSize > maxSizePerSegment, we allow some segments exceed the average volumes.
 	// with conditions: it less than 0.001* totalrelationsize and
 	// less than 32M(in case of Big Table such as 1T*0.001=1G which lead to data extremely
 	// imbalance) or it less than 0.05* the sum of size of all the last blocks of relation,
-	// which we call it as maxSizePerSegmentDiffSmallVolumn (consider we have 64 small files with 1.5M
+	// which we call it as maxSizePerSegmentDiffSmallVolume (consider we have 64 small files with 1.5M
 	// avg size and 16 segment to assign. maxSizePerSegmentshould be 1.5*4 =6M and we can allow
 	// a exceed about 6+ 6*0.05=6.3M)
-	if (maxSizePerSegmentDiffBigVolumn > maxSizePerSegmentDiffScalar){
-		maxSizePerSegmentDiffBigVolumn = maxSizePerSegmentDiffScalar;
+	if (maxSizePerSegmentDiffBigVolume > maxSizePerSegmentDiffScalar){
+		maxSizePerSegmentDiffBigVolume = maxSizePerSegmentDiffScalar;
 	}
-	if(maxSizePerSegmentDiffBigVolumn > maxSizePerSegmentDiffSmallVolumn){
-		return maxSizePerSegmentDiffBigVolumn + (int64)(*maxSizePerSegment) + 1;
+	if(maxSizePerSegmentDiffBigVolume > maxSizePerSegmentDiffSmallVolume){
+		return maxSizePerSegmentDiffBigVolume + (int64)(*maxSizePerSegment) + 1;
 	}
 	else{
-		return maxSizePerSegmentDiffSmallVolumn + (int64)(*maxSizePerSegment) + 1;
+		return maxSizePerSegmentDiffSmallVolume + (int64)(*maxSizePerSegment) + 1;
 	}
 }
 
@@ -2654,7 +2654,7 @@ static void allocate_random_relation(Relation_Data* rel_data,
 	 *size can be exceeded by different strategy for big and small table
 	 */
 	double maxSizePerSegment = 0.0;
-	int64 maxExtendedSizePerSegment = set_maximum_segment_volumn_parameter(rel_data,
+	int64 maxExtendedSizePerSegment = set_maximum_segment_volume_parameter(rel_data,
 			assignment_context->virtual_segment_num, &maxSizePerSegment);
 
 	/* sort file based on the ratio of continue local read.
@@ -3185,12 +3185,12 @@ static void allocate_random_relation(Relation_Data* rel_data,
 			elog(LOG, "total size of vs%d is "INT64_FORMAT"",j, assignment_context->totalvols[j]);
 			elog(LOG, "total size with penalty of vs%d is "INT64_FORMAT"",j, assignment_context->totalvols_with_penalty[j]);
 		}
-		elog(LOG, "avg,max,min volumn of segments are"
+		elog(LOG, "avg,max,min volume of segments are"
 		" %f,"INT64_FORMAT","INT64_FORMAT" for relation %u.",
 		maxSizePerSegment,maxvsSize,minvsSize,myrelid);
-		elog(LOG, "total max,min volumn of segments are "INT64_FORMAT","INT64_FORMAT" for relation %u.",
+		elog(LOG, "total max,min volume of segments are "INT64_FORMAT","INT64_FORMAT" for relation %u.",
 				totalMaxvsSize,totalMinvsSize,myrelid);
-		elog(LOG, "total max,min volumn with penalty of segments are "INT64_FORMAT","INT64_FORMAT" for relation %u.",
+		elog(LOG, "total max,min volume with penalty of segments are "INT64_FORMAT","INT64_FORMAT" for relation %u.",
 						totalMaxvsSizePenalty,totalMinvsSizePenalty,myrelid);
 	}
 
@@ -3221,7 +3221,7 @@ static int remedy_non_localRead(int fileIndex, int splitIndex, int parentPos,
 				bool isDone = false;
 				int orivseg = former_file->splits[j].host;
 				int64 former_split_size = former_file->splits[j].length;
-				// after swap with current split, the vseg should not exceed its volumn
+				// after swap with current split, the vseg should not exceed its volume
 				bool isExceedMaxSizeCurSplit = cur_file->splits[splitIndex].length
 						- former_split_size + assignment_context->vols[orivseg]
 						> maxExtendedSizePerSegment;
@@ -3316,7 +3316,7 @@ static void print_datalocality_overall_log_information(SplitAllocResult *result,
 	{
 		VirtualSegmentNode *vsn = (VirtualSegmentNode *) lfirst(lc);
 
-		HostDataVolumnInfo *hdvInfo = search_host_in_stat_context(context,
+		HostDataVolumeInfo *hdvInfo = search_host_in_stat_context(context,
 				vsn->hostname);
 		if (hdvInfo->occur_count > 0) {
 			if (hdvInfo->occur_count > log_context->maxSegmentNumofHost) {
@@ -4070,21 +4070,21 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		/*allocate new resource*/
 		if (((resourceLife == QRL_INHERIT) && (resource == NULL))
 				|| (resourceLife == QRL_ONCE) || (resourceLife == QRL_NONE)) {
-			/*generate hostname-volumn pair to help RM to choose a host with
+			/*generate hostname-volume pair to help RM to choose a host with
 			 *maximum data locality(only when the vseg number less than host number)
 			 */
 			if(enable_prefer_list_to_rm){
 				context.host_context.size = context.dds_context.size;
 				MemoryContextSwitchTo(context.datalocality_memorycontext);
-				context.host_context.hostnameVolInfos = (HostnameVolumnInfo *) palloc(
-						sizeof(HostnameVolumnInfo) * context.host_context.size);
+				context.host_context.hostnameVolInfos = (HostnameVolumeInfo *) palloc(
+						sizeof(HostnameVolumeInfo) * context.host_context.size);
 				for (int i = 0; i < context.host_context.size; i++) {
 					MemSet(&(context.host_context.hostnameVolInfos[i].hostname), 0,
 							HOSTNAME_MAX_LENGTH);
 					strncpy(context.host_context.hostnameVolInfos[i].hostname,
 							context.dds_context.volInfos[i].hashEntry->key.hostname,
 							HOSTNAME_MAX_LENGTH-1);
-					context.host_context.hostnameVolInfos[i].datavolumn = context.dds_context.volInfos[i].datavolumn;
+					context.host_context.hostnameVolInfos[i].datavolume = context.dds_context.volInfos[i].datavolume;
 				}
 				MemoryContextSwitchTo(context.old_memorycontext);
 			}else{

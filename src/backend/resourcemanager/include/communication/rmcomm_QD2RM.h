@@ -85,19 +85,19 @@ int registerConnectionInRMByOID(int 		   index,
 								int		 	   errorbufsize);
 
 /* Acquire resource for executing current statement.*/
-struct HostDataVolumnInfo{
+struct HostDataVolumeInfo{
 	int64_t		scansize;
 	char	   *hostname;
 };
 
-typedef struct HostDataVolumnInfo  HostDataVolumnInfo;
-typedef struct HostDataVolumnInfo *HostDataVolumnInfoPtr;
+typedef struct HostDataVolumeInfo  HostDataVolumeInfo;
+typedef struct HostDataVolumeInfo *HostDataVolumeInfoPtr;
 
 int acquireResourceFromRM(int 		  		  index,
 						  int			  	  sessionid,
 						  int			  	  slice_size,
 						  int64_t			  iobytes,
-						  HostnameVolumnInfo *preferred_nodes,
+						  HostnameVolumeInfo *preferred_nodes,
 						  int				  preferred_nodes_size,
 						  uint32_t    		  max_seg_count_fix,
 						  uint32_t			  min_seg_count_fix,
