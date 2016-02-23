@@ -18,7 +18,7 @@
 
 import os, sys, re
 from optparse import Option, OptionParser
-from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml
+from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml, local_ssh
 from gppylib.db import dbconn
 from pg import DatabaseError
 
@@ -32,7 +32,7 @@ def parseargs():
                       help="Change HAWQ Property name.")
     parser.add_option('-l', '--list', action='store_true',
                       help="List all HAWQ Properties.")
-    parser.add_option('--skipvalidation', action='store_true')
+    parser.add_option('--skipvalidation', action='store_true', default=False)
     parser.add_option('-q', '--quiet', action='store_true', default=False)
     parser.add_option("-v", "--value",
                       dest="property_value",
@@ -50,10 +50,26 @@ def check_property(hawq_site, property_name, property_value):
         print "Update it with value: %s" % property_value
         item_exist = True
     else:
-        print "GUC %s does not exist in hawq-site.xml." % property_name
+        print "GUC %s does not exist in hawq-site.xml" % property_name
         print "Try to add it with value: %s" % property_value
         item_exist = False
     return item_exist
+
+
+def check_property_valid(hawq_site, property_name = 'None'):
+    try:
+        dburl = dbconn.DbURL(port=hawq_site.hawq_dict['hawq_master_address_port'], dbname='template1')
+        conn = dbconn.connect(dburl, True)
+        query = "select name, setting from pg_settings where name='%s';" % property_name
+        rows = dbconn.execSQL(conn, query)
+        conn.close()
+    except DatabaseError, ex:
+        print "Failed to connect to database, this script can only be run when the database is up"
+        sys.exit(1)
+
+    if rows.rowcount == 0:
+        print "This GUC name is not valid, use --skipvalidation to do force update"
+        sys.exit(1)
 
 
 def list_properties(hawq_site):
@@ -66,7 +82,7 @@ def list_properties(hawq_site):
         rows = dbconn.execSQL(conn, query)
         conn.close()
     except DatabaseError, ex:
-        print "Failed to connect to database, this script can only be run when the database is up."
+        print "Failed to connect to database, this script can only be run when the database is up"
         sys.exit(1)
     for row in rows:
         property_name = row[0]
@@ -88,7 +104,7 @@ def show_guc(hawq_site, property_name):
             for row in rows:
                 property_value = row[0]
         else:
-            print "No such GUC exist."
+            print "No such GUC exist"
             sys.exit(1)
         conn.close()
     except DatabaseError, ex:
@@ -110,7 +126,7 @@ def show_property(hawq_site, property_name):
         print "GUC\t\t: %s" % property_name
         print "Value\t\t: %s" % hawq_site.hawq_dict[property_name]
     else:
-        print "Failed to retrieve GUC information, guc '%s' does not exist in hawq-site.xml." % property_name
+        print "Failed to retrieve GUC information, guc '%s' does not exist in hawq-site.xml" % property_name
     return None
 
 
@@ -174,15 +190,14 @@ def update_hawq_site(org_config_file, hawq_site, property_name, property_value):
         os.system('mv %s %s' % (org_config_file + '.backup', org_config_file))
 
 
-def sync_hawq_site(GPHOME, host_list):
+def sync_hawq_site(config_dir, host_list):
+    sync_host_str = ""
     for node in host_list:
-        try:
-            # Print "Sync hawq-site.xml to %s." % node
-            os.system("scp %s/etc/hawq-site.xml %s:%s/etc/hawq-site.xml > /dev/null 2>&1" % (GPHOME, node, GPHOME))
-        except:
-            print ""
-            sys.exit("sync to node %s failed." % node)
-    return None
+        sync_host_str += " -h %s" % node
+
+    result = local_ssh("hawq scp %s %s/etc/hawq-site.xml =:%s/etc/" % (sync_host_str, config_dir, config_dir))
+    if result != 0:
+        sys.exit("sync hawq-site.xml failed.")
 
 options, args = parseargs()
 
@@ -205,8 +220,15 @@ else:
 
 # Update hawq-site.xml
 if options.change:
+    if not options.property_value:
+        print "Please specify GUC value"
+        sys.exit(1)
+    if not options.skipvalidation:
+        check_property_valid(hawq_site, options.change)
+
     update_hawq_site(org_config_file, hawq_site, options.change, options.property_value)
     sync_hawq_site(GPHOME, host_list)
+
     if not options.quiet:
         latest_hawq_site = HawqXMLParser(GPHOME)
         latest_hawq_site.get_all_values()
@@ -222,10 +244,10 @@ elif options.list:
 elif options.remove:
     except_list = ['hawq_master_address_host', 'hawq_master_directory', 'hawq_segment_directory']
     if options.remove in except_list:
-        print "Remove %s is not allowed." % options.remove
+        print "Remove %s is not allowed" % options.remove
         sys.exit(1)
     remove_property_xml(options.remove, org_config_file)
     sync_hawq_site(GPHOME, host_list)
 else:
-    print "Please input correct options."
+    print "Please input correct options"
     sys.exit(1)
