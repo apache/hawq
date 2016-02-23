@@ -441,8 +441,6 @@ void recvIncreaseMemoryQuotaResponse(AsyncCommMessageHandlerContext	context,
 
 void sentIncreaseMemoryQuota(AsyncCommMessageHandlerContext context)
 {
-	/* Mark that there is one more RPC on-the-fly for increasing resource quota. */
-	DRMGlobalInstance->IncreaseMemoryRPCCounter++;
 }
 
 void sentIncreaseMemoryQuotaError(AsyncCommMessageHandlerContext context)
@@ -470,10 +468,6 @@ void sentIncreaseMemoryQuotaCleanup(AsyncCommMessageHandlerContext context)
 
 	Assert( ctns->Containers == NULL );
 	rm_pfree(PCONTEXT, (GRMContainerSet)(context->UserData));
-
-	/* Mark that there is one RPC done for increasing resource quota. */
-	DRMGlobalInstance->IncreaseMemoryRPCCounter--;
-	Assert(DRMGlobalInstance->IncreaseMemoryRPCCounter >= 0);
 }
 
 int decreaseMemoryQuota(char 			*seghostname,
@@ -611,8 +605,6 @@ void recvDecreaseMemoryQuotaResponse(AsyncCommMessageHandlerContext	context,
 
 void sentDecreaseMemoryQuota(AsyncCommMessageHandlerContext context)
 {
-	/* Mark that there is one more RPC on-the-fly for decreasing resource quota. */
-	DRMGlobalInstance->DecreaseMemoryRPCCounter++;
 }
 
 void sentDecreaseMemoryQuotaError(AsyncCommMessageHandlerContext context)
@@ -639,10 +631,6 @@ void sentDecreaseMemoryQuotaCleanup(AsyncCommMessageHandlerContext context)
 	}
 
 	freeGRMContainerSet(ctns);
-
-	/* Mark that there is one RPC done for decreasing resource quota. */
-	DRMGlobalInstance->DecreaseMemoryRPCCounter--;
-	Assert(DRMGlobalInstance->DecreaseMemoryRPCCounter >= 0);
 }
 
 void processContainersAfterIncreaseMemoryQuota(GRMContainerSet ctns, bool accepted)

@@ -108,12 +108,7 @@ static void
 psql_init(void)
 {
 	/* set default regression database name */
-	if (!dblist)
-		add_stringlist_item(&dblist, "regression");
-	if(!expected_statuses_file)
-		expected_statuses_file = "expected_statuses";
-	if(!initfile)
-		initfile = "./init_file";
+	add_stringlist_item(&dblist, "regression");
 }
 
 int
