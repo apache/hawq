@@ -91,8 +91,8 @@ static int	port = -1;
 static char *user = NULL;
 static char *srcdir = NULL;
 static _stringlist *extraroles = NULL;
-char *initfile = NULL;
-char *expected_statuses_file = NULL;
+static char *initfile = "./init_file";
+static char *expected_statuses_file = "expected_statuses";
 
 /* internal variables */
 static const char *progname;
@@ -846,8 +846,6 @@ initialize_environment(void)
 		new_pgoptions = malloc(strlen(old_pgoptions) + strlen(my_pgoptions) + 12);
 		sprintf(new_pgoptions, "PGOPTIONS=%s %s", old_pgoptions, my_pgoptions);
 		putenv(new_pgoptions);
-
-		free(new_pgoptions);
 	}
 
 	{
@@ -1062,7 +1060,6 @@ spawn_process(const char *cmdline)
 
 	cmdline2 = malloc(strlen(cmdline) + 8);
 	sprintf(cmdline2, "cmd /c %s", cmdline);
-	free(cmdline2);
 
 #ifndef __CYGWIN__
 	AddUserToTokenDacl(restrictedToken);
@@ -2078,6 +2075,12 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 	hostname = "localhost";
 #endif
 
+	/*
+	 * We call the initialization function here because that way we can set
+	 * default parameters and let them be overwritten by the commandline.
+	 */
+	ifunc();
+
 	while ((c = getopt_long(argc, argv, "hV", long_options, &option_index)) != -1)
 	{
 		switch (c)
@@ -2175,11 +2178,6 @@ regression_main(int argc, char *argv[], init_function ifunc, test_function tfunc
 		add_stringlist_item(&extra_tests, argv[optind]);
 		optind++;
 	}
-
-	/*
-	 * Set default values if user didn't pass arguments
-	 */
-	ifunc();
 
 	/*
 	 * Initialization
