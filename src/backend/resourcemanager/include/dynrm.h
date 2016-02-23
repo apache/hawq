@@ -240,12 +240,6 @@ struct DynRMGlobalData{
     bool					ResBrokerTriggerCleanup;
 
     /*------------------------------------------------------------------------*/
-    /* MARKER FOR RESOURCE ON-THE-FLY                                         */
-    /*------------------------------------------------------------------------*/
-    int						IncreaseMemoryRPCCounter;
-    int						DecreaseMemoryRPCCounter;
-
-    /*------------------------------------------------------------------------*/
     /* MARKER FOR RESOURCE BREATH                                             */
     /*------------------------------------------------------------------------*/
     int						ForcedReturnGRMContainerCount;
