@@ -55,6 +55,7 @@ class HawqInit:
         self.timeout = opts.timeout_seconds
         self.no_update = opts.no_update
         self.remove_standby = opts.remove_standby
+        self.new_standby_hostname = opts.new_standby_hostname
         self.hawq_dict = hawq_dict
         self.locale = opts.hawq_locale
         self.quiet  = opts.quiet_run
@@ -109,8 +110,13 @@ class HawqInit:
                 logger.error("Standby host should not be the same as master host")
                 sys.exit(1)
         else:
-            logger.info("No standby host configured, skip it")
             self.standby_host_name = ''
+
+        if self.new_standby_hostname != 'none':
+            self.standby_host_name = self.new_standby_hostname
+
+        if self.standby_host_name.lower() in ('', 'none'):
+            logger.info("No standby host configured, skip it")
 
         if 'enable_secure_filesystem' in self.hawq_dict:
             self.enable_secure_filesystem = self.hawq_dict['enable_secure_filesystem']
@@ -148,8 +154,7 @@ class HawqInit:
             f.write("dfs_url=%s\n" % self.dfs_url)
             f.write("log_filename=%s\n" % log_filename)
             f.write("log_dir=%s\n" % self.log_dir)
-        if 'hawq_standby_address_host' in self.hawq_dict:
-            with open(configFile, 'a') as f: 
+            if self.standby_host_name.lower() not in ('', 'none'):
                 f.write("standby_host_name=%s\n" % self.standby_host_name)
 
 
@@ -168,6 +173,16 @@ class HawqInit:
         logger.debug("Check hdfs: %s" % cmd)
         check_return_code(local_ssh(cmd, logger, warning = True), logger, "Check hdfs failed, please verify your hdfs settings")
 
+
+    def set_new_standby_host(self):
+        cmd = "%s; hawq config -c hawq_standby_address_host -v %s --skipvalidation -q > /dev/null" % \
+               (source_hawq_env, self.new_standby_hostname)
+        result = local_ssh(cmd, logger)
+        if result != 0:
+            logger.warn("Set standby host name failed")
+        return result
+
+
     def set_total_vsegment_num(self):
         cmd = "%s; hawq config -c default_segment_num -v %s --skipvalidation -q > /dev/null" % \
                (source_hawq_env, self.total_vseg_num)
@@ -175,6 +190,7 @@ class HawqInit:
         if result != 0:
             logger.warn("Set default_segment_num failed")
         return result
+
 
     def set_vsegment_num_per_node(self):
         cmd = "%s; hawq config -c hawq_rm_nvseg_perquery_perseg_limit \
@@ -185,15 +201,18 @@ class HawqInit:
             logger.warn("Set hawq_rm_nvseg_perquery_perseg_limit failed")
         return result
 
+
     def _get_master_init_cmd(self):
         cmd = "%s/bin/lib/hawqinit.sh master '%s'" % \
                 (self.GPHOME, self.GPHOME)
         return cmd
 
+
     def _get_standby_init_cmd(self):
         cmd = "%s/bin/lib/hawqinit.sh standby '%s'" % \
                 (self.GPHOME, self.GPHOME)
         return cmd
+
 
     def hawq_remove_standby(self):
         """Removes the standby master"""
@@ -266,6 +285,7 @@ class HawqInit:
         else:
             logger.info("Do not find a running standby master")
 
+
     def _init_standby(self):
         logger.info("Start to init standby master: '%s'" % self.standby_host_name)
         logger.info("This might take a couple of minutes, please wait...")
@@ -303,10 +323,12 @@ class HawqInit:
 
         return result
         
+
     def _get_segment_init_cmd(self):
         cmd = "%s/bin/lib/hawqinit.sh segment '%s'" % \
                 (self.GPHOME, self.GPHOME)
         return cmd
+
 
     def _init_cluster(self):
         logger.info("%s segment hosts defined" % self.hosts_count_number)
@@ -347,7 +369,11 @@ class HawqInit:
 
         return node_init.return_flag
 
+
     def run(self):
+        if self.new_standby_hostname != 'none':
+            check_return_code(self.set_new_standby_host())
+
         if self.node_type == "master":
             self.check_hdfs_path()
             logger.info("%s segment hosts defined" % self.hosts_count_number)
@@ -387,6 +413,7 @@ class HawqInit:
         else:
             sys.exit('hawq init object should be one of master/standby/segment/cluster')
         return None
+
 
 class HawqStart:
     def __init__(self, opts, hawq_dict):
@@ -1032,6 +1059,9 @@ def create_parser():
     parser.add_option('-r', '--remove-standby', action='store_true',
                       dest='remove_standby', default=False,
                       help='Delete hawq standby master node.')
+    parser.add_option('-s', '--standby-host', type='string',
+                      dest='new_standby_hostname', default='none',
+                      help='Hostname of system to create standby master on')
     parser.add_option('-n', '--no-update', action='store_true',
                       dest='no_update', default=False,
                       help='Do not update system catalog tables.')
