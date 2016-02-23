@@ -360,10 +360,10 @@ ExecHashJoin(HashJoinState *node)
 			 * outer join, we can quit without scanning the outer relation.
 			 */
 			if (TupIsNull(outerTupleSlot)
-				  && node->js.jointype != JOIN_LEFT
-					&& node->js.jointype != JOIN_LASJ
-					&& node->js.jointype != JOIN_LASJ_NOTIN
-					&& node->hj_InnerEmpty)
+          && node->js.jointype != JOIN_LEFT
+          && node->js.jointype != JOIN_LASJ
+          && node->js.jointype != JOIN_LASJ_NOTIN
+          && node->hj_InnerEmpty)
 			{
 				/* end of join */
 				if (gp_eager_hashtable_release)
