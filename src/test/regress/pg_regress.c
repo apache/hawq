@@ -896,7 +896,6 @@ initialize_environment(void)
 	convert_sourcefiles();
 	load_resultmap();
 	load_expected_statuses(expected_statuses_file);
-	free(expected_statuses_file);
 }
 
 /*
@@ -1283,7 +1282,6 @@ results_differ(const char *testname, const char *resultsfile, const char *defaul
 
 	  snprintf(m_pretty_diff_opts, sizeof(m_pretty_diff_opts),
 			   "%s --gpd_init %s", pretty_diff_opts, initfile);
-	  free(initfile);
 	}
 	else
 	{
