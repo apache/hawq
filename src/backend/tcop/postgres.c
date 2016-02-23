@@ -4652,7 +4652,21 @@ PostgresMain(int argc, char *argv[], const char *username)
 		}
 
 		IdleTracker_DeactivateProcess();
-		firstchar = ReadCommand(&input_message);
+		/*
+		 * During read command, if we have any exception we want to reactivate the process
+		 * before falling back to postgres main exception handler.
+		 */
+		PG_TRY();
+		{
+			firstchar = ReadCommand(&input_message);
+		}
+		PG_CATCH();
+		{
+			IdleTracker_ActivateProcess();
+			elog(LOG, "Caught exception while reading command");
+			PG_RE_THROW();
+		}
+		PG_END_TRY();
 		IdleTracker_ActivateProcess();
 
 		if (!IsTransactionOrTransactionBlock()){
