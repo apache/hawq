@@ -868,7 +868,7 @@ int handleRB2RM_AllocatedResource(void)
 	removePendingResourceRequestInRootQueue(
 		response.MemoryMB * (response.ExpectedContainerCount - acceptedcount),
 		response.Core     * (response.ExpectedContainerCount - acceptedcount),
-		response.Result == FUNC_RETURN_OK);
+		(response.Result == FUNC_RETURN_OK) && (acceptedcount > 0));
 
 	elog(LOG, "Resource manager accepted YARN containers (%d MB, %d CORE) x %d "
 			  "from resource broker, expected %d containers, skipped %d containers.",
