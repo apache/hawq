@@ -28,6 +28,7 @@
 #include "utils/lsyscache.h"
 #include "utils/pg_locale.h"
 #include "utils/string_wrapper.h"
+#include "utils/memutils.h"
 
 typedef struct varlena unknown;
 
@@ -54,6 +55,13 @@ typedef struct
 	DatumGetCString(DirectFunctionCall1(textout, PointerGetDatum(textp_)))
 #define PG_STR_GET_TEXT(str_) \
 	DatumGetTextP(DirectFunctionCall1(textin, CStringGetDatum(str_)))
+
+/*
+ * Max considered sub-string size is set to MaxAllocSize - 4MB).
+ * The 4MB is saved aside for memory allocation overhead such
+ * as allocation set headers.
+ */
+#define MAX_STRING_BYTES	((Size) (MaxAllocSize - 0x400000))
 
 static int	text_position_ptr_len(char* p1, int len1, char *p2, int len2); 
 static void text_position_setup_ptr_len(char* p1, int len1, char* p2, int len2, TextPositionState *state);
@@ -616,6 +624,65 @@ charlen_to_bytelen(const char *p, int n)
 		return s - p;
 	}
 }
+
+/* find_memory_limited_substring()
+ *	Computes the sub-string length in number of characters and number
+ *	of bytes where the sub-string consumes up to "memoryLimit" amount of memory.
+ *
+ *	Parameters:
+ *		strStart: starting pointer in the string
+ * 		byteLen: number of bytes in the string, starting from strStart
+ * 		memoryLimit: max string size in terms of bytes
+ *
+ * 	Out parameters:
+ *		subStringByteLen: length of chosen sub-string in bytes
+ *		subStringCharLen: length of chosen sub-string in character count
+ *
+ * It is caller's responsibility that there actually are byteLen bytes
+ * starting from strStart; the string needs not be null-terminated.
+ */
+static void
+find_memory_limited_substring(const char *strStart, int byteLen, int memoryLimit, int *subStringByteLen, int *subStringCharLen)
+{
+	AssertArg(byteLen > memoryLimit);
+	AssertArg(NULL != strStart);
+	AssertArg(NULL != subStringCharLen);
+
+	if (pg_database_encoding_max_length() == 1)
+	{
+		/* Optimization for single-byte encodings */
+		*subStringByteLen = byteLen < memoryLimit ? byteLen : memoryLimit;
+		*subStringCharLen = *subStringByteLen;
+
+		return;
+	}
+	else
+	{
+		const char *strCurPointer = strStart;;
+
+		int consumedBytes = 0;
+		int consumedChars = 0;
+
+		while (consumedBytes <= byteLen)
+		{
+			int curCharBytes = pg_mblen(strCurPointer);
+			strCurPointer += curCharBytes;
+			consumedChars++;
+			consumedBytes += curCharBytes;
+
+			if (consumedBytes > memoryLimit)
+			{
+				*subStringByteLen = consumedBytes - curCharBytes;
+				*subStringCharLen = consumedChars - 1;
+
+				Insist((*subStringByteLen > 0) && (*subStringCharLen > 0));
+
+				return;
+			}
+		}
+	}
+}
+
 
 /*
  * text_substr()
@@ -2559,24 +2626,36 @@ split_text(PG_FUNCTION_ARGS)
 	PG_RETURN_TEXT_P(result_text);
 }
 
+
 /*
- * text_to_array
- * parse input string
- * return text array of elements
- * based on provided field separator
+ * text_to_array_impl
+ *		Carries out the actual tokenization and array conversion of an input string.
+ *
+ * Parameters:
+ * 		string: Where to start in the input string
+ * 		stringByteLen: Length of current string
+ * 		delimiter: Which delimiter to use
+ * 		delimiterByteLen: Length of delimiter in bytes
+ * 		delimiterCharLen: Length of delimiter in chars
+ * 		arrayState: State of the output array where we accumulate results
+ * 		endOfString: Do we expect any more chunk of the main input string?
+ *
+ * Returns the pointer where the last match was found. Successively the
+ * caller can splice more data starting from this address to find further
+ * array elements.
  */
-Datum
-text_to_array(PG_FUNCTION_ARGS)
+static char* text_to_array_impl(char *string, int stringByteLen, char *delimiter,
+		int delimiterByteLen, int delimiterCharLen, ArrayBuildState **arrayState, bool endOfString)
 {
-	Datum d0 = PG_GETARG_DATUM(0);
-	char *p0; void *tofree0; int len0;
+	int start_posn = 1;
+	int fldnum = 1;
+	int end_posn = 0;
+	int chunk_len = 0;
+	text	   *result_text;
 
-	Datum d1 = PG_GETARG_DATUM(1);
-	char *p1; void *tofree1; int len1;
+	char* cur_ptr = string;
 
-	int			inputstring_len;
-	int			fldsep_len; 
-	TextPositionState state = 		
+	TextPositionState state =
 		{
 		0, /* use_wchar */
 		NULL, /* str1 */
@@ -2587,79 +2666,32 @@ text_to_array(PG_FUNCTION_ARGS)
 		0, /* len2 */
 		};
 
-	int			fldnum;
-	int			start_posn;
-	int			end_posn;
-	int			chunk_len;
-	char	   *start_ptr;
-	text	   *result_text;
-	ArrayBuildState *astate = NULL;
-
-	varattrib_untoast_ptr_len(d0, &p0, &len0, &tofree0);
-	varattrib_untoast_ptr_len(d1, &p1, &len1, &tofree1);
-
-	if(pg_database_encoding_max_length() == 1)
-	{
-		inputstring_len = len0;
-		fldsep_len = len1;
-	}
-	else
-	{
-		inputstring_len = pg_mbstrlen_with_len(p0, len0);
-		fldsep_len = pg_mbstrlen_with_len(p1, len1);
-	}
-
-	/* return NULL for empty input string */
-	if (inputstring_len < 1)
-	{
-		if(tofree0)
-			pfree(tofree0);
-		if(tofree1)
-			pfree(tofree1);
-
-		PG_RETURN_NULL();
-	}
-
-	/*
-	 * empty field separator return one element, 1D, array using the input
-	 * string
-	 */
-	if (fldsep_len < 1)
-	{
-		if(tofree0)
-			pfree(tofree0);
-		if(tofree1)
-			pfree(tofree1);
-
-		PG_RETURN_ARRAYTYPE_P(create_singleton_array(fcinfo, TEXTOID, d0, 1));
-	}
-
-	text_position_setup_ptr_len(p0, len0, p1, len1, &state);
-
-	start_posn = 1;
-	/* start_ptr points to the start_posn'th character of inputstring */
-	start_ptr = p0; 
+	text_position_setup_ptr_len(string, stringByteLen, delimiter, delimiterByteLen, &state);
 
 	for (fldnum = 1;; fldnum++) /* field number is 1 based */
 	{
 		end_posn = text_position_next(start_posn, &state);
 
-		if (end_posn == 0)
+		if (end_posn == 0 && !endOfString)
+		{
+			break;
+		}
+		else if (end_posn == 0)
 		{
 			/* fetch last field */
-			chunk_len = (p0 + len0) - start_ptr;
+			chunk_len = (string + stringByteLen) - cur_ptr;
 		}
 		else
 		{
 			/* fetch non-last field */
-			chunk_len = charlen_to_bytelen(start_ptr, end_posn - start_posn);
+			chunk_len = charlen_to_bytelen(cur_ptr, end_posn - start_posn);
 		}
 
 		/* must build a temp text datum to pass to accumArrayResult */
-		result_text = cstring_to_text_with_len(start_ptr, chunk_len);
+		result_text = cstring_to_text_with_len(cur_ptr, chunk_len);
 
 		/* stash away this field */
-		astate = accumArrayResult(astate,
+		*arrayState = accumArrayResult(*arrayState,
 								  PointerGetDatum(result_text),
 								  false,
 								  TEXTOID,
@@ -2668,20 +2700,168 @@ text_to_array(PG_FUNCTION_ARGS)
 		pfree(result_text);
 
 		if (end_posn == 0)
+		{
+			/* Process next sub-string if any */
 			break;
+		}
 
 		start_posn = end_posn;
-		start_ptr += chunk_len;
-		start_posn += fldsep_len;
-		start_ptr += charlen_to_bytelen(start_ptr, fldsep_len);
+		cur_ptr += chunk_len;
+		start_posn += delimiterCharLen;
+		cur_ptr += charlen_to_bytelen(cur_ptr, delimiterCharLen);
 	}
 
 	text_position_cleanup(&state);
 
-	if(tofree0)
-		pfree(tofree0);
-	if(tofree1)
-		pfree(tofree1);
+	return cur_ptr;
+}
+
+
+/*
+ * text_to_array_multi_pass
+ *		Carries out the actual tokenization and array conversion of input string
+ *		in multiple passes, where each pass is restricted to GPDB memory allocation limit.
+ *
+ * Parameters:
+ * 		string: The start of the input string
+ * 		stringByteLen: Length of current string
+ * 		delimiter: Which delimiter to use
+ * 		delimiterByteLen: Length of delimiter in bytes
+ * 		delimiterCharLen: Length of delimiter in chars
+ * 		endOfString: Do we expect any more chunk of the main input string?
+ *
+ * Returns the ArrayBuildState containing all the array elements.
+ */
+static ArrayBuildState* text_to_array_multi_pass(char *string, int stringByteLen, char *delimiter, int delimiterByteLen, int delimiterCharLen)
+{
+	ArrayBuildState *astate = NULL;
+
+	/* Start with full string. If it is too big then we chunk it later */
+	char	   *start_ptr = string;
+	int curSubStringByteLen = stringByteLen;
+
+	bool endOfString = false;
+
+	/* More bytes to consider? */
+	while (!endOfString)
+	{
+		/*
+		 * Give the rest of the string to the current pass; may be chunked if
+		 * the rest still doesn't fit in the memory
+		 */
+		curSubStringByteLen = (string + stringByteLen) - start_ptr;
+
+		/* Will this MBCS become too big to fit in memory once converted to wchar? */
+		if (pg_database_encoding_max_length() > 1 && curSubStringByteLen > ((MAX_STRING_BYTES)/ sizeof(pg_wchar)))
+		{
+			int curSubStringCharLen = 0;
+			/* We need multi-pass. So find the sub-string boundary for the current pass */
+			find_memory_limited_substring(start_ptr, string + stringByteLen - start_ptr,
+				(MAX_STRING_BYTES) / sizeof(pg_wchar), &curSubStringByteLen, &curSubStringCharLen);
+		}
+
+		Insist(start_ptr + curSubStringByteLen <= string + stringByteLen);
+
+		endOfString = ((start_ptr + curSubStringByteLen) == (string + stringByteLen));
+
+		char *nextStartPtr = text_to_array_impl(start_ptr, curSubStringByteLen, delimiter, delimiterByteLen, delimiterCharLen, &astate, endOfString);
+
+		Insist(nextStartPtr >= start_ptr);
+
+		if (!endOfString && nextStartPtr == start_ptr)
+		{
+			elog(ERROR, "String size not supported.");
+		}
+
+		start_ptr = nextStartPtr;
+	}
+
+	return astate;
+}
+
+
+/*
+ *  * text_to_array
+ *   * parse input string
+ *    * return text array of elements
+ *     * based on provided field separator
+ *      */
+Datum
+text_to_array(PG_FUNCTION_ARGS)
+{
+	Datum stringDatum = PG_GETARG_DATUM(0);
+	char *string = NULL;
+	void *toFreeString = NULL;
+	int stringByteLen = 0;
+
+	Datum delimiterDatum = PG_GETARG_DATUM(1);
+	char *delimiter = NULL;
+	void *toFreeDelimiter = NULL;
+	int delimiterByteLen = 0;
+
+	int stringCharLen = 0;
+	int	delimiterCharLen = 0;
+
+	varattrib_untoast_ptr_len(stringDatum, &string, &stringByteLen, &toFreeString);
+	varattrib_untoast_ptr_len(delimiterDatum, &delimiter, &delimiterByteLen, &toFreeDelimiter);
+
+	if(pg_database_encoding_max_length() == 1)
+	{
+		stringCharLen = stringByteLen;
+		delimiterCharLen = delimiterByteLen;
+	}
+	else
+	{
+		stringCharLen = pg_mbstrlen_with_len(string, stringByteLen);
+		delimiterCharLen = pg_mbstrlen_with_len(delimiter, delimiterByteLen);
+	}
+
+	/* return NULL for empty input string */
+	if (stringCharLen < 1)
+	{
+		if(toFreeString)
+		{
+			pfree(toFreeString);
+		}
+
+		if(toFreeDelimiter)
+		{
+			pfree(toFreeDelimiter);
+		}
+
+		PG_RETURN_NULL();
+	}
+
+	/*
+	 * empty field separator return one element, 1D, array using the input
+	 * string
+	 */
+	if (delimiterCharLen < 1)
+	{
+		if(toFreeString)
+		{
+			pfree(toFreeString);
+		}
+
+		if(toFreeDelimiter)
+		{
+			pfree(toFreeDelimiter);
+		}
+
+		PG_RETURN_ARRAYTYPE_P(create_singleton_array(fcinfo, TEXTOID, stringDatum, 1));
+	}
+
+	ArrayBuildState *astate = text_to_array_multi_pass(string, stringByteLen, delimiter, delimiterByteLen, delimiterCharLen);
+
+	if(toFreeString)
+	{
+		pfree(toFreeString);
+	}
+	if(toFreeDelimiter)
+	{
+		pfree(toFreeDelimiter);
+	}
+
 	PG_RETURN_DATUM(makeArrayResult(astate, CurrentMemoryContext));
 }
 
