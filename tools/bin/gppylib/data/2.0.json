@@ -308,50 +308,6 @@
          "text" : "with (camelcase=GpGlobalSequence, oid=false, relid=5096, reltype_oid=6995, content=PERSISTENT)"
       }
    },
-   "gp_id" : {
-      "CamelCaseRelationId" : "GpIdRelationId",
-      "colh" : {
-         "content" : "int2",
-         "dbid" : "int2",
-         "gpname" : "NameData",
-         "numsegments" : "int2"
-      },
-      "cols" : [
-         {
-            "colname" : "gpname",
-            "ctype" : "NameData",
-            "precomment" : "\n**TK_BLANK_LINE**",
-            "sqltype" : "name"
-         },
-         {
-            "colname" : "numsegments",
-            "ctype" : "int2",
-            "sqltype" : "smallint"
-         },
-         {
-            "colname" : "dbid",
-            "ctype" : "int2",
-            "sqltype" : "smallint"
-         },
-         {
-            "colname" : "content",
-            "ctype" : "int2",
-            "sqltype" : "smallint"
-         }
-      ],
-      "filename" : "gp_id.h",
-      "relid_comment_tag" : "/* relation id: 5001 - gp_id */\n",
-      "tabdef_text" : "\n   CREATE TABLE gp_id\n   with (shared=true, oid=false, relid=5001, content=SEGMENT_LOCAL)\n   (\n   gpname       name     ,\n   numsegments  smallint ,\n   dbid         smallint ,\n   content      smallint \n   )",
-      "with" : {
-         "bootstrap" : 0,
-         "camelcase" : "GpId",
-         "content" : "SEGMENT_LOCAL",
-         "oid" : "",
-         "relid" : "5001",
-         "shared" : "1",
-         "text" : "with (shared=true, oid=false, relid=5001, content=SEGMENT_LOCAL)"
-      }
-   },
    "gp_interfaces" : {
       "CamelCaseRelationId" : "GpInterfacesRelationId",
       "UppercaseReltypeOid" : "GP_INTERFACES_RELTYPE_OID",
