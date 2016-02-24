@@ -43,39 +43,24 @@ void initSimpleStringWithContent( SimpStringPtr str,
 					  	  	  	  MCTYPE 	    context,
 					  	  	  	  char 		   *content,
 					  	  	  	  int 		    length);
-
-void initSimpleStringFilled( SimpStringPtr str,
-							 MCTYPE 	   context,
-							 uint8_t 	   val,
-							 int 	 	   length);
-
 /* set string value. */
-
 void setSimpleStringWithContent( SimpStringPtr  str,
 					  	  	 	 char		   *content,
 					  	  	 	 int		    length);
-
-void setSimpleStringFilled( SimpStringPtr  str,
-							uint8_t        val,
-							int			   length);
 
 /* free simple string with allocated content. */
 void freeSimpleStringContent(SimpStringPtr str);
 
 /* Reference one existing buffer without memory allocation. */
 void setSimpleStringRef(SimpStringPtr str, char *content, int length);
-void clearSimpleStringRef(SimpStringPtr str);
 
 /* string operations. */
 int  SimpleStringFind(SimpStringPtr str, char *target);
 int  SimpleStringComp(SimpStringPtr str, char *target);
-int  SimpleStringCaseComp(SimpStringPtr str, char *target);
 void SimpleStringCopy(SimpStringPtr str, SimpString *source);
 void SimpleStringFill(SimpStringPtr str, int start, int length, uint8_t val);
 bool SimpleStringEmpty(SimpStringPtr str);
 int  SimpleStringLocateChar(SimpStringPtr str, char target, int *location);
-void SimpleStringReplaceChar(SimpStringPtr str, char oldchar, char newchar);
-void SimpleStringReplaceFirst(SimpStringPtr str, char *oldstr, char *newstr);
 /* string to the other number values. */
 int  SimpleStringToInt8(SimpStringPtr str, int8_t *value);
 int  SimpleStringToInt32(SimpStringPtr str, int32_t *value);
@@ -129,23 +114,6 @@ void freeSimpleStringTokens(SimpStringPtr   owner,
 #define setSimpleStringRefNoLen(str, content) \
 		setSimpleStringRef((str),(content),strlen((content)))
 
-/* Serialization and de-serialization */
-
-/*-----------------------------------------------------------------------------
- *
- *  Format: ( 8-byte aligned memory block. )
- *         ---------------------------------------------
- *         |   Length(int32)     | string              |
- *         +----------------------                     +
- * 		   |                                           |
- * 		   ---------------------------------------------
- *
- *---------------------------------------------------------------------------*/
-
-int  deserializeToSimpleString(SimpStringPtr str, char *content);
-int  serializeFromSimpleString(SimpStringPtr str, char *content);
-int  serializationSize(SimpStringPtr str);
-
 struct SimpArray
 {
 	MCTYPE				Context;
@@ -157,8 +125,6 @@ typedef struct SimpArray  SimpArray;
 typedef struct SimpArray *SimpArrayPtr;
 
 SimpArrayPtr createSimpleArray(MCTYPE context);
-/* initialize string. */
-void initSimpleArray(SimpArrayPtr array, MCTYPE context);
 
 /* set array value. */
 void setSimpleArrayWithContent( SimpArrayPtr  array,

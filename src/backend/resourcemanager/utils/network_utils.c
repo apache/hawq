@@ -30,44 +30,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-int hostname_to_ipaddressstr(const char *hostname, char *ip )
-{
-	struct hostent *host;
-	struct in_addr **address_list;
-
-	host = gethostbyname(hostname);
-	if ( host == NULL ) {
-		return -1; /* Can not get host address from the name. */
-	}
-
-	address_list = (struct in_addr **)(host->h_addr_list);
-
-	if ( address_list[0] == NULL )
-		return -1; /* No usable address. */
-	strcpy(ip, inet_ntoa(*address_list[0]));
-
-	return 0;
-
-}
-
-int ipaddressstr_to_4bytes(const char *ip, uint8_t nums[4])
-{
-	int val[4];
-	sscanf(ip, "%d.%d.%d.%d", val, val+1, val+2, val+3);
-	nums[0] = val[0] & 0xFF;
-	nums[1] = val[1] & 0xFF;
-	nums[2] = val[2] & 0xFF;
-	nums[3] = val[3] & 0xFF;
-
-	return 0;
-}
-
-int ipaddress4bytes_to_str(uint8_t nums[4], char *ip)
-{
-	sprintf(ip, "%d.%d.%d.%d", nums[0], nums[1], nums[2], nums[3]);
-	return 0;
-}
-
 uint64_t gettime_microsec(void)
 {
     static struct timeval t;
@@ -195,12 +157,6 @@ int getLocalHostName(SimpStringPtr hostname)
 	return res;
 }
 
-int getLocalHostAllIPAddresses(DQueue addresslist)
-{
-	Assert(false);
-	return FUNC_RETURN_OK;
-}
-
 int getLocalHostAllIPAddressesAsStrings(DQueue addresslist)
 {
 	int		 res	   = FUNC_RETURN_OK;
@@ -250,31 +206,6 @@ int getLocalHostAllIPAddressesAsStrings(DQueue addresslist)
 	freeifaddrs(ifaddr);
 
 	return res;
-}
-
-HostAddress createHostAddressAsStringFromIPV4Address(MCTYPE context, uint32_t addr)
-{
-	static char 	tmpaddrstr[16];
-	static uint32_t tmpaddrlen = 0;
-	HostAddress 	result = NULL;
-	int				resultsize = 0;
-
-	result = rm_palloc0(context, sizeof(HostAddressData));
-	result->Attribute.Offset  = 0;
-	result->Attribute.Mark   |= HOST_ADDRESS_CONTENT_STRING;
-
-	ipaddress4bytes_to_str((uint8_t *)&addr, tmpaddrstr);
-	tmpaddrlen = strlen(tmpaddrstr);
-	resultsize = __SIZE_ALIGN64(offsetof(AddressStringData, Address) +
-								tmpaddrlen + 1 );
-	AddressString straddr = rm_palloc0(context, resultsize);
-
-	straddr->Length = tmpaddrlen;
-	strcpy(straddr->Address, tmpaddrstr);
-	result->Address = (char *)straddr;
-	result->AddressSize = resultsize;
-
-	return result;
 }
 
 HostAddress createHostAddressAsStringFromIPV4AddressStr(MCTYPE context, const char *addr)

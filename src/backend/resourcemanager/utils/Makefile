@@ -37,8 +37,7 @@ OBJS = balancedbst.o \
 	   simplestring.o \
 	   network_utils.o \
 	   memutilities.o \
-	   kvproperties.o \
-	   filesystem_utils.o
+	   kvproperties.o 
 
 include $(top_srcdir)/src/backend/common.mk
 

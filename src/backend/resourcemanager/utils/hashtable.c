@@ -341,24 +341,14 @@ void cleanHASHTABLE( HASHTABLE table )
 	table->Slots = NULL;
 }
 
+/*
 void freeHASHTABLE( HASHTABLE table )
 {
 	Assert( table != NULL );
 	cleanHASHTABLE( table );
 	rm_pfree(table->Context, table);
 }
-
-uint32_t getHASHTABLESize( HASHTABLE table )
-{
-	Assert(table != NULL);
-	return table->NodeCount;
-}
-
-uint32_t getHASHTABLEVolume( HASHTABLE table )
-{
-	Assert(table != NULL);
-	return table->SlotVolume;
-}
+*/
 
 uint32_t HASHTABLE_Hash_UINT32 (void *data)
 {

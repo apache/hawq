@@ -22,7 +22,6 @@
 #include "utils/memutilities.h"
 #include "utils/simplestring.h"
 #include "utils/linkedlist.h"
-#include "utils/nullablebool.h"
 #include "nodes/pg_list.h"
 #include "commands/defrem.h"
 #include "pgstat.h"

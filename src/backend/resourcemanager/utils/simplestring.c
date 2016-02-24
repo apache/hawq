@@ -50,16 +50,6 @@ void initSimpleStringWithContent( SimpStringPtr str,
 	setSimpleStringWithContent( str, content, length);
 }
 
-void initSimpleStringFilled( SimpStringPtr str,
-							 MCTYPE 	   context,
-							 uint8_t 	   val,
-							 int 	 	   length)
-{
-	Assert( str != NULL );
-	str->Context = context;
-	setSimpleStringFilled( str, val, length);
-}
-
 void setSimpleStringWithContent( SimpStringPtr str,
 					  	  	     char		  *content,
 					  	  	     int		   length)
@@ -82,16 +72,6 @@ void setSimpleStringWithContent( SimpStringPtr str,
 	str->Len = length;
 }
 
-void setSimpleStringFilled( SimpStringPtr  str,
-							uint8_t 	   val,
-							int 		   length)
-{
-	Assert( str != NULL );
-	str->Str = (char *)rm_palloc0(str->Context, length+1);
-	memset(str->Str, val, length);
-	str->Len = length;
-}
-
 void freeSimpleStringContent(SimpStringPtr  str)
 {
 	Assert( str != NULL );
@@ -100,7 +80,6 @@ void freeSimpleStringContent(SimpStringPtr  str)
 	}
 	str->Str = NULL;
 	str->Len = -1;
-	//str->Context = NULL;
 }
 
 void setSimpleStringRef(SimpStringPtr str, char *content, int length)
@@ -108,14 +87,6 @@ void setSimpleStringRef(SimpStringPtr str, char *content, int length)
 	Assert( str != NULL );
 	str->Str = content;
 	str->Len = length;
-	str->Context = NULL;
-}
-
-void clearSimpleStringRef(SimpStringPtr str)
-{
-	Assert( str != NULL );
-	str->Str = NULL;
-	str->Len = -1;
 	str->Context = NULL;
 }
 
@@ -134,12 +105,6 @@ int  SimpleStringComp(SimpStringPtr str, char *target)
 {
 	Assert( str != NULL );
 	return strcmp(str->Str, target);
-}
-
-int  SimpleStringCaseComp(SimpStringPtr str, char *target)
-{
-	Assert( str != NULL );
-	return strcasecmp(str->Str, target);
 }
 
 void SimpleStringCopy(SimpStringPtr str, SimpStringPtr source)
@@ -174,27 +139,6 @@ int SimpleStringSubstring( SimpStringPtr str,
 								newlen);
 
 	return newlen;
-}
-
-int deserializeToSimpleString(SimpStringPtr str, char *content)
-{
-	Assert(str != NULL);
-	str->Len = *((int32_t *)content);
-	str->Str = (char *)rm_palloc0(str->Context, (str->Len+1));
-	memcpy(str->Str, content+4, str->Len);
-	return __SIZE_ALIGN64(str->Len + sizeof(int32_t));
-}
-
-int serializeFromSimpleString(SimpStringPtr str, char *content)
-{
-	*((int32_t *)content) = str->Len;
-	memcpy(content+4, str->Str, str->Len);
-	return __SIZE_ALIGN64(str->Len + sizeof(int32_t));
-}
-
-int serializationSize(SimpStringPtr str)
-{
-	return __SIZE_ALIGN64(str->Len + sizeof(int32_t));
 }
 
 bool SimpleStringIsPercentage(SimpStringPtr str)
@@ -361,34 +305,6 @@ int  SimpleStringLocateChar(SimpStringPtr str, char target, int *location)
 	return FUNC_RETURN_FAIL;
 }
 
-void SimpleStringReplaceChar(SimpStringPtr str, char oldchar, char newchar)
-{
-	for ( int i = 0 ; i < str->Len ; ++i ) {
-		str->Str[i] = str->Str[i] == oldchar ? newchar : str->Str[i];
-	}
-}
-
-void SimpleStringReplaceFirst(SimpStringPtr str, char *oldstr, char *newstr)
-{
-	char *pos = strstr(str->Str, oldstr);
-	/* If the old string does not exist, no need to do any update. */
-	if ( pos == NULL )
-		return;
-
-	SelfMaintainBufferData smb;
-	initializeSelfMaintainBuffer(&smb, str->Context);
-	if ( str->Str != pos ) {
-		appendSelfMaintainBuffer(&smb, str->Str, pos - str->Str);
-	}
-	int oldstrlen = strlen(oldstr);
-	appendSelfMaintainBuffer(&smb, newstr, strlen(newstr));
-	if ( oldstrlen + (pos - str->Str) < str->Len ) {
-		appendSMBStr(&smb, pos + oldstrlen);
-	}
-	setSimpleStringWithContent(str, smb.Buffer, getSMBContentSize(&smb));
-	destroySelfMaintainBuffer(&smb);
-}
-
 int SimpleArrayComp(SimpArrayPtr array1, SimpArrayPtr array2)
 {
 	int val = 0;
@@ -408,15 +324,6 @@ SimpArrayPtr createSimpleArray(MCTYPE context)
 	res->Len 	 = -1;
 	res->Context = context;
 	return res;
-}
-
-/* initialize string. */
-void initSimpleArray(SimpArrayPtr array, MCTYPE context)
-{
-	Assert( array != NULL );
-	array->Array   = NULL;
-	array->Len 	   = -1;
-	array->Context = context;
 }
 
 /* set array value. */
@@ -505,25 +412,6 @@ int SimpleStringSetFloat(SimpStringPtr str, float value)
 	Assert(str != NULL);
 	sprintf(valuestr, "%f", value);
 	setSimpleStringNoLen(str, valuestr);
-	return FUNC_RETURN_OK;
-}
-int SimpleStringSetText(MCTYPE context, SimpStringPtr str, text *value)
-{
-	Assert(str != NULL);
-
-	if ( value != NULL ) {
-		char *tmpvalue = NULL;
-		MEMORY_CONTEXT_SWITCH_TO(context)
-		tmpvalue = DatumGetCString(DirectFunctionCall1(textout,
-													   PointerGetDatum(value)));
-		setSimpleStringNoLen(str, tmpvalue);
-		pfree(tmpvalue);
-		MEMORY_CONTEXT_SWITCH_BACK
-	}
-	else {
-		setSimpleStringNoLen(str, "");
-	}
-
 	return FUNC_RETURN_OK;
 }
 
