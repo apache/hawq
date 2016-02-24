@@ -533,6 +533,13 @@ int MainHandlerLoop(void)
 
 	while( DRMGlobalInstance->ResManagerMainKeepRun )
 	{
+		/* STEP 0. Check if postmaster process exists. */
+		if (!PostmasterIsAlive(true)) {
+			DRMGlobalInstance->ResManagerMainKeepRun = false;
+			elog(LOG, "Postmaster is not alive, resource manager exits");
+			break;
+		}
+
 		/* STEP 1. Check resource broker status. */
 		RB_start(true);
 
