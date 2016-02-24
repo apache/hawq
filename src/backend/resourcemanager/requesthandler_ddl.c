@@ -429,7 +429,10 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			 * Refresh actual capacity of the resource queue, the change is
 			 * expected to be updated in the shadow instances.
 			 */
-			refreshResourceQueuePercentageCapacity(true);
+			if ( PRESPOOL->ClusterMemoryCoreRatio > 0 )
+			{
+				refreshResourceQueuePercentageCapacity(true);
+			}
 
 			/*------------------------------------------------------------------
 			 * Till now, we expect the input for altering a resource queue is

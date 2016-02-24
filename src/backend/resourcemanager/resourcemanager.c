@@ -497,6 +497,9 @@ int ResManagerMainServer2ndPhase(void)
 
 	elog(DEBUG5, "HAWQ RM :: passed loading queue and user definition.");
 
+	/* Check slaves file firstly to ensure we have expected cluster size. */
+	checkSlavesFile();
+
 	if ( rm_resourcepool_test_filename != NULL &&
 		 rm_resourcepool_test_filename[0] != '\0' ) {
 		loadHostInformationIntoResourcePool();
@@ -504,9 +507,6 @@ int ResManagerMainServer2ndPhase(void)
 
 	/******* TILL NOW, resource manager starts providing services *******/
 	elog(LOG, "HAWQ RM process works now.");
-
-	/* Check slaves file firstly to ensure we have expected cluster size. */
-	checkSlavesFile();
 
     /* Start request handler to provide services. */
     res = MainHandlerLoop();

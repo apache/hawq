@@ -355,10 +355,6 @@ void initializeResourcePoolManager(void)
 						HASHTABLE_KEYTYPE_SIMPSTR,
 						NULL);
 
-	PRESPOOL->MemCoreRatio 				  = 0;
-	PRESPOOL->MemCoreRatioMajorityCounter = 0;
-
-
 	initializeHASHTABLE(&(PRESPOOL->ToAcceptContainers),
 						PCONTEXT,
 						HASHTABLE_SLOT_VOLUME_DEFAULT,
@@ -398,6 +394,8 @@ void initializeResourcePoolManager(void)
 	}
 
 	PRESPOOL->RBClusterReportCounter = 0;
+
+	PRESPOOL->ClusterMemoryCoreRatio = 0;
 }
 
 #define CONNECT_TIMEOUT 60
@@ -743,6 +741,15 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 	SimpString		 hostnamekey;
 	SimpArray 		 hostaddrkey;
 	bool			 segcapchanged  = false;
+
+	/*
+	 * Anyway, the host capacity is updated here if the cluster level capacity
+	 * is fixed.
+	 */
+	if ( PRESPOOL->ClusterMemoryCoreRatio > 0 )
+	{
+		adjustSegmentStatFTSCapacity(segstat);
+	}
 
 	/*
 	 * Check if the host information exists in the resource pool. Fetch old
@@ -1117,41 +1124,6 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		res = RESOURCEPOOL_DUPLICATE_HOST;
 	}
 
-
-	/*
-	 * If host capacity is changed, update the cluster level memory/core ratio.
-	 * The expectation is that more than 50% cluster nodes has the same memory/
-	 * core ratio which is selected as the cluster memory/core ratio.
-	 */
-	if ( segcapchanged )
-	{
-		uint32_t curratio = 0;
-		if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
-		{
-			curratio = trunc(segresource->Stat->FTSTotalMemoryMB /
-							 segresource->Stat->FTSTotalCore);
-
-			if ( curratio != PRESPOOL->MemCoreRatio )
-			{
-				PRESPOOL->MemCoreRatioMajorityCounter--;
-				if ( PRESPOOL->MemCoreRatioMajorityCounter == -1 )
-				{
-					PRESPOOL->MemCoreRatioMajorityCounter = 1;
-					PRESPOOL->MemCoreRatio = curratio;
-					elog(LOG, "Resource manager changes cluster memory/core ratio "
-							  "to %d MBPCORE.",
-							  curratio);
-
-
-				}
-			}
-			else
-			{
-				PRESPOOL->MemCoreRatioMajorityCounter++;
-			}
-		}
-	}
-
 	validateResourcePoolStatus(true);
 	return res;
 }
@@ -1166,6 +1138,14 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	SegResource	 	 segres	 		 = NULL;
 	SegStat	 	 	 newSegStat	     = NULL;
 	int32_t		 	 segid			 = SEGSTAT_ID_INVALID;
+
+	/* Anyway, the host GRM capacity is updated here if the cluster level
+	 * capacity is fixed.
+	 */
+	if ( PRESPOOL->ClusterMemoryCoreRatio > 0 )
+	{
+		adjustSegmentStatGRMCapacity(segstat);
+	}
 
 	/*
 	 * Check if the host information exists in the resource pool. Fetch old
@@ -1303,23 +1283,6 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	{
 		curratio = trunc(segres->Stat->GRMTotalMemoryMB /
 						 segres->Stat->GRMTotalCore);
-	}
-
-	if ( curratio != PRESPOOL->MemCoreRatio )
-	{
-		PRESPOOL->MemCoreRatioMajorityCounter--;
-		if ( PRESPOOL->MemCoreRatioMajorityCounter == -1 )
-		{
-			PRESPOOL->MemCoreRatioMajorityCounter = 1;
-			PRESPOOL->MemCoreRatio = curratio;
-			elog(LOG, "Resource manager changes cluster memory/core ratio to "
-						"%d MB Per core.",
-						curratio);
-		}
-	}
-	else
-	{
-		PRESPOOL->MemCoreRatioMajorityCounter++;
 	}
 
 	return FUNC_RETURN_OK;
@@ -4228,6 +4191,339 @@ void getSegResResourceCountersByMemCoreCounters(SegResource  resinfo,
 						GET_SEGRESOURCE_HOSTNAME(resinfo));
 		}
 	}
+}
+
+void fixClusterMemoryCoreRatio(void)
+{
+	/*
+	 * Once the ratio to fix has been estimated and fixed, we never change it
+	 * again.
+	 */
+	if ( PRESPOOL->ClusterMemoryCoreRatio > 0 )
+	{
+		return;
+	}
+
+	/* If no enough segment ready for fixing ratio, skip this. */
+	if ( PRESPOOL->SlavesHostCount <= 0 )
+	{
+		return;
+	}
+
+	int rejectlimit = PRESPOOL->SlavesHostCount <= rm_rejectrequest_nseg_limit ?
+					  0 :
+					  rm_rejectrequest_nseg_limit;
+	int criteria1 = PRESPOOL->SlavesHostCount - rejectlimit;
+	int criteria2 = (PRESPOOL->SlavesHostCount + 1) / 2;
+
+	if ( PRESPOOL->AvailNodeCount < criteria1 ||
+		 PRESPOOL->AvailNodeCount < criteria2 )
+	{
+		elog(RMLOG, "Resource manager expects at least %d segments available "
+					"before first time fixing cluster memory to core ratio, "
+					"currently %d available segments are ready.",
+					criteria1 > criteria2 ? criteria1 : criteria2,
+					PRESPOOL->AvailNodeCount );
+		return;
+	}
+
+	/*
+	 * Go into real calculation of the cluster level memory to core ratio now,
+	 * The idea of fixing the ratio is to calculate possible
+	 */
+
+	HASHTABLEData ratios;
+	initializeHASHTABLE(&ratios,
+						PCONTEXT,
+						HASHTABLE_SLOT_VOLUME_DEFAULT,
+						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
+						HASHTABLE_KEYTYPE_UINT32,
+						NULL);
+
+	/*
+	 * STEP 1. Go through all current segments to get segment level ratios.
+	 */
+	List 	 *ressegl	 = NULL;
+	ListCell *cell		 = NULL;
+	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &ressegl);
+	foreach(cell, ressegl)
+	{
+		PAIR 		pair 	 = (PAIR)lfirst(cell);
+		SegResource segres 	 = (SegResource)(pair->Value);
+		uint32_t 	ratio 	 = 0;
+		uint32_t 	memorymb = 0;
+		uint32_t 	core	 = 0;
+
+		if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
+		{
+			continue;
+		}
+
+		if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
+		{
+			memorymb = segres->Stat->FTSTotalMemoryMB;
+			core	 = segres->Stat->FTSTotalCore;
+		}
+		else
+		{
+			if ( !IS_SEGSTAT_GRMAVAILABLE(segres->Stat) )
+			{
+				continue;
+			}
+			memorymb = segres->Stat->GRMTotalMemoryMB;
+			core	 = segres->Stat->GRMTotalCore;
+		}
+
+		Assert(core > 0);
+		ratio = memorymb / core;
+
+		PAIR ratiopair = getHASHTABLENode(&ratios, TYPCONVERT(void *, ratio));
+		if ( ratiopair == NULL )
+		{
+			setHASHTABLENode(&ratios, TYPCONVERT(void *, ratio), NULL, false);
+		}
+	}
+
+	/*
+	 * STEP 2. Choose one ratio as cluster ratio by estimating the possible
+	 * 		   resource waste.
+	 */
+	uint32_t minmemorywaste = UINT32_MAX;
+	uint32_t candratio = 0;
+
+	List 	 *ratiol	= NULL;
+	ListCell *ratiocell	= NULL;
+	getAllPAIRRefIntoList(&ratios, &ratiol);
+	foreach(ratiocell, ratiol)
+	{
+		PAIR pair = (PAIR)lfirst(ratiocell);
+		uint32_t segratio = TYPCONVERT(uint32_t, pair->Key);
+
+		uint32_t memorywaste = 0;
+		foreach(cell, ressegl)
+		{
+			PAIR segpair = (PAIR)lfirst(cell);
+			SegResource segres 	 = (SegResource)(segpair->Value);
+			uint32_t 	ratio 	 = 0;
+			uint32_t 	memorymb = 0;
+			uint32_t 	core	 = 0;
+
+			if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
+			{
+				continue;
+			}
+
+			if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
+			{
+				memorymb = segres->Stat->FTSTotalMemoryMB;
+				core	 = segres->Stat->FTSTotalCore;
+			}
+			else
+			{
+				if ( !IS_SEGSTAT_GRMAVAILABLE(segres->Stat) )
+				{
+					continue;
+				}
+				memorymb = segres->Stat->GRMTotalMemoryMB;
+				core	 = segres->Stat->GRMTotalCore;
+			}
+			Assert(core > 0);
+			ratio = memorymb / core;
+			uint32_t segmemwaste = 0;
+
+			if ( segratio * core > memorymb )
+			{
+				segmemwaste = memorymb - (memorymb / segratio) * segratio;
+			}
+			else
+			{
+				segmemwaste = memorymb - core *segratio;
+			}
+			memorywaste += segmemwaste;
+		}
+
+		elog(RMLOG, "Resource manager estimates that ratio %u MB per core wastes "
+					"%d MB resource in the whole recognized cluster.",
+					segratio,
+					memorywaste);
+
+		if ( memorywaste < minmemorywaste )
+		{
+			minmemorywaste = memorywaste;
+			candratio = segratio;
+		}
+	}
+
+	PRESPOOL->ClusterMemoryCoreRatio = candratio;
+
+	elog(LOG, "Resource manager chooses ratio %u MB per core as cluster level "
+			  "memory to core ratio, there are %d MB memory resource unable to "
+			  "utilize.",
+			  PRESPOOL->ClusterMemoryCoreRatio,
+			  minmemorywaste);
+
+	/*
+	 * Refresh segments' capacity following the fixed cluster level memory to
+	 * core ratio.
+	 */
+
+	foreach(cell, ressegl)
+	{
+		PAIR 		pair 	 = (PAIR)lfirst(cell);
+		SegResource segres 	 = (SegResource)(pair->Value);
+		adjustSegmentCapacity(segres);
+	}
+
+	/* Clean up. */
+	freePAIRRefList(&(PRESPOOL->Segments), &ressegl);
+	cleanHASHTABLE(&ratios);
+
+}
+
+void adjustSegmentCapacity(SegResource segres)
+{
+	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	{
+		return;
+	}
+
+	if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
+	{
+		adjustSegmentCapacityForNone(segres);
+	}
+	else
+	{
+		adjustSegmentCapacityForGRM(segres);
+	}
+}
+
+void adjustSegmentStatFTSCapacity(SegStat segstat)
+{
+	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	{
+		return;
+	}
+
+	uint32_t oldmemorymb = segstat->FTSTotalMemoryMB;
+	uint32_t oldcore	 = segstat->FTSTotalCore;
+
+	adjustMemoryCoreValue(&(segstat->FTSTotalMemoryMB), &(segstat->FTSTotalCore));
+
+	if ( oldmemorymb != segstat->FTSTotalMemoryMB ||
+		 oldcore	 != segstat->FTSTotalCore )
+	{
+		elog(RMLOG, "Resource manager adjusts segment FTS capacity from "
+					"(%d MB, %d CORE) to (%d MB, %d CORE)",
+					oldmemorymb,
+					oldcore,
+					segstat->FTSTotalMemoryMB,
+					segstat->FTSTotalCore);
+	}
+}
+
+void adjustSegmentStatGRMCapacity(SegStat segstat)
+{
+	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	{
+		return;
+	}
+
+	uint32_t oldmemorymb = segstat->GRMTotalMemoryMB;
+	uint32_t oldcore	 = segstat->GRMTotalCore;
+
+	adjustMemoryCoreValue(&(segstat->GRMTotalMemoryMB), &(segstat->GRMTotalCore));
+
+	if ( oldmemorymb != segstat->GRMTotalMemoryMB ||
+		 oldcore	 != segstat->GRMTotalCore )
+	{
+		elog(RMLOG, "Resource manager adjusts segment GRM capacity from "
+					"(%d MB, %d CORE) to (%d MB, %d CORE)",
+					oldmemorymb,
+					oldcore,
+					segstat->GRMTotalMemoryMB,
+					segstat->GRMTotalCore);
+	}
+}
+
+void adjustSegmentCapacityForNone(SegResource segres)
+{
+	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	{
+		return;
+	}
+
+	uint32_t oldmemorymb = 0;
+	uint32_t oldcore	 = 0;
+
+	oldmemorymb = segres->Stat->FTSTotalMemoryMB;
+	oldcore		= segres->Stat->FTSTotalCore;
+
+	adjustMemoryCoreValue(&(segres->Stat->FTSTotalMemoryMB),
+						  &(segres->Stat->FTSTotalCore));
+
+	if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
+	{
+		return;
+	}
+
+	if ( oldmemorymb != segres->Stat->FTSTotalMemoryMB ||
+		 oldcore	 != segres->Stat->FTSTotalCore )
+	{
+		minusResourceBundleData(&(PRESPOOL->FTSTotal),
+								oldmemorymb,
+								oldcore * 1.0);
+		addResourceBundleData(&(PRESPOOL->FTSTotal),
+							  segres->Stat->FTSTotalMemoryMB,
+							  segres->Stat->FTSTotalCore * 1.0);
+	}
+}
+
+void adjustSegmentCapacityForGRM(SegResource segres)
+{
+	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	{
+		return;
+	}
+
+	uint32_t oldmemorymb = 0;
+	uint32_t oldcore	 = 0;
+
+	oldmemorymb = segres->Stat->GRMTotalMemoryMB;
+	oldcore		= segres->Stat->GRMTotalCore;
+
+	adjustMemoryCoreValue(&(segres->Stat->GRMTotalMemoryMB),
+						  &(segres->Stat->GRMTotalCore));
+
+	if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
+		 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat))
+	{
+		return;
+	}
+
+	if ( oldmemorymb != segres->Stat->GRMTotalMemoryMB ||
+		 oldcore 	 != segres->Stat->GRMTotalCore )
+	{
+		minusResourceBundleData(&(PRESPOOL->GRMTotal),
+								oldmemorymb,
+								oldcore * 1.0);
+		addResourceBundleData(&(PRESPOOL->GRMTotal),
+							  segres->Stat->GRMTotalMemoryMB,
+							  segres->Stat->GRMTotalCore * 1.0);
+	}
+}
+
+void adjustMemoryCoreValue(uint32_t *memorymb, uint32_t *core)
+{
+	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	{
+		return;
+	}
+
+	if ( *core * PRESPOOL->ClusterMemoryCoreRatio > *memorymb )
+	{
+		*core = *memorymb / PRESPOOL->ClusterMemoryCoreRatio;
+	}
+	*memorymb = *core * PRESPOOL->ClusterMemoryCoreRatio;
 }
 
 void dumpResourcePoolHosts(const char *filename)
