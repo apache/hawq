@@ -1440,7 +1440,9 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 							  segres->Stat->GRMTotalCore);
 
 		addNewResourceToResourceManagerByBundle(&(segres->Allocated));
-		if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
+		if ( (DRMGlobalInstance->ImpType == NONE_HAWQ2) ||
+			 (DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
+			  IS_SEGSTAT_GRMAVAILABLE(segres->Stat)))
 		{
 			PRESPOOL->AvailNodeCount++;
 		}
