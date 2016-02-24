@@ -1018,11 +1018,11 @@ int  loadDynamicResourceManagerConfigure(void)
 				 rm_segment_port);
 
 	/* Decide global resource manager mode. */
-	if ( strcmp(rm_global_rm_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_YARN) == 0 )
+	if ( strcasecmp(rm_global_rm_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_YARN) == 0 )
 	{
 		DRMGlobalInstance->ImpType = YARN_LIBYARN;
 	}
-	else if ( strcmp(rm_global_rm_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_NONE) == 0 )
+	else if ( strcasecmp(rm_global_rm_type, HAWQDRM_CONFFILE_SVRTYPE_VAL_NONE) == 0 )
 	{
 		DRMGlobalInstance->ImpType = NONE_HAWQ2;
 	}
