@@ -850,9 +850,6 @@ int initializeDRMInstance(MCTYPE context)
 	DRMGlobalInstance->ResBrokerAppTimeStamp    = 0;
 	DRMGlobalInstance->ResBrokerTriggerCleanup  = false;
 
-	DRMGlobalInstance->IncreaseMemoryRPCCounter = 0;
-	DRMGlobalInstance->DecreaseMemoryRPCCounter = 0;
-
 	/* Get local host name here to make all components able to use this info. */
 	initSimpleString(&(DRMGlobalInstance->SocketLocalHostName), 	   context);
 	res = getLocalHostName(&(DRMGlobalInstance->SocketLocalHostName));
