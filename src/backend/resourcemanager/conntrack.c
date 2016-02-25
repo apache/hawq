@@ -352,8 +352,7 @@ bool canTransformConnectionTrackProgress(ConnectionTrack track,
 	case CONN_PP_REGISTER_FAIL:
 		return track->Progress == CONN_PP_ESTABLISHED;
 	case CONN_PP_RESOURCE_ACQUIRE_FAIL:
-		return track->Progress == CONN_PP_REGISTER_DONE ||
-			   track->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT;
+		return track->Progress == CONN_PP_REGISTER_DONE;
 	case CONN_PP_RESOURCE_QUEUE_ALLOC_FAIL:
 		return track->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT;
 	case CONN_PP_TIMEOUT_FAIL:
