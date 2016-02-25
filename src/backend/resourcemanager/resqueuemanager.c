@@ -5527,7 +5527,7 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 			{
 				buildAcquireResourceErrorResponse(newconn, res, errorbuf);
 				transformConnectionTrackProgress(newconn,
-												 CONN_PP_RESOURCE_ACQUIRE_FAIL);
+												 CONN_PP_RESOURCE_QUEUE_ALLOC_FAIL);
 				/*
 				 * We still add this failed connection track into the shadow
 				 * instance, we will remove them later.
