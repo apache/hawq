@@ -129,8 +129,7 @@ CreateSchemaCommand(CreateSchemaStmt *stmt, const char *queryString)
 		check_is_member_of_role(saved_uid, owner_uid);
 
 		/* Additional check to protect reserved schema names */
-		if (!allowSystemTableModsDDL &&
-			(IsReservedName(schemaName) || strcmp(schemaName, "madlib") == 0))
+		if (!allowSystemTableModsDDL && IsReservedName(schemaName))
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_RESERVED_NAME),
