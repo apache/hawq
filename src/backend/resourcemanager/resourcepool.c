@@ -746,7 +746,8 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 	 * Anyway, the host capacity is updated here if the cluster level capacity
 	 * is fixed.
 	 */
-	if ( PRESPOOL->ClusterMemoryCoreRatio > 0 )
+	if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 &&
+		 PRESPOOL->ClusterMemoryCoreRatio > 0 )
 	{
 		adjustSegmentStatFTSCapacity(segstat);
 	}
