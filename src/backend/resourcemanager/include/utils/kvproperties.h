@@ -77,12 +77,6 @@ KVProperty createPropertyBool(MCTYPE  		context,
 							  int	 	   *index,
 							  Oid	  		value);
 
-KVProperty createPropertyText(MCTYPE  		context,
-							  const char   *tag1,
-							  const char   *tag2,
-							  int	 	   *index,
-							  text	  	   *value);
-
 KVProperty createPropertyString(MCTYPE  	  context,
 							    const char   *tag1,
 							    const char   *tag2,
@@ -99,17 +93,5 @@ void buildDottedPropertyNameString(SimpStringPtr 	 string,
 								   const char 		*tag1,
 								   const char 		*tag2,
 								   int  			*index);
-
-int parseRangeTupleBracket(MCTYPE			  context,
-						   Datum 			  textdatum,
-						   bool 			  isNull,
-						   const char 		**p1,
-						   const char 		**p2);
-
-int parseRangeTextBracket (MCTYPE 	 	  	  context,
-						   char 			 *text,
-						   bool 		 	  isNull,
-						   const char 		**p1,
-						   const char 		**p2);
 
 #endif /* _KEY_VALUE_PROPERTIES_PROCESSOR_H */

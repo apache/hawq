@@ -79,8 +79,6 @@ shiftupCalculateChildCountAndDepth(node)                                       \
 void rotateNodeBelowRight(BBSTNode nodea, BBSTNode *nodeptr);
 void rotateNodeBelowLeft(BBSTNode nodea, BBSTNode *nodeptr);
 void rebalanceBBST(BBST tree, BBSTNode node);
-int  getDepthOfBBST(BBSTNode ptr);
-
 
 /*
  * Get balance factor of one BBST node, if the factor is less than 0, the right
@@ -354,6 +352,8 @@ BBSTNode createBBSTNode(BBST tree, void *data)
 /*
  * Free one BBST node and save it in the free list of the BBST.
  */
+
+/*
 void freeBBSTNode(BBST tree, BBSTNode node)
 {
 
@@ -370,6 +370,7 @@ void freeBBSTNode(BBST tree, BBSTNode node)
     tree->Free = node->Right;
     
 }
+*/
 
 BBSTNode getBBSTNode(BBST tree, void *data)
 {
@@ -642,6 +643,7 @@ int getBBSTNodeCount(BBST tree)
 	return tree->Root == NULL ? 0 : tree->Root->NodeCount;
 }
 
+/*
 void freeBBST(BBST tree)
 {
 	clearBBST(tree);
@@ -660,62 +662,7 @@ void clearBBST(BBST tree)
 		freeBBSTNode(tree, node);
 	}
 }
-
-void freeBBSTFreeNodes(BBST tree)
-{
-	Assert( tree != NULL );
-	while( tree->Free != NULL ) {
-		BBSTNode tofree = tree->Free;
-		tree->Free = tofree->Right;
-		rm_pfree(tree->Context, tofree);
-	}
-}
-
-int getMaxDepthofBBST(BBST tree)
-{
-	return getDepthOfBBST(tree->Root);
-}
-
-int getDepthOfBBST(BBSTNode ptr)
-{
-	if( ptr == NULL ) {
-		return 0;
-	}
-	int leftdepth  = getDepthOfBBST(ptr->Left);
-	int rightdepth = getDepthOfBBST(ptr->Right);
-	return leftdepth > rightdepth ? leftdepth+1 : rightdepth+1;
-}
-
-/* This function generates a sequence of nodes by a depth-first traverse in
- * pre-order, this is for verifying if the BST is well balanced. */
-int traverseBBSTPreOrder(BBST tree, DQueue lines, int maxcount)
-{
-	BBSTNode 	p 		= tree->Root;
-	DQueueData 	stack;
-
-	initializeDQueue(&stack, tree->Context);
-
-	while( stack.NodeCount > 0 || p != NULL ) {
-		if ( p != NULL ) {
-			insertDQueueTailNode(lines, p);
-			insertDQueueHeadNode(&stack, p);
-			p = p->Left;
-
-			if ( maxcount > 0 && getDQueueLength(lines) == maxcount ) {
-				break;
-			}
-		}
-		else {
-				p = (BBSTNode)removeDQueueHeadNode(&stack);
-				p = p->Right;
-		}
-	}
-
-    removeAllDQueueNodes(&stack);
-	cleanDQueue(&stack);
-
-	return FUNC_RETURN_OK;
-}
+*/
 
 int traverseBBSTMidOrder(BBST tree, DQueue lines)
 {
@@ -751,19 +698,6 @@ BBSTNode getLeftMostNode(BBST tree)
 
 	while( res->Left != NULL ) {
 		res = res->Left;
-	}
-
-	return res;
-}
-
-BBSTNode getRightMostNode(BBST tree)
-{
-	BBSTNode res = tree->Root;
-	if ( res == NULL )
-		return res;
-
-	while( res->Right != NULL ) {
-		res = res->Right;
 	}
 
 	return res;

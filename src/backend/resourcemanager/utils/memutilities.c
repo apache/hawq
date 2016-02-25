@@ -241,36 +241,6 @@ void appendSelfMaintainBufferTill64bitAligned(SelfMaintainBuffer buffer)
 		appendSelfMaintainBuffer(buffer, ZEROPAD, padsize);
 }
 
-void swapSelfMaintainBuffer(SelfMaintainBuffer buffer1,
-							SelfMaintainBuffer buffer2)
-{
-	Assert( buffer1 != NULL && buffer2 != NULL );
-
-	char *tmpbuff = buffer1->Buffer ;
-	buffer1->Buffer = buffer2->Buffer ;
-	buffer2->Buffer = tmpbuff;
-
-	int32_t tmpcursor = buffer1->Cursor;
-	buffer1->Cursor = buffer2->Cursor;
-	buffer2->Cursor = tmpcursor;
-
-	int32_t tmpsize = buffer1->Size;
-	buffer1->Size = buffer2->Size;
-	buffer2->Size = tmpsize;
-
-	MCTYPE context = buffer1->Context;
-	buffer1->Context = buffer2->Context;
-	buffer2->Context = context;
-}
-
-void copySelfMaintainBuffer(SelfMaintainBuffer buffer1,
-							SelfMaintainBuffer buffer2)
-{
-	Assert( buffer1 != NULL && buffer2 != NULL );
-	resetSelfMaintainBuffer(buffer1);
-	appendSelfMaintainBuffer(buffer1, buffer2->Buffer, buffer2->Cursor+1);
-}
-
 void shiftLeftSelfMaintainBuffer(SelfMaintainBuffer buffer, int shift)
 {
 	Assert( buffer != NULL );

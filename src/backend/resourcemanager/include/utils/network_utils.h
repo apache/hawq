@@ -30,11 +30,6 @@
 /******************************************************************************
  * miscs
  *****************************************************************************/
-int hostname_to_ipaddressstr(const char *hostname, char *ip );
-//int hostname_to_ipaddress4bytes(const char *hostname, uint8_t nums[4] );
-int ipaddressstr_to_4bytes(const char *ip, uint8_t nums[4]);
-int ipaddress4bytes_to_str(uint8_t nums[4], char *ip);
-
 #define SOCKADDR(addr) inet_ntoa(((struct sockaddr_in *)(addr))->sin_addr)
 #define SOCKPORT(addr) ((struct sockaddr_in *)(addr))->sin_port
 
@@ -91,7 +86,6 @@ typedef struct HostAddressData 		*HostAddress;
 #define HOST_ADDRESS_TYPE_IPV6			0X1
 #define HOST_ADDRESS_CONTENT_STRING		0X2
 
-HostAddress createHostAddressAsStringFromIPV4Address(MCTYPE context, uint32_t addr);
 HostAddress createHostAddressAsStringFromIPV4AddressStr(MCTYPE context, const char *addr);
 void freeHostAddress(MCTYPE context, HostAddress addr);
 /* In case we have only host name of a remote machine, we need this one to find
@@ -106,7 +100,6 @@ void freeHostIPV4AddressesAsString(MCTYPE context, List **addresses);
 int getLocalHostName(SimpStringPtr hostname);
 
 int getLocalHostAllIPAddressesAsStrings(DQueue addresslist);
-int getLocalHostAllIPAddresses(DQueue addresslist);
 
 bool AddressStringComp(AddressString addr1, AddressString addr2);
 

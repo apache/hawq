@@ -133,10 +133,9 @@ PAIR	  getHASHTABLENode	  ( HASHTABLE table, void *key );
 int	  	  removeHASHTABLENode ( HASHTABLE table, void *key );
 void	  clearHASHTABLE	  ( HASHTABLE table );
 void	  cleanHASHTABLE	  ( HASHTABLE table );
+/*
 void	  freeHASHTABLE		  ( HASHTABLE table );
-uint32_t  getHASHTABLESize    ( HASHTABLE table );
-uint32_t  getHASHTABLEVolume  ( HASHTABLE table );
-
+*/
 void	  extendHASHTABLESlotSize ( HASHTABLE table, int newsize );
 void	  getAllPAIRRefIntoList   ( HASHTABLE table, List **list );
 void 	  freePAIRRefList		  ( HASHTABLE table, List **list );

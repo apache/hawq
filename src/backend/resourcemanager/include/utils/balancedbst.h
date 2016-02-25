@@ -88,7 +88,6 @@ int  	 getBalanceFactor(BBSTNode node);
 
 /* Node creation/free helper */
 BBSTNode createBBSTNode(BBST tree, void *data);
-void     freeBBSTNode(BBST tree, BBSTNode node);
 BBSTNode getBBSTNode(BBST tree, void *data);
 
 /* Insert / Remove one node identified by the node address node */
@@ -100,16 +99,15 @@ int		 reorderBBSTNodeData(BBST tree, void *data);
 /* Get count of node with no less value than specified criterion */
 int countBBSTNodeNoLessThan(BBST tree, void * critirion);
 
+/*
+void     freeBBSTNode(BBST tree, BBSTNode node);
 void     freeBBST(BBST tree);
 void     clearBBST(BBST tree);
-void	 freeBBSTFreeNodes(BBST tree);
+*/
 
 /* Get node */
-BBSTNode getRightMostNode(BBST tree);
 BBSTNode getLeftMostNode(BBST tree);
 
-int getMaxDepthofBBST(BBST tree);
-int traverseBBSTPreOrder(BBST tree, DQueue lines, int maxcount);
 int traverseBBSTMidOrder(BBST tree, DQueue lines);
 
 #endif //BALANCED_BINARY_SEARCH_TREE_H

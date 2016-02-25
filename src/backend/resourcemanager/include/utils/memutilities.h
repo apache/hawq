@@ -75,8 +75,6 @@ void *_rm_repalloc (MCTYPE context, void *ptr,
 void  _rm_pfree    (MCTYPE context, void *ptr,
 					const char *filename, int line, const char *function);
 
-uint64_t gettime_cost_microsec(void);
-
 /******************************************************************************
  *  Self-grow buffer.
  *
@@ -148,11 +146,6 @@ void destroySelfMaintainBuffer(SelfMaintainBuffer buffer);
 void deleteSelfMaintainBuffer(SelfMaintainBuffer buffer);
 
 void appendSelfMaintainBufferTill64bitAligned(SelfMaintainBuffer buffer);
-
-void swapSelfMaintainBuffer(SelfMaintainBuffer buffer1,
-							SelfMaintainBuffer buffer2);
-void copySelfMaintainBuffer(SelfMaintainBuffer buffer1,
-							SelfMaintainBuffer buffer2);
 
 void shiftLeftSelfMaintainBuffer(SelfMaintainBuffer buffer, int shift);
 #endif /* RESOURCE_MANAGER_UTIL_MEMORY_UTILITIES_H */
