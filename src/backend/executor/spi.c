@@ -46,6 +46,7 @@
 #include "cdb/memquota.h"
 #include "executor/nodeFunctionscan.h"
 #include "nodes/stack.h"
+#include "cdb/cdbdatalocality.h"
 
 extern char *savedSeqServerHost;
 extern int savedSeqServerPort;
@@ -74,6 +75,7 @@ static int	_SPI_curid = -1;
 
 static PGconn *_QD_conn = NULL; /* To call back to the QD for SQL execution */
 static char *_QD_currently_prepared_stmt = NULL;
+static int SPI_prepare_depth = 0;
 
 static void _SPI_prepare_plan(const char *src, SPIPlanPtr plan);
 
@@ -105,6 +107,32 @@ static bool _SPI_checktuples(void);
 
 
 /* =================== interface functions =================== */
+
+bool SPI_IsInPrepare(void)
+{
+	if (SPI_prepare_depth > 0)
+	{
+		return true;
+	}
+	else if (SPI_prepare_depth < 0)
+	{
+		elog(ERROR, "Invalid SPI_prepare_depth %d while getting SPI prepare depth",
+		            SPI_prepare_depth);
+	}
+
+	return false;
+}
+
+void SPI_IncreasePrepareDepth(void)
+{
+	SPI_prepare_depth++;
+}
+
+void SPI_DecreasePrepareDepth(void)
+{
+	SPI_prepare_depth--;
+}
+
 
 int
 SPI_connect(void)
@@ -566,6 +594,8 @@ SPI_prepare(const char *src, int nargs, Oid *argtypes)
 	_SPI_plan	plan;
 	_SPI_plan  *result;
 
+	SPI_IncreasePrepareDepth();
+
 	if (src == NULL || nargs < 0 || (nargs > 0 && argtypes == NULL))
 	{
 		SPI_result = SPI_ERROR_ARGUMENT;
@@ -591,9 +621,13 @@ SPI_prepare(const char *src, int nargs, Oid *argtypes)
 
 		/* copy plan to procedure context */
 		result = _SPI_copy_plan(&plan, _SPI_CPLAN_PROCXT);
+
+		SPI_DecreasePrepareDepth();
 	}
 	PG_CATCH();
 	{
+		SPI_DecreasePrepareDepth();
+
 		_SPI_end_call(true);
 		PG_RE_THROW();
 	}
@@ -1819,13 +1853,37 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
 					     (stmt->resource == NULL) &&
 					     (stmt->resource_parameters != NULL) )
 					{
-						stmt->resource = AllocateResource(stmt->resource_parameters->life,
-						                        stmt->resource_parameters->slice_size,
-						                        stmt->resource_parameters->iobytes,
-						                        stmt->resource_parameters->max_target_segment_num,
-						                        stmt->resource_parameters->min_target_segment_num,
-						                        stmt->resource_parameters->vol_info,
-						                        stmt->resource_parameters->vol_info_size);
+						SplitAllocResult *allocResult = NULL;
+
+						/* If this is a parallel plan. */
+						if (stmt->planTree->dispatch == DISPATCH_PARALLEL)
+						{
+							/*
+							 * Now, we want to allocate resource.
+							 */
+							allocResult = calculate_planner_segment_num(queryTree,
+							                                            stmt->resource_parameters->life,
+							                                            stmt->rtable,
+							                                            stmt->intoPolicy,
+							                                            stmt->nMotionNodes + stmt->nInitPlans + 1,
+							                                            stmt->resource_parameters->min_target_segment_num);
+
+							Assert(allocResult);
+
+							if(stmt->resource !=NULL)
+							{
+								pfree(stmt->resource);
+							}
+							stmt->resource = allocResult->resource;
+							if(stmt->scantable_splits !=NULL)
+							{
+								list_free_deep(stmt->scantable_splits);
+							}
+							stmt->scantable_splits = allocResult->alloc_results;
+							stmt->planner_segments = allocResult->planner_segments;
+							stmt->datalocalityInfo = allocResult->datalocalityInfo;
+							pfree(allocResult);
+						}
 					}
 
 					originalStmt->resource = NULL;
