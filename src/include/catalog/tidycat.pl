@@ -426,6 +426,7 @@ my %dynamic_reltype_h =
 	(
  5000 => "gp_configuration",
  5002 => "gp_distribution_policy",
+ 5001 => "gp_id",
  5008 => "gp_master_mirroring",
  5003 => "gp_version_at_initdb",
  2600 => "pg_aggregate",
