@@ -50,4 +50,8 @@ extern bool choose_hashed_grouping(PlannerInfo *root,
 								   double dNumGroups, 
 								   AggClauseCounts *agg_counts);
 
+extern bool is_in_planning_phase(void);
+extern void increase_planning_depth(void);
+extern void decrease_planning_depth(void);
+
 #endif   /* PLANNER_H */
