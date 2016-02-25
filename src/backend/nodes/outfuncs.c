@@ -987,6 +987,7 @@ _outDML(StringInfo str, DML *node)
 	WRITE_INT_FIELD(actionColIdx);
 	WRITE_INT_FIELD(ctidColIdx);
 	WRITE_INT_FIELD(tupleoidColIdx);
+	WRITE_BOOL_FIELD(inputSorted);
 
 	_outPlanInfo(str, (Plan *) node);
 }

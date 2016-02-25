@@ -41,7 +41,7 @@ SELECT a, b, c FROM altable WHERE a = 12;
 ROLLBACK;
 ALTER TABLE altable ALTER COLUMN c SET NOT NULL;
 INSERT INTO altable(a, b) VALUES(13, '13');
-ERROR:  NULL value in column "c" violates not-null constraint (COptTasks.cpp:1294)
+ERROR:  null value in column "c" violates not-null constraint (COptTasks.cpp:1756)
 ALTER TABLE altable ALTER COLUMN c DROP NOT NULL;
 INSERT INTO altable(a, b) VALUES(13, '13');
 SELECT a, b, c FROM altable WHERE a = 13;

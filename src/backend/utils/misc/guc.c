@@ -762,6 +762,7 @@ bool 		optimizer_multilevel_partitioning;
 bool        optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
+int		optimizer_parts_to_force_sort_on_insert;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -6143,6 +6144,16 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&optimizer_segments,
 		0, 0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"optimizer_parts_to_force_sort_on_insert", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Minimum number of partitions required to force sorting tuples during insertion in an append only row-oriented partitioned table"),
+			NULL,
+			GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_parts_to_force_sort_on_insert,
+		INT_MAX, 0, INT_MAX, NULL, NULL
 	},
 
 	{
