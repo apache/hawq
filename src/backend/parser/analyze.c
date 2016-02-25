@@ -2817,15 +2817,7 @@ transformDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 					policy->bucketnum = GetRelOpt_bucket_num_fromOptions(options, -1);
 
 				if (policy->bucketnum == -1)
-				{
 					policy->bucketnum = oldTablePolicy->bucketnum;
-				}
-				else if (policy->bucketnum != oldTablePolicy->bucketnum)
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-							 errmsg("cannot create partition table with child partitions having different bucketnum.")));
-				}
 
 				if (!bQuiet)
 					elog(NOTICE, "Table has parent, setting distribution columns "
@@ -3002,13 +2994,17 @@ transformDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 		{
 			RangeVar   *parent = (RangeVar *) lfirst(entry);
 			Oid			relId = RangeVarGetRelid(parent, false, false /*allowHcatalog*/);
-			GpPolicy  *oldTablePolicy = GpPolicyFetch(CurrentMemoryContext, relId);
+			GpPolicy  *parentPolicy = GpPolicyFetch(CurrentMemoryContext, relId);
 
-			if (policy->bucketnum != oldTablePolicy->bucketnum)
+			if (policy->bucketnum != parentPolicy->bucketnum)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot create partition table with child partitions having different bucketnum.")));
+								errmsg("cannot create child table \"%s\" with bucketnum=%d "
+										"inheriting parent table \"%s\" with bucketnum=%d, "
+										"because they have different bucketnum",
+										cxt->relation->relname, policy->bucketnum,
+										parent->relname, parentPolicy->bucketnum)));
 			}
 		}
 	}
@@ -7469,17 +7465,7 @@ make_child_node(CreateStmt *stmt, CreateStmtContext *cxt, char *relname,
 
 		/* Options */
 		if ( psa_apc->arg1 )
-		{
 			child_tab_stmt->options = (List *)psa_apc->arg1;
-			int bucketnum = stmt->policy->bucketnum;
-			int child_bucketnum = GetRelOpt_bucket_num_fromOptions(child_tab_stmt->options, bucketnum);
-
-			if (child_bucketnum != bucketnum)
-				ereport(ERROR,
-						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-						 errmsg("cannot create partition table with child partitions having different bucketnum.")));
-		}
-
 		/* Tablespace from parent (input CreateStmt)... */
 		if ( psa_apc->arg2 && *strVal(psa_apc->arg2) )
 			child_tab_stmt->tablespacename = strVal(psa_apc->arg2);
@@ -8266,6 +8252,23 @@ transformPartitionBy(ParseState *pstate, CreateStmtContext *cxt,
 										 prtstr, 	/* part spec */
 										 snamespaceid,
 										 NULL);
+
+		/* check non-uniform bucketnum options */
+		if (pStoreAttr && ((AlterPartitionCmd *)pStoreAttr)->arg1)
+		{
+			List *pWithList = (List *)(((AlterPartitionCmd *)pStoreAttr)->arg1);
+			int bucketnum = policy->bucketnum;
+			int child_bucketnum = GetRelOpt_bucket_num_fromOptions(pWithList, bucketnum);
+
+			if (child_bucketnum != bucketnum)
+				ereport(ERROR,
+						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+								errmsg("cannot create partition \"%s\" with bucketnum=%d "
+										"for table \"%s\" with bucketnum=%d, "
+										"because they have different bucketnum",
+										relname, child_bucketnum,
+										cxt->relation->relname, bucketnum)));
+		}
 
 		/* XXX: temporarily add rule creation code for debugging */
 

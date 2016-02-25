@@ -6,7 +6,10 @@ CREATE TABLE t1(c1 int);
 
 CREATE TABLE t1_1(c2 int) INHERITS(t1);
 
+-- should error out messages with different bucketnum
 CREATE TABLE t1_1_w(c2 int) INHERITS(t1) WITH (bucketnum = 3);
+
+CREATE TABLE t1_1_w(c2 int) INHERITS(t1) WITH (bucketnum = 8);
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1');
 
@@ -20,6 +23,7 @@ CREATE TABLE t1_1_2(c2 int) INHERITS (t1) DISTRIBUTED BY(c2);
 
 CREATE TABLE t1_1_3(c2 int) INHERITS (t1) DISTRIBUTED RANDOMLY;
 
+-- should error out messages with different bucketnum
 CREATE TABLE t1_1_4(c2 int) INHERITS (t1) WITH (bucketnum = 3) DISTRIBUTED BY(c1) ;
 
 CREATE TABLE t1_1_5(c2 int) INHERITS (t1) WITH (bucketnum = 5) DISTRIBUTED BY(c2);
@@ -40,6 +44,7 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
 
 CREATE TABLE t1_2(LIKE t1);        
 
+-- should error out messages with different bucketnum
 CREATE TABLE t1_2_w(LIKE t1) WITH (bucketnum = 4);   
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_2');
@@ -54,6 +59,7 @@ CREATE TABLE t1_2_2(LIKE t1) DISTRIBUTED RANDOMLY;
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_2_2');
 
+-- should error out messages with different bucketnum
 CREATE TABLE t1_2_3(LIKE t1) WITH (bucketnum = 4) DISTRIBUTED BY (c1);
 
 CREATE TABLE t1_2_4(LIKE t1) WITH (bucketnum = 4) DISTRIBUTED RANDOMLY;
@@ -86,7 +92,7 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_3_4');
 
-DROP TABLE t1_3_4, t1_3_3, t1_3_2, t1_3_1, t1_3_w, t1_3, t1_2_4, t1_2_3, t1_2_2, t1_2_1, t1_2_w, t1_2, t1_1_1, t1_1_2, t1_1_3, t1_1_4, t1_1_5, t1_1_6, t1_1_w, t1_1, t1;
+DROP TABLE t1_3_4, t1_3_3, t1_3_2, t1_3_1, t1_3_w, t1_3, t1_2_4, t1_2_3, t1_2_2, t1_2_1, t1_2_w, t1_2, t1_1_1, t1_1_2, t1_1_3, t1_1_w, t1_1, t1;
 
 CREATE TABLE t2(c1 int) DISTRIBUTED BY (c1);
 
@@ -188,3 +194,34 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
 
 DROP TABLE t3_2, t3_1, t3;
 
+CREATE TABLE t4 (id int, date date, amt decimal(10,2))
+DISTRIBUTED RANDOMLY
+PARTITION BY RANGE (date)
+( PARTITION Jan08 START (date '2008-01-01') INCLUSIVE WITH (bucketnum = 9), 
+ PARTITION Feb08 START (date '2008-02-01') INCLUSIVE END (date '2008-03-01') EXCLUSIVE WITH (bucketnum = 8));
+
+-- expected error out
+select bucketnum, attrnums from gp_distribution_policy where localoid='t4'::regclass;
+
+CREATE TABLE t4 (id int, date date, amt decimal(10,2))
+DISTRIBUTED RANDOMLY
+PARTITION BY RANGE (date)
+( PARTITION Jan08 START (date '2008-01-01') INCLUSIVE WITH (bucketnum = 8), 
+ PARTITION Feb08 START (date '2008-02-01') INCLUSIVE END (date '2008-03-01') EXCLUSIVE WITH (bucketnum = 8));
+
+select bucketnum, attrnums from gp_distribution_policy where localoid='t4'::regclass;
+
+ALTER TABLE t4 ADD PARTITION 
+START (date '2008-03-01') INCLUSIVE 
+END (date '2008-04-01') EXCLUSIVE WITH (bucketnum = 6, tablename='t4_new_part');
+
+-- expected error out
+select bucketnum, attrnums from gp_distribution_policy where localoid='t4_new_part'::regclass;
+
+ALTER TABLE t4 ADD PARTITION 
+START (date '2008-03-01') INCLUSIVE 
+END (date '2008-04-01') EXCLUSIVE WITH (bucketnum = 8, tablename='t4_new_part');
+
+select bucketnum, attrnums from gp_distribution_policy where localoid='t4_new_part'::regclass;
+
+DROP TABLE t4 CASCADE;

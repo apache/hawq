@@ -13758,6 +13758,25 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 					 errhint("use a named partition"),
 							   errOmitLocation(true)));
 
+	PartitionElem *pElem = (PartitionElem *) pc2->arg1;
+	Node *pStoreAttr = pElem->storeAttr;
+	if (pStoreAttr && ((AlterPartitionCmd *)pStoreAttr)->arg1)
+	{
+		List *pWithList = (List *)(((AlterPartitionCmd *)pStoreAttr)->arg1);
+		GpPolicy *parentPolicy = GpPolicyFetch(CurrentMemoryContext, RelationGetRelid(rel));
+		int bucketnum = parentPolicy->bucketnum;
+		int child_bucketnum = GetRelOpt_bucket_num_fromOptions(pWithList, bucketnum);
+
+		if (child_bucketnum != bucketnum)
+			ereport(ERROR,
+					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+							errmsg("cannot add partition%s with bucketnum=%d "
+									"to %s with bucketnum=%d, "
+									"because they have different bucketnum",
+									namBuf, child_bucketnum,
+									lrelname, bucketnum)));
+	}
+
 	/* don't check if splitting or setting a subpartition template */
 	if (!is_split && !bSetTemplate)
 		/* We complain if partition already exists, so prule should be NULL */
