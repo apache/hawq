@@ -38,7 +38,7 @@ under the License.
     </configurations>
 
     <dependencies>
-      <dependency org="emc"             name="optimizer"       rev="1.617"          conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
+      <dependency org="emc"             name="optimizer"       rev="1.622"          conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
       <dependency org="emc"             name="libgpos"         rev="1.133"          conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
       <dependency org="xerces"          name="xerces-c"        rev="3.1.1-p1"       conf="osx106_x86->osx106_x86_32;osx106_x86_32->osx106_x86_32;rhel5_x86_64->rhel5_x86_64;suse10_x86_64->suse10_x86_64" />
     </dependencies>
