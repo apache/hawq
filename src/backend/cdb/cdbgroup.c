@@ -649,11 +649,16 @@ cdb_grouping_planner(PlannerInfo* root,
 		{
 			TargetEntry *tle = (TargetEntry*)lfirst(lc);
 			
+			/*
+			 * the first tlist whose expression is equal() to the expression of tle
+			 * may not be the desired one. We should also check if ressortgroupref is
+			 * same if ressortgroupref > 0
+			 */
 			if ( IsA(tle->expr, Var) && tle->resname == NULL )
 			{
 				TargetEntry *vartle =
-					tlist_member((Node*)tle->expr, group_context->tlist);
-				
+						tlist_member_with_ressortgroupref((Node*)tle->expr,
+								                          group_context->tlist, tle->ressortgroupref);
 				if ( vartle != NULL && vartle->resname != NULL )
 					tle->resname = pstrdup(vartle->resname);
 			}
@@ -3365,7 +3370,7 @@ Node* deconstruct_expr_mutator(Node *node, MppGroupContext *ctx)
 	 * a Var node referring to the (lower) preliminary aggregation's
 	 * target list.
 	 */
-	tle = tlist_member(node, ctx->grps_tlist);
+	tle = tlist_member_with_ressortgroupref(node, ctx->grps_tlist, ctx->split_aggref_sortgroupref);
 	if ( tle != NULL )
 	{
 		return  (Node*) makeVar(grp_varno, tle->resno,
@@ -3940,8 +3945,7 @@ add_second_stage_agg(PlannerInfo *root,
 		parse->targetList = copyObject(upper_tlist); /* Match range. */
 	}
 
-	result_plan = add_subqueryscan(root, p_current_pathkeys, 
-								   1, subquery, result_plan);
+	result_plan = add_subqueryscan(root, p_current_pathkeys, 1, subquery, result_plan);
 
 	/* Add an Agg node */
 	/* convert current_numGroups to long int */
