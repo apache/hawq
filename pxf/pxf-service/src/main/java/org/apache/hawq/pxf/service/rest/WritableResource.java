@@ -47,7 +47,7 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
  * Running this resource manually:
  *
  * run:
- 	curl -i -X post "http://localhost:50070/pxf/{version}/Writable/stream?path=/data/curl/curl`date \"+%h%d_%H%M%s\"`" \
+ 	curl -i -X post "http://localhost:51200/pxf/{version}/Writable/stream?path=/data/curl/curl`date \"+%h%d_%H%M%s\"`" \
  	--header "X-GP-Accessor: TextFileWAccessor" \
  	--header "X-GP-Resolver: TextWResolver" \
  	--header "Content-Type:application/octet-stream" \
@@ -57,9 +57,9 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
  	--header "X-GP-SEGMENT-COUNT: 3" \
  	--header "X-GP-HAS-FILTER: 0" \
  	--header "X-GP-FORMAT: TEXT" \
- 	--header "X-GP-URI: pxf://localhost:50070/data/curl/?Accessor=TextFileWAccessor&Resolver=TextWResolver" \
+ 	--header "X-GP-URI: pxf://localhost:51200/data/curl/?Accessor=TextFileWAccessor&Resolver=TextWResolver" \
  	--header "X-GP-URL-HOST: localhost" \
- 	--header "X-GP-URL-PORT: 50070" \
+ 	--header "X-GP-URL-PORT: 51200" \
  	--header "X-GP-ATTRS: 0" \
  	--header "X-GP-DATA-DIR: data/curl/" \
  	  -d "data111" -d "data222"
