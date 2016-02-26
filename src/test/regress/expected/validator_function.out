@@ -53,7 +53,7 @@ FROM (
   SELECT oid FROM pg_proc
   WHERE proname = 'foo'
 ) AS bar;
-ERROR:  language validation function 2248 called for language 10886 in stead of 10885
+ERROR:  language validation function 2248 called for language 10885 in stead of 10884
 -- --------------------------------------
 -- Cannot run validator on functions to
 -- which user has no privilege to execute
