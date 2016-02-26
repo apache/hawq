@@ -91,8 +91,6 @@ planner_hook_type planner_hook = NULL;
 
 ParamListInfo PlannerBoundParamList = NULL;		/* current boundParams */
 
-static int PlanningDepth = 0;		/* Planning depth */
-
 /* Expression kind codes for preprocess_expression */
 #define EXPRKIND_QUAL			0
 #define EXPRKIND_TARGET			1
@@ -166,32 +164,6 @@ static void sort_canonical_gs_list(List *gs, int *p_nsets, Bitmapset ***p_sets);
 
 static Plan *pushdown_preliminary_limit(Plan *plan, Node *limitCount, int64 count_est, Node *limitOffset, int64 offset_est);
 bool is_dummy_plan(Plan *plan);
-
-
-bool is_in_planning_phase(void)
-{
-	if (PlanningDepth > 0)
-	{
-		return true;
-	}
-	else if (PlanningDepth < 0)
-	{
-		elog(ERROR, "Invalid PlanningDepth %d while getting planning phase", PlanningDepth);
-	}
-
-	return false;
-}
-
-void increase_planning_depth(void)
-{
-	PlanningDepth++;
-}
-
-void decrease_planning_depth(void)
-{
-	PlanningDepth--;
-}
-
 
 #ifdef USE_ORCA
 /**
@@ -328,8 +300,6 @@ planner(Query *parse, int cursorOptions,
 	 * resource to run this query. After gaining the resource, we can perform the
 	 * actual optimization.
 	 */
-	increase_planning_depth();
-
 	plannerLevel++;
 	if (!resourceNegotiateDone)
 	{
@@ -338,8 +308,6 @@ planner(Query *parse, int cursorOptions,
       START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Resource_Negotiator));
       {
         resource_negotiator(parse, cursorOptions, boundParams, resourceLife, &ppResult);
-
-		decrease_planning_depth();
 
 		if(ppResult->stmt && ppResult->stmt->planTree)
 		{
@@ -350,8 +318,6 @@ planner(Query *parse, int cursorOptions,
 	  }
 	  PG_CATCH();
 	  {
-		decrease_planning_depth();
-
 		if ((ppResult != NULL))
 		{
 		  pfree(ppResult);

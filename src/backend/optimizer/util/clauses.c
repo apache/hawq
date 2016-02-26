@@ -2831,15 +2831,8 @@ simplify_function(Oid funcid, Oid result_type, List *args,
 	if (!HeapTupleIsValid(func_tuple))
 		elog(ERROR, "cache lookup failed for function %u", funcid);
 
-	if (is_in_planning_phase())
-	{
-		newexpr = NULL;
-	}
-	else
-	{
-		newexpr = evaluate_function(funcid, result_type, args,
-		                            func_tuple, context);
-	}
+	newexpr = evaluate_function(funcid, result_type, args,
+								func_tuple, context);
 
 	if (large_const(newexpr, context->max_size))
 	{
