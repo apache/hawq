@@ -344,7 +344,7 @@ pg_tablespace_size_oid(PG_FUNCTION_ARGS)
 		
 		initStringInfo(&buffer);
 
-		appendStringInfo(&buffer, "select sum(pg_tablespace_size(%u))::int8 from gp_dist_random('gp_id');", tblspcOid);
+		appendStringInfo(&buffer, "select sum(pg_tablespace_size(%u))::int8 from gp_dist_random('gp_version_at_initdb');", tblspcOid);
 
 		size += get_size_from_segDBs(buffer.data);
 	}
@@ -373,7 +373,7 @@ pg_tablespace_size_name(PG_FUNCTION_ARGS)
 
 		initStringInfo(&buffer);
 
-		appendStringInfo(&buffer, "select sum(pg_tablespace_size('%s'))::int8 from gp_dist_random('gp_id');", NameStr(*tblspcName));
+		appendStringInfo(&buffer, "select sum(pg_tablespace_size('%s'))::int8 from gp_dist_random('gp_version_at_initdb');", NameStr(*tblspcName));
 
 		size += get_size_from_segDBs(buffer.data);
 	}
@@ -609,7 +609,7 @@ pg_total_relation_size_oid(PG_FUNCTION_ARGS)
 
 		initStringInfo(&buffer);
 
-		appendStringInfo(&buffer, "select sum(pg_total_relation_size('%s.%s'))::int8 from gp_dist_random('gp_id');", quote_identifier(schemaName), quote_identifier(relName));
+		appendStringInfo(&buffer, "select sum(pg_total_relation_size('%s.%s'))::int8 from gp_dist_random('gp_version_at_initdb');", quote_identifier(schemaName), quote_identifier(relName));
 
 		size += get_size_from_segDBs(buffer.data);
 	}
@@ -655,7 +655,7 @@ pg_total_relation_size_name(PG_FUNCTION_ARGS)
 		rawname = DatumGetCString(DirectFunctionCall1(textout,
 													  PointerGetDatum(relname)));
 		
-		appendStringInfo(&buffer, "select sum(pg_total_relation_size('%s'))::int8 from gp_dist_random('gp_id');", rawname);
+		appendStringInfo(&buffer, "select sum(pg_total_relation_size('%s'))::int8 from gp_dist_random('gp_version_at_initdb');", rawname);
 		
 		size += get_size_from_segDBs(buffer.data);
 	}

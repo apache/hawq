@@ -11,7 +11,7 @@
 -- or replacing the on-disk representation of views. These must be done as DML.
 -- For example:
 --   update @gpupgradeschemaname@.pg_aggregate set dummy = 123;
---   select catDML('update pg_catalog.pg_aggregate set dummy = 123') from gp_dist_random('gp_id');
+--   select catDML('update pg_catalog.pg_aggregate set dummy = 123') from gp_dist_random('gp_version_at_initdb');
 --
 -- make fundamental changes to pg_proc ...
 SELECT catDML('UPDATE pg_class SET relnatts = 20 WHERE relname = ''pg_proc''');

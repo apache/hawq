@@ -28,7 +28,7 @@ class ReconfigDetectionSQLQueryCommand(SQLCommand):
     """A distributed query that will cause the system to detect
     the reconfiguration of the system"""
     
-    query = "SELECT * FROM gp_dist_random('gp_id')"
+    query = "SELECT * FROM gp_dist_random('gp_version_at_initdb')"
     
     def __init__(self, conn):
         SQLCommand.__init__(self, "Reconfig detection sql query")

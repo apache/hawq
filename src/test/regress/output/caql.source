@@ -407,7 +407,6 @@ WARNING:  skipping "gp_configuration" --- only table or database owner can vacuu
 WARNING:  skipping "gp_configuration_history" --- only table or database owner can vacuum it
 WARNING:  skipping "gp_db_interfaces" --- only table or database owner can vacuum it
 WARNING:  skipping "gp_interfaces" --- only table or database owner can vacuum it
-WARNING:  skipping "gp_id" --- only table or database owner can vacuum it
 WARNING:  skipping "gp_distribution_policy" --- only table or database owner can vacuum it
 WARNING:  skipping "gp_version_at_initdb" --- only table or database owner can vacuum it
 WARNING:  skipping "gp_segment_configuration" --- only table or database owner can vacuum it

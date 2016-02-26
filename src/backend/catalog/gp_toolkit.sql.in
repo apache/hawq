@@ -1881,7 +1881,7 @@ GRANT EXECUTE ON FUNCTION %%JETPACK_PREFIX_AUX%%workfile_entries_f() TO public;
 
 CREATE VIEW  %%JETPACK_PREFIX_AUX%%workfile_data AS
    SELECT C.*
-          FROM gp_dist_random('gp_id'), %%JETPACK_PREFIX_AUX%%workfile_entries_f() AS C (
+          FROM gp_dist_random('gp_version_at_initdb'), %%JETPACK_PREFIX_AUX%%workfile_entries_f() AS C (
             segid int, 
             path text, 
             hash int, 
@@ -1898,7 +1898,7 @@ CREATE VIEW  %%JETPACK_PREFIX_AUX%%workfile_data AS
           )
     UNION ALL
     SELECT C.*
-          FROM gp_id, %%JETPACK_PREFIX_AUX%%workfile_entries_f() AS C (
+          FROM gp_version_at_initdb, %%JETPACK_PREFIX_AUX%%workfile_entries_f() AS C (
             segid int, 
             path text, 
             hash int, 
@@ -2024,9 +2024,9 @@ CREATE FUNCTION %%JETPACK_PREFIX%%workfile_cache_clear_segment(content int)
 RETURNS SETOF int
 AS
 $$
- SELECT C.* FROM gp_dist_random('gp_id'), %%JETPACK_PREFIX_AUX%%workfile_cache_clear_f($1) as C
+ SELECT C.* FROM gp_dist_random('gp_version_at_initdb'), %%JETPACK_PREFIX_AUX%%workfile_cache_clear_f($1) as C
  UNION ALL
- SELECT C.* FROM gp_id, %%JETPACK_PREFIX_AUX%%workfile_cache_clear_f($1) as C;
+ SELECT C.* FROM gp_version_at_initdb, %%JETPACK_PREFIX_AUX%%workfile_cache_clear_f($1) as C;
 $$
 LANGUAGE SQL;
 

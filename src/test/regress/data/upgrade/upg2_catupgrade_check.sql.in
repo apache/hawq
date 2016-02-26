@@ -28,7 +28,7 @@ $$ language 'plpgsql';
 create or replace function @gpupgradeschemaname@.addProcPIN(procid oid) returns int as $$
 begin
   INSERT INTO @gpupgradeschemaname@.pg_depend values(0,0,0, 1255, procid, 0, 'p');
-  PERFORM @gpupgradeschemaname@.catDML('INSERT INTO @gpupgradeschemaname@.pg_depend values(0,0,0, 1255, '||procid||', 0, ''p'')') from gp_dist_random('gp_id');
+  PERFORM @gpupgradeschemaname@.catDML('INSERT INTO @gpupgradeschemaname@.pg_depend values(0,0,0, 1255, '||procid||', 0, ''p'')') from gp_dist_random('gp_version_at_initdb');
   return 1;
 end;
 $$ language 'plpgsql';
@@ -55,7 +55,7 @@ select @gpupgradeschemaname@.catDML(
         where (tableoid,oid) not in (Select refclassid, refobjid from @gpupgradeschemaname@.pg_depend)
           and pronamespace = 11
           and oid < 16384')
-from gp_dist_random('gp_id');
+from gp_dist_random('gp_version_at_initdb');
 
 drop function @gpupgradeschemaname@.catDML(stmt text);
 drop function @gpupgradeschemaname@.addProcPIN(procid oid);

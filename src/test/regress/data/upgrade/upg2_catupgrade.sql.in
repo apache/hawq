@@ -44,7 +44,7 @@ create language plpgsql;
   -- EXECUTE 'SHOW gp_session_role' INTO role;
   -- IF dbid = 0 THEN
     -- IF role = 'dispatch' THEN
-      -- PERFORM @gpupgradeschemaname@.catDML(stmt) FROM gp_dist_random('gp_id');
+      -- PERFORM @gpupgradeschemaname@.catDML(stmt) FROM gp_dist_random('gp_version_at_initdb');
     -- END IF;
   -- END IF;
 
