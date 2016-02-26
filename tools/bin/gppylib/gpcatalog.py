@@ -72,7 +72,6 @@ PERSISTENT_TABLES = [
 
 # Hard coded tables that have different values on every segment
 SEGMENT_LOCAL_TABLES = [
-    'gp_id',
     'pg_depend',  # (not if we fix oid inconsistencies)
     'pg_shdepend', # (not if we fix oid inconsistencies)
     'gp_fastsequence', # AO segment row id allocations

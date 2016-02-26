@@ -418,9 +418,9 @@ SELECT * FROM multiset_5( TABLE(SELECT a, b from example)) where (a,b) in (selec
 -- end equivalent
 
 -- Explain a couple interesting cases
-explain SELECT * FROM multiset_5( TABLE (SELECT dbid, gpname FROM gp_id) );
-explain SELECT * FROM multiset_5( TABLE (SELECT dbid, gpname FROM gp_id SCATTER BY dbid) );
-explain SELECT * FROM multiset_5( TABLE (SELECT dbid, gpname FROM gp_id SCATTER RANDOMLY) );
+explain SELECT * FROM multiset_5( TABLE (SELECT schemaversion, productversion FROM gp_version_at_initdb) );
+explain SELECT * FROM multiset_5( TABLE (SELECT schemaversion, productversion FROM gp_version_at_initdb SCATTER BY schemaversion) );
+explain SELECT * FROM multiset_5( TABLE (SELECT schemaversion, productversion FROM gp_version_at_initdb SCATTER RANDOMLY) );
 explain SELECT * FROM multiset_5( TABLE (SELECT * FROM example) );
 explain SELECT * from multiset_5( TABLE (SELECT * FROM example ORDER BY a limit 10 ) );
 explain SELECT * FROM multiset_5( TABLE (SELECT * FROM example SCATTER BY a) );

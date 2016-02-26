@@ -1546,32 +1546,32 @@ SELECT * FROM multiset_5( TABLE(SELECT a, b from example)) where (a,b) in (selec
 
 -- end equivalent
 -- Explain a couple interesting cases
-explain SELECT * FROM multiset_5( TABLE (SELECT dbid, gpname FROM gp_id) );
+explain SELECT * FROM multiset_5( TABLE (SELECT schemaversion, productversion FROM gp_version_at_initdb) );
                               QUERY PLAN                               
 -----------------------------------------------------------------------
  Table Function Scan on multiset_5  (cost=0.00..1.11 rows=64 width=36)
-   ->  Seq Scan on gp_id  (cost=0.00..1.01 rows=8 width=66)
+   ->  Seq Scan on gp_version_at_initdb  (cost=0.00..1.01 rows=8 width=66)
  Settings:  gp_segments_for_planner=8
 (3 rows)
 
-explain SELECT * FROM multiset_5( TABLE (SELECT dbid, gpname FROM gp_id SCATTER BY dbid) );
+explain SELECT * FROM multiset_5( TABLE (SELECT schemaversion, productversion FROM gp_version_at_initdb SCATTER BY schemaversion) );
                                     QUERY PLAN                                    
 ----------------------------------------------------------------------------------
  Gather Motion 2:1  (slice2; segments: 2)  (cost=0.00..1.11 rows=4 width=36)
    ->  Table Function Scan on multiset_5  (cost=0.00..1.11 rows=4 width=36)
          ->  Redistribute Motion 1:2  (slice1)  (cost=0.00..1.01 rows=8 width=66)
-               Hash Key: gp_id.dbid
+               Hash Key: gp_version_at_initdb.schemaversion
                ->  Seq Scan on gp_id  (cost=0.00..1.01 rows=8 width=66)
  Settings:  gp_segments_for_planner=8
 (6 rows)
 
-explain SELECT * FROM multiset_5( TABLE (SELECT dbid, gpname FROM gp_id SCATTER RANDOMLY) );
+explain SELECT * FROM multiset_5( TABLE (SELECT schemaversion, productversion FROM gp_version_at_initdb SCATTER RANDOMLY) );
                                     QUERY PLAN                                    
 ----------------------------------------------------------------------------------
  Gather Motion 2:1  (slice2; segments: 2)  (cost=0.00..1.11 rows=4 width=36)
    ->  Table Function Scan on multiset_5  (cost=0.00..1.11 rows=4 width=36)
          ->  Redistribute Motion 1:2  (slice1)  (cost=0.00..1.01 rows=8 width=66)
-               ->  Seq Scan on gp_id  (cost=0.00..1.01 rows=8 width=66)
+               ->  Seq Scan on gp_version_at_initdb  (cost=0.00..1.01 rows=8 width=66)
  Settings:  gp_segments_for_planner=8
 (5 rows)
 

@@ -11,7 +11,7 @@
 -- or replacing the on-disk representation of views. These must be done as DML.
 -- For example:
 --   update @gpupgradeschemaname@.pg_aggregate set dummy = 123;
---   select catDML('update pg_catalog.pg_aggregate set dummy = 123') from gp_dist_random('gp_id');
+--   select catDML('update pg_catalog.pg_aggregate set dummy = 123') from gp_dist_random('gp_version_at_initdb');
 --
 -- The first DML will populate the master catalog and the second DML will
 -- update the catalog in all the segments.
@@ -142,7 +142,7 @@ select @gpupgradeschemaname@.addProcPIN(2620, oid)
 delete from pg_depend where classid = 2620 and objid = (select oid from pg_trigger where tgname = 'pg_sync_pg_auth_time_constraint' and tgrelid=2914);
 select @gpupgradeschemaname@.catDML(
   'delete from pg_depend where classid = 2620 and objid = (select oid from pg_trigger where tgname = ''pg_sync_pg_auth_time_constraint'' and tgrelid=2914)')
-from gp_dist_random('gp_id');
+from gp_dist_random('gp_version_at_initdb');
 
 CREATE OR REPLACE VIEW @gpupgradeschemaname@.pg_max_external_files AS
     SELECT   address::name as hostname, count(*) as maxfiles
@@ -386,7 +386,7 @@ CREATE AGGREGATE @gpupgradeschemaname@.pg_partition_oid(oid, record) (
 update @gpupgradeschemaname@.pg_class set relhaspkey = false where relnamespace = 11 and relname = 'gp_relation_node';
 select @gpupgradeschemaname@.catDML(
 'update @gpupgradeschemaname@.pg_class set relhaspkey = false where relnamespace = 11 and relname = ''gp_relation_node''')
-from gp_dist_random('gp_id');
+from gp_dist_random('gp_version_at_initdb');
 
 
 ---
@@ -394,14 +394,14 @@ from gp_dist_random('gp_id');
 ---
 update @gpupgradeschemaname@.pg_pltemplate set tmpltrusted=true where tmplname='pljava';
 select catDML('update @gpupgradeschemaname@.pg_pltemplate set tmpltrusted=true where tmplname=''pljava''')
-  from gp_dist_random('gp_id');
+  from gp_dist_random('gp_version_at_initdb');
 
 insert into @gpupgradeschemaname@.pg_pltemplate 
   select 'pljavau', false, 'pljavau_call_handler', null, '$libdir/pljava', null
   where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname='pljavau')=0;
 select catDML('insert into @gpupgradeschemaname@.pg_pltemplate 
   select ''pljavau'', false, ''pljavau_call_handler'', null, ''$libdir/pljava'', null
-  where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname=''pljavau'')=0') from gp_dist_random('gp_id');
+  where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname=''pljavau'')=0') from gp_dist_random('gp_version_at_initdb');
 
 
 -- Column compression improvements assume that all CO tables have
@@ -454,7 +454,7 @@ INSERT INTO @gpupgradeschemaname@.pg_attribute_encoding
 		WHERE columnstore=''t'') a,
 		pg_attribute t
 		WHERE a.relid = t.attrelid AND t.attnum > 0;')
-	FROM gp_dist_random('gp_id');
+	FROM gp_dist_random('gp_version_at_initdb');
 
 -- pg_compression
 
@@ -488,14 +488,14 @@ drop schema __@gpupgradeschemaname@_gpmigrator;
 ---
 update @gpupgradeschemaname@.pg_pltemplate set tmpltrusted=true where tmplname='pljava';
 select catDML('update @gpupgradeschemaname@.pg_pltemplate set tmpltrusted=true where tmplname=''pljava''')
-  from gp_dist_random('gp_id');
+  from gp_dist_random('gp_version_at_initdb');
 
 insert into @gpupgradeschemaname@.pg_pltemplate 
   select 'pljavau', false, 'pljavau_call_handler', null, '$libdir/pljava', null
   where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname='pljavau')=0;
 select catDML('insert into @gpupgradeschemaname@.pg_pltemplate 
   select ''pljavau'', false, ''pljavau_call_handler'', null, ''$libdir/pljava'', null
-  where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname=''pljavau'')=0') from gp_dist_random('gp_id');
+  where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname=''pljavau'')=0') from gp_dist_random('gp_version_at_initdb');
 
 
 ---

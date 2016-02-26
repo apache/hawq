@@ -580,7 +580,7 @@ inline static bool GpPersistent_SkipXLogInfo(
 		return true;
 	
 	/*
-	 * gp_id and pg_shdepend 
+	 * pg_shdepend 
 	 */
 	if (testOid == SharedDependRelationId)					// 1214
 		return true;

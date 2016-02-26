@@ -1039,9 +1039,9 @@ ERROR:  argument of percentile function must not contain grouping(), or group_id
 LINE 1: select percentile_disc(0.1) within group (order by group_id(...
                ^
 -- subquery is not allowed to the argument
-select percentile_cont((select 0.1 from gp_id)) within group (order by a) from perct;
+select percentile_cont((select 0.1 from gp_version_at_initdb)) within group (order by a) from perct;
 ERROR:  argument of percentile function must not contain subqueries
-LINE 1: select percentile_cont((select 0.1 from gp_id)) within group...
+LINE 1: select percentile_cont((select 0.1 from gp_version_at_initdb)) within group...
                                ^
 -- the argument must not be volatile expression
 select percentile_cont(random()) within group (order by a) from perct;

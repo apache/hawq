@@ -32,9 +32,9 @@ CREATE FUNCTION gp_workfile_mgr_test_allsegs(testname text)
 RETURNS SETOF BOOL
 AS
 $$
- SELECT C.* FROM gp_dist_random('gp_id'), workfile.gp_workfile_mgr_test($1) as C
+ SELECT C.* FROM gp_dist_random('gp_version_at_initdb'), workfile.gp_workfile_mgr_test($1) as C
  UNION ALL
- SELECT C.* FROM gp_id, workfile.gp_workfile_mgr_test($1) as C;
+ SELECT C.* FROM gp_version_at_initdb, workfile.gp_workfile_mgr_test($1) as C;
 $$
 LANGUAGE SQL;
 

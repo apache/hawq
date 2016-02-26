@@ -11,7 +11,7 @@
 -- or replacing the on-dist representation of views. These must be done DML.
 -- For example:
 --   update pg_catalog.pg_aggregate set dummy = 123;
---   select catDML('update pg_catalog.pg_aggregate set dummy = 123') from gp_dist_random('gp_id');
+--   select catDML('update pg_catalog.pg_aggregate set dummy = 123') from gp_dist_random('gp_version_at_initdb');
 --
 -- The first DML will populate the mater catalog and the second DML will update the catalog
 -- in all the segments.
@@ -59,16 +59,16 @@ comment on function @gpupgradeschemaname@.gp_persistent_set_relation_bufpool_kin
 is 'Populate the gp_persistent_relation_node table''s relation_bufpool_kind column for the whole database instance for upgrade from 4.0 to 4.1';
 
 select gp_persistent_set_relation_bufpool_kind_all();
-select gp_persistent_set_relation_bufpool_kind_all() from gp_dist_random('gp_id');
+select gp_persistent_set_relation_bufpool_kind_all() from gp_dist_random('gp_version_at_initdb');
 
 update @gpupgradeschemaname@.pg_class set relhaspkey = true where oid = 5094;
-select catDML('update @gpupgradeschemaname@.pg_class set relhaspkey = true where oid = 5094') from gp_dist_random('gp_id');
+select catDML('update @gpupgradeschemaname@.pg_class set relhaspkey = true where oid = 5094') from gp_dist_random('gp_version_at_initdb');
 --
 -- Ordered Aggregates
 --
 alter table @gpupgradeschemaname@.pg_aggregate add column aggordered boolean;
 update @gpupgradeschemaname@.pg_aggregate set aggordered = 'f';
-select catDML('update @gpupgradeschemaname@.pg_aggregate set aggordered = ''f''') from gp_dist_random('gp_id');
+select catDML('update @gpupgradeschemaname@.pg_aggregate set aggordered = ''f''') from gp_dist_random('gp_version_at_initdb');
 
 ---
 --- PL/Java template
@@ -78,7 +78,7 @@ insert into @gpupgradeschemaname@.pg_pltemplate
   where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname='pljava')=0;
 select catDML('insert into @gpupgradeschemaname@.pg_pltemplate 
   select ''pljava'', false, ''pljava_call_handler'', null, ''$libdir/pljava'', null
-  where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname=''pljava'')=0') from gp_dist_random('gp_id');
+  where (select count(*) from @gpupgradeschemaname@.pg_pltemplate where tmplname=''pljava'')=0') from gp_dist_random('gp_version_at_initdb');
 
 --------------------------------
 -- Re-create gp_toolkit
@@ -152,7 +152,7 @@ select 1/0 from pg_catalog.pg_opclass, pg_catalog.pg_namespace n where opcnamesp
 select 1/0 from pg_catalog.pg_conversion, pg_catalog.pg_namespace n where connamespace = n.oid and n.nspname = '@gpupgradetoolkitschema@';
 
 delete from @gpupgradeschemaname@.pg_depend where refobjid=8001;
-select catDML('delete from @gpupgradeschemaname@.pg_depend where refobjid=8001') from gp_dist_random('gp_id');
+select catDML('delete from @gpupgradeschemaname@.pg_depend where refobjid=8001') from gp_dist_random('gp_version_at_initdb');
 
 drop schema if exists @gpupgradetoolkitschema@;
 create schema @gpupgradetoolkitschema@;
@@ -507,7 +507,7 @@ CREATE OR REPLACE VIEW @gpupgradeschemaname@.pg_locks AS
 create writable external web table @gpupgradeschemaname@.pg_resqueue_delete (s text)
   execute 'PGOPTIONS=''-c gp_session_role=utility'' psql -p $GP_SEG_PORT --command "delete from @gpupgradeschemaname@.pg_resqueue" template1 $GP_USER'
   format 'csv';
-select catDML('insert into @gpupgradeschemaname@.pg_resqueue_delete values(1)') from gp_dist_random('gp_id');
+select catDML('insert into @gpupgradeschemaname@.pg_resqueue_delete values(1)') from gp_dist_random('gp_version_at_initdb');
 drop external web table @gpupgradeschemaname@.pg_resqueue_delete;
 
 create writable external web table @gpupgradeschemaname@.pg_resqueue_rebuilt (
@@ -532,7 +532,7 @@ create or replace function @gpupgradeschemaname@.distributed_insert_gp_tmp(
 ) returns int as $$
 begin
   perform @gpupgradeschemaname@.insert_gp_tmp(rsqoid, rsqname, cnt, cost, oc, icost)
-    from gp_dist_random('gp_id');
+    from gp_dist_random('gp_version_at_initdb');
   return 1;
 end;
 $$ language 'plpgsql';
@@ -562,7 +562,7 @@ drop function @gpupgradeschemaname@.distributed_insert_gp_tmp(oid, name, real, r
 create writable external web table @gpupgradeschemaname@.pg_resqueuecapability_delete (s text)
   execute 'PGOPTIONS=''-c gp_session_role=utility'' psql -p $GP_SEG_PORT --command "delete from @gpupgradeschemaname@.pg_resqueuecapability" template1 $GP_USER'
   format 'csv';
-select catDML('insert into @gpupgradeschemaname@.pg_resqueuecapability_delete values(1)') from gp_dist_random('gp_id');
+select catDML('insert into @gpupgradeschemaname@.pg_resqueuecapability_delete values(1)') from gp_dist_random('gp_version_at_initdb');
 drop external web table @gpupgradeschemaname@.pg_resqueuecapability_delete;
 
 create writable external web table @gpupgradeschemaname@.pg_resqueuecapability_rebuilt (
@@ -587,7 +587,7 @@ create or replace function @gpupgradeschemaname@.distributed_insert_gp_tmp(
 ) returns int as $$
 begin
   perform @gpupgradeschemaname@.insert_gp_tmp(rsqoid, resqueueid, restypid, ressetting)
-    from gp_dist_random('gp_id');
+    from gp_dist_random('gp_version_at_initdb');
   return 1;
 end;
 $$ language 'plpgsql';
@@ -615,7 +615,7 @@ drop function @gpupgradeschemaname@.distributed_insert_gp_tmp(rsqoid oid, resque
 create writable external web table @gpupgradeschemaname@.pg_resourcetype_delete (s text)
   execute 'PGOPTIONS=''-c gp_session_role=utility'' psql -p $GP_SEG_PORT --command "delete from @gpupgradeschemaname@.pg_resourcetype" template1 $GP_USER'
   format 'csv';
-select catDML('insert into @gpupgradeschemaname@.pg_resourcetype_delete values(1)') from gp_dist_random('gp_id');
+select catDML('insert into @gpupgradeschemaname@.pg_resourcetype_delete values(1)') from gp_dist_random('gp_version_at_initdb');
 drop external web table @gpupgradeschemaname@.pg_resourcetype_delete;
 
 create writable external web table @gpupgradeschemaname@.pg_resourcetype_rebuilt (
@@ -647,7 +647,7 @@ create or replace function @gpupgradeschemaname@.distributed_insert_gp_tmp(
 begin
   perform @gpupgradeschemaname@.insert_gp_tmp(rsqoid, resname, restypid, resrequired, reshasdefault,
   reshasdisable, resdefaultsetting, resdisabledsetting)
-    from gp_dist_random('gp_id');
+    from gp_dist_random('gp_version_at_initdb');
   return 1;
 end;
 $$ language 'plpgsql';
@@ -672,7 +672,7 @@ drop function @gpupgradeschemaname@.distributed_insert_gp_tmp(rsqoid oid, resnam
 alter table @gpupgradeschemaname@.pg_authid add column rolcreaterexthdfs bool;
 alter table @gpupgradeschemaname@.pg_authid add column rolcreatewexthdfs bool;
 update @gpupgradeschemaname@.pg_authid set rolcreaterexthdfs = false, rolcreatewexthdfs = false;
-select catDML('update @gpupgradeschemaname@.pg_authid set rolcreaterexthdfs = false, rolcreatewexthdfs = false') from gp_dist_random('gp_id');
+select catDML('update @gpupgradeschemaname@.pg_authid set rolcreaterexthdfs = false, rolcreatewexthdfs = false') from gp_dist_random('gp_version_at_initdb');
 
 -- sync pg_authid.rolsequeue between master and seg
 select catDML('select catDML(''update @gpupgradeschemaname@.pg_authid set rolresqueue ='||rolresqueue||'
