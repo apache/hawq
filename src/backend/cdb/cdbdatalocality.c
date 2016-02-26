@@ -41,7 +41,6 @@
 #include "utils/tqual.h"
 #include "utils/memutils.h"
 #include "executor/execdesc.h"
-#include "executor/spi.h"
 #include "nodes/nodes.h"
 #include "nodes/parsenodes.h"
 #include "optimizer/walkers.h"
@@ -3960,11 +3959,10 @@ static void cleanup_allocation_algorithm(
 
 /*
  * calculate_planner_segment_num
- * fixedVsegNum is used by PBE, since all the execute should use the same number of vsegs.
  */
 SplitAllocResult *
 calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
-		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum, int fixedVsegNum) {
+		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum) {
 	SplitAllocResult *result = NULL;
 	QueryResource *resource = NULL;
 	QueryResourceParameters *resource_parameters = NULL;
@@ -4048,15 +4046,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 		/*use inherit resource*/
 		if (resourceLife == QRL_INHERIT) {
-
-			if ( SPI_IsInPrepare() && (GetActiveQueryResource() == NULL) )
-			{
-				resource = NULL;
-			}
-			else
-			{
-				resource = AllocateResource(resourceLife, sliceNum, 0, 0, 0, NULL, 0);
-			}
+			resource = AllocateResource(resourceLife, sliceNum, 0, 0, 0, NULL, 0);
 
 			saveQueryResourceParameters(
 							resource_parameters,  /* resource_parameters */
@@ -4207,11 +4197,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				maxTargetSegmentNumber = enforce_virtual_segment_number;
 				minTargetSegmentNumber = enforce_virtual_segment_number;
 			}
-			/* in PBE mode, the execute should use the same vseg number. */
-			if(fixedVsegNum > 0 ){
-				maxTargetSegmentNumber = fixedVsegNum;
-				minTargetSegmentNumber = fixedVsegNum;
-			}
 			uint64_t before_rm_allocate_resource = gettime_microsec();
 
 			/* cost is use by RM to balance workload between hosts. the cost is at least one block size*/
@@ -4219,40 +4204,9 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			mincost <<= 20;
 			int64 queryCost = context.total_size < mincost ? mincost : context.total_size;
 			if (QRL_NONE != resourceLife) {
-
-				if (SPI_IsInPrepare())
-				{
-					resource = NULL;
-					/*
-					 * prepare need to get resource quota from RM
-					 * and pass quota(planner_segments) to Orca or Planner to generate plan
-					 * the following executes(in PBE) should reallocate the same number
-					 * of resources.
-					 */
-					uint32 seg_num;
-					uint32 seg_num_min;
-					uint32 seg_memory_mb;
-					double seg_core;
-
-					GetResourceQuota(maxTargetSegmentNumber,
-					                 minTargetSegmentNumber,
-					                 &seg_num,
-					                 &seg_num_min,
-					                 &seg_memory_mb,
-					                 &seg_core);
-
-					planner_segments = seg_num;
-					minTargetSegmentNumber = planner_segments;
-					maxTargetSegmentNumber = planner_segments;
-				}
-				else
-				{
-					resource = AllocateResource(QRL_ONCE, sliceNum, queryCost,
-					                            maxTargetSegmentNumber,
-					                            minTargetSegmentNumber,
-					                            context.host_context.hostnameVolInfos,
-					                            context.host_context.size);
-				}
+				resource = AllocateResource(QRL_ONCE, sliceNum, queryCost,
+						maxTargetSegmentNumber, minTargetSegmentNumber,
+						context.host_context.hostnameVolInfos, context.host_context.size);
 
 				saveQueryResourceParameters(
 								resource_parameters,                   /* resource_parameters */
@@ -4282,7 +4236,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 			if (resource == NULL) {
 				result->resource = NULL;
-				result->resource_parameters = resource_parameters;
+				result->resource_parameters = NULL;
 				result->alloc_results = NIL;
 				result->relsType = NIL;
 				result->planner_segments = planner_segments;
