@@ -13770,11 +13770,10 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 		if (child_bucketnum != bucketnum)
 			ereport(ERROR,
 					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-							errmsg("cannot add partition%s with bucketnum=%d "
-									"to %s with bucketnum=%d, "
-									"because they have different bucketnum",
-									namBuf, child_bucketnum,
-									lrelname, bucketnum)));
+							errmsg("distribution policy for partition%s "
+									"must be the same as that for %s",
+									namBuf,
+									lrelname)));
 	}
 
 	/* don't check if splitting or setting a subpartition template */

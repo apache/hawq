@@ -92,7 +92,7 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_3_4');
 
-DROP TABLE t1_3_4, t1_3_3, t1_3_2, t1_3_1, t1_3_w, t1_3, t1_2_4, t1_2_3, t1_2_2, t1_2_1, t1_2_w, t1_2, t1_1_1, t1_1_2, t1_1_3, t1_1_w, t1_1, t1;
+DROP TABLE t1_3_4, t1_3_3, t1_3_2, t1_3_1, t1_3_w, t1_3, t1_2_4, t1_2_3, t1_2_2, t1_2_1, t1_2_w, t1_2, t1_1_3, t1_1_w, t1_1, t1;
 
 CREATE TABLE t2(c1 int) DISTRIBUTED BY (c1);
 
@@ -178,7 +178,7 @@ CREATE TABLE t2_3_4 WITH (bucketnum = 6) AS (SELECT * FROM  t2) DISTRIBUTED RAND
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_4');
 
-DROP TABLE t2_3_4, t2_3_3, t2_3_2, t2_3_1, t2_3_w, t2_3, t2_2_4, t2_2_3, t2_2_2, t2_2_1, t2_2_w, t2_2, t2_1_1, t2_1_2, t2_1_3, t2_1_4, t2_1_5, t2_1_6, t2_1_w, t2_1, t2;
+DROP TABLE t2_3_4, t2_3_3, t2_3_2, t2_3_1, t2_3_w, t2_3, t2_2_4, t2_2_3, t2_2_2, t2_2_1, t2_2_w, t2_2, t2_1_1, t2_1_w, t2_1, t2;
 
 CREATE TABLE t3 (c1 int) WITH (bucketnum = 4);
 

@@ -2996,15 +2996,14 @@ transformDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 			Oid			relId = RangeVarGetRelid(parent, false, false /*allowHcatalog*/);
 			GpPolicy  *parentPolicy = GpPolicyFetch(CurrentMemoryContext, relId);
 
-			if (policy->bucketnum != parentPolicy->bucketnum)
+			if (!GpPolicyEqual(policy, parentPolicy))
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-								errmsg("cannot create child table \"%s\" with bucketnum=%d "
-										"inheriting parent table \"%s\" with bucketnum=%d, "
-										"because they have different bucketnum",
-										cxt->relation->relname, policy->bucketnum,
-										parent->relname, parentPolicy->bucketnum)));
+								errmsg("distribution policy for \"%s\" "
+										"must be the same as that for \"%s\"",
+										cxt->relation->relname,
+										parent->relname)));
 			}
 		}
 	}
@@ -8263,11 +8262,10 @@ transformPartitionBy(ParseState *pstate, CreateStmtContext *cxt,
 			if (child_bucketnum != bucketnum)
 				ereport(ERROR,
 						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-								errmsg("cannot create partition \"%s\" with bucketnum=%d "
-										"for table \"%s\" with bucketnum=%d, "
-										"because they have different bucketnum",
-										relname, child_bucketnum,
-										cxt->relation->relname, bucketnum)));
+								errmsg("distribution policy for \"%s\" "
+										"must be the same as that for \"%s\"",
+										relname,
+										cxt->relation->relname)));
 		}
 
 		/* XXX: temporarily add rule creation code for debugging */

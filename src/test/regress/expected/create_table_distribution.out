@@ -7,7 +7,7 @@ NOTICE:  Table has parent, setting distribution columns to match parent table
 -- should error out messages with different bucketnum
 CREATE TABLE t1_1_w(c2 int) INHERITS(t1) WITH (bucketnum = 3);
 NOTICE:  Table has parent, setting distribution columns to match parent table
-ERROR:  cannot create child table "t1_1_w" with bucketnum=3 inheriting parent table "t1" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t1_1_w" must be the same as that for "t1"
 CREATE TABLE t1_1_w(c2 int) INHERITS(t1) WITH (bucketnum = 8);
 NOTICE:  Table has parent, setting distribution columns to match parent table
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1');
@@ -29,26 +29,26 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
 (1 row)
 
 CREATE TABLE t1_1_1(c2 int) INHERITS (t1) DISTRIBUTED BY(c1);
+ERROR:  distribution policy for "t1_1_1" must be the same as that for "t1"
 CREATE TABLE t1_1_2(c2 int) INHERITS (t1) DISTRIBUTED BY(c2);
+ERROR:  distribution policy for "t1_1_2" must be the same as that for "t1"
 CREATE TABLE t1_1_3(c2 int) INHERITS (t1) DISTRIBUTED RANDOMLY;
 -- should error out messages with different bucketnum
 CREATE TABLE t1_1_4(c2 int) INHERITS (t1) WITH (bucketnum = 3) DISTRIBUTED BY(c1) ;
-ERROR:  cannot create child table "t1_1_4" with bucketnum=3 inheriting parent table "t1" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t1_1_4" must be the same as that for "t1"
 CREATE TABLE t1_1_5(c2 int) INHERITS (t1) WITH (bucketnum = 5) DISTRIBUTED BY(c2);
-ERROR:  cannot create child table "t1_1_5" with bucketnum=5 inheriting parent table "t1" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t1_1_5" must be the same as that for "t1"
 CREATE TABLE t1_1_6(c2 int) INHERITS (t1) WITH (bucketnum = 7) DISTRIBUTED RANDOMLY;
-ERROR:  cannot create child table "t1_1_6" with bucketnum=7 inheriting parent table "t1" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t1_1_6" must be the same as that for "t1"
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_1');
  bucketnum | attrnums 
 -----------+----------
-         8 | {1}
-(1 row)
+(0 rows)
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_2');
  bucketnum | attrnums 
 -----------+----------
-         8 | {2}
-(1 row)
+(0 rows)
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't1_1_3');
  bucketnum | attrnums 
@@ -159,7 +159,7 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
          7 | 
 (1 row)
 
-DROP TABLE t1_3_4, t1_3_3, t1_3_2, t1_3_1, t1_3_w, t1_3, t1_2_4, t1_2_3, t1_2_2, t1_2_1, t1_2_w, t1_2, t1_1_1, t1_1_2, t1_1_3, t1_1_w, t1_1, t1;
+DROP TABLE t1_3_4, t1_3_3, t1_3_2, t1_3_1, t1_3_w, t1_3, t1_2_4, t1_2_3, t1_2_2, t1_2_1, t1_2_w, t1_2, t1_1_3, t1_1_w, t1_1, t1;
 CREATE TABLE t2(c1 int) DISTRIBUTED BY (c1);
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2');
  bucketnum | attrnums 
@@ -177,7 +177,7 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
 
 CREATE TABLE t2_1_w(c2 int) INHERITS (t2) WITH (bucketnum = 3);
 NOTICE:  Table has parent, setting distribution columns to match parent table
-ERROR:  cannot create child table "t2_1_w" with bucketnum=3 inheriting parent table "t2" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t2_1_w" must be the same as that for "t2"
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_w');
  bucketnum | attrnums 
 -----------+----------
@@ -185,7 +185,9 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
 
 CREATE TABLE t2_1_1(c2 int) INHERITS (t2) DISTRIBUTED BY (c1);
 CREATE TABLE t2_1_2(c2 int) INHERITS (t2) DISTRIBUTED BY (c2);
+ERROR:  distribution policy for "t2_1_2" must be the same as that for "t2"
 CREATE TABLE t2_1_3(c2 int) INHERITS (t2) DISTRIBUTED RANDOMLY;
+ERROR:  distribution policy for "t2_1_3" must be the same as that for "t2"
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_1');
  bucketnum | attrnums 
 -----------+----------
@@ -195,21 +197,19 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_2');
  bucketnum | attrnums 
 -----------+----------
-         8 | {2}
-(1 row)
+(0 rows)
 
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_3');
  bucketnum | attrnums 
 -----------+----------
-         8 | 
-(1 row)
+(0 rows)
 
 CREATE TABLE t2_1_4(c2 int) INHERITS (t2) WITH (bucketnum = 3) DISTRIBUTED BY (c1);
-ERROR:  cannot create child table "t2_1_4" with bucketnum=3 inheriting parent table "t2" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t2_1_4" must be the same as that for "t2"
 CREATE TABLE t2_1_5(c2 int) INHERITS (t2) WITH (bucketnum = 5) DISTRIBUTED BY (c2);
-ERROR:  cannot create child table "t2_1_5" with bucketnum=5 inheriting parent table "t2" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t2_1_5" must be the same as that for "t2"
 CREATE TABLE t2_1_6(c2 int) INHERITS (t2) WITH (bucketnum = 7) DISTRIBUTED RANDOMLY;
-ERROR:  cannot create child table "t2_1_6" with bucketnum=7 inheriting parent table "t2" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t2_1_6" must be the same as that for "t2"
 SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_4');
  bucketnum | attrnums 
 -----------+----------
@@ -312,8 +312,8 @@ SELECT bucketnum, attrnums FROM gp_distribution_policy WHERE localoid = (SELECT 
          6 | 
 (1 row)
 
-DROP TABLE t2_3_4, t2_3_3, t2_3_2, t2_3_1, t2_3_w, t2_3, t2_2_4, t2_2_3, t2_2_2, t2_2_1, t2_2_w, t2_2, t2_1_1, t2_1_2, t2_1_3, t2_1_4, t2_1_5, t2_1_6, t2_1_w, t2_1, t2;
-ERROR:  table "t2_1_4" does not exist
+DROP TABLE t2_3_4, t2_3_3, t2_3_2, t2_3_1, t2_3_w, t2_3, t2_2_4, t2_2_3, t2_2_2, t2_2_1, t2_2_w, t2_2, t2_1_1, t2_1_w, t2_1, t2;
+ERROR:  table "t2_1_w" does not exist
 CREATE TABLE t3 (c1 int) WITH (bucketnum = 4);
 CREATE TABLE t3_1 (c1 int) WITH (bucketnum = 5) DISTRIBUTED BY(c1);
 CREATE TABLE t3_2 (c1 int) WITH (bucketnum = 6) DISTRIBUTED RANDOMLY;
@@ -341,7 +341,7 @@ DISTRIBUTED RANDOMLY
 PARTITION BY RANGE (date)
 ( PARTITION Jan08 START (date '2008-01-01') INCLUSIVE WITH (bucketnum = 9), 
  PARTITION Feb08 START (date '2008-02-01') INCLUSIVE END (date '2008-03-01') EXCLUSIVE WITH (bucketnum = 8));
-ERROR:  cannot create partition "t4_1_prt_jan08" with bucketnum=9 for table "t4" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for "t4_1_prt_jan08" must be the same as that for "t4"
 -- expected error out
 select bucketnum, attrnums from gp_distribution_policy where localoid='t4'::regclass;
 ERROR:  relation "t4" does not exist
@@ -363,7 +363,7 @@ select bucketnum, attrnums from gp_distribution_policy where localoid='t4'::regc
 ALTER TABLE t4 ADD PARTITION 
 START (date '2008-03-01') INCLUSIVE 
 END (date '2008-04-01') EXCLUSIVE WITH (bucketnum = 6, tablename='t4_new_part');
-ERROR:  cannot add partition with bucketnum=6 to relation "t4" with bucketnum=8, because they have different bucketnum
+ERROR:  distribution policy for partition must be the same as that for relation "t4"
 -- expected error out
 select bucketnum, attrnums from gp_distribution_policy where localoid='t4_new_part'::regclass;
 ERROR:  relation "t4_new_part" does not exist
