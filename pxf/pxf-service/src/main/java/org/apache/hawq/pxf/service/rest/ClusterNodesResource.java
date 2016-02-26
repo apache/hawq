@@ -38,7 +38,7 @@ import javax.ws.rs.core.Response;
 /**
  * Class enhances the API of the HBASE rest server.
  * Example for querying API getClusterNodesInfo from a web client
- * <code>curl "http://localhost:51200/pxf/v2/HadoopCluster/getNodesInfo"</code>
+ * <code>curl "http://localhost:51200/pxf/{version}/HadoopCluster/getNodesInfo"</code>
  * /pxf/ is made part of the path when there is a webapp by that name in tcServer.
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/HadoopCluster/")

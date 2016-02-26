@@ -44,7 +44,7 @@ import org.apache.hawq.pxf.service.MetadataResponseFormatter;
  * Class enhances the API of the WEBHDFS REST server. Returns the metadata of a
  * given hcatalog table. <br>
  * Example for querying API FRAGMENTER from a web client:<br>
- * <code>curl -i "http://localhost:51200/pxf/v13/Metadata/getTableMetadata?table=t1"</code>
+ * <code>curl -i "http://localhost:51200/pxf/{version}/Metadata/getTableMetadata?table=t1"</code>
  * <br>
  * /pxf/ is made part of the path when there is a webapp by that name in tomcat.
  */

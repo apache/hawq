@@ -49,7 +49,7 @@ import java.util.Map;
  * Class enhances the API of the WEBHDFS REST server. Returns the data fragments
  * that a data resource is made of, enabling parallel processing of the data
  * resource. Example for querying API FRAGMENTER from a web client
- * {@code curl -i "http://localhost:50070/pxf/v2/Fragmenter/getFragments?path=/dir1/dir2/*txt"}
+ * {@code curl -i "http://localhost:50070/pxf/{version}/Fragmenter/getFragments?path=/dir1/dir2/*txt"}
  * <code>/pxf/</code> is made part of the path when there is a webapp by that
  * name in tomcat.
  */
@@ -59,7 +59,7 @@ public class FragmenterResource extends RestResource {
 
     /**
      * The function is called when
-     * {@code http://nn:port/pxf/vx/Fragmenter/getFragments?path=...} is used.
+     * {@code http://nn:port/pxf/{version}/Fragmenter/getFragments?path=...} is used.
      *
      * @param servletContext Servlet context contains attributes required by
      *            SecuredHDFS
@@ -93,7 +93,7 @@ public class FragmenterResource extends RestResource {
 
     /**
      * The function is called when
-     * {@code http://nn:port/pxf/vx/Fragmenter/getFragmentsStats?path=...} is
+     * {@code http://nn:port/pxf/{version}/Fragmenter/getFragmentsStats?path=...} is
      * used.
      *
      * @param servletContext Servlet context contains attributes required by

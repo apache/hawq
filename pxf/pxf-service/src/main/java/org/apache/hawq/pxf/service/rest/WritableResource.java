@@ -47,7 +47,7 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
  * Running this resource manually:
  *
  * run:
- 	curl -i -X post "http://localhost:50070/pxf/v5w/Writable/stream?path=/data/curl/curl`date \"+%h%d_%H%M%s\"`" \
+ 	curl -i -X post "http://localhost:50070/pxf/{version}/Writable/stream?path=/data/curl/curl`date \"+%h%d_%H%M%s\"`" \
  	--header "X-GP-Accessor: TextFileWAccessor" \
  	--header "X-GP-Resolver: TextWResolver" \
  	--header "Content-Type:application/octet-stream" \
@@ -93,7 +93,7 @@ public class WritableResource extends RestResource{
     }
 
     /**
-     * This function is called when http://nn:port/pxf/vx/Writable/stream?path=...
+     * This function is called when http://nn:port/pxf/{version}/Writable/stream?path=...
 	 * is used.
 	 *
 	 * @param servletContext Servlet context contains attributes required by SecuredHDFS
