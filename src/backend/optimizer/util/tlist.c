@@ -77,6 +77,27 @@ tlist_member(Node *node, List *targetlist)
 }
 
 /*
+ * tlist_member_with_ressortgroupref
+ *    Compared with tlist_member, there is an additional check on ressortgroupref
+ */
+TargetEntry *
+tlist_member_with_ressortgroupref(Node *node, List *targetlist, int ressortgroupref) {
+	ListCell   *temp;
+
+	foreach(temp, targetlist)
+	{
+		TargetEntry *tlentry = (TargetEntry *) lfirst(temp);
+
+		Assert(IsA(tlentry, TargetEntry));
+
+		if (equal(node, tlentry->expr) && (ressortgroupref == 0 ||
+										   ressortgroupref == tlentry->ressortgroupref) )
+			return tlentry;
+	}
+	return NULL;
+}
+
+/*
  * tlist_members
  *	  Finds all members of the given tlist whose expression is
  *	  equal() to the given expression.	Result is NIL if no such member.

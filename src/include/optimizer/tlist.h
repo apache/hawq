@@ -38,6 +38,10 @@
 // return the first target entries that match the node expression
 extern TargetEntry *tlist_member(Node *node, List *targetlist);
 
+// return the TargetEntry that match both the node expression and ressortgroupref
+extern TargetEntry *tlist_member_with_ressortgroupref(Node *node, List *targetlist,
+													  int ressortgroupref);
+
 // return a list a target entries that match the node expression
 extern List *tlist_members(Node *node, List *targetlist);
 
