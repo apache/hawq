@@ -2869,34 +2869,31 @@ static char* GetExtTableFirstLocation(Datum *array)
 }
 
 /* 
- * Using host from uri, dispatch HDFS credentials to 
+ * Using HAWQ's HDFS location, dispatch HDFS credentials to
  * segments.
  *
- * The function uses a hdfs uri in the form hdfs://host:port/ where
- * port is hard-coded 8020. For HA the function uses hdfs://nameservice/
+ * The function uses a hdfs uri in the form hdfs://host:port/path
+ * or hdfs://nameservice/path where
+ * this value is taken from pg_filespace_entry which is populated
+ * based on hawq-site.xml's hawq_dfs_url entry.
  *
  * prepareDispatchedCatalogFileSystemCredential will store the token
- * using port == 0 in HA case (otherwise the supplied port)
- *
- * TODO Get HDFS port from someplace else, currently hard coded
+ * using port == 0 in HA case (otherwise the supplied port).
  */
 static void AddFileSystemCredentialForPxfTable(char *uri)
 {
-	StringInfoData hdfs_uri;
+	char* dfs_address = NULL;
 
-	initStringInfo(&hdfs_uri);
-	GPHDUri *gphd_uri = parseGPHDUri(uri);
-    if (gphd_uri->ha_nodes)
-        appendStringInfo(&hdfs_uri, "hdfs://%s/", gphd_uri->ha_nodes->nameservice);
-    else
-        appendStringInfo(&hdfs_uri, "hdfs://%s:8020/", gphd_uri->host);
+	if (!enable_secure_filesystem)
+		return;
 
-    elog(DEBUG2, "about to acquire delegation token for %s", hdfs_uri.data);
+	get_hdfs_location_from_filespace(&dfs_address);
 
-	prepareDispatchedCatalogFileSystemCredential(hdfs_uri.data);
+    elog(DEBUG2, "about to acquire delegation token for %s", dfs_address);
 
-	freeGPHDUri(gphd_uri);
-	pfree(hdfs_uri.data);
+	prepareDispatchedCatalogFileSystemCredential(dfs_address);
+
+	pfree(dfs_address);
 }
 
 List *

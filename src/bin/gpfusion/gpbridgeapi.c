@@ -473,7 +473,6 @@ void build_uri_for_write(gphadoop_context* context, PxfServer* rest_server )
 					 rest_server->host, rest_server->port,
 					 PXF_SERVICE_PREFIX, PXF_VERSION, context->write_file_name.data);
 	elog(DEBUG2, "pxf: uri %s with file name for write: %s", context->uri.data, context->write_file_name.data);
-
 }
 
 size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
@@ -496,46 +495,39 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
 
 /*
  * The function will get the cached delegation token
- * for remote host and add it to inputData
- * 
- * In HA case, where only a nameservice is used, port has to 
- * be zero (stored that way by prepareDispatchedCatalogFileSystemCredential)
- * see HdfsGetConnection()@fd.c
- * 
- * TODO Get "hdfs" and port from someplace else.
+ * for remote host and add it to inputData.
+ *
+ * The function uses a hdfs uri in the form of hdfs://host:port/path
+ * or hdfs://nameservice/path.
+ * This value is taken from pg_filespace_entry which is populated
+ * based on hawq-site.xml's hawq_dfs_url entry.
+ *
+ * Both regular and HA cases are handled the same way,
+ * where a nameservice is parsed by HdfsParsePath()@fd.c
  */
 void add_delegation_token(PxfInputData *inputData)
 {
 	PxfHdfsTokenData *token = NULL;
-    int port;
-    char *host = NULL;
+	char* dfs_address = NULL;
 
 	if (!enable_secure_filesystem)
 		return;
 
 	token = palloc0(sizeof(PxfHdfsTokenData));
 
-    if (inputData->gphduri->ha_nodes)
-    {
-        host = inputData->gphduri->ha_nodes->nameservice;
-        port = 0 /* port used when using a nameservice */;
-    } else
-    {
-        host = inputData->gphduri->host;
-        port = 8020;
-    }
+	get_hdfs_location_from_filespace(&dfs_address);
 
-    elog(DEBUG2, "locating token for %s:%d", host, port);
+    elog(DEBUG2, "locating token for %s", dfs_address);
 
-	token->hdfs_token = find_filesystem_credential("hdfs", 
-												   host,
-												   port);
+	token->hdfs_token = find_filesystem_credential_with_uri(dfs_address);
 
 	if (token->hdfs_token == NULL)
-		elog(ERROR, "failed to find delegation token for %s", inputData->gphduri->host);
-	elog(DEBUG2, "Delegation token for %s found", inputData->gphduri->host);
+		elog(ERROR, "failed to find delegation token for %s", dfs_address);
+	elog(DEBUG2, "Delegation token for %s found", dfs_address);
 
 	inputData->token = token;
+
+	pfree(dfs_address);
 }
 
 void free_token_resources(PxfInputData *inputData)

@@ -18,6 +18,11 @@
  */
 
 #include "access/pxfutils.h"
+
+#include "catalog/catalog.h"
+#include "catalog/pg_tablespace.h"
+#include "commands/dbcommands.h"
+#include "miscadmin.h"
 #include "utils/builtins.h"
 
 /* Wrapper for libchurl */
@@ -44,6 +49,24 @@ void port_to_str(char **port, int new_port)
 	Assert((new_port <= 65535) && (new_port >= 1)); /* legal port range */
 	pg_ltoa(new_port, tmp);
 	*port = pstrdup(tmp);
+}
+
+/*
+ * get_hdfs_location_from_filespace
+ *
+ * Get hdfs location from pg_filespace_entry
+ * The returned path needs to be pfreed by the caller.
+ */
+void get_hdfs_location_from_filespace(char** path)
+{
+	Assert(NULL != path);
+	Oid dtsoid = get_database_dts(MyDatabaseId);
+	GetFilespacePathForTablespace(dtsoid, path);
+
+	Assert(NULL != *path);
+	Assert(strlen(*path) < FilespaceLocationBlankPaddedWithNullTermLen);
+
+	elog(DEBUG2, "found hdfs location is %s", *path);
 }
 
 /*

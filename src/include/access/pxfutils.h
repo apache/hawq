@@ -39,6 +39,9 @@ bool are_ips_equal(char *ip1, char *ip2);
 /* override port str with given new port int */
 void port_to_str(char** port, int new_port);
 
+/* get hdfs location from current session's filespace entry */
+void get_hdfs_location_from_filespace(char** path);
+
 /* Parse the REST message and issue the libchurl call */
 void call_rest(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);
 

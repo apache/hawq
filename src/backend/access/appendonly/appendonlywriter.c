@@ -115,7 +115,7 @@ struct TspSupportTruncate
 static struct TspSupportTruncate TspSupportTruncateMap = {NULL, NULL, 0, 0};
 
 
-    static AORelHelp
+static AORelHelp
 GetAOHashTableHelpEntry(Oid relid)
 {
     int             i;
