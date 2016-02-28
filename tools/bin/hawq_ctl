@@ -278,10 +278,10 @@ class HawqInit:
 
             tmp_dir_list = self.hawq_master_temp_directory.replace(',', ' ')
 
-            logger.debug("rm -rf %s %s" % (self.master_data_directory, tmp_dir_list))
-            cmd = "rm -rf %s %s" % (self.master_data_directory, tmp_dir_list)
+            logger.debug("rm -rf %s/* %s/*" % (self.master_data_directory, tmp_dir_list))
+            cmd = "rm -rf %s/* %s/*" % (self.master_data_directory, tmp_dir_list)
             check_return_code(remote_ssh(cmd, self.standby_host_name, self.user), logger, \
-                              "Delete standby master's directories failed, exit")
+                              "Delete standby master's files failed, exit")
             signal.signal(signal.SIGINT,signal.default_int_handler)
             logger.info('Remove standby master finished')
         else:
