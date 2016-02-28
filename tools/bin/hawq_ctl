@@ -31,11 +31,13 @@ try:
     from gppylib.gplog import setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
     from gppylib.commands.unix import getLocalHostname, getUserName
     from gppylib.commands import gp
+    from gppylib.commands.gp import SEGMENT_TIMEOUT_DEFAULT
     from gppylib import userinput
+    from gppylib.db import catalog
     from gppylib.commands import unix
     from hawqpylib.hawqlib import local_ssh, HawqCommands, HawqXMLParser, parse_hosts_file,\
         remove_property_xml, sync_hawq_site, check_return_code, check_file_exist, check_postgres_running, \
-        check_syncmaster_running, create_cluster_directory
+        check_syncmaster_running, create_cluster_directory, remote_ssh_output
     from hawqpylib.HAWQ_HELP import *
     from gppylib.db import dbconn
     from pg import DatabaseError
@@ -219,7 +221,7 @@ class HawqInit:
         running_standby_host = ''
 
         try:
-            dburl = dbconn.DbURL(port=self.master_port, dbname='template1')
+            dburl = dbconn.DbURL(port=self.master_port, username=self.user, dbname='template1')
             conn = dbconn.connect(dburl, True)
             query = "select role, hostname from gp_segment_configuration where role = 's';"
             rows = dbconn.execSQL(conn, query)
@@ -464,6 +466,20 @@ class HawqStart:
             logger.info("No standby host configured")
             self.standby_host_name = ''
 
+    def _check_recovery_start(self):
+        cmd = "%s; %s/bin/pg_controldata %s |grep 'Database cluster state';" % (source_hawq_env, self.GPHOME, self.master_data_directory)
+        result, stdout, stderr = remote_ssh_output(cmd, self.master_host_name, '')
+
+        if stdout.find("recovery") != -1:
+            hawq_recovery_state = 'recoverying'
+        elif stdout.find("starting up") != -1:
+            hawq_recovery_state = 'starting_up'
+        elif stdout.find("in production") != -1:
+            hawq_recovery_state = 'recovery_success'
+        else:
+            hawq_recovery_state = 'recovery_failed'
+
+        return hawq_recovery_state
 
     def _start_master_cmd(self):
         logger.info("Start master service")
@@ -485,6 +501,34 @@ class HawqStart:
     def start_master(self):
         cmd = self._start_master_cmd()
         result = remote_ssh(cmd, self.master_host_name, self.user)
+        if result != 0:
+            hawq_recovery_state = self._check_recovery_start()
+            if hawq_recovery_state == 'recoverying':
+                recovery_sleep_time = 3
+                logger.warn("Master is doing recovery, this might take minutes to hours")
+                logger.warn("Please do not interrupt it and wait patient")
+                sys.stdout.write("\r")
+
+                while True:
+                    sys.stdout.write(".")
+                    sys.stdout.flush()
+                    time.sleep(recovery_sleep_time)
+                    if recovery_sleep_time < 60:
+                        recovery_sleep_time = recovery_sleep_time + 1
+                    hawq_recovery_state = self._check_recovery_start()
+
+                    if hawq_recovery_state == 'recovery_success':
+                        result = 0
+                        break
+                    elif hawq_recovery_state == 'recovery_failed':
+                        logger.error("HAWQ master recoverying failed")
+                        result = 1
+                        break
+                    else:
+                        result = 0
+
+                sys.stdout.write("\n")
+
         return result
 
     def _start_standby_cmd(self):
@@ -582,6 +626,8 @@ class HawqStop:
         self.hawq_dict = hawq_dict
         self.hawq_reload = opts.hawq_reload
         self.lock = threading.Lock()
+        self.dburl = None
+        self.conn = None
         self.skip_segments = []
         self._get_config()
 
@@ -640,6 +686,38 @@ class HawqStop:
 
         return hawq_running
 
+    def _stop_master_checks(self):
+        self.dburl = dbconn.DbURL(port=self.master_port, username=self.user, dbname='template1')
+        self.conn = dbconn.connect(self.dburl, utility=True)
+        total_connections=len(catalog.getUserPIDs(self.conn))
+        self.conn.close()
+        logger.info("There are %d connections to the database" % total_connections)
+
+        if total_connections > 0 and self.stop_mode=='smart':
+            logger.warning("There are other connections to this instance, shutdown mode smart aborted")
+            logger.warning("Either remove connections, or use 'hawq stop master -M fast' or 'hawq stop master -M immediate'")
+            logger.warning("See hawq stop --help for all options")
+            logger.error("Active connections. Aborting shutdown...")
+            sys.exit(1)
+
+        logger.info("Commencing Master instance shutdown with mode='%s'" % self.stop_mode)
+        logger.info("Master host=%s" % self.master_host_name)
+
+        if self.stop_mode == 'smart':
+            pass
+        elif self.stop_mode == 'fast':
+            logger.info("Detected %d connections to database" % total_connections)
+            if total_connections > 0:
+                logger.info("Switching to WAIT mode")
+                logger.info("Will wait for shutdown to complete, this may take some time if")
+                logger.info("there are a large number of active complex transactions, please wait...")
+            else:
+                if self.timeout == SEGMENT_TIMEOUT_DEFAULT:
+                    logger.info("Using standard WAIT mode of %s seconds" % SEGMENT_TIMEOUT_DEFAULT)
+                else:
+                    logger.info("Using WAIT mode of %s seconds" % self.timeout)
+        pass
+
     def _stop_master_cmd(self):
         logger.info("Stop hawq master")
         if self.hawq_reload:
@@ -655,6 +733,8 @@ class HawqStop:
     def _stop_master(self):
         master_running = self._check_hawq_running(self.master_host_name, self.master_data_directory, self.master_port)
         if master_running:
+            self._stop_master_checks()
+
             cmd = self._stop_master_cmd()
             result = remote_ssh(cmd, self.master_host_name, self.user)
             return result
@@ -1035,7 +1115,7 @@ def create_parser():
                       help="Sets the directory for log files")
     parser.add_option("-t", "--timeout",
                       dest="timeout_seconds",
-                      default="60",
+                      default="600",
                       help="Set the timeout seconds, default is 60")
     parser.add_option("-B", "--parallel",
                       dest="parallel_processses",

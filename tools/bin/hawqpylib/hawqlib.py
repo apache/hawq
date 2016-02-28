@@ -132,6 +132,20 @@ def remote_ssh(cmd, host, user):
     result = subprocess.Popen(remote_cmd_str, shell=True).wait()
     return result
 
+
+def remote_ssh_output(cmd, host, user):
+
+    if user == "":
+        remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s \"%s\"" % (host, cmd)
+    else:
+        remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s@%s \"%s\"" % (user, host, cmd)
+
+    result = subprocess.Popen(remote_cmd_str, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    stdout,stderr = result.communicate()
+
+    return (result.returncode, str(stdout.strip()), str(stderr.strip()))
+
+
 def check_return_code(result, logger = None,  error_msg = None, info_msg = None, exit_true = False):
     '''Check shell command exit code.'''
     if result != 0:
