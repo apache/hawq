@@ -237,7 +237,7 @@ class HawqInit:
             logger.info("running standby host is %s" % running_standby_host)
             signal.signal(signal.SIGINT,signal.SIG_IGN)
             logger.info("Stop HAWQ cluster")
-            cmd = "%s; hawq stop master -a -q" % source_hawq_env
+            cmd = "%s; hawq stop master -a -M fast -q" % source_hawq_env
             check_return_code(local_ssh(cmd, logger), logger, "Stop HAWQ master failed, exit")
             cmd = "%s; hawq stop allsegments -a -q" % source_hawq_env
             check_return_code(local_ssh(cmd, logger), logger, "Stop HAWQ segments failed, exit")
@@ -259,11 +259,11 @@ class HawqInit:
                 check_return_code(local_ssh(cmd, logger), logger, \
                                   "Update catalog failed, exit", "Catalog updated successfully.")
                 logger.info("Stop HAWQ master")
-                cmd = "%s; hawq stop master -a" % source_hawq_env
+                cmd = "%s; hawq stop master -a -M fast" % source_hawq_env
                 check_return_code(local_ssh(cmd, logger), logger, "Stop hawq master failed, exit")
             except DatabaseError, ex:
                 logger.error("Failed to connect to database, this script can only be run when the database is up")
-                cmd = "%s; hawq stop master -a" % source_hawq_env
+                cmd = "%s; hawq stop master -a -M fast" % source_hawq_env
                 check_return_code(local_ssh(cmd, logger), logger, "Stop hawq master failed, exit")
             remove_property_xml("hawq_standby_address_host", "%s/etc/hawq-site.xml" % self.GPHOME)
             host_list = parse_hosts_file(self.GPHOME)
@@ -312,7 +312,7 @@ class HawqInit:
 
     def _resync_standby(self):
         logger.info("Re-sync standby")
-        cmd = "%s; hawq stop master -a" % source_hawq_env
+        cmd = "%s; hawq stop master -a;" % source_hawq_env
         check_return_code(local_ssh(cmd, logger), logger, "Stop hawq cluster failed, exit")
         cmd = "cd %s; %s; %s/bin/lib/pysync.py -x gpperfmon/data -x pg_log -x db_dumps %s %s:%s" % \
                  (self.master_data_directory, source_hawq_env,  self.GPHOME, self.master_data_directory,
@@ -539,6 +539,8 @@ class HawqStart:
 
     def start_standby(self):
         cmd = self._start_standby_cmd()
+        result = remote_ssh(cmd, self.standby_host_name, self.user)
+        cmd = "%s; %s/sbin/hawqstandbywatch.py %s debug" % (source_hawq_env, self.GPHOME, self.master_data_directory)
         result = remote_ssh(cmd, self.standby_host_name, self.user)
         return result
 
