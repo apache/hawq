@@ -990,13 +990,13 @@ bool handleRMRequestSegmentIsDown(void **arg)
 
 	while( (hostname - SMBUFF_CONTENT(&(conntrack->MessageBuff)) <
 			getSMBContentSize(&(conntrack->MessageBuff))) &&
-		   *hostname != '\0' )
+			*hostname != '\0' )
 	{
 		hostnamelen = strlen(hostname);
 		res = getSegIDByHostName(hostname, hostnamelen, &segid);
 		if ( res == FUNC_RETURN_OK )
 		{
-			/* Get resourceinfo of the expected host. */
+			/* Get resource info of the expected host. */
 			SegResource segres = getSegResource(segid);
 			Assert( segres != NULL );
 
@@ -1015,45 +1015,48 @@ bool handleRMRequestSegmentIsDown(void **arg)
 			else
 			{
 				elog(RMLOG, "Resource manager probes the status of host %s by "
-						 	"sending RUAlive request.",
+							"sending RUAlive request.",
 							hostname);
 
-		        res = sendRUAlive(hostname);
-		        /* IN THIS CASE, the segment is considered as down. */
-		        if (res != FUNC_RETURN_OK)
-		        {
-		        	/*----------------------------------------------------------
-		        	 * This call makes resource manager able to adjust queue and
-		        	 * mem/core trackers' capacity.
-		        	 *----------------------------------------------------------
-		        	 */
-		        	setSegResHAWQAvailability(segres,
-		        							  RESOURCE_SEG_STATUS_UNAVAILABLE);
+				res = sendRUAlive(hostname);
+				/* IN THIS CASE, the segment is considered as down. */
+				if (res != FUNC_RETURN_OK)
+				{
+					/*----------------------------------------------------------
+					 * This call makes resource manager able to adjust queue and
+					 * mem/core trackers' capacity.
+					 *----------------------------------------------------------
+					 */
+					setSegResHAWQAvailability(segres,
+											  RESOURCE_SEG_STATUS_UNAVAILABLE);
 
-		        	/* Make resource pool remove unused containers */
-		        	returnAllGRMResourceFromSegment(segres);
-		        	/* Set the host down in gp_segment_configuration table */
-		        	if (Gp_role != GP_ROLE_UTILITY)
-		        	{
-		        		update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
-		        							  SEGMENT_STATUS_DOWN);
-		        	}
+					/* Make resource pool remove unused containers */
+					returnAllGRMResourceFromSegment(segres);
+					/* Set the host down in gp_segment_configuration table */
+					if (Gp_role != GP_ROLE_UTILITY)
+					{
+						update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+											  SEGMENT_STATUS_DOWN);
+						add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+												hostname,
+												SEG_STATUS_CHANGE_DOWN_RUALIVE_FAILED);
+					}
 
-		        	/* Set the host down. */
-		        	elog(LOG, "Resource manager sets host %s from up to down "
-		        			  "due to not reaching host.", hostname);
-		        }
-		        else
-		        {
-		        	elog(RMLOG, "Resource manager triggered RUAlive request to "
-		        				"host %s.",
+					/* Set the host down. */
+					elog(LOG, "Resource manager sets host %s from up to down "
+							  "due to not reaching host.", hostname);
+				}
+				else
+				{
+					elog(RMLOG, "Resource manager triggered RUAlive request to "
+								"host %s.",
 								hostname);
-		        }
+				}
 			}
 		}
 		else {
 			elog(WARNING, "Resource manager cannot find host %s to check status, "
-					  	  "skip it.",
+						  "skip it.",
 						  hostname);
 		}
 

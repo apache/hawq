@@ -688,6 +688,19 @@ void add_segment_config_row(int32_t 	 id,
 							uint32_t	 failed_tmpdir_num,
 							char*		 failed_tmpdir);
 
+enum SegStatusChangeReason {
+	SEG_STATUS_CHANGE_UNKNOWN,
+	SEG_STATUS_CHANGE_UP_GET_HEARTBEAT,
+	SEG_STATUS_CHANGE_DOWN_TIMEOUT,
+	SEG_STATUS_CHANGE_DOWN_RUALIVE_FAILED,
+	SEG_STATUS_CHANGE_DOWN_COMMUNICATION_ERROR,
+	SEG_STATUS_CHANGE_DOWN_FAILED_TMPDIR,
+	SEG_STATUS_CHANGE_UP_NO_FAILED_TMPDIR,
+	SEG_STATUS_CHANGE_DOWN_RM_RESET
+};
+
+/* Add a new entry into gp_configuration_history table*/
+void add_segment_history_row(int32_t id, char* hostname, int reason);
 /*
  * In resource pool, segment's id starts from 0, however in gp_segment_configuration table,
  * segment registration order starts from 1(0 is for master, -1 is for standby).

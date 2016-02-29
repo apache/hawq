@@ -2624,26 +2624,29 @@ void updateStatusOfAllNodes()
             (curtime - node->LastUpdateTime >
 			 1000000LL * rm_segment_heartbeat_timeout) &&
 			IS_SEGSTAT_FTSAVAILABLE(node->Stat) )
-        {
-        	/*
-        	 * This call makes resource manager able to adjust queue and mem/core
-        	 * trackers' capacity.
-        	 */
-        	setSegResHAWQAvailability(node, RESOURCE_SEG_STATUS_UNAVAILABLE);
-        	/*
-        	 * This call makes resource pool remove unused containers.
-        	 */
-        	returnAllGRMResourceFromSegment(node);
-        	if (Gp_role != GP_ROLE_UTILITY)
-        	{
-        		update_segment_status(idx + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
-        	}
+		{
+			/*
+			 * This call makes resource manager able to adjust queue and mem/core
+			 * trackers' capacity.
+			 */
+			setSegResHAWQAvailability(node, RESOURCE_SEG_STATUS_UNAVAILABLE);
+			/*
+			 * This call makes resource pool remove unused containers.
+			 */
+			returnAllGRMResourceFromSegment(node);
+			if (Gp_role != GP_ROLE_UTILITY)
+			{
+				update_segment_status(idx + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
+				add_segment_history_row(idx + REGISTRATION_ORDER_OFFSET,
+										GET_SEGRESOURCE_HOSTNAME(node),
+										SEG_STATUS_CHANGE_DOWN_TIMEOUT);
+			}
 
-        	elog(WARNING, "Resource manager sets host %s from up to down.",
-        			  	  GET_SEGRESOURCE_HOSTNAME(node));
+			elog(WARNING, "Resource manager sets host %s from up to down.",
+						  GET_SEGRESOURCE_HOSTNAME(node));
 
-        	changedstatus = true;
-        }
+			changedstatus = true;
+		}
 	}
 
 	if ( changedstatus )

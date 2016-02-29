@@ -26,6 +26,8 @@
 #include "resourcepool.h"
 #include "gp-libpq-fe.h"
 #include "gp-libpq-int.h"
+#include "utils/builtins.h"
+#include "catalog/pg_proc.h"
 
 void addSegResourceAvailIndex(SegResource segres);
 void addSegResourceAllocIndex(SegResource segres);
@@ -467,6 +469,90 @@ cleanup:
 		PQclear(result);
 	PQfinish(conn);
 }
+
+/*
+ * Remove all entries in gp_configuration_history.
+ *
+ * gp_remove_segment_history()
+ *
+ * Returns:
+ *   true upon success, otherwise throws error.
+ */
+Datum
+gp_remove_segment_history(PG_FUNCTION_ARGS)
+{
+	int	libpqres = CONNECTION_OK;
+	PGconn *conn = NULL;
+	char conninfo[512];
+	PQExpBuffer sql = NULL;
+	PGresult* result = NULL;
+	int ret = true;
+
+	if (!superuser())
+		elog(ERROR, "gp_remove_segment_history can only be run by a superuser");
+
+	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
+			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
+	conn = PQconnectdb(conninfo);
+	if ((libpqres = PQstatus(conn)) != CONNECTION_OK)
+	{
+		elog(WARNING, "Fail to connect database when cleanup "
+					  "segment configuration catalog table, error code: %d, %s",
+					  libpqres,
+					  PQerrorMessage(conn));
+		PQfinish(conn);
+		PG_RETURN_BOOL(false);
+	}
+
+	result = PQexec(conn, "BEGIN");
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when cleanup "
+					  "segment history catalog table, reason : %s",
+					  "BEGIN",
+					  PQresultErrorMessage(result));
+		ret = false;
+		goto cleanup;
+	}
+	PQclear(result);
+
+	sql = createPQExpBuffer();
+	appendPQExpBuffer(sql,"DELETE FROM gp_configuration_history");
+	result = PQexec(conn, sql->data);
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when cleanup "
+					  "segment history catalog table, reason : %s",
+					  sql->data,
+					  PQresultErrorMessage(result));
+		ret = false;
+		goto cleanup;
+	}
+	PQclear(result);
+
+	result = PQexec(conn, "COMMIT");
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when cleanup "
+					  "segment history catalog table, reason : %s",
+					  "COMMIT",
+					  PQresultErrorMessage(result));
+		ret = false;
+		goto cleanup;
+	}
+
+	elog(LOG, "Cleanup segment history catalog table successfully!");
+
+cleanup:
+	if(sql)
+		destroyPQExpBuffer(sql);
+	if(result)
+		PQclear(result);
+	PQfinish(conn);
+
+	PG_RETURN_BOOL(ret);
+}
+
 /*
  *  update a segment's status in gp_segment_configuration table.
  *  id : registration order of this segment
@@ -540,6 +626,98 @@ cleanup:
 	PQfinish(conn);
 }
 
+static const char* SegStatusChangeReasonDesc[] = {
+	"invalid reason",
+	"segment status is set to UP because gets a heartbeat from it",
+	"segment status is set to DOWN because of heartbeat timeout",
+	"segment status is set to DOWN because RUALive probe failed",
+	"segment status is set to DOWN because of communication error",
+	"segment status is set to DOWN because failed temporary directory is detected",
+	"segment status is set to UP because there is no failed temporary directory",
+	"segment status is set to DOWN because its resource manager process was reset"
+};
+
+/*
+ *  Insert a row into gp_configuration_history,
+ *  to record the status change of a segment.
+ *  id : registration order of this segment
+ *  hostname : hostname of this segment
+ *  reason : reason of status change
+ */
+void add_segment_history_row(int32_t id, char* hostname, int reason)
+{
+	int	libpqres = CONNECTION_OK;
+	PGconn *conn = NULL;
+	char conninfo[1024];
+	PQExpBuffer sql = NULL;
+	PGresult* result = NULL;
+
+	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
+			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
+	conn = PQconnectdb(conninfo);
+	if ((libpqres = PQstatus(conn)) != CONNECTION_OK)
+	{
+		elog(WARNING, "Fail to connect database when add a new row into "
+					  "segment configuration history catalog table, error code: %d, %s",
+					  libpqres,
+					  PQerrorMessage(conn));
+		PQfinish(conn);
+		return;
+	}
+
+	result = PQexec(conn, "BEGIN");
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when add a new row into "
+					  "segment configuration history catalog table, reason : %s",
+					  "BEGIN",
+					  PQresultErrorMessage(result));
+		goto cleanup;
+	}
+	PQclear(result);
+
+	TimestampTz curtime = GetCurrentTimestamp();
+	const char *curtimestr = timestamptz_to_str(curtime);
+	sql = createPQExpBuffer();
+	appendPQExpBuffer(sql,
+					  "INSERT INTO gp_configuration_history"
+					  "(time, registration_order, hostname, description) "
+					  "VALUES ('%s','%d','%s','%s')",
+					  curtimestr, id, hostname, SegStatusChangeReasonDesc[reason]);
+
+	result = PQexec(conn, sql->data);
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when add a new row into "
+				      "segment configuration history catalog table, reason : %s",
+					  sql->data,
+					  PQresultErrorMessage(result));
+		goto cleanup;
+	}
+	PQclear(result);
+
+	result = PQexec(conn, "COMMIT");
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when add a new row into "
+				      "segment configuration history catalog table, reason : %s",
+					  "COMMIT",
+					  PQresultErrorMessage(result));
+		goto cleanup;
+	}
+
+	elog(LOG, "Add a new row into segment configuration history catalog table,"
+			  "time: %s, registration order:%d, hostname:%s, description:%s",
+			  curtimestr, id, hostname, SegStatusChangeReasonDesc[reason]);
+
+cleanup:
+	if(sql)
+		destroyPQExpBuffer(sql);
+	if(result)
+		PQclear(result);
+	PQfinish(conn);
+}
+
 /*
  *  update a segment's status and failed tmp dir
  *  in gp_segment_configuration table.
@@ -553,7 +731,7 @@ void update_segment_failed_tmpdir
 {
 	int	libpqres = CONNECTION_OK;
 	PGconn *conn = NULL;
-	char conninfo[512];
+	char conninfo[1024];
 	PQExpBuffer sql = NULL;
 	PGresult* result = NULL;
 
@@ -741,6 +919,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 	SimpString		 hostnamekey;
 	SimpArray 		 hostaddrkey;
 	bool			 segcapchanged  = false;
+	int 			 reason 		= SEG_STATUS_CHANGE_UNKNOWN;
 
 	/*
 	 * Anyway, the host capacity is updated here if the cluster level capacity
@@ -791,6 +970,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
     /* CASE 1. It is a new host. */
 	if ( res != FUNC_RETURN_OK )
 	{
+		reason = SEG_STATUS_CHANGE_UP_GET_HEARTBEAT;
 		uint8_t reportStatus = segstat->FTSAvailable;
 
 		/* Create machine information and corresponding resource information. */
@@ -844,22 +1024,31 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 					  	  	       TYPCONVERT(void *, &hostaddrkey)) == NULL )
 			{
 				setHASHTABLENode( &(PRESPOOL->SegmentHostAddrIndexed),
-							  	  TYPCONVERT(void *, &hostaddrkey),
+								  TYPCONVERT(void *, &hostaddrkey),
 								  TYPCONVERT(void *, segid),
 								  false /* There should be no old value. */);
 
 				elog(LOG, "Resource manager tracked ip address '%.*s' for host '%s'",
 						  hostaddrkey.Len, hostaddrkey.Array,
-					      hostname);
+						  hostname);
 			}
 		}
 
 		/*
 		 * This is a new host registration. Normally the status is available,
-		 * But if the number of failed temporary directory exceeds guc,
+		 * But if there is failed temporary directory,
 		 * this segment is considered as unavailable.
 		 */
 		setSegResHAWQAvailability(segresource, reportStatus);
+		if (reportStatus == RESOURCE_SEG_STATUS_UNAVAILABLE)
+		{
+			/*
+			 * If master gets a heartbeat and this segment status is unavailable,
+			 * it means there is failed temporary directory on this segment.
+			 */
+			Assert(segresource->Stat->FailedTmpDirNum != 0);
+			reason = SEG_STATUS_CHANGE_DOWN_FAILED_TMPDIR;
+		}
 
 		/* Add this node into the table gp_segment_configuration */
 		AddressString straddr = NULL;
@@ -878,6 +1067,9 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 									segresource->Stat->FailedTmpDirNum,
 									segresource->Stat->FailedTmpDirNum == 0 ?
 										"":GET_SEGINFO_FAILEDTMPDIR(&segresource->Stat->Info));
+			add_segment_history_row(segid+REGISTRATION_ORDER_OFFSET,
+									hostname,
+									reason);
 		}
 
 		if (segresource->Stat->FTSAvailable == RESOURCE_SEG_STATUS_AVAILABLE)
@@ -899,6 +1091,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 	 * NOTE: We update the capacity and availability now.
 	 */
 	else {
+		reason = SEG_STATUS_CHANGE_UP_GET_HEARTBEAT;
 		segresource = getSegResource(segid);
 		Assert(segresource != NULL);
 		uint8_t oldStatus = segresource->Stat->FTSAvailable;
@@ -922,6 +1115,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 			{
 				segstat->FTSAvailable = RESOURCE_SEG_STATUS_UNAVAILABLE;
 				statusChanged = true;
+				reason = SEG_STATUS_CHANGE_DOWN_RM_RESET;
 			}
 			segresource->Stat->RMStartTimestamp = segstat->RMStartTimestamp;
 			elog(LOG, "Master RM finds segment:%s 's RM process has restarted. "
@@ -967,6 +1161,9 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 					update_segment_status(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET,
 											segstat->FTSAvailable == RESOURCE_SEG_STATUS_AVAILABLE ?
 											SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN);
+					add_segment_history_row(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET,
+											GET_SEGRESOURCE_HOSTNAME(segresource),
+											reason);
 				}
 
 				setSegResHAWQAvailability(segresource, segstat->FTSAvailable);
@@ -1054,6 +1251,29 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 												 segresource->Stat->FailedTmpDirNum,
 												 segresource->Stat->FailedTmpDirNum == 0 ?
 															 "" : GET_SEGINFO_FAILEDTMPDIR(&segresource->Stat->Info));
+					if (statusChanged)
+					{
+						if(oldStatus == RESOURCE_SEG_STATUS_AVAILABLE)
+						{
+							/*
+							 * segment's status is set to DOWN
+							 * because of failed temporary directory
+							 */
+							add_segment_history_row(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET,
+													GET_SEGRESOURCE_HOSTNAME(segresource),
+													SEG_STATUS_CHANGE_DOWN_FAILED_TMPDIR);
+						}
+						else
+						{
+							/*
+							 * segment's status is set to UP because of
+							 * there is no failed temporary directory
+							 */
+							add_segment_history_row(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET,
+													GET_SEGRESOURCE_HOSTNAME(segresource),
+													SEG_STATUS_CHANGE_UP_NO_FAILED_TMPDIR);
+						}
+					}
 				}
 
 				if (statusChanged)
