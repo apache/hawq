@@ -367,6 +367,12 @@ GCOV = @GCOV@
 LCOV = @LCOV@
 GENHTML = @GENHTML@
 
+ifeq ($(BUILD_TYPE),gcov)
+	CFLAGS+=-fprofile-arcs -ftest-coverage
+	CXXFLAGS+=-fprofile-arcs -ftest-coverage
+	export BUILD_TYPE=gcov
+endif
+
 ifeq ($(enable_coverage),yes)
 # ccache loses .gcno files
 export CCACHE_DISABLE = 1

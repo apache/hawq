@@ -21,6 +21,9 @@ top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
 LIBS := -levent -lyaml -lz -lbz2 -lssl -lcrypto
+ifeq ($(BUILD_TYPE), gcov)
+LIBS := -lgcov $(LIBS)
+endif
 
 code_dir     = $(CURDIR)/src/gpfdist/
 GPFDISTFILES = fstream.c gfile.c gpfdist.c transform.c
