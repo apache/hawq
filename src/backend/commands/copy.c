@@ -1660,8 +1660,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			Assert(Gp_role == GP_ROLE_EXECUTE);
 			if (RelationIsAoRows(cstate->rel) || RelationIsParquet(cstate->rel))
 			{
-				cstate->splits = GetFileSplitsOfSegment(stmt->scantable_splits,
-								cstate->rel->rd_id, GetQEIndex());
+				cstate->splits = stmt->scantable_splits;
 			}
 			else
 			{
@@ -2274,7 +2273,9 @@ CopyTo(CopyState cstate)
 				MemTupleBinding *mt_bind = create_memtuple_binding(tupDesc);
 
 				aoscandesc = appendonly_beginscan(rel, ActiveSnapshot, 0, NULL);
-				aoscandesc->splits = cstate->splits;
+				aoscandesc->splits = GetFileSplitsOfSegment(cstate->splits,
+												rel->rd_id, GetQEIndex());
+
 
 				while ((tuple = appendonly_getnext(aoscandesc, ForwardScanDirection, slot)) != NULL)
 				{
