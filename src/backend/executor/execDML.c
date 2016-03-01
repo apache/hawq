@@ -158,10 +158,11 @@ reconstructMatchingTupleSlot(TupleTableSlot *slot, ResultRelInfo *resultRelInfo)
  */
 void
 ExecInsert(TupleTableSlot *slot,
-		   DestReceiver *dest,
-		   EState *estate,
-		   PlanGenerator planGen,
-		   bool isUpdate)
+		DestReceiver *dest,
+		EState *estate,
+		PlanGenerator planGen,
+		bool isUpdate,
+		bool isInputSorted)
 {
 	void		*tuple = NULL;
 	ResultRelInfo *resultRelInfo = NULL;
@@ -184,7 +185,7 @@ ExecInsert(TupleTableSlot *slot,
 		resultRelInfo = slot_get_partition(slot, estate);
 		estate->es_result_relation_info = resultRelInfo;
 
-		if (NULL != resultRelInfo->ri_parquetSendBack)
+		if (NULL != resultRelInfo->ri_insertSendBack)
 		{
 			/*
 			 * The Parquet part we are about to insert into
@@ -203,59 +204,82 @@ ExecInsert(TupleTableSlot *slot,
 		 * inserted into (GPSQL-2291).
 		 */
 		Oid new_part_oid = resultRelInfo->ri_RelationDesc->rd_id;
-		if (gp_parquet_insert_sort &&
+
+		if (isInputSorted &&
 				PLANGEN_OPTIMIZER == planGen &&
-				InvalidOid != estate->es_last_parq_part &&
-				new_part_oid != estate->es_last_parq_part)
+				InvalidOid != estate->es_last_inserted_part &&
+				new_part_oid != estate->es_last_inserted_part)
 		{
 
 			Assert(NULL != estate->es_partition_state->result_partition_hash);
 
 			ResultPartHashEntry *entry = hash_search(estate->es_partition_state->result_partition_hash,
-									&estate->es_last_parq_part,
-									HASH_FIND,
-									NULL /* found */);
+					&estate->es_last_inserted_part,
+					HASH_FIND,
+					NULL /* found */);
 
 			Assert(NULL != entry);
 			Assert(entry->offset < estate->es_num_result_relations);
 
 			ResultRelInfo *oldResultRelInfo = & estate->es_result_relations[entry->offset];
+			Assert(NULL != oldResultRelInfo);
 
-			elog(DEBUG1, "Switching from old part oid=%d name=[%s] to new part oid=%d name=[%s]",
-					estate->es_last_parq_part,
-					oldResultRelInfo->ri_RelationDesc->rd_rel->relname.data,
-					new_part_oid,
-					resultRelInfo->ri_RelationDesc->rd_rel->relname.data);
-
-			/*
-			 * We are opening a new partition, and the last partition we
-			 * inserted into was a Parquet part. Let's close the old
-			 * parquet insert descriptor to free the memory before
-			 * opening the new one.
-			 */
-			ParquetInsertDescData *oldInsertDesc = oldResultRelInfo->ri_parquetInsertDesc;
 
 			/*
 			 * We need to preserve the "sendback" information that needs to be
 			 * sent back to the QD process from this part.
 			 * Compute it here, and store it for later use.
 			 */
-			QueryContextDispatchingSendBack sendback =
-					CreateQueryContextDispatchingSendBack(1);
+			QueryContextDispatchingSendBack sendback = CreateQueryContextDispatchingSendBack(1);
 			sendback->relid = RelationGetRelid(oldResultRelInfo->ri_RelationDesc);
-			oldInsertDesc->sendback = sendback;
-			parquet_insert_finish(oldInsertDesc);
+
+			Relation oldRelation = oldResultRelInfo->ri_RelationDesc;
+			if (RelationIsAoRows(oldRelation))
+			{
+				AppendOnlyInsertDescData *oldInsertDesc = oldResultRelInfo->ri_aoInsertDesc;
+				Assert(NULL != oldInsertDesc);
+
+				elog(DEBUG1, "AO: Switching from old part oid=%d name=[%s] to new part oid=%d name=[%s]",
+						estate->es_last_inserted_part,
+						oldResultRelInfo->ri_RelationDesc->rd_rel->relname.data,
+						new_part_oid,
+						resultRelInfo->ri_RelationDesc->rd_rel->relname.data);
+
+				oldInsertDesc->sendback = sendback;
+
+				appendonly_insert_finish(oldInsertDesc);
+				oldResultRelInfo->ri_aoInsertDesc = NULL;
+
+			}
+			else if (RelationIsParquet(oldRelation))
+			{
+				ParquetInsertDescData *oldInsertDesc = oldResultRelInfo->ri_parquetInsertDesc;
+				Assert(NULL != oldInsertDesc);
+
+				elog(DEBUG1, "PARQ: Switching from old part oid=%d name=[%s] to new part oid=%d name=[%s]",
+						estate->es_last_inserted_part,
+						oldResultRelInfo->ri_RelationDesc->rd_rel->relname.data,
+						new_part_oid,
+						resultRelInfo->ri_RelationDesc->rd_rel->relname.data);
+
+				oldInsertDesc->sendback = sendback;
+
+				parquet_insert_finish(oldInsertDesc);
+				oldResultRelInfo->ri_parquetInsertDesc = NULL;
+
+			}
+			else
+			{
+				Assert(false && "Unreachable");
+			}
 
 			/* Store the sendback information in the resultRelInfo for this part */
-			oldResultRelInfo->ri_parquetSendBack = sendback;
+			oldResultRelInfo->ri_insertSendBack = sendback;
 
-			/* Record in the resultRelInfo that we closed the parquet insert descriptor */
-			oldResultRelInfo->ri_parquetInsertDesc = NULL;
-
-			/* Reset the last parquet part Oid, it's now closed */
-			estate->es_last_parq_part = InvalidOid;
+			estate->es_last_inserted_part = InvalidOid;
 		}
-	}
+
+  }
 	else
 	{
 		resultRelInfo = estate->es_result_relation_info;
@@ -362,7 +386,7 @@ ExecInsert(TupleTableSlot *slot,
 			resultRelInfo->ri_aoInsertDesc =
 				appendonly_insert_init(resultRelationDesc,
 									   segfileinfo);
-
+			estate->es_last_inserted_part = resultRelationDesc->rd_id;
 		}
 
 		appendonly_insert(resultRelInfo->ri_aoInsertDesc, tuple, &newId, &aoTupleId);
@@ -391,8 +415,7 @@ ExecInsert(TupleTableSlot *slot,
 			 * in estate, so that we can close it when switching to a
 			 * new partition (GPSQL-2291)
 			 */
-			elog(DEBUG1, "Saving es_last_parq_part. Old=%d, new=%d", estate->es_last_parq_part, resultRelationDesc->rd_id);
-			estate->es_last_parq_part = resultRelationDesc->rd_id;
+			estate->es_last_inserted_part = resultRelationDesc->rd_id;
 		}
 
 		newId = parquet_insert(resultRelInfo->ri_parquetInsertDesc, partslot);

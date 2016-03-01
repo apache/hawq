@@ -2197,3 +2197,129 @@ NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04_3_prt
 NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan05"
 NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan05"
 NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan05"
+-- Tests for sort operator before insert with AO and PARQUET tables (HAWQ-404)
+-- A GUC's value is set to less than the number of partitions in the example table, so that sort is activated.
+DROP TABLE IF EXISTS ch_sort_src, ch_sort_aodest, ch_sort_pqdest, ch_sort_aopqdest, ch_sort__pq_table;
+SET optimizer_parts_to_force_sort_on_insert = 5;
+CREATE TABLE ch_sort_src (id int, year int, month int, day int, region text)
+DISTRIBUTED BY (month); 
+INSERT INTO ch_sort_src select i, 2000 + i, i % 12, (2*i) % 30, i::text from generate_series(0, 99) i; 
+-- AO partitioned table
+CREATE TABLE ch_sort_aodest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_outlying_years" for table "ch_sort_aodest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_2" for table "ch_sort_aodest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_3" for table "ch_sort_aodest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_4" for table "ch_sort_aodest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_5" for table "ch_sort_aodest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_6" for table "ch_sort_aodest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_7" for table "ch_sort_aodest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_8" for table "ch_sort_aodest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_9" for table "ch_sort_aodest"
+-- PARQUET partitioned table
+CREATE TABLE ch_sort_pqdest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE, ORIENTATION = PARQUET)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_outlying_years" for table "ch_sort_pqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_2" for table "ch_sort_pqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_3" for table "ch_sort_pqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_4" for table "ch_sort_pqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_5" for table "ch_sort_pqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_6" for table "ch_sort_pqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_7" for table "ch_sort_pqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_8" for table "ch_sort_pqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_9" for table "ch_sort_pqdest"
+-- AO/PARQUET mixed table
+CREATE TABLE ch_sort_aopqdest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_outlying_years" for table "ch_sort_aopqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_2" for table "ch_sort_aopqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_3" for table "ch_sort_aopqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_4" for table "ch_sort_aopqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_5" for table "ch_sort_aopqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_6" for table "ch_sort_aopqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_7" for table "ch_sort_aopqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_8" for table "ch_sort_aopqdest"
+NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_9" for table "ch_sort_aopqdest"
+CREATE TABLE ch_sort__pq_table (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE, ORIENTATION = PARQUET)
+DISTRIBUTED BY (id);
+ALTER TABLE ch_sort_aopqdest
+EXCHANGE PARTITION FOR(2006)
+WITH TABLE ch_sort__pq_table;
+-- Test that inserts work
+INSERT INTO ch_sort_aodest SELECT * FROM ch_sort_src;
+SELECT COUNT(*) FROM ch_sort_aodest;
+ count 
+-------
+   100
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_aodest_1_prt_6;
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_aodest_1_prt_outlying_years;
+ count 
+-------
+    92
+(1 row)
+
+INSERT INTO ch_sort_pqdest SELECT * FROM ch_sort_src;
+SELECT COUNT(*) FROM ch_sort_pqdest;
+ count 
+-------
+   100
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_pqdest_1_prt_6;
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_pqdest_1_prt_outlying_years;
+ count 
+-------
+    92
+(1 row)
+
+INSERT INTO ch_sort_aopqdest SELECT * FROM ch_sort_src;
+SELECT COUNT(*) FROM ch_sort_aopqdest;
+ count 
+-------
+   100
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_6;
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_outlying_years;
+ count 
+-------
+    92
+(1 row)
+
+RESET optimizer_parts_to_force_sort_on_insert;
