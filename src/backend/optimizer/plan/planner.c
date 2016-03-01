@@ -495,7 +495,8 @@ resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
        */
       allocResult = calculate_planner_segment_num(my_parse, resourceLife,
                                           plannedstmt->rtable, plannedstmt->intoPolicy,
-                                          plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1);
+                                          plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1,
+                                          -1);
 
       Assert(allocResult);
 
