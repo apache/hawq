@@ -79,10 +79,12 @@ tlist_member(Node *node, List *targetlist)
 /*
  * tlist_member_with_ressortgroupref
  *    Compared with tlist_member, there is an additional check on ressortgroupref
+ *    If not found, return the first matched member
  */
 TargetEntry *
 tlist_member_with_ressortgroupref(Node *node, List *targetlist, int ressortgroupref) {
 	ListCell   *temp;
+	TargetEntry *retentry = NULL;
 
 	foreach(temp, targetlist)
 	{
@@ -90,11 +92,13 @@ tlist_member_with_ressortgroupref(Node *node, List *targetlist, int ressortgroup
 
 		Assert(IsA(tlentry, TargetEntry));
 
-		if (equal(node, tlentry->expr) && (ressortgroupref == 0 ||
-										   ressortgroupref == tlentry->ressortgroupref) )
-			return tlentry;
+		if (equal(node, tlentry->expr)) {
+			if (!retentry) retentry = tlentry;
+			if (ressortgroupref == 0 || ressortgroupref == tlentry->ressortgroupref)
+				return tlentry;
+		}
 	}
-	return NULL;
+	return retentry;
 }
 
 /*
