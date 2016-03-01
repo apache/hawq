@@ -606,7 +606,7 @@ calcHashAggTableSizes(double memquota,	/* Memory quota in bytes. */
 	if (nbuckets < gp_hashagg_default_nbatches)
 		nbuckets = gp_hashagg_default_nbatches;
 
-	if (nbatches > UINT_MAX || nentries > UINT_MAX || nbuckets > UINT_MAX)
+	if (nbatches > ULONG_LONG_MAX || nentries > ULONG_LONG_MAX || nbuckets > ULONG_LONG_MAX)
 	{
 		if (force)
 		{
