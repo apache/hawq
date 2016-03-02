@@ -27,7 +27,7 @@ from gppylib.commands.unix import getLocalHostname, getUserName
 
 
 def parseargs():
-    parser = OptionParser(usage="HAWQ config options.")
+    parser = OptionParser(usage="HAWQ state options.")
     parser.add_option('-b', default=False, action='store_true', dest='show_brief_status',
                       help="Show brief status of cluster.")
     parser.add_option('-q', '--quiet', action='store_true', default=False)
@@ -57,7 +57,9 @@ def check_status(status_value):
 
 def show_brief_status(hawq_site, segment_list, standby_host):
     try:
-        dburl = dbconn.DbURL(port=hawq_site.hawq_dict['hawq_master_address_port'], dbname='template1')
+        master_host_name = hawq_site.hawq_dict['hawq_master_address_host']
+        master_port_num = hawq_site.hawq_dict['hawq_master_address_port']
+        dburl = dbconn.DbURL(hostname=master_host_name, port=master_port_num, dbname='template1')
         conn = dbconn.connect(dburl, True)
         query = "select role, status, port, hostname, address from gp_segment_configuration;"
         rows = dbconn.execSQL(conn, query)

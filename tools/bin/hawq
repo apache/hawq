@@ -16,11 +16,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import os
-import sys
-import subprocess
-from hawqpylib.HAWQ_HELP import *
-from hawqpylib.hawqlib import check_return_code
+try:
+    import os
+    import sys
+    import subprocess
+    from hawqpylib.HAWQ_HELP import *
+    from hawqpylib.hawqlib import *
+except ImportError, e:
+    sys.exit('ERROR: Cannot import modules.  Please check that you '
+                 'have sourced greenplum_path.sh.  Detail: ' + str(e))
 
 global hawq_home, source_hawq_env
 
@@ -35,16 +39,44 @@ def local_ssh(cmd):
     result = subprocess.Popen(cmd, shell=True).wait()
     return result
 
-def main():
-    cluster_type_list = ('cluster', 'segment', 'master', 'standby', 'allsegments')
-    cluster_init_list = ('cluster', 'segment', 'master', 'standby')
-    hawq_home = os.getenv('GPHOME')
-    result = 0
+def check_master_or_standby_host(master_host_name='localhost', standby_host_name='None'):
+    if not check_hostname_equal(master_host_name, user = ""):
+       if standby_host_name.lower() != 'none':
+           if not check_hostname_equal(standby_host_name, user = ""):
+               return False
+           else:
+               return True
+       else:
+               return False
+    else:
+        return True
 
+def main():
+    hawq_home = os.getenv('GPHOME')
     if not hawq_home:
         print "HAWQ home directory not defined, please check GPHOME settings."
         sys.exit(1)
 
+    hawqsite = HawqXMLParser(hawq_home)
+    hawqsite.get_all_values()
+    hawq_dict = hawqsite.hawq_dict
+    master_host_name = hawq_dict['hawq_master_address_host']
+    cluster_host_list = list()
+    cluster_host_list.append(master_host_name)
+    if 'hawq_standby_address_host' in hawq_dict:
+        standby_host_name = hawq_dict['hawq_standby_address_host']
+        cluster_host_list.append(standby_host_name)
+    else:
+        standby_host_name = 'None'
+
+    segments_host_list = parse_hosts_file(hawq_home)
+    for host in segments_host_list:
+        cluster_host_list.append(host)
+
+    result = 0
+
+    cluster_type_list = ('cluster', 'segment', 'master', 'standby', 'allsegments')
+    cluster_init_list = ('cluster', 'segment', 'master', 'standby')
     source_hawq_env = "source %s/greenplum_path.sh" % hawq_home
 
     if len(sys.argv) > 2:
@@ -59,6 +91,17 @@ def main():
         hawq_command = ''
         second_arg = ''
         sub_args = ''
+
+    if (second_arg == 'cluster' or (hawq_command in ('remove', 'filespace', 'state'))):
+        if not check_hostname_equal(master_host_name, user = ""):
+            print "This can be run on master host only"
+            sys.exit(1)
+
+    if (hawq_command == 'config' or
+       (hawq_command in ('init', 'activate') and second_arg == 'standby')):
+        if not check_master_or_standby_host(master_host_name, standby_host_name):
+            print "This can be run only on master or standby host"
+            sys.exit(1)
 
     if hawq_command == "start":
         if second_arg not in cluster_type_list:

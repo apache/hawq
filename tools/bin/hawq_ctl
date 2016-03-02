@@ -35,9 +35,7 @@ try:
     from gppylib import userinput
     from gppylib.db import catalog
     from gppylib.commands import unix
-    from hawqpylib.hawqlib import local_ssh, HawqCommands, HawqXMLParser, parse_hosts_file,\
-        remove_property_xml, sync_hawq_site, check_return_code, check_file_exist, check_postgres_running, \
-        check_syncmaster_running, create_cluster_directory, remote_ssh_output
+    from hawqpylib.hawqlib import *
     from hawqpylib.HAWQ_HELP import *
     from gppylib.db import dbconn
     from pg import DatabaseError
@@ -689,7 +687,7 @@ class HawqStop:
         return hawq_running
 
     def _stop_master_checks(self):
-        self.dburl = dbconn.DbURL(port=self.master_port, username=self.user, dbname='template1')
+        self.dburl = dbconn.DbURL(hostname=self.master_host_name, port=self.master_port, username=self.user, dbname='template1')
         self.conn = dbconn.connect(self.dburl, utility=True)
         total_connections=len(catalog.getUserPIDs(self.conn))
         self.conn.close()
@@ -1209,6 +1207,7 @@ def create_parser():
 
 if __name__ == '__main__':
     (opts, hawq_dict) = get_args()
+
     if opts.hawq_command == 'start':
         start_hawq(opts, hawq_dict)
     elif opts.hawq_command == 'stop':

@@ -109,6 +109,16 @@ class HawqXMLParser:
         return xmldoc
 
 
+def check_hostname_equal(remote_host, user = ""):
+    cmd = "hostname"
+    result_local, local_hostname, stderr_remote  = local_ssh_output(cmd)
+    result_remote, remote_hostname, stderr_remote = remote_ssh_output(cmd, remote_host, user)
+    if local_hostname.strip() == remote_hostname.strip():
+        return True
+    else:
+        return False
+
+
 def local_ssh(cmd, logger = None, warning = False):
     result = subprocess.Popen(cmd, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     stdout,stderr = result.communicate()
@@ -121,6 +131,13 @@ def local_ssh(cmd, logger = None, warning = False):
             else:
                 logger.warn(stderr.strip())
     return result.returncode
+
+
+def local_ssh_output(cmd):
+    result = subprocess.Popen(cmd, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    stdout,stderr = result.communicate()
+
+    return (result.returncode, str(stdout.strip()), str(stderr.strip()))
 
 
 def remote_ssh(cmd, host, user):
