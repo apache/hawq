@@ -11145,9 +11145,9 @@ fi
 
 # json-c
 
-for ac_header in json/json.h
+for ac_header in json-c/json.h
 do :
-  ac_fn_c_check_header_mongrel "$LINENO" "json/json.h" "ac_cv_header_json_json_h" "$ac_includes_default"
+  ac_fn_c_check_header_mongrel "$LINENO" "json-c/json.h" "ac_cv_header_json_json_h" "$ac_includes_default"
 if test "x$ac_cv_header_json_json_h" = xyes; then :
   cat >>confdefs.h <<_ACEOF
 #define HAVE_JSON_JSON_H 1

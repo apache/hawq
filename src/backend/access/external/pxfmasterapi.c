@@ -25,7 +25,7 @@
  *
  *-------------------------------------------------------------------------
  */
-#include <json/json.h>
+#include <json-c/json.h>
 #include "access/pxfmasterapi.h"
 #include "catalog/hcatalog/externalmd.h"
 

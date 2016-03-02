@@ -28,7 +28,7 @@
  */
 
 #include "postgres.h"
-#include <json/json.h>
+#include <json-c/json.h>
 
 #include "miscadmin.h"
 #include "access/transam.h"

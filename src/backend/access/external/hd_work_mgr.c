@@ -27,7 +27,7 @@
 
 #include "postgres.h"
 #include <curl/curl.h>
-#include <json/json.h>
+#include <json-c/json.h>
 #include "access/pxfmasterapi.h"
 #include "access/hd_work_mgr.h"
 #include "access/libchurl.h"
