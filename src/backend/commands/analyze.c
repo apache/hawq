@@ -819,7 +819,9 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 					rel->rd_id);
 			if (targetPolicy->nattrs > 0) {
 				isHashRelationExist = true;
-				maxHashBucketNumber = targetPolicy->bucketnum;
+				if(maxHashBucketNumber < targetPolicy->bucketnum){
+					maxHashBucketNumber = targetPolicy->bucketnum;
+				}
 			}
 			/*
 			 * if no hash relation, we calculate the data size of all the relations.
