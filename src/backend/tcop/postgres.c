@@ -4880,7 +4880,17 @@ PostgresMain(int argc, char *argv[], const char *username)
 						SetUserIdAndContext(cuid, false); /* Set current userid */
 
 					if (serializedIdentityLen > 0)
-						SetupProcessIdentity(serializedIdentity);
+					{
+						/*
+						 * serializedIdentity doesn't include '\0', which will cause core dump in SetupProcessIdentity() with using elog(DEBUG1).
+						 * So palloc a new string with '\0'.
+						 */
+						char *completeSerializedIdentity = (char *) palloc((serializedIdentityLen + 1) * sizeof(char) );
+						memcpy(completeSerializedIdentity, serializedIdentity, serializedIdentityLen);
+						completeSerializedIdentity[serializedIdentityLen] = '\0';
+						SetupProcessIdentity((const char*)completeSerializedIdentity);
+						pfree(completeSerializedIdentity);
+					}
 
 					if (serializedQuerytreelen==0 && serializedPlantreelen==0)
 					{
