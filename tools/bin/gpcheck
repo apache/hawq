@@ -251,23 +251,26 @@ def getHDFSNamenodeHost():
     # read namenode address from core-site.xml
     with open(core_site_file) as f:
         xmldoc = minidom.parse(f)
+    namenode_addr = ''
     for node in xmldoc.getElementsByTagName('property'):
-        if getPropName(node) == 'fs.default.name':
+        if getPropName(node) == 'fs.default.name' or getPropName(node) == 'fs.defaultFS':
             fsurl = getPropValue(node).strip()
             namenode_addr = re.search(r"//([^:/]*)", fsurl).group(1)
             break
 
     # run hostname command on remote to get actual hostname
-    cmd = Command(namenode_addr, "hostname", REMOTE, namenode_addr)
-    pool.addCommand(cmd)
-    pool.join()
-    items = pool.getCompletedItems()
-    for i in items:
-        if i.results.rc or i.results.halt or not i.results.completed:
-            raise Exception("error running 'hostname' command: %s" % i.results.stderr.strip())
-        namenode_host = i.results.stdout.strip()
-
-    logger.info("detect namenode hostname to be %s" % namenode_host)
+    if namenode_addr == '':
+        logger.error("cannot detect namenode from %s" % core_site_file)
+    else:
+        cmd = Command(namenode_addr, "hostname", REMOTE, namenode_addr)
+        pool.addCommand(cmd)
+        pool.join()
+        items = pool.getCompletedItems()
+        for i in items:
+            if i.results.rc or i.results.halt or not i.results.completed:
+                raise Exception("error running 'hostname' command: %s" % i.results.stderr.strip())
+            namenode_host = i.results.stdout.strip()
+        logger.info("detect namenode hostname to be %s" % namenode_host)
     return namenode_host
 
 
