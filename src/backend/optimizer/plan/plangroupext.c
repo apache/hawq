@@ -2281,6 +2281,8 @@ typedef struct ReplaceGroupColsContext
 	 * appear inside an Aggref.
 	 */
 	bool in_aggref;
+
+	int ressortgroupref;
 } ReplaceGroupColsContext;
 
 
@@ -2293,13 +2295,26 @@ replace_grouping_columns_mutator(Node *node, void *v_cxt)
 	if (node == NULL)
 		return NULL;
 
+	if (IsA(node, TargetEntry))
+	{
+		cxt->ressortgroupref = ((TargetEntry *) node)->ressortgroupref;
+	}
+
 	Assert(IsA(cxt->grpcols, List));	
 
 	foreach (lc, cxt->grpcols)
 	{
 		Node *grpcol = lfirst(lc);
-		if (equal(node, grpcol))
-			break;
+
+		Assert(IsA(grpcol, TargetEntry));
+
+		TargetEntry *grpcoltle = (TargetEntry *) grpcol;
+
+		if (equal(node, (Node *)(grpcoltle->expr)))
+		{
+			if (cxt->ressortgroupref == 0 || cxt->ressortgroupref == grpcoltle->ressortgroupref)
+				break;
+		}
 	}
 
 	if (IsA(node, Aggref))
@@ -2323,10 +2338,11 @@ replace_grouping_columns_mutator(Node *node, void *v_cxt)
 		/* Generate a NULL constant to replace the node. */
 		Const *null;
 		Node *grpcol = lfirst(lc);
+		TargetEntry *grpcoltle = (TargetEntry *) grpcol;
 
 		if (!cxt->in_aggref)
 		{
-			null = makeNullConst(exprType((Node *)grpcol), -1);
+			null = makeNullConst(exprType((Node *)(grpcoltle->expr)), -1);
 			return (Node *)null;
 		}
 	}
@@ -2361,11 +2377,12 @@ replace_grouping_columns(Node *node,
 	{
 		TargetEntry *te = get_tle_by_resno(sub_tlist, grpColIdx[attno]);
 		Assert(te != NULL);
-		grpcols = lappend(grpcols, te->expr);
+		grpcols = lappend(grpcols, te);
 	}
 
 	cxt.grpcols = grpcols;
 	cxt.in_aggref = false;
+	cxt.ressortgroupref = 0;
 	
 	new_node = replace_grouping_columns_mutator((Node *)node, (void *)&cxt);
 	list_free(grpcols);
