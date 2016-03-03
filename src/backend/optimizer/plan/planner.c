@@ -2070,7 +2070,9 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 
 						if ( IsA(tle->expr, Var) && tle->resname == NULL )
 						{
-							TargetEntry *vartle = tlist_member((Node*)tle->expr, tlist);
+							TargetEntry *vartle = tlist_member_with_ressortgroupref((Node*)tle->expr,
+																					tlist,
+																					tle->ressortgroupref);
 
 							if ( vartle != NULL && vartle->resname != NULL )
 								tle->resname = pstrdup(vartle->resname);

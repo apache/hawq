@@ -88,6 +88,7 @@ typedef struct
 		indexed_tlist *subplan_itlist;
 		int			rtoffset;
 		bool		use_scan_slot;
+		int 		ressortgroupref;
 	} fix_upper_expr_context;
 
 /*
@@ -125,7 +126,8 @@ static Var *search_indexed_tlist_for_var(Var *var,
 										 int rtoffset);
 static Var *search_indexed_tlist_for_non_var(Node *node,
 											 indexed_tlist *itlist,
-											 Index newvarno);
+											 Index newvarno,
+											 int ressortgroupref);
 static List *fix_join_expr(PlannerGlobal *glob,
 						   List *clauses,
 						   indexed_tlist *outer_itlist,
@@ -1590,7 +1592,7 @@ set_upper_references(PlannerGlobal *glob, Plan *plan,
 			newexpr = copyObject(tle->expr);
 		else
 			newexpr = fix_upper_expr(glob,
-					(Node *) tle->expr,
+					(Node *) tle,
 					subplan_itlist,
 					rtoffset,
 					use_scan_slot);
@@ -1845,11 +1847,13 @@ search_indexed_tlist_for_var(Var *var, indexed_tlist *itlist,
  */
 static Var *
 search_indexed_tlist_for_non_var(Node *node,
-								 indexed_tlist *itlist, Index newvarno)
+								 indexed_tlist *itlist,
+								 Index newvarno,
+								 int ressortgroupref)
 {
 	TargetEntry *tle;
 	
-	tle = tlist_member(node, itlist->tlist);
+	tle = tlist_member_with_ressortgroupref(node, itlist->tlist, ressortgroupref);
 	if (tle)
 	{
 		/* Found a matching subplan output expression */
@@ -2067,7 +2071,8 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
 	{
 		newvar = search_indexed_tlist_for_non_var(node,
 												  context->outer_itlist,
-												  OUTER);
+												  OUTER,
+												  0);
 		if (newvar)
 			return (Node *) newvar;
 	}
@@ -2076,7 +2081,8 @@ fix_join_expr_mutator(Node *node, fix_join_expr_context *context)
 	{
 		newvar = search_indexed_tlist_for_non_var(node,
 												  context->inner_itlist,
-												  INNER);
+												  INNER,
+												  0);
 		if (newvar)
 			return (Node *) newvar;
 	}
@@ -2134,6 +2140,17 @@ fix_upper_expr(PlannerGlobal *glob,
 	context.rtoffset = rtoffset;
 	context.use_scan_slot = use_scan_slot;
 	
+	if (node != NULL && IsA(node, TargetEntry))
+	{
+		TargetEntry *tle = (TargetEntry *) node;
+		node = (Node *) tle->expr;
+		context.ressortgroupref = tle->ressortgroupref;
+	}
+	else
+	{
+		context.ressortgroupref = 0;
+	}
+
 	return fix_upper_expr_mutator(node, &context);
 }
 
@@ -2169,7 +2186,8 @@ fix_upper_expr_mutator(Node *node, fix_upper_expr_context *context)
 	{
 		newvar = search_indexed_tlist_for_non_var(node,
 												  context->subplan_itlist,
-												  slot_varno);
+												  slot_varno,
+												  context->ressortgroupref);
 		if (newvar)
 			return (Node *) newvar;
 	}
