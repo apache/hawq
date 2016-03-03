@@ -141,6 +141,7 @@ static void analyzeComputeAttributeStatistics(Oid relationOid,
 static List* analyzableRelations(bool rootonly);
 static bool analyzePermitted(Oid relationOid);
 static List *analyzableAttributes(Relation candidateRelation);
+static int calculate_virtual_segment_number(List* candidateRelations);
 static List	*buildExplicitAttributeNames(Oid relationOid, VacuumStmt *stmt);
 
 /* Reltuples/relpages estimation functions */
@@ -255,7 +256,6 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	GpAutoStatsModeValue autostatvalBackup = gp_autostats_mode;
 	GpAutoStatsModeValue autostatInFunctionsvalBackup = gp_autostats_mode_in_functions;
 	bool optimizerBackup = optimizer;
-	int target_seg_num = (preferred_seg_num > 0) ? preferred_seg_num : GetUtilPartitionNum();
 
 	gp_autostats_mode = GP_AUTOSTATS_NONE;
 	gp_autostats_mode_in_functions = GP_AUTOSTATS_NONE;
@@ -263,7 +263,7 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 
 	PG_TRY();
 	{
-		analyzeStmt(stmt, relids, target_seg_num);
+		analyzeStmt(stmt, relids, preferred_seg_num);
 		gp_autostats_mode = autostatvalBackup;
 		gp_autostats_mode_in_functions = autostatInFunctionsvalBackup;
 		optimizer = optimizerBackup;
@@ -292,7 +292,7 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
  * 	vacstmt - Vacuum statement.
  * 	relids  - Usually NULL except when called by autovacuum.
  */
-void analyzeStmt(VacuumStmt *stmt, List *relids, int target_seg_num)
+void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 {
 	List	   			  	*lRelOids = NIL;
 	MemoryContext			callerContext = NULL;
@@ -492,6 +492,17 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int target_seg_num)
 			            RelationGetRelationName(candidateRelation));
 		}
 	}
+
+	/**
+	 *  we use preferred_seg_num as default and
+	 *  compute target_seg_num based on data size and distributed type
+	 *  if there is no preferred_seg_num.
+	 */
+	int target_seg_num = preferred_seg_num;
+	if (target_seg_num <= 0) {
+		target_seg_num = calculate_virtual_segment_number(candidateRelations);
+	}
+	elog(LOG, "virtual segment number of analyze is: %d\n", target_seg_num);
 
 	/**
 	 * We allocate query resource for analyze
@@ -788,6 +799,49 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int target_seg_num)
 	MemoryContextDelete(analyzeStatementContext);
 }
 
+/*
+ * calculate virtual segment number for analyze statement.
+ * if there is hash distributed relations exist, use the max bucket number.
+ * if all relation are random, use the data size to determine vseg number.
+ */
+static int calculate_virtual_segment_number(List* candidateRelations) {
+	ListCell* le1;
+	int vsegNumber = 1;
+	int64_t totalDataSize = 0;
+	bool isHashRelationExist = false;
+	int maxHashBucketNumber = 0;
+
+	foreach (le1, candidateRelations)
+	{
+		Relation rel = (Relation)lfirst(le1);
+		if (rel ) {
+			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext,
+					rel->rd_id);
+			if (targetPolicy->nattrs > 0) {
+				isHashRelationExist = true;
+				if(maxHashBucketNumber < targetPolicy->bucketnum){
+					maxHashBucketNumber = targetPolicy->bucketnum;
+				}
+			}
+			/*
+			 * if no hash relation, we calculate the data size of all the relations.
+			 */
+			if (!isHashRelationExist) {
+				totalDataSize += calculate_relation_size(rel);
+			}
+		}
+	}
+
+	if (isHashRelationExist) {
+		vsegNumber = maxHashBucketNumber;
+	} else {
+		/*we allocate one virtual segment for each 128M data */
+		totalDataSize >>= 27;
+		vsegNumber = totalDataSize + 1;
+	}
+
+	return vsegNumber;
+}
 
 /*
  * This method extracts the explicit attributes listed in a vacuum statement. It must
