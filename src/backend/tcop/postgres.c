@@ -4760,7 +4760,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 					const char *serializedIdentity = NULL;
 					const char *serializedResource = NULL;
 					
-					char *completeSerializedIdentity = NULL;
 					int query_string_len = 0;
 					int serializedSnapshotlen = 0;
 					int serializedQuerytreelen = 0;
@@ -4886,11 +4885,10 @@ PostgresMain(int argc, char *argv[], const char *username)
 						 * serializedIdentity doesn't include '\0', which will cause core dump in SetupProcessIdentity() with using elog(DEBUG1).
 						 * So palloc a new string with '\0'.
 						 */
-						completeSerializedIdentity = (char *) palloc((serializedIdentityLen + 1) * sizeof(char) );
+						char *completeSerializedIdentity = (char *) palloc((serializedIdentityLen + 1) * sizeof(char) );
 						memcpy(completeSerializedIdentity, serializedIdentity, serializedIdentityLen);
 						completeSerializedIdentity[serializedIdentityLen] = '\0';
-						serializedIdentity = completeSerializedIdentity;
-						SetupProcessIdentity(serializedIdentity);
+						SetupProcessIdentity((const char*)completeSerializedIdentity);
 						pfree(completeSerializedIdentity);
 					}
 
