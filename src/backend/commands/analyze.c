@@ -817,6 +817,9 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 		if (rel ) {
 			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext,
 					rel->rd_id);
+			if(targetPolicy == NULL){
+				return GetUtilPartitionNum();
+			}
 			if (targetPolicy->nattrs > 0) {
 				isHashRelationExist = true;
 				if(maxHashBucketNumber < targetPolicy->bucketnum){

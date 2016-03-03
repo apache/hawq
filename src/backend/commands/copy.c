@@ -2273,8 +2273,7 @@ CopyTo(CopyState cstate)
 				MemTupleBinding *mt_bind = create_memtuple_binding(tupDesc);
 
 				aoscandesc = appendonly_beginscan(rel, ActiveSnapshot, 0, NULL);
-				aoscandesc->splits = GetFileSplitsOfSegment(cstate->splits,
-												rel->rd_id, GetQEIndex());
+				aoscandesc->splits = GetFileSplitsOfSegment(cstate->splits,rel->rd_id, GetQEIndex());
 
 
 				while ((tuple = appendonly_getnext(aoscandesc, ForwardScanDirection, slot)) != NULL)
@@ -2314,7 +2313,7 @@ CopyTo(CopyState cstate)
 					proj[i] = true;
 
 				scan = parquet_beginscan(rel, ActiveSnapshot, 0, proj);
-				scan->splits = cstate->splits;
+				scan->splits = GetFileSplitsOfSegment(cstate->splits, rel->rd_id, GetQEIndex());
 				for(;;)
 				{
 					parquet_getnext(scan, ForwardScanDirection, slot);
