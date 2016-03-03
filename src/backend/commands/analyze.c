@@ -842,6 +842,10 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 		totalDataSize >>= 27;
 		vsegNumber = totalDataSize + 1;
 	}
+	/*vsegNumber should be less than GetUtilPartitionNum*/
+	if(vsegNumber > GetUtilPartitionNum()){
+		vsegNumber = GetUtilPartitionNum();
+	}
 
 	return vsegNumber;
 }
