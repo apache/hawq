@@ -6204,4 +6204,3 @@ SyncAgentMain(int argc, char *argv[], const char *username)
 	return 1;					/* keep compiler quiet */
 }
 
-
