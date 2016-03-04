@@ -2919,7 +2919,10 @@ HdfsFileSync(File file)
 
 		if (HdfsSync(VfdCache[file].hProtocol, VfdCache[file].hFS,
 				VfdCache[file].hFile))
+		{
+			errno = EIO;
 			return -1;
+		}
 	}
 	return 0;
 }
@@ -2949,7 +2952,10 @@ HdfsRemovePath(FileName fileName, int recursive)
 		return -1;
 
 	if (HdfsDelete(protocol, fs, path, recursive))
+	{
+		errno = EIO;
 		return -1;
+	}
 	return 0;
 }
 
@@ -3023,7 +3029,10 @@ HdfsFileTruncate(File file, int64 offset)
 		return -1;
 
 	if (0 != HdfsTruncate(protocol, fs, path, offset))
+	{
+		errno = EIO;
 	    return -1;
+	}
 
 	pfree(protocol);
 	/*
