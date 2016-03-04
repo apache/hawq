@@ -807,7 +807,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 static int calculate_virtual_segment_number(List* candidateRelations) {
 	ListCell* le1;
 	int vsegNumber = 1;
-	int64_t totalDataSize = 0;
+	int64 totalDataSize = 0;
 	bool isHashRelationExist = false;
 	int maxHashBucketNumber = 0;
 
@@ -839,11 +839,12 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 		vsegNumber = maxHashBucketNumber;
 	} else {
 		/*we allocate one virtual segment for each 128M data */
-		totalDataSize >>= 27;
+		int64 block_unit =  1 << 27;
+		totalDataSize = totalDataSize / block_unit;
 		vsegNumber = totalDataSize + 1;
 	}
 	/*vsegNumber should be less than GetUtilPartitionNum*/
-	if(vsegNumber > GetUtilPartitionNum()){
+	if(vsegNumber > GetUtilPartitionNum() || vsegNumber <= 0){
 		vsegNumber = GetUtilPartitionNum();
 	}
 
