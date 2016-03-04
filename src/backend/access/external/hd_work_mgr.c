@@ -803,6 +803,7 @@ make_allocation_output_string(List *segment_fragments)
 		pfree(fragment_str.data);
 
 	}
+	pfree(dfs_address);
 
 	return segwork.data;
 }

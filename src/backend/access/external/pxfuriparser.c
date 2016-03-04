@@ -663,7 +663,7 @@ GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 
 /*
  * Parsed a fragment string in the form:
- * <ip>@<port>@<index>[@user_data] - 192.168.1.1@1422@1[@user_data]
+ * <ip>@<port>@<index>@<fragment_md>@<dfs_address>[@user_data] - 192.168.1.1@1422@1@<fragment metadata>@hdfs://nameservice/hawq_default[@user_data]
  * to authority ip:port - 192.168.1.1:1422
  * to index - 1
  * user data is optional
@@ -752,6 +752,10 @@ GPHDUri_free_fragments(GPHDUri *uri)
 		pfree(data->authority);
 		pfree(data->index);
 		pfree(data->source_name);
+		pfree(data->fragment_md);
+		pfree(data->dfs_address);
+		if(data->user_data)
+			pfree(data->user_data);
 		pfree(data);
 	}
 	list_free(uri->fragments);
