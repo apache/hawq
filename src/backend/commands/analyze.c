@@ -839,8 +839,7 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 		vsegNumber = maxHashBucketNumber;
 	} else {
 		/*we allocate one virtual segment for each 128M data */
-		int64 block_unit =  1 << 27;
-		totalDataSize = totalDataSize / block_unit;
+		totalDataSize >>= 27;
 		vsegNumber = totalDataSize + 1;
 	}
 	/*vsegNumber should be less than GetUtilPartitionNum*/
