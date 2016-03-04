@@ -709,7 +709,15 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 	*value_end = '\0';
 	fragment_data->index = pstrdup(value_start);
 	value_start = value_end + 1;
+
 	/* expect fragment metadata */
+	value_end = strchr(value_start, segwork_separator);
+	Assert(value_end != NULL);
+	*value_end = '\0';
+	fragment_data->fragment_md = pstrdup(value_start);
+	value_start = value_end + 1;
+
+	/* expect fragment dfs_address */
 	Assert(value_start);
 
 	/* check for user data */
@@ -719,7 +727,7 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 		has_user_data = true;
 		*value_end = '\0';
 	}
-	fragment_data->fragment_md = pstrdup(value_start);
+	fragment_data->dfs_address = pstrdup(value_start);
 
 	/* read user data */
 	if (has_user_data)

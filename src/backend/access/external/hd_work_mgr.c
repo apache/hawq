@@ -768,6 +768,9 @@ make_allocation_output_string(List *segment_fragments)
 	initStringInfo(&segwork);
 	appendStringInfoString(&segwork, SEGWORK_PREFIX);
 	
+	char* dfs_address = NULL;
+	get_hdfs_location_from_filespace(&dfs_address);
+
 	foreach(frag_cell, segment_fragments)
 	{
 		AllocatedDataFragment *frag = (AllocatedDataFragment*)lfirst(frag_cell);
@@ -783,6 +786,10 @@ make_allocation_output_string(List *segment_fragments)
 		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
 		if (frag->fragment_md)
 			appendStringInfo(&fragment_str, "%s", frag->fragment_md);
+		/* Adding dfs_address from pg_filespace entry required for HAWQ-462 */
+		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
+		if (dfs_address)
+			appendStringInfo(&fragment_str, "%s", dfs_address);
 		if (frag->user_data)
 		{
 			appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);

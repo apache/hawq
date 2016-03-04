@@ -52,7 +52,7 @@ void	append_churl_header_if_exists(gphadoop_context* context,
 void    set_current_fragment_headers(gphadoop_context* context);
 void	gpbridge_import_start(PG_FUNCTION_ARGS);
 void	gpbridge_export_start(PG_FUNCTION_ARGS);
-PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel);
+PxfServer* get_pxf_server(gphadoop_context* context, const Relation rel);
 size_t	gpbridge_read(PG_FUNCTION_ARGS);
 size_t	gpbridge_write(PG_FUNCTION_ARGS);
 void	parse_gphd_uri(gphadoop_context* context, bool is_import, PG_FUNCTION_ARGS);
@@ -60,7 +60,7 @@ void	build_uri_for_read(gphadoop_context* context);
 void 	build_file_name_for_write(gphadoop_context* context);
 void 	build_uri_for_write(gphadoop_context* context, PxfServer* rest_server);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
-void	add_delegation_token(PxfInputData *inputData);
+void	add_delegation_token(PxfInputData *inputData, char* dfs_address);
 void	free_token_resources(PxfInputData *inputData);
 
 /* Custom protocol entry point for read
@@ -181,8 +181,8 @@ void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	inputData.gphduri = context->gphd_uri;
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
 	inputData.filterstr = serializePxfFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
-	add_delegation_token(&inputData);
-	
+	add_delegation_token(&inputData, ((FragmentData*)lfirst(context->current_fragment))->dfs_address);
+
 	build_http_header(&inputData);
 	free_token_resources(&inputData);
 }
@@ -251,7 +251,7 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 
 	/* get rest servers list and choose one */
 	Relation rel = EXTPROTOCOL_GET_RELATION(fcinfo);
-	PxfServer* rest_server = get_pxf_server(context->gphd_uri, rel);
+	PxfServer* rest_server = get_pxf_server(context, rel);
 
 	if (!rest_server)
 		ereport(ERROR,
@@ -290,8 +290,9 @@ static void init_client_context(ClientContext *client_context)
  * if pxf_isilon is true, there are no PXF instances on the datanodes.
  * TODO: add locality
  */
-PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
+PxfServer* get_pxf_server(gphadoop_context* context, const Relation rel)
 {
+	GPHDUri* gphd_uri = context->gphd_uri;
 	ClientContext client_context; /* holds the communication info */
 	PxfInputData inputData = {0};
 	List	 	*rest_servers = NIL;
@@ -313,7 +314,6 @@ PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	{
 		return NULL;
 	}
-
 	/*
 	 * Enrich the curl HTTP header
 	 */
@@ -321,7 +321,7 @@ PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 	inputData.gphduri = gphd_uri;
 	inputData.rel = rel;
 	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */
-	add_delegation_token(&inputData);
+	add_delegation_token(&inputData, ((FragmentData*)lfirst(context->current_fragment))->dfs_address);
 	build_http_header(&inputData);
 
 	int port = atoi(gphd_uri->port);
@@ -505,20 +505,16 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
  * Both regular and HA cases are handled the same way,
  * where a nameservice is parsed by HdfsParsePath()@fd.c
  */
-void add_delegation_token(PxfInputData *inputData)
+void add_delegation_token(PxfInputData *inputData, char *dfs_address)
 {
 	PxfHdfsTokenData *token = NULL;
-	char* dfs_address = NULL;
 
 	if (!enable_secure_filesystem)
 		return;
 
 	token = palloc0(sizeof(PxfHdfsTokenData));
 
-	get_hdfs_location_from_filespace(&dfs_address);
-
-    elog(DEBUG2, "locating token for %s", dfs_address);
-
+	elog(DEBUG2, "locating token for %s", dfs_address);
 	token->hdfs_token = find_filesystem_credential_with_uri(dfs_address);
 
 	if (token->hdfs_token == NULL)
@@ -526,8 +522,6 @@ void add_delegation_token(PxfInputData *inputData)
 	elog(DEBUG2, "Delegation token for %s found", dfs_address);
 
 	inputData->token = token;
-
-	pfree(dfs_address);
 }
 
 void free_token_resources(PxfInputData *inputData)
