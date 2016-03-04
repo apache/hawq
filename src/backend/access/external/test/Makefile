@@ -84,4 +84,4 @@ pxfanalyze_REAL_OBJS=$(COMMON_REAL_OBJS) \
 
 include ../../../../Makefile.mock
 
-MOCK_LIBS += -ljson
+MOCK_LIBS += -ljson-c
