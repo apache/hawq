@@ -129,6 +129,11 @@ typedef struct AttributeStatistics
  */
 static int 			elevel = -1;
 
+/*
+ * in dbsize.c
+ */
+extern int64 calculate_relation_size(Relation rel);
+
 /* Top level functions */
 static void analyzeRelation(Relation relation, List *lAttributeNames, bool rootonly);
 static void analyzeComputeAttributeStatistics(Oid relationOid, 
@@ -842,8 +847,9 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 		totalDataSize >>= 27;
 		vsegNumber = totalDataSize + 1;
 	}
+	assert(vsegNumber > 0);
 	/*vsegNumber should be less than GetUtilPartitionNum*/
-	if(vsegNumber > GetUtilPartitionNum() || vsegNumber <= 0){
+	if(vsegNumber > GetUtilPartitionNum()){
 		vsegNumber = GetUtilPartitionNum();
 	}
 
