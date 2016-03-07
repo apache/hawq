@@ -3031,7 +3031,7 @@ HdfsFileTruncate(File file, int64 offset)
 	if (0 != HdfsTruncate(protocol, fs, path, offset))
 	{
 		errno = EIO;
-	    return -1;
+		return -1;
 	}
 
 	pfree(protocol);
@@ -3048,6 +3048,7 @@ HdfsFileTruncate(File file, int64 offset)
 			(errcode(ERRCODE_IO_ERROR),
 					errmsg("cannot reopen file %s after truncate, errno %d", VfdCache[file].fileName, errno),
 					errdetail("%s", HdfsGetLastError())));
+		errno = EIO;
 		return -1;
 	}
 
@@ -3073,6 +3074,7 @@ HdfsFileTruncate(File file, int64 offset)
 			(errcode(ERRCODE_IO_ERROR),
 					errmsg("cannot get file length for file %s after truncate, errno %d", VfdCache[file].fileName, errno),
 					errdetail("%s", HdfsGetLastError())));
+		errno = EIO;
 		return -1;
 	}
 
