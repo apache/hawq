@@ -292,7 +292,6 @@ static void init_client_context(ClientContext *client_context)
  */
 PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 {
-	GPHDUri* gphd_uri = context->gphd_uri;
 	ClientContext client_context; /* holds the communication info */
 	PxfInputData inputData = {0};
 	List	 	*rest_servers = NIL;
