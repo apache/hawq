@@ -17,19 +17,55 @@
  * under the License.
  */
 /*
- * externalmd.h
+ * itemmd.h
  *
+ *  Representation of PXF item metadata
  *  Created on: Mar 6, 2015
  *      Author: antova
  */
 
-#ifndef EXTERNALMD_H_
-#define EXTERNALMD_H_
+#ifndef ITEMMD_H_
+#define ITEMMD_H_
 
 #include "postgres.h"
-#include "catalog/hcatalog/hcatalogmd.h"
 #include "nodes/parsenodes.h"
 
-extern List *ParseHCatalogEntries(StringInfo json);
+/*
+ * Metadata for fields in PXF items
+ */
+typedef struct PxfField
+{
+	/* column name */
+	char *name;
+	
+	/* type name */
+	char *type;
+	
+	/* type modifiers, e.g. max length or precision */
+	int typeModifiers[2];
+	
+	/* number of type modifiers */
+	int nTypeModifiers;
+} PxfField;
 
-#endif /* EXTERNALMD_H_ */
+/*
+ * Metadata for PXF items
+ */
+typedef struct PxfItem
+{
+	/* profile name */
+	char *profile;
+
+	/* path */
+	char *path;
+
+	/* item name */
+	char *name;
+	
+	/* fields */
+	List *fields;
+} PxfItem;
+
+
+
+#endif /* ITEMMD_H_ */

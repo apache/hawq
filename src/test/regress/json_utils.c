@@ -5,11 +5,12 @@
  *      Author: antova
  */
 
+#include "catalog/external/externalmd.h"
 #include "postgres.h"
+#include "access/hd_work_mgr.h"
 #include "funcapi.h"
 #include "catalog/catquery.h"
 #include "catalog/gp_policy.h"
-#include "catalog/hcatalog/externalmd.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_exttable.h"
@@ -68,16 +69,16 @@ load_json_data(PG_FUNCTION_ARGS)
 	initStringInfo(&buf);
 	appendStringInfo(&buf, "%s", pcbuf);
     
-	List *hcatalog_tables = ParseHCatalogEntries(&buf);
+	List *items = ParsePxfEntries(&buf, HiveProfileName, HcatalogDbOid);
 	pfree(buf.data);
 	
 	StringInfoData tblNames;
 	initStringInfo(&tblNames);
 	ListCell *lc = NULL;
-	foreach (lc, hcatalog_tables)
+	foreach (lc, items)
 	{
-		HCatalogTable *hcatalogTable = (HCatalogTable *) lfirst(lc);
-		appendStringInfo(&tblNames, "%s.%s ", hcatalogTable->dbName, hcatalogTable->tableName);
+		PxfItem *item = (PxfItem *) lfirst(lc);
+		appendStringInfo(&tblNames, "%s.%s ", item->path, item->name);
 	}
 	
 	PG_RETURN_TEXT_P(cstring_to_text(tblNames.data));

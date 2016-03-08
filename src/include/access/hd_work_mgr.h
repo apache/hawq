@@ -45,6 +45,8 @@ typedef struct sPxfFragmentStatsElem
 } PxfFragmentStatsElem;
 PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel);
 
-List *get_pxf_hcat_metadata(char *relation_location);
+List *get_pxf_item_metadata(char *profile, char *pattern, Oid dboid);
+
+#define HiveProfileName "Hive"
 
 #endif   /* HDWORKMGR_H */
