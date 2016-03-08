@@ -184,7 +184,7 @@ END TRANSACTION;
 -- negative test: duplicated tables
 BEGIN TRANSACTION;
 SELECT load_json_data('@abs_builddir@/data/hcatalog/multi_table_duplicates.json');
-ERROR:  relation "hcatalog.db.t" already exists
+ERROR:  relation "db.db.t" already exists
 END TRANSACTION;
 -- negative test case: invalid numeric typemod
 BEGIN TRANSACTION;
