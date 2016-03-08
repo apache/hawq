@@ -163,13 +163,13 @@ static HTAB                     *RevertBlockNamesMap = NULL;
 static HTAB                     *RevertBlockTopologyPathsMap = NULL;
 
 //static BlockLocation *CreateHdfsFileBlockLocations(BlockLocation *hdfs_locations, int block_num);
-static BlockLocation *MergeHdfsFileBlockLocations(BlockLocation *locations1, int block_num1, BlockLocation *locations2, int block_num2);
+//static BlockLocation *MergeHdfsFileBlockLocations(BlockLocation *locations1, int block_num1, BlockLocation *locations2, int block_num2);
 
 
 // create block locations for user
 static BlockLocation *GetHdfsFileBlockLocationsNoCache(const HdfsFileInfo *file_info, uint64_t filesize, int *block_num);
 static BlockLocation *GetHdfsFileBlockLocationsFromCache(MetadataCacheEntry *entry, uint64_t filesize, int *block_num);
-static BlockLocation *AppendHdfsFileBlockLocationsToCache(const HdfsFileInfo *file_info, MetadataCacheEntry *entry, uint64_t filesize, int *block_num, double *hit_ratio);
+//static BlockLocation *AppendHdfsFileBlockLocationsToCache(const HdfsFileInfo *file_info, MetadataCacheEntry *entry, uint64_t filesize, int *block_num, double *hit_ratio);
 
 /*
  *  Estimate metadata cache shared memory size
@@ -895,6 +895,7 @@ err:
 /*
  *  Get hdfs block locations from cache and fetch extra part from hadoop hdfs
  */
+/*
 BlockLocation *
 AppendHdfsFileBlockLocationsToCache(const HdfsFileInfo *file_info, MetadataCacheEntry *entry, uint64_t filesize, int *block_num, double *hit_ratio)
 {
@@ -1028,6 +1029,7 @@ done:
 
     return locations;
 }
+*/
 
 /*
  * Free hdf file block location which create from GetHdfsFileBlockLocations
@@ -1117,6 +1119,7 @@ CreateHdfsFileBlockLocations(BlockLocation *hdfs_locations, int block_num)
     return locations;
 }
 
+/*
 BlockLocation *
 MergeHdfsFileBlockLocations(BlockLocation *locations1, int block_num1, BlockLocation *locations2, int block_num2)
 {
@@ -1164,6 +1167,7 @@ MergeHdfsFileBlockLocations(BlockLocation *locations1, int block_num1, BlockLoca
     return locations;
 
 }
+*/
 
 void 
 DumpHdfsFileBlockLocations(BlockLocation *locations, int block_num)

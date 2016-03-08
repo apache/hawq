@@ -1147,8 +1147,8 @@ cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
       instr->firsttuple       = ntuples.nsimax->firsttuple;
       instr->startup          = ntuples.nsimax->startup;
       instr->total            = ntuples.nsimax->total;
-      instr->startupLast      = ntuples.nsiLast->startup;
-      instr->totalLast        = ntuples.nsiLast->total;
+      instr->startupLast      = ntuples.nsiLast ? ntuples.nsiLast->startup : ntuples.nsimax->startup;
+      instr->totalLast        = ntuples.nsiLast ? ntuples.nsiLast->total : ntuples.nsimax->total;
       instr->ntuples          = ntuples.nsimax->ntuples;
       instr->nloops           = ntuples.nsimax->nloops;
       instr->execmemused      = ntuples.nsimax->execmemused;
@@ -1157,7 +1157,7 @@ cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
       instr->workfileReused   = ntuples.nsimax->workfileReused;
       instr->workfileCreated  = ntuples.nsimax->workfileCreated;
       instr->firststart       = ntuples.nsimax->firststart;
-      instr->firststartLast       = ntuples.nsiLast->firststart;
+      instr->firststartLast       = ntuples.nsiLast ? ntuples.nsiLast->firststart : ntuples.nsimax->firststart;
     }
 
     /* Save extra message text for the most interesting winning qExecs. */
