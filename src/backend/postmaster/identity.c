@@ -35,8 +35,10 @@
 #include "storage/proc.h"				/* MyProc */
 #include "executor/execdesc.h"			/* AllocateResource */
 #include "cdb/cdbutil.h"				/* QueryResource */
+#include "cdb/cdbvars.h"
 #include "optimizer/cost.h"
 #include "utils/guc.h"
+
 #include "commands/defrem.h"			/* defGetInt64() */
 
 #include "resourcemanager/envswitch.h"
@@ -53,6 +55,8 @@
 #ifndef SHOULD_REMOVE
 #include "cdb/cdbvars.h"
 #endif
+
+int slaveHostNumber;
 
 typedef enum SegmentRole
 {
@@ -452,10 +456,20 @@ GetQEGangNum(void)
 	return SegmentId.pid.init ? SegmentId.pid.gang_member_num : 0;
 }
 
-int
-GetUtilPartitionNum(void)
+int	GetAnalyzeVSegNumLimit(void)
 {
-	return default_segment_num;
+	int nvseg = hawq_rm_nvseg_for_analyze_perquery_perseg_limit * slaveHostNumber;
+	while(nvseg > hawq_rm_nvseg_for_analyze_perquery_limit){
+		nvseg -= slaveHostNumber;
+	}
+	if(nvseg <= 0){
+		nvseg = hawq_rm_nvseg_for_analyze_perquery_limit;
+	}
+	return nvseg;
+}
+
+int	GetCopyFromVSegNum(void){
+	return hawq_rm_nvseg_for_copy_from_perquery;
 }
 
 int
@@ -469,7 +483,7 @@ GetPlannerSegmentNum(void)
 		return gp_segments_for_planner;
 	}
 
-	return GetUtilPartitionNum();
+	return GetQueryVsegNum();
 }
 /** 
   *	Read Relation Option from statement WITH options
@@ -525,19 +539,38 @@ GetRelOpt_bucket_num_fromRangeVar(const RangeVar* rel_rv, int default_val)
 int
 GetRandomDistPartitionNum(void)
 {
-	return default_segment_num;
+	return default_hash_table_bucket_number;
 }
 
 int
 GetHashDistPartitionNum(void)
 {
-	return default_segment_num;
+	return default_hash_table_bucket_number;
+}
+
+int
+GetQueryVsegNum(void)
+{
+	int nvseg = rm_nvseg_perquery_perseg_limit * slaveHostNumber;
+	while(nvseg > rm_nvseg_perquery_limit){
+		nvseg -= slaveHostNumber;
+	}
+	if(nvseg <= 0){
+		nvseg = rm_nvseg_perquery_limit;
+	}
+	return nvseg;
 }
 
 int
 GetExternalTablePartitionNum(void)
 {
-	return default_segment_num;
+	return GetQueryVsegNum();
+}
+
+int
+GetUserDefinedFunctionVsegNum(void)
+{
+	return GetQueryVsegNum();
 }
 
 int

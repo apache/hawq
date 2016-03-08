@@ -251,7 +251,6 @@ bool		gp_parquet_insert_sort = true;
 /* The following GUCs is for HAWQ 2.o */
 
 bool optimizer_enforce_hash_dist_policy;
-int default_segment_num;
 int external_table_init_segment_num;
 int appendonly_split_write_size_mb;
 int split_read_size_mb;

@@ -240,6 +240,7 @@ extern void CheckForQDMirroringWork(void);
 extern bool ResourceScheduler;
 
 static int64 master_start_time		  = 0;
+static int64_t	 slavesFileTimestamp = 0;
 static bool  has_been_moved_to_cgroup = false;
 
 /* ----------------------------------------------------------------
@@ -261,6 +262,9 @@ static bool IsTransactionStmtList(List *nodes);
 static void SigHupHandler(SIGNAL_ARGS);
 static void log_disconnections(int code, Datum arg);
 static bool renice_current_process(int nice_level);
+static int getSlaveHostNumber(FILE *fp);
+static bool CheckSlaveFile();
+
 
 /*
  * Change the priority of the current process to the specified level
@@ -4572,7 +4576,16 @@ PostgresMain(int argc, char *argv[], const char *username)
 		 * those every time through the message loop because it'd slow down
 		 * processing of batched messages, and because we don't want to report
 		 * uncommitted updates (that confuses autovacuum).
+		 *
+		 * We need to check the slave file first
 		 */
+		if (Gp_role == GP_ROLE_DISPATCH){
+			/* set slave host number which enable to set query vseg dynamically*/
+			if(!CheckSlaveFile()){
+				slaveHostNumber = 1;
+			}
+		}
+
 		if (send_ready_for_query)
 		{
 			if (IsTransactionOrTransactionBlock())
@@ -6202,5 +6215,119 @@ SyncAgentMain(int argc, char *argv[], const char *username)
 	Assert(false);
 
 	return 1;					/* keep compiler quiet */
+}
+
+
+
+
+static int getSlaveHostNumber(FILE *fp)
+{
+	int 					slavecnt 	  = 0;
+	bool 					haserror  = false;
+	bool					incomment = false;
+	char   *buffer = NULL;;
+	int32_t size = -1;
+	int32_t cursor = -1;
+	while( true )
+	{
+		int c = fgetc(fp);
+		if ( c == EOF )
+		{
+			if ( feof(fp) == 0 )
+			{
+				elog(WARNING, "Failed to read slaves file, ferror() gets %d",
+							  ferror(fp));
+				haserror = true;
+				slavecnt = 1;
+			}
+
+			break;
+		}
+
+		if ( c == '\t' || c == ' ' || c == '\r' )
+		{
+			continue;
+		}
+
+		if ( c == '\n' )
+		{
+			if ( cursor + 1 > 0 )
+			{
+				cursor = -1;
+				slavecnt++;
+			}
+			incomment = false;
+		}
+		/* '#' is treated as a start symbol of a comment string in the line. */
+		else if ( c == '#' )
+		{
+			incomment = true;
+		}
+		else if ( !incomment )
+		{
+			cursor++;
+		}
+	}
+
+	if ( cursor + 1 > 0 )
+	{
+		slavecnt++;
+	}
+
+	return slavecnt;
+}
+static bool CheckSlaveFile(){
+	char *filename = NULL;
+	if ( filename == NULL )
+	{
+
+		char *gphome = getenv("GPHOME");
+		if ( gphome == NULL )
+		{
+			elog(WARNING, "The environment variable GPHOME is not set. "
+							"can not find file slaves.");
+			return false;
+		}
+
+		filename = (char*)palloc(strlen(gphome) + sizeof("/etc/slaves"));
+
+		sprintf(filename, "%s%s", gphome, "/etc/slaves");
+	}
+
+	elog(DEBUG3, "Postmaster reads slaves file %s.", filename);
+
+	/* Get file stat. */
+	struct stat filestat;
+	FILE *fp = fopen(filename, "r");
+	if ( fp == NULL )
+	{
+		pfree(filename);
+		elog(WARNING, "Fail to open slaves file %s. errno %d", filename, errno);
+		return false;
+	}
+	int fd = fileno(fp);
+
+	int fres = fstat(fd, &filestat);
+	if ( fres != 0 )
+	{
+		pfree(filename);
+		fclose(fp);
+		elog(WARNING, "Fail to get slaves file stat %s. errno %d", filename, errno);
+		return false;
+	}
+
+	int64_t filechangetime = filestat.st_mtime;
+
+	if ( filechangetime != slavesFileTimestamp )
+	{
+		slaveHostNumber = getSlaveHostNumber(fp);
+		slavesFileTimestamp = filechangetime;
+	}
+
+
+
+	pfree(filename);
+	fclose(fp);
+	return true;
 }
 
