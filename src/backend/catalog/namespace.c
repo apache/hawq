@@ -263,7 +263,7 @@ RangeVarGetRelid(const RangeVar *relation, bool failOK, bool allowHcatalog)
 			appendStringInfo(&location, "%s.%s", relation->schemaname, relation->relname);
 
 			// TODO: May 29, 2015 - shivram: revisit returning the hcat tables here
-			List *hcat_tables = get_pxf_hcat_metadata(location.data);
+			List *hcat_tables = get_pxf_item_metadata(HiveProfileName, location.data, HcatalogDbOid);
 			Assert(hcat_tables != NIL);
 			elog(DEBUG2, "Retrieved %d tables from HCatalog for \"%s.%s\"", 
 				list_length(hcat_tables), relation->schemaname, relation->relname);

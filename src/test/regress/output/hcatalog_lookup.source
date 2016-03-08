@@ -7,8 +7,15 @@ SELECT * from hcatalog.db.t;
 ERROR:  HCatalog querying is not enabled, query for "hcatalog.db.t" is not allowed in this context
 LINE 1: SELECT * from hcatalog.db.t;
                       ^
+SELECT * FROM pxf_get_item_fields('Hive', '*');
+ERROR:  HCatalog querying is not enabled
 -- enable GUC
 SET hcatalog_enable = true;
+SELECT * FROM pxf_get_item_fields('Hive', '*abc*abc*');
+ path | itemname | fieldname | fieldtype 
+------+----------+-----------+-----------
+(0 rows)
+
 -- Create function to insert and scan in-memory data to pg_class
 CREATE OR REPLACE FUNCTION convert_to_hcatalog_schema(schemaName text) RETURNS text
   AS '@abs_builddir@/regress@DLSUFFIX@', 'convert_to_hcatalog_schema'

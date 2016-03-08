@@ -18,11 +18,11 @@
 #-------------------------------------------------------------------------
 #
 # Makefile--
-#    Makefile for catalog/hcatalog
+#    Makefile for catalog/external
 #
 #-------------------------------------------------------------------------
 
-subdir = src/backend/catalog/hcatalog
+subdir = src/backend/catalog/external
 top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 

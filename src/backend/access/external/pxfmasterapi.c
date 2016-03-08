@@ -27,7 +27,7 @@
  */
 #include <json-c/json.h>
 #include "access/pxfmasterapi.h"
-#include "catalog/hcatalog/externalmd.h"
+#include "catalog/external/externalmd.h"
 
 static List* parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf);
 static PxfFragmentStatsElem *parse_get_frag_stats_response(StringInfo rest_buf);
@@ -35,7 +35,7 @@ static float4 normalize_size(long size, char* unit);
 static List* parse_get_fragments_response(List* fragments, StringInfo rest_buf);
 static void ha_failover(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);
 static void rest_request(GPHDUri *hadoop_uri, ClientContext* client_context, char *rest_msg);
-static char* concat(char *body, char *tail);
+static char* concat(int num_args, ...);
 
 /*
  * Obtain the datanode REST servers host/port data
@@ -145,7 +145,7 @@ void free_datanode_rest_server(PxfServer* srv)
 PxfFragmentStatsElem *get_fragments_statistics(GPHDUri* hadoop_uri,
 											   ClientContext *client_context)
 {
-	char *restMsg = concat("http://%s:%s/%s/%s/Fragmenter/getFragmentsStats?path=", hadoop_uri->data);
+	char *restMsg = concat(2, "http://%s:%s/%s/%s/Fragmenter/getFragmentsStats?path=", hadoop_uri->data);
 
 	/* send the request. The response will exist in rest_buf.data */
 	rest_request(hadoop_uri, client_context, restMsg);
@@ -258,14 +258,20 @@ ha_failover(GPHDUri *hadoop_uri,
 	}
 }
 
-/* Concatenate two literal strings using stringinfo */
-char* concat(char *body, char *tail)
+/* Concatenate multiple literal strings using stringinfo */
+char* concat(int num_args, ...)
 {
+	va_list ap;
 	StringInfoData str;
 	initStringInfo(&str);
 
-	appendStringInfoString(&str, body);
-	appendStringInfoString(&str, tail);
+	va_start(ap, num_args);
+
+	for (int i = 0; i < num_args; i++) {
+		appendStringInfoString(&str, va_arg(ap, char*));
+	}
+	va_end(ap);
+
 	return str.data;
 }
 
@@ -282,7 +288,7 @@ get_data_fragment_list(GPHDUri *hadoop_uri,
 					   ClientContext *client_context)
 {
 	List *data_fragments = NIL;
-	char *restMsg = concat("http://%s:%s/%s/%s/Fragmenter/getFragments?path=",hadoop_uri->data);
+	char *restMsg = concat(2, "http://%s:%s/%s/%s/Fragmenter/getFragments?path=", hadoop_uri->data);
 
 	rest_request(hadoop_uri, client_context, restMsg);
 
@@ -398,23 +404,35 @@ void free_fragment(DataFragment *fragment)
 }
 
 /*
- * get_hcat_metadata
+ * get_external_metadata
  *
- * Request hcatalog metadata from the PXF MetadataResource
- * Process the hcat response
- * TODO: The hcat response processing might be pushed out of this function's context
+ * Request item metadata from the PXF MetadataResource
+ * Process the PXF response
+ * Cache data to dboid if it's not NULL
+ * TODO: The PXF response processing might be pushed out of this function's context
  *
  */
-List* get_hcat_metadata(GPHDUri* hadoop_uri, char *location, ClientContext *client_context)
+
+List* get_external_metadata(GPHDUri* hadoop_uri, char *profile, char *pattern, ClientContext *client_context, Oid dboid)
 {
-	List *hcat_tables = NIL;
-	char *restMsg = concat("http://%s:%s/%s/%s/Metadata/getTableMetadata?table=", location);
+	List *objects = NIL;
+	char *restMsg = concat(4, "http://%s:%s/%s/%s/Metadata/getMetadata?profile=", profile, "&pattern=", pattern);
 
 	rest_request(hadoop_uri, client_context, restMsg);
 
 	/* parse the JSON response and form a fragments list to return */
-	hcat_tables = ParseHCatalogEntries(&(client_context->the_rest_buf));
+	objects = ParsePxfEntries(&(client_context->the_rest_buf), profile, dboid);
 
-	return hcat_tables;
+	return objects;
 }
 
+
+List* get_and_cache_external_metadata(GPHDUri* hadoop_uri, char *profile, char *pattern, ClientContext *client_context, Oid dboid)
+{
+	return get_external_metadata(hadoop_uri, profile, pattern, client_context, dboid);
+}
+
+List* get_no_cache_external_metadata(GPHDUri* hadoop_uri, char *profile, char *pattern, ClientContext *client_context)
+{
+	return get_external_metadata(hadoop_uri, profile, pattern, client_context, NULL);
+}

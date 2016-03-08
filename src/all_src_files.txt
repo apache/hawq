@@ -138,6 +138,7 @@ backend/catalog/pg_proc_callback.c
 backend/catalog/pg_shdepend.c
 backend/catalog/pg_type.c
 backend/catalog/toasting.c
+backend/catalog/external/externalmd.c
 backend/cdb/cdbanalyze.c
 backend/cdb/cdbappendonlystorage.c
 backend/cdb/cdbappendonlystorageformat.c
@@ -662,6 +663,7 @@ backend/utils/adt/percentile.c
 backend/utils/adt/pg_locale.c
 backend/utils/adt/pg_lzcompress.c
 backend/utils/adt/pgstatfuncs.c
+backend/utils/adt/pxf_functions.c
 backend/utils/adt/pivot.c
 backend/utils/adt/pseudotypes.c
 backend/utils/adt/quote.c
@@ -934,6 +936,8 @@ include/catalog/pg_type_encoding.h
 include/catalog/pg_user_mapping.h
 include/catalog/pg_window.h
 include/catalog/toasting.h
+include/catalog/external/externalmd.h
+include/catalog/external/itemmd.h
 include/cdb/cdbanalyze.h
 include/cdb/cdbaocsam.h
 include/cdb/cdbappendonlyam.h

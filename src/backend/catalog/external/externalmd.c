@@ -23,9 +23,10 @@
  *      Author: antova
  *
  *
- *		Utilities for loading external hcatalog metadata
+ *		Utilities for loading external PXF metadata
  *
  */
+
 
 #include "postgres.h"
 #include <json-c/json.h>
@@ -33,11 +34,11 @@
 #include "miscadmin.h"
 #include "access/transam.h"
 #include "catalog/catquery.h"
+#include "catalog/external/externalmd.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_exttable.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/namespace.h"
-#include "catalog/hcatalog/externalmd.h"
 #include "commands/typecmds.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
@@ -45,22 +46,25 @@
 #include "utils/numeric.h"
 #include "utils/guc.h"
 
-static HCatalogTable *ParseHCatalogTable(struct json_object *hcatalogMD);
-static void LoadHCatalogEntry(HCatalogTable *hcatalogTable);
-static Oid LoadHCatalogNamespace(const char *namespaceName);
-static void LoadHCatalogTable(Oid namespaceOid, HCatalogTable *hcatalogTable);
-static void LoadHCatalogType(Oid relid, Oid reltypeoid, NameData relname, Oid relnamespaceoid);
-static void LoadHCatalogDistributionPolicy(Oid relid, HCatalogTable *hcatalogTable);
-static void LoadHCatalogExtTable(Oid relid, HCatalogTable *hcatalogTable);
-static void LoadHCatalogColumns(Oid relid, List *columns);
-int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nTypeMod);
+
+List *ParsePxfEntries(StringInfo json, char *profile, Oid dboid);
+static PxfItem *ParsePxfItem(struct json_object *pxfMD, char* profile);
+static void LoadPxfItem(PxfItem *pxfItem, Oid dboid);
+static Oid LoadNamespace(const char *namespaceName, Oid dboid);
+static void LoadTable(Oid namespaceOid, PxfItem *pxfItem);
+static void LoadType(Oid relid, Oid reltypeoid, NameData relname, Oid relnamespaceoid);
+static void LoadDistributionPolicy(Oid relid, PxfItem *pxfItem);
+static void LoadExtTable(Oid relid, PxfItem *pxfItem);
+static void LoadColumns(Oid relid, List *columns);
+static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nTypeMod);
 
 const int maxNumTypeModifiers = 2;
 /*
- * Parse a json response containing HCatalog metadata and load it in the in-memory heap tables,
+ * Parse a json response containing PXF metadata and load it in the in-memory heap tables,
+ * to database with Oid=dboid if dboid is not NULL
  * Return the list of the parsed tables
  */
-List *ParseHCatalogEntries(StringInfo json)
+List *ParsePxfEntries(StringInfo json, char *profile, Oid dboid)
 {
 	struct json_object *jsonObj = json_tokener_parse(json->data);
 	if ((NULL == jsonObj ) || is_error(jsonObj))
@@ -69,59 +73,61 @@ List *ParseHCatalogEntries(StringInfo json)
 	}
 	
 	List *tables = NIL;
-	struct json_object *jsonTables = json_object_object_get(jsonObj, "PXFMetadata");
-	if ((jsonTables == NULL) || is_error(jsonTables))
+	struct json_object *jsonItems = json_object_object_get(jsonObj, "PXFMetadata");
+	if ((jsonItems == NULL) || is_error(jsonItems))
 	{
 		return NIL;
 	}
 	
-	const int numTables = json_object_array_length(jsonTables);
-	for (int i = 0; i < numTables; i++)
+	const int numItems = json_object_array_length(jsonItems);
+	for (int i = 0; i < numItems; i++)
 	{
-		struct json_object *jsonTable = json_object_array_get_idx(jsonTables, i);
-		HCatalogTable *hcatalogTable = ParseHCatalogTable(jsonTable);
-		LoadHCatalogEntry(hcatalogTable);
-		tables = lappend(tables, hcatalogTable);
+		struct json_object *jsonItem = json_object_array_get_idx(jsonItems, i);
+		PxfItem *pxfItem = ParsePxfItem(jsonItem, profile);
+		if (dboid != NULL)
+			LoadPxfItem(pxfItem, dboid);
+		tables = lappend(tables, pxfItem);
 	}
 		
 	return tables;
 }
 
 /*
- * ParseHcatalogTable
- * 		Parse the given json object representing a single HCatalog table into the internal
+ * ParsePxfItem
+ * 		Parse the given json object representing a single PXF item into the internal
  * 		representation
  */
-HCatalogTable *ParseHCatalogTable(struct json_object *hcatalogMD)
+static PxfItem *ParsePxfItem(struct json_object *pxfMD, char* profile)
 {
-	HCatalogTable *hcatalogTable = palloc0(sizeof(HCatalogTable));
+	PxfItem *pxfItem = palloc0(sizeof(PxfItem));
 
-	/* parse table name */
-	struct json_object *jsonTable = json_object_object_get(hcatalogMD, "table");
-	char *dbName = pstrdup(json_object_get_string(json_object_object_get(jsonTable, "dbName")));
-	char *tableName = pstrdup(json_object_get_string(json_object_object_get(jsonTable, "tableName")));
+	/* parse item name */
+	struct json_object *jsonItem = json_object_object_get(pxfMD, "item");
+	char *itemPath = pstrdup(json_object_get_string(json_object_object_get(jsonItem, "path")));
+	char *itemName = pstrdup(json_object_get_string(json_object_object_get(jsonItem, "name")));
 	
-	hcatalogTable->dbName = dbName;
-	hcatalogTable->tableName = tableName;
+	pxfItem->profile = profile;
+	pxfItem->path = itemPath;
+	pxfItem->name = itemName;
 	
-	elog(DEBUG1, "Parsed table %s, namespace %s", tableName, dbName);
+	elog(DEBUG1, "Parsed item %s, namespace %s", itemName, itemPath);
 		
 	/* parse columns */
-	struct json_object *jsonColumns = json_object_object_get(hcatalogMD, "fields");
-	const int numColumns = json_object_array_length(jsonColumns);
-	for (int i = 0; i < numColumns; i++)
+	struct json_object *jsonFields = json_object_object_get(pxfMD, "fields");
+	const int numFields = json_object_array_length(jsonFields);
+	for (int i = 0; i < numFields; i++)
 	{
-		HCatalogColumn *hcatalogCol = palloc0(sizeof(HCatalogColumn));
-		struct json_object *jsonCol = json_object_array_get_idx(jsonColumns, i);
+		PxfField *pxfField = palloc0(sizeof(PxfField));
+		struct json_object *jsonCol = json_object_array_get_idx(jsonFields, i);
 
-		struct json_object *colName = json_object_object_get(jsonCol, "name");
-		hcatalogCol->colName = pstrdup(json_object_get_string(colName));
+		struct json_object *fieldName = json_object_object_get(jsonCol, "name");
+		pxfField->name = pstrdup(json_object_get_string(fieldName));
 
-		struct json_object *colType = json_object_object_get(jsonCol, "type");
-		hcatalogCol->typeName = pstrdup(json_object_get_string(colType));
-		hcatalogCol->nTypeModifiers = 0;
+		struct json_object *fieldType = json_object_object_get(jsonCol, "type");
+		pxfField->type = pstrdup(json_object_get_string(fieldType));
+		pxfField->nTypeModifiers = 0;
 		
-		elog(DEBUG1, "Parsing column %s, type %s", hcatalogCol->colName, hcatalogCol->typeName);
+		elog(DEBUG1, "Parsing field %s, type %s", pxfField->name, pxfField->type);
 
 		struct json_object *jsonModifiers = json_object_object_get(jsonCol, "modifiers");
 		if (NULL != jsonModifiers)
@@ -129,46 +135,48 @@ HCatalogTable *ParseHCatalogTable(struct json_object *hcatalogMD)
 			const int numModifiers = json_object_array_length(jsonModifiers);
 			Assert(2 >= numModifiers);
 			
-			hcatalogCol->nTypeModifiers = numModifiers;
+			pxfField->nTypeModifiers = numModifiers;
 			for (int j = 0; j < numModifiers; j++)
 			{
 				struct json_object *jsonMod = json_object_array_get_idx(jsonModifiers, j);
-				hcatalogCol->typeModifiers[j] = json_object_get_int(jsonMod);
+				pxfField->typeModifiers[j] = json_object_get_int(jsonMod);
 				
-				elog(DEBUG1, "modifier[%d]: %d", j, hcatalogCol->typeModifiers[j]);
+				elog(DEBUG1, "modifier[%d]: %d", j, pxfField->typeModifiers[j]);
 			}
 		}
-		hcatalogTable->columns = lappend(hcatalogTable->columns, hcatalogCol);
+		pxfItem->fields = lappend(pxfItem->fields, pxfField);
 	}
 
-	return hcatalogTable;
+	return pxfItem;
 }
 
 /*
- * LoadHcatalogTable
- * 		Load the given hcatalog table into in-memory heap tables
+ * LoadPxfItem
+ * 		Load the given PXF item into in-memory heap tables
  */
-void LoadHCatalogEntry(HCatalogTable *hcatalogTable)
+static void LoadPxfItem(PxfItem *pxfItem, Oid dboid)
 {
-	Oid namespaceOid = LookupNamespaceId(hcatalogTable->dbName, HcatalogDbOid);
+	Oid namespaceOid = LookupNamespaceId(pxfItem->path, dboid);
 
 	if (!OidIsValid(namespaceOid))
 	{
-		/* hcatalog database name has not been mapped to a namespace yet: create it */
-		namespaceOid = LoadHCatalogNamespace(hcatalogTable->dbName);
-		elog(DEBUG1, "No namespace found: %s. Generated new namespace oid: %u", hcatalogTable->dbName, namespaceOid);
+		/* external database name has not been mapped to a namespace yet: create it */
+		namespaceOid = LoadNamespace(pxfItem->path, dboid);
+		elog(DEBUG1, "No namespace found: %s. Generated new namespace oid: %u", pxfItem->path, namespaceOid);
 	}
 	
-	LoadHCatalogTable(namespaceOid, hcatalogTable);
+	LoadTable(namespaceOid, pxfItem);
 }
 
 /*
- * CreateHCatalogNamespace
- * 		Create an entry for the given HCatalog namespace in the in-memory heap tables and
+ * LoadNamespace
+ * 		Create an entry for the given PXF namespace in the in-memory heap tables and
  * 		return the reserved namespace oid
  */
-Oid LoadHCatalogNamespace(const char *namespaceName)
+static Oid LoadNamespace(const char *namespaceName, Oid dboid)
 {
+	Assert(OidIsValid(dboid));
+
 	Oid namespaceOid = GetNewExternalObjectId();
 
 	bool nulls[Natts_pg_namespace] = {false};
@@ -177,7 +185,7 @@ Oid LoadHCatalogNamespace(const char *namespaceName)
 	NameData name;
 	namestrcpy(&name, namespaceName);
 	values[Anum_pg_namespace_nspname - 1] = NameGetDatum(&name);
-	values[Anum_pg_namespace_nspdboid - 1] = ObjectIdGetDatum((Oid) HcatalogDbOid);
+	values[Anum_pg_namespace_nspdboid - 1] = ObjectIdGetDatum((Oid) dboid);
 	values[Anum_pg_namespace_nspowner - 1] = ObjectIdGetDatum(GetUserId());
 	nulls[Anum_pg_namespace_nspacl - 1] = true;
 
@@ -195,10 +203,10 @@ Oid LoadHCatalogNamespace(const char *namespaceName)
 }
 
 /*
- * LoadHCatalogTable
- * 		Load the metadata for an HCatalog table to pg_class and related catalog tables.
+ * LoadTable
+ * 		Load the metadata for an PXF table to pg_class and related catalog tables.
  */
-void LoadHCatalogTable(Oid namespaceOid, HCatalogTable *hcatalogTable)
+static void LoadTable(Oid namespaceOid, PxfItem *pxfItem)
 {
 	/*
 	 * assert entry is not already loaded in pg_class
@@ -208,13 +216,29 @@ void LoadHCatalogTable(Oid namespaceOid, HCatalogTable *hcatalogTable)
 			NULL,
 			cql("SELECT oid FROM pg_class "
 				" WHERE relname = :1 and relnamespace = :2",
-				CStringGetDatum(hcatalogTable->tableName), ObjectIdGetDatum(namespaceOid)));
+				CStringGetDatum(pxfItem->name), ObjectIdGetDatum(namespaceOid)));
 	if (InvalidOid != relid)
 	{
+
+		HeapTuple	tup;
+		Form_pg_namespace namespace;
+
+		tup = caql_getfirst(
+				NULL,
+				cql("SELECT * FROM pg_namespace "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(namespaceOid)));
+
+		if (!HeapTupleIsValid(tup))
+			elog(ERROR, "could not find tuple for namespace with oid=%u",
+				namespaceOid);
+
+		namespace = (Form_pg_namespace) GETSTRUCT(tup);
+
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_TABLE),
-				 errmsg("relation \"hcatalog.%s.%s\" already exists",
-						hcatalogTable->dbName, hcatalogTable->tableName),
+				 errmsg("relation \"%s.%s.%s\" already exists",
+						 NameStr(namespace->nspname), pxfItem->path, pxfItem->name),
 				errOmitLocation(true)));
 	}
 	
@@ -235,7 +259,7 @@ void LoadHCatalogTable(Oid namespaceOid, HCatalogTable *hcatalogTable)
 	}
 
 	NameData name;
-	namestrcpy(&name, hcatalogTable->tableName);
+	namestrcpy(&name, pxfItem->name);
 
 	values[Anum_pg_class_relname - 1] = NameGetDatum(&name);
 	values[Anum_pg_class_relnamespace - 1] = ObjectIdGetDatum(namespaceOid);
@@ -254,7 +278,7 @@ void LoadHCatalogTable(Oid namespaceOid, HCatalogTable *hcatalogTable)
 	values[Anum_pg_class_relisshared - 1] = BoolGetDatum(false);
 	values[Anum_pg_class_relkind - 1] = CharGetDatum(RELKIND_RELATION);
 	values[Anum_pg_class_relstorage - 1] = CharGetDatum(RELSTORAGE_EXTERNAL);
-	values[Anum_pg_class_relnatts - 1] = Int16GetDatum(list_length(hcatalogTable->columns));
+	values[Anum_pg_class_relnatts - 1] = Int16GetDatum(list_length(pxfItem->fields));
 	values[Anum_pg_class_relchecks - 1] = Int16GetDatum(0);
 	values[Anum_pg_class_reltriggers - 1] = Int16GetDatum(0);
 	values[Anum_pg_class_relukeys - 1] = Int16GetDatum(0);
@@ -278,17 +302,17 @@ void LoadHCatalogTable(Oid namespaceOid, HCatalogTable *hcatalogTable)
 	caql_insert_inmem(pcqCtx, tup);
 	caql_endscan(pcqCtx);
 
-	LoadHCatalogType(relid, reltypeoid, name, namespaceOid);
-	LoadHCatalogDistributionPolicy(relid, hcatalogTable);
-	LoadHCatalogExtTable(relid, hcatalogTable);
-	LoadHCatalogColumns(relid, hcatalogTable->columns);
+	LoadType(relid, reltypeoid, name, namespaceOid);
+	LoadDistributionPolicy(relid, pxfItem);
+	LoadExtTable(relid, pxfItem);
+	LoadColumns(relid, pxfItem->fields);
 }
 
 /*
- * LoadHCatalogType
- * 		Load the metadata for an HCatalog table to pg_type
+ * LoadType
+ * 		Load the metadata for an PXF table to pg_type
  */
-static void LoadHCatalogType(Oid relid, Oid reltypeoid, NameData relname, Oid relnamespaceoid)
+static void LoadType(Oid relid, Oid reltypeoid, NameData relname, Oid relnamespaceoid)
 {
 	Datum		values[Natts_pg_type];
 	bool		nulls[Natts_pg_type];
@@ -334,10 +358,10 @@ static void LoadHCatalogType(Oid relid, Oid reltypeoid, NameData relname, Oid re
 }
 
 /*
- * LoadHCatalogDistributionPolicy
- * 		Load the metadata for an HCatalog table to gp_distribution_policy
+ * LoadDistributionPolicy
+ * 		Load the metadata for an PXF table to gp_distribution_policy
  */
-void LoadHCatalogDistributionPolicy(Oid relid, HCatalogTable *hcatalogTable)
+static void LoadDistributionPolicy(Oid relid, PxfItem *pxfItem)
 {
 	Datum		values[Natts_gp_policy];
 	bool		nulls[Natts_gp_policy];
@@ -361,10 +385,10 @@ void LoadHCatalogDistributionPolicy(Oid relid, HCatalogTable *hcatalogTable)
 }
 
 /*
- * LoadHCatalogExtTable
- * 		Load the metadata for an HCatalog table to pg_exttable
+ * LoadExtTable
+ * 		Load the metadata for an PXF table to pg_exttable
  */
-void LoadHCatalogExtTable(Oid relid, HCatalogTable *hcatalogTable)
+static void LoadExtTable(Oid relid, PxfItem *pxfItem)
 {
 	Datum		values[Natts_pg_exttable];
 	bool		nulls[Natts_pg_exttable];
@@ -378,8 +402,8 @@ void LoadHCatalogExtTable(Oid relid, HCatalogTable *hcatalogTable)
 	 * pxf://<ip:port/namaservice>/<hive db>.<hive table>?Profile=Hive */
 	StringInfoData locationStr;
 	initStringInfo(&locationStr);
-	appendStringInfo(&locationStr, "pxf://%s/%s.%s?Profile=Hive",
-			pxf_service_address, hcatalogTable->dbName, hcatalogTable->tableName);
+	appendStringInfo(&locationStr, "pxf://%s/%s.%s?Profile=%s",
+			pxf_service_address, pxfItem->path, pxfItem->name, pxfItem->profile);
 	Size len = VARHDRSZ + locationStr.len;
 	/* +1 leaves room for sprintf's trailing null */
 	text *t = (text *) palloc(len + 1);
@@ -422,10 +446,10 @@ void LoadHCatalogExtTable(Oid relid, HCatalogTable *hcatalogTable)
 }
 
 /*
- * LoadHCatalogColumns
- * 		Load the column metadata for an HCatalog table to pg_attribute
+ * LoadPxfColumns
+ * 		Load the column metadata for an PXF table to pg_attribute
  */
-void LoadHCatalogColumns(Oid relid, List *columns)
+static void LoadColumns(Oid relid, List *columns)
 {
 	Assert(OidIsValid(relid));
 	Assert(NULL != columns);
@@ -438,18 +462,18 @@ void LoadHCatalogColumns(Oid relid, List *columns)
 	AttrNumber attno = 1;
 	foreach(lc, columns)
 	{
-		HCatalogColumn *hcatCol = lfirst(lc);
+		PxfField *field = lfirst(lc);
 		Oid typeOid = 
 				caql_getoid_only(
 						NULL,
 						NULL,
 						cql("SELECT oid FROM pg_type "
 							" WHERE typname = :1 and typnamespace = :2",
-							CStringGetDatum(hcatCol->typeName), ObjectIdGetDatum((Oid) PG_CATALOG_NAMESPACE)));
+							CStringGetDatum(field->type), ObjectIdGetDatum((Oid) PG_CATALOG_NAMESPACE)));
 		
 		if (!OidIsValid(typeOid))
 		{
-			elog(ERROR, "Unsupported type %s for imported column %s", hcatCol->typeName, hcatCol->colName);
+			elog(ERROR, "Unsupported type %s for imported column %s", field->type, field->name);
 		}
 
 		FormData_pg_attribute attributeD;
@@ -467,12 +491,12 @@ void LoadHCatalogColumns(Oid relid, List *columns)
 		get_typlenbyvalalign(typeOid, &typlen, &typbyval, &typealign);
 
 		attribute->attrelid = relid;
-		namestrcpy(&(attribute->attname), hcatCol->colName);
+		namestrcpy(&(attribute->attname), field->name);
 		attribute->atttypid = typeOid;
 		attribute->attstattarget = 0; /* no stats collection for column */
 		attribute->attlen = typlen;
 		attribute->attcacheoff = -1;
-		attribute->atttypmod = ComputeTypeMod(typeOid, hcatCol->colName, hcatCol->typeModifiers, hcatCol->nTypeModifiers);
+		attribute->atttypmod = ComputeTypeMod(typeOid, field->name, field->typeModifiers, field->nTypeModifiers);
 		attribute->attnum = attno;
 		attribute->attbyval = typbyval;
 		attribute->attndims = 0; /* array types not supported */
@@ -497,7 +521,7 @@ void LoadHCatalogColumns(Oid relid, List *columns)
  * get_typemod
  * 		Compute the type modifiers for a column of the given type
  */
-int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nTypeMod)
+static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nTypeMod)
 {
 	Assert(0 <= nTypeMod && nTypeMod <= maxNumTypeModifiers);
 	if (0 == nTypeMod)
