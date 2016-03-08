@@ -45,7 +45,6 @@ typedef struct FragmentData
 	char	 *index;
 	char	 *source_name;
 	char	 *fragment_md;
-	char 	 *dfs_address;
 	char	 *user_data;
 } FragmentData;
 
@@ -77,6 +76,9 @@ typedef struct GPHDUri
 	 * NNHAConf  will also occupy <host> and <port> members
 	 */
 	NNHAConf        *ha_nodes;
+
+	/* dfs address from pg_filespace (optional) */
+	char			*dfs_address;
 } GPHDUri;
 
 GPHDUri	*parseGPHDUri(const char *uri_str);

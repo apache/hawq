@@ -98,6 +98,7 @@ typedef struct sGpHost
 
 static const char *SEGWORK_PREFIX = "segwork=";
 static const char SEGWORK_IN_PAIR_DELIM = '@';
+static const char SEGWORK_DFS_DELIM = '&';
 
 static List* free_fragment_list(List *fragments);
 static List** distribute_work_2_gp_segments(List *data_fragments_list, int num_segs, int working_segs);
@@ -768,8 +769,11 @@ make_allocation_output_string(List *segment_fragments)
 	initStringInfo(&segwork);
 	appendStringInfoString(&segwork, SEGWORK_PREFIX);
 	
+	/* Add dfs_address from pg_filespace to the segment data. Fixes HAWQ-462 *//* dfs_address from pg_filespace entry */
 	char* dfs_address = NULL;
 	get_hdfs_location_from_filespace(&dfs_address);
+	appendStringInfoString(&segwork, dfs_address);
+	appendStringInfoChar(&segwork, SEGWORK_DFS_DELIM);
 
 	foreach(frag_cell, segment_fragments)
 	{
@@ -786,10 +790,6 @@ make_allocation_output_string(List *segment_fragments)
 		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
 		if (frag->fragment_md)
 			appendStringInfo(&fragment_str, "%s", frag->fragment_md);
-		/* Adding dfs_address from pg_filespace entry required for HAWQ-462 */
-		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
-		if (dfs_address)
-			appendStringInfo(&fragment_str, "%s", dfs_address);
 		if (frag->user_data)
 		{
 			appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
@@ -801,7 +801,6 @@ make_allocation_output_string(List *segment_fragments)
 		appendStringInfoChar(&segwork, SEGWORK_IN_PAIR_DELIM);
 		appendStringInfoString(&segwork, fragment_str.data);
 		pfree(fragment_str.data);
-
 	}
 	pfree(dfs_address);
 
