@@ -769,11 +769,15 @@ make_allocation_output_string(List *segment_fragments)
 	initStringInfo(&segwork);
 	appendStringInfoString(&segwork, SEGWORK_PREFIX);
 	
-	/* Add dfs_address from pg_filespace to the segment data. Fixes HAWQ-462 *//* dfs_address from pg_filespace entry */
-	char* dfs_address = NULL;
-	get_hdfs_location_from_filespace(&dfs_address);
-	appendStringInfoString(&segwork, dfs_address);
-	appendStringInfoChar(&segwork, SEGWORK_DFS_DELIM);
+	if (enable_secure_filesystem)
+	{
+		/* Add dfs_address from pg_filespace to the segment data. Fixes HAWQ-462 *//* dfs_address from pg_filespace entry */
+		char* dfs_address = NULL;
+		get_hdfs_location_from_filespace(&dfs_address);
+		appendStringInfoString(&segwork, dfs_address);
+		appendStringInfoChar(&segwork, SEGWORK_DFS_DELIM);
+		pfree(dfs_address);
+	}
 
 	foreach(frag_cell, segment_fragments)
 	{
@@ -802,7 +806,6 @@ make_allocation_output_string(List *segment_fragments)
 		appendStringInfoString(&segwork, fragment_str.data);
 		pfree(fragment_str.data);
 	}
-	pfree(dfs_address);
 
 	return segwork.data;
 }

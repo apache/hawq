@@ -77,7 +77,7 @@ typedef struct GPHDUri
 	 */
 	NNHAConf        *ha_nodes;
 
-	/* dfs address from pg_filespace (optional) */
+	/* dfs address from pg_filespace (optional, required only if secure) */
 	char			*dfs_address;
 } GPHDUri;
 

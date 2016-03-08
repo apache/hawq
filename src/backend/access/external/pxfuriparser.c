@@ -623,7 +623,8 @@ GPHDUri_debug_print_segwork(GPHDUri *uri)
 
 /*
  * GPHDUri_parse_segwork parses the segwork section of the uri.
- * ...&segwork=dfs_address@<size>@<ip>@<port>@<index><size>@<ip>@<port>@<index><size>...
+ * ...&segwork=<dfs_address>@<size>@<ip>@<port>@<index><size>@<ip>@<port>@<index><size>...
+ * <dfs_address>@ is present only if secure
  */
 static void
 GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
@@ -639,13 +640,16 @@ GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 		return;
 	segwork += strlen(segwork_substring);
 
-	/* parse dfs address */
-	size_end = strchr(segwork, segwork_dfs_separator);
-	if(size_end != NULL)
+	if (enable_secure_filesystem)
 	{
-		*size_end = '\0';
-		uri->dfs_address = pnstrdup(segwork, size_end-segwork);
-		segwork = size_end + 1;
+		/* parse dfs address */
+		size_end = strchr(segwork, segwork_dfs_separator);
+		if(size_end != NULL)
+		{
+			*size_end = '\0';
+			uri->dfs_address = pnstrdup(segwork, size_end-segwork);
+			segwork = size_end + 1;
+		}
 	}
 
 	/*
