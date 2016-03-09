@@ -342,7 +342,7 @@ standby_init() {
     fi
 
     # Sync data directories to standby master.
-    LOG_MSG "[INFO]:-Sync files to standby from master"
+    LOG_MSG "[INFO]:-Sync files to standby from master" verbose
     ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
         "cd ${master_data_directory}; \
          ${SOURCE_PATH}; ${GPHOME}/bin/lib/pysync.py -x gpperfmon/data -x pg_log -x db_dumps \
@@ -428,13 +428,13 @@ segment_init() {
     source ${GPHOME}/greenplum_path.sh
     for tmp_path in `${ECHO} ${hawqSegmentTemp} | sed 's|,| |g'`; do
         if [ ! -d ${tmp_path} ]; then
-            ${ECHO} "Temp directory is not exist, please create it" | tee -a ${SEGMENT_LOG_FILE}
-            ${ECHO} "Segment init failed on ${host_name}"
+            LOG_MSG "[ERROR]:-Temp directory is not exist, please create it" verbose
+            LOG_MSG "[ERROR]:-Segment init failed on ${host_name}" verbose
             exit 1
         else
            if [ ! -w "${tmp_path}" ]; then 
-               ${ECHO} "Do not have write permission to temp directory, please check" | tee -a ${SEGMENT_LOG_FILE}
-               ${ECHO} "Segment init failed on ${host_name}"
+               LOG_MSG "[ERROR]:-Do not have write permission to temp directory, please check" verbose
+               LOG_MSG "[ERROR]:-Segment init failed on ${host_name}" verbose
                exit 1
            fi
         fi
@@ -447,8 +447,8 @@ segment_init() {
          --shared_buffers=${shared_buffers} --backend_output=${log_dir}/segment.initdb 1>>${SEGMENT_LOG_FILE} 2>&1
 
     if [ $? -ne 0 ] ; then
-        ${ECHO} "Postgres initdb failed" | tee -a ${SEGMENT_LOG_FILE}
-        ${ECHO} "Segment init failed on ${host_name}"
+        LOG_MSG "[ERROR]:-Postgres initdb failed" verbose
+        LOG_MSG "[ERROR]:-Segment init failed on ${host_name}" verbose
         exit 1
     fi
 
@@ -458,7 +458,7 @@ segment_init() {
          " -p ${hawq_port} --silent-mode=true -M segment -i" start >> ${SEGMENT_LOG_FILE}
 
     if [ $? -ne 0  ] ; then
-        ${ECHO} "Segment init failed on ${host_name}" | tee -a ${SEGMENT_LOG_FILE}
+        LOG_MSG "[ERROR]:-Segment init failed on ${host_name}" verbose
         exit 1
     fi
     }
@@ -475,11 +475,11 @@ check_data_directorytory() {
     # Check if data directory already exist and clean.
     if [ -d ${hawq_data_directory} ]; then
         if [ "$(ls -A ${hawq_data_directory})" ] && [ "${hawq_data_directory}" != "" ]; then
-             ${ECHO} "Data directory ${hawq_data_directory} is not empty on ${host_name}"
+             LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} is not empty on ${host_name}" verbose
              exit 1
         fi
     else
-        ${ECHO} "Data directory ${hawq_data_directory} does not exist, please create it"
+        LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} does not exist, please create it" verbose
         exit 1
     fi
 }
@@ -488,11 +488,11 @@ check_temp_directory() {
     # Check if temp directory exist.
     for tmp_dir in ${tmp_dir_list}; do
         if [ ! -d ${tmp_dir} ]; then
-            ${ECHO} "Temporary directory ${tmp_dir} does not exist, please create it"
+            LOG_MSG "[ERROR]:-Temporary directory ${tmp_dir} does not exist, please create it" verbose
             exit 1
         fi
         if [ ! -w ${tmp_dir} ]; then
-            ${ECHO} "Temporary directory ${tmp_dir} is not writable, exit." ;
+            LOG_MSG "[ERROR]:-Temporary directory ${tmp_dir} is not writable, exit." verbose
             exit 1
         fi
     done

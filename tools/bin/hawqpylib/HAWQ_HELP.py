@@ -80,7 +80,7 @@ The "options" are:
    -v --verbose    Displays detailed status, progress and error messages output by the utility.
    -t --timeout    Sets timeout value in seconds, default is 60 seconds.
    -M --mode       Stop with mode [smart|fast|immediate]
-   -u --reload     Reload GUC values without restart hawq cluster.
+   -u --reload     Reload GUC values without restarting hawq cluster.
 
 See 'hawq --help' for more information on other commands.
 """
