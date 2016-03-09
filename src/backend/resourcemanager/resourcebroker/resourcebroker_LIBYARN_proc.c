@@ -1500,6 +1500,8 @@ int RB2YARN_getClusterReport(DQueue hosts)
     		segstat->Info.GRMRackNameLen         = racknamelen;
     		segstat->Info.GRMRackNameOffset 	 = segstat->Info.GRMHostNameOffset +
     											   __SIZE_ALIGN64(hostnamelen+1);
+    		segstat->Info.FailedTmpDirOffset	 = 0;
+    		segstat->Info.FailedTmpDirLen		 = 0;
     		segstat->Info.Size 		 		 	 = segsize;
 
     		memcpy((char *)&(segstat->Info) + sizeof(SegInfoData),
