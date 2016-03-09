@@ -771,7 +771,7 @@ make_allocation_output_string(List *segment_fragments)
 	
 	if (enable_secure_filesystem)
 	{
-		/* Add dfs_address from pg_filespace to the segment data. Fixes HAWQ-462 *//* dfs_address from pg_filespace entry */
+		/* Add dfs_address from pg_filespace to the segment data. Fixes HAWQ-462 */
 		char* dfs_address = NULL;
 		get_hdfs_location_from_filespace(&dfs_address);
 		appendStringInfoString(&segwork, dfs_address);

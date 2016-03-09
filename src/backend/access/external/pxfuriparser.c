@@ -644,7 +644,7 @@ GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 	{
 		/* parse dfs address */
 		size_end = strchr(segwork, segwork_dfs_separator);
-		if(size_end != NULL)
+		if (size_end != NULL)
 		{
 			*size_end = '\0';
 			uri->dfs_address = pnstrdup(segwork, size_end-segwork);
@@ -760,7 +760,7 @@ GPHDUri_free_fragments(GPHDUri *uri)
 		pfree(data->index);
 		pfree(data->source_name);
 		pfree(data->fragment_md);
-		if(data->user_data)
+		if (data->user_data)
 			pfree(data->user_data);
 		pfree(data);
 	}
