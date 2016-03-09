@@ -324,6 +324,12 @@ void
 WalSendServerGetClientTimeout(struct timeval *timeout)
 {
 	ServiceGetClientTimeout(&WalSendServer_ServiceConfig, timeout);
+
+	// Here we need to set client timeout greater than the server timeout, otherwise this timeout
+	// will be triggered before the connection between WalSendServer and standby timeout trigger,
+	// it will lead to the QD process report FATAL, and all processes on master restart.
+	timeout->tv_sec *= 2;
+	timeout->tv_usec *= 2;
 }
 
 /*
