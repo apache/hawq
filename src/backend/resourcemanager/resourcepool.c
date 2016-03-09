@@ -1059,13 +1059,13 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 				segresource->Stat->Info.FailedTmpDirLen = segstat->Info.FailedTmpDirLen;
 				segresource->Stat->FailedTmpDirNum = segstat->FailedTmpDirNum;
 
-				elog(DEBUG3, "After resource manager"
-							 "updates segment failed temporary directory, "
-							 "GRM hostname:%s, GRM rackname:%s",
-							 segresource->Stat->Info.GRMHostNameLen == 0 ?
-								 "":GET_SEGINFO_GRMHOSTNAME(&(segresource->Stat->Info)),
-							 segresource->Stat->Info.GRMRackNameLen == 0 ?
-								 "":GET_SEGINFO_GRMRACKNAME(&(segresource->Stat->Info)));
+				elog(RMLOG, "After resource manager"
+							"updates segment failed temporary directory, "
+							"GRM hostname:%s, GRM rackname:%s",
+							segresource->Stat->Info.GRMHostNameLen == 0 ?
+								"":GET_SEGINFO_GRMHOSTNAME(&(segresource->Stat->Info)),
+							segresource->Stat->Info.GRMRackNameLen == 0 ?
+								"":GET_SEGINFO_GRMRACKNAME(&(segresource->Stat->Info)));
 
 				setSegResHAWQAvailability(segresource, segstat->FTSAvailable);
 				if (Gp_role != GP_ROLE_UTILITY)
@@ -1253,7 +1253,8 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 		newSegStat = segres->Stat;
 
 	/* Refill failed temporary directory string */
-	if (segres->Stat->FailedTmpDirNum != 0 && change > 0)
+	if (segres->Stat->FailedTmpDirNum != 0 && change > 0
+			&& current < (ghostlen + gracklen))
 	{
 		Assert(newSegStat->Info.FailedTmpDirOffset != 0 &&
 				newSegStat->Info.FailedTmpDirLen != 0);
@@ -1261,7 +1262,7 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 				+ newSegStat->Info.FailedTmpDirOffset + change,
 				(char*)newSegStat + offsetof(SegStatData, Info)
 				+ newSegStat->Info.FailedTmpDirOffset,
-				change);
+				__SIZE_ALIGN64(segres->Stat->Info.FailedTmpDirLen + 1));
 		memset((char*)newSegStat + offsetof(SegStatData, Info)
 				+ newSegStat->Info.FailedTmpDirOffset,
 				0,
@@ -1275,7 +1276,11 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	memset((char *)&newSegStat->Info + newSegStat->Info.HostNameOffset +
 			__SIZE_ALIGN64(newSegStat->Info.HostNameLen + 1),
 			0,
-			ghostlen + gracklen);
+			segres->Stat->Info.Size -
+			newSegStat->Info.HostNameOffset -
+			__SIZE_ALIGN64(newSegStat->Info.HostNameLen + 1) -
+			(segres->Stat->Info.FailedTmpDirLen == 0) ?
+				0:__SIZE_ALIGN64(segres->Stat->Info.FailedTmpDirLen + 1));
 
 	newSegStat->Info.GRMHostNameLen    = segstat->Info.GRMHostNameLen;
 	newSegStat->Info.GRMHostNameOffset = newSegStat->Info.HostNameOffset +
@@ -1297,10 +1302,10 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 			  GET_SEGINFO_GRMHOSTNAME(&(newSegStat->Info)),
 			  GET_SEGINFO_GRMRACKNAME(&(newSegStat->Info)));
 
-	elog(DEBUG3, "After resource manager"
-				 "updates segment info's GRM host name and rack name, "
-				 "failed temporary directory: %s",
-				 segres->Stat->FailedTmpDirNum == 0 ? "":GET_SEGINFO_FAILEDTMPDIR(&(segres->Stat->Info)));
+	elog(RMLOG, "After resource manager"
+				"updates segment info's GRM host name and rack name, "
+				"failed temporary directory: %s",
+				segres->Stat->FailedTmpDirNum == 0 ? "":GET_SEGINFO_FAILEDTMPDIR(&(segres->Stat->Info)));
 
 	/* Always set segment global resource manager available. */
 	setSegResGLOBAvailability(segres, RESOURCE_SEG_STATUS_AVAILABLE);
