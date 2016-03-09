@@ -1059,7 +1059,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 				segresource->Stat->Info.FailedTmpDirLen = segstat->Info.FailedTmpDirLen;
 				segresource->Stat->FailedTmpDirNum = segstat->FailedTmpDirNum;
 
-				elog(RMLOG, "After resource manager"
+				elog(RMLOG, "After resource manager "
 							"updates segment failed temporary directory, "
 							"GRM hostname:%s, GRM rackname:%s",
 							segresource->Stat->Info.GRMHostNameLen == 0 ?
@@ -1302,7 +1302,7 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 			  GET_SEGINFO_GRMHOSTNAME(&(newSegStat->Info)),
 			  GET_SEGINFO_GRMRACKNAME(&(newSegStat->Info)));
 
-	elog(RMLOG, "After resource manager"
+	elog(RMLOG, "After resource manager "
 				"updates segment info's GRM host name and rack name, "
 				"failed temporary directory: %s",
 				segres->Stat->FailedTmpDirNum == 0 ? "":GET_SEGINFO_FAILEDTMPDIR(&(segres->Stat->Info)));
