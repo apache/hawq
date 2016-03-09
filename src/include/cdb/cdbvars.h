@@ -1111,7 +1111,6 @@ extern int	gp_temporary_directory_mark_error;
 /* HAWQ 2.0 GUCs */
 
 extern bool optimizer_enforce_hash_dist_policy;
-extern int default_segment_num;
 extern int appendonly_split_write_size_mb;
 extern int split_read_size_mb;
 extern int enforce_virtual_segment_number;

@@ -733,6 +733,10 @@ bool		optimizer_sample_plans;
 int		optimizer_plan_id;
 int  optimizer_samples_number;
 int  optimizer_log_failure;
+int default_hash_table_bucket_number;
+int hawq_rm_nvseg_for_copy_from_perquery;
+int hawq_rm_nvseg_for_analyze_perquery_perseg_limit;
+int hawq_rm_nvseg_for_analyze_perquery_limit;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
@@ -4495,15 +4499,43 @@ static struct config_int ConfigureNamesInt[] =
 		&join_collapse_limit,
 		20, 1, INT_MAX, NULL, NULL
 	},
+
 	{
-		{"default_segment_num", PGC_USERSET, QUERY_TUNING_OTHER,
-			gettext_noop("Sets default segment number"),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		{"default_hash_table_bucket_number", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default hash table bucket number"),
+			NULL
 		},
-		&default_segment_num,
-		8, 1, INT_MAX, NULL, NULL
+		&default_hash_table_bucket_number,
+		6, 1, INT_MAX, NULL, NULL
 	},
+
+	{
+		{"hawq_rm_nvseg_for_copy_from_perquery", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default virtual segment number for copy from statement"),
+			NULL
+		},
+		&hawq_rm_nvseg_for_copy_from_perquery,
+		6, 1, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_nvseg_for_analyze_perquery_perseg_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default virtual segment number per query per segment limit for analyze statement"),
+			NULL
+		},
+		&hawq_rm_nvseg_for_analyze_perquery_perseg_limit,
+		4, 1, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_nvseg_for_analyze_perquery_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default virtual segment number per query limit for analyze statement"),
+			NULL
+		},
+		&hawq_rm_nvseg_for_analyze_perquery_limit,
+		256, 1, INT_MAX, NULL, NULL
+	},
+
 	{
 		{"enforce_virtual_segment_number", PGC_USERSET, QUERY_TUNING_OTHER,
 			gettext_noop("Sets virtual segment number manually"),
@@ -6327,7 +6359,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nvseg_perquery_perseg_limit,
-            8, 1, 65535, NULL, NULL
+            6, 1, 65535, NULL, NULL
     },
 
     {

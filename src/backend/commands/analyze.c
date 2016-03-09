@@ -823,7 +823,7 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext,
 					rel->rd_id);
 			if(targetPolicy == NULL){
-				return GetUtilPartitionNum();
+				return GetAnalyzeVSegNumLimit();
 			}
 			if (targetPolicy->nattrs > 0) {
 				isHashRelationExist = true;
@@ -849,8 +849,8 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 	}
 	Assert(vsegNumber > 0);
 	/*vsegNumber should be less than GetUtilPartitionNum*/
-	if(vsegNumber > GetUtilPartitionNum()){
-		vsegNumber = GetUtilPartitionNum();
+	if(vsegNumber > GetAnalyzeVSegNumLimit()){
+		vsegNumber = GetAnalyzeVSegNumLimit();
 	}
 
 	return vsegNumber;

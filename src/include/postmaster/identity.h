@@ -66,30 +66,35 @@ typedef struct ProcessIdentity
 	ProcessFunctionList	function;
 } ProcessIdentity;
 
+extern int slaveHostNumber;
+
 extern void SetSegmentIdentity(const char *name);
 extern bool IsOnMaster(void);
 extern const char *SerializeProcessIdentity(struct ProcessIdentity *id, int *msg_len);
 extern bool SetupProcessIdentity(const char *str);
 extern void SetupDispatcherIdentity(int segmentNum);
 
-extern bool	AmIMaster(void);
-extern bool	AmIStandby(void);
-extern bool	AmISegment(void);
+extern bool AmIMaster(void);
+extern bool AmIStandby(void);
+extern bool AmISegment(void);
 
-extern bool	InitQDContext(struct ProcessIdentity *id);
+extern bool InitQDContext(struct ProcessIdentity *id);
 
-extern bool	InitQEContext(struct ProcessIdentity *id, const char *str);
-extern int	GetQEIndex(void);
-extern int	GetQEGangNum(void);
-extern int	GetPlannerSegmentNum(void);
-extern int	GetUtilPartitionNum(void);
-extern int  GetRelOpt_bucket_num_fromOptions(List *options, int default_val);
-extern int  GetRelOpt_bucket_num_fromRel(Relation relation, int default_val);
-extern int  GetRelOpt_bucket_num_fromRangeVar(const RangeVar* rel_rv, int default_val);
-extern int	GetRandomDistPartitionNum(void);
-extern int	GetHashDistPartitionNum(void);
-extern int	GetExternalTablePartitionNum(void);
-extern int	GetAllWorkerHostNum(void);
+extern bool InitQEContext(struct ProcessIdentity *id, const char *str);
+extern int GetQEIndex(void);
+extern int GetQEGangNum(void);
+extern int GetPlannerSegmentNum(void);
+extern int GetQueryVsegNum(void);
+extern int GetUserDefinedFunctionVsegNum(void);
+extern int GetAnalyzeVSegNum(void);
+extern int	 GetCopyFromVSegNum(void);
+extern int GetRelOpt_bucket_num_fromOptions(List *options, int default_val);
+extern int GetRelOpt_bucket_num_fromRel(Relation relation, int default_val);
+extern int GetRelOpt_bucket_num_fromRangeVar(const RangeVar* rel_rv, int default_val);
+extern int GetRandomDistPartitionNum(void);
+extern int GetHashDistPartitionNum(void);
+extern int GetExternalTablePartitionNum(void);
+extern int GetAllWorkerHostNum(void);
 
 extern SegmentFunctionList *GetSegmentFunctionList(void);
 extern ProcessFunctionList *GetProcessFunctionList(void);

@@ -4034,7 +4034,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		 *0 Otherwise.
 		 */
 		if (isTableFunctionExists) {
-			context.tableFuncSegNum = default_segment_num;
+			context.tableFuncSegNum = GetUserDefinedFunctionVsegNum();
 		}
 
 		/* set expected virtual segment number for hash table and external table*/
@@ -4125,7 +4125,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 			if (debug_fake_segmentnum){
 				fpsegnum = fopen("/tmp/segmentnumber", "w+");
-				fprintf(fpsegnum, "Default segment num : %d.\n", default_segment_num);
+				fprintf(fpsegnum, "Default segment num : %d.\n", GetHashDistPartitionNum());
 				fprintf(fpsegnum, "\n");
 				fprintf(fpsegnum, "From random relation segment num : %d.\n", context.randomSegNum);
 				fprintf(fpsegnum, "Result relation hash segment num : %d.\n", context.resultRelationHashSegNum);
