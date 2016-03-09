@@ -6359,7 +6359,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nvseg_perquery_perseg_limit,
-            8, 1, 65535, NULL, NULL
+            6, 1, 65535, NULL, NULL
     },
 
     {
