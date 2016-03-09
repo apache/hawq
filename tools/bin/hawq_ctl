@@ -180,11 +180,11 @@ class HawqInit:
         return result
 
     def set_total_vsegment_num(self):
-        cmd = "%s; hawq config -c default_segment_num -v %s --skipvalidation -q > /dev/null" % \
+        cmd = "%s; hawq config -c default_hash_table_bucket_number -v %s --skipvalidation -q > /dev/null" % \
                (source_hawq_env, self.total_vseg_num)
         result = local_ssh(cmd, logger)
         if result != 0:
-            logger.warn("Set default_segment_num failed")
+            logger.warn("Set default_hash_table_bucket_number failed")
         return result
 
     def set_vsegment_num_per_node(self):
@@ -332,7 +332,7 @@ class HawqInit:
 
     def _init_cluster(self):
         logger.info("%s segment hosts defined" % self.hosts_count_number)
-        logger.info("Set default_segment_num as: %s" % self.total_vseg_num)
+        logger.info("Set default_hash_table_bucket_number as: %s" % self.total_vseg_num)
         check_return_code(self.set_total_vsegment_num())
         check_return_code(self.set_vsegment_num_per_node())
 
@@ -375,7 +375,7 @@ class HawqInit:
         if self.node_type == "master":
             self.check_hdfs_path()
             logger.info("%s segment hosts defined" % self.hosts_count_number)
-            logger.info("Set default_segment_num as: %s" % self.total_vseg_num)
+            logger.info("Set default_hash_table_bucket_number as: %s" % self.total_vseg_num)
             check_return_code(self.set_total_vsegment_num())
             check_return_code(self.set_vsegment_num_per_node())
             logger.info("Start to init master")
@@ -1200,12 +1200,12 @@ def create_parser():
     parser.add_option("--vsegNumber",
                       type="int",
                       dest="virtual_seg_num",
-                      default=8,
+                      default=6,
                       help="Sets maximum number of virtual segments per node")
     parser.add_option("--vsegment-number",
                       type="int",
                       dest="virtual_seg_num",
-                      default=8,
+                      default=6,
                       help="Sets maximum number of virtual segments per node")
     parser.add_option("--locale",
                       dest="hawq_locale",
