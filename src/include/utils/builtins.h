@@ -1120,6 +1120,7 @@ extern Datum gp_remove_master_standby(PG_FUNCTION_ARGS);
 extern Datum gp_activate_standby(PG_FUNCTION_ARGS);
 
 extern Datum gp_add_segment_mirror(PG_FUNCTION_ARGS);
+extern Datum gp_remove_segment_history(PG_FUNCTION_ARGS);
 extern Datum gp_remove_segment_mirror(PG_FUNCTION_ARGS);
 extern Datum gp_add_segment(PG_FUNCTION_ARGS);
 extern Datum gp_remove_segment(PG_FUNCTION_ARGS);

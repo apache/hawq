@@ -10196,7 +10196,6 @@ DESCR("Convert a cloned master catalog for use as a segment");
 DATA(insert OID = 5053 ( gp_activate_standby  PGNSP PGUID 12 f f f f v 0 16 f "" _null_ _null_ _null_ gp_activate_standby - _null_ n ));
 DESCR("Activate a standby");
 
-
 /* We cheat in the following two functions: they are technically volatile but */
 /* we can only dispatch them if they're immutable :(. */
 /* gp_add_segment_persistent_entries(int2, int2, _text) => bool */ 
@@ -10284,6 +10283,10 @@ DESCR("Remove an entry from gp_relation_node");
 /* gp_persistent_relation_node_check() => SETOF gp_persistent_relation_node */ 
 DATA(insert OID = 5074 ( gp_persistent_relation_node_check  PGNSP PGUID 12 f f f t v 0 6990 f "" _null_ _null_ _null_ gp_persistent_relation_node_check - _null_ n ));
 DESCR("physical filesystem information");
+
+/* gp_remove_segment_history() => bool */
+DATA(insert OID = 5075 ( gp_remove_segment_history  PGNSP PGUID 12 f f f f v 0 16 f "" _null_ _null_ _null_ gp_remove_segment_history - _null_ n ));
+DESCR("Remove all entries from the gp_configuration_history");
 
 /* cosh(float8) => float8 */ 
 DATA(insert OID = 3539 ( cosh  PGNSP PGUID 12 f f f f i 1 701 f "701" _null_ _null_ _null_ dcosh - _null_ n ));
