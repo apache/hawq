@@ -355,9 +355,19 @@ CREATE VIEW pg_stat_activity AS
             S.application_name,
             S.xact_start,
 			S.waiting_resource
-    FROM pg_database D, pg_stat_get_activity(NULL) AS S, pg_authid U
+    FROM pg_database D, pg_stat_get_activity(NULL) AS S, pg_authid U,
+         (
+              SELECT
+                  sess_id,
+                  min(backend_start) AS min_backend_start
+              FROM 
+                  pg_stat_get_activity(NULL)
+              GROUP BY 
+                  sess_id)S2
     WHERE S.datid = D.oid AND 
-            S.usesysid = U.oid;
+          S.usesysid = U.oid AND
+          S.sess_id = S2.sess_id AND
+          S.backend_start = S2.min_backend_start;
 
 CREATE VIEW pg_stat_database AS 
     SELECT 
