@@ -44,15 +44,6 @@
 extern int64 PersistentRelfile_MyHighestSerialNum(void);
 extern int64 PersistentRelfile_CurrentMaxSerialNum(void);
 
-extern void PersistentRelfile_CheckTablespace(
-	Oid 			tablespace,
-
-	int32			*useCount,
-
-	RelFileNode 	*exampleRelFileNode);
-
-extern void PersistentRelfile_FlushXLog(void);
-
 extern void PersistentRelfile_Reset(void);
 
 /*
@@ -114,16 +105,6 @@ extern void PersistentRelfile_AddCreated(
 // -----------------------------------------------------------------------------
 // Transaction End	
 // -----------------------------------------------------------------------------
-
-void PersistentRelfile_FinishBufferPoolBulkLoad(
-	RelFileNode 		*relFileNode,
-				/* The tablespace, database, and relation OIDs for the created relation. */
-
-	ItemPointer 		persistentTid,
-				/* TID of the gp_persistent_rel_files tuple for the relation. */
-
-	int64				persistentSerialNum);
-				/* Serial number for the relation.	Distinquishes the uses of the tuple. */
 
 /*
  * Indicate the transaction commited and the relation is officially created.
