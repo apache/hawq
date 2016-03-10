@@ -13824,11 +13824,9 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 										   errOmitLocation(true)));
 
 			/* XXX XXX: move this check to gram.y ? */
-			if (pc2->arg1)
+			if (pElem)
 			{
-				PartitionElem *pelem = (PartitionElem *) pc2->arg1;
-
-				if (pelem->boundSpec)
+				if (pElem->boundSpec)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 							 errmsg("invalid use of boundary specification "
