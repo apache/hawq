@@ -105,16 +105,6 @@ static void PersistentRelfile_VerifyInitScan(void)
 // Helpers 
 // -----------------------------------------------------------------------------
 
-inline static void XLogRecPtr_Zero(XLogRecPtr *xlogLoc)
-{
-	MemSet(xlogLoc, 0, sizeof(XLogRecPtr));
-}
-
-void PersistentRelfile_FlushXLog(void)
-{
-	PersistentFileSysObj_FlushXLog();
-}
-
 extern void PersistentRelfile_Reset(void)
 {
 	// Currently, nothing to do.
@@ -145,75 +135,7 @@ int64 PersistentRelfile_CurrentMaxSerialNum(void)
 	return value;
 }
 
-static Oid persistentRelfileCheckTablespace;
-static int32 persistentRelfileCheckTablespaceUseCount;
-static RelFileNode persistentRelfileCheckTablespaceRelFileNode;
 
-static bool PersistentRelfile_CheckTablespaceScanTupleCallback(
-	ItemPointer 			persistentTid,
-	int64					persistentSerialNum,
-	Datum					*values)
-{
-	RelFileNode		relFileNode;
-	int32			segmentFileNum;
-
-	PersistentFileSysRelStorageMgr relationStorageManager;
-
-	PersistentFileSysState	state;
-
-	PersistentFileSysRelBufpoolKind relBufpoolKind;
-
-	TransactionId			parentXid;
-	int64					serialNum;
-	ItemPointerData			previousFreeTid;
-	bool					sharedStorage;
-
-	GpPersistentRelfileNode_GetValues(
-									values,
-									&relFileNode.spcNode,
-									&relFileNode.dbNode,
-									&relFileNode.relNode,
-									&segmentFileNum,
-									&relationStorageManager,
-									&state,
-									&relBufpoolKind,
-									&parentXid,
-									&serialNum,
-									&previousFreeTid,
-									&sharedStorage);
-
-	if (state == PersistentFileSysState_Created &&
-		relFileNode.spcNode == persistentRelfileCheckTablespace)
-	{
-		persistentRelfileCheckTablespaceUseCount++;
-		if (persistentRelfileCheckTablespaceUseCount == 1)
-		{
-			memcpy(&persistentRelfileCheckTablespaceRelFileNode, &relFileNode, sizeof(RelFileNode));
-		}
-	}
-
-	return true;	// Continue.
-}
-
-void PersistentRelfile_CheckTablespace(
-	Oid				tablespace,
-
-	int32			*useCount,
-
-	RelFileNode		*exampleRelFileNode)
-{
-	persistentRelfileCheckTablespace = tablespace;
-	persistentRelfileCheckTablespaceUseCount = 0;
-
-	MemSet(&persistentRelfileCheckTablespaceRelFileNode, 0, sizeof(RelFileNode));
-
-	PersistentFileSysObj_Scan(
-		PersistentFsObjType_RelationFile,
-		PersistentRelfile_CheckTablespaceScanTupleCallback);
-
-	*useCount = persistentRelfileCheckTablespaceUseCount;
-	memcpy(exampleRelFileNode, &persistentRelfileCheckTablespaceRelFileNode, sizeof(RelFileNode));
-}
 
 // -----------------------------------------------------------------------------
 // State Change 
@@ -449,80 +371,6 @@ void PersistentRelfile_AddCreated(
 // -----------------------------------------------------------------------------
 // Transaction End  
 // -----------------------------------------------------------------------------
-
-/*
- * Indicate the transaction commited and the relation is officially created.
- */
-void PersistentRelfile_FinishBufferPoolBulkLoad(
-	RelFileNode 		*relFileNode,
-				/* The tablespace, database, and relation OIDs for the created relation. */
-
-	ItemPointer			persistentTid,
-				/* TID of the gp_persistent_rel_files tuple for the relation. */
-
-	int64				persistentSerialNum)
-				/* Serial number for the relation.  Distinquishes the uses of the tuple. */
-
-{
-	WRITE_PERSISTENT_STATE_ORDERED_LOCK_DECLARE;
-
-	PersistentFileSysObjName fsObjName;
-
-	PersistentFileSysObjStateChangeResult stateChangeResult;
-	
-	if(RelFileNode_IsEmpty(relFileNode))
-		elog(ERROR, "Invalid RelFileNode (0,0,0)");
-
-	if (Persistent_BeforePersistenceWork())
-	{	
-		if (Debug_persistent_print)
-			elog(Persistent_DebugPrintLevel(), 
-			     "Skipping persistent relation '%s' because we are before persistence work",
-				 relpath(*relFileNode));
-
-		return;	// The initdb process will load the persistent table once we out of bootstrap mode.
-	}
-
-	PersistentRelfile_VerifyInitScan();
-
-	PersistentFileSysObjName_SetRelationFile(
-										&fsObjName, 
-										relFileNode,
-										/* segmentFileNum */ 0,
-										is_tablespace_shared);
-
-	// Do this check after skipping out if in bootstrap mode.
-	if (PersistentStore_IsZeroTid(persistentTid))
-		elog(ERROR, "TID for persistent '%s' tuple for 'Created' is invalid (0,0)",
-			 PersistentFileSysObjName_TypeAndObjectName(&fsObjName));
-
-	if (persistentSerialNum == 0)
-		elog(ERROR, "Persistent '%s' serial number for 'Created' is invalid (0)",
-			 PersistentFileSysObjName_TypeAndObjectName(&fsObjName));
-
-	WRITE_PERSISTENT_STATE_ORDERED_LOCK;
-
-	stateChangeResult =
-		PersistentFileSysObj_StateChange(
-								&fsObjName,
-								persistentTid,
-								persistentSerialNum,
-								PersistentFileSysState_CreatePending,
-								/* retryPossible */ false,
-								/* flushToXlog */ false,
-								/* oldState */ NULL,
-								/* verifiedActionCallback */ NULL);
-
-	WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
-
-	if (Debug_persistent_print)
-		elog(Persistent_DebugPrintLevel(), 
-		     "Persistent relation: '%s' changed state from 'Bulk Load Create Pending' to 'Create Pending', serial number " INT64_FORMAT " at TID %s (State-Change result '%s')",
-			 PersistentFileSysObjName_ObjectName(&fsObjName),
-			 persistentSerialNum,
-			 ItemPointerToString(persistentTid),
-			 PersistentFileSysObjStateChangeResult_Name(stateChangeResult));
-}
 
 /*
  * Indicate the transaction commited and the relation is officially created.
