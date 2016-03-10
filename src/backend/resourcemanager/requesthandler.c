@@ -1027,7 +1027,7 @@ bool handleRMRequestSegmentIsDown(void **arg)
 											  (description->Len > 0)?description->Str:"");
 						add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 												hostname,
-												description);
+												description->Str);
 						if (description != NULL)
 						{
 							freeSimpleStringContent(description);
