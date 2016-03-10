@@ -425,3 +425,15 @@ DROP FUNCTION inner(int);
 
 -- TEARDOWN
 DROP TABLE foo;
+
+
+
+-- HAWQ-510
+drop table if exists testEntryDB;
+create table testEntryDB(key int, value int) distributed randomly;
+insert into testEntryDB values(1, 0);
+select t2.key, t2.value
+from   (select key, value from testEntryDB where value = 0) as t1,
+       (select generate_series(1,2)::int as key, 0::int as value) as t2
+where  t1.value=t2.value;
+drop table testEntryDB;
