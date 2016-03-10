@@ -3862,16 +3862,18 @@ void validateResourcePoolStatus(bool refquemgr)
 	 * Validation 4. The total allocated should be no more than the capacity of
 	 * whole cluster.
 	 */
-	int32_t  mem  = 0;
+	uint32_t mem  = 0;
 	uint32_t core = 0;
 
 	if ( PQUEMGR->RootTrack != NULL )
 	{
-
 		if ( DRMGlobalInstance->ImpType == YARN_LIBYARN )
 		{
-			mem  = PRESPOOL->GRMTotal.MemoryMB * PQUEMGR->GRMQueueMaxCapacity;
-			core = PRESPOOL->GRMTotal.Core     * PQUEMGR->GRMQueueMaxCapacity;
+			mem  = PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB *
+				   PQUEMGR->GRMQueueMaxCapacity;
+			core = PRESPOOL->GRMTotalHavingNoHAWQNode.Core     *
+				   PQUEMGR->GRMQueueMaxCapacity;
+
 		}
 		else if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
 		{
@@ -3887,6 +3889,12 @@ void validateResourcePoolStatus(bool refquemgr)
 	{
 		return;
 	}
+
+	/*
+	 * If we use global resource manager to manage resource, the total capacity
+	 * might not follow the cluster memory to core ratio.
+	 */
+	adjustMemoryCoreValue(&mem, &core);
 
 	if ( totalallocmem > mem || totalalloccore > core )
 	{
