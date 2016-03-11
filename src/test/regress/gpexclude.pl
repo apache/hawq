@@ -153,7 +153,7 @@ my $glob_verbose;
 sub stringsubs
 {
     use IO::File;
-    use POSIX qw(tmpnam);
+    use File::Temp;
 
     my ($conn_str, $verbose) = @_;
 

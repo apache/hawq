@@ -22,6 +22,7 @@ use strict;
 use warnings;
 use POSIX;
 use File::Spec;
+use File::Temp;
 use Config;
 
 =head1 NAME
