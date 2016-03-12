@@ -881,7 +881,6 @@ DROP FUNCTION outer(int);
 DROP FUNCTION inner(int);
 -- TEARDOWN
 DROP TABLE foo;
-
 -- HAWQ-510
 drop table if exists testEntryDB;
 NOTICE:  table "testentrydb" does not exist, skipping
@@ -895,3 +894,6 @@ where  t1.value=t2.value;
 -----+-------
    1 |     0
    2 |     0
+(2 rows)
+
+drop table testEntryDB;
