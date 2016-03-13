@@ -2096,12 +2096,9 @@ int generateAllocRequestToBroker(void)
 		/*
 		 * Resource manager skips this segment if
 		 * 1) Not FTS available;
-		 * 2) Not GRM available;
-		 * 3) Having resource decrease pending.
+		 * 2) Having resource decrease pending.
 		 */
 		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-			(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-			 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
 			(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 		{
 			continue;
@@ -2311,12 +2308,9 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 		/*
 		 * Resource manager skips this segment if
 		 * 1) Not FTS available;
-		 * 2) Not GRM available;
-		 * 3) Having resource decrease pending.
+		 * 2) Having resource decrease pending.
 		 */
-		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-			(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-			 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
+		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat)  ||
 			(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 		{
 			index++;
@@ -2391,12 +2385,9 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 			/*
 			 * Resource manager skips this segment if
 			 * 1) Not FTS available;
-			 * 2) Not GRM available;
-			 * 3) Having resource decrease pending.
+			 * 2) Having resource decrease pending.
 			 */
 			if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-				(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-				 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
 				(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 			{
 				index++;
@@ -2783,11 +2774,10 @@ int  loadHostInformationIntoResourcePool(void)
 
         /* Build machine info instance. */
         SegStat segstat = (SegStat)rm_palloc0(PCONTEXT,
-                                   	   	   	  offsetof(SegStatData, Info) +
-											  seginfobuff.Cursor + 1);
-        segstat->ID      		   = SEGSTAT_ID_INVALID;
-        segstat->GRMAvailable     = RESOURCE_SEG_STATUS_UNSET;
-        segstat->FTSAvailable     = RESOURCE_SEG_STATUS_AVAILABLE;
+                                              offsetof(SegStatData, Info) +
+                                              seginfobuff.Cursor + 1);
+        segstat->ID                = SEGSTAT_ID_INVALID;
+        segstat->FTSAvailable      = RESOURCE_SEG_STATUS_AVAILABLE;
         segstat->FTSTotalMemoryMB  = DRMGlobalInstance->SegmentMemoryMB;
         segstat->FTSTotalCore      = DRMGlobalInstance->SegmentCore;
         segstat->GRMTotalMemoryMB  = 0;

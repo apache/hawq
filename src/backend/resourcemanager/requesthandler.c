@@ -759,14 +759,13 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	destroySelfMaintainBuffer(&newseginfo);
 
 	newsegstat->ID 				 = SEGSTAT_ID_INVALID;
-	newsegstat->GRMAvailable 	 = RESOURCE_SEG_STATUS_UNSET;
 
 	RPCRequestHeadIMAlive header = SMBUFF_HEAD(RPCRequestHeadIMAlive,
 												&(conntrack->MessageBuff));
 	newsegstat->FailedTmpDirNum  = header->TmpDirBrokenCount;
 	newsegstat->RMStartTimestamp = header->RMStartTimestamp;
 	newsegstat->StatusDesc = 0;
-	newsegstat->Reserved = 0;
+	newsegstat->Reserved   = 0;
 
 	bool capstatchanged = false;
 	if ( addHAWQSegWithSegStat(newsegstat, &capstatchanged) != FUNC_RETURN_OK )
@@ -1018,7 +1017,7 @@ bool handleRMRequestSegmentIsDown(void **arg)
 					/* Make resource pool remove unused containers */
 					returnAllGRMResourceFromSegment(segres);
 					/* Set the host down in gp_segment_configuration table */
-					segres->Stat->StatusDesc |= SEG_STATUS_RUALIVE_FAILED;
+					segres->Stat->StatusDesc |= SEG_STATUS_NO_RESPONSE;
 					if (Gp_role != GP_ROLE_UTILITY)
 					{
 						SimpStringPtr description = build_segment_status_description(segres->Stat);

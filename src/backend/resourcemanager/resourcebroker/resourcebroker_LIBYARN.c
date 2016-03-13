@@ -644,11 +644,7 @@ int handleRB2RM_ClusterReport(void)
 		return res;
 	}
 
-	/*
-	 * Set all current segments GRM unavailable, only the segments identified by
-	 * one segment in segstats are available.
-	 */
-	setAllSegResourceGRMUnavailable();
+	setAllSegResourceGRMUnhandled();
 
 	/*
 	 * Start to update resource pool content. The YARN cluster total size is
@@ -687,7 +683,8 @@ int handleRB2RM_ClusterReport(void)
 	}
 
 	/*
-	 * iterate all segments, check its FTS and GLOB status.
+	 * iterate all segments without GRM report,
+	 * and update its status.
 	 */
 	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &allsegres);
 	foreach(cell, allsegres)
@@ -695,74 +692,45 @@ int handleRB2RM_ClusterReport(void)
 		SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
 		bool statusDescChange = false;
 
-		if(IS_SEGSTAT_GRMAVAILABLE(segres->Stat))
-		{
-			if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
-			{
-				/*
-				 * This segment is FTS unavailable, now GRM is available
-				 */
-				if ((segres->Stat->StatusDesc & SEG_STATUS_NO_YARN_NODE_REPORT) != 0)
-				{
-					statusDescChange = true;
-					segres->Stat->StatusDesc &= ~SEG_STATUS_NO_YARN_NODE_REPORT;
-				}
+		/*
+		 * skip segments handled in GRM report list
+		 */
+		if (segres->Stat->GRMHandled)
+			continue;
 
-				/*
-				 * Get node report for this segment, and there is no other
-				 * DOWN flag, then mark this segment to UP.
-				 */
-				if (segres->Stat->StatusDesc == 0)
-				{
-					setSegResHAWQAvailability(segres, RESOURCE_SEG_STATUS_AVAILABLE);
-					statusDescChange = true;
-				}
-			}
-			else
-			{
-				Assert(segres->Stat->StatusDesc == 0);
-			}
-		}
-		else
+		/*
+		 * Set no GRM node report flag for this segment.
+		 */
+		if ((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT) == 0)
 		{
-			if (IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
-			{
-				/*
-				 * This segment is FTS available, now GRM is unavailable
-				 * set this segment to DOWN.
-				 */
-				Assert(segres->Stat->StatusDesc == 0);
-				setSegResHAWQAvailability(segres, RESOURCE_SEG_STATUS_UNAVAILABLE);
-				segres->Stat->StatusDesc |= SEG_STATUS_NO_YARN_NODE_REPORT;
-				statusDescChange = true;
-			}
-			else
-			{
-				if ((segres->Stat->StatusDesc & SEG_STATUS_NO_YARN_NODE_REPORT) == 0)
-				{
-					segres->Stat->StatusDesc |= SEG_STATUS_NO_YARN_NODE_REPORT;
-					statusDescChange = true;
-				}
-			}
+			segres->Stat->StatusDesc |= SEG_STATUS_NO_GRM_NODE_REPORT;
+			statusDescChange = true;
 		}
 
+		if (IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
+		{
+			/*
+			 * This segment is FTS available, but master hasn't
+			 * gotten its GRM node report, so set this segment to DOWN.
+			 */
+			setSegResHAWQAvailability(segres, RESOURCE_SEG_STATUS_UNAVAILABLE);
+		}
+
+		Assert(!IS_SEGSTAT_FTSAVAILABLE(segres->Stat));
 		if (statusDescChange && Gp_role != GP_ROLE_UTILITY)
 		{
 			SimpStringPtr description = build_segment_status_description(segres->Stat);
 			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
-									IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
-										SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
+									SEGMENT_STATUS_DOWN,
 									 (description->Len > 0)?description->Str:"");
 			add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 									GET_SEGRESOURCE_HOSTNAME(segres),
-									IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
-										SEG_STATUS_DESCRIPTION_UP:description->Str);
+									description->Str);
 
-			elog(LOG, "Resource manager update node(%s) information with yarn node report,"
-						"status:'%c', description:%s",
+			elog(LOG, "Resource manager hasn't gotten GRM node report for segment(%s),"
+						"updates its status:'%c', description:%s",
 						GET_SEGRESOURCE_HOSTNAME(segres),
-						IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
-							SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
+						SEGMENT_STATUS_DOWN,
 						(description->Len > 0)?description->Str:"");
 			if (description != NULL)
 			{

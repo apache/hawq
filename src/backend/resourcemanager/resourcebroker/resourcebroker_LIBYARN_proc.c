@@ -1482,7 +1482,6 @@ int RB2YARN_getClusterReport(DQueue hosts)
 
     		segstat->ID     					 = SEGSTAT_ID_INVALID;
     		segstat->FTSAvailable 				 = RESOURCE_SEG_STATUS_UNSET;
-    		segstat->GRMAvailable 				 = RESOURCE_SEG_STATUS_AVAILABLE;
     		segstat->GRMTotalMemoryMB  	   		 = pnodereport->memoryCapability;
     		segstat->GRMTotalCore	  	   		 = pnodereport->vcoresCapability;
     		segstat->FTSTotalMemoryMB	   		 = 0;

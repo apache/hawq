@@ -233,7 +233,7 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 			 */
 			returnAllGRMResourceFromSegment(segres);
 
-			segres->Stat->StatusDesc |= SEG_STATUS_RUALIVE_FAILED;
+			segres->Stat->StatusDesc |= SEG_STATUS_NO_RESPONSE;
 			/* Set the host down in gp_segment_configuration table */
 			if (Gp_role != GP_ROLE_UTILITY)
 			{

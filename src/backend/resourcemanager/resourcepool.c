@@ -947,12 +947,13 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		}
 
 		/*
-		 * If in Yarn mode, the new registered segment is marked
-		 * as DOWN, since master hasn't get a cluster report for it from YARN.
+		 * If in GRM mode, the new registered segment is marked
+		 * as DOWN, since master hasn't get a cluster report for it
+		 * from global Resource Manager.
 		 */
 		if (DRMGlobalInstance->ImpType != NONE_HAWQ2)
 		{
-			segresource->Stat->StatusDesc |= SEG_STATUS_NO_YARN_NODE_REPORT;
+			segresource->Stat->StatusDesc |= SEG_STATUS_NO_GRM_NODE_REPORT;
 		}
 
 		/*
@@ -1032,12 +1033,12 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		if (segresource->Stat->RMStartTimestamp != segstat->RMStartTimestamp &&
 				(segresource->Stat->StatusDesc & SEG_STATUS_HEARTBEAT_TIMEOUT) == 0 &&
 				(segresource->Stat->StatusDesc & SEG_STATUS_COMMUNICATION_ERROR) == 0 &&
-				(segresource->Stat->StatusDesc & SEG_STATUS_RUALIVE_FAILED) == 0)
+				(segresource->Stat->StatusDesc & SEG_STATUS_NO_RESPONSE) == 0)
 		{
 			/*
 			 * This segment's RM process has restarted.
 			 * if StatusDesc doesn't have heartbeat timeout flag, or communication error,
-			 * or RUAlive failed flag, this segment is set to DOWN.
+			 * or no response flag, this segment is set to DOWN.
 			 * It will be set to UP when reports a new heartbeat.
 			 */
 			segresource->Stat->StatusDesc |= SEG_STATUS_RM_RESET;
@@ -1055,17 +1056,37 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 			}
 			/*
 			 * Now clear heartbeat timeout flag, RM reset flag,
-			 * RUAlive failed flag, communication error flag
+			 * no response flag, communication error flag
 			 * and RM reset flag in StatusDesc
 			 */
 			if ((segresource->Stat->StatusDesc & SEG_STATUS_HEARTBEAT_TIMEOUT) != 0)
+			{
 				segresource->Stat->StatusDesc &= ~SEG_STATUS_HEARTBEAT_TIMEOUT;
-			if ((segresource->Stat->StatusDesc & SEG_STATUS_RUALIVE_FAILED) != 0)
-				segresource->Stat->StatusDesc &= ~SEG_STATUS_RUALIVE_FAILED;
+				elog(DEBUG5, "Master RM gets heartbeat report from segment:%s, "
+							 "clear its heartbeat timeout flag",
+							 GET_SEGRESOURCE_HOSTNAME(segresource));
+			}
+			if ((segresource->Stat->StatusDesc & SEG_STATUS_NO_RESPONSE) != 0)
+			{
+				segresource->Stat->StatusDesc &= ~SEG_STATUS_NO_RESPONSE;
+				elog(DEBUG5, "Master RM gets heartbeat report from segment:%s, "
+							 "clear its no response flag",
+							 GET_SEGRESOURCE_HOSTNAME(segresource));
+			}
 			if ((segresource->Stat->StatusDesc & SEG_STATUS_COMMUNICATION_ERROR) != 0)
+			{
 				segresource->Stat->StatusDesc &= ~SEG_STATUS_COMMUNICATION_ERROR;
+				elog(DEBUG5, "Master RM gets heartbeat report from segment:%s, "
+							 "clear its communication error flag",
+							 GET_SEGRESOURCE_HOSTNAME(segresource));
+			}
 			if ((segresource->Stat->StatusDesc & SEG_STATUS_RM_RESET) != 0)
+			{
 				segresource->Stat->StatusDesc &= ~SEG_STATUS_RM_RESET;
+				elog(DEBUG5, "Master RM gets heartbeat report from segment:%s, "
+							 "clear its RM reset flag",
+							 GET_SEGRESOURCE_HOSTNAME(segresource));
+			}
 		}
 
 		/*
@@ -1185,7 +1206,8 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 
 		if (segresource->Stat->StatusDesc == 0)
 		{
-			if (oldStatus == RESOURCE_SEG_STATUS_UNAVAILABLE)
+			if (oldStatus == RESOURCE_SEG_STATUS_UNAVAILABLE ||
+					oldStatus == RESOURCE_SEG_STATUS_UNSET)
 				setSegResHAWQAvailability(segresource, RESOURCE_SEG_STATUS_AVAILABLE);
 		}
 		else
@@ -1301,6 +1323,7 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	SegResource	 	 segres	 		 = NULL;
 	SegStat	 	 	 newSegStat	     = NULL;
 	int32_t		 	 segid			 = SEGSTAT_ID_INVALID;
+	bool 			statusDescChange = false;
 
 	/* Anyway, the host GRM capacity is updated here if the cluster level
 	 * capacity is fixed.
@@ -1448,9 +1471,6 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 				segres->Stat->FailedTmpDirNum == 0 ?
 					"":GET_SEGINFO_FAILEDTMPDIR(&(segres->Stat->Info)));
 
-	/* Always set segment global resource manager available. */
-	setSegResGLOBAvailability(segres, RESOURCE_SEG_STATUS_AVAILABLE);
-
 	if ( segres->Stat->GRMTotalMemoryMB != segstat->GRMTotalMemoryMB ||
 		 segres->Stat->GRMTotalCore     != segstat->GRMTotalCore )
 	{
@@ -1482,6 +1502,49 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 					segres->Stat->GRMTotalCore);
 	}
 
+	segres->Stat->GRMHandled = true;
+	/* Clear no GRM node report flag. */
+	if ((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT) != 0)
+	{
+		segres->Stat->StatusDesc &= ~SEG_STATUS_NO_GRM_NODE_REPORT;
+		statusDescChange = true;
+	}
+
+	/*
+	 * If get GRM node report, and there is no other flag,
+	 * mark this segment to UP
+	 */
+	if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) && segres->Stat->StatusDesc == 0)
+	{
+		Assert(statusDescChange == true);
+		setSegResHAWQAvailability(segres, RESOURCE_SEG_STATUS_AVAILABLE);
+	}
+
+	if (statusDescChange && Gp_role != GP_ROLE_UTILITY)
+	{
+		SimpStringPtr description = build_segment_status_description(segres->Stat);
+		update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+								IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
+									SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
+								 (description->Len > 0)?description->Str:"");
+		add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+								GET_SEGRESOURCE_HOSTNAME(segres),
+								IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
+									SEG_STATUS_DESCRIPTION_UP:description->Str);
+
+		elog(LOG, "Resource manager update node(%s) information with yarn node report,"
+					"status:'%c', description:%s",
+					GET_SEGRESOURCE_HOSTNAME(segres),
+					IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
+						SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
+					(description->Len > 0)?description->Str:"");
+		if (description != NULL)
+		{
+			freeSimpleStringContent(description);
+			rm_pfree(PCONTEXT, description);
+		}
+	}
+
 	int32_t curratio = 0;
 	if (DRMGlobalInstance->ImpType == YARN_LIBYARN &&
 		segres->Stat->GRMTotalMemoryMB > 0 &&
@@ -1494,7 +1557,7 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	return FUNC_RETURN_OK;
 }
 
-void setAllSegResourceGRMUnavailable(void)
+void setAllSegResourceGRMUnhandled(void)
 {
 	List 	 *allsegres = NULL;
 	ListCell *cell		= NULL;
@@ -1503,7 +1566,7 @@ void setAllSegResourceGRMUnavailable(void)
 	foreach(cell, allsegres)
 	{
 		SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
-		setSegResGLOBAvailability(segres, RESOURCE_SEG_STATUS_UNAVAILABLE);
+		segres->Stat->GRMHandled = false;
 	}
 	freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
 }
@@ -1579,7 +1642,6 @@ SegResource createSegResource(SegStat segstat)
 	res->LastUpdateTime  = gettime_microsec();
 	res->RUAlivePending  = false;
 	res->Stat->FTSAvailable = RESOURCE_SEG_STATUS_UNSET;
-	res->Stat->GRMAvailable = RESOURCE_SEG_STATUS_UNSET;
 
 	for ( int i = 0 ; i < RESOURCE_QUEUE_RATIO_SIZE ; ++i )
 	{
@@ -1599,13 +1661,6 @@ int setSegStatHAWQAvailability( SegStat segstat, uint8_t newstatus)
 {
 	int res = segstat->FTSAvailable;
 	segstat->FTSAvailable = newstatus;
-	return res;
-}
-
-int setSegStatGLOBAvailability( SegStat segstat, uint8_t newstatus)
-{
-	int res = segstat->GRMAvailable;
-	segstat->GRMAvailable = newstatus;
 	return res;
 }
 
@@ -1646,12 +1701,7 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 							  segres->Stat->GRMTotalCore);
 
 		addNewResourceToResourceManagerByBundle(&(segres->Allocated));
-		if ( (DRMGlobalInstance->ImpType == NONE_HAWQ2) ||
-			 (DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-			  IS_SEGSTAT_GRMAVAILABLE(segres->Stat)))
-		{
-			PRESPOOL->AvailNodeCount++;
-		}
+		PRESPOOL->AvailNodeCount++;
 	}
 	else
 	{
@@ -1675,12 +1725,6 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 	return res;
 }
 
-int setSegResGLOBAvailability( SegResource segres, uint8_t newstatus)
-{
-	int res = setSegStatGLOBAvailability(segres->Stat, newstatus);
-	return res;
-}
-
 /* Generate HAWQ host report. */
 void generateSegResourceReport(int32_t segid, SelfMaintainBuffer buff)
 {
@@ -1697,14 +1741,13 @@ void generateSegResourceReport(int32_t segid, SelfMaintainBuffer buff)
 
 		int headsize = sprintf(reporthead,
 							   "SEGMENT:ID=%d, "
-							   "HAWQAVAIL=%d,GLOBAVAIL=%d. "
+							   "HAWQAVAIL=%d. "
 							   "FTS( %d MB, %d CORE). "
 							   "GRM( %d MB, %d CORE). "
 							   "MEM=%d(%d) MB. "
 							   "CORE=%lf(%lf).\n",
 							   seg->Stat->ID,
 							   seg->Stat->FTSAvailable,
-							   seg->Stat->GRMAvailable,
 							   seg->Stat->FTSTotalMemoryMB,
 							   seg->Stat->FTSTotalCore,
 							   seg->Stat->GRMTotalMemoryMB,
@@ -1802,13 +1845,12 @@ void  generateSegStatReport(SegStat segstat, SelfMaintainBuffer buff)
 	static char reporthead[256];
 	int reportheadlen = 0;
 	reportheadlen = sprintf(reporthead,
-            "NODE:ID=%d,HAWQ %s, GRM %s, "
-            "HAWQ CAP (%d MB, %lf CORE), "
+			"NODE:ID=%d,HAWQ %s, "
+			"HAWQ CAP (%d MB, %lf CORE), "
 			"GRM CAP(%d MB, %lf CORE),",
-            segstat->ID,
+			segstat->ID,
 			segstat->FTSAvailable ? "AVAIL" : "UNAVAIL",
-			segstat->GRMAvailable ? "AVAIL" : "UNAVAIL",
-            segstat->FTSTotalMemoryMB,
+			segstat->FTSTotalMemoryMB,
 			segstat->FTSTotalCore * 1.0,
 			segstat->GRMTotalMemoryMB,
 			segstat->GRMTotalCore * 1.0);
@@ -3163,8 +3205,7 @@ void returnAllGRMResourceFromUnavailableSegments(void)
 	foreach(cell, allsegres)
 	{
 		SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
-		if ( IS_SEGSTAT_GRMAVAILABLE(segres->Stat) &&
-			 IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
+		if (IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
 		{
 			continue;
 		}
@@ -4348,8 +4389,7 @@ void refreshAvailableNodeCount(void)
 		SegResource segres = (SegResource)(pair->Value);
 		Assert( segres != NULL );
 
-		if ( IS_SEGSTAT_FTSAVAILABLE(segres->Stat) &&
-			 IS_SEGSTAT_GRMAVAILABLE(segres->Stat) )
+		if ( IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
 		{
 			PRESPOOL->AvailNodeCount++;
 		}
@@ -4475,10 +4515,12 @@ void fixClusterMemoryCoreRatio(void)
 		}
 		else
 		{
-			if ( !IS_SEGSTAT_GRMAVAILABLE(segres->Stat) )
-			{
-				continue;
-			}
+			/*
+			 * If this segment is FTS available,
+			 * RM should get GRM report for it.
+			 */
+			Assert((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT)
+					== 0);
 			memorymb = segres->Stat->GRMTotalMemoryMB;
 			core	 = segres->Stat->GRMTotalCore;
 		}
@@ -4529,10 +4571,12 @@ void fixClusterMemoryCoreRatio(void)
 			}
 			else
 			{
-				if ( !IS_SEGSTAT_GRMAVAILABLE(segres->Stat) )
-				{
-					continue;
-				}
+				/*
+				 * If this segment is FTS available,
+				 * RM should get GRM report for it.
+				 */
+				Assert((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT)
+						== 0);
 				memorymb = segres->Stat->GRMTotalMemoryMB;
 				core	 = segres->Stat->GRMTotalCore;
 			}
@@ -4703,8 +4747,7 @@ void adjustSegmentCapacityForGRM(SegResource segres)
 	adjustMemoryCoreValue(&(segres->Stat->GRMTotalMemoryMB),
 						  &(segres->Stat->GRMTotalCore));
 
-	if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-		 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat))
+	if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
 	{
 		return;
 	}
@@ -4768,9 +4811,8 @@ void dumpResourcePoolHosts(const char *filename)
                     segresource->Stat->FTSTotalCore,
                     segresource->Stat->GRMTotalMemoryMB,
                     segresource->Stat->GRMTotalCore);
-            fprintf(fp, "HOST_AVAILABLITY(HAWQAvailable=%s:GLOBAvailable=%s)\n",
-                    segresource->Stat->FTSAvailable == 0 ? "false" : "true",
-                    segresource->Stat->GRMAvailable == 0 ? "false" : "true");
+            fprintf(fp, "HOST_AVAILABLITY(HAWQAvailable=%s)\n",
+                    segresource->Stat->FTSAvailable == 0 ? "false" : "true");
             fprintf(fp, "HOST_RESOURCE(AllocatedMemory=%d:AllocatedCores=%f:"
             						  "AvailableMemory=%d:AvailableCores=%f:"
             						  "IOBytesWorkload="INT64_FORMAT":"
@@ -4827,20 +4869,13 @@ void dumpResourcePoolHosts(const char *filename)
     fclose(fp);
 }
 
-#define	SEG_STATUS_HEARTBEAT_TIMEOUT			0x00000001
-#define	SEG_STATUS_RUALIVE_FAILED				0x00000002
-#define	SEG_STATUS_COMMUNICATION_ERROR			0x00000004
-#define	SEG_STATUS_FAILED_TMPDIR				0x00000008
-#define	SEG_STATUS_RM_RESET						0x00000010
-#define	SEG_STATUS_NO_YARN_NODE_REPORT			0x00000020
-
 static const char* SegStatusDesc[] = {
 	"heartbeat timeout",
-	"RUAlive probe failed",
+	"no response",
 	"communication error",
 	"failed temporary directory",
 	"resource manager process was reset",
-	"no YARN node report"
+	"no global node report"
 };
 
 /*
