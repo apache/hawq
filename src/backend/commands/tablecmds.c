@@ -13824,17 +13824,14 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 										   errOmitLocation(true)));
 
 			/* XXX XXX: move this check to gram.y ? */
-			if (pElem)
-			{
-				if (pElem->boundSpec)
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-							 errmsg("invalid use of boundary specification "
-									"for DEFAULT partition%s of %s",
-									namBuf,
-									lrelname),
-											   errOmitLocation(true)));
-			}
+            if (pElem->boundSpec)
+                ereport(ERROR,
+                        (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+                         errmsg("invalid use of boundary specification "
+                                "for DEFAULT partition%s of %s",
+                                namBuf,
+                                lrelname),
+                                           errOmitLocation(true)));
 		}
 
 		/* Do the real work for add ... */
