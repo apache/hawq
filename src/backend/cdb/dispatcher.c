@@ -1656,12 +1656,7 @@ dispatcher_compute_threads_num(DispatchData *data)
 	/* TODO: decide the groups(threads) number. */
 	if (query_executors_num == 0)
 		threads_num = 1;
-	if (executors_num_per_thread == 0)
-	{
-		threads_num = query_executors_num;
-		executors_num_per_thread = 1;
-	}
-	else if (executors_num_per_thread > query_executors_num)
+	if (executors_num_per_thread > query_executors_num)
 		threads_num = 1;
 	else
 		threads_num = (query_executors_num / executors_num_per_thread) + ((query_executors_num % executors_num_per_thread == 0) ? 0 : 1); 

@@ -449,14 +449,7 @@ dispmgt_create_concurrent_connect_state(List *executors, int executors_num_per_t
 	int		i, j;
 
 	/* Compute threads_num */
-	if (executors_num == 0)
-		return NIL;
-	else if (executors_num_per_thread == 0)
-	{
-		threads_num = executors_num;
-		executors_num_per_thread = 1;
-	}
-	else if (executors_num_per_thread > executors_num)
+	if (executors_num_per_thread > executors_num)
 		threads_num = 1;
 	else
 		threads_num = (executors_num / executors_num_per_thread) + ((executors_num % executors_num_per_thread == 0) ? 0 : 1); 
