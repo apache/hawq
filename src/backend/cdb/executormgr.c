@@ -202,13 +202,9 @@ executormgr_bind_executor_task(struct DispatchData *data,
 							struct DispatchTask *task,
 							struct DispatchSlice *slice)
 {
-	executor->state = QES_UNINIT;
-	if (desc == NULL)
-	{
-		executor->health = QEH_ERROR;
-		return false;
-	}
+  Assert(desc != NULL);
 
+  executor->state = QES_UNINIT;
 	executor->desc = desc;
 	executor->state = QES_DISPATCHABLE;
 	executor->health = QEH_NA;
