@@ -52,7 +52,7 @@ LIBS := $(filter-out -lpgport, $(LIBS)) $(LDAP_LIBS_BE) $(CONNECTEMCLIB)
 
 # The backend doesn't need everything that's in LIBS, however
 LIBS := $(filter-out -lreadline -ledit -ltermcap -lncurses -lcurses, $(LIBS))
-LIBS := -lprotobuf -lboost_thread -lboost_system -lboost_date_time -lstdc++ -lhdfs3 -lgsasl -lxml2 $(LIBS)
+LIBS := -lprotobuf -lboost_thread-mt -lboost_system -lboost_date_time -lstdc++ -lhdfs3 -lgsasl -lxml2 $(LIBS)
 
 # adding orca libraries
 ifeq ($(enable_orca),yes)
@@ -213,9 +213,6 @@ ifeq ($(MAKE_DLL), true)
 	$(INSTALL_DATA) libpostgres.a '$(DESTDIR)$(libdir)/libpostgres.a'
 endif
 endif
-ifeq ($(enable_orca),yes)
-	$(MAKE) -C gpopt install
-endif
 	$(MAKE) -C catalog install-data
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_hba.conf.sample '$(DESTDIR)$(datadir)/pg_hba.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_ident.conf.sample '$(DESTDIR)$(datadir)/pg_ident.conf.sample'
@@ -228,6 +225,9 @@ endif
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/slaves ${sysconfdir}
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/template-hawq-site.xml ${sysconfdir}
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/gpcheck.cnf ${sysconfdir}
+ifeq ($(enable_orca), yes)
+	$(MAKE) -C gpopt $@ INSTLOC=$(DESTDIR)$(libdir)
+endif
 
 install-bin: postgres $(POSTGRES_IMP) installdirs
 	$(INSTALL_PROGRAM) postgres$(X) '$(DESTDIR)$(bindir)/postgres$(X)'
