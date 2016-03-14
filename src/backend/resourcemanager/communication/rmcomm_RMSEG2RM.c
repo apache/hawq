@@ -141,8 +141,7 @@ int sendIMAlive(int  *errorcode,
 
 	/* Connect to HAWQ RM server */
 
-	res = registerAsyncConnectionFileDesc(NULL,
-										  DRMGlobalInstance->SendToStandby?
+	res = registerAsyncConnectionFileDesc(DRMGlobalInstance->SendToStandby?
 										  standby_addr_host:
 										  master_addr_host,
 										  rm_master_port,
@@ -203,8 +202,7 @@ void receivedIMAliveResponse(AsyncCommMessageHandlerContext  context,
 				  response->Result);
 	}
 
-	context->AsyncBuffer->toClose     = true;
-	context->AsyncBuffer->forcedClose = false;
+	closeFileDesc(context->AsyncBuffer);
 }
 
 void sentIMAlive(AsyncCommMessageHandlerContext context)

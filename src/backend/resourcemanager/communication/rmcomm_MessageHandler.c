@@ -320,16 +320,14 @@ void performMessageForErrorActionForWritingMessageByID(int  		   messageid,
 	case ERRINJ_DISCONNECT_BEFORE_SEND:
 		if ( beforeact )
 		{
-			buffer->toClose     = true;
-			buffer->forcedClose = true;
+			forceCloseFileDesc(buffer);
 		}
 		break;
 	case ERRINJ_DISCONNECT_AFTER_SEND:
 	case ERRINJ_DISCONNECT_AFTER_PROC:
 		if ( !beforeact )
 		{
-			buffer->toClose     = true;
-			buffer->forcedClose = true;
+			forceCloseFileDesc(buffer);
 		}
 		break;
 	case ERRINJ_PARTIAL_SEND:
@@ -351,8 +349,7 @@ void performMessageForErrorActionForWritingMessageByID(int  		   messageid,
 						  buffer->WriteContentOriginalSize,
 						  buffer->WriteContentSize);
 			}
-			buffer->toClose     = true;
-			buffer->forcedClose = false;
+			closeFileDesc(buffer);
 		}
 		break;
 	case ERRINJ_PARTIAL_SEND_FRAME_TAIL:
@@ -376,8 +373,7 @@ void performMessageForErrorActionForWritingMessageByID(int  		   messageid,
 						  buffer->WriteContentSize);
 
 			}
-			buffer->toClose     = true;
-			buffer->forcedClose = false;
+			closeFileDesc(buffer);
 		}
 		break;
 	case ERRINJ_PARTIAL_SEND_FRAME_HEAD:
@@ -397,8 +393,7 @@ void performMessageForErrorActionForWritingMessageByID(int  		   messageid,
 						  buffer->WriteContentOriginalSize,
 						  buffer->WriteContentSize);
 			}
-			buffer->toClose     = true;
-			buffer->forcedClose = false;
+			closeFileDesc(buffer);
 		}
 		break;
 	case ERRINJ_PARTIAL_RECV:

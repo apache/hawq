@@ -67,8 +67,7 @@ void ReadPostHandler_Message(AsyncCommBuffer buffer)
 				 * framework, therefore, here we force to close the connection.
 				 * No more processing is needed.
 				 */
-				buffer->forcedClose = true;
-				buffer->toClose     = true;
+				forceCloseFileDesc(buffer);
 				elog(WARNING, "AsyncComm framework received invalid message head. "
 							  "Close the connection FD %d.",
 							  buffer->FD);
@@ -143,8 +142,7 @@ void ReadPostHandler_Message(AsyncCommBuffer buffer)
 				/* We get wrong message content. */
 				elog(WARNING, "AsyncComm framework received wrong message tail "
 							  "content.");
-				buffer->forcedClose = true;
-				buffer->toClose     = true;
+				forceCloseFileDesc(buffer);
 			}
 		}
 	}

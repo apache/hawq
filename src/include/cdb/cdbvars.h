@@ -1153,6 +1153,8 @@ extern char   *seg_directory;
 extern int	   rm_master_domain_port;
 extern int     rm_master_port;
 extern int	   rm_segment_port;
+extern bool	   rm_enable_connpool;
+extern int	   rm_connpool_sameaddr_buffersize;
 
 extern char   *rm_global_rm_type;
 

@@ -4885,8 +4885,7 @@ void timeoutDeadResourceAllocation(void)
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
-					curcon->CommBuffer->toClose = true;
-					curcon->CommBuffer->forcedClose = true;
+					forceCloseFileDesc(curcon->CommBuffer);
 				}
 				else
 				{
@@ -4913,8 +4912,7 @@ void timeoutDeadResourceAllocation(void)
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
-					curcon->CommBuffer->toClose = true;
-					curcon->CommBuffer->forcedClose = true;
+					forceCloseFileDesc(curcon->CommBuffer);
 				}
 				else
 				{
@@ -4935,8 +4933,7 @@ void timeoutDeadResourceAllocation(void)
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
-					curcon->CommBuffer->toClose = true;
-					curcon->CommBuffer->forcedClose = true;
+					forceCloseFileDesc(curcon->CommBuffer);
 				}
 				else
 				{
@@ -4979,14 +4976,14 @@ void timeoutQueuedRequest(void)
 		 * 		   added into resource queue manager queues.
 		 */
 		elog(DEBUG3, "Deferred connection track is found. "
-					 " Conn Time " UINT64_FORMAT
+					 " Request Time " UINT64_FORMAT
 					 " Curr Time " UINT64_FORMAT
 					 " Delta " UINT64_FORMAT,
-					 ct->ConnectTime,
+					 ct->RequestTime,
 					 curmsec,
-					 curmsec - ct->ConnectTime);
+					 curmsec - ct->RequestTime);
 
-		if ( curmsec - ct->ConnectTime > 1000000L * rm_resource_allocation_timeout )
+		if ( curmsec - ct->RequestTime > 1000000L * rm_resource_allocation_timeout )
 		{
 			snprintf(errorbuf, sizeof(errorbuf),
 					 "resource request is timed out due to no available cluster");

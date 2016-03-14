@@ -58,12 +58,12 @@ void ErrorHandler_MsgServer(AsyncCommBuffer buffer);
 void CleanUpHandler_MsgServer(AsyncCommBuffer buffer);
 
 /* Callbacks registered in AsyncComm Message instance */
-void addNewMessageToConnTrack(AsyncCommMessageHandlerContext context,
-							  uint16_t						 messageid,
-							  uint8_t						 mark1,
-							  uint8_t						 mark2,
-							  char 							*buffer,
-							  uint32_t						 buffersize);
+void addMessageToConnTrack(AsyncCommMessageHandlerContext	context,
+						   uint16_t							messageid,
+						   uint8_t							mark1,
+						   uint8_t							mark2,
+						   char 						   *buffer,
+						   uint32_t							buffersize);
 
 void sentMessageFromConnTrack(AsyncCommMessageHandlerContext context);
 void hasCommErrorInConnTrack(AsyncCommMessageHandlerContext context);

@@ -193,13 +193,6 @@ DQueue buildResourceDistRowData(MCTYPE 				context,
  *------------------------------------------------------------------------------
  */
 
-#ifdef ENABLE_DOMAINSERVER
-/* Reference global configure.   */
-extern char 	   *UnixSocketDir;
-/* Unix domain socket file.      */
-char				QD2RM_SocketFile[1024];
-#endif
-
 MemoryContext		QD2RM_CommContext			  = NULL;
 QDResourceContext  *QD2RM_ResourceSets            = NULL;
 int					QD2RM_ResourceSetSize         = 0;
@@ -249,10 +242,6 @@ void initializeQD2RMComm(void)
 					"resource manager.");
     }
 
-#ifdef ENABLE_DOMAINSERVER
-    /* Get UNIX domain socket file. */
-    UNIXSOCK_PATH(QD2RM_SocketFile, rm_master_domain_port, UnixSocketDir);
-#endif
     /* Initialize global variables for maintaining a list of resource sets. */
     QD2RM_ResourceSets 	   = rm_palloc0(QD2RM_CommContext,
             							sizeof(QDResourceContext) *
@@ -341,6 +330,8 @@ void initializeQD2RMComm(void)
     }
 
     initializeMessageHandlers();
+
+    initializeSocketConnectionPool();
 
     QD2RM_Initialized = true;
 }
@@ -460,6 +451,8 @@ int cleanupQD2RMComm(void)
 {
 	int res = FUNC_RETURN_OK;
 	char errorbuf[ERRORMESSAGE_SIZE];
+
+	elog(LOG, "Clean up communication to resource manager now.");
 
 	initializeQD2RMComm();
 
@@ -1376,6 +1369,8 @@ void *generateResourceRefreshHeartBeat(void *arg)
 								   '\0','\0','\0','\0','\0','\0','\0','\0'};
 	static char messagetail[8]  = {'M' ,'S' ,'G' ,'E' ,'N' ,'D' ,'S' ,'!' };
 
+	int fd = -1;
+
 	HeartBeatThreadArg tharg = arg;
 	Assert(arg != NULL);
 
@@ -1423,49 +1418,54 @@ void *generateResourceRefreshHeartBeat(void *arg)
 
 		if ( sendcontent )
 		{
-			/* Connect to resource manager server. */
-			struct sockaddr_in server_addr;
-			int fd = socket(AF_INET, SOCK_STREAM, 0);
+			/* Connect to server only when necessary. */
 			if ( fd < 0 )
 			{
-				write_log("ERROR generateResourceRefreshHeartBeat failed to open "
-						  "socket (errno %d)", errno);
-				break;
-			}
-			memset(&server_addr, 0, sizeof(server_addr));
-			server_addr.sin_family = AF_INET;
-			memcpy(&(server_addr.sin_addr.s_addr),
-				   tharg->HostAddrs[0],
-				   tharg->HostAddrLength);
-			server_addr.sin_port = htons(rm_master_port);
-
-			int sockres = 0;
-			while(true)
-			{
-				sockres = connect(fd,
-								  (struct sockaddr *)&server_addr,
-								  sizeof(server_addr));
-				if (sockres < 0)
+				/* Connect to resource manager server. */
+				struct sockaddr_in server_addr;
+				fd = socket(AF_INET, SOCK_STREAM, 0);
+				if ( fd < 0 )
 				{
-					if (errno == EINTR)
-					{
-						continue;
-					}
-					else
-					{
-						write_log("ERROR generateResourceRefreshHeartBeat "
-								  "failed to connect to resource manager, "
-								  "fd %d (errno %d)", fd, errno);
-						close(fd);
-					}
+					write_log("ERROR generateResourceRefreshHeartBeat failed to open "
+							  "socket (errno %d)", errno);
+					break;
 				}
-				break;
-			}
+				memset(&server_addr, 0, sizeof(server_addr));
+				server_addr.sin_family = AF_INET;
+				memcpy(&(server_addr.sin_addr.s_addr),
+					   tharg->HostAddrs[0],
+					   tharg->HostAddrLength);
+				server_addr.sin_port = htons(rm_master_port);
 
-			if ( sockres < 0 )
-			{
-				pg_usleep(1000000L);
-				continue;
+				int sockres = 0;
+				while(true)
+				{
+					sockres = connect(fd,
+									  (struct sockaddr *)&server_addr,
+									  sizeof(server_addr));
+					if (sockres < 0)
+					{
+						if (errno == EINTR)
+						{
+							continue;
+						}
+						else
+						{
+							write_log("ERROR generateResourceRefreshHeartBeat "
+									  "failed to connect to resource manager, "
+									  "fd %d (errno %d)", fd, errno);
+							close(fd);
+						}
+					}
+					break;
+				}
+
+				if ( sockres < 0 )
+				{
+					pg_usleep(1000000L);
+					continue;
+				}
+
 			}
 
 			RMMessageHead phead = (RMMessageHead)messagehead;
@@ -1499,14 +1499,17 @@ void *generateResourceRefreshHeartBeat(void *arg)
 				{
 					write_log("ERROR generateResourceRefreshHeartBeat recv error "
 							  "(errno %d)", errno);
+					close(fd);
+					fd = -1;
 				}
 			}
 			else
 			{
 				write_log("ERROR generateResourceRefreshHeartBeat send error "
 						  "(errno %d)", errno);
+				close(fd);
+				fd = -1;
 			}
-			close(fd);
 
 			if ( log_min_messages <= DEBUG3 )
 			{
@@ -1515,6 +1518,9 @@ void *generateResourceRefreshHeartBeat(void *arg)
 		}
 		pg_usleep(rm_session_lease_heartbeat_interval * 1000000L);
 	}
+
+	close(fd);
+	fd = -1;
 
 	freeHeartBeatThreadArg(&tharg);
 	write_log("generateResourceRefreshHeartBeat exits.");
@@ -2774,24 +2780,13 @@ int callSyncRPCToRM(const char 	 	   *sendbuff,
 					char			   *errorbuf,
 					int					errorbufsize)
 {
-#ifdef ENABLE_DOMAINSERVER
-		return callSyncRPCDomain(QD2RM_SocketFile,
-								 sendbuff,
-								 sendbuffsize,
-								 sendmsgid,
-								 exprecvmsgid,
-								 recvsmb,
-								 errorbuf,
-								 errorbufsize);
-#else
-		return callSyncRPCRemote(master_addr_host,
-								 rm_master_port,
-								 sendbuff,
-								 sendbuffsize,
-								 sendmsgid,
-								 exprecvmsgid,
-								 recvsmb,
-								 errorbuf,
-								 errorbufsize);
-#endif
+	return callSyncRPCRemote(master_addr_host,
+							 rm_master_port,
+							 sendbuff,
+							 sendbuffsize,
+							 sendmsgid,
+							 exprecvmsgid,
+							 recvsmb,
+							 errorbuf,
+							 errorbufsize);
 }

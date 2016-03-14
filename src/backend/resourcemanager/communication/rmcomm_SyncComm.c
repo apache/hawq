@@ -60,96 +60,6 @@ void sentSyncRPCRequest(AsyncCommMessageHandlerContext context);
 void sentSyncRPCRequestError(AsyncCommMessageHandlerContext context);
 void sentSyncRPCRequestCleanUp(AsyncCommMessageHandlerContext context);
 
-
-
-int callSyncRPCDomain(const char     	   *sockfile,
-					  const char 	 	   *sendbuff,
-		        	  int   		  		sendbuffsize,
-					  uint16_t		  		sendmsgid,
-					  uint16_t 		  		exprecvmsgid,
-					  SelfMaintainBuffer 	recvsmb,
-					  char				   *errorbuf,
-					  int					errorbufsize)
-{
-	static char            			dfilename[DOMAINSOCKET_FILE_SIZE];
-	int 							fd 			  = -1;
-	int 							res 		  = FUNC_RETURN_OK;
-	AsyncCommBuffer					newcommbuffer = NULL;
-	AsyncCommMessageHandlerContext 	context 	  = NULL;
-	SyncRPCContextData 				userdata;
-
-	/* Connect to the server side. */
-	res = connectToServerDomain(sockfile, 0, &fd, 0, dfilename);
-	if ( res != FUNC_RETURN_OK )
-	{
-		snprintf(errorbuf, errorbufsize,
-				 "failed to connect to domain socket server %s",
-				 sockfile);
-
-		elog(WARNING, "%s", errorbuf);
-		goto exit;
-	}
-
-	initializeSyncRPContent(&userdata, recvsmb, exprecvmsgid);
-	context = createMessageHandlerContext(&userdata);
-
-	res = registerFileDesc(fd,
-						   dfilename,
-						   ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
-						   &AsyncCommBufferHandlersMessage,
-						   context,
-						   &newcommbuffer);
-	if ( res != FUNC_RETURN_OK )
-	{
-		rm_pfree(AsyncCommContext, context);
-		elog(WARNING, "Fail to register FD for synchronous communication. %d", res);
-		goto exit;
-	}
-
-	buildMessageToCommBuffer(newcommbuffer,
-							 sendbuff,
-							 sendbuffsize,
-							 sendmsgid,
-							 0,
-							 0);
-	context->AsyncBuffer = newcommbuffer;
-
-	InitHandler_Message(newcommbuffer);
-
-	/* Wait for the complete of the communication. */
-	while( true )
-	{
-		processAllCommFileDescs();
-		if ( userdata.CommStatus == SYNC_RPC_COMM_IDLE )
-		{
-			break;
-		}
-		else if ( QueryCancelPending )
-		{
-			/*
-			 * We find that this QD wants to cancel the query, we don't need
-			 * to continue the communication.
-			 */
-			res = TRANSCANCEL_INPROGRESS;
-			break;
-		}
-	}
-
-	res = res == TRANSCANCEL_INPROGRESS ? res : userdata.Result;
-
-	/* Close and cleanup */
-	closeAndRemoveAllRegisteredFileDesc();
-
-	if (res != FUNC_RETURN_OK)
-	{
-	  elog(WARNING, "Sync RPC framework (domain) finds exception raised.");
-	}
-	return res;
-exit:
-	closeConnectionDomain(&fd, dfilename);
-	return res;
-}
-
 int callSyncRPCRemote(const char     	   *hostname,
 					  uint16_t              port,
 		  	  	  	  const char 	 	   *sendbuff,
@@ -182,7 +92,6 @@ int callSyncRPCRemote(const char     	   *hostname,
 	context = createMessageHandlerContext(&userdata);
 
 	res = registerFileDesc(fd,
-						   NULL,
 						   ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 						   &AsyncCommBufferHandlersMessage,
 						   context,
@@ -201,12 +110,7 @@ int callSyncRPCRemote(const char     	   *hostname,
 		goto exit;
 	}
 
-	buildMessageToCommBuffer(newcommbuffer,
-							 sendbuff,
-							 sendbuffsize,
-							 sendmsgid,
-							 0,
-							 0);
+	buildMessageToCommBuffer(newcommbuffer, sendbuff, sendbuffsize, sendmsgid, 0, 0);
 
 	context->AsyncBuffer = newcommbuffer;
 
@@ -234,7 +138,15 @@ int callSyncRPCRemote(const char     	   *hostname,
 	res = res == TRANSCANCEL_INPROGRESS ? res : userdata.Result;
 
 	/* Close and cleanup */
-	closeAndRemoveAllRegisteredFileDesc();
+	unresigsterFileDesc(fd);
+	if ( res == FUNC_RETURN_OK )
+	{
+		returnAliveConnectionRemoteByHostname(&fd, hostname, port);
+	}
+	else
+	{
+		closeConnectionRemote(&fd);
+	}
 
 	if (res != FUNC_RETURN_OK)
 	{

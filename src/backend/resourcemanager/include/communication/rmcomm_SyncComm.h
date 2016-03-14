@@ -27,15 +27,6 @@ typedef void (* UserDefinedBackgroundLogicHandler)(void);
 void initializeSyncRPCComm(void);
 void setUserDefinedBackgroundLogic(UserDefinedBackgroundLogicHandler handler);
 
-int callSyncRPCDomain(const char     	   *sockfile,
-					  const char 	 	   *sendbuff,
-		        	  int   		  		sendbuffsize,
-					  uint16_t		  		sendmsgid,
-					  uint16_t 		  		exprecvmsgid,
-					  SelfMaintainBuffer 	recvsmb,
-					  char				   *errorbuf,
-					  int					errorbufsize);
-
 int callSyncRPCRemote(const char     	   *hostname,
 					  uint16_t              port,
 		  	  	  	  const char 	 	   *sendbuff,

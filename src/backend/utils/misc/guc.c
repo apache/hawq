@@ -4413,6 +4413,15 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"hawq_rm_enable_connpool", PGC_POSTMASTER, RESOURCES_MGM,
+		 gettext_noop("enalbe client side socket connection pool."),
+		 NULL
+		},
+		&rm_enable_connpool,
+		true, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_force_alterqueue_cancel_queued_request", PGC_POSTMASTER, RESOURCES_MGM,
 		 gettext_noop("force to cancel a query resource request when altering a resource queue."),
 		 NULL
@@ -6231,6 +6240,16 @@ static struct config_int ConfigureNamesInt[] =
             },
             &rm_segment_port,
             5438, 1, 65535, NULL, NULL
+    },
+
+    {
+            {"hawq_rm_connpool_sameaddr_buffersize", PGC_POSTMASTER, RESOURCES_MGM,
+                    gettext_noop("buffered socket connection maximum size for "
+                    			 "one address and one port"),
+                    NULL
+            },
+            &rm_connpool_sameaddr_buffersize,
+            2, 1, 65535, NULL, NULL
     },
 
     {

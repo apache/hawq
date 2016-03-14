@@ -32,11 +32,6 @@
 
 #include "resourcemanager.h"
 
-/******************************************************************************
- * Global Variables
- ******************************************************************************/
-extern char *UnixSocketDir;		  /* Reference from global configure.         */
-
 /*
  * The MAIN ENTRY of request handler.
  * The implementation of all request handlers are :
@@ -248,20 +243,17 @@ bool handleRMRequestConnectionUnReg(void **arg)
 
 	elog(DEBUG3, "ConnID %d. Try to unregister.", request->ConnID);
 
-	if ( (*conntrack)->ConnID == INVALID_CONNID )
+	res = retrieveConnectionTrack((*conntrack), request->ConnID);
+	if ( res != FUNC_RETURN_OK )
 	{
-		res = retrieveConnectionTrack((*conntrack), request->ConnID);
-		if ( res != FUNC_RETURN_OK )
-		{
-			snprintf(errorbuf, sizeof(errorbuf),
-					 "the resource context is invalid or timed out");
-			elog(WARNING, "ConnID %d. %s", request->ConnID, errorbuf);
-			goto sendresponse;
-		}
-		elog(DEBUG3, "ConnID %d. Fetched existing connection track, progress=%d.",
-					 (*conntrack)->ConnID,
-					 (*conntrack)->Progress);
+		snprintf(errorbuf, sizeof(errorbuf),
+				 "the resource context is invalid or timed out");
+		elog(WARNING, "ConnID %d. %s", request->ConnID, errorbuf);
+		goto sendresponse;
 	}
+	elog(DEBUG3, "ConnID %d. Fetched existing connection track, progress=%d.",
+				 (*conntrack)->ConnID,
+				 (*conntrack)->Progress);
 
 	/* Get connection ID. */
 	request = SMBUFF_HEAD(RPCRequestHeadUnregisterConnectionInRM,
@@ -363,20 +355,17 @@ bool handleRMRequestAcquireResource(void **arg)
 				 request->ConnID,
 				 request->SessionID);
 
-	if ( (*conntrack)->ConnID == INVALID_CONNID )
+	res = retrieveConnectionTrack((*conntrack), request->ConnID);
+	if ( res != FUNC_RETURN_OK )
 	{
-		res = retrieveConnectionTrack((*conntrack), request->ConnID);
-		if ( res != FUNC_RETURN_OK )
-		{
-			snprintf(errorbuf, sizeof(errorbuf),
-					 "the resource context may be timed out");
-			elog(WARNING, "ConnID %d. %s", request->ConnID, errorbuf);
-			goto sendresponse;
-		}
-		elog(DEBUG3, "ConnID %d. Fetched existing connection track, progress=%d.",
-					 (*conntrack)->ConnID,
-					 (*conntrack)->Progress);
+		snprintf(errorbuf, sizeof(errorbuf),
+				 "the resource context may be timed out");
+		elog(WARNING, "ConnID %d. %s", request->ConnID, errorbuf);
+		goto sendresponse;
 	}
+	elog(DEBUG3, "ConnID %d. Fetched existing connection track, progress=%d.",
+				 (*conntrack)->ConnID,
+				 (*conntrack)->Progress);
 
 	request = SMBUFF_HEAD(RPCRequestHeadAcquireResourceFromRM,
 						  &((*conntrack)->MessageBuff));
@@ -523,20 +512,17 @@ bool handleRMRequestReturnResource(void **arg)
 
 	elog(DEBUG3, "ConnID %d. Returns query resource.", request->ConnID);
 
-	if ( (*conntrack)->ConnID == INVALID_CONNID )
+	res = retrieveConnectionTrack((*conntrack), request->ConnID);
+	if ( res != FUNC_RETURN_OK )
 	{
-		res = retrieveConnectionTrack((*conntrack), request->ConnID);
-		if ( res != FUNC_RETURN_OK )
-		{
-			snprintf(errorbuf, sizeof(errorbuf),
-					 "the resource context may be timed out");
-			elog(WARNING, "ConnID %d. %s", request->ConnID, errorbuf);
-			goto sendresponse;
-		}
-		elog(DEBUG3, "ConnID %d. Fetched existing connection track, progress=%d.",
-					 (*conntrack)->ConnID,
-					 (*conntrack)->Progress);
+		snprintf(errorbuf, sizeof(errorbuf),
+				 "the resource context may be timed out");
+		elog(WARNING, "ConnID %d. %s", request->ConnID, errorbuf);
+		goto sendresponse;
 	}
+	elog(DEBUG3, "ConnID %d. Fetched existing connection track, progress=%d.",
+				 (*conntrack)->ConnID,
+				 (*conntrack)->Progress);
 
 	/* Get connection ID. */
 	request = SMBUFF_HEAD(RPCRequestHeadReturnResource,
@@ -617,7 +603,8 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	struct hostent* fts_client_host   = NULL;
 	struct in_addr 	fts_client_addr;
 
-	fts_client_ip = conntrack->ClientAddrDotStr;
+	Assert(conntrack->CommBuffer != NULL);
+	fts_client_ip = conntrack->CommBuffer->ClientAddrDotStr;
 	fts_client_ip_len = strlen(fts_client_ip);
 	inet_aton(fts_client_ip, &fts_client_addr);
 	fts_client_host = gethostbyaddr(&fts_client_addr, 4, AF_INET);

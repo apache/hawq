@@ -158,8 +158,7 @@ int sendRUAlive(char *seghostname)
 	context->UserData                = (void *)segres;
 
 	/* Connect to HAWQ RM server */
-	res = registerAsyncConnectionFileDesc(NULL,
-										  seghostname,
+	res = registerAsyncConnectionFileDesc(seghostname,
 										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
@@ -253,8 +252,7 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 	}
 
 	setSegResRUAlivePending(segres, false);
-	context->AsyncBuffer->toClose     = true;
-	context->AsyncBuffer->forcedClose = false;
+	closeFileDesc(context->AsyncBuffer);
 }
 
 void sentRUAlive(AsyncCommMessageHandlerContext context)
@@ -358,8 +356,7 @@ int increaseMemoryQuota(char *seghostname, GRMContainerSet containerset)
 
     elog(DEBUG3, "Created AsyncComm Message context for Async Conn.");
 
-	res = registerAsyncConnectionFileDesc(NULL,
-										  seghostname,
+	res = registerAsyncConnectionFileDesc(seghostname,
 										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
@@ -435,8 +432,7 @@ void recvIncreaseMemoryQuotaResponse(AsyncCommMessageHandlerContext	context,
 	}
 
     processContainersAfterIncreaseMemoryQuota(ctns, acceptedcontainer);
-    context->AsyncBuffer->toClose     = true;
-    context->AsyncBuffer->forcedClose = false;
+    closeFileDesc(context->AsyncBuffer);
 }
 
 void sentIncreaseMemoryQuota(AsyncCommMessageHandlerContext context)
@@ -523,8 +519,7 @@ int decreaseMemoryQuota(char 			*seghostname,
     context->MessageErrorHandler     = sentDecreaseMemoryQuotaError;
     context->MessageCleanUpHandler   = sentDecreaseMemoryQuotaCleanup;
 
-	res = registerAsyncConnectionFileDesc(NULL,
-										  seghostname,
+	res = registerAsyncConnectionFileDesc(seghostname,
 										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
@@ -599,8 +594,7 @@ void recvDecreaseMemoryQuotaResponse(AsyncCommMessageHandlerContext	context,
         		  rsp->Result);
     }
     processContainersAfterDecreaseMemoryQuota(ctns, kickedcontainer);
-    context->AsyncBuffer->toClose     = true;
-    context->AsyncBuffer->forcedClose = false;
+    closeFileDesc(context->AsyncBuffer);
 }
 
 void sentDecreaseMemoryQuota(AsyncCommMessageHandlerContext context)

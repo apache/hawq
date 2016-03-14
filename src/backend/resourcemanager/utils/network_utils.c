@@ -30,6 +30,15 @@
 #include <unistd.h>
 #include <sys/types.h>
 
+#include "dynrm.h"
+/*
+ * Global variables for socket connection pool
+ */
+HASHTABLEData ResolvedHostnames;	/* All resolved hostname's address info.  */
+HASHTABLEData ActiveConnections;	/* All currently active connections.	  */
+
+static void cleanupSocketConnectionPool(int code, Datum arg);
+
 uint64_t gettime_microsec(void)
 {
     static struct timeval t;
@@ -326,101 +335,6 @@ int setConnectionNonBlocked(int fd)
 }
 
 /*
- * A wrapper for getting one unix domain socket connection to server.
- *
- * sockpath[in]			The domain socket file name.
- * port[in] 			The port number.
- * clientfd[out]		The fd of connection.
- *
- * Return:
- * FUNC_RETURN_OK					Succeed.
- * UTIL_NETWORK_FAIL_CREATESOCKET. 	Fail to call socket().
- * UTIL_NETWORK_FAIL_BIND. 			Fail to call bind().
- * UTIL_NETWORK_FAIL_CONNECT. 		Fail to call connect().
- **/
-int  connectToServerDomain(const char 	*sockpath,
-						   uint16_t 	 port,
-						   int 			*clientfd,
-						   int			 fileidx,
-						   char			*filename)
-{
-	struct sockaddr_un  sockaddr;
-	int					fd			= 0;
-	int					len			= 0;
-	int					sockres		= 0;
-
-	*clientfd   = -1;
-	filename[0] = '\0';
-
-	fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if ( fd < 0 )
-	{
-		write_log("Failed to open socket for connecting domain socket server "
-				  "(errno %d)",
-				  errno);
-		return UTIL_NETWORK_FAIL_CREATESOCKET;
-	}
-
-	memset( &sockaddr, 0, sizeof(struct sockaddr_un) );
-	sockaddr.sun_family = AF_UNIX;
-	sprintf(sockaddr.sun_path, "%s.%d.%lu.%d",
-			sockpath,
-			getpid(),
-			(unsigned long)pthread_self(),
-			fileidx);
-	len = offsetof(struct sockaddr_un, sun_path) + strlen(sockaddr.sun_path);
-	unlink(sockaddr.sun_path);
-	strcpy(filename, sockaddr.sun_path);
-
-	sockres = bind(fd, (struct sockaddr *)&sockaddr, len);
-	if ( sockres < 0 )
-	{
-		write_log("Failed to bind socket for connecting domain socket server "
-				  "%s (errno %d), close fd %d at once",
-				  filename,
-				  errno,
-				  fd);
-		closeConnectionDomain(&fd, filename);
-		return UTIL_NETWORK_FAIL_BIND;
-	}
-
-	memset( &sockaddr, 0, sizeof(struct sockaddr_un) );
-	sockaddr.sun_family = AF_UNIX;
-	sprintf(sockaddr.sun_path, "%s", sockpath);
-	len = offsetof(struct sockaddr_un, sun_path) + strlen(sockaddr.sun_path);
-
-	for ( int i = 0 ; i < DRM_SOCKET_CONN_RETRY ; ++i )
-	{
-		sockres = connect(fd, (struct sockaddr *)&sockaddr, len);
-		if ( sockres < 0 )
-		{
-			write_log("Failed to connect to domain socket server "
-					  "(retry %d, errno %d), fd %d",
-					  i,
-					  errno,
-					  fd);
-			pg_usleep(1000000); /* Sleep 1 seconds and retry. */
-		}
-		else
-		{
-			break;
-		}
-	}
-
-	if ( sockres < 0 )
-	{
-		write_log("Failed to connect to domain socket server after retries, "
-				  "close fd %d at once",
-				  fd);
-		closeConnectionDomain(&fd, filename);
-		return UTIL_NETWORK_FAIL_CONNECT;
-	}
-
-	*clientfd = fd;
-	return FUNC_RETURN_OK;
-}
-
-/*
  * A wrapper for getting one socket connection to server.
  *
  * address[in]			The address to connect.
@@ -435,23 +349,33 @@ int  connectToServerDomain(const char 	*sockpath,
  */
 int connectToServerRemote(const char *address, uint16_t port, int *clientfd)
 {
-	int					fd		= 0;
+	int					fd		= -1;
 	int 		    	sockres = 0;
 	struct sockaddr_in 	server_addr;
-	struct hostent 	   *server  = NULL;
 
 	*clientfd = -1;
 
-	server = gethostbyname(address);
-	if ( server == NULL )
+	AddressString resolvedaddr = getAddressStringByHostName(address);
+	if ( resolvedaddr == NULL )
 	{
 		write_log("Failed to get host by name %s for connecting to a remote "
-				  "socket server %s:%d (error %s)",
+				  "socket server %s:%d",
 				  address,
 				  address,
-				  port,
-				  hstrerror(h_errno));
+				  port);
 		return UTIL_NETWORK_FAIL_GETHOST;
+	}
+
+	if ( rm_enable_connpool )
+	{
+		/* Try to get an alive connection from connection pool. */
+		fd = fetchAliveSocketConnection(address, resolvedaddr, port);
+	}
+
+	if ( fd != -1 )
+	{
+		*clientfd = fd;
+		return FUNC_RETURN_OK;
 	}
 
 	fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -465,30 +389,28 @@ int connectToServerRemote(const char *address, uint16_t port, int *clientfd)
 
 	bzero((char *)&server_addr, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
-	bcopy((char *)server->h_addr,
-		  (char *)&server_addr.sin_addr.s_addr,
-		  server->h_length);
+	memcpy((char *)&server_addr.sin_addr.s_addr,
+		   resolvedaddr->Address,
+		   resolvedaddr->Length);
 	server_addr.sin_port = htons(port);
 
 	while(true)
 	{
-		sockres = connect(fd,
-						  (struct sockaddr *)&server_addr,
-						  sizeof(server_addr));
+		sockres = connect(fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 		if( sockres < 0)
 		{
-			write_log("Failed to connect to remove socket server (errno %d), fd %d",
+			write_log("Failed to connect to remove socket server "
+					  "(errno %d), fd %d",
 					  errno,
 					  fd);
-
 			if (errno == EINTR)
 			{
 				continue;
 			}
 			else
 			{
-				write_log("Close fd %d at once due to not recoverable error "
-						  "detected.",
+				write_log("Close fd %d at once due to not recoverable connection"
+						  "error detected.",
 						  fd);
 				closeConnectionRemote(&fd);
 				return UTIL_NETWORK_FAIL_CONNECT;
@@ -516,30 +438,6 @@ void closeConnectionRemote(int *clientfd)
 	{
 		write_log("Failed to close fd %d (errno %d)", *clientfd, errno);
 	}
-	*clientfd = -1;
-}
-
-void closeConnectionDomain(int *clientfd, char *filename)
-{
-	Assert(clientfd);
-	if (*clientfd == -1)
-	{
-		return;
-	}
-	else
-	{
-		int ret = close(*clientfd);
-		if (ret < 0)
-		{
-			write_log("Failed to close fd %d (errno %d)", *clientfd, errno);
-		}
-	}
-
-	if ( filename != NULL && filename[0] != '\0' )
-	{
-		unlink(filename);
-	}
-
 	*clientfd = -1;
 }
 
@@ -599,4 +497,221 @@ retry:
 	write_log("writePipe got write() error , fd %d, (errno %d)", fd, errno);
 
 	return -1;
+}
+
+/*
+ * This function check buffered resolved host address by hostname string. If the
+ * hostname is new to current process, gethostbyname() is called. If the hostname
+ * is not resolved successfully, NULL is returned.
+ */
+AddressString getAddressStringByHostName(const char *hostname)
+{
+	AddressString res = NULL;
+
+	/* Check HASHTABLE to see if this hostname has been successfully resolved. */
+	SimpString key;
+	setSimpleStringRef(&key, (char *)hostname, strlen(hostname));
+
+	PAIR pair = getHASHTABLENode(&ResolvedHostnames, (void *)&key);
+	if ( pair != NULL )
+	{
+		/* Return buffered host address content. */
+		res = pair->Value;
+		return res;
+	}
+
+	/* Resolve hostname and build up the object buffered in HASHTABLE. */
+	struct hostent *server = gethostbyname(hostname);
+	if ( server == NULL )
+	{
+		write_log("Failed to resolve hostname %s. (herrno %d)", hostname, h_errno);
+		return NULL;
+	}
+
+	res = rm_palloc0(PCONTEXT,
+					 offsetof(AddressStringData, Address) + server->h_length + 1);
+	memcpy(res->Address, server->h_addr, server->h_length);
+	res->Length = server->h_length;
+	setHASHTABLENode(&ResolvedHostnames, (void *)&key, (void *)res, false);
+	return res;
+}
+
+ConnAddressString createConnAddressString(AddressString address, uint16_t port)
+{
+	ConnAddressString res = rm_palloc0(PCONTEXT,
+									   EXPSIZEOFCONNADDRSTRING(address));
+	res->Port = port;
+	res->Reserved = 0;
+	res->Address.Length = address->Length;
+	memcpy(res->Address.Address, address->Address, address->Length);
+	return res;
+}
+
+void freeConnAddressString(ConnAddressString connaddr)
+{
+	rm_pfree(PCONTEXT, connaddr);
+}
+
+int fetchAliveSocketConnection(const char 	 *hostname,
+							   AddressString  address,
+							   uint16_t 	  port)
+{
+	ConnAddressString connaddr = createConnAddressString(address, port);
+	SimpArray key;
+	setSimpleArrayRef(&key, (char *)connaddr, SIZEOFCONNADDRSTRING(connaddr));
+	PAIR pair = getHASHTABLENode(&ActiveConnections, (void *)&key);
+	if ( pair == NULL )
+	{
+		freeConnAddressString(connaddr);
+		return -1;
+	}
+
+	List *list = (List *)pair->Value;
+	Assert(list != NULL);
+
+	int res = lfirst_int(list_head(list));
+	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT);
+	list = list_delete_first(list);
+	MEMORY_CONTEXT_SWITCH_BACK
+
+	if ( list == NULL )
+	{
+		/*
+		 * If the last buffered connection for this address and port, remove
+		 * the hash table node.
+		 */
+		removeHASHTABLENode(&ActiveConnections, (void *)&key);
+	}
+
+	freeConnAddressString(connaddr);
+	elog(DEBUG3, "Fetched FD %d for %s:%d.", res, hostname, port);
+	return res;
+}
+
+void returnAliveConnectionRemoteByHostname(int 		  *clientfd,
+										   const char *hostname,
+										   uint16_t port)
+{
+	/* Resolve hostname by checking hash table. */
+	AddressString addrstr = getAddressStringByHostName(hostname);
+	if ( addrstr == NULL )
+	{
+		closeConnectionRemote(clientfd);
+	}
+	else
+	{
+		returnAliveConnectionRemote(clientfd, hostname, addrstr, port);
+	}
+
+}
+
+void returnAliveConnectionRemote(int 			*clientfd,
+								 const char 	*hostname,
+								 AddressString   addrstr,
+								 uint16_t 		 port)
+{
+
+	/* In case no need to buffer connection, we close the connection directly. */
+	if ( !rm_enable_connpool )
+	{
+		closeConnectionRemote(clientfd);
+		return;
+	}
+
+	/* Try to get node. */
+	ConnAddressString connaddr = createConnAddressString(addrstr, port);
+	SimpArray key;
+	setSimpleArrayRef(&key, (char *)connaddr, SIZEOFCONNADDRSTRING(connaddr));
+	PAIR pair = getHASHTABLENode(&ActiveConnections, (void *)&key);
+
+	List *list = NULL;
+	if ( pair == NULL )
+	{
+		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+		list = list_make1_int(*clientfd);
+		MEMORY_CONTEXT_SWITCH_BACK
+		setHASHTABLENode(&ActiveConnections, (void *)&key, (void *)list, false);
+		elog(DEBUG3, "Buffered FD %d for %s:%d.", *clientfd, hostname, port);
+	}
+	else
+	{
+		list = (List *)(pair->Value);
+		if ( list_length(list) >= rm_connpool_sameaddr_buffersize )
+		{
+			elog(DEBUG3, "Drop FD %d because too many FDs buffered already for "
+						 "the same address and port.",
+						 *clientfd);
+			closeConnectionRemote(clientfd);
+		}
+		else
+		{
+			MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+			list = lappend_int(list, *clientfd);
+			MEMORY_CONTEXT_SWITCH_BACK
+			elog(DEBUG3, "Buffered FD %d for %s:%d.", *clientfd, hostname, port);
+		}
+		pair->Value = (void *)list;
+	}
+
+	*clientfd = -1;
+	freeConnAddressString(connaddr);
+}
+
+void initializeSocketConnectionPool(void)
+{
+	/* Initialize the hash table for buffering resolved hosts. */
+    initializeHASHTABLE(&ResolvedHostnames,
+    					PCONTEXT,
+						HASHTABLE_SLOT_VOLUME_DEFAULT,
+						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
+						HASHTABLE_KEYTYPE_SIMPSTR,
+						NULL);
+
+    /* Initialize the hash table for buffering alive socket connections. */
+    initializeHASHTABLE(&ActiveConnections,
+        				PCONTEXT,
+    					HASHTABLE_SLOT_VOLUME_DEFAULT,
+    					HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
+						HASHTABLE_KEYTYPE_CHARARRAY,
+    					NULL);
+
+    on_proc_exit(cleanupSocketConnectionPool, 0);
+}
+
+static void cleanupSocketConnectionPool(int code, Datum arg)
+{
+	/* Free alive connections. */
+	List 	 *connlist 	= NULL;
+	ListCell *cell 		= NULL;
+	getAllPAIRRefIntoList(&ActiveConnections, &connlist);
+	foreach(cell, connlist)
+	{
+		PAIR pair = (PAIR)lfirst(cell);
+		List *aliveconns = (List *)(pair->Value);
+
+		while( aliveconns != NULL )
+		{
+			int fd = lfirst_int(list_head(aliveconns));
+			MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+			aliveconns = list_delete_first(aliveconns);
+			MEMORY_CONTEXT_SWITCH_BACK
+			closeConnectionRemote(&fd);
+		}
+		pair->Value = NULL;
+	}
+
+	freePAIRRefList(&ActiveConnections, &connlist);
+	cleanHASHTABLE(&ActiveConnections);
+
+	/* Free buffered resolved hosts. */
+	List 	 *addrlist	= NULL;
+	getAllPAIRRefIntoList(&ResolvedHostnames, &addrlist);
+	foreach(cell, addrlist)
+	{
+		AddressString addrstr = (AddressString)(((PAIR)lfirst(cell))->Value);
+		rm_pfree(PCONTEXT, addrstr);
+	}
+
+	freePAIRRefList(&ResolvedHostnames, &addrlist);
+	cleanHASHTABLE(&ResolvedHostnames);
 }

@@ -22,6 +22,8 @@
 #include "communication/rmcomm_MessageHandler.h"
 #include "communication/rmcomm_QD_RM_Protocol.h"
 
+void cutReferenceOfConnTrackAndCommBuffer(AsyncCommMessageHandlerContext context);
+
 /* Initialize connection track manager. */
 void initializeConnectionTrackManager(void)
 {
@@ -94,15 +96,12 @@ void createEmptyConnectionTrack(ConnectionTrack *track)
 	/* Create new entry in connection track. */
 	(*track) = rm_palloc0(PCONTEXT, sizeof(ConnectionTrackData));
 
-	(*track)->ConnectTime	 			= 0;
+	(*track)->RequestTime	 			= 0;
 	(*track)->RegisterTime   			= 0;
 	(*track)->ResRequestTime 			= 0;
 	(*track)->ResAllocTime	 			= 0;
 	(*track)->LastActTime	 			= 0;
 	(*track)->HeadQueueTime				= 0;
-
-	(*track)->ClientAddrLen  			= 0;
-	(*track)->ClientSocket   			= 0;
 
 	(*track)->MessageSize	 	 		= 0;
 	(*track)->MessageMark1   	 		= 0;
@@ -269,6 +268,7 @@ int retrieveConnectionTrack(ConnectionTrack track, int32_t connid)
 	track->RegisterTime 			= oldct->RegisterTime;
 	track->ResAllocTime 			= oldct->ResAllocTime;
 	track->ResRequestTime 			= oldct->ResRequestTime;
+	track->LastActTime				= oldct->LastActTime;
 
 	/* Move old resource list to new connection tracker. */
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
@@ -380,14 +380,17 @@ void transformConnectionTrackProgress(ConnectionTrack track,
 	track->Progress = progress;
 }
 
-void addNewMessageToConnTrack(AsyncCommMessageHandlerContext context,
-							  uint16_t						 messageid,
-							  uint8_t						 mark1,
-							  uint8_t						 mark2,
-							  char 							*buffer,
-							  uint32_t						 buffersize)
+void addMessageToConnTrack(AsyncCommMessageHandlerContext	context,
+						   uint16_t							messageid,
+						   uint8_t							mark1,
+						   uint8_t							mark2,
+						   char 						   *buffer,
+						   uint32_t							buffersize)
 {
-	ConnectionTrack conntrack = (ConnectionTrack)(context->UserData);
+	/* Create a new connection track instance to save received message. */
+	ConnectionTrack conntrack = NULL;
+	createEmptyConnectionTrack(&conntrack);
+
 	conntrack->MessageID    = messageid;
 	conntrack->MessageMark1 = mark1;
 	conntrack->MessageMark2 = mark2;
@@ -395,8 +398,18 @@ void addNewMessageToConnTrack(AsyncCommMessageHandlerContext context,
 	resetSelfMaintainBuffer(&(conntrack->MessageBuff));
 	appendSelfMaintainBuffer(&(conntrack->MessageBuff), buffer, buffersize);
 
+	/* Let connection track instance able to find the socket connection. */
+	conntrack->CommBuffer = context->AsyncBuffer;
+	/* Let comm buffer instance able to find connection track. */
+	context->UserData = conntrack;
+
+	/* Start from a established connection. */
+	transformConnectionTrackProgress(conntrack, CONN_PP_ESTABLISHED);
+
+	conntrack->RequestTime = gettime_microsec();
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-	PCONTRACK->ConnHavingRequests = lappend(PCONTRACK->ConnHavingRequests, conntrack);
+	PCONTRACK->ConnHavingRequests = lappend(PCONTRACK->ConnHavingRequests,
+											conntrack);
 	MEMORY_CONTEXT_SWITCH_BACK
 }
 
@@ -404,26 +417,36 @@ void sentMessageFromConnTrack(AsyncCommMessageHandlerContext context)
 {
 	ConnectionTrack conntrack = (ConnectionTrack)(context->UserData);
 	conntrack->ResponseSent = true;
+
+	/* Clean up the connection between connection track and comm buffer. */
+	cutReferenceOfConnTrackAndCommBuffer(context);
 }
 void hasCommErrorInConnTrack(AsyncCommMessageHandlerContext context)
 {
 	/* This is a call back function, nothing to do. */
+	cutReferenceOfConnTrackAndCommBuffer(context);
 }
+
 void cleanupConnTrack(AsyncCommMessageHandlerContext context)
+{
+	cutReferenceOfConnTrackAndCommBuffer(context);
+}
+
+void cutReferenceOfConnTrackAndCommBuffer(AsyncCommMessageHandlerContext context)
 {
 	ConnectionTrack conntrack = (ConnectionTrack)(context->UserData);
 	bool returnconn = false;
 
 	if ( conntrack != NULL && conntrack->ConnID == -1 )
 	{
-		elog(DEBUG5, "Resource manager returns connection track with no conn id set.");
+		elog(DEBUG3, "Resource manager returns connection track with no conn id set.");
 		returnconn = true;
 	}
 	else if ( conntrack != NULL &&
-		      (conntrack->Progress == CONN_PP_ESTABLISHED ||
+		      (conntrack->Progress == CONN_PP_ESTABLISHED||
 		       conntrack->Progress > CONN_PP_FAILS) )
 	{
-		elog(DEBUG5, "Resource manager returns connection track due to removable "
+		elog(DEBUG3, "Resource manager returns connection track due to removable "
 					 "status. %d",
 					 conntrack->Progress);
 		returnconn = true;
@@ -432,6 +455,7 @@ void cleanupConnTrack(AsyncCommMessageHandlerContext context)
 	{
 		/* Cut the reference between connection track and rmcomm buffer. */
 		conntrack->CommBuffer = NULL;
+		context->UserData = NULL;
 	}
 
 	if ( returnconn )
@@ -586,11 +610,17 @@ void dumpConnectionTracks(const char *filename)
 		{
 			ConnectionTrack conn = (ConnectionTrack)(((PAIR)lfirst(cell))->Value);
 
-			fprintf(fp, "SOCK(client=%s:%d:time=%s),",
-						conn->ClientAddrDotStr,
-						conn->ClientAddrPort,
-						format_time_microsec(conn->ConnectTime));
-
+			if ( conn->CommBuffer != NULL )
+			{
+				fprintf(fp, "SOCK(client=%s:%d:time=%s),",
+							conn->CommBuffer->ClientAddrDotStr,
+							conn->CommBuffer->ClientAddrPort,
+							format_time_microsec(conn->RequestTime));
+			}
+			else
+			{
+				fprintf(fp, "SOCK(client=DISCONNECTED:time=NOTIME),");
+			}
 			fprintf(fp, "CONN(id=%d:user=%s:",
 						conn->ConnID,
 						conn->UserID);
@@ -678,8 +708,12 @@ void dumpConnectionTracks(const char *filename)
 						conn->MessageSize,
 						conn->MessageBuff.Cursor+1,
 						format_time_microsec(conn->MessageReceiveTime),
-						conn->ClientAddrDotStr,
-						conn->ClientAddrPort);
+						conn->CommBuffer == NULL ?
+							"UNKNOWNHOST" :
+							conn->CommBuffer->ClientAddrDotStr,
+						conn->CommBuffer == NULL ?
+							0:
+							conn->CommBuffer->ClientAddrPort);
 
 			fprintf(fp, "COMMSTAT(");
 			if ( conn->CommBuffer == NULL )
@@ -724,22 +758,12 @@ void buildResponseIntoConnTrack(ConnectionTrack      conntrack,
 void copyAllocWaitingConnectionTrack(ConnectionTrack source,
 									 ConnectionTrack target)
 {
-	target->ConnectTime					= source->ConnectTime;
+	target->RequestTime					= source->RequestTime;
 	target->RegisterTime   				= source->RegisterTime;
 	target->ResRequestTime 				= source->ResRequestTime;
 	target->ResAllocTime	 			= 0;
 	target->LastActTime	 				= source->LastActTime;
 	target->HeadQueueTime				= source->HeadQueueTime;
-
-	memcpy(&(target->ClientAddr),
-		   &(source->ClientAddr),
-		   sizeof(struct sockaddr_in));
-	target->ClientAddrLen  				= source->ClientAddrLen;
-	target->ClientSocket   				= source->ClientSocket;
-	memcpy(target->ClientAddrDotStr,
-		   source->ClientAddrDotStr,
-		   sizeof(target->ClientAddrDotStr));
-	target->ClientAddrPort				= source->ClientAddrPort;
 
 	target->MessageSize	 	 			= source->MessageSize;
 	target->MessageMark1   	 			= source->MessageMark1;

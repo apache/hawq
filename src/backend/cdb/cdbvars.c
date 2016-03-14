@@ -302,6 +302,8 @@ char  *seg_directory;
 int    rm_master_port;
 int	   rm_segment_port;
 int	   rm_master_domain_port;
+bool   rm_enable_connpool;
+int	   rm_connpool_sameaddr_buffersize;
 
 int    rm_nvseg_perquery_limit;
 int	   rm_nvseg_perquery_perseg_limit;
