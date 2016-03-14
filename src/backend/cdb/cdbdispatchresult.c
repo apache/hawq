@@ -183,15 +183,18 @@ void
 cdbdisp_resetResult(CdbDispatchResult  *dispatchResult)
 {
     PQExpBuffer buf = dispatchResult->resultbuf;
-    PGresult  **begp = (PGresult **)buf->data;
-    PGresult  **endp = (PGresult **)(buf->data + buf->len);
-    PGresult  **p;
-
-    /* Free the PGresult objects. */
-    for (p = begp; p < endp; ++p)
+    if (buf != NULL)
     {
-        Assert(*p != NULL);
-        PQclear(*p);
+        PGresult  **begp = (PGresult **)buf->data;
+        PGresult  **endp = (PGresult **)(buf->data + buf->len);
+        PGresult  **p;
+
+        /* Free the PGresult objects. */
+        for (p = begp; p < endp; ++p)
+        {
+            Assert(*p != NULL);
+            PQclear(*p);
+        }
     }
 
     /* Reset summary indicators. */

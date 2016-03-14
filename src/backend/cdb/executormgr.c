@@ -220,7 +220,9 @@ executormgr_bind_executor_task(struct DispatchData *data,
 	executor->refResult = cdbdisp_makeResult(dispatch_get_results(data),
 											executor->desc,
 											dispatch_get_task_identity(task)->slice_id);
-	Assert(executor->refResult != NULL);
+
+	if (executor->refResult == NULL)
+	  return false;
 
 	/* Transfer any connection errors from segdbDesc. */
 	executormgr_merge_error(executor);
