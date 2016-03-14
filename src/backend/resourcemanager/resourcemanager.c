@@ -305,6 +305,9 @@ int ResManagerMain(int argc, char *argv[])
 	DRMGlobalInstance->ThisPID	 = getpid();
 	DRMGlobalInstance->ParentPID = getppid();
 
+	/* Initialize socket connection pool. */
+	initializeSocketConnectionPool();
+
 	elog(DEBUG5, "HAWQ RM :: starts as role %d.", DRMGlobalInstance->Role);
 
 	/*******************************************/
@@ -1008,10 +1011,6 @@ static void InitTemporaryDirs(DQueue tmpdirs_list, char *tmpdirs_string)
  */
 int  loadDynamicResourceManagerConfigure(void)
 {
-#ifdef ENABLE_DOMAINSERVER
-	elog(DEBUG3, "Resource manager loads Unix Domain Socket Port %d",
-				 rm_master_addr_domain_port);
-#endif
 	elog(DEBUG3, "Resource manager loads Socket Listening Port %d",
 				 rm_master_port);
 	elog(DEBUG3, "Resource manager loads Segment Socket Listening Port %d",
@@ -2468,43 +2467,12 @@ int	 initializeSocketServer(void)
 		RMListenSocket[i] = PGINVALID_SOCKET;
 	}
 
-#ifdef ENABLE_DOMAINSERVER
-	/* Listen local unix domain socket port. */
-	netres = StreamServerPort(AF_UNIX,
-							  NULL,
-							  rm_master_addr_domain_port,
-							  UnixSocketDir,
-							  RMListenSocket,
-							  1);	 /* Only one unix domain socket server. */
-
-	if ( netres != STATUS_OK ||
-		 /*
-		  * This condition is for double-checking the server is successfully
-		  * created.
-		  */
-		 (netres == STATUS_OK && RMListenSocket[0] == PGINVALID_SOCKET)	)
-	{
-		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
-		elog(LOG, "Resource manager cannot create UNIX domain socket server. Port=%d",
-				  rm_master_addr_domain_port);
-		return res;
-	}
-
-	/* Listen normal socket addresses. */
-	netres = StreamServerPort(AF_UNSPEC,
-							  allip,
-							  rm_master_port,
-							  NULL,
-							  &(RMListenSocket[1]),
-							  HAWQRM_SERVER_PORT_COUNT-1);
-#else
 	netres = StreamServerPort(AF_UNSPEC,
 			  	  	  	  	  allip,
 							  rm_master_port,
 							  NULL,
 							  RMListenSocket,
 							  HAWQRM_SERVER_PORT_COUNT);
-#endif
 	if ( netres != STATUS_OK )
 	{
 		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
@@ -2522,7 +2490,6 @@ int	 initializeSocketServer(void)
 		if (RMListenSocket[i] != PGINVALID_SOCKET)
 		{
 			netres = registerFileDesc(RMListenSocket[i],
-									  NULL,
 									  ASYNCCOMM_READ,
 									  &AsyncCommBufferHandlersMsgServer,
 									  NULL,
@@ -2550,21 +2517,11 @@ int	 initializeSocketServer(void)
 		return res;
 	}
 
-#ifdef ENABLE_DOMAINSERVER
-	elog(LOG, "Resource manager starts accepting resource request. "
-			  "Listening unix domain socket port %d. "
-			  "Listening normal socket port %d. "
-			  "Total listened %d FDs.",
-			  rm_master_addr_domain_port,
-			  rm_master_port,
-			  validfdcount);
-#else
 	elog(LOG, "Resource manager starts accepting resource request. "
 			  "Listening normal socket port %d. "
 			  "Total listened %d FDs.",
 			  rm_master_port,
 			  validfdcount);
-#endif
 	return res;
 }
 
@@ -2592,16 +2549,6 @@ void sendResponseToClients(void)
 									 conntrack->MessageID,
 									 conntrack->MessageMark1,
 									 conntrack->MessageMark2);
-			/* If socket connection has error, close connection but keep the
-			 * connection track. */
-			if ( conntrack->Progress >= CONN_PP_FAILS ) {
-
-				/* Tell AsyncComm framework, gracefully close the connection. */
-				conntrack->CommBuffer->forcedClose = false;
-				conntrack->CommBuffer->toClose     = true;
-
-				elog(DEBUG5, "Resource manager returns connection track.");
-			}
 		}
 	}
 }

@@ -36,7 +36,7 @@ AsyncCommBufferHandlersData AsyncCommBufferHandlersMsgServer = {
 	CleanUpHandler_MsgServer
 };
 
-AsyncCommMessageHandlerContext createConnTrackHandlerContext(ConnectionTrack newtrack);
+AsyncCommMessageHandlerContext createConnTrackHandlerContext(void);
 
 void ReadReadyHandler_MsgServer(AsyncCommBuffer buffer)
 {
@@ -44,94 +44,54 @@ void ReadReadyHandler_MsgServer(AsyncCommBuffer buffer)
 	ConnectionTrack 	newtrack 		= NULL;
 	ConnectionTrackData tmptrackdata;
 	AsyncCommBuffer     newcommbuffer   = NULL;
+	struct sockaddr_in	clientaddr;
+	socklen_t			clientaddrlen	= sizeof(clientaddr);
+	int					fd				= -1;
 
-	/* For each new client connection, we use one new connection tracker. */
-	res = useConnectionTrack(&newtrack);
-	if ( res == FUNC_RETURN_OK && canRegisterFileDesc() )
+	/* Always accept the connection. */
+	fd = accept(buffer->FD, (struct sockaddr *)&clientaddr, &clientaddrlen);
+	if ( fd == -1 )
 	{
-		/* The connection track progress must be at initial state. */
-		Assert(newtrack->Progress == CONN_PP_INFO_NOTSET);
-		/* Accept connection. */
-		newtrack->ClientAddrLen = sizeof(newtrack->ClientAddr);
-		newtrack->ClientSocket  = accept(buffer->FD,
-										 (struct sockaddr *)&(newtrack->ClientAddr),
-										 &(newtrack->ClientAddrLen));
-		if ( newtrack->ClientSocket == -1 )
-		{
-			elog(WARNING, "Resource manager socket accept error is detected. "
-						  "This connection is to be closed. errno %d",
-						  errno);
-			/* Return connection track. */
-			returnConnectionTrack(newtrack);
-		}
-		else
-		{
-			/* Set client connection address and port. */
-			strncpy(newtrack->ClientAddrDotStr,
-					SOCKADDR(&(newtrack->ClientAddr)),
-					sizeof(newtrack->ClientAddrDotStr)-1);
-			newtrack->ClientAddrPort = SOCKPORT(&(newtrack->ClientAddr));
-			newtrack->ConnectTime    = gettime_microsec();
-			newtrack->LastActTime    = newtrack->ConnectTime;
-
-			/* Create AsyncComm Message handler instance. */
-			AsyncCommMessageHandlerContext context =
-										createConnTrackHandlerContext(newtrack);
-
-			/* Add new client fd into AsyncComm manager. */
-			res = registerFileDesc(newtrack->ClientSocket,
-								   NULL,
-								   ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
-								   &AsyncCommBufferHandlersMessage,
-								   context,
-								   &newcommbuffer);
-			if ( res != FUNC_RETURN_OK )
-			{
-				elog(WARNING, "Resource manager can not track client FD %d. %d",
-							  newtrack->ClientSocket,
-							  res);
-				closeConnectionRemote(&newtrack->ClientSocket);
-				rm_pfree(AsyncCommContext, context);
-				returnConnectionTrack(newtrack);
-				return;
-			}
-
-			/* Make the connection tracker able to reference AsyncComm buffer */
-			newtrack->CommBuffer = newcommbuffer;
-			context->AsyncBuffer = newcommbuffer;
-
-			transformConnectionTrackProgress(newtrack, CONN_PP_ESTABLISHED);
-
-			elog(DEBUG3, "Resource manager accepted one client connected from "
-						 "%s:%d FD %d. connection track %lx\n",
-						 newtrack->ClientAddrDotStr,
-						 newtrack->ClientAddrPort,
-						 newtrack->ClientSocket,
-						 (unsigned long)newtrack);
-
-			/* Call callback function to initialize context for message handlers. */
-			InitHandler_Message(newcommbuffer);
-		}
+		elog(WARNING, "Resource manager socket accept error is detected. errno %d",
+					  errno);
+		return;
 	}
-	else
+
+	/* Create AsyncComm Message handler instance. */
+	AsyncCommMessageHandlerContext context = createConnTrackHandlerContext();
+
+	/* Add new client fd into AsyncComm manager. */
+	res = registerFileDesc(fd,
+						   ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
+						   &AsyncCommBufferHandlersMessage,
+						   context,
+						   &newcommbuffer);
+	if ( res != FUNC_RETURN_OK )
 	{
-		/* Accept but close the connection. */
-		tmptrackdata.ClientAddrLen = sizeof(tmptrackdata.ClientAddr);
-		tmptrackdata.ClientSocket  = accept(buffer->FD,
-											(struct sockaddr *)&(tmptrackdata.ClientAddr),
-											&(tmptrackdata.ClientAddrLen));
-		if ( tmptrackdata.ClientSocket != -1 )
-		{
-			elog(WARNING, "Resource manager cannot add more connections. Accept "
-						  "but close the connection. FD %d.",
-						  tmptrackdata.ClientSocket);
-			closeConnectionRemote(&tmptrackdata.ClientSocket);
-		}
-		if ( newtrack != NULL )
-		{
-			returnConnectionTrack(newtrack);
-		}
+		Assert(newcommbuffer == NULL);
+		/* close the connection and cleanup. */
+		closeConnectionRemote(&fd);
+		rm_pfree(AsyncCommContext, context);
+		return;
 	}
+
+	assignFileDescClientAddressInfo(newcommbuffer,
+									NULL,
+									0,
+									&clientaddr,
+									clientaddrlen);
+
+	/* Let context able to track comm buffer. */
+	context->AsyncBuffer = newcommbuffer;
+
+	/* Call callback function to initialize context for message handlers. */
+	InitHandler_Message(newcommbuffer);
+
+	elog(DEBUG3, "Resource manager accepted one client connected from "
+				 "%s:%d as FD %d.\n",
+				 newcommbuffer->ClientAddrDotStr,
+				 newcommbuffer->ClientAddrPort,
+				 newcommbuffer->FD);
 }
 
 void ErrorHandler_MsgServer(AsyncCommBuffer buffer)
@@ -147,16 +107,16 @@ void CleanUpHandler_MsgServer(AsyncCommBuffer buffer)
 }
 
 /* Register message handlers for clien FDs. */
-AsyncCommMessageHandlerContext createConnTrackHandlerContext(ConnectionTrack newtrack)
+AsyncCommMessageHandlerContext createConnTrackHandlerContext(void)
 {
 	AsyncCommMessageHandlerContext result =
 			rm_palloc0(AsyncCommContext,
 					   sizeof(AsyncCommMessageHandlerContextData));
 
 	result->inMessage				= false;
-	result->UserData  				= newtrack;
+	result->UserData  				= NULL;
 	result->MessageRecvReadyHandler = NULL;
-	result->MessageRecvedHandler 	= addNewMessageToConnTrack;
+	result->MessageRecvedHandler 	= addMessageToConnTrack;
 	result->MessageSendReadyHandler = NULL;
 	result->MessageSentHandler		= sentMessageFromConnTrack;
 	result->MessageErrorHandler 	= hasCommErrorInConnTrack;

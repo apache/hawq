@@ -21,6 +21,7 @@
 #define RESOURCE_MAMANGER_INTER_PROCESS_COMMUNICATION_ASYNCCOMM_H
 
 #include "resourcemanager/envswitch.h"
+#include "resourcemanager/utils/simplestring.h"
 
 extern MCTYPE AsyncCommContext;
 
@@ -50,19 +51,27 @@ typedef struct AsyncCommBufferHandlersData *AsyncCommBufferHandlers;
 
 struct AsyncCommBufferData {
 	int						 FD;
-	char					*DomainFileName;
+
+	/* Socket connection information */
+	SimpString				 ClientHostname;
+	struct sockaddr_in 		 ClientAddr;
+	socklen_t				 ClientAddrLen;
+	char					 ClientAddrDotStr[16];
+	uint16_t				 ClientAddrPort;
+	uint16_t				 ServerPort;
+
 	SelfMaintainBufferData 	 ReadBuffer;
 	List 		 			*WriteBuffer;
+
 	/* Complete content size track. */
 	int						 WriteContentSize;
 	int						 WriteContentOriginalSize;
 
 	uint32_t				 ActionMask;
 
-	/* If should actively close. */
-	bool				  	 toClose;
-	/* If should close without handling left data. */
-	bool					 forcedClose;
+	bool				  	 toClose;		/* If should actively close. */
+	bool					 forcedClose;	/* If should close without handling
+											   left to write data. */
 	void				   	*UserData;
 	AsyncCommBufferHandlers	 Methods;
 
@@ -75,26 +84,28 @@ void initializeAsyncComm(void);
 
 /* Register one file descriptor for a connected socket connection. */
 int registerFileDesc(int 					  fd,
-					 char					 *dmfilename,
 					 uint32_t				  actionmask,
 					 AsyncCommBufferHandlers  methods,
 					 void 					 *userdata,
 					 AsyncCommBuffer         *newcommbuffer);
 
+void assignFileDescClientAddressInfo(AsyncCommBuffer	 commbuffer,
+									 const char			*clienthostname,
+									 uint16_t			 serverport,
+									 struct sockaddr_in	*clientaddr,
+									 socklen_t			 clientaddrlen);
+
 /* Register one comm buffer for asynchronous connection and communication. */
-int registerAsyncConnectionFileDesc(const char				*sockpath,
-									const char				*address,
+int registerAsyncConnectionFileDesc(const char				*address,
 									uint16_t				 port,
 									uint32_t				 actionmask,
 									AsyncCommBufferHandlers  methods,
 									void					*userdata,
 									AsyncCommBuffer			*newcommbuffer);
 
-/* If new fd can be registered. */
-bool canRegisterFileDesc(void);
 /* Process all registered file descriptors. */
 int processAllCommFileDescs(void);
-
+void unresigsterFileDesc(int fd);
 void closeAndRemoveAllRegisteredFileDesc(void);
 
 void addMessageContentToCommBuffer(AsyncCommBuffer 		buffer,
@@ -103,4 +114,7 @@ void addMessageContentToCommBuffer(AsyncCommBuffer 		buffer,
 SelfMaintainBuffer getFirstWriteBuffer(AsyncCommBuffer commbuffer);
 
 void shiftOutFirstWriteBuffer(AsyncCommBuffer commbuffer);
+
+void closeFileDesc(AsyncCommBuffer commbuff);
+void forceCloseFileDesc(AsyncCommBuffer commbuff);
 #endif /*RESOURCE_MAMANGER_INTER_PROCESS_COMMUNICATION_ASYNCCOMM_H*/

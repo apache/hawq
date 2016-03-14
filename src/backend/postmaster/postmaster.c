@@ -5483,8 +5483,6 @@ BackendStartup(Port *port)
 		/* And run the backend */
 		int brres = BackendRun(port);
 
-		cleanupQD2RMComm();
-
 		proc_exit(brres);
 	}
 #endif   /* EXEC_BACKEND */

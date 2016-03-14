@@ -108,18 +108,43 @@ int recvWithRetry(int fd, char *buff, int size, bool checktrans);
 int setConnectionNonBlocked(int fd);
 
 #define DRM_SOCKET_CONN_RETRY 5
-int  connectToServerDomain(const char 	*sockpath,
-						   uint16_t 	 port,
-						   int 			*clientfd,
-						   int			 fileidx,
-						   char			*filename);
 int  connectToServerRemote(const char *address,uint16_t port,int *clientfd);
 void closeConnectionRemote(int *clientfd);
-void closeConnectionDomain(int *clientfd, char *filename);
-
+void returnAliveConnectionRemote(int 			*clientfd,
+								 const char 	*hostname,
+								 AddressString   addrstr,
+								 uint16_t 		 port);
+void returnAliveConnectionRemoteByHostname(int 		  *clientfd,
+										   const char *hostname,
+										   uint16_t    port);
 char *format_time_microsec(uint64_t microtime);
 
 int readPipe(int fd, void *buff, int buffsize);
 int writePipe(int fd, void *buff, int buffsize);
 
+struct ConnAddressStringData {
+	uint16_t				Port;
+	uint16_t				Reserved;
+	AddressStringData		Address;
+};
+typedef struct ConnAddressStringData	 ConnAddressStringData;
+typedef struct ConnAddressStringData	*ConnAddressString;
+
+#define SIZEOFCONNADDRSTRING(connaddr) offsetof(ConnAddressStringData,Address)+\
+									   offsetof(AddressStringData,Address)+\
+									   (connaddr)->Address.Length+1
+
+#define EXPSIZEOFCONNADDRSTRING(addrstr) offsetof(ConnAddressStringData,Address)+\
+		   	   	   	   	   	   	   	     offsetof(AddressStringData,Address)+\
+										 (addrstr)->Length+1
+
+ConnAddressString createConnAddressString(AddressString address, uint16_t port);
+void freeConnAddressString(ConnAddressString connaddr);
+
+void initializeSocketConnectionPool(void);
+AddressString getAddressStringByHostName(const char *hostname);
+
+int fetchAliveSocketConnection(const char 	 *hostname,
+							   AddressString  address,
+							   uint16_t 	  port);
 #endif /* RESOURCE_MANANGER_NETWORK_UTILITIES_H */
