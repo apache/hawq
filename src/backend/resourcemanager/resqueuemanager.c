@@ -5735,7 +5735,8 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
 		resetResourceBundleDataByBundle(&(quetrack->TotalAllocated),
 										&(shadowtrack->TotalAllocated));
 
-		resetResourceBundleData(&(shadowtrack->TotalRequest), 0, 0.0, 0);
+		resetResourceBundleDataByBundle(&(quetrack->TotalRequest),
+										&(shadowtrack->TotalRequest));
 
 		quetrack->expectMoreResource	= false;
 		quetrack->pauseAllocation 		= false;
