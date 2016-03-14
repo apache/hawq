@@ -1519,12 +1519,6 @@ void *generateResourceRefreshHeartBeat(void *arg)
 		pg_usleep(rm_session_lease_heartbeat_interval * 1000000L);
 	}
 
-	if ( fd >= 0 )
-	{
-		close(fd);
-		fd = -1;
-	}
-
 	freeHeartBeatThreadArg(&tharg);
 	write_log("generateResourceRefreshHeartBeat exits.");
 	return 0;
