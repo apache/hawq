@@ -1033,12 +1033,12 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		if (segresource->Stat->RMStartTimestamp != segstat->RMStartTimestamp &&
 				(segresource->Stat->StatusDesc & SEG_STATUS_HEARTBEAT_TIMEOUT) == 0 &&
 				(segresource->Stat->StatusDesc & SEG_STATUS_COMMUNICATION_ERROR) == 0 &&
-				(segresource->Stat->StatusDesc & SEG_STATUS_NO_RESPONSE) == 0)
+				(segresource->Stat->StatusDesc & SEG_STATUS_FAILED_PROBING_SEGMENT) == 0)
 		{
 			/*
 			 * This segment's RM process has restarted.
 			 * if StatusDesc doesn't have heartbeat timeout flag, or communication error,
-			 * or no response flag, this segment is set to DOWN.
+			 * or failed probing segment flag, this segment is set to DOWN.
 			 * It will be set to UP when reports a new heartbeat.
 			 */
 			segresource->Stat->StatusDesc |= SEG_STATUS_RM_RESET;
@@ -1062,30 +1062,30 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 			if ((segresource->Stat->StatusDesc & SEG_STATUS_HEARTBEAT_TIMEOUT) != 0)
 			{
 				segresource->Stat->StatusDesc &= ~SEG_STATUS_HEARTBEAT_TIMEOUT;
-				elog(DEBUG5, "Master RM gets heartbeat report from segment:%s, "
-							 "clear its heartbeat timeout flag",
-							 GET_SEGRESOURCE_HOSTNAME(segresource));
+				elog(RMLOG, "Master RM gets heartbeat report from segment:%s, "
+							"clear its heartbeat timeout flag",
+							GET_SEGRESOURCE_HOSTNAME(segresource));
 			}
-			if ((segresource->Stat->StatusDesc & SEG_STATUS_NO_RESPONSE) != 0)
+			if ((segresource->Stat->StatusDesc & SEG_STATUS_FAILED_PROBING_SEGMENT) != 0)
 			{
-				segresource->Stat->StatusDesc &= ~SEG_STATUS_NO_RESPONSE;
-				elog(DEBUG5, "Master RM gets heartbeat report from segment:%s, "
-							 "clear its no response flag",
-							 GET_SEGRESOURCE_HOSTNAME(segresource));
+				segresource->Stat->StatusDesc &= ~SEG_STATUS_FAILED_PROBING_SEGMENT;
+				elog(RMLOG, "Master RM gets heartbeat report from segment:%s, "
+							"clear its failed probing segment flag",
+							GET_SEGRESOURCE_HOSTNAME(segresource));
 			}
 			if ((segresource->Stat->StatusDesc & SEG_STATUS_COMMUNICATION_ERROR) != 0)
 			{
 				segresource->Stat->StatusDesc &= ~SEG_STATUS_COMMUNICATION_ERROR;
-				elog(DEBUG5, "Master RM gets heartbeat report from segment:%s, "
-							 "clear its communication error flag",
-							 GET_SEGRESOURCE_HOSTNAME(segresource));
+				elog(RMLOG, "Master RM gets heartbeat report from segment:%s, "
+							"clear its communication error flag",
+							GET_SEGRESOURCE_HOSTNAME(segresource));
 			}
 			if ((segresource->Stat->StatusDesc & SEG_STATUS_RM_RESET) != 0)
 			{
 				segresource->Stat->StatusDesc &= ~SEG_STATUS_RM_RESET;
-				elog(DEBUG5, "Master RM gets heartbeat report from segment:%s, "
-							 "clear its RM reset flag",
-							 GET_SEGRESOURCE_HOSTNAME(segresource));
+				elog(RMLOG, "Master RM gets heartbeat report from segment:%s, "
+							"clear its RM reset flag",
+							GET_SEGRESOURCE_HOSTNAME(segresource));
 			}
 		}
 
@@ -4871,7 +4871,7 @@ void dumpResourcePoolHosts(const char *filename)
 
 static const char* SegStatusDesc[] = {
 	"heartbeat timeout",
-	"no response",
+	"failed probing segment",
 	"communication error",
 	"failed temporary directory",
 	"resource manager process was reset",

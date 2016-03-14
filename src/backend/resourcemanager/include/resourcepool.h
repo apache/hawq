@@ -687,7 +687,7 @@ void add_segment_config_row(int32_t 	 id,
  * SegStatData's StatusDesc is a combination of below flags
  */
 #define	SEG_STATUS_HEARTBEAT_TIMEOUT			0x00000001
-#define	SEG_STATUS_NO_RESPONSE					0x00000002
+#define	SEG_STATUS_FAILED_PROBING_SEGMENT		0x00000002
 #define	SEG_STATUS_COMMUNICATION_ERROR			0x00000004
 #define	SEG_STATUS_FAILED_TMPDIR				0x00000008
 #define	SEG_STATUS_RM_RESET						0x00000010

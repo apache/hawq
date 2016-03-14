@@ -1017,7 +1017,7 @@ bool handleRMRequestSegmentIsDown(void **arg)
 					/* Make resource pool remove unused containers */
 					returnAllGRMResourceFromSegment(segres);
 					/* Set the host down in gp_segment_configuration table */
-					segres->Stat->StatusDesc |= SEG_STATUS_NO_RESPONSE;
+					segres->Stat->StatusDesc |= SEG_STATUS_FAILED_PROBING_SEGMENT;
 					if (Gp_role != GP_ROLE_UTILITY)
 					{
 						SimpStringPtr description = build_segment_status_description(segres->Stat);
