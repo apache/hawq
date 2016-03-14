@@ -33,6 +33,9 @@
 #include "access/filesplit.h"
 #include "access/parquetsegfiles.h"
 #include "catalog/catalog.h"
+#include "catalog/pg_inherits.h"
+#include "catalog/catquery.h"
+#include "catalog/pg_proc.h"
 #include "cdb/cdbdatalocality.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
@@ -55,11 +58,7 @@
 #include "catalog/pg_proc.h"
 #include "postgres.h"
 #include "resourcemanager/utils/hashtable.h"
-#include "catalog/pg_inherits.h"
-//#include "utils/misc/guc.c"
 
-#define PRONAME 1
-#define PROISAGG 5
 /* We need to build a mapping from host name to host index */
 
 extern bool		optimizer; /* Enable the optimizer */
@@ -373,7 +372,7 @@ static Block_Host_Index * update_data_dist_stat(
 static HostDataVolumeInfo *search_host_in_stat_context(
 		split_to_segment_mapping_context *context, char *hostname);
 
-static bool IsAggFunction(char* funcName);
+static bool IsBuildInFunction(Oid funcOid);
 
 static bool allocate_hash_relation(Relation_Data* rel_data,
 		Assignment_Log_Context *log_context, TargetSegmentIDMap* idMap,
@@ -631,39 +630,36 @@ static void collect_range_tables(Query *query, List* full_range_table,
 /*
  *
  */
-static bool IsAggFunction(char* funcName) {
-	if (funcName == NULL) {
+static bool IsBuildInFunction(Oid foid) {
+
+	cqContext  *pcqCtx;
+	HeapTuple readtup = NULL;
+	HeapTuple	procedureTuple;
+	Form_pg_proc procedureStruct;
+
+	/*
+	 * get the procedure tuple corresponding to the given function Oid
+	 */
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(foid)));
+
+	procedureTuple = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(procedureTuple))
+		elog(ERROR, "cache lookup failed for function %u", foid);
+	procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
+	caql_endscan(pcqCtx);
+	/* we treat proc namespace = 11 to build in function.*/
+	if (procedureStruct->pronamespace == 11) {
+		return true;
+	} else {
 		return false;
 	}
-	Relation pg_proc_rel;
-	TupleDesc pg_proc_dsc;
-	HeapTuple tuple;
-	SysScanDesc pg_proc_scan;
-
-	pg_proc_rel = heap_open(ProcedureRelationId, AccessShareLock);
-	pg_proc_dsc = RelationGetDescr(pg_proc_rel);
-	ScanKeyData skey;
-
-	ScanKeyInit(&skey, PRONAME, BTEqualStrategyNumber,
-	F_NAMEEQ, CStringGetDatum(funcName));
-
-	pg_proc_scan = systable_beginscan(pg_proc_rel, InvalidOid, FALSE,
-			ActiveSnapshot, 1, &skey);
-	while (HeapTupleIsValid(tuple = systable_getnext(pg_proc_scan))) {
-
-		bool isAgg = DatumGetBool(fastgetattr(tuple, PROISAGG, pg_proc_dsc, NULL));
-		systable_endscan(pg_proc_scan);
-		heap_close(pg_proc_rel, AccessShareLock);
-		if (isAgg) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-	systable_endscan(pg_proc_scan);
-	heap_close(pg_proc_rel, AccessShareLock);
-	return true;
 }
+
 /*
  *
  */
@@ -677,25 +673,6 @@ static void convert_range_tables_to_oids_and_check_table_functions(List **range_
 	foreach(old_lc, *range_tables)
 	{
 		RangeTblEntry *entry = (RangeTblEntry *) lfirst(old_lc);
-		if (entry->rtekind == RTE_FUNCTION || entry->rtekind == RTE_TABLEFUNCTION) {
-			*isTableFunctionExists = true;
-		}
-		if (entry->rtekind == RTE_SUBQUERY) {
-			Query* subQuery = entry->subquery;
-			ListCell *lc;
-			foreach(lc, subQuery->targetList)
-			{
-				TargetEntry *te = (TargetEntry *) lfirst(lc);
-				bool isAggFunc = IsAggFunction(te->resname);
-				// if target list of subquery contains non aggregate function,
-				// then we consider the query contains and use default_segment_num guc
-				// as the number of virtual segment
-				if (!isAggFunc) {
-					*isTableFunctionExists = true;
-				}
-			}
-
-		}
 		if (entry->rtekind != RTE_RELATION) {
 			continue;
 		}
@@ -3959,6 +3936,48 @@ static void cleanup_allocation_algorithm(
 }
 
 /*
+ * udf_collector_walker: the routine to file udfs.
+ */
+bool udf_collector_walker(Node *node,
+		udf_collector_context *context) {
+	if (node == NULL) {
+		return false;
+	}
+
+	if (IsA(node, Query)) {
+		return query_tree_walker((Query *) node, udf_collector_walker,
+				(void *) context,
+				QTW_EXAMINE_RTES);
+	}
+
+	/*For Aggref, we don't consider it as udf.*/
+
+	if(IsA(node,FuncExpr)){
+		if(!IsBuildInFunction(((FuncExpr *) node)->funcid)){
+			context->udf_exist = true;
+		}
+		return false;
+	}
+
+	return expression_tree_walker(node, udf_collector_walker,
+			(void *) context);
+
+	return false;
+}
+
+/*
+ * find_udf: collect all udf, and store them into the udf_collector_context.
+ */
+void find_udf(Query *query, udf_collector_context *context) {
+
+	query_tree_walker(query, udf_collector_walker, (void *) context,
+	QTW_EXAMINE_RTES);
+
+	return;
+}
+
+
+/*
  * calculate_planner_segment_num
  * fixedVsegNum is used by PBE, since all the execute should use the same number of vsegs.
  */
@@ -3973,14 +3992,14 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	List *alloc_result = NIL;
 	split_to_segment_mapping_context context;
 
-	int planner_segments = -1; /*virtual segments number for explain statement */
+	int planner_segments = 0; /*virtual segments number for explain statement */
 
 	result = (SplitAllocResult *) palloc(sizeof(SplitAllocResult));
 	result->resource = NULL;
 	result->resource_parameters = NULL;
 	result->alloc_results = NIL;
 	result->relsType = NIL;
-	result->planner_segments = -1;
+	result->planner_segments = 0;
 	result->datalocalityInfo = makeStringInfo();
 
 	/* fake data locality */
@@ -3997,7 +4016,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		result->resource_parameters = NULL;
 		result->alloc_results = NIL;
 		result->relsType = NIL;
-		result->planner_segments = -1;
+		result->planner_segments = 0;
 		return result;
 	}
 
@@ -4022,6 +4041,11 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		 * 5 data size of random "from" relation
 		 */
 
+		udf_collector_context udf_context;
+		udf_context.udf_exist = false;
+
+		find_udf(query, &udf_context);
+		isTableFunctionExists = udf_context.udf_exist;
 		/*convert range table list to oid list and check whether table function exists
 		 *we keep a full range table list and a range table list without result relation separately
 		 */

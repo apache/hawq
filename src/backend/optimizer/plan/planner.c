@@ -313,7 +313,7 @@ planner(Query *parse, int cursorOptions,
 	PlannedStmt *result = NULL;
 	instr_time	starttime, endtime;
 	ResourceNegotiatorResult *ppResult = (ResourceNegotiatorResult *) palloc(sizeof(ResourceNegotiatorResult));
-	SplitAllocResult initResult = {NULL, NULL, NIL, -1, NIL, NULL};
+	SplitAllocResult initResult = {NULL, NULL, NIL, 0, NIL, NULL};
 	ppResult->saResult = initResult;
 	ppResult->stmt = NULL;
 	static int plannerLevel = 0;
@@ -464,7 +464,7 @@ planner(Query *parse, int cursorOptions,
 	  }
 	  else
 	  {
-	    gp_segments_for_planner = -1;
+	    gp_segments_for_planner = 0;
 	  }
 	  SetActiveQueryResource(savedQueryResource);
 	  if ((ppResult != NULL))
@@ -484,7 +484,7 @@ planner(Query *parse, int cursorOptions,
 		}
 		else
 		{
-			gp_segments_for_planner = -1;
+			gp_segments_for_planner = 0;
 		}
 		SetActiveQueryResource(savedQueryResource);
 
@@ -504,6 +504,7 @@ planner(Query *parse, int cursorOptions,
 	return result;
 }
 
+
 /*
  * The new framework for HAWQ 2.0 query optimizer
  */
@@ -514,6 +515,8 @@ resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
   PlannedStmt *plannedstmt = NULL;
   do
   {
+  		udf_collector_context udf_context;
+  		udf_context.udf_exist = false;
     SplitAllocResult *allocResult = NULL;
     Query *my_parse = copyObject(parse);
     ParamListInfo my_boundParams = copyParamList(boundParams);
@@ -536,6 +539,17 @@ resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
 
       (*result)->saResult = *allocResult;
       pfree(allocResult);
+    }else{
+    		find_udf(my_parse, &udf_context);
+    		if(udf_context.udf_exist){
+    			if ((resourceLife == QRL_ONCE) || (resourceLife == QRL_NONE)) {
+    				int64 mincost = min_cost_for_each_query;
+					mincost <<= 20;
+					int avgSliceNum = 3;
+					(*result)->saResult.resource = AllocateResource(QRL_ONCE, avgSliceNum, mincost,
+							GetUserDefinedFunctionVsegNum(),GetUserDefinedFunctionVsegNum(),NULL, 0);
+    			}
+    		}
     }
   } while (0);
 }
