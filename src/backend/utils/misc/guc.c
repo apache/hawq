@@ -766,7 +766,6 @@ bool 		optimizer_multilevel_partitioning;
 bool        optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
-int		optimizer_parts_to_force_sort_on_insert;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;

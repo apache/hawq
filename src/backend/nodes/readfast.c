@@ -3604,7 +3604,6 @@ _readDML(const char ** str)
 	READ_INT_FIELD(actionColIdx);
 	READ_INT_FIELD(ctidColIdx);
 	READ_INT_FIELD(tupleoidColIdx);
-	READ_BOOL_FIELD(inputSorted);
 
 	readPlanInfo(str, (Plan *)local_node);
 
