@@ -109,8 +109,9 @@
       "CamelCaseRelationId" : "GpConfigHistoryRelationId",
       "UppercaseReltypeOid" : "GP_CONFIGURATION_HISTORY_RELTYPE_OID",
       "colh" : {
-         "dbid" : "int2",
-         "desc" : "text",
+         "description" : "text",
+         "hostname" : "text",
+         "registration_order" : "int4",
          "time" : "timestamptz"
       },
       "cols" : [
@@ -121,19 +122,24 @@
             "sqltype" : "timestamp_with_time_zone"
          },
          {
-            "colname" : "dbid",
-            "ctype" : "int2",
-            "sqltype" : "smallint"
+            "colname" : "registration_order",
+            "ctype" : "int4",
+            "sqltype" : "integer"
          },
          {
-            "colname" : "desc",
+            "colname" : "hostname",
+            "ctype" : "text",
+            "sqltype" : "text"
+         },
+         {
+            "colname" : "description",
             "ctype" : "text",
             "sqltype" : "text"
          }
       ],
       "filename" : "gp_configuration.h",
       "relid_comment_tag" : "/* relation id: 5006 - gp_configuration_history */\n",
-      "tabdef_text" : "\n   CREATE TABLE gp_configuration_history\n   with (camelcase=GpConfigHistory, shared=true, oid=false, relid=5006, reltype_oid=6434, content=MASTER_ONLY)\n   (\n   time    timestamp with time zone,\n   dbid    smallint,\n   \"desc\"    text\n   )",
+      "tabdef_text" : "\n   CREATE TABLE gp_configuration_history\n   with (camelcase=GpConfigHistory, shared=true, oid=false, relid=5006, reltype_oid=6434, content=MASTER_ONLY)\n   (\n   time               timestamp with time zone,\n   registration_order integer,\n   hostname           text,\n   description        text\n   )",
       "tzhack" : "\"time\"",
       "with" : {
          "bootstrap" : 0,
@@ -868,8 +874,7 @@
       "UppercaseToastReltypeOid" : "GP_SEGMENT_CONFIGURATION_TOAST_RELTYPE_OID",
       "colh" : {
          "address" : "text",
-         "failed_tmpdir" : "text",
-         "failed_tmpdir_num" : "int4",
+         "description" : "text",
          "hostname" : "text",
          "port" : "int4",
          "registration_order" : "int4",
@@ -909,12 +914,7 @@
             "sqltype" : "text"
          },
          {
-            "colname" : "failed_tmpdir_num",
-            "ctype" : "int4",
-            "sqltype" : "integer"
-         },
-         {
-            "colname" : "failed_tmpdir",
+            "colname" : "description",
             "ctype" : "text",
             "sqltype" : "text"
          }
@@ -955,7 +955,7 @@
          }
       ],
       "relid_comment_tag" : "/* relation id: 5036 - gp_segment_configuration */\n",
-      "tabdef_text" : "\n   CREATE TABLE gp_segment_configuration\n   with (camelcase=GpSegmentConfig, shared=true, oid=false, relid=5036, reltype_oid=6442, toast_oid=2900, toast_index=2901, toast_reltype=2906, content=MASTER_ONLY)\n   (\n   registration_order integer    ,\n   role               \"char\"     ,\n   status             \"char\"     ,\n   port               integer    ,\n   hostname           text       ,\n   address            text       ,\n   failed_tmpdir_num  integer    ,\n   failed_tmpdir      text\n   )",
+      "tabdef_text" : "\n   CREATE TABLE gp_segment_configuration\n   with (camelcase=GpSegmentConfig, shared=true, oid=false, relid=5036, reltype_oid=6442, toast_oid=2900, toast_index=2901, toast_reltype=2906, content=MASTER_ONLY)\n   (\n   registration_order integer    ,\n   role               \"char\"     ,\n   status             \"char\"     ,\n   port               integer    ,\n   hostname           text       ,\n   address            text       ,\n   description        text\n   )",
       "with" : {
          "bootstrap" : 0,
          "camelcase" : "GpSegmentConfig",

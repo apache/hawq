@@ -489,7 +489,6 @@ int ResManagerMainServer2ndPhase(void)
                            PostPortNumber,
                            SEGMENT_ROLE_MASTER_CONFIG,
                            SEGMENT_STATUS_UP,
-                           0,
                            "");
 
 	/* Load queue and user definition as no DDL now. */
@@ -2096,12 +2095,9 @@ int generateAllocRequestToBroker(void)
 		/*
 		 * Resource manager skips this segment if
 		 * 1) Not FTS available;
-		 * 2) Not GRM available;
-		 * 3) Having resource decrease pending.
+		 * 2) Having resource decrease pending.
 		 */
 		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-			(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-			 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
 			(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 		{
 			continue;
@@ -2311,12 +2307,9 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 		/*
 		 * Resource manager skips this segment if
 		 * 1) Not FTS available;
-		 * 2) Not GRM available;
-		 * 3) Having resource decrease pending.
+		 * 2) Having resource decrease pending.
 		 */
-		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-			(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-			 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
+		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat)  ||
 			(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 		{
 			index++;
@@ -2391,12 +2384,9 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 			/*
 			 * Resource manager skips this segment if
 			 * 1) Not FTS available;
-			 * 2) Not GRM available;
-			 * 3) Having resource decrease pending.
+			 * 2) Having resource decrease pending.
 			 */
 			if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-				(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-				 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
 				(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 			{
 				index++;
@@ -2566,31 +2556,51 @@ void updateStatusOfAllNodes()
 	curtime = gettime_microsec();
 	for(uint32_t idx = 0; idx < PRESPOOL->SegmentIDCounter; idx++)
 	{
-	    node = getSegResource(idx);
-        if (node != NULL &&
-            (curtime - node->LastUpdateTime >
+		node = getSegResource(idx);
+		uint8_t oldStatus = node->Stat->FTSAvailable;
+		if (node != NULL &&
+			 (curtime - node->LastUpdateTime >
 			 1000000LL * rm_segment_heartbeat_timeout) &&
-			IS_SEGSTAT_FTSAVAILABLE(node->Stat) )
-        {
-        	/*
-        	 * This call makes resource manager able to adjust queue and mem/core
-        	 * trackers' capacity.
-        	 */
-        	setSegResHAWQAvailability(node, RESOURCE_SEG_STATUS_UNAVAILABLE);
-        	/*
-        	 * This call makes resource pool remove unused containers.
-        	 */
-        	returnAllGRMResourceFromSegment(node);
-        	if (Gp_role != GP_ROLE_UTILITY)
-        	{
-        		update_segment_status(idx + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
-        	}
+			 (node->Stat->StatusDesc & SEG_STATUS_HEARTBEAT_TIMEOUT) == 0)
+		{
+			/*
+			 * This segment is heartbeat timeout, update its description
+			 * and set it to unavailable if needed.
+			 */
+			if (oldStatus == RESOURCE_SEG_STATUS_AVAILABLE)
+			{
+				/*
+				 * This call makes resource manager able to adjust queue and mem/core
+				 * trackers' capacity.
+				 */
+				setSegResHAWQAvailability(node, RESOURCE_SEG_STATUS_UNAVAILABLE);
+				/*
+				 * This call makes resource pool remove unused containers.
+				 */
+				returnAllGRMResourceFromSegment(node);
+				changedstatus = true;
+			}
 
-        	elog(WARNING, "Resource manager sets host %s from up to down.",
-        			  	  GET_SEGRESOURCE_HOSTNAME(node));
+			node->Stat->StatusDesc |= SEG_STATUS_HEARTBEAT_TIMEOUT;
+			if (Gp_role != GP_ROLE_UTILITY)
+			{
+				SimpStringPtr description = build_segment_status_description(node->Stat);
+				update_segment_status(idx + REGISTRATION_ORDER_OFFSET,
+										SEGMENT_STATUS_DOWN,
+										(description->Len > 0)?description->Str:"");
+				add_segment_history_row(idx + REGISTRATION_ORDER_OFFSET,
+										GET_SEGRESOURCE_HOSTNAME(node),
+										(description->Len > 0)?description->Str:"");
+				if (description != NULL)
+				{
+					freeSimpleStringContent(description);
+					rm_pfree(PCONTEXT, description);
+				}
+			}
 
-        	changedstatus = true;
-        }
+			elog(WARNING, "Resource manager sets host %s heartbeat timeout.",
+						  GET_SEGRESOURCE_HOSTNAME(node));
+		}
 	}
 
 	if ( changedstatus )
@@ -2711,11 +2721,10 @@ int  loadHostInformationIntoResourcePool(void)
 
         /* Build machine info instance. */
         SegStat segstat = (SegStat)rm_palloc0(PCONTEXT,
-                                   	   	   	  offsetof(SegStatData, Info) +
-											  seginfobuff.Cursor + 1);
-        segstat->ID      		   = SEGSTAT_ID_INVALID;
-        segstat->GRMAvailable     = RESOURCE_SEG_STATUS_UNSET;
-        segstat->FTSAvailable     = RESOURCE_SEG_STATUS_AVAILABLE;
+                                              offsetof(SegStatData, Info) +
+                                              seginfobuff.Cursor + 1);
+        segstat->ID                = SEGSTAT_ID_INVALID;
+        segstat->FTSAvailable      = RESOURCE_SEG_STATUS_AVAILABLE;
         segstat->FTSTotalMemoryMB  = DRMGlobalInstance->SegmentMemoryMB;
         segstat->FTSTotalCore      = DRMGlobalInstance->SegmentCore;
         segstat->GRMTotalMemoryMB  = 0;

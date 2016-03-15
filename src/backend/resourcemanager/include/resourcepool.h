@@ -145,13 +145,14 @@ struct SegStatData {
 	int32_t			ID;					/* Internal ID.						  */
 	uint16_t		FailedTmpDirNum;	/* Failed temporary directory number */
 	uint8_t			FTSAvailable;		/* If it is available now.			  */
-	uint8_t			GRMAvailable;		/* If it is global resource available.*/
-
+	uint8_t			GRMHandled;			/* If its GRM status is handled */
 	uint32_t		FTSTotalMemoryMB;		/* FTS reports memory capacity.   */
 	uint32_t		FTSTotalCore;			/* FTS reports core capacity.	  */
 	uint32_t		GRMTotalMemoryMB;		/* GRM reports memory capacity.	  */
 	uint32_t		GRMTotalCore;			/* GRM reports core capacity. 	  */
 	uint64_t		RMStartTimestamp;		/* RM process reset timestamp */
+	uint32_t		StatusDesc;				/* Description of status */
+	uint32_t		Reserved;
 	SegInfoData		Info;					/* 64-bit aligned.				  */
 };
 
@@ -168,12 +169,9 @@ enum SegAvailabilityStatus {
 };
 
 int setSegStatHAWQAvailability( SegStat machine, uint8_t newstatus);
-int setSegStatGLOBAvailability( SegStat machine, uint8_t newstatus);
 
 #define IS_SEGSTAT_FTSAVAILABLE(seg) \
 		((seg)->FTSAvailable == RESOURCE_SEG_STATUS_AVAILABLE)
-#define IS_SEGSTAT_GRMAVAILABLE(seg) \
-	    ((seg)->GRMAvailable == RESOURCE_SEG_STATUS_AVAILABLE)
 
 /* Generate SegStat instance's report as a string saved in self maintained buffer. */
 void  generateSegStatReport(SegStat segstat, SelfMaintainBuffer buff);
@@ -610,7 +608,7 @@ int returnResourceToResourcePool(int 		memory,
 void returnAllGRMResourceFromSegment(SegResource segres);
 void dropAllGRMContainersFromSegment(SegResource segres);
 
-void returnAllGRMResourceFromGRMUnavailableSegments(void);
+void returnAllGRMResourceFromUnavailableSegments(void);
 
 void generateSegResourceReport(int32_t nodeid, SelfMaintainBuffer buff);
 
@@ -632,7 +630,7 @@ int addOrderedResourceAvailTreeIndexByRatio(uint32_t ratio, BBST *tree);
 int getOrderedResourceAvailTreeIndexByRatio(uint32_t ratio, BBST *tree);
 int getOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree);
 
-void setAllSegResourceGRMUnavailable(void);
+void setAllSegResourceGRMUnhandled(void);
 
 void resetAllSegmentsGRMContainerFailAllocCount(void);
 
@@ -671,13 +669,11 @@ void adjustMemoryCoreValue(uint32_t *memorymb, uint32_t *core);
 
 /* Clean up gp_segment_configuration */
 void cleanup_segment_config(void);
+
+#define SEG_STATUS_DESCRIPTION_UP "segment is up"
 /* update a segment's status in gp_segment_configuration table */
-void update_segment_status(int32_t id, char status);
-/* update a segment's status and failed temporary directory
- * in gp_segment_configuration table
- */
-void update_segment_failed_tmpdir
-(int32_t id, char status, int32_t failedNum, char* failedTmpDir);
+void update_segment_status(int32_t id, char status, char* description);
+
 /* Add a new entry into gp_segment_configuration table*/
 void add_segment_config_row(int32_t 	 id,
 							char		*hostname,
@@ -685,8 +681,25 @@ void add_segment_config_row(int32_t 	 id,
 							uint32_t 	 port,
 							char 		 role,
 							char		 status,
-							uint32_t	 failed_tmpdir_num,
-							char*		 failed_tmpdir);
+							char*		 description);
+
+/*
+ * SegStatData's StatusDesc is a combination of below flags
+ */
+#define	SEG_STATUS_HEARTBEAT_TIMEOUT			0x00000001
+#define	SEG_STATUS_FAILED_PROBING_SEGMENT		0x00000002
+#define	SEG_STATUS_COMMUNICATION_ERROR			0x00000004
+#define	SEG_STATUS_FAILED_TMPDIR				0x00000008
+#define	SEG_STATUS_RM_RESET						0x00000010
+#define	SEG_STATUS_NO_GRM_NODE_REPORT			0x00000020
+
+/* Add a new entry into gp_configuration_history table */
+void add_segment_history_row(int32_t id,
+							 char* hostname,
+							 char* description);
+
+/* build a string of status description based on SegStat */
+SimpStringPtr build_segment_status_description(SegStat segstat);
 
 /*
  * In resource pool, segment's id starts from 0, however in gp_segment_configuration table,

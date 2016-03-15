@@ -182,7 +182,6 @@ int refreshLocalHostInstance(void)
 		RMSEG_INBUILDHOST->GRMTotalCore     = 0.0;
 		RMSEG_INBUILDHOST->FTSTotalMemoryMB = DRMGlobalInstance->SegmentMemoryMB;
 		RMSEG_INBUILDHOST->FTSTotalCore     = DRMGlobalInstance->SegmentCore;
-		RMSEG_INBUILDHOST->GRMAvailable    = RESOURCE_SEG_STATUS_UNSET;
 		RMSEG_INBUILDHOST->FTSAvailable    = RESOURCE_SEG_STATUS_AVAILABLE;
 		RMSEG_INBUILDHOST->ID				= SEGSTAT_ID_INVALID;
 		RMSEG_INBUILDHOST->FailedTmpDirNum  = failedTmpDirNum;

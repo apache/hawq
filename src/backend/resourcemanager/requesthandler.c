@@ -746,29 +746,13 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	destroySelfMaintainBuffer(&newseginfo);
 
 	newsegstat->ID 				 = SEGSTAT_ID_INVALID;
-	newsegstat->GRMAvailable 	 = RESOURCE_SEG_STATUS_UNSET;
 
 	RPCRequestHeadIMAlive header = SMBUFF_HEAD(RPCRequestHeadIMAlive,
 												&(conntrack->MessageBuff));
 	newsegstat->FailedTmpDirNum  = header->TmpDirBrokenCount;
 	newsegstat->RMStartTimestamp = header->RMStartTimestamp;
-
-	/*
-	 * Check if the there is any failed temporary directory on this segment.
-	 * if has, master considers this segment as down, even it has heart-beat report.
-	 */
-	if (newsegstat->FailedTmpDirNum == 0)
-	{
-		newsegstat->FTSAvailable = RESOURCE_SEG_STATUS_AVAILABLE;
-	}
-	else
-	{
-		elog(RMLOG, "Resource manager finds there is %d failed temporary directories "
-					"on this segment, "
-					"so mark this segment unavailable.",
-					newsegstat->FailedTmpDirNum);
-		newsegstat->FTSAvailable = RESOURCE_SEG_STATUS_UNAVAILABLE;
-	}
+	newsegstat->StatusDesc = 0;
+	newsegstat->Reserved   = 0;
 
 	bool capstatchanged = false;
 	if ( addHAWQSegWithSegStat(newsegstat, &capstatchanged) != FUNC_RETURN_OK )
@@ -977,13 +961,13 @@ bool handleRMRequestSegmentIsDown(void **arg)
 
 	while( (hostname - SMBUFF_CONTENT(&(conntrack->MessageBuff)) <
 			getSMBContentSize(&(conntrack->MessageBuff))) &&
-		   *hostname != '\0' )
+			*hostname != '\0' )
 	{
 		hostnamelen = strlen(hostname);
 		res = getSegIDByHostName(hostname, hostnamelen, &segid);
 		if ( res == FUNC_RETURN_OK )
 		{
-			/* Get resourceinfo of the expected host. */
+			/* Get resource info of the expected host. */
 			SegResource segres = getSegResource(segid);
 			Assert( segres != NULL );
 
@@ -1002,45 +986,56 @@ bool handleRMRequestSegmentIsDown(void **arg)
 			else
 			{
 				elog(RMLOG, "Resource manager probes the status of host %s by "
-						 	"sending RUAlive request.",
+							"sending RUAlive request.",
 							hostname);
 
-		        res = sendRUAlive(hostname);
-		        /* IN THIS CASE, the segment is considered as down. */
-		        if (res != FUNC_RETURN_OK)
-		        {
-		        	/*----------------------------------------------------------
-		        	 * This call makes resource manager able to adjust queue and
-		        	 * mem/core trackers' capacity.
-		        	 *----------------------------------------------------------
-		        	 */
-		        	setSegResHAWQAvailability(segres,
-		        							  RESOURCE_SEG_STATUS_UNAVAILABLE);
+				res = sendRUAlive(hostname);
+				/* IN THIS CASE, the segment is considered as down. */
+				if (res != FUNC_RETURN_OK)
+				{
+					/*----------------------------------------------------------
+					 * This call makes resource manager able to adjust queue and
+					 * mem/core trackers' capacity.
+					 *----------------------------------------------------------
+					 */
+					setSegResHAWQAvailability(segres,
+											  RESOURCE_SEG_STATUS_UNAVAILABLE);
 
-		        	/* Make resource pool remove unused containers */
-		        	returnAllGRMResourceFromSegment(segres);
-		        	/* Set the host down in gp_segment_configuration table */
-		        	if (Gp_role != GP_ROLE_UTILITY)
-		        	{
-		        		update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
-		        							  SEGMENT_STATUS_DOWN);
-		        	}
+					/* Make resource pool remove unused containers */
+					returnAllGRMResourceFromSegment(segres);
+					/* Set the host down in gp_segment_configuration table */
+					segres->Stat->StatusDesc |= SEG_STATUS_FAILED_PROBING_SEGMENT;
+					if (Gp_role != GP_ROLE_UTILITY)
+					{
+						SimpStringPtr description = build_segment_status_description(segres->Stat);
+						update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+											  SEGMENT_STATUS_DOWN,
+											  (description->Len > 0)?description->Str:"");
+						add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+												hostname,
+												description->Str);
+						if (description != NULL)
+						{
+							freeSimpleStringContent(description);
+							rm_pfree(PCONTEXT, description);
+						}
+					}
 
-		        	/* Set the host down. */
-		        	elog(LOG, "Resource manager sets host %s from up to down "
-		        			  "due to not reaching host.", hostname);
-		        }
-		        else
-		        {
-		        	elog(RMLOG, "Resource manager triggered RUAlive request to "
-		        				"host %s.",
+					/* Set the host down. */
+					elog(LOG, "Resource manager sets host %s from up to down "
+							  "due to not reaching host.", hostname);
+				}
+				else
+				{
+					elog(RMLOG, "Resource manager triggered RUAlive request to "
+								"host %s.",
 								hostname);
-		        }
+				}
 			}
 		}
 		else {
 			elog(WARNING, "Resource manager cannot find host %s to check status, "
-					  	  "skip it.",
+						  "skip it.",
 						  hostname);
 		}
 
@@ -1124,7 +1119,7 @@ bool handleRMRequestTmpDir(void **arg)
                                    RESPONSE_QD_TMPDIR);
         
         elog(LOG, "Resource manager assigned temporary directory %s",
-        		  tmpdir->Str);
+                  tmpdir->Str);
     }
 
     conntrack->ResponseSent = false;
@@ -1271,11 +1266,11 @@ bool handleRMRequestDummy(void **arg)
                                sizeof(response),
                                conntrack->MessageMark1,
                                conntrack->MessageMark2,
-							   RESPONSE_DUMMY);
+                               RESPONSE_DUMMY);
     conntrack->ResponseSent = false;
-	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-	PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conntrack);
-	MEMORY_CONTEXT_SWITCH_BACK
+    MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+    PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conntrack);
+    MEMORY_CONTEXT_SWITCH_BACK
 
     return true;
 }

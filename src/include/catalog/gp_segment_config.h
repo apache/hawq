@@ -53,8 +53,7 @@
    port               integer    ,
    hostname           text       ,
    address            text       ,
-   failed_tmpdir_num  integer    ,
-   failed_tmpdir      text
+   description        text
    );
 
    create unique index on gp_segment_configuration(registration_order) with (indexid=6106, indexname=gp_segment_config_registration_order_index);
@@ -95,8 +94,7 @@ CATALOG(gp_segment_configuration,5036) BKI_SHARED_RELATION BKI_WITHOUT_OIDS
 	int4	port;				
 	text	hostname;			
 	text	address;			
-	int4	failed_tmpdir_num;	
-	text	failed_tmpdir;		
+	text	description;		
 } FormData_gp_segment_configuration;
 
 
@@ -112,15 +110,14 @@ typedef FormData_gp_segment_configuration *Form_gp_segment_configuration;
  *		compiler constants for gp_segment_configuration
  * ----------------
  */
-#define Natts_gp_segment_configuration						8
+#define Natts_gp_segment_configuration						7
 #define Anum_gp_segment_configuration_registration_order	1
 #define Anum_gp_segment_configuration_role					2
 #define Anum_gp_segment_configuration_status				3
 #define Anum_gp_segment_configuration_port					4
 #define Anum_gp_segment_configuration_hostname				5
 #define Anum_gp_segment_configuration_address				6
-#define Anum_gp_segment_configuration_failed_tmpdir_num		7
-#define Anum_gp_segment_configuration_failed_tmpdir			8
+#define Anum_gp_segment_configuration_description			7
 
 
 /* TIDYCAT_END_CODEGEN */
