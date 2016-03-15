@@ -3868,7 +3868,7 @@ int computeQueryQuota_EVEN(DynResourceQueueTrack	track,
 	*segnummin = reservsegnum;
 	*segnummin = *segnummin > *segnum ? *segnum : *segnummin;
 
-	Assert( *segnummin > 0 && *segnummin <= *segnum );
+	Assert( *segnummin >= 0 && *segnummin <= *segnum );
 	return FUNC_RETURN_OK;
 }
 
