@@ -4518,6 +4518,8 @@ CTranslatorDXLToPlStmt::PplanDML
 		plTargetListDML = plTargetListWithDroppedCols;
 	}
 	
+	pdml->inputSorted = pdxlop->FInputSorted();
+
 	// add ctid, action and oid columns to target list
 	pdml->oidColIdx = UlAddTargetEntryForColId(&plTargetListDML, &dxltrctxChild, pdxlop->UlOid(), true /*fResjunk*/);
 	pdml->actionColIdx = UlAddTargetEntryForColId(&plTargetListDML, &dxltrctxChild, pdxlop->UlAction(), true /*fResjunk*/);
