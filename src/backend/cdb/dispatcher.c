@@ -49,6 +49,7 @@
 #include "utils/memutils.h"	/* GetMemoryChunkContext */
 #include "cdb/cdbsrlz.h"	/* serializeNode */
 #include "utils/datum.h"	/* datumGetSize */
+#include "utils/faultinjector.h"
 #include "utils/lsyscache.h"	/* get_typlenbyval */
 #include "miscadmin.h"		/* CHECK_FOR_INTERRUPTS */
 #include "tcop/tcopprot.h"	/* ResetUsage */
@@ -962,6 +963,14 @@ dispatcher_bind_executor(DispatchData *data)
 				data->num_of_new_connected_executors++;
 				continue;
 			}
+
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   ConnectionFailAfterGangCreation,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
 
 			if (!executormgr_bind_executor_task(data, executor, desc, task, slice))
 				return false;

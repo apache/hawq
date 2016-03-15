@@ -281,8 +281,12 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault after dispatcher thread creation*/
 /*	_("dispatch_wait"),
 		 inject fault after dispatcher wait for results from segments*/
-	_("connection_fail_after_gang"),
+	_("connection_fail_after_gang_creation"),
 		/* inject fault after gang thread creation, set connection null*/
+	_("create_cdb_dispath_result_object"),
+		/* inject fault when create cdb dispatch result object, set out of memory */
+	_("worker_manager_submit_job"),
+		/* inject fault when worker manager submit job , set error*/
 /*	_("make_dispatch_thread"),
 		 inject fault when initialing memory structure for dispatcher thread*/
 	_("before_dispatch"),
@@ -1070,6 +1074,9 @@ FaultInjector_NewHashEntry(
 		case DtmXLogDistributedCommit:
 		case AnalyzeSubxactError:
 		case OptTaskAllocateStringBuffer:
+		case ConnectionFailAfterGangCreation:
+		case CreateCdbDispathResultObject:
+		case WorkerManagerSubmitJob:
 
 			/* These faults are designed for master. */
 			if(!AmIMaster())

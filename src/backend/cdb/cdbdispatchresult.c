@@ -33,6 +33,7 @@
 
 #include "lib/stringinfo.h"         /* StringInfoData */
 #include "utils/guc.h"              /* log_min_messages */
+#include "utils/faultinjector.h"
 
 #include "cdb/cdbconn.h"            /* SegmentDatabaseDescriptor */
 #include "cdb/cdbpartition.h"
@@ -109,6 +110,14 @@ cdbdisp_makeResult(struct CdbDispatchResults           *meleeResults,
     /* Allocate a slot for the new CdbDispatchResult object. */
     meleeIndex = meleeResults->resultCount++;
     dispatchResult = &meleeResults->resultArray[meleeIndex];
+
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   CreateCdbDispathResultObject,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
 
     /* Initialize CdbDispatchResult. */
     dispatchResult->meleeResults = meleeResults;
