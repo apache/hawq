@@ -2396,7 +2396,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 			int segcountact = containerset == NULL ?
 							  0 :
 							  containerset->Available.MemoryMB / memory;
-			if ( segcountact == 0 )
+			if ( segcountact <= 0 )
 			{
 				elog(RMLOG, "Segment %s does not have more resource to allocate. "
 							"This segment is skipped.",
@@ -3838,16 +3838,12 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 
 					Assert( segres->Allocated.MemoryMB >= 0 );
 					Assert( segres->Allocated.Core     >= 0 );
-					Assert( segres->Available.MemoryMB >= 0 );
-					Assert( segres->Available.Core     >= 0 );
 
 					minusResourceBundleData(&(ctnset->Allocated), ctn->MemoryMB, ctn->Core);
 					minusResourceBundleData(&(ctnset->Available), ctn->MemoryMB, ctn->Core);
 
 					Assert( ctnset->Allocated.MemoryMB >= 0 );
 					Assert( ctnset->Allocated.Core     >= 0 );
-					Assert( ctnset->Available.MemoryMB >= 0 );
-					Assert( ctnset->Available.Core     >= 0 );
 
 					reorderSegResourceAllocIndex(segres, PQUEMGR->RatioReverseIndex[ridx]);
 					reorderSegResourceAvailIndex(segres, PQUEMGR->RatioReverseIndex[ridx]);
