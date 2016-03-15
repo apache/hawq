@@ -1119,7 +1119,6 @@ _copyDML(const DML *from)
 	COPY_SCALAR_FIELD(actionColIdx);
 	COPY_SCALAR_FIELD(ctidColIdx);
 	COPY_SCALAR_FIELD(tupleoidColIdx);
-	COPY_SCALAR_FIELD(inputSorted);
 
 	return newnode;
 }
