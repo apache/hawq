@@ -188,6 +188,8 @@ typedef enum FaultInjectorIdentifier_e {
 	ConnectionFailAfterGangCreation,
 
 /*	MakeDispatchThread,*/
+	CreateCdbDispathResultObject,
+	WorkerManagerSubmitJob,
 
 	BeforeDispatch,
 
