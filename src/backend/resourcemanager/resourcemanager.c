@@ -2557,9 +2557,9 @@ void updateStatusOfAllNodes()
 	for(uint32_t idx = 0; idx < PRESPOOL->SegmentIDCounter; idx++)
 	{
 		node = getSegResource(idx);
+		Assert(node != NULL);
 		uint8_t oldStatus = node->Stat->FTSAvailable;
-		if (node != NULL &&
-			 (curtime - node->LastUpdateTime >
+		if ( (curtime - node->LastUpdateTime >
 			 1000000LL * rm_segment_heartbeat_timeout) &&
 			 (node->Stat->StatusDesc & SEG_STATUS_HEARTBEAT_TIMEOUT) == 0)
 		{
@@ -2591,11 +2591,9 @@ void updateStatusOfAllNodes()
 				add_segment_history_row(idx + REGISTRATION_ORDER_OFFSET,
 										GET_SEGRESOURCE_HOSTNAME(node),
 										(description->Len > 0)?description->Str:"");
-				if (description != NULL)
-				{
-					freeSimpleStringContent(description);
-					rm_pfree(PCONTEXT, description);
-				}
+
+				freeSimpleStringContent(description);
+				rm_pfree(PCONTEXT, description);
 			}
 
 			elog(WARNING, "Resource manager sets host %s heartbeat timeout.",
