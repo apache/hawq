@@ -55,7 +55,7 @@ public class HiveMetadataFetcherTest {
     HiveConf hiveConfiguration;
     HiveMetaStoreClient hiveClient;
     HiveMetadataFetcher fetcher;
-    Metadata metadata;
+    List<Metadata> metadataList;
 
     @Before
     public void SetupCompressionFactory() {
@@ -90,7 +90,7 @@ public class HiveMetadataFetcherTest {
         String tableName = "t.r.o.u.b.l.e.m.a.k.e.r";
 
         try {
-            fetcher.getTableMetadata(tableName);
+            fetcher.getMetadata(tableName);
             fail("Expected an IllegalArgumentException");
         } catch (IllegalArgumentException ex) {
             assertEquals("\"t.r.o.u.b.l.e.m.a.k.e.r\" is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>", ex.getMessage()); 
@@ -110,7 +110,7 @@ public class HiveMetadataFetcherTest {
         when(hiveClient.getTable("default", tableName)).thenReturn(hiveTable);
 
         try {
-            metadata = fetcher.getTableMetadata(tableName);
+            metadataList = fetcher.getMetadata(tableName);
             fail("Expected an UnsupportedOperationException because PXF doesn't support views");
         } catch (UnsupportedOperationException e) {
             assertEquals("Hive views are not supported by HAWQ", e.getMessage());
@@ -137,9 +137,10 @@ public class HiveMetadataFetcherTest {
         when(hiveClient.getTable("default", tableName)).thenReturn(hiveTable);
 
         // get metadata
-        metadata = fetcher.getTableMetadata(tableName);
+        metadataList = fetcher.getMetadata(tableName);
+        Metadata metadata = metadataList.get(0);
 
-        assertEquals("default.cause", metadata.getTable().toString());
+        assertEquals("default.cause", metadata.getItem().toString());
 
         List<Metadata.Field> resultFields = metadata.getFields();
         assertNotNull(resultFields);

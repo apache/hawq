@@ -53,7 +53,7 @@ under the License.
     </profile>
     <profile>
         <name>HiveRC</name>
-        <description>This profile is suitable only for Hive tables stored in RC files
+        <description>This profile is suitable only for Hive items stored in RC files
             and serialized with either the ColumnarSerDe or the LazyBinaryColumnarSerDe.
             It is much faster than the general purpose Hive profile.
             DELIMITER parameter is mandatory.
@@ -66,7 +66,7 @@ under the License.
     </profile>
     <profile>
         <name>HiveText</name>
-        <description>This profile is suitable only for Hive tables stored as Text files.
+        <description>This profile is suitable only for Hive items stored as Text files.
             It is much faster than the general purpose Hive profile.
             DELIMITER parameter is mandatory.
         </description>

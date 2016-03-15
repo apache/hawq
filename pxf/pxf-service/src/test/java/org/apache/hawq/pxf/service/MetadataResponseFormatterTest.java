@@ -36,14 +36,14 @@ public class MetadataResponseFormatterTest {
     @Test
     public void formatResponseString() throws Exception {
         List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
-        Metadata.Table tableName = new Metadata.Table("default", "table1");
-        Metadata metadata = new Metadata(tableName, fields);
+        Metadata.Item itemName = new Metadata.Item("default", "table1");
+        Metadata metadata = new Metadata(itemName, fields);
         fields.add(new Metadata.Field("field1", "int"));
         fields.add(new Metadata.Field("field2", "text"));
 
         result = MetadataResponseFormatter.formatResponseString(metadata);
         String expected = "{\"PXFMetadata\":[{"
-                + "\"table\":{\"dbName\":\"default\",\"tableName\":\"table1\"},"
+                + "\"item\":{\"path\":\"default\",\"name\":\"table1\"},"
                 + "\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}";
 
         assertEquals(expected, result);
@@ -52,14 +52,14 @@ public class MetadataResponseFormatterTest {
     @Test
     public void formatResponseStringWithNullModifier() throws Exception {
         List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
-        Metadata.Table tableName = new Metadata.Table("default", "table1");
-        Metadata metadata = new Metadata(tableName, fields);
+        Metadata.Item itemName = new Metadata.Item("default", "table1");
+        Metadata metadata = new Metadata(itemName, fields);
         fields.add(new Metadata.Field("field1", "int", null));
         fields.add(new Metadata.Field("field2", "text", new String[] {}));
 
         result = MetadataResponseFormatter.formatResponseString(metadata);
         String expected = "{\"PXFMetadata\":[{"
-                + "\"table\":{\"dbName\":\"default\",\"tableName\":\"table1\"},"
+                + "\"item\":{\"path\":\"default\",\"name\":\"table1\"},"
                 + "\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}";
 
         assertEquals(expected, result);
@@ -68,8 +68,8 @@ public class MetadataResponseFormatterTest {
     @Test
     public void formatResponseStringWithModifiers() throws Exception {
         List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
-        Metadata.Table tableName = new Metadata.Table("default", "table1");
-        Metadata metadata = new Metadata(tableName, fields);
+        Metadata.Item itemName = new Metadata.Item("default", "table1");
+        Metadata metadata = new Metadata(itemName, fields);
         fields.add(new Metadata.Field("field1", "int"));
         fields.add(new Metadata.Field("field2", "numeric",
                 new String[] {"1349", "1789"}));
@@ -78,7 +78,7 @@ public class MetadataResponseFormatterTest {
 
         result = MetadataResponseFormatter.formatResponseString(metadata);
         String expected = "{\"PXFMetadata\":[{"
-                + "\"table\":{\"dbName\":\"default\",\"tableName\":\"table1\"},"
+                + "\"item\":{\"path\":\"default\",\"name\":\"table1\"},"
                 + "\"fields\":["
                 + "{\"name\":\"field1\",\"type\":\"int\"},"
                 + "{\"name\":\"field2\",\"type\":\"numeric\",\"modifiers\":[\"1349\",\"1789\"]},"
@@ -102,8 +102,8 @@ public class MetadataResponseFormatterTest {
 
     @Test
     public void formatResponseStringNoFields() throws Exception {
-        Metadata.Table tableName = new Metadata.Table("default", "table1");
-        Metadata metadata = new Metadata(tableName, null);
+        Metadata.Item itemName = new Metadata.Item("default", "table1");
+        Metadata metadata = new Metadata(itemName, null);
 
         try {
             result = MetadataResponseFormatter.formatResponseString(metadata);
@@ -113,7 +113,7 @@ public class MetadataResponseFormatterTest {
         }
 
         ArrayList<Metadata.Field> fields = new ArrayList<Metadata.Field>();
-        metadata = new Metadata(tableName, fields);
+        metadata = new Metadata(itemName, fields);
 
         try {
             result = MetadataResponseFormatter.formatResponseString(metadata);

@@ -28,7 +28,14 @@ import org.apache.hawq.pxf.api.MetadataFetcher;
  * abstract class which is returned by the MetadataFetcherFactory. 
  */
 public class MetadataFetcherFactory {
-    static public MetadataFetcher create(String fetcherName) throws Exception {
-        return (MetadataFetcher) Class.forName(fetcherName).newInstance();
+    public static MetadataFetcher create(String profile) throws Exception {
+        String fetcherClass;
+        /* TODO: The metadata class will be moved to the pxf-profile.xml in the future */
+        if ( "hcatalog".equals(profile) || "hive".equals(profile) ) {
+            fetcherClass = "org.apache.hawq.pxf.plugins.hive.HiveMetadataFetcher";
+        } else {
+            throw new IllegalArgumentException("Metadata access for profile " + profile + " not supported");
+        }
+        return (MetadataFetcher) Class.forName(fetcherClass).newInstance();
     }
 }

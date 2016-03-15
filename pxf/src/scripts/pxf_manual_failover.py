@@ -17,7 +17,7 @@
 # under the License.
 
 # pxf_manual_failover.py
-# This python script will adapt the PXF external tables to the new NameNode in case
+# This python script will adapt the PXF external items to the new NameNode in case
 # of High Availability manual failover. 
 # The script receives as input the new namenode host and then goes over each external
 # table entry in the catalog table pg_exttable and updates the LOCATION field - 

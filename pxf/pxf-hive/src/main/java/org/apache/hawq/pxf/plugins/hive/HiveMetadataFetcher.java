@@ -20,6 +20,7 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -49,23 +50,29 @@ public class HiveMetadataFetcher extends MetadataFetcher {
     }
 
     @Override
-    public Metadata getTableMetadata(String tableName) throws Exception {
+    public List<Metadata> getMetadata(String itemName) throws Exception {
 
-        Metadata.Table tblDesc = HiveUtilities.parseTableQualifiedName(tableName);
-        Metadata metadata = new Metadata(tblDesc);
+        List<Metadata.Item> tblsDesc = HiveUtilities.extractTablesFromPattern(client, itemName);
+        List<Metadata> metadataList = new ArrayList<Metadata>();
 
-        Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
+        for(Metadata.Item tblDesc: tblsDesc) {
+            Metadata metadata = new Metadata(tblDesc);
+            Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
+            getSchema(tbl, metadata);
+            metadataList.add(metadata);
+        }
 
-        getSchema(tbl, metadata);
-
-        return metadata;
+        return metadataList;
     }
 
 
     /**
-     * Populates the given metadata object with the given table's fields and partitions,
+     * Populates the given metadata item with the given table's fields and partitions,
      * The partition fields are added at the end of the table schema.
      * Throws an exception if the table contains unsupported field types.
+     * Supported HCatalog types: TINYINT,
+     * SMALLINT, INT, BIGINT, BOOLEAN, FLOAT, DOUBLE, STRING, BINARY, TIMESTAMP,
+     * DATE, DECIMAL, VARCHAR, CHAR.
      *
      * @param tbl Hive table
      * @param metadata schema of given table
@@ -91,7 +98,7 @@ public class HiveMetadataFetcher extends MetadataFetcher {
                 metadata.addField(HiveUtilities.mapHiveType(hivePart));
             }
         } catch (UnsupportedTypeException e) {
-            String errorMsg = "Failed to retrieve metadata for table " + metadata.getTable() + ". " +
+            String errorMsg = "Failed to retrieve metadata for table " + metadata.getItem() + ". " +
                     e.getMessage();
             throw new UnsupportedTypeException(errorMsg);
         }

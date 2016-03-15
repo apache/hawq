@@ -20,6 +20,7 @@ package org.apache.hawq.pxf.service.rest;
  */
 
 import java.io.IOException;
+import java.util.List;
 
 import javax.servlet.ServletContext;
 import javax.ws.rs.GET;
@@ -56,51 +57,44 @@ public class MetadataResource extends RestResource {
     }
 
     /**
-     * This function queries the HiveMetaStore to get the given table's
-     * metadata: Table name, field names, field types. The types are converted
-     * from HCatalog types to HAWQ types. Supported HCatalog types: TINYINT,
-     * SMALLINT, INT, BIGINT, BOOLEAN, FLOAT, DOUBLE, STRING, BINARY, TIMESTAMP,
-     * DATE, DECIMAL, VARCHAR, CHAR. <br>
+     * This function queries the underlying store based on the given profile to get schema for the given item(s)
+     * metadata: Item name, field names, field types. The types are converted
+     * from the underlying types to HAWQ types.
      * Unsupported types result in an error. <br>
      * Response Examples:<br>
      * For a table <code>default.t1</code> with 2 fields (a int, b float) will
      * be returned as:
-     * <code>{"PXFMetadata":[{"table":{"dbName":"default","tableName":"t1"},"fields":[{"name":"a","type":"int"},{"name":"b","type":"float"}]}]}</code>
+     * <code>{"PXFMetadata":[{"item":{"path":"default","name":"t1"},"fields":[{"name":"a","type":"int"},{"name":"b","type":"float"}]}]}</code>
      *
      * @param servletContext servlet context
      * @param headers http headers
-     * @param table HCatalog table name
-     * @return JSON formatted response with metadata for given table
-     * @throws Exception if connection to Hcatalog failed, table didn't exist or
+     * @param profile based on this the metadata source can be inferred
+     * @param item table/file name or pattern in the given source
+     * @return JSON formatted response with metadata for given item(s)
+     * @throws Exception if connection to the source/catalog failed, item didn't exist or
      *             its type or fields are not supported
      */
     @GET
-    @Path("getTableMetadata")
+    @Path("getMetadata")
     @Produces("application/json")
     public Response read(@Context final ServletContext servletContext,
                          @Context final HttpHeaders headers,
-                         @QueryParam("table") final String table)
+                         @QueryParam("profile") final String profile,
+                         @QueryParam("item") final String item)
             throws Exception {
-        LOG.debug("getTableMetadata started");
+        LOG.debug("getMetadata started");
         String jsonOutput;
         try {
             // 1. start MetadataFetcher
-            MetadataFetcher metadataFetcher = MetadataFetcherFactory.create("org.apache.hawq.pxf.plugins.hive.HiveMetadataFetcher"); // TODO:
-                                                                                                                                     // nhorn
-                                                                                                                                     // -
-                                                                                                                                     // 09-03-15
-                                                                                                                                     // -
-                                                                                                                                     // pass
-                                                                                                                                     // as
-                                                                                                                                     // param
+            MetadataFetcher metadataFetcher = MetadataFetcherFactory.create(profile);
 
             // 2. get Metadata
-            Metadata metadata = metadataFetcher.getTableMetadata(table);
+            List<Metadata> metadata = metadataFetcher.getMetadata(item);
 
             // 3. serialize to JSON
             jsonOutput = MetadataResponseFormatter.formatResponseString(metadata);
 
-            LOG.debug("getTableMetadata output: " + jsonOutput);
+            LOG.debug("getMetadata output: " + jsonOutput);
 
         } catch (ClientAbortException e) {
             LOG.error("Remote connection closed by HAWQ", e);

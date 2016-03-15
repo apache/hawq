@@ -1,5 +1,7 @@
 package org.apache.hawq.pxf.api;
 
+import java.util.List;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,10 +23,10 @@ package org.apache.hawq.pxf.api;
 
 
 /**
- * Abstract class that defines getting metadata of a table.
+ * Abstract class that defines getting metadata of an item.
  */
 public abstract class MetadataFetcher {
-    protected Metadata metadata;
+    protected List<Metadata> metadata;
 
     /**
      * Constructs a MetadataFetcher.
@@ -37,9 +39,9 @@ public abstract class MetadataFetcher {
     /**
      * Gets a metadata of a given table
      *
-     * @param tableName table name
-     * @return metadata of given table
+     * @param itemName table/file name or pattern
+     * @return metadata of given item(s)
      * @throws Exception if metadata information could not be retrieved
      */
-    public abstract Metadata getTableMetadata(String tableName) throws Exception;
+    public abstract List<Metadata> getMetadata(String itemName) throws Exception;
 }
