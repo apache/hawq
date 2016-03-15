@@ -2585,7 +2585,6 @@ void updateStatusOfAllNodes()
 			if (Gp_role != GP_ROLE_UTILITY)
 			{
 				SimpStringPtr description = build_segment_status_description(node->Stat);
-				Assert(description != NULL);
 				update_segment_status(idx + REGISTRATION_ORDER_OFFSET,
 										SEGMENT_STATUS_DOWN,
 										(description->Len > 0)?description->Str:"");

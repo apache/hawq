@@ -237,7 +237,6 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 			if (Gp_role != GP_ROLE_UTILITY)
 			{
 				SimpStringPtr description = build_segment_status_description(segres->Stat);
-				Assert(description != NULL);
 				update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 									  SEGMENT_STATUS_DOWN,
 									  (description->Len > 0)?description->Str:"");
@@ -297,7 +296,6 @@ void sentRUAliveError(AsyncCommMessageHandlerContext context)
 		if (Gp_role != GP_ROLE_UTILITY)
 		{
 			SimpStringPtr description = build_segment_status_description(segres->Stat);
-			Assert(description != NULL);
 			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 								  SEGMENT_STATUS_DOWN,
 								  (description->Len > 0)?description->Str:"");
