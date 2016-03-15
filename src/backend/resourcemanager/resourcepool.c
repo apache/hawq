@@ -1227,6 +1227,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 			if (Gp_role != GP_ROLE_UTILITY)
 			{
 				SimpStringPtr description = build_segment_status_description(segresource->Stat);
+				Assert(description != NULL);
 				update_segment_status(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET,
 										IS_SEGSTAT_FTSAVAILABLE(segresource->Stat) ?
 																SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
@@ -1243,11 +1244,9 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 										GET_SEGRESOURCE_HOSTNAME(segresource),
 										IS_SEGSTAT_FTSAVAILABLE(segresource->Stat) ?
 											SEG_STATUS_DESCRIPTION_UP:description->Str);
-				if (description != NULL)
-				{
-					freeSimpleStringContent(description);
-					rm_pfree(PCONTEXT, description);
-				}
+
+				freeSimpleStringContent(description);
+				rm_pfree(PCONTEXT, description);
 			}
 		}
 
@@ -1523,6 +1522,7 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	if (statusDescChange && Gp_role != GP_ROLE_UTILITY)
 	{
 		SimpStringPtr description = build_segment_status_description(segres->Stat);
+		Assert(description != NULL);
 		update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 								IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
 									SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
@@ -1538,11 +1538,9 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 					IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
 						SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
 					(description->Len > 0)?description->Str:"");
-		if (description != NULL)
-		{
-			freeSimpleStringContent(description);
-			rm_pfree(PCONTEXT, description);
-		}
+
+		freeSimpleStringContent(description);
+		rm_pfree(PCONTEXT, description);
 	}
 
 	int32_t curratio = 0;

@@ -237,17 +237,16 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 			if (Gp_role != GP_ROLE_UTILITY)
 			{
 				SimpStringPtr description = build_segment_status_description(segres->Stat);
+				Assert(description != NULL);
 				update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 									  SEGMENT_STATUS_DOWN,
 									  (description->Len > 0)?description->Str:"");
 				add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 										GET_SEGRESOURCE_HOSTNAME(segres),
 										description->Str);
-				if (description != NULL)
-				{
-					freeSimpleStringContent(description);
-					rm_pfree(PCONTEXT, description);
-				}
+
+				freeSimpleStringContent(description);
+				rm_pfree(PCONTEXT, description);
 			}
 			/* Set the host down. */
 			elog(WARNING, "Resource manager sets host %s from up to down "
@@ -298,17 +297,16 @@ void sentRUAliveError(AsyncCommMessageHandlerContext context)
 		if (Gp_role != GP_ROLE_UTILITY)
 		{
 			SimpStringPtr description = build_segment_status_description(segres->Stat);
+			Assert(description != NULL);
 			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 								  SEGMENT_STATUS_DOWN,
 								  (description->Len > 0)?description->Str:"");
 			add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 									GET_SEGRESOURCE_HOSTNAME(segres),
 									description->Str);
-			if (description != NULL)
-			{
-				freeSimpleStringContent(description);
-				rm_pfree(PCONTEXT, description);
-			}
+
+			freeSimpleStringContent(description);
+			rm_pfree(PCONTEXT, description);
 		}
 		/* Set the host down. */
 		elog(LOG, "Resource manager sets host %s from up to down "

@@ -1008,17 +1008,16 @@ bool handleRMRequestSegmentIsDown(void **arg)
 					if (Gp_role != GP_ROLE_UTILITY)
 					{
 						SimpStringPtr description = build_segment_status_description(segres->Stat);
+						Assert(description != NULL);
 						update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 											  SEGMENT_STATUS_DOWN,
 											  (description->Len > 0)?description->Str:"");
 						add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
 												hostname,
 												description->Str);
-						if (description != NULL)
-						{
-							freeSimpleStringContent(description);
-							rm_pfree(PCONTEXT, description);
-						}
+
+						freeSimpleStringContent(description);
+						rm_pfree(PCONTEXT, description);
 					}
 
 					/* Set the host down. */
