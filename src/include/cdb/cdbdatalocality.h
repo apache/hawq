@@ -49,6 +49,13 @@ typedef struct SplitAllocResult
 } SplitAllocResult;
 
 /*
+ * structure containing all relation range table entries.
+ */
+typedef struct udf_collector_context {
+	bool udf_exist;
+} udf_collector_context;
+
+/*
  * structure containing rel and type when execution
  */
 typedef struct CurrentRelType {
@@ -86,7 +93,17 @@ void saveQueryResourceParameters(
  * we calculate the appropriate planner segment_num.
  */
 SplitAllocResult * calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
-                                                List *rtable, GpPolicy *intoPolicy, int sliceNum);
+                                                List *rtable, GpPolicy *intoPolicy, int sliceNum, int fixedVsegNum);
+
+/*
+ * udf_collector_walker: the routine to file udfs.
+ */
+bool udf_collector_walker(Node *node,	udf_collector_context *context);
+
+/*
+ * find_udf: collect all udf, and store them into the udf_collector_context.
+ */
+void find_udf(Query *query, udf_collector_context *context);
 
 FILE *fp;
 FILE *fpaoseg;

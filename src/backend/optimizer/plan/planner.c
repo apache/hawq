@@ -91,6 +91,8 @@ planner_hook_type planner_hook = NULL;
 
 ParamListInfo PlannerBoundParamList = NULL;		/* current boundParams */
 
+static int PlanningDepth = 0;		/* Planning depth */
+
 /* Expression kind codes for preprocess_expression */
 #define EXPRKIND_QUAL			0
 #define EXPRKIND_TARGET			1
@@ -164,6 +166,32 @@ static void sort_canonical_gs_list(List *gs, int *p_nsets, Bitmapset ***p_sets);
 
 static Plan *pushdown_preliminary_limit(Plan *plan, Node *limitCount, int64 count_est, Node *limitOffset, int64 offset_est);
 bool is_dummy_plan(Plan *plan);
+
+
+bool is_in_planning_phase(void)
+{
+	if (PlanningDepth > 0)
+	{
+		return true;
+	}
+	else if (PlanningDepth < 0)
+	{
+		elog(ERROR, "Invalid PlanningDepth %d while getting planning phase", PlanningDepth);
+	}
+
+	return false;
+}
+
+void increase_planning_depth(void)
+{
+	PlanningDepth++;
+}
+
+void decrease_planning_depth(void)
+{
+	PlanningDepth--;
+}
+
 
 #ifdef USE_ORCA
 /**
@@ -285,7 +313,7 @@ planner(Query *parse, int cursorOptions,
 	PlannedStmt *result = NULL;
 	instr_time	starttime, endtime;
 	ResourceNegotiatorResult *ppResult = (ResourceNegotiatorResult *) palloc(sizeof(ResourceNegotiatorResult));
-	SplitAllocResult initResult = {NULL, NULL, NIL, -1, NIL, NULL};
+	SplitAllocResult initResult = {NULL, NULL, NIL, 0, NIL, NULL};
 	ppResult->saResult = initResult;
 	ppResult->stmt = NULL;
 	static int plannerLevel = 0;
@@ -300,6 +328,8 @@ planner(Query *parse, int cursorOptions,
 	 * resource to run this query. After gaining the resource, we can perform the
 	 * actual optimization.
 	 */
+	increase_planning_depth();
+
 	plannerLevel++;
 	if (!resourceNegotiateDone)
 	{
@@ -308,6 +338,8 @@ planner(Query *parse, int cursorOptions,
       START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Resource_Negotiator));
       {
         resource_negotiator(parse, cursorOptions, boundParams, resourceLife, &ppResult);
+
+		decrease_planning_depth();
 
 		if(ppResult->stmt && ppResult->stmt->planTree)
 		{
@@ -318,6 +350,8 @@ planner(Query *parse, int cursorOptions,
 	  }
 	  PG_CATCH();
 	  {
+		decrease_planning_depth();
+
 		if ((ppResult != NULL))
 		{
 		  pfree(ppResult);
@@ -430,7 +464,7 @@ planner(Query *parse, int cursorOptions,
 	  }
 	  else
 	  {
-	    gp_segments_for_planner = -1;
+	    gp_segments_for_planner = 0;
 	  }
 	  SetActiveQueryResource(savedQueryResource);
 	  if ((ppResult != NULL))
@@ -450,7 +484,7 @@ planner(Query *parse, int cursorOptions,
 		}
 		else
 		{
-			gp_segments_for_planner = -1;
+			gp_segments_for_planner = 0;
 		}
 		SetActiveQueryResource(savedQueryResource);
 
@@ -470,6 +504,7 @@ planner(Query *parse, int cursorOptions,
 	return result;
 }
 
+
 /*
  * The new framework for HAWQ 2.0 query optimizer
  */
@@ -480,6 +515,8 @@ resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
   PlannedStmt *plannedstmt = NULL;
   do
   {
+  		udf_collector_context udf_context;
+  		udf_context.udf_exist = false;
     SplitAllocResult *allocResult = NULL;
     Query *my_parse = copyObject(parse);
     ParamListInfo my_boundParams = copyParamList(boundParams);
@@ -495,12 +532,24 @@ resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
        */
       allocResult = calculate_planner_segment_num(my_parse, resourceLife,
                                           plannedstmt->rtable, plannedstmt->intoPolicy,
-                                          plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1);
+                                          plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1,
+                                          -1);
 
       Assert(allocResult);
 
       (*result)->saResult = *allocResult;
       pfree(allocResult);
+    }else{
+    		find_udf(my_parse, &udf_context);
+    		if(udf_context.udf_exist){
+    			if ((resourceLife == QRL_ONCE) || (resourceLife == QRL_NONE)) {
+    				int64 mincost = min_cost_for_each_query;
+    				mincost <<= 20;
+    				int avgSliceNum = 3;
+    				(*result)->saResult.resource = AllocateResource(QRL_ONCE, avgSliceNum, mincost,
+    						GetUserDefinedFunctionVsegNum(),GetUserDefinedFunctionVsegNum(),NULL, 0);
+    			}
+    		}
     }
   } while (0);
 }
