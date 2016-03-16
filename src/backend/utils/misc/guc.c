@@ -6269,7 +6269,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &segment_history_keep_period,
-            30, 1, INT_MAX, NULL, NULL
+            365, 1, INT_MAX, NULL, NULL
     },
 
     {
