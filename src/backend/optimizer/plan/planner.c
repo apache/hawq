@@ -544,10 +544,10 @@ resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
     		if(udf_context.udf_exist){
     			if ((resourceLife == QRL_ONCE) || (resourceLife == QRL_NONE)) {
     				int64 mincost = min_cost_for_each_query;
-					mincost <<= 20;
-					int avgSliceNum = 3;
-					(*result)->saResult.resource = AllocateResource(QRL_ONCE, avgSliceNum, mincost,
-							GetUserDefinedFunctionVsegNum(),GetUserDefinedFunctionVsegNum(),NULL, 0);
+    				mincost <<= 20;
+    				int avgSliceNum = 3;
+    				(*result)->saResult.resource = AllocateResource(QRL_ONCE, avgSliceNum, mincost,
+    						GetUserDefinedFunctionVsegNum(),GetUserDefinedFunctionVsegNum(),NULL, 0);
     			}
     		}
     }
