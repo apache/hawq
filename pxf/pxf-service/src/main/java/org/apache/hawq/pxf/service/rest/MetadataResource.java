@@ -57,7 +57,7 @@ public class MetadataResource extends RestResource {
     }
 
     /**
-     * This function queries the underlying store based on the given profile to get schema for the given item(s)
+     * This function queries the underlying store based on the given profile to get schema for items that match the given pattern
      * metadata: Item name, field names, field types. The types are converted
      * from the underlying types to HAWQ types.
      * Unsupported types result in an error. <br>
@@ -69,9 +69,9 @@ public class MetadataResource extends RestResource {
      * @param servletContext servlet context
      * @param headers http headers
      * @param profile based on this the metadata source can be inferred
-     * @param item table/file name or pattern in the given source
-     * @return JSON formatted response with metadata for given item(s)
-     * @throws Exception if connection to the source/catalog failed, item didn't exist or
+     * @param pattern table/file name or pattern in the given source
+     * @return JSON formatted response with metadata of each item that corresponds to the pattern
+     * @throws Exception if connection to the source/catalog failed, item didn't exist for the pattern
      *             its type or fields are not supported
      */
     @GET
@@ -80,7 +80,7 @@ public class MetadataResource extends RestResource {
     public Response read(@Context final ServletContext servletContext,
                          @Context final HttpHeaders headers,
                          @QueryParam("profile") final String profile,
-                         @QueryParam("item") final String item)
+                         @QueryParam("pattern") final String pattern)
             throws Exception {
         LOG.debug("getMetadata started");
         String jsonOutput;
@@ -89,7 +89,7 @@ public class MetadataResource extends RestResource {
             MetadataFetcher metadataFetcher = MetadataFetcherFactory.create(profile.toLowerCase());
 
             // 2. get Metadata
-            List<Metadata> metadata = metadataFetcher.getMetadata(item);
+            List<Metadata> metadata = metadataFetcher.getMetadata(pattern);
 
             // 3. serialize to JSON
             jsonOutput = MetadataResponseFormatter.formatResponseString(metadata);

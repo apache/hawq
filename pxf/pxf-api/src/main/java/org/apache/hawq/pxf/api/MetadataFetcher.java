@@ -39,9 +39,9 @@ public abstract class MetadataFetcher {
     /**
      * Gets a metadata of a given table
      *
-     * @param itemName table/file name or pattern
+     * @param pattern table/file name or pattern
      * @return metadata of given item(s)
      * @throws Exception if metadata information could not be retrieved
      */
-    public abstract List<Metadata> getMetadata(String itemName) throws Exception;
+    public abstract List<Metadata> getMetadata(String pattern) throws Exception;
 }

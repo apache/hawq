@@ -50,9 +50,9 @@ public class HiveMetadataFetcher extends MetadataFetcher {
     }
 
     @Override
-    public List<Metadata> getMetadata(String tableName) throws Exception {
+    public List<Metadata> getMetadata(String pattern) throws Exception {
 
-        List<Metadata.Item> tblsDesc = HiveUtilities.extractTablesFromPattern(client, tableName);
+        List<Metadata.Item> tblsDesc = HiveUtilities.extractTablesFromPattern(client, pattern);
         List<Metadata> metadataList = new ArrayList<Metadata>();
 
         for(Metadata.Item tblDesc: tblsDesc) {
