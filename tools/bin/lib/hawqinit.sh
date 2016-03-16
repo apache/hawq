@@ -473,13 +473,49 @@ check_data_directorytory() {
         ${MKDIR} -p ${default_sdd}
     fi
     # Check if data directory already exist and clean.
+    if [ "${hawq_data_directory}" = "" ]; then
+        LOG_MSG "[ERROR]:-Data directory path is not valid value on ${host_name}" verbose
+        exit 1
+    fi
+
     if [ -d ${hawq_data_directory} ]; then
-        if [ "$(ls -A ${hawq_data_directory})" ] && [ "${hawq_data_directory}" != "" ]; then
+        if [ "$(ls -A ${hawq_data_directory})" ]; then
              LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} is not empty on ${host_name}" verbose
              exit 1
         fi
     else
         LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} does not exist, please create it" verbose
+        exit 1
+    fi
+}
+
+check_standby_data_directorytory() {
+    # If it's default directory, create it if not exist.
+    default_mdd=~/hawq-data-directory/masterdd
+    default_sdd=~/hawq-data-directory/segmentdd
+    if [ "${hawq_data_directory}" = "${default_mdd}" ]; then
+        ${MKDIR} -p ${default_mdd}
+    elif [ "${hawq_data_directory}" = "${default_sdd}" ]; then
+        ${MKDIR} -p ${default_sdd}
+    fi
+    # Check if data directory already exist and clean.
+    if [ "${hawq_data_directory}" = "" ]; then
+        LOG_MSG "[ERROR]:-Data directory path is not valid value on ${host_name}" verbose
+        exit 1
+    fi
+
+    if [ -d "${hawq_data_directory}" ]; then
+        if [ "$(ls -A ${hawq_data_directory}| ${GREP} -v pg_log)" ]; then
+            LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} is not empty on ${host_name}" verbose
+            exit 1
+        else
+            if [ -d ${hawq_data_directory}/pg_log ] && [ "$(ls -A ${hawq_data_directory}/pg_log)" ]; then
+                 LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} is not empty on ${host_name}" verbose
+                 exit 1
+            fi
+        fi
+    else
+        LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} does not exist on ${host_name}, please create it" verbose
         exit 1
     fi
 }
@@ -504,7 +540,7 @@ if [ ${object_type} == "master" ]; then
     check_temp_directory
     master_init
 elif [ ${object_type} == "standby" ]; then
-    check_data_directorytory
+    check_standby_data_directorytory
     standby_init
 elif [ ${object_type} == "segment" ]; then
     check_data_directorytory
