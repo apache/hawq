@@ -473,7 +473,7 @@ cleanup:
 
 /*
  * Remove records in gp_configuration_history that are longer than
- * a period defined in GUC, the default values is 30 days.
+ * a period defined in GUC, the default values is 365 days.
  */
 void cleanup_segment_config_history(){
 	int	libpqres = CONNECTION_OK;
@@ -531,7 +531,8 @@ void cleanup_segment_config_history(){
 		goto cleanup;
 	}
 
-	elog(LOG, "Cleanup segment configuration history catalog table successfully!");
+	elog(LOG, "Cleanup segment configuration history catalog table successfully, "
+			  "keep period: recent %d days.", segment_history_keep_period);
 
 cleanup:
 	if(sql)
