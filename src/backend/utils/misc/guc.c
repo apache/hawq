@@ -6264,6 +6264,15 @@ static struct config_int ConfigureNamesInt[] =
     },
 
     {
+            {"hawq_segment_history_keep_period", PGC_POSTMASTER, RESOURCES_MGM,
+                    gettext_noop("period of storing rows in segment_configuration_history"),
+                    NULL
+            },
+            &segment_history_keep_period,
+            30, 1, INT_MAX, NULL, NULL
+    },
+
+    {
             {"hawq_rm_master_domain_port", PGC_POSTMASTER, RESOURCES_MGM,
                     gettext_noop("resource manager master domain socket port number"),
                     NULL

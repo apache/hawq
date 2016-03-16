@@ -479,6 +479,8 @@ int ResManagerMainServer2ndPhase(void)
 	/* Clean up gp_segment_configuration table. */
 	cleanup_segment_config();
 
+	cleanup_segment_config_history();
+
 	/*
 	 * register itself into gp_segment_configuration table
 	 * master internal id is 0, segment id starts from 1
