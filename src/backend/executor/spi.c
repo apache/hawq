@@ -1146,6 +1146,20 @@ SPI_cursor_open(const char *name, SPIPlanPtr plan,
 	qtlist = copyObject(qtlist);
 	ptlist = copyObject(ptlist);
 
+	PlannedStmt* stmt = (PlannedStmt*)linitial(ptlist);
+
+	if ( (Gp_role == GP_ROLE_DISPATCH) &&
+			 (stmt->resource_parameters != NULL) )
+	{
+		/*
+		 * Now, we want to allocate resource.
+		 */
+		stmt->resource = AllocateResource(stmt->resource_parameters->life, stmt->resource_parameters->slice_size,
+				stmt->resource_parameters->iobytes, stmt->resource_parameters->max_target_segment_num,
+				stmt->resource_parameters->min_target_segment_num, stmt->resource_parameters->vol_info,
+				stmt->resource_parameters->vol_info_size);
+	}
+
 	/* If the plan has parameters, set them up */
 	if (spiplan->nargs > 0)
 	{
@@ -1846,12 +1860,12 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
 				 * We only allocate resource for multiple executions of queries, NOT for utility commands.
 				 * SELECT/INSERT are supported at present.
 				 */
-				if( (queryTree->commandType == CMD_SELECT) ||
-				    (queryTree->commandType == CMD_INSERT) )
+				if((queryTree->commandType == CMD_SELECT) ||
+						(queryTree->commandType == CMD_INSERT))
 				{
-					if ( (Gp_role == GP_ROLE_DISPATCH) &&
-					     (stmt->resource == NULL) &&
-					     (stmt->resource_parameters != NULL) )
+					if ((Gp_role == GP_ROLE_DISPATCH) &&
+							(stmt->resource == NULL) &&
+							(stmt->resource_parameters != NULL))
 					{
 						SplitAllocResult *allocResult = NULL;
 
