@@ -50,9 +50,9 @@ public class HiveMetadataFetcher extends MetadataFetcher {
     }
 
     @Override
-    public List<Metadata> getMetadata(String itemName) throws Exception {
+    public List<Metadata> getMetadata(String tableName) throws Exception {
 
-        List<Metadata.Item> tblsDesc = HiveUtilities.extractTablesFromPattern(client, itemName);
+        List<Metadata.Item> tblsDesc = HiveUtilities.extractTablesFromPattern(client, tableName);
         List<Metadata> metadataList = new ArrayList<Metadata>();
 
         for(Metadata.Item tblDesc: tblsDesc) {
@@ -67,7 +67,7 @@ public class HiveMetadataFetcher extends MetadataFetcher {
 
 
     /**
-     * Populates the given metadata item with the given table's fields and partitions,
+     * Populates the given metadata object with the given table's fields and partitions,
      * The partition fields are added at the end of the table schema.
      * Throws an exception if the table contains unsupported field types.
      * Supported HCatalog types: TINYINT,

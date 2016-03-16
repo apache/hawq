@@ -217,7 +217,7 @@ public class HiveDataFragmenter extends Fragmenter {
             if (partitions == null || partitions.isEmpty()) {
 
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Item -  " + tblDesc.getPath() + "."
+                    LOG.debug("Table -  " + tblDesc.getPath() + "."
                             + tblDesc.getName()
                             + " Has no matched partitions for the filter : "
                             + filterStringForHive);
@@ -226,7 +226,7 @@ public class HiveDataFragmenter extends Fragmenter {
             }
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Item -  " + tblDesc.getPath() + "."
+                LOG.debug("Table -  " + tblDesc.getPath() + "."
                         + tblDesc.getName()
                         + " Matched partitions list size: " + partitions.size());
             }

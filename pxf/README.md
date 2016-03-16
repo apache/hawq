@@ -12,7 +12,7 @@ Introduction
 ============
 
 PXF is an extensible framework that allows HAWQ to query external system data.
-PXF includes built-in connectors for accessing data that exists inside HDFS files, Hive items, HBase items and more.
+PXF includes built-in connectors for accessing data that exists inside HDFS files, Hive tables, HBase tables and more.
 Users can also create their own connectors to other parallel data stores or processing engines.
 To create these connectors using JAVA plugins, see the Pivotal Extension Framework API and Reference Guide .
 

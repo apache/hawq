@@ -26,13 +26,13 @@ import java.util.List;
 import org.apache.commons.lang.StringUtils;
 
 /**
- * Metadata holds a item's metadata information.
+ * Metadata holds an item's metadata information.
  * {@link MetadataFetcher#getMetadata} returns the item's metadata.
  */
 public class Metadata {
 
     /**
-     * Class representing item name - db (schema) name and item name.
+     * Class representing item name - db/schema/path name and table/file name.
      */
     public static class Item {
         private String path;
@@ -113,7 +113,7 @@ public class Metadata {
     private List<Metadata.Field> fields;
 
     /**
-     * Constructs a item's Metadata.
+     * Constructs an item's Metadata.
      *
      * @param itemName the item name
      * @param fields the item's fields
