@@ -346,6 +346,17 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG:
 		case RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG:
 		{
+
+			/* The empty value is not allowed. */
+			if ( SimpleStringEmpty(&(property->Val)) )
+			{
+				snprintf(errorbuf, errorbufsize,
+						 "the value of %s cannot be empty",
+						 RSQDDLAttrNames[attrindex]);
+				elog(WARNING, "Resource manager failed parsing attribute, %s",
+							  errorbuf);
+				return RMDDL_WRONG_ATTRVALUE;
+			}
 			/*
 			 * Build property.
 			 *
