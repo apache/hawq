@@ -568,7 +568,7 @@ int handleRB2RM_ClusterReport(void)
 	}
 
 	elog(LOG, "YARN mode resource broker got cluster report having %d host(s), "
-			  "maximum capacity is %lf.",
+			  "maximum queue capacity is %lf.",
 			  response.MachineCount,
 			  response.QueueMaxCapacity);
 
@@ -630,6 +630,19 @@ int handleRB2RM_ClusterReport(void)
 	/*
 	 * TILL NOW, the whole message content is received.
 	 */
+
+	if ( res == FUNC_RETURN_OK )
+	{
+		/* Check if the YARN resource queue report is valid, i.e. maximum
+		 * capacity and capacity are all greater than 0.
+		 */
+		if ( response.QueueCapacity <= 0 || response.QueueMaxCapacity <= 0 )
+		{
+			elog(WARNING, "YARN mode resource broker got invalid cluster report");
+			res = RESBROK_WRONG_GLOB_MGR_QUEUEREPORT;
+
+		}
+	}
 
 	/* If something wrong, no need to keep the received content, free them. */
 	if ( res != FUNC_RETURN_OK )
@@ -1176,6 +1189,7 @@ void RB_LIBYARN_handleError(int errorcode)
 	}
 	else
 	{
-		Assert(errorcode == FUNC_RETURN_OK);
+		Assert(errorcode == FUNC_RETURN_OK ||
+			   errorcode == RESBROK_WRONG_GLOB_MGR_QUEUEREPORT);
 	}
 }
