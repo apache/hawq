@@ -86,7 +86,7 @@ public class MetadataResource extends RestResource {
         String jsonOutput;
         try {
             // 1. start MetadataFetcher
-            MetadataFetcher metadataFetcher = MetadataFetcherFactory.create(profile);
+            MetadataFetcher metadataFetcher = MetadataFetcherFactory.create(profile.toLowerCase());
 
             // 2. get Metadata
             List<Metadata> metadata = metadataFetcher.getMetadata(item);
