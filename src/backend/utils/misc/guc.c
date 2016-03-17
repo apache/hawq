@@ -6379,7 +6379,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nvseg_perquery_limit,
-            512, 1, 65535, NULL, NULL
+            1000, 1, 65535, NULL, NULL
     },
 
     {
@@ -6535,7 +6535,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&rm_rejectrequest_nseg_limit,
-		4, 0, 65535, NULL, NULL
+		2, 0, 65535, NULL, NULL
 	},
 
 	{
