@@ -204,6 +204,7 @@ typedef struct PlannedStmt
 		MemoryAccount *memoryAccount;
 
 		StringInfo datalocalityInfo;
+        double     datalocalityTime;
 } PlannedStmt;
 
 

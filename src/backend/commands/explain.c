@@ -470,7 +470,7 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
     MemoryContext   oldcxt = CurrentMemoryContext;
 	QueryDesc  *queryDesc;
 	instr_time	starttime;
-	double		totaltime = 0;
+	double		totaltime = plannedstmt->datalocalityTime / 1000;
     StringInfo  buf = &es->outbuf;
     EState     *estate = NULL;
 	int			eflags;
