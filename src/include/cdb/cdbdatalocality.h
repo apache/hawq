@@ -46,6 +46,7 @@ typedef struct SplitAllocResult
   int planner_segments;
   List *relsType;// relation type after datalocality changing
   StringInfo datalocalityInfo;
+  double datalocalityTime;
 } SplitAllocResult;
 
 /*

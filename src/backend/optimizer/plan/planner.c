@@ -459,6 +459,7 @@ planner(Query *parse, int cursorOptions,
 		result->scantable_splits = ppResult->saResult.alloc_results;
 		result->planner_segments = ppResult->saResult.planner_segments;
 		result->datalocalityInfo = ppResult->saResult.datalocalityInfo;
+        result->datalocalityTime = ppResult->saResult.datalocalityTime;
 	}
 	plannerLevel--;
 	if ((ppResult != NULL))

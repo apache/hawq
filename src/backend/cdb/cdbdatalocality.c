@@ -309,6 +309,10 @@ typedef struct split_to_segment_mapping_context {
 	int64 total_file_count;
 
 	int64 total_metadata_logic_len;
+
+    int metadata_cache_time_us;
+    int alloc_resource_time_us;
+    int cal_datalocality_time_us;
 } split_to_segment_mapping_context;
 
 typedef struct vseg_list{
@@ -569,6 +573,10 @@ static void init_datalocality_context(split_to_segment_mapping_context *context)
 	context->total_split_count = 0;
 	context->total_file_count = 0;
 	context->total_metadata_logic_len = 0;
+
+    context->metadata_cache_time_us = 0;
+    context->alloc_resource_time_us = 0;
+    context->cal_datalocality_time_us = 0;
 	return;
 }
 
@@ -928,6 +936,8 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 	}
 	context->total_file_count = totalFileCount;
 	context->total_size = total_size;
+    
+    context->metadata_cache_time_us = eclaspeTime;
 
 	if(debug_datalocality_time){
 		elog(LOG, "metadata overall execution time: %d us. \n", eclaspeTime);
@@ -3395,13 +3405,13 @@ static void print_datalocality_overall_log_information(SplitAllocResult *result,
 	appendStringInfo(result->datalocalityInfo, "data locality ratio: %.3f; virtual segment number: %d; "
 			"different host number: %d; virtual segment number per host(avg/min/max): (%d/%d/%d); "
 			"segment size(avg/min/max): (%.3f B/"INT64_FORMAT" B/"INT64_FORMAT" B); "
-			"segment size with penalty(avg/min/max): (%.3f B/"INT64_FORMAT" B/"INT64_FORMAT" B); continuity(avg/min/max): (%.3f/%.3f/%.3f)."
+			"segment size with penalty(avg/min/max): (%.3f B/"INT64_FORMAT" B/"INT64_FORMAT" B); continuity(avg/min/max): (%.3f/%.3f/%.3f); "
 			,log_context->datalocalityRatio,assignment_context->virtual_segment_num,log_context->numofDifferentHost,
 			log_context->avgSegmentNumofHost,log_context->minSegmentNumofHost,log_context->maxSegmentNumofHost,
 			log_context->avgSizeOverall,log_context->minSizeSegmentOverall,log_context->maxSizeSegmentOverall,
 			log_context->avgSizeOverallPenalty,log_context->minSizeSegmentOverallPenalty,log_context->maxSizeSegmentOverallPenalty,
-			log_context->avgContinuityOverall,log_context->minContinuityOverall,log_context->maxContinuityOverall
-			);
+			log_context->avgContinuityOverall,log_context->minContinuityOverall,log_context->maxContinuityOverall);
+
 	if (debug_fake_datalocality) {
 			fprintf(fp, "datalocality ratio: %.3f; virtual segments number: %d, "
 					"different host number: %d, segment number per host(avg/min/max): (%d/%d/%d); "
@@ -3919,9 +3929,17 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 	uint64_t run_datalocality = 0;
 	run_datalocality = gettime_microsec();
 	int dl_overall_time = run_datalocality - before_run_allocation;
+    
+    context->cal_datalocality_time_us = dl_overall_time; 
+
 	if(debug_datalocality_time){
 		elog(LOG, "datalocality overall execution time: %d us. \n", dl_overall_time);
 	}
+
+    result->datalocalityTime = (double)(context->metadata_cache_time_us + context->alloc_resource_time_us + context->cal_datalocality_time_us)/ 1000;
+    appendStringInfo(result->datalocalityInfo, "DFS metadatacache: %.3f ms; resource allocation: %.3f ms; datalocality calculation: %.3f ms.",
+            (double)context->metadata_cache_time_us/1000, (double)context->alloc_resource_time_us/1000, (double)context->cal_datalocality_time_us/1000);  
+
 	return alloc_result;
 }
 
@@ -3980,6 +3998,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	result->relsType = NIL;
 	result->planner_segments = -1;
 	result->datalocalityInfo = makeStringInfo();
+    result->datalocalityTime = 0;
 
 	/* fake data locality */
 	if (debug_fake_datalocality) {
@@ -4230,6 +4249,9 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			}
 			uint64_t after_rm_allocate_resource = gettime_microsec();
 			int eclaspeTime = after_rm_allocate_resource - before_rm_allocate_resource;
+        
+            context.alloc_resource_time_us = eclaspeTime;
+
 			if(debug_datalocality_time){
 				elog(LOG, "rm allocate resource overall execution time: %d us. \n", eclaspeTime);
 			}
