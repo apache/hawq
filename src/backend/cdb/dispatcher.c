@@ -1240,6 +1240,8 @@ dispatch_run(DispatchData *data)
 	 * Only after we have the executors, we can serialize the state. Or we
 	 * don't know the executor listening address.
 	 */
+	CHECK_FOR_INTERRUPTS();
+
 	dispatcher_serialize_state(data);
 	dispatcher_serialize_query_resource(data);
 	dispatcher_set_state_run(data);
