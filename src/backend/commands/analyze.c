@@ -143,7 +143,7 @@ static void analyzeComputeAttributeStatistics(Oid relationOid,
 		float4 sampleTableRelTuples, 
 		bool mergeStats,
 		AttributeStatistics *stats);
-static List* analyzableRelations(bool rootonly);
+static List* analyzableRelations(bool rootonly, List** fullRelOids);
 static bool analyzePermitted(Oid relationOid);
 static List *analyzableAttributes(Relation candidateRelation);
 static int calculate_virtual_segment_number(List* candidateRelations);
@@ -300,6 +300,7 @@ void analyzeStatement(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 {
 	List	   			  	*lRelOids = NIL;
+	List	   			  	*lFullRelOids = NIL;
 	MemoryContext			callerContext = NULL;
 	MemoryContext 			analyzeStatementContext = NULL;
 	MemoryContext 			analyzeRelationContext = NULL;
@@ -379,7 +380,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		/**
 		 * ANALYZE entire DB.
 		 */
-		lRelOids = analyzableRelations(stmt->rootonly);
+		lRelOids = analyzableRelations(stmt->rootonly, &lFullRelOids);
 		if (stmt->rootonly && NIL == lRelOids)
 		{
 			ereport(WARNING,
@@ -392,6 +393,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		 * ANALYZE called by autovacuum.
 		 */
 		lRelOids = relids;
+		lFullRelOids = relids;
 	}
 	else
 	{
@@ -419,11 +421,14 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 			{
 				lRelOids = all_leaf_partition_relids(pn); /* all leaves */
 			}
+			lFullRelOids = all_leaf_partition_relids(pn);
 			lRelOids = lappend_oid(lRelOids, relationOid); /* root partition */
+			lFullRelOids = lappend_oid(lFullRelOids, relationOid); /* root partition */
 			if (optimizer_analyze_midlevel_partition)
 			{
 				lRelOids = list_concat(lRelOids, all_interior_partition_relids(pn)); /* interior partitions */
 			}
+			lFullRelOids = list_concat(lFullRelOids, all_interior_partition_relids(pn)); /* interior partitions */
 		}
 		else if (ps == PART_STATUS_INTERIOR) /* analyze an interior partition directly */
 		{
@@ -440,6 +445,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		else
 		{
 			lRelOids = list_make1_oid(relationOid);
+			lFullRelOids = list_make1_oid(relationOid);
 		}
 	}
 
@@ -472,6 +478,17 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	}
 
 	/**
+	 *  we use preferred_seg_num as default and
+	 *  compute target_seg_num based on data size and distributed type
+	 *  if there is no preferred_seg_num.
+	 */
+	int target_seg_num = preferred_seg_num;
+	if (target_seg_num <= 0) {
+		target_seg_num = calculate_virtual_segment_number(lFullRelOids);
+	}
+	elog(LOG, "virtual segment number of analyze is: %d\n", target_seg_num);
+
+	/**
 	 * We open relations with appropreciate locks
 	 */
 	List *candidateRelations = NIL;
@@ -497,17 +514,6 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 			            RelationGetRelationName(candidateRelation));
 		}
 	}
-
-	/**
-	 *  we use preferred_seg_num as default and
-	 *  compute target_seg_num based on data size and distributed type
-	 *  if there is no preferred_seg_num.
-	 */
-	int target_seg_num = preferred_seg_num;
-	if (target_seg_num <= 0) {
-		target_seg_num = calculate_virtual_segment_number(candidateRelations);
-	}
-	elog(LOG, "virtual segment number of analyze is: %d\n", target_seg_num);
 
 	/**
 	 * We allocate query resource for analyze
@@ -809,19 +815,23 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
  * if there is hash distributed relations exist, use the max bucket number.
  * if all relation are random, use the data size to determine vseg number.
  */
-static int calculate_virtual_segment_number(List* candidateRelations) {
+static int calculate_virtual_segment_number(List* candidateOids) {
 	ListCell* le1;
 	int vsegNumber = 1;
 	int64 totalDataSize = 0;
 	bool isHashRelationExist = false;
 	int maxHashBucketNumber = 0;
 
-	foreach (le1, candidateRelations)
+	foreach (le1, candidateOids)
 	{
-		Relation rel = (Relation)lfirst(le1);
-		if (rel ) {
+		Oid				candidateOid	  = InvalidOid;
+		candidateOid = lfirst_oid(le1);
+
+		//Relation rel = (Relation)lfirst(le1);
+		Relation rel = relation_open(candidateOid, AccessShareLock);
+		if (candidateOid > 0 ) {
 			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext,
-					rel->rd_id);
+					candidateOid);
 			if(targetPolicy == NULL){
 				return GetAnalyzeVSegNumLimit();
 			}
@@ -838,6 +848,7 @@ static int calculate_virtual_segment_number(List* candidateRelations) {
 				totalDataSize += calculate_relation_size(rel);
 			}
 		}
+		relation_close(rel, AccessShareLock);
 	}
 
 	if (isHashRelationExist) {
@@ -942,7 +953,7 @@ static bool analyzePermitted(Oid relationOid)
  * Output:
  * 	List of relids
  */
-static List* analyzableRelations(bool rootonly)
+static List* analyzableRelations(bool rootonly, List **fullRelOids)
 {
 	List	   		*lRelOids = NIL;
 	cqContext		*pcqCtx;
@@ -957,6 +968,11 @@ static List* analyzableRelations(bool rootonly)
 	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
 	{
 		Oid candidateOid = HeapTupleGetOid(tuple);
+		if (analyzePermitted(candidateOid)
+						&& candidateOid != StatisticRelationId)
+		{
+			*fullRelOids = lappend_oid(*fullRelOids, candidateOid);
+		}
 		if (rootonly && !rel_is_partitioned(candidateOid))
 		{
 			continue;
