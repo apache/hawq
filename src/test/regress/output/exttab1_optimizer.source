@@ -557,9 +557,11 @@ drop external table ext_mpp12839;
 -- test for exec child process stderr showing in error message
 --
 create external web table ext_stderr1(a text) execute 'nosuchcommand' format 'text';
-ERROR:  the ON ALL syntax for external tables is deprecated
+ERROR:  ON clause must be specified in external table
+HINT:  Use ON number instread
 create external web table ext_stderr2(a text) execute 'cat nosuchfile.txt' format 'text';
-ERROR:  the ON ALL syntax for external tables is deprecated
+ERROR:  ON clause must be specified in external table
+HINT:  Use ON number instread
 --
 -- bad csv (quote must be a single char)
 --
