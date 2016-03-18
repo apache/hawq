@@ -28,6 +28,7 @@
 #include "gp-libpq-int.h"
 #include "utils/builtins.h"
 #include "catalog/pg_proc.h"
+#include "cdb/cdbvars.h"
 
 void addSegResourceAvailIndex(SegResource segres);
 void addSegResourceAllocIndex(SegResource segres);
@@ -471,6 +472,77 @@ cleanup:
 }
 
 /*
+ * Remove records in gp_configuration_history that are longer than
+ * a period defined in GUC, the default values is 365 days.
+ */
+void cleanup_segment_config_history(){
+	int	libpqres = CONNECTION_OK;
+	PGconn *conn = NULL;
+	char conninfo[512];
+	PQExpBuffer sql = NULL;
+	PGresult* result = NULL;
+
+	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
+			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
+	conn = PQconnectdb(conninfo);
+	if ((libpqres = PQstatus(conn)) != CONNECTION_OK)
+	{
+		elog(WARNING, "Fail to connect database when cleanup "
+				      "segment history catalog table, error code: %d, %s",
+				      libpqres,
+				      PQerrorMessage(conn));
+		PQfinish(conn);
+		return;
+	}
+
+	result = PQexec(conn, "BEGIN");
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when cleanup "
+				      "segment history catalog table, reason : %s",
+				      "BEGIN",
+				      PQresultErrorMessage(result));
+		goto cleanup;
+	}
+	PQclear(result);
+
+	sql = createPQExpBuffer();
+	appendPQExpBuffer(sql,"DELETE FROM gp_configuration_history WHERE "
+						  "current_timestamp - time > interval '%d days'",
+						  segment_history_keep_period);
+	result = PQexec(conn, sql->data);
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when cleanup "
+				      "segment history catalog table, reason : %s",
+				      sql->data,
+				      PQresultErrorMessage(result));
+		goto cleanup;
+	}
+	PQclear(result);
+
+	result = PQexec(conn, "COMMIT");
+	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
+	{
+		elog(WARNING, "Fail to run SQL: %s when cleanup "
+				      "segment history catalog table, reason : %s",
+				      "COMMIT",
+				      PQresultErrorMessage(result));
+		goto cleanup;
+	}
+
+	elog(LOG, "Cleanup segment configuration history catalog table successfully, "
+			  "keep period: recent %d days.", segment_history_keep_period);
+
+cleanup:
+	if(sql)
+		destroyPQExpBuffer(sql);
+	if(result)
+		PQclear(result);
+	PQfinish(conn);
+}
+
+/*
  * Remove all entries in gp_configuration_history.
  *
  * gp_remove_segment_history()
@@ -500,7 +572,7 @@ gp_remove_segment_history(PG_FUNCTION_ARGS)
 	if ((libpqres = PQstatus(conn)) != CONNECTION_OK)
 	{
 		elog(WARNING, "Fail to connect database when cleanup "
-					  "segment configuration catalog table, error code: %d, %s",
+					  "segment history catalog table, error code: %d, %s",
 					  libpqres,
 					  PQerrorMessage(conn));
 		PQfinish(conn);

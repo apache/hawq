@@ -1148,6 +1148,7 @@ extern int     seg_addr_port;
 extern char   *dfs_url;
 extern char   *master_directory;
 extern char   *seg_directory;
+extern int    segment_history_keep_period;
 
 /* HAWQ 2.0 resource manager GUCs */
 extern int	   rm_master_domain_port;

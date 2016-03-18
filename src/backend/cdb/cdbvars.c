@@ -297,6 +297,7 @@ int    seg_addr_port;
 char  *dfs_url;
 char  *master_directory;
 char  *seg_directory;
+int    segment_history_keep_period;
 
 /* HAWQ 2.0 resource manager GUCs */
 int    rm_master_port;

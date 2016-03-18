@@ -670,6 +670,9 @@ void adjustMemoryCoreValue(uint32_t *memorymb, uint32_t *core);
 /* Clean up gp_segment_configuration */
 void cleanup_segment_config(void);
 
+/* Clean up gp_configuration_history */
+void cleanup_segment_config_history(void);
+
 #define SEG_STATUS_DESCRIPTION_UP "segment is up"
 /* update a segment's status in gp_segment_configuration table */
 void update_segment_status(int32_t id, char status, char* description);
