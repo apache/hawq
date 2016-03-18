@@ -312,7 +312,7 @@ apply_motion(PlannerInfo *root, Plan *plan, Query *query)
 				
 					targetPolicy = palloc0(sizeof(GpPolicy)- sizeof(targetPolicy->attrs) + maxattrs * sizeof(targetPolicy->attrs[0]));
 					targetPolicy->nattrs = 0;
-					targetPolicy->bucketnum = GetRelOpt_bucket_num_fromRangeVar(query->intoClause->rel, GetRandomDistPartitionNum());
+					targetPolicy->bucketnum = GetRelOpt_bucket_num_fromRangeVar(query->intoClause->rel, GetDefaultPartitionNum());
 					targetPolicy->ptype = POLICYTYPE_PARTITIONED;
 					
 					/* Find out what the flow is partitioned on */

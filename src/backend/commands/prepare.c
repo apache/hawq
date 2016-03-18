@@ -242,7 +242,7 @@ ExecuteQuery(ExecuteStmt *stmt, const char *queryString,
 									+ 255 * sizeof(pstmt->intoPolicy->attrs[0]));
 		pstmt->intoPolicy->nattrs = 0;
 		pstmt->intoPolicy->ptype = POLICYTYPE_PARTITIONED;
-		pstmt->intoPolicy->bucketnum = GetRelOpt_bucket_num_fromRangeVar(stmt->into->rel, GetRandomDistPartitionNum());
+		pstmt->intoPolicy->bucketnum = GetRelOpt_bucket_num_fromRangeVar(stmt->into->rel, GetDefaultPartitionNum());
 		
 		MemoryContextSwitchTo(oldContext);
 	}

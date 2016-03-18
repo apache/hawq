@@ -4516,7 +4516,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&default_hash_table_bucket_number,
-		6, 1, 10000, NULL, NULL
+		6, 1, 65535, NULL, NULL
 	},
 
 	{
@@ -4525,7 +4525,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&hawq_rm_nvseg_for_copy_from_perquery,
-		6, 1, 10000, NULL, NULL
+		6, 1, 65535, NULL, NULL
 	},
 
 	{
@@ -4534,7 +4534,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&hawq_rm_nvseg_for_analyze_perquery_perseg_limit,
-		4, 1, 10000, NULL, NULL
+		4, 1, 65535, NULL, NULL
 	},
 
 	{
@@ -4543,7 +4543,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&hawq_rm_nvseg_for_analyze_perquery_limit,
-		256, 1, 10000, NULL, NULL
+		256, 1, 65535, NULL, NULL
 	},
 
 	{
@@ -6388,7 +6388,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nvseg_perquery_limit,
-            512, 1, 10000, NULL, NULL
+            512, 1, 65535, NULL, NULL
     },
 
     {
@@ -6398,7 +6398,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nvseg_perquery_perseg_limit,
-            6, 1, 10000, NULL, NULL
+            6, 1, 65535, NULL, NULL
     },
 
     {

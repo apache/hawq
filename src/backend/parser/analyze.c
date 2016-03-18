@@ -2724,7 +2724,7 @@ transformETDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 										 sizeof(p->attrs[0]));
 			p->ptype = POLICYTYPE_PARTITIONED;
 			p->nattrs = 0;
-			p->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetRandomDistPartitionNum());
+			p->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetDefaultPartitionNum());
 			p->attrs[0] = 1;
 		}
 
@@ -2981,7 +2981,7 @@ transformDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 
 	if (policy->bucketnum == -1)
 	{
-		policy->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetRandomDistPartitionNum());
+		policy->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetDefaultPartitionNum());
 	}
 
 	*policyp = policy;
@@ -12187,7 +12187,7 @@ setQryDistributionPolicy(SelectStmt *stmt, Query *qry)
 	policy->nattrs = 0;
 	policy->attrs[0] = 1;
 	if(stmt->intoClause != NULL)
-		policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetRandomDistPartitionNum());
+		policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetDefaultPartitionNum());
 
 	if (stmt->distributedBy)
 	{
@@ -12241,7 +12241,7 @@ setQryDistributionPolicy(SelectStmt *stmt, Query *qry)
 		}
 		else
 		{
-			policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetRandomDistPartitionNum());
+			policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetDefaultPartitionNum());
 		}
 	}
 
