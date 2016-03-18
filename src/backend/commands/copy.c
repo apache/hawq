@@ -1888,11 +1888,12 @@ DoCopyTo(CopyState cstate)
 			 */
 			PartitionNode *pn = get_parts(cstate->rel->rd_id, 0 /*level*/ ,
 													0 /*parent*/, false /* inctemplate */, CurrentMemoryContext, true /*includesubparts*/);
-			Assert(pn);
 			List		*lFullRelOids = NIL;
-			lFullRelOids = all_leaf_partition_relids(pn);
-			lFullRelOids = lappend_oid(lFullRelOids, cstate->rel->rd_id); /* root partition */
-			lFullRelOids = list_concat(lFullRelOids, all_interior_partition_relids(pn)); /* interior partitions */
+			if(pn){
+				lFullRelOids = all_leaf_partition_relids(pn);
+				lFullRelOids = list_concat(lFullRelOids, all_interior_partition_relids(pn)); /* interior partitions */
+			}
+			lFullRelOids = lappend_oid(lFullRelOids, cstate->rel->rd_id);
 
 			target_segment_num = calculate_virtual_segment_number(lFullRelOids);
 			elog(LOG, "virtual segment number of copy to is: %d\n", target_segment_num);
