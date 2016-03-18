@@ -155,4 +155,11 @@ extern uint64 SPI_GetMemoryReservation(void);
 extern void SPI_ReserveMemory(uint64 mem_reserved);
 extern bool SPI_IsMemoryReserved(void);
 
+/**
+ * Query resource related routines.
+ */
+extern bool SPI_IsInPrepare(void);
+extern void SPI_IncreasePrepareCounter(void);
+extern void SPI_DecreasePrepareCounter(void);
+
 #endif   /* SPI_H */
