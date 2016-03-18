@@ -1440,6 +1440,7 @@ void *generateResourceRefreshHeartBeat(void *arg)
 				int sockres = 0;
 				while(true)
 				{
+					int on;
 					sockres = connect(fd,
 									  (struct sockaddr *)&server_addr,
 									  sizeof(server_addr));
@@ -1455,8 +1456,34 @@ void *generateResourceRefreshHeartBeat(void *arg)
 									  "failed to connect to resource manager, "
 									  "fd %d (errno %d)", fd, errno);
 							close(fd);
+							fd = -1;
 						}
 					}
+#ifdef	TCP_NODELAY
+					on = 1;
+					if (sockres == 0 &&
+						setsockopt(fd,
+								   IPPROTO_TCP, TCP_NODELAY,
+								   (char *) &on, sizeof(on)) < 0)
+					{
+						write_log("ERROR setsockopt(TCP_NODELAY) failed: %m");
+						close(fd);
+						fd = -1;
+						sockres = -1;
+					}
+#endif
+					on = 1;
+					if (sockres == 0 &&
+						setsockopt(fd,
+								   SOL_SOCKET, SO_KEEPALIVE,
+								   (char *) &on, sizeof(on)) < 0)
+					{
+						write_log("ERROR setsockopt(SO_KEEPALIVE) failed: %m");
+						close(fd);
+						fd = -1;
+						sockres = -1;
+					}
+
 					break;
 				}
 

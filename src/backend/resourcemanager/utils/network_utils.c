@@ -715,3 +715,23 @@ static void cleanupSocketConnectionPool(int code, Datum arg)
 	freePAIRRefList(&ResolvedHostnames, &addrlist);
 	cleanHASHTABLE(&ResolvedHostnames);
 }
+
+int setConnectionLongTermNoDelay(int fd)
+{
+	int on;
+#ifdef	TCP_NODELAY
+	on = 1;
+	if (setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (char *) &on, sizeof(on)) < 0)
+	{
+		elog(WARNING, "setsockopt(TCP_NODELAY) failed: %m");
+		return SYSTEM_CALL_ERROR;
+	}
+#endif
+	on = 1;
+	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, (char *) &on, sizeof(on)) < 0)
+	{
+		elog(WARNING, "setsockopt(SO_KEEPALIVE) failed: %m");
+		return SYSTEM_CALL_ERROR;
+	}
+	return FUNC_RETURN_OK;
+}
