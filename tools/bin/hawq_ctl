@@ -939,6 +939,14 @@ def get_args():
     if args_lens != 2:
         sys.exit('Only support two arguements.')
     
+    if opts.verbose and opts.quiet_run:
+        logger.error("Multiple actions specified.  See the --help info.")
+        sys.exit(1)
+
+    if opts.special_mode and (opts.node_type != 'start'):
+        logger.error("['-U', '--special-mode'] only apply to 'hawq start'.  See the --help info.")
+        sys.exit(1)
+
     opts.GPHOME = os.getenv('GPHOME')
     if not opts.GPHOME:
         logger.error("Didn't get GPHOME value, exit")
@@ -1165,21 +1173,13 @@ def create_parser():
                       action="store_true",
                       dest="quiet_run",
                       help="Execute in quiet mode")
-    parser.add_option("-y", "--nostandby",
-                      action="store_false",
-                      dest="nostandby",
-                      help="Exclude standby master")
     parser.add_option("-l", "--logdir",
                       dest="log_dir",
                       help="Sets the directory for log files")
     parser.add_option("-t", "--timeout",
                       dest="timeout_seconds",
                       default="600",
-                      help="Set the timeout seconds, default is 60")
-    parser.add_option("-B", "--parallel",
-                      dest="parallel_processses",
-                      default="60",
-                      help="Sets the max parallel processes")
+                      help="Set the timeout seconds, default is 600")
     parser.add_option("--user",
                       dest="user",
                       default="",
@@ -1262,6 +1262,7 @@ def create_parser():
     if len(args) == 0:
         parser.print_help()
         sys.exit(1)
+
     return (options, args)
 
 if __name__ == '__main__':
