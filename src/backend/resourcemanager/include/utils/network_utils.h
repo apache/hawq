@@ -109,6 +109,7 @@ int setConnectionNonBlocked(int fd);
 
 #define DRM_SOCKET_CONN_RETRY 5
 int  connectToServerRemote(const char *address,uint16_t port,int *clientfd);
+int setConnectionLongTermNoDelay(int fd);
 void closeConnectionRemote(int *clientfd);
 void returnAliveConnectionRemote(int 			*clientfd,
 								 const char 	*hostname,

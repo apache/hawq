@@ -718,6 +718,12 @@ int registerAsyncConnectionFileDesc(const char				*address,
 	sockres = connect(fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 	if ( sockres == 0 )
 	{
+		if ( setConnectionLongTermNoDelay(fd) != FUNC_RETURN_OK )
+		{
+			close(fd);
+			res = UTIL_NETWORK_FAIL_CONNECT;
+			goto exit;
+		}
 		/*
 		 * New connection is created. Suppose domain socket and local socket
 		 * connection can be done now. Register a normal client FD in poll() to
