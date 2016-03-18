@@ -2556,7 +2556,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 		freePAIRRefList(&(PRESPOOL->Segments), &ressegl);
 		Assert(minnvseg <= maxnvseg);
 
-		if ( maxnvseg - minnvseg > rm_nvseg_variance_among_seg_respool_limit )
+		if ( maxnvseg - minnvseg > rm_tolerate_nseg_limit )
 		{
 			elog(LOG, "Reject virtual segment allocation based on data "
 					  "locality information. After tentative allocation "
@@ -2565,7 +2565,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 					  "is %d, tolerated difference limit is %d.",
 					  maxnvseg,
 					  minnvseg,
-					  rm_nvseg_variance_among_seg_respool_limit);
+					  rm_tolerate_nseg_limit);
 
 			/* Return the allocated resource. */
 			List 	 *vsegcntlist = NULL;
