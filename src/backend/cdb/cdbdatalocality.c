@@ -33,6 +33,9 @@
 #include "access/filesplit.h"
 #include "access/parquetsegfiles.h"
 #include "catalog/catalog.h"
+#include "catalog/catquery.h"
+#include "catalog/pg_inherits.h"
+#include "catalog/pg_proc.h"
 #include "cdb/cdbdatalocality.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
@@ -41,6 +44,7 @@
 #include "utils/tqual.h"
 #include "utils/memutils.h"
 #include "executor/execdesc.h"
+#include "executor/spi.h"
 #include "nodes/nodes.h"
 #include "nodes/parsenodes.h"
 #include "optimizer/walkers.h"
@@ -54,11 +58,7 @@
 #include "catalog/pg_proc.h"
 #include "postgres.h"
 #include "resourcemanager/utils/hashtable.h"
-#include "catalog/pg_inherits.h"
-//#include "utils/misc/guc.c"
 
-#define PRONAME 1
-#define PROISAGG 5
 /* We need to build a mapping from host name to host index */
 
 extern bool		optimizer; /* Enable the optimizer */
@@ -376,7 +376,7 @@ static Block_Host_Index * update_data_dist_stat(
 static HostDataVolumeInfo *search_host_in_stat_context(
 		split_to_segment_mapping_context *context, char *hostname);
 
-static bool IsAggFunction(char* funcName);
+static bool IsBuildInFunction(Oid funcOid);
 
 static bool allocate_hash_relation(Relation_Data* rel_data,
 		Assignment_Log_Context *log_context, TargetSegmentIDMap* idMap,
@@ -638,39 +638,35 @@ static void collect_range_tables(Query *query, List* full_range_table,
 /*
  *
  */
-static bool IsAggFunction(char* funcName) {
-	if (funcName == NULL) {
+static bool IsBuildInFunction(Oid foid) {
+
+	cqContext  *pcqCtx;
+	HeapTuple	procedureTuple;
+	Form_pg_proc procedureStruct;
+
+	/*
+	 * get the procedure tuple corresponding to the given function Oid
+	 */
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(foid)));
+
+	procedureTuple = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(procedureTuple))
+		elog(ERROR, "cache lookup failed for function %u", foid);
+	procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
+	caql_endscan(pcqCtx);
+	/* we treat proc namespace = 11 to build in function.*/
+	if (procedureStruct->pronamespace == 11) {
+		return true;
+	} else {
 		return false;
 	}
-	Relation pg_proc_rel;
-	TupleDesc pg_proc_dsc;
-	HeapTuple tuple;
-	SysScanDesc pg_proc_scan;
-
-	pg_proc_rel = heap_open(ProcedureRelationId, AccessShareLock);
-	pg_proc_dsc = RelationGetDescr(pg_proc_rel);
-	ScanKeyData skey;
-
-	ScanKeyInit(&skey, PRONAME, BTEqualStrategyNumber,
-	F_NAMEEQ, CStringGetDatum(funcName));
-
-	pg_proc_scan = systable_beginscan(pg_proc_rel, InvalidOid, FALSE,
-			ActiveSnapshot, 1, &skey);
-	while (HeapTupleIsValid(tuple = systable_getnext(pg_proc_scan))) {
-
-		bool isAgg = DatumGetBool(fastgetattr(tuple, PROISAGG, pg_proc_dsc, NULL));
-		systable_endscan(pg_proc_scan);
-		heap_close(pg_proc_rel, AccessShareLock);
-		if (isAgg) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-	systable_endscan(pg_proc_scan);
-	heap_close(pg_proc_rel, AccessShareLock);
-	return true;
 }
+
 /*
  *
  */
@@ -684,25 +680,6 @@ static void convert_range_tables_to_oids_and_check_table_functions(List **range_
 	foreach(old_lc, *range_tables)
 	{
 		RangeTblEntry *entry = (RangeTblEntry *) lfirst(old_lc);
-		if (entry->rtekind == RTE_FUNCTION || entry->rtekind == RTE_TABLEFUNCTION) {
-			*isTableFunctionExists = true;
-		}
-		if (entry->rtekind == RTE_SUBQUERY) {
-			Query* subQuery = entry->subquery;
-			ListCell *lc;
-			foreach(lc, subQuery->targetList)
-			{
-				TargetEntry *te = (TargetEntry *) lfirst(lc);
-				bool isAggFunc = IsAggFunction(te->resname);
-				// if target list of subquery contains non aggregate function,
-				// then we consider the query contains and use default_segment_num guc
-				// as the number of virtual segment
-				if (!isAggFunc) {
-					*isTableFunctionExists = true;
-				}
-			}
-
-		}
 		if (entry->rtekind != RTE_RELATION) {
 			continue;
 		}
@@ -1833,7 +1810,7 @@ static int select_random_host_algorithm(Relation_Assignment_Context *context,
 	}
 	if (debug_fake_datalocality) {
 		fprintf(fp,
-				"cur_size_of_whole_query is:"INT64_FORMAT", avg_size_of_whole_query is: %.3f",
+				"cur_size_of_whole_query is:%.0f, avg_size_of_whole_query is: %.3f",
 				context->totalvols_with_penalty[minindex] + net_disk_ratio * splitsize,
 				context->avg_size_of_whole_query);
 	}
@@ -2393,7 +2370,7 @@ static Relation_File** change_file_order_based_on_continuity(
 		Relation_Data *rel_data, TargetSegmentIDMap* idMap, int host_num,
 		int* fileCount, Relation_Assignment_Context *assignment_context) {
 
-	Relation_File** file_vector;
+	Relation_File** file_vector = NULL;
 	int* isBlockContinue = (int *) palloc(sizeof(int) * host_num);
 	for (int i = 0; i < host_num; i++) {
 		isBlockContinue[i] = 0;
@@ -3429,45 +3406,45 @@ static void print_datalocality_overall_log_information(SplitAllocResult *result,
 			if(log_context->minSegmentNumofHost > 0 ){
 				fprintf(fpratio, "segmentnumber_perhost_max/min=%.2f\n", (double)(log_context->maxSegmentNumofHost / log_context->minSegmentNumofHost));
 			}else{
-				fprintf(fpratio, "segmentnumber_perhost_max/min="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segmentnumber_perhost_max/min=%lld\n", INT64_MAX);
 			}
 			if(log_context->avgSegmentNumofHost > 0 ){
 				fprintf(fpratio, "segmentnumber_perhost_max/avg=%.2f\n", (double)(log_context->maxSegmentNumofHost / log_context->avgSegmentNumofHost));
 			}else{
-				fprintf(fpratio, "segmentnumber_perhost_max/avg="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segmentnumber_perhost_max/avg=%lld\n", INT64_MAX);
 			}
 
 			if (log_context->minSizeSegmentOverall > 0){
 				fprintf(fpratio, "segments_size_max/min=%.5f\n", (double)log_context->maxSizeSegmentOverall / (double)log_context->minSizeSegmentOverall);
 			}else{
-				fprintf(fpratio, "segments_size_max/min="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_max/min=%lld\n", INT64_MAX);
 			}
 			if (log_context->avgSizeOverall > 0){
 				fprintf(fpratio, "segments_size_max/avg=%.5f\n", log_context->maxSizeSegmentOverall / log_context->avgSizeOverall);
 			}else{
-				fprintf(fpratio, "segments_size_max/avg="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_max/avg=%lld\n", INT64_MAX);
 			}
 
 			if (log_context->minSizeSegmentOverallPenalty > 0){
 				fprintf(fpratio, "segments_size_penalty_max/min=%.5f\n",(double)log_context->maxSizeSegmentOverallPenalty / (double)log_context->minSizeSegmentOverallPenalty);
 			}else{
-				fprintf(fpratio, "segments_size_penalty_max/min="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_penalty_max/min=%lld\n", INT64_MAX);
 			}
 			if (log_context->avgSizeOverallPenalty > 0){
 				fprintf(fpratio, "segments_size_penalty_max/avg=%.5f\n",log_context->maxSizeSegmentOverallPenalty / log_context->avgSizeOverallPenalty);
 			}else{
-				fprintf(fpratio, "segments_size_penalty_max/avg="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_penalty_max/avg=%lld\n", INT64_MAX);
 			}
 
 			if (log_context->minContinuityOverall > 0){
 				fprintf(fpratio, "continuity_max/min=%.5f\n",log_context->maxContinuityOverall / log_context->minContinuityOverall);
 			}else{
-				fprintf(fpratio, "continuity_max/min="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "continuity_max/min=%lld\n", INT64_MAX);
 			}
 			if (log_context->avgContinuityOverall > 0){
 				fprintf(fpratio, "continuity_max/avg=%.5f\n",log_context->maxContinuityOverall / log_context->avgContinuityOverall);
 			}else{
-				fprintf(fpratio, "continuity_max/avg="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "continuity_max/avg=%lld\n", INT64_MAX);
 			}
 			fflush(fpratio);
 			fclose(fpratio);
@@ -3976,11 +3953,54 @@ static void cleanup_allocation_algorithm(
 }
 
 /*
+ * udf_collector_walker: the routine to file udfs.
+ */
+bool udf_collector_walker(Node *node,
+		udf_collector_context *context) {
+	if (node == NULL) {
+		return false;
+	}
+
+	if (IsA(node, Query)) {
+		return query_tree_walker((Query *) node, udf_collector_walker,
+				(void *) context,
+				QTW_EXAMINE_RTES);
+	}
+
+	/*For Aggref, we don't consider it as udf.*/
+
+	if(IsA(node,FuncExpr)){
+		if(!IsBuildInFunction(((FuncExpr *) node)->funcid)){
+			context->udf_exist = true;
+		}
+		return false;
+	}
+
+	return expression_tree_walker(node, udf_collector_walker,
+			(void *) context);
+
+	return false;
+}
+
+/*
+ * find_udf: collect all udf, and store them into the udf_collector_context.
+ */
+void find_udf(Query *query, udf_collector_context *context) {
+
+	query_tree_walker(query, udf_collector_walker, (void *) context,
+	QTW_EXAMINE_RTES);
+
+	return;
+}
+
+
+/*
  * calculate_planner_segment_num
+ * fixedVsegNum is used by PBE, since all the execute should use the same number of vsegs.
  */
 SplitAllocResult *
 calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
-		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum) {
+		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum, int fixedVsegNum) {
 	SplitAllocResult *result = NULL;
 	QueryResource *resource = NULL;
 	QueryResourceParameters *resource_parameters = NULL;
@@ -3989,14 +4009,14 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	List *alloc_result = NIL;
 	split_to_segment_mapping_context context;
 
-	int planner_segments = -1; /*virtual segments number for explain statement */
+	int planner_segments = 0; /*virtual segments number for explain statement */
 
 	result = (SplitAllocResult *) palloc(sizeof(SplitAllocResult));
 	result->resource = NULL;
 	result->resource_parameters = NULL;
 	result->alloc_results = NIL;
 	result->relsType = NIL;
-	result->planner_segments = -1;
+	result->planner_segments = 0;
 	result->datalocalityInfo = makeStringInfo();
     result->datalocalityTime = 0;
 
@@ -4014,7 +4034,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		result->resource_parameters = NULL;
 		result->alloc_results = NIL;
 		result->relsType = NIL;
-		result->planner_segments = -1;
+		result->planner_segments = 0;
 		return result;
 	}
 
@@ -4039,6 +4059,11 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		 * 5 data size of random "from" relation
 		 */
 
+		udf_collector_context udf_context;
+		udf_context.udf_exist = false;
+
+		find_udf(query, &udf_context);
+		isTableFunctionExists = udf_context.udf_exist;
 		/*convert range table list to oid list and check whether table function exists
 		 *we keep a full range table list and a range table list without result relation separately
 		 */
@@ -4065,7 +4090,15 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 		/*use inherit resource*/
 		if (resourceLife == QRL_INHERIT) {
-			resource = AllocateResource(resourceLife, sliceNum, 0, 0, 0, NULL, 0);
+
+			if ( SPI_IsInPrepare() && (GetActiveQueryResource() == NULL) )
+			{
+				resource = NULL;
+			}
+			else
+			{
+				resource = AllocateResource(resourceLife, sliceNum, 0, 0, 0, NULL, 0);
+			}
 
 			saveQueryResourceParameters(
 							resource_parameters,  /* resource_parameters */
@@ -4216,6 +4249,11 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				maxTargetSegmentNumber = enforce_virtual_segment_number;
 				minTargetSegmentNumber = enforce_virtual_segment_number;
 			}
+			/* in PBE mode, the execute should use the same vseg number. */
+			if(fixedVsegNum > 0 ){
+				maxTargetSegmentNumber = fixedVsegNum;
+				minTargetSegmentNumber = fixedVsegNum;
+			}
 			uint64_t before_rm_allocate_resource = gettime_microsec();
 
 			/* cost is use by RM to balance workload between hosts. the cost is at least one block size*/
@@ -4223,9 +4261,40 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			mincost <<= 20;
 			int64 queryCost = context.total_size < mincost ? mincost : context.total_size;
 			if (QRL_NONE != resourceLife) {
-				resource = AllocateResource(QRL_ONCE, sliceNum, queryCost,
-						maxTargetSegmentNumber, minTargetSegmentNumber,
-						context.host_context.hostnameVolInfos, context.host_context.size);
+
+				if (SPI_IsInPrepare())
+				{
+					resource = NULL;
+					/*
+					 * prepare need to get resource quota from RM
+					 * and pass quota(planner_segments) to Orca or Planner to generate plan
+					 * the following executes(in PBE) should reallocate the same number
+					 * of resources.
+					 */
+					uint32 seg_num;
+					uint32 seg_num_min;
+					uint32 seg_memory_mb;
+					double seg_core;
+
+					GetResourceQuota(maxTargetSegmentNumber,
+					                 minTargetSegmentNumber,
+					                 &seg_num,
+					                 &seg_num_min,
+					                 &seg_memory_mb,
+					                 &seg_core);
+
+					planner_segments = seg_num;
+					minTargetSegmentNumber = planner_segments;
+					maxTargetSegmentNumber = planner_segments;
+				}
+				else
+				{
+					resource = AllocateResource(QRL_ONCE, sliceNum, queryCost,
+					                            maxTargetSegmentNumber,
+					                            minTargetSegmentNumber,
+					                            context.host_context.hostnameVolInfos,
+					                            context.host_context.size);
+				}
 
 				saveQueryResourceParameters(
 								resource_parameters,                   /* resource_parameters */
@@ -4258,7 +4327,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 			if (resource == NULL) {
 				result->resource = NULL;
-				result->resource_parameters = NULL;
+				result->resource_parameters = resource_parameters;
 				result->alloc_results = NIL;
 				result->relsType = NIL;
 				result->planner_segments = planner_segments;
