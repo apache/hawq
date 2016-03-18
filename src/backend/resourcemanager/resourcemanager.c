@@ -614,11 +614,8 @@ int MainHandlerLoop(void)
         timeoutDeadResourceAllocation();
         timeoutQueuedRequest();
 
-        /* STEP 7. Generate output content to client connections. */
-        sendResponseToClients();
-
 		/*
-		 * STEP 8. Check the status of all segment nodes, mark down if hasn't got
+		 * STEP 7. Check the status of all segment nodes, mark down if hasn't got
 		 * 		   IMAlive message for a pre-defined period.
 		 */
         uint64_t curtime = gettime_microsec();
@@ -631,7 +628,7 @@ int MainHandlerLoop(void)
 			PRESPOOL->LastCheckTime = curtime;
 		}
 
-		/* STEP 9. Move all accepted GRM containers into resource pool. */
+		/* STEP 8. Move all accepted GRM containers into resource pool. */
 		moveAllAcceptedGRMContainersToResPool();
 
 		/*
@@ -657,7 +654,7 @@ int MainHandlerLoop(void)
 			setForcedReturnGRMContainerCount();
 		}
 
-		/* STEP 10. Dispatch resource to queries and send the messages out.*/
+		/* STEP 9. Dispatch resource to queries and send the messages out.*/
         if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 &&
 			 PQUEMGR->toRunQueryDispatch &&
 			 PQUEMGR->ForcedReturnGRMContainerCount == 0 &&
@@ -677,6 +674,9 @@ int MainHandlerLoop(void)
 						 PQUEMGR->toRunQueryDispatch ? 1 : 0,
 						 PQUEMGR->ForcedReturnGRMContainerCount);
         }
+
+        /* STEP 10. Generate output content to client connections. */
+        sendResponseToClients();
 
         /*
          * STEP 11. Return containers to global resource manager if there some
