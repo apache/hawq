@@ -2065,7 +2065,7 @@ int generateAllocRequestToBroker(void)
 	}
 
 	/* Decide water level of resource. */
-	int wlevel = hasWorkload ? rm_min_resource_perseg : 0;
+	int wlevel = hasWorkload ? PQUEMGR->ActualMinGRMContainerPerSeg : 0;
 	switch( DRMGlobalInstance->ImpType )
 	{
 	case YARN_LIBYARN:
