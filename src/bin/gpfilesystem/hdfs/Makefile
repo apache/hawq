@@ -24,7 +24,7 @@ OBJS       = gpfshdfs.o
 
 PG_CPPFLAGS = -I$(libpq_srcdir)
 PG_LIBS = $(libpq_pgport)
-SHLIB_LINK = -lprotobuf -lboost_thread -lboost_system -lboost_date_time -lstdc++ -lhdfs3
+SHLIB_LINK = -lprotobuf -lboost_thread-mt -lboost_system -lboost_date_time -lstdc++ -lhdfs3
 
 ifdef USE_PGXS
 PGXS := $(shell pg_config --pgxs)
