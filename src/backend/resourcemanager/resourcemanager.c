@@ -78,6 +78,7 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 								  int32_t 	 *reqcore,
 								  List 		**preferred);
 void processResourceBrokerTasks(void);
+void generateResourceRequestToResourceBroker(void);
 void cleanupAllGRMContainers(void);
 bool cleanedAllGRMContainers(void);
 
@@ -610,12 +611,15 @@ int MainHandlerLoop(void)
 		/* STEP 5. Handle all submitted requests through socket clients. */
 		processSubmittedRequests();
 
-        /* STEP 6. Check timeout resource allocation and timeout queuing requests. */
+		/* STEP 6. Generate possible resource request to resource broker. */
+		generateResourceRequestToResourceBroker();
+
+        /* STEP 7. Check timeout resource allocation and timeout queuing requests. */
         timeoutDeadResourceAllocation();
         timeoutQueuedRequest();
 
 		/*
-		 * STEP 7. Check the status of all segment nodes, mark down if hasn't got
+		 * STEP 8. Check the status of all segment nodes, mark down if hasn't got
 		 * 		   IMAlive message for a pre-defined period.
 		 */
         uint64_t curtime = gettime_microsec();
@@ -628,12 +632,13 @@ int MainHandlerLoop(void)
 			PRESPOOL->LastCheckTime = curtime;
 		}
 
-		/* STEP 8. Move all accepted GRM containers into resource pool. */
+
+		/* STEP 9. Move all accepted GRM containers into resource pool. */
 		moveAllAcceptedGRMContainersToResPool();
 
 		/*
-		 * Check if should pause dispatching resource to queries to collect
-		 * resource back in order to return GRM containers.
+		 * STEP 10. Check if should pause dispatching resource to queries to
+		 * collect resource back in order to return GRM containers.
 		 */
 		if ( DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
 			 PRESPOOL->AddPendingContainerCount == 0 &&
@@ -654,7 +659,8 @@ int MainHandlerLoop(void)
 			setForcedReturnGRMContainerCount();
 		}
 
-		/* STEP 9. Dispatch resource to queries and send the messages out.*/
+		/* STEP 11. Dispatch resource to queries and send the messages out.*/
+
         if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 &&
 			 PQUEMGR->toRunQueryDispatch &&
 			 PQUEMGR->ForcedReturnGRMContainerCount == 0 &&
@@ -675,23 +681,23 @@ int MainHandlerLoop(void)
 						 PQUEMGR->ForcedReturnGRMContainerCount);
         }
 
-        /* STEP 10. Generate output content to client connections. */
+        /* STEP 12. Generate output content to client connections. */
         sendResponseToClients();
 
         /*
-         * STEP 11. Return containers to global resource manager if there some
+         * STEP 13. Return containers to global resource manager if there some
          * 			some idle resource.
          */
         timeoutIdleGRMResourceToRB();
 
-		/* STEP 12. Notify segments to increase resource quota. */
+		/* STEP 14. Notify segments to increase resource quota. */
 		notifyToBeAcceptedGRMContainersToRMSEG();
 
-        /* STEP 13. Notify segments to decrease resource. */
+        /* STEP 15. Notify segments to decrease resource. */
         notifyToBeKickedGRMContainersToRMSEG();
 
         /*
-         * STEP 14. Check slaves file if the content is not checked or is
+         * STEP 16. Check slaves file if the content is not checked or is
          * 			updated.
          */
         checkSlavesFile();
@@ -2881,26 +2887,7 @@ void processResourceBrokerTasks(void)
 			}
 		}
 
-		/* STEP 3. Generate GRM container allocation request. */
-		curtime = gettime_microsec();
-
-        if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 )
-        {
-        	refreshMemoryCoreRatioLevelUsage(curtime);
-        	if ( curtime - PRESPOOL->LastResAcqTime > 1000000LL)
-        	{
-        		PRESPOOL->LastResAcqTime = curtime;
-				res = generateAllocRequestToBroker();
-				if ( res != FUNC_RETURN_OK )
-				{
-					elog(WARNING, "Resource manager fails to allocate container "
-								  "from global resource manager.");
-					goto exit;
-				}
-        	}
-        }
-
-        /* STEP 4. Return kicked GRM containers. */
+        /* STEP 3. Return kicked GRM containers. */
         curtime = gettime_microsec();
 
     	if ( !PRESPOOL->pausePhase[QUOTA_PHASE_KICKED_TO_RETURN] )
@@ -2918,7 +2905,7 @@ void processResourceBrokerTasks(void)
 			elog(LOG, "Paused returning GRM containers kicked to GRM.");
     	}
 	    /*
-	     * STEP 5. Handle resource broker input as new allocated resource or
+	     * STEP 4. Handle resource broker input as new allocated resource or
 		 * 		   cluster report, container report etc. The allocated resource
 		 * 		   from resource broker will be added to the resource queue
 		 * 		   manager and resource pool.
@@ -2938,6 +2925,38 @@ void processResourceBrokerTasks(void)
 
 exit:
 	RB_handleError(res);
+}
+
+void generateResourceRequestToResourceBroker(void)
+{
+	uint64_t curtime = 0;
+	int		 res	 = FUNC_RETURN_OK;
+
+	if ( !isCleanGRMResourceStatus() )
+	{
+
+		curtime = gettime_microsec();
+
+        if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 )
+        {
+        	refreshMemoryCoreRatioLevelUsage(curtime);
+        	if ( curtime - PRESPOOL->LastResAcqTime > 1000000LL)
+        	{
+        		PRESPOOL->LastResAcqTime = curtime;
+				res = generateAllocRequestToBroker();
+				if ( res != FUNC_RETURN_OK )
+				{
+					elog(WARNING, "Resource manager fails to allocate container "
+								  "from global resource manager.");
+					goto exit;
+				}
+        	}
+        }
+	}
+
+exit:
+	RB_handleError(res);
+
 }
 
 void cleanupAllGRMContainers(void)
