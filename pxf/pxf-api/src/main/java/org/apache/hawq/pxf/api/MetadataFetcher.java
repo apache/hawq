@@ -2,6 +2,9 @@ package org.apache.hawq.pxf.api;
 
 import java.util.List;
 
+import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Plugin;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,22 +28,23 @@ import java.util.List;
 /**
  * Abstract class that defines getting metadata of an item.
  */
-public abstract class MetadataFetcher {
+public abstract class MetadataFetcher extends Plugin {
     protected List<Metadata> metadata;
 
     /**
      * Constructs a MetadataFetcher.
      *
+     * @param metaData the input data
      */
-    public MetadataFetcher() {
-
+    public MetadataFetcher(InputData metaData) {
+        super(metaData);
     }
 
     /**
      * Gets a metadata of a given table
      *
      * @param pattern table/file name or pattern
-     * @return metadata of given item(s)
+     * @return metadata of all items corresponding to given pattern
      * @throws Exception if metadata information could not be retrieved
      */
     public abstract List<Metadata> getMetadata(String pattern) throws Exception;

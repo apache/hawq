@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.service.rest;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletContext;
 import javax.ws.rs.GET;
@@ -38,8 +39,11 @@ import org.apache.commons.logging.LogFactory;
 
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.MetadataFetcher;
+import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.service.MetadataFetcherFactory;
 import org.apache.hawq.pxf.service.MetadataResponseFormatter;
+import org.apache.hawq.pxf.service.utilities.ProtocolData;
+import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
 
 /**
  * Class enhances the API of the WEBHDFS REST server. Returns the metadata of a
@@ -85,8 +89,17 @@ public class MetadataResource extends RestResource {
         LOG.debug("getMetadata started");
         String jsonOutput;
         try {
+
+            // Convert headers into a regular map
+            Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
+
+            // Add profile and verify token
+            params.put("X-GP-PROFILE", profile.toLowerCase());
+            ProtocolData protData = new ProtocolData(params);
+            SecuredHDFS.verifyToken(protData, servletContext);
+
             // 1. start MetadataFetcher
-            MetadataFetcher metadataFetcher = MetadataFetcherFactory.create(profile.toLowerCase());
+            MetadataFetcher metadataFetcher = MetadataFetcherFactory.create(protData);
 
             // 2. get Metadata
             List<Metadata> metadata = metadataFetcher.getMetadata(pattern);

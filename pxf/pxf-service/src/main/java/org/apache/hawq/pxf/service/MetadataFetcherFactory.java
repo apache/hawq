@@ -21,6 +21,8 @@ package org.apache.hawq.pxf.service;
 
 
 import org.apache.hawq.pxf.api.MetadataFetcher;
+import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 
 /**
  * Factory class for creation of {@link MetadataFetcher} objects. 
@@ -31,13 +33,9 @@ public class MetadataFetcherFactory {
     /* TODO: This is a tempororary workaround.
      * The metadata class will be moved to the pxf-profile.xml in the future
      */
-    public static MetadataFetcher create(String profile) throws Exception {
-        String fetcherClass;
-        if ( "hcatalog".equals(profile) || "hive".equals(profile) ) {
-            fetcherClass = "org.apache.hawq.pxf.plugins.hive.HiveMetadataFetcher";
-        } else {
-            throw new IllegalArgumentException("Metadata access for profile " + profile + " not supported");
-        }
-        return (MetadataFetcher) Class.forName(fetcherClass).newInstance();
+    public static MetadataFetcher create(InputData inputData) throws Exception {
+        String metadataFetcher = inputData.getMetadata();
+
+        return (MetadataFetcher) Utilities.createAnyInstance(InputData.class, metadataFetcher, inputData);
     }
 }

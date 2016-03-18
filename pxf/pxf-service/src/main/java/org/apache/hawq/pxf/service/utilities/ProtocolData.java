@@ -95,6 +95,7 @@ public class ProtocolData extends InputData {
         accessor = getProperty("ACCESSOR");
         resolver = getProperty("RESOLVER");
         fragmenter = getOptionalProperty("FRAGMENTER");
+        metadata = getOptionalProperty("METADATA");
         dataSource = getProperty("DATA-DIR");
 
         /* Kerberos token information */

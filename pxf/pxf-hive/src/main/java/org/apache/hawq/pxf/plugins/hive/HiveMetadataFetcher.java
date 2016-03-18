@@ -32,6 +32,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.MetadataFetcher;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
+import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 
 /**
@@ -42,8 +43,8 @@ public class HiveMetadataFetcher extends MetadataFetcher {
     private static final Log LOG = LogFactory.getLog(HiveMetadataFetcher.class);
     private HiveMetaStoreClient client;
 
-    public HiveMetadataFetcher() {
-        super();
+    public HiveMetadataFetcher(InputData md) {
+        super(md);
 
         // init hive metastore client connection.
         client = HiveUtilities.initHiveClient();

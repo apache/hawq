@@ -33,6 +33,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hawq.pxf.api.utilities.InputData;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -50,7 +51,7 @@ import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 @SuppressStaticInitializationFor({"org.apache.hadoop.hive.metastore.api.MetaException",
 "org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities"}) // Prevents static inits
 public class HiveMetadataFetcherTest {
-
+    InputData inputData;
     Log LOG;
     HiveConf hiveConfiguration;
     HiveMetaStoreClient hiveClient;
@@ -66,7 +67,7 @@ public class HiveMetadataFetcherTest {
     @Test
     public void construction() throws Exception {
         prepareConstruction();
-        fetcher = new HiveMetadataFetcher();
+        fetcher = new HiveMetadataFetcher(inputData);
         PowerMockito.verifyNew(HiveMetaStoreClient.class).withArguments(hiveConfiguration);
     }
 
@@ -76,7 +77,7 @@ public class HiveMetadataFetcherTest {
         PowerMockito.whenNew(HiveMetaStoreClient.class).withArguments(hiveConfiguration).thenThrow(new MetaException("which way to albuquerque"));
 
         try {
-            fetcher = new HiveMetadataFetcher();
+            fetcher = new HiveMetadataFetcher(inputData);
             fail("Expected a RuntimeException");
         } catch (RuntimeException ex) {
             assertEquals("Failed connecting to Hive MetaStore service: which way to albuquerque", ex.getMessage());
@@ -86,7 +87,7 @@ public class HiveMetadataFetcherTest {
     @Test
     public void getTableMetadataInvalidTableName() throws Exception {
         prepareConstruction();
-        fetcher = new HiveMetadataFetcher();
+        fetcher = new HiveMetadataFetcher(inputData);
         String tableName = "t.r.o.u.b.l.e.m.a.k.e.r";
 
         try {
@@ -101,7 +102,7 @@ public class HiveMetadataFetcherTest {
     public void getTableMetadataView() throws Exception {
         prepareConstruction();
 
-        fetcher = new HiveMetadataFetcher();
+        fetcher = new HiveMetadataFetcher(inputData);
         String tableName = "cause";
 
         // mock hive table returned from hive client
@@ -121,7 +122,7 @@ public class HiveMetadataFetcherTest {
     public void getTableMetadata() throws Exception {
         prepareConstruction();
 
-        fetcher = new HiveMetadataFetcher();
+        fetcher = new HiveMetadataFetcher(inputData);
         String tableName = "cause";
 
         // mock hive table returned from hive client
