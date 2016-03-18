@@ -182,6 +182,18 @@ class HawqInit:
             logger.warn("Set standby host name failed")
         return result
 
+    def set_number_by_datanodes_num(self):
+        reuslt = 0
+        if self.hosts_count_number < 4:
+            # Set output.replace-datanode-on-failure to false if datanode number less than 4.
+            logger.info("Set output.replace-datanode-on-failure to false as %s datanode detected" % self.hosts_count_number)
+            logger.info("If you actually have more than 4 datanodes, please set it to 'true'")
+            cmd = "hawq config -c 'output.replace-datanode-on-failure'  -v 'false' --skipvalidation -q > /dev/null"
+            result = local_ssh(cmd, logger)
+            if result != 0:
+                logger.warn("Set output.replace-datanode-on-failure failed")
+        return result
+
     def set_total_vsegment_num(self):
         cmd = "%s; hawq config -c default_hash_table_bucket_number -v %s --skipvalidation -q > /dev/null" % \
                (source_hawq_env, self.total_vseg_num)
@@ -337,7 +349,9 @@ class HawqInit:
         logger.info("%s segment hosts defined" % self.hosts_count_number)
         logger.info("Set default_hash_table_bucket_number as: %s" % self.total_vseg_num)
         check_return_code(self.set_total_vsegment_num())
+        logger.info("Set hawq_rm_nvseg_perquery_perseg_limit as: %s" % self.vseg_num_per_node)
         check_return_code(self.set_vsegment_num_per_node())
+        check_return_code(self.set_number_by_datanodes_num())
 
         master_cmd = self._get_master_init_cmd()
         logger.info("Start to init master node: '%s'" % self.master_host_name)
@@ -380,7 +394,9 @@ class HawqInit:
             logger.info("%s segment hosts defined" % self.hosts_count_number)
             logger.info("Set default_hash_table_bucket_number as: %s" % self.total_vseg_num)
             check_return_code(self.set_total_vsegment_num())
+            logger.info("Set hawq_rm_nvseg_perquery_perseg_limit as: %s" % self.vseg_num_per_node)
             check_return_code(self.set_vsegment_num_per_node())
+            check_return_code(self.set_number_by_datanodes_num())
             logger.info("Start to init master")
             cmd = self._get_master_init_cmd()
             check_return_code(local_ssh(cmd, logger, warning = True), logger, \
@@ -931,7 +947,8 @@ def get_args():
             quiet_stdout_logging()
         logger, log_filename = setup_hawq_tool_logging('hawq_%s' % opts.hawq_command,getLocalHostname(),getUserName(), opts.log_dir)
         logger.info("Prepare to do 'hawq %s'" % opts.hawq_command)
-        logger.info("You can check log in %s" % log_filename)
+        logger.info("You can find log in:")
+        logger.info(log_filename)
     else:
         print COMMON_HELP
         sys.exit(1)
@@ -953,7 +970,8 @@ def get_args():
     if not opts.GPHOME:
         logger.error("Didn't get GPHOME value, exit")
         sys.exit()
-    logger.debug("GPHOME is %s" % opts.GPHOME)
+    logger.info("GPHOME is set to:")
+    logger.info(opts.GPHOME)
     global source_hawq_env
     source_hawq_env = "source %s/greenplum_path.sh" % opts.GPHOME 
 
@@ -963,6 +981,8 @@ def get_args():
         logger.error("'root' user is not allowed")
         sys.exit()
     logger.debug("Current user is '%s'" % opts.user)
+    logger.debug("Parsing config file:")
+    logger.debug("%s/etc/hawq-site.xml" % opts.GPHOME)
     hawqsite = HawqXMLParser(opts.GPHOME)
     hawqsite.get_all_values()
     hawq_dict = hawqsite.hawq_dict

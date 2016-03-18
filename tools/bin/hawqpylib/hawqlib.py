@@ -22,7 +22,9 @@ import threading
 import Queue
 from xml.dom import minidom
 from xml.etree.ElementTree import ElementTree
+import shutil
 from gppylib.db import dbconn
+import re
 
 
 class HawqCommands(object):
@@ -353,6 +355,65 @@ def parse_hosts_file(GPHOME):
         if host:
             host_list.append(host)
     return host_list
+
+
+def update_xml_property(xmlfile, property_name, property_value):
+    file_path, filename = os.path.split(xmlfile)
+    xmlfile_backup = os.path.join(file_path, '.bak.' + filename)
+    xmlfile_swap = os.path.join(file_path, '.swp.' + filename)
+    shutil.copyfile(xmlfile, xmlfile_backup)
+    with open(xmlfile_backup) as f:
+        f_tmp = open(xmlfile_swap, 'w')
+        while 1:
+            line = f.readline()
+
+            if not line:
+                break
+
+            m = re.match('\s*<name>%s' % property_name, line)
+            if m:
+                while 1:
+                    next_line = f.readline()
+                    m2 = re.match('\s*<value>', next_line)
+                    if m2:
+                        f_tmp.write(line)
+                        p = re.compile('\s*<value>(.*)</value>')
+                        p_value = p.match(next_line).group(1)
+                        next_line_new = re.sub(p_value, property_value, next_line)
+                        f_tmp.write(next_line_new)
+                        break
+            else:
+                f_tmp.write(line)
+        f_tmp.close()
+
+    shutil.move(xmlfile_swap, xmlfile)
+
+
+def append_xml_property(xmlfile, property_name, property_value):
+    file_path, filename = os.path.split(xmlfile)
+    xmlfile_backup = os.path.join(file_path, '.bak.' + filename)
+    xmlfile_swap = os.path.join(file_path, '.swp.' + filename)
+    shutil.copyfile(xmlfile, xmlfile_backup)
+    with open(xmlfile_backup) as f:
+        f_tmp = open(xmlfile_swap, 'w')
+        while 1:
+            line = f.readline()
+
+            if not line:
+                break
+
+            m = re.match('\s*</configuration>', line)
+            if m:
+                f_tmp.write('    <property>\n')
+                f_tmp.write('        <name>%s</name>\n' % property_name)
+                f_tmp.write('       <value>%s</value>\n' % property_value)
+                f_tmp.write('    </property>\n')
+                f_tmp.write('</configuration>\n')
+            else:
+                f_tmp.write(line)
+        f_tmp.close()
+
+    shutil.move(xmlfile_swap, xmlfile)
 
 
 def remove_property_xml(property_name, org_config_file):
