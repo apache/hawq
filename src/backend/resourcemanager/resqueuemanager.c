@@ -5213,8 +5213,10 @@ void getIdleResourceRequest(int32_t *mem, double *core)
 	Assert(PRESPOOL->ClusterMemoryCoreRatio > 0);
 	*mem  = PRESPOOL->ClusterMemoryCoreRatio *
 			PRESPOOL->AvailNodeCount *
-			rm_min_resource_perseg;
-	*core = 1.0 * PRESPOOL->AvailNodeCount * rm_min_resource_perseg;
+			PQUEMGR->ActualMinGRMContainerPerSeg;
+	*core = 1.0 *
+			PRESPOOL->AvailNodeCount *
+			PQUEMGR->ActualMinGRMContainerPerSeg;
 }
 
 void setForcedReturnGRMContainerCount(void)
