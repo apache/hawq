@@ -364,7 +364,19 @@ executormgr_validate_conn(PGconn *conn)
 {
   if (conn == NULL)
     return false;
-  return dispatch_validate_conn(conn->sock);
+  if (!dispatch_validate_conn(conn->sock))
+  {
+    printfPQExpBuffer(&conn->errorMessage,
+              libpq_gettext(
+                  "server closed the connection unexpectedly\n"
+             "\tThis probably means the server terminated abnormally\n"
+                 "\tbefore or while processing the request.\n"));
+    conn->status = CONNECTION_BAD;
+    closesocket(conn->sock);
+    conn->sock = -1;
+    return false;
+  }
+  return true;
 }
 
 /*
@@ -408,7 +420,7 @@ executormgr_dispatch_and_run(struct DispatchData *data, QueryExecutor *executor)
 	DispatchCommandQueryParms	*parms = dispatcher_get_QueryParms(data);
 
 	if (!executormgr_is_dispatchable(executor))
-		return false;
+	  goto error;
 
 	TIMING_BEGIN(executor->time_dispatch_begin);
 	query = PQbuildGpQueryString(parms->strCommand, parms->strCommandlen,
@@ -573,10 +585,8 @@ executormgr_catch_error(QueryExecutor *executor)
 
 	msg = PQerrorMessage(conn);
 
-	if (msg && (strcmp("", msg) != 0) && (executor->refResult->errcode == 0)){
+	if (msg && (strcmp("", msg) != 0) && (executor->refResult->errcode == 0)) {
 	  errCode = ERRCODE_GP_INTERCONNECTION_ERROR;
-	  if (errCode == ERRCODE_GP_INTERCONNECTION_ERROR)
-	    errCode = ERRCODE_GP_INTERCONNECTION_ERROR;
 	}
 
 	PQExpBufferData selfDesc;
