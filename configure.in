@@ -640,39 +640,12 @@ PGAC_ARG_BOOL(enable, orca, no, [  --enable-orca        enable Pivotal Query Opt
 AC_SUBST(enable_orca)
 
 if test "$enable_orca" = yes ; then
-
-	if test -z "$ORCA_DEPENDS_DIR" ; then
-		AC_MSG_ERROR([orca is enabled but ORCA_DEPENDS_DIR is not set])]
-	fi
-
-	if test -z "$ORCA_OBJDIR_DEFAULT" ; then
-		AC_MSG_ERROR([orca is enabled but ORCA_OBJDIR_DEFAULT is not set])]
-	fi
-	
-	if test -z "$XERCES_VER" ; then
-		AC_MSG_ERROR([orca is enabled but XERCES_VER is not set])]
-	fi
-	
-	if test -z "$LIBGPOS_VER" ; then
-		AC_MSG_ERROR([orca is enabled but LIBGPOS_VER is not set])]
-	fi
-	
-	if test -z "$OPTIMIZER_VER" ; then
-		AC_MSG_ERROR([orca is enabled but OPTIMIZER_VER is not set])]
-	fi
-
     ORCA_DEPENDS_DIR_INTER="$ORCA_DEPENDS_DIR"
     ORCA_DEPENDS_OBJDIR_DEFAULT="$ORCA_OBJDIR_DEFAULT"
-    ORCA_DEPENDS_XERCES_VER="$XERCES_VER"
-    ORCA_DEPENDS_LIBGPOS_VER="$LIBGPOS_VER"
-    ORCA_DEPENDS_OPTIMIZER_VER="$OPTIMIZER_VER"
 fi
 
 AC_SUBST(ORCA_DEPENDS_DIR_INTER)
 AC_SUBST(ORCA_DEPENDS_OBJDIR_DEFAULT)
-AC_SUBST(ORCA_DEPENDS_XERCES_VER)
-AC_SUBST(ORCA_DEPENDS_LIBGPOS_VER)
-AC_SUBST(ORCA_DEPENDS_OPTIMIZER_VER)
 
 #
 # Include directories
