@@ -33,7 +33,6 @@
 #include "nodes/parsenodes.h"
 #include "executor/execdesc.h"
 
-#define minimum_segment_num 1
 /*
  * structure containing information about data residence
  * at the host.

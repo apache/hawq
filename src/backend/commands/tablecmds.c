@@ -968,7 +968,12 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 			locationUris = transformLocationUris(exttypeDesc->location_list,
 												 createExtStmt->formatOpts,
 												 isweb, iswritable);
-			
+			int locLength = list_length(exttypeDesc->location_list);
+			if (createStmt->policy && locLength > 0)
+			{
+				createStmt->policy->bucketnum = locLength;
+			}
+
 			break;
 
 		case EXTTBL_TYPE_EXECUTE:
@@ -6437,7 +6442,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 										 tab->relid,
 										 false,
 										 NULL);
-		ar_tab->scantable_splits = AssignAOSegFileSplitToSegment(tab->relid, NIL, true,
+		ar_tab->scantable_splits = AssignAOSegFileSplitToSegment(tab->relid, NIL,
 		                    target_segment_num, ar_tab->scantable_splits);
 		/*
 		 * Specify the segno directly as we don't have segno mapping here.
@@ -16719,7 +16724,7 @@ ATPExecPartSplit(Relation rel,
      * Dispatch split-related metadata.
      */
     scantable_splits = AssignAOSegFileSplitToSegment((Oid)intVal((Value *)pc->partid),
-              NIL, true, target_segment_num, scantable_splits);
+              NIL, target_segment_num, scantable_splits);
 
     pc->scantable_splits = scantable_splits;
     pc->newpart_aosegnos = segment_segnos;

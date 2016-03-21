@@ -65,7 +65,7 @@ typedef SegFileSplitMapNode *SegFileSplitMap;
  * table data.
  */
 List *
-AssignAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_hash_policy, int target_segment_num, List *existings);
+AssignAOSegFileSplitToSegment(Oid relid, List *segment_infos, int target_segment_num, List *existings);
 
 /*
  * Given the relid, and the segment index, return the splits assigned

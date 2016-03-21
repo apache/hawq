@@ -2724,7 +2724,7 @@ transformETDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 										 sizeof(p->attrs[0]));
 			p->ptype = POLICYTYPE_PARTITIONED;
 			p->nattrs = 0;
-			p->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetDefaultPartitionNum());
+			p->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetExternalTablePartitionNum());
 			p->attrs[0] = 1;
 		}
 
