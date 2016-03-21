@@ -34,6 +34,7 @@
 #include "access/parquetsegfiles.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
+#include "catalog/pg_exttable.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_proc.h"
 #include "cdb/cdbdatalocality.h"
@@ -296,11 +297,13 @@ typedef struct split_to_segment_mapping_context {
 	int64 split_size;
 	MemoryContext old_memorycontext;
 	MemoryContext datalocality_memorycontext;
-	int externTableSegNum;  //expected virtual segment number when external table exists
+	int externTableOnClauseSegNum;  //expected virtual segment number when external table exists
+	int externTableLocationSegNum;  //expected virtual segment number when external table exists
 	int tableFuncSegNum;  //expected virtual segment number when table function exists
 	int hashSegNum;  // expected virtual segment number when there is hash table in from clause
 	int randomSegNum; // expected virtual segment number when there is random table in from clause
 	int resultRelationHashSegNum; // expected virtual segment number when hash table as a result relation
+	int minimum_segment_num; //default is 1.
 	int64 randomRelSize; //all the random relation size
 	int64 hashRelSize; //all the hash relation size
 
@@ -529,13 +532,15 @@ static void init_datalocality_context(split_to_segment_mapping_context *context)
 	context->rtc_context.range_tables = NIL;
 	context->rtc_context.full_range_tables = NIL;
 
-	context->externTableSegNum = 0;
+	context->externTableOnClauseSegNum = 0;
+	context->externTableLocationSegNum = 0;
 	context->tableFuncSegNum = 0;
 	context->hashSegNum = 0;
 	context->resultRelationHashSegNum = 0;
 	context->randomSegNum = 0;
 	context->randomRelSize = 0;
 	context->hashRelSize = 0;
+	context->minimum_segment_num = 1;
 	/*
 	 * initialize the data distribution
 	 * static context.
@@ -762,17 +767,24 @@ static void check_keep_hash_and_external_table(
 			/* targetPolicy->bucketnum is bucket number of external table,
 			 * whose default value is set to default_segment_num
 			 */
-			if (context->externTableSegNum == 0) {
-				context->externTableSegNum = targetPolicy->bucketnum;
-			} else {
-				if (context->externTableSegNum < targetPolicy->bucketnum) {
-					context->externTableSegNum = targetPolicy->bucketnum;
-					/*
-					 * In this case, two external table join but with different bucket number
-					 * we cannot allocate the right segment number.
-					 */
-					//now we just restrict that vseg num > bucket number of external table
-					//elog(ERROR, "All external tables in one query must have the same bucket number!");
+			ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
+			if(extEnrty->isweb){
+				if (context->externTableOnClauseSegNum == 0) {
+					context->externTableOnClauseSegNum = targetPolicy->bucketnum;
+				} else {
+					if (context->externTableOnClauseSegNum != targetPolicy->bucketnum) {
+						/*
+						 * In this case, two external table join but with different bucket number
+						 * we cannot allocate the right segment number.
+						 */
+						elog(ERROR, "All external tables in one query must have the same bucket number!");
+					}
+				}
+			}
+			else{
+				if (context->externTableLocationSegNum < targetPolicy->bucketnum) {
+					context->externTableLocationSegNum = targetPolicy->bucketnum;
+					context->minimum_segment_num =  targetPolicy->bucketnum;
 				}
 			}
 		}
@@ -4074,16 +4086,16 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				&(context.rtc_context.range_tables), &isTableFunctionExists,
 				context.datalocality_memorycontext);
 
-		/*Table Function VSeg Number = default_segment_number(configured in GUC) if table function exists,
+		/* set expected virtual segment number for hash table and external table*/
+		/* calculate hashSegNum, externTableSegNum, resultRelationHashSegNum */
+		check_keep_hash_and_external_table(&context, query, intoPolicy);
+
+		/*Table Function VSeg Number = default_segment_number(configured in GUC) if table function exists or gpfdist exists,
 		 *0 Otherwise.
 		 */
 		if (isTableFunctionExists) {
 			context.tableFuncSegNum = GetUserDefinedFunctionVsegNum();
 		}
-
-		/* set expected virtual segment number for hash table and external table*/
-		/* calculate hashSegNum, externTableSegNum, resultRelationHashSegNum */
-		check_keep_hash_and_external_table(&context, query, intoPolicy);
 
 		/* get block location and calculate relation size*/
 		get_block_locations_and_claculte_table_size(&context);
@@ -4163,13 +4175,11 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				context.randomSegNum = expected_segment_num_with_max_filecount;
 			}
 			/* Step4 we at least use one segment*/
-			if (context.randomSegNum < minimum_segment_num) {
-				context.randomSegNum = minimum_segment_num;
+			if (context.randomSegNum < context.minimum_segment_num) {
+				context.randomSegNum = context.minimum_segment_num;
 			}
 
 			int maxExpectedNonRandomSegNum = 0;
-			if (maxExpectedNonRandomSegNum < context.externTableSegNum)
-				maxExpectedNonRandomSegNum = context.externTableSegNum;
 			if (maxExpectedNonRandomSegNum < context.tableFuncSegNum)
 				maxExpectedNonRandomSegNum = context.tableFuncSegNum;
 			if (maxExpectedNonRandomSegNum < context.hashSegNum)
@@ -4183,7 +4193,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				fprintf(fpsegnum, "Result relation hash segment num : %d.\n", context.resultRelationHashSegNum);
 				fprintf(fpsegnum, "\n");
 				fprintf(fpsegnum, "Table  function      segment num : %d.\n", context.tableFuncSegNum);
-				fprintf(fpsegnum, "Extern table         segment num : %d.\n", context.externTableSegNum);
+				fprintf(fpsegnum, "Extern table         segment num : %d.\n", context.externTableOnClauseSegNum);
 				fprintf(fpsegnum, "From hash relation   segment num : %d.\n", context.hashSegNum);
 				fprintf(fpsegnum, "MaxExpectedNonRandom segment num : %d.\n", maxExpectedNonRandomSegNum);
 				fprintf(fpsegnum, "\n");
@@ -4193,29 +4203,33 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			int maxTargetSegmentNumber = 0;
 			/* we keep resultRelationHashSegNum in the highest priority*/
 			if (context.resultRelationHashSegNum != 0) {
-				if (context.resultRelationHashSegNum < context.externTableSegNum
-						&& context.externTableSegNum != 0) {
+				if ((context.resultRelationHashSegNum != context.externTableOnClauseSegNum
+						&& context.externTableOnClauseSegNum != 0)
+						|| (context.resultRelationHashSegNum < context.externTableLocationSegNum)) {
 					cleanup_allocation_algorithm(&context);
 					elog(ERROR, "Could not allocate enough memory! "
 							"bucket number of result hash table and external table should match each other");
 				}
 				maxTargetSegmentNumber = context.resultRelationHashSegNum;
 				minTargetSegmentNumber = context.resultRelationHashSegNum;
-			} else if (maxExpectedNonRandomSegNum > 0) {
+			}
+			else if(context.externTableOnClauseSegNum > 0){
 				/* bucket number of external table must be the same with the number of virtual segments*/
-				if (maxExpectedNonRandomSegNum == context.externTableSegNum) {
-					context.externTableSegNum =
-							context.externTableSegNum < minimum_segment_num ?
-									minimum_segment_num : context.externTableSegNum;
-					maxTargetSegmentNumber = context.externTableSegNum;
-					minTargetSegmentNumber = context.externTableSegNum;
-				} else if (maxExpectedNonRandomSegNum == context.hashSegNum) {
+				if(context.externTableOnClauseSegNum < context.externTableLocationSegNum){
+					cleanup_allocation_algorithm(&context);
+					elog(ERROR, "external table bucket number should match each other");
+				}
+				maxTargetSegmentNumber = context.externTableOnClauseSegNum;
+				minTargetSegmentNumber = context.externTableOnClauseSegNum;
+			}
+			else if (maxExpectedNonRandomSegNum > 0) {
+				if (maxExpectedNonRandomSegNum == context.hashSegNum) {
 					/* in general, we keep bucket number of hash table equals to the number of virtual segments
 					 * but this rule can be broken when there is a large random table in the range tables list
 					 */
 					context.hashSegNum =
-							context.hashSegNum < minimum_segment_num ?
-							minimum_segment_num : context.hashSegNum;
+							context.hashSegNum < context.minimum_segment_num ?
+							context.minimum_segment_num : context.hashSegNum;
 					double considerRandomWhenHashExistRatio = 1.5;
 					/*if size of random table >1.5 *hash table, we consider relax the restriction of hash bucket number*/
 					if (context.randomRelSize
@@ -4224,7 +4238,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 							context.randomSegNum = context.hashSegNum;
 						}
 						maxTargetSegmentNumber = context.randomSegNum;
-						minTargetSegmentNumber = minimum_segment_num;
+						minTargetSegmentNumber = context.minimum_segment_num;
 					} else {
 						maxTargetSegmentNumber = context.hashSegNum;
 						minTargetSegmentNumber = context.hashSegNum;
@@ -4232,17 +4246,17 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				} else if (maxExpectedNonRandomSegNum == context.tableFuncSegNum) {
 					/* if there is a table function, we should at least use tableFuncSegNum virtual segments*/
 					context.tableFuncSegNum =
-							context.tableFuncSegNum < minimum_segment_num ?
-									minimum_segment_num : context.tableFuncSegNum;
+							context.tableFuncSegNum < context.minimum_segment_num ?
+									context.minimum_segment_num : context.tableFuncSegNum;
 					if (context.randomSegNum < context.tableFuncSegNum) {
 						context.randomSegNum = context.tableFuncSegNum;
 					}
 					maxTargetSegmentNumber = context.randomSegNum;
-					minTargetSegmentNumber = minimum_segment_num;
+					minTargetSegmentNumber = context.minimum_segment_num;
 				}
 			} else {
 				maxTargetSegmentNumber = context.randomSegNum;
-				minTargetSegmentNumber = minimum_segment_num;
+				minTargetSegmentNumber = context.minimum_segment_num;
 			}
 
 			if (enforce_virtual_segment_number > 0) {
@@ -4253,6 +4267,9 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			if(fixedVsegNum > 0 ){
 				maxTargetSegmentNumber = fixedVsegNum;
 				minTargetSegmentNumber = fixedVsegNum;
+			}
+			if(maxTargetSegmentNumber < minTargetSegmentNumber){
+				maxTargetSegmentNumber = minTargetSegmentNumber;
 			}
 			uint64_t before_rm_allocate_resource = gettime_microsec();
 

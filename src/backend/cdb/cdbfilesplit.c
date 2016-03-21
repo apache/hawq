@@ -44,8 +44,7 @@ static void fileSplit_free(FileSplitNode *split);
 
 static List *
 computeSplitToSegmentMaps(Oid relid, GpPolicy *targetPolicy, List *splits,
-						List *segment_infos, bool keep_hash_policy,
-						int target_segment_num);
+						List *segment_infos, int target_segment_num);
 
 static List *
 postProcessSplitsPerSegment(List *oldSplitToSegmentMaps);
@@ -54,7 +53,7 @@ static int
 fileSplitNodeCmp(const void *left, const void *right);
 
 static SegFileSplitMapNode *
-AssignSingleAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_hash_policy, int target_segment_num)
+AssignSingleAOSegFileSplitToSegment(Oid relid, List *segment_infos, int target_segment_num)
 {
 	SegFileSplitMapNode *result = NULL;
 	char storageChar;
@@ -108,7 +107,7 @@ AssignSingleAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_ha
 	 * data locality into account.
 	 */
 	splitToSegmentMaps = computeSplitToSegmentMaps(relid, targetPolicy, splits, segment_infos,
-											keep_hash_policy, target_segment_num);
+											target_segment_num);
 	Assert(splitToSegmentMaps);
 	list_free(splits);
 
@@ -118,7 +117,7 @@ AssignSingleAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_ha
 }
 
 List *
-AssignAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_hash_policy, int target_segment_num, List *existings)
+AssignAOSegFileSplitToSegment(Oid relid, List *segment_infos, int target_segment_num, List *existings)
 {
 	SegFileSplitMapNode *result = NULL;
 
@@ -130,7 +129,7 @@ AssignAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_hash_pol
 		foreach (child, children)
 		{
 			Oid myrelid = lfirst_oid(child);
-			result = AssignSingleAOSegFileSplitToSegment(myrelid, segment_infos, keep_hash_policy,
+			result = AssignSingleAOSegFileSplitToSegment(myrelid, segment_infos,
 					target_segment_num);
 			existings = lappend(existings, result);
 		}
@@ -140,7 +139,7 @@ AssignAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_hash_pol
 	}
 	else
 	{
-		result = AssignSingleAOSegFileSplitToSegment(relid, segment_infos, keep_hash_policy,
+		result = AssignSingleAOSegFileSplitToSegment(relid, segment_infos,
 													target_segment_num);
 		existings = lappend(existings, result);
 	}
@@ -149,25 +148,14 @@ AssignAOSegFileSplitToSegment(Oid relid, List *segment_infos, bool keep_hash_pol
 }
 
 /*
- * If keep_hash_policy is false, then the table is treated as randomly
- * distributed, regardless of its distribution policy.
  *
  * If segment_infos is NIL, then data locality is not needed.
  */
 static List *
 computeSplitToSegmentMaps(Oid relid, GpPolicy *targetPolicy, List *splits, List *segment_infos,
-						bool keep_hash_policy, int target_segment_num)
+						int target_segment_num)
 {
 	List *splitToSegmentMaps = NIL;
-	if (keep_hash_policy)
-	{
-		/*
-		 * If we want to keep the hash distribution policy,
-		 * we need to make sure the data partition number
-		 * equals to the number of target segments.
-		 */
-		Assert(targetPolicy->bucketnum == target_segment_num);
-	}
 
 	if (segment_infos != NIL)
 	{
@@ -184,37 +172,22 @@ computeSplitToSegmentMaps(Oid relid, GpPolicy *targetPolicy, List *splits, List 
 	 */
 	if (segment_infos == NIL)
 	{
-		/*
-		 * Sub case 1: we need to keep the hash distribution policy.
-		 *
-		 * In this case, we just need consider the segment file number.
-		 * This case works exactly the same as HAWQ1.x.
-		 */
-		if (keep_hash_policy)
+		ListCell *lc;
+		int i;
+		for (i = 0; i < target_segment_num; i++)
 		{
-			ListCell *lc;
-			int i;
-			for (i = 0; i < target_segment_num; i++)
-			{
-				splitToSegmentMaps = lappend(splitToSegmentMaps, NIL);
-			}
-
-			foreach(lc, splits)
-			{
-				int assigned_seg_no;
-				ListCell *per_seg_split;
-				FileSplit split = (FileSplitNode *)lfirst(lc);
-				Assert(split);
-				assigned_seg_no = (split->segno - 1) % target_segment_num;
-				per_seg_split = list_nth_cell(splitToSegmentMaps, assigned_seg_no);
-				lfirst(per_seg_split) = lappend((List *)lfirst(per_seg_split), split);
-			}
+			splitToSegmentMaps = lappend(splitToSegmentMaps, NIL);
 		}
-		else
+
+		foreach(lc, splits)
 		{
-			ereport(ERROR,
-					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-					errmsg("Assigning splits to segment without keeping hash distribution policy is not allowed")));
+			int assigned_seg_no;
+			ListCell *per_seg_split;
+			FileSplit split = (FileSplitNode *)lfirst(lc);
+			Assert(split);
+			assigned_seg_no = (split->segno - 1) % target_segment_num;
+			per_seg_split = list_nth_cell(splitToSegmentMaps, assigned_seg_no);
+			lfirst(per_seg_split) = lappend((List *)lfirst(per_seg_split), split);
 		}
 	}
 	else
