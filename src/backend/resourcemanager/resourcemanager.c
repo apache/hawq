@@ -580,6 +580,7 @@ int MainHandlerLoop(void)
 			refreshMemoryCoreRatioLevelUsage(gettime_microsec());
 
 			resetAllSegmentsGRMContainerFailAllocCount();
+			resetAllSegmentsNVSeg();
 
 			/* Check if can resume using new available global resource manager.*/
 			if ( cleanedAllGRMContainers() )

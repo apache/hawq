@@ -6557,6 +6557,17 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"hawq_rm_nvseg_variance_amon_seg_respool_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("the variance of vseg number in each segment that resource manager "
+						 "should tolerate at most in resource pool when choosing segments "
+						 "based on data locality reference."),
+			NULL
+		},
+		&rm_nvseg_variance_among_seg_respool_limit,
+		2, 0, 65535, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_container_batch_limit", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("the batch process limit for global resource manager containers."),
 			NULL
