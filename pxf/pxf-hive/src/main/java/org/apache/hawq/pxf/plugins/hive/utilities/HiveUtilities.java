@@ -221,16 +221,13 @@ public class HiveUtilities {
      * or when querying HCatalog table.
      * It can be either <code>table_name_pattern</code> or <code>db_name_pattern.table_name_pattern</code>.
      *
+     * @param client Hivemetastore client
      * @param pattern Hive table name or pattern
      * @return {@link Metadata.Item} object holding the full table name
      */
     public static List<Metadata.Item> extractTablesFromPattern(HiveMetaStoreClient client, String pattern) {
 
-
         String dbPattern, tablePattern;
-
-        System.out.println(pattern);
-
         String errorMsg = " is not a valid Hive table name. "
                 + "Should be either <table_name> or <db_name.table_name>";
 

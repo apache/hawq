@@ -39,19 +39,6 @@ public class MetadataResponseFormatter {
     private static final Log LOG = LogFactory.getLog(MetadataResponseFormatter.class);
 
     /**
-     * Converts {@link Metadata} to JSON String format.
-     *
-     * @param metadata metadata objects to convert
-     * @return JSON formatted response
-     * @throws IOException if converting the data to JSON fails
-     */
-    public static String formatResponseString(Metadata metadata) throws IOException {
-        List<Metadata> metadataList = new ArrayList<Metadata>();
-        metadataList.add(metadata);
-        return formatResponseString(metadataList);
-    }
-
-    /**
      * Converts list of {@link Metadata} to JSON String format.
      *
      * @param metadataList list of metadata objects to convert
@@ -59,9 +46,6 @@ public class MetadataResponseFormatter {
      * @throws IOException if converting the data to JSON fails
      */
     public static String formatResponseString(List<Metadata> metadataList) throws IOException {
-        /* print the metadata before serialization */
-        LOG.debug(MetadataResponseFormatter.metadataToString(metadataList));
-
         return MetadataResponseFormatter.metadataToJSON(metadataList);
     }
 
