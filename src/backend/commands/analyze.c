@@ -828,7 +828,7 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 		candidateOid = lfirst_oid(le1);
 
 		//Relation rel = (Relation)lfirst(le1);
-		Relation rel = relation_open(candidateOid, AccessShareLock);
+		Relation rel = relation_open(candidateOid, ShareUpdateExclusiveLock);
 		if (candidateOid > 0 ) {
 			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext,
 					candidateOid);
@@ -848,7 +848,7 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 				totalDataSize += calculate_relation_size(rel);
 			}
 		}
-		relation_close(rel, AccessShareLock);
+		relation_close(rel, NoLock);
 	}
 
 	if (isHashRelationExist) {
