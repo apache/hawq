@@ -633,6 +633,7 @@ int getOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree);
 void setAllSegResourceGRMUnhandled(void);
 
 void resetAllSegmentsGRMContainerFailAllocCount(void);
+void resetAllSegmentsNVSeg(void);
 
 struct RB_GRMContainerStatData
 {

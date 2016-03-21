@@ -390,6 +390,8 @@ double	rm_regularize_io_factor;
 double	rm_regularize_usage_factor;
 double	rm_regularize_nvseg_factor;
 
+int		rm_nvseg_variance_among_seg_respool_limit;
+
 /* Greenplum Database Experimental Feature GUCs */
 int         gp_distinct_grouping_sets_threshold = 32;
 bool		gp_enable_explain_allstat = FALSE;
