@@ -54,7 +54,8 @@ ExecInsert(TupleTableSlot *slot,
 		   DestReceiver *dest,
 		   EState *estate,
 		   PlanGenerator planGen,
-		   bool isUpdate);
+		   bool isUpdate,
+		   bool isInputSorted);
 
 extern void
 ExecDelete(ItemPointer tupleid,

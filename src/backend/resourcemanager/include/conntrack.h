@@ -76,7 +76,7 @@ struct DynResourceQueueTrackData;
 
 struct ConnectionTrackData
 {
-	uint64_t				ConnectTime;   /* When connection is created.	  */
+	uint64_t				RequestTime;   /* When request is accepted.	  	  */
 	uint64_t				RegisterTime;  /* When connection registered. 	  */
 	uint64_t				ResRequestTime;/* When resource allocation request
 											  is received.			  		  */
@@ -84,14 +84,6 @@ struct ConnectionTrackData
 	uint64_t				LastActTime;   /* Last action time.			      */
 	uint64_t				HeadQueueTime; /* When request is queued at head. */
 
-	/* Socket connection information */
-	struct sockaddr_in 		ClientAddr;
-	socklen_t				ClientAddrLen;
-	int						ClientSocket;
-	char					ClientAddrDotStr[16];
-	uint16_t				ClientAddrPort;
-
-	/* Input Message content */
 	uint32_t				MessageSize;
 	uint8_t					MessageMark1;
 	uint8_t					MessageMark2;
@@ -215,4 +207,5 @@ void setConnectionTrackMessageBuffer(ConnectionTrack  track,
 									 int 			  size);
 
 void freeUsedConnectionTrack(ConnectionTrack track);
+
 #endif /*DYNAMIC_RESOURCE_MANAGEMENT_CONNECTION_TRACK_H*/

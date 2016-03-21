@@ -64,8 +64,8 @@ public class TPCHClusterTester extends TPCHTester {
 
 			// 1. load TPCH data
 			Map<String, String> rs = HAWQJdbcUtils.executeSafeQueryForSingleRow(
-					conn, "SHOW default_segment_num;");
-			int segnum = Integer.parseInt(rs.get("default_segment_num"));
+					conn, "SHOW default_hash_table_bucket_number;");
+			int segnum = Integer.parseInt(rs.get("default_hash_table_bucket_number"));
 			MRFormatTestUtils.runShellCommand(tpchSpec.getLoadCmd(segnum));
 
 			// 2. generate answer

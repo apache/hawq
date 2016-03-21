@@ -4610,9 +4610,12 @@ CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_n
 								
 								/* if no ON clause specified, default to "ON ALL" */
 								if(extdesc->on_clause == NIL)
-								{									
-									extdesc->on_clause = lappend(extdesc->on_clause, 
-										   				   		 makeDefElem("all", (Node *)makeInteger(TRUE)));
+								{
+									ereport(ERROR,
+										(errcode(ERRCODE_SYNTAX_ERROR),
+										errmsg("ON clause must be specified in external table"),
+										errhint("Use ON number instread"),
+										errOmitLocation(true)));
 								}
 							}
 

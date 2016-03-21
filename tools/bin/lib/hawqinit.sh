@@ -190,7 +190,7 @@ LOAD_GP_TOOLKIT () {
 }
 
 get_master_ipv6_addresses() {
-    if [ "${distro_based_on}" = "Mac" ] && [ "${distro_version:0:5}" = "10.11" ]; then
+    if [ "${distro_based_on}" = "Mac" ]; then
         MASTER_IPV6_LOCAL_ADDRESS_ALL=(`${IFCONFIG} | ${GREP} inet6 | ${AWK} '{print $2}' | cut -d'%' -f1`)
     else
         MASTER_IPV6_LOCAL_ADDRESS_ALL=(`ip -6 address show |${GREP} inet6|${AWK} '{print $2}' |cut -d'/' -f1`)
@@ -342,7 +342,7 @@ standby_init() {
     fi
 
     # Sync data directories to standby master.
-    LOG_MSG "[INFO]:-Sync files to standby from master"
+    LOG_MSG "[INFO]:-Sync files to standby from master" verbose
     ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
         "cd ${master_data_directory}; \
          ${SOURCE_PATH}; ${GPHOME}/bin/lib/pysync.py -x gpperfmon/data -x pg_log -x db_dumps \
@@ -428,13 +428,13 @@ segment_init() {
     source ${GPHOME}/greenplum_path.sh
     for tmp_path in `${ECHO} ${hawqSegmentTemp} | sed 's|,| |g'`; do
         if [ ! -d ${tmp_path} ]; then
-            ${ECHO} "Temp directory is not exist, please create it" | tee -a ${SEGMENT_LOG_FILE}
-            ${ECHO} "Segment init failed on ${host_name}"
+            LOG_MSG "[ERROR]:-Temp directory is not exist, please create it" verbose
+            LOG_MSG "[ERROR]:-Segment init failed on ${host_name}" verbose
             exit 1
         else
            if [ ! -w "${tmp_path}" ]; then 
-               ${ECHO} "Do not have write permission to temp directory, please check" | tee -a ${SEGMENT_LOG_FILE}
-               ${ECHO} "Segment init failed on ${host_name}"
+               LOG_MSG "[ERROR]:-Do not have write permission to temp directory, please check" verbose
+               LOG_MSG "[ERROR]:-Segment init failed on ${host_name}" verbose
                exit 1
            fi
         fi
@@ -447,8 +447,8 @@ segment_init() {
          --shared_buffers=${shared_buffers} --backend_output=${log_dir}/segment.initdb 1>>${SEGMENT_LOG_FILE} 2>&1
 
     if [ $? -ne 0 ] ; then
-        ${ECHO} "Postgres initdb failed" | tee -a ${SEGMENT_LOG_FILE}
-        ${ECHO} "Segment init failed on ${host_name}"
+        LOG_MSG "[ERROR]:-Postgres initdb failed" verbose
+        LOG_MSG "[ERROR]:-Segment init failed on ${host_name}" verbose
         exit 1
     fi
 
@@ -458,7 +458,7 @@ segment_init() {
          " -p ${hawq_port} --silent-mode=true -M segment -i" start >> ${SEGMENT_LOG_FILE}
 
     if [ $? -ne 0  ] ; then
-        ${ECHO} "Segment init failed on ${host_name}" | tee -a ${SEGMENT_LOG_FILE}
+        LOG_MSG "[ERROR]:-Segment init failed on ${host_name}" verbose
         exit 1
     fi
     }
@@ -473,13 +473,49 @@ check_data_directorytory() {
         ${MKDIR} -p ${default_sdd}
     fi
     # Check if data directory already exist and clean.
+    if [ "${hawq_data_directory}" = "" ]; then
+        LOG_MSG "[ERROR]:-Data directory path is not valid value on ${host_name}" verbose
+        exit 1
+    fi
+
     if [ -d ${hawq_data_directory} ]; then
-        if [ "$(ls -A ${hawq_data_directory})" ] && [ "${hawq_data_directory}" != "" ]; then
-             ${ECHO} "Data directory ${hawq_data_directory} is not empty on ${host_name}"
+        if [ "$(ls -A ${hawq_data_directory})" ]; then
+             LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} is not empty on ${host_name}" verbose
              exit 1
         fi
     else
-        ${ECHO} "Data directory ${hawq_data_directory} does not exist, please create it"
+        LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} does not exist, please create it" verbose
+        exit 1
+    fi
+}
+
+check_standby_data_directorytory() {
+    # If it's default directory, create it if not exist.
+    default_mdd=~/hawq-data-directory/masterdd
+    default_sdd=~/hawq-data-directory/segmentdd
+    if [ "${hawq_data_directory}" = "${default_mdd}" ]; then
+        ${MKDIR} -p ${default_mdd}
+    elif [ "${hawq_data_directory}" = "${default_sdd}" ]; then
+        ${MKDIR} -p ${default_sdd}
+    fi
+    # Check if data directory already exist and clean.
+    if [ "${hawq_data_directory}" = "" ]; then
+        LOG_MSG "[ERROR]:-Data directory path is not valid value on ${host_name}" verbose
+        exit 1
+    fi
+
+    if [ -d "${hawq_data_directory}" ]; then
+        if [ "$(ls -A ${hawq_data_directory}| ${GREP} -v pg_log)" ]; then
+            LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} is not empty on ${host_name}" verbose
+            exit 1
+        else
+            if [ -d ${hawq_data_directory}/pg_log ] && [ "$(ls -A ${hawq_data_directory}/pg_log)" ]; then
+                 LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} is not empty on ${host_name}" verbose
+                 exit 1
+            fi
+        fi
+    else
+        LOG_MSG "[ERROR]:-Data directory ${hawq_data_directory} does not exist on ${host_name}, please create it" verbose
         exit 1
     fi
 }
@@ -488,11 +524,11 @@ check_temp_directory() {
     # Check if temp directory exist.
     for tmp_dir in ${tmp_dir_list}; do
         if [ ! -d ${tmp_dir} ]; then
-            ${ECHO} "Temporary directory ${tmp_dir} does not exist, please create it"
+            LOG_MSG "[ERROR]:-Temporary directory ${tmp_dir} does not exist, please create it" verbose
             exit 1
         fi
         if [ ! -w ${tmp_dir} ]; then
-            ${ECHO} "Temporary directory ${tmp_dir} is not writable, exit." ;
+            LOG_MSG "[ERROR]:-Temporary directory ${tmp_dir} is not writable, exit." verbose
             exit 1
         fi
     done
@@ -504,7 +540,7 @@ if [ ${object_type} == "master" ]; then
     check_temp_directory
     master_init
 elif [ ${object_type} == "standby" ]; then
-    check_data_directorytory
+    check_standby_data_directorytory
     standby_init
 elif [ ${object_type} == "segment" ]; then
     check_data_directorytory

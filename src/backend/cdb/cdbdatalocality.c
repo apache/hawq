@@ -33,6 +33,10 @@
 #include "access/filesplit.h"
 #include "access/parquetsegfiles.h"
 #include "catalog/catalog.h"
+#include "catalog/catquery.h"
+#include "catalog/pg_exttable.h"
+#include "catalog/pg_inherits.h"
+#include "catalog/pg_proc.h"
 #include "cdb/cdbdatalocality.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
@@ -41,6 +45,7 @@
 #include "utils/tqual.h"
 #include "utils/memutils.h"
 #include "executor/execdesc.h"
+#include "executor/spi.h"
 #include "nodes/nodes.h"
 #include "nodes/parsenodes.h"
 #include "optimizer/walkers.h"
@@ -54,11 +59,7 @@
 #include "catalog/pg_proc.h"
 #include "postgres.h"
 #include "resourcemanager/utils/hashtable.h"
-#include "catalog/pg_inherits.h"
-//#include "utils/misc/guc.c"
 
-#define PRONAME 1
-#define PROISAGG 5
 /* We need to build a mapping from host name to host index */
 
 extern bool		optimizer; /* Enable the optimizer */
@@ -296,11 +297,13 @@ typedef struct split_to_segment_mapping_context {
 	int64 split_size;
 	MemoryContext old_memorycontext;
 	MemoryContext datalocality_memorycontext;
-	int externTableSegNum;  //expected virtual segment number when external table exists
+	int externTableOnClauseSegNum;  //expected virtual segment number when external table exists
+	int externTableLocationSegNum;  //expected virtual segment number when external table exists
 	int tableFuncSegNum;  //expected virtual segment number when table function exists
 	int hashSegNum;  // expected virtual segment number when there is hash table in from clause
 	int randomSegNum; // expected virtual segment number when there is random table in from clause
 	int resultRelationHashSegNum; // expected virtual segment number when hash table as a result relation
+	int minimum_segment_num; //default is 1.
 	int64 randomRelSize; //all the random relation size
 	int64 hashRelSize; //all the hash relation size
 
@@ -309,6 +312,10 @@ typedef struct split_to_segment_mapping_context {
 	int64 total_file_count;
 
 	int64 total_metadata_logic_len;
+
+    int metadata_cache_time_us;
+    int alloc_resource_time_us;
+    int cal_datalocality_time_us;
 } split_to_segment_mapping_context;
 
 typedef struct vseg_list{
@@ -372,7 +379,7 @@ static Block_Host_Index * update_data_dist_stat(
 static HostDataVolumeInfo *search_host_in_stat_context(
 		split_to_segment_mapping_context *context, char *hostname);
 
-static bool IsAggFunction(char* funcName);
+static bool IsBuildInFunction(Oid funcOid);
 
 static bool allocate_hash_relation(Relation_Data* rel_data,
 		Assignment_Log_Context *log_context, TargetSegmentIDMap* idMap,
@@ -525,13 +532,15 @@ static void init_datalocality_context(split_to_segment_mapping_context *context)
 	context->rtc_context.range_tables = NIL;
 	context->rtc_context.full_range_tables = NIL;
 
-	context->externTableSegNum = 0;
+	context->externTableOnClauseSegNum = 0;
+	context->externTableLocationSegNum = 0;
 	context->tableFuncSegNum = 0;
 	context->hashSegNum = 0;
 	context->resultRelationHashSegNum = 0;
 	context->randomSegNum = 0;
 	context->randomRelSize = 0;
 	context->hashRelSize = 0;
+	context->minimum_segment_num = 1;
 	/*
 	 * initialize the data distribution
 	 * static context.
@@ -569,6 +578,10 @@ static void init_datalocality_context(split_to_segment_mapping_context *context)
 	context->total_split_count = 0;
 	context->total_file_count = 0;
 	context->total_metadata_logic_len = 0;
+
+    context->metadata_cache_time_us = 0;
+    context->alloc_resource_time_us = 0;
+    context->cal_datalocality_time_us = 0;
 	return;
 }
 
@@ -630,39 +643,35 @@ static void collect_range_tables(Query *query, List* full_range_table,
 /*
  *
  */
-static bool IsAggFunction(char* funcName) {
-	if (funcName == NULL) {
+static bool IsBuildInFunction(Oid foid) {
+
+	cqContext  *pcqCtx;
+	HeapTuple	procedureTuple;
+	Form_pg_proc procedureStruct;
+
+	/*
+	 * get the procedure tuple corresponding to the given function Oid
+	 */
+	pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(foid)));
+
+	procedureTuple = caql_getnext(pcqCtx);
+
+	if (!HeapTupleIsValid(procedureTuple))
+		elog(ERROR, "cache lookup failed for function %u", foid);
+	procedureStruct = (Form_pg_proc) GETSTRUCT(procedureTuple);
+	caql_endscan(pcqCtx);
+	/* we treat proc namespace = 11 to build in function.*/
+	if (procedureStruct->pronamespace == 11) {
+		return true;
+	} else {
 		return false;
 	}
-	Relation pg_proc_rel;
-	TupleDesc pg_proc_dsc;
-	HeapTuple tuple;
-	SysScanDesc pg_proc_scan;
-
-	pg_proc_rel = heap_open(ProcedureRelationId, AccessShareLock);
-	pg_proc_dsc = RelationGetDescr(pg_proc_rel);
-	ScanKeyData skey;
-
-	ScanKeyInit(&skey, PRONAME, BTEqualStrategyNumber,
-	F_NAMEEQ, CStringGetDatum(funcName));
-
-	pg_proc_scan = systable_beginscan(pg_proc_rel, InvalidOid, FALSE,
-			ActiveSnapshot, 1, &skey);
-	while (HeapTupleIsValid(tuple = systable_getnext(pg_proc_scan))) {
-
-		bool isAgg = DatumGetBool(fastgetattr(tuple, PROISAGG, pg_proc_dsc, NULL));
-		systable_endscan(pg_proc_scan);
-		heap_close(pg_proc_rel, AccessShareLock);
-		if (isAgg) {
-			return true;
-		} else {
-			return false;
-		}
-	}
-	systable_endscan(pg_proc_scan);
-	heap_close(pg_proc_rel, AccessShareLock);
-	return true;
 }
+
 /*
  *
  */
@@ -676,25 +685,6 @@ static void convert_range_tables_to_oids_and_check_table_functions(List **range_
 	foreach(old_lc, *range_tables)
 	{
 		RangeTblEntry *entry = (RangeTblEntry *) lfirst(old_lc);
-		if (entry->rtekind == RTE_FUNCTION || entry->rtekind == RTE_TABLEFUNCTION) {
-			*isTableFunctionExists = true;
-		}
-		if (entry->rtekind == RTE_SUBQUERY) {
-			Query* subQuery = entry->subquery;
-			ListCell *lc;
-			foreach(lc, subQuery->targetList)
-			{
-				TargetEntry *te = (TargetEntry *) lfirst(lc);
-				bool isAggFunc = IsAggFunction(te->resname);
-				// if target list of subquery contains non aggregate function,
-				// then we consider the query contains and use default_segment_num guc
-				// as the number of virtual segment
-				if (!isAggFunc) {
-					*isTableFunctionExists = true;
-				}
-			}
-
-		}
 		if (entry->rtekind != RTE_RELATION) {
 			continue;
 		}
@@ -777,17 +767,24 @@ static void check_keep_hash_and_external_table(
 			/* targetPolicy->bucketnum is bucket number of external table,
 			 * whose default value is set to default_segment_num
 			 */
-			if (context->externTableSegNum == 0) {
-				context->externTableSegNum = targetPolicy->bucketnum;
-			} else {
-				if (context->externTableSegNum < targetPolicy->bucketnum) {
-					context->externTableSegNum = targetPolicy->bucketnum;
-					/*
-					 * In this case, two external table join but with different bucket number
-					 * we cannot allocate the right segment number.
-					 */
-					//now we just restrict that vseg num > bucket number of external table
-					//elog(ERROR, "All external tables in one query must have the same bucket number!");
+			ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
+			if(extEnrty->isweb){
+				if (context->externTableOnClauseSegNum == 0) {
+					context->externTableOnClauseSegNum = targetPolicy->bucketnum;
+				} else {
+					if (context->externTableOnClauseSegNum != targetPolicy->bucketnum) {
+						/*
+						 * In this case, two external table join but with different bucket number
+						 * we cannot allocate the right segment number.
+						 */
+						elog(ERROR, "All external tables in one query must have the same bucket number!");
+					}
+				}
+			}
+			else{
+				if (context->externTableLocationSegNum < targetPolicy->bucketnum) {
+					context->externTableLocationSegNum = targetPolicy->bucketnum;
+					context->minimum_segment_num =  targetPolicy->bucketnum;
 				}
 			}
 		}
@@ -928,6 +925,8 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 	}
 	context->total_file_count = totalFileCount;
 	context->total_size = total_size;
+    
+    context->metadata_cache_time_us = eclaspeTime;
 
 	if(debug_datalocality_time){
 		elog(LOG, "metadata overall execution time: %d us. \n", eclaspeTime);
@@ -1823,7 +1822,7 @@ static int select_random_host_algorithm(Relation_Assignment_Context *context,
 	}
 	if (debug_fake_datalocality) {
 		fprintf(fp,
-				"cur_size_of_whole_query is:"INT64_FORMAT", avg_size_of_whole_query is: %.3f",
+				"cur_size_of_whole_query is:%.0f, avg_size_of_whole_query is: %.3f",
 				context->totalvols_with_penalty[minindex] + net_disk_ratio * splitsize,
 				context->avg_size_of_whole_query);
 	}
@@ -2383,7 +2382,7 @@ static Relation_File** change_file_order_based_on_continuity(
 		Relation_Data *rel_data, TargetSegmentIDMap* idMap, int host_num,
 		int* fileCount, Relation_Assignment_Context *assignment_context) {
 
-	Relation_File** file_vector;
+	Relation_File** file_vector = NULL;
 	int* isBlockContinue = (int *) palloc(sizeof(int) * host_num);
 	for (int i = 0; i < host_num; i++) {
 		isBlockContinue[i] = 0;
@@ -3395,13 +3394,13 @@ static void print_datalocality_overall_log_information(SplitAllocResult *result,
 	appendStringInfo(result->datalocalityInfo, "data locality ratio: %.3f; virtual segment number: %d; "
 			"different host number: %d; virtual segment number per host(avg/min/max): (%d/%d/%d); "
 			"segment size(avg/min/max): (%.3f B/"INT64_FORMAT" B/"INT64_FORMAT" B); "
-			"segment size with penalty(avg/min/max): (%.3f B/"INT64_FORMAT" B/"INT64_FORMAT" B); continuity(avg/min/max): (%.3f/%.3f/%.3f)."
+			"segment size with penalty(avg/min/max): (%.3f B/"INT64_FORMAT" B/"INT64_FORMAT" B); continuity(avg/min/max): (%.3f/%.3f/%.3f); "
 			,log_context->datalocalityRatio,assignment_context->virtual_segment_num,log_context->numofDifferentHost,
 			log_context->avgSegmentNumofHost,log_context->minSegmentNumofHost,log_context->maxSegmentNumofHost,
 			log_context->avgSizeOverall,log_context->minSizeSegmentOverall,log_context->maxSizeSegmentOverall,
 			log_context->avgSizeOverallPenalty,log_context->minSizeSegmentOverallPenalty,log_context->maxSizeSegmentOverallPenalty,
-			log_context->avgContinuityOverall,log_context->minContinuityOverall,log_context->maxContinuityOverall
-			);
+			log_context->avgContinuityOverall,log_context->minContinuityOverall,log_context->maxContinuityOverall);
+
 	if (debug_fake_datalocality) {
 			fprintf(fp, "datalocality ratio: %.3f; virtual segments number: %d, "
 					"different host number: %d, segment number per host(avg/min/max): (%d/%d/%d); "
@@ -3419,45 +3418,45 @@ static void print_datalocality_overall_log_information(SplitAllocResult *result,
 			if(log_context->minSegmentNumofHost > 0 ){
 				fprintf(fpratio, "segmentnumber_perhost_max/min=%.2f\n", (double)(log_context->maxSegmentNumofHost / log_context->minSegmentNumofHost));
 			}else{
-				fprintf(fpratio, "segmentnumber_perhost_max/min="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segmentnumber_perhost_max/min=%lld\n", INT64_MAX);
 			}
 			if(log_context->avgSegmentNumofHost > 0 ){
 				fprintf(fpratio, "segmentnumber_perhost_max/avg=%.2f\n", (double)(log_context->maxSegmentNumofHost / log_context->avgSegmentNumofHost));
 			}else{
-				fprintf(fpratio, "segmentnumber_perhost_max/avg="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segmentnumber_perhost_max/avg=%lld\n", INT64_MAX);
 			}
 
 			if (log_context->minSizeSegmentOverall > 0){
 				fprintf(fpratio, "segments_size_max/min=%.5f\n", (double)log_context->maxSizeSegmentOverall / (double)log_context->minSizeSegmentOverall);
 			}else{
-				fprintf(fpratio, "segments_size_max/min="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_max/min=%lld\n", INT64_MAX);
 			}
 			if (log_context->avgSizeOverall > 0){
 				fprintf(fpratio, "segments_size_max/avg=%.5f\n", log_context->maxSizeSegmentOverall / log_context->avgSizeOverall);
 			}else{
-				fprintf(fpratio, "segments_size_max/avg="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_max/avg=%lld\n", INT64_MAX);
 			}
 
 			if (log_context->minSizeSegmentOverallPenalty > 0){
 				fprintf(fpratio, "segments_size_penalty_max/min=%.5f\n",(double)log_context->maxSizeSegmentOverallPenalty / (double)log_context->minSizeSegmentOverallPenalty);
 			}else{
-				fprintf(fpratio, "segments_size_penalty_max/min="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_penalty_max/min=%lld\n", INT64_MAX);
 			}
 			if (log_context->avgSizeOverallPenalty > 0){
 				fprintf(fpratio, "segments_size_penalty_max/avg=%.5f\n",log_context->maxSizeSegmentOverallPenalty / log_context->avgSizeOverallPenalty);
 			}else{
-				fprintf(fpratio, "segments_size_penalty_max/avg="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_penalty_max/avg=%lld\n", INT64_MAX);
 			}
 
 			if (log_context->minContinuityOverall > 0){
 				fprintf(fpratio, "continuity_max/min=%.5f\n",log_context->maxContinuityOverall / log_context->minContinuityOverall);
 			}else{
-				fprintf(fpratio, "continuity_max/min="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "continuity_max/min=%lld\n", INT64_MAX);
 			}
 			if (log_context->avgContinuityOverall > 0){
 				fprintf(fpratio, "continuity_max/avg=%.5f\n",log_context->maxContinuityOverall / log_context->avgContinuityOverall);
 			}else{
-				fprintf(fpratio, "continuity_max/avg="INT64_FORMAT"\n", INT64_MAX);
+				fprintf(fpratio, "continuity_max/avg=%lld\n", INT64_MAX);
 			}
 			fflush(fpratio);
 			fclose(fpratio);
@@ -3919,9 +3918,17 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 	uint64_t run_datalocality = 0;
 	run_datalocality = gettime_microsec();
 	int dl_overall_time = run_datalocality - before_run_allocation;
+    
+    context->cal_datalocality_time_us = dl_overall_time; 
+
 	if(debug_datalocality_time){
 		elog(LOG, "datalocality overall execution time: %d us. \n", dl_overall_time);
 	}
+
+    result->datalocalityTime = (double)(context->metadata_cache_time_us + context->alloc_resource_time_us + context->cal_datalocality_time_us)/ 1000;
+    appendStringInfo(result->datalocalityInfo, "DFS metadatacache: %.3f ms; resource allocation: %.3f ms; datalocality calculation: %.3f ms.",
+            (double)context->metadata_cache_time_us/1000, (double)context->alloc_resource_time_us/1000, (double)context->cal_datalocality_time_us/1000);  
+
 	return alloc_result;
 }
 
@@ -3958,11 +3965,54 @@ static void cleanup_allocation_algorithm(
 }
 
 /*
+ * udf_collector_walker: the routine to file udfs.
+ */
+bool udf_collector_walker(Node *node,
+		udf_collector_context *context) {
+	if (node == NULL) {
+		return false;
+	}
+
+	if (IsA(node, Query)) {
+		return query_tree_walker((Query *) node, udf_collector_walker,
+				(void *) context,
+				QTW_EXAMINE_RTES);
+	}
+
+	/*For Aggref, we don't consider it as udf.*/
+
+	if(IsA(node,FuncExpr)){
+		if(!IsBuildInFunction(((FuncExpr *) node)->funcid)){
+			context->udf_exist = true;
+		}
+		return false;
+	}
+
+	return expression_tree_walker(node, udf_collector_walker,
+			(void *) context);
+
+	return false;
+}
+
+/*
+ * find_udf: collect all udf, and store them into the udf_collector_context.
+ */
+void find_udf(Query *query, udf_collector_context *context) {
+
+	query_tree_walker(query, udf_collector_walker, (void *) context,
+	QTW_EXAMINE_RTES);
+
+	return;
+}
+
+
+/*
  * calculate_planner_segment_num
+ * fixedVsegNum is used by PBE, since all the execute should use the same number of vsegs.
  */
 SplitAllocResult *
 calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
-		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum) {
+		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum, int fixedVsegNum) {
 	SplitAllocResult *result = NULL;
 	QueryResource *resource = NULL;
 	QueryResourceParameters *resource_parameters = NULL;
@@ -3971,15 +4021,16 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	List *alloc_result = NIL;
 	split_to_segment_mapping_context context;
 
-	int planner_segments = -1; /*virtual segments number for explain statement */
+	int planner_segments = 0; /*virtual segments number for explain statement */
 
 	result = (SplitAllocResult *) palloc(sizeof(SplitAllocResult));
 	result->resource = NULL;
 	result->resource_parameters = NULL;
 	result->alloc_results = NIL;
 	result->relsType = NIL;
-	result->planner_segments = -1;
+	result->planner_segments = 0;
 	result->datalocalityInfo = makeStringInfo();
+    result->datalocalityTime = 0;
 
 	/* fake data locality */
 	if (debug_fake_datalocality) {
@@ -3995,7 +4046,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		result->resource_parameters = NULL;
 		result->alloc_results = NIL;
 		result->relsType = NIL;
-		result->planner_segments = -1;
+		result->planner_segments = 0;
 		return result;
 	}
 
@@ -4020,6 +4071,11 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		 * 5 data size of random "from" relation
 		 */
 
+		udf_collector_context udf_context;
+		udf_context.udf_exist = false;
+
+		find_udf(query, &udf_context);
+		isTableFunctionExists = udf_context.udf_exist;
 		/*convert range table list to oid list and check whether table function exists
 		 *we keep a full range table list and a range table list without result relation separately
 		 */
@@ -4030,23 +4086,31 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				&(context.rtc_context.range_tables), &isTableFunctionExists,
 				context.datalocality_memorycontext);
 
-		/*Table Function VSeg Number = default_segment_number(configured in GUC) if table function exists,
+		/* set expected virtual segment number for hash table and external table*/
+		/* calculate hashSegNum, externTableSegNum, resultRelationHashSegNum */
+		check_keep_hash_and_external_table(&context, query, intoPolicy);
+
+		/*Table Function VSeg Number = default_segment_number(configured in GUC) if table function exists or gpfdist exists,
 		 *0 Otherwise.
 		 */
 		if (isTableFunctionExists) {
 			context.tableFuncSegNum = GetUserDefinedFunctionVsegNum();
 		}
 
-		/* set expected virtual segment number for hash table and external table*/
-		/* calculate hashSegNum, externTableSegNum, resultRelationHashSegNum */
-		check_keep_hash_and_external_table(&context, query, intoPolicy);
-
 		/* get block location and calculate relation size*/
 		get_block_locations_and_claculte_table_size(&context);
 
 		/*use inherit resource*/
 		if (resourceLife == QRL_INHERIT) {
-			resource = AllocateResource(resourceLife, sliceNum, 0, 0, 0, NULL, 0);
+
+			if ( SPI_IsInPrepare() && (GetActiveQueryResource() == NULL) )
+			{
+				resource = NULL;
+			}
+			else
+			{
+				resource = AllocateResource(resourceLife, sliceNum, 0, 0, 0, NULL, 0);
+			}
 
 			saveQueryResourceParameters(
 							resource_parameters,  /* resource_parameters */
@@ -4111,13 +4175,11 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				context.randomSegNum = expected_segment_num_with_max_filecount;
 			}
 			/* Step4 we at least use one segment*/
-			if (context.randomSegNum < minimum_segment_num) {
-				context.randomSegNum = minimum_segment_num;
+			if (context.randomSegNum < context.minimum_segment_num) {
+				context.randomSegNum = context.minimum_segment_num;
 			}
 
 			int maxExpectedNonRandomSegNum = 0;
-			if (maxExpectedNonRandomSegNum < context.externTableSegNum)
-				maxExpectedNonRandomSegNum = context.externTableSegNum;
 			if (maxExpectedNonRandomSegNum < context.tableFuncSegNum)
 				maxExpectedNonRandomSegNum = context.tableFuncSegNum;
 			if (maxExpectedNonRandomSegNum < context.hashSegNum)
@@ -4131,7 +4193,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				fprintf(fpsegnum, "Result relation hash segment num : %d.\n", context.resultRelationHashSegNum);
 				fprintf(fpsegnum, "\n");
 				fprintf(fpsegnum, "Table  function      segment num : %d.\n", context.tableFuncSegNum);
-				fprintf(fpsegnum, "Extern table         segment num : %d.\n", context.externTableSegNum);
+				fprintf(fpsegnum, "Extern table         segment num : %d.\n", context.externTableOnClauseSegNum);
 				fprintf(fpsegnum, "From hash relation   segment num : %d.\n", context.hashSegNum);
 				fprintf(fpsegnum, "MaxExpectedNonRandom segment num : %d.\n", maxExpectedNonRandomSegNum);
 				fprintf(fpsegnum, "\n");
@@ -4141,29 +4203,33 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			int maxTargetSegmentNumber = 0;
 			/* we keep resultRelationHashSegNum in the highest priority*/
 			if (context.resultRelationHashSegNum != 0) {
-				if (context.resultRelationHashSegNum < context.externTableSegNum
-						&& context.externTableSegNum != 0) {
+				if ((context.resultRelationHashSegNum != context.externTableOnClauseSegNum
+						&& context.externTableOnClauseSegNum != 0)
+						|| (context.resultRelationHashSegNum < context.externTableLocationSegNum)) {
 					cleanup_allocation_algorithm(&context);
 					elog(ERROR, "Could not allocate enough memory! "
 							"bucket number of result hash table and external table should match each other");
 				}
 				maxTargetSegmentNumber = context.resultRelationHashSegNum;
 				minTargetSegmentNumber = context.resultRelationHashSegNum;
-			} else if (maxExpectedNonRandomSegNum > 0) {
+			}
+			else if(context.externTableOnClauseSegNum > 0){
 				/* bucket number of external table must be the same with the number of virtual segments*/
-				if (maxExpectedNonRandomSegNum == context.externTableSegNum) {
-					context.externTableSegNum =
-							context.externTableSegNum < minimum_segment_num ?
-									minimum_segment_num : context.externTableSegNum;
-					maxTargetSegmentNumber = context.externTableSegNum;
-					minTargetSegmentNumber = context.externTableSegNum;
-				} else if (maxExpectedNonRandomSegNum == context.hashSegNum) {
+				if(context.externTableOnClauseSegNum < context.externTableLocationSegNum){
+					cleanup_allocation_algorithm(&context);
+					elog(ERROR, "external table bucket number should match each other");
+				}
+				maxTargetSegmentNumber = context.externTableOnClauseSegNum;
+				minTargetSegmentNumber = context.externTableOnClauseSegNum;
+			}
+			else if (maxExpectedNonRandomSegNum > 0) {
+				if (maxExpectedNonRandomSegNum == context.hashSegNum) {
 					/* in general, we keep bucket number of hash table equals to the number of virtual segments
 					 * but this rule can be broken when there is a large random table in the range tables list
 					 */
 					context.hashSegNum =
-							context.hashSegNum < minimum_segment_num ?
-							minimum_segment_num : context.hashSegNum;
+							context.hashSegNum < context.minimum_segment_num ?
+							context.minimum_segment_num : context.hashSegNum;
 					double considerRandomWhenHashExistRatio = 1.5;
 					/*if size of random table >1.5 *hash table, we consider relax the restriction of hash bucket number*/
 					if (context.randomRelSize
@@ -4172,7 +4238,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 							context.randomSegNum = context.hashSegNum;
 						}
 						maxTargetSegmentNumber = context.randomSegNum;
-						minTargetSegmentNumber = minimum_segment_num;
+						minTargetSegmentNumber = context.minimum_segment_num;
 					} else {
 						maxTargetSegmentNumber = context.hashSegNum;
 						minTargetSegmentNumber = context.hashSegNum;
@@ -4180,22 +4246,30 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				} else if (maxExpectedNonRandomSegNum == context.tableFuncSegNum) {
 					/* if there is a table function, we should at least use tableFuncSegNum virtual segments*/
 					context.tableFuncSegNum =
-							context.tableFuncSegNum < minimum_segment_num ?
-									minimum_segment_num : context.tableFuncSegNum;
+							context.tableFuncSegNum < context.minimum_segment_num ?
+									context.minimum_segment_num : context.tableFuncSegNum;
 					if (context.randomSegNum < context.tableFuncSegNum) {
 						context.randomSegNum = context.tableFuncSegNum;
 					}
 					maxTargetSegmentNumber = context.randomSegNum;
-					minTargetSegmentNumber = minimum_segment_num;
+					minTargetSegmentNumber = context.minimum_segment_num;
 				}
 			} else {
 				maxTargetSegmentNumber = context.randomSegNum;
-				minTargetSegmentNumber = minimum_segment_num;
+				minTargetSegmentNumber = context.minimum_segment_num;
 			}
 
 			if (enforce_virtual_segment_number > 0) {
 				maxTargetSegmentNumber = enforce_virtual_segment_number;
 				minTargetSegmentNumber = enforce_virtual_segment_number;
+			}
+			/* in PBE mode, the execute should use the same vseg number. */
+			if(fixedVsegNum > 0 ){
+				maxTargetSegmentNumber = fixedVsegNum;
+				minTargetSegmentNumber = fixedVsegNum;
+			}
+			if(maxTargetSegmentNumber < minTargetSegmentNumber){
+				maxTargetSegmentNumber = minTargetSegmentNumber;
 			}
 			uint64_t before_rm_allocate_resource = gettime_microsec();
 
@@ -4204,9 +4278,40 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			mincost <<= 20;
 			int64 queryCost = context.total_size < mincost ? mincost : context.total_size;
 			if (QRL_NONE != resourceLife) {
-				resource = AllocateResource(QRL_ONCE, sliceNum, queryCost,
-						maxTargetSegmentNumber, minTargetSegmentNumber,
-						context.host_context.hostnameVolInfos, context.host_context.size);
+
+				if (SPI_IsInPrepare())
+				{
+					resource = NULL;
+					/*
+					 * prepare need to get resource quota from RM
+					 * and pass quota(planner_segments) to Orca or Planner to generate plan
+					 * the following executes(in PBE) should reallocate the same number
+					 * of resources.
+					 */
+					uint32 seg_num;
+					uint32 seg_num_min;
+					uint32 seg_memory_mb;
+					double seg_core;
+
+					GetResourceQuota(maxTargetSegmentNumber,
+					                 minTargetSegmentNumber,
+					                 &seg_num,
+					                 &seg_num_min,
+					                 &seg_memory_mb,
+					                 &seg_core);
+
+					planner_segments = seg_num;
+					minTargetSegmentNumber = planner_segments;
+					maxTargetSegmentNumber = planner_segments;
+				}
+				else
+				{
+					resource = AllocateResource(QRL_ONCE, sliceNum, queryCost,
+					                            maxTargetSegmentNumber,
+					                            minTargetSegmentNumber,
+					                            context.host_context.hostnameVolInfos,
+					                            context.host_context.size);
+				}
 
 				saveQueryResourceParameters(
 								resource_parameters,                   /* resource_parameters */
@@ -4230,13 +4335,16 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			}
 			uint64_t after_rm_allocate_resource = gettime_microsec();
 			int eclaspeTime = after_rm_allocate_resource - before_rm_allocate_resource;
+        
+            context.alloc_resource_time_us = eclaspeTime;
+
 			if(debug_datalocality_time){
 				elog(LOG, "rm allocate resource overall execution time: %d us. \n", eclaspeTime);
 			}
 
 			if (resource == NULL) {
 				result->resource = NULL;
-				result->resource_parameters = NULL;
+				result->resource_parameters = resource_parameters;
 				result->alloc_results = NIL;
 				result->relsType = NIL;
 				result->planner_segments = planner_segments;

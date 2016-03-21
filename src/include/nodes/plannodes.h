@@ -204,6 +204,7 @@ typedef struct PlannedStmt
 		MemoryAccount *memoryAccount;
 
 		StringInfo datalocalityInfo;
+        double     datalocalityTime;
 } PlannedStmt;
 
 
@@ -1149,6 +1150,7 @@ typedef struct DML
 	AttrNumber	actionColIdx;	/* index of action column into the target list */
 	AttrNumber	ctidColIdx;		/* index of ctid column into the target list */
 	AttrNumber	tupleoidColIdx;	/* index of tuple oid column into the target list */
+	bool		inputSorted;		/* needs the data to be sorted */
 
 } DML;
 

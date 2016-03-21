@@ -1227,3 +1227,71 @@ subpartition ohio values ('OH')
 )
 )
 );
+
+-- Tests for sort operator before insert with AO and PARQUET tables (HAWQ-404)
+-- A GUC's value is set to less than the number of partitions in the example table, so that sort is activated.
+
+DROP TABLE IF EXISTS ch_sort_src, ch_sort_aodest, ch_sort_pqdest, ch_sort_aopqdest, ch_sort__pq_table;
+
+SET optimizer_parts_to_force_sort_on_insert = 5;
+
+CREATE TABLE ch_sort_src (id int, year int, month int, day int, region text)
+DISTRIBUTED BY (month); 
+INSERT INTO ch_sort_src select i, 2000 + i, i % 12, (2*i) % 30, i::text from generate_series(0, 99) i; 
+
+-- AO partitioned table
+CREATE TABLE ch_sort_aodest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+
+-- PARQUET partitioned table
+CREATE TABLE ch_sort_pqdest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE, ORIENTATION = PARQUET)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+
+-- AO/PARQUET mixed table
+CREATE TABLE ch_sort_aopqdest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+
+CREATE TABLE ch_sort__pq_table (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE, ORIENTATION = PARQUET)
+DISTRIBUTED BY (id);
+
+ALTER TABLE ch_sort_aopqdest
+EXCHANGE PARTITION FOR(2006)
+WITH TABLE ch_sort__pq_table;
+
+
+-- Test that inserts work
+INSERT INTO ch_sort_aodest SELECT * FROM ch_sort_src;
+SELECT COUNT(*) FROM ch_sort_aodest;
+SELECT COUNT(*) FROM ch_sort_aodest_1_prt_6;
+SELECT COUNT(*) FROM ch_sort_aodest_1_prt_outlying_years;
+
+INSERT INTO ch_sort_pqdest SELECT * FROM ch_sort_src;
+SELECT COUNT(*) FROM ch_sort_pqdest;
+SELECT COUNT(*) FROM ch_sort_pqdest_1_prt_6;
+SELECT COUNT(*) FROM ch_sort_pqdest_1_prt_outlying_years;
+
+INSERT INTO ch_sort_aopqdest SELECT * FROM ch_sort_src;
+SELECT COUNT(*) FROM ch_sort_aopqdest;
+SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_6;
+SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_outlying_years;
+
+RESET optimizer_parts_to_force_sort_on_insert;

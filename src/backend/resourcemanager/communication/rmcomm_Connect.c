@@ -68,12 +68,15 @@ void WriteReadyHandler_Connect(AsyncCommBuffer buffer)
 		shouldclose = true;
 	}
 
+	if ( setConnectionLongTermNoDelay(buffer->FD) != FUNC_RETURN_OK )
+	{
+		shouldclose = true;
+	}
+
 	if ( shouldclose )
 	{
 		ErrorHandler_Connect(buffer);
-
-		buffer->toClose 	= true;
-		buffer->forcedClose = true;
+		forceCloseFileDesc(buffer);
 		return;
 	}
 
@@ -123,7 +126,6 @@ void CleanUpHandler_Connect(AsyncCommBuffer buffer)
 }
 
 int registerFileDescForAsyncConn(int 		 			  fd,
-								 char					 *dmfilename,
 								 uint32_t				  actionmask_afterconn,
 								 AsyncCommBufferHandlers  methods_afterconn,
 								 void				     *userdata_afterconn,
@@ -139,7 +141,6 @@ int registerFileDescForAsyncConn(int 		 			  fd,
 	elog(DEBUG3, "Created AsyncComm Conn context.");
 
 	int res = registerFileDesc(fd,
-					 	 	   dmfilename,
 							   ASYNCCOMM_WRITE,
 							   &AsyncCommBufferHandlersConn,
 							   userdata,

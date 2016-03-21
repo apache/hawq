@@ -766,6 +766,7 @@ bool 		optimizer_multilevel_partitioning;
 bool        optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
+int		optimizer_parts_to_force_sort_on_insert;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -4413,6 +4414,15 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"hawq_rm_enable_connpool", PGC_POSTMASTER, RESOURCES_MGM,
+		 gettext_noop("enalbe client side socket connection pool."),
+		 NULL
+		},
+		&rm_enable_connpool,
+		true, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_force_alterqueue_cancel_queued_request", PGC_POSTMASTER, RESOURCES_MGM,
 		 gettext_noop("force to cancel a query resource request when altering a resource queue."),
 		 NULL
@@ -4506,7 +4516,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&default_hash_table_bucket_number,
-		6, 1, INT_MAX, NULL, NULL
+		6, 1, 65535, NULL, NULL
 	},
 
 	{
@@ -4515,7 +4525,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&hawq_rm_nvseg_for_copy_from_perquery,
-		6, 1, INT_MAX, NULL, NULL
+		6, 1, 65535, NULL, NULL
 	},
 
 	{
@@ -4524,7 +4534,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&hawq_rm_nvseg_for_analyze_perquery_perseg_limit,
-		4, 1, INT_MAX, NULL, NULL
+		4, 1, 65535, NULL, NULL
 	},
 
 	{
@@ -4533,7 +4543,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&hawq_rm_nvseg_for_analyze_perquery_limit,
-		256, 1, INT_MAX, NULL, NULL
+		256, 1, 65535, NULL, NULL
 	},
 
 	{
@@ -5638,7 +5648,7 @@ static struct config_int ConfigureNamesInt[] =
 			GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
 		},
 		&gp_connections_per_thread,
-		512, 0, INT_MAX, assign_gp_connections_per_thread, show_gp_connections_per_thread
+		512, 1, INT_MAX, assign_gp_connections_per_thread, show_gp_connections_per_thread
 	},
 
 	{
@@ -6178,6 +6188,16 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"optimizer_parts_to_force_sort_on_insert", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Minimum number of partitions required to force sorting tuples during insertion in an append only row-oriented partitioned table"),
+			NULL,
+			GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
+		},
+		&optimizer_parts_to_force_sort_on_insert,
+		INT_MAX, 0, INT_MAX, NULL, NULL
+	},
+
+	{
 		{"pxf_stat_max_fragments", PGC_USERSET, EXTERNAL_TABLES,
 			gettext_noop("Max number of fragments to be sampled during ANALYZE on a PXF table."),
 			NULL,
@@ -6231,6 +6251,25 @@ static struct config_int ConfigureNamesInt[] =
             },
             &rm_segment_port,
             5438, 1, 65535, NULL, NULL
+    },
+
+    {
+            {"hawq_rm_connpool_sameaddr_buffersize", PGC_POSTMASTER, RESOURCES_MGM,
+                    gettext_noop("buffered socket connection maximum size for "
+                    			 "one address and one port"),
+                    NULL
+            },
+            &rm_connpool_sameaddr_buffersize,
+            2, 1, 65535, NULL, NULL
+    },
+
+    {
+            {"hawq_segment_history_keep_period", PGC_POSTMASTER, RESOURCES_MGM,
+                    gettext_noop("period of storing rows in segment_configuration_history"),
+                    NULL
+            },
+            &segment_history_keep_period,
+            365, 1, INT_MAX, NULL, NULL
     },
 
     {
@@ -6349,7 +6388,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nvseg_perquery_limit,
-            1000, 1, 65535, NULL, NULL
+            512, 1, 65535, NULL, NULL
     },
 
     {

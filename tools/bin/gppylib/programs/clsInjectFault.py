@@ -405,7 +405,10 @@ class GpInjectFaultProgram:
                   "analyze_subxact_error (inject an error during analyze)," \
                   "opt_task_allocate_string_buffer (inject fault while allocating string buffer), " \
                   "runaway_cleanup (inject fault before starting the cleanup for a runaway query)" \
-                  "all (affects all faults injected, used for 'status' and 'reset'), ") 
+                  "connection_fail_after_gang_creation (inject fault after gang thread creation, set connection null)" \
+				  "create_cdb_dispath_result_object (inject fault when create cdb dispatch result object, set out of memeory)" \
+				  "worker_manager_submit_job (inject fault when worker manager submit job , set error)" \
+				  "all (affects all faults injected, used for 'status' and 'reset'), ")
         addTo.add_option("-c", "--ddl_statement", dest="ddlStatement", type="string",
                          metavar="ddlStatement",
                          help="The DDL statement on which fault should be set and triggered " \

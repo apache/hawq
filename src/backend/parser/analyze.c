@@ -2724,7 +2724,7 @@ transformETDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 										 sizeof(p->attrs[0]));
 			p->ptype = POLICYTYPE_PARTITIONED;
 			p->nattrs = 0;
-			p->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetRandomDistPartitionNum());
+			p->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetExternalTablePartitionNum());
 			p->attrs[0] = 1;
 		}
 
@@ -2981,11 +2981,32 @@ transformDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
 
 	if (policy->bucketnum == -1)
 	{
-		policy->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetRandomDistPartitionNum());
+		policy->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetDefaultPartitionNum());
 	}
 
 	*policyp = policy;
 
+	if (cxt && cxt->inhRelations)
+	{
+		ListCell   *entry;
+
+		foreach(entry, cxt->inhRelations)
+		{
+			RangeVar   *parent = (RangeVar *) lfirst(entry);
+			Oid			relId = RangeVarGetRelid(parent, false, false /*allowHcatalog*/);
+			GpPolicy  *parentPolicy = GpPolicyFetch(CurrentMemoryContext, relId);
+
+			if (!GpPolicyEqual(policy, parentPolicy))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+								errmsg("distribution policy for \"%s\" "
+										"must be the same as that for \"%s\"",
+										cxt->relation->relname,
+										parent->relname)));
+			}
+		}
+	}
 
 	if (cxt && cxt->pkey)		/* Primary key	specified.	Make sure
 								 * distribution columns match */
@@ -8231,6 +8252,22 @@ transformPartitionBy(ParseState *pstate, CreateStmtContext *cxt,
 										 snamespaceid,
 										 NULL);
 
+		/* check non-uniform bucketnum options */
+		if (pStoreAttr && ((AlterPartitionCmd *)pStoreAttr)->arg1)
+		{
+			List *pWithList = (List *)(((AlterPartitionCmd *)pStoreAttr)->arg1);
+			int bucketnum = policy->bucketnum;
+			int child_bucketnum = GetRelOpt_bucket_num_fromOptions(pWithList, bucketnum);
+
+			if (child_bucketnum != bucketnum)
+				ereport(ERROR,
+						(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+								errmsg("distribution policy for \"%s\" "
+										"must be the same as that for \"%s\"",
+										relname,
+										cxt->relation->relname)));
+		}
+
 		/* XXX: temporarily add rule creation code for debugging */
 
 		/* now that we have the child table name, make the rule */
@@ -12150,7 +12187,7 @@ setQryDistributionPolicy(SelectStmt *stmt, Query *qry)
 	policy->nattrs = 0;
 	policy->attrs[0] = 1;
 	if(stmt->intoClause != NULL)
-		policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetRandomDistPartitionNum());
+		policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetDefaultPartitionNum());
 
 	if (stmt->distributedBy)
 	{
@@ -12204,7 +12241,7 @@ setQryDistributionPolicy(SelectStmt *stmt, Query *qry)
 		}
 		else
 		{
-			policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetRandomDistPartitionNum());
+			policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetDefaultPartitionNum());
 		}
 	}
 

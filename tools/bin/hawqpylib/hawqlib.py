@@ -19,6 +19,7 @@
 import os, sys
 import subprocess
 import threading
+import Queue
 from xml.dom import minidom
 from xml.etree.ElementTree import ElementTree
 from gppylib.db import dbconn
@@ -67,6 +68,49 @@ class HawqCommands(object):
 
     def batch_result(self):
         return self.return_flag
+
+
+class threads_with_return(object):
+    def __init__(self, function_list=None, name='HAWQ', action_name = 'execute', logger = None, return_values = None):
+        self.function_list = function_list
+        self.name = name
+        self.action_name = action_name
+        self.return_values = return_values
+        self.thread_list = []
+        self.logger = logger
+
+    def get_function_list(self, function_list):
+        self.function_list = function_list
+
+    def exec_function(self, func, *args, **kwargs):
+        result = func(*args, **kwargs)
+        if result != 0 and self.logger and func.__name__ == 'remote_ssh':
+            self.logger.error("%s %s failed on %s" % (self.name, self.action_name, args[1]))
+        self.return_values.put(result)
+
+    def start(self):
+        self.thread_list = []
+        for func_dict in self.function_list:
+            if func_dict["args"]:
+                new_arg_list = []
+                new_arg_list.append(func_dict["func"])
+                for arg in func_dict["args"]:
+                    new_arg_list.append(arg)
+                new_arg_tuple = tuple(new_arg_list)
+                t = threading.Thread(target=self.exec_function, args=new_arg_tuple, name=self.name)
+            else:
+                t = threading.Thread(target=self.exec_function, args=(func_dict["func"],), name=self.name)
+            self.thread_list.append(t)
+
+        for thread_instance in self.thread_list:
+            thread_instance.start()
+            #print threading.enumerate()
+
+        for thread_instance in self.thread_list:
+            thread_instance.join()
+
+    def batch_result(self):
+        return self.return_values
 
 
 class HawqXMLParser:
@@ -119,6 +163,38 @@ def check_hostname_equal(remote_host, user = ""):
         return False
 
 
+def check_hawq_running(host, data_directory, port, user = '', logger = None):
+
+    hawq_running = True
+    hawq_pid_file_path = data_directory + '/postmaster.pid'
+
+    if check_file_exist(hawq_pid_file_path, host, logger):
+        if not check_postgres_running(data_directory, user, host, logger):
+            if logger:
+                logger.warning("Have a postmaster.pid file but no hawq process running")
+
+            lockfile="/tmp/.s.PGSQL.%s" % port
+            if logger:
+                logger.info("Clearing hawq instance lock files and pid file")
+            cmd = "rm -rf %s %s" % (lockfile, hawq_pid_file_path)
+            remote_ssh(cmd, host, user)
+            hawq_running = False
+        else:
+            hawq_running = True
+
+    else:
+        if check_postgres_running(data_directory, user, host, logger):
+            if logger:
+                logger.warning("postmaster.pid file does not exist, but hawq process is running.")
+            hawq_running = True
+        else:
+            if logger:
+                logger.warning("HAWQ process is not running on %s, skip" % host)
+            hawq_running = False
+
+    return host, hawq_running
+
+
 def local_ssh(cmd, logger = None, warning = False):
     result = subprocess.Popen(cmd, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
     stdout,stderr = result.communicate()
@@ -146,7 +222,12 @@ def remote_ssh(cmd, host, user):
         remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s \"%s\"" % (host, cmd)
     else:
         remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s@%s \"%s\"" % (user, host, cmd)
-    result = subprocess.Popen(remote_cmd_str, shell=True).wait()
+    try:
+        result = subprocess.Popen(remote_cmd_str, shell=True).wait()
+    except subprocess.CalledProcessError:
+        print "Execute shell command on %s failed" % host
+        pass
+
     return result
 
 
@@ -157,8 +238,12 @@ def remote_ssh_output(cmd, host, user):
     else:
         remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s@%s \"%s\"" % (user, host, cmd)
 
-    result = subprocess.Popen(remote_cmd_str, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout,stderr = result.communicate()
+    try:
+        result = subprocess.Popen(remote_cmd_str, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+        stdout,stderr = result.communicate()
+    except subprocess.CalledProcessError:
+        print "Execute shell command on %s failed" % host
+        pass
 
     return (result.returncode, str(stdout.strip()), str(stderr.strip()))
 
@@ -221,15 +306,41 @@ def check_file_exist_list(file_path, hostlist, user):
     return file_exist_host_list
 
 
-def create_cluster_directory(directory_path, hostlist, user = ''):
+def check_directory_exist(directory_path, host, user):
     if user == "":
         user = os.getenv('USER')
-    file_exist_host_list = {}
+    cmd = "if [ ! -d %s ]; then mkdir -p %s; fi;" % (directory_path, directory_path)
+    result = remote_ssh("if [ ! -d %s ]; then mkdir -p %s; fi;" % (directory_path, directory_path), host, user)
+    if result == 0:
+        file_exist = True
+    else:
+        file_exist = False
+    return host, file_exist
+
+
+def create_cluster_directory(directory_path, hostlist, user = '', logger = None):
+    if user == "":
+        user = os.getenv('USER')
+
+    create_success_host = []
+    create_failed_host = []
+    work_list = []
+    q = Queue.Queue()
     for host in hostlist:
-        try:
-            remote_ssh("if [ ! -d %s ]; then mkdir -p %s; fi;" % (directory_path, directory_path), host, user)
-        except :
-            pass
+        work_list.append({"func":check_directory_exist,"args":(directory_path, host, user)})
+
+    dir_creator = threads_with_return(name = 'HAWQ', action_name = 'create', logger = logger, return_values = q)
+    dir_creator.get_function_list(work_list)
+    dir_creator.start()
+
+    while not q.empty():
+        item = q.get()
+        if item[1] == True:
+            create_success_host.append(item[0])
+        else:
+            create_failed_host.append(item[0])
+
+    return create_success_host, create_failed_host
 
 
 def parse_hosts_file(GPHOME):

@@ -182,7 +182,6 @@ int refreshLocalHostInstance(void)
 		RMSEG_INBUILDHOST->GRMTotalCore     = 0.0;
 		RMSEG_INBUILDHOST->FTSTotalMemoryMB = DRMGlobalInstance->SegmentMemoryMB;
 		RMSEG_INBUILDHOST->FTSTotalCore     = DRMGlobalInstance->SegmentCore;
-		RMSEG_INBUILDHOST->GRMAvailable    = RESOURCE_SEG_STATUS_UNSET;
 		RMSEG_INBUILDHOST->FTSAvailable    = RESOURCE_SEG_STATUS_AVAILABLE;
 		RMSEG_INBUILDHOST->ID				= SEGSTAT_ID_INVALID;
 		RMSEG_INBUILDHOST->FailedTmpDirNum  = failedTmpDirNum;
@@ -308,7 +307,8 @@ bool handleRMSEGRequestRUAlive(void **arg)
 		{
 			if (retry == 0)
 			{
-				elog(LOG, "Segment's postmaster is down, PQconnectdb result : %d, %s",
+				elog(LOG, "Segment receives RUAlive from master "
+						  "and postmaster is down, PQconnectdb result : %d, %s",
 						  libpqres,
 						  PQerrorMessage(conn));
 				/* Don't send IMAlive anymore */
@@ -323,7 +323,7 @@ bool handleRMSEGRequestRUAlive(void **arg)
 		}
 		else
 		{
-			elog(DEBUG3, "Segment's postmaster is healthy.");
+			elog(LOG, "Segment receives RUAlive from master and postmaster is healthy.");
 			break;
 		}
 	}

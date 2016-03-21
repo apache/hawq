@@ -968,7 +968,12 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 			locationUris = transformLocationUris(exttypeDesc->location_list,
 												 createExtStmt->formatOpts,
 												 isweb, iswritable);
-			
+			int locLength = list_length(exttypeDesc->location_list);
+			if (createStmt->policy && locLength > 0)
+			{
+				createStmt->policy->bucketnum = locLength;
+			}
+
 			break;
 
 		case EXTTBL_TYPE_EXECUTE:
@@ -6437,7 +6442,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 										 tab->relid,
 										 false,
 										 NULL);
-		ar_tab->scantable_splits = AssignAOSegFileSplitToSegment(tab->relid, NIL, true,
+		ar_tab->scantable_splits = AssignAOSegFileSplitToSegment(tab->relid, NIL,
 		                    target_segment_num, ar_tab->scantable_splits);
 		/*
 		 * Specify the segno directly as we don't have segno mapping here.
@@ -13758,6 +13763,24 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 					 errhint("use a named partition"),
 							   errOmitLocation(true)));
 
+	PartitionElem *pElem = (PartitionElem *) pc2->arg1;
+	Node *pStoreAttr = pElem->storeAttr;
+	if (pStoreAttr && ((AlterPartitionCmd *)pStoreAttr)->arg1)
+	{
+		List *pWithList = (List *)(((AlterPartitionCmd *)pStoreAttr)->arg1);
+		GpPolicy *parentPolicy = GpPolicyFetch(CurrentMemoryContext, RelationGetRelid(rel));
+		int bucketnum = parentPolicy->bucketnum;
+		int child_bucketnum = GetRelOpt_bucket_num_fromOptions(pWithList, bucketnum);
+
+		if (child_bucketnum != bucketnum)
+			ereport(ERROR,
+					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+							errmsg("distribution policy for partition%s "
+									"must be the same as that for %s",
+									namBuf,
+									lrelname)));
+	}
+
 	/* don't check if splitting or setting a subpartition template */
 	if (!is_split && !bSetTemplate)
 		/* We complain if partition already exists, so prule should be NULL */
@@ -13806,19 +13829,14 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 										   errOmitLocation(true)));
 
 			/* XXX XXX: move this check to gram.y ? */
-			if (pc2->arg1)
-			{
-				PartitionElem *pelem = (PartitionElem *) pc2->arg1;
-
-				if (pelem->boundSpec)
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-							 errmsg("invalid use of boundary specification "
-									"for DEFAULT partition%s of %s",
-									namBuf,
-									lrelname),
-											   errOmitLocation(true)));
-			}
+            if (pElem->boundSpec)
+                ereport(ERROR,
+                        (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+                         errmsg("invalid use of boundary specification "
+                                "for DEFAULT partition%s of %s",
+                                namBuf,
+                                lrelname),
+                                           errOmitLocation(true)));
 		}
 
 		/* Do the real work for add ... */
@@ -16706,7 +16724,7 @@ ATPExecPartSplit(Relation rel,
      * Dispatch split-related metadata.
      */
     scantable_splits = AssignAOSegFileSplitToSegment((Oid)intVal((Value *)pc->partid),
-              NIL, true, target_segment_num, scantable_splits);
+              NIL, target_segment_num, scantable_splits);
 
     pc->scantable_splits = scantable_splits;
     pc->newpart_aosegnos = segment_segnos;

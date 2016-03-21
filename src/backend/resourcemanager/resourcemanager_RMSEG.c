@@ -118,7 +118,6 @@ int  initializeSocketServer_RMSEG(void)
 	for ( int i = 0 ; i < HAWQRM_SERVER_PORT_COUNT ; ++i ) {
 		if (RMListenSocket[i] != PGINVALID_SOCKET) {
 			netres = registerFileDesc(RMListenSocket[i],
-									  NULL,
 									  ASYNCCOMM_READ,
 									  &AsyncCommBufferHandlersMsgServer,
 									  NULL,

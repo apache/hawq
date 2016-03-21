@@ -5,7 +5,7 @@ configfile_version = 4
 mount.points = /
 
 [linux.sysctl]
-sysctl.kernel.shmmax = 500000000
+sysctl.kernel.shmmax = 1000000000
 sysctl.kernel.shmmni = 4096
 sysctl.kernel.shmall = 4000000000
 sysctl.kernel.sem = 250 512000 100 2048

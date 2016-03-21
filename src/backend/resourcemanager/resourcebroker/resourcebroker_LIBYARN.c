@@ -536,7 +536,9 @@ int handleRB2RM_ClusterReport(void)
 	uint32_t	segsize;
 	int			fd 		    = ResBrokerNotifyPipe[0];
 	int			piperes     = 0;
-	List	   *segstats	= NULL;
+	List		*segstats	= NULL;
+	List		*allsegres  = NULL;
+	ListCell	*cell		= NULL;
 
 	PRESPOOL->RBClusterReportCounter++;
 
@@ -566,7 +568,7 @@ int handleRB2RM_ClusterReport(void)
 	}
 
 	elog(LOG, "YARN mode resource broker got cluster report having %d host(s), "
-			  "maximum capacity is %lf.",
+			  "maximum queue capacity is %lf.",
 			  response.MachineCount,
 			  response.QueueMaxCapacity);
 
@@ -629,6 +631,19 @@ int handleRB2RM_ClusterReport(void)
 	 * TILL NOW, the whole message content is received.
 	 */
 
+	if ( res == FUNC_RETURN_OK )
+	{
+		/* Check if the YARN resource queue report is valid, i.e. maximum
+		 * capacity and capacity are all greater than 0.
+		 */
+		if ( response.QueueCapacity <= 0 || response.QueueMaxCapacity <= 0 )
+		{
+			elog(WARNING, "YARN mode resource broker got invalid cluster report");
+			res = RESBROK_WRONG_GLOB_MGR_QUEUEREPORT;
+
+		}
+	}
+
 	/* If something wrong, no need to keep the received content, free them. */
 	if ( res != FUNC_RETURN_OK )
 	{
@@ -642,11 +657,7 @@ int handleRB2RM_ClusterReport(void)
 		return res;
 	}
 
-	/*
-	 * Set all current segments GRM unavailable, only the segments identified by
-	 * one segment in segstats are available.
-	 */
-	setAllSegResourceGRMUnavailable();
+	setAllSegResourceGRMUnhandled();
 
 	/*
 	 * Start to update resource pool content. The YARN cluster total size is
@@ -683,6 +694,64 @@ int handleRB2RM_ClusterReport(void)
 		rm_pfree(PCONTEXT, segstat);
 		segstats = list_delete_first(segstats);
 	}
+
+	/*
+	 * iterate all segments without GRM report,
+	 * and update its status.
+	 */
+	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &allsegres);
+	foreach(cell, allsegres)
+	{
+		SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
+		bool statusDescChange = false;
+
+		/*
+		 * skip segments handled in GRM report list
+		 */
+		if (segres->Stat->GRMHandled)
+			continue;
+
+		/*
+		 * Set no GRM node report flag for this segment.
+		 */
+		if ((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT) == 0)
+		{
+			segres->Stat->StatusDesc |= SEG_STATUS_NO_GRM_NODE_REPORT;
+			statusDescChange = true;
+		}
+
+		if (IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
+		{
+			/*
+			 * This segment is FTS available, but master hasn't
+			 * gotten its GRM node report, so set this segment to DOWN.
+			 */
+			setSegResHAWQAvailability(segres, RESOURCE_SEG_STATUS_UNAVAILABLE);
+		}
+
+		Assert(!IS_SEGSTAT_FTSAVAILABLE(segres->Stat));
+		if (statusDescChange && Gp_role != GP_ROLE_UTILITY)
+		{
+			SimpStringPtr description = build_segment_status_description(segres->Stat);
+			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+									SEGMENT_STATUS_DOWN,
+									 (description->Len > 0)?description->Str:"");
+			add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+									GET_SEGRESOURCE_HOSTNAME(segres),
+									description->Str);
+
+			elog(LOG, "Resource manager hasn't gotten GRM node report for segment(%s),"
+						"updates its status:'%c', description:%s",
+						GET_SEGRESOURCE_HOSTNAME(segres),
+						SEGMENT_STATUS_DOWN,
+						(description->Len > 0)?description->Str:"");
+
+			freeSimpleStringContent(description);
+			rm_pfree(PCONTEXT, description);
+		}
+	}
+	freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
+
 	MEMORY_CONTEXT_SWITCH_BACK
 
 	elog(LOG, "Resource manager YARN resource broker counted HAWQ cluster now "
@@ -694,10 +763,10 @@ int handleRB2RM_ClusterReport(void)
 			  PRESPOOL->GRMTotalHavingNoHAWQNode.Core);
 
 	/*
-	 * If the segment is not GRM available, RM should return all containers
-	 * located upon them.
+	 * If the segment is GRM unavailable or FTS unavailable,
+	 * RM should return all containers located upon them.
 	 */
-	returnAllGRMResourceFromGRMUnavailableSegments();
+	returnAllGRMResourceFromUnavailableSegments();
 
 	/* Refresh available node count. */
 	refreshAvailableNodeCount();
@@ -706,7 +775,7 @@ int handleRB2RM_ClusterReport(void)
 	PQUEMGR->GRMQueueCapacity	 	= response.QueueCapacity;
 	PQUEMGR->GRMQueueCurCapacity 	= response.QueueCurCapacity;
 	PQUEMGR->GRMQueueMaxCapacity 	= (response.QueueMaxCapacity > 0 &&
-								   	   response.QueueMaxCapacity <= 1) ?
+									  response.QueueMaxCapacity <= 1) ?
 									  response.QueueMaxCapacity :
 									  PQUEMGR->GRMQueueMaxCapacity;
 	PQUEMGR->GRMQueueResourceTight 	= response.ResourceTight > 0 ? true : false;
@@ -714,9 +783,9 @@ int handleRB2RM_ClusterReport(void)
 	refreshResourceQueueCapacity(false);
 	refreshActualMinGRMContainerPerSeg();
 
-    PRESPOOL->LastUpdateTime = gettime_microsec();
+	PRESPOOL->LastUpdateTime = gettime_microsec();
 
-    return FUNC_RETURN_OK;
+	return FUNC_RETURN_OK;
 }
 
 /*
@@ -1120,6 +1189,7 @@ void RB_LIBYARN_handleError(int errorcode)
 	}
 	else
 	{
-		Assert(errorcode == FUNC_RETURN_OK);
+		Assert(errorcode == FUNC_RETURN_OK ||
+			   errorcode == RESBROK_WRONG_GLOB_MGR_QUEUEREPORT);
 	}
 }

@@ -162,6 +162,7 @@ expression_tree_walker(Node *node,
 		case T_PartBoundExpr:
 		case T_PartBoundInclusionExpr:
 		case T_PartBoundOpenExpr:
+		case T_RangeTblEntry	:
 			/* primitive node types with no expression subnodes */
 			break;
 		case T_Aggref:

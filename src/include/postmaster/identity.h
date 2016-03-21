@@ -91,7 +91,7 @@ extern int	 GetCopyFromVSegNum(void);
 extern int GetRelOpt_bucket_num_fromOptions(List *options, int default_val);
 extern int GetRelOpt_bucket_num_fromRel(Relation relation, int default_val);
 extern int GetRelOpt_bucket_num_fromRangeVar(const RangeVar* rel_rv, int default_val);
-extern int GetRandomDistPartitionNum(void);
+extern int GetDefaultPartitionNum(void);
 extern int GetHashDistPartitionNum(void);
 extern int GetExternalTablePartitionNum(void);
 extern int GetAllWorkerHostNum(void);

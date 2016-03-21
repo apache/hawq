@@ -35,6 +35,8 @@
 #include "cdb/cdbgang.h"		/* gp_pthread_create */
 #include "miscadmin.h"			/* TODO: InterruptPending */
 
+#include "utils/faultinjector.h"
+
 
 /*
  * This structure abstract the general job.
@@ -113,6 +115,14 @@ workermgr_submit_job(WorkerMgrState *state,
 		worker_mgr_thread->task = (Task) list_nth(tasks, i);
 		i++;
 		worker_mgr_thread->func = func;
+
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   WorkerManagerSubmitJob,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
 
 		worker_mgr_thread->thread_ret = gp_pthread_create(&worker_mgr_thread->thread, workermgr_thread_func, worker_mgr_thread, "submit_plan_to_qe");
 		if (worker_mgr_thread->thread_ret)

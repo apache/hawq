@@ -1482,7 +1482,6 @@ int RB2YARN_getClusterReport(DQueue hosts)
 
     		segstat->ID     					 = SEGSTAT_ID_INVALID;
     		segstat->FTSAvailable 				 = RESOURCE_SEG_STATUS_UNSET;
-    		segstat->GRMAvailable 				 = RESOURCE_SEG_STATUS_AVAILABLE;
     		segstat->GRMTotalMemoryMB  	   		 = pnodereport->memoryCapability;
     		segstat->GRMTotalCore	  	   		 = pnodereport->vcoresCapability;
     		segstat->FTSTotalMemoryMB	   		 = 0;
@@ -1500,6 +1499,8 @@ int RB2YARN_getClusterReport(DQueue hosts)
     		segstat->Info.GRMRackNameLen         = racknamelen;
     		segstat->Info.GRMRackNameOffset 	 = segstat->Info.GRMHostNameOffset +
     											   __SIZE_ALIGN64(hostnamelen+1);
+    		segstat->Info.FailedTmpDirOffset	 = 0;
+    		segstat->Info.FailedTmpDirLen		 = 0;
     		segstat->Info.Size 		 		 	 = segsize;
 
     		memcpy((char *)&(segstat->Info) + sizeof(SegInfoData),

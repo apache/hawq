@@ -4325,9 +4325,12 @@ PostgresMain(int argc, char *argv[], const char *username)
 	ereport(DEBUG3,
 			(errmsg_internal("InitPostgres")));
 
-	/* This is the initdb process */
+	/* This is the initdb process
+	 *
+	 * NOTE: we init entrydb as QE
+	 */
 	if (MyProcPort == NULL ||
-	    AmIMaster() || AmIStandby() ||
+	    (AmIMaster() && Gp_role != GP_ROLE_EXECUTE) || AmIStandby() ||
 	    MyProcPort->bootstrap_user == NULL){
 		am_superuser = InitPostgres(dbname, InvalidOid, username, NULL);
 	}

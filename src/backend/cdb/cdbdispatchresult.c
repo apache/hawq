@@ -33,6 +33,7 @@
 
 #include "lib/stringinfo.h"         /* StringInfoData */
 #include "utils/guc.h"              /* log_min_messages */
+#include "utils/faultinjector.h"
 
 #include "cdb/cdbconn.h"            /* SegmentDatabaseDescriptor */
 #include "cdb/cdbpartition.h"
@@ -110,6 +111,14 @@ cdbdisp_makeResult(struct CdbDispatchResults           *meleeResults,
     meleeIndex = meleeResults->resultCount++;
     dispatchResult = &meleeResults->resultArray[meleeIndex];
 
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   CreateCdbDispathResultObject,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
+
     /* Initialize CdbDispatchResult. */
     dispatchResult->meleeResults = meleeResults;
     dispatchResult->meleeIndex = meleeIndex;
@@ -183,15 +192,18 @@ void
 cdbdisp_resetResult(CdbDispatchResult  *dispatchResult)
 {
     PQExpBuffer buf = dispatchResult->resultbuf;
-    PGresult  **begp = (PGresult **)buf->data;
-    PGresult  **endp = (PGresult **)(buf->data + buf->len);
-    PGresult  **p;
-
-    /* Free the PGresult objects. */
-    for (p = begp; p < endp; ++p)
+    if (buf != NULL)
     {
-        Assert(*p != NULL);
-        PQclear(*p);
+        PGresult  **begp = (PGresult **)buf->data;
+        PGresult  **endp = (PGresult **)(buf->data + buf->len);
+        PGresult  **p;
+
+        /* Free the PGresult objects. */
+        for (p = begp; p < endp; ++p)
+        {
+            Assert(*p != NULL);
+            PQclear(*p);
+        }
     }
 
     /* Reset summary indicators. */

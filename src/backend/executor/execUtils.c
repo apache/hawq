@@ -278,7 +278,7 @@ InternalCreateExecutorState(MemoryContext qcontext, bool is_subquery)
 	estate->es_result_relations = NULL;
 	estate->es_num_result_relations = 0;
 	estate->es_result_relation_info = NULL;
-	estate->es_last_parq_part = InvalidOid;
+	estate->es_last_inserted_part = InvalidOid;
 
 	estate->es_junkFilter = NULL;
 

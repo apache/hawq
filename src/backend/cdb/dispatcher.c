@@ -49,6 +49,7 @@
 #include "utils/memutils.h"	/* GetMemoryChunkContext */
 #include "cdb/cdbsrlz.h"	/* serializeNode */
 #include "utils/datum.h"	/* datumGetSize */
+#include "utils/faultinjector.h"
 #include "utils/lsyscache.h"	/* get_typlenbyval */
 #include "miscadmin.h"		/* CHECK_FOR_INTERRUPTS */
 #include "tcop/tcopprot.h"	/* ResetUsage */
@@ -963,6 +964,14 @@ dispatcher_bind_executor(DispatchData *data)
 				continue;
 			}
 
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   ConnectionFailAfterGangCreation,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
+
 			if (!executormgr_bind_executor_task(data, executor, desc, task, slice))
 				return false;
 			data->num_of_cached_executors++;
@@ -1231,6 +1240,8 @@ dispatch_run(DispatchData *data)
 	 * Only after we have the executors, we can serialize the state. Or we
 	 * don't know the executor listening address.
 	 */
+	CHECK_FOR_INTERRUPTS();
+
 	dispatcher_serialize_state(data);
 	dispatcher_serialize_query_resource(data);
 	dispatcher_set_state_run(data);
@@ -1656,12 +1667,7 @@ dispatcher_compute_threads_num(DispatchData *data)
 	/* TODO: decide the groups(threads) number. */
 	if (query_executors_num == 0)
 		threads_num = 1;
-	if (executors_num_per_thread == 0)
-	{
-		threads_num = query_executors_num;
-		executors_num_per_thread = 1;
-	}
-	else if (executors_num_per_thread > query_executors_num)
+	if (executors_num_per_thread > query_executors_num)
 		threads_num = 1;
 	else
 		threads_num = (query_executors_num / executors_num_per_thread) + ((query_executors_num % executors_num_per_thread == 0) ? 0 : 1); 

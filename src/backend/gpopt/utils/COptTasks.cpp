@@ -774,13 +774,15 @@ COptTasks::PoconfCreate
 	DOUBLE dDampingFactorGroupBy = (DOUBLE) optimizer_damping_factor_groupby;
 
 	ULONG ulCTEInliningCutoff =  (ULONG) optimizer_cte_inlining_bound;
+	ULONG ulPartsToForceSortOnInsert =  (ULONG) optimizer_parts_to_force_sort_on_insert;
 
 	return GPOS_NEW(pmp) COptimizerConfig
 						(
 						GPOS_NEW(pmp) CEnumeratorConfig(pmp, ullPlanId, ullSamples, dCostThreshold),
 						GPOS_NEW(pmp) CStatisticsConfig(pmp, dDampingFactorFilter, dDampingFactorJoin, dDampingFactorGroupBy),
 						GPOS_NEW(pmp) CCTEConfig(ulCTEInliningCutoff),
-						pcm
+						pcm,
+						GPOS_NEW(pmp) CHint(ulPartsToForceSortOnInsert)
 						);
 }
 

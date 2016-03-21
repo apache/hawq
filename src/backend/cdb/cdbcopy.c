@@ -222,7 +222,7 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror, List *err_aoseg
 		List *scantable_splits = NIL;
 		prepareDispatchedCatalogRelation(q->contextdisp, relid, FALSE, NULL);
 		scantable_splits = AssignAOSegFileSplitToSegment(relid, NIL,
-														true, c->partition_num,
+														c->partition_num,
 														scantable_splits);
 		((CopyStmt *)q->utilityStmt)->scantable_splits = scantable_splits;
 	}

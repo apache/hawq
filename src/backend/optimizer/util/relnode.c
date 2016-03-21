@@ -142,7 +142,7 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptKind reloptkind)
 			{
 				rel->cdbpolicy = (GpPolicy *) palloc(sizeof(GpPolicy));
 				rel->cdbpolicy->ptype = POLICYTYPE_PARTITIONED;
-				rel->cdbpolicy->bucketnum = GetRandomDistPartitionNum();
+				rel->cdbpolicy->bucketnum = GetDefaultPartitionNum();
 				rel->cdbpolicy->nattrs = 0;
 				rel->cdbpolicy->attrs[0] = 1;
 			}

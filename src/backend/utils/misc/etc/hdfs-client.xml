@@ -236,7 +236,7 @@ HA -->
 	<!-- output client configuration -->
 	<property>
 		<name>output.replace-datanode-on-failure</name>
-		<value>false</value>
+		<value>true</value>
 		<description>
 		whether the client add new datanode into pipeline if the number of nodes in pipeline is less the specified number of replicas. default is true.
 		</description>

@@ -152,12 +152,12 @@ class GpMetadataAccessor:
 
         Example:
         >>> accessor.get_aoseg_files(35709)
-        >>> [{'content':'0', 'fileno':'1', 'filesize':'320'},
-        ...  {'content':'1', 'fileno':'1', 'filesize':'880'},
-        ...  {'content':'1', 'fileno':'2', 'filesize':'160'}]
+        >>> [{'fileno':'1', 'filesize':'320'},
+        ...  {'fileno':'2', 'filesize':'880'},
+        ...  {'fileno':'3', 'filesize':'160'}]
         '''
         qry = """
-        SELECT content, segno as fileno, eof as filesize 
+        SELECT segno as fileno, eof as filesize 
         FROM pg_aoseg.pg_aoseg_%d
         ORDER by fileno;
         """ % oid
@@ -170,14 +170,14 @@ class GpMetadataAccessor:
 
         Example:
         >>> accessor.get_paqseg_files(35709)
-        >>> [{'content':'0', 'fileno':'1', 'filesize':'320'},
-        ...  {'content':'1', 'fileno':'1', 'filesize':'880'},
-        ...  {'content':'1', 'fileno':'2', 'filesize':'160'}]
+        >>> [{'fileno':'1', 'filesize':'320'},
+        ...  {'fileno':'2', 'filesize':'880'},
+        ...  {'fileno':'3', 'filesize':'160'}]
         '''
         qry = """
-        SELECT content, segno as fileno, eof as filesize 
+        SELECT segno as fileno, eof as filesize 
         FROM pg_aoseg.pg_paqseg_%d
-        WHERE content >= 0 ORDER by content, fileno;
+        ORDER by fileno;
         """ % oid
         return self.exec_query(qry)
 
@@ -306,17 +306,17 @@ def extract_metadata(conn, tbname):
 
         Example:
         >>> segment_localtions
-        >>> ['hdfs://127.0.0.1:9000/gpseg0', 'hdfs://127.0.0.1:9000/gpseg1']
+        >>> ['hdfs://127.0.0.1:9000/hawq_default', 'hdfs://127.0.0.1:9000/hawq_default']
         >>> tablespace_oid, database_oid, relfilenode, oid
         >>> (16385, 35469, 35470, 35488)
         >>> accessor.get_aoseg_files(35488)
-        >>> [{'content': '0', 'fileno': '1', 'filesize': '180'},
-        ...  {'content': '0', 'fileno': '2', 'filesize': '150'},
-        ...  {'content': '1', 'fileno': '1', 'filesize': '320'}]
+        >>> [{'fileno': '1', 'filesize': '180'},
+        ...  {'fileno': '2', 'filesize': '150'},
+        ...  {'fileno': '3', 'filesize': '320'}]
         >>> get_ao_table_files(35488, 35470)
-        >>> [{'path' :'/gpseg0/16385/35469/35470.1', 'size': 180},
-        ...  {'path' :'/gpseg0/16385/35469/35470.2', 'size': 150},
-        ...  {'path' :'/gpseg1/16385/35469/35470.1', 'size': 320}]
+        >>> [{'path' :'/hawq_default/16385/35469/1', 'size': 180},
+        ...  {'path' :'/hawq_default/16385/35469/2', 'size': 150},
+        ...  {'path' :'/hawq_default/16385/35469/3', 'size': 320}]
         '''
         files = []
         for f in accessor.get_aoseg_files(oid):

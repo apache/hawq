@@ -78,6 +78,7 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 								  int32_t 	 *reqcore,
 								  List 		**preferred);
 void processResourceBrokerTasks(void);
+void generateResourceRequestToResourceBroker(void);
 void cleanupAllGRMContainers(void);
 bool cleanedAllGRMContainers(void);
 
@@ -305,6 +306,9 @@ int ResManagerMain(int argc, char *argv[])
 	DRMGlobalInstance->ThisPID	 = getpid();
 	DRMGlobalInstance->ParentPID = getppid();
 
+	/* Initialize socket connection pool. */
+	initializeSocketConnectionPool();
+
 	elog(DEBUG5, "HAWQ RM :: starts as role %d.", DRMGlobalInstance->Role);
 
 	/*******************************************/
@@ -476,6 +480,8 @@ int ResManagerMainServer2ndPhase(void)
 	/* Clean up gp_segment_configuration table. */
 	cleanup_segment_config();
 
+	cleanup_segment_config_history();
+
 	/*
 	 * register itself into gp_segment_configuration table
 	 * master internal id is 0, segment id starts from 1
@@ -486,7 +492,6 @@ int ResManagerMainServer2ndPhase(void)
                            PostPortNumber,
                            SEGMENT_ROLE_MASTER_CONFIG,
                            SEGMENT_STATUS_UP,
-                           0,
                            "");
 
 	/* Load queue and user definition as no DDL now. */
@@ -575,6 +580,7 @@ int MainHandlerLoop(void)
 			refreshMemoryCoreRatioLevelUsage(gettime_microsec());
 
 			resetAllSegmentsGRMContainerFailAllocCount();
+			resetAllSegmentsNVSeg();
 
 			/* Check if can resume using new available global resource manager.*/
 			if ( cleanedAllGRMContainers() )
@@ -606,12 +612,12 @@ int MainHandlerLoop(void)
 		/* STEP 5. Handle all submitted requests through socket clients. */
 		processSubmittedRequests();
 
-        /* STEP 6. Check timeout resource allocation and timeout queuing requests. */
+		/* STEP 6. Generate possible resource request to resource broker. */
+		generateResourceRequestToResourceBroker();
+
+        /* STEP 7. Check timeout resource allocation and timeout queuing requests. */
         timeoutDeadResourceAllocation();
         timeoutQueuedRequest();
-
-        /* STEP 7. Generate output content to client connections. */
-        sendResponseToClients();
 
 		/*
 		 * STEP 8. Check the status of all segment nodes, mark down if hasn't got
@@ -627,12 +633,13 @@ int MainHandlerLoop(void)
 			PRESPOOL->LastCheckTime = curtime;
 		}
 
+
 		/* STEP 9. Move all accepted GRM containers into resource pool. */
 		moveAllAcceptedGRMContainersToResPool();
 
 		/*
-		 * Check if should pause dispatching resource to queries to collect
-		 * resource back in order to return GRM containers.
+		 * STEP 10. Check if should pause dispatching resource to queries to
+		 * collect resource back in order to return GRM containers.
 		 */
 		if ( DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
 			 PRESPOOL->AddPendingContainerCount == 0 &&
@@ -653,7 +660,8 @@ int MainHandlerLoop(void)
 			setForcedReturnGRMContainerCount();
 		}
 
-		/* STEP 10. Dispatch resource to queries and send the messages out.*/
+		/* STEP 11. Dispatch resource to queries and send the messages out.*/
+
         if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 &&
 			 PQUEMGR->toRunQueryDispatch &&
 			 PQUEMGR->ForcedReturnGRMContainerCount == 0 &&
@@ -674,20 +682,23 @@ int MainHandlerLoop(void)
 						 PQUEMGR->ForcedReturnGRMContainerCount);
         }
 
+        /* STEP 12. Generate output content to client connections. */
+        sendResponseToClients();
+
         /*
-         * STEP 11. Return containers to global resource manager if there some
+         * STEP 13. Return containers to global resource manager if there some
          * 			some idle resource.
          */
         timeoutIdleGRMResourceToRB();
 
-		/* STEP 12. Notify segments to increase resource quota. */
+		/* STEP 14. Notify segments to increase resource quota. */
 		notifyToBeAcceptedGRMContainersToRMSEG();
 
-        /* STEP 13. Notify segments to decrease resource. */
+        /* STEP 15. Notify segments to decrease resource. */
         notifyToBeKickedGRMContainersToRMSEG();
 
         /*
-         * STEP 14. Check slaves file if the content is not checked or is
+         * STEP 16. Check slaves file if the content is not checked or is
          * 			updated.
          */
         checkSlavesFile();
@@ -1008,10 +1019,6 @@ static void InitTemporaryDirs(DQueue tmpdirs_list, char *tmpdirs_string)
  */
 int  loadDynamicResourceManagerConfigure(void)
 {
-#ifdef ENABLE_DOMAINSERVER
-	elog(DEBUG3, "Resource manager loads Unix Domain Socket Port %d",
-				 rm_master_addr_domain_port);
-#endif
 	elog(DEBUG3, "Resource manager loads Socket Listening Port %d",
 				 rm_master_port);
 	elog(DEBUG3, "Resource manager loads Segment Socket Listening Port %d",
@@ -2065,7 +2072,7 @@ int generateAllocRequestToBroker(void)
 	}
 
 	/* Decide water level of resource. */
-	int wlevel = hasWorkload ? rm_min_resource_perseg : 0;
+	int wlevel = hasWorkload ? PQUEMGR->ActualMinGRMContainerPerSeg : 0;
 	switch( DRMGlobalInstance->ImpType )
 	{
 	case YARN_LIBYARN:
@@ -2097,12 +2104,9 @@ int generateAllocRequestToBroker(void)
 		/*
 		 * Resource manager skips this segment if
 		 * 1) Not FTS available;
-		 * 2) Not GRM available;
-		 * 3) Having resource decrease pending.
+		 * 2) Having resource decrease pending.
 		 */
 		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-			(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-			 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
 			(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 		{
 			continue;
@@ -2312,12 +2316,9 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 		/*
 		 * Resource manager skips this segment if
 		 * 1) Not FTS available;
-		 * 2) Not GRM available;
-		 * 3) Having resource decrease pending.
+		 * 2) Having resource decrease pending.
 		 */
-		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-			(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-			 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
+		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat)  ||
 			(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 		{
 			index++;
@@ -2392,12 +2393,9 @@ void completeAllocRequestToBroker(int32_t 	 *reqmem,
 			/*
 			 * Resource manager skips this segment if
 			 * 1) Not FTS available;
-			 * 2) Not GRM available;
-			 * 3) Having resource decrease pending.
+			 * 2) Having resource decrease pending.
 			 */
 			if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-				(DRMGlobalInstance->ImpType != NONE_HAWQ2 &&
-				 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat)) ||
 				(segres->DecPending.MemoryMB > 0 && segres->DecPending.Core > 0))
 			{
 				index++;
@@ -2468,43 +2466,12 @@ int	 initializeSocketServer(void)
 		RMListenSocket[i] = PGINVALID_SOCKET;
 	}
 
-#ifdef ENABLE_DOMAINSERVER
-	/* Listen local unix domain socket port. */
-	netres = StreamServerPort(AF_UNIX,
-							  NULL,
-							  rm_master_addr_domain_port,
-							  UnixSocketDir,
-							  RMListenSocket,
-							  1);	 /* Only one unix domain socket server. */
-
-	if ( netres != STATUS_OK ||
-		 /*
-		  * This condition is for double-checking the server is successfully
-		  * created.
-		  */
-		 (netres == STATUS_OK && RMListenSocket[0] == PGINVALID_SOCKET)	)
-	{
-		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
-		elog(LOG, "Resource manager cannot create UNIX domain socket server. Port=%d",
-				  rm_master_addr_domain_port);
-		return res;
-	}
-
-	/* Listen normal socket addresses. */
-	netres = StreamServerPort(AF_UNSPEC,
-							  allip,
-							  rm_master_port,
-							  NULL,
-							  &(RMListenSocket[1]),
-							  HAWQRM_SERVER_PORT_COUNT-1);
-#else
 	netres = StreamServerPort(AF_UNSPEC,
 			  	  	  	  	  allip,
 							  rm_master_port,
 							  NULL,
 							  RMListenSocket,
 							  HAWQRM_SERVER_PORT_COUNT);
-#endif
 	if ( netres != STATUS_OK )
 	{
 		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
@@ -2522,7 +2489,6 @@ int	 initializeSocketServer(void)
 		if (RMListenSocket[i] != PGINVALID_SOCKET)
 		{
 			netres = registerFileDesc(RMListenSocket[i],
-									  NULL,
 									  ASYNCCOMM_READ,
 									  &AsyncCommBufferHandlersMsgServer,
 									  NULL,
@@ -2550,21 +2516,11 @@ int	 initializeSocketServer(void)
 		return res;
 	}
 
-#ifdef ENABLE_DOMAINSERVER
-	elog(LOG, "Resource manager starts accepting resource request. "
-			  "Listening unix domain socket port %d. "
-			  "Listening normal socket port %d. "
-			  "Total listened %d FDs.",
-			  rm_master_addr_domain_port,
-			  rm_master_port,
-			  validfdcount);
-#else
 	elog(LOG, "Resource manager starts accepting resource request. "
 			  "Listening normal socket port %d. "
 			  "Total listened %d FDs.",
 			  rm_master_port,
 			  validfdcount);
-#endif
 	return res;
 }
 
@@ -2592,16 +2548,6 @@ void sendResponseToClients(void)
 									 conntrack->MessageID,
 									 conntrack->MessageMark1,
 									 conntrack->MessageMark2);
-			/* If socket connection has error, close connection but keep the
-			 * connection track. */
-			if ( conntrack->Progress >= CONN_PP_FAILS ) {
-
-				/* Tell AsyncComm framework, gracefully close the connection. */
-				conntrack->CommBuffer->forcedClose = false;
-				conntrack->CommBuffer->toClose     = true;
-
-				elog(DEBUG5, "Resource manager returns connection track.");
-			}
 		}
 	}
 }
@@ -2619,31 +2565,49 @@ void updateStatusOfAllNodes()
 	curtime = gettime_microsec();
 	for(uint32_t idx = 0; idx < PRESPOOL->SegmentIDCounter; idx++)
 	{
-	    node = getSegResource(idx);
-        if (node != NULL &&
-            (curtime - node->LastUpdateTime >
+		node = getSegResource(idx);
+		Assert(node != NULL);
+		uint8_t oldStatus = node->Stat->FTSAvailable;
+		if ( (curtime - node->LastUpdateTime >
 			 1000000LL * rm_segment_heartbeat_timeout) &&
-			IS_SEGSTAT_FTSAVAILABLE(node->Stat) )
-        {
-        	/*
-        	 * This call makes resource manager able to adjust queue and mem/core
-        	 * trackers' capacity.
-        	 */
-        	setSegResHAWQAvailability(node, RESOURCE_SEG_STATUS_UNAVAILABLE);
-        	/*
-        	 * This call makes resource pool remove unused containers.
-        	 */
-        	returnAllGRMResourceFromSegment(node);
-        	if (Gp_role != GP_ROLE_UTILITY)
-        	{
-        		update_segment_status(idx + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
-        	}
+			 (node->Stat->StatusDesc & SEG_STATUS_HEARTBEAT_TIMEOUT) == 0)
+		{
+			/*
+			 * This segment is heartbeat timeout, update its description
+			 * and set it to unavailable if needed.
+			 */
+			if (oldStatus == RESOURCE_SEG_STATUS_AVAILABLE)
+			{
+				/*
+				 * This call makes resource manager able to adjust queue and mem/core
+				 * trackers' capacity.
+				 */
+				setSegResHAWQAvailability(node, RESOURCE_SEG_STATUS_UNAVAILABLE);
+				/*
+				 * This call makes resource pool remove unused containers.
+				 */
+				returnAllGRMResourceFromSegment(node);
+				changedstatus = true;
+			}
 
-        	elog(WARNING, "Resource manager sets host %s from up to down.",
-        			  	  GET_SEGRESOURCE_HOSTNAME(node));
+			node->Stat->StatusDesc |= SEG_STATUS_HEARTBEAT_TIMEOUT;
+			if (Gp_role != GP_ROLE_UTILITY)
+			{
+				SimpStringPtr description = build_segment_status_description(node->Stat);
+				update_segment_status(idx + REGISTRATION_ORDER_OFFSET,
+										SEGMENT_STATUS_DOWN,
+										(description->Len > 0)?description->Str:"");
+				add_segment_history_row(idx + REGISTRATION_ORDER_OFFSET,
+										GET_SEGRESOURCE_HOSTNAME(node),
+										(description->Len > 0)?description->Str:"");
 
-        	changedstatus = true;
-        }
+				freeSimpleStringContent(description);
+				rm_pfree(PCONTEXT, description);
+			}
+
+			elog(WARNING, "Resource manager sets host %s heartbeat timeout.",
+						  GET_SEGRESOURCE_HOSTNAME(node));
+		}
 	}
 
 	if ( changedstatus )
@@ -2764,11 +2728,10 @@ int  loadHostInformationIntoResourcePool(void)
 
         /* Build machine info instance. */
         SegStat segstat = (SegStat)rm_palloc0(PCONTEXT,
-                                   	   	   	  offsetof(SegStatData, Info) +
-											  seginfobuff.Cursor + 1);
-        segstat->ID      		   = SEGSTAT_ID_INVALID;
-        segstat->GRMAvailable     = RESOURCE_SEG_STATUS_UNSET;
-        segstat->FTSAvailable     = RESOURCE_SEG_STATUS_AVAILABLE;
+                                              offsetof(SegStatData, Info) +
+                                              seginfobuff.Cursor + 1);
+        segstat->ID                = SEGSTAT_ID_INVALID;
+        segstat->FTSAvailable      = RESOURCE_SEG_STATUS_AVAILABLE;
         segstat->FTSTotalMemoryMB  = DRMGlobalInstance->SegmentMemoryMB;
         segstat->FTSTotalCore      = DRMGlobalInstance->SegmentCore;
         segstat->GRMTotalMemoryMB  = 0;
@@ -2925,26 +2888,7 @@ void processResourceBrokerTasks(void)
 			}
 		}
 
-		/* STEP 3. Generate GRM container allocation request. */
-		curtime = gettime_microsec();
-
-        if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 )
-        {
-        	refreshMemoryCoreRatioLevelUsage(curtime);
-        	if ( curtime - PRESPOOL->LastResAcqTime > 1000000LL)
-        	{
-        		PRESPOOL->LastResAcqTime = curtime;
-				res = generateAllocRequestToBroker();
-				if ( res != FUNC_RETURN_OK )
-				{
-					elog(WARNING, "Resource manager fails to allocate container "
-								  "from global resource manager.");
-					goto exit;
-				}
-        	}
-        }
-
-        /* STEP 4. Return kicked GRM containers. */
+        /* STEP 3. Return kicked GRM containers. */
         curtime = gettime_microsec();
 
     	if ( !PRESPOOL->pausePhase[QUOTA_PHASE_KICKED_TO_RETURN] )
@@ -2962,7 +2906,7 @@ void processResourceBrokerTasks(void)
 			elog(LOG, "Paused returning GRM containers kicked to GRM.");
     	}
 	    /*
-	     * STEP 5. Handle resource broker input as new allocated resource or
+	     * STEP 4. Handle resource broker input as new allocated resource or
 		 * 		   cluster report, container report etc. The allocated resource
 		 * 		   from resource broker will be added to the resource queue
 		 * 		   manager and resource pool.
@@ -2982,6 +2926,38 @@ void processResourceBrokerTasks(void)
 
 exit:
 	RB_handleError(res);
+}
+
+void generateResourceRequestToResourceBroker(void)
+{
+	uint64_t curtime = 0;
+	int		 res	 = FUNC_RETURN_OK;
+
+	if ( !isCleanGRMResourceStatus() )
+	{
+
+		curtime = gettime_microsec();
+
+        if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 )
+        {
+        	refreshMemoryCoreRatioLevelUsage(curtime);
+        	if ( curtime - PRESPOOL->LastResAcqTime > 1000000LL)
+        	{
+        		PRESPOOL->LastResAcqTime = curtime;
+				res = generateAllocRequestToBroker();
+				if ( res != FUNC_RETURN_OK )
+				{
+					elog(WARNING, "Resource manager fails to allocate container "
+								  "from global resource manager.");
+					goto exit;
+				}
+        	}
+        }
+	}
+
+exit:
+	RB_handleError(res);
+
 }
 
 void cleanupAllGRMContainers(void)

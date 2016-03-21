@@ -34,7 +34,6 @@ void ErrorHandler_Connect(AsyncCommBuffer buffer);
 void CleanUpHandler_Connect(AsyncCommBuffer buffer);
 
 int registerFileDescForAsyncConn(int 		 			  fd,
-								 char					 *dmfilename,
 								 uint32_t				  actionmask_afterconn,
 								 AsyncCommBufferHandlers  methods_afterconn,
 								 void				     *userdata_afterconn,

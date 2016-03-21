@@ -537,7 +537,7 @@ GetRelOpt_bucket_num_fromRangeVar(const RangeVar* rel_rv, int default_val)
 }
 
 int
-GetRandomDistPartitionNum(void)
+GetDefaultPartitionNum(void)
 {
 	return default_hash_table_bucket_number;
 }

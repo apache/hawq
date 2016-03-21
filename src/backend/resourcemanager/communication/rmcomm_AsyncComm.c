@@ -37,12 +37,12 @@ char			RWBuffer[ASYNCCOMM_READ_WRITE_ONCE_SIZE];
 void freeCommBuffer(AsyncCommBuffer *pcommbuffer);
 
 AsyncCommBuffer createCommBuffer(int 					  fd,
-								 char					 *dmfilename,
 								 uint32_t				  actionmask,
 								 AsyncCommBufferHandlers  methods,
 								 void					 *userdata);
 
 void closeRegisteredFileDesc(AsyncCommBuffer commbuff);
+static void closeAllRegisteredFileDescs(int code, Datum arg);
 
 void initializeAsyncComm(void)
 {
@@ -53,15 +53,11 @@ void initializeAsyncComm(void)
 											 ALLOCSET_DEFAULT_INITSIZE,
 											 ALLOCSET_DEFAULT_MAXSIZE);
 	CommBufferCounter = 0;
-}
 
-bool canRegisterFileDesc(void)
-{
-	return CommBufferCounter < ASYNCCOMM_CONNECTION_MAX_CAPABILITY;
+	on_proc_exit(closeAllRegisteredFileDescs, 0);
 }
 
 int registerFileDesc(int 					  fd,
-					 char					 *dmfilename,
 					 uint32_t				  actionmask,
 					 AsyncCommBufferHandlers  methods,
 					 void 					 *userdata,
@@ -81,7 +77,6 @@ int registerFileDesc(int 					  fd,
 	}
 
 	CommBuffers[CommBufferCounter] = createCommBuffer(fd,
-													  dmfilename,
 													  actionmask,
 													  methods,
 													  userdata);
@@ -99,6 +94,31 @@ int registerFileDesc(int 					  fd,
 	return FUNC_RETURN_OK;
 }
 
+void assignFileDescClientAddressInfo(AsyncCommBuffer	 commbuffer,
+									 const char			*clienthostname,
+									 uint16_t			 serverport,
+									 struct sockaddr_in	*clientaddr,
+									 socklen_t			 clientaddrlen)
+{
+	/* Assign connection information into comm buffer. */
+	memcpy(&(commbuffer->ClientAddr), clientaddr, clientaddrlen);
+	commbuffer->ClientAddrLen = clientaddrlen;
+	strncpy(commbuffer->ClientAddrDotStr,
+			SOCKADDR(clientaddr),
+			sizeof(commbuffer->ClientAddrDotStr)-1);
+	commbuffer->ClientAddrPort = SOCKPORT(clientaddr);
+	commbuffer->ServerPort = serverport;
+
+	if ( clienthostname != NULL )
+	{
+		setSimpleStringNoLen(&(commbuffer->ClientHostname), clienthostname);
+
+		elog(DEBUG3, "Resource manager assigned hostname %s, port %d",
+					 clienthostname,
+					 commbuffer->ClientAddrPort);
+	}
+}
+
 int processAllCommFileDescs(void)
 {
 	static int FreeIndexes[ASYNCCOMM_CONNECTION_MAX_CAPABILITY];
@@ -106,8 +126,8 @@ int processAllCommFileDescs(void)
 
 	/*
 	 * This loop is to check if there are some FDs no need to check POLLOUT
-	 * event. Because, some FDs maybe usually POLLOUT ready but no data to write,
-	 * which causes CPU resource wasted.
+	 * event. Because, some FDs maybe usually POLLOUT ready but no data to
+	 * write, which causes CPU resource wasted.
 	 */
 	for ( int i = 0 ; i < CommBufferCounter ; ++i )
 	{
@@ -177,8 +197,7 @@ int processAllCommFileDescs(void)
 					CommBuffers[i]->Methods->ErrorReadyHandle(CommBuffers[i]);
 
 					/* Tell the close this connection and free the buffer. */
-					CommBuffers[i]->forcedClose = true;
-					CommBuffers[i]->toClose     = true;
+					forceCloseFileDesc(CommBuffers[i]);
 					readycount--;
 					continue;
 				}
@@ -270,9 +289,9 @@ int processAllCommFileDescs(void)
 									 CommBuffers[i]->WriteContentSize,
 									 list_length(CommBuffers[i]->WriteBuffer));
 					}
-					else if ( wrsize == -1 &&
-							  errno != EWOULDBLOCK &&
-							  errno != EAGAIN      &&
+					else if ( wrsize == -1 			&&
+							  errno != EWOULDBLOCK 	&&
+							  errno != EAGAIN      	&&
 							  errno != EINTR)
 					{
 						elog(WARNING, "FD %d failed to send message. errno %d",
@@ -283,8 +302,7 @@ int processAllCommFileDescs(void)
 						CommBuffers[i]->Methods->ErrorReadyHandle(CommBuffers[i]);
 
 						/* Not acceptable error, should actively force close. */
-						CommBuffers[i]->forcedClose = true;
-						CommBuffers[i]->toClose     = true;
+						forceCloseFileDesc(CommBuffers[i]);
 					}
 				}
 				readycount--;
@@ -299,6 +317,11 @@ int processAllCommFileDescs(void)
 				{
 					CommBuffers[i]->Methods->ReadReadyHandle(CommBuffers[i]);
 				}
+
+				elog(DEBUG3, "commbuffer action mask %d, toclose %d, forced %d",
+							 CommBuffers[i]->ActionMask,
+							 CommBuffers[i]->toClose ? 1 : 0,
+							 CommBuffers[i]->forcedClose ? 1 : 0);
 
 				/* Read ready handler might force the connection to close. */
 				if ( (CommBuffers[i]->ActionMask & ASYNCCOMM_READBYTES) &&
@@ -322,15 +345,14 @@ int processAllCommFileDescs(void)
 						 */
 						Assert(CommBuffers[i]->Methods->ReadPostHandle != NULL);
 						CommBuffers[i]->Methods->ReadPostHandle(CommBuffers[i]);
-						elog(DEBUG5, "FD %d read %d bytes. %d to handle",
+						elog(DEBUG3, "FD %d read %d bytes. %d to handle",
 									 CommBuffers[i]->FD,
 									 rdsize,
 									 getSMBContentSize(&(CommBuffers[i]->ReadBuffer)));
 					}
 					else if ( rdsize == 0 )
 					{
-						CommBuffers[i]->forcedClose = true;
-						CommBuffers[i]->toClose     = true;
+						forceCloseFileDesc(CommBuffers[i]);
 						elog(DEBUG3, "FD %d (client) is normally closed.",
 									 CommBuffers[i]->FD);
 					}
@@ -348,8 +370,11 @@ int processAllCommFileDescs(void)
 						CommBuffers[i]->Methods->ErrorReadyHandle(CommBuffers[i]);
 
 						/* Not acceptable error, should actively close. */
-						CommBuffers[i]->forcedClose = true;
-						CommBuffers[i]->toClose     = true;
+						forceCloseFileDesc(CommBuffers[i]);
+					}
+					else
+					{
+						elog(WARNING, "FD %d errno %d", CommBuffers[i]->FD, errno);
 					}
 				}
 				readycount--;
@@ -374,28 +399,35 @@ int processAllCommFileDescs(void)
 	freeidx = -1;
 	for ( int i = 0 ; i < CommBufferCounter ; ++i )
 	{
-		if ( CommBuffers[i]->toClose )
+		bool shouldfree = false;
+		if ( CommBuffers[i]->forcedClose )
 		{
-			/*
-			 * If we do not force a close request, we have to wait for cleaning
-			 * the write buffer by sending them out.
-			 */
-			int wbuffsize = list_length(CommBuffers[i]->WriteBuffer);
-			if ( !CommBuffers[i]->forcedClose && wbuffsize > 0 )
-			{
-
-				elog(DEBUG5, "FD %d has %d buffs in write buffer. Skip close.",
-							 CommBuffers[i]->FD,
-							 wbuffsize);
-				continue;
-			}
-
 			/* Call cleanup handler if necessary to do user-defined cleanup. */
 			elog(DEBUG5, "Close FD %d Index %d.", CommBuffers[i]->FD, i);
 
 			/* Close connection and free buffer */
 			closeRegisteredFileDesc(CommBuffers[i]);
+			shouldfree = true;
+		}
+		else if ( CommBuffers[i]->toClose && CommBuffers[i]->WriteBuffer == NULL )
+		{
+			if ( CommBuffers[i]->ClientHostname.Str != NULL &&
+				 CommBuffers[i]->ServerPort != 0 )
+			{
+				returnAliveConnectionRemoteByHostname(
+							&(CommBuffers[i]->FD),
+							CommBuffers[i]->ClientHostname.Str,
+							CommBuffers[i]->ServerPort);
+			}
+			else
+			{
+				closeRegisteredFileDesc(CommBuffers[i]);
+			}
+			shouldfree = true;
+		}
 
+		if ( shouldfree )
+		{
 			Assert(CommBuffers[i]->Methods->CleanUpHandle != NULL);
 			CommBuffers[i]->Methods->CleanUpHandle(CommBuffers[i]);
 			freeCommBuffer(&CommBuffers[i]); /* Now CommBuffers[i] is set NULL.*/
@@ -448,7 +480,6 @@ int processAllCommFileDescs(void)
 }
 
 AsyncCommBuffer createCommBuffer(int 					  fd,
-								 char					 *dmfilename,
 								 uint32_t				  actionmask,
 								 AsyncCommBufferHandlers  methods,
 								 void					 *userdata)
@@ -463,12 +494,12 @@ AsyncCommBuffer createCommBuffer(int 					  fd,
 	result->forcedClose 	 = false;
 	result->UserData		 = userdata;
 
-	if ( dmfilename != NULL )
-	{
-		int fstrlen = strlen(dmfilename);
-		result->DomainFileName = rm_palloc0(AsyncCommContext, fstrlen+1);
-		memcpy(result->DomainFileName, dmfilename, fstrlen+1);
-	}
+	result->ClientAddrLen	 = 0;
+	result->ClientAddrPort	 = 0;
+
+	result->ServerPort		 = 0;
+
+	initSimpleString(&(result->ClientHostname), AsyncCommContext);
 
 	initializeSelfMaintainBuffer(&(result->ReadBuffer), AsyncCommContext);
 	result->WriteBuffer 	 		 = NULL;
@@ -487,10 +518,7 @@ void freeCommBuffer(AsyncCommBuffer *pcommbuffer)
 {
 	Assert( pcommbuffer != NULL );
 
-	if ( (*pcommbuffer)->DomainFileName != NULL )
-	{
-		rm_pfree(AsyncCommContext, (*pcommbuffer)->DomainFileName);
-	}
+	freeSimpleStringContent(&((*pcommbuffer)->ClientHostname));
 
 	destroySelfMaintainBuffer(&((*pcommbuffer)->ReadBuffer));
 
@@ -509,14 +537,7 @@ void freeCommBuffer(AsyncCommBuffer *pcommbuffer)
 
 void closeRegisteredFileDesc(AsyncCommBuffer commbuff)
 {
-	if ( commbuff->DomainFileName != NULL )
-	{
-		closeConnectionDomain(&(commbuff->FD), commbuff->DomainFileName);
-	}
-	else
-	{
-		closeConnectionRemote(&(commbuff->FD));
-	}
+	closeConnectionRemote(&(commbuff->FD));
 }
 
 void closeAndRemoveAllRegisteredFileDesc(void)
@@ -536,6 +557,46 @@ void closeAndRemoveAllRegisteredFileDesc(void)
 		RegClients[i].fd = -1;
 	}
 	CommBufferCounter = 0;
+}
+
+static void closeAllRegisteredFileDescs(int code, Datum arg)
+{
+	closeAndRemoveAllRegisteredFileDesc();
+}
+void unresigsterFileDesc(int fd)
+{
+	int pos = -1;
+	for ( int i = 0 ; i < CommBufferCounter ; ++i )
+	{
+		Assert(CommBuffers[i] != NULL);
+
+		if ( CommBuffers[i]->FD == fd )
+		{
+			/* Call cleanup handler if necessary to do user-defined cleanup. */
+			CommBuffers[i]->Methods->CleanUpHandle(CommBuffers[i]);
+			elog(DEBUG5, "Unregister FD %d Index %d.", CommBuffers[i]->FD, i);
+			CommBuffers[i]->FD = -1;
+			freeCommBuffer(&CommBuffers[i]);
+			pos = i;
+			break;
+		}
+	}
+
+	/*
+	 * Shift to remove freed slot among in-use slots to shorten the length of
+	 * poll status array.
+	 */
+	if ( pos >= 0 )
+	{
+		if ( CommBufferCounter > 1 )
+		{
+			RegClients[pos].fd      = RegClients[CommBufferCounter-1].fd;
+			RegClients[pos].events  = RegClients[CommBufferCounter-1].events;
+			RegClients[pos].revents = RegClients[CommBufferCounter-1].revents;
+			CommBuffers[pos]        = CommBuffers[CommBufferCounter-1];
+		}
+		CommBufferCounter--;
+	}
 }
 
 void addMessageContentToCommBuffer(AsyncCommBuffer 		buffer,
@@ -580,8 +641,16 @@ void shiftOutFirstWriteBuffer(AsyncCommBuffer commbuffer)
 	commbuffer->WriteContentOriginalSize = commbuffer->WriteContentSize;
 }
 
-int registerAsyncConnectionFileDesc(const char				*sockpath,
-									const char				*address,
+void closeFileDesc(AsyncCommBuffer commbuff)
+{
+	commbuff->toClose = true;
+}
+void forceCloseFileDesc(AsyncCommBuffer commbuff)
+{
+	commbuff->toClose 	  = true;
+	commbuff->forcedClose = true;
+}
+int registerAsyncConnectionFileDesc(const char				*address,
 									uint16_t				 port,
 									uint32_t				 actionmask,
 									AsyncCommBufferHandlers  methods,
@@ -590,24 +659,43 @@ int registerAsyncConnectionFileDesc(const char				*sockpath,
 {
 	int					res				= FUNC_RETURN_OK;
 	int 				fd 				= -1;
-	bool				dconn 			= false;
-	char			   *dfilename		= NULL;
 	int					sockres			= 0;
-	struct hostent 	   *server  		= NULL;
-	struct sockaddr_un  sockaddr_domain;
-	struct sockaddr_in 	sockaddr_inet;
-	int 				len 			= 0;
+	struct sockaddr_in 	server_addr;
 
-	/* Decide to use domain or remote socket connection. */
-	Assert( (sockpath == NULL && address != NULL && port > 0) ||
-			(sockpath != NULL && address == NULL && port == 0) );
-	dconn = sockpath != NULL;
+	/* Prepare for connecting. */
+	AddressString resolvedaddr = getAddressStringByHostName(address);
+	if ( resolvedaddr == NULL )
+	{
+		write_log("Failed to get host by name %s for async connecting a remote "
+				  "socket server %s:%d",
+				  address,
+				  address,
+				  port);
+		return UTIL_NETWORK_FAIL_GETHOST;
+	}
+
+	if ( rm_enable_connpool )
+	{
+		/* Try to get an alive connection from connection pool. */
+		fd = fetchAliveSocketConnection(address, resolvedaddr, port);
+	}
+
+	if ( fd != -1 )
+	{
+		res = registerFileDesc(fd,
+							   actionmask,
+							   methods,
+							   userdata,
+							   newcommbuffer);
+		goto exit;
+	}
 
 	/* Create socket FD */
-	fd = socket(dconn ? AF_UNIX : AF_INET, SOCK_STREAM, 0);
+	fd = socket(AF_INET, SOCK_STREAM, 0);
 	if ( fd < 0 )
 	{
-		write_log("registerAsyncConnectionFileDesc open socket failed (errno %d)",
+		write_log("Failed to open socket for async connecting a remote socket "
+				  "(errno %d)",
 				  errno);
 		return UTIL_NETWORK_FAIL_CREATESOCKET;
 	}
@@ -619,75 +707,40 @@ int registerAsyncConnectionFileDesc(const char				*sockpath,
 		return UTIL_NETWORK_FAIL_SETFCNTL;
 	}
 
-	/* Prepare for connecting. */
-	if ( dconn )
-	{
-		memset( &sockaddr_domain, 0, sizeof(struct sockaddr_un) );
-		sockaddr_domain.sun_family = AF_UNIX;
-		sprintf(sockaddr_domain.sun_path, "%s.%d.%lu.%d",
-				sockpath,
-				getpid(),
-				(unsigned long)pthread_self(),
-				ASYNCCOMM_CONN_FILEINDEX);
-		len = offsetof(struct sockaddr_un, sun_path) + strlen(sockaddr_domain.sun_path);
-		unlink(sockaddr_domain.sun_path);
-		dfilename = rm_palloc0(AsyncCommContext, strlen(sockaddr_domain.sun_path) + 1);
-		strcpy(dfilename, sockaddr_domain.sun_path);
-
-		sockres = bind(fd, (struct sockaddr *)&sockaddr_domain, len);
-		if ( sockres < 0 )
-		{
-		  write_log("connectToServerDomain bind socket failed %s, fd %d (errno %d)",
-				    dfilename,
-					fd,
-					errno);
-		  closeConnectionDomain(&fd, dfilename);
-		  rm_pfree(AsyncCommContext, dfilename);
-		  return UTIL_NETWORK_FAIL_BIND;
-		}
-
-		memset( &sockaddr_domain, 0, sizeof(struct sockaddr_un) );
-		sockaddr_domain.sun_family = AF_UNIX;
-		sprintf(sockaddr_domain.sun_path, "%s", sockpath);
-		len = offsetof(struct sockaddr_un, sun_path) + strlen(sockaddr_domain.sun_path);
-	}
-	else
-	{
-		server = gethostbyname(address);
-		if ( server == NULL )
-		{
-			write_log("connectToServerRemote resove address %s failed. (herrno %d)",
-					  address,
-					  h_errno);
-			closeConnectionRemote(&fd);
-			return UTIL_NETWORK_FAIL_GETHOST;
-		}
-		bzero((char *)&sockaddr_inet, sizeof(sockaddr_inet));
-		sockaddr_inet.sin_family = AF_INET;
-		bcopy((char *)server->h_addr, (char *)&sockaddr_inet.sin_addr.s_addr, server->h_length);
-		sockaddr_inet.sin_port = htons(port);
-		len = sizeof(sockaddr_inet);
-	}
+	bzero((char *)&server_addr, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	memcpy((char *)&server_addr.sin_addr.s_addr,
+		   resolvedaddr->Address,
+		   resolvedaddr->Length);
+	server_addr.sin_port = htons(port);
 
 	/* Asynchronous connect. Should return value at once. */
-	sockres = connect(fd,
-					  dconn ?
-					    (struct sockaddr *)&sockaddr_domain :
-						(struct sockaddr *)&sockaddr_inet,
-					  len);
+	sockres = connect(fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
 	if ( sockres == 0 )
 	{
+		if ( setConnectionLongTermNoDelay(fd) != FUNC_RETURN_OK )
+		{
+			close(fd);
+			res = UTIL_NETWORK_FAIL_CONNECT;
+			goto exit;
+		}
 		/*
 		 * New connection is created. Suppose domain socket and local socket
 		 * connection can be done now. Register a normal client FD in poll() to
 		 * perform content sending and receiving.
 		 */
 		res = registerFileDesc(fd,
-						 	   dfilename,
 							   actionmask,
 							   methods,
 							   userdata,
 							   newcommbuffer);
+
+		/* Assign connection address. */
+		assignFileDescClientAddressInfo(*newcommbuffer,
+										address,
+										port,
+										&server_addr,
+										sizeof(server_addr));
 		goto exit;
 	}
 	else if ( sockres < 0 && errno == EINPROGRESS )
@@ -697,19 +750,25 @@ int registerAsyncConnectionFileDesc(const char				*sockpath,
 		 * asynchronous check. Build asynchronous connection commbuffer.
 		 */
 		res = registerFileDescForAsyncConn(fd,
-										   dfilename,
 										   actionmask,
 										   methods,
 										   userdata,
 										   newcommbuffer);
+
+		/* Assign connection address. */
+		assignFileDescClientAddressInfo(*newcommbuffer,
+										address,
+										port,
+										&server_addr,
+										sizeof(server_addr));
+
 		goto exit;
 	}
 	else
 	{
 		/* Fail to build connection. */
-		 write_log("registerAsyncConnectionFileDesc connect socket failed %s, "
+		 write_log("registerAsyncConnectionFileDesc connect socket failed, "
 				   "fd %d (errno %d)",
-				   dfilename == NULL ? "" : dfilename,
 				   fd,
 				   errno);
 		 close(fd);
@@ -717,9 +776,5 @@ int registerAsyncConnectionFileDesc(const char				*sockpath,
 	}
 
 exit:
-	if( dfilename != NULL )
-	{
-		rm_pfree(AsyncCommContext, dfilename);
-	}
 	return res;
 }

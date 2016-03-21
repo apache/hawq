@@ -158,8 +158,7 @@ int sendRUAlive(char *seghostname)
 	context->UserData                = (void *)segres;
 
 	/* Connect to HAWQ RM server */
-	res = registerAsyncConnectionFileDesc(NULL,
-										  seghostname,
+	res = registerAsyncConnectionFileDesc(seghostname,
 										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
@@ -232,11 +231,21 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 			 * This call makes resource pool remove unused containers.
 			 */
 			returnAllGRMResourceFromSegment(segres);
+
+			segres->Stat->StatusDesc |= SEG_STATUS_FAILED_PROBING_SEGMENT;
 			/* Set the host down in gp_segment_configuration table */
 			if (Gp_role != GP_ROLE_UTILITY)
 			{
+				SimpStringPtr description = build_segment_status_description(segres->Stat);
 				update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
-									  SEGMENT_STATUS_DOWN);
+									  SEGMENT_STATUS_DOWN,
+									  (description->Len > 0)?description->Str:"");
+				add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+										GET_SEGRESOURCE_HOSTNAME(segres),
+										description->Str);
+
+				freeSimpleStringContent(description);
+				rm_pfree(PCONTEXT, description);
 			}
 			/* Set the host down. */
 			elog(WARNING, "Resource manager sets host %s from up to down "
@@ -253,8 +262,7 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 	}
 
 	setSegResRUAlivePending(segres, false);
-	context->AsyncBuffer->toClose     = true;
-	context->AsyncBuffer->forcedClose = false;
+	closeFileDesc(context->AsyncBuffer);
 }
 
 void sentRUAlive(AsyncCommMessageHandlerContext context)
@@ -283,10 +291,20 @@ void sentRUAliveError(AsyncCommMessageHandlerContext context)
 		 * This call makes resource pool remove unused containers.
 		 */
 		returnAllGRMResourceFromSegment(segres);
+		segres->Stat->StatusDesc |= SEG_STATUS_COMMUNICATION_ERROR;
 		/* Set the host down in gp_segment_configuration table */
 		if (Gp_role != GP_ROLE_UTILITY)
 		{
-			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET, SEGMENT_STATUS_DOWN);
+			SimpStringPtr description = build_segment_status_description(segres->Stat);
+			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+								  SEGMENT_STATUS_DOWN,
+								  (description->Len > 0)?description->Str:"");
+			add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+									GET_SEGRESOURCE_HOSTNAME(segres),
+									description->Str);
+
+			freeSimpleStringContent(description);
+			rm_pfree(PCONTEXT, description);
 		}
 		/* Set the host down. */
 		elog(LOG, "Resource manager sets host %s from up to down "
@@ -358,8 +376,7 @@ int increaseMemoryQuota(char *seghostname, GRMContainerSet containerset)
 
     elog(DEBUG3, "Created AsyncComm Message context for Async Conn.");
 
-	res = registerAsyncConnectionFileDesc(NULL,
-										  seghostname,
+	res = registerAsyncConnectionFileDesc(seghostname,
 										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
@@ -435,8 +452,7 @@ void recvIncreaseMemoryQuotaResponse(AsyncCommMessageHandlerContext	context,
 	}
 
     processContainersAfterIncreaseMemoryQuota(ctns, acceptedcontainer);
-    context->AsyncBuffer->toClose     = true;
-    context->AsyncBuffer->forcedClose = false;
+    closeFileDesc(context->AsyncBuffer);
 }
 
 void sentIncreaseMemoryQuota(AsyncCommMessageHandlerContext context)
@@ -523,8 +539,7 @@ int decreaseMemoryQuota(char 			*seghostname,
     context->MessageErrorHandler     = sentDecreaseMemoryQuotaError;
     context->MessageCleanUpHandler   = sentDecreaseMemoryQuotaCleanup;
 
-	res = registerAsyncConnectionFileDesc(NULL,
-										  seghostname,
+	res = registerAsyncConnectionFileDesc(seghostname,
 										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
@@ -599,8 +614,7 @@ void recvDecreaseMemoryQuotaResponse(AsyncCommMessageHandlerContext	context,
         		  rsp->Result);
     }
     processContainersAfterDecreaseMemoryQuota(ctns, kickedcontainer);
-    context->AsyncBuffer->toClose     = true;
-    context->AsyncBuffer->forcedClose = false;
+    closeFileDesc(context->AsyncBuffer);
 }
 
 void sentDecreaseMemoryQuota(AsyncCommMessageHandlerContext context)

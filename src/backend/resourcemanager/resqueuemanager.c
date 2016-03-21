@@ -346,6 +346,17 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 		case RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG:
 		case RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG:
 		{
+
+			/* The empty value is not allowed. */
+			if ( SimpleStringEmpty(&(property->Val)) )
+			{
+				snprintf(errorbuf, errorbufsize,
+						 "the value of %s cannot be empty",
+						 RSQDDLAttrNames[attrindex]);
+				elog(WARNING, "Resource manager failed parsing attribute, %s",
+							  errorbuf);
+				return RMDDL_WRONG_ATTRVALUE;
+			}
 			/*
 			 * Build property.
 			 *
@@ -2631,8 +2642,7 @@ void refreshActualMinGRMContainerPerSeg(void)
 		foreach(cell, allsegres)
 		{
 			SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
-			if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ||
-				 !IS_SEGSTAT_GRMAVAILABLE(segres->Stat) )
+			if (IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
 			{
 				continue;
 			}
@@ -3869,7 +3879,7 @@ int computeQueryQuota_EVEN(DynResourceQueueTrack	track,
 	*segnummin = reservsegnum;
 	*segnummin = *segnummin > *segnum ? *segnum : *segnummin;
 
-	Assert( *segnummin > 0 && *segnummin <= *segnum );
+	Assert( *segnummin >= 0 && *segnummin <= *segnum );
 	return FUNC_RETURN_OK;
 }
 
@@ -4885,8 +4895,7 @@ void timeoutDeadResourceAllocation(void)
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
-					curcon->CommBuffer->toClose = true;
-					curcon->CommBuffer->forcedClose = true;
+					forceCloseFileDesc(curcon->CommBuffer);
 				}
 				else
 				{
@@ -4913,8 +4922,7 @@ void timeoutDeadResourceAllocation(void)
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
-					curcon->CommBuffer->toClose = true;
-					curcon->CommBuffer->forcedClose = true;
+					forceCloseFileDesc(curcon->CommBuffer);
 				}
 				else
 				{
@@ -4935,8 +4943,7 @@ void timeoutDeadResourceAllocation(void)
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
-					curcon->CommBuffer->toClose = true;
-					curcon->CommBuffer->forcedClose = true;
+					forceCloseFileDesc(curcon->CommBuffer);
 				}
 				else
 				{
@@ -4979,14 +4986,14 @@ void timeoutQueuedRequest(void)
 		 * 		   added into resource queue manager queues.
 		 */
 		elog(DEBUG3, "Deferred connection track is found. "
-					 " Conn Time " UINT64_FORMAT
+					 " Request Time " UINT64_FORMAT
 					 " Curr Time " UINT64_FORMAT
 					 " Delta " UINT64_FORMAT,
-					 ct->ConnectTime,
+					 ct->RequestTime,
 					 curmsec,
-					 curmsec - ct->ConnectTime);
+					 curmsec - ct->RequestTime);
 
-		if ( curmsec - ct->ConnectTime > 1000000L * rm_resource_allocation_timeout )
+		if ( curmsec - ct->RequestTime > 1000000L * rm_resource_allocation_timeout )
 		{
 			snprintf(errorbuf, sizeof(errorbuf),
 					 "resource request is timed out due to no available cluster");
@@ -5206,8 +5213,10 @@ void getIdleResourceRequest(int32_t *mem, double *core)
 	Assert(PRESPOOL->ClusterMemoryCoreRatio > 0);
 	*mem  = PRESPOOL->ClusterMemoryCoreRatio *
 			PRESPOOL->AvailNodeCount *
-			rm_min_resource_perseg;
-	*core = 1.0 * PRESPOOL->AvailNodeCount * rm_min_resource_perseg;
+			PQUEMGR->ActualMinGRMContainerPerSeg;
+	*core = 1.0 *
+			PRESPOOL->AvailNodeCount *
+			PQUEMGR->ActualMinGRMContainerPerSeg;
 }
 
 void setForcedReturnGRMContainerCount(void)
@@ -5738,7 +5747,8 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
 		resetResourceBundleDataByBundle(&(quetrack->TotalAllocated),
 										&(shadowtrack->TotalAllocated));
 
-		resetResourceBundleData(&(shadowtrack->TotalRequest), 0, 0.0, 0);
+		resetResourceBundleDataByBundle(&(quetrack->TotalRequest),
+										&(shadowtrack->TotalRequest));
 
 		quetrack->expectMoreResource	= false;
 		quetrack->pauseAllocation 		= false;
