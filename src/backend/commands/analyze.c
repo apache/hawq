@@ -501,8 +501,6 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		Assert(analyzeStatementContext == CurrentMemoryContext);
 
 		candidateOid = lfirst_oid(le1);
-		candidateRelation =
-		        try_relation_open(candidateOid, ShareUpdateExclusiveLock, false);
 
 		if (candidateRelation)
 		{
