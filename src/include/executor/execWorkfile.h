@@ -153,7 +153,7 @@ ExecWorkFile_Tell64(ExecWorkFile *workfile);
  *    close the work file, and release the space.
  */
 int64
-ExecWorkFile_Close(ExecWorkFile *workfile);
+ExecWorkFile_Close(ExecWorkFile *workfile, bool canReportError);
 
 int ExecWorkFile_Seek(ExecWorkFile *workfile, uint64 offset, int whence);
 void ExecWorkFile_Flush(ExecWorkFile *workfile);

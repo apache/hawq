@@ -1331,7 +1331,7 @@ execworkfile_buffile_test(void)
 	unit_test_result(success && expected_size == WorkfileSegspace_GetSize() - initial_diskspace);
 
 	elog(LOG, "Running sub-test: Closing EWF/Buffile");
-	final_size = ExecWorkFile_Close(ewf);
+	final_size = ExecWorkFile_Close(ewf, true);
 	unit_test_result(final_size == expected_size);
 
 	elog(LOG, "Running sub-test: Opening existing EWF/Buffile and checking size");
@@ -1354,7 +1354,7 @@ execworkfile_buffile_test(void)
 	pfree(buf);
 
 	elog(LOG, "Running sub-test: Closing EWF/Buffile");
-	final_size = ExecWorkFile_Close(ewf);
+	final_size = ExecWorkFile_Close(ewf, true);
 
 	unit_test_result(final_size == current_size);
 
@@ -1449,7 +1449,7 @@ execworkfile_bfz_zlib_test(void)
 	unit_test_result(true);
 
 	elog(LOG, "Running sub-test: Closing EWF/BFZ");
-	final_size = ExecWorkFile_Close(ewf);
+	final_size = ExecWorkFile_Close(ewf, true);
 
 	unit_test_result(final_size < expected_size);
 
@@ -1472,7 +1472,7 @@ execworkfile_bfz_zlib_test(void)
 	pfree(buf);
 
 	elog(LOG, "Running sub-test: Closing EWF/BFZ");
-	final_size = ExecWorkFile_Close(ewf);
+	final_size = ExecWorkFile_Close(ewf, true);
 
 	unit_test_result(final_size == current_size);
 
@@ -1568,7 +1568,7 @@ execworkfile_bfz_uncompressed_test(void)
 	unit_test_result(true);
 
 	elog(LOG, "Running sub-test: Closing EWF/BFZ");
-	final_size = ExecWorkFile_Close(ewf);
+	final_size = ExecWorkFile_Close(ewf, true);
 
 	/* For uncompressed files, final file may contain checksums, which makes it
 	 * larger than expected */
@@ -1593,7 +1593,7 @@ execworkfile_bfz_uncompressed_test(void)
 	pfree(buf);
 
 	elog(LOG, "Running sub-test: Closing EWF/BFZ");
-	final_size = ExecWorkFile_Close(ewf);
+	final_size = ExecWorkFile_Close(ewf, true);
 
 	unit_test_result(final_size == current_size);
 
@@ -2110,7 +2110,7 @@ execworkfile_create_one_MB_file(void)
 
 	elog(LOG, "Running sub-test: Closing file %s", filename->data);
 
-	int64 final_size = workfile_mgr_close_file(NULL /* work_set */, ewf);
+	int64 final_size = workfile_mgr_close_file(NULL /* work_set */, ewf, true);
 
 	/* Verify correct size of the created file */
 	unit_test_result (final_size == (int64)nchars*sizeof(char) );
@@ -2303,7 +2303,7 @@ workfile_create_and_individual_cleanup(void)
 
 	for (int i=0; i < TEST_MAX_NUM_WORKFILES; i++)
 	{
-		workfile_mgr_close_file(work_set, ewfiles[i]);
+		workfile_mgr_close_file(work_set, ewfiles[i], true);
 
 		if (i % 1000 == 999)
 		{

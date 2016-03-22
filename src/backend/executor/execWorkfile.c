@@ -440,7 +440,7 @@ ExecWorkFile_Tell64(ExecWorkFile *workfile)
  *    Returns the actual size of the file on disk upon closing
  */
 int64
-ExecWorkFile_Close(ExecWorkFile *workfile)
+ExecWorkFile_Close(ExecWorkFile *workfile, bool canReportError)
 {
 	Assert(workfile != NULL);
 	bfz_t *bfz_file = NULL;
@@ -463,7 +463,7 @@ ExecWorkFile_Close(ExecWorkFile *workfile)
 				ExecWorkFile_AdjustBFZSize(workfile, file_size);
 			}
 
-			bfz_close(bfz_file, true, true);
+			bfz_close(bfz_file, true, canReportError);
 			break;
 		default:
 			insist_log(false, "invalid work file type: %d", workfile->fileType);
