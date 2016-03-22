@@ -33,6 +33,7 @@
 #include "utils/relcache.h"
 #include "utils/tqual.h"
 #include "utils/rel.h"
+#include "utils/faultinjector.h"
 #include "access/aomd.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbparquetam.h"
@@ -148,6 +149,14 @@ parquet_beginscan(
 	aoEntry = GetAppendOnlyEntry(RelationGetRelid(relation), parquetMetaDataSnapshot);
 	scan->aoEntry = aoEntry;
 	Assert(aoEntry->majorversion == 1 && aoEntry->minorversion == 0);
+
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   FailQeWhenBeginParquetScan,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
 
 	/*
 	 * initialize the scan descriptor
