@@ -45,12 +45,12 @@ static int32_t StrToInt32(const char * str) {
     retval = strtol(str, &end, 0);
 
     if (EINVAL == errno || 0 != *end) {
-        THROW(YarnBadNumFoumat, "Invalid int32_t type: %s", str);
+        THROW(YarnBadNumFormat, "Invalid int32_t type: %s", str);
     }
 
     if (ERANGE == errno || retval > std::numeric_limits<int32_t>::max()
             || retval < std::numeric_limits<int32_t>::min()) {
-        THROW(YarnBadNumFoumat, "Underflow/Overflow int32_t type: %s", str);
+        THROW(YarnBadNumFormat, "Underflow/Overflow int32_t type: %s", str);
     }
 
     return retval;
@@ -63,12 +63,12 @@ static int64_t StrToInt64(const char * str) {
     retval = strtoll(str, &end, 0);
 
     if (EINVAL == errno || 0 != *end) {
-        THROW(YarnBadNumFoumat, "Invalid int64_t type: %s", str);
+        THROW(YarnBadNumFormat, "Invalid int64_t type: %s", str);
     }
 
     if (ERANGE == errno || retval > std::numeric_limits<int64_t>::max()
             || retval < std::numeric_limits<int64_t>::min()) {
-        THROW(YarnBadNumFoumat, "Underflow/Overflow int64_t type: %s", str);
+        THROW(YarnBadNumFormat, "Underflow/Overflow int64_t type: %s", str);
     }
 
     return retval;
@@ -82,7 +82,7 @@ static bool StrToBool(const char * str) {
     } else if (!strcasecmp(str, "false") || !strcmp(str, "0")) {
         retval = false;
     } else {
-        THROW(YarnBadBoolFoumat, "Invalid bool type: %s", str);
+        THROW(YarnBadBoolFormat, "Invalid bool type: %s", str);
     }
 
     return retval;
@@ -95,12 +95,12 @@ static double StrToDouble(const char * str) {
     retval = strtod(str, &end);
 
     if (EINVAL == errno || 0 != *end) {
-        THROW(YarnBadNumFoumat, "Invalid double type: %s", str);
+        THROW(YarnBadNumFormat, "Invalid double type: %s", str);
     }
 
     if (ERANGE == errno || retval > std::numeric_limits<double>::max()
             || retval < std::numeric_limits<double>::min()) {
-        THROW(YarnBadNumFoumat, "Underflow/Overflow int64_t type: %s", str);
+        THROW(YarnBadNumFormat, "Underflow/Overflow int64_t type: %s", str);
     }
 
     return retval;
@@ -142,7 +142,7 @@ static void readConfigItem(xmlNodePtr root, Map & kv, const char * path) {
         return;
     }
 
-    THROW(YarnBadConfigFoumat, "Config cannot parse configure file: \"%s\"",
+    THROW(YarnBadConfigFormat, "Config cannot parse configure file: \"%s\"",
           path);
 }
 
@@ -151,7 +151,7 @@ static void readConfigItems(xmlDocPtr doc, Map & kv, const char * path) {
     root = xmlDocGetRootElement(doc);
 
     if (NULL == root || strcmp((const char *) root->name, "configuration")) {
-        THROW(YarnBadConfigFoumat, "Config cannot parse configure file: \"%s\"",
+        THROW(YarnBadConfigFormat, "Config cannot parse configure file: \"%s\"",
               path);
     }
 
@@ -164,7 +164,7 @@ static void readConfigItems(xmlDocPtr doc, Map & kv, const char * path) {
         }
 
         if (strcmp((const char *) curNode->name, "property")) {
-            THROW(YarnBadConfigFoumat,
+            THROW(YarnBadConfigFormat,
                   "Config cannot parse configure file: \"%s\"", path);
         }
 
@@ -186,7 +186,7 @@ void Config::update(const char * p) {
 
     if (access(path.c_str(), R_OK)) {
         strerror_r(errno, msg, sizeof(msg));
-        THROW(YarnBadConfigFoumat, "Cannot read configure file: \"%s\", %s",
+        THROW(YarnBadConfigFormat, "Cannot read configure file: \"%s\", %s",
               path.c_str(), msg);
     }
 
@@ -196,7 +196,7 @@ void Config::update(const char * p) {
     try {
         /* check if parsing succeeded */
         if (doc == NULL) {
-            THROW(YarnBadConfigFoumat,
+            THROW(YarnBadConfigFormat,
                   "Config cannot parse configure file: \"%s\"", path.c_str());
         } else {
             readConfigItems(doc, kv, path.c_str());
@@ -248,7 +248,7 @@ int64_t Config::getInt64(const char * key) const {
 
     try {
         retval = StrToInt64(it->second.c_str());
-    } catch (const YarnBadNumFoumat & e) {
+    } catch (const YarnBadNumFormat & e) {
         NESTED_THROW(YarnConfigNotFound, "Config key: %s not found", key);
     }
 
@@ -265,7 +265,7 @@ int64_t Config::getInt64(const char * key, int64_t def) const {
 
     try {
         retval = StrToInt64(it->second.c_str());
-    } catch (const YarnBadNumFoumat & e) {
+    } catch (const YarnBadNumFormat & e) {
         NESTED_THROW(YarnConfigNotFound, "Config key: %s not found", key);
     }
 
@@ -282,7 +282,7 @@ int32_t Config::getInt32(const char * key) const {
 
     try {
         retval = StrToInt32(it->second.c_str());
-    } catch (const YarnBadNumFoumat & e) {
+    } catch (const YarnBadNumFormat & e) {
         NESTED_THROW(YarnConfigNotFound, "Config key: %s not found", key);
     }
 
@@ -299,7 +299,7 @@ int32_t Config::getInt32(const char * key, int32_t def) const {
 
     try {
         retval = StrToInt32(it->second.c_str());
-    } catch (const YarnBadNumFoumat & e) {
+    } catch (const YarnBadNumFormat & e) {
         NESTED_THROW(YarnConfigNotFound, "Config key: %s not found", key);
     }
 
@@ -316,7 +316,7 @@ double Config::getDouble(const char * key) const {
 
     try {
         retval = StrToDouble(it->second.c_str());
-    } catch (const YarnBadNumFoumat & e) {
+    } catch (const YarnBadNumFormat & e) {
         NESTED_THROW(YarnConfigNotFound, "Config key: %s not found", key);
     }
 
@@ -333,7 +333,7 @@ double Config::getDouble(const char * key, double def) const {
 
     try {
         retval = StrToDouble(it->second.c_str());
-    } catch (const YarnBadNumFoumat & e) {
+    } catch (const YarnBadNumFormat & e) {
         NESTED_THROW(YarnConfigNotFound, "Config key: %s not found", key);
     }
 
@@ -350,7 +350,7 @@ bool Config::getBool(const char * key) const {
 
     try {
         retval = StrToBool(it->second.c_str());
-    } catch (const YarnBadBoolFoumat & e) {
+    } catch (const YarnBadBoolFormat & e) {
         NESTED_THROW(YarnConfigNotFound, "Config key: %s not found", key);
     }
 
@@ -367,7 +367,7 @@ bool Config::getBool(const char * key, bool def) const {
 
     try {
         retval = StrToBool(it->second.c_str());
-    } catch (const YarnBadNumFoumat & e) {
+    } catch (const YarnBadNumFormat & e) {
         NESTED_THROW(YarnConfigNotFound, "Config key: %s not found", key);
     }
 

@@ -169,36 +169,36 @@ public:
     static const char * ReflexName;
 };
 
-class YarnBadBoolFoumat: public YarnException {
+class YarnBadBoolFormat: public YarnException {
 public:
-    YarnBadBoolFoumat(const std::string & arg, const char * file, int line,
+    YarnBadBoolFormat(const std::string & arg, const char * file, int line,
                       const char * stack) :
         YarnException(arg, file, line, stack) {
     }
 
-    ~YarnBadBoolFoumat() throw () {
+    ~YarnBadBoolFormat() throw () {
     }
 };
 
-class YarnBadConfigFoumat: public YarnException {
+class YarnBadConfigFormat: public YarnException {
 public:
-    YarnBadConfigFoumat(const std::string & arg, const char * file, int line,
+    YarnBadConfigFormat(const std::string & arg, const char * file, int line,
                         const char * stack) :
         YarnException(arg, file, line, stack) {
     }
 
-    ~YarnBadConfigFoumat() throw () {
+    ~YarnBadConfigFormat() throw () {
     }
 };
 
-class YarnBadNumFoumat: public YarnException {
+class YarnBadNumFormat: public YarnException {
 public:
-    YarnBadNumFoumat(const std::string & arg, const char * file, int line,
+    YarnBadNumFormat(const std::string & arg, const char * file, int line,
                      const char * stack) :
         YarnException(arg, file, line, stack) {
     }
 
-    ~YarnBadNumFoumat() throw () {
+    ~YarnBadNumFormat() throw () {
     }
 };
 

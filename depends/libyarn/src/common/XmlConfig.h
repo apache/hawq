@@ -41,13 +41,13 @@ public:
     /**
      * Construct a Config with given configure file.
      * @param path The path of configure file.
-     * @throw HdfsBadConfigFoumat
+     * @throw YarnBadConfigFormat
      */
     Config(const char * path);
 
     /**
      * Parse the configure file.
-     * @throw HdfsBadConfigFoumat
+     * @throw YarnBadConfigFormat
      */
     void update(const char * path);
 
