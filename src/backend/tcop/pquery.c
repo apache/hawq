@@ -43,6 +43,7 @@
 #include "tcop/pquery.h"
 #include "tcop/tcopprot.h"
 #include "tcop/utility.h"
+#include "utils/faultinjector.h"
 #include "utils/memutils.h"
 #include "utils/resscheduler.h"
 #include "commands/vacuum.h"
@@ -1409,6 +1410,14 @@ PortalRun(Portal portal, int64 count, bool isTopLevel,
 	MemoryContext saveMemoryContext;
 
 	AssertArg(PortalIsValid(portal));
+
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   FailQeWhenDoQuery,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
 
 	/* Initialize completion tag to empty string */
 	if (completionTag)

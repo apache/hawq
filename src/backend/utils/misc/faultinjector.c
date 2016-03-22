@@ -287,6 +287,12 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault when create cdb dispatch result object, set out of memory */
 	_("worker_manager_submit_job"),
 		/* inject fault when worker manager submit job , set error*/
+	_("fail_qe_after_connection"),
+		/* inject fault after connecting to QD, sleep to wait QE fail */
+	_("fail_qe_when_do_query"),
+		/* inject fault when QE actually working, set error */
+	_("fail_qe_when_begin_parquet_scan"),
+		/* inject fault when begin scan parquet table, set error */
 /*	_("make_dispatch_thread"),
 		 inject fault when initialing memory structure for dispatcher thread*/
 	_("before_dispatch"),
@@ -1077,6 +1083,7 @@ FaultInjector_NewHashEntry(
 		case ConnectionFailAfterGangCreation:
 		case CreateCdbDispathResultObject:
 		case WorkerManagerSubmitJob:
+		case FaillQeAfterConnection:
 
 			/* These faults are designed for master. */
 			if(!AmIMaster())
@@ -1102,6 +1109,8 @@ FaultInjector_NewHashEntry(
 		case SegmentProbeResponse:
 		/* We do not use vmem on master. Therefore, we only attempt large palloc on segments. */
 		case MultiExecHashLargeVmem:
+		case FailQeWhenDoQuery:
+		case FailQeWhenBeginParquetScan:
 			/* SEGMENT */
 			if(!AmISegment())
 			{
