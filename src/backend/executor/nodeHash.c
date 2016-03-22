@@ -698,13 +698,13 @@ ExecHashTableDestroy(HashState *hashState, HashJoinTable hashtable)
 
 		if (batch->innerside.workfile != NULL)
 		{
-			workfile_mgr_close_file(hashtable->work_set, batch->innerside.workfile);
+			workfile_mgr_close_file(hashtable->work_set, batch->innerside.workfile, true);
 			batch->innerside.workfile = NULL;
 		}
 
 		if (batch->outerside.workfile != NULL)
 		{
-			workfile_mgr_close_file(hashtable->work_set, batch->outerside.workfile);
+			workfile_mgr_close_file(hashtable->work_set, batch->outerside.workfile, true);
 			batch->outerside.workfile = NULL;
 		}
 	}
@@ -712,7 +712,7 @@ ExecHashTableDestroy(HashState *hashState, HashJoinTable hashtable)
 	/* Close state file as well */
 	if (hashtable->state_file != NULL)
 	{
-		workfile_mgr_close_file(hashtable->work_set, hashtable->state_file);
+		workfile_mgr_close_file(hashtable->work_set, hashtable->state_file, true);
 		hashtable->state_file = NULL;
 	}
 

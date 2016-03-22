@@ -982,7 +982,7 @@ tuplesort_end_mk(Tuplesortstate_mk *state)
 
         if (state->tapeset_state_file)
         {
-        	workfile_mgr_close_file(state->work_set, state->tapeset_state_file);
+        	workfile_mgr_close_file(state->work_set, state->tapeset_state_file, true);
         }
     }
 

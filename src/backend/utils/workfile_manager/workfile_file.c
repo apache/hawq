@@ -122,7 +122,7 @@ workfile_mgr_open_filename(workfile_set *work_set, const char *file_name)
  *  Returns the actual size of the file on disk in bytes upon closing
  */
 int64
-workfile_mgr_close_file(workfile_set *work_set, ExecWorkFile *file)
+workfile_mgr_close_file(workfile_set *work_set, ExecWorkFile *file, bool canReportError)
 {
 	Assert(NULL != file);
 
@@ -133,7 +133,7 @@ workfile_mgr_close_file(workfile_set *work_set, ExecWorkFile *file)
 	int64 size = 0;
 	PG_TRY();
 	{
-		size = ExecWorkFile_Close(file);
+		size = ExecWorkFile_Close(file, canReportError);
 	}
 	PG_CATCH();
 	{

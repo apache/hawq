@@ -918,7 +918,7 @@ tuplesort_end(Tuplesortstate *state)
 
 		if (state->pfile_rwfile_state)
         {
-			workfile_mgr_close_file(NULL /* workset */, state->pfile_rwfile_state);
+			workfile_mgr_close_file(NULL /* workset */, state->pfile_rwfile_state, true);
         }
 	}
 

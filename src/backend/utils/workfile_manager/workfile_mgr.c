@@ -1017,7 +1017,7 @@ workfile_mgr_save_plan(workfile_set *work_set, workfile_set_plan *sf_plan)
 		workfile_mgr_report_error();
 	}
 
-	workfile_mgr_close_file(work_set, plan_file);
+	workfile_mgr_close_file(work_set, plan_file, true);
 }
 
 /*
@@ -1113,7 +1113,7 @@ workfile_mgr_compare_plan(workfile_set *work_set, workfile_set_plan *sf_plan)
 		plan_offset += size_read;
 	}
 
-	workfile_mgr_close_file(work_set, plan_file);
+	workfile_mgr_close_file(work_set, plan_file, true);
 	return match;
 }
 
