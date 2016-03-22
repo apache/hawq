@@ -730,6 +730,8 @@ void GetResourceQuota(int		max_target_segment_num,
 	}
 }
 
+int ResourceIndex = -1;
+
 QueryResource *
 AllocateResource(QueryResourceLife   life,
 				 int32 			     slice_size,
@@ -791,6 +793,7 @@ AllocateResource(QueryResourceLife   life,
 		elog(ERROR, "%s. (%d)", errorbuf, errorcode);
 	}
 
+	ResourceIndex = resourceId;
 	/* Acquire resource. */
 	ret = acquireResourceFromRM(resourceId,
 								gp_session_id,

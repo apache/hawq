@@ -3518,6 +3518,8 @@ ProcessInterrupts(void)
 
 		QueryCancelPending = false;
 			ImmediateInterruptOK = false;	/* not idle anymore */
+			/* clean up the resource as it cancel the query. */
+			cleanupQD2RMComm();
 			DisableNotifyInterrupt();
 			DisableCatchupInterrupt();
 			if (Gp_role == GP_ROLE_EXECUTE)

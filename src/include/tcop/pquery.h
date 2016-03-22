@@ -19,6 +19,7 @@
 
 extern PGDLLIMPORT Portal ActivePortal;
 
+extern int ResourceIndex;
 
 extern PortalStrategy ChoosePortalStrategy(List *stmts);
 
