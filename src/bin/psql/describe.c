@@ -42,6 +42,7 @@ static bool describeOneTSConfig(const char *oid, const char *nspname,
 static void printACLColumn(PQExpBuffer buf, const char *colname);
 static bool isGPDB(void);
 static bool isGPDB4200OrLater(void);
+static bool describeHcatalogTable(const char *pattern, bool verbose);
 
 /* GPDB 3.2 used PG version 8.2.10, and we've moved the minor number up since then for each release,  4.1 = 8.2.15 */
 /* Allow for a couple of future releases.  If the version isn't in this range, we are talking to PostgreSQL, not GPDB */
@@ -1151,6 +1152,12 @@ describeTableDetails(const char *pattern, bool verbose, bool showSystem)
 	PQExpBufferData buf;
 	PGresult   *res;
 	int			i;
+	char const *hcatalog = "hcatalog";
+
+
+	//Hcatalog hook in this method
+	if(strncmp(pattern, hcatalog, strlen(hcatalog)) == 0)
+		return describeHcatalogTable(pattern, verbose);
 
 	initPQExpBuffer(&buf);
 
@@ -4212,4 +4219,45 @@ printACLColumn(PQExpBuffer buf, const char *colname)
 		appendPQExpBuffer(buf,
 						  "pg_catalog.array_to_string(%s, '\\n') AS \"%s\"",
 						  colname, gettext_noop("Access privileges"));
+}
+
+
+static void
+parseExternalPattern(const char *user_pattern, char **profile, char **pattern)
+{
+
+	*profile = strtok(user_pattern, ".");
+	*pattern = strtok(NULL, "/0");
+
+}
+
+static bool
+describeHcatalogTable(const char *pattern, bool verbose)
+{
+	PQExpBufferData buf;
+	PGresult *res;
+	printQueryOpt myopt = pset.popt;
+	char *pxf_profile = "*";
+	char *pxf_pattern = "*";
+
+	parseExternalPattern(pattern, &pxf_profile, &pattern);
+
+	initPQExpBuffer(&buf);
+
+	printfPQExpBuffer(&buf, "SELECT * FROM\n"
+			"pxf_get_object_fields('%s', '%s') \n", pxf_profile, pxf_pattern);
+
+	res = PSQLexec(buf.data, false);
+	termPQExpBuffer(&buf);
+	if (!res)
+		return false;
+
+	myopt.nullPrint = NULL;
+	myopt.title = _("List of Hcatalog tables");
+	myopt.translate_header = true;
+
+	printQuery(res, &myopt, pset.queryFout, pset.logfile);
+
+	PQclear(res);
+	return true;
 }
