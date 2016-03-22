@@ -1561,12 +1561,14 @@ dispatch_free_result(DispatchDataResult *result)
 		result->errbuf.data = NULL;
 	}
 
-	for (int i = 0; i <= result->numresults; i++){
-	  PQclear(result->result[i]);
-	  result->result[i] = NULL;
-	}
 	if (!result->result)
+	{
+	  for (int i = 0; i <= result->numresults; i++){
+	    PQclear(result->result[i]);
+	    result->result[i] = NULL;
+	  }
 	  free(result->result);
+	}
 
 	dispmgt_free_takeoved_segment_conns(result->segment_conns);
 }
