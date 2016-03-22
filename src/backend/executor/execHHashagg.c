@@ -1182,7 +1182,7 @@ closeSpillFile(AggState *aggstate, SpillSet *spill_set, int file_no)
 	if (spill_file->file_info &&
 		spill_file->file_info->wfile != NULL)
 	{
-		workfile_mgr_close_file(hashtable->work_set, spill_file->file_info->wfile);
+		workfile_mgr_close_file(hashtable->work_set, spill_file->file_info->wfile, true);
 		spill_file->file_info->wfile = NULL;
 		freedspace += (BATCHFILE_METADATA - sizeof(BatchFileInfo));
 		
@@ -1516,7 +1516,7 @@ agg_hash_close_state_file(HashAggTable *hashtable)
 {
 	if (hashtable->state_file != NULL)
 	{
-		workfile_mgr_close_file(hashtable->work_set, hashtable->state_file);
+		workfile_mgr_close_file(hashtable->work_set, hashtable->state_file, true);
 		hashtable->state_file = NULL;
 	}
 }

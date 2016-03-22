@@ -426,7 +426,7 @@ void
 LogicalTapeSetClose(LogicalTapeSet *lts, workfile_set *workset)
 {
 	Assert(lts != NULL);
-	workfile_mgr_close_file(workset, lts->pfile);
+	workfile_mgr_close_file(workset, lts->pfile, true);
 	if(lts->freeBlocks)
 		pfree(lts->freeBlocks);
 	pfree(lts);
