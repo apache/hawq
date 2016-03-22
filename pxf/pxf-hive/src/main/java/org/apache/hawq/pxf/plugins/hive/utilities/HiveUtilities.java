@@ -216,14 +216,14 @@ public class HiveUtilities {
     }
 
     /**
-     * Extracts the db_name and table_name from the qualifiedName.
-     * qualifiedName is the Hive table name or pattern that the user enters in the CREATE EXTERNAL TABLE statement
+     * Extracts the db_name(s) and table_name(s) corresponding to the given pattern.
+     * pattern is the Hive table name or pattern that the user enters in the CREATE EXTERNAL TABLE statement
      * or when querying HCatalog table.
      * It can be either <code>table_name_pattern</code> or <code>db_name_pattern.table_name_pattern</code>.
      *
      * @param client Hivemetastore client
      * @param pattern Hive table name or pattern
-     * @return {@link Metadata.Item} object holding the full table name
+     * @return list of {@link Metadata.Item} objects holding the full table name
      */
     public static List<Metadata.Item> extractTablesFromPattern(HiveMetaStoreClient client, String pattern) {
 
@@ -255,8 +255,7 @@ public class HiveUtilities {
         }
 
         return getTablesFromPattern(client, dbPattern, tablePattern);
-
-    }
+   }
 
     private static List<Metadata.Item> getTablesFromPattern(HiveMetaStoreClient client, String dbPattern, String tablePattern) {
 
@@ -277,9 +276,7 @@ public class HiveUtilities {
             }
             for(String dbName: databases) {
                 for(String tableName: client.getTables(dbName, tablePattern)) {
-                    if (!tableName.isEmpty()) {
-                        itemList.add(new Metadata.Item(dbName, tableName));
-                    }
+                    itemList.add(new Metadata.Item(dbName, tableName));
                 }
             }
             return itemList;

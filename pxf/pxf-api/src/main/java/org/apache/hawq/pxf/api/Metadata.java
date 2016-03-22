@@ -41,7 +41,7 @@ public class Metadata {
         public Item(String path, String itemName) {
 
             if (StringUtils.isBlank(path) || StringUtils.isBlank(itemName)) {
-                throw new IllegalArgumentException("Item name cannot be empty");
+                throw new IllegalArgumentException("Item or path name cannot be empty");
             }
 
             this.path = path;

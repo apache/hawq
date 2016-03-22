@@ -30,12 +30,7 @@ import org.apache.hawq.pxf.api.utilities.Utilities;
  * abstract class which is returned by the MetadataFetcherFactory. 
  */
 public class MetadataFetcherFactory {
-    /* TODO: This is a tempororary workaround.
-     * The metadata class will be moved to the pxf-profile.xml in the future
-     */
     public static MetadataFetcher create(InputData inputData) throws Exception {
-        String metadataFetcher = inputData.getMetadata();
-
-        return (MetadataFetcher) Utilities.createAnyInstance(InputData.class, metadataFetcher, inputData);
+        return (MetadataFetcher) Utilities.createAnyInstance(InputData.class, inputData.getMetadata(), inputData);
     }
 }

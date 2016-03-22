@@ -250,9 +250,8 @@ public class HiveDataFragmenter extends Fragmenter {
             for (Partition partition : partitions) {
                 StorageDescriptor descPartition = partition.getSd();
                 props = MetaStoreUtils.getSchema(descPartition, descTable,
-                        null, // Map<string, string> parameters - can be empty
-                        tblDesc.getPath(), tblDesc.getName(), // table
-                                                                     // name
+                        null,
+                        tblDesc.getPath(), tblDesc.getName(),
                         partitionKeys);
                 fetchMetaDataForPartitionedTable(descPartition, props,
                         partition, partitionKeys, tblDesc.getName());

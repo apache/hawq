@@ -26,7 +26,7 @@ import org.apache.hawq.pxf.api.utilities.Plugin;
 
 
 /**
- * Abstract class that defines getting metadata of an item.
+ * Abstract class that defines getting metadata.
  */
 public abstract class MetadataFetcher extends Plugin {
     protected List<Metadata> metadata;

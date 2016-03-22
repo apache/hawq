@@ -69,7 +69,7 @@ public class MetadataResponseFormatter {
                 throw new IllegalArgumentException("metadata object is null - cannot serialize");
             }
             if ((metadata.getFields() == null) || metadata.getFields().isEmpty()) {
-                throw new IllegalArgumentException("metadata contains no fields - cannot serialize");
+                throw new IllegalArgumentException("metadata for " + metadata.getItem() + " contains no fields - cannot serialize");
             }
             if (result == null) {
                 result = new StringBuilder("{\"PXFMetadata\":["); /* prefix info */

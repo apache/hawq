@@ -118,7 +118,7 @@ public class MetadataResponseFormatterTest {
             result = MetadataResponseFormatter.formatResponseString(metadataList);
             fail("formatting should fail because fields field is null");
         } catch (IllegalArgumentException e) {
-            assertEquals("metadata contains no fields - cannot serialize", e.getMessage());
+            assertEquals("metadata for " + metadata.getItem() + " contains no fields - cannot serialize", e.getMessage());
         }
 
         ArrayList<Metadata.Field> fields = new ArrayList<Metadata.Field>();
@@ -129,7 +129,7 @@ public class MetadataResponseFormatterTest {
             result = MetadataResponseFormatter.formatResponseString(metadataList);
             fail("formatting should fail because there are no fields");
         } catch (IllegalArgumentException e) {
-            assertEquals("metadata contains no fields - cannot serialize", e.getMessage());
+            assertEquals("metadata for " + metadata.getItem() + " contains no fields - cannot serialize", e.getMessage());
         }
     }
 
