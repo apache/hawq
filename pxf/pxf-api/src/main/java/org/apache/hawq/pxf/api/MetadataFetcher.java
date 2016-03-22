@@ -1,10 +1,5 @@
 package org.apache.hawq.pxf.api;
 
-import java.util.List;
-
-import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.hawq.pxf.api.utilities.Plugin;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,6 +19,11 @@ import org.apache.hawq.pxf.api.utilities.Plugin;
  * under the License.
  */
 
+import java.util.List;
+
+import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Plugin;
+
 
 /**
  * Abstract class that defines getting metadata of an item.
@@ -41,7 +41,7 @@ public abstract class MetadataFetcher extends Plugin {
     }
 
     /**
-     * Gets a metadata of a given table
+     * Gets a metadata of a given item
      *
      * @param pattern table/file name or pattern
      * @return metadata of all items corresponding to given pattern

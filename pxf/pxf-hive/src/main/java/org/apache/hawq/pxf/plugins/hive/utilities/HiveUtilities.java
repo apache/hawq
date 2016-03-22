@@ -210,7 +210,7 @@ public class HiveUtilities {
     public static Metadata.Item extractTableFromName(String qualifiedName) {
         List<Metadata.Item> items = extractTablesFromPattern(null, qualifiedName);
         if(items.isEmpty()) {
-            return null;
+            throw new IllegalArgumentException("No tables found");
         }
         return items.get(0);
     }
@@ -271,12 +271,9 @@ public class HiveUtilities {
         }
 
         try {
-            /*if(dbPattern.contains(WILDCARD)) {
-                databases.addAll(client.getAllDatabases());
-            }*/
             databases = client.getDatabases(dbPattern);
             if(databases.isEmpty()) {
-                throw new IllegalArgumentException("no database found for the given pattern");
+                throw new IllegalArgumentException("No database found for the given pattern");
             }
             for(String dbName: databases) {
                 for(String tableName: client.getTables(dbName, tablePattern)) {
@@ -284,9 +281,6 @@ public class HiveUtilities {
                         itemList.add(new Metadata.Item(dbName, tableName));
                     }
                 }
-            }
-            if(itemList.isEmpty()) {
-                throw new IllegalArgumentException("no tables found");
             }
             return itemList;
 
