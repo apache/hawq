@@ -94,10 +94,7 @@ extern int GetRelOpt_bucket_num_fromRangeVar(const RangeVar* rel_rv, int default
 extern int GetDefaultPartitionNum(void);
 extern int GetHashDistPartitionNum(void);
 extern int GetExternalTablePartitionNum(void);
-extern int GetAllWorkerHostNum(void);
 
-extern SegmentFunctionList *GetSegmentFunctionList(void);
-extern ProcessFunctionList *GetProcessFunctionList(void);
 
 /* Assert used for everyone */
 #define		AssertOnMaster()		Assert(AmIMaster());
