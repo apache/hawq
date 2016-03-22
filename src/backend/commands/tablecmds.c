@@ -17665,9 +17665,11 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, 
           errOmitLocation(true)));
 
 			/* result: "ALL_SEGMENTS" */
+			/*
 			exec_location_str = (char *) palloc(12 + 1);
 			exec_location_str = "ALL_SEGMENTS";
 			*preferred_segment_num = GetAllWorkerHostNum();
+			*/
 		}
 		else if (strcmp(defel->defname, "hostname") == 0)
 		{
@@ -17678,10 +17680,12 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, 
           errOmitLocation(true)));
 
 			/* result: "HOST:<hostname>" */
+			/*
 			value_str = strVal(defel->arg);
 			exec_location_str = (char *) palloc(5 + 1 + strlen(value_str) + 1);
 			sprintf((char *) exec_location_str, "HOST:%s", value_str);
 			*preferred_segment_num = GetAllWorkerHostNum();
+			*/
 		}
 		else if (strcmp(defel->defname, "eachhost") == 0)
 		{
@@ -17692,9 +17696,11 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, 
           errOmitLocation(true)));
 
 			/* result: "PER_HOST" */
+			/*
 			exec_location_str = (char *) palloc(8 + 1);
 			exec_location_str = "PER_HOST";
 			*preferred_segment_num = GetAllWorkerHostNum();
+			*/
 		}
 		else if (strcmp(defel->defname, "master") == 0)
 		{

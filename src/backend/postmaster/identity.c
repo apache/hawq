@@ -228,18 +228,6 @@ IsOnMaster(void)
 	return SegmentId.role == SEGMENT_ROLE_MASTER;
 }
 
-SegmentFunctionList *
-GetSegmentFunctionList(void)
-{
-	return &SegmentId.function;
-}
-
-ProcessFunctionList *
-GetProcessFunctionList(void)
-{
-	return &SegmentId.pid.function;
-}
-
 static void
 GenerateProcessIdentityLabel(ProcessIdentity *id)
 {
@@ -573,6 +561,7 @@ GetUserDefinedFunctionVsegNum(void)
 	return GetQueryVsegNum();
 }
 
+/*
 int
 GetAllWorkerHostNum(void)
 {
@@ -583,6 +572,7 @@ GetAllWorkerHostNum(void)
 
 	return num;
 }
+*/
 
 static void
 DebugSegmentIdentity(SegmentIdentity *id)
