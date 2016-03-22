@@ -129,7 +129,7 @@ postgresql-test-$(VERSION).tar: distdir
 
 distdir:
 	-rm -rf $(distdir)* $(dummy)
-	for x in `cd $(top_srcdir) && find . -name CVS -prune -o -print`; do \
+	IFS=$$(echo -en "\n\b"); for x in `cd $(top_srcdir) && find . -name CVS -prune -o -print`; do \
 	  file=`expr X$$x : 'X\./\(.*\)'`; \
 	  if test -d "$(top_srcdir)/$$file" ; then \
 	    mkdir "$(distdir)/$$file" && chmod 777 "$(distdir)/$$file";	\
