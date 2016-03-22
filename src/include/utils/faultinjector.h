@@ -190,6 +190,9 @@ typedef enum FaultInjectorIdentifier_e {
 /*	MakeDispatchThread,*/
 	CreateCdbDispathResultObject,
 	WorkerManagerSubmitJob,
+	FaillQeAfterConnection,
+	FailQeWhenDoQuery,
+	FailQeWhenBeginParquetScan,
 
 	BeforeDispatch,
 

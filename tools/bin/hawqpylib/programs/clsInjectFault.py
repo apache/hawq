@@ -416,6 +416,9 @@ class HAWQInjectFaultProgram:
                   "connection_fail_after_gang_creation (inject fault after gang thread creation, set connection null)" \
 				  "create_cdb_dispath_result_object (inject fault when create cdb dispatch result object, set out of memory)" \
                   "worker_manager_submit_job (inject fault when worker manager submit job , set error)" \
+				  "fail_qe_after_connection (inject fault after connecting to QD, sleep to wait QE fail)" \
+				  "fail_qe_when_do_query (inject fault when QE actually working, set error)" \
+				  "fail_qe_when_begin_parquet_scan (inject fault when begin scan parquet table, set error)"\
 				  "all (affects all faults injected, used for 'status' and 'reset'), ")
         addTo.add_option("-c", "--ddl_statement", dest="ddlStatement", type="string",
                          metavar="ddlStatement",
