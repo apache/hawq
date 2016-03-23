@@ -131,6 +131,8 @@ elog(DEBUG2, "external_getnext returning tuple")
  */
 static FILE *g_dataSource = NULL;
 
+static const char NAMESPACE_DELIM = '*';
+
 
 /* ----------------
 *		external_beginscan	- begin file scan
@@ -572,7 +574,7 @@ external_insert_init(Relation rel, int errAosegno, char *namespace)
 		StringInfoData buffer;
 		initStringInfo(&buffer);
 		pq_sendtext(&buffer, v->val.str, strlen(v->val.str));
-		pq_sendbyte(&buffer, '*');
+		pq_sendbyte(&buffer, NAMESPACE_DELIM);
 		pq_sendstring(&buffer, namespace);
 
 		extInsertDesc->ext_uri = buffer.data;
