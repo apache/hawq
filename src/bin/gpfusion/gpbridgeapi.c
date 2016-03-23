@@ -247,27 +247,11 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 {
 	gphadoop_context* context = create_context(fcinfo);
 
-	char *uri = EXTPROTOCOL_GET_URL(fcinfo);
-	int i = 0;
-	int len = strlen(uri);
+	char *extracted_namespace;
+	parse_namespace(EXTPROTOCOL_GET_URL(fcinfo), extracted_namespace);
 
-	while(uri[i] != '*' && i < len){
-		i++;
-	}
-
-	uri[i++] = '\0';
-	char* buffer;
-	if(i < len){
-		buffer = palloc(len - i + 1);
-		int buffer_len = len - i;
-		int j = 0;
-		while(i < len && j < buffer_len){
-			buffer[j++] = uri[i++];
-		}
-		buffer[j] = '\0';
-	}
 	parse_gphd_uri(context, false, fcinfo);
-	context->gphd_uri->namespace = buffer;
+	context->gphd_uri->namespace = extracted_namespace;
 
 	/* get rest servers list and choose one */
 	Relation rel = EXTPROTOCOL_GET_RELATION(fcinfo);
@@ -291,6 +275,26 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 	context->churl_handle = churl_init_upload(context->uri.data,
 											  context->churl_headers);
 
+}
+
+void parse_namespace(char *uri, char *extracted_namespace){
+	int i = 0;
+	int len = strlen(uri);
+
+	while(uri[i] != '*' && i < len){
+		i++;
+	}
+
+	uri[i++] = '\0';
+	if(i < len){
+		extracted_namespace = palloc(len - i + 1);
+		int extracted_namespace_len = len - i;
+		int j = 0;
+		while(i < len && j < extracted_namespace_len){
+			extracted_namespace[j++] = uri[i++];
+		}
+		extracted_namespace[j] = '\0';
+	}
 }
 
 /*
