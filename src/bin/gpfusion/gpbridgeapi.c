@@ -258,7 +258,7 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 	uri[i++] = '\0';
 	char* buffer;
 	if(i < len){
-		buffer = palloc(len - i);
+		buffer = palloc(len - i + 1);
 		int buffer_len = len - i;
 		int j = 0;
 		while(i < len && j < buffer_len){

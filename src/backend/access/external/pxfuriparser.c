@@ -120,6 +120,8 @@ freeGPHDUri(GPHDUri *uri)
 	pfree(uri->host);
 	pfree(uri->port);
 	pfree(uri->data);
+	if(uri->namespace)
+		pfree(uri->namespace);
 
 	GPHDUri_free_options(uri);
 	if (uri->ha_nodes)

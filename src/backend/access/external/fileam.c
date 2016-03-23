@@ -571,13 +571,11 @@ external_insert_init(Relation rel, int errAosegno, char *namespace)
 		v = list_nth(extentry->locations, my_url);
 		StringInfoData buffer;
 		initStringInfo(&buffer);
-//		pq_sendstring(&buffer, v->val.str);
 		pq_sendtext(&buffer, v->val.str, strlen(v->val.str));
 		pq_sendbyte(&buffer, '*');
 		pq_sendstring(&buffer, namespace);
-//		uri_str = pstrdup(v->val.str);
-		extInsertDesc->ext_uri = buffer.data;
 
+		extInsertDesc->ext_uri = buffer.data;
 		/*elog(NOTICE, "seg %d got url number %d: %s", segindex, my_url, uri_str);*/
 	}
 

@@ -328,6 +328,7 @@ FinalizeQueryContextInfo(QueryContextInfo *cxt)
 
 		WriteData(cxt, buffer.data, buffer.len);
 		WriteData(cxt, namespace, size);
+		pfree(buffer.data);
     }
 
     if (cxt->useFile)
