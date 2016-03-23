@@ -5229,9 +5229,9 @@ void setForcedReturnGRMContainerCount(void)
 
 		if ( quetrack->DLDetector.LockedTotal.MemoryMB > 0 )
 		{
-			elog(LOG, "Queue %s has potential resource deadlock, skip breathe.",
+			elog(LOG, "Queue %s has potential resource deadlock, cancel breathe.",
 					  quetrack->QueueInfo->Name);
-			PQUEMGR->GRMQueueCurCapacity   = PQUEMGR->GRMQueueCapacity;
+			PQUEMGR->GRMQueueCurCapacity   = 1.0;
 			PQUEMGR->GRMQueueResourceTight = false;
 			return;
 		}
@@ -5240,20 +5240,22 @@ void setForcedReturnGRMContainerCount(void)
 	/* Get current GRM container size. */
 	int clusterctnsize = getClusterGRMContainerSize();
 	int toretctnsize = 0;
-	if ( PQUEMGR->GRMQueueCurCapacity > PQUEMGR->GRMQueueCapacity )
+	double curabscapacity = PQUEMGR->GRMQueueCurCapacity *
+							PQUEMGR->GRMQueueCapacity;
+
+	if ( curabscapacity > PQUEMGR->GRMQueueCapacity )
 	{
 		/*
 		 * We would like to return as many containers as possible to make queue
 		 * usage lower than expected capacity.
 		 */
-		double r = (PQUEMGR->GRMQueueCurCapacity - PQUEMGR->GRMQueueCapacity) /
-				   PQUEMGR->GRMQueueCurCapacity;
-		elog(DEBUG3, "GRM queue cur capacity %lf is larger than capacity %lf. "
-					 "ratio %lf, curent GRM container size %d",
-					 PQUEMGR->GRMQueueCurCapacity,
-					 PQUEMGR->GRMQueueCapacity,
-					 r,
-					 clusterctnsize);
+		double r = (curabscapacity - PQUEMGR->GRMQueueCapacity) / curabscapacity;
+		elog(LOG, "GRM queue is over-using, cur capacity %lf*%lf, "
+				  "ratio %lf, curent GRM container size %d",
+				  PQUEMGR->GRMQueueCurCapacity,
+				  PQUEMGR->GRMQueueCapacity,
+				  r,
+				  clusterctnsize);
 		toretctnsize = ceil(r * clusterctnsize);
 
 		if ( rm_return_percentage_on_overcommit > 0 )
@@ -5272,7 +5274,7 @@ void setForcedReturnGRMContainerCount(void)
 
 	/* Restore queue report to avoid force return again. */
 	PQUEMGR->ForcedReturnGRMContainerCount = toretctnsize;
-	PQUEMGR->GRMQueueCurCapacity		   = PQUEMGR->GRMQueueCapacity;
+	PQUEMGR->GRMQueueCurCapacity		   = 1.0;
 	PQUEMGR->GRMQueueResourceTight 		   = false;
 }
 

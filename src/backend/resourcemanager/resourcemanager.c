@@ -645,11 +645,11 @@ int MainHandlerLoop(void)
 			 PRESPOOL->AddPendingContainerCount == 0 &&
 			 PRESPOOL->RetPendingContainerCount == 0 &&
 			 PQUEMGR->ForcedReturnGRMContainerCount == 0 &&
-			 (PQUEMGR->GRMQueueCurCapacity > PQUEMGR->GRMQueueCapacity ||
-			  PQUEMGR->GRMQueueResourceTight) )
+			 PQUEMGR->GRMQueueCurCapacity > 1 &&
+			 PQUEMGR->GRMQueueResourceTight )
 		{
 			elog(LOG, "Resource manager decides to breathe out resource. "
-					  "Current GRM queue capacity %lf, "
+					  "Current relative GRM queue capacity %lf, "
 					  "Expect GRM queue capacity %lf, "
 					  "Estimae GRM queue %s",
 					  PQUEMGR->GRMQueueCurCapacity,
