@@ -98,6 +98,7 @@ typedef struct sGpHost
 
 static const char *SEGWORK_PREFIX = "segwork=";
 static const char SEGWORK_IN_PAIR_DELIM = '@';
+static const char SEGWORK_DFS_DELIM = '&';
 
 static List* free_fragment_list(List *fragments);
 static List** distribute_work_2_gp_segments(List *data_fragments_list, int num_segs, int working_segs);
@@ -768,6 +769,16 @@ make_allocation_output_string(List *segment_fragments)
 	initStringInfo(&segwork);
 	appendStringInfoString(&segwork, SEGWORK_PREFIX);
 	
+	if (enable_secure_filesystem)
+	{
+		/* Add dfs_address from pg_filespace to the segment data. Fixes HAWQ-462 */
+		char* dfs_address = NULL;
+		get_hdfs_location_from_filespace(&dfs_address);
+		appendStringInfoString(&segwork, dfs_address);
+		appendStringInfoChar(&segwork, SEGWORK_DFS_DELIM);
+		pfree(dfs_address);
+	}
+
 	foreach(frag_cell, segment_fragments)
 	{
 		AllocatedDataFragment *frag = (AllocatedDataFragment*)lfirst(frag_cell);
@@ -794,7 +805,6 @@ make_allocation_output_string(List *segment_fragments)
 		appendStringInfoChar(&segwork, SEGWORK_IN_PAIR_DELIM);
 		appendStringInfoString(&segwork, fragment_str.data);
 		pfree(fragment_str.data);
-
 	}
 
 	return segwork.data;

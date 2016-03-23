@@ -27,6 +27,7 @@
 
 static const char* segwork_substring = "segwork=";
 static const char segwork_separator = '@';
+static const char segwork_dfs_separator = '&';
 static const int EMPTY_VALUE_LEN = 2;
 
 static void  GPHDUri_parse_protocol(GPHDUri *uri, char **cursor);
@@ -120,12 +121,13 @@ freeGPHDUri(GPHDUri *uri)
 	pfree(uri->host);
 	pfree(uri->port);
 	pfree(uri->data);
-	if(uri->namespace)
-		pfree(uri->namespace);
 
 	GPHDUri_free_options(uri);
 	if (uri->ha_nodes)
 		GPHD_HA_release_nodes(uri->ha_nodes);
+
+	if (uri->dfs_address)
+		pfree(uri->dfs_address);
 
 	pfree(uri);
 }
@@ -579,7 +581,6 @@ GPHDUri_debug_print_options(GPHDUri *uri)
 {
 	ListCell	*item;
 	int			count = 0;
-
 	elog(NOTICE, "options section data: ");
 	foreach(item, uri->options)
 	{
@@ -623,7 +624,8 @@ GPHDUri_debug_print_segwork(GPHDUri *uri)
 
 /*
  * GPHDUri_parse_segwork parses the segwork section of the uri.
- * ...&segwork=<size>@<ip>@<port>@<index><size>@<ip>@<port>@<index><size>...
+ * ...&segwork=<dfs_address>@<size>@<ip>@<port>@<index><size>@<ip>@<port>@<index><size>...
+ * <dfs_address>@ is present only if secure
  */
 static void
 GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
@@ -637,8 +639,19 @@ GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 	segwork = strstr(uri_str, segwork_substring);
 	if (segwork == NULL)
 		return;
-
 	segwork += strlen(segwork_substring);
+
+	if (enable_secure_filesystem)
+	{
+		/* parse dfs address */
+		size_end = strchr(segwork, segwork_dfs_separator);
+		if (size_end != NULL)
+		{
+			*size_end = '\0';
+			uri->dfs_address = pnstrdup(segwork, size_end-segwork);
+			segwork = size_end + 1;
+		}
+	}
 
 	/*
 	 * read next segment.
@@ -666,7 +679,7 @@ GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 
 /*
  * Parsed a fragment string in the form:
- * <ip>@<port>@<index>[@user_data] - 192.168.1.1@1422@1[@user_data]
+ * <ip>@<port>@<index>@<fragment_md>[@user_data] - 192.168.1.1@1422@1@<fragment metadata>[@user_data]
  * to authority ip:port - 192.168.1.1:1422
  * to index - 1
  * user data is optional
@@ -747,6 +760,9 @@ GPHDUri_free_fragments(GPHDUri *uri)
 		pfree(data->authority);
 		pfree(data->index);
 		pfree(data->source_name);
+		pfree(data->fragment_md);
+		if (data->user_data)
+			pfree(data->user_data);
 		pfree(data);
 	}
 	list_free(uri->fragments);

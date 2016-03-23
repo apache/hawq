@@ -76,7 +76,8 @@ typedef struct GPHDUri
 	 * NNHAConf  will also occupy <host> and <port> members
 	 */
 	NNHAConf        *ha_nodes;
-	char            *namespace;
+	/* dfs address from pg_filespace (optional, required only if secure) */
+	char			*dfs_address;
 } GPHDUri;
 
 GPHDUri	*parseGPHDUri(const char *uri_str);
