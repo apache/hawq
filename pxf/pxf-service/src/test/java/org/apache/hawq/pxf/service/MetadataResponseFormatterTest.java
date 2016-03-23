@@ -46,11 +46,11 @@ public class MetadataResponseFormatterTest {
         metadataList.add(metadata);
 
         result = MetadataResponseFormatter.formatResponseString(metadataList);
-        String expected = "{\"PXFMetadata\":[{"
-                + "\"item\":{\"path\":\"default\",\"name\":\"table1\"},"
-                + "\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}";
+        StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
+        expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
+                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}");
 
-        assertEquals(expected, result);
+        assertEquals(expected.toString(), result);
     }
 
     @Test
@@ -64,11 +64,11 @@ public class MetadataResponseFormatterTest {
         metadataList.add(metadata);
 
         result = MetadataResponseFormatter.formatResponseString(metadataList);
-        String expected = "{\"PXFMetadata\":[{"
-                + "\"item\":{\"path\":\"default\",\"name\":\"table1\"},"
-                + "\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}";
+        StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
+        expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
+                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}");
 
-        assertEquals(expected, result);
+        assertEquals(expected.toString(), result);
     }
 
     @Test
@@ -85,27 +85,23 @@ public class MetadataResponseFormatterTest {
         metadataList.add(metadata);
 
         result = MetadataResponseFormatter.formatResponseString(metadataList);
-        String expected = "{\"PXFMetadata\":[{"
-                + "\"item\":{\"path\":\"default\",\"name\":\"table1\"},"
-                + "\"fields\":["
-                + "{\"name\":\"field1\",\"type\":\"int\"},"
-                + "{\"name\":\"field2\",\"type\":\"numeric\",\"modifiers\":[\"1349\",\"1789\"]},"
-                + "{\"name\":\"field3\",\"type\":\"char\",\"modifiers\":[\"50\"]}"
-                + "]}]}";
+        StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
+        expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
+                .append("\"fields\":[")
+                .append("{\"name\":\"field1\",\"type\":\"int\"},")
+                .append("{\"name\":\"field2\",\"type\":\"numeric\",\"modifiers\":[\"1349\",\"1789\"]},")
+                .append("{\"name\":\"field3\",\"type\":\"char\",\"modifiers\":[\"50\"]}")
+                .append("]}]}");
 
-        assertEquals(expected, result);
+        assertEquals(expected.toString(), result);
     }
 
     @Test
     public void formatResponseStringNull() throws Exception {
         List<Metadata> metadataList = null;
-
-        try {
-            result = MetadataResponseFormatter.formatResponseString(metadataList);
-            fail("no metadata objects found - cannot serialize");
-        } catch (IllegalArgumentException e) {
-            assertEquals("no metadata objects found - cannot serialize", e.getMessage());
-        }
+        result = MetadataResponseFormatter.formatResponseString(metadataList);
+        String expected = new String("{\"PXFMetadata\":[]}");
+        assertEquals(expected, result);
     }
 
     @Test

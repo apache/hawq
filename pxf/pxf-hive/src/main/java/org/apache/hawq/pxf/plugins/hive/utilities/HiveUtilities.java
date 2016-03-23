@@ -272,7 +272,8 @@ public class HiveUtilities {
         try {
             databases = client.getDatabases(dbPattern);
             if(databases.isEmpty()) {
-                throw new IllegalArgumentException("No database found for the given pattern");
+                LOG.warn("No database found for the given pattern: " + dbPattern);
+                return null;
             }
             for(String dbName: databases) {
                 for(String tableName: client.getTables(dbName, tablePattern)) {

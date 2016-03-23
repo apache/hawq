@@ -54,6 +54,12 @@ public class HiveMetadataFetcher extends MetadataFetcher {
     public List<Metadata> getMetadata(String pattern) throws Exception {
 
         List<Metadata.Item> tblsDesc = HiveUtilities.extractTablesFromPattern(client, pattern);
+
+        if(tblsDesc == null || tblsDesc.isEmpty()) {
+            LOG.warn("No tables found for the given pattern: " + pattern);
+            return null;
+        }
+
         List<Metadata> metadataList = new ArrayList<Metadata>();
 
         for(Metadata.Item tblDesc: tblsDesc) {

@@ -37,6 +37,7 @@ import org.apache.hawq.pxf.api.Metadata;
 public class MetadataResponseFormatter {
 
     private static final Log LOG = LogFactory.getLog(MetadataResponseFormatter.class);
+    private static final String METADATA_DEFAULT_RESPONSE = "{\"PXFMetadata\":[]}";
 
     /**
      * Converts list of {@link Metadata} to JSON String format.
@@ -59,7 +60,7 @@ public class MetadataResponseFormatter {
     private static String metadataToJSON(List<Metadata> metadataList) throws IOException {
 
         if (metadataList == null || metadataList.isEmpty()) {
-            throw new IllegalArgumentException("no metadata objects found - cannot serialize");
+               return METADATA_DEFAULT_RESPONSE;
         }
 
         StringBuilder result = null;
