@@ -943,7 +943,7 @@ def get_args():
         logger.error("Multiple actions specified.  See the --help info.")
         sys.exit(1)
 
-    if opts.special_mode and (opts.node_type != 'start'):
+    if opts.special_mode and (opts.hawq_command != 'start'):
         logger.error("['-U', '--special-mode'] only apply to 'hawq start'.  See the --help info.")
         sys.exit(1)
 
