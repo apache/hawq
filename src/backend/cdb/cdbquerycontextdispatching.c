@@ -102,7 +102,7 @@ int QueryContextDispatchingSizeMemoryLimit = 100 * 1024; /* KB */
 
 enum QueryContextDispatchingItemType
 {
-    MasterXid, TablespaceLocation, TupleType, EmptyTable, FileSystemCredential
+    MasterXid, TablespaceLocation, TupleType, EmptyTable, FileSystemCredential, Namespace
 };
 typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
@@ -313,6 +313,21 @@ FinalizeQueryContextInfo(QueryContextInfo *cxt)
 			WriteData(cxt, buffer.data, buffer.len);
 			WriteData(cxt, credential, size);
         }
+
+    }
+
+    //Add Namespace for PXF
+    if(Gp_role != GP_ROLE_EXECUTE){
+    	const char *namespace = cxt->sharedPath;
+		int size = strlen(namespace);
+		StringInfoData buffer;
+		initStringInfo(&buffer);
+
+		pq_sendint(&buffer, (int) Namespace, sizeof(char));
+		pq_sendint(&buffer, size, sizeof(int));
+
+		WriteData(cxt, buffer.data, buffer.len);
+		WriteData(cxt, namespace, size);
     }
 
     if (cxt->useFile)
@@ -616,6 +631,37 @@ RebuildFilesystemCredentials(QueryContextInfo *cxt, HTAB ** currentFilesystemCre
 	pfree(binary);
 }
 
+
+/*
+ * deserialize the namespace data
+ */
+
+static void
+RebuildNamespace(QueryContextInfo *cxt)
+{
+
+	int len;
+	char buffer[4], *binary;
+	ReadData(cxt, buffer, sizeof(buffer), TRUE);
+
+	len = (int) ntohl(*(uint32 *) buffer);
+	binary = palloc(len);
+	if(ReadData(cxt, binary, len, TRUE))
+	{
+		StringInfoData buffer;
+		initStringInfoOfString(&buffer, binary, len);
+
+		cxt->sharedPath = palloc(buffer.len + 1);
+		while(buffer.cursor < buffer.len) {
+		  cxt->sharedPath[buffer.cursor] = buffer.data[buffer.cursor];
+		  buffer.cursor++;
+		}
+		cxt->sharedPath[buffer.cursor] = '\0';
+	} else {
+		elog(ERROR, "Couldn't rebuild Namespace");
+	}
+	pfree(binary);
+}
 /*
  * build a new empty in-memory table with given relid.
  */
@@ -800,6 +846,9 @@ RebuildQueryContext(QueryContextInfo *cxt, HTAB **currentFilesystemCredentials,
         case FileSystemCredential:
         	RebuildFilesystemCredentials(cxt, currentFilesystemCredentials,
         	        currentFilesystemCredentialsMemoryContext);
+        	break;
+        case Namespace:
+        	RebuildNamespace(cxt);
         	break;
         default:
             ereport(ERROR,

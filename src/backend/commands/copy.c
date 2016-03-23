@@ -4180,8 +4180,9 @@ CopyFrom(CopyState cstate)
 				else if (relstorage == RELSTORAGE_EXTERNAL &&
 						 resultRelInfo->ri_extInsertDesc == NULL)
 				{
+					char *dummy = "";
 					resultRelInfo->ri_extInsertDesc =
-						external_insert_init(resultRelInfo->ri_RelationDesc, 0);
+						external_insert_init(resultRelInfo->ri_RelationDesc, 0, dummy);
 				}
 
 				MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));

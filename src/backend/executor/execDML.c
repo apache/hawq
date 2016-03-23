@@ -396,7 +396,7 @@ ExecInsert(TupleTableSlot *slot,
 		/* Writable external table */
 		if (resultRelInfo->ri_extInsertDesc == NULL)
 			resultRelInfo->ri_extInsertDesc = external_insert_init(
-					resultRelationDesc, 0);
+					resultRelationDesc, 0, estate->es_plannedstmt->contextdisp->sharedPath);
 
 		newId = external_insert(resultRelInfo->ri_extInsertDesc, tuple);
 	}

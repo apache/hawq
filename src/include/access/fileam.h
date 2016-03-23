@@ -44,12 +44,13 @@
  * ExternalInsertDescData is used for storing state related
  * to inserting data into a writable external table.
  */
-typedef struct ExternalInsertDescData
+typedef struct ExternalInsertDescDat
 {
 	Relation		ext_rel;
 	FILE*			ext_file;
 	char*			ext_uri;		/* "command:<cmd>" or "tablespace:<path>" */
 	bool			ext_noop;		/* no op. this segdb needs to do nothing (e.g. mirror seg) */
+	char*           ext_namespace;  /* Namespace data */
 	
 	TupleDesc		ext_tupDesc;
 	Datum*			ext_values;
@@ -81,7 +82,7 @@ extern void external_rescan(FileScanDesc scan);
 extern void external_endscan(FileScanDesc scan);
 extern void external_stopscan(FileScanDesc scan);
 extern HeapTuple external_getnext(FileScanDesc scan, ScanDirection direction);
-extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno);
+extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno, char *namespace);
 extern Oid external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup);
 extern void external_insert_finish(ExternalInsertDesc extInsertDesc);
 extern void external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char* quote, bool header, uint32 scancounter);

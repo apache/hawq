@@ -204,6 +204,11 @@ typedef struct PortalData
 	 */
 	MemoryContext filesystem_credentials_memory;
 	HTAB		 *filesystem_credentials;
+
+	/*
+	 * Namespace of Filesystem. PXF
+	 */
+	char *namespace;
 } PortalData;
 
 extern PortalStatus PortalGetStatus(PortalData *p);

@@ -84,6 +84,7 @@ parseGPHDUri(const char *uri_str)
 	return uri;
 }
 
+
 /* parseGPHDUriForHCAT
  *
  * Go over a URI string and parse it into its various components while
