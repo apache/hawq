@@ -73,8 +73,6 @@ struct QueryContextInfo
     List	   *errTblOid;		/* already handled error table oid in the statement */
 
     bool  finalized;   /* whether this query context info is closed */
-
-    char  *currentNamespace;
 };
 
 typedef struct QueryContextInfo QueryContextInfo;
