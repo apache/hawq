@@ -681,11 +681,14 @@ PQclear(PGresult *res)
 
 	if (res->sendback)
 	{
-		if (res->sendback->eof)
-			free(res->sendback->eof);
-		if (res->sendback->uncompressed_eof)
-			free(res->sendback->uncompressed_eof);
-		free(res->sendback);
+	  for (int i = 0; i < res->numSendback; i++)
+	  {
+	    if (res->sendback[i].eof)
+	      free(res->sendback[i].eof);
+	    if (res->sendback[i].uncompressed_eof)
+	      free(res->sendback[i].uncompressed_eof);
+	  }
+	  free(res->sendback);
 	}
 
 	/* Free the PGresult structure itself */
