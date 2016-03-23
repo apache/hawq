@@ -473,18 +473,24 @@ int cleanupQD2RMComm(void)
                 res = returnResource(i, errorbuf, sizeof(errorbuf));
                 if ( res != FUNC_RETURN_OK )
                 {
-                	elog(WARNING, "%s", errorbuf);
-            	}
+                    elog(WARNING, "%s", errorbuf);
+                }
                 errorbuf[0] = '\0';
                 res = unregisterConnectionInRM(i, errorbuf, sizeof(errorbuf));
                 if ( res != FUNC_RETURN_OK )
                 {
-                	elog(WARNING, "%s", errorbuf);
+                    elog(WARNING, "%s", errorbuf);
                 }
             }
         }
     }
     pthread_mutex_unlock(&ResourceSetsMutex);
+    pthread_mutex_destroy(&ResourceSetsMutex);
+
+    res = pthread_join(ResourceHeartBeatThreadHandle, NULL);
+    if ( res != FUNC_RETURN_OK ) {
+        elog(WARNING, "Fail to cancel resource heartbeat thread.");
+    }
 
     return FUNC_RETURN_OK;
 }
@@ -1546,6 +1552,8 @@ void *generateResourceRefreshHeartBeat(void *arg)
 		pg_usleep(rm_session_lease_heartbeat_interval * 1000000L);
 	}
 
+	destroySelfMaintainBuffer(&sendbuffer);
+	destroySelfMaintainBuffer(&contbuffer);
 	freeHeartBeatThreadArg(&tharg);
 	write_log("generateResourceRefreshHeartBeat exits.");
 	return 0;
