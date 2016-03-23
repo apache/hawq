@@ -69,6 +69,9 @@ const char * YarnInvalidBlockToken::ReflexName =
 
 const char * SaslException::ReflexName = "javax.security.sasl.SaslException";
 
+const char * ApplicationMasterNotRegisteredException::ReflexName =
+    "org.apache.hadoop.yarn.exceptions.ApplicationMasterNotRegisteredException";
+
 YarnException::YarnException(const std::string & arg, const char * file,
                              int line, const char * stack) :
     std::runtime_error(arg) {
