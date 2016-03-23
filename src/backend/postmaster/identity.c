@@ -100,8 +100,9 @@ static SegmentIdentity SegmentId = { SEGMENT_ROLE_INVALID };
 static void DebugSegmentIdentity(struct SegmentIdentity *id);
 static void DebugProcessIdentity(struct ProcessIdentity *id);
 static bool	DeserializeProcessIdentity(struct ProcessIdentity *id, const char *str);
-static void GetLocalTmpDirFromRM(char *host, uint16_t port, int session_id, int command_id, int qeidx);
+//static void GetLocalTmpDirFromRM(char *host, uint16_t port, int session_id, int command_id, int qeidx);
 
+/*
 static void
 GetLocalTmpDirFromRM(char *host,
 					 uint16_t port,
@@ -156,6 +157,7 @@ GetLocalTmpDirFromRM(char *host,
                 session_id, command_id, qeidx); 
     }
 }
+*/
 
 static void
 SetSegmentRole(const char *name, SegmentIdentity *segment)
@@ -384,7 +386,10 @@ SetupProcessIdentity(const char *str)
         
         if (get_tmpdir_from_rm)
         {
+            elog(ERROR, "The GUC value get_tmpdir_from_rm to be true hasn't been supported yet. "
+			"Please set get_tmpdir_from_rm=false ");
             /* If QE is under one segment. */
+            /*
             if ( GetQEIndex() != -1 ) {
                 GetLocalTmpDirFromRM("127.0.0.1",//DRMGlobalInstance->SocketLocalHostName.Str,
                                      rm_segment_port,
@@ -392,7 +397,9 @@ SetupProcessIdentity(const char *str)
                                      gp_command_count,
                                      GetQEIndex());
             }
+            */
             /* QE is under master. */
+            /*
             else {
                 GetLocalTmpDirFromRM("127.0.0.1",//DRMGlobalInstance->SocketLocalHostName.Str,
                                      rm_master_port,
@@ -403,6 +410,7 @@ SetupProcessIdentity(const char *str)
 
             elog(DEBUG1, "Get temporary directory from segment resource manager, %s",
         		    LocalTempPath);
+            */
         }
         else
         {
