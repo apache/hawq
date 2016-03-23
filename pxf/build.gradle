@@ -111,7 +111,6 @@ subprojects { subProject ->
 
     //buildRpm
     ospackage {
-        summary = 'The PXF extensions library for HAWQ'
         vendor = project.vendor
         release = buildNumber()
         version = subProject.version.split('-')[0];
@@ -191,6 +190,8 @@ project('pxf-service') {
     }
 
     ospackage {
+        summary = 'HAWQ Extension Framework (PXF), service REST API'
+        description = 'Rest API for the HAWQ Extenstion framework'
 
         requires('apache-tomcat', "$tomcatVersion", GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
@@ -287,6 +288,9 @@ project('pxf-hdfs') {
     }
 
     ospackage {
+        summary = 'HAWQ Extension Framework (PXF), HDFS plugin'
+        description = 'Querying external data stored in HDFS'
+
         requires('pxf-service', project.version, GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
         requires('hadoop-mapreduce', "$hadoopVersion", GREATER | EQUAL)
@@ -317,6 +321,10 @@ project('pxf-hive') {
     }
 
     ospackage {
+
+        summary = 'HAWQ Extension Framework (PXF), Hive plugin'
+        description = 'Querying external data stored in Hive'
+
         requires('pxf-hdfs', project.version, GREATER | EQUAL)
         requires('hive', "$hiveVersion", GREATER | EQUAL)
 
@@ -336,6 +344,9 @@ project('pxf-hbase') {
     }
 
     ospackage {
+        summary = 'HAWQ Extension Framework (PXF), HBase plugin'
+        description = 'Querying external data stored in HBase'
+
         requires('pxf-service', project.version, GREATER | EQUAL)
         requires('hbase', "$hbaseVersionRPM", GREATER | EQUAL)
 
