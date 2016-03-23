@@ -248,7 +248,7 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 	gphadoop_context* context = create_context(fcinfo);
 
 	char *extracted_namespace;
-	parse_namespace(EXTPROTOCOL_GET_URL(fcinfo), extracted_namespace);
+	parse_namespace(EXTPROTOCOL_GET_URL(fcinfo), &extracted_namespace);
 
 	parse_gphd_uri(context, false, fcinfo);
 	context->gphd_uri->dfs_address = extracted_namespace;
@@ -277,7 +277,7 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 
 }
 
-void parse_namespace(char *uri, char *extracted_namespace){
+void parse_namespace(char *uri, char** extracted_namespace){
 	int i = 0;
 	int len = strlen(uri);
 
@@ -287,13 +287,13 @@ void parse_namespace(char *uri, char *extracted_namespace){
 
 	uri[i++] = '\0';
 	if(i < len){
-		extracted_namespace = palloc(len - i + 1);
+		*extracted_namespace = palloc(len - i + 1);
 		int extracted_namespace_len = len - i;
 		int j = 0;
 		while(i < len && j < extracted_namespace_len){
-			extracted_namespace[j++] = uri[i++];
+			(*extracted_namespace)[j++] = uri[i++];
 		}
-		extracted_namespace[j] = '\0';
+		(*extracted_namespace)[j] = '\0';
 	}
 }
 
