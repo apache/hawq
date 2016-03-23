@@ -31,6 +31,7 @@
 #include "resourcemanager/resourcemanager.h"
 #include "resourcemanager/conntrack.h"
 #include "resourcemanager/communication/rmcomm_MessageProtocol.h"
+#include "tcop/pquery.h"
 
 #include "funcapi.h"
 #include "fmgr.h"
@@ -461,7 +462,22 @@ int cleanupQD2RMComm(void)
     {
         if ( QD2RM_ResourceSets[i] != NULL )
         {
-            if ( QD2RM_ResourceSets[i]->QD_ResourceList != NULL )
+            if (ResourceIndex == i)
+            {
+                errorbuf[0] = '\0';
+                res = returnResource(i, errorbuf, sizeof(errorbuf));
+                if ( res != FUNC_RETURN_OK )
+                {
+                    elog(WARNING, "%s", errorbuf);
+                }
+                errorbuf[0] = '\0';
+                res = unregisterConnectionInRM(i, errorbuf, sizeof(errorbuf));
+                if ( res != FUNC_RETURN_OK )
+                {
+                    elog(WARNING, "%s", errorbuf);
+                }
+            }
+            else if ( QD2RM_ResourceSets[i]->QD_ResourceList != NULL )
             {
             	elog(WARNING, "Un-returned resource is probed, will be returned. "
                               "(%d MB, %lf CORE) x %d. Conn ID=%d",
@@ -936,6 +952,8 @@ int returnResource(int 		index,
     elog(LOG, "ConnID %d. Returned resource to resource manager.",
         	  QD2RM_ResourceSets[index]->QD_Conn_ID);
 
+    if (index == ResourceIndex)
+	ResourceIndex = -1;
     return FUNC_RETURN_OK;
 }
 
@@ -1886,6 +1904,7 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 		}
 		freeSimpleStringTokens(&locality, &tokens, toksize);
 
+		ResourceIndex = resourceId;
 		ret = acquireResourceFromRM(resourceId,
 									gp_session_id,
 									slicesize,
