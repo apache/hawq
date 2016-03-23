@@ -167,7 +167,7 @@ void SendResourceRefreshHeartBeat(void);
 
 void sendFailedNodeToResourceManager(int hostNum, char **pghost);
 
-int getLocalTmpDirFromMasterRM(char *errorbuf, int errorbufsize);
+//int getLocalTmpDirFromMasterRM(char *errorbuf, int errorbufsize);
 
 int dumpResourceManagerStatus(uint32_t		 type,
 							  const char	*dump_file,
