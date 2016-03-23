@@ -1570,7 +1570,7 @@ dispatch_free_result(DispatchDataResult *result)
 		result->errbuf.data = NULL;
 	}
 
-	if (!result->result)
+	if (result->result)
 	{
 	  for (int i = 0; i <= result->numresults; i++){
 	    PQclear(result->result[i]);
