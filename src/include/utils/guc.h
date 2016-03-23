@@ -310,7 +310,8 @@ extern int Debug_dtm_action_segment;
 
 extern int default_hash_table_bucket_number;
 extern int hawq_rm_nvseg_for_copy_from_perquery;
-extern int hawq_rm_nvseg_for_analyze_perquery_perseg_limit;
+extern int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
+extern int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_perquery_limit;
 
 extern char *ConfigFileName;
