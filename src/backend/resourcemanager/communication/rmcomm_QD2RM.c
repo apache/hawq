@@ -334,6 +334,8 @@ void initializeQD2RMComm(void)
     initializeSocketConnectionPool();
 
     QD2RM_Initialized = true;
+
+    on_proc_exit(cleanupQD2RMComm, 0);
 }
 
 int createNewResourceContext(int *index)
