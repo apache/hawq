@@ -256,7 +256,7 @@ utils/probes.o: utils/probes.d $(SUBDIROBJS)
 
 distprep:
 	$(MAKE) -C parser	gram.c gram.h scan.c
-	$(MAKE) -C bootstrap	bootparse.c bootstrap_tokens.h bootscanner.c
+	$(MAKE) -C bootstrap	bootparse.c bootscanner.c
 	$(MAKE) -C utils/misc	guc-file.c
 
 
@@ -376,7 +376,6 @@ distclean: clean
 maintainer-clean: distclean
 	rm -f $(srcdir)/bootstrap/bootparse.c \
 	      $(srcdir)/bootstrap/bootscanner.c \
-	      $(srcdir)/bootstrap/bootstrap_tokens.h \
 	      $(srcdir)/parser/gram.c \
 	      $(srcdir)/parser/scan.c \
 	      $(srcdir)/parser/gram.h \
