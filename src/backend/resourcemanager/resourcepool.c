@@ -1972,6 +1972,21 @@ int  addGRMContainerToToBeAccepted(GRMContainer ctn)
 	/* The host must has registered resource information linked. */
 	Assert( ctn->Resource != NULL);
 
+	/* If the new container makes total possible resource quota greater than
+	 * maximum resource capacity, reject this container.
+	 */
+	uint32_t memlimit = DRMGlobalInstance->ImpType == NONE_HAWQ2 ?
+						ctn->Resource->Stat->FTSTotalMemoryMB :
+						ctn->Resource->Stat->GRMTotalMemoryMB;
+	if ( ctn->Resource->IncPending.MemoryMB + ctn->Resource->Allocated.MemoryMB > memlimit )
+	{
+		elog(WARNING, "Global resource manager allocated too many containers to "
+					  "host %s. To return this host's resource container at once.",
+					  ctn->HostName);
+		addGRMContainerToKicked(ctn);
+		return RESOURCEPOOL_TOO_MANY_CONTAINERS;
+	}
+
 	/* Set the resource as increasing pending. */
 	addResourceBundleData(&(ctn->Resource->IncPending), ctn->MemoryMB, ctn->Core);
 
@@ -4162,10 +4177,12 @@ void validateResourcePoolStatus(bool refquemgr)
 
 	if ( totalallocmem > mem || totalalloccore > core )
 	{
-		elog(ERROR, "HAWQ RM Validation. Allocated too much resource in resource "
-					"pool. (%d MB, %lf CORE)",
-					totalallocmem,
-					totalalloccore);
+		elog(WARNING, "HAWQ RM Validation. Allocated too much resource in resource "
+					  "pool (%d MB, %lf CORE), maximum capacity (%d MB, %lf CORE)",
+					  totalallocmem,
+					  totalalloccore,
+					  core,
+					  mem);
 	}
 
 	/*
