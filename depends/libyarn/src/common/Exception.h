@@ -482,7 +482,7 @@ public:
 
 class ResourceManagerStandbyException: public YarnException {
 public:
-	ResourceManagerStandbyException(const std::string & arg, const char * file,
+    ResourceManagerStandbyException(const std::string & arg, const char * file,
                              int line, const char * stack) :
         YarnException(arg, file, line, stack) {
     }
@@ -494,7 +494,18 @@ public:
     static const char * ReflexName;
 };
 
+class ApplicationMasterNotRegisteredException: public YarnException {
+public:
+    ApplicationMasterNotRegisteredException(const std::string & arg, const char * file,
+                                            int line, const char * stack) :
+        YarnException(arg, file, line, stack) {
+    }
 
+    ~ApplicationMasterNotRegisteredException() throw () {
+    }
+
+public:
+    static const char * ReflexName;
+};
 }
-
 #endif /* _YARN_LIBYARN_COMMON_EXCEPTION_H_ */

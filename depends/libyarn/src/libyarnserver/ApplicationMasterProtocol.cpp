@@ -62,9 +62,6 @@ RegisterApplicationMasterResponse ApplicationMasterProtocol::registerApplication
         return RegisterApplicationMasterResponse(responseProto);
     } catch (const YarnFailoverException & e) {
          throw;
-    } catch (const YarnRpcServerException & e) {
-        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
-        unwrapper.unwrap(__FILE__, __LINE__);
     } catch (...) {
         THROW(YarnIOException,
               "Unexpected exception: when calling "
@@ -83,10 +80,9 @@ AllocateResponse ApplicationMasterProtocol::allocate(AllocateRequest &request) {
     } catch (const YarnFailoverException & e) {
          throw;
     } catch (const YarnRpcServerException & e) {
-        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        UnWrapper<ApplicationMasterNotRegisteredException, YarnIOException> unwrapper(e);
         unwrapper.unwrap(__FILE__, __LINE__);
-    }
-    catch (...) {
+    } catch (...) {
         THROW(YarnIOException,
               "Unexpected exception: when calling "
               "ApplicationMasterProtocol::allocate in %s: %d",
@@ -104,9 +100,9 @@ FinishApplicationMasterResponse ApplicationMasterProtocol::finishApplicationMast
     } catch (const YarnFailoverException & e) {
          throw;
     } catch (const YarnRpcServerException & e) {
-        UnWrapper<UnresolvedLinkException, YarnIOException> unwrapper(e);
+        UnWrapper<ApplicationMasterNotRegisteredException, YarnIOException> unwrapper(e);
         unwrapper.unwrap(__FILE__, __LINE__);
-    }	catch (...) {
+    } catch (...) {
         THROW(YarnIOException,
               "Unexpected exception: when calling "
               "ApplicationMasterProtocol::finishApplicationMaster in %s: %d",
