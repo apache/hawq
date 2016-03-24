@@ -538,8 +538,6 @@ void add_delegation_token(PxfInputData *inputData)
 
 	token = palloc0(sizeof(PxfHdfsTokenData));
 
-//	get_hdfs_location_from_filespace(&dfs_address);
-
 	elog(DEBUG2, "locating token for %s", dfs_address);
 	token->hdfs_token = find_filesystem_credential_with_uri(dfs_address);
 
