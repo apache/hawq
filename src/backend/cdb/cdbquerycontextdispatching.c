@@ -651,12 +651,7 @@ RebuildNamespace(QueryContextInfo *cxt)
 		StringInfoData buffer;
 		initStringInfoOfString(&buffer, binary, len);
 
-		cxt->sharedPath = palloc(buffer.len + 1);
-		while(buffer.cursor < buffer.len) {
-		  cxt->sharedPath[buffer.cursor] = buffer.data[buffer.cursor];
-		  buffer.cursor++;
-		}
-		cxt->sharedPath[buffer.cursor] = '\0';
+		cxt->sharedPath = pnstrdup(buffer.data, buffer.len);
 	} else {
 		elog(ERROR, "Couldn't rebuild Namespace");
 	}
