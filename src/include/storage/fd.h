@@ -89,6 +89,7 @@ extern int64 LocalFileSeek(File file, int64 offset, int whence);
 extern int LocalFileSync(File file);
 extern int LocalRemovePath(FileName fileName, int recursive);
 extern int LocalFileTruncate(File file, int64 offset);
+extern bool LocalPathExist(char *path);
 
 /* access hdfs file system */
 extern int HdfsParsePath(const char * path, char **protocol, char **host, int *port, short *replica);
@@ -140,6 +141,7 @@ extern int64 FileNonVirtualTell(File file);
 extern int	FileTruncate(File file, int64 offset);
 extern int  PathFileTruncate(FileName fileName);
 extern int64 FileDiskSize(File file);
+extern bool PathExist(char *path);
 
 /* Operations that allow use of regular stdio --- USE WITH CAUTION */
 extern FILE *AllocateFile(const char *name, const char *mode);

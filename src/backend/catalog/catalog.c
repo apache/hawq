@@ -1052,8 +1052,7 @@ GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class, bool i
 {
 	RelFileNode rnode;
 	char	   *rpath;
-	int			fd;
-	bool		collides;
+	bool		exist = false;
 
 	/* This should match RelationInitPhysicalAddr */
 	if (isAo && reltablespace == InvalidOid)
@@ -1077,32 +1076,10 @@ GetNewRelFileNode(Oid reltablespace, bool relisshared, Relation pg_class, bool i
 
 		/* Check for existing file of same name */
 		rpath = relpath(rnode);
-		fd = PathNameOpenFile(rpath, O_RDONLY | PG_BINARY, 0);
-
-		if (fd >= 0)
-		{
-			/* definite collision */
-			gp_retry_close(fd);
-			collides = true;
-		}
-		else
-		{
-			/*
-			 * Here we have a little bit of a dilemma: if errno is something
-			 * other than ENOENT, should we declare a collision and loop? In
-			 * particular one might think this advisable for, say, EPERM.
-			 * However there really shouldn't be any unreadable files in a
-			 * tablespace directory, and if the EPERM is actually complaining
-			 * that we can't read the directory itself, we'd be in an infinite
-			 * loop.  In practice it seems best to go ahead regardless of the
-			 * errno.  If there is a colliding file we will get an smgr
-			 * failure when we attempt to create the new relation file.
-			 */
-			collides = false;
-		}
+		exist = PathExist(rpath);
 
 		pfree(rpath);
-	} while (collides);
+	} while (exist);
 	
 	if (!gp_upgrade_mode && Gp_role == GP_ROLE_EXECUTE)
 		Insist(!PointerIsValid(pg_class));
