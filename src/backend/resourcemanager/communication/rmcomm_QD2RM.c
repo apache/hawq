@@ -1221,6 +1221,7 @@ exit:
 	destroySelfMaintainBuffer(&recvbuffer);
 }
 
+/*
 int getLocalTmpDirFromMasterRM(char *errorbuf, int errorbufsize)
 {
 	static char 	 errorbuf2[ERRORMESSAGE_SIZE];
@@ -1273,7 +1274,7 @@ exit:
 	destroySelfMaintainBuffer(&recvbuffer);
 	return res;
 }
-
+*/
 
 int acquireResourceQuotaFromRM(int64_t		user_oid,
 							   uint32_t		max_seg_count_fix,

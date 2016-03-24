@@ -4577,85 +4577,27 @@ void fixClusterMemoryCoreRatio(void)
 	}
 
 	/*
-	 * Go into real calculation of the cluster level memory to core ratio now,
-	 * The idea of fixing the ratio is to calculate possible
+	 * Go through all current segments to get segment level ratios.
 	 */
-
-	HASHTABLEData ratios;
-	initializeHASHTABLE(&ratios,
-						PCONTEXT,
-						HASHTABLE_SLOT_VOLUME_DEFAULT,
-						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
-						HASHTABLE_KEYTYPE_UINT32,
-						NULL);
-
-	/*
-	 * STEP 1. Go through all current segments to get segment level ratios.
-	 */
+	uint32_t  cratio	 = 1024;
+	uint32_t  maxmemmb	 = 0;
 	List 	 *ressegl	 = NULL;
 	ListCell *cell		 = NULL;
 	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &ressegl);
-	foreach(cell, ressegl)
+
+
+	uint32_t minwastememorymb = UINT32_MAX;
+	uint32_t minwastecore	  = UINT32_MAX;
+	uint32_t minwasteratio	  = cratio;
+	while ( true )
 	{
-		PAIR 		pair 	 = (PAIR)lfirst(cell);
-		SegResource segres 	 = (SegResource)(pair->Value);
-		uint32_t 	ratio 	 = 0;
-		uint32_t 	memorymb = 0;
-		uint32_t 	core	 = 0;
+		uint32_t wastememorymb = 0;
+		uint32_t wastecore	   = 0;
 
-		if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
-		{
-			continue;
-		}
-
-		if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
-		{
-			memorymb = segres->Stat->FTSTotalMemoryMB;
-			core	 = segres->Stat->FTSTotalCore;
-		}
-		else
-		{
-			/*
-			 * If this segment is FTS available,
-			 * RM should get GRM report for it.
-			 */
-			Assert((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT)
-					== 0);
-			memorymb = segres->Stat->GRMTotalMemoryMB;
-			core	 = segres->Stat->GRMTotalCore;
-		}
-
-		Assert(core > 0);
-		ratio = memorymb / core;
-
-		PAIR ratiopair = getHASHTABLENode(&ratios, TYPCONVERT(void *, ratio));
-		if ( ratiopair == NULL )
-		{
-			setHASHTABLENode(&ratios, TYPCONVERT(void *, ratio), NULL, false);
-		}
-	}
-
-	/*
-	 * STEP 2. Choose one ratio as cluster ratio by estimating the possible
-	 * 		   resource waste.
-	 */
-	uint32_t minmemorywaste = UINT32_MAX;
-	uint32_t candratio = 0;
-
-	List 	 *ratiol	= NULL;
-	ListCell *ratiocell	= NULL;
-	getAllPAIRRefIntoList(&ratios, &ratiol);
-	foreach(ratiocell, ratiol)
-	{
-		PAIR pair = (PAIR)lfirst(ratiocell);
-		uint32_t segratio = TYPCONVERT(uint32_t, pair->Key);
-
-		uint32_t memorywaste = 0;
 		foreach(cell, ressegl)
 		{
-			PAIR segpair = (PAIR)lfirst(cell);
-			SegResource segres 	 = (SegResource)(segpair->Value);
-			uint32_t 	ratio 	 = 0;
+			PAIR 		pair 	 = (PAIR)lfirst(cell);
+			SegResource segres 	 = (SegResource)(pair->Value);
 			uint32_t 	memorymb = 0;
 			uint32_t 	core	 = 0;
 
@@ -4672,48 +4614,68 @@ void fixClusterMemoryCoreRatio(void)
 			else
 			{
 				/*
-				 * If this segment is FTS available,
-				 * RM should get GRM report for it.
+				 * If this segment is FTS available, RM should get GRM report for it.
 				 */
 				Assert((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT)
 						== 0);
 				memorymb = segres->Stat->GRMTotalMemoryMB;
 				core	 = segres->Stat->GRMTotalCore;
 			}
-			Assert(core > 0);
-			ratio = memorymb / core;
-			uint32_t segmemwaste = 0;
 
-			if ( segratio * core > memorymb )
+			Assert(core > 0);
+
+			if ( maxmemmb < memorymb )
 			{
-				segmemwaste = memorymb - (memorymb / segratio) * segratio;
+				maxmemmb = memorymb;
 			}
-			else
-			{
-				segmemwaste = memorymb - core *segratio;
-			}
-			memorywaste += segmemwaste;
+
+			int count = (core * cratio > memorymb) ?
+						(memorymb / cratio) :
+						core;
+			wastememorymb += memorymb - count * cratio;
+			wastecore += core - count *1;
 		}
 
-		elog(RMLOG, "Resource manager estimates that ratio %u MB per core wastes "
-					"%d MB resource in the whole recognized cluster.",
-					segratio,
-					memorywaste);
+		elog(DEBUG3, "Ratio %d, having %d MB %d CORE wasted.",
+					 cratio,
+					 wastememorymb,
+					 wastecore);
 
-		if ( memorywaste < minmemorywaste )
+		/*
+		 * Check if we got minimum resource waste this time. We expect firstly
+		 * we can use as much memory as possible then as much core as possible.
+		 */
+		if ( wastememorymb < minwastememorymb || wastecore < minwastecore )
 		{
-			minmemorywaste = memorywaste;
-			candratio = segratio;
+			minwastememorymb = wastememorymb;
+			minwastecore = wastecore;
+			minwasteratio = cratio;
+		}
+
+		if ( maxmemmb == 0 )
+		{
+			/* If no available segment to fix ratio, dont loop. */
+			break;
+		}
+
+		if ( cratio >= maxmemmb )
+		{
+			break;
+		}
+		else
+		{
+			cratio += 1024; /* The step is 1gb. */
 		}
 	}
 
-	PRESPOOL->ClusterMemoryCoreRatio = candratio;
+	PRESPOOL->ClusterMemoryCoreRatio = minwasteratio;
 
 	elog(LOG, "Resource manager chooses ratio %u MB per core as cluster level "
-			  "memory to core ratio, there are %d MB memory resource unable to "
-			  "utilize.",
+			  "memory to core ratio, there are %d MB memory %d CORE resource "
+			  "unable to be utilized.",
 			  PRESPOOL->ClusterMemoryCoreRatio,
-			  minmemorywaste);
+			  minwastememorymb,
+			  minwastecore);
 
 	/*
 	 * Refresh segments' capacity following the fixed cluster level memory to
@@ -4729,7 +4691,6 @@ void fixClusterMemoryCoreRatio(void)
 
 	/* Clean up. */
 	freePAIRRefList(&(PRESPOOL->Segments), &ressegl);
-	cleanHASHTABLE(&ratios);
 
 }
 
