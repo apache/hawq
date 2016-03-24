@@ -247,7 +247,11 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 {
 	gphadoop_context* context = create_context(fcinfo);
 
+	char *extracted_namespace;
+	parse_namespace(EXTPROTOCOL_GET_URL(fcinfo), &extracted_namespace);
+
 	parse_gphd_uri(context, false, fcinfo);
+	context->gphd_uri->dfs_address = extracted_namespace;
 
 	/* get rest servers list and choose one */
 	Relation rel = EXTPROTOCOL_GET_RELATION(fcinfo);
@@ -271,6 +275,25 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 	context->churl_handle = churl_init_upload(context->uri.data,
 											  context->churl_headers);
 
+}
+
+void parse_namespace(char *uri, char** extracted_namespace){
+	int len = strlen(uri);
+	int i = len;
+
+	while(uri[i] != '@' && i > 0)
+		i--;
+
+	uri[i++] = '\0';
+	if(i < len){
+		*extracted_namespace = palloc(len - i + 1);
+		int extracted_namespace_len = len - i;
+		int j = 0;
+		while(i < len && j < extracted_namespace_len){
+			(*extracted_namespace)[j++] = uri[i++];
+		}
+		(*extracted_namespace)[j] = '\0';
+	}
 }
 
 /*
@@ -508,17 +531,14 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
 void add_delegation_token(PxfInputData *inputData)
 {
 	PxfHdfsTokenData *token = NULL;
-	char* dfs_address = NULL;
+	char *dfs_address = inputData->gphduri->dfs_address;
 
 	if (!enable_secure_filesystem)
 		return;
 
 	token = palloc0(sizeof(PxfHdfsTokenData));
 
-	get_hdfs_location_from_filespace(&dfs_address);
-
-    elog(DEBUG2, "locating token for %s", dfs_address);
-
+	elog(DEBUG2, "locating token for %s", dfs_address);
 	token->hdfs_token = find_filesystem_credential_with_uri(dfs_address);
 
 	if (token->hdfs_token == NULL)
@@ -526,10 +546,7 @@ void add_delegation_token(PxfInputData *inputData)
 	elog(DEBUG2, "Delegation token for %s found", dfs_address);
 
 	inputData->token = token;
-
-	pfree(dfs_address);
 }
-
 void free_token_resources(PxfInputData *inputData)
 {
 	if (inputData->token == NULL)
