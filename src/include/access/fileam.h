@@ -44,13 +44,12 @@
  * ExternalInsertDescData is used for storing state related
  * to inserting data into a writable external table.
  */
-typedef struct ExternalInsertDescDat
+typedef struct ExternalInsertDescData
 {
 	Relation		ext_rel;
 	FILE*			ext_file;
 	char*			ext_uri;		/* "command:<cmd>" or "tablespace:<path>" */
 	bool			ext_noop;		/* no op. this segdb needs to do nothing (e.g. mirror seg) */
-	char*           ext_namespace;  /* Namespace data */
 	
 	TupleDesc		ext_tupDesc;
 	Datum*			ext_values;

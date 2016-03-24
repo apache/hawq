@@ -316,9 +316,9 @@ FinalizeQueryContextInfo(QueryContextInfo *cxt)
 
     }
 
-    //Add Namespace for PXF
-    if(Gp_role != GP_ROLE_EXECUTE){
-    	const char *namespace = cxt->sharedPath;
+    /* Add Namespace for PXF External Table Case */
+    if (Gp_role != GP_ROLE_EXECUTE){
+		const char *namespace = cxt->sharedPath;
 		int size = strlen(namespace);
 		StringInfoData buffer;
 		initStringInfo(&buffer);
@@ -632,9 +632,8 @@ RebuildFilesystemCredentials(QueryContextInfo *cxt, HTAB ** currentFilesystemCre
 	pfree(binary);
 }
 
-
 /*
- * deserialize the namespace data
+ * Deserialize the Namespace data
  */
 
 static void

@@ -687,7 +687,6 @@ external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup)
 
 		fcinfo.arg[0] = HeapTupleGetDatum(instup);
 		fcinfo.argnull[0] = false;
-		fcinfo.arg[1] = "test";
 		fcinfo.argnull[1] = false;
 
 		d = FunctionCallInvoke(&fcinfo);
