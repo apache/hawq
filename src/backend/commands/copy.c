@@ -1786,7 +1786,7 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext,
 					candidateOid);
 			if(targetPolicy == NULL){
-				return GetAnalyzeVSegNumLimit();
+				return GetQueryVsegNum();
 			}
 			if (targetPolicy->nattrs > 0) {
 				isHashRelationExist = true;
