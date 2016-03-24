@@ -1170,6 +1170,8 @@ AdvanceMemoryAccountingGeneration()
 	{
 		/* Overflow happened, we need to adjust for generation */
 		elog(LOG, "Migrating all allocated memory chunks to generation %u due to generation counter exhaustion and QE recycling", MemoryAccountingCurrentGeneration);
+		/* elog might have allocated more memory and we need to record that in current RolloverMemoryAccount->peak */
+		RolloverMemoryAccount->peak = Max(RolloverMemoryAccount->peak, MemoryAccountingPeakBalance);
 		HandleMemoryAccountingGenerationOverflow(TopMemoryContext);
 	}
 
