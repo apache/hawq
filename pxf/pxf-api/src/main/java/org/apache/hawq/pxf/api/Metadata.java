@@ -26,51 +26,52 @@ import java.util.List;
 import org.apache.commons.lang.StringUtils;
 
 /**
- * Metadata holds a table's metadata information.
- * {@link MetadataFetcher#getTableMetadata} returns the table's metadata.
+ * Metadata holds an item's metadata information.
+ * {@link MetadataFetcher#getMetadata} returns the item's metadata.
  */
 public class Metadata {
 
     /**
-     * Class representing table name - db (schema) name and table name.
+     * Class representing item name - db/schema/path name and table/file name.
      */
-    public static class Table {
-        private String dbName;
-        private String tableName;
+    public static class Item {
+        private String path;
+        private String name;
 
-        public Table(String dbName, String tableName) {
+        public Item(String path, String itemName) {
 
-            if (StringUtils.isBlank(dbName) || StringUtils.isBlank(tableName)) {
-                throw new IllegalArgumentException("Table name cannot be empty");
+            if (StringUtils.isBlank(path) || StringUtils.isBlank(itemName)) {
+                throw new IllegalArgumentException("Item or path name cannot be empty");
             }
 
-            this.dbName = dbName;
-            this.tableName = tableName;
+            this.path = path;
+            this.name = itemName;
         }
 
-        public String getDbName() {
-            return dbName;
+        public String getPath() {
+            return path;
         }
 
-        public String getTableName() {
-            return tableName;
+        public String getName() {
+            return name;
         }
 
         /**
-         * Returns full table name in the form db_name.table_name
+         * Returns full item name in the form path.name
+         * eg: dbname.tblname
          */
         @Override
         public String toString() {
-            return dbName + "." + tableName;
+            return path + "." + name;
         }
     }
 
     /**
-     * Class representing table field - name and type.
+     * Class representing item field - name and type.
      */
     public static class Field {
         private String name;
-        private String type; // TODO: nhorn - 06-03-15 - change to enum
+        private String type; // TODO: change to enum
         private String[] modifiers; // type modifiers, optional field
 
         public Field(String name, String type) {
@@ -102,33 +103,33 @@ public class Metadata {
     }
 
     /**
-     * Table name
+     * Item name
      */
-    private Metadata.Table table;
+    private Item item;
 
     /**
-     * Table's fields
+     * Item's fields
      */
     private List<Metadata.Field> fields;
 
     /**
-     * Constructs a table's Metadata.
+     * Constructs an item's Metadata.
      *
-     * @param tableName the table name
-     * @param fields the table's fields
+     * @param itemName the item name
+     * @param fields the item's fields
      */
-    public Metadata(Metadata.Table tableName,
+    public Metadata(Item itemName,
             List<Metadata.Field> fields) {
-        this.table = tableName;
+        this.item = itemName;
         this.fields = fields;
     }
 
-    public Metadata(Metadata.Table tableName) {
-        this(tableName, new ArrayList<Metadata.Field>());
+    public Metadata(Item itemName) {
+        this(itemName, new ArrayList<Metadata.Field>());
     }
 
-    public Metadata.Table getTable() {
-        return table;
+    public Item getItem() {
+        return item;
     }
 
     public List<Metadata.Field> getFields() {

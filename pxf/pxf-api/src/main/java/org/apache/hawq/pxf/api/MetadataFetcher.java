@@ -19,27 +19,33 @@ package org.apache.hawq.pxf.api;
  * under the License.
  */
 
+import java.util.List;
+
+import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Plugin;
+
 
 /**
- * Abstract class that defines getting metadata of a table.
+ * Abstract class that defines getting metadata.
  */
-public abstract class MetadataFetcher {
-    protected Metadata metadata;
+public abstract class MetadataFetcher extends Plugin {
+    protected List<Metadata> metadata;
 
     /**
      * Constructs a MetadataFetcher.
      *
+     * @param metaData the input data
      */
-    public MetadataFetcher() {
-
+    public MetadataFetcher(InputData metaData) {
+        super(metaData);
     }
 
     /**
-     * Gets a metadata of a given table
+     * Gets a metadata of a given item
      *
-     * @param tableName table name
-     * @return metadata of given table
+     * @param pattern table/file name or pattern
+     * @return metadata of all items corresponding to given pattern
      * @throws Exception if metadata information could not be retrieved
      */
-    public abstract Metadata getTableMetadata(String tableName) throws Exception;
+    public abstract List<Metadata> getMetadata(String pattern) throws Exception;
 }

@@ -33,6 +33,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hawq.pxf.api.utilities.InputData;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -50,12 +51,12 @@ import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 @SuppressStaticInitializationFor({"org.apache.hadoop.hive.metastore.api.MetaException",
 "org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities"}) // Prevents static inits
 public class HiveMetadataFetcherTest {
-
+    InputData inputData;
     Log LOG;
     HiveConf hiveConfiguration;
     HiveMetaStoreClient hiveClient;
     HiveMetadataFetcher fetcher;
-    Metadata metadata;
+    List<Metadata> metadataList;
 
     @Before
     public void SetupCompressionFactory() {
@@ -66,7 +67,7 @@ public class HiveMetadataFetcherTest {
     @Test
     public void construction() throws Exception {
         prepareConstruction();
-        fetcher = new HiveMetadataFetcher();
+        fetcher = new HiveMetadataFetcher(inputData);
         PowerMockito.verifyNew(HiveMetaStoreClient.class).withArguments(hiveConfiguration);
     }
 
@@ -76,7 +77,7 @@ public class HiveMetadataFetcherTest {
         PowerMockito.whenNew(HiveMetaStoreClient.class).withArguments(hiveConfiguration).thenThrow(new MetaException("which way to albuquerque"));
 
         try {
-            fetcher = new HiveMetadataFetcher();
+            fetcher = new HiveMetadataFetcher(inputData);
             fail("Expected a RuntimeException");
         } catch (RuntimeException ex) {
             assertEquals("Failed connecting to Hive MetaStore service: which way to albuquerque", ex.getMessage());
@@ -86,11 +87,11 @@ public class HiveMetadataFetcherTest {
     @Test
     public void getTableMetadataInvalidTableName() throws Exception {
         prepareConstruction();
-        fetcher = new HiveMetadataFetcher();
+        fetcher = new HiveMetadataFetcher(inputData);
         String tableName = "t.r.o.u.b.l.e.m.a.k.e.r";
 
         try {
-            fetcher.getTableMetadata(tableName);
+            fetcher.getMetadata(tableName);
             fail("Expected an IllegalArgumentException");
         } catch (IllegalArgumentException ex) {
             assertEquals("\"t.r.o.u.b.l.e.m.a.k.e.r\" is not a valid Hive table name. Should be either <table_name> or <db_name.table_name>", ex.getMessage()); 
@@ -101,7 +102,7 @@ public class HiveMetadataFetcherTest {
     public void getTableMetadataView() throws Exception {
         prepareConstruction();
 
-        fetcher = new HiveMetadataFetcher();
+        fetcher = new HiveMetadataFetcher(inputData);
         String tableName = "cause";
 
         // mock hive table returned from hive client
@@ -110,7 +111,7 @@ public class HiveMetadataFetcherTest {
         when(hiveClient.getTable("default", tableName)).thenReturn(hiveTable);
 
         try {
-            metadata = fetcher.getTableMetadata(tableName);
+            metadataList = fetcher.getMetadata(tableName);
             fail("Expected an UnsupportedOperationException because PXF doesn't support views");
         } catch (UnsupportedOperationException e) {
             assertEquals("Hive views are not supported by HAWQ", e.getMessage());
@@ -121,7 +122,7 @@ public class HiveMetadataFetcherTest {
     public void getTableMetadata() throws Exception {
         prepareConstruction();
 
-        fetcher = new HiveMetadataFetcher();
+        fetcher = new HiveMetadataFetcher(inputData);
         String tableName = "cause";
 
         // mock hive table returned from hive client
@@ -137,9 +138,10 @@ public class HiveMetadataFetcherTest {
         when(hiveClient.getTable("default", tableName)).thenReturn(hiveTable);
 
         // get metadata
-        metadata = fetcher.getTableMetadata(tableName);
+        metadataList = fetcher.getMetadata(tableName);
+        Metadata metadata = metadataList.get(0);
 
-        assertEquals("default.cause", metadata.getTable().toString());
+        assertEquals("default.cause", metadata.getItem().toString());
 
         List<Metadata.Field> resultFields = metadata.getFields();
         assertNotNull(resultFields);

@@ -21,6 +21,8 @@ package org.apache.hawq.pxf.service;
 
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,19 +37,17 @@ import org.apache.hawq.pxf.api.Metadata;
 public class MetadataResponseFormatter {
 
     private static final Log LOG = LogFactory.getLog(MetadataResponseFormatter.class);
+    private static final String METADATA_DEFAULT_RESPONSE = "{\"PXFMetadata\":[]}";
 
     /**
-     * Converts {@link Metadata} to JSON String format.
+     * Converts list of {@link Metadata} to JSON String format.
      *
-     * @param metadata metadata to convert
+     * @param metadataList list of metadata objects to convert
      * @return JSON formatted response
      * @throws IOException if converting the data to JSON fails
      */
-    public static String formatResponseString(Metadata metadata) throws IOException {
-        /* print the metadata before serialization */
-        LOG.debug(MetadataResponseFormatter.metadataToString(metadata));
-
-        return MetadataResponseFormatter.metadataToJSON(metadata);
+    public static String formatResponseString(List<Metadata> metadataList) throws IOException {
+        return MetadataResponseFormatter.metadataToJSON(metadataList);
     }
 
     /**
@@ -55,50 +55,65 @@ public class MetadataResponseFormatter {
      * To be used as the result string for HAWQ.
      * An example result is as follows:
      *
-     * {"PXFMetadata":[{"table":{"dbName":"default","tableName":"t1"},"fields":[{"name":"a","type":"int"},{"name":"b","type":"float"}]}]}
+     * {"PXFMetadata":[{"item":{"path":"default","name":"t1"},"fields":[{"name":"a","type":"int"},{"name":"b","type":"float"}]}]}
      */
-    private static String metadataToJSON(Metadata metadata) throws IOException {
+    private static String metadataToJSON(List<Metadata> metadataList) throws IOException {
 
-        if (metadata == null) {
-            throw new IllegalArgumentException("metadata object is null - cannot serialize");
+        if (metadataList == null || metadataList.isEmpty()) {
+               return METADATA_DEFAULT_RESPONSE;
         }
 
-        if ((metadata.getFields() == null) || metadata.getFields().isEmpty()) {
-            throw new IllegalArgumentException("metadata contains no fields - cannot serialize");
+        StringBuilder result = null;
+
+        for(Metadata metadata: metadataList) {
+            if(metadata == null) {
+                throw new IllegalArgumentException("metadata object is null - cannot serialize");
+            }
+            if ((metadata.getFields() == null) || metadata.getFields().isEmpty()) {
+                throw new IllegalArgumentException("metadata for " + metadata.getItem() + " contains no fields - cannot serialize");
+            }
+            if (result == null) {
+                result = new StringBuilder("{\"PXFMetadata\":["); /* prefix info */
+            } else {
+                result.append(",");
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.setSerializationInclusion(Inclusion.NON_EMPTY); // ignore empty fields
+            result.append(mapper.writeValueAsString(metadata));
         }
 
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.setSerializationInclusion(Inclusion.NON_EMPTY); // ignore empty fields
+        return result.append("]}").toString(); /* append suffix info */
 
-        StringBuilder result = new StringBuilder("{\"PXFMetadata\":");
-        String prefix = "["; // preparation for supporting multiple tables
-        result.append(prefix).append(mapper.writeValueAsString(metadata));
-        return result.append("]}").toString();
     }
 
     /**
-     * Converts metadata to a readable string.
+     * Converts metadata list to a readable string.
      * Intended for debugging purposes only.
      */
-    private static String metadataToString(Metadata metadata) {
-        StringBuilder result = new StringBuilder("Metadata for table \"");
+    private static String metadataToString(List<Metadata> metadataList) {
+        StringBuilder result = new StringBuilder("Metadata:");
 
-        if (metadata == null) {
-            return "No metadata";
-        }
+        for(Metadata metadata: metadataList) {
+            result.append(" Metadata for item \"");
 
-        result.append(metadata.getTable()).append("\": ");
+            if (metadata == null) {
+                return "No metadata";
+            }
 
-        if ((metadata.getFields() == null) || metadata.getFields().isEmpty()) {
-            result.append("no fields in table");
-            return result.toString();
-        }
+            result.append(metadata.getItem()).append("\": ");
 
-        int i = 0;
-        for (Metadata.Field field: metadata.getFields()) {
-            result.append("Field #").append(++i).append(": [")
-                .append("Name: ").append(field.getName())
-                .append(", Type: ").append(field.getType()).append("] ");
+            if ((metadata.getFields() == null) || metadata.getFields().isEmpty()) {
+                result.append("no fields in item");
+                return result.toString();
+            }
+
+            int i = 0;
+            for (Metadata.Field field : metadata.getFields()) {
+                result.append("Field #").append(++i).append(": [")
+                        .append("Name: ").append(field.getName())
+                        .append(", Type: ").append(field.getType()).append("] ");
+            }
         }
 
         return result.toString();
