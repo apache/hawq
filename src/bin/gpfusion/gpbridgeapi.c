@@ -278,12 +278,11 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 }
 
 void parse_namespace(char *uri, char** extracted_namespace){
-	int i = 0;
 	int len = strlen(uri);
+	int i = len;
 
-	while(uri[i] != '*' && i < len){
-		i++;
-	}
+	while(uri[i] != '@' && i > 0)
+		i--;
 
 	uri[i++] = '\0';
 	if(i < len){
