@@ -131,7 +131,7 @@ elog(DEBUG2, "external_getnext returning tuple")
  */
 static FILE *g_dataSource = NULL;
 
-static const char NAMESPACE_DELIM = '*';
+static const char NAMESPACE_DELIM = '@';
 
 
 /* ----------------
