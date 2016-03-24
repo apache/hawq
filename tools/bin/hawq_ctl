@@ -715,6 +715,7 @@ class HawqStop:
             logger.info("There are %d connections to the database" % total_connections)
         except DatabaseError, ex:
             logger.error("Failed to connect to the running database, please check master status")
+            logger.error("Or you can check hawq stop --help for other stop options")
             sys.exit(1)
 
         if total_connections > 0 and self.stop_mode=='smart':
@@ -757,7 +758,8 @@ class HawqStop:
     def _stop_master(self):
         master_host, master_running = check_hawq_running(self.master_host_name, self.master_data_directory, self.master_port, self.user, logger)
         if master_running:
-            self._stop_master_checks()
+            if self.stop_mode != 'immediate':
+                self._stop_master_checks()
             cmd = self._stop_master_cmd()
             result = remote_ssh(cmd, self.master_host_name, self.user)
             return result
