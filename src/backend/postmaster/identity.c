@@ -444,9 +444,11 @@ GetQEGangNum(void)
 	return SegmentId.pid.init ? SegmentId.pid.gang_member_num : 0;
 }
 
-int	GetAnalyzeVSegNumLimit(void)
+int	GetAnalyzeVSegNumLimit(bool isPartitionTableExist)
 {
-	int nvseg = hawq_rm_nvseg_for_analyze_perquery_perseg_limit * slaveHostNumber;
+	int perSegLimit = isPartitionTableExist ? hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit
+			: hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
+	int nvseg = perSegLimit * slaveHostNumber;
 	while(nvseg > hawq_rm_nvseg_for_analyze_perquery_limit){
 		nvseg -= slaveHostNumber;
 	}

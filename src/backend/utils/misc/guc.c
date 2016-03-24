@@ -735,7 +735,8 @@ int  optimizer_samples_number;
 int  optimizer_log_failure;
 int default_hash_table_bucket_number;
 int hawq_rm_nvseg_for_copy_from_perquery;
-int hawq_rm_nvseg_for_analyze_perquery_perseg_limit;
+int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
+int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_perquery_limit;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
@@ -4529,12 +4530,21 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_rm_nvseg_for_analyze_perquery_perseg_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+		{"hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit", PGC_USERSET, QUERY_TUNING_OTHER,
 			gettext_noop("Sets default virtual segment number per query per segment limit for analyze statement"),
 			NULL
 		},
-		&hawq_rm_nvseg_for_analyze_perquery_perseg_limit,
+		&hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit,
 		4, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default virtual segment number per query per segment limit for analyze statement"),
+			NULL
+		},
+		&hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit,
+		8, 1, 65535, NULL, NULL
 	},
 
 	{

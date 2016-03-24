@@ -821,19 +821,23 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 	int64 totalDataSize = 0;
 	bool isHashRelationExist = false;
 	int maxHashBucketNumber = 0;
-
+	bool isPartitionTableExist = false;
 	foreach (le1, candidateOids)
 	{
 		Oid				candidateOid	  = InvalidOid;
 		candidateOid = lfirst_oid(le1);
 
-		//Relation rel = (Relation)lfirst(le1);
+		PartStatus ps = rel_part_status(candidateOid);
+		if(ps != PART_STATUS_NONE){
+			isPartitionTableExist = true;
+		}
+
 		Relation rel = relation_open(candidateOid, ShareUpdateExclusiveLock);
 		if (candidateOid > 0 ) {
 			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext,
 					candidateOid);
 			if(targetPolicy == NULL){
-				return GetAnalyzeVSegNumLimit();
+				return GetAnalyzeVSegNumLimit(isPartitionTableExist);
 			}
 			if (targetPolicy->nattrs > 0) {
 				isHashRelationExist = true;
@@ -860,8 +864,8 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 	}
 	Assert(vsegNumber > 0);
 	/*vsegNumber should be less than GetUtilPartitionNum*/
-	if(vsegNumber > GetAnalyzeVSegNumLimit()){
-		vsegNumber = GetAnalyzeVSegNumLimit();
+	if(vsegNumber > GetAnalyzeVSegNumLimit(isPartitionTableExist)){
+		vsegNumber = GetAnalyzeVSegNumLimit(isPartitionTableExist);
 	}
 
 	return vsegNumber;
