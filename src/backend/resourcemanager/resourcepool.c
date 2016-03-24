@@ -4586,9 +4586,10 @@ void fixClusterMemoryCoreRatio(void)
 	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &ressegl);
 
 
-	uint32_t minwastememorymb = UINT32_MAX;
-	uint32_t minwastecore	  = UINT32_MAX;
-	uint32_t minwasteratio	  = cratio;
+	uint32_t minwaste 			= UINT32_MAX;
+	uint32_t minwasteratio		= cratio;
+	uint32_t minwastememorymb	= 0;
+	uint32_t minwastecore		= 0;
 	while ( true )
 	{
 		uint32_t wastememorymb = 0;
@@ -4645,11 +4646,18 @@ void fixClusterMemoryCoreRatio(void)
 		 * Check if we got minimum resource waste this time. We expect firstly
 		 * we can use as much memory as possible then as much core as possible.
 		 */
-		if ( wastememorymb < minwastememorymb || wastecore < minwastecore )
+		uint32_t waste = wastememorymb +
+						 wastecore * rm_clusterratio_core_to_memorygb_factor * 1024;
+		if ( waste < minwaste )
 		{
-			minwastememorymb = wastememorymb;
-			minwastecore = wastecore;
-			minwasteratio = cratio;
+			minwaste 			= waste;
+			minwasteratio 		= cratio;
+			minwastememorymb 	= wastememorymb;
+			minwastecore 		= wastecore;
+			if ( waste == 0 )
+			{
+				break;
+			}
 		}
 
 		if ( maxmemmb == 0 )

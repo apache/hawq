@@ -366,7 +366,6 @@ int		rm_rejectrequest_nseg_limit;
 int		rm_nvseg_variance_among_seg_limit;
 int		rm_container_batch_limit;
 
-
 char   *rm_resourcepool_test_filename;
 
 bool	rm_enforce_cpu_enable;
@@ -389,6 +388,8 @@ double	rm_regularize_nvseg_max;
 double	rm_regularize_io_factor;
 double	rm_regularize_usage_factor;
 double	rm_regularize_nvseg_factor;
+
+int		rm_clusterratio_core_to_memorygb_factor;
 
 int		rm_nvseg_variance_among_seg_respool_limit;
 
