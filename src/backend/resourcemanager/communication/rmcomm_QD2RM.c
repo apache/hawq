@@ -202,6 +202,7 @@ uint64_t			QD2RM_LastRefreshResourceTime = 0;
 bool				QD2RM_Initialized			  = false;
 
 pthread_t       	ResourceHeartBeatThreadHandle;
+bool				ResourceHeartBeatRunning	  = false;
 pthread_mutex_t 	ResourceSetsMutex;
 uint64_t        	LastSendResourceRefreshHeartBeatTime = 0;
 
@@ -317,12 +318,14 @@ void initializeQD2RMComm(void)
     	}
 
 
-    	/* Start heart-beat thread. */
+		/* Start heart-beat thread. */
+		ResourceHeartBeatRunning = true;
 		if ( pthread_create(&ResourceHeartBeatThreadHandle,
 							NULL,
 							generateResourceRefreshHeartBeat,
 							tharg) != 0)
 		{
+			ResourceHeartBeatRunning = false;
 			freeHeartBeatThreadArg(&tharg);
 			elog(ERROR, "failed to create background thread for communication with "
 						"resource manager.");
@@ -489,9 +492,13 @@ int cleanupQD2RMComm(void)
     pthread_mutex_unlock(&ResourceSetsMutex);
     pthread_mutex_destroy(&ResourceSetsMutex);
 
-    res = pthread_join(ResourceHeartBeatThreadHandle, NULL);
-    if ( res != FUNC_RETURN_OK ) {
-        elog(WARNING, "Fail to cancel resource heartbeat thread.");
+    if (ResourceHeartBeatRunning)
+    {
+        ResourceHeartBeatRunning = false;
+        res = pthread_join(ResourceHeartBeatThreadHandle, NULL);
+        if ( res != FUNC_RETURN_OK ) {
+            elog(WARNING, "Fail to cancel resource heartbeat thread.");
+        }
     }
 
     return FUNC_RETURN_OK;
@@ -1387,14 +1394,12 @@ void *generateResourceRefreshHeartBeat(void *arg)
 
 	gp_set_thread_sigmasks();
 
-	pthread_detach(pthread_self());
-
 	initializeSelfMaintainBuffer(&sendbuffer, NULL);
 	initializeSelfMaintainBuffer(&contbuffer, NULL);
 	prepareSelfMaintainBuffer(&sendbuffer, DEFAULT_HEARTBEAT_BUFFER, true);
 	prepareSelfMaintainBuffer(&contbuffer, DEFAULT_HEARTBEAT_BUFFER, true);
 
-	while( true )
+	while( ResourceHeartBeatRunning )
 	{
 		resetSelfMaintainBuffer(&sendbuffer);
 		resetSelfMaintainBuffer(&contbuffer);
