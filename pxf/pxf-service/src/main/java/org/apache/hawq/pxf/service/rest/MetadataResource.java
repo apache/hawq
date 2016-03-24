@@ -94,8 +94,9 @@ public class MetadataResource extends RestResource {
             Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
 
             // Add profile and verify token
-            params.put("X-GP-PROFILE", profile.toLowerCase());
-            ProtocolData protData = new ProtocolData(params);
+            ProtocolData protData = new ProtocolData(params, profile.toLowerCase());
+
+            // 0. Verify token
             SecuredHDFS.verifyToken(protData, servletContext);
 
             // 1. start MetadataFetcher

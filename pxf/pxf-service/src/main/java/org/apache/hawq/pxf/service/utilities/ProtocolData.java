@@ -151,6 +151,24 @@ public class ProtocolData extends InputData {
     }
 
     /**
+     * Constructs a ProtocolData. Parses X-GP-* configuration variables.
+     *
+     * @param paramsMap contains all query-specific parameters from Hawq
+     * @param profile contains the profile name
+     */
+    public ProtocolData(Map<String, String> paramsMap, String profileString) {
+        requestParametersMap = paramsMap;
+        profile = profileString;
+        setProfilePlugins();
+        metadata = getProperty("METADATA");
+
+        /* Kerberos token information */
+        if (UserGroupInformation.isSecurityEnabled()) {
+            token = getProperty("TOKEN");
+        }
+    }
+
+    /**
      * Sets the requested profile plugins from profile file into
      * {@link #requestParametersMap}.
      */
