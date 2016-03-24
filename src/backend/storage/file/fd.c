@@ -975,6 +975,35 @@ FileInvalidate(File file)
 }
 #endif
 
+bool
+PathExist(char *fileName)
+{
+	Assert(fileName);
+
+	if (IsLocalPath(fileName))
+	{
+		return LocalPathExist(fileName);
+	}
+	else
+	{
+		return HdfsPathExist(fileName);
+	}
+}
+
+bool
+LocalPathExist(char *fileName)
+{
+	Assert(fileName);
+
+	if( access( fileName, F_OK ) != -1 )
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
 
 /*
  * open a file in an arbitrary directory
