@@ -95,6 +95,7 @@ public class ProtocolData extends InputData {
         accessor = getProperty("ACCESSOR");
         resolver = getProperty("RESOLVER");
         fragmenter = getOptionalProperty("FRAGMENTER");
+        metadata = getOptionalProperty("METADATA");
         dataSource = getProperty("DATA-DIR");
 
         /* Kerberos token information */
@@ -147,6 +148,24 @@ public class ProtocolData extends InputData {
         this.token = copy.token;
         this.statsMaxFragments = copy.statsMaxFragments;
         this.statsSampleRatio = copy.statsSampleRatio;
+    }
+
+    /**
+     * Constructs a ProtocolData. Parses X-GP-* configuration variables.
+     *
+     * @param paramsMap contains all query-specific parameters from Hawq
+     * @param profile contains the profile name
+     */
+    public ProtocolData(Map<String, String> paramsMap, String profileString) {
+        requestParametersMap = paramsMap;
+        profile = profileString;
+        setProfilePlugins();
+        metadata = getProperty("METADATA");
+
+        /* Kerberos token information */
+        if (UserGroupInformation.isSecurityEnabled()) {
+            token = getProperty("TOKEN");
+        }
     }
 
     /**

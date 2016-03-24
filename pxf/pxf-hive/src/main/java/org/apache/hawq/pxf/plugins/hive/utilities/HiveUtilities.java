@@ -20,6 +20,7 @@ package org.apache.hawq.pxf.plugins.hive.utilities;
  */
 
 
+import java.util.List;
 import java.util.ArrayList;
 
 import org.apache.commons.lang.StringUtils;
@@ -42,6 +43,7 @@ import org.apache.hawq.pxf.api.UnsupportedTypeException;
 public class HiveUtilities {
 
     private static final Log LOG = LogFactory.getLog(HiveUtilities.class);
+    private static final String WILDCARD = "*";
 
     /**
      * Default Hive DB (schema) name.
@@ -64,13 +66,13 @@ public class HiveUtilities {
         return client;
     }
 
-    public static Table getHiveTable(HiveMetaStoreClient client, Metadata.Table tableName)
+    public static Table getHiveTable(HiveMetaStoreClient client, Metadata.Item itemName)
             throws Exception {
-        Table tbl = client.getTable(tableName.getDbName(), tableName.getTableName());
+        Table tbl = client.getTable(itemName.getPath(), itemName.getName());
         String tblType = tbl.getTableType();
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Table: " + tableName.getDbName() + "." + tableName.getTableName() + ", type: " + tblType);
+            LOG.debug("Item: " + itemName.getPath() + "." + itemName.getName() + ", type: " + tblType);
         }
 
         if (TableType.valueOf(tblType) == TableType.VIRTUAL_VIEW) {
@@ -203,19 +205,37 @@ public class HiveUtilities {
      * It can be either <code>table_name</code> or <code>db_name.table_name</code>.
      *
      * @param qualifiedName Hive table name
-     * @return {@link org.apache.hawq.pxf.api.Metadata.Table} object holding the full table name
+     * @return {@link Metadata.Item} object holding the full table name
      */
-    public static Metadata.Table parseTableQualifiedName(String qualifiedName) {
+    public static Metadata.Item extractTableFromName(String qualifiedName) {
+        List<Metadata.Item> items = extractTablesFromPattern(null, qualifiedName);
+        if(items.isEmpty()) {
+            throw new IllegalArgumentException("No tables found");
+        }
+        return items.get(0);
+    }
 
-        String dbName, tableName;
+    /**
+     * Extracts the db_name(s) and table_name(s) corresponding to the given pattern.
+     * pattern is the Hive table name or pattern that the user enters in the CREATE EXTERNAL TABLE statement
+     * or when querying HCatalog table.
+     * It can be either <code>table_name_pattern</code> or <code>db_name_pattern.table_name_pattern</code>.
+     *
+     * @param client Hivemetastore client
+     * @param pattern Hive table name or pattern
+     * @return list of {@link Metadata.Item} objects holding the full table name
+     */
+    public static List<Metadata.Item> extractTablesFromPattern(HiveMetaStoreClient client, String pattern) {
+
+        String dbPattern, tablePattern;
         String errorMsg = " is not a valid Hive table name. "
                 + "Should be either <table_name> or <db_name.table_name>";
 
-        if (StringUtils.isBlank(qualifiedName)) {
+        if (StringUtils.isBlank(pattern)) {
             throw new IllegalArgumentException("empty string" + errorMsg);
         }
 
-        String[] rawToks = qualifiedName.split("[.]");
+        String[] rawToks = pattern.split("[.]");
         ArrayList<String> toks = new ArrayList<String>();
         for (String tok: rawToks) {
             if (StringUtils.isBlank(tok)) {
@@ -225,15 +245,45 @@ public class HiveUtilities {
         }
 
         if (toks.size() == 1) {
-            dbName = HIVE_DEFAULT_DBNAME;
-            tableName = toks.get(0);
+            dbPattern = HIVE_DEFAULT_DBNAME;
+            tablePattern = toks.get(0);
         } else if (toks.size() == 2) {
-            dbName = toks.get(0);
-            tableName = toks.get(1);
+            dbPattern = toks.get(0);
+            tablePattern = toks.get(1);
         } else {
-            throw new IllegalArgumentException("\"" + qualifiedName + "\"" + errorMsg);
+            throw new IllegalArgumentException("\"" + pattern + "\"" + errorMsg);
         }
 
-        return new Metadata.Table(dbName, tableName);
+        return getTablesFromPattern(client, dbPattern, tablePattern);
+   }
+
+    private static List<Metadata.Item> getTablesFromPattern(HiveMetaStoreClient client, String dbPattern, String tablePattern) {
+
+        List<String> databases = null;
+        List<Metadata.Item> itemList = new ArrayList<Metadata.Item>();
+        List<String> tables = new ArrayList<String>();
+
+        if(client == null || (!dbPattern.contains(WILDCARD) && !tablePattern.contains(WILDCARD)) ) {
+            /* This case occurs when the call is invoked as part of the fragmenter api or when metadata is requested for a specific table name */
+            itemList.add(new Metadata.Item(dbPattern, tablePattern));
+            return itemList;
+        }
+
+        try {
+            databases = client.getDatabases(dbPattern);
+            if(databases.isEmpty()) {
+                LOG.warn("No database found for the given pattern: " + dbPattern);
+                return null;
+            }
+            for(String dbName: databases) {
+                for(String tableName: client.getTables(dbName, tablePattern)) {
+                    itemList.add(new Metadata.Item(dbName, tableName));
+                }
+            }
+            return itemList;
+
+        } catch (MetaException cause) {
+            throw new RuntimeException("Failed connecting to Hive MetaStore service: " + cause.getMessage(), cause);
+        }
     }
 }

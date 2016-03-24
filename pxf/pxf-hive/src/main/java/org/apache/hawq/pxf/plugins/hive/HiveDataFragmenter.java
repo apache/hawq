@@ -141,7 +141,7 @@ public class HiveDataFragmenter extends Fragmenter {
 
     @Override
     public List<Fragment> getFragments() throws Exception {
-        Metadata.Table tblDesc = HiveUtilities.parseTableQualifiedName(inputData.getDataSource());
+        Metadata.Item tblDesc = HiveUtilities.extractTableFromName(inputData.getDataSource());
 
         fetchTableMetaData(tblDesc);
 
@@ -175,7 +175,7 @@ public class HiveDataFragmenter extends Fragmenter {
      * Goes over the table partitions metadata and extracts the splits and the
      * InputFormat and Serde per split.
      */
-    private void fetchTableMetaData(Metadata.Table tblDesc) throws Exception {
+    private void fetchTableMetaData(Metadata.Item tblDesc) throws Exception {
 
         Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
 
@@ -210,15 +210,15 @@ public class HiveDataFragmenter extends Fragmenter {
             // API call to Hive Metastore, will return a List of all the
             // partitions for this table, that matches the partition filters
             // Defined in filterStringForHive.
-            partitions = client.listPartitionsByFilter(tblDesc.getDbName(),
-                    tblDesc.getTableName(), filterStringForHive, ALL_PARTS);
+            partitions = client.listPartitionsByFilter(tblDesc.getPath(),
+                    tblDesc.getName(), filterStringForHive, ALL_PARTS);
 
             // No matched partitions for the filter, no fragments to return.
             if (partitions == null || partitions.isEmpty()) {
 
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Table -  " + tblDesc.getDbName() + "."
-                            + tblDesc.getTableName()
+                    LOG.debug("Table -  " + tblDesc.getPath() + "."
+                            + tblDesc.getName()
                             + " Has no matched partitions for the filter : "
                             + filterStringForHive);
                 }
@@ -226,16 +226,16 @@ public class HiveDataFragmenter extends Fragmenter {
             }
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Table -  " + tblDesc.getDbName() + "."
-                        + tblDesc.getTableName()
+                LOG.debug("Table -  " + tblDesc.getPath() + "."
+                        + tblDesc.getName()
                         + " Matched partitions list size: " + partitions.size());
             }
 
         } else {
             // API call to Hive Metastore, will return a List of all the
             // partitions for this table (no filtering)
-            partitions = client.listPartitions(tblDesc.getDbName(),
-                    tblDesc.getTableName(), ALL_PARTS);
+            partitions = client.listPartitions(tblDesc.getPath(),
+                    tblDesc.getName(), ALL_PARTS);
         }
 
         StorageDescriptor descTable = tbl.getSd();
@@ -250,12 +250,11 @@ public class HiveDataFragmenter extends Fragmenter {
             for (Partition partition : partitions) {
                 StorageDescriptor descPartition = partition.getSd();
                 props = MetaStoreUtils.getSchema(descPartition, descTable,
-                        null, // Map<string, string> parameters - can be empty
-                        tblDesc.getDbName(), tblDesc.getTableName(), // table
-                                                                     // name
+                        null,
+                        tblDesc.getPath(), tblDesc.getName(),
                         partitionKeys);
                 fetchMetaDataForPartitionedTable(descPartition, props,
-                        partition, partitionKeys, tblDesc.getTableName());
+                        partition, partitionKeys, tblDesc.getName());
             }
         }
     }
