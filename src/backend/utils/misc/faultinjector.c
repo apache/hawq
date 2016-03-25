@@ -293,6 +293,8 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault when QE actually working, set error */
 	_("fail_qe_when_begin_parquet_scan"),
 		/* inject fault when begin scan parquet table, set error */
+	_("fail_qe_when_parquet_get_next"),
+		/* inject fault when get next, set error */
 /*	_("make_dispatch_thread"),
 		 inject fault when initialing memory structure for dispatcher thread*/
 	_("before_dispatch"),
@@ -1083,7 +1085,7 @@ FaultInjector_NewHashEntry(
 		case ConnectionFailAfterGangCreation:
 		case CreateCdbDispathResultObject:
 		case WorkerManagerSubmitJob:
-		case FaillQeAfterConnection:
+		case FailQeAfterConnection:
 
 			/* These faults are designed for master. */
 			if(!AmIMaster())
@@ -1111,6 +1113,7 @@ FaultInjector_NewHashEntry(
 		case MultiExecHashLargeVmem:
 		case FailQeWhenDoQuery:
 		case FailQeWhenBeginParquetScan:
+		case FailQeWhenParquetGetNext:
 			/* SEGMENT */
 			if(!AmISegment())
 			{

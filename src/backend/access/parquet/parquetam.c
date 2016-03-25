@@ -266,6 +266,14 @@ void parquet_getnext(ParquetScanDesc scan, ScanDirection direction,
 	AOTupleId aoTupleId;
 	Assert(ScanDirectionIsForward(direction));
 
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   FailQeWhenParquetGetNext,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
+
 	for(;;)
 	{
 		if(scan->bufferDone)
