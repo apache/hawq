@@ -73,6 +73,8 @@ typedef int File;
 extern int	max_files_per_process;
 extern bool	enable_secure_filesystem;
 
+/* DFS address needed on segments */
+extern char* dfs_address;
 
 /*
  * prototypes for functions in fd.c

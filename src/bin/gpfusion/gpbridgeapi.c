@@ -507,14 +507,11 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
 void add_delegation_token(PxfInputData *inputData)
 {
 	PxfHdfsTokenData *token = NULL;
-	char* dfs_address = NULL;
 
 	if (!enable_secure_filesystem)
 		return;
 
 	token = palloc0(sizeof(PxfHdfsTokenData));
-
-	get_hdfs_location_from_filespace(&dfs_address);
 
     elog(DEBUG2, "locating token for %s", dfs_address);
 
