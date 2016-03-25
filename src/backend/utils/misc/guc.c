@@ -6577,6 +6577,16 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"hawq_rm_clusterratio_core_to_memorygb_factor",PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("Set the factor of balance one virtual core to memory by gigabyte "
+					     "for fixing cluster level memory to core ratio."),
+			NULL
+		},
+		&rm_clusterratio_core_to_memorygb_factor,
+		5, 0, 65535, NULL, NULL
+	},
+
+	{
 		{"hawq_rm_nresqueue_limit", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("the maximum number of resource queue."),
 			NULL
