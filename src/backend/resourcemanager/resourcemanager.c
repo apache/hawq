@@ -769,16 +769,6 @@ int getStringValue(int argc, char **argv, int pos, SimpString *val)
 	return FUNC_RETURN_OK;
 }
 
-/******************************************************************************
- * Load HAWQ cluster node information.
- ******************************************************************************/
-int loadHAWQClusterConfigure(void)
-{
-	int res = FUNC_RETURN_OK;
-
-	return res;
-}
-
 int createDRMInstance(void)
 {
 	int res = FUNC_RETURN_OK;
