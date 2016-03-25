@@ -772,7 +772,6 @@ RebuildTupleForRelation(QueryContextInfo *cxt)
 /*
  * Deserialize the Namespace data
  */
-
 static void
 RebuildNamespace(QueryContextInfo *cxt)
 {
@@ -3015,9 +3014,10 @@ GetResultRelSegFileInfos(Oid relid, List *segnomaps, List *existing_seginfomaps)
 }
 
 void
-prepareDfsAddressForDispatch(QueryContextInfo* cxt){
-//	if (enable_secure_filesystem)
-//		return;
+prepareDfsAddressForDispatch(QueryContextInfo* cxt)
+{
+	if (enable_secure_filesystem)
+		return;
 	const char *namespace = cxt->sharedPath;
 	int size = strlen(namespace);
 	StringInfoData buffer;
