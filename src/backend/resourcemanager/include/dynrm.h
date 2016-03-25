@@ -305,8 +305,6 @@ int  ResManagerMainServer2ndPhase(void);
 void printHelpInfo(void);
 int  parseCommandLine(int argc, char **argv);
 
-int  loadHAWQClusterConfigure(void);
-
 int	 initializeSocketServer(void);
 int  startResourceBroker(bool isForked);
 int  processSocketInputs(void);
