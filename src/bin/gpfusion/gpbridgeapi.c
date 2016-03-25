@@ -511,9 +511,10 @@ void add_delegation_token(PxfInputData *inputData)
 	if (!enable_secure_filesystem)
 		return;
 
-	token = palloc0(sizeof(PxfHdfsTokenData));
+	Assert(dfs_address);
 
-    elog(DEBUG2, "locating token for %s", dfs_address);
+	token = palloc0(sizeof(PxfHdfsTokenData));
+	elog(DEBUG2, "locating token for %s", dfs_address);
 
 	token->hdfs_token = find_filesystem_credential_with_uri(dfs_address);
 
