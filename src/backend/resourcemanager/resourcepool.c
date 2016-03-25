@@ -1804,42 +1804,6 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 	return res;
 }
 
-/* Generate HAWQ host report. */
-void generateSegResourceReport(int32_t segid, SelfMaintainBuffer buff)
-{
-	SegResource seg = getSegResource(segid);
-
-	if ( seg == NULL )
-	{
-		static char messagenull[] = "NULL NODE.";
-		appendSelfMaintainBuffer(buff, messagenull, sizeof(messagenull));
-	}
-	else
-	{
-		static char reporthead[256];
-
-		int headsize = sprintf(reporthead,
-							   "SEGMENT:ID=%d, "
-							   "HAWQAVAIL=%d. "
-							   "FTS( %d MB, %d CORE). "
-							   "GRM( %d MB, %d CORE). "
-							   "MEM=%d(%d) MB. "
-							   "CORE=%lf(%lf).\n",
-							   seg->Stat->ID,
-							   seg->Stat->FTSAvailable,
-							   seg->Stat->FTSTotalMemoryMB,
-							   seg->Stat->FTSTotalCore,
-							   seg->Stat->GRMTotalMemoryMB,
-							   seg->Stat->GRMTotalCore,
-							   seg->Allocated.MemoryMB,
-							   seg->Available.MemoryMB,
-							   seg->Allocated.Core,
-							   seg->Available.Core);
-		appendSelfMaintainBuffer(buff, reporthead, headsize);
-		generateSegInfoReport(&(seg->Stat->Info), buff);
-	}
-}
-
 /* Generate machine id instance data into a string as report. */
 void  generateSegInfoReport(SegInfo seginfo, SelfMaintainBuffer buff)
 {
