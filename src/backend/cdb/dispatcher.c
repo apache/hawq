@@ -1239,7 +1239,7 @@ dispatch_run(DispatchData *data)
 
 #ifdef FAULT_INJECTOR
 				FaultInjector_InjectFaultIfSet(
-											   FaillQeAfterConnection,
+											   FailQeAfterConnection,
 											   DDLNotSpecified,
 											   "",	// databaseName
 											   ""); // tableName
