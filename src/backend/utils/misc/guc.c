@@ -6214,7 +6214,7 @@ static struct config_int ConfigureNamesInt[] =
 			GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
 		},
 		&optimizer_parts_to_force_sort_on_insert,
-		INT_MAX, 0, INT_MAX, NULL, NULL
+		160, 0, INT_MAX, NULL, NULL
 	},
 
 	{
