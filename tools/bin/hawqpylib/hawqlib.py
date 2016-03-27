@@ -115,6 +115,20 @@ class threads_with_return(object):
         return self.return_values
 
 
+def check_property_exist_xml(xml_file, property_name):
+    property_exist = False
+    property_value = ''
+    with open(xml_file) as f:
+        xmldoc = minidom.parse(f)
+    for node in xmldoc.getElementsByTagName('property'):
+        name, value = (node.getElementsByTagName('name')[0].childNodes[0].data,
+                       node.getElementsByTagName('value')[0].childNodes[0].data)
+        if name == property_name:
+            property_exist = True
+            property_value = value
+    return property_exist, property_name, property_value
+
+
 class HawqXMLParser:
     def __init__(self, GPHOME):
         self.GPHOME = GPHOME
@@ -416,14 +430,15 @@ def append_xml_property(xmlfile, property_name, property_value):
     shutil.move(xmlfile_swap, xmlfile)
 
 
-def remove_property_xml(property_name, org_config_file):
+def remove_property_xml(property_name, org_config_file, quiet = False):
     tree = ElementTree()
     tree.parse(org_config_file)
     root = tree.getroot()
     for child in root:
         for subet in child:
             if subet.text == property_name:
-                print "Remove property %s." % subet.text
+                if not quiet:
+                    print "Remove property %s." % subet.text
                 root.remove(child)
     tree.write(org_config_file, encoding="utf-8")
 

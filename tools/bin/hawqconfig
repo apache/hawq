@@ -18,7 +18,7 @@
 try:
     import os, sys, re
     from optparse import Option, OptionParser
-    from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml, local_ssh
+    from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml, update_xml_property, append_xml_property, local_ssh
     from gppylib.commands.unix import getLocalHostname, getUserName
     from gppylib.db import dbconn
     from pg import DatabaseError
@@ -166,64 +166,12 @@ def show_property(hawq_site, property_name):
     return None
 
 
-def update_line(xmlfile, property_name, property_value):
-    with open(xmlfile) as f:
-        f_tmp = open(xmlfile + '.backup', 'w')
-        while 1:
-            line = f.readline()
-
-            if not line:
-                break
-
-            m = re.match('\s*<name>%s' % property_name, line)
-            if m:
-                while 1:
-                    next_line = f.readline()
-                    m2 = re.match('\s*<value>', next_line)
-                    if m2:
-                        f_tmp.write(line)
-                        p = re.compile('\s*<value>(.*)</value>')
-                        p_value = p.match(next_line).group(1)
-                        next_line_new = re.sub(p_value, property_value, next_line)
-                        f_tmp.write(next_line_new)
-                        break
-            else:
-                f_tmp.write(line)
-        f_tmp.close()
-    return None
-
-
-def add_property(xmlfile, property_name, property_value):
-    with open(xmlfile) as f:
-        f_tmp = open(xmlfile + '.backup', 'w')
-        while 1:
-            line = f.readline()
-
-            if not line:
-                break
-
-            m = re.match('\s*</configuration>', line)
-            if m:
-                f_tmp.write('    <property>\n')
-                f_tmp.write('        <name>%s</name>\n' % property_name)
-                f_tmp.write('       <value>%s</value>\n' % property_value)
-                f_tmp.write('    </property>\n')
-                f_tmp.write('</configuration>\n')
-            else:
-                f_tmp.write(line)
-        f_tmp.close()
-    return None
-
-
 def update_hawq_site(org_config_file, hawq_site, property_name, property_value):
-    os.system('cp %s %s' % (org_config_file, org_config_file + '.org'))
     result = check_property(hawq_site, property_name, property_value)
     if result:
-        update_line(org_config_file, property_name, property_value)
-        os.system('mv %s %s' % (org_config_file + '.backup', org_config_file))
+        update_xml_property(org_config_file, property_name, property_value)
     else:
-        add_property(org_config_file, property_name, property_value)
-        os.system('mv %s %s' % (org_config_file + '.backup', org_config_file))
+        append_xml_property(org_config_file, property_name, property_value)
 
 
 def sync_hawq_site(config_dir, host_list):
@@ -283,7 +231,7 @@ if __name__ == '__main__':
         if options.remove in except_list:
             print "Remove %s is not allowed" % options.remove
             sys.exit(1)
-        remove_property_xml(options.remove, org_config_file)
+        remove_property_xml(options.remove, org_config_file, options.quiet)
         sync_hawq_site(GPHOME, host_list)
     else:
         print "Please input correct options"
