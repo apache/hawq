@@ -182,16 +182,50 @@ class HawqInit:
             logger.warn("Set standby host name failed")
         return result
 
-    def set_number_by_datanodes_num(self):
-        reuslt = 0
-        if self.hosts_count_number < 4:
-            # Set output.replace-datanode-on-failure to false if datanode number less than 4.
-            logger.info("Set output.replace-datanode-on-failure to false as %s datanode detected" % self.hosts_count_number)
-            logger.info("If you actually have more than 4 datanodes, please set it to 'true'")
-            cmd = "hawq config -c 'output.replace-datanode-on-failure'  -v 'false' --skipvalidation -q > /dev/null"
-            result = local_ssh(cmd, logger)
-            if result != 0:
-                logger.warn("Set output.replace-datanode-on-failure failed")
+    def sync_hdfs_client(self):
+        sync_host_str = ""
+        for node in self.host_list:
+            sync_host_str += " -h %s" % node
+
+        if 'hawq_standby_address_host' in self.hawq_dict and self.standby_host_name.lower() not in ('', 'none'):
+            sync_host_str += " -h %s" % self.standby_host_name
+
+        result = local_ssh("hawq scp %s %s/etc/hdfs-client.xml =:%s/etc/" % (sync_host_str, self.GPHOME, self.GPHOME))
+        if result != 0:
+            logger.error("Sync hdfs-client.xml failed.")
+            sys.exit(1)
+
+    def set_replace_datanode_on_failure(self):
+        xml_file = "%s/etc/hdfs-client.xml" % self.GPHOME
+        property_name = 'output.replace-datanode-on-failure'
+        pexist, pname, pvalue = check_property_exist_xml(xml_file, property_name)
+        datanodes_threshold = 4
+
+        if self.hosts_count_number < datanodes_threshold:
+            property_value = 'false'
+        else:
+            property_value = 'true'
+
+        if pvalue != property_value:
+            logger.info("Set output.replace-datanode-on-failure to %s" % property_value)
+            if pexist:
+                logger.debug("Update output.replace-datanode-on-failure to %s" % property_value)
+                update_xml_property(xml_file, property_name, property_value)
+            else:
+                logger.debug("Add output.replace-datanode-on-failure as %s" % property_value)
+                append_xml_property(xml_file, property_name, property_value)
+
+            self.sync_hdfs_client()
+
+            # Check hdfs-client.xml again to validate changes
+            pexist, pname, pvalue = check_property_exist_xml(xml_file, property_name)
+            if pvalue == property_value:
+                result = 0
+            else:
+                result = 1
+        else:
+            result = 0
+
         return result
 
     def set_total_vsegment_num(self):
@@ -270,7 +304,7 @@ class HawqInit:
                 logger.error("Failed to connect to database, this script can only be run when the database is up")
                 cmd = "%s; hawq stop master -a -M fast" % source_hawq_env
                 check_return_code(local_ssh(cmd, logger), logger, "Stop hawq master failed, exit")
-            remove_property_xml("hawq_standby_address_host", "%s/etc/hawq-site.xml" % self.GPHOME)
+            remove_property_xml("hawq_standby_address_host", "%s/etc/hawq-site.xml" % self.GPHOME, self.quiet)
             host_list = parse_hosts_file(self.GPHOME)
             sync_hawq_site(self.GPHOME, host_list)
             gpsyncmaster_pid = gp.getSyncmasterPID(running_standby_host, self.master_data_directory)
@@ -351,7 +385,7 @@ class HawqInit:
         check_return_code(self.set_total_vsegment_num())
         logger.info("Set hawq_rm_nvseg_perquery_perseg_limit as: %s" % self.vseg_num_per_node)
         check_return_code(self.set_vsegment_num_per_node())
-        check_return_code(self.set_number_by_datanodes_num())
+        check_return_code(self.set_replace_datanode_on_failure())
 
         master_cmd = self._get_master_init_cmd()
         logger.info("Start to init master node: '%s'" % self.master_host_name)
@@ -396,7 +430,7 @@ class HawqInit:
             check_return_code(self.set_total_vsegment_num())
             logger.info("Set hawq_rm_nvseg_perquery_perseg_limit as: %s" % self.vseg_num_per_node)
             check_return_code(self.set_vsegment_num_per_node())
-            check_return_code(self.set_number_by_datanodes_num())
+            check_return_code(self.set_replace_datanode_on_failure())
             logger.info("Start to init master")
             cmd = self._get_master_init_cmd()
             check_return_code(local_ssh(cmd, logger, warning = True), logger, \
