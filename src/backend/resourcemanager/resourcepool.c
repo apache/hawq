@@ -4558,10 +4558,7 @@ void fixClusterMemoryCoreRatio(void)
 	{
 		return;
 	}
-
-	int rejectlimit = PRESPOOL->SlavesHostCount <= rm_rejectrequest_nseg_limit ?
-					  0 :
-					  rm_rejectrequest_nseg_limit;
+	int rejectlimit = ceil(PRESPOOL->SlavesHostCount * rm_rejectrequest_nseg_limit);
 	int criteria1 = PRESPOOL->SlavesHostCount - rejectlimit;
 	int criteria2 = (PRESPOOL->SlavesHostCount + 1) / 2;
 

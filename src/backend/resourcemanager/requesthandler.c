@@ -381,21 +381,13 @@ bool handleRMRequestAcquireResource(void **arg)
 	/*--------------------------------------------------------------------------
 	 * We firstly check if the cluster has too many unavailable segments, which
 	 * is measured by rm_rejectrequest_nseg_limit. The expected cluster size is
-	 * loaded from couting hosts in $GPHOME/etc/slaves. Resource manager rejects
-	 * query  resource requests at once if currently there are more than
-	 * rm_rejectrequest_nseg_limit segments unavailable.
-	 *
-	 * NOTE: If the number of hosts in $GPHOME/etc/slaves is not greater than
-	 * 		 rm_rejectrequest_nseg_limit, this guc value is treated as 0, i.e.
-	 * 		 all the segments must be available before accepting query resource
-	 * 		 requests.
+	 * loaded from counting hosts in $GPHOME/etc/slaves. Resource manager rejects
+	 * query  resource requests at once if currently there are too many segments
+	 * unavailable.
 	 *--------------------------------------------------------------------------
 	 */
 	Assert(PRESPOOL->SlavesHostCount > 0);
-	int rejectlimit = PRESPOOL->SlavesHostCount <= rm_rejectrequest_nseg_limit ?
-					  0 :
-					  rm_rejectrequest_nseg_limit;
-
+	int rejectlimit = ceil(PRESPOOL->SlavesHostCount * rm_rejectrequest_nseg_limit);
 	int unavailcount = PRESPOOL->SlavesHostCount - PRESPOOL->AvailNodeCount;
 	if ( unavailcount > rejectlimit )
 	{

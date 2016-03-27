@@ -361,10 +361,12 @@ int		rm_segment_config_refresh_interval; /* How many seconds to wait before
 int		rm_segment_tmpdir_detect_interval;	/* How many seconds to wait before
 											   another detecting local temporary
 											   directories. */
-int		rm_tolerate_nseg_limit;
-int		rm_rejectrequest_nseg_limit;
+
 int		rm_nvseg_variance_among_seg_limit;
 int		rm_container_batch_limit;
+
+double	rm_tolerate_nseg_limit;
+double	rm_rejectrequest_nseg_limit;
 
 char   *rm_resourcepool_test_filename;
 
