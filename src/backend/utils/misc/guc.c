@@ -6437,7 +6437,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nslice_perseg_limit,
-            3000, 1, 65535, NULL, NULL
+            5000, 1, 65535, NULL, NULL
     },
 
 	{
