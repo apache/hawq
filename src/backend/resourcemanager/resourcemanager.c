@@ -453,7 +453,6 @@ int ResManagerMainServer2ndPhase(void)
 	registerMessageHandler(REQUEST_RM_IMALIVE               , handleRMSEGRequestIMAlive);
 	registerMessageHandler(REQUEST_QD_DDL_MANIPULATERESQUEUE, handleRMDDLRequestManipulateResourceQueue);
 	registerMessageHandler(REQUEST_QD_DDL_MANIPULATEROLE	, handleRMDDLRequestManipulateRole);
-	registerMessageHandler(REQUEST_QD_TMPDIR				, handleRMRequestTmpDir);
 	registerMessageHandler(REQUEST_RM_TMPDIR				, handleRMSEGRequestTmpDir);
 	registerMessageHandler(REQUEST_QD_ACQUIRE_RESOURCE_QUOTA, handleRMRequestAcquireResourceQuota);
 	registerMessageHandler(REQUEST_QD_REFRESH_RESOURCE      , handleRMRequestRefreshResource);
