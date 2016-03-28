@@ -610,8 +610,6 @@ void dropAllGRMContainersFromSegment(SegResource segres);
 
 void returnAllGRMResourceFromUnavailableSegments(void);
 
-void generateSegResourceReport(int32_t nodeid, SelfMaintainBuffer buff);
-
 /* Notify RM SEG to update resource capacity. */
 int notifyToBeAcceptedGRMContainersToRMSEG(void);
 int notifyToBeKickedGRMContainersToRMSEG(void);

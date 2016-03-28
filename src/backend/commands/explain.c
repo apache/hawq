@@ -584,7 +584,7 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
             cdbexplain_localExecStats(queryDesc->planstate, es->showstatctx);
 
         /* Fill in the plan's Instrumentation with stats from qExecs. */
-        if (estate->dispatch_data)
+        if (estate->dispatch_data && !dispatcher_has_error(estate->dispatch_data))
             cdbexplain_recvExecStats(queryDesc->planstate,
                                      dispatch_get_results(estate->dispatch_data),
                                      LocallyExecutingSliceIndex(estate),

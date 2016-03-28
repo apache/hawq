@@ -387,7 +387,7 @@ static void update_ri_trigger_args(Oid relid,
 					   const char *newname,
 					   bool fk_scan,
 					   bool update_relname);
-static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool iswritable);
+static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool iswritable, bool* isCustom);
 static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, bool iswritable);
 static char transformFormatType(char *formatname);
 static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols, bool iswritable);
@@ -959,19 +959,21 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	createStmt->tablespacename = NULL;
 	createStmt->policy = createExtStmt->policy; /* policy was set in transform */
 	
-		
+	bool isCustom = false;
 	switch(exttypeDesc->exttabletype)
 	{
 		case EXTTBL_TYPE_LOCATION:
 
 			/* Parse and validate URI strings (LOCATION clause) */
 			locationUris = transformLocationUris(exttypeDesc->location_list,
-												 createExtStmt->formatOpts,
-												 isweb, iswritable);
-			int locLength = list_length(exttypeDesc->location_list);
-			if (createStmt->policy && locLength > 0)
-			{
-				createStmt->policy->bucketnum = locLength;
+									 createExtStmt->formatOpts,
+									 isweb, iswritable,&isCustom);
+			if(!isCustom){
+				int locLength = list_length(exttypeDesc->location_list);
+				if (createStmt->policy && locLength > 0)
+				{
+					createStmt->policy->bucketnum = locLength;
+				}
 			}
 
 			break;
@@ -17427,7 +17429,7 @@ AtEOSubXact_on_commit_actions(bool isCommit, SubTransactionId mySubid,
  * The result is a text array but we declare it as Datum to avoid
  * including array.h in analyze.h.
  */
-static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool iswritable)
+static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool iswritable, bool* isCustom)
 {
 	ListCell   *cell;
 	ArrayBuildState *astate;
@@ -17552,6 +17554,9 @@ static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool i
 		{
 		    first_protocol = uri->protocol;
 		    first_uri = false;
+		    if(uri->protocol == URI_CUSTOM){
+		    		*isCustom = true;
+		    }
 		} 
 		    	
 
