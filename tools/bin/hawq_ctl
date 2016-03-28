@@ -65,9 +65,9 @@ class HawqInit:
         self.hawq_lc_monetary = opts.hawq_lc_monetary
         self.hawq_lc_numeric = opts.hawq_lc_numeric
         self.hawq_lc_time = opts.hawq_lc_time
-        self.vseg_num_per_node = opts.virtual_seg_num
         self.max_connections = opts.max_connections
         self.shared_buffers = opts.shared_buffers
+        self.default_hash_table_bucket_number = opts.default_hash_table_bucket_number
         self.lock = threading.Lock()
         self._get_config()
         self._write_config()
@@ -97,10 +97,6 @@ class HawqInit:
         self.dfs_url = self.hawq_dict['hawq_dfs_url']
         self.host_list = parse_hosts_file(self.GPHOME)
         self.hosts_count_number = len(self.host_list)
-        if self.hosts_count_number == 0:
-            self.total_vseg_num = self.vseg_num_per_node
-        else:
-            self.total_vseg_num = self.hosts_count_number * self.vseg_num_per_node
 
         if 'hawq_standby_address_host' in self.hawq_dict:
             self.standby_host_name = self.hawq_dict['hawq_standby_address_host']
@@ -111,6 +107,9 @@ class HawqInit:
                 sys.exit(1)
         else:
             self.standby_host_name = ''
+
+        if not self.default_hash_table_bucket_number and 'default_hash_table_bucket_number' in self.hawq_dict:
+                self.default_hash_table_bucket_number = self.hawq_dict['default_hash_table_bucket_number']
 
         if self.new_standby_hostname != 'none':
             self.standby_host_name = self.new_standby_hostname
@@ -228,21 +227,39 @@ class HawqInit:
 
         return result
 
-    def set_total_vsegment_num(self):
-        cmd = "%s; hawq config -c default_hash_table_bucket_number -v %s --skipvalidation -q > /dev/null" % \
-               (source_hawq_env, self.total_vseg_num)
-        result = local_ssh(cmd, logger)
-        if result != 0:
-            logger.warn("Set default_hash_table_bucket_number failed")
-        return result
+    def set_default_hash_table_bucket_number(self):
+        if not self.default_hash_table_bucket_number:
+            if 'hawq_rm_nvseg_perquery_limit' in self.hawq_dict:
+                hawq_rm_nvseg_perquery_limit = self.hawq_dict['hawq_rm_nvseg_perquery_limit']
+            else:
+                hawq_rm_nvseg_perquery_limit = 512
 
-    def set_vsegment_num_per_node(self):
-        cmd = "%s; hawq config -c hawq_rm_nvseg_perquery_perseg_limit \
-              -v %s --skipvalidation -q > /dev/null" % \
-              (source_hawq_env, self.vseg_num_per_node)
+            factor_min = 1
+            factor_max = 6
+            limit = int(hawq_rm_nvseg_perquery_limit)
+            if int(self.hosts_count_number) == 0:
+                segments_num = 1
+            else:
+                segments_num = int(self.hosts_count_number)
+
+            factor = limit / segments_num
+            # if too many segments or default limit is too low --> stick with the limit
+            if factor < factor_min:
+                buckets = limit
+            # if the limit is large and results in factor > max --> limit factor to max
+            elif factor > factor_max:
+                buckets = factor_max * segments_num
+            else:
+                buckets = factor * segments_num
+
+            self.default_hash_table_bucket_number = buckets
+
+        logger.info("Set default_hash_table_bucket_number as: %s" % self.default_hash_table_bucket_number)
+        cmd = "hawq config -c default_hash_table_bucket_number -v %s --skipvalidation -q > /dev/null" % \
+               self.default_hash_table_bucket_number
         result = local_ssh(cmd, logger)
         if result != 0:
-            logger.warn("Set hawq_rm_nvseg_perquery_perseg_limit failed")
+            logger.error("Set default_hash_table_bucket_number failed")
         return result
 
     def _get_master_init_cmd(self):
@@ -381,10 +398,7 @@ class HawqInit:
 
     def _init_cluster(self):
         logger.info("%s segment hosts defined" % self.hosts_count_number)
-        logger.info("Set default_hash_table_bucket_number as: %s" % self.total_vseg_num)
-        check_return_code(self.set_total_vsegment_num())
-        logger.info("Set hawq_rm_nvseg_perquery_perseg_limit as: %s" % self.vseg_num_per_node)
-        check_return_code(self.set_vsegment_num_per_node())
+        check_return_code(self.set_default_hash_table_bucket_number())
         check_return_code(self.set_replace_datanode_on_failure())
 
         master_cmd = self._get_master_init_cmd()
@@ -426,10 +440,7 @@ class HawqInit:
         if self.node_type == "master":
             self.check_hdfs_path()
             logger.info("%s segment hosts defined" % self.hosts_count_number)
-            logger.info("Set default_hash_table_bucket_number as: %s" % self.total_vseg_num)
-            check_return_code(self.set_total_vsegment_num())
-            logger.info("Set hawq_rm_nvseg_perquery_perseg_limit as: %s" % self.vseg_num_per_node)
-            check_return_code(self.set_vsegment_num_per_node())
+            check_return_code(self.set_default_hash_table_bucket_number())
             check_return_code(self.set_replace_datanode_on_failure())
             logger.info("Start to init master")
             cmd = self._get_master_init_cmd()
@@ -1268,15 +1279,9 @@ def create_parser():
     parser.add_option('-n', '--no-update', action='store_true',
                       dest='no_update', default=False,
                       help='Do not update system catalog tables.')
-    parser.add_option("--vsegNumber",
+    parser.add_option("--bucket_number",
                       type="int",
-                      dest="virtual_seg_num",
-                      default=6,
-                      help="Sets maximum number of virtual segments per node")
-    parser.add_option("--vsegment-number",
-                      type="int",
-                      dest="virtual_seg_num",
-                      default=6,
+                      dest="default_hash_table_bucket_number",
                       help="Sets maximum number of virtual segments per node")
     parser.add_option("--locale",
                       dest="hawq_locale",
