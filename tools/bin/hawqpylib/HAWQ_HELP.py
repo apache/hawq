@@ -108,9 +108,9 @@ The "options" are:
    --lc-monetary        Sets the locale to use for formatting monetary amounts.
    --lc-numeric         Sets the locale to use for formatting numbers.
    --lc-time            Sets the locale to use for formatting dates and times.
-   --vsegment_number    Sets the virtual segments number per node.
    --max_connections    Sets the max_connections for formatting hawq database.
    --shared_buffers     Sets the shared_buffers for initializing hawq.
+   --bucket_number      Sets the GUC value of default_hash_table_bucket_number.
 
 See 'hawq --help' for more information on other commands.
 """
