@@ -41,6 +41,7 @@ import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.MetadataFetcher;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.service.MetadataFetcherFactory;
+import org.apache.hawq.pxf.service.MetadataResponse;
 import org.apache.hawq.pxf.service.MetadataResponseFormatter;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
 import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
@@ -105,10 +106,11 @@ public class MetadataResource extends RestResource {
             // 2. get Metadata
             List<Metadata> metadata = metadataFetcher.getMetadata(pattern);
 
-            // 3. serialize to JSON
-            jsonOutput = MetadataResponseFormatter.formatResponseString(metadata);
+            // 3. stream JSON ouptput
+            MetadataResponse metadataResponse = MetadataResponseFormatter.formatResponse(
+                    metadata, pattern);
 
-            LOG.debug("getMetadata output: " + jsonOutput);
+            return Response.ok(metadataResponse, MediaType.APPLICATION_JSON_TYPE).build();
 
         } catch (ClientAbortException e) {
             LOG.error("Remote connection closed by HAWQ", e);
@@ -118,6 +120,5 @@ public class MetadataResource extends RestResource {
             throw e;
         }
 
-        return Response.ok(jsonOutput, MediaType.APPLICATION_JSON_TYPE).build();
     }
 }
