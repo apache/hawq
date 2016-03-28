@@ -456,12 +456,14 @@ int	GetAnalyzeVSegNumLimit(bool isPartitionTableExist)
 {
 	int perSegLimit = isPartitionTableExist ? hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit
 			: hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
+	int perQueryLimit = isPartitionTableExist ? hawq_rm_nvseg_for_analyze_part_perquery_limit
+				: hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 	int nvseg = perSegLimit * slaveHostNumber;
-	while(nvseg > hawq_rm_nvseg_for_analyze_perquery_limit){
+	while(nvseg > perQueryLimit){
 		nvseg -= slaveHostNumber;
 	}
 	if(nvseg <= 0){
-		nvseg = hawq_rm_nvseg_for_analyze_perquery_limit;
+		nvseg = perQueryLimit;
 	}
 	return nvseg;
 }
