@@ -886,7 +886,6 @@ static void init_client_context(ClientContext *client_context)
 {
 	client_context->http_headers = NULL;
 	client_context->handle = NULL;
-	memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
 	initStringInfo(&(client_context->the_rest_buf));
 }
 
