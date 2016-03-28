@@ -100,7 +100,6 @@ bool handleRMRequestAcquireResource(void **arg);
 bool handleRMRequestReturnResource(void **arg);
 bool handleRMSEGRequestIMAlive(void **arg);
 bool handleRMSEGRequestRUAlive(void **arg);
-bool handleRMRequestTmpDir(void **arg);
 bool handleRMSEGRequestTmpDir(void **arg);
 bool handleRMRequestAcquireResourceQuota(void **arg);
 bool handleRMRequestRefreshResource(void **arg);
