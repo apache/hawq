@@ -2648,7 +2648,7 @@ int  loadHostInformationIntoResourcePool(void)
         char *phostip = strtok(NULL, ",");
         if ( phostip == NULL ) continue;
         uint32_t port = 0;
-        if (sscanf(phostport, "%d", &port) == 0)
+        if (sscanf(phostport, "%d", &port) != 1)
         {
             elog(LOG, "HAWQ RM :: Invalid port, skip machine %s", phostname);
             continue;
