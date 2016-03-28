@@ -80,6 +80,8 @@ makeCdbCopy(bool is_copy_in, QueryResource *resource)
 
 	c->executors.segment_conns = NIL;
 	c->executors.errbuf.data = NULL;
+	c->executors.result = NULL;
+	c->executors.numresults = 0;
 
 	/* Initialize the state of each segment database */
 	c->segdb_state = (SegDbState **) palloc((c->partition_num) * sizeof(SegDbState *));
