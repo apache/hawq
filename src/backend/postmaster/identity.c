@@ -562,7 +562,7 @@ GetQueryVsegNum(void)
 int
 GetExternalTablePartitionNum(void)
 {
-	return GetQueryVsegNum();
+	return GetHashDistPartitionNum();
 }
 
 int
