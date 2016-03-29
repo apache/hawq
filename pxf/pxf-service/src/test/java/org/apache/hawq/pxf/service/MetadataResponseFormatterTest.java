@@ -19,21 +19,29 @@ package org.apache.hawq.pxf.service;
  * under the License.
  */
 
-
-import static org.junit.Assert.*;
-
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang.StringUtils;
-import org.apache.directory.shared.kerberos.components.MethodData;
-import org.junit.Test;
-
+import static org.junit.Assert.*;
 import org.apache.hawq.pxf.api.Metadata;
+
+import org.junit.Test;
 
 public class MetadataResponseFormatterTest {
 
-    String result = null;
+    MetadataResponse response = null;
+
+    private String convertResponseToString(MetadataResponse data) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        try {
+            data.write(outputStream);
+        } catch (IOException e) {
+            fail(e.toString());
+        }
+        return outputStream.toString();
+    }
 
     @Test
     public void formatResponseString() throws Exception {
@@ -45,12 +53,12 @@ public class MetadataResponseFormatterTest {
         fields.add(new Metadata.Field("field2", "text"));
         metadataList.add(metadata);
 
-        result = MetadataResponseFormatter.formatResponseString(metadataList);
+        response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
                 .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}");
 
-        assertEquals(expected.toString(), result);
+        assertEquals(expected.toString(), convertResponseToString(response));
     }
 
     @Test
@@ -63,12 +71,12 @@ public class MetadataResponseFormatterTest {
         fields.add(new Metadata.Field("field2", "text", new String[] {}));
         metadataList.add(metadata);
 
-        result = MetadataResponseFormatter.formatResponseString(metadataList);
+        response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
                 .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}");
 
-        assertEquals(expected.toString(), result);
+        assertEquals(expected.toString(), convertResponseToString(response));
     }
 
     @Test
@@ -84,7 +92,7 @@ public class MetadataResponseFormatterTest {
                 new String[] {"50"}));
         metadataList.add(metadata);
 
-        result = MetadataResponseFormatter.formatResponseString(metadataList);
+        response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
                 .append("\"fields\":[")
@@ -93,15 +101,16 @@ public class MetadataResponseFormatterTest {
                 .append("{\"name\":\"field3\",\"type\":\"char\",\"modifiers\":[\"50\"]}")
                 .append("]}]}");
 
-        assertEquals(expected.toString(), result);
+        assertEquals(expected.toString(), convertResponseToString(response));
     }
 
     @Test
     public void formatResponseStringNull() throws Exception {
         List<Metadata> metadataList = null;
-        result = MetadataResponseFormatter.formatResponseString(metadataList);
+        response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
         String expected = new String("{\"PXFMetadata\":[]}");
-        assertEquals(expected, result);
+
+        assertEquals(expected, convertResponseToString(response));
     }
 
     @Test
@@ -111,7 +120,8 @@ public class MetadataResponseFormatterTest {
         Metadata metadata = new Metadata(itemName, null);
         metadataList.add(metadata);
         try {
-            result = MetadataResponseFormatter.formatResponseString(metadataList);
+            response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
+            convertResponseToString(response);
             fail("formatting should fail because fields field is null");
         } catch (IllegalArgumentException e) {
             assertEquals("metadata for " + metadata.getItem() + " contains no fields - cannot serialize", e.getMessage());
@@ -122,7 +132,8 @@ public class MetadataResponseFormatterTest {
         metadata = new Metadata(itemName, fields);
         metadataList.add(metadata);
         try {
-            result = MetadataResponseFormatter.formatResponseString(metadataList);
+            response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
+            convertResponseToString(response);
             fail("formatting should fail because there are no fields");
         } catch (IllegalArgumentException e) {
             assertEquals("metadata for " + metadata.getItem() + " contains no fields - cannot serialize", e.getMessage());
@@ -139,7 +150,8 @@ public class MetadataResponseFormatterTest {
         metadataList.add(null);
         metadataList.add(metadata);
         try {
-            result = MetadataResponseFormatter.formatResponseString(metadataList);
+            response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
+            convertResponseToString(response);
             fail("formatting should fail because one of the metdata object is null");
         } catch (IllegalArgumentException e) {
             assertEquals("metadata object is null - cannot serialize", e.getMessage());
@@ -157,7 +169,7 @@ public class MetadataResponseFormatterTest {
             fields.add(new Metadata.Field("field2", "text"));
             metdataList.add(metadata);
         }
-        result = MetadataResponseFormatter.formatResponseString(metdataList);
+        response = MetadataResponseFormatter.formatResponse(metdataList, "path.file");
 
         StringBuilder expected = new StringBuilder();
         for (int i=1; i<=10; i++) {
@@ -171,7 +183,7 @@ public class MetadataResponseFormatterTest {
         }
         expected.append("]}");
 
-        assertEquals(expected.toString(), result);
+        assertEquals(expected.toString(), convertResponseToString(response));
     }
 
     @Test
@@ -185,7 +197,7 @@ public class MetadataResponseFormatterTest {
             fields.add(new Metadata.Field("field2", "text"));
             metdataList.add(metadata);
         }
-        result = MetadataResponseFormatter.formatResponseString(metdataList);
+        response = MetadataResponseFormatter.formatResponse(metdataList, "path.file");
         StringBuilder expected = new StringBuilder();
         for (int i=1; i<=10; i++) {
             if(i==1) {
@@ -198,7 +210,7 @@ public class MetadataResponseFormatterTest {
         }
         expected.append("]}");
 
-        assertEquals(expected.toString(), result);
+        assertEquals(expected.toString(), convertResponseToString(response));
     }
 }
 
