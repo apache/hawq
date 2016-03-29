@@ -6547,27 +6547,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_rm_tolerate_nseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("resource manager re-allocates resource if the number of exclusive "
-						 "segments is greater than this limit value when there is at least "
-						 "one segment containing two or more virtual segments."),
-			NULL
-		},
-		&rm_tolerate_nseg_limit,
-		2, 0, 65535, NULL, NULL
-	},
-
-	{
-		{"hawq_rm_rejectrequest_nseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
-			gettext_noop("resource manager rejects new resource request if the number of "
-						 "unavailable segments is greater than this limit value."),
-			NULL
-		},
-		&rm_rejectrequest_nseg_limit,
-		2, 0, 65535, NULL, NULL
-	},
-
-	{
 		{"hawq_rm_nvseg_variance_amon_seg_limit", PGC_POSTMASTER, RESOURCES_MGM,
 			gettext_noop("the variance of vseg number in each segment that resource manager should tolerate at most."),
 			NULL
@@ -6970,6 +6949,29 @@ static struct config_real ConfigureNamesReal[] =
 		},
 		&rm_seg_core_use,
 		16.0, 1.0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_tolerate_nseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("resource manager re-allocates resource if the percentage of exclusive "
+						 "segments is greater than this limit value when there is at least "
+						 "one segment containing two or more virtual segments. Total expected "
+						 "cluster size is the number of hosts in file slaves."),
+			NULL
+		},
+		&rm_tolerate_nseg_limit,
+		0.25, 0.0, 1.0, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_rejectrequest_nseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("resource manager rejects new resource request if the percentage of "
+						 "unavailable segments is greater than this limit value. Total expected "
+						 "cluster size is the number of hosts in file slaves."),
+			NULL
+		},
+		&rm_rejectrequest_nseg_limit,
+		0.25, 0.0, 1.0, NULL, NULL
 	},
 
 	{

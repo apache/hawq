@@ -4257,15 +4257,15 @@ RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact)
 	 */
 	if ( segnumact > list_length(conn->Resource) )
 	{
-		if ( PRESPOOL->SlavesHostCount - rm_tolerate_nseg_limit >
-			 list_length(conn->Resource) )
+		int limit = ceil(PRESPOOL->SlavesHostCount * rm_tolerate_nseg_limit);
+		if ( PRESPOOL->SlavesHostCount - limit > list_length(conn->Resource) )
 		{
 			elog(WARNING, "Find virtual segments are dispatched to %d segments in "
 						  "the cluster containing %d segments defined in slaves file. "
 						  "The number of excluded segments are more than %d.",
 						  list_length(conn->Resource),
 						  PRESPOOL->SlavesHostCount,
-						  rm_tolerate_nseg_limit);
+						  limit);
 			return RESPROBLEM_TOOFEWSEG;
 		}
 	}
