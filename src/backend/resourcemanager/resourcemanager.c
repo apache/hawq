@@ -467,8 +467,6 @@ int ResManagerMainServer2ndPhase(void)
 		elog(FATAL, "Fail to initialize socket server.");
 	}
 
-	initializeRM2RMSEGComm();
-
 	/*
 	 * Notify postmaster that HAWQ RM is ready. Ignore the possible problem that
 	 * the parent process quits. HAWQ RM will automatically detect if its parent
