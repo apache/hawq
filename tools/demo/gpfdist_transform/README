@@ -1,8 +1,8 @@
 **************************************************************************
-ABOUT THE GREENPLUM GPFDIST TRANSFORM DEMOS
+ABOUT THE HAWQ GPFDIST TRANSFORM DEMOS
 **************************************************************************
 
-This package contains example programs of Greenplum gpfdist transformations:
+This package contains example programs of HAWQ gpfdist transformations:
 
 1. dblp - This example demonstrates loading and extracting 
           database research data.
@@ -36,14 +36,14 @@ BEFORE YOU BEGIN
     $ cd data
     $ make
 
-2. Create a database to use for the Greenplum gpfdist transform demos:
+2. Create a database to use for the HAWQ gpfdist transform demos:
 
     $ createdb gptransform
 
 
 
 **************************************************************************
-RUNNING DEMO 1: input transformation via gpload
+RUNNING DEMO 1: input transformation via hawq load 
 **************************************************************************
 
 DBLP example
@@ -51,11 +51,11 @@ DBLP example
 
 1. Edit the 1_dblp.yaml file and change the LOCAL_HOSTNAME setting
    reflect the name of the host (e.g. myhostname) you where you will 
-   run gpload.
+   run hawq load.
 
       LOCAL_HOSTNAME: [ myhostname ]
 
-   GPDB will attempt to connect to this host to access the data.
+   HAWQ will attempt to connect to this host to access the data.
 
 
 2. Create the dblp_thesis table
@@ -65,7 +65,7 @@ DBLP example
 
 3. load the data
 
-    $ gpload -f 1_dblp.yaml
+    $ hawq load -f 1_dblp.yaml
 
 
 4. review some of the data
@@ -78,11 +78,11 @@ MeF example
 
 5. Edit the 2_mef.yaml file and change the LOCAL_HOSTNAME setting
    reflect the name of the host (e.g. myhostname) you where you will 
-   run gpload.
+   run hawq load.
 
       LOCAL_HOSTNAME: [ myhostname ]
 
-   GPDB will attempt to connect to this host to access the data.
+   HAWQ will attempt to connect to this host to access the data.
 
 
 6. Create the mef_xml table
@@ -92,7 +92,7 @@ MeF example
 
 7. load the data
 
-    $ gpload -f 2_mef.yaml
+    $ hawq load -f 2_mef.yaml
 
 
 8. review the data
@@ -105,11 +105,11 @@ WITSML example
 
 9. Edit the 3_rig.yaml file and change the LOCAL_HOSTNAME setting
    reflect the name of the host (e.g. myhostname) you where you will 
-   run gpload.
+   run hawq load.
 
       LOCAL_HOSTNAME: [ myhostname ]
 
-   GPDB will attempt to connect to this host to access the data.
+   HAWQ will attempt to connect to this host to access the data.
 
 
 10. Create the rig_xml table
@@ -119,7 +119,7 @@ WITSML example
 
 11. load the data
 
-    $ gpload -f 3_rig.yaml
+    $ hawq load -f 3_rig.yaml
 
 12. review some data
 
@@ -136,7 +136,7 @@ RUNNING DEMO 2: input/output transformations via gpfdist
 
       location ('gpfdist://myhostname:8080/data/dblp.xml#transform=dblp_input') 
 
-   GPDB will attempt to connect to this host to read and write the data.
+   HAWQ will attempt to connect to this host to read and write the data.
 
 
 2. in a separate window, start gpfdist:
