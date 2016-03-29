@@ -83,7 +83,6 @@ public class MetadataResponse implements StreamingOutput {
                 throw new IllegalArgumentException("metadata for " + metadata.getItem() + " contains no fields - cannot serialize");
             }
             StringBuilder result = new StringBuilder();
-            /* metaData and userData are automatically converted to Base64 */
             result.append(prefix).append(mapper.writeValueAsString(metadata));
             prefix = ",";
             dos.write(result.toString().getBytes());
