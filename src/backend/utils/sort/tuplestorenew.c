@@ -614,7 +614,7 @@ static NTupleStorePage *nts_load_prev_page(NTupleStore *store, NTupleStorePage *
 	}
 }
 
-static void ntuplestore_cleanup(NTupleStore *ts, bool fNormal)
+static void ntuplestore_cleanup(NTupleStore *ts, bool fNormal, bool canReportError)
 {
 	NTupleStorePage *p = ts->first_page;
 
@@ -651,12 +651,12 @@ static void ntuplestore_cleanup(NTupleStore *ts, bool fNormal)
 
 	if(ts->pfile)
 	{
-		workfile_mgr_close_file(ts->work_set, ts->pfile);
+		workfile_mgr_close_file(ts->work_set, ts->pfile, canReportError);
 		ts->pfile = NULL;
 	}
 	if(ts->plobfile)
 	{
-		workfile_mgr_close_file(ts->work_set, ts->plobfile);
+		workfile_mgr_close_file(ts->work_set, ts->plobfile, canReportError);
 		ts->plobfile = NULL;
 	}
 
@@ -671,7 +671,7 @@ static void ntuplestore_cleanup(NTupleStore *ts, bool fNormal)
 
 static void XCallBack_NTS(XactEvent event, void *nts)
 {
-	ntuplestore_cleanup((NTupleStore *)nts, false);
+	ntuplestore_cleanup((NTupleStore *)nts, false, (event!=XACT_EVENT_ABORT));
 }
 
 NTupleStore *
@@ -927,7 +927,7 @@ void
 ntuplestore_destroy(NTupleStore *ts)
 {
 	UnregisterXactCallbackOnce(XCallBack_NTS, (void *) ts);
-	ntuplestore_cleanup(ts, true);
+	ntuplestore_cleanup(ts, true, true);
 }
 
 NTupleStoreAccessor* 

@@ -503,6 +503,7 @@ cdbexplain_recvExecStats(struct PlanState              *planstate,
     int             iDispatch;
     int             nDispatch;
     int             imsgptr;
+    bool            isFirstValidateStat = true;
 
     if (!planstate ||
         !planstate->instrument ||
@@ -597,7 +598,7 @@ cdbexplain_recvExecStats(struct PlanState              *planstate,
         }
 
         /* Slice should have same number of plan nodes on every qExec. */
-        if (iDispatch == 0)
+        if (isFirstValidateStat)
             ctx.nStatInst = hdr->nInst;
         else
 		{
@@ -614,12 +615,14 @@ cdbexplain_recvExecStats(struct PlanState              *planstate,
 		}
 
         /* Save lowest and highest segment id for which we have stats. */
-        if (iDispatch == 0)
+        if (isFirstValidateStat)
             ctx.segindexMin = ctx.segindexMax = hdr->segindex;
         else if (ctx.segindexMax < hdr->segindex)
             ctx.segindexMax = hdr->segindex;
         else if (ctx.segindexMin > hdr->segindex)
             ctx.segindexMin = hdr->segindex;
+
+        if (isFirstValidateStat) isFirstValidateStat = false;
 
         /* Save message ptr for easy reference. */
         ctx.msgptrs[ctx.nmsgptr] = hdr;

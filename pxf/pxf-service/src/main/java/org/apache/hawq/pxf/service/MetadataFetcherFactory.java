@@ -21,6 +21,8 @@ package org.apache.hawq.pxf.service;
 
 
 import org.apache.hawq.pxf.api.MetadataFetcher;
+import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 
 /**
  * Factory class for creation of {@link MetadataFetcher} objects. 
@@ -28,7 +30,7 @@ import org.apache.hawq.pxf.api.MetadataFetcher;
  * abstract class which is returned by the MetadataFetcherFactory. 
  */
 public class MetadataFetcherFactory {
-    static public MetadataFetcher create(String fetcherName) throws Exception {
-        return (MetadataFetcher) Class.forName(fetcherName).newInstance();
+    public static MetadataFetcher create(InputData inputData) throws Exception {
+        return (MetadataFetcher) Utilities.createAnyInstance(InputData.class, inputData.getMetadata(), inputData);
     }
 }

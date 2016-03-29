@@ -962,7 +962,7 @@ start_over:
 			batch = hashtable->batches[curbatch];
 			if (batch->outerside.workfile != NULL)
 			{
-				workfile_mgr_close_file(hashtable->work_set, batch->outerside.workfile);
+				workfile_mgr_close_file(hashtable->work_set, batch->outerside.workfile, true);
 			}
 			batch->outerside.workfile = NULL;
 		}
@@ -1006,13 +1006,13 @@ start_over:
 		/* Release associated temp files right away. */
 		if (batch->innerside.workfile != NULL)
 		{
-			workfile_mgr_close_file(hashtable->work_set, batch->innerside.workfile);
+			workfile_mgr_close_file(hashtable->work_set, batch->innerside.workfile, true);
 		}
 		batch->innerside.workfile = NULL;
 		
 		if (batch->outerside.workfile != NULL)
 		{
-			workfile_mgr_close_file(hashtable->work_set, batch->outerside.workfile);
+			workfile_mgr_close_file(hashtable->work_set, batch->outerside.workfile, true);
 		}
 		batch->outerside.workfile = NULL;
 
@@ -1083,7 +1083,7 @@ start_over:
 				hashtable->stats->batchstats[curbatch].innerfilesize =
 						ExecWorkFile_Tell64(hashtable->batches[curbatch]->innerside.workfile);
 			}
-			workfile_mgr_close_file(hashtable->work_set, batch->innerside.workfile);
+			workfile_mgr_close_file(hashtable->work_set, batch->innerside.workfile, true);
 			batch->innerside.workfile = NULL;
 		}
     }
@@ -1577,7 +1577,7 @@ SaveBatchFileNameAndClose(HashJoinTable hashtable, ExecWorkFile *workfile)
 	{
 		batch_file_name = pstrdup(ExecWorkFile_GetFileName(workfile));
 		free_name = true;
-		workfile_mgr_close_file(hashtable->work_set, workfile);
+		workfile_mgr_close_file(hashtable->work_set, workfile, true);
 	}
 
 	bool res = WriteStringWorkFile(hashtable->state_file, batch_file_name);
@@ -1662,7 +1662,7 @@ ExecHashJoinSaveState(HashJoinTable hashtable)
 		hashtable->batches[i]->outerside.workfile = NULL;
 	}
 
-	workfile_mgr_close_file(hashtable->work_set, hashtable->state_file);
+	workfile_mgr_close_file(hashtable->work_set, hashtable->state_file, true);
 	hashtable->state_file = NULL;
 }
 

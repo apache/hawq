@@ -100,7 +100,6 @@ bool handleRMRequestAcquireResource(void **arg);
 bool handleRMRequestReturnResource(void **arg);
 bool handleRMSEGRequestIMAlive(void **arg);
 bool handleRMSEGRequestRUAlive(void **arg);
-bool handleRMRequestTmpDir(void **arg);
 bool handleRMSEGRequestTmpDir(void **arg);
 bool handleRMRequestAcquireResourceQuota(void **arg);
 bool handleRMRequestRefreshResource(void **arg);
@@ -304,8 +303,6 @@ int  ResManagerMainServer2ndPhase(void);
 
 void printHelpInfo(void);
 int  parseCommandLine(int argc, char **argv);
-
-int  loadHAWQClusterConfigure(void);
 
 int	 initializeSocketServer(void);
 int  startResourceBroker(bool isForked);

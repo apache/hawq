@@ -20,6 +20,7 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.MetadataFetcher;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
+import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 
 /**
@@ -41,24 +43,33 @@ public class HiveMetadataFetcher extends MetadataFetcher {
     private static final Log LOG = LogFactory.getLog(HiveMetadataFetcher.class);
     private HiveMetaStoreClient client;
 
-    public HiveMetadataFetcher() {
-        super();
+    public HiveMetadataFetcher(InputData md) {
+        super(md);
 
         // init hive metastore client connection.
         client = HiveUtilities.initHiveClient();
     }
 
     @Override
-    public Metadata getTableMetadata(String tableName) throws Exception {
+    public List<Metadata> getMetadata(String pattern) throws Exception {
 
-        Metadata.Table tblDesc = HiveUtilities.parseTableQualifiedName(tableName);
-        Metadata metadata = new Metadata(tblDesc);
+        List<Metadata.Item> tblsDesc = HiveUtilities.extractTablesFromPattern(client, pattern);
 
-        Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
+        if(tblsDesc == null || tblsDesc.isEmpty()) {
+            LOG.warn("No tables found for the given pattern: " + pattern);
+            return null;
+        }
 
-        getSchema(tbl, metadata);
+        List<Metadata> metadataList = new ArrayList<Metadata>();
 
-        return metadata;
+        for(Metadata.Item tblDesc: tblsDesc) {
+            Metadata metadata = new Metadata(tblDesc);
+            Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
+            getSchema(tbl, metadata);
+            metadataList.add(metadata);
+        }
+
+        return metadataList;
     }
 
 
@@ -66,6 +77,9 @@ public class HiveMetadataFetcher extends MetadataFetcher {
      * Populates the given metadata object with the given table's fields and partitions,
      * The partition fields are added at the end of the table schema.
      * Throws an exception if the table contains unsupported field types.
+     * Supported HCatalog types: TINYINT,
+     * SMALLINT, INT, BIGINT, BOOLEAN, FLOAT, DOUBLE, STRING, BINARY, TIMESTAMP,
+     * DATE, DECIMAL, VARCHAR, CHAR.
      *
      * @param tbl Hive table
      * @param metadata schema of given table
@@ -91,7 +105,7 @@ public class HiveMetadataFetcher extends MetadataFetcher {
                 metadata.addField(HiveUtilities.mapHiveType(hivePart));
             }
         } catch (UnsupportedTypeException e) {
-            String errorMsg = "Failed to retrieve metadata for table " + metadata.getTable() + ". " +
+            String errorMsg = "Failed to retrieve metadata for table " + metadata.getItem() + ". " +
                     e.getMessage();
             throw new UnsupportedTypeException(errorMsg);
         }

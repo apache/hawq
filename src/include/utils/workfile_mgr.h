@@ -195,7 +195,7 @@ ExecWorkFile *workfile_mgr_create_file(workfile_set *work_set);
 ExecWorkFile *workfile_mgr_create_fileno(workfile_set *work_set, uint32 file_no);
 ExecWorkFile *workfile_mgr_open_fileno(workfile_set *work_set, uint32 file_no);
 ExecWorkFile *workfile_mgr_open_filename(workfile_set *work_set, const char *file_name);
-int64 workfile_mgr_close_file(workfile_set *work_set, ExecWorkFile *file);
+int64 workfile_mgr_close_file(workfile_set *work_set, ExecWorkFile *file, bool canReportError);
 
 /* Workfile diskspace operations */
 void WorkfileDiskspace_Init(void);

@@ -735,8 +735,10 @@ int  optimizer_samples_number;
 int  optimizer_log_failure;
 int default_hash_table_bucket_number;
 int hawq_rm_nvseg_for_copy_from_perquery;
-int hawq_rm_nvseg_for_analyze_perquery_perseg_limit;
-int hawq_rm_nvseg_for_analyze_perquery_limit;
+int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
+int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
+int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
+int hawq_rm_nvseg_for_analyze_part_perquery_limit;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
@@ -4529,20 +4531,38 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_rm_nvseg_for_analyze_perquery_perseg_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+		{"hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit", PGC_USERSET, QUERY_TUNING_OTHER,
 			gettext_noop("Sets default virtual segment number per query per segment limit for analyze statement"),
 			NULL
 		},
-		&hawq_rm_nvseg_for_analyze_perquery_perseg_limit,
+		&hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit,
 		4, 1, 65535, NULL, NULL
 	},
 
 	{
-		{"hawq_rm_nvseg_for_analyze_perquery_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+		{"hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default virtual segment number per query per segment limit for analyze statement"),
+			NULL
+		},
+		&hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit,
+		8, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_nvseg_for_analyze_nopart_perquery_limit", PGC_USERSET, QUERY_TUNING_OTHER,
 			gettext_noop("Sets default virtual segment number per query limit for analyze statement"),
 			NULL
 		},
-		&hawq_rm_nvseg_for_analyze_perquery_limit,
+		&hawq_rm_nvseg_for_analyze_nopart_perquery_limit,
+		512, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_nvseg_for_analyze_part_perquery_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default virtual segment number per query limit for analyze statement"),
+			NULL
+		},
+		&hawq_rm_nvseg_for_analyze_part_perquery_limit,
 		256, 1, 65535, NULL, NULL
 	},
 
@@ -6194,7 +6214,7 @@ static struct config_int ConfigureNamesInt[] =
 			GUC_NOT_IN_SAMPLE | GUC_GPDB_ADDOPT
 		},
 		&optimizer_parts_to_force_sort_on_insert,
-		INT_MAX, 0, INT_MAX, NULL, NULL
+		160, 0, INT_MAX, NULL, NULL
 	},
 
 	{
@@ -6417,7 +6437,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nslice_perseg_limit,
-            3000, 1, 65535, NULL, NULL
+            5000, 1, 65535, NULL, NULL
     },
 
 	{
@@ -6574,6 +6594,16 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&rm_container_batch_limit,
 		1000, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rm_clusterratio_core_to_memorygb_factor",PGC_POSTMASTER, RESOURCES_MGM,
+			gettext_noop("Set the factor of balance one virtual core to memory by gigabyte "
+					     "for fixing cluster level memory to core ratio."),
+			NULL
+		},
+		&rm_clusterratio_core_to_memorygb_factor,
+		5, 0, 65535, NULL, NULL
 	},
 
 	{

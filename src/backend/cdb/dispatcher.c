@@ -1236,6 +1236,15 @@ dispatch_run(DispatchData *data)
 	INSTR_TIME_SET_CURRENT(data->time_begin);
 	if (!dispatcher_bind_executor(data))
 		goto error;
+
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   FaillQeAfterConnection,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
+
 	/*
 	 * Only after we have the executors, we can serialize the state. Or we
 	 * don't know the executor listening address.
@@ -1560,6 +1569,16 @@ dispatch_free_result(DispatchDataResult *result)
 		pfree(result->errbuf.data);
 		result->errbuf.data = NULL;
 	}
+
+	if (result->result)
+	{
+	  for (int i = 0; i <= result->numresults; i++){
+	    PQclear(result->result[i]);
+	    result->result[i] = NULL;
+	  }
+	  free(result->result);
+	}
+
 	dispmgt_free_takeoved_segment_conns(result->segment_conns);
 }
 

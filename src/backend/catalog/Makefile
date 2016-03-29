@@ -22,7 +22,7 @@ OBJS = catalog.o dependency.o heap.o index.o indexing.o namespace.o aclchk.o \
        pg_type.o toasting.o aoseg.o \
 	pg_attribute_encoding.o pg_compression.o $(QUICKLZ_COMPRESSION)
 
-SUBDIRS = caql core hcatalog
+SUBDIRS = caql core external
 
 BKIFILES = postgres.bki postgres.description postgres.shdescription
 

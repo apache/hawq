@@ -1305,13 +1305,17 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 
                 /* Jam stats into subplan's Instrumentation nodes. */
                 explainRecvStats = true;
-                cdbexplain_recvExecStats(planstate,
+                if (queryDesc->estate->dispatch_data &&
+                    !dispatcher_has_error(queryDesc->estate->dispatch_data))
+                {
+                  cdbexplain_recvExecStats(planstate,
                                          dispatch_get_results(queryDesc->estate->dispatch_data),
                                          LocallyExecutingSliceIndex(queryDesc->estate),
                                          econtext->ecxt_estate->showstatctx,
                                          dispatch_get_segment_num(queryDesc->estate->dispatch_data));
-            }
 
+                }
+            }
             /*
              * Wait for all gangs to finish.  Check and free the results.
              * If the dispatcher or any QE had an error, report it and

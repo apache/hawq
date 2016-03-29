@@ -768,7 +768,8 @@ static void check_keep_hash_and_external_table(
 			 * whose default value is set to default_segment_num
 			 */
 			ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
-			if(extEnrty->isweb){
+			if(extEnrty->command){
+				// command external table case
 				if (context->externTableOnClauseSegNum == 0) {
 					context->externTableOnClauseSegNum = targetPolicy->bucketnum;
 				} else {
@@ -782,6 +783,7 @@ static void check_keep_hash_and_external_table(
 				}
 			}
 			else{
+				// gpfdist location case.
 				if (context->externTableLocationSegNum < targetPolicy->bucketnum) {
 					context->externTableLocationSegNum = targetPolicy->bucketnum;
 					context->minimum_segment_num =  targetPolicy->bucketnum;
@@ -4256,6 +4258,9 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				}
 			} else {
 				maxTargetSegmentNumber = context.randomSegNum;
+				if(context.externTableLocationSegNum > 0 && maxTargetSegmentNumber < GetQueryVsegNum()){
+					maxTargetSegmentNumber = GetQueryVsegNum();
+				}
 				minTargetSegmentNumber = context.minimum_segment_num;
 			}
 

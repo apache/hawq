@@ -46,6 +46,7 @@ public class InputData {
     protected String accessor;
     protected String resolver;
     protected String fragmenter;
+    protected String metadata;
     protected String remoteLogin;
     protected String remoteSecret;
     protected int dataFragment; /* should be deprecated */
@@ -96,6 +97,7 @@ public class InputData {
         this.accessor = copy.accessor;
         this.resolver = copy.resolver;
         this.fragmenter = copy.fragmenter;
+        this.metadata = copy.metadata;
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
         this.threadSafe = copy.threadSafe;
@@ -269,6 +271,16 @@ public class InputData {
      */
     public String getFragmenter() {
         return fragmenter;
+    }
+
+    /**
+     * Returns the ClassName for the java class that was defined as Metadata
+     * or null if no metadata was defined.
+     *
+     * @return class name for METADATA or null
+     */
+    public String getMetadata() {
+        return metadata;
     }
 
     /**

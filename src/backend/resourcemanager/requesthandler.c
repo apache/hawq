@@ -1060,74 +1060,6 @@ bool handleRMRequestSegmentIsDown(void **arg)
 	return true;
 }
 
-bool handleRMRequestTmpDir(void **arg)
-{
-	static char errorbuf[ERRORMESSAGE_SIZE];
-    ConnectionTrack conntrack = (ConnectionTrack)(*arg);
-
-    RPCResponseTmpDirForQDData response;
-
-    if (DRMGlobalInstance->NextLocalHostTempDirIdx < 0) 
-    {
-    	SelfMaintainBufferData responsedata;
-    	initializeSelfMaintainBuffer(&responsedata, PCONTEXT);
-
-        response.Result	   = RM_STATUS_BAD_TMPDIR;
-        response.tmpdir[0] = '\0';
-        response.Reserved  = 0;
-
-        snprintf(errorbuf, sizeof(errorbuf),
-        		 "no available temporary directory in resource manager");
-
-        appendSMBVar(&responsedata, response);
-        appendSMBVar(&responsedata, errorbuf);
-        appendSelfMaintainBufferTill64bitAligned(&responsedata);
-
-        buildResponseIntoConnTrack(conntrack,
-                                   (char *)&response,
-                                   sizeof(response),
-                                   conntrack->MessageMark1,
-                                   conntrack->MessageMark2,
-                                   RESPONSE_QD_TMPDIR);
-        elog(WARNING, "%s", errorbuf);
-        destroySelfMaintainBuffer(&responsedata);
-    }
-    else
-    {
-        response.Result	  = FUNC_RETURN_OK;
-        response.Reserved = 0;
-        
-        SimpStringPtr tmpdir =
-        	(SimpStringPtr)getDQueueNodeDataByIndex(
-        					   &DRMGlobalInstance->LocalHostTempDirectoriesForQD,
-							   DRMGlobalInstance->NextLocalHostTempDirIdxForQD);
-
-        DRMGlobalInstance->NextLocalHostTempDirIdxForQD =
-                    (DRMGlobalInstance->NextLocalHostTempDirIdxForQD + 1) %
-                     getDQueueLength(&DRMGlobalInstance->LocalHostTempDirectoriesForQD);
-        
-        memset(response.tmpdir, 0, sizeof(response.tmpdir));
-        memcpy(response.tmpdir, tmpdir->Str, tmpdir->Len);
-
-        buildResponseIntoConnTrack(conntrack,
-                                   (char *)&response,
-                                   sizeof(response),
-                                   conntrack->MessageMark1,
-                                   conntrack->MessageMark2,
-                                   RESPONSE_QD_TMPDIR);
-        
-        elog(LOG, "Resource manager assigned temporary directory %s",
-                  tmpdir->Str);
-    }
-
-    conntrack->ResponseSent = false;
-	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-	PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conntrack);
-	MEMORY_CONTEXT_SWITCH_BACK
-
-    return true;
-}
-
 bool handleRMRequestDumpResQueueStatus(void **arg)
 {
     ConnectionTrack conntrack   = (ConnectionTrack)(*arg);
@@ -1219,11 +1151,7 @@ bool handleRMRequestDumpStatus(void **arg)
         dumpResourcePoolHosts(request->dump_file);
         break;
     default:
-        response.Result = RM_STATUS_BAD_DUMP_TYPE;
-        snprintf(errorbuf, sizeof(errorbuf),
-        		 "wrong dump type index %d",
-				 request->type);
-        elog(WARNING, "%s", errorbuf);
+        Assert(false);
         break;
     }
 
@@ -1231,11 +1159,6 @@ bool handleRMRequestDumpStatus(void **arg)
     initializeSelfMaintainBuffer(&responsedata, PCONTEXT);
 
     appendSMBVar(&responsedata, response);
-    if ( response.Result != FUNC_RETURN_OK )
-    {
-    	appendSMBVar(&responsedata, errorbuf);
-    	appendSelfMaintainBufferTill64bitAligned(&responsedata);
-    }
 
     buildResponseIntoConnTrack(conntrack,
                                SMBUFF_CONTENT(&responsedata),

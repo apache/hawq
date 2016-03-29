@@ -1223,6 +1223,8 @@ extern double  rm_regularize_io_factor;
 extern double  rm_regularize_usage_factor;
 extern double  rm_regularize_nvseg_factor;
 
+extern int	   rm_clusterratio_core_to_memorygb_factor;
+
 extern int	   rm_nvseg_variance_among_seg_respool_limit;
 
 extern int max_filecount_notto_split_segment;

@@ -1804,42 +1804,6 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 	return res;
 }
 
-/* Generate HAWQ host report. */
-void generateSegResourceReport(int32_t segid, SelfMaintainBuffer buff)
-{
-	SegResource seg = getSegResource(segid);
-
-	if ( seg == NULL )
-	{
-		static char messagenull[] = "NULL NODE.";
-		appendSelfMaintainBuffer(buff, messagenull, sizeof(messagenull));
-	}
-	else
-	{
-		static char reporthead[256];
-
-		int headsize = sprintf(reporthead,
-							   "SEGMENT:ID=%d, "
-							   "HAWQAVAIL=%d. "
-							   "FTS( %d MB, %d CORE). "
-							   "GRM( %d MB, %d CORE). "
-							   "MEM=%d(%d) MB. "
-							   "CORE=%lf(%lf).\n",
-							   seg->Stat->ID,
-							   seg->Stat->FTSAvailable,
-							   seg->Stat->FTSTotalMemoryMB,
-							   seg->Stat->FTSTotalCore,
-							   seg->Stat->GRMTotalMemoryMB,
-							   seg->Stat->GRMTotalCore,
-							   seg->Allocated.MemoryMB,
-							   seg->Available.MemoryMB,
-							   seg->Allocated.Core,
-							   seg->Available.Core);
-		appendSelfMaintainBuffer(buff, reporthead, headsize);
-		generateSegInfoReport(&(seg->Stat->Info), buff);
-	}
-}
-
 /* Generate machine id instance data into a string as report. */
 void  generateSegInfoReport(SegInfo seginfo, SelfMaintainBuffer buff)
 {
@@ -1971,6 +1935,21 @@ int  addGRMContainerToToBeAccepted(GRMContainer ctn)
 
 	/* The host must has registered resource information linked. */
 	Assert( ctn->Resource != NULL);
+
+	/* If the new container makes total possible resource quota greater than
+	 * maximum resource capacity, reject this container.
+	 */
+	uint32_t memlimit = DRMGlobalInstance->ImpType == NONE_HAWQ2 ?
+						ctn->Resource->Stat->FTSTotalMemoryMB :
+						ctn->Resource->Stat->GRMTotalMemoryMB;
+	if ( ctn->Resource->IncPending.MemoryMB + ctn->Resource->Allocated.MemoryMB > memlimit )
+	{
+		elog(WARNING, "Global resource manager allocated too many containers to "
+					  "host %s. To return this host's resource container at once.",
+					  ctn->HostName);
+		addGRMContainerToKicked(ctn);
+		return RESOURCEPOOL_TOO_MANY_CONTAINERS;
+	}
 
 	/* Set the resource as increasing pending. */
 	addResourceBundleData(&(ctn->Resource->IncPending), ctn->MemoryMB, ctn->Core);
@@ -4162,10 +4141,12 @@ void validateResourcePoolStatus(bool refquemgr)
 
 	if ( totalallocmem > mem || totalalloccore > core )
 	{
-		elog(ERROR, "HAWQ RM Validation. Allocated too much resource in resource "
-					"pool. (%d MB, %lf CORE)",
-					totalallocmem,
-					totalalloccore);
+		elog(WARNING, "HAWQ RM Validation. Allocated too much resource in resource "
+					  "pool (%d MB, %lf CORE), maximum capacity (%d MB, %lf CORE)",
+					  totalallocmem,
+					  totalalloccore,
+					  core,
+					  mem);
 	}
 
 	/*
@@ -4560,85 +4541,28 @@ void fixClusterMemoryCoreRatio(void)
 	}
 
 	/*
-	 * Go into real calculation of the cluster level memory to core ratio now,
-	 * The idea of fixing the ratio is to calculate possible
+	 * Go through all current segments to get segment level ratios.
 	 */
-
-	HASHTABLEData ratios;
-	initializeHASHTABLE(&ratios,
-						PCONTEXT,
-						HASHTABLE_SLOT_VOLUME_DEFAULT,
-						HASHTABLE_SLOT_VOLUME_DEFAULT_MAX,
-						HASHTABLE_KEYTYPE_UINT32,
-						NULL);
-
-	/*
-	 * STEP 1. Go through all current segments to get segment level ratios.
-	 */
+	uint32_t  cratio	 = 1024;
+	uint32_t  maxmemmb	 = 0;
 	List 	 *ressegl	 = NULL;
 	ListCell *cell		 = NULL;
 	getAllPAIRRefIntoList(&(PRESPOOL->Segments), &ressegl);
-	foreach(cell, ressegl)
+
+
+	uint32_t minwaste 			= UINT32_MAX;
+	uint32_t minwasteratio		= cratio;
+	uint32_t minwastememorymb	= 0;
+	uint32_t minwastecore		= 0;
+	while ( true )
 	{
-		PAIR 		pair 	 = (PAIR)lfirst(cell);
-		SegResource segres 	 = (SegResource)(pair->Value);
-		uint32_t 	ratio 	 = 0;
-		uint32_t 	memorymb = 0;
-		uint32_t 	core	 = 0;
+		uint32_t wastememorymb = 0;
+		uint32_t wastecore	   = 0;
 
-		if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
-		{
-			continue;
-		}
-
-		if ( DRMGlobalInstance->ImpType == NONE_HAWQ2 )
-		{
-			memorymb = segres->Stat->FTSTotalMemoryMB;
-			core	 = segres->Stat->FTSTotalCore;
-		}
-		else
-		{
-			/*
-			 * If this segment is FTS available,
-			 * RM should get GRM report for it.
-			 */
-			Assert((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT)
-					== 0);
-			memorymb = segres->Stat->GRMTotalMemoryMB;
-			core	 = segres->Stat->GRMTotalCore;
-		}
-
-		Assert(core > 0);
-		ratio = memorymb / core;
-
-		PAIR ratiopair = getHASHTABLENode(&ratios, TYPCONVERT(void *, ratio));
-		if ( ratiopair == NULL )
-		{
-			setHASHTABLENode(&ratios, TYPCONVERT(void *, ratio), NULL, false);
-		}
-	}
-
-	/*
-	 * STEP 2. Choose one ratio as cluster ratio by estimating the possible
-	 * 		   resource waste.
-	 */
-	uint32_t minmemorywaste = UINT32_MAX;
-	uint32_t candratio = 0;
-
-	List 	 *ratiol	= NULL;
-	ListCell *ratiocell	= NULL;
-	getAllPAIRRefIntoList(&ratios, &ratiol);
-	foreach(ratiocell, ratiol)
-	{
-		PAIR pair = (PAIR)lfirst(ratiocell);
-		uint32_t segratio = TYPCONVERT(uint32_t, pair->Key);
-
-		uint32_t memorywaste = 0;
 		foreach(cell, ressegl)
 		{
-			PAIR segpair = (PAIR)lfirst(cell);
-			SegResource segres 	 = (SegResource)(segpair->Value);
-			uint32_t 	ratio 	 = 0;
+			PAIR 		pair 	 = (PAIR)lfirst(cell);
+			SegResource segres 	 = (SegResource)(pair->Value);
 			uint32_t 	memorymb = 0;
 			uint32_t 	core	 = 0;
 
@@ -4655,48 +4579,75 @@ void fixClusterMemoryCoreRatio(void)
 			else
 			{
 				/*
-				 * If this segment is FTS available,
-				 * RM should get GRM report for it.
+				 * If this segment is FTS available, RM should get GRM report for it.
 				 */
 				Assert((segres->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT)
 						== 0);
 				memorymb = segres->Stat->GRMTotalMemoryMB;
 				core	 = segres->Stat->GRMTotalCore;
 			}
-			Assert(core > 0);
-			ratio = memorymb / core;
-			uint32_t segmemwaste = 0;
 
-			if ( segratio * core > memorymb )
+			Assert(core > 0);
+
+			if ( maxmemmb < memorymb )
 			{
-				segmemwaste = memorymb - (memorymb / segratio) * segratio;
+				maxmemmb = memorymb;
 			}
-			else
-			{
-				segmemwaste = memorymb - core *segratio;
-			}
-			memorywaste += segmemwaste;
+
+			int count = (core * cratio > memorymb) ?
+						(memorymb / cratio) :
+						core;
+			wastememorymb += memorymb - count * cratio;
+			wastecore += core - count *1;
 		}
 
-		elog(RMLOG, "Resource manager estimates that ratio %u MB per core wastes "
-					"%d MB resource in the whole recognized cluster.",
-					segratio,
-					memorywaste);
+		elog(DEBUG3, "Ratio %d, having %d MB %d CORE wasted.",
+					 cratio,
+					 wastememorymb,
+					 wastecore);
 
-		if ( memorywaste < minmemorywaste )
+		/*
+		 * Check if we got minimum resource waste this time. We expect firstly
+		 * we can use as much memory as possible then as much core as possible.
+		 */
+		uint32_t waste = wastememorymb +
+						 wastecore * rm_clusterratio_core_to_memorygb_factor * 1024;
+		if ( waste < minwaste )
 		{
-			minmemorywaste = memorywaste;
-			candratio = segratio;
+			minwaste 			= waste;
+			minwasteratio 		= cratio;
+			minwastememorymb 	= wastememorymb;
+			minwastecore 		= wastecore;
+			if ( waste == 0 )
+			{
+				break;
+			}
+		}
+
+		if ( maxmemmb == 0 )
+		{
+			/* If no available segment to fix ratio, dont loop. */
+			break;
+		}
+
+		if ( cratio >= maxmemmb )
+		{
+			break;
+		}
+		else
+		{
+			cratio += 1024; /* The step is 1gb. */
 		}
 	}
 
-	PRESPOOL->ClusterMemoryCoreRatio = candratio;
+	PRESPOOL->ClusterMemoryCoreRatio = minwasteratio;
 
 	elog(LOG, "Resource manager chooses ratio %u MB per core as cluster level "
-			  "memory to core ratio, there are %d MB memory resource unable to "
-			  "utilize.",
+			  "memory to core ratio, there are %d MB memory %d CORE resource "
+			  "unable to be utilized.",
 			  PRESPOOL->ClusterMemoryCoreRatio,
-			  minmemorywaste);
+			  minwastememorymb,
+			  minwastecore);
 
 	/*
 	 * Refresh segments' capacity following the fixed cluster level memory to
@@ -4712,7 +4663,6 @@ void fixClusterMemoryCoreRatio(void)
 
 	/* Clean up. */
 	freePAIRRefList(&(PRESPOOL->Segments), &ressegl);
-	cleanHASHTABLE(&ratios);
 
 }
 

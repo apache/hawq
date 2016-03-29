@@ -73,7 +73,9 @@ extern void free_datanode_rest_server(PxfServer* srv);
 extern PxfFragmentStatsElem *get_fragments_statistics(GPHDUri* hadoop_uri, ClientContext *cl_context);
 extern List* get_data_fragment_list(GPHDUri *hadoop_uri,  ClientContext* client_context);
 extern void free_fragment(DataFragment *fragment);
-extern List* get_hcat_metadata(GPHDUri* hadoop_uri, char *location, ClientContext *client_context);
+extern List* get_external_metadata(GPHDUri* hadoop_uri, char *profile, char *pattern, ClientContext *client_context, Oid dboid);
+extern List* get_and_cache_external_metadata(GPHDUri* hadoop_uri, char *profile, char *pattern, ClientContext *client_context, Oid dboid);
+extern List* get_no_cache_external_metadata(GPHDUri* hadoop_uri, char *profile, char *pattern, ClientContext *client_context);
 
 #endif //_PXF_NAMENODE_H_
 

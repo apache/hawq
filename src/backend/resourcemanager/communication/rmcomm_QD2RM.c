@@ -202,6 +202,7 @@ uint64_t			QD2RM_LastRefreshResourceTime = 0;
 bool				QD2RM_Initialized			  = false;
 
 pthread_t       	ResourceHeartBeatThreadHandle;
+bool				ResourceHeartBeatRunning	  = false;
 pthread_mutex_t 	ResourceSetsMutex;
 uint64_t        	LastSendResourceRefreshHeartBeatTime = 0;
 
@@ -317,12 +318,14 @@ void initializeQD2RMComm(void)
     	}
 
 
-    	/* Start heart-beat thread. */
+		/* Start heart-beat thread. */
+		ResourceHeartBeatRunning = true;
 		if ( pthread_create(&ResourceHeartBeatThreadHandle,
 							NULL,
 							generateResourceRefreshHeartBeat,
 							tharg) != 0)
 		{
+			ResourceHeartBeatRunning = false;
 			freeHeartBeatThreadArg(&tharg);
 			elog(ERROR, "failed to create background thread for communication with "
 						"resource manager.");
@@ -334,6 +337,8 @@ void initializeQD2RMComm(void)
     initializeSocketConnectionPool();
 
     QD2RM_Initialized = true;
+
+    on_proc_exit(cleanupQD2RMComm, 0);
 }
 
 int createNewResourceContext(int *index)
@@ -473,18 +478,28 @@ int cleanupQD2RMComm(void)
                 res = returnResource(i, errorbuf, sizeof(errorbuf));
                 if ( res != FUNC_RETURN_OK )
                 {
-                	elog(WARNING, "%s", errorbuf);
-            	}
+                    elog(WARNING, "%s", errorbuf);
+                }
                 errorbuf[0] = '\0';
                 res = unregisterConnectionInRM(i, errorbuf, sizeof(errorbuf));
                 if ( res != FUNC_RETURN_OK )
                 {
-                	elog(WARNING, "%s", errorbuf);
+                    elog(WARNING, "%s", errorbuf);
                 }
             }
         }
     }
     pthread_mutex_unlock(&ResourceSetsMutex);
+    pthread_mutex_destroy(&ResourceSetsMutex);
+
+    if (ResourceHeartBeatRunning)
+    {
+        ResourceHeartBeatRunning = false;
+        res = pthread_join(ResourceHeartBeatThreadHandle, NULL);
+        if ( res != FUNC_RETURN_OK ) {
+            elog(WARNING, "Fail to cancel resource heartbeat thread.");
+        }
+    }
 
     return FUNC_RETURN_OK;
 }
@@ -1221,6 +1236,7 @@ exit:
 	destroySelfMaintainBuffer(&recvbuffer);
 }
 
+/*
 int getLocalTmpDirFromMasterRM(char *errorbuf, int errorbufsize)
 {
 	static char 	 errorbuf2[ERRORMESSAGE_SIZE];
@@ -1273,7 +1289,7 @@ exit:
 	destroySelfMaintainBuffer(&recvbuffer);
 	return res;
 }
-
+*/
 
 int acquireResourceQuotaFromRM(int64_t		user_oid,
 							   uint32_t		max_seg_count_fix,
@@ -1379,14 +1395,12 @@ void *generateResourceRefreshHeartBeat(void *arg)
 
 	gp_set_thread_sigmasks();
 
-	pthread_detach(pthread_self());
-
 	initializeSelfMaintainBuffer(&sendbuffer, NULL);
 	initializeSelfMaintainBuffer(&contbuffer, NULL);
 	prepareSelfMaintainBuffer(&sendbuffer, DEFAULT_HEARTBEAT_BUFFER, true);
 	prepareSelfMaintainBuffer(&contbuffer, DEFAULT_HEARTBEAT_BUFFER, true);
 
-	while( true )
+	while( ResourceHeartBeatRunning )
 	{
 		resetSelfMaintainBuffer(&sendbuffer);
 		resetSelfMaintainBuffer(&contbuffer);
@@ -1546,6 +1560,8 @@ void *generateResourceRefreshHeartBeat(void *arg)
 		pg_usleep(rm_session_lease_heartbeat_interval * 1000000L);
 	}
 
+	destroySelfMaintainBuffer(&sendbuffer);
+	destroySelfMaintainBuffer(&contbuffer);
 	freeHeartBeatThreadArg(&tharg);
 	write_log("generateResourceRefreshHeartBeat exits.");
 	return 0;

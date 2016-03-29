@@ -949,22 +949,22 @@ static void cancel_delegation_token(PxfInputData *inputData)
 }
 
 /*
- * Fetches meatdata for the relation from hcatalog using pxf
- * Create the necessary hadoop uri for the hcat proxy and the clientcontext
- * Returns the list of metadata for hcat tables
+ * Fetches metadata for the item from PXF
+ * Returns the list of metadata for PXF items
+ * Caches data if dboid is not NULL
  *
  */
-List *get_pxf_hcat_metadata(char *relation_location)
+List *get_pxf_item_metadata(char *profile, char *pattern, Oid dboid)
 {
 	ClientContext client_context; /* holds the communication info */
 	PxfInputData inputData = {0};
-	List *hcat_tables = NIL;
+	List *objects = NIL;
 
 	/* Define pxf service url address  */
 	StringInfoData uri;
 	initStringInfo(&uri);
 	appendStringInfo(&uri, "%s/", pxf_service_address);
-	GPHDUri* hadoop_uri = parseGPHDUriForHCAT(uri.data);
+	GPHDUri* hadoop_uri = parseGPHDUriForMetadata(uri.data);
 	pfree(uri.data);
 
 	init_client_context(&client_context);
@@ -982,9 +982,9 @@ List *get_pxf_hcat_metadata(char *relation_location)
 	generate_delegation_token(&inputData);
 	build_http_header(&inputData);
 
-	hcat_tables = get_hcat_metadata(hadoop_uri, relation_location, &client_context);
+	objects = get_external_metadata(hadoop_uri, profile, pattern, &client_context, dboid);
 
-	freeGPHDUriForHCAT(hadoop_uri);
+	freeGPHDUriForMetadata(hadoop_uri);
 	cancel_delegation_token(&inputData);
-	return hcat_tables;
+	return objects;
 }

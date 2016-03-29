@@ -31,7 +31,7 @@ import org.apache.hawq.pxf.api.UnsupportedTypeException;
 public class HiveUtilitiesTest {
 
     FieldSchema hiveColumn;
-    Metadata.Table tblDesc;
+    Metadata.Item tblDesc;
 
     static String[][] typesMappings = {
         /* hive type -> hawq type */
@@ -154,19 +154,19 @@ public class HiveUtilitiesTest {
     @Test
     public void parseTableQualifiedNameNoDbName() throws Exception {
         String name = "orphan";
-        tblDesc = HiveUtilities.parseTableQualifiedName(name);
+        tblDesc = HiveUtilities.extractTableFromName(name);
 
-        assertEquals("default", tblDesc.getDbName());
-        assertEquals(name, tblDesc.getTableName());
+        assertEquals("default", tblDesc.getPath());
+        assertEquals(name, tblDesc.getName());
     }
 
     @Test
     public void parseTableQualifiedName() throws Exception {
         String name = "not.orphan";
-        tblDesc = HiveUtilities.parseTableQualifiedName(name);
+        tblDesc = HiveUtilities.extractTableFromName(name);
 
-        assertEquals("not", tblDesc.getDbName());
-        assertEquals("orphan", tblDesc.getTableName());
+        assertEquals("not", tblDesc.getPath());
+        assertEquals("orphan", tblDesc.getName());
     }
 
     @Test
@@ -206,7 +206,7 @@ public class HiveUtilitiesTest {
 
     private void parseTableQualifiedNameNegative(String name, String errorMsg, String reason) throws Exception {
         try {
-            tblDesc = HiveUtilities.parseTableQualifiedName(name);
+            tblDesc = HiveUtilities.extractTableFromName(name);
             fail("test should fail because of " + reason);
         } catch (IllegalArgumentException e) {
             assertEquals(errorMsg, e.getMessage());

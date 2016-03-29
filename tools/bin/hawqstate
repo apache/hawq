@@ -120,16 +120,23 @@ def show_brief_status(hawq_site, segment_list, standby_host):
 
 if __name__ == '__main__':
     options, args = parseargs()
+
+    if options.verbose and options.quiet:
+        print "Multiple actions specified.  See the --help info."
+        sys.exit(1)
+
     if options.verbose:
         enable_verbose_logging()
     if options.quiet:
         quiet_stdout_logging()
 
     logger, log_filename = setup_hawq_tool_logging('hawq_state',getLocalHostname(),getUserName(), options.logDir) 
+
     if options.hawq_home is None:
         GPHOME = os.getenv('GPHOME')
     else:
         GPHOME = options.hawq_home
+
     hawq_site = HawqXMLParser(GPHOME)
     hawq_site.get_all_values()
     segment_list = parse_hosts_file(GPHOME)

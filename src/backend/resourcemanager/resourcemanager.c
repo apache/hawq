@@ -453,7 +453,6 @@ int ResManagerMainServer2ndPhase(void)
 	registerMessageHandler(REQUEST_RM_IMALIVE               , handleRMSEGRequestIMAlive);
 	registerMessageHandler(REQUEST_QD_DDL_MANIPULATERESQUEUE, handleRMDDLRequestManipulateResourceQueue);
 	registerMessageHandler(REQUEST_QD_DDL_MANIPULATEROLE	, handleRMDDLRequestManipulateRole);
-	registerMessageHandler(REQUEST_QD_TMPDIR				, handleRMRequestTmpDir);
 	registerMessageHandler(REQUEST_RM_TMPDIR				, handleRMSEGRequestTmpDir);
 	registerMessageHandler(REQUEST_QD_ACQUIRE_RESOURCE_QUOTA, handleRMRequestAcquireResourceQuota);
 	registerMessageHandler(REQUEST_QD_REFRESH_RESOURCE      , handleRMRequestRefreshResource);
@@ -645,11 +644,11 @@ int MainHandlerLoop(void)
 			 PRESPOOL->AddPendingContainerCount == 0 &&
 			 PRESPOOL->RetPendingContainerCount == 0 &&
 			 PQUEMGR->ForcedReturnGRMContainerCount == 0 &&
-			 (PQUEMGR->GRMQueueCurCapacity > PQUEMGR->GRMQueueCapacity ||
-			  PQUEMGR->GRMQueueResourceTight) )
+			 PQUEMGR->GRMQueueCurCapacity > 1 &&
+			 PQUEMGR->GRMQueueResourceTight )
 		{
 			elog(LOG, "Resource manager decides to breathe out resource. "
-					  "Current GRM queue capacity %lf, "
+					  "Current relative GRM queue capacity %lf, "
 					  "Expect GRM queue capacity %lf, "
 					  "Estimae GRM queue %s",
 					  PQUEMGR->GRMQueueCurCapacity,
@@ -767,16 +766,6 @@ int getStringValue(int argc, char **argv, int pos, SimpString *val)
 		return MAIN_WRONG_COMMANDLINE;
 	setSimpleStringNoLen(val, argv[pos]);
 	return FUNC_RETURN_OK;
-}
-
-/******************************************************************************
- * Load HAWQ cluster node information.
- ******************************************************************************/
-int loadHAWQClusterConfigure(void)
-{
-	int res = FUNC_RETURN_OK;
-
-	return res;
 }
 
 int createDRMInstance(void)

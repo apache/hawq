@@ -84,7 +84,7 @@ parseGPHDUri(const char *uri_str)
 	return uri;
 }
 
-/* parseGPHDUriForHCAT
+/* parseGPHDUriForMetadata
  *
  * Go over a URI string and parse it into its various components while
  * verifying valid structure given a specific target protocol.
@@ -100,7 +100,7 @@ parseGPHDUri(const char *uri_str)
  * 		a parsed uri as a GPHDUri structure, or reports a format error.
  */
 GPHDUri*
-parseGPHDUriForHCAT(char *uri_str)
+parseGPHDUriForMetadata(char *uri_str)
 {
 	GPHDUri	*uri = (GPHDUri *)palloc0(sizeof(GPHDUri));
 
@@ -128,7 +128,7 @@ freeGPHDUri(GPHDUri *uri)
 }
 
 void
-freeGPHDUriForHCAT(GPHDUri *uri)
+freeGPHDUriForMetadata(GPHDUri *uri)
 {
 
 	pfree(uri->host);

@@ -182,6 +182,52 @@ class HawqInit:
             logger.warn("Set standby host name failed")
         return result
 
+    def sync_hdfs_client(self):
+        sync_host_str = ""
+        for node in self.host_list:
+            sync_host_str += " -h %s" % node
+
+        if 'hawq_standby_address_host' in self.hawq_dict and self.standby_host_name.lower() not in ('', 'none'):
+            sync_host_str += " -h %s" % self.standby_host_name
+
+        result = local_ssh("hawq scp %s %s/etc/hdfs-client.xml =:%s/etc/" % (sync_host_str, self.GPHOME, self.GPHOME))
+        if result != 0:
+            logger.error("Sync hdfs-client.xml failed.")
+            sys.exit(1)
+
+    def set_replace_datanode_on_failure(self):
+        xml_file = "%s/etc/hdfs-client.xml" % self.GPHOME
+        property_name = 'output.replace-datanode-on-failure'
+        pexist, pname, pvalue = check_property_exist_xml(xml_file, property_name)
+        datanodes_threshold = 4
+
+        if self.hosts_count_number < datanodes_threshold:
+            property_value = 'false'
+        else:
+            property_value = 'true'
+
+        if pvalue != property_value:
+            logger.info("Set output.replace-datanode-on-failure to %s" % property_value)
+            if pexist:
+                logger.debug("Update output.replace-datanode-on-failure to %s" % property_value)
+                update_xml_property(xml_file, property_name, property_value)
+            else:
+                logger.debug("Add output.replace-datanode-on-failure as %s" % property_value)
+                append_xml_property(xml_file, property_name, property_value)
+
+            self.sync_hdfs_client()
+
+            # Check hdfs-client.xml again to validate changes
+            pexist, pname, pvalue = check_property_exist_xml(xml_file, property_name)
+            if pvalue == property_value:
+                result = 0
+            else:
+                result = 1
+        else:
+            result = 0
+
+        return result
+
     def set_total_vsegment_num(self):
         cmd = "%s; hawq config -c default_hash_table_bucket_number -v %s --skipvalidation -q > /dev/null" % \
                (source_hawq_env, self.total_vseg_num)
@@ -258,7 +304,7 @@ class HawqInit:
                 logger.error("Failed to connect to database, this script can only be run when the database is up")
                 cmd = "%s; hawq stop master -a -M fast" % source_hawq_env
                 check_return_code(local_ssh(cmd, logger), logger, "Stop hawq master failed, exit")
-            remove_property_xml("hawq_standby_address_host", "%s/etc/hawq-site.xml" % self.GPHOME)
+            remove_property_xml("hawq_standby_address_host", "%s/etc/hawq-site.xml" % self.GPHOME, self.quiet)
             host_list = parse_hosts_file(self.GPHOME)
             sync_hawq_site(self.GPHOME, host_list)
             gpsyncmaster_pid = gp.getSyncmasterPID(running_standby_host, self.master_data_directory)
@@ -337,7 +383,9 @@ class HawqInit:
         logger.info("%s segment hosts defined" % self.hosts_count_number)
         logger.info("Set default_hash_table_bucket_number as: %s" % self.total_vseg_num)
         check_return_code(self.set_total_vsegment_num())
+        logger.info("Set hawq_rm_nvseg_perquery_perseg_limit as: %s" % self.vseg_num_per_node)
         check_return_code(self.set_vsegment_num_per_node())
+        check_return_code(self.set_replace_datanode_on_failure())
 
         master_cmd = self._get_master_init_cmd()
         logger.info("Start to init master node: '%s'" % self.master_host_name)
@@ -380,7 +428,9 @@ class HawqInit:
             logger.info("%s segment hosts defined" % self.hosts_count_number)
             logger.info("Set default_hash_table_bucket_number as: %s" % self.total_vseg_num)
             check_return_code(self.set_total_vsegment_num())
+            logger.info("Set hawq_rm_nvseg_perquery_perseg_limit as: %s" % self.vseg_num_per_node)
             check_return_code(self.set_vsegment_num_per_node())
+            check_return_code(self.set_replace_datanode_on_failure())
             logger.info("Start to init master")
             cmd = self._get_master_init_cmd()
             check_return_code(local_ssh(cmd, logger, warning = True), logger, \
@@ -715,6 +765,7 @@ class HawqStop:
             logger.info("There are %d connections to the database" % total_connections)
         except DatabaseError, ex:
             logger.error("Failed to connect to the running database, please check master status")
+            logger.error("Or you can check hawq stop --help for other stop options")
             sys.exit(1)
 
         if total_connections > 0 and self.stop_mode=='smart':
@@ -757,7 +808,8 @@ class HawqStop:
     def _stop_master(self):
         master_host, master_running = check_hawq_running(self.master_host_name, self.master_data_directory, self.master_port, self.user, logger)
         if master_running:
-            self._stop_master_checks()
+            if self.stop_mode != 'immediate':
+                self._stop_master_checks()
             cmd = self._stop_master_cmd()
             result = remote_ssh(cmd, self.master_host_name, self.user)
             return result
@@ -929,7 +981,8 @@ def get_args():
             quiet_stdout_logging()
         logger, log_filename = setup_hawq_tool_logging('hawq_%s' % opts.hawq_command,getLocalHostname(),getUserName(), opts.log_dir)
         logger.info("Prepare to do 'hawq %s'" % opts.hawq_command)
-        logger.info("You can check log in %s" % log_filename)
+        logger.info("You can find log in:")
+        logger.info(log_filename)
     else:
         print COMMON_HELP
         sys.exit(1)
@@ -939,11 +992,20 @@ def get_args():
     if args_lens != 2:
         sys.exit('Only support two arguements.')
     
+    if opts.verbose and opts.quiet_run:
+        logger.error("Multiple actions specified.  See the --help info.")
+        sys.exit(1)
+
+    if opts.special_mode and (opts.hawq_command != 'start'):
+        logger.error("['-U', '--special-mode'] only apply to 'hawq start'.  See the --help info.")
+        sys.exit(1)
+
     opts.GPHOME = os.getenv('GPHOME')
     if not opts.GPHOME:
         logger.error("Didn't get GPHOME value, exit")
         sys.exit()
-    logger.debug("GPHOME is %s" % opts.GPHOME)
+    logger.info("GPHOME is set to:")
+    logger.info(opts.GPHOME)
     global source_hawq_env
     source_hawq_env = "source %s/greenplum_path.sh" % opts.GPHOME 
 
@@ -953,6 +1015,8 @@ def get_args():
         logger.error("'root' user is not allowed")
         sys.exit()
     logger.debug("Current user is '%s'" % opts.user)
+    logger.debug("Parsing config file:")
+    logger.debug("%s/etc/hawq-site.xml" % opts.GPHOME)
     hawqsite = HawqXMLParser(opts.GPHOME)
     hawqsite.get_all_values()
     hawq_dict = hawqsite.hawq_dict
@@ -1165,21 +1229,13 @@ def create_parser():
                       action="store_true",
                       dest="quiet_run",
                       help="Execute in quiet mode")
-    parser.add_option("-y", "--nostandby",
-                      action="store_false",
-                      dest="nostandby",
-                      help="Exclude standby master")
     parser.add_option("-l", "--logdir",
                       dest="log_dir",
                       help="Sets the directory for log files")
     parser.add_option("-t", "--timeout",
                       dest="timeout_seconds",
                       default="600",
-                      help="Set the timeout seconds, default is 60")
-    parser.add_option("-B", "--parallel",
-                      dest="parallel_processses",
-                      default="60",
-                      help="Sets the max parallel processes")
+                      help="Set the timeout seconds, default is 600")
     parser.add_option("--user",
                       dest="user",
                       default="",
@@ -1262,6 +1318,7 @@ def create_parser():
     if len(args) == 0:
         parser.print_help()
         sys.exit(1)
+
     return (options, args)
 
 if __name__ == '__main__':

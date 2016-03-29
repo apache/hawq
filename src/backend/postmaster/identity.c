@@ -100,8 +100,9 @@ static SegmentIdentity SegmentId = { SEGMENT_ROLE_INVALID };
 static void DebugSegmentIdentity(struct SegmentIdentity *id);
 static void DebugProcessIdentity(struct ProcessIdentity *id);
 static bool	DeserializeProcessIdentity(struct ProcessIdentity *id, const char *str);
-static void GetLocalTmpDirFromRM(char *host, uint16_t port, int session_id, int command_id, int qeidx);
+//static void GetLocalTmpDirFromRM(char *host, uint16_t port, int session_id, int command_id, int qeidx);
 
+/*
 static void
 GetLocalTmpDirFromRM(char *host,
 					 uint16_t port,
@@ -156,6 +157,7 @@ GetLocalTmpDirFromRM(char *host,
                 session_id, command_id, qeidx); 
     }
 }
+*/
 
 static void
 SetSegmentRole(const char *name, SegmentIdentity *segment)
@@ -226,18 +228,6 @@ bool
 IsOnMaster(void)
 {
 	return SegmentId.role == SEGMENT_ROLE_MASTER;
-}
-
-SegmentFunctionList *
-GetSegmentFunctionList(void)
-{
-	return &SegmentId.function;
-}
-
-ProcessFunctionList *
-GetProcessFunctionList(void)
-{
-	return &SegmentId.pid.function;
 }
 
 static void
@@ -396,7 +386,10 @@ SetupProcessIdentity(const char *str)
         
         if (get_tmpdir_from_rm)
         {
+            elog(ERROR, "The GUC value get_tmpdir_from_rm to be true hasn't been supported yet. "
+			"Please set get_tmpdir_from_rm=false ");
             /* If QE is under one segment. */
+            /*
             if ( GetQEIndex() != -1 ) {
                 GetLocalTmpDirFromRM("127.0.0.1",//DRMGlobalInstance->SocketLocalHostName.Str,
                                      rm_segment_port,
@@ -404,7 +397,9 @@ SetupProcessIdentity(const char *str)
                                      gp_command_count,
                                      GetQEIndex());
             }
+            */
             /* QE is under master. */
+            /*
             else {
                 GetLocalTmpDirFromRM("127.0.0.1",//DRMGlobalInstance->SocketLocalHostName.Str,
                                      rm_master_port,
@@ -415,6 +410,7 @@ SetupProcessIdentity(const char *str)
 
             elog(DEBUG1, "Get temporary directory from segment resource manager, %s",
         		    LocalTempPath);
+            */
         }
         else
         {
@@ -456,14 +452,18 @@ GetQEGangNum(void)
 	return SegmentId.pid.init ? SegmentId.pid.gang_member_num : 0;
 }
 
-int	GetAnalyzeVSegNumLimit(void)
+int	GetAnalyzeVSegNumLimit(bool isPartitionTableExist)
 {
-	int nvseg = hawq_rm_nvseg_for_analyze_perquery_perseg_limit * slaveHostNumber;
-	while(nvseg > hawq_rm_nvseg_for_analyze_perquery_limit){
+	int perSegLimit = isPartitionTableExist ? hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit
+			: hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
+	int perQueryLimit = isPartitionTableExist ? hawq_rm_nvseg_for_analyze_part_perquery_limit
+				: hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
+	int nvseg = perSegLimit * slaveHostNumber;
+	while(nvseg > perQueryLimit){
 		nvseg -= slaveHostNumber;
 	}
 	if(nvseg <= 0){
-		nvseg = hawq_rm_nvseg_for_analyze_perquery_limit;
+		nvseg = perQueryLimit;
 	}
 	return nvseg;
 }
@@ -564,7 +564,7 @@ GetQueryVsegNum(void)
 int
 GetExternalTablePartitionNum(void)
 {
-	return GetQueryVsegNum();
+	return GetHashDistPartitionNum();
 }
 
 int
@@ -573,6 +573,7 @@ GetUserDefinedFunctionVsegNum(void)
 	return GetQueryVsegNum();
 }
 
+/*
 int
 GetAllWorkerHostNum(void)
 {
@@ -583,6 +584,7 @@ GetAllWorkerHostNum(void)
 
 	return num;
 }
+*/
 
 static void
 DebugSegmentIdentity(SegmentIdentity *id)

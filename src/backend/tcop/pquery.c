@@ -43,6 +43,7 @@
 #include "tcop/pquery.h"
 #include "tcop/tcopprot.h"
 #include "tcop/utility.h"
+#include "utils/faultinjector.h"
 #include "utils/memutils.h"
 #include "utils/resscheduler.h"
 #include "commands/vacuum.h"
@@ -109,7 +110,7 @@ static int64 DoPortalRunFetch(Portal portal,
 				 DestReceiver *dest);
 static void DoPortalRewind(Portal portal);
 
-static void AddToGlobalQueryResources(QueryResource *resource);
+static void AddToGlobalQueryResources(int resourceId, QueryResourceLife life);
 
 static int compare_segment(const void *e1, const void *e2);
 /*
@@ -791,6 +792,7 @@ AllocateResource(QueryResourceLife   life,
 		elog(ERROR, "%s. (%d)", errorbuf, errorcode);
 	}
 
+	AddToGlobalQueryResources(resourceId, life);
 	/* Acquire resource. */
 	ret = acquireResourceFromRM(resourceId,
 								gp_session_id,
@@ -898,7 +900,6 @@ AllocateResource(QueryResourceLife   life,
 	 * appropriate place.
 	 */
 	gp_segments_for_planner = list_length(resource->segments);
-	AddToGlobalQueryResources(resource);
 
 	return resource;
 }
@@ -916,13 +917,13 @@ AutoFreeResource(QueryResource *resource)
 }
 
 static void
-AddToGlobalQueryResources(QueryResource *resource)
+AddToGlobalQueryResources(int resourceId, QueryResourceLife life)
 {
   ListCell *lc;
   QueryResourceItem *newItem;
   MemoryContext old;
 
-  if ((!resource) || (resource->life == QRL_NONE))
+  if (life == QRL_NONE)
   {
     return;
   }
@@ -930,7 +931,7 @@ AddToGlobalQueryResources(QueryResource *resource)
   foreach(lc, GlobalQueryResources)
   {
     QueryResourceItem *qri = lfirst(lc);
-    if(qri->resource_id == resource->resource_id)
+    if(qri->resource_id == resourceId)
     {
       /*
        * found, no need to add.
@@ -946,7 +947,7 @@ AddToGlobalQueryResources(QueryResource *resource)
   old = MemoryContextSwitchTo(TopMemoryContext);
   newItem = palloc(sizeof(QueryResourceItem));
   newItem->alive = true;
-  newItem->resource_id = resource->resource_id;
+  newItem->resource_id = resourceId;
   GlobalQueryResources = lappend(GlobalQueryResources, newItem);
   MemoryContextSwitchTo(old);
 }
@@ -1409,6 +1410,14 @@ PortalRun(Portal portal, int64 count, bool isTopLevel,
 	MemoryContext saveMemoryContext;
 
 	AssertArg(PortalIsValid(portal));
+
+#ifdef FAULT_INJECTOR
+				FaultInjector_InjectFaultIfSet(
+											   FailQeWhenDoQuery,
+											   DDLNotSpecified,
+											   "",	// databaseName
+											   ""); // tableName
+#endif
 
 	/* Initialize completion tag to empty string */
 	if (completionTag)

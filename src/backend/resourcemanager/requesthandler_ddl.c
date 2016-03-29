@@ -45,9 +45,6 @@ int performInsertActionForPGResqueue(List *colvalues, Oid *newoid);
 int performUpdateActionForPGResqueue(List *colvalues, char *queuename);
 int performDeleteActionForPGResqueue(char *queuename);
 
-Datum getDatumFromStringValuForPGResqueue(int	 colindex,
-								   		  char  *colvaluestr);
-
 int buildInsertActionForPGResqueue(DynResourceQueue   queue,
 							   	   List 			 *rsqattr,
 							   	   List		   		**insvalues);
@@ -1545,50 +1542,6 @@ cleanup:
 	}
 	PQfinish(conn);
 	return res;
-}
-
-/*******************************************************************************
- * Recognize the column value based on column index and convert string format
- * value into Datum instance for caql operations.
- ******************************************************************************/
-Datum getDatumFromStringValuForPGResqueue(int	 colindex,
-										  char  *colvaluestr)
-{
-	switch(colindex) {
-	case Anum_pg_resqueue_rsqname:
-		/* Set value as name format */
-		return DirectFunctionCall1(namein, CStringGetDatum(colvaluestr));
-
-
-	case Anum_pg_resqueue_creationtime:
-	case Anum_pg_resqueue_updatetime:
-		return 0;
-
-	case Anum_pg_resqueue_memorylimit:
-	case Anum_pg_resqueue_corelimit:
-	case Anum_pg_resqueue_allocpolicy:
-	case Anum_pg_resqueue_vsegresourcequota:
-	case Anum_pg_resqueue_status:
-		/* Set value as text format */
-		return DirectFunctionCall1(textin, CStringGetDatum(colvaluestr));
-
-	case Anum_pg_resqueue_activestats:
-	{
-		int32_t tmpvalue;
-		sscanf(colvaluestr, "%d", &tmpvalue);
-		return Int32GetDatum(tmpvalue);
-	}
-	case Anum_pg_resqueue_parentoid:
-	{
-		int64_t tmpoid;
-		Oid 	parentoid;
-		sscanf(colvaluestr, INT64_FORMAT, &tmpoid);
-		parentoid = tmpoid;
-		return ObjectIdGetDatum(parentoid);
-	}
-	Assert(false);
-	}
-	return 0;
 }
 
 void freeUpdateActionList(MCTYPE context, List **actions)
