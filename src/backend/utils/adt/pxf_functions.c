@@ -63,7 +63,7 @@ pxf_item_fields_enum_next(ItemContext *item_context)
 	else if (lnext(item_context->current_field))
 		item_context->current_field = lnext(item_context->current_field);
 	/* next item */
-	else if (lnext(item_context->current_item))
+	else if (item_context->current_item && lnext(item_context->current_item))
 	{
 		item_context->current_item = lnext(item_context->current_item);
 		item_context->current_field = list_head(((PxfItem *) lfirst(item_context->current_item))->fields);

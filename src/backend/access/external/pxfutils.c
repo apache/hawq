@@ -100,10 +100,11 @@ call_rest(GPHDUri *hadoop_uri,
 static void process_request(ClientContext* client_context, char *uri)
 {
 	size_t n = 0;
+	char buffer[RAW_BUF_SIZE];
 
 	print_http_headers(client_context->http_headers);
 	client_context->handle = churl_init_download(uri, client_context->http_headers);
-	memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
+	memset(buffer, 0, RAW_BUF_SIZE);
 	resetStringInfo(&(client_context->the_rest_buf));
 
 	/*
@@ -115,10 +116,10 @@ static void process_request(ClientContext* client_context, char *uri)
 	{
 		/* read some bytes to make sure the connection is established */
 		churl_read_check_connectivity(client_context->handle);
-		while ((n = churl_read(client_context->handle, client_context->chunk_buf, sizeof(client_context->chunk_buf))) != 0)
+		while ((n = churl_read(client_context->handle, buffer, sizeof(buffer))) != 0)
 		{
-			appendBinaryStringInfo(&(client_context->the_rest_buf), client_context->chunk_buf, n);
-			memset(client_context->chunk_buf, 0, RAW_BUF_SIZE);
+			appendBinaryStringInfo(&(client_context->the_rest_buf), buffer, n);
+			memset(buffer, 0, RAW_BUF_SIZE);
 		}
 		churl_cleanup(client_context->handle, false);
 	}

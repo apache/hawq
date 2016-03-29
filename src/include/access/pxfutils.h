@@ -28,7 +28,7 @@ typedef struct sClientContext
 {
 	CHURL_HEADERS http_headers;
 	CHURL_HANDLE handle;
-	char chunk_buf[RAW_BUF_SIZE];	/* part of the HTTP response - received	*/
+									/* part of the HTTP response - received	*/
 									/* from one call to churl_read 			*/
 	StringInfoData the_rest_buf; 	/* contains the complete HTTP response 	*/
 } ClientContext;
