@@ -75,7 +75,7 @@ public class MetadataResponseFormatter {
                 continue;
             }
 
-            result.("Metadata for item \"").append(metadata.getItem()).append("\": ");
+            result.append("Metadata for item \"").append(metadata.getItem()).append("\": ");
 
             if ((metadata.getFields() == null) || metadata.getFields().isEmpty()) {
                 result.append("None");
