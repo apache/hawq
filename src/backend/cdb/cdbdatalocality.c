@@ -771,16 +771,16 @@ static void check_keep_hash_and_external_table(
 			ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
 
 			bool isPxf = false;
-			if(!extEnrty->command && extEnrty->locations){
+			if (!extEnrty->command && extEnrty->locations) {
 				char* first_uri_str = (char *) strVal(lfirst(list_head(extEnrty->locations)));
-				if(first_uri_str){
+				if (first_uri_str) {
 					Uri* uri = ParseExternalTableUri(first_uri_str);
-					if(uri && uri->protocol == URI_CUSTOM && is_pxf_protocol(uri)){
+					if (uri && uri->protocol == URI_CUSTOM && is_pxf_protocol(uri)) {
 						isPxf = true;
 					}
 				}
 			}
-			if(extEnrty->command || isPxf){
+			if (extEnrty->command || isPxf) {
 				// command external table or pxf case
 				if (context->externTableForceSegNum == 0) {
 					context->externTableForceSegNum = targetPolicy->bucketnum;
@@ -794,7 +794,7 @@ static void check_keep_hash_and_external_table(
 					}
 				}
 			}
-			else{
+			else {
 				// gpfdist location case and others
 				if (context->externTableLocationSegNum < targetPolicy->bucketnum) {
 					context->externTableLocationSegNum = targetPolicy->bucketnum;
