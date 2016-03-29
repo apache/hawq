@@ -1851,9 +1851,13 @@ bool dispatch_validate_conn(pgsocket sock)
   if (ret == 0) /* socket has been closed. EOF */
     return false;
 
-  if (ret > 0) /* data waiting on socket, it must be OK. */
-    return true;
-
+  if (ret > 0) /* data waiting on socket */
+  {
+    if (buf == 'E') /* waiting data indicates error */
+      return false;
+    else
+      return true;
+  }
   if (ret == -1) /* error, or would be block. */
   {
     if (errno == EAGAIN || errno == EINPROGRESS || errno == EWOULDBLOCK)
