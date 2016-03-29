@@ -29,8 +29,6 @@
 #include "utils/simplestring.h"
 #include "utils/linkedlist.h"
 
-#define DRMRM2RMSEG_MEMORY_CONTEXT_NAME  "RM to RMSEG communication"
-
 void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 							 uint16_t						 messageid,
 							 uint8_t						 mark1,
@@ -63,50 +61,6 @@ void sentDecreaseMemoryQuotaCleanup(AsyncCommMessageHandlerContext context);
 
 void processContainersAfterIncreaseMemoryQuota(GRMContainerSet ctns, bool accepted);
 void processContainersAfterDecreaseMemoryQuota(GRMContainerSet cts, bool kicked);
-
-/******************************************************************************
- *
- * Global Variables.
- *
- * Postmaster side global variables saving the data not necessarily always sent
- * from resource manager.
- *
- ******************************************************************************/
-
-MemoryContext			RM2RMSEG_CommContext;
-RM2RMSEGContextData		RM2RMSEG_Context;
-
-void initializeRM2RMSEGComm(void)
-{
-
-	/* Ask for new memory context for this postmaster side memory consumption.*/
-	MEMORY_CONTEXT_SWITCH_TO(TopMemoryContext)
-
-	RM2RMSEG_CommContext = NULL;
-
-	RM2RMSEG_CommContext = AllocSetContextCreate( CurrentMemoryContext,
-											      DRMRM2RMSEG_MEMORY_CONTEXT_NAME,
-											      ALLOCSET_DEFAULT_MINSIZE,
-											      ALLOCSET_DEFAULT_INITSIZE,
-											      ALLOCSET_DEFAULT_MAXSIZE);
-	Assert( RM2RMSEG_CommContext != NULL );
-	MEMORY_CONTEXT_SWITCH_BACK
-
-	/* Create communication context. */
-	RM2RMSEG_Context.RM2RMSEG_Conn_FD = -1;
-
-	initializeSelfMaintainBuffer(&(RM2RMSEG_Context.SendBuffer),
-								 RM2RMSEG_CommContext);
-	initializeSelfMaintainBuffer(&(RM2RMSEG_Context.RecvBuffer),
-								 RM2RMSEG_CommContext);
-}
-
-int cleanupRM2RMSEGComm(void)
-{
-	destroySelfMaintainBuffer(&(RM2RMSEG_Context.SendBuffer));
-	destroySelfMaintainBuffer(&(RM2RMSEG_Context.RecvBuffer));
-	return FUNC_RETURN_OK;
-}
 
 int sendRUAlive(char *seghostname)
 {
