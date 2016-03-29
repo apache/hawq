@@ -2625,7 +2625,7 @@ int  loadHostInformationIntoResourcePool(void)
 
     phostlist = fopen(rm_resourcepool_test_filename, "r");
     if ( phostlist == NULL )
-    	return FUNC_RETURN_OK;
+        return FUNC_RETURN_OK;
 
     /* This buffer is used for building machine id instance. */
     initializeSelfMaintainBuffer(&seginfobuff, PCONTEXT);
@@ -2637,22 +2637,26 @@ int  loadHostInformationIntoResourcePool(void)
     char line[1024];
     while( fgets(line, sizeof(line)-1, phostlist) != NULL ) {
 
-    	elog(LOG, "HAWQ RM :: Load line %s", line);
+        elog(LOG, "HAWQ RM :: Load line %s", line);
 
-    	/* Parse line. */
-    	char *phostname = strtok(line, ",");
-    	if ( phostname == NULL ) continue;
-    	char *phostport = strtok(NULL, ",");
-    	if ( phostport == NULL ) continue;
-    	char *phostip = strtok(NULL, ",");
-    	if ( phostip == NULL ) continue;
-    	uint32_t port = 0;
-    	sscanf(phostport, "%d", &port);
+        /* Parse line. */
+        char *phostname = strtok(line, ",");
+        if ( phostname == NULL ) continue;
+        char *phostport = strtok(NULL, ",");
+        if ( phostport == NULL ) continue;
+        char *phostip = strtok(NULL, ",");
+        if ( phostip == NULL ) continue;
+        uint32_t port = 0;
+        if (sscanf(phostport, "%d", &port) != 1)
+        {
+            elog(LOG, "HAWQ RM :: Invalid port, skip machine %s", phostname);
+            continue;
+        }
 
         /* If the host is new, add new host instance in resource pool */
         int32_t segtid = SEGSTAT_ID_INVALID;
         if ( getSegIDByHostName(phostname,strlen(phostname), &segtid) ==
-        	 FUNC_RETURN_OK )
+             FUNC_RETURN_OK )
         {
             elog(LOG, "HAWQ RM :: Skip machine %s", phostname);
             continue;
@@ -2676,7 +2680,7 @@ int  loadHostInformationIntoResourcePool(void)
         newhost->AddressAttributeOffset = sizeof(SegInfoData);
         /* Jump offset and reserved pad. */
         newhost->AddressContentOffset   = sizeof(SegInfoData) +
-        		sizeof(uint32_t) * (((newhost->HostAddrCount + 1) >> 1) << 1);
+                sizeof(uint32_t) * (((newhost->HostAddrCount + 1) >> 1) << 1);
         uint16_t addrattr   = HOST_ADDRESS_CONTENT_STRING;
         uint16_t addroffset = newhost->AddressContentOffset;
 
@@ -2687,17 +2691,17 @@ int  loadHostInformationIntoResourcePool(void)
         /* Add hostip content. */
         uint32_t length   = strlen(phostip);
         while( length > 0 &&
-        	   (phostip[length-1] == '\r' ||
-        	    phostip[length-1] == '\n' ||
-        	    phostip[length-1] == '\t' ||
-        	    phostip[length-1] == ' ') ) {
-        	length--;
+               (phostip[length-1] == '\r' ||
+                phostip[length-1] == '\n' ||
+                phostip[length-1] == '\t' ||
+                phostip[length-1] == ' ') ) {
+            length--;
         }
         int     addrsize  = __SIZE_ALIGN64(offsetof(AddressStringData, Address) +
                                            length + 1);
         prepareSelfMaintainBuffer(&seginfobuff, addrsize, true);
         AddressString straddr = (AddressString)(seginfobuff.Buffer +
-        										seginfobuff.Cursor + 1);
+                                                seginfobuff.Cursor + 1);
         straddr->Length = length;
         memcpy(straddr->Address, phostip, length+1);
         straddr->Address[length] = '\0';
@@ -2751,16 +2755,16 @@ int  loadHostInformationIntoResourcePool(void)
         SimpString key;
         setSimpleStringRefNoLen(&key, GET_SEGINFO_HOSTNAME(&(segstat->Info)));
         getSegIDByHostName(GET_SEGINFO_HOSTNAME(&(segstat->Info)),
-        				   segstat->Info.HostNameLen,
-        				   &id);
+                           segstat->Info.HostNameLen,
+                           &id);
         setHASHTABLENode(&(PRESPOOL->HDFSHostNameIndexed),
-				 	 	 &key,
-						 TYPCONVERT(void *, id),
-						 false);
+                         &key,
+                         TYPCONVERT(void *, id),
+                         false);
         setHASHTABLENode(&(PRESPOOL->GRMHostNameIndexed),
-				 	 	 &key,
-						 TYPCONVERT(void *, id),
-						 false);
+                         &key,
+                         TYPCONVERT(void *, id),
+                         false);
     }
 
 	/* Refresh resource queue capacities. */
