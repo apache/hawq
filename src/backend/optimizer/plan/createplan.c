@@ -1366,7 +1366,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	 */
 
 	/* (1) */
-	if(using_location && (uri->protocol == URI_FILE || uri->protocol == URI_HTTP))
+	if(using_location && uri->protocol == URI_HTTP)
 	{
 		/* 
 		 * extract file path and name from URI strings and assign them a primary segdb 
@@ -1394,22 +1394,11 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 				 * Assign mapping of external file to this segdb only if:
 				 * 1) This segdb is a valid primary.
 				 * 2) An external file wasn't already assigned to it. 
-				 * 3) If 'file' protocol, host of segdb and file must be 
-				 *    the same.
 				 *
 				 * This logic also guarantees that file that appears first in 
 				 * the external location list for the same host gets assigned
 				 * the segdb with the lowest index for this host.
 				 */			
-				if(uri->protocol == URI_FILE)
-				{
-				  /* Hack the code to pass some regression test.
-				   * In the future, we will remove this feature.
-				   */
-					if (pg_strcasecmp(uri->hostname, segment->hostname) != 0 && pg_strcasecmp(uri->hostname, segment->hostip) != 0
-					    && pg_strcasecmp(uri->hostname, "localhost") != 0)
-						continue;
-				}
 
 				/* a valid primary segdb exist on this host */
 				found_candidate = true;
@@ -1430,36 +1419,12 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 			 */
 			if(allocatedResource && (!found_match))
 			{
-				if(uri->protocol == URI_FILE)
-				{
-					if(found_candidate)
-					{
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-								 errmsg("Could not assign a segment database for \"%s\". "
-										"There are more external files than primary segment "
-										"databases on host \"%s\"", uri_str, uri->hostname),
-												 errOmitLocation(true)));
-					}
-					else
-					{
-						ereport(ERROR,
-								(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-								 errmsg("Could not assign a segment database for \"%s\". "
-										"There isn't a valid primary segment database "
-										"on host \"%s\"", uri_str, uri->hostname),
-												 errOmitLocation(true)));
-					}
-				}
-				else /* HTTP */
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-							 errmsg("Could not assign a segment database for \"%s\". "
-									"There are more URIs than total primary segment "
-									"databases", uri_str),
-											 errOmitLocation(true)));
-				}
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+						 errmsg("Could not assign a segment database for \"%s\". "
+								"There are more URIs than total primary segment "
+								"databases", uri_str),
+										 errOmitLocation(true)));
 			}		
 		}
 
