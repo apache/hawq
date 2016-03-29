@@ -68,7 +68,6 @@ public class MetadataResponseFormatter {
 
         for(Metadata metadata: metadataList) {
             StringBuilder result = new StringBuilder();
-            result.append("Metadata for item \"");
 
             if (metadata == null) {
                 result.append("None");
@@ -76,7 +75,7 @@ public class MetadataResponseFormatter {
                 continue;
             }
 
-            result.append(metadata.getItem()).append("\": ");
+            result.("Metadata for item \"").append(metadata.getItem()).append("\": ");
 
             if ((metadata.getFields() == null) || metadata.getFields().isEmpty()) {
                 result.append("None");
