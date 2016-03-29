@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
+#include "envswitch.h"
 #include "communication/rmcomm_RMSEG2RM.h"
 #include "communication/rmcomm_Message.h"
 #include "communication/rmcomm_MessageHandler.h"
@@ -25,8 +25,6 @@
 #include "utils/memutilities.h"
 #include "utils/simplestring.h"
 #include "utils/linkedlist.h"
-
-#define DRMRMSEG2RM_MEMORY_CONTEXT_NAME  "RMSEG to RM communication"
 
 void receivedIMAliveResponse(AsyncCommMessageHandlerContext  context,
 							 uint16_t						 messageid,
@@ -37,49 +35,6 @@ void receivedIMAliveResponse(AsyncCommMessageHandlerContext  context,
 void sentIMAlive(AsyncCommMessageHandlerContext context);
 void sentIMAliveError(AsyncCommMessageHandlerContext context);
 void sentIMAliveCleanUp(AsyncCommMessageHandlerContext context);
-/******************************************************************************
- *
- * Global Variables.
- *
- * Postmaster side global variables saving the data not necessarily always sent
- * from resource manager.
- *
- ******************************************************************************/
-
-MemoryContext			RMSEG2RM_CommContext;
-RMSEG2RMContextData		RMSEG2RM_Context;
-
-void initializeRMSEG2RMComm(void)
-{
-	/* Ask for new memory context for this postmaster side memory consumption.*/
-	MEMORY_CONTEXT_SWITCH_TO(TopMemoryContext)
-
-	RMSEG2RM_CommContext 	= NULL;
-
-	RMSEG2RM_CommContext = AllocSetContextCreate( CurrentMemoryContext,
-											      DRMRMSEG2RM_MEMORY_CONTEXT_NAME,
-											      ALLOCSET_DEFAULT_MINSIZE,
-											      ALLOCSET_DEFAULT_INITSIZE,
-											      ALLOCSET_DEFAULT_MAXSIZE );
-	Assert( RMSEG2RM_CommContext != NULL );
-	MEMORY_CONTEXT_SWITCH_BACK
-
-	/* Create communication context. */
-	RMSEG2RM_Context.RMSEG2RM_Conn_FD = -1;
-
-	initializeSelfMaintainBuffer(&(RMSEG2RM_Context.SendBuffer),
-								 RMSEG2RM_CommContext);
-	initializeSelfMaintainBuffer(&(RMSEG2RM_Context.RecvBuffer),
-								 RMSEG2RM_CommContext);
-}
-
-int cleanupRMSEG2RMComm(void)
-{
-	destroySelfMaintainBuffer(&(RMSEG2RM_Context.SendBuffer));
-	destroySelfMaintainBuffer(&(RMSEG2RM_Context.RecvBuffer));
-
-	return FUNC_RETURN_OK;
-}
 
 /******************************************************************************
  * I aM Alive.
@@ -173,13 +128,6 @@ int sendIMAlive(int  *errorcode,
 	return FUNC_RETURN_OK;
 }
 
-
-
-int sendIShutdown(void)
-{
-	return FUNC_RETURN_OK;
-}
-
 void receivedIMAliveResponse(AsyncCommMessageHandlerContext  context,
 							 uint16_t						 messageid,
 							 uint8_t						 mark1,
@@ -190,18 +138,17 @@ void receivedIMAliveResponse(AsyncCommMessageHandlerContext  context,
 	RPCResponseIMAlive response = (RPCResponseIMAlive)buffer;
 	if ( messageid != RESPONSE_RM_IMALIVE ||
 		 buffersize != sizeof(RPCResponseIMAliveData) ) {
-		elog(WARNING, "Segment's resource manager received wrong response for heart-beat request.");
-		return;
+		elog(WARNING, "Segment's resource manager received wrong response for "
+					  "heart-beat request.");
+		DRMGlobalInstance->SendToStandby = !DRMGlobalInstance->SendToStandby;
 	}
-	if ( response->Result == FUNC_RETURN_OK ) {
-		elog(DEBUG5, "Segment's resource manager gets response of heart-beat request successfully.");
+	else
+	{
+		/* Should always be a FUNC_RETURN_OK result. */
+		Assert(response->Result == FUNC_RETURN_OK);
+		elog(DEBUG5, "Segment's resource manager gets response of heart-beat "
+					 "request successfully.");
 	}
-	else {
-		elog(LOG, "Segment's resource manager gets error code %d as the response of "
-				  "heart-beat request.",
-				  response->Result);
-	}
-
 	closeFileDesc(context->AsyncBuffer);
 }
 
@@ -213,9 +160,11 @@ void sentIMAlive(AsyncCommMessageHandlerContext context)
 void sentIMAliveError(AsyncCommMessageHandlerContext context)
 {
 	if(DRMGlobalInstance->SendToStandby)
-		elog(WARNING, "Segment's resource manager sending IMAlive message switches from standby to master");
+		elog(WARNING, "Segment's resource manager sending IMAlive message "
+					  "switches from standby to master");
 	else
-		elog(WARNING, "Segment's resource manager sending IMAlive message switches from master to standby");
+		elog(WARNING, "Segment's resource manager sending IMAlive message "
+					  "switches from master to standby");
 	DRMGlobalInstance->SendToStandby = !DRMGlobalInstance->SendToStandby;
 }
 

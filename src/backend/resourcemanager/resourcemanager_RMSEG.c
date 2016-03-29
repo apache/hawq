@@ -53,8 +53,6 @@ int ResManagerMainSegment2ndPhase(void)
 		MainHandler_RMSEGDummyLoop();
 	}
 
-	initializeRMSEG2RMComm();
-
 	/*
 	 * Resource enforcement: initialize, cleanup, and rebuild CGroup hash table
 	 * when segment resource manager starts/restarts
