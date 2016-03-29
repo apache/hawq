@@ -56,6 +56,7 @@
 #include "resourcemanager/utils/network_utils.h"
 #include "access/skey.h"
 #include "utils/fmgroids.h"
+#include "utils/uri.h"
 #include "catalog/pg_proc.h"
 #include "postgres.h"
 #include "resourcemanager/utils/hashtable.h"
@@ -297,7 +298,7 @@ typedef struct split_to_segment_mapping_context {
 	int64 split_size;
 	MemoryContext old_memorycontext;
 	MemoryContext datalocality_memorycontext;
-	int externTableOnClauseSegNum;  //expected virtual segment number when external table exists
+	int externTableForceSegNum;  //expected virtual segment number when external table exists
 	int externTableLocationSegNum;  //expected virtual segment number when external table exists
 	int tableFuncSegNum;  //expected virtual segment number when table function exists
 	int hashSegNum;  // expected virtual segment number when there is hash table in from clause
@@ -532,7 +533,7 @@ static void init_datalocality_context(split_to_segment_mapping_context *context)
 	context->rtc_context.range_tables = NIL;
 	context->rtc_context.full_range_tables = NIL;
 
-	context->externTableOnClauseSegNum = 0;
+	context->externTableForceSegNum = 0;
 	context->externTableLocationSegNum = 0;
 	context->tableFuncSegNum = 0;
 	context->hashSegNum = 0;
@@ -768,12 +769,23 @@ static void check_keep_hash_and_external_table(
 			 * whose default value is set to default_segment_num
 			 */
 			ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
-			if(extEnrty->command){
-				// command external table case
-				if (context->externTableOnClauseSegNum == 0) {
-					context->externTableOnClauseSegNum = targetPolicy->bucketnum;
+
+			bool isPxf = false;
+			if(!extEnrty->command && extEnrty->locations){
+				char* first_uri_str = (char *) strVal(lfirst(list_head(extEnrty->locations)));
+				if(first_uri_str){
+					Uri* uri = ParseExternalTableUri(first_uri_str);
+					if(uri && uri->protocol == URI_CUSTOM && is_pxf_protocol(uri)){
+						isPxf = true;
+					}
+				}
+			}
+			if(extEnrty->command || isPxf){
+				// command external table or pxf case
+				if (context->externTableForceSegNum == 0) {
+					context->externTableForceSegNum = targetPolicy->bucketnum;
 				} else {
-					if (context->externTableOnClauseSegNum != targetPolicy->bucketnum) {
+					if (context->externTableForceSegNum != targetPolicy->bucketnum) {
 						/*
 						 * In this case, two external table join but with different bucket number
 						 * we cannot allocate the right segment number.
@@ -783,7 +795,7 @@ static void check_keep_hash_and_external_table(
 				}
 			}
 			else{
-				// gpfdist location case.
+				// gpfdist location case and others
 				if (context->externTableLocationSegNum < targetPolicy->bucketnum) {
 					context->externTableLocationSegNum = targetPolicy->bucketnum;
 					context->minimum_segment_num =  targetPolicy->bucketnum;
@@ -4195,7 +4207,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				fprintf(fpsegnum, "Result relation hash segment num : %d.\n", context.resultRelationHashSegNum);
 				fprintf(fpsegnum, "\n");
 				fprintf(fpsegnum, "Table  function      segment num : %d.\n", context.tableFuncSegNum);
-				fprintf(fpsegnum, "Extern table         segment num : %d.\n", context.externTableOnClauseSegNum);
+				fprintf(fpsegnum, "Extern table         segment num : %d.\n", context.externTableForceSegNum);
 				fprintf(fpsegnum, "From hash relation   segment num : %d.\n", context.hashSegNum);
 				fprintf(fpsegnum, "MaxExpectedNonRandom segment num : %d.\n", maxExpectedNonRandomSegNum);
 				fprintf(fpsegnum, "\n");
@@ -4205,8 +4217,8 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			int maxTargetSegmentNumber = 0;
 			/* we keep resultRelationHashSegNum in the highest priority*/
 			if (context.resultRelationHashSegNum != 0) {
-				if ((context.resultRelationHashSegNum != context.externTableOnClauseSegNum
-						&& context.externTableOnClauseSegNum != 0)
+				if ((context.resultRelationHashSegNum != context.externTableForceSegNum
+						&& context.externTableForceSegNum != 0)
 						|| (context.resultRelationHashSegNum < context.externTableLocationSegNum)) {
 					cleanup_allocation_algorithm(&context);
 					elog(ERROR, "Could not allocate enough memory! "
@@ -4215,14 +4227,14 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				maxTargetSegmentNumber = context.resultRelationHashSegNum;
 				minTargetSegmentNumber = context.resultRelationHashSegNum;
 			}
-			else if(context.externTableOnClauseSegNum > 0){
+			else if(context.externTableForceSegNum > 0){
 				/* bucket number of external table must be the same with the number of virtual segments*/
-				if(context.externTableOnClauseSegNum < context.externTableLocationSegNum){
+				if(context.externTableForceSegNum < context.externTableLocationSegNum){
 					cleanup_allocation_algorithm(&context);
 					elog(ERROR, "external table bucket number should match each other");
 				}
-				maxTargetSegmentNumber = context.externTableOnClauseSegNum;
-				minTargetSegmentNumber = context.externTableOnClauseSegNum;
+				maxTargetSegmentNumber = context.externTableForceSegNum;
+				minTargetSegmentNumber = context.externTableForceSegNum;
 			}
 			else if (maxExpectedNonRandomSegNum > 0) {
 				if (maxExpectedNonRandomSegNum == context.hashSegNum) {
