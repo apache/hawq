@@ -21,7 +21,9 @@
 #include "libyarnclient/LibYarnClient.h"
 #include "records/FinalApplicationStatus.h"
 
-using namespace std;
+using std::string;
+using std::list;
+using std::set;
 using namespace libyarn;
 
 class TestLibYarnClient: public ::testing::Test {

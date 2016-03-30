@@ -18,6 +18,7 @@
  */
 
 #include "GetContainerStatusesResponse.h"
+using std::list;
 
 namespace libyarn {
 

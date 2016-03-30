@@ -27,7 +27,9 @@
 #include "MockContainerManagement.h"
 #include "TestLibYarnClientStub.h"
 
-using namespace std;
+using std::string;
+using std::list;
+using std::set;
 using namespace libyarn;
 using namespace testing;
 using namespace Mock;

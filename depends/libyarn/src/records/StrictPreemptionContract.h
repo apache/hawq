@@ -26,7 +26,8 @@
 
 #include "PreemptionContainer.h"
 
-using namespace std;
+using std::string; 
+using std::set;
 using namespace hadoop;
 using namespace yarn;
 namespace libyarn {

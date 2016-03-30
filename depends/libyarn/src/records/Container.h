@@ -29,7 +29,7 @@
 #include "Token.h"
 
 
-using namespace std;
+using std::string;
 using namespace hadoop::yarn;
 using namespace hadoop::common;
 

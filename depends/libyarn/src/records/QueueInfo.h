@@ -28,7 +28,7 @@
 #include "QueueState.h"
 #include "ApplicationReport.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace hadoop::yarn;
 
 namespace libyarn {

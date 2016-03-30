@@ -30,7 +30,7 @@
 #include "libyarnserver/ApplicationMasterProtocol.h"
 
 using namespace libyarn;
-using namespace std;
+using std::string; using std::list;
 
 namespace Mock{
 class MockApplicationMasterProtocol : public ApplicationMasterProtocol {

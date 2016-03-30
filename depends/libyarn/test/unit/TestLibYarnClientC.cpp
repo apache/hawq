@@ -23,7 +23,7 @@
 #include "libyarnclient/LibYarnClientC.h"
 #include "MockLibYarnClient.h"
 
-using namespace std;
+using std::string;
 using namespace libyarn;
 using namespace testing;
 using namespace Mock;

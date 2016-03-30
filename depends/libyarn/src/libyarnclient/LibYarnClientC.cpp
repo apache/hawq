@@ -25,7 +25,7 @@
 #include "records/ResourceRequest.h"
 #include "records/Priority.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace libyarn;
 
 extern "C" {

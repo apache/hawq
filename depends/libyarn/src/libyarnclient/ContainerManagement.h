@@ -43,7 +43,7 @@
 #include "protocolrecords/GetContainerStatusesRequest.h"
 #include "protocolrecords/GetContainerStatusesResponse.h"
 
-using namespace std;
+using std::string; using std::list;
 
 #ifdef MOCKTEST
 #include "TestContainerManagementStub.h"

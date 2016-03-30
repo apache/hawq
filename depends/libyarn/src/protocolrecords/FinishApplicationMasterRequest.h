@@ -26,7 +26,7 @@
 
 #include "records/FinalApplicationStatus.h"
 
-using namespace std;
+using std::string;
 using namespace hadoop::yarn;
 
 namespace libyarn {

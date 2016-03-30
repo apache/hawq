@@ -23,7 +23,8 @@
 #include "libyarnclient/ApplicationClient.h"
 #include "MockApplicationClientProtocol.h"
 
-using namespace std;
+using std::string;
+using std::list;
 using namespace libyarn;
 using namespace testing;
 using namespace Mock;

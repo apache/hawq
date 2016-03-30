@@ -24,7 +24,7 @@
 #include "YARN_yarn_service_protos.pb.h"
 #include "records/ContainerReport.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace hadoop::yarn;
 namespace libyarn {
 

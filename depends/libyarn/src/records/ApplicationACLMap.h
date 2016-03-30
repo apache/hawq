@@ -24,7 +24,7 @@
 #include "YARN_yarn_protos.pb.h"
 #include "ApplicationAccessType.h"
 
-using namespace std;
+using std::string; 
 using namespace hadoop::yarn;
 
 namespace libyarn {

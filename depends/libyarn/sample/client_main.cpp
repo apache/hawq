@@ -25,7 +25,10 @@
 #include "libyarn/LibYarnClient.h"
 #include "libyarn/records/FinalApplicationStatus.h"
 
-using namespace std;
+using std::string;
+using std::cout;
+using std::endl;
+using std::list;
 using namespace libyarn;
 
 int main(void)

@@ -54,7 +54,7 @@
 #define APP_CLIENT_PROTOCOL "org.apache.hadoop.yarn.api.ApplicationClientProtocolPB"
 #define APP_CLIENT_DELEGATION_TOKEN_KIND "ContainerToken"
 
-using namespace std;
+using std::string; using std::list;
 using namespace google::protobuf;
 using namespace hadoop::yarn;
 using namespace Yarn::Internal;

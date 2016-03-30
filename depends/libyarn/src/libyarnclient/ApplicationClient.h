@@ -31,7 +31,7 @@
 #include "records/QueueUserACLInfo.h"
 #include "Thread.h"
 
-using namespace std;
+using std::string; using std::list;
 
 namespace libyarn {
 

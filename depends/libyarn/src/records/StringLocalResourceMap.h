@@ -23,7 +23,7 @@
 #include "YARN_yarn_protos.pb.h"
 #include "LocalResource.h"
 
-using namespace std;
+using std::string; 
 using namespace hadoop::yarn;
 namespace libyarn {
 

@@ -25,7 +25,7 @@
 #include "StartContainerRequest.h"
 #include "records/Token.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace hadoop::yarn;
 
 namespace libyarn {

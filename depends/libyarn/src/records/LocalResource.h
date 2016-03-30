@@ -26,7 +26,7 @@
 #include "LocalResourceType.h"
 #include "LocalResourceVisibility.h"
 
-using namespace std;
+using std::string;
 using namespace hadoop::yarn;
 namespace libyarn {
 

@@ -23,7 +23,7 @@
 #include <list>
 #include "YARN_yarn_protos.pb.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace hadoop::yarn;
 
 namespace libyarn {

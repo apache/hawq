@@ -29,7 +29,7 @@
 #include "gmock/gmock.h"
 #include "libyarnclient/LibYarnClient.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace libyarn;
 
 namespace Mock {
