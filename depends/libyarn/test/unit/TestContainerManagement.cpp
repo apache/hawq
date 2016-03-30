@@ -24,7 +24,9 @@
 #include "MockContainerManagementProtocol.h"
 #include "TestContainerManagementStub.h"
 
-using namespace std;
+using std::map;
+using std::string;
+using std::list;
 using namespace libyarn;
 using namespace testing;
 using namespace Mock;

@@ -17,7 +17,10 @@
  * under the License.
  */
 
+#include <set>
 #include "PreemptionContract.h"
+
+using std::set;
 
 namespace libyarn {
 

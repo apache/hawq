@@ -106,7 +106,7 @@ void ApplicationMaster::failoverToNextAppMasterProto(uint32_t oldValue){
 
 static void HandleYarnFailoverException(const Yarn::YarnFailoverException & e) {
     try {
-        rethrow_if_nested(e);
+		Yarn::rethrow_if_nested(e);
     } catch (...) {
         NESTED_THROW(Yarn::YarnRpcException, "%s", e.what());
     }

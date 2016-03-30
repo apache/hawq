@@ -25,7 +25,7 @@
 #include "YARN_yarn_protos.pb.h"
 #include "QueueACL.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace hadoop::yarn;
 
 namespace libyarn {

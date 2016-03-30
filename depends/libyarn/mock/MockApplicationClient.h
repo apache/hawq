@@ -31,7 +31,7 @@
 #include "libyarnclient/ApplicationClient.h"
 
 using namespace libyarn;
-using namespace std;
+using std::string; using std::list;
 
 namespace Mock{
 class MockApplicationClient : public ApplicationClient {

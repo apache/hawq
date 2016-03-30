@@ -41,6 +41,11 @@
 #include "TestLibYarnClientStub.h"
 #endif
 
+using std::string;
+using std::list;
+using std::map;
+using std::set;
+
 namespace libyarn {
 	class LibYarnClient {
 	public:

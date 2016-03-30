@@ -36,7 +36,7 @@
 #include "records/ResourceBlacklistRequest.h"
 
 
-using namespace std;
+using std::string; using std::list;
 using namespace Yarn::Internal;
 using namespace Yarn;
 

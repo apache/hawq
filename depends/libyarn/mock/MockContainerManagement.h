@@ -31,7 +31,7 @@
 #include "libyarnclient/ContainerManagement.h"
 
 using namespace libyarn;
-using namespace std;
+using std::string; using std::list;
 
 namespace Mock{
 class MockContainerManagement : public ContainerManagement {

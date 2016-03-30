@@ -26,7 +26,7 @@
 #include "YARN_yarn_protos.pb.h"
 #include "records/ApplicationAttemptId.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace hadoop::yarn;
 
 namespace libyarn {

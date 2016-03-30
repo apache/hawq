@@ -24,7 +24,7 @@
 
 using namespace testing;
 using namespace Mock;
-using namespace std;
+using std::string;
 
 class TestMockApplicationMasterProtocol: public ::testing::Test {
 public:

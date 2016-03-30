@@ -26,7 +26,7 @@
 #include "Priority.h"
 #include "Resource.h"
 
-using namespace std;
+using std::string;
 using namespace hadoop::yarn;
 
 namespace libyarn {

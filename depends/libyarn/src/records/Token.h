@@ -22,7 +22,7 @@
 
 #include "YARNSecurity.pb.h"
 
-using namespace std;
+using std::string;
 using namespace hadoop::common;
 
 namespace libyarn {

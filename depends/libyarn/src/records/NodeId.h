@@ -22,7 +22,7 @@
 
 #include "YARN_yarn_protos.pb.h"
 
-using namespace std;
+using std::string; 
 
 using namespace hadoop::yarn;
 

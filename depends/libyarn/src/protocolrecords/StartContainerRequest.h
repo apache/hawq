@@ -26,7 +26,7 @@
 #include "records/ContainerLaunchContext.h"
 #include "records/Token.h"
 
-using namespace std;
+using std::string; using std::list;
 using namespace hadoop::yarn;
 using namespace hadoop::common;
 

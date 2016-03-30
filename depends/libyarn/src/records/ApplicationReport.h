@@ -33,7 +33,7 @@
 #include "ApplicationResourceUsageReport.h"
 #include "ApplicationAttemptId.h"
 
-using namespace std;
+using std::string; 
 using namespace hadoop::yarn;
 using namespace hadoop::common;
 

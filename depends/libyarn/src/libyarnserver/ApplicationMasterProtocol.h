@@ -47,7 +47,7 @@
 #define APPLICATION_MASTER_PROTOCOL "org.apache.hadoop.yarn.api.ApplicationMasterProtocolPB"
 #define AMRM_TOKEN_KIND "YARN_AM_RM_TOKEN"
 
-using namespace std;
+using std::string; using std::list;
 using namespace google::protobuf;
 
 using namespace hadoop::yarn;

@@ -31,7 +31,7 @@
 #include "libyarnserver/ApplicationClientProtocol.h"
 
 using namespace libyarn;
-using namespace std;
+using std::string; using std::list;
 
 namespace Mock{
 class MockApplicationClientProtocol : public ApplicationClientProtocol {

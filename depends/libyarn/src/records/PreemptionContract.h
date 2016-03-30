@@ -28,7 +28,8 @@
 #include "PreemptionResourceRequest.h"
 #include "PreemptionContainer.h"
 
-using namespace std;
+using std::list;
+using std::set;
 using namespace hadoop;
 using namespace yarn;
 namespace libyarn {

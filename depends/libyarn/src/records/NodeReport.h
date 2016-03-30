@@ -33,7 +33,7 @@
 #include "Resource.h"
 #include "NodeState.h"
 
-using namespace std;
+using std::string;
 using namespace hadoop::yarn;
 
 namespace libyarn {

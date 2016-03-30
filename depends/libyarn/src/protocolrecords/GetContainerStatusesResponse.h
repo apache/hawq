@@ -24,7 +24,7 @@
 #include <list>
 #include "YARN_yarn_service_protos.pb.h"
 #include "records/ContainerStatus.h"
-
+using std::list;
 using namespace hadoop::yarn;
 namespace libyarn {
 
