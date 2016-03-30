@@ -42,10 +42,15 @@ static bool describeOneTSConfig(const char *oid, const char *nspname,
 static void printACLColumn(PQExpBuffer buf, const char *colname);
 static bool isGPDB(void);
 static bool isGPDB4200OrLater(void);
+static bool describePxfTable(const char *profile, const char *pattern, bool verbose);
+static void parsePxfPattern(const char *user_pattern, char **pattern);
 
 /* GPDB 3.2 used PG version 8.2.10, and we've moved the minor number up since then for each release,  4.1 = 8.2.15 */
 /* Allow for a couple of future releases.  If the version isn't in this range, we are talking to PostgreSQL, not GPDB */
 #define mightBeGPDB() (pset.sversion >= 80210 && pset.sversion < 80222)
+
+#define HiveProfileName "Hive"
+#define HcatalogSourceName "hcatalog"
 
 static bool isGPDB(void)
 {
@@ -1151,6 +1156,25 @@ describeTableDetails(const char *pattern, bool verbose, bool showSystem)
 	PQExpBufferData buf;
 	PGresult   *res;
 	int			i;
+
+	//Hive hook in this method
+	if(pattern && strncmp(pattern, HcatalogSourceName, strlen(HcatalogSourceName)) == 0)
+	{
+		char *pxf_pattern = NULL;
+		char *pattern_dup = strdup(pattern);
+		parsePxfPattern(pattern_dup, &pxf_pattern);
+		if (!pxf_pattern)
+		{
+			fprintf(stderr, _("Invalid pattern provided.\n"));
+			free(pattern_dup);
+			return false;
+		}
+
+		bool success = describePxfTable(HiveProfileName, pxf_pattern, verbose);
+		free(pattern_dup);
+		return success;
+	}
+
 
 	initPQExpBuffer(&buf);
 
@@ -4212,4 +4236,124 @@ printACLColumn(PQExpBuffer buf, const char *colname)
 		appendPQExpBuffer(buf,
 						  "pg_catalog.array_to_string(%s, '\\n') AS \"%s\"",
 						  colname, gettext_noop("Access privileges"));
+}
+
+/*
+ * parsePxfPattern
+ *
+ * Splits user_pattern by "." and writes second part to pattern.
+ */
+static void
+parsePxfPattern(const char *user_pattern, char **pattern)
+{
+	strtok(user_pattern, ".");
+	*pattern = strtok(NULL, "/0");
+}
+
+/*
+ * describePxfTable
+ *
+ * Describes external PXF table.
+ */
+static bool
+describePxfTable(const char *profile, const char *pattern, bool verbose)
+{
+	PQExpBufferData buf;
+	PQExpBufferData title;
+	PGresult *res;
+	printQueryOpt myopt = pset.popt;
+	printTableContent cont;
+	int			cols = 0;
+	int			total_numrows = 0;
+	char	   *headers[2];
+	bool		printTableInitialized = false;
+
+	char *previous_path = NULL;
+	char *previous_itemname = NULL;
+
+	char *path;
+	char *itemname;
+	char *fieldname;
+	char *fieldtype;
+	int total_fields = 0; //needed to know how much memory allocate for current table
+
+	initPQExpBuffer(&buf);
+
+	printfPQExpBuffer(&buf, "SELECT t.*, COUNT() OVER(PARTITION BY path, itemname) as total_fields FROM\n"
+			"pxf_get_item_fields('%s', '%s') t\n", profile, pattern);
+
+	res = PSQLexec(buf.data, false);
+	total_numrows = PQntuples(res);
+	termPQExpBuffer(&buf);
+	if (!res)
+		return false;
+
+	myopt.nullPrint = NULL;
+	myopt.title = _("List of Hive tables");
+	myopt.translate_header = true;
+
+	/* Header */
+	headers[0] = gettext_noop("Column");
+	headers[1] = gettext_noop("Type");
+	cols = 2;
+
+	for (int i = 0; i < total_numrows; i++)
+	{
+
+		path = PQgetvalue(res, i, 0);
+		itemname = PQgetvalue(res, i, 1);
+		fieldname = PQgetvalue(res, i, 2);
+		fieldtype = PQgetvalue(res, i, 3);
+		total_fields = PQgetvalue(res, i, 4);
+
+		/* First row for current table */
+		if (previous_itemname == NULL
+				|| strncmp(previous_itemname, itemname,
+						strlen(previous_itemname)) != 0
+				|| strncmp(previous_path, path,
+						strlen(previous_path)) != 0)
+		{
+
+			if (previous_itemname != NULL)
+				printTable(&cont, pset.queryFout, pset.logfile);
+
+			/* Do clean-up for previous tables if any */
+			if (printTableInitialized)
+			{
+				printTableCleanup(&cont);
+				termPQExpBuffer(&title);
+				printTableInitialized = false;
+			}
+
+			/* Initialize */
+			initPQExpBuffer(&title);
+			printfPQExpBuffer(&title, _("PXF %s Table \"%s.%s\""), profile, path, itemname);
+			printTableInit(&cont, &myopt, title.data, cols, total_fields);
+			printTableInitialized = true;
+
+			for (int j = 0; j < cols; j++)
+				printTableAddHeader(&cont, headers[j], true, 'l');
+		}
+
+		/* Column */
+		printTableAddCell(&cont, fieldname, false, false);
+
+		/* Type */
+		printTableAddCell(&cont, fieldtype, false, false);
+
+		previous_path = path;
+		previous_itemname = itemname;
+
+	}
+
+	printTable(&cont, pset.queryFout, pset.logfile);
+
+	if (printTableInitialized)
+	{
+		printTableCleanup(&cont);
+		termPQExpBuffer(&title);
+	}
+
+	PQclear(res);
+	return true;
 }
