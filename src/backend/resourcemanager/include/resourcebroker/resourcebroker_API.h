@@ -83,7 +83,6 @@ int RB_returnResource(List **containers);
 int RB_getContainerReport(List **ctnstat);
 
 int RB_handleNotifications(void);
-void RB_freeClusterReport(List **machines);
 void RB_freeContainerReport(List **containers);
 void RB_handleSignalSIGCHLD(void);
 void RB_handleError(int errorcode);

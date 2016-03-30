@@ -118,25 +118,6 @@ int RB_handleNotifications(void)
 		   FUNC_RETURN_OK;
 }
 
-void RB_freeClusterReport(List **segments)
-{
-	if (CurrentRBImp.freeClusterReport != NULL)
-	{
-		CurrentRBImp.freeClusterReport(segments);
-		return;
-	}
-
-	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-	/* default implementation for freeing the cluster report objects. */
-	while( list_length(*segments) > 0 )
-	{
-		SegInfo seginfo = (SegInfo)lfirst(list_head(*segments));
-		*segments = list_delete_first(*segments);
-		rm_pfree(PCONTEXT, seginfo);
-	}
-	MEMORY_CONTEXT_SWITCH_BACK
-}
-
 void RB_handleSignalSIGCHLD(void)
 {
 	if (CurrentRBImp.handleSigSIGCHLD != NULL)
