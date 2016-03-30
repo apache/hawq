@@ -594,50 +594,6 @@ int	reorderBBSTNodeData(BBST tree, void *data)
 	return res;
 }
 
-/* 
- * Return the number of nodes that has no less value than critirion. This is de-
- * signed to support the requirement that how many data objects are qualified to
- * contain expected volume of resource. BBST supports O(logN) time complexity of
- * searching. 
- */
-int countBBSTNodeNoLessThan(BBST tree, void *critirion)
-{
-
-    BBSTNode p = NULL;
-    int res = 0;
-    int comp = 0;
-    
-    Assert( tree != NULL );
-	Assert( critirion != NULL );
-	Assert( tree->DataCompFunc != NULL );
-    
-    p = tree->Root;
-    
-	while( p != NULL ) {
-		comp = tree->DataCompFunc( tree->DataCompArg,
-								   p,
-								   critirion);
-		/* Case 1: p is larger than critirion. Go to left child tree. */
-		if ( comp > 0 ) {
-			p = p->Left;
-			continue;
-		}
-		/* Current code and all left nodes are qualifying nodes. */
-		res += 1;
-		res += (p->Left != NULL) ? p->Left->NodeCount : 0;
-        
-		/* Case 2: p is equal to the critirion. Finish searching. */
-		if ( comp == 0 ) {
-			break;
-		}
-		/* Case 3: p is smaller than the critirion. Go to right child tree. */
-		else {
-			p = p->Right;
-		}
-	}
-	return res;
-}
-
 int getBBSTNodeCount(BBST tree)
 {
 	return tree->Root == NULL ? 0 : tree->Root->NodeCount;

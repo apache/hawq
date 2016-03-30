@@ -70,53 +70,40 @@ void processXMLNode(xmlTextReaderPtr reader, MCTYPE context, List **properties)
     {
     	if ( xmlDepth == 0 && xmlType  == XML_READER_TYPE_ELEMENT )
     	{
-    		if ( countConfiguration > 0 )
-    		{
-    			resultCode = UTIL_PROPERTIES_ELEMENT_MULTI_CONFIGURATION;
-    			return;
-    		}
     		countConfiguration++;
     	}
     	else if ( xmlDepth == 0 && xmlType == XML_READER_TYPE_END_ELEMENT )
     	{
-    		if ( countConfiguration != 1 )
-    		{
-    			/* Allow one configuration element. Should not occur. */
-    			resultCode = UTIL_PROPERTIES_ELEMENT_INTERNAL_ERROR;
-    			return;
-    		}
     		countConfiguration--;
     	}
     	else
     	{
     		/* Wrong level or wrong node type. */
     		resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_CONFIGURATION;
+    		elog(WARNING, "Wrong element <configuration> is parsed.");
     		return;
     	}
     }
     else if ( strcmp((const char *)name, "property") == 0 )
     {
-    	/* Must be in element <configuration> */
-    	if ( countConfiguration != 1 )
-    	{
-    		resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_PROPERTY;
-    		return;
-    	}
+    	/*
+    	 * Must be in element <configuration>, suppose this is guaranteed by
+    	 * hawq control scripts.
+    	 */
+    	Assert(countConfiguration == 1);
     	if ( xmlDepth == 1 && xmlType  == XML_READER_TYPE_ELEMENT )
     	{
-    		if ( countProperty != 0 )
-    		{
-    			resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_PROPERTY;
-    			return;
-    		}
     		countProperty++;
     	}
     	else if ( xmlDepth == 1 && xmlType == XML_READER_TYPE_END_ELEMENT )
     	{
-    		/* In property element, there is only one <name> element, one <value>
-    		 * element as a pair. */
+    		/*
+    		 * In property element, there is only one <name> element, one <value>
+    		 * element as a pair.
+    		 */
     		if ( countProperty != 1 || countName != 1 || countValue != 1 )
     		{
+    			elog(WARNING, "Element <property> is not correctly defined.");
 				resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_PROPERTY;
 				return;
     		}
@@ -152,6 +139,7 @@ void processXMLNode(xmlTextReaderPtr reader, MCTYPE context, List **properties)
     	{
     		/* Wrong level or wrong node type. */
     		resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_PROPERTY;
+    		elog(WARNING, "Wrong element <property> is parsed.");
     		return;
     	}
     }
@@ -160,30 +148,23 @@ void processXMLNode(xmlTextReaderPtr reader, MCTYPE context, List **properties)
     	if ( countConfiguration != 1 || countProperty != 1 )
     	{
     		resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_NAME;
+    		elog(WARNING, "Element <name> is not correctly defined.");
     		return;
     	}
 
     	if ( xmlDepth == 2 && xmlType  == XML_READER_TYPE_ELEMENT )
     	{
-    		if ( countName != 0 )
-    		{
-				resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_NAME;
-				return;
-    		}
     	    countName++;
 		}
 		else if ( xmlDepth == 2 && xmlType == XML_READER_TYPE_END_ELEMENT )
 		{
-			if ( countName != 1 )
-			{
-				resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_NAME;
-				return;
-			}
+			/* Do nothing here. */
 		}
 		else
 		{
 			/* Wrong level or wrong node type. */
 			resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_NAME;
+			elog(WARNING, "Wrong element <name> is parsed.");
 			return;
 		}
 
@@ -193,26 +174,21 @@ void processXMLNode(xmlTextReaderPtr reader, MCTYPE context, List **properties)
     	if ( countConfiguration != 1 || countProperty != 1 || countName != 1)
     	{
     		resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_VALUE;
+    		elog(WARNING, "Element <value> is not correctly defined.");
     		return;
     	}
     	if ( xmlDepth == 2 && xmlType  == XML_READER_TYPE_ELEMENT )
     	{
-    		if ( countValue != 0 )
-    		{
-				resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_VALUE;
-				return;
-    		}
     	    countValue++;
 		}
 		else if ( xmlDepth == 2 && xmlType == XML_READER_TYPE_END_ELEMENT ) {
-			if ( countValue != 1 ) {
-				resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_VALUE;
-				return;
-			}
+			/* Do nothing here. */
 		}
-		else {
+		else
+		{
 			/* Wrong level or wrong node type. */
 			resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_VALUE;
+			elog(WARNING, "Wrong element <value> is parsed.");
 			return;
 		}
     }
@@ -221,31 +197,13 @@ void processXMLNode(xmlTextReaderPtr reader, MCTYPE context, List **properties)
     	if ( countConfiguration != 1 || countProperty != 1 )
     	{
     		resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_DESC;
+    		elog(WARNING, "Element <description> is not correctly defined.");
     		return;
     	}
 
     	if ( xmlDepth == 2 && xmlType  == XML_READER_TYPE_ELEMENT )
     	{
-    		if ( countDesc != 0 )
-    		{
-				resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_DESC;
-				return;
-    		}
     	    countDesc++;
-		}
-		else if ( xmlDepth == 2 && xmlType == XML_READER_TYPE_END_ELEMENT )
-		{
-			if ( countDesc != 1 )
-			{
-				resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_DESC;
-				return;
-			}
-		}
-		else
-		{
-			/* Wrong level or wrong node type. */
-			resultCode = UTIL_PROPERTIES_ELEMENT_WRONG_DESC;
-			return;
 		}
     }
     else if ( xmlDepth == 3 &&
@@ -294,7 +252,7 @@ int processXMLPropertyFile(const char   *filename,
 	countName			= 0;
 	countValue			= 0;
 	countDesc			= 0;
-	resultCode			= 0;
+	resultCode			= FUNC_RETURN_OK;
 	posNodeLine			= -1;
 	posNodeColumn		= -1;
 
@@ -302,10 +260,16 @@ int processXMLPropertyFile(const char   *filename,
 	initSimpleString(&currentValueString, context);
 
 	readerres = xmlTextReaderRead(reader);
-	while (readerres == 1)
+	while (readerres == 1 && resultCode == FUNC_RETURN_OK)
 	{
 		processXMLNode(reader, context, properties);
 		readerres = xmlTextReaderRead(reader);
+	}
+
+	if ( resultCode != FUNC_RETURN_OK )
+	{
+		res = UTIL_PROPERTIES_INVALID_XML;
+		goto exit;
 	}
 
 	readerres = xmlTextReaderIsValid(reader);
