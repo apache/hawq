@@ -445,6 +445,8 @@ bool cdbCopyGetData(CdbCopy *c, bool copy_cancel, uint64 *rows_processed)
 			 */
 			else
 			{
+			  c->io_errors = true;
+
 				/* should never happen since we are blocking. Don't bother to try again, exit with error. */
 				if (nbytes == 0)
 					appendStringInfo(&(c->err_msg),
@@ -467,8 +469,6 @@ bool cdbCopyGetData(CdbCopy *c, bool copy_cancel, uint64 *rows_processed)
 					/* start over from first seg as we just changes the seg list */
 					break;
 				}
-
-				c->io_errors = true;
 			}
 		}
 
