@@ -144,6 +144,9 @@ dispmgt_get_query_executor_in_group_iterator(QueryExecutorGroup *group,
 			executormgr_is_stop(executor))
 			continue;
 
+		if (!executormgr_is_executor_valid(executor))
+		  continue;
+
 		/* Increase index or we may return same object in the next iterate. */
 		iterator->executor_id++;
 		return executor;
@@ -162,9 +165,10 @@ dispmgt_init_query_executor_iterator(QueryExecutorTeam *team,
 }
 
 struct QueryExecutor *
-dispmgt_get_query_executor_iterator(QueryExecutorIterator *iterator)
+dispmgt_get_query_executor_iterator(QueryExecutorIterator *iterator, bool mayContainInvalidExecutor)
 {
 	QueryExecutorGroup	*group;
+	struct QueryExecutor *executor = NULL;
 
 	do {
 		if (iterator->group_id >= iterator->team->query_executor_group_num)
@@ -180,7 +184,11 @@ dispmgt_get_query_executor_iterator(QueryExecutorIterator *iterator)
 			continue;
 		}
 
-		return group->query_executors[iterator->executor_id++];
+		executor = group->query_executors[iterator->executor_id++];
+		if (mayContainInvalidExecutor && !executormgr_is_executor_valid(executor))
+		  continue;
+		else
+		  return executor;
 	} while (1);
 
 	return NULL;
@@ -194,7 +202,7 @@ dispmgt_takeover_segment_conns(QueryExecutorTeam *team)
 	List					*segment_conns = NIL;
 
 	dispmgt_init_query_executor_iterator(team, &iterator);
-	while ((executor = dispmgt_get_query_executor_iterator(&iterator)))
+	while ((executor = dispmgt_get_query_executor_iterator(&iterator, true)))
 	{
 		segment_conns = lappend(segment_conns, executormgr_takeover_segment_conns(executor));
 	}

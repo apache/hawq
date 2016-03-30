@@ -946,22 +946,25 @@ dispatcher_bind_executor(DispatchData *data)
 			DispatchTask	*task = &slice->tasks[j];
 			struct SegmentDatabaseDescriptor *desc;
 
-			executor = dispmgt_get_query_executor_iterator(&iterator);
+			executor = dispmgt_get_query_executor_iterator(&iterator, false);
 			desc = executormgr_allocate_executor(task->segment, task->id.is_writer, task->entrydb);
 
 			if (!desc)
 			{
-				struct ConcurrentConnectExecutorInfo *info;
+			  // may have problem for tasks assigned to entrydb for dispatch_statement_node
+			  // and dispatch_statement_string
+			  if (task->segment != NULL)
+			  {
+			    struct ConcurrentConnectExecutorInfo *info;
 
-				info = dispmgt_build_preconnect_info(task->segment,
-													task->id.is_writer,
-													executor,
-													data,
-													slice,
-													task);
-				concurrent_connect_executors = lappend(concurrent_connect_executors, info);
-				data->num_of_new_connected_executors++;
-				continue;
+			    info = dispmgt_build_preconnect_info(task->segment,
+                                               task->id.is_writer, executor,
+                                               data, slice, task);
+			    concurrent_connect_executors = lappend(concurrent_connect_executors,
+                                                 info);
+			    data->num_of_new_connected_executors++;
+			  }
+			  continue;
 			}
 
 #ifdef FAULT_INJECTOR
@@ -1021,7 +1024,9 @@ dispatcher_serialize_state(DispatchData *data)
 		{
 			DispatchTask	*task = &slice->tasks[j];
 
-			executor = dispmgt_get_query_executor_iterator(&iterator);
+			executor = dispmgt_get_query_executor_iterator(&iterator, true);
+			if (executor == NULL)
+			  continue;
  			executormgr_serialize_executor_state(data, executor, task, slice);
 
 			if (sliceTable)
@@ -1094,7 +1099,9 @@ dispatcher_unbind_executor(DispatchData *data)
 		{
 			DispatchTask	*task = &slice->tasks[j];
 
-			executor = dispmgt_get_query_executor_iterator(&iterator);
+			executor = dispmgt_get_query_executor_iterator(&iterator, true);
+			if (executor == NULL)
+			  continue;
 			executormgr_unbind_executor_task(data, executor, task, slice);
 		}
 	}
@@ -1200,7 +1207,9 @@ dispatcher_update_statistics(DispatchData *data)
 
 		for (j = 0; j < slice->tasks_num; j++)
 		{
-			executor = dispmgt_get_query_executor_iterator(&iterator);
+			executor = dispmgt_get_query_executor_iterator(&iterator, true);
+			if (executor == NULL)
+			  continue;
 			dispatcher_update_statistics_per_executor(data, executor);
 		}
 	}
@@ -1739,7 +1748,7 @@ dispatch_collect_executors_error(DispatchData *data)
 	char **errHostName = (char**) palloc0(errHostSize * sizeof(char *));
 
 	dispmgt_init_query_executor_iterator(data->query_executor_team, &iterator);
-	while ((executor = dispmgt_get_query_executor_iterator(&iterator)) != NULL)
+	while ((executor = dispmgt_get_query_executor_iterator(&iterator, true)) != NULL)
 	{
 		executormgr_merge_error_for_dispatcher(executor, &errHostSize,
 		                                       &errHostNum, &errHostName);
