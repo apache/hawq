@@ -183,7 +183,7 @@ static char*
 GetExtTableFirstLocation(Datum *array);
 
 static void 
-AddFileSystemCredentialForPxfTable(char *uri);
+AddFileSystemCredentialForPxfTable();
 
 /**
  * construct the file location for query context dispatching.
@@ -1773,7 +1773,7 @@ prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt,
 	if (IS_PXF_URI(location))
 	{
 		Insist(array_size == 1);
-		AddFileSystemCredentialForPxfTable(location);
+		AddFileSystemCredentialForPxfTable();
 		prepareDfsAddressForDispatch(cxt);
 	}
 
@@ -2908,7 +2908,7 @@ static char* GetExtTableFirstLocation(Datum *array)
  * prepareDispatchedCatalogFileSystemCredential will store the token
  * using port == 0 in HA case (otherwise the supplied port).
  */
-static void AddFileSystemCredentialForPxfTable(char *uri)
+static void AddFileSystemCredentialForPxfTable()
 {
 	char* dfs_address = NULL;
 
