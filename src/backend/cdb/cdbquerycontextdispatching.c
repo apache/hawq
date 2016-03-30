@@ -3013,6 +3013,15 @@ GetResultRelSegFileInfos(Oid relid, List *segnomaps, List *existing_seginfomaps)
 	return existing_seginfomaps;
 }
 
+/*
+ * prepareDfsAddressForDispatch
+ *
+ * Given the cxt use the currently set value of cxt->sharedPath
+ * and add it to cxt->buffer so that it is dispatched from
+ * master to segment. This is only required in the case of
+ * a secure filesystem.
+ */
+
 void
 prepareDfsAddressForDispatch(QueryContextInfo* cxt)
 {
