@@ -64,7 +64,8 @@ typedef struct QueryExecutorTeam {
 extern void dispmgt_init_query_executor_iterator(struct QueryExecutorTeam *team,
 							QueryExecutorIterator *iterator);
 extern struct QueryExecutor *dispmgt_get_query_executor_iterator(
-							QueryExecutorIterator *iterator);
+							QueryExecutorIterator *iterator,
+							bool mayContainInvalidExecutor);
 extern int	dispmgt_get_group_num(struct QueryExecutorTeam *team);
 
 extern struct QueryExecutorTeam *dispmgt_create_dispmgt_state(struct DispatchData *data,

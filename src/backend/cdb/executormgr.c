@@ -664,6 +664,11 @@ executormgr_is_executor_error(QueryExecutor *executor) {
     return false;
 }
 
+bool
+executormgr_is_executor_valid(QueryExecutor *executor) {
+  return executor->desc != NULL;
+}
+
 SegmentDatabaseDescriptor *
 executormgr_takeover_segment_conns(QueryExecutor *executor)
 {

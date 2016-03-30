@@ -80,6 +80,7 @@ extern void executormgr_merge_error_for_dispatcher(
     struct QueryExecutor *executor, int *errHostSize,
     int *errNum, char ***errHostInfo);
 extern bool executormgr_is_executor_error(struct QueryExecutor *executor);
+extern bool executormgr_is_executor_valid(struct QueryExecutor *executor);
 extern void executormgr_setup_env(MemoryContext ctx);
 extern void executormgr_cleanup_env(void);
 extern int executormgr_get_cached_executor_num(void);
