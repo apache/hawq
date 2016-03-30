@@ -62,12 +62,15 @@ void SimpleStringFill(SimpStringPtr str, int start, int length, uint8_t val);
 bool SimpleStringEmpty(SimpStringPtr str);
 int  SimpleStringLocateChar(SimpStringPtr str, char target, int *location);
 /* string to the other number values. */
-int  SimpleStringToInt8(SimpStringPtr str, int8_t *value);
 int  SimpleStringToInt32(SimpStringPtr str, int32_t *value);
-int  SimpleStringToUInt32(SimpStringPtr str, uint32_t *value);
 int  SimpleStringToInt64(SimpStringPtr str, int64_t *value);
 int  SimpleStringToDouble(SimpStringPtr str, double *value);
 int  SimpleStringToBool(SimpStringPtr str, bool *value);
+
+/*
+int  SimpleStringToInt8(SimpStringPtr str, int8_t *value);
+int  SimpleStringToUInt32(SimpStringPtr str, uint32_t *value);
+*/
 
 /* convert different types of value into string. */
 int SimpleStringSetOid(SimpStringPtr str, Oid value);

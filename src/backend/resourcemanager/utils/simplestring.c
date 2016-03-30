@@ -231,6 +231,7 @@ int  SimpleStringToBool(SimpStringPtr str, bool *value)
 	return FUNC_RETURN_OK;
 }
 
+/*
 int  SimpleStringToInt8(SimpStringPtr str, int8_t *value)
 {
 	int val;
@@ -242,6 +243,7 @@ int  SimpleStringToInt8(SimpStringPtr str, int8_t *value)
 	return UTIL_SIMPSTRING_WRONG_FORMAT;
 
 }
+*/
 
 int  SimpleStringToInt32(SimpStringPtr str, int32_t *value)
 {
@@ -254,6 +256,7 @@ int  SimpleStringToInt32(SimpStringPtr str, int32_t *value)
 	return UTIL_SIMPSTRING_WRONG_FORMAT;
 }
 
+/*
 int  SimpleStringToUInt32(SimpStringPtr str, uint32_t *value)
 {
 	uint32_t val;
@@ -264,6 +267,7 @@ int  SimpleStringToUInt32(SimpStringPtr str, uint32_t *value)
 	}
 	return UTIL_SIMPSTRING_WRONG_FORMAT;
 }
+*/
 
 int  SimpleStringToInt64(SimpStringPtr str, int64_t *value)
 {

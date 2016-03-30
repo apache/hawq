@@ -96,9 +96,6 @@ int      removeBBSTNode(BBST tree, BBSTNode *node);
 
 int		 reorderBBSTNodeData(BBST tree, void *data);
 
-/* Get count of node with no less value than specified criterion */
-int countBBSTNodeNoLessThan(BBST tree, void * critirion);
-
 /*
 void     freeBBSTNode(BBST tree, BBSTNode node);
 void     freeBBST(BBST tree);
