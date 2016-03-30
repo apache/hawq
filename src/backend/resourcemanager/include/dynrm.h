@@ -100,7 +100,6 @@ bool handleRMRequestAcquireResource(void **arg);
 bool handleRMRequestReturnResource(void **arg);
 bool handleRMSEGRequestIMAlive(void **arg);
 bool handleRMSEGRequestRUAlive(void **arg);
-bool handleRMSEGRequestTmpDir(void **arg);
 bool handleRMRequestAcquireResourceQuota(void **arg);
 bool handleRMRequestRefreshResource(void **arg);
 bool handleRMRequestSegmentIsDown(void **arg);
@@ -326,7 +325,6 @@ void updateStatusOfAllNodes(void);
 int  ResManagerMainSegment2ndPhase(void);
 int  initializeSocketServer_RMSEG(void);
 int  MainHandlerLoop_RMSEG(void);
-int  MainHandler_RMSEGDummyLoop(void);
 
 void checkAndBuildFailedTmpDirList(void);
 #endif //DYNAMIC_RESOURCE_MANAGEMENT_H

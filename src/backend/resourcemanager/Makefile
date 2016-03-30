@@ -34,7 +34,8 @@ OBJS = resourcepool.o requesthandler_ddl.o \
        hawqsite.o \
        requesthandler_RMSEG.o requesthandler.o \
        resourcemanager_RMSEG.o \
-       resourcemanager.o
+       resourcemanager.o \
+       requesthandler_RMSEG_CGroup.o
 
 SUBDIRS = communication utils resourcebroker resourceenforcer
 

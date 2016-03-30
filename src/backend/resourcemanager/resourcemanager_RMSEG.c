@@ -40,7 +40,6 @@ int ResManagerMainSegment2ndPhase(void)
 	registerMessageHandler(REQUEST_QE_SETWEIGHTCGROUP, handleQESetWeightCGroup);
 	registerMessageHandler(REQUEST_RM_INCREASE_MEMORY_QUOTA, handleRMIncreaseMemoryQuota);
 	registerMessageHandler(REQUEST_RM_DECREASE_MEMORY_QUOTA, handleRMDecreaseMemoryQuota);
-	registerMessageHandler(REQUEST_RM_TMPDIR, handleRMSEGRequestTmpDir);
 	registerMessageHandler(REQUEST_RM_RUALIVE, handleRMSEGRequestRUAlive);
 
 
@@ -49,8 +48,7 @@ int ResManagerMainSegment2ndPhase(void)
 	 **************************************************************************/
 	res = initializeSocketServer_RMSEG();
 	if ( res != FUNC_RETURN_OK ) {
-		elog(LOG, "Fail to initialize socket server. Segment sleeps for ever.");
-		MainHandler_RMSEGDummyLoop();
+		elog(FATAL, "Fail to initialize socket server.");
 	}
 
 	/*
@@ -220,17 +218,6 @@ int MainHandlerLoop_RMSEG(void)
 	elog(RMLOG, "Resource manager main event handler exits.");
 
 	return res;
-}
-
-int MainHandler_RMSEGDummyLoop(void)
-{
-	while( DRMGlobalInstance->ResManagerMainKeepRun ) {
-		sleep(1000000);
-	}
-
-	elog(RMLOG, "Dummy resource manager main event handler exits.");
-
-	return FUNC_RETURN_OK;
 }
 
 /*
