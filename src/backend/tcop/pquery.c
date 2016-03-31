@@ -85,6 +85,7 @@ static List *ActiveRelsType =NULL;
 typedef struct QueryResourceItem {
   bool alive;
   int resource_id;
+  bool allocateSucceed;
 } QueryResourceItem;
 
 static List *GlobalQueryResources = NIL;
@@ -111,7 +112,8 @@ static int64 DoPortalRunFetch(Portal portal,
 static void DoPortalRewind(Portal portal);
 
 static void AddToGlobalQueryResources(int resourceId, QueryResourceLife life);
-
+static void RemoveFromGlobalQueryResources(int resourceId, QueryResourceLife life);
+static void SetResourcesAllocatedSucceed(int resourceId, QueryResourceLife life);
 static int compare_segment(const void *e1, const void *e2);
 /*
  * CreateQueryDesc
@@ -805,7 +807,10 @@ AllocateResource(QueryResourceLife   life,
 								errorbuf,
 								sizeof(errorbuf));
 	if (ret != FUNC_RETURN_OK) {
+		RemoveFromGlobalQueryResources(resourceId, life);
 		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s",errorbuf)));
+	} else {
+		SetResourcesAllocatedSucceed(resourceId, life);
 	}
 
 	elog(DEBUG3, "Acquired resource from resource manager.");
@@ -948,8 +953,71 @@ AddToGlobalQueryResources(int resourceId, QueryResourceLife life)
   newItem = palloc(sizeof(QueryResourceItem));
   newItem->alive = true;
   newItem->resource_id = resourceId;
+  /*
+   * Only if the allocate resource RPC returns OK,
+   * the allocateSucceed can be set true by using SetResourcesAllocatedSucceed()
+   */
+  newItem->allocateSucceed = false;
   GlobalQueryResources = lappend(GlobalQueryResources, newItem);
   MemoryContextSwitchTo(old);
+}
+
+static void
+RemoveFromGlobalQueryResources(int resourceId, QueryResourceLife life)
+{
+  ListCell *lc;
+  QueryResourceItem *newItem;
+  MemoryContext old;
+
+  if (life == QRL_NONE)
+  {
+    return;
+  }
+
+  foreach(lc, GlobalQueryResources)
+  {
+    QueryResourceItem *qri = lfirst(lc);
+    if(qri->resource_id == resourceId)
+    {
+      /*
+       * found, delete it.
+       */
+      break;
+    }
+  }
+
+  /*
+   * remove from the global query resource.
+   */
+  old = MemoryContextSwitchTo(TopMemoryContext);
+  GlobalQueryResources = list_delete_ptr(GlobalQueryResources,lfirst(lc));
+  MemoryContextSwitchTo(old);
+}
+
+static void
+SetResourcesAllocatedSucceed(int resourceId, QueryResourceLife life)
+{
+	ListCell *lc;
+	QueryResourceItem *newItem;
+	MemoryContext old;
+
+	if (life == QRL_NONE)
+	{
+	  return;
+	}
+
+	foreach(lc, GlobalQueryResources)
+	{
+	  QueryResourceItem *qri = lfirst(lc);
+	  if(qri->resource_id == resourceId)
+	  {
+	     /*
+	     * found, set it succeed.
+	     */
+	     qri->allocateSucceed = true;
+	     return;
+	  }
+	}
 }
 
 void
@@ -1068,17 +1136,22 @@ CleanupGlobalQueryResources(void)
 		if (qri->alive)
 		{
 			ret = returnResource(qri->resource_id, errorbuf, sizeof(errorbuf));
-			if (ret != FUNC_RETURN_OK)
+			/*
+			 * If qri->allocateSucceed == false, that means it interrupts during acquireResourceFromRM().
+			 * And we don't know if it has been allocated succeed.
+			 * It also means it may return resource failed as if the resource hasn't been allocated yet.
+			 * So don't report warning message in this situation.
+			 */
+			if (ret != FUNC_RETURN_OK && qri->allocateSucceed)
 			{
 				ereport(WARNING, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s",errorbuf)));
 			}
 
 			ret = unregisterConnectionInRM(qri->resource_id, errorbuf, sizeof(errorbuf));
-			if (ret != FUNC_RETURN_OK)
+			if (ret != FUNC_RETURN_OK  && qri->allocateSucceed)
 			{
 				ereport(WARNING, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s",errorbuf)));
 			}
-
 			releaseResourceContext(qri->resource_id);
 			qri->alive = false;
 		}
