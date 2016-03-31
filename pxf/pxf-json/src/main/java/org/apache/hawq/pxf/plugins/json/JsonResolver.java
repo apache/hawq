@@ -203,12 +203,16 @@ public class JsonResolver extends Plugin implements ReadResolver {
 				oneField.val = val.asText().getBytes();
 				break;
 			case FLOAT8:
-			case REAL:
 				oneField.val = val.asDouble();
 				break;
+			case REAL:
+				oneField.val = (float)val.asDouble();
+				break;
 			case INTEGER:
-			case SMALLINT:
 				oneField.val = val.asInt();
+				break;
+			case SMALLINT:
+				oneField.val = (short)val.asInt();
 				break;
 			case BPCHAR:
 			case TEXT:
