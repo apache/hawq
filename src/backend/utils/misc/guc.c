@@ -780,8 +780,6 @@ bool gp_plpgsql_clear_cache_always = false;
 /* indicate whether called by gpdump, if yes, processutility will open some limitations */
 bool gp_called_by_pgdump = false;
 
-/* indicate whether CO table is enabled or not*/
-bool gp_enable_column_oriented_table = false;
 
 /*
  * Displayable names for context types (enum GucContext)
@@ -4397,16 +4395,6 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-	  {"gp_enable_column_oriented_table", PGC_USERSET, CUSTOM_OPTIONS,
-			gettext_noop("Enable to create or insert/copy into a column oriented table."),
-			NULL,
-			GUC_GPDB_ADDOPT | GUC_SUPERUSER_ONLY
-		},
-		&gp_enable_column_oriented_table,
-		false, NULL, NULL
-	},
-
-	{
 		{"hawq_rm_force_fifo_queuing", PGC_POSTMASTER, RESOURCES_MGM,
 		 gettext_noop("force to execute query in queue in a fifo sequence."),
 		 NULL
@@ -4681,7 +4669,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&SegMaxBackends,
-		1280, 240, MAX_MAX_BACKENDS, NULL, NULL
+		3000, 240, MAX_MAX_BACKENDS, NULL, NULL
 	},
 
 	{
