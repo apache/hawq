@@ -158,6 +158,7 @@ proc_exit_prepare(int code)
 	QueryCancelPending = false;
 	/* And let's just make *sure* we're not interrupted ... */
 	ImmediateInterruptOK = false;
+	InterruptWhenCallingPLUDF = false;
 	InterruptHoldoffCount = 1;
 	CritSectionCount = 0;
 

@@ -443,6 +443,7 @@ errstart(int elevel, const char *filename, int lineno,
             if (recursion_depth > 2 * ERRORDATA_STACK_SIZE)
             {
                 ImmediateInterruptOK = false;
+                InterruptWhenCallingPLUDF = false;
                 fflush(stdout);
                 fflush(stderr);
                 return false;
@@ -554,6 +555,7 @@ errfinish(int dummy __attribute__((unused)),...)
 
         /* This is just in case the error came while waiting for input */
         ImmediateInterruptOK = false;
+        InterruptWhenCallingPLUDF = false;
 
         /*
          * Reset InterruptHoldoffCount in case we ereport'd from inside an
@@ -642,6 +644,7 @@ errfinish(int dummy __attribute__((unused)),...)
          * For a FATAL error, we let proc_exit clean up and exit.
          */
         ImmediateInterruptOK = false;
+        InterruptWhenCallingPLUDF = false;
 
         /*
          * If we just reported a startup failure, the client will disconnect
@@ -677,6 +680,7 @@ errfinish(int dummy __attribute__((unused)),...)
          * children...
          */
         ImmediateInterruptOK = false;
+        InterruptWhenCallingPLUDF = false;
         fflush(stdout);
         fflush(stderr);
         abort();
