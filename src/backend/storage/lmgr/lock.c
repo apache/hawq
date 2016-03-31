@@ -552,49 +552,10 @@ LockAcquire(const LOCKTAG *locktag,
 #endif /* USE_TEST_UTILS_X86 */
 
 	/*
-	 * lockHolder is the gang member that should hold and manage locks for this
-	 * transaction.  In Utility mode, or on the QD, it's allways myself.
-	 * 
-	 * On the QEs, it should normally be the Writer gang member.
+	 * QD needs to acquire locks, while QE and entry database don't in hawq indeed
 	 */
 	if (lockHolderProcPtr == NULL)
 		lockHolderProcPtr = MyProc;
-	
-	if (lockmethodid == DEFAULT_LOCKMETHOD && locktag->locktag_type != LOCKTAG_TRANSACTION)
-	{
-		if (Gp_role == GP_ROLE_EXECUTE && !Gp_is_writer)
-		{	
-			if (lockHolderProcPtr == NULL || lockHolderProcPtr == MyProc)
-			{
-				/* Find the guy who should manage our locks */
-				PGPROC * proc = FindProcByGpSessionId(gp_session_id);
-				int count = 0;
-				while(proc==NULL && count < 5)
-				{
-					pg_usleep( /* microseconds */ 2000);
-					count++;
-					CHECK_FOR_INTERRUPTS();
-					proc = FindProcByGpSessionId(gp_session_id);
-				}
-				if (proc != NULL)
-				{
-					elog(DEBUG1,"Found writer proc entry.  My Pid %d, his pid %d", MyProc-> pid, proc->pid);
-					lockHolderProcPtr = proc;
-				}
-				else
-					elog(DEBUG1,"Could not find writer proc entry!");
-		
-					elog(DEBUG1,"Reader gang member trying to acquire a lock [%u,%u] %s %d",
-						 locktag->locktag_field1, locktag->locktag_field2,
-						 lock_mode_names[lockmode], (int)locktag->locktag_type);
-			}
-				
-		}
-	}
-	
-	
-	
-	
 
 	/*
 	 * Otherwise we've got to mess with the shared lock table.

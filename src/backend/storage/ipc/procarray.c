@@ -1016,38 +1016,6 @@ DisplayXidCache(void)
 
 #endif   /* XIDCACHE_DEBUG */
 
-PGPROC *
-FindProcByGpSessionId(long gp_session_id)
-{
-	/* Find the guy who should manage our locks */
-	ProcArrayStruct *arrayP = procArray;
-	int			index;
-
-	Assert(gp_session_id > 0);
-		
-	LWLockAcquire(ProcArrayLock, LW_SHARED);
-
-	for (index = 0; index < arrayP->numProcs; index++)
-	{
-		PGPROC	   *proc = arrayP->procs[index];
-			
-		if (proc->pid == MyProc->pid)
-			continue;
-				
-		if (!proc->mppIsWriter)
-			continue;
-				
-		if (proc->mppSessionId == gp_session_id)
-		{
-			LWLockRelease(ProcArrayLock);
-			return proc;
-		}
-	}
-		
-	LWLockRelease(ProcArrayLock);
-	return NULL;
-}
-
 /*
  * FindAndSignalProcess
  *     Find the PGPROC entry in procArray which contains the given sessionId and commandId,

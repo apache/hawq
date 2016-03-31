@@ -40,8 +40,6 @@ extern int	CountUserBackends(Oid roleid);
 extern void XidCacheRemoveRunningXids(TransactionId xid,
 						  int nxids, TransactionId *xids);
 						  
-extern PGPROC *FindProcByGpSessionId(long gp_session_id);
-
 extern struct SnapshotData* GetSnapshotData(struct SnapshotData *snapshot, bool serializable);
 extern void updateSharedLocalSnapshot(struct DtxContextInfo *dtxContextInfo, struct SnapshotData *snapshot, char* debugCaller);
 
