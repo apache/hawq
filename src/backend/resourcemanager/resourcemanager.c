@@ -823,24 +823,14 @@ int initializeDRMInstance(MCTYPE context)
 	DRMGlobalInstance->HeartBeatLastSentTime    = 0;
 	DRMGlobalInstance->TmpDirLastCheckTime      = 0;
 	DRMGlobalInstance->LocalHostStat			= NULL;
-
-	initializeDQueue(&(DRMGlobalInstance->LocalHostTempDirectoriesForQD),   context);
-    DRMGlobalInstance->NextLocalHostTempDirIdxForQD = -1;
 	
     initializeDQueue(&(DRMGlobalInstance->LocalHostTempDirectories),   context);
-    DRMGlobalInstance->NextLocalHostTempDirIdx = -1;
     DRMGlobalInstance->LocalHostFailedTmpDirList = NULL;
 
     HASHCTL ctl;
     ctl.keysize                                 = sizeof(TmpDirKey);
     ctl.entrysize                               = sizeof(TmpDirEntry);
     ctl.hcxt                                    = context;
-    DRMGlobalInstance->LocalTmpDirTable         = hash_create("Executor temporary directory table",
-    														  16,
-															  &ctl,
-															  HASH_ELEM);
-    DRMGlobalInstance->TmpDirTableCapacity      = 256;
-    initializeDQueue(&(DRMGlobalInstance->TmpDirLRUList), context);
 
 	/* Tell the working threads keep running. */
 	DRMGlobalInstance->ResManagerMainKeepRun 	= true;
@@ -1054,16 +1044,7 @@ int  loadDynamicResourceManagerConfigure(void)
 				 DRMGlobalInstance->SegmentCore);
 
     // For temporary directories
-    
-    InitTemporaryDirs(&DRMGlobalInstance->LocalHostTempDirectoriesForQD, rm_master_tmp_dirs);
-	DRMGlobalInstance->NextLocalHostTempDirIdxForQD = 0;
-	
-    DQUEUE_LOOP_BEGIN(&DRMGlobalInstance->LocalHostTempDirectoriesForQD, iter, SimpStringPtr, value)
-		elog(LOG, "HAWQ Master RM :: Temporary directory %s", value->Str);
-	DQUEUE_LOOP_END
-    
     InitTemporaryDirs(&DRMGlobalInstance->LocalHostTempDirectories, rm_seg_tmp_dirs);
-	DRMGlobalInstance->NextLocalHostTempDirIdx = 0;
 
 	DQUEUE_LOOP_BEGIN(&DRMGlobalInstance->LocalHostTempDirectories, iter, SimpStringPtr, value)
 		elog(LOG, "HAWQ Segment RM :: Temporary directory %s", value->Str);

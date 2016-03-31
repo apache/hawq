@@ -206,15 +206,8 @@ struct DynRMGlobalData{
     /*------------------------------------------------------------------------*/
     SegStat 				 LocalHostStat;
     
-    DQueueData				 LocalHostTempDirectoriesForQD;
-    int                      NextLocalHostTempDirIdxForQD;
-    
     DQueueData				 LocalHostTempDirectories;
     List*                    LocalHostFailedTmpDirList;
-    int                      NextLocalHostTempDirIdx;
-    HTAB                     *LocalTmpDirTable;
-    int                      TmpDirTableCapacity;
-    DQueueData               TmpDirLRUList;
     
     uint64_t				 LocalHostLastUpdateTime;
     uint64_t				 HeartBeatLastSentTime;
