@@ -7,15 +7,11 @@ SET hcatalog_enable = false;
 SELECT * from hcatalog.db.t;
 
 SELECT * FROM pxf_get_item_fields('Hive', '*');
- \d hcatalog.*.*
 
 -- enable GUC
 SET hcatalog_enable = true;
 
 SELECT * FROM pxf_get_item_fields('Hive', '*abc*abc*');
-\d hcatalog.*abc*.*abc*
-\d hcatalog
-\d hcatalog.
 
 -- Create function to insert and scan in-memory data to pg_class
 CREATE OR REPLACE FUNCTION convert_to_hcatalog_schema(schemaName text) RETURNS text
