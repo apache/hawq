@@ -1619,13 +1619,13 @@ restart:
 				fcinfo.isnull = false;
 				rsinfo.isDone = ExprSingleResult;
 
-				bool save_ImmediateInterruptOK = ImmediateInterruptOK;
+				bool savedImmediateInterruptOK = ImmediateInterruptOK;
 				/* Allow "die" interrupt to be processed while waiting */
 				ImmediateInterruptOK = true;
 				InterruptWhenCallingPLUDF = true;
 				result = FunctionCallInvoke(&fcinfo);
 				InterruptWhenCallingPLUDF = false;
-				ImmediateInterruptOK = save_ImmediateInterruptOK;
+				ImmediateInterruptOK = savedImmediateInterruptOK;
 
 				*isNull = fcinfo.isnull;
 				*isDone = rsinfo.isDone;
@@ -1755,13 +1755,13 @@ restart:
 		}
 		fcinfo.isnull = false;
 
-		bool save_ImmediateInterruptOK = ImmediateInterruptOK;
+		bool savedImmediateInterruptOK = ImmediateInterruptOK;
 		/* Allow "die" interrupt to be processed while waiting */
 		ImmediateInterruptOK = true;
 		InterruptWhenCallingPLUDF = true;
 		result = FunctionCallInvoke(&fcinfo);
 		InterruptWhenCallingPLUDF = false;
-		ImmediateInterruptOK = save_ImmediateInterruptOK;
+		ImmediateInterruptOK = savedImmediateInterruptOK;
 
 		*isNull = fcinfo.isnull;
 	}
@@ -1824,13 +1824,13 @@ ExecMakeFunctionResultNoSets(FuncExprState *fcache,
 	}
 	/* fcinfo.isnull = false; */	/* handled by InitFunctionCallInfoData */
 
-	bool save_ImmediateInterruptOK = ImmediateInterruptOK;
+	bool savedImmediateInterruptOK = ImmediateInterruptOK;
 	/* Allow "die" interrupt to be processed while waiting */
 	ImmediateInterruptOK = true;
 	InterruptWhenCallingPLUDF = true;
 	result = FunctionCallInvoke(&fcinfo);
 	InterruptWhenCallingPLUDF = false;
-	ImmediateInterruptOK = save_ImmediateInterruptOK;
+	ImmediateInterruptOK = savedImmediateInterruptOK;
 
 	*isNull = fcinfo.isnull;
 
@@ -1987,13 +1987,13 @@ ExecMakeTableFunctionResult(ExprState *funcexpr,
 			fcinfo.isnull = false;
 			rsinfo.isDone = ExprSingleResult;
 
-			bool save_ImmediateInterruptOK = ImmediateInterruptOK;
+			bool savedImmediateInterruptOK = ImmediateInterruptOK;
 			/* Allow "die" interrupt to be processed while waiting */
 			ImmediateInterruptOK = true;
 			InterruptWhenCallingPLUDF = true;
 			result = FunctionCallInvoke(&fcinfo);
 			InterruptWhenCallingPLUDF = false;
-			ImmediateInterruptOK = save_ImmediateInterruptOK;
+			ImmediateInterruptOK = savedImmediateInterruptOK;
 		}
 		else
 		{
