@@ -266,8 +266,8 @@ static int getSlaveHostNumber(FILE *fp);
 static bool CheckSlaveFile();
 
 /*saved interrupt global variable for client_read_xxx functions*/
-static bool saveImmediateInterruptOK = false;
-static bool saveQueryCancelPending = false;
+static bool SavedImmediateInterruptOK = false;
+static bool SavedQueryCancelPending = false;
 
 /*
  * Change the priority of the current process to the specified level
@@ -611,11 +611,11 @@ prepare_for_client_read(void)
 		EnableClientWaitTimeoutInterrupt();
 
 		/* Allow "die" interrupt to be processed while waiting */
-		saveImmediateInterruptOK = ImmediateInterruptOK;
+		SavedImmediateInterruptOK = ImmediateInterruptOK;
 		ImmediateInterruptOK = true;
 
 		/* And don't forget to detect one that already arrived */
-		saveQueryCancelPending = QueryCancelPending;
+		SavedQueryCancelPending = QueryCancelPending;
 		QueryCancelPending = false;
 		CHECK_FOR_INTERRUPTS();
 	}
@@ -630,8 +630,8 @@ client_read_ended(void)
 	if (DoingCommandRead)
 	{
 		/* set back to saved status so that not overwrite when set before calling PL UDF */
-		ImmediateInterruptOK = saveImmediateInterruptOK;
-		QueryCancelPending = saveQueryCancelPending;
+		ImmediateInterruptOK = SavedImmediateInterruptOK;
+		QueryCancelPending = SavedQueryCancelPending;
 
 		DisableClientWaitTimeoutInterrupt();
 		DisableNotifyInterrupt();
