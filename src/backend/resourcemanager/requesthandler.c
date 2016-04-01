@@ -392,10 +392,12 @@ bool handleRMRequestAcquireResource(void **arg)
 	if ( unavailcount > rejectlimit )
 	{
 		snprintf(errorbuf, sizeof(errorbuf),
-				 "%d of %d segments %s unavailable",
+				 "%d of %d segments %s unavailable, exceeds %.1f%% defined in GUC hawq_rm_rejectrequest_nseg_limit. "
+				 "The allocation request is rejected.",
 				 unavailcount,
 				 PRESPOOL->SlavesHostCount,
-				 unavailcount == 1 ? "is" : "are");
+				 unavailcount == 1 ? "is" : "are",
+				 rm_rejectrequest_nseg_limit*100.0);
 		elog(WARNING, "ConnID %d. %s", (*conntrack)->ConnID, errorbuf);
 		res = RESOURCEPOOL_TOO_MANY_UAVAILABLE_HOST;
 		goto sendresponse;
