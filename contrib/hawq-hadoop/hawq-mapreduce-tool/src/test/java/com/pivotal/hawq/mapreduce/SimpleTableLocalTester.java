@@ -78,7 +78,7 @@ public class SimpleTableLocalTester extends SimpleTableTester {
 
 				// extract metadata
 				MRFormatTestUtils.runShellCommand(
-						String.format("gpextract -d %s -o %s %s",
+						String.format("hawqextract -d %s -o %s %s",
 									  TEST_DB_NAME, metadataFile.getPath(), tableName));
 
 				// copy data files to local in order to run local mapreduce job
