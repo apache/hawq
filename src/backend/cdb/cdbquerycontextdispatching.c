@@ -786,7 +786,7 @@ RebuildNamespace(QueryContextInfo *cxt)
 	{
 		StringInfoData buffer;
 		initStringInfoOfString(&buffer, binary, len);
-		dfs_address = pnstrdup(buffer.data, buffer.len);
+		dfs_address = strdup(buffer.data);
 	} else {
 		elog(ERROR, "Couldn't rebuild Namespace");
 	}
