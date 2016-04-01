@@ -907,8 +907,8 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 	int32_t		 	 segid			 = SEGSTAT_ID_INVALID;
 	SimpString		 hostnamekey;
 	SimpArray 		 hostaddrkey;
-	bool			 segcapchanged  = false;
-
+	bool			 segcapchanged   = false;
+	bool			 segavailchanged = false;
 	/*
 	 * Anyway, the host capacity is updated here if the cluster level capacity
 	 * is fixed.
@@ -1040,6 +1040,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		if (segresource->Stat->StatusDesc == 0)
 		{
 			setSegResHAWQAvailability(segresource, RESOURCE_SEG_STATUS_AVAILABLE);
+			segavailchanged = true;
 		}
 
 		/* Add this node into the table gp_segment_configuration */
@@ -1277,12 +1278,20 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		{
 			if (oldStatus == RESOURCE_SEG_STATUS_UNAVAILABLE ||
 					oldStatus == RESOURCE_SEG_STATUS_UNSET)
-				setSegResHAWQAvailability(segresource, RESOURCE_SEG_STATUS_AVAILABLE);
+			{
+				setSegResHAWQAvailability(segresource,
+										  RESOURCE_SEG_STATUS_AVAILABLE);
+				segavailchanged = true;
+			}
 		}
 		else
 		{
 			if (oldStatus == RESOURCE_SEG_STATUS_AVAILABLE)
-				setSegResHAWQAvailability(segresource, RESOURCE_SEG_STATUS_UNAVAILABLE);
+			{
+				setSegResHAWQAvailability(segresource,
+										  RESOURCE_SEG_STATUS_UNAVAILABLE);
+				segavailchanged = true;
+			}
 		}
 
 		if (oldStatusDesc != segresource->Stat->StatusDesc ||
@@ -1374,6 +1383,12 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		/* update the status of this node */
 		segresource->LastUpdateTime = gettime_microsec();
 		res = RESOURCEPOOL_DUPLICATE_HOST;
+	}
+
+	if ( segavailchanged )
+	{
+		refreshResourceQueueCapacity(false);
+		refreshActualMinGRMContainerPerSeg();
 	}
 
 	validateResourcePoolStatus(true);
@@ -1585,6 +1600,8 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	{
 		Assert(statusDescChange == true);
 		setSegResHAWQAvailability(segres, RESOURCE_SEG_STATUS_AVAILABLE);
+		refreshResourceQueueCapacity(false);
+		refreshActualMinGRMContainerPerSeg();
 	}
 
 	if (statusDescChange && Gp_role != GP_ROLE_UTILITY)
@@ -1945,14 +1962,23 @@ int  addGRMContainerToToBeAccepted(GRMContainer ctn)
 	if ( ctn->Resource->IncPending.MemoryMB + ctn->Resource->Allocated.MemoryMB > memlimit )
 	{
 		elog(WARNING, "Global resource manager allocated too many containers to "
-					  "host %s. To return this host's resource container at once.",
-					  ctn->HostName);
+					  "host %s. To return this host's resource container at once. "
+					  "pending memory %d mb, allocated memory %d mb.",
+					  ctn->HostName,
+					  ctn->Resource->IncPending.MemoryMB,
+					  ctn->Resource->Allocated.MemoryMB);
 		addGRMContainerToKicked(ctn);
 		return RESOURCEPOOL_TOO_MANY_CONTAINERS;
 	}
 
 	/* Set the resource as increasing pending. */
 	addResourceBundleData(&(ctn->Resource->IncPending), ctn->MemoryMB, ctn->Core);
+	elog(RMLOG, "Host %s is added container to be accepted (%d MB, %d CORE), "
+				"now pending %d MB.",
+				ctn->HostName,
+				ctn->MemoryMB,
+				ctn->Core,
+				ctn->Resource->IncPending.MemoryMB);
 
 	/* Add the container to the hash-table to be processed consequently. */
 	SimpString key;
@@ -1971,7 +1997,7 @@ int  addGRMContainerToToBeAccepted(GRMContainer ctn)
 
 	appendGRMContainerSetContainer(ctns, ctn);
 	PRESPOOL->AddPendingContainerCount++;
-	elog(LOG, "AddPendingContainerCount added 1, current value %d",
+	elog(LOG, "AddPendingContainerCount added 1, current value %d.",
 			  PRESPOOL->AddPendingContainerCount);
 	return FUNC_RETURN_OK;
 }
@@ -2046,13 +2072,14 @@ void addGRMContainerToResPool(GRMContainer container)
 	reorderSegResourceCombinedWorkloadIndex(segresource);
 
 	elog(LOG, "Resource manager added resource container into resource pool "
-			  "(%d MB, %d CORE) at %s (%d:%.*s)",
+			  "(%d MB, %d CORE) at %s (%d:%.*s), still pending %d MB",
 			  container->MemoryMB,
 			  container->Core,
 			  container->HostName,
 			  segresource->Stat->ID,
 			  segresource->Stat->Info.HostNameLen,
-			  GET_SEGRESOURCE_HOSTNAME(segresource));
+			  GET_SEGRESOURCE_HOSTNAME(segresource),
+			  segresource->IncPending.MemoryMB);
 }
 
 void addGRMContainerToToBeKicked(GRMContainer ctn)

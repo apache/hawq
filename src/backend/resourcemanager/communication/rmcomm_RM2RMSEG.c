@@ -618,7 +618,7 @@ void processContainersAfterIncreaseMemoryQuota(GRMContainerSet ctns, bool accept
     		ctn->Life += 1;
 
     		PRESPOOL->AddPendingContainerCount--;
-    		elog(LOG, "AddPendingContainerCount minused 1, current value %d",
+    		elog(LOG, "AddPendingContainerCount minus 1, current value %d",
     				  PRESPOOL->AddPendingContainerCount);
     		/*
     		 * Add container to ToKickContainers if lifetime is not too long.
@@ -628,6 +628,10 @@ void processContainersAfterIncreaseMemoryQuota(GRMContainerSet ctns, bool accept
     		if( !isCleanGRMResourceStatus() &&
     			ctn->Life < RESOURCE_CONTAINER_MAX_LIFETIME )
     		{
+    			/* This container can not generate additional increase pending */
+    			minusResourceBundleData(&(ctn->Resource->IncPending),
+    									ctn->MemoryMB,
+										ctn->Core);
     			addGRMContainerToToBeAccepted(ctn);
     		}
     		/* Add container to KickedContainers if lifetime is long enough */
