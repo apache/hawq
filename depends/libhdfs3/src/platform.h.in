@@ -1,0 +1,32 @@
+#define THREAD_LOCAL __thread
+#define ATTRIBUTE_NORETURN __attribute__ ((noreturn))
+#define ATTRIBUTE_NOINLINE __attribute__ ((noinline))
+
+#define GCC_VERSION (__GNUC__ * 10000 \
+                     + __GNUC_MINOR__ * 100 \
+                     + __GNUC_PATCHLEVEL__)
+
+#cmakedefine LIBUNWIND_FOUND
+#cmakedefine HAVE_DLADDR
+#cmakedefine OS_LINUX
+#cmakedefine OS_MACOSX
+#cmakedefine ENABLE_FRAME_POINTER
+#cmakedefine HAVE_SYMBOLIZE
+#cmakedefine NEED_BOOST
+#cmakedefine STRERROR_R_RETURN_INT
+#cmakedefine HAVE_STEADY_CLOCK
+#cmakedefine HAVE_NESTED_EXCEPTION
+#cmakedefine HAVE_BOOST_CHRONO
+#cmakedefine HAVE_STD_CHRONO
+#cmakedefine HAVE_BOOST_ATOMIC
+#cmakedefine HAVE_STD_ATOMIC
+
+// defined by gcc
+#if defined(__ELF__) && defined(OS_LINUX)
+# define HAVE_SYMBOLIZE
+#elif defined(OS_MACOSX) && defined(HAVE_DLADDR)
+// Use dladdr to symbolize.
+# define HAVE_SYMBOLIZE
+#endif
+
+#define STACK_LENGTH 64

@@ -44,6 +44,14 @@
               <exclude>depends/libyarn/CMake/FindBoost.cmake</exclude>
               <exclude>depends/libyarn/CMake/FindGSasl.cmake</exclude>
               <exclude>depends/libyarn/CMake/FindKERBEROS.cmake</exclude>
+			  <exclude>depends/libhdfs3/CMake/FindBoost.cmake</exclude>
+			  <exclude>depends/libhdfs3/CMake/CodeCoverage.cmake</exclude>
+			  <exclude>depends/libhdfs3/CMake/FindGSasl.cmake</exclude>
+			  <exclude>depends/libhdfs3/CMake/FindKERBEROS.cmake</exclude>
+			  <exclude>depends/libhdfs3/CMake/FindLibUUID.cmake</exclude>
+			  <exclude>depends/libhdfs3/CMake/Functions.cmake</exclude>
+			  <exclude>depends/libhdfs3/CMake/Options.cmake</exclude>
+			  <exclude>depends/libhdfs3/CMake/Platform.cmake</exclude>
               <exclude>src/bin/gpfdist/src/gpfdist/glob.c</exclude>
               <exclude>src/bin/gpfdist/src/gpfdist/include/glob.h</exclude>
               <exclude>src/include/port/win32_msvc/glob.h</exclude>
@@ -52,6 +60,8 @@
               <!-- Google BSD license -->
               <exclude>depends/libyarn/gmock/**</exclude>
               <exclude>depends/libyarn/gtest/**</exclude>
+			  <exclude>depends/libhdfs3/gmock/**</exclude>
+			  <exclude>depends/libhdfs3/gtest/**</exclude>
 
               <!-- Oraface Project BSD license https://github.com/orafce -->
               <exclude>contrib/orafce/*</exclude>

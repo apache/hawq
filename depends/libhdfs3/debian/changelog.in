@@ -1,0 +1,5 @@
+libhdfs3 (@libhdfs3_VERSION_STRING@-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Zhanwei Wang <wangzw@wangzw.org>  Fri, 06 Feb 2015 11:58:35 +0100

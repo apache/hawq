@@ -283,6 +283,14 @@ Source code under
   depends/libyarn/CMake/FindBoost.cmake
   depends/libyarn/CMake/FindGSasl.cmake
   depends/libyarn/CMake/FindKERBEROS.cmake
+  depends/libhdfs3/CMake/FindBoost.cmake
+  depends/libhdfs3/CMake/CodeCoverage.cmake
+  depends/libhdfs3/CMake/FindGSasl.cmake
+  depends/libhdfs3/CMake/FindKERBEROS.cmake
+  depends/libhdfs3/CMake/FindLibUUID.cmake
+  depends/libhdfs3/CMake/Functions.cmake
+  depends/libhdfs3/CMake/Options.cmake
+  depends/libhdfs3/CMake/Platform.cmake
 is taken from CMake and is available under the following license:
 
 CMake - Cross Platform Makefile Generator
@@ -403,7 +411,10 @@ Julian Seward, jseward@bzip.org
 bzip2/libbzip2 version 1.0.6 of 6 September 2010
 
 ***********************************************************************
-Source code under depends/libyarn/gmock is taken from googlemock
+Source code under
+  depends/libyarn/gmock
+  depends/libhdfs3/gmock
+is taken from googlemock
 and is available under the following license:
 
 Copyright 2008, Google Inc.
@@ -436,7 +447,10 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ***********************************************************************
-Source code under depends/libyarn/gtest is taken from googletest
+Source code under
+  depends/libyarn/gtest
+  depends/libhdfs3/gtest
+is taken from googletest
 and is available under the following license:
 
 Copyright 2008, Google Inc.
