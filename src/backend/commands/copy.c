@@ -1557,7 +1557,8 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			Oid		relid = RelationGetRelid(cstate->rel);
 			List	*all_relids = NIL;
 			GpPolicy *target_policy = NULL;
-			int target_segment_num = 0;
+			int min_target_segment_num = 0;
+			int max_target_segment_num = 0;
 			QueryResource *savedResource = NULL;
 
 			target_policy = GpPolicyFetch(CurrentMemoryContext, relid);
@@ -1567,14 +1568,16 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			 * For random table, we use a fixed GUC value to request vsegs.
 			 */
 			if(target_policy->nattrs > 0){
-				target_segment_num = target_policy->bucketnum;
+				min_target_segment_num = target_policy->bucketnum;
+				max_target_segment_num = target_policy->bucketnum;
 			}
 			else{
-				target_segment_num = hawq_rm_nvseg_for_copy_from_perquery;
+				min_target_segment_num = 1;
+				max_target_segment_num = hawq_rm_nvseg_for_copy_from_perquery;
 			}
 			pfree(target_policy);
 
-			cstate->resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num,NULL,0);
+			cstate->resource = AllocateResource(QRL_ONCE, 1, 1, max_target_segment_num, min_target_segment_num,NULL,0);
 			savedResource = GetActiveQueryResource();
 			SetActiveQueryResource(cstate->resource);
 			all_relids = lappend_oid(all_relids, relid);
