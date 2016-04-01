@@ -1145,7 +1145,7 @@ def hawq_activate_standby(opts, hawq_dict):
             logger.error("Stop master failed, try again with immediate mode")
             cmd = "%s; hawq stop master -a -M immediate -q;" % source_hawq_env
             return_result = remote_ssh(cmd, old_master_host_name, '')
-            if return_resutl != 0:
+            if return_result != 0:
                 logger.error("Stop master failed, abort")
                 logger.error("Please manually bring hawq cluster down, then do activate standby again")
                 sys.exit(1)
@@ -1175,13 +1175,13 @@ def hawq_activate_standby(opts, hawq_dict):
     
     # Set current standby host name as the new master host name in configuration.
     logger.info("Update master host name in hawq-site.xml")
-    cmd = "%s; hawq config -c hawq_master_address_host -v %s --skipvalidation -q" % \
-           (source_hawq_env, hawq_dict['hawq_standby_address_host'])
+    ignore_bad_hosts = '--ignore-bad-hosts' if opts.ignore_bad_hosts else ''
+    cmd = "%s; hawq config -c hawq_master_address_host -v %s --skipvalidation -q %s" % (source_hawq_env, hawq_dict['hawq_standby_address_host'], ignore_bad_hosts)
     check_return_code(remote_ssh(cmd, old_standby_host_name, ''), logger, "Set hawq_master_address_host failed")
 
     # Remove the old standby host configuration from hawq-site.xml.
     logger.info("Remove current standby from hawq-site.xml")
-    cmd = "%s; hawq config -r hawq_standby_address_host --skipvalidation -q" % source_hawq_env
+    cmd = "%s; hawq config -r hawq_standby_address_host --skipvalidation -q %s" % (source_hawq_env, ignore_bad_hosts)
     check_return_code(remote_ssh(cmd, old_standby_host_name, ''), logger, "Remove hawq_standby_address_host from configuration failed")
 
     cmd = '''echo "gp_persistent_repair_global_sequence = true" >> %s/%s''' % (hawq_dict['hawq_master_directory'], 'postgresql.conf')
@@ -1279,6 +1279,10 @@ def create_parser():
     parser.add_option('-n', '--no-update', action='store_true',
                       dest='no_update', default=False,
                       help='Do not update system catalog tables.')
+    parser.add_option('-i', '--ignore-bad-hosts',
+                      dest='ignore_bad_hosts', action='store_true',
+                      default=False,
+                      help='Skips syncing configuration files on hosts on which SSH fails')
     parser.add_option("--bucket_number",
                       type="int",
                       dest="default_hash_table_bucket_number",
@@ -1319,6 +1323,7 @@ def create_parser():
                       dest="shared_buffers",
                       default="128000kB",
                       help="Sets the shared_buffers for formatting hawq database")
+
     (options, args) = parser.parse_args()
     if len(args) == 0:
         parser.print_help()
