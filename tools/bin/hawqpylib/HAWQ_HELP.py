@@ -164,6 +164,7 @@ The "options" are:
    -v --verbose        Displays detailed status.
    -r --remove         HAWQ GUC name to be removed.
    --skipvalidation    Skip the system validation checks.
+   --ignore-bad-hosts  Skips copying configuration files on host on which SSH fails
 
 See 'hawq --help' for more information on other commands.
 """
