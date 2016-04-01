@@ -308,7 +308,6 @@ struct SegResourceData {
 SegResource createSegResource(SegStat segstat);
 
 int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus);
-int setSegResGLOBAvailability( SegResource segres, uint8_t newstatus);
 
 /* Set the segment is under or not under RUAlive pending status. */
 bool setSegResRUAlivePending( SegResource segres, bool pending);
