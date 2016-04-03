@@ -210,12 +210,18 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 			refreshActualMinGRMContainerPerSeg();
 		}
 		else {
-			elog(DEBUG3, "Resource manager find host %s is down already.",
+			elog(DEBUG3, "Resource manager finds host %s is down already.",
 						 GET_SEGRESOURCE_HOSTNAME(segres));
 		}
 	}
+	else
+	{
+		elog(DEBUG3, "Resource manager finds host %s still up.");
+	}
 
 	setSegResRUAlivePending(segres, false);
+	PQUEMGR->toRunQueryDispatch = true;
+
 	closeFileDesc(context->AsyncBuffer);
 }
 
