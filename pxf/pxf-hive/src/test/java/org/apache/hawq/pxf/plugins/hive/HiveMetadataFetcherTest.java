@@ -24,6 +24,7 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -137,11 +138,120 @@ public class HiveMetadataFetcherTest {
         hiveTable.setPartitionKeys(new ArrayList<FieldSchema>());
         when(hiveClient.getTable("default", tableName)).thenReturn(hiveTable);
 
-        // get metadata
+        // Get metadata
         metadataList = fetcher.getMetadata(tableName);
         Metadata metadata = metadataList.get(0);
 
         assertEquals("default.cause", metadata.getItem().toString());
+
+        List<Metadata.Field> resultFields = metadata.getFields();
+        assertNotNull(resultFields);
+        assertEquals(2, resultFields.size());
+        Metadata.Field field = resultFields.get(0);
+        assertEquals("field1", field.getName());
+        assertEquals("text", field.getType()); // converted type
+        field = resultFields.get(1);
+        assertEquals("field2", field.getName());
+        assertEquals("int4", field.getType());
+    }
+
+    @Test
+    public void getTableMetadataWithMultipleTables() throws Exception {
+        prepareConstruction();
+
+        fetcher = new HiveMetadataFetcher(inputData);
+
+        String tablepattern = "*";
+        String dbpattern = "*";
+        String dbname = "default";
+        String tablenamebase = "regulartable";
+        String pattern = dbpattern + "." + tablepattern;
+
+        List<String> dbNames = new ArrayList<String>(Arrays.asList(dbname));
+        List<String> tableNames = new ArrayList<String>();
+
+        // Prepare for tables
+        List<FieldSchema> fields = new ArrayList<FieldSchema>();
+        fields.add(new FieldSchema("field1", "string", null));
+        fields.add(new FieldSchema("field2", "int", null));
+        StorageDescriptor sd = new StorageDescriptor();
+        sd.setCols(fields);
+
+        // Mock hive tables returned from hive client
+        for(int index=1;index<=2;index++) {
+            String tableName = tablenamebase + index;
+            tableNames.add(tableName);;
+            Table hiveTable = new Table();
+            hiveTable.setTableType("MANAGED_TABLE");
+            hiveTable.setSd(sd);
+            hiveTable.setPartitionKeys(new ArrayList<FieldSchema>());
+            when(hiveClient.getTable(dbname, tableName)).thenReturn(hiveTable);
+        }
+
+        // Mock database and table names return from hive client
+        when(hiveClient.getDatabases(dbpattern)).thenReturn(dbNames);
+        when(hiveClient.getTables(dbname, tablepattern)).thenReturn(tableNames);
+
+        // Get metadata
+        metadataList = fetcher.getMetadata(pattern);
+        assertEquals(2, metadataList.size());
+
+        for(int index=1;index<=2;index++) {
+            Metadata metadata = metadataList.get(index-1);
+            assertEquals(dbname + "." + tablenamebase+index, metadata.getItem().toString());
+            List<Metadata.Field> resultFields = metadata.getFields();
+            assertNotNull(resultFields);
+            assertEquals(2, resultFields.size());
+            Metadata.Field field = resultFields.get(0);
+            assertEquals("field1", field.getName());
+            assertEquals("text", field.getType()); // converted type
+            field = resultFields.get(1);
+            assertEquals("field2", field.getName());
+            assertEquals("int4", field.getType());
+        }
+    }
+
+    @Test
+    public void getTableMetadataWithIncompatibleTables() throws Exception {
+        prepareConstruction();
+
+        fetcher = new HiveMetadataFetcher(inputData);
+
+        String tablepattern = "*";
+        String dbpattern = "*";
+        String dbname = "default";
+        String pattern = dbpattern + "." + tablepattern;
+
+        String tableName1 = "viewtable";
+        // mock hive table returned from hive client
+        Table hiveTable1 = new Table();
+        hiveTable1.setTableType("VIRTUAL_VIEW");
+        when(hiveClient.getTable(dbname, tableName1)).thenReturn(hiveTable1);
+
+        String tableName2 = "regulartable";
+        // mock hive table returned from hive client
+        List<FieldSchema> fields = new ArrayList<FieldSchema>();
+        fields.add(new FieldSchema("field1", "string", null));
+        fields.add(new FieldSchema("field2", "int", null));
+        StorageDescriptor sd = new StorageDescriptor();
+        sd.setCols(fields);
+        Table hiveTable2 = new Table();
+        hiveTable2.setTableType("MANAGED_TABLE");
+        hiveTable2.setSd(sd);
+        hiveTable2.setPartitionKeys(new ArrayList<FieldSchema>());
+        when(hiveClient.getTable(dbname, tableName2)).thenReturn(hiveTable2);
+
+        // Mock get databases and tables return from hive client
+        List<String> tableNames = new ArrayList<String>(Arrays.asList(tableName1, tableName2));
+        List<String> dbNames = new ArrayList<String>(Arrays.asList(dbname));
+        when(hiveClient.getDatabases(dbpattern)).thenReturn(dbNames);
+        when(hiveClient.getTables(dbname, tablepattern)).thenReturn(tableNames);
+
+        // Get metadata
+        metadataList = fetcher.getMetadata(pattern);
+        assertEquals(1, metadataList.size());
+        Metadata metadata = metadataList.get(0);
+        assertEquals(dbname + "." + tableName2, metadata.getItem().toString());
 
         List<Metadata.Field> resultFields = metadata.getFields();
         assertNotNull(resultFields);
