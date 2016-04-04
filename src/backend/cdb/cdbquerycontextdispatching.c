@@ -102,7 +102,7 @@ int QueryContextDispatchingSizeMemoryLimit = 100 * 1024; /* KB */
 
 enum QueryContextDispatchingItemType
 {
-    MasterXid, TablespaceLocation, TupleType, EmptyTable, FileSystemCredential
+    MasterXid, TablespaceLocation, TupleType, EmptyTable, FileSystemCredential, Namespace
 };
 typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
@@ -183,7 +183,7 @@ static char*
 GetExtTableFirstLocation(Datum *array);
 
 static void 
-AddFileSystemCredentialForPxfTable(char *uri);
+AddFileSystemCredentialForPxfTable();
 
 /**
  * construct the file location for query context dispatching.
@@ -770,6 +770,30 @@ RebuildTupleForRelation(QueryContextInfo *cxt)
 }
 
 /*
+ * Deserialize the Namespace data
+ */
+static void
+RebuildNamespace(QueryContextInfo *cxt)
+{
+
+	int len;
+	char buffer[4], *binary;
+	ReadData(cxt, buffer, sizeof(buffer), TRUE);
+
+	len = (int) ntohl(*(uint32 *) buffer);
+	binary = palloc(len);
+	if(ReadData(cxt, binary, len, TRUE))
+	{
+		StringInfoData buffer;
+		initStringInfoOfString(&buffer, binary, len);
+		dfs_address = strdup(buffer.data);
+	} else {
+		elog(ERROR, "Couldn't rebuild Namespace");
+	}
+	pfree(binary);
+}
+
+/*
  * rebuild execute context
  */
 void
@@ -801,6 +825,9 @@ RebuildQueryContext(QueryContextInfo *cxt, HTAB **currentFilesystemCredentials,
         	RebuildFilesystemCredentials(cxt, currentFilesystemCredentials,
         	        currentFilesystemCredentialsMemoryContext);
         	break;
+        case Namespace:
+            RebuildNamespace(cxt);
+            break;
         default:
             ereport(ERROR,
                     (errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg( "unrecognized "
@@ -1746,7 +1773,8 @@ prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt,
 	if (IS_PXF_URI(location))
 	{
 		Insist(array_size == 1);
-		AddFileSystemCredentialForPxfTable(location);
+		AddFileSystemCredentialForPxfTable();
+		prepareDfsAddressForDispatch(cxt);
 	}
 
 	AddTupleWithToastsToContextInfo(cxt, ExtTableRelationId, "pg_exttable", tuple,
@@ -2880,7 +2908,7 @@ static char* GetExtTableFirstLocation(Datum *array)
  * prepareDispatchedCatalogFileSystemCredential will store the token
  * using port == 0 in HA case (otherwise the supplied port).
  */
-static void AddFileSystemCredentialForPxfTable(char *uri)
+static void AddFileSystemCredentialForPxfTable()
 {
 	char* dfs_address = NULL;
 
@@ -2983,4 +3011,31 @@ GetResultRelSegFileInfos(Oid relid, List *segnomaps, List *existing_seginfomaps)
 	}
 
 	return existing_seginfomaps;
+}
+
+/*
+ * prepareDfsAddressForDispatch
+ *
+ * Given the cxt use the currently set value of cxt->sharedPath
+ * and add it to cxt->buffer so that it is dispatched from
+ * master to segment. This is only required in the case of
+ * a secure filesystem.
+ */
+
+void
+prepareDfsAddressForDispatch(QueryContextInfo* cxt)
+{
+	if (!enable_secure_filesystem)
+		return;
+	const char *namespace = cxt->sharedPath;
+	int size = strlen(namespace);
+	StringInfoData buffer;
+	initStringInfo(&buffer);
+
+	pq_sendint(&buffer, (int) Namespace, sizeof(char));
+	pq_sendint(&buffer, size, sizeof(int));
+
+	WriteData(cxt, buffer.data, buffer.len);
+	WriteData(cxt, namespace, size);
+	pfree(buffer.data);
 }

@@ -241,6 +241,8 @@ void gpbridge_import_start(PG_FUNCTION_ARGS)
 
 	/* read some bytes to make sure the connection is established */
 	churl_read_check_connectivity(context->churl_handle);
+
+	free_dfs_address();
 }
 
 void gpbridge_export_start(PG_FUNCTION_ARGS)
@@ -271,6 +273,7 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 	context->churl_handle = churl_init_upload(context->uri.data,
 											  context->churl_headers);
 
+	free_dfs_address();
 }
 
 /*
@@ -507,16 +510,14 @@ size_t fill_buffer(gphadoop_context* context, char* start, size_t size)
 void add_delegation_token(PxfInputData *inputData)
 {
 	PxfHdfsTokenData *token = NULL;
-	char* dfs_address = NULL;
 
 	if (!enable_secure_filesystem)
 		return;
 
+	Assert(dfs_address);
+
 	token = palloc0(sizeof(PxfHdfsTokenData));
-
-	get_hdfs_location_from_filespace(&dfs_address);
-
-    elog(DEBUG2, "locating token for %s", dfs_address);
+	elog(DEBUG2, "locating token for %s", dfs_address);
 
 	token->hdfs_token = find_filesystem_credential_with_uri(dfs_address);
 
@@ -526,7 +527,6 @@ void add_delegation_token(PxfInputData *inputData)
 
 	inputData->token = token;
 
-	pfree(dfs_address);
 }
 
 void free_token_resources(PxfInputData *inputData)
@@ -535,4 +535,9 @@ void free_token_resources(PxfInputData *inputData)
 		return;
 
 	pfree(inputData->token);
+}
+
+void free_dfs_address()
+{
+	free(dfs_address);
 }

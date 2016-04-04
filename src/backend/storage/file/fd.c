@@ -250,6 +250,8 @@ static int	RecentRemoteAllocatedDesc = -1;
  */
 static long tempFileCounter = 0;
 
+char* dfs_address;
+
 
 /*--------------------
  *
