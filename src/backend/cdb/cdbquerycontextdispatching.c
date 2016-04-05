@@ -172,6 +172,9 @@ static void
 prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt, Oid relid);
 
 static void
+prepareDfsAddressForDispatch(QueryContextInfo* cxt);
+
+static void
 addOperatorToDispatchContext(QueryContextInfo *ctx, Oid opOid);
 
 static void
@@ -3022,7 +3025,7 @@ GetResultRelSegFileInfos(Oid relid, List *segnomaps, List *existing_seginfomaps)
  * a secure filesystem.
  */
 
-void
+static void
 prepareDfsAddressForDispatch(QueryContextInfo* cxt)
 {
 	if (!enable_secure_filesystem)

@@ -62,6 +62,7 @@ void 	build_uri_for_write(gphadoop_context* context, PxfServer* rest_server);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
 void	add_delegation_token(PxfInputData *inputData);
 void	free_token_resources(PxfInputData *inputData);
+void free_dfs_address();
 
 /* Custom protocol entry point for read
  */
