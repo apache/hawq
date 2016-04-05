@@ -159,7 +159,7 @@ class HawqInit:
     def _get_ips(self):
         cmd = "%s/bin/lib/get_ip_addresses_of_host.sh %s master_ip_address_all" % (self.GPHOME, self.master_host_name)
         local_ssh(cmd, logger)
-        if self.standby_host_name.lower() not in ('', 'none'):
+        if self.standby_host_name.lower() not in ('', 'none') and not self.remove_standby:
             cmd = "%s/bin/lib/get_ip_addresses_of_host.sh %s standby_ip_address_all" % (self.GPHOME, self.standby_host_name)
             local_ssh(cmd, logger)
 
@@ -284,6 +284,7 @@ class HawqInit:
             conn.close()
         except DatabaseError, ex:
             logger.error("Failed to connect to database, this script can only be run when the database is up")
+            sys.exit(1)
 
         for row in rows:
             if row[0] == 's':
@@ -310,7 +311,7 @@ class HawqInit:
                 #for row in rows:
                 #    print row
                 #conn.close()
-                cmd = 'env PGOPTIONS="-c gp_session_role=utility" %s/bin/psql -p %s -d template1 -c \
+                cmd = 'env PGOPTIONS="-c gp_session_role=utility" %s/bin/psql -p %s -d template1 -o /dev/null -c \
                     "select gp_remove_master_standby();"' % (self.GPHOME, self.master_port)
                 check_return_code(local_ssh(cmd, logger), logger, \
                                   "Update catalog failed, exit", "Catalog updated successfully.")
@@ -321,23 +322,30 @@ class HawqInit:
                 logger.error("Failed to connect to database, this script can only be run when the database is up")
                 cmd = "%s; hawq stop master -a -M fast" % source_hawq_env
                 check_return_code(local_ssh(cmd, logger), logger, "Stop hawq master failed, exit")
+
             remove_property_xml("hawq_standby_address_host", "%s/etc/hawq-site.xml" % self.GPHOME, self.quiet)
             host_list = parse_hosts_file(self.GPHOME)
             sync_hawq_site(self.GPHOME, host_list)
-            gpsyncmaster_pid = gp.getSyncmasterPID(running_standby_host, self.master_data_directory)
-            if gpsyncmaster_pid > 0:
-                # stop it
-                logger.info('Stopping gpsyncmaster on %s' % running_standby_host)
-                gp.SegmentStop.remote('stop gpsyncmaster',
-                                    running_standby_host,
-                                    self.master_data_directory)
+            if is_node_alive(self.standby_host_name, self.user, logger):
+                logger.info("Check if gpsyncmaster running on %s" % running_standby_host)
+                gpsyncmaster_pid = gp.getSyncmasterPID(running_standby_host, self.master_data_directory)
+                if gpsyncmaster_pid > 0:
+                    # stop it
+                    logger.info('Stopping gpsyncmaster on %s' % running_standby_host)
+                    gp.SegmentStop.remote('stop gpsyncmaster',
+                                        running_standby_host,
+                                        self.master_data_directory)
 
-            tmp_dir_list = self.hawq_master_temp_directory.replace(',', ' ')
+                tmp_dir_list = self.hawq_master_temp_directory.replace(',', ' ')
 
-            logger.debug("rm -rf %s/* %s/*" % (self.master_data_directory, tmp_dir_list))
-            cmd = "rm -rf %s/* %s/*" % (self.master_data_directory, tmp_dir_list)
-            check_return_code(remote_ssh(cmd, self.standby_host_name, self.user), logger, \
-                              "Delete standby master's files failed, exit")
+                logger.debug("rm -rf %s/* %s/*" % (self.master_data_directory, tmp_dir_list))
+                cmd = "rm -rf %s/* %s/*" % (self.master_data_directory, tmp_dir_list)
+                result = remote_ssh(cmd, self.standby_host_name, self.user)
+                if result != 0:
+                    logger.warn('Remove data files on standby master failed')
+            else:
+                logger.warn('Not able to connect to Standby master, skip node clean')
+
             signal.signal(signal.SIGINT,signal.default_int_handler)
             logger.info('Remove standby master finished')
         else:
@@ -956,8 +964,9 @@ class HawqStop:
             check_return_code(self._stop_master(), logger, \
                               "Master stop failed, exit", "Master stopped successfully")
         elif self.node_type == "standby":
-            check_return_code(self._stop_standby(), logger, \
-                              "Standby master stop failed, exit", "Standby master stopped successfully")
+            if self.standby_host_name.lower() not in ('', 'none'):
+                check_return_code(self._stop_standby(), logger, \
+                                  "Standby master stop failed, exit", "Standby master stopped successfully")
         elif self.node_type == "segment":
             check_return_code(self._stop_segment(), logger, \
                               "Segment stop failed, exit", "Segment stopped successfully")

@@ -266,6 +266,16 @@ def remote_ssh_output(cmd, host, user):
     return (result.returncode, str(stdout.strip()), str(stderr.strip()))
 
 
+def is_node_alive(host, user = '', logger = None):
+    result = remote_ssh('true', host, user)
+    if result != 0:
+        if logger:
+            logger.info("node %s is not alive" % host)
+        return False
+    else:
+        return True
+
+
 def check_return_code(result, logger = None,  error_msg = None, info_msg = None, exit_true = False):
     '''Check shell command exit code.'''
     if result != 0:
