@@ -326,14 +326,14 @@ GenerateMetadataCacheLRUList()
 {
     HASH_SEQ_STATUS hstat;
     MetadataCacheEntry *entry;
-    long cache_entry_num = hash_get_num_entries(MetadataCache);
+    long cache_entry_num = 0;
 
     LWLockAcquire(MetadataCacheLock, LW_EXCLUSIVE);
+    cache_entry_num = hash_get_num_entries(MetadataCache);
 
-    if (MetadataCacheLRUList)
-    {
-        list_free_deep(MetadataCacheLRUList);
-        MetadataCacheLRUList = NULL;
+    if (cache_entry_num == 0) {
+        LWLockRelease(MetadataCacheLock);
+        return;
     }
 
     MetadataCacheEntry** entry_vector = (MetadataCacheEntry**)palloc(sizeof(MetadataCacheEntry*) * cache_entry_num);   
