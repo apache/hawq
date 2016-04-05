@@ -52,7 +52,7 @@ public class HiveMetadataFetcher extends MetadataFetcher {
 
     /**
      * Fetches metadata of hive tables corresponding to the given pattern
-     * For patterns matching more than one table, the tables are skipped.
+     * For patterns matching more than one table, the unsupported tables are skipped.
      * If the pattern correspond to exactly one table, throws an exception if
      * the table type is not supported or contains unsupported field types.
      * Supported HCatalog types: TINYINT,
