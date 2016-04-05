@@ -50,9 +50,21 @@ public class HiveMetadataFetcher extends MetadataFetcher {
         client = HiveUtilities.initHiveClient();
     }
 
+    /**
+     * Fetches metadata of hive tables corresponding to the given pattern
+     * For patterns matching more than one table, the unsupported tables are skipped.
+     * If the pattern correspond to exactly one table, throws an exception if
+     * the table type is not supported or contains unsupported field types.
+     * Supported HCatalog types: TINYINT,
+     * SMALLINT, INT, BIGINT, BOOLEAN, FLOAT, DOUBLE, STRING, BINARY, TIMESTAMP,
+     * DATE, DECIMAL, VARCHAR, CHAR.
+     *
+     * @param pattern pattern table/file name or pattern in the given source
+     */
     @Override
     public List<Metadata> getMetadata(String pattern) throws Exception {
 
+        boolean ignoreErrors = false;
         List<Metadata.Item> tblsDesc = HiveUtilities.extractTablesFromPattern(client, pattern);
 
         if(tblsDesc == null || tblsDesc.isEmpty()) {
@@ -62,11 +74,24 @@ public class HiveMetadataFetcher extends MetadataFetcher {
 
         List<Metadata> metadataList = new ArrayList<Metadata>();
 
+        if(tblsDesc.size() > 1) {
+            ignoreErrors = true;
+        }
+
         for(Metadata.Item tblDesc: tblsDesc) {
-            Metadata metadata = new Metadata(tblDesc);
-            Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
-            getSchema(tbl, metadata);
-            metadataList.add(metadata);
+            try {
+                Metadata metadata = new Metadata(tblDesc);
+                Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
+                getSchema(tbl, metadata);
+                metadataList.add(metadata);
+            } catch (UnsupportedTypeException | UnsupportedOperationException e) {
+                if(ignoreErrors) {
+                    LOG.warn("Metadata fetch for " + tblDesc.toString() + " failed. " + e.getMessage());
+                    continue;
+                } else {
+                    throw e;
+                }
+            }
         }
 
         return metadataList;
