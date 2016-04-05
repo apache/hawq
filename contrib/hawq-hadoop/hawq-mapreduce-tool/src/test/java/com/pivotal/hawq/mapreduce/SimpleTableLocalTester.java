@@ -51,6 +51,8 @@ public class SimpleTableLocalTester extends SimpleTableTester {
 		final File answerFile	= new File(caseFolder, tableName + ".ans");
 		final File metadataFile	= new File(caseFolder, tableName + ".yaml");
 		final File outputFile	= new File(caseFolder, "output/part-r-00000");
+		final String caseName = tableName.replaceAll("\\.", "_");
+		System.out.println("Executing test case: " + caseName);
 
 		List<String> answers;
 
@@ -106,5 +108,7 @@ public class SimpleTableLocalTester extends SimpleTableTester {
 		// compare result
 		List<String> outputs = Files.readLines(outputFile, Charsets.UTF_8);
 		checkOutput(answers, outputs, table);
+		
+		System.out.println("Successfully finish test case: " + caseName);
 	}
 }
