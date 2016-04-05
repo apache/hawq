@@ -1958,21 +1958,10 @@ int acquireResourceQuotaFromResQueMgr(ConnectionTrack	conntrack,
 	userinfo = getUserByUserName(conntrack->UserID,
 							     strlen(conntrack->UserID),
 							     &exist);
-	if ( exist )
-	{
-		/* Get the queue, and check if the parallel limit is achieved. */
-		queuetrack = getQueueTrackByQueueOID(userinfo->QueueOID, &exist);
-	}
-	else
-	{
-		elog(LOG, "ConnID %d. No user %s defined for registering connection. "
-				  "Assign to pg_default queue.",
-				  conntrack->ConnID,
-				  conntrack->UserID);
-		queuetrack = PQUEMGR->DefaultTrack;
-		userinfo = NULL;
-	}
+	Assert(exist && userinfo != NULL);
 
+	/* Get the queue, and check if the parallel limit is achieved. */
+	queuetrack = getQueueTrackByQueueOID(userinfo->QueueOID, &exist);
 	Assert( queuetrack != NULL );
 
 	conntrack->QueueTrack = queuetrack;
@@ -1985,29 +1974,6 @@ int acquireResourceQuotaFromResQueMgr(ConnectionTrack	conntrack,
 	{
 		if ( conntrack->StatNVSeg == 0 )
 		{
-			/*------------------------------------------------------------------
-			 * The following logic consider the actual resource requirement from
-			 * dispatcher based on table size, workload, etc. The requirement is
-			 * described by (MinSegCountFixed, MaxSegCountFixed). The requirement
-			 * can be satisfied only when there is a non-empty intersect between
-			 * (MinSegCountFixed, MaxSegCountFixed) and (SegNumMin, SegNum).
-			 *------------------------------------------------------------------
-			 */
-			conntrack->SegNumMin = conntrack->MaxSegCountFixed < conntrack->SegNumMin ?
-								   conntrack->MinSegCountFixed :
-								   max(conntrack->SegNumMin, conntrack->MinSegCountFixed);
-
-			conntrack->SegNum = min(conntrack->SegNum, conntrack->MaxSegCountFixed);
-
-			Assert( conntrack->SegNumMin <= conntrack->SegNum );
-			elog(LOG, "ConnID %d. Query resource quota expects (%d MB, %lf CORE) x %d "
-					  "( MIN %d ) resource after adjusting based on query characters.",
-					  conntrack->ConnID,
-					  conntrack->SegMemoryMB,
-					  conntrack->SegCore,
-					  conntrack->SegNum,
-					  conntrack->SegNumMin);
-
 			/*------------------------------------------------------------------
 			 * Adjust the number of virtual segments again based on
 			 * NVSEG_*_LIMITs and NVSEG_*_LIMIT_PERSEGs. This adjustment must

@@ -793,17 +793,51 @@ bool handleRMRequestAcquireResourceQuota(void **arg)
 	int      		 res		= FUNC_RETURN_OK;
 	ConnectionTrack  conntrack  = (ConnectionTrack)(*arg);
 	bool			 exist		= false;
+	uint64_t		 reqtime	= gettime_microsec();
+	/* If we run in YARN mode, we expect that we should try to get at least one
+	 * available segment, and this requires at least once global resource manager
+	 * cluster report returned.
+	 */
+	if ( reqtime - DRMGlobalInstance->ResourceManagerStartTime <=
+		 rm_nocluster_timeout * 1000000LL &&
+		 PRESPOOL->RBClusterReportCounter == 0 )
+	{
+		elog(DEBUG3, "Resource manager defers the resource request.");
+		return false;
+	}
+
+	/*
+	 * If resource queue has no concrete capacity set yet, no need to handle
+	 * the request.
+	 */
+	if ( PQUEMGR->RootTrack->QueueInfo->ClusterMemoryMB <= 0 )
+	{
+		elog(DEBUG3, "Resource manager defers the resource request because the "
+					 "resource queues have no valid resource capacities yet.");
+		return false;
+	}
+
+	Assert(PRESPOOL->SlavesHostCount > 0);
+	int rejectlimit = ceil(PRESPOOL->SlavesHostCount * rm_rejectrequest_nseg_limit);
+	int unavailcount = PRESPOOL->SlavesHostCount - PRESPOOL->AvailNodeCount;
+	if ( unavailcount > rejectlimit )
+	{
+		snprintf(errorbuf, sizeof(errorbuf),
+				 "%d of %d segments %s unavailable, exceeds %.1f%% defined in "
+				 "GUC hawq_rm_rejectrequest_nseg_limit. The resource quota "
+				 "request is rejected.",
+				 unavailcount,
+				 PRESPOOL->SlavesHostCount,
+				 unavailcount == 1 ? "is" : "are",
+				 rm_rejectrequest_nseg_limit*100.0);
+		elog(WARNING, "ConnID %d. %s", conntrack->ConnID, errorbuf);
+		res = RESOURCEPOOL_TOO_MANY_UAVAILABLE_HOST;
+		goto errorexit;
+	}
 
 	RPCRequestHeadAcquireResourceQuotaFromRMByOID request =
 		SMBUFF_HEAD(RPCRequestHeadAcquireResourceQuotaFromRMByOID,
 					&(conntrack->MessageBuff));
-
-	elog(LOG, "ConnID %d. User "INT64_FORMAT" acquires query resource quota "
-			  "with expected %d vseg (MIN %d).",
-			  conntrack->ConnID,
-			  request->UseridOid,
-			  request->MaxSegCountFix,
-			  request->MinSegCountFix);
 
 	/* Get user name from oid. */
 	UserInfo reguser = getUserByUserOID(request->UseridOid, &exist);
@@ -826,6 +860,31 @@ bool handleRMRequestAcquireResourceQuota(void **arg)
 	conntrack->MinSegCountFixed = request->MinSegCountFix;
 	conntrack->VSegLimitPerSeg	= request->VSegLimitPerSeg;
 	conntrack->VSegLimit		= request->VSegLimit;
+	conntrack->StatVSegMemoryMB	= request->StatVSegMemoryMB;
+	conntrack->StatNVSeg		= request->StatNVSeg;
+
+	elog(RMLOG, "ConnID %d. User "INT64_FORMAT" acquires query resource quota. "
+			  	"Expect %d vseg (MIN %d). "
+				"Each segment has maximum %d vseg. "
+				"Query has maximum %d vseg. "
+				"Statement quota %d MB x %d vseg",
+				conntrack->ConnID,
+				request->UseridOid,
+				request->MaxSegCountFix,
+				request->MinSegCountFix,
+				request->VSegLimitPerSeg,
+				request->VSegLimit,
+				request->StatVSegMemoryMB,
+				request->StatNVSeg);
+
+	if ( conntrack->StatNVSeg > 0 )
+	{
+		elog(LOG, "ConnID %d. Statement level resource quota is active. "
+				  "Expect resource ( %d MB ) x %d.",
+				  conntrack->ConnID,
+				  conntrack->StatVSegMemoryMB,
+				  conntrack->StatNVSeg);
+	}
 
 	res = acquireResourceQuotaFromResQueMgr(conntrack, errorbuf, sizeof(errorbuf));
 
