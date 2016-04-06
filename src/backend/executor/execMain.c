@@ -1306,12 +1306,6 @@ ExecutorEnd(QueryDesc *queryDesc)
 	/* sanity checks */
 	Assert(queryDesc != NULL);
 
-	/* Cleanup the global resource reference for spi/function resource inheritate. */
-	if ( Gp_role == GP_ROLE_DISPATCH ) {
-		AutoFreeResource(queryDesc->resource);
-		queryDesc->resource = NULL;
-	}
-
 	estate = queryDesc->estate;
 
 	Assert(estate != NULL);
@@ -1385,6 +1379,12 @@ ExecutorEnd(QueryDesc *queryDesc)
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
+
+	/* Cleanup the global resource reference for spi/function resource inheritate. */
+	if ( Gp_role == GP_ROLE_DISPATCH ) {
+		AutoFreeResource(queryDesc->resource);
+		queryDesc->resource = NULL;
+	}
 
 	/*
 	 * If normal termination, let each operator clean itself up.
