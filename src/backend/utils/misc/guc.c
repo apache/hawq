@@ -6446,7 +6446,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&rm_session_lease_timeout,
-		10, 5, 65535, NULL, NULL
+		180, 5, 65535, NULL, NULL
 	},
 
 	{
@@ -6493,7 +6493,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&rm_session_lease_heartbeat_interval,
-		1, 1, 65535, NULL, NULL
+		10, 1, 65535, NULL, NULL
 	},
 
 	{
