@@ -84,6 +84,13 @@ character is an equal sign (=).
 Optional. Reports additional messages in addition to the 
 SCP command output.
 
+--ignore-bad-hosts
+Ignore copying files to the hosts on which test SSH attempt failed
+and continue with the remaining. If test SSH failed, it indicates 
+that either the host is not working or there are issues while attempting
+to SSH on these host. Once the skipped hosts are brought back, ensure 
+that the required files are synced to them.
+
 <file_to_copy>
 
 Required. The file name (or absolute path) of a file that 

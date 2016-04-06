@@ -160,6 +160,29 @@ class HostList():
         
         return self.list
 
+    def removeBadHosts(self):
+        ''' Update list of host to include only the host on which SSH was successful'''
+
+        pool = WorkerPool()
+
+        for h in self.list:
+            cmd = Echo('ssh test', '', ctxt=REMOTE, remoteHost=h)
+            pool.addCommand(cmd)
+
+        pool.join()
+        pool.haltWork()
+
+        bad_hosts = []
+        working_hosts = []
+        for cmd in pool.getCompletedItems():
+            if not cmd.get_results().wasSuccessful():
+                bad_hosts.append(cmd.remoteHost)
+            else:
+                working_hosts.append(cmd.remoteHost)
+
+        self.list = working_hosts[:]
+        return bad_hosts
+
 # Session is a command session, derived from a base class cmd.Cmd
 class Session(cmd.Cmd):
     '''Implements a list of open ssh sessions ready to execute commands'''

@@ -39,6 +39,8 @@ def parseargs():
     parser.add_option('-l', '--list', action='store_true',
                       help="List all HAWQ Properties.")
     parser.add_option('--skipvalidation', action='store_true', default=False)
+    parser.add_option('--ignore-bad-hosts', action='store_true', default=False,
+                      help='Skips copying configuration files on host on which SSH fails')
     parser.add_option('-q', '--quiet', action='store_true', default=False)
     parser.add_option("-v", "--value",
                       dest="property_value",
@@ -174,12 +176,11 @@ def update_hawq_site(org_config_file, hawq_site, property_name, property_value):
         append_xml_property(org_config_file, property_name, property_value)
 
 
-def sync_hawq_site(config_dir, host_list):
+def sync_hawq_site(config_dir, host_list, ignore_bad_hosts):
     sync_host_str = ""
     for node in host_list:
         sync_host_str += " -h %s" % node
-
-    result = local_ssh("hawq scp %s %s/etc/hawq-site.xml =:%s/etc/" % (sync_host_str, config_dir, config_dir))
+    result = local_ssh("hawq scp %s %s %s/etc/hawq-site.xml =:%s/etc/" % (sync_host_str, ignore_bad_hosts, config_dir, config_dir))
     if result != 0:
         sys.exit("sync hawq-site.xml failed.")
 
@@ -196,6 +197,7 @@ if __name__ == '__main__':
     segment_list = parse_hosts_file(GPHOME)
     master_host = hawq_site.hawq_dict['hawq_master_address_host']
     host_list = segment_list + [master_host]
+    ignore_bad_hosts = '--ignore-bad-hosts' if options.ignore_bad_hosts else ''
     if 'hawq_standby_address_host' in hawq_site.hawq_dict:
         standby_host = hawq_site.hawq_dict['hawq_standby_address_host']
         if standby_host not in ('None', 'none', ''):
@@ -212,7 +214,7 @@ if __name__ == '__main__':
             check_property_valid(hawq_site, options.change)
 
         update_hawq_site(org_config_file, hawq_site, options.change, options.property_value)
-        sync_hawq_site(GPHOME, host_list)
+        sync_hawq_site(GPHOME, host_list, ignore_bad_hosts)
 
         if not options.quiet:
             latest_hawq_site = HawqXMLParser(GPHOME)
@@ -232,7 +234,7 @@ if __name__ == '__main__':
             print "Remove %s is not allowed" % options.remove
             sys.exit(1)
         remove_property_xml(options.remove, org_config_file, options.quiet)
-        sync_hawq_site(GPHOME, host_list)
+        sync_hawq_site(GPHOME, host_list, ignore_bad_hosts)
     else:
         print "Please input correct options"
         sys.exit(1)

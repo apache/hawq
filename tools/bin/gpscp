@@ -64,6 +64,7 @@ class Global:
     opt['-f'] = None
     opt['-J'] = '=:'
     opt['-r'] = False
+    opt['--ignore-bad-hosts'] = False
     filePath = []
 
 GV = Global()
@@ -86,18 +87,19 @@ def print_version():
 #############
 def parseCommandLine():
     try:
-        (options, args) = getopt.getopt(sys.argv[1:], '?vrJ:p:u:h:f:', ['version'])
+        (options, args) = getopt.getopt(sys.argv[1:], '?vrJ:p:u:h:f:', ['version', 'ignore-bad-hosts'])
     except Exception, e:
         usage('[ERROR] ' + str(e))
 
     for (switch, val) in options:
-	if (switch == '-?'): 	      usage(0)
-	elif (switch == '-v'):        GV.opt[switch] = True
-	elif (switch == '-f'):        GV.opt[switch] = val
-	elif (switch == '-h'):        GV.opt[switch].append(val)
-        elif (switch == '-J'):        GV.opt[switch] = val + ':'
-        elif (switch == '-r'):        GV.opt[switch] = True
-        elif (switch == '--version'): print_version()
+        if (switch == '-?'): 	                              usage(0)
+        elif (switch == '-v'):                              GV.opt[switch] = True
+        elif (switch == '-f'):                              GV.opt[switch] = val
+        elif (switch == '-h'):                              GV.opt[switch].append(val)
+        elif (switch == '-J'):                              GV.opt[switch] = val + ':'
+        elif (switch == '-r'):                              GV.opt[switch] = True
+        elif (switch == '--version'):                       print_version()
+        elif (switch == '--ignore-bad-hosts'):          GV.opt[switch] = True
 
     hf = (len(GV.opt['-h']) and 1 or 0) + (GV.opt['-f'] and 1 or 0)
     if hf != 1:
@@ -131,15 +133,23 @@ try:
     if GV.opt['-f']:
         hostlist.parseFile(GV.opt['-f'])
 
-    try:
-        hostlist.checkSSH()
-    except ssh_utils.SSHError, e:
-        sys.exit('[ERROR] ' + str(e))
+    if GV.opt['--ignore-bad-hosts']:
+        original_hostlist = hostlist.list
+        bad_hosts = hostlist.removeBadHosts()
+        if len(bad_hosts) == len(original_hostlist):
+            sys.exit('[ERROR]: Unable to SSH to any of the hosts {0}'.format(original_hostlist))
+        if len(bad_hosts) > 0:
+            print "[WARN]: Skipping syncing configuration file on hosts {0}, as ssh test failed".format(bad_hosts)
+    else:
+        try:
+            hostlist.checkSSH()
+        except ssh_utils.SSHError, e:
+            sys.exit('[ERROR] ' + str(e))
 
     GV.opt['-h'] = hostlist.filterMultiHomedHosts()
+
     if len(GV.opt['-h']) == 0:
         usage('Error: missing hosts in -h and/or -f arguments')
-
     scp = 'scp -o "BatchMode yes" -o "StrictHostKeyChecking no"'
     if GV.opt['-r']:  scp += ' -r'
     

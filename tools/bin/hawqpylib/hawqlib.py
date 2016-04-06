@@ -24,6 +24,8 @@ from xml.dom import minidom
 from xml.etree.ElementTree import ElementTree
 import shutil
 from gppylib.db import dbconn
+from gppylib.commands.base import WorkerPool, REMOTE
+from gppylib.commands.unix import Echo
 import re
 
 
@@ -484,3 +486,40 @@ def get_hawq_hostname_all(master_port):
 
     hawq_host_array = {'master': {master_host: master_status}, 'standby': {standby_host: standby_status}, 'segment': seg_host_list} 
     return hawq_host_array
+
+def get_host_status(hostlist):
+    """
+    Test if SSH command works on a host and return a dictionary
+    Return Ex: {host1: True, host2: False}
+    where True represents SSH command success and False represents failure
+    """
+    if not isinstance(hostlist, list):
+        raise Exception("Input parameter should be of type list")
+
+    pool = WorkerPool()
+
+    for host in hostlist:
+        cmd = Echo('ssh test', '', ctxt=REMOTE, remoteHost=host)
+        pool.addCommand(cmd)
+
+    pool.join()
+    pool.haltWork()
+
+    host_status_dict = {}
+    for cmd in pool.getCompletedItems():
+        if not cmd.get_results().wasSuccessful():
+            host_status_dict[cmd.remoteHost] = False
+        else:
+            host_status_dict[cmd.remoteHost] = True
+
+    return host_status_dict
+
+
+def exclude_bad_hosts(host_list):
+    """
+    Split Hosts on which SSH works vs node on which it fails
+    """
+    host_status_dict = get_host_status(host_list)
+    working_hosts = [host for host in host_status_dict.keys() if host_status_dict[host]]
+    bad_hosts = list(set(host_list) - set(working_hosts))
+    return working_hosts, bad_hosts
