@@ -1366,8 +1366,8 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 								      segresource->Stat->FTSTotalCore);
 			}
 
-			elog(LOG, "Resource manager sets physical host '%s' capacity change "
-					  "from FTS (%d MB,%d CORE) to FTS (%d MB,%d CORE)",
+			elog(LOG, "Resource manager finds host %s segment resource capacity "
+					  "changed from (%d MB,%d CORE) to (%d MB,%d CORE)",
 					  GET_SEGRESOURCE_HOSTNAME(segresource),
 					  oldftsmem,
 					  oldftscore,
@@ -1575,13 +1575,14 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 								  segres->Stat->GRMTotalCore);
 		}
 
-		elog(LOG, "Resource manager finds host %s capacity changed from "
-					"GRM (%d MB, %d CORE) to GRM (%d MB, %d CORE)",
-					GET_SEGRESOURCE_HOSTNAME(segres),
-					oldgrmmem,
-					oldgrmcore,
-					segres->Stat->GRMTotalMemoryMB,
-					segres->Stat->GRMTotalCore);
+		elog(LOG, "Resource manager finds host %s global resource manager "
+				  "node resource capacity changed from (%d MB, %d CORE) to "
+				  "GRM (%d MB, %d CORE)",
+				  GET_SEGRESOURCE_HOSTNAME(segres),
+				  oldgrmmem,
+				  oldgrmcore,
+				  segres->Stat->GRMTotalMemoryMB,
+				  segres->Stat->GRMTotalCore);
 	}
 
 	segres->Stat->GRMHandled = true;
@@ -1789,6 +1790,7 @@ int setSegResHAWQAvailability( SegResource segres, uint8_t newstatus)
 	}
 	else if (newstatus == RESOURCE_SEG_STATUS_AVAILABLE)
 	{
+		adjustSegmentCapacity(segres);
 		addResourceBundleData(&(PRESPOOL->FTSTotal),
 							  segres->Stat->FTSTotalMemoryMB,
 							  segres->Stat->FTSTotalCore);
@@ -4722,12 +4724,13 @@ void adjustSegmentStatFTSCapacity(SegStat segstat)
 	if ( oldmemorymb != segstat->FTSTotalMemoryMB ||
 		 oldcore	 != segstat->FTSTotalCore )
 	{
-		elog(RMLOG, "Resource manager adjusts segment FTS capacity from "
-					"(%d MB, %d CORE) to (%d MB, %d CORE)",
-					oldmemorymb,
-					oldcore,
-					segstat->FTSTotalMemoryMB,
-					segstat->FTSTotalCore);
+		elog(LOG, "Resource manager adjusts segment %s original resource "
+				  "capacity from (%d MB, %d CORE) to (%d MB, %d CORE)",
+				  GET_SEGINFO_HOSTNAME(&(segstat->Info)),
+				  oldmemorymb,
+				  oldcore,
+				  segstat->FTSTotalMemoryMB,
+				  segstat->FTSTotalCore);
 	}
 }
 
@@ -4746,12 +4749,14 @@ void adjustSegmentStatGRMCapacity(SegStat segstat)
 	if ( oldmemorymb != segstat->GRMTotalMemoryMB ||
 		 oldcore	 != segstat->GRMTotalCore )
 	{
-		elog(RMLOG, "Resource manager adjusts segment GRM capacity from "
-					"(%d MB, %d CORE) to (%d MB, %d CORE)",
-					oldmemorymb,
-					oldcore,
-					segstat->GRMTotalMemoryMB,
-					segstat->GRMTotalCore);
+		elog(LOG, "Resource manager adjusts segment %s original global resource "
+				  "manager resource capacity from (%d MB, %d CORE) to "
+				  "(%d MB, %d CORE)",
+				  GET_SEGINFO_HOSTNAME(&(segstat->Info)),
+				  oldmemorymb,
+				  oldcore,
+				  segstat->GRMTotalMemoryMB,
+				  segstat->GRMTotalCore);
 	}
 }
 
