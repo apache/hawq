@@ -84,7 +84,7 @@ int callSyncRPCRemote(const char     	   *hostname,
 				 "failed to connect to remote socket server %s:%d",
 				 hostname,
 				 port);
-		elog(WARNING, "%s", errorbuf);
+		elog(LOG, "%s", errorbuf);
 		goto exit;
 	}
 
@@ -106,7 +106,7 @@ int callSyncRPCRemote(const char     	   *hostname,
 				 fd,
 				 hostname, port);
 
-		elog(WARNING, "%s", errorbuf);
+		elog(LOG, "%s", errorbuf);
 		goto exit;
 	}
 
@@ -150,7 +150,7 @@ int callSyncRPCRemote(const char     	   *hostname,
 
 	if (res != FUNC_RETURN_OK)
 	{
-	  elog(WARNING, "Sync RPC framework (inet) finds exception raised.");
+	  elog(LOG, "Sync RPC framework (inet) finds exception raised.");
 
 	  switch(res)
 	  {

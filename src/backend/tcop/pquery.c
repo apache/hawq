@@ -747,8 +747,7 @@ AllocateResource(QueryResourceLife   life,
 
 	int ret;
 	int resourceId = -1;
-	char errorbuf[1024];
-	int  errorcode;
+	static char errorbuf[1024];
 
 	QDResourceContext rescontext = NULL;
 
@@ -766,7 +765,8 @@ AllocateResource(QueryResourceLife   life,
 
 	/* Create new resource context. */
 	ret = createNewResourceContext(&resourceId);
-	if ( ret == FUNC_RETURN_OK ) {
+	if ( ret == FUNC_RETURN_OK )
+	{
 		elog(DEBUG3, "Created new resource context for this session indexed %d",
 					 resourceId);
 	}
@@ -782,16 +782,9 @@ AllocateResource(QueryResourceLife   life,
 									  useridoid,
 									  errorbuf,
 									  sizeof(errorbuf));
-	errorcode = ret;
-	if (ret != FUNC_RETURN_OK) {
-		ereport(ERROR,
-				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("must be superuser to create resource queues")));
-		elog(ERROR, "%s. (%d)", errorbuf, ret);
-	}
-
-	if ( errorcode != FUNC_RETURN_OK ) {
-		elog(ERROR, "%s. (%d)", errorbuf, errorcode);
+	if (ret != FUNC_RETURN_OK)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s",errorbuf)));
 	}
 
 	AddToGlobalQueryResources(resourceId, life);
