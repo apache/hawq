@@ -759,7 +759,14 @@ workfile_mgr_unlink_directory(const char *dirpath)
 
 	if (!res)
 	{
-		ereport(ERROR,
+		int error_level = ERROR;
+
+		/* If we are already in an abort transaction, don't throw an exception */
+		if (IsAbortInProgress())
+		{
+			error_level = WARNING;
+		}
+		ereport(error_level,
 				(errcode(ERRCODE_IO_ERROR),
 				errmsg("could not remove spill file directory")));
 	}
