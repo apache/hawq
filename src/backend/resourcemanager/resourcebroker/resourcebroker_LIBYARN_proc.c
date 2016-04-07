@@ -138,7 +138,9 @@ int ResBrokerMain(void)
 
     /* Load parameters */
     int res = loadParameters();
-    if ( res != FUNC_RETURN_OK ) { return res; }
+    if ( res != FUNC_RETURN_OK ) {
+        elog(WARNING, "Resource broker loads invalid yarn parameters");
+    }
 
     /* Set signal behavior */
     PG_SETMASK(&BlockSig);
@@ -510,7 +512,7 @@ int  loadParameters(void)
 		      YARNUser);
 exit:
 	if ( res != FUNC_RETURN_OK ) {
-		elog(LOG, "YARN mode resource broker failed to load YARN connection arguments.");
+		elog(WARNING, "YARN mode resource broker failed to load YARN connection arguments.");
 	}
 	return res;
 }
