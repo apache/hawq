@@ -155,8 +155,6 @@ RpcChannel & RpcClientImpl::getChannel(const RpcAuth & auth,
             allChannels[key] = rc;
         }
 
-        rc->addRef();
-
         if (!cleaning) {
             cleaning = true;
 
@@ -166,6 +164,8 @@ RpcChannel & RpcClientImpl::getChannel(const RpcAuth & auth,
 
             CREATE_THREAD(cleaner, bind(&RpcClientImpl::clean, this));
         }
+        // increase ref count after successfully done without any exception
+        rc->addRef();
     } catch (const HdfsRpcException & e) {
         throw;
     } catch (...) {
