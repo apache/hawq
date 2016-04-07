@@ -509,8 +509,10 @@ def collectSysctl():
 def collectLimits():
     data = limitsconf()
     try:
-        with open("/etc/security/limits.conf", "r") as f:
-            lines = map(removeComments, f.readlines())
+        lines = []
+        results = [open("/etc/security/limits.conf")] +  [open(f) for f in glob.glob("/etc/security/limits.d/*.conf")]
+        for f in results:
+            lines += map(removeComments, f.readlines())
 
         for line in lines: 
             words = line.split()
