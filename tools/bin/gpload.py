@@ -702,7 +702,7 @@ def notice_processor(self):
        return
 
     theNotices = self.db.notices()
-    r = re.compile("^NOTICE:  Found (\d) data formatting errors.*")
+    r = re.compile("^NOTICE:  Found (\d+) data formatting errors.*")
     messageNumber = 0
     m = None
     while messageNumber < len(theNotices) and m == None:
@@ -2279,7 +2279,8 @@ class gpload:
 
 
     def count_errors(self):
-        notice_processor(self)
+        if hasattr(self.db, 'notices'):
+            notice_processor(self)
         if self.error_table and not self.options.D and not self.reuse_tables:
             # make sure we only get errors for our own instance
             queryStr = 'select count(*) from ' + self.error_table + " WHERE relname = '%s'" % self.extTableName
