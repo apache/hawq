@@ -403,7 +403,7 @@ int processAllCommFileDescs(void)
 		if ( CommBuffers[i]->forcedClose )
 		{
 			/* Call cleanup handler if necessary to do user-defined cleanup. */
-			elog(DEBUG5, "Close FD %d Index %d.", CommBuffers[i]->FD, i);
+			elog(DEBUG3, "Close FD %d Index %d.", CommBuffers[i]->FD, i);
 
 			/* Close connection and free buffer */
 			closeRegisteredFileDesc(CommBuffers[i]);
@@ -414,6 +414,7 @@ int processAllCommFileDescs(void)
 			if ( CommBuffers[i]->ClientHostname.Str != NULL &&
 				 CommBuffers[i]->ServerPort != 0 )
 			{
+				elog(DEBUG3, "Return FD %d Index %d.", CommBuffers[i]->FD, i);
 				returnAliveConnectionRemoteByHostname(
 							&(CommBuffers[i]->FD),
 							CommBuffers[i]->ClientHostname.Str,
@@ -421,6 +422,7 @@ int processAllCommFileDescs(void)
 			}
 			else
 			{
+				elog(DEBUG3, "Close FD %d Index %d normally.", CommBuffers[i]->FD, i);
 				closeRegisteredFileDesc(CommBuffers[i]);
 			}
 			shouldfree = true;
@@ -518,6 +520,8 @@ void freeCommBuffer(AsyncCommBuffer *pcommbuffer)
 {
 	Assert( pcommbuffer != NULL );
 
+	elog(DEBUG3, "Free CommBuffer for FD %d.", (*pcommbuffer)->FD);
+
 	freeSimpleStringContent(&((*pcommbuffer)->ClientHostname));
 
 	destroySelfMaintainBuffer(&((*pcommbuffer)->ReadBuffer));
@@ -574,7 +578,7 @@ void unresigsterFileDesc(int fd)
 		{
 			/* Call cleanup handler if necessary to do user-defined cleanup. */
 			CommBuffers[i]->Methods->CleanUpHandle(CommBuffers[i]);
-			elog(DEBUG5, "Unregister FD %d Index %d.", CommBuffers[i]->FD, i);
+			elog(DEBUG3, "Unregister FD %d Index %d.", CommBuffers[i]->FD, i);
 			CommBuffers[i]->FD = -1;
 			freeCommBuffer(&CommBuffers[i]);
 			pos = i;

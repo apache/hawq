@@ -120,25 +120,19 @@ int callSyncRPCRemote(const char     	   *hostname,
 	while( true )
 	{
 		processAllCommFileDescs();
+		CHECK_FOR_INTERRUPTS();
 		if ( userdata.CommStatus == SYNC_RPC_COMM_IDLE )
 		{
 			break;
 		}
-		else if ( QueryCancelPending )
-		{
-			/*
-			 * We find that this QD wants to cancel the query, we don't need
-			 * to continue the communication.
-			 */
-			res = TRANSCANCEL_INPROGRESS;
-			break;
-		}
 	}
 
-	res = res == TRANSCANCEL_INPROGRESS ? res : userdata.Result;
+	res = userdata.Result;
 
 	/* Close and cleanup */
 	unresigsterFileDesc(fd);
+	elog(DEBUG3, "Result of synchronous RPC. %d", res);
+
 	if ( res == FUNC_RETURN_OK )
 	{
 		returnAliveConnectionRemoteByHostname(&fd, hostname, port);

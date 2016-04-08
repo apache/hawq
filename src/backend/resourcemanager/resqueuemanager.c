@@ -1861,7 +1861,9 @@ void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout)
 /*
  * Cancel one queued resource allocation request.
  */
-void cancelResourceAllocRequest(ConnectionTrack conntrack, char *errorbuf)
+void cancelResourceAllocRequest(ConnectionTrack  conntrack,
+								char 			*errorbuf,
+								bool			 generror)
 {
 	Assert(conntrack->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT);
 
@@ -1879,9 +1881,12 @@ void cancelResourceAllocRequest(ConnectionTrack conntrack, char *errorbuf)
 	/* Unlock session in deadlock */
 	unlockSessionResource(&(queuetrack->DLDetector), conntrack->SessionID);
 
-	buildAcquireResourceErrorResponseAndSend(conntrack,
-										 	 RESQUEMGR_NORESOURCE_TIMEOUT,
-											 errorbuf);
+	if (generror)
+	{
+		buildAcquireResourceErrorResponseAndSend(conntrack,
+												 RESQUEMGR_NORESOURCE_TIMEOUT,
+												 errorbuf);
+	}
 }
 
 /* Acquire resource from queue. */
@@ -4512,7 +4517,7 @@ void timeoutDeadResourceAllocation(void)
 						 "queued resource request is timed out due to no session "
 						 "lease heart-beat received");
 
-				cancelResourceAllocRequest(curcon, errorbuf);
+				cancelResourceAllocRequest(curcon, errorbuf, true);
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
@@ -4710,7 +4715,7 @@ void timeoutQueuedRequest(void)
 
 			if ( tocancel )
 			{
-				cancelResourceAllocRequest(curcon, errorbuf);
+				cancelResourceAllocRequest(curcon, errorbuf, true);
 				returnConnectionToQueue(curcon, true);
 			}
 		}

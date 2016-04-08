@@ -470,7 +470,9 @@ void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout);
 int acquireResourceQuotaFromResQueMgr(ConnectionTrack	conntrack,
 									  char			   *errorbuf,
 									  int				errorbufsize);
-void cancelResourceAllocRequest(ConnectionTrack conntrack, char *errorbuf);
+void cancelResourceAllocRequest(ConnectionTrack  conntrack,
+								char 			*errorbuf,
+								bool			 generror);
 /*
  * APIs for operating resource detail instance.
  */
