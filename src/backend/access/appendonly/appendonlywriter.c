@@ -1139,7 +1139,8 @@ List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num,
             if (remaining_num > 0)
             {
                 //generate new segment_num to make sure that in keepHash mode, all segment node has at least one segfile is writable
-                for(int i= 1; i<= segment_num; i++)
+                int newAllocatedNum = remaining_num;
+                for(int i= 1; i<= newAllocatedNum; i++)
                 {
                     int new_status = AORelGetSegfileStatus(aoentry);
                     if (new_status == NEXT_END_OF_LIST)
