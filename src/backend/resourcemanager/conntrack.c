@@ -23,6 +23,8 @@
 #include "communication/rmcomm_QD_RM_Protocol.h"
 
 void cutReferenceOfConnTrackAndCommBuffer(AsyncCommMessageHandlerContext context);
+void removeResourceRequestInConnHavingRequestsInternal(int32_t 	 connid,
+													   List    **requests);
 
 /* Initialize connection track manager. */
 void initializeConnectionTrackManager(void)
@@ -36,6 +38,7 @@ void initializeConnectionTrackManager(void)
 
 	PCONTRACK->FreeConnIDs			= NULL;
 	PCONTRACK->ConnHavingRequests 	= NULL;
+	PCONTRACK->ConnToRetry			= NULL;
 	PCONTRACK->ConnToSend			= NULL;
 
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
@@ -472,7 +475,6 @@ void cutReferenceOfConnTrackAndCommBuffer(AsyncCommMessageHandlerContext context
 void processSubmittedRequests(void)
 {
 	ConnectionTrack  ct    		= NULL;
-	List			*tryagain	= NULL;
 
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 	while( list_length(PCONTRACK->ConnHavingRequests) > 0 )
@@ -483,20 +485,20 @@ void processSubmittedRequests(void)
 		Assert(handler != NULL);
 		if ( !handler((void **)&ct) )
 		{
-			tryagain = lappend(tryagain, ct);
+			PCONTRACK->ConnToRetry = lappend(PCONTRACK->ConnToRetry, ct);
 		}
 	}
 
-	if ( list_length(tryagain) > 0 )
+	if ( list_length(PCONTRACK->ConnToRetry) > 0 )
 	{
 		elog(DEBUG3, "Resource manager retries %d requests in next loop.",
-				  	 list_length(tryagain));
+				  	 list_length(PCONTRACK->ConnToRetry));
 	}
 
-	while( list_length(tryagain) > 0 )
+	while( list_length(PCONTRACK->ConnToRetry) > 0 )
 	{
-		void *move = lfirst(list_head(tryagain));
-		tryagain = list_delete_first(tryagain);
+		void *move = lfirst(list_head(PCONTRACK->ConnToRetry));
+		PCONTRACK->ConnToRetry = list_delete_first(PCONTRACK->ConnToRetry);
 		PCONTRACK->ConnHavingRequests = lappend(PCONTRACK->ConnHavingRequests, move);
 	}
 	MEMORY_CONTEXT_SWITCH_BACK
@@ -828,4 +830,48 @@ void copyResourceQuotaConnectionTrack(ConnectionTrack source,
 	target->SegNum			= source->SegNum;
 	target->SegNumMin		= source->SegNumMin;
 	target->SegNumEqual		= source->SegNumEqual;
+}
+
+void removeResourceRequestInConnHavingReqeusts(int32_t connid)
+{
+	removeResourceRequestInConnHavingRequestsInternal(connid,
+													  &(PCONTRACK->ConnHavingRequests));
+	removeResourceRequestInConnHavingRequestsInternal(connid,
+													  &(PCONTRACK->ConnToRetry));
+}
+
+void removeResourceRequestInConnHavingRequestsInternal(int32_t 	 connid,
+													   List    **requests)
+{
+	ConnectionTrack  ct		  = NULL;
+	ListCell		*cell	  = NULL;
+	ListCell		*prevcell = NULL;
+
+	foreach(cell, (*requests))
+	{
+		ct = (ConnectionTrack)lfirst(cell);
+		elog(LOG, "Request id %d", ct->MessageID);
+		if ( ct->MessageID == REQUEST_QD_ACQUIRE_RESOURCE )
+		{
+			/* Try to get the connection id in this reqeust. */
+			RPCRequestHeadAcquireResourceFromRM request =
+				SMBUFF_HEAD(RPCRequestHeadAcquireResourceFromRM,
+							&(ct->MessageBuff));
+			if ( request->ConnID == connid )
+			{
+				elog(WARNING, "Resource manager finds ConnID %d in request pending "
+							  "list should be cancelled.",
+							  request->ConnID);
+				if ( ct->CommBuffer!= NULL )
+				{
+					forceCloseFileDesc(ct->CommBuffer);
+				}
+				MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+				(*requests) = list_delete_cell((*requests), cell, prevcell);
+				MEMORY_CONTEXT_SWITCH_BACK
+				break;
+			}
+		}
+		prevcell = cell;
+	}
 }

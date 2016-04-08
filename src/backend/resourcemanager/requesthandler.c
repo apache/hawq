@@ -259,7 +259,32 @@ bool handleRMRequestConnectionUnReg(void **arg)
 	request = SMBUFF_HEAD(RPCRequestHeadUnregisterConnectionInRM,
 			  	  	  	  &((*conntrack)->MessageBuff));
 
-	if ( !canTransformConnectionTrackProgress((*conntrack), CONN_PP_ESTABLISHED) )
+	/*
+	 * If this connection is waiting for resource allocated, cancel the request
+	 * from resource queue.
+	 */
+	if ( (*conntrack)->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT )
+	{
+		cancelResourceAllocRequest((*conntrack), errorbuf, false);
+		transformConnectionTrackProgress(conntrack, CONN_PP_REGISTER_DONE);
+	}
+	/* If this connection has resource allocated, return the resource. */
+	else if ( (*conntrack)->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_DONE )
+	{
+		returnResourceToResQueMgr((*conntrack));
+	}
+	/*
+	 * If this connection has acquire resource not processed yet, we should
+	 * remove that now. In this case, this connection should have registered.
+	 */
+	else if ( (*conntrack)->Progress == CONN_PP_REGISTER_DONE )
+	{
+		elog(WARNING, "Resource manager finds possible not handled resource "
+					  "request from ConnID %d.",
+					  request->ConnID);
+		removeResourceRequestInConnHavingReqeusts(request->ConnID);
+	}
+	else if ( !canTransformConnectionTrackProgress((*conntrack), CONN_PP_ESTABLISHED) )
 	{
 		snprintf(errorbuf, sizeof(errorbuf),
 				 "wrong resource context status for unregistering, %d",

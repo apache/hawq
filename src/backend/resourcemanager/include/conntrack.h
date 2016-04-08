@@ -149,6 +149,7 @@ struct ConnectionTrackManagerData
 	List		   *FreeConnIDs;			/* Pre-built free connection IDs. */
 
 	List		   *ConnHavingRequests;		/* Batch request processing list. */
+	List		   *ConnToRetry;			/* Batch request to process list. */
 	List		   *ConnToSend;				/* Batch response sending list.	  */
 };
 
@@ -208,4 +209,6 @@ void setConnectionTrackMessageBuffer(ConnectionTrack  track,
 
 void freeUsedConnectionTrack(ConnectionTrack track);
 
+
+void removeResourceRequestInConnHavingReqeusts(int32_t connid);
 #endif /*DYNAMIC_RESOURCE_MANAGEMENT_CONNECTION_TRACK_H*/

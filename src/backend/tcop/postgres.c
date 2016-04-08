@@ -4612,7 +4612,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 				if (Gp_role == GP_ROLE_DISPATCH)
 				{
-				  CleanupGlobalQueryResources();
+					CleanupGlobalQueryResources();
 				}
 			}
 

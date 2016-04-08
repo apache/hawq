@@ -1119,9 +1119,15 @@ CleanupActiveQueryResource(void)
 extern void
 CleanupGlobalQueryResources(void)
 {
-  ListCell *lc;
-  int ret;
-  char errorbuf[1024];
+	ListCell *lc;
+	int ret;
+	char errorbuf[1024];
+
+	elog(LOG, "In CleanupGlobalQueryResources().");
+
+	/* Force using new socket connection to return and free. */
+	bool oldval = rm_enable_connpool;
+	rm_enable_connpool = false;
 
 	foreach(lc, GlobalQueryResources)
 	{
@@ -1152,6 +1158,9 @@ CleanupGlobalQueryResources(void)
 
   list_free(GlobalQueryResources);
   GlobalQueryResources = NULL;
+
+  /* Restore using connection pool. */
+  rm_enable_connpool = oldval;
 }
 
 extern QueryResource *
