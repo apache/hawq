@@ -1259,10 +1259,10 @@ int	 loadUserPropertiesFromCatalog(List **users)
 	foreach(cell, *users)
 	{
 		KVProperty property = lfirst(cell);
-		elog(LOG, "Resource manager loaded role specifications from pg_authid : "
-				  "[%s]=[%s]",
-				  property->Key.Str,
-				  property->Val.Str);
+		elog(RMLOG, "Resource manager loaded role specifications from pg_authid : "
+				    "[%s]=[%s]",
+					property->Key.Str,
+					property->Val.Str);
 	}
 	elog(LOG, "Resource manager successfully loaded role specifications.");
 
@@ -1569,10 +1569,10 @@ int	 loadQueuePropertiesFromCatalog(List **queues)
 	foreach(cell, *queues)
 	{
 		KVProperty property = lfirst(cell);
-		elog(LOG, "Resource manger loaded resource queue specifications from "
-				  "pg_resqueue : [%s]=[%s]",
-				  property->Key.Str,
-				  property->Val.Str);
+		elog(RMLOG, "Resource manger loaded resource queue specifications from "
+				  	"pg_resqueue : [%s]=[%s]",
+					property->Key.Str,
+					property->Val.Str);
 	}
 	elog(LOG, "Resource manger successfully loaded resource queue specifications");
 
@@ -2947,9 +2947,9 @@ bool cleanedAllGRMContainers(void)
 	if ( PRESPOOL->AddPendingContainerCount > 0 ||
 		 PRESPOOL->RetPendingContainerCount > 0 )
 	{
-		elog(DEBUG3, "Pending GRM container count inc %d, dec %d.",
-					 PRESPOOL->AddPendingContainerCount,
-					 PRESPOOL->RetPendingContainerCount);
+		elog(RMLOG, "Pending GRM container count inc %d, dec %d.",
+					PRESPOOL->AddPendingContainerCount,
+					PRESPOOL->RetPendingContainerCount);
 	}
 	/* Condition 2. No on-the-fly GRM containers for increasing and decreasing.*/
 	return PRESPOOL->AddPendingContainerCount == 0 &&

@@ -698,16 +698,16 @@ int acquireResourceFromRM(int 		  		  index,
     								0 :
 									preferred_nodes_size;
 
-    elog(LOG, "ConnID: %d. Acquire resource request for index %d. "
-    		  "Max vseg size %d Min vseg size %d Estimated slice size %d "
-    		  "estimated IO bytes size " INT64_FORMAT " Preferred node count %d.",
-			  curcontext->QD_Conn_ID,
-			  index,
-			  max_seg_count_fix,
-			  min_seg_count_fix,
-			  slice_size,
-			  iobytes,
-			  nodecount);
+    elog(RMLOG, "ConnID: %d. Acquire resource request for index %d. "
+    		  	"Max vseg size %d Min vseg size %d Estimated slice size %d "
+    			"estimated IO bytes size " INT64_FORMAT " Preferred node count %d.",
+				curcontext->QD_Conn_ID,
+				index,
+				max_seg_count_fix,
+				min_seg_count_fix,
+				slice_size,
+				iobytes,
+				nodecount);
 
     /* Build request. */
     resetSelfMaintainBuffer(sendbuffer);

@@ -189,8 +189,8 @@ int ResBrokerMainInternal(void)
 		 * run anymore. The process goes to the exit phase directly.
 		 */
 		if ( getppid() != ResBrokerParentPID ) {
-			elog(LOG, "Parent process of YARN mode resource broker quited. "
-					  "Resource broker process will actively close.");
+			elog(WARNING, "Parent process of YARN mode resource broker quit. "
+					  	  "Resource broker process will actively close.");
 			ResBrokerKeepRun = false;
 			continue;
 		}
@@ -270,10 +270,10 @@ int ResBrokerMainInternal(void)
 			}
 
             if ( res != FUNC_RETURN_OK ) {
-            	elog(LOG, "YARN mode resource broker failed to process request. "
-            			  "Message id = %d, result = %d.",
-            			  messageid,
-            			  res);
+            	elog(WARNING, "YARN mode resource broker failed to process request. "
+            			  	  "Message id = %d, result = %d.",
+							  messageid,
+							  res);
             	/* If this is a pipe error between RM and RB or YARN remove error.
             	 * Exit RB and let RM restart RB process. */
                 if ( res == RESBROK_ERROR_GRM )
@@ -1035,9 +1035,9 @@ int handleRM2RB_ReturnResource(void)
 
     for ( int i = 0 ; i < request.ContainerCount ; ++i )
     {
-    	elog(LOG, "YARN mode resource broker tries to return container of id "
-    			  INT64_FORMAT,
-    			  containerids[i]);
+    	elog(RMLOG, "YARN mode resource broker tries to return container of id "
+    			    INT64_FORMAT,
+					containerids[i]);
     }
 
 	if ( YARNJobID == NULL )
@@ -1169,9 +1169,9 @@ int handleRM2RB_GetContainerReport(void)
 
     for( int i = 0 ; i < size ; ++i )
     {
-    	elog(LOG, "Container report ID:"INT64_FORMAT", isActive:%d",
-    			  ctnstats[i].ContainerID,
-				  ctnstats[i].isActive);
+    	elog(RMLOG, "Container report ID:"INT64_FORMAT", isActive:%d",
+    			    ctnstats[i].ContainerID,
+					ctnstats[i].isActive);
     }
 
 	/* Build response message. */
@@ -1396,9 +1396,9 @@ int RB2YARN_getClusterReport(DQueue hosts)
 							  &nodeReportArraySize);
     if ( yarnres != FUNCTION_SUCCEEDED )
     {
-    	elog(LOG, "YARN mode resource broker failed to get cluster information "
-    			  "from YARN. %s",
-				  getErrorMessage());
+    	elog(WARNING, "YARN mode resource broker failed to get cluster "
+    				  "information from YARN. %s",
+					  getErrorMessage());
     }
     else
     {
@@ -1525,37 +1525,37 @@ int RB2YARN_getClusterReport(DQueue hosts)
 
     		insertDQueueTailNode(hosts, segstat);
 
-        	elog(LOG, "YARN mode resource broker got YARN cluster host \n"
-        			  "\thost:%s\n"
-					  "\tport:%d\n"
-					  "\thttpAddress:%s\n"
-        			  "\trackName:%s\n"
-        			  "\tmemoryUsed:%d\n"
-        			  "\tvcoresUsed:%d\n"
-        			  "\tmemoryCapability:%d\n"
-        			  "\tvcoresCapability:%d\n"
-        			  "\tnumContainers:%d\n"
-        			  "\tnodeState:%d\n"
-        			  "\thealthReport:%s\n"
-        			  "\tlastHealthReportTime:"INT64_FORMAT"\n"
-					  "\tmachineidsize:%d",
-    				  pnodereport->host,
-					  pnodereport->port,
-					  pnodereport->httpAddress,
-					  pnodereport->rackName,
-					  pnodereport->memoryUsed,
-					  pnodereport->vcoresUsed,
-					  pnodereport->memoryCapability,
-					  pnodereport->vcoresCapability,
-					  pnodereport->numContainers,
-					  pnodereport->nodeState,
-					  pnodereport->healthReport,
-					  pnodereport->lastHealthReportTime,
-					  segstat->Info.Size);
+        	elog(RMLOG, "YARN mode resource broker got YARN cluster host \n"
+        			    "\thost:%s\n"
+					    "\tport:%d\n"
+					    "\thttpAddress:%s\n"
+        			    "\trackName:%s\n"
+        			    "\tmemoryUsed:%d\n"
+        			    "\tvcoresUsed:%d\n"
+        			    "\tmemoryCapability:%d\n"
+        			    "\tvcoresCapability:%d\n"
+        			    "\tnumContainers:%d\n"
+        			    "\tnodeState:%d\n"
+        			    "\thealthReport:%s\n"
+        			    "\tlastHealthReportTime:"INT64_FORMAT"\n"
+					    "\tmachineidsize:%d",
+    				    pnodereport->host,
+					    pnodereport->port,
+					    pnodereport->httpAddress,
+					    pnodereport->rackName,
+					    pnodereport->memoryUsed,
+					    pnodereport->vcoresUsed,
+					    pnodereport->memoryCapability,
+					    pnodereport->vcoresCapability,
+					    pnodereport->numContainers,
+					    pnodereport->nodeState,
+					    pnodereport->healthReport,
+					    pnodereport->lastHealthReportTime,
+					    segstat->Info.Size);
 
-        	elog(LOG, "YARN mode reosurce broker built cluster segment %s at rack %s",
-        			  GET_SEGINFO_GRMHOSTNAME(&(segstat->Info)),
-        			  GET_SEGINFO_GRMRACKNAME(&(segstat->Info)));
+        	elog(RMLOG, "YARN mode reosurce broker built cluster segment %s at rack %s",
+        			    GET_SEGINFO_GRMHOSTNAME(&(segstat->Info)),
+        			    GET_SEGINFO_GRMRACKNAME(&(segstat->Info)));
     	}
     	freeMemNodeReportArray(nodeReportArray, nodeReportArraySize);
     }
@@ -1592,9 +1592,9 @@ int RB2YARN_acquireResource(uint32_t memorymb,
 								&allocatedResourcesArray,
 								&allocatedResourcesArraySize);
     if( yarnres != FUNCTION_SUCCEEDED ) {
-    	elog(LOG, "YARN mode resource broker failed to allocate "
-    			  "containers from YARN. %s",
-				  getErrorMessage());
+    	elog(WARNING, "YARN mode resource broker failed to allocate "
+    			  	  "containers from YARN. %s",
+					  getErrorMessage());
     	return yarnres;
     }
     else if ( allocatedResourcesArraySize == 0 ) {
@@ -1640,17 +1640,18 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     									&activeFailIds,
 										&activeFailSize);
     if( yarnres != FUNCTION_SUCCEEDED ) {
-    	elog(LOG, "YARN mode resource broker failed to get active-fail "
-    			  "containers. %s",
-    			  getErrorMessage());
+    	elog(WARNING, "YARN mode resource broker failed to get active-fail "
+    			  	  "containers. %s",
+					  getErrorMessage());
     	goto exit;
     }
 
     /* Build temporary failed container ids in hash table for fast retrieving.*/
     if ( activeFailSize > 0 ) {
     	for (int i = 0 ; i < activeFailSize ; ++i) {
-    		elog(LOG, "YARN mode resource broker failed to activate container "INT64_FORMAT,
-    				  activeFailIds[i]);
+    		elog(WARNING, "YARN mode resource broker failed to activate "
+    					  "container "INT64_FORMAT,
+						  activeFailIds[i]);
 
 			SimpArray key;
 			setSimpleArrayRef(&key, (void *)&(activeFailIds[i]), sizeof(int64_t));
@@ -1662,7 +1663,7 @@ int RB2YARN_acquireResource(uint32_t memorymb,
 								   activeFailIds,
 								   activeFailSize);
     	if ( yarnres != FUNCTION_SUCCEEDED ) {
-    		elog(LOG, "YARN mode resource broker failed to return active-fail "
+    		elog(WARNING, "YARN mode resource broker failed to return active-fail "
     					  "containers. %s",
 						  getErrorMessage());
     	}
@@ -1681,12 +1682,12 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     	strcpy(hostnamestr, allocatedResourcesArray[i].host);
     	insertDQueueTailNode(containerhosts, hostnamestr);
 
-    	elog(LOG, "YARN mode resource broker allocated and activated container. "
-    			  "ID : "INT64_FORMAT"(%d MB, %d CORE) at %s.",
-				  allocatedResourcesArray[i].containerId,
-				  allocatedResourcesArray[i].memory,
-				  allocatedResourcesArray[i].vCores,
-				  allocatedResourcesArray[i].host);
+    	elog(RMLOG, "YARN mode resource broker allocated and activated container. "
+    			    "ID : "INT64_FORMAT"(%d MB, %d CORE) at %s.",
+					allocatedResourcesArray[i].containerId,
+					allocatedResourcesArray[i].memory,
+					allocatedResourcesArray[i].vCores,
+					allocatedResourcesArray[i].host);
     }
 
 exit:
@@ -1716,8 +1717,8 @@ int RB2YARN_returnResource(int64_t *contids, int contcount)
 							   contids,
 							   contcount);
 	if ( yarnres != FUNCTION_SUCCEEDED ) {
-		elog(LOG, "YARN mode resource broker failed to return containers. %s",
-				  getErrorMessage());
+		elog(WARNING, "YARN mode resource broker failed to return containers. %s",
+				  	  getErrorMessage());
 	}
 
 	for ( int i = 0 ; i < contcount ; ++i ) {
@@ -1744,8 +1745,9 @@ int RB2YARN_getContainerReport(RB_GRMContainerStat *ctnstats, int *size)
 	yarnres = getContainerReports(LIBYARNClient, YARNJobID, &ctnrparr, &arrsize);
 	if ( yarnres != FUNCTION_SUCCEEDED )
 	{
-		elog(LOG, "YARN mode resource broker failed to get container report. %s",
-				  getErrorMessage());
+		elog(WARNING, "YARN mode resource broker failed to get container "
+					  "report. %s",
+					  getErrorMessage());
 	}
 	else if ( arrsize > 0 )
 	{
@@ -1769,8 +1771,9 @@ int RB2YARN_getContainerReport(RB_GRMContainerStat *ctnstats, int *size)
 									   &ctnstatsize);
         if ( yarnres != FUNCTION_SUCCEEDED )
         {
-        	elog(LOG, "YARN mode resource broker failed to get container status. %s",
-        			  getErrorMessage());
+        	elog(WARNING, "YARN mode resource broker failed to get container "
+        				  "status. %s",
+        			  	  getErrorMessage());
         }
 
         rm_pfree(PCONTEXT, ctnidarr);
@@ -1834,10 +1837,10 @@ int  RB2YARN_getQueueReport(char 	*queuename,
 	Assert( queuename != NULL );
 	yarnres = getQueueInfo(LIBYARNClient, queuename, true, true, true, &queueInfo);
 	if ( yarnres != FUNCTION_SUCCEEDED ) {
-		elog(LOG, "YARN mode resource broker failed to get YARN queue report of"
-				  " queue %s. %s",
-				  queuename,
-				  RB2YARN_getErrorMessage());
+		elog(WARNING, "YARN mode resource broker failed to get YARN queue report "
+					  "of queue %s. %s",
+					  queuename,
+					  RB2YARN_getErrorMessage());
 		return yarnres;
 	}
 
@@ -1857,8 +1860,8 @@ int  RB2YARN_finishYARNApplication(void)
 	int yarnres = FUNCTION_SUCCEEDED;
     yarnres = finishJob(LIBYARNClient, YARNJobID, APPLICATION_SUCCEEDED);
     if (yarnres != FUNCTION_SUCCEEDED) {
-    	elog(LOG, "YARN mode resource broker failed to finish job in YARN. %s",
-    			  getErrorMessage());
+    	elog(WARNING, "YARN mode resource broker failed to finish job in YARN. %s",
+    			  	  getErrorMessage());
     }
     else {
     	elog(LOG, "YARN mode resource broker finished job in YARN.");

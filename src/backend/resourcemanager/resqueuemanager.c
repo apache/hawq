@@ -1897,9 +1897,9 @@ int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
 	int						res			= FUNC_RETURN_OK;
 	DynResourceQueueTrack	queuetrack	= conntrack->QueueTrack;
 
-	elog(LOG, "ConnID %d. Expect query resource for session "INT64_FORMAT,
-			  conntrack->ConnID,
-			  conntrack->SessionID);
+	elog(RMLOG, "ConnID %d. Expect query resource for session "INT64_FORMAT,
+			    conntrack->ConnID,
+			    conntrack->SessionID);
 
 	/* Call quota logic to make decision of resource for current query. */
 	res = computeQueryQuota(conntrack, errorbuf, errorbufsize);
@@ -3397,13 +3397,13 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 			return res;
 		}
 
-		elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
-				  "(MIN %d) after checking queue capacity.",
-				  conn->ConnID,
-				  conn->SegMemoryMB,
-				  conn->SegCore,
-				  conn->SegNum,
-				  conn->SegNumMin);
+		elog(RMLOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
+				    "(MIN %d) after checking queue capacity.",
+					conn->ConnID,
+					conn->SegMemoryMB,
+					conn->SegCore,
+					conn->SegNum,
+					conn->SegNumMin);
 
 		/*------------------------------------------------------------------
 		 * The following logic consider the actual resource requirement from
@@ -3427,15 +3427,15 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 			conn->SegNum	= conn->MaxSegCountFixed;
 		}
 
-		elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
-				  "(MIN %d) after checking query expectation %d (MIN %d).",
-				  conn->ConnID,
-				  conn->SegMemoryMB,
-				  conn->SegCore,
-				  conn->SegNum,
-				  conn->SegNumMin,
-				  conn->MaxSegCountFixed,
-				  conn->MinSegCountFixed);
+		elog(RMLOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
+				    "(MIN %d) after checking query expectation %d (MIN %d).",
+					conn->ConnID,
+					conn->SegMemoryMB,
+					conn->SegCore,
+					conn->SegNum,
+					conn->SegNumMin,
+					conn->MaxSegCountFixed,
+					conn->MinSegCountFixed);
 
 	}
 
@@ -5003,9 +5003,9 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 		}
 		else
 		{
-			elog(LOG, "Resource manager passed rebuilding resource queue %s "
-					  "dynamic status in its shadow.",
-					  quetrack->QueueInfo->Name);
+			elog(RMLOG, "Resource manager passed rebuilding resource queue %s "
+					    "dynamic status in its shadow.",
+					    quetrack->QueueInfo->Name);
 		}
 
 		res = detectAndDealWithDeadLockInShadow(quetrack, queuechanged);
@@ -5020,13 +5020,14 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 		}
 		else
 		{
-			elog(LOG, "Resource manager passed detecting deadlock issues in the "
-					  "shadow of resource queue %s",
-					  quetrack->QueueInfo->Name);
+			elog(RMLOG, "Resource manager passed detecting deadlock issues in the "
+					    "shadow of resource queue %s",
+					    quetrack->QueueInfo->Name);
 		}
 	}
 
-	elog(LOG, "Resource manager finished rebuilding resource queues' dynamic status");
+	elog(RMLOG, "Resource manager finished rebuilding resource queues' dynamic "
+				"status");
 	return FUNC_RETURN_OK;
 }
 
@@ -5037,8 +5038,8 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 {
 	int res = FUNC_RETURN_OK;
 
-	elog(LOG, "Rebuild resource queue %s dynamic status in its shadow.",
-			  quetrack->QueueInfo->Name);
+	elog(RMLOG, "Rebuild resource queue %s dynamic status in its shadow.",
+			    quetrack->QueueInfo->Name);
 
 	DynResourceQueueTrack shadowtrack = quetrack->ShadowQueueTrack;
 	/* Get deadlock detector ready in the shadow instance. */
@@ -5139,8 +5140,9 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 				 shadowtrack->DLDetector.InUseTotal.MemoryMB,
 				 shadowtrack->DLDetector.LockedTotal.MemoryMB);
 
-	elog(LOG, "Finished rebuilding resource queue %s dynamic status in its shadow.",
-			  quetrack->QueueInfo->Name);
+	elog(RMLOG, "Finished rebuilding resource queue %s dynamic status in its "
+				"shadow.",
+			    quetrack->QueueInfo->Name);
 
 	return FUNC_RETURN_OK;
 }
