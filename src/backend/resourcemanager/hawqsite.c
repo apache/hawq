@@ -50,7 +50,6 @@ List *getHawqSiteConfigurationList(const char *hawqsitepath, MCTYPE context)
 	if ( res != FUNC_RETURN_OK )
 	{
 		elog(ERROR, "Fail to parse file %s for reading configuration.", conffile);
-		return NULL;
 	}
 
 	return result;
@@ -58,9 +57,9 @@ List *getHawqSiteConfigurationList(const char *hawqsitepath, MCTYPE context)
 
 void freeHawqSiteConfigurationList(MCTYPE context, List **conf)
 {
-	if ( *conf == NULL )
+	if ( *conf != NULL )
 	{
-		return;
+		cleanPropertyList(context, conf);
 	}
-	cleanPropertyList(context, conf);
+
 }
