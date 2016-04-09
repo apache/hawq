@@ -4776,14 +4776,23 @@ void adjustSegmentCapacityForNone(SegResource segres)
 	adjustMemoryCoreValue(&(segres->Stat->FTSTotalMemoryMB),
 						  &(segres->Stat->FTSTotalCore));
 
-	if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
-	{
-		return;
-	}
 
 	if ( oldmemorymb != segres->Stat->FTSTotalMemoryMB ||
 		 oldcore	 != segres->Stat->FTSTotalCore )
 	{
+		elog(LOG, "Resource manager adjusts segment %s original resource "
+				  "capacity from (%d MB, %d CORE) to (%d MB, %d CORE)",
+				  GET_SEGINFO_HOSTNAME(&(segres->Stat->Info)),
+				  oldmemorymb,
+				  oldcore,
+				  segres->Stat->FTSTotalMemoryMB,
+				  segres->Stat->FTSTotalCore);
+
+		if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
+		{
+			return;
+		}
+
 		minusResourceBundleData(&(PRESPOOL->FTSTotal),
 								oldmemorymb,
 								oldcore * 1.0);
@@ -4809,14 +4818,23 @@ void adjustSegmentCapacityForGRM(SegResource segres)
 	adjustMemoryCoreValue(&(segres->Stat->GRMTotalMemoryMB),
 						  &(segres->Stat->GRMTotalCore));
 
-	if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
-	{
-		return;
-	}
-
 	if ( oldmemorymb != segres->Stat->GRMTotalMemoryMB ||
 		 oldcore 	 != segres->Stat->GRMTotalCore )
 	{
+		elog(LOG, "Resource manager adjusts segment %s original global resource "
+				  "manager resource capacity from (%d MB, %d CORE) to "
+				  "(%d MB, %d CORE)",
+				  GET_SEGINFO_HOSTNAME(&(segres->Stat->Info)),
+				  oldmemorymb,
+				  oldcore,
+				  segres->Stat->GRMTotalMemoryMB,
+				  segres->Stat->GRMTotalCore);
+
+		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
+		{
+			return;
+		}
+
 		minusResourceBundleData(&(PRESPOOL->GRMTotal),
 								oldmemorymb,
 								oldcore * 1.0);
