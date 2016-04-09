@@ -306,7 +306,10 @@ elif test "${CFLAGS+set}" = set; then
 elif test "$enable_coverage" = yes; then
   : # no optimization by default
 elif test "$GCC" = yes; then
-  CFLAGS="-O3"
+  if test "$enable_debug" == yes; then
+    CFLAGS="-O0"
+  else
+    CFLAGS="-O3"
 else
   # if the user selected debug mode, don't use -O
   if test "$enable_debug" != yes; then
