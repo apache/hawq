@@ -178,8 +178,8 @@ bool handleRMRequestConnectionRegByOID(void **arg)
 		if ( res == FUNC_RETURN_OK )
 		{
 			trackConnectionTrack(conntrack);
-			elog(LOG, "ConnID %d. Resource manager tracked connection.",
-					  conntrack->ConnID);
+			elog(RMLOG, "ConnID %d. Resource manager tracked connection.",
+					  	conntrack->ConnID);
 			response.Result = FUNC_RETURN_OK;
 			response.ConnID = conntrack->ConnID;
 		}

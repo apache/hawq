@@ -987,7 +987,11 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 			Assert(false);
 		}
 
-		elog(LOG, "Resource manager tracked segment %d of host %s.", segid, hostname);
+		SelfMaintainBufferData logcontent;
+		initializeSelfMaintainBuffer(&logcontent, PCONTEXT);
+		appendSelfMaintainBuffer(&logcontent, "host ", sizeof("host ")-1);
+		appendSelfMaintainBuffer(&logcontent, hostname, strlen(hostname));
+		appendSelfMaintainBuffer(&logcontent, " ip address ", sizeof(" ip address"));
 
 		/* Index all HAWQ node's ip addresses.
 		 *
@@ -1012,11 +1016,23 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 								  TYPCONVERT(void *, segid),
 								  false /* There should be no old value. */);
 
+				appendSelfMaintainBuffer(&logcontent, ",", sizeof(",")-1);
+
+				appendSelfMaintainBuffer(&logcontent,
+										 hostaddrkey.Array,
+										 hostaddrkey.Len);
+
 				elog(LOG, "Resource manager tracked ip address '%.*s' for host '%s'",
 						  hostaddrkey.Len, hostaddrkey.Array,
 						  hostname);
 			}
 		}
+		appendSMBStr(&logcontent, "");
+
+		elog(LOG, "Resource manager tracked segment %d of %s.",
+				  segid,
+				  SMBUFF_CONTENT(&logcontent));
+		destroySelfMaintainBuffer(&logcontent);
 
 		/*
 		 * If in GRM mode, the new registered segment is marked
@@ -1541,11 +1557,11 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 
 	segres->Stat = newSegStat;
 
-	elog(LOG, "Resource manager update segment info, hostname:%s, "
-			  "with GRM hostname:%s, GRM rackname:%s",
-			  GET_SEGINFO_HOSTNAME(&(newSegStat->Info)),
-			  GET_SEGINFO_GRMHOSTNAME(&(newSegStat->Info)),
-			  GET_SEGINFO_GRMRACKNAME(&(newSegStat->Info)));
+	elog(RMLOG, "Resource manager update segment info, hostname:%s, "
+			    "with GRM hostname:%s, GRM rackname:%s",
+				GET_SEGINFO_HOSTNAME(&(newSegStat->Info)),
+				GET_SEGINFO_GRMHOSTNAME(&(newSegStat->Info)),
+				GET_SEGINFO_GRMRACKNAME(&(newSegStat->Info)));
 
 	elog(RMLOG, "After resource manager "
 				"updates segment info's GRM host name and rack name, "
@@ -1999,8 +2015,8 @@ int  addGRMContainerToToBeAccepted(GRMContainer ctn)
 
 	appendGRMContainerSetContainer(ctns, ctn);
 	PRESPOOL->AddPendingContainerCount++;
-	elog(LOG, "AddPendingContainerCount added 1, current value %d.",
-			  PRESPOOL->AddPendingContainerCount);
+	elog(RMLOG, "AddPendingContainerCount added 1, current value %d.",
+			  	PRESPOOL->AddPendingContainerCount);
 	return FUNC_RETURN_OK;
 }
 
@@ -2073,15 +2089,15 @@ void addGRMContainerToResPool(GRMContainer container)
 	reorderSegResourceAllocIndex(segresource, ratio);
 	reorderSegResourceCombinedWorkloadIndex(segresource);
 
-	elog(LOG, "Resource manager added resource container into resource pool "
-			  "(%d MB, %d CORE) at %s (%d:%.*s), still pending %d MB",
-			  container->MemoryMB,
-			  container->Core,
-			  container->HostName,
-			  segresource->Stat->ID,
-			  segresource->Stat->Info.HostNameLen,
-			  GET_SEGRESOURCE_HOSTNAME(segresource),
-			  segresource->IncPending.MemoryMB);
+	elog(RMLOG, "Resource manager added resource container into resource pool "
+			  	"(%d MB, %d CORE) at %s (%d:%.*s), still pending %d MB",
+				container->MemoryMB,
+				container->Core,
+				container->HostName,
+				segresource->Stat->ID,
+				segresource->Stat->Info.HostNameLen,
+				GET_SEGRESOURCE_HOSTNAME(segresource),
+				segresource->IncPending.MemoryMB);
 }
 
 void addGRMContainerToToBeKicked(GRMContainer ctn)
@@ -3059,10 +3075,10 @@ void addSegResourceAllocIndex(SegResource segres)
 			Assert(false);
 		}
 
-		elog(LOG, "Resource manager tracked host %s in allocated resource "
-				  "ordered  index for mem/core ratio %d MBPCORE.",
-				  GET_SEGRESOURCE_HOSTNAME(segres),
-				  ratio);
+		elog(RMLOG, "Resource manager tracked host %s in allocated resource "
+				    "ordered  index for mem/core ratio %d MBPCORE.",
+				    GET_SEGRESOURCE_HOSTNAME(segres),
+				    ratio);
 	}
 }
 
@@ -3077,8 +3093,8 @@ void addSegResourceCombinedWorkloadIndex(SegResource segres)
 		Assert(false);
 	}
 
-	elog(LOG, "Resource manager tracked host %s in io bytes workload.",
-			  GET_SEGRESOURCE_HOSTNAME(segres));
+	elog(RMLOG, "Resource manager tracked host %s in io bytes workload.",
+			  	GET_SEGRESOURCE_HOSTNAME(segres));
 }
 
 int reorderSegResourceAvailIndex(SegResource segres, uint32_t ratio)
@@ -3490,8 +3506,8 @@ void moveAllAcceptedGRMContainersToResPool(void)
 
 		addGRMContainerToResPool(ctn);
 		PRESPOOL->AddPendingContainerCount--;
-		elog(LOG, "AddPendingContainerCount minused 1, current value %d",
-				  PRESPOOL->AddPendingContainerCount);
+		elog(RMLOG, "AddPendingContainerCount minus 1, current value %d",
+				  	PRESPOOL->AddPendingContainerCount);
 		addNewResourceToResourceManager(ctn->MemoryMB, ctn->Core);
 		removePendingResourceRequestInRootQueue(ctn->MemoryMB, ctn->Core, true);
 

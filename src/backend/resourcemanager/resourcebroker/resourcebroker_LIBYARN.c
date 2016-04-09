@@ -454,8 +454,8 @@ int RB_LIBYARN_getContainerReport(List **ctnstatl)
 		res = RESBROK_PIPE_ERROR;
 	}
 	destroySelfMaintainBuffer(&sendBuffer);
-	elog(LOG, "YARN mode resource broker wrote get container status request to "
-			  "resource broker process.");
+	elog(RMLOG, "YARN mode resource broker wrote get container status request to "
+			    "resource broker process.");
 	PipeReceivePending = res == FUNC_RETURN_OK;
 	return res;
 }
@@ -509,7 +509,7 @@ int RB_LIBYARN_handleNotification(void)
 		}
 
 		PipeReceivePending = false;
-		elog(LOG, "Finish processing message %d", messageid);
+		elog(RMLOG, "Finish processing message %d", messageid);
 
 		if ( res != FUNC_RETURN_OK )
 		{
@@ -568,9 +568,11 @@ int handleRB2RM_ClusterReport(void)
 	}
 
 	elog(LOG, "YARN mode resource broker got cluster report having %d host(s), "
-			  "maximum queue capacity is %lf.",
+			  "queue capacity %lf (MAX %lf) current capacity %lf.",
 			  response.MachineCount,
-			  response.QueueMaxCapacity);
+			  response.QueueCapacity,
+			  response.QueueMaxCapacity,
+			  response.QueueCurCapacity);
 
 	/* Read machines. */
 	for( int i = 0 ; i < response.MachineCount ; ++i )
@@ -659,12 +661,20 @@ int handleRB2RM_ClusterReport(void)
 
 	setAllSegResourceGRMUnhandled();
 
+
+	ResourceBundleData oldGRMTotalAll;
+	ResourceBundleData oldGRMTotal;
+	resetResourceBundleDataByBundle(&oldGRMTotalAll,
+									&(PRESPOOL->GRMTotalHavingNoHAWQNode));
+	resetResourceBundleDataByBundle(&oldGRMTotal,
+									&(PRESPOOL->GRMTotal));
 	/*
 	 * Start to update resource pool content. The YARN cluster total size is
 	 * also counted the same time.
 	 */
-
 	resetResourceBundleData(&(PRESPOOL->GRMTotalHavingNoHAWQNode), 0, 0.0, 0);
+	int updatedcnt = 0;
+	int skipedcnt = 0;
 
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 	while( list_length(segstats) > 0 )
@@ -681,19 +691,27 @@ int handleRB2RM_ClusterReport(void)
 			SelfMaintainBufferData buffer;
 			initializeSelfMaintainBuffer(&buffer, PCONTEXT);
 			generateSegStatReport(segstat, &buffer);
-			elog(LOG, "YARN mode resource broker updated segment configuration "
-					  "in resource pool. %s", buffer.Buffer);
+			elog(RMLOG, "YARN mode resource broker updated segment configuration "
+					    "in resource pool. %s", buffer.Buffer);
 			destroySelfMaintainBuffer(&buffer);
+			updatedcnt++;
 		}
 		else
 		{
-			elog(LOG, "YARN mode resource broker skipped segment configuration "
-					  "from host %s",
-					  GET_SEGINFO_GRMHOSTNAME(&(segstat->Info)));
+			elog(WARNING, "YARN mode resource broker skipped segment configuration "
+					  	  "from host %s",
+						  GET_SEGINFO_GRMHOSTNAME(&(segstat->Info)));
+			skipedcnt++;
 		}
 		rm_pfree(PCONTEXT, segstat);
 		segstats = list_delete_first(segstats);
 	}
+
+	elog(LOG, "YARN mode resource broker updated %d %s, skiped %d %s",
+			  updatedcnt,
+			  updatedcnt <= 1 ? "segment" : "segments",
+			  skipedcnt,
+			  skipedcnt <= 1 ? "segment" : "segments");
 
 	/*
 	 * iterate all segments without GRM report,
@@ -754,13 +772,26 @@ int handleRB2RM_ClusterReport(void)
 
 	MEMORY_CONTEXT_SWITCH_BACK
 
-	elog(LOG, "Resource manager YARN resource broker counted HAWQ cluster now "
-			  "having (%d MB, %lf CORE) in a YARN cluster of total resource "
-			  "(%d MB, %lf CORE).",
-			  PRESPOOL->GRMTotal.MemoryMB,
-			  PRESPOOL->GRMTotal.Core,
-			  PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB,
-			  PRESPOOL->GRMTotalHavingNoHAWQNode.Core);
+	if ( oldGRMTotalAll.MemoryMB != PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB ||
+		 oldGRMTotalAll.Core	 != PRESPOOL->GRMTotalHavingNoHAWQNode.Core )
+	{
+		elog(LOG, "Resource manager YARN resource broker counted YARN cluster "
+				  "having total resource (%d MB, %lf CORE).",
+				  PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB,
+				  PRESPOOL->GRMTotalHavingNoHAWQNode.Core);
+	}
+
+	if ( oldGRMTotal.MemoryMB != PRESPOOL->GRMTotal.MemoryMB ||
+		 oldGRMTotal.Core != PRESPOOL->GRMTotal.Core )
+	{
+		elog(LOG, "Resource manager YARN resource broker counted HAWQ cluster now "
+				  "having (%d MB, %lf CORE) in a YARN cluster of total resource "
+				  "(%d MB, %lf CORE).",
+				  PRESPOOL->GRMTotal.MemoryMB,
+				  PRESPOOL->GRMTotal.Core,
+				  PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB,
+				  PRESPOOL->GRMTotalHavingNoHAWQNode.Core);
+	}
 
 	/*
 	 * If the segment is GRM unavailable or FTS unavailable,

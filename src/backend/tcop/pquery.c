@@ -1123,8 +1123,6 @@ CleanupGlobalQueryResources(void)
 	int ret;
 	char errorbuf[1024];
 
-	elog(LOG, "In CleanupGlobalQueryResources().");
-
 	/* Force using new socket connection to return and free. */
 	bool oldval = rm_enable_connpool;
 	rm_enable_connpool = false;

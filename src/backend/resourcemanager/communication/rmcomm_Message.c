@@ -96,13 +96,9 @@ void ReadPostHandler_Message(AsyncCommBuffer buffer)
 			if ( DRM_MSGFRAME_TAILTAG_MATCHED(p) )
 			{
 				/* Skip heart-beat message log. */
-				elog((header->MessageID == REQUEST_QD_REFRESH_RESOURCE ||
-					  header->MessageID == REQUEST_RM_IMALIVE          ||
-					  header->MessageID == RESPONSE_QD_REFRESH_RESOURCE ||
-					  header->MessageID == RESPONSE_RM_IMALIVE) ? DEBUG3 : LOG,
-					 "AsyncComm framework receives message %d from FD %d",
-					 header->MessageID,
-					 buffer->FD);
+				elog(RMLOG, "AsyncComm framework receives message %d from FD %d",
+							header->MessageID,
+							buffer->FD);
 
 				/* Get complete message and call the handler. */
 				if ( context->MessageRecvedHandler != NULL )
