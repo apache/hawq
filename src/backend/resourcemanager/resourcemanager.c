@@ -2194,7 +2194,6 @@ int generateAllocRequestToBroker(void)
 	/* Call resource broker to request resource. */
 	if ( reqmem > 0 && reqcore > 0 )
 	{
-
 		/*
 		 * Here we know that we have to allocate more resource from GRM, we should
 		 * check again to enrich the preferred host list for new locality data
@@ -2211,6 +2210,8 @@ int generateAllocRequestToBroker(void)
 
 		if ( reqcore > 0 )
 		{
+			PRESPOOL->LastResAcqTime = gettime_microsec();
+
 			addResourceBundleData(&(mctrack->TotalPending), reqmem, reqcore);
 			uint64_t oldtime = mctrack->TotalPendingStartTime;
 			if ( mctrack->TotalPendingStartTime == 0 )
@@ -2906,7 +2907,6 @@ void generateResourceRequestToResourceBroker(void)
 
 	if ( !isCleanGRMResourceStatus() )
 	{
-
 		curtime = gettime_microsec();
 
         if ( PRESPOOL->Segments.NodeCount > 0 && PQUEMGR->RatioCount > 0 )
@@ -2914,7 +2914,6 @@ void generateResourceRequestToResourceBroker(void)
         	refreshMemoryCoreRatioLevelUsage(curtime);
         	if ( curtime - PRESPOOL->LastResAcqTime > 1000000LL)
         	{
-        		PRESPOOL->LastResAcqTime = curtime;
 				res = generateAllocRequestToBroker();
 				if ( res != FUNC_RETURN_OK )
 				{
