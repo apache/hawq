@@ -10,7 +10,7 @@ SYNOPSIS
 hawq ssh-exkeys -f <hostfile_exkeys> [-p <password>] | -h <hostname> 
 [-h <hostname> ...] [-p <password>]
 
-hawq ssh-exkeys -e <hostfile_exkeys> -x <hostfile_gpexpand>
+hawq ssh-exkeys -e <hostfile_exkeys> -x <hostfile_hawq_expand>
 
 hawq ssh-exkeys -? 
 
@@ -104,7 +104,7 @@ OPTIONS
  Displays the version of this utility.
 
 
--x <hostfile_gpexpand>
+-x <hostfile_hawq_expand>
 
  When doing a system expansion, this is the name and location of a file 
  containing all configured host names and host addresses (interface names) 
@@ -153,7 +153,7 @@ hosts sdw4 and sdw5 as part of a system expansion operation:
     sdw3-1
     sdw3-2
 
-  $ cat hostfile_gpexpand
+  $ cat hostfile_hawq_expand
     sdw4
     sdw4-1
     sdw4-2
@@ -161,7 +161,7 @@ hosts sdw4 and sdw5 as part of a system expansion operation:
     sdw5-1
     sdw5-2
 
- $ hawq ssh-exkeys -e hostfile_exkeys -x hostfile_gpexpand
+ $ hawq ssh-exkeys -e hostfile_exkeys -x hostfile_hawq_expand
 
 *****************************************************
 SEE ALSO

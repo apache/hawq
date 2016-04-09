@@ -18,7 +18,7 @@
 try:
     import os, sys, re
     from optparse import Option, OptionParser
-    from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml, update_xml_property, append_xml_property, local_ssh
+    from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml, update_xml_property, local_ssh
     from gppylib.commands.unix import getLocalHostname, getUserName
     from gppylib.db import dbconn
     from pg import DatabaseError
@@ -170,10 +170,7 @@ def show_property(hawq_site, property_name):
 
 def update_hawq_site(org_config_file, hawq_site, property_name, property_value):
     result = check_property(hawq_site, property_name, property_value)
-    if result:
-        update_xml_property(org_config_file, property_name, property_value)
-    else:
-        append_xml_property(org_config_file, property_name, property_value)
+    update_xml_property(org_config_file, property_name, property_value)
 
 
 def sync_hawq_site(config_dir, host_list, ignore_bad_hosts):
@@ -202,8 +199,6 @@ if __name__ == '__main__':
         standby_host = hawq_site.hawq_dict['hawq_standby_address_host']
         if standby_host not in ('None', 'none', ''):
             host_list = host_list + [standby_host]
-    else:
-        print "No standby host configured, skip it."
 
     # Update hawq-site.xml
     if options.change:

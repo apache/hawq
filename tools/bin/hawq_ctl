@@ -212,7 +212,7 @@ class HawqInit:
                 update_xml_property(xml_file, property_name, property_value)
             else:
                 logger.debug("Add output.replace-datanode-on-failure as %s" % property_value)
-                append_xml_property(xml_file, property_name, property_value)
+                update_xml_property(xml_file, property_name, property_value)
 
             self.sync_hdfs_client()
 

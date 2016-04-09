@@ -142,8 +142,12 @@ class HawqXMLParser:
         with open(self.xml_file) as f:
             xmldoc = minidom.parse(f)
         for node in xmldoc.getElementsByTagName('property'):
-            name, value = (node.getElementsByTagName('name')[0].childNodes[0].data,
-                           node.getElementsByTagName('value')[0].childNodes[0].data)
+            name = node.getElementsByTagName('name')[0].childNodes[0].data.encode('ascii')
+            try:
+                value = node.getElementsByTagName('value')[0].childNodes[0].data.encode('ascii')
+            except:
+                value = ''
+
             if name == property_name:
                 self.propertyValue = value
         return self.propertyValue
@@ -153,8 +157,13 @@ class HawqXMLParser:
             xmldoc = minidom.parse(f)
 
         for node in xmldoc.getElementsByTagName('property'):
-            name, value = (node.getElementsByTagName('name')[0].childNodes[0].data.encode('ascii'),
-                           node.getElementsByTagName('value')[0].childNodes[0].data.encode('ascii'))
+            name = node.getElementsByTagName('name')[0].childNodes[0].data.encode('ascii')
+
+            try:
+                value = node.getElementsByTagName('value')[0].childNodes[0].data.encode('ascii')
+            except:
+                value = ''
+
             if value == '':
                 value == 'None'
             self.hawq_dict[name] = value
@@ -387,72 +396,125 @@ def update_xml_property(xmlfile, property_name, property_value):
     file_path, filename = os.path.split(xmlfile)
     xmlfile_backup = os.path.join(file_path, '.bak.' + filename)
     xmlfile_swap = os.path.join(file_path, '.swp.' + filename)
+
+    # Backup current xmlfile
     shutil.copyfile(xmlfile, xmlfile_backup)
-    with open(xmlfile_backup) as f:
-        f_tmp = open(xmlfile_swap, 'w')
+
+    f_tmp = open(xmlfile_swap, 'w')
+
+    with open(xmlfile) as f:
+        xmldoc = minidom.parse(f)
+
+    with open(xmlfile) as f:
         while 1:
             line = f.readline()
-
             if not line:
                 break
-
-            m = re.match('\s*<name>%s' % property_name, line)
+            m = re.match('.*<configuration>.*', line)
             if m:
-                while 1:
-                    next_line = f.readline()
-                    m2 = re.match('\s*<value>', next_line)
-                    if m2:
-                        f_tmp.write(line)
-                        p = re.compile('\s*<value>(.*)</value>')
-                        p_value = p.match(next_line).group(1)
-                        next_line_new = re.sub(p_value, property_value, next_line)
-                        f_tmp.write(next_line_new)
-                        break
+                line_1 = line.split('<configuration>')[0] + '<configuration>\n'
+                f_tmp.write(line_1)
+                break
             else:
                 f_tmp.write(line)
-        f_tmp.close()
+
+    count_num = 0
+
+    for node in xmldoc.getElementsByTagName('property'):
+
+        name = node.getElementsByTagName('name')[0].childNodes[0].data.encode('ascii')
+
+        try:
+            value = node.getElementsByTagName('value')[0].childNodes[0].data.encode('ascii')
+        except:
+            value = ''
+
+        try:
+            description = node.getElementsByTagName('description')[0].childNodes[0].data.encode('ascii')
+        except:
+            description = ''
+
+        if name == property_name:
+            value = property_value
+            count_num += 1
+
+        f_tmp.write("        <property>\n")
+        f_tmp.write("                <name>%s</name>\n" % name)
+        f_tmp.write("                <value>%s</value>\n" % value)
+        if description:
+            f_tmp.write("                <description>%s</description>\n" % description)
+        f_tmp.write("        </property>\n\n")
+
+    if count_num == 0:
+        f_tmp.write("        <property>\n")
+        f_tmp.write("                <name>%s</name>\n" % property_name)
+        f_tmp.write("                <value>%s</value>\n" % property_value)
+        f_tmp.write("        </property>\n\n")
+        f_tmp.write("</configuration>\n")
+    else:
+        f_tmp.write("</configuration>\n")
+
+    f_tmp.close
 
     shutil.move(xmlfile_swap, xmlfile)
 
 
-def append_xml_property(xmlfile, property_name, property_value):
+def remove_property_xml(property_name, xmlfile, quiet = False):
     file_path, filename = os.path.split(xmlfile)
     xmlfile_backup = os.path.join(file_path, '.bak.' + filename)
     xmlfile_swap = os.path.join(file_path, '.swp.' + filename)
+
+    # Backup current xmlfile
     shutil.copyfile(xmlfile, xmlfile_backup)
-    with open(xmlfile_backup) as f:
-        f_tmp = open(xmlfile_swap, 'w')
+
+    f_tmp = open(xmlfile_swap, 'w')
+
+    with open(xmlfile) as f:
+        xmldoc = minidom.parse(f)
+
+    with open(xmlfile) as f:
         while 1:
             line = f.readline()
-
             if not line:
                 break
-
-            m = re.match('\s*</configuration>', line)
+            m = re.match('.*<configuration>.*', line)
             if m:
-                f_tmp.write('    <property>\n')
-                f_tmp.write('        <name>%s</name>\n' % property_name)
-                f_tmp.write('       <value>%s</value>\n' % property_value)
-                f_tmp.write('    </property>\n')
-                f_tmp.write('</configuration>\n')
+                line_1 = line.split('<configuration>')[0] + '<configuration>\n'
+                f_tmp.write(line_1)
+                break
             else:
                 f_tmp.write(line)
-        f_tmp.close()
+
+    for node in xmldoc.getElementsByTagName('property'):
+
+        name = node.getElementsByTagName('name')[0].childNodes[0].data.encode('ascii')
+
+        try:
+            value = node.getElementsByTagName('value')[0].childNodes[0].data.encode('ascii')
+        except:
+            value = ''
+
+        try:
+            description = node.getElementsByTagName('description')[0].childNodes[0].data.encode('ascii')
+        except:
+            description = ''
+
+        if name == property_name:
+            if not quiet:
+                print "Remove property %s" % property_name
+        else:
+            f_tmp.write("        <property>\n")
+            f_tmp.write("                <name>%s</name>\n" % name)
+            f_tmp.write("                <value>%s</value>\n" % value)
+            if description:
+                f_tmp.write("                <description>%s</description>\n" % description)
+            f_tmp.write("        </property>\n\n")
+
+    f_tmp.write("</configuration>\n")
+
+    f_tmp.close
 
     shutil.move(xmlfile_swap, xmlfile)
-
-
-def remove_property_xml(property_name, org_config_file, quiet = False):
-    tree = ElementTree()
-    tree.parse(org_config_file)
-    root = tree.getroot()
-    for child in root:
-        for subet in child:
-            if subet.text == property_name:
-                if not quiet:
-                    print "Remove property %s." % subet.text
-                root.remove(child)
-    tree.write(org_config_file, encoding="utf-8")
 
 
 def sync_hawq_site(GPHOME, host_list):
