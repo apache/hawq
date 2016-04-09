@@ -925,9 +925,9 @@ def getDescendentProcesses(pid):
     children = list()
     grandchildren = list()
 
-    for p in psutil.process.ProcessTable().values():
+    for p in psutil.process_iter():
 
-        if int(p.ppid) == int(pid):
+        if int(p.ppid()) == int(pid):
             children.append(int(p.pid))
 
     # recursion
