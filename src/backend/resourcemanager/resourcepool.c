@@ -2030,7 +2030,7 @@ void moveGRMContainerSetToAccepted(GRMContainerSet ctns)
 
 void moveGRMContainerSetToKicked(GRMContainerSet ctns)
 {
-	if ( ctns == NULL )
+	if ( ctns != NULL )
 	{
 		PRESPOOL->KickedContainers = list_concat(PRESPOOL->KickedContainers,
 												   ctns->Containers);
