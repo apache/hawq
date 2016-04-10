@@ -240,11 +240,10 @@ void getBufferedHostName(char *hostname, char **buffhostname)
 		length = strlen(hostname);
 		newstring = (char *)rm_palloc0(PCONTEXT, length+1);
 		strcpy(newstring, hostname);
-		void *oldval = setHASHTABLENode(&(PRESPOOL->BufferedHostNames),
-						 	 	 	 	(void *)&hostnamestr,
-										(void *)newstring,
-										false /* No need to free old value. */);
-		Assert(oldval == NULL);
+		setHASHTABLENode(&(PRESPOOL->BufferedHostNames),
+						 (void *)&hostnamestr,
+						 (void *)newstring,
+						 false /* No need to free old value. */);
 		*buffhostname = newstring;
 		elog(DEBUG3, "Resource manager adds new hostname %s to hostname buffer. "
 					 "Current hostname buffer size %d",
@@ -965,20 +964,18 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		segid = segresource->Stat->ID;
 
 		/* Add HAWQ node into resource pool indexed by machine id. */
-		void *oldval = setHASHTABLENode(&(PRESPOOL->Segments),
-						  	  	  	    TYPCONVERT(void *, segid),
-										TYPCONVERT(void *, segresource),
-										false /* Should be no old value. */);
-		Assert( oldval == NULL );
+		setHASHTABLENode(&(PRESPOOL->Segments),
+						 TYPCONVERT(void *, segid),
+						 TYPCONVERT(void *, segresource),
+						 false /* Should be no old value. */);
 
 		/* Set HAWQ node indices to help find machine id. */
 		setSimpleStringRef(&hostnamekey, hostname, hostnamelen);
 
-		oldval = setHASHTABLENode(&(PRESPOOL->SegmentHostNameIndexed),
-								  TYPCONVERT(void *, &hostnamekey),
-								  TYPCONVERT(void *, segid),
-								  false /* There should be no old value. */);
-		Assert( oldval == NULL );
+		setHASHTABLENode(&(PRESPOOL->SegmentHostNameIndexed),
+						 TYPCONVERT(void *, &hostnamekey),
+						 TYPCONVERT(void *, segid),
+						 false /* There should be no old value. */);
 
 		SelfMaintainBufferData logcontent;
 		initializeSelfMaintainBuffer(&logcontent, PCONTEXT);
