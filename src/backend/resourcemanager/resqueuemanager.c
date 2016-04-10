@@ -1218,6 +1218,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 	int 				  	res 			 = FUNC_RETURN_OK;
 	DynResourceQueueTrack	parenttrack		 = NULL;
     DynResourceQueueTrack 	newqueuetrack 	 = NULL;
+    DynResourceQueueTrack 	tmpquetrack		 = NULL;
     bool					isDefaultQueue   = false;
     bool					isRootQueue		 = false;
 
@@ -1238,15 +1239,14 @@ int createQueueAndTrack( DynResourceQueue		queue,
      */
     if ( queue->OID > InvalidOid )
     {
-    	DynResourceQueueTrack tmpquetrack = getQueueTrackByQueueOID(queue->OID);
+    	tmpquetrack = getQueueTrackByQueueOID(queue->OID);
 		Assert(tmpquetrack == NULL);
     }
 
     /* New queue name must be set and unique. */
     Assert(queue->NameLen > 0);
 
-    DynResourceQueueTrack tmpquetrack = getQueueTrackByQueueName((char *)(queue->Name),
-    															 queue->NameLen);
+    tmpquetrack = getQueueTrackByQueueName((char *)(queue->Name), queue->NameLen);
 	if (tmpquetrack != NULL) {
 		res = RESQUEMGR_DUPLICATE_QUENAME;
 		snprintf(errorbuf, errorbufsize,
