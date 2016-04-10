@@ -244,10 +244,7 @@ void getBufferedHostName(char *hostname, char **buffhostname)
 						 	 	 	 	(void *)&hostnamestr,
 										(void *)newstring,
 										false /* No need to free old value. */);
-		if( oldval != NULL )
-		{
-			Assert(false);
-		}
+		Assert(oldval == NULL);
 		*buffhostname = newstring;
 		elog(DEBUG3, "Resource manager adds new hostname %s to hostname buffer. "
 					 "Current hostname buffer size %d",
@@ -561,10 +558,14 @@ gp_remove_segment_history(PG_FUNCTION_ARGS)
 	int ret = true;
 
 	if (!superuser())
+	{
 		elog(ERROR, "gp_remove_segment_history can only be run by a superuser");
+	}
 
 	if (Gp_role != GP_ROLE_UTILITY)
+	{
 		elog(ERROR, "gp_remove_segment_history can only be run in utility mode");
+	}
 
 	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
@@ -645,8 +646,6 @@ void update_segment_status(int32_t id, char status, char* description)
 		Assert(strlen(description) == 0);
 	else if (status == SEGMENT_STATUS_DOWN)
 		Assert(strlen(description) != 0);
-	else
-		Assert(0);
 
 	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
@@ -970,10 +969,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 						  	  	  	    TYPCONVERT(void *, segid),
 										TYPCONVERT(void *, segresource),
 										false /* Should be no old value. */);
-		if ( oldval != NULL )
-		{
-			Assert(false);
-		}
+		Assert( oldval == NULL );
 
 		/* Set HAWQ node indices to help find machine id. */
 		setSimpleStringRef(&hostnamekey, hostname, hostnamelen);
@@ -982,10 +978,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 								  TYPCONVERT(void *, &hostnamekey),
 								  TYPCONVERT(void *, segid),
 								  false /* There should be no old value. */);
-		if ( oldval != NULL )
-		{
-			Assert(false);
-		}
+		Assert( oldval == NULL );
 
 		SelfMaintainBufferData logcontent;
 		initializeSelfMaintainBuffer(&logcontent, PCONTEXT);
@@ -1206,16 +1199,25 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 							"" : GET_SEGINFO_FAILEDTMPDIR(&segstat->Info));
 
 			int old = segresource->Stat->Info.FailedTmpDirLen == 0 ?
-									0 :__SIZE_ALIGN64(segresource->Stat->Info.FailedTmpDirLen+1);
+					  0 :
+					  __SIZE_ALIGN64(segresource->Stat->Info.FailedTmpDirLen+1);
 			int new = segstat->Info.FailedTmpDirLen == 0 ?
-									0 : __SIZE_ALIGN64(segstat->Info.FailedTmpDirLen+1);
+					  0 :
+					  __SIZE_ALIGN64(segstat->Info.FailedTmpDirLen+1);
 
 			int current = segresource->Stat->Info.Size -
-					(segresource->Stat->Info.HostNameOffset + __SIZE_ALIGN64(segresource->Stat->Info.HostNameLen+1));
-			if (segresource->Stat->Info.GRMHostNameLen != 0 && segresource->Stat->Info.GRMHostNameOffset != 0)
+						  (segresource->Stat->Info.HostNameOffset +
+						  __SIZE_ALIGN64(segresource->Stat->Info.HostNameLen+1));
+			if (segresource->Stat->Info.GRMHostNameLen != 0 &&
+				segresource->Stat->Info.GRMHostNameOffset != 0)
+			{
 				current -= __SIZE_ALIGN64(segresource->Stat->Info.GRMHostNameLen+1);
-			if (segresource->Stat->Info.GRMRackNameLen != 0 && segresource->Stat->Info.GRMRackNameOffset != 0)
+			}
+			if (segresource->Stat->Info.GRMRackNameLen != 0 &&
+				segresource->Stat->Info.GRMRackNameOffset != 0)
+			{
 				current -= __SIZE_ALIGN64(segresource->Stat->Info.GRMRackNameLen+1);
+			}
 
 			/*
 			 * repalloc memory if new size exceeds the old one.
@@ -1895,16 +1897,10 @@ void generateSegInfoAddrStr(SegInfo seginfo, int addrindex, SelfMaintainBuffer b
 	/* Get address attribute and offset value. */
 	uint16_t attr = GET_SEGINFO_ADDR_ATTR_AT(seginfo, addrindex);
 
-	if ( IS_SEGINFO_ADDR_STR(attr) )
-	{
-		AddressString straddr = NULL;
-		getSegInfoHostAddrStr(seginfo, addrindex, &straddr);
-		appendSelfMaintainBuffer(buff, straddr->Address, straddr->Length);
-	}
-	else
-	{
-		Assert(false);
-	}
+	Assert(IS_SEGINFO_ADDR_STR(attr));
+	AddressString straddr = NULL;
+	getSegInfoHostAddrStr(seginfo, addrindex, &straddr);
+	appendSelfMaintainBuffer(buff, straddr->Address, straddr->Length);
 }
 
 /* Get segment resource instance based on segment id. */
@@ -2022,28 +2018,26 @@ int  addGRMContainerToToBeAccepted(GRMContainer ctn)
 
 void moveGRMContainerSetToAccepted(GRMContainerSet ctns)
 {
-	if ( ctns == NULL )
+	if ( ctns != NULL )
 	{
-		return;
+		PRESPOOL->AcceptedContainers = list_concat(PRESPOOL->AcceptedContainers,
+												   ctns->Containers);
+		ctns->Containers = NULL;
+		resetResourceBundleData(&(ctns->Allocated), 0, 0.0, 0);
+		resetResourceBundleData(&(ctns->Available), 0, 0.0, 0);
 	}
-	PRESPOOL->AcceptedContainers = list_concat(PRESPOOL->AcceptedContainers,
-											   ctns->Containers);
-	ctns->Containers = NULL;
-	resetResourceBundleData(&(ctns->Allocated), 0, 0.0, 0);
-	resetResourceBundleData(&(ctns->Available), 0, 0.0, 0);
 }
 
 void moveGRMContainerSetToKicked(GRMContainerSet ctns)
 {
 	if ( ctns == NULL )
 	{
-		return;
+		PRESPOOL->KickedContainers = list_concat(PRESPOOL->KickedContainers,
+												   ctns->Containers);
+		ctns->Containers = NULL;
+		resetResourceBundleData(&(ctns->Allocated), 0, 0.0, 0);
+		resetResourceBundleData(&(ctns->Available), 0, 0.0, 0);
 	}
-	PRESPOOL->KickedContainers = list_concat(PRESPOOL->KickedContainers,
-											   ctns->Containers);
-	ctns->Containers = NULL;
-	resetResourceBundleData(&(ctns->Allocated), 0, 0.0, 0);
-	resetResourceBundleData(&(ctns->Available), 0, 0.0, 0);
 }
 
 /**
@@ -2143,16 +2137,13 @@ int getOrderedResourceAvailTreeIndexByRatio(uint32_t ratio, BBST *tree)
 {
 	*tree = NULL;
 	int32_t rindex = getResourceQueueRatioIndex(ratio);
-	if ( rindex < 0 )
+	if ( rindex < 0 || rindex >= RESOURCE_QUEUE_RATIO_SIZE )
 	{
 		return RESOURCEPOOL_NO_RATIO;
 	}
 	else if ( rindex < RESOURCE_QUEUE_RATIO_SIZE )
 	{
 		*tree = PRESPOOL->OrderedSegResAvailByRatio[rindex];
-	}
-	else {
-		Assert(false);
 	}
 	return FUNC_RETURN_OK;
 }
@@ -2161,17 +2152,13 @@ int getOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree)
 {
 	*tree = NULL;
 	int32_t rindex = getResourceQueueRatioIndex(ratio);
-	if ( rindex < 0 )
+	if ( rindex < 0 || rindex >= RESOURCE_QUEUE_RATIO_SIZE )
 	{
 		return RESOURCEPOOL_NO_RATIO;
 	}
 	else if ( rindex < RESOURCE_QUEUE_RATIO_SIZE )
 	{
 		*tree = PRESPOOL->OrderedSegResAllocByRatio[rindex];
-	}
-	else
-	{
-		Assert(false);
 	}
 	return FUNC_RETURN_OK;
 }
@@ -2180,7 +2167,7 @@ int  addOrderedResourceAvailTreeIndexByRatio(uint32_t ratio, BBST *tree)
 {
 	*tree = NULL;
 	int32_t rindex = getResourceQueueRatioIndex(ratio);
-	if ( rindex < 0 )
+	if ( rindex < 0 || rindex >= RESOURCE_QUEUE_RATIO_SIZE)
 	{
 		return RESOURCEPOOL_NO_RATIO;
 	}
@@ -2208,10 +2195,6 @@ int  addOrderedResourceAvailTreeIndexByRatio(uint32_t ratio, BBST *tree)
 		}
 		freePAIRRefList(&(PRESPOOL->Segments), &allnodes);
 	}
-	else
-	{
-		Assert(false);
-	}
 	return FUNC_RETURN_OK;
 }
 
@@ -2219,7 +2202,7 @@ int  addOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree)
 {
 	*tree = NULL;
 	int32_t rindex = getResourceQueueRatioIndex(ratio);
-	if ( rindex < 0 )
+	if ( rindex < 0 || rindex >= RESOURCE_QUEUE_RATIO_SIZE )
 	{
 		return RESOURCEPOOL_NO_RATIO;
 	}
@@ -2248,10 +2231,6 @@ int  addOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree)
 		}
 		freePAIRRefList(&(PRESPOOL->Segments), &allnodes);
 	}
-	else
-	{
-		Assert(false);
-	}
 	return FUNC_RETURN_OK;
 }
 
@@ -2260,7 +2239,7 @@ int getGRMContainerSet(SegResource segres, uint32_t ratio, GRMContainerSet *ctns
 	Assert(segres != NULL);
 	*ctns = NULL;
 	int32_t rindex = getResourceQueueRatioIndex(ratio);
-	if ( rindex < 0 )
+	if ( rindex < 0 || rindex >= RESOURCE_QUEUE_RATIO_SIZE )
 	{
 		return RESOURCEPOOL_NO_RATIO;
 	}
@@ -2268,10 +2247,6 @@ int getGRMContainerSet(SegResource segres, uint32_t ratio, GRMContainerSet *ctns
 	if ( rindex < RESOURCE_QUEUE_RATIO_SIZE )
 	{
 		*ctns = segres->ContainerSets[rindex];
-	}
-	else
-	{
-		Assert(false);
 	}
 	return FUNC_RETURN_OK;
 }
@@ -2282,7 +2257,7 @@ int getGRMContainerSet(SegResource segres, uint32_t ratio, GRMContainerSet *ctns
 int createAndGetGRMContainerSet(SegResource segres, uint32_t ratio, GRMContainerSet *ctns)
 {
 	int32_t rindex = getResourceQueueRatioIndex(ratio);
-	if ( rindex < 0 )
+	if ( rindex < 0 || rindex >= RESOURCE_QUEUE_RATIO_SIZE )
 	{
 		return RESOURCEPOOL_NO_RATIO;
 	}
@@ -2299,10 +2274,6 @@ int createAndGetGRMContainerSet(SegResource segres, uint32_t ratio, GRMContainer
 			*ctns = segres->ContainerSets[rindex];
 		}
 	}
-	else
-	{
-		Assert(false);
-	}
 	return FUNC_RETURN_OK;
 }
 
@@ -2318,29 +2289,28 @@ GRMContainerSet createGRMContainerSet(void)
 
 GRMContainer popGRMContainerSetContainerList(GRMContainerSet ctns)
 {
-	if ( ctns->Containers == NULL )
+	GRMContainer res = NULL;
+	if ( ctns->Containers != NULL )
 	{
-		return NULL;
+		res = (GRMContainer)lfirst(list_head(ctns->Containers));
+		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+		ctns->Containers = list_delete_first(ctns->Containers);
+		MEMORY_CONTEXT_SWITCH_BACK
+
+		minusResourceBundleData(&(ctns->Allocated), res->MemoryMB, res->Core);
+		minusResourceBundleData(&(ctns->Available), res->MemoryMB, res->Core);
 	}
-
-	GRMContainer res = (GRMContainer)lfirst(list_head(ctns->Containers));
-	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-	ctns->Containers = list_delete_first(ctns->Containers);
-	MEMORY_CONTEXT_SWITCH_BACK
-
-	minusResourceBundleData(&(ctns->Allocated), res->MemoryMB, res->Core);
-	minusResourceBundleData(&(ctns->Available), res->MemoryMB, res->Core);
-
 	return res;
 }
 
 GRMContainer getGRMContainerSetContainerFirst(GRMContainerSet ctns)
 {
-	if ( ctns->Containers == NULL )
+	GRMContainer res = NULL;
+	if ( ctns->Containers != NULL )
 	{
-		return NULL;
+		res = (GRMContainer)lfirst(list_head(ctns->Containers));
 	}
-	return (GRMContainer)lfirst(list_head(ctns->Containers));
+	return res;
 }
 
 void appendGRMContainerSetContainer(GRMContainerSet ctns, GRMContainer ctn)
@@ -3034,17 +3004,11 @@ void addSegResourceAvailIndex(SegResource segres)
 		/* Get the BBST for this ratio. */
 		ratio = PQUEMGR->RatioReverseIndex[i];
 		res = getOrderedResourceAvailTreeIndexByRatio(ratio, &tree);
-		if ( res != FUNC_RETURN_OK )
-		{
-			Assert(false);
-		}
+		Assert(res == FUNC_RETURN_OK);
 
 		/* Add the node */
 		res = insertBBSTNode(tree, createBBSTNode(tree, segres));
-		if (res != FUNC_RETURN_OK)
-		{
-			Assert(false);
-		}
+		Assert(res == FUNC_RETURN_OK);
 
 		elog(LOG, "Resource manager tracked host %s in available resource "
 				  "ordered  index for mem/core ratio %d MBPCORE.",
@@ -3063,17 +3027,11 @@ void addSegResourceAllocIndex(SegResource segres)
 		/* Get the BBST for this ratio. */
 		ratio = PQUEMGR->RatioReverseIndex[i];
 		res = getOrderedResourceAllocTreeIndexByRatio(ratio, &tree);
-		if ( res != FUNC_RETURN_OK )
-		{
-			Assert(false);
-		}
+		Assert(res == FUNC_RETURN_OK);
 
 		/* Add the node */
 		res = insertBBSTNode(tree, createBBSTNode(tree, segres));
-		if (res != FUNC_RETURN_OK)
-		{
-			Assert(false);
-		}
+		Assert(res == FUNC_RETURN_OK);
 
 		elog(RMLOG, "Resource manager tracked host %s in allocated resource "
 				    "ordered  index for mem/core ratio %d MBPCORE.",
@@ -3088,10 +3046,7 @@ void addSegResourceCombinedWorkloadIndex(SegResource segres)
 	int res = insertBBSTNode(&(PRESPOOL->OrderedCombinedWorkload),
 						 	 createBBSTNode(&(PRESPOOL->OrderedCombinedWorkload),
 						 			 	 	segres));
-	if (res != FUNC_RETURN_OK)
-	{
-		Assert(false);
-	}
+	Assert(res == FUNC_RETURN_OK);
 
 	elog(RMLOG, "Resource manager tracked host %s in io bytes workload.",
 			  	GET_SEGRESOURCE_HOSTNAME(segres));
@@ -3103,12 +3058,11 @@ int reorderSegResourceAvailIndex(SegResource segres, uint32_t ratio)
 	BBST	 tree	= NULL;
 	/* Get the BBST for this ratio. */
 	res = getOrderedResourceAvailTreeIndexByRatio(ratio, &tree);
-	if ( res == RESOURCEPOOL_NO_RATIO )
+	if ( res == FUNC_RETURN_OK )
 	{
-		return res; /* If it is to reorder a node, the BBST must already exist.*/
+		res = reorderBBSTNodeData(tree, segres);
 	}
-
-	return reorderBBSTNodeData(tree, segres);
+	return res;
 }
 
 int reorderSegResourceAllocIndex(SegResource segres, uint32_t ratio)
@@ -3117,12 +3071,11 @@ int reorderSegResourceAllocIndex(SegResource segres, uint32_t ratio)
 	BBST	 tree	= NULL;
 	/* Get the BBST for this ratio. */
 	res = getOrderedResourceAllocTreeIndexByRatio(ratio, &tree);
-	if ( res == RESOURCEPOOL_NO_RATIO )
+	if ( res == FUNC_RETURN_OK )
 	{
-		return res; /* If it is to reorder a node, the BBST must already exist.*/
+		res = reorderBBSTNodeData(tree, segres);
 	}
-
-	return reorderBBSTNodeData(tree, segres);
+	return res;
 }
 
 int reorderSegResourceCombinedWorkloadIndex(SegResource segres)
@@ -3992,18 +3945,6 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 	cleanHASHTABLE(&stattbl);
 }
 
-void freeVSegmentConterList(List **list)
-{
-	while( list_length(*list) > 0 )
-	{
-		VSegmentCounterInternal vsegcnt = (VSegmentCounterInternal)lfirst(list_head(*list));
-		MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
-		*list = list_delete_first(*list);
-		MEMORY_CONTEXT_SWITCH_BACK
-		rm_pfree(PCONTEXT, vsegcnt);
-	}
-}
-
 void dropAllResPoolGRMContainersToToBeKicked(void)
 {
 	elog(LOG, "Resource manager drops all allocated resource per request from "
@@ -4752,27 +4693,25 @@ void adjustSegmentStatFTSCapacity(SegStat segstat)
 
 void adjustSegmentStatGRMCapacity(SegStat segstat)
 {
-	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	if ( PRESPOOL->ClusterMemoryCoreRatio != 0 )
 	{
-		return;
-	}
+		uint32_t oldmemorymb = segstat->GRMTotalMemoryMB;
+		uint32_t oldcore	 = segstat->GRMTotalCore;
 
-	uint32_t oldmemorymb = segstat->GRMTotalMemoryMB;
-	uint32_t oldcore	 = segstat->GRMTotalCore;
+		adjustMemoryCoreValue(&(segstat->GRMTotalMemoryMB), &(segstat->GRMTotalCore));
 
-	adjustMemoryCoreValue(&(segstat->GRMTotalMemoryMB), &(segstat->GRMTotalCore));
-
-	if ( oldmemorymb != segstat->GRMTotalMemoryMB ||
-		 oldcore	 != segstat->GRMTotalCore )
-	{
-		elog(LOG, "Resource manager adjusts segment %s original global resource "
-				  "manager resource capacity from (%d MB, %d CORE) to "
-				  "(%d MB, %d CORE)",
-				  GET_SEGINFO_HOSTNAME(&(segstat->Info)),
-				  oldmemorymb,
-				  oldcore,
-				  segstat->GRMTotalMemoryMB,
-				  segstat->GRMTotalCore);
+		if ( oldmemorymb != segstat->GRMTotalMemoryMB ||
+			 oldcore	 != segstat->GRMTotalCore )
+		{
+			elog(LOG, "Resource manager adjusts segment %s original global resource "
+					  "manager resource capacity from (%d MB, %d CORE) to "
+					  "(%d MB, %d CORE)",
+					  GET_SEGINFO_HOSTNAME(&(segstat->Info)),
+					  oldmemorymb,
+					  oldcore,
+					  segstat->GRMTotalMemoryMB,
+					  segstat->GRMTotalCore);
+		}
 	}
 }
 
@@ -4780,41 +4719,39 @@ void adjustSegmentCapacityForNone(SegResource segres)
 {
 	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
 	{
-		return;
-	}
+		uint32_t oldmemorymb = 0;
+		uint32_t oldcore	 = 0;
 
-	uint32_t oldmemorymb = 0;
-	uint32_t oldcore	 = 0;
+		oldmemorymb = segres->Stat->FTSTotalMemoryMB;
+		oldcore		= segres->Stat->FTSTotalCore;
 
-	oldmemorymb = segres->Stat->FTSTotalMemoryMB;
-	oldcore		= segres->Stat->FTSTotalCore;
-
-	adjustMemoryCoreValue(&(segres->Stat->FTSTotalMemoryMB),
-						  &(segres->Stat->FTSTotalCore));
+		adjustMemoryCoreValue(&(segres->Stat->FTSTotalMemoryMB),
+							  &(segres->Stat->FTSTotalCore));
 
 
-	if ( oldmemorymb != segres->Stat->FTSTotalMemoryMB ||
-		 oldcore	 != segres->Stat->FTSTotalCore )
-	{
-		elog(LOG, "Resource manager adjusts segment %s original resource "
-				  "capacity from (%d MB, %d CORE) to (%d MB, %d CORE)",
-				  GET_SEGINFO_HOSTNAME(&(segres->Stat->Info)),
-				  oldmemorymb,
-				  oldcore,
-				  segres->Stat->FTSTotalMemoryMB,
-				  segres->Stat->FTSTotalCore);
-
-		if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
+		if ( oldmemorymb != segres->Stat->FTSTotalMemoryMB ||
+			 oldcore	 != segres->Stat->FTSTotalCore )
 		{
-			return;
-		}
+			elog(LOG, "Resource manager adjusts segment %s original resource "
+					  "capacity from (%d MB, %d CORE) to (%d MB, %d CORE)",
+					  GET_SEGINFO_HOSTNAME(&(segres->Stat->Info)),
+					  oldmemorymb,
+					  oldcore,
+					  segres->Stat->FTSTotalMemoryMB,
+					  segres->Stat->FTSTotalCore);
 
-		minusResourceBundleData(&(PRESPOOL->FTSTotal),
-								oldmemorymb,
-								oldcore * 1.0);
-		addResourceBundleData(&(PRESPOOL->FTSTotal),
-							  segres->Stat->FTSTotalMemoryMB,
-							  segres->Stat->FTSTotalCore * 1.0);
+			if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
+			{
+				return;
+			}
+
+			minusResourceBundleData(&(PRESPOOL->FTSTotal),
+									oldmemorymb,
+									oldcore * 1.0);
+			addResourceBundleData(&(PRESPOOL->FTSTotal),
+								  segres->Stat->FTSTotalMemoryMB,
+								  segres->Stat->FTSTotalCore * 1.0);
+		}
 	}
 }
 
@@ -4822,41 +4759,39 @@ void adjustSegmentCapacityForGRM(SegResource segres)
 {
 	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
 	{
-		return;
-	}
+		uint32_t oldmemorymb = 0;
+		uint32_t oldcore	 = 0;
 
-	uint32_t oldmemorymb = 0;
-	uint32_t oldcore	 = 0;
+		oldmemorymb = segres->Stat->GRMTotalMemoryMB;
+		oldcore		= segres->Stat->GRMTotalCore;
 
-	oldmemorymb = segres->Stat->GRMTotalMemoryMB;
-	oldcore		= segres->Stat->GRMTotalCore;
+		adjustMemoryCoreValue(&(segres->Stat->GRMTotalMemoryMB),
+							  &(segres->Stat->GRMTotalCore));
 
-	adjustMemoryCoreValue(&(segres->Stat->GRMTotalMemoryMB),
-						  &(segres->Stat->GRMTotalCore));
-
-	if ( oldmemorymb != segres->Stat->GRMTotalMemoryMB ||
-		 oldcore 	 != segres->Stat->GRMTotalCore )
-	{
-		elog(LOG, "Resource manager adjusts segment %s original global resource "
-				  "manager resource capacity from (%d MB, %d CORE) to "
-				  "(%d MB, %d CORE)",
-				  GET_SEGINFO_HOSTNAME(&(segres->Stat->Info)),
-				  oldmemorymb,
-				  oldcore,
-				  segres->Stat->GRMTotalMemoryMB,
-				  segres->Stat->GRMTotalCore);
-
-		if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
+		if ( oldmemorymb != segres->Stat->GRMTotalMemoryMB ||
+			 oldcore 	 != segres->Stat->GRMTotalCore )
 		{
-			return;
-		}
+			elog(LOG, "Resource manager adjusts segment %s original global "
+					  "resource manager resource capacity from (%d MB, %d CORE) to "
+					  "(%d MB, %d CORE)",
+					  GET_SEGINFO_HOSTNAME(&(segres->Stat->Info)),
+					  oldmemorymb,
+					  oldcore,
+					  segres->Stat->GRMTotalMemoryMB,
+					  segres->Stat->GRMTotalCore);
 
-		minusResourceBundleData(&(PRESPOOL->GRMTotal),
-								oldmemorymb,
-								oldcore * 1.0);
-		addResourceBundleData(&(PRESPOOL->GRMTotal),
-							  segres->Stat->GRMTotalMemoryMB,
-							  segres->Stat->GRMTotalCore * 1.0);
+			if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
+			{
+				return;
+			}
+
+			minusResourceBundleData(&(PRESPOOL->GRMTotal),
+									oldmemorymb,
+									oldcore * 1.0);
+			addResourceBundleData(&(PRESPOOL->GRMTotal),
+								  segres->Stat->GRMTotalMemoryMB,
+								  segres->Stat->GRMTotalCore * 1.0);
+		}
 	}
 }
 
@@ -4876,10 +4811,7 @@ void adjustMemoryCoreValue(uint32_t *memorymb, uint32_t *core)
 
 void dumpResourcePoolHosts(const char *filename)
 {
-    if ( filename == NULL )
-    {
-    	return;
-    }
+    Assert( filename != NULL );
 
     FILE *fp = fopen(filename, "w");
     if ( fp == NULL )
