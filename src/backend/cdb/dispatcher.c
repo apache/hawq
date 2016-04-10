@@ -963,6 +963,8 @@ dispatcher_bind_executor(DispatchData *data)
 			    concurrent_connect_executors = lappend(concurrent_connect_executors,
                                                  info);
 			    data->num_of_new_connected_executors++;
+			    if (!executormgr_bind_executor_task(data, executor, info->desc, task, slice))
+			      return false;
 			  }
 			  continue;
 			}

@@ -150,10 +150,9 @@ cdbdisp_makeResult(struct CdbDispatchResults           *meleeResults,
         }
         else
         {
-            if (si->resultBegin > meleeIndex)
-                si->resultBegin = meleeIndex;
-            if (si->resultEnd <= meleeIndex)
-                si->resultEnd = meleeIndex + 1;
+            Assert(si->resultBegin <= meleeIndex);
+            Assert(si->resultEnd <= meleeIndex);
+            si->resultEnd = meleeIndex + 1;
         }
     }
 
@@ -685,10 +684,11 @@ cdbdisp_makeDispatchResults(int     resultCapacity,
                             int     sliceCapacity,
                             bool    cancelOnError)
 {
-    CdbDispatchResults *results = palloc0(sizeof(*results));
-    int     nbytes = resultCapacity * sizeof(results->resultArray[0]);
+    CdbDispatchResults *results = (CdbDispatchResults*) palloc0(sizeof(CdbDispatchResults));
+    int     nbytes = resultCapacity * sizeof(CdbDispatchResult);
 
-    results->resultArray = palloc0(nbytes);
+    results->resultArray = (CdbDispatchResult*) palloc0(nbytes);
+
     results->resultCapacity = resultCapacity;
     results->resultCount = 0;
     results->iFirstError = -1;
@@ -699,8 +699,8 @@ cdbdisp_makeDispatchResults(int     resultCapacity,
     results->sliceCapacity = sliceCapacity;
     if (sliceCapacity > 0)
     {
-        nbytes = sliceCapacity * sizeof(results->sliceMap[0]);
-        results->sliceMap = palloc0(nbytes);
+        nbytes = sliceCapacity * sizeof(CdbDispatchResults_SliceInfo);
+        results->sliceMap = (CdbDispatchResults_SliceInfo*) palloc0(nbytes);
     }
 
     return results;
