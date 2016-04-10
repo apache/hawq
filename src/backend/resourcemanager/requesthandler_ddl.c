@@ -93,7 +93,6 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	DynResourceQueueTrack 	newtrack 		= NULL;
 	DynResourceQueueTrack   todroptrack		= NULL;
 	SelfMaintainBufferData  responsebuff;
-	bool					exist 			= false;
 	List 				   *fineattr		= NULL;
 	List 				   *rsqattr			= NULL;
 	DynResourceQueue 		newqueue 		= NULL;
@@ -342,9 +341,8 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			newqueue = NULL;
 
 			toaltertrack = getQueueTrackByQueueName((char *)(nameattr->Val.Str),
-					   	   	   	   	   	   	   	   	nameattr->Val.Len,
-					   	   	   	   	   	   	   	   	&exist);
-			if (!exist || toaltertrack == NULL)
+					   	   	   	   	   	   	   	   	nameattr->Val.Len);
+			if (toaltertrack == NULL)
 			{
 				ddlres = RESQUEMGR_NO_QUENAME;
 				snprintf(errorbuf, sizeof(errorbuf), "the queue doesn't exist");
@@ -482,9 +480,8 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 		}
 		case MANIPULATE_RESQUEUE_DROP:
 			todroptrack = getQueueTrackByQueueName((char *)(nameattr->Val.Str),
-												   nameattr->Val.Len,
-												   &exist);
-			if (!exist || todroptrack == NULL )
+												   nameattr->Val.Len);
+			if ( todroptrack == NULL )
 			{
 				ddlres = RESQUEMGR_NO_QUENAME;
 				snprintf(errorbuf, sizeof(errorbuf),
