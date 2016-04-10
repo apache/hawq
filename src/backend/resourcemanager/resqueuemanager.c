@@ -305,12 +305,9 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 		case RSQ_DDL_ATTR_PARENT:
 		{
 			/* Find oid of the parent resource queue. */
-			bool exist = false;
 			DynResourceQueueTrack parentque =
-				getQueueTrackByQueueName(property->Val.Str,
-										 property->Val.Len,
-										 &exist);
-			if ( !exist )
+				getQueueTrackByQueueName(property->Val.Str, property->Val.Len);
+			if ( parentque == NULL )
 			{
 				snprintf(errorbuf, errorbufsize,
 						 "cannot recognize parent resource queue name %s.",
@@ -1005,9 +1002,8 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 
 	if ( !RESQUEUE_IS_ROOT(queue) && queue->ParentOID != InvalidOid )
 	{
-		bool exist = false;
-		parenttrack = getQueueTrackByQueueOID(queue->ParentOID, &exist);
-		Assert(exist && parenttrack != NULL);
+		parenttrack = getQueueTrackByQueueOID(queue->ParentOID);
+		Assert(parenttrack != NULL);
 
 		/* pg_default cannot be a parent queue. */
 		if ( RESQUEUE_IS_DEFAULT(parenttrack->QueueInfo) )
@@ -1087,9 +1083,8 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 		if (queue->ParentOID != InvalidOid)
 		{
 			double current = 0.0;
-			bool   exist   = false;
-			parenttrack = getQueueTrackByQueueOID(queue->ParentOID, &exist);
-			if (exist && parenttrack != NULL)
+			parenttrack = getQueueTrackByQueueOID(queue->ParentOID);
+			if (parenttrack != NULL)
 			{
 				ListCell *cell = NULL;
 				foreach(cell, parenttrack->ChildrenTracks)
@@ -1223,7 +1218,6 @@ int createQueueAndTrack( DynResourceQueue		queue,
 	int 				  	res 			 = FUNC_RETURN_OK;
 	DynResourceQueueTrack	parenttrack		 = NULL;
     DynResourceQueueTrack 	newqueuetrack 	 = NULL;
-    bool					exist			 = false;
     bool					isDefaultQueue   = false;
     bool					isRootQueue		 = false;
 
@@ -1244,15 +1238,16 @@ int createQueueAndTrack( DynResourceQueue		queue,
      */
     if ( queue->OID > InvalidOid )
     {
-		getQueueTrackByQueueOID(queue->OID, &exist);
-		Assert(!exist);
+    	DynResourceQueueTrack tmpquetrack = getQueueTrackByQueueOID(queue->OID);
+		Assert(tmpquetrack == NULL);
     }
 
     /* New queue name must be set and unique. */
     Assert(queue->NameLen > 0);
 
-	getQueueTrackByQueueName((char *)(queue->Name), queue->NameLen, &exist);
-	if (exist) {
+    DynResourceQueueTrack tmpquetrack = getQueueTrackByQueueName((char *)(queue->Name),
+    															 queue->NameLen);
+	if (tmpquetrack != NULL) {
 		res = RESQUEMGR_DUPLICATE_QUENAME;
 		snprintf(errorbuf, errorbufsize,
 				 "duplicate queue name %s for creating resource queue.",
@@ -1276,8 +1271,8 @@ int createQueueAndTrack( DynResourceQueue		queue,
 	if ( !isRootQueue )
 	{
 		/* Check if the parent queue id exists. */
-		parenttrack = getQueueTrackByQueueOID(queue->ParentOID, &exist);
-		Assert(exist);
+		parenttrack = getQueueTrackByQueueOID(queue->ParentOID);
+		Assert(parenttrack != NULL);
 
 		/* The parent queue can not have connections. */
 		if ( parenttrack->CurConnCounter > 0 )
@@ -1413,7 +1408,7 @@ int dropQueueAndTrack( DynResourceQueueTrack track,
 }
 
 
-DynResourceQueueTrack getQueueTrackByQueueOID (int64_t queoid, bool *exist)
+DynResourceQueueTrack getQueueTrackByQueueOID (int64_t queoid)
 {
 	PAIR pair = NULL;
 	SimpArray key;
@@ -1421,26 +1416,23 @@ DynResourceQueueTrack getQueueTrackByQueueOID (int64_t queoid, bool *exist)
 	pair = getHASHTABLENode(&(PQUEMGR->QueuesIDIndex), (void *)&key);
 	if ( pair == NULL )
 	{
-		*exist = false;
 		return NULL;
 	}
-	*exist = true;
+	Assert(pair->Value != NULL);
 	return (DynResourceQueueTrack)(pair->Value);
 }
 
 DynResourceQueueTrack getQueueTrackByQueueName(char 	*quename,
-											   int 		 quenamelen,
-											   bool 	*exist)
+											   int 		 quenamelen)
 {
 	SimpString quenamestr;
 	setSimpleStringRef(&quenamestr, quename, quenamelen);
 	PAIR pair = getHASHTABLENode(&(PQUEMGR->QueuesNameIndex),
 								 (void *)(&quenamestr));
 	if ( pair == NULL ) {
-		*exist = false;
 		return NULL;
 	}
-	*exist = true;
+	Assert(pair->Value != NULL);
 	return (DynResourceQueueTrack)(pair->Value);
 }
 
@@ -1681,10 +1673,9 @@ void removeResourceQueueRatio(DynResourceQueueTrack track)
 void generateQueueReport( int queid, char *buff, int buffsize )
 {
 	DynResourceQueue 	  que 		= NULL;
-	bool 			 	  exist 	= false;
-	DynResourceQueueTrack quetrack 	= getQueueTrackByQueueOID(queid, &exist);
+	DynResourceQueueTrack quetrack 	= getQueueTrackByQueueOID(queid);
 
-	Assert( exist && quetrack != NULL );
+	Assert( quetrack != NULL );
 	que = quetrack->QueueInfo;
 
 	if ( RESQUEUE_IS_PERCENT(que) )
@@ -1790,7 +1781,7 @@ int registerConnectionByUserID(ConnectionTrack  conntrack,
 		/* Mark the user is in use in some connections.*/
 		userinfo->isInUse++;
 		/* Get the queue, and check if the parallel limit is achieved. */
-		queuetrack = getQueueTrackByQueueOID(userinfo->QueueOID, &exist);
+		queuetrack = getQueueTrackByQueueOID(userinfo->QueueOID);
 	}
 	else
 	{
@@ -1966,7 +1957,7 @@ int acquireResourceQuotaFromResQueMgr(ConnectionTrack	conntrack,
 	Assert(exist && userinfo != NULL);
 
 	/* Get the queue, and check if the parallel limit is achieved. */
-	queuetrack = getQueueTrackByQueueOID(userinfo->QueueOID, &exist);
+	queuetrack = getQueueTrackByQueueOID(userinfo->QueueOID);
 	Assert( queuetrack != NULL );
 
 	conntrack->QueueTrack = queuetrack;
@@ -2669,8 +2660,8 @@ int parseUserAttributes( List 	 	*attributes,
 			}
 			/* The target queue must exist. */
 			queueoid64 = queueoid;
-			track = getQueueTrackByQueueOID(queueoid64, &exist);
-			if ( !exist )
+			track = getQueueTrackByQueueOID(queueoid64);
+			if ( track == NULL )
 			{
 				res = RESQUEMGR_WRONG_TARGET_QUEUE;
 				snprintf(errorbuf, errorbufsize,
@@ -2679,7 +2670,6 @@ int parseUserAttributes( List 	 	*attributes,
 				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
 			}
-			Assert(exist && track != NULL);
 
 			/* Set value. */
 			user->QueueOID = track->QueueInfo->OID;

@@ -917,9 +917,8 @@ bool handleRMRequestAcquireResourceQuota(void **arg)
 	{
 		RPCResponseHeadAcquireResourceQuotaFromRMByOIDData response;
 
-		DynResourceQueueTrack queuetrack =
-			getQueueTrackByQueueOID(reguser->QueueOID, &exist);
-		if ( exist )
+		DynResourceQueueTrack queuetrack = getQueueTrackByQueueOID(reguser->QueueOID);
+		if ( queuetrack != NULL )
 		{
 			memcpy(response.QueueName,
 				   queuetrack->QueueInfo->Name,

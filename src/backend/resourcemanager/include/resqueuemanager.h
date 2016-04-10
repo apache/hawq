@@ -406,11 +406,10 @@ void setQueueTrackIndexedByQueueName(DynResourceQueueTrack queuetrack);
 
 void removeQueueTrackIndexedByQueueName(DynResourceQueueTrack queuetrack);
 
-DynResourceQueueTrack getQueueTrackByQueueOID (int64_t queoid, bool *exist);
+DynResourceQueueTrack getQueueTrackByQueueOID (int64_t queoid);
 
 DynResourceQueueTrack getQueueTrackByQueueName(char 	*quename,
-											   int 		 quenamelen,
-											   bool		*exist);
+											   int 		 quenamelen);
 
 bool hasUserAssignedToQueue(DynResourceQueue queue);
 
