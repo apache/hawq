@@ -4714,7 +4714,7 @@ void adjustSegmentStatGRMCapacity(SegStat segstat)
 
 void adjustSegmentCapacityForNone(SegResource segres)
 {
-	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	if ( PRESPOOL->ClusterMemoryCoreRatio != 0 )
 	{
 		uint32_t oldmemorymb = 0;
 		uint32_t oldcore	 = 0;
@@ -4754,7 +4754,7 @@ void adjustSegmentCapacityForNone(SegResource segres)
 
 void adjustSegmentCapacityForGRM(SegResource segres)
 {
-	if ( PRESPOOL->ClusterMemoryCoreRatio == 0 )
+	if ( PRESPOOL->ClusterMemoryCoreRatio != 0 )
 	{
 		uint32_t oldmemorymb = 0;
 		uint32_t oldcore	 = 0;
