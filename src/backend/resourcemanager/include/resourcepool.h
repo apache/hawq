@@ -564,8 +564,6 @@ struct VSegmentCounterInternalData {
 typedef struct VSegmentCounterInternalData  VSegmentCounterInternalData;
 typedef struct VSegmentCounterInternalData *VSegmentCounterInternal;
 
-void freeVSegmentConterList(List **list);
-
 int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 										     int32_t	 minnodecount,
 										     uint32_t 	 memory,
