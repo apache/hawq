@@ -230,7 +230,7 @@ class GpPkgProgram:
             query_type, package_path = self.query
             QueryPackage(query_type, package_path).run()
         elif self.remove:
-            if self.remove.count('-') != 1:
+            if self.remove.count('-') > 3:
                 raise ExceptionNoStackTraceNeeded('Please specify the correct <name>-<version>.')
             pkg_file_list = ListFilesByPattern(GPPKG_ARCHIVE_PATH, self.remove + '-*-*' + GPPKG_EXTENSION).run() 
             if len(pkg_file_list) == 0:
