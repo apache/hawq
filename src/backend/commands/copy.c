@@ -1777,7 +1777,7 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 	int64 totalDataSize = 0;
 	bool isHashRelationExist = false;
 	int maxHashBucketNumber = 0;
-
+	int maxSegno = 0;
 	foreach (le1, candidateOids)
 	{
 		Oid				candidateOid	  = InvalidOid;
@@ -1803,6 +1803,28 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 			if (!isHashRelationExist) {
 				totalDataSize += calculate_relation_size(rel);
 			}
+
+      // calculate file segno.
+      if(RelationIsAoRows(rel))
+      {
+        FileSegTotals *fstotal = GetSegFilesTotals(rel, SnapshotNow);
+        if(fstotal){
+          if(maxSegno < fstotal->totalfilesegs){
+            maxSegno = fstotal->totalfilesegs;
+          }
+          pfree(fstotal);
+        }
+      }
+      else if(RelationIsParquet(rel))
+      {
+        ParquetFileSegTotals *fstotal = GetParquetSegFilesTotals(rel, SnapshotNow);
+        if(fstotal){
+          if (maxSegno < fstotal->totalfilesegs) {
+            maxSegno = fstotal->totalfilesegs;
+          }
+          pfree(fstotal);
+        }
+      }
 		}
 		relation_close(rel, AccessShareLock);
 	}
@@ -1818,6 +1840,10 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 	/*vsegNumber should be less than GetUtilPartitionNum*/
 	if(vsegNumber > GetQueryVsegNum()){
 		vsegNumber = GetQueryVsegNum();
+	}
+	// if vsegnum bigger than maxsegno, which will lead to idle QE
+	if(vsegNumber > maxSegno && maxSegno > 0){
+	  vsegNumber = maxSegno;
 	}
 
 	return vsegNumber;
