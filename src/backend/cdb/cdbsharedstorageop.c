@@ -156,7 +156,7 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks,
   int gp_segments_for_planner_before = gp_segments_for_planner;
 
   QueryResource *resource =
-      AllocateResource(QRL_INHERIT, 0, 0, 1, tasks->numTasks, NULL, 0);
+      AllocateResource(QRL_INHERIT, 0, 0, tasks->numTasks, 1, NULL, 0);
   DispatchDataResult result;
   dispatch_statement_node((Node *) stat, contextdisp, resource, &result);
   dispatch_free_result(&result);
