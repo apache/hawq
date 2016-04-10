@@ -73,7 +73,7 @@ clean:
 	rm -rf build
 	find . -name '*.o' -exec rm -f {} \;
 
-install:
+install: all
 	@for file in `find build/bin -type f`; \
 		do \
 			echo install $${file} into '$(DESTDIR)$(bindir)';\
