@@ -928,18 +928,21 @@ dispatcher_split_logical_tasks_for_statemet_or_node(DispatchData *data)
 static bool
 dispatcher_bind_executor(DispatchData *data)
 {
-	int		i,
-			j;
+	int		i, j;
 	struct QueryExecutor	*executor;
 	QueryExecutorIterator	iterator;
 	List		*concurrent_connect_executors = NIL;
 	ListCell	*lc;
-	bool		ret;
+	bool		ret = true;
+	bool    bindExecutorError = false;
 
 	dispmgt_init_query_executor_iterator(data->query_executor_team, &iterator);
 	for (i = 0; i < data->job.used_slices_num; i++)
 	{
 		DispatchSlice	*slice = &data->job.slices[i];
+
+		if (bindExecutorError)
+		  break;
 
 		for (j = 0; j < slice->tasks_num; j++)
 		{
@@ -963,6 +966,11 @@ dispatcher_bind_executor(DispatchData *data)
 			    concurrent_connect_executors = lappend(concurrent_connect_executors,
                                                  info);
 			    data->num_of_new_connected_executors++;
+			    if (!executormgr_bind_executor_task(data, executor, info->desc, task, slice))
+			    {
+			      bindExecutorError = true;
+			      break;
+			    }
 			  }
 			  continue;
 			}
@@ -975,8 +983,10 @@ dispatcher_bind_executor(DispatchData *data)
 											   ""); // tableName
 #endif
 
-			if (!executormgr_bind_executor_task(data, executor, desc, task, slice))
-				return false;
+			if (!executormgr_bind_executor_task(data, executor, desc, task, slice)) {
+			  bindExecutorError = true;
+			  break;
+			}
 			data->num_of_cached_executors++;
 		}
 	}
@@ -990,8 +1000,12 @@ dispatcher_bind_executor(DispatchData *data)
 	if (concurrent_connect_executors == NIL)
 		return true;
 
-	ret = dispmgt_concurrent_connect(concurrent_connect_executors,
-										gp_connections_per_thread);
+	if (!bindExecutorError) {
+	  ret = dispmgt_concurrent_connect(concurrent_connect_executors,
+	                      gp_connections_per_thread);
+	} else {
+	  ret = false;
+	}
 
 	foreach(lc, concurrent_connect_executors)
 		dispmgt_free_preconnect_info(lfirst(lc));

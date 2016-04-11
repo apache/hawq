@@ -27,7 +27,6 @@ struct DispatchData;
 struct QueryExecutorTeam;
 struct QueryExecutor;
 struct WorkerMgrState;
-struct ConcurrentConnectExecutorInfo;
 struct Segment;
 struct DispatchSlice;
 struct DispatchTask;
@@ -39,6 +38,21 @@ typedef struct QueryExecutorIterator
 	int		group_id;
 	int		executor_id;
 } QueryExecutorIterator;
+
+/*
+ * ConcurrentConnectExecutorInfo
+ *  Used to create the executor concurrently.
+ */
+typedef struct ConcurrentConnectExecutorInfo {
+  bool          is_writer;
+  bool          is_superuser;
+  struct QueryExecutor  *executor;
+  struct DispatchData   *data;
+  struct DispatchSlice  *slice;
+  struct DispatchTask   *task;
+
+  struct SegmentDatabaseDescriptor *desc;
+} ConcurrentConnectExecutorInfo;
 
 /*
  * QueryExecutorTeam/QueryExecutorGroup
