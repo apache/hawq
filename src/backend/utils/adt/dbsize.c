@@ -179,10 +179,9 @@ calculate_database_size(Oid dbOid)
 
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 
+    /* Do not error out because it would break some existing client calls*/
 	if (dbOid == HcatalogDbOid)
-		ereport(ERROR,
-			(ERRCODE_UNDEFINED_DATABASE,
-			errmsg("database hcatalog (OID 6120) is reserved")));
+		return -1;
 
 	/* User must have connect privilege for target database */
 	aclresult = pg_database_aclcheck(dbOid, GetUserId(), ACL_CONNECT);
