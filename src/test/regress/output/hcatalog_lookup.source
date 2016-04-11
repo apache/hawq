@@ -275,11 +275,19 @@ select r1.*, r2.* from hcatalog.test_schema.r r1, test_schema.r r2;
 -- negative test: partitioned tables and hcatalog
 alter table test_schema.p exchange partition p1 with table hcatalog.test_schema.r;
 ERROR:  reference to hcatalog table "hcatalog.test_schema.r" is not allowed in this context
--- negative test: cannot run pg_database_size on hcatalog
+-- negative test: return -1 as a size for hcatalog
 select pg_catalog.pg_database_size('hcatalog');
-ERROR:  database hcatalog (OID 6120) is reserved (SOMEFILE:SOMEFUNC)
+ pg_database_size 
+------------------
+               -1
+(1 row)
+
 select pg_catalog.pg_database_size(6120);
-ERROR:  database hcatalog (OID 6120) is reserved (SOMEFILE:SOMEFUNC)
+ pg_database_size 
+------------------
+               -1
+(1 row)
+
 --positive test: should be able to create table named "hcatalog"
 CREATE TABLE hcatalog(a int);
 --negative test: cannot create database named "hcatalog"
