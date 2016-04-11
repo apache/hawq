@@ -2263,7 +2263,7 @@ void refreshActualMinGRMContainerPerSeg(void)
 		foreach(cell, allsegres)
 		{
 			SegResource segres = (SegResource)(((PAIR)lfirst(cell))->Value);
-			if (IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
+			if (!IS_SEGSTAT_FTSAVAILABLE(segres->Stat))
 			{
 				continue;
 			}

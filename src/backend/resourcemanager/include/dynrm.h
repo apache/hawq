@@ -312,6 +312,8 @@ void sendResponseToClients(void);
 
 void updateStatusOfAllNodes(void);
 
+void setAllNodesGRMDown(void);
+
 /* HAWQ RM binds maximum count of different addresses to listen connections.  */
 #define HAWQRM_SERVER_PORT_COUNT				64
 

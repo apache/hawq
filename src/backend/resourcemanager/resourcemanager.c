@@ -569,6 +569,11 @@ int MainHandlerLoop(void)
 			 */
 			resetAllDeadLockDetector();
 
+			/*
+			 * Mark all segments DOWN due to no GRM cluster report
+			 */
+			setAllNodesGRMDown();
+
 			/* Move all resource broker allocated GRM containers to returned. */
 			cleanupAllGRMContainers();
 
@@ -2579,6 +2584,66 @@ void updateStatusOfAllNodes()
 	}
 
 	if ( changedstatus )
+	{
+		refreshResourceQueueCapacity(false);
+		refreshActualMinGRMContainerPerSeg();
+	}
+
+	validateResourcePoolStatus(true);
+}
+
+/*
+ * Set all nodes DOWN due to no GRM cluster report
+ */
+void setAllNodesGRMDown()
+{
+	SegResource node = NULL;
+
+	bool changedstatus = false;
+	for(uint32_t idx = 0; idx < PRESPOOL->SegmentIDCounter; idx++)
+	{
+		node = getSegResource(idx);
+		Assert(node != NULL);
+		uint8_t oldStatus = node->Stat->FTSAvailable;
+		uint32_t oldDesc  = node->Stat->StatusDesc;
+
+		if (oldStatus == RESOURCE_SEG_STATUS_AVAILABLE)
+		{
+			/*
+			 * This call makes resource manager able to adjust queue and mem/core
+			 * trackers' capacity.
+			 */
+			setSegResHAWQAvailability(node, RESOURCE_SEG_STATUS_UNAVAILABLE);
+			/*
+			 * This call makes resource pool remove unused containers.
+			 */
+			returnAllGRMResourceFromSegment(node);
+			changedstatus = true;
+		}
+
+		node->Stat->StatusDesc |= SEG_STATUS_NO_GRM_NODE_REPORT;
+		if (Gp_role != GP_ROLE_UTILITY && oldDesc != node->Stat->StatusDesc)
+		{
+			SimpStringPtr description = build_segment_status_description(node->Stat);
+			update_segment_status(idx + REGISTRATION_ORDER_OFFSET,
+									SEGMENT_STATUS_DOWN,
+									(description->Len > 0)?description->Str:"");
+			add_segment_history_row(idx + REGISTRATION_ORDER_OFFSET,
+									GET_SEGRESOURCE_HOSTNAME(node),
+									(description->Len > 0)?description->Str:"");
+
+			freeSimpleStringContent(description);
+			rm_pfree(PCONTEXT, description);
+		}
+
+		if (oldDesc != node->Stat->StatusDesc)
+		{
+			elog(WARNING, "Resource manager sets host %s DOWN in cleanup phase for resource broker error.",
+						  GET_SEGRESOURCE_HOSTNAME(node));
+		}
+	}
+
+	if (changedstatus)
 	{
 		refreshResourceQueueCapacity(false);
 		refreshActualMinGRMContainerPerSeg();
