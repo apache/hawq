@@ -434,6 +434,7 @@ class HawqInit:
             scpcmd = "scp %s/etc/_mgmt_config %s:%s/etc/_mgmt_config > /dev/null" % (self.GPHOME, host, self.GPHOME)
             local_ssh(scpcmd)
             work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+        logger.info("Total segment number is: %s" % len(self.host_list))
         work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'init', 0, self.quiet)})
         node_init = HawqCommands(name='HAWQ', action_name = 'init', logger = logger)
         node_init.get_function_list(work_list)
@@ -708,11 +709,12 @@ class HawqStart:
         work_list = []
         for host in working_hosts:
             work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+        logger.info("Total segment number is: %s" % len(self.host_list))
         work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'start', len(bad_hosts), self.quiet)})
         node_init = HawqCommands(name = 'HAWQ', action_name = 'start', logger = logger)
         node_init.get_function_list(work_list)
         node_init.start()
-        logger.info("Total threads return value is : %d" % node_init.return_flag)
+        logger.debug("Total threads return value is : %d" % node_init.return_flag)
         if node_init.return_flag != 0:
             logger.error("Segments start failed")
         else:
@@ -756,6 +758,7 @@ class HawqStop:
         self.dburl = None
         self.conn = None
         self._get_config()
+        self.ignore_bad_hosts = opts.ignore_bad_hosts
 
     def _get_config(self):
         check_items = ('hawq_master_address_host', 'hawq_master_address_port',
@@ -916,13 +919,13 @@ class HawqStop:
             logger.info("Cluster stopped successfully")
         return cluster_result
 
-    def _running_segments_list(self):
+    def _running_segments_list(self, host_list):
         work_list = []
         running_host = []
         stopped_host = []
         seg_check_q = Queue.Queue()
 
-        for host in self.host_list:
+        for host in host_list:
             work_list.append({"func":check_hawq_running,"args":(host, self.segment_data_directory, self.segment_port, self.user, logger)})
 
         node_checks = threads_with_return(name = 'HAWQ', action_name = 'check', logger = logger, return_values = seg_check_q)
@@ -939,25 +942,47 @@ class HawqStop:
 
 
     def _stopAllSegments(self):
-        running_host, stopped_host = self._running_segments_list()
+        bad_hosts = []
+        working_hosts = self.host_list
         segment_cmd_str = self._stop_segment_cmd()
-        # Execute segment stop command on each nodes.
         logger.info("Stop segments in list: %s" % self.host_list)
-        work_list = []
-        self.running_segment_num = len(running_host)
-        q = Queue.Queue()
-        for host in running_host:
-            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
 
-        work_list.append({"func":check_progress,"args":(q, self.running_segment_num, 'stop', len(stopped_host), self.quiet)})
+        working_hosts, bad_hosts = exclude_bad_hosts(self.host_list)
+        if len(bad_hosts) == len(self.host_list):
+            logger.error("Unable to SSH on any of the hosts, skipping segment stop operation")
+            return 1
+
+        process_running_host, stopped_host = self._running_segments_list(working_hosts)
+
+        # Execute segment stop command on specified nodes.
+        if self.ignore_bad_hosts:
+            if len(bad_hosts) > 0:
+                logger.warning("Skipping stop segments in the list {0}, SSH test failed".format(bad_hosts))
+            skip_host_list = bad_hosts + stopped_host
+        else:
+            skip_host_list = stopped_host
+
+        work_list = []
+        q = Queue.Queue()
+        for host in process_running_host:
+            work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
+        logger.info("Total segment number is: %s" % len(self.host_list))
+        work_list.append({"func":check_progress,"args":(q, len(process_running_host), 'stop', len(skip_host_list), self.quiet)})
         node_init = HawqCommands(name = 'HAWQ', action_name = 'stop', logger = logger)
         node_init.get_function_list(work_list)
         node_init.start()
-        if node_init.return_flag != 0:
+        if self.ignore_bad_hosts:
+            total_return_flag = node_init.return_flag
+        else:
+            if len(bad_hosts) > 0:
+                logger.error("%s segment stop failed, SSH test failed on %s" % (len(bad_hosts), bad_hosts))
+            total_return_flag = node_init.return_flag + len(bad_hosts)
+
+        if total_return_flag != 0:
             logger.error("Segments stop failed")
         else:
             logger.info("Segments stopped successfully")
-        return node_init.return_flag
+        return total_return_flag
 
     def run(self):
         if self.node_type == "master":
