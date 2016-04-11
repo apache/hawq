@@ -517,32 +517,6 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				goto senderr;
 			}
 
-			if (todroptrack->QueueInfo->OID == DEFAULTRESQUEUE_OID)
-			{
-				/* already check before send RPC to RM */
-				Assert(todroptrack->QueueInfo->OID != DEFAULTRESQUEUE_OID);
-				ddlres = RESQUEMGR_IN_USE;
-				snprintf(errorbuf, sizeof(errorbuf),
-						"pg_default as system queue cannot be dropped");
-				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
-							  nameattr->Val.Str,
-							  errorbuf);
-				goto senderr;
-			}
-
-			if (todroptrack->QueueInfo->OID == ROOTRESQUEUE_OID)
-			{
-				/* already check before send RPC to RM */
-				Assert(todroptrack->QueueInfo->OID != ROOTRESQUEUE_OID);
-				ddlres = RESQUEMGR_IN_USE;
-				snprintf(errorbuf, sizeof(errorbuf),
-						"pg_root as system queue cannot be dropped.");
-				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
-							  nameattr->Val.Str,
-							  errorbuf);
-				goto senderr;
-			}
-
 			res = updateResqueueCatalog(request->ManipulateAction,
 									    todroptrack,
 										rsqattr);
