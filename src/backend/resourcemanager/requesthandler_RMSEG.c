@@ -450,10 +450,10 @@ bool handleRMIncreaseMemoryQuota(void **arg)
 								   conntrack->MessageMark2,
 								   RESPONSE_RM_INCREASE_MEMORY_QUOTA);
 
-		elog(ERROR, "Resource enforcer fails to increase memory quota to: ",
-		            "total memory quota = "INT64_FORMAT" MB, "
-		            "delta memory quota = "INT64_FORMAT" MB",
-		            memquotatotal, memquotadelta);
+		elog(WARNING, "Resource enforcer fails to increase memory quota to: ",
+		              "total memory quota = "INT64_FORMAT" MB, "
+		              "delta memory quota = "INT64_FORMAT" MB",
+					  memquotatotal, memquotadelta);
 	}
 
 	conntrack->ResponseSent = false;
@@ -538,10 +538,10 @@ bool handleRMDecreaseMemoryQuota(void **arg)
 								   conntrack->MessageMark2,
 								   RESPONSE_RM_DECREASE_MEMORY_QUOTA);
 
-		elog(ERROR, "Resource enforcer fails to decrease memory quota to: ",
-		            "total memory quota = "INT64_FORMAT" MB, "
-		            "delta memory quota = "INT64_FORMAT" MB",
-		            memquotatotal, memquotadelta);
+		elog(WARNING, "Resource enforcer fails to decrease memory quota to: ",
+		              "total memory quota = "INT64_FORMAT" MB, "
+		              "delta memory quota = "INT64_FORMAT" MB",
+		              memquotatotal, memquotadelta);
 	}
 
 	conntrack->ResponseSent = false;
