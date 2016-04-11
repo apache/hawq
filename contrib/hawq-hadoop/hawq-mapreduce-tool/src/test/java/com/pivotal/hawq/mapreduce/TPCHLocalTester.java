@@ -77,7 +77,7 @@ public class TPCHLocalTester extends TPCHTester {
 
 				// extract metadata
 				MRFormatTestUtils.runShellCommand(
-						String.format("gpextract -d %s -o %s %s",
+						String.format("hawq extract -d %s -o %s %s",
 									  TEST_DB_NAME, metadataFile.getPath(), tableName));
 
 				// copy data files to local

@@ -39,7 +39,7 @@ import org.apache.hadoop.util.ToolRunner;
 public class HAWQInputFormatDemo2 extends Configured implements Tool {
 
 	private static void printUsage() {
-		System.out.println("HAWQInputFormatDemo2 <gpextract_file> <output_path>");
+		System.out.println("HAWQInputFormatDemo2 <hawq_extract_file> <output_path>");
 		ToolRunner.printGenericCommandUsage(System.out);
 	}
 

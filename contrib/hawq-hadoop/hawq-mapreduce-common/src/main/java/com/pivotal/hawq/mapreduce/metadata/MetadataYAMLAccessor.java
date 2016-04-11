@@ -37,7 +37,7 @@ import java.util.Map;
 
 /**
  * Accessor for reading metadata from a YAML formatted file,
- * which was generated using gpextract utility.
+ * which was generated using hawq extract utility.
  */
 class MetadataYAMLAccessor extends MetadataAccessor {
 	private HAWQTableFormat tableFormat;

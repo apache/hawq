@@ -18,7 +18,7 @@
 # under the License.
 
 '''
-gpextract [options] tablename
+hawq extract [options] tablename
 
 Options:
     -h hostname: host to connect to
@@ -30,7 +30,7 @@ Options:
     -v: verbose
     -?: help 
 
-gpextract output YAML file format:
+hawq extract output YAML file format:
 
 Version: string (xxx.xxx.xxx)
 DBVersion: string
