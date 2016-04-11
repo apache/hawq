@@ -62,11 +62,28 @@ typedef struct QueryExecutorGroupIterator
 	int		group_id;
 } QueryExecutorGroupIterator;
 
+/*
+ * ConcurrentConnectExecutorInfo
+ *	Used to create the executor concurrently.
+ */
+typedef struct ConcurrentConnectExecutorInfo {
+	bool					is_writer;
+	bool					is_superuser;
+	struct QueryExecutor	*executor;
+	struct DispatchData		*data;
+	struct DispatchSlice	*slice;
+	struct DispatchTask		*task;
+
+	struct SegmentDatabaseDescriptor *desc;
+} ConcurrentConnectExecutorInfo;
+
+
 /* Iterate all of groups. */
 static void	dispmgt_init_query_executor_group_iterator(QueryExecutorTeam *team,
 							QueryExecutorGroupIterator *iterator);
 static QueryExecutorGroup *dispmgt_get_query_executor_group_iterator(
 							QueryExecutorGroupIterator *iterator);
+static bool dispmgt_bind_executor_task(List *executors);
 
 
 
@@ -537,7 +554,7 @@ dispmgt_concurrent_connect(List	*executors, int executors_num_per_thread)
 	dispmgt_free_concurrent_connect_state(tasks);
 	workermgr_free_workermgr_state(state);
 
-	return true;
+	return dispmgt_bind_executor_task(executors);
 }
 
 ConcurrentConnectExecutorInfo *
@@ -567,4 +584,29 @@ dispmgt_free_preconnect_info(ConcurrentConnectExecutorInfo *info)
 	pfree(info);
 }
 
+/*
+ * dispmgt_bind_executor_task
+ */
+static bool
+dispmgt_bind_executor_task(List *executors)
+{
+	ListCell	*lc;
+	bool		has_error = false;
+
+	foreach(lc, executors)
+	{
+		ConcurrentConnectExecutorInfo	*info = lfirst(lc);
+
+		if (has_error)
+		{
+			executormgr_free_executor(info->desc);
+			continue;
+		}
+
+		if (!executormgr_bind_executor_task(info->data, info->executor, info->desc, info->task, info->slice))
+			has_error = true;
+	}
+
+	return !has_error;
+}
 
