@@ -1362,8 +1362,11 @@ ExecutorEnd(QueryDesc *queryDesc)
 	{
 	  /* Cleanup the global resource reference for spi/function resource inheritate. */
     if (Gp_role == GP_ROLE_DISPATCH) {
+      // we need to free resource in old memory-context.
+      MemoryContextSwitchTo(oldcontext);
       AutoFreeResource(queryDesc->resource);
       queryDesc->resource = NULL;
+      oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
     }
 
 		/*
@@ -1388,8 +1391,11 @@ ExecutorEnd(QueryDesc *queryDesc)
 
 	/* Cleanup the global resource reference for spi/function resource inheritate. */
 	if ( Gp_role == GP_ROLE_DISPATCH ) {
+	  // we need to free resource in old memory-context.
+	  MemoryContextSwitchTo(oldcontext);
 		AutoFreeResource(queryDesc->resource);
 		queryDesc->resource = NULL;
+		oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
 	}
 
 	/*
