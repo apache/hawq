@@ -1360,6 +1360,12 @@ ExecutorEnd(QueryDesc *queryDesc)
 	}
 	PG_CATCH();
 	{
+	  /* Cleanup the global resource reference for spi/function resource inheritate. */
+    if (Gp_role == GP_ROLE_DISPATCH) {
+      AutoFreeResource(queryDesc->resource);
+      queryDesc->resource = NULL;
+    }
+
 		/*
 		 * we got an error. do all the necessary cleanup.
 		 */
@@ -1376,11 +1382,6 @@ ExecutorEnd(QueryDesc *queryDesc)
 		 */
 		FreeExecutorState(estate);
 
-		/* Cleanup the global resource reference for spi/function resource inheritate. */
-		if (Gp_role == GP_ROLE_DISPATCH) {
-		  AutoFreeResource(queryDesc->resource);
-		  queryDesc->resource = NULL;
-		}
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
