@@ -204,7 +204,7 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 			/* Set the host down. */
 			elog(WARNING, "Resource manager sets host %s from up to down "
 					  	  "due to not getting valid RUAlive response.",
-					  GET_SEGRESOURCE_HOSTNAME(segres));
+						  GET_SEGRESOURCE_HOSTNAME(segres));
 
 			refreshResourceQueueCapacity(false);
 			refreshActualMinGRMContainerPerSeg();
