@@ -151,6 +151,20 @@ class hdfs:
             return "============= HDFS ==========================\n" + output
 
 
+class hawq:
+    def __init__(self):
+        self.site_config = dict()
+        self.errormsg = None
+
+    def __str__(self):
+        if self.errormsg:
+            return "============= HAWQ ERROR ====================\n" + self.errormsg
+        else:
+            output  = "HAWQ checks \n" 
+            output += "\n".join(["%s = %s" % (k, self.site_config[k]) for k in sorted(self.site_config.iterkeys())])
+            return "============= HAWQ ==========================\n" + output
+
+
 class diskusage_entry:
     def __init__(self, fs, size, used, avail, used_percent, mount):
         self.fs = fs
@@ -336,6 +350,7 @@ class GenericLinuxOutputData:
         self.uname = None
         self.machine = None
         self.hdfs = None
+        self.hawq = None
         self.diskusage = None
         self.sysctl = None
         self.limitsconf = None
@@ -346,7 +361,7 @@ class GenericLinuxOutputData:
 
     def __str__(self):
         applied_checks = filter(lambda x: x is not None,
-                                [ self.uname, self.machine, self.hdfs, self.diskusage, self.sysctl,
+                                [ self.uname, self.machine, self.hdfs, self.hawq, self.diskusage, self.sysctl,
                                   self.limitsconf, self.mounts, self.ioschedulers, self.blockdev, self.ntp ])
         return "\n".join(map(str, applied_checks))
 

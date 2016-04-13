@@ -40,12 +40,11 @@ hard.nproc  = 131072
 diskusage.monitor.mounts = /
 diskusage.monitor.usagemax = 90%
 
-[hdfs]
+[hdfs.base]
 dfs.mem.namenode.heap = 40960
 dfs.mem.datanode.heap = 6144
 # in hdfs-site.xml
 dfs.support.append = true
-dfs.client.enable.read.from.local = true
 dfs.block.local-path-access.user = gpadmin
 dfs.datanode.max.transfer.threads = 40960
 dfs.client.socket-timeout = 300000000
@@ -54,5 +53,48 @@ dfs.namenode.handler.count = 60
 ipc.server.handler.queue.size = 3300
 dfs.datanode.handler.count = 60
 ipc.client.connection.maxidletime = 3600000
-dfs.namenode.accesstime.precision = -1
+dfs.namenode.accesstime.precision = 0
+dfs.client.read.shortcircuit = true
 
+[hdfs.non]
+dfs.block.access.token.enable = FALSE
+
+[hdfs.ha]
+dfs.block.access.token.enable = FALSE
+
+[hdfs.kerberos]
+dfs.block.access.token.enable = TRUE
+dfs.datanode.data.dir.perm = 750
+
+[hdfs.ha.kerberos]
+dfs.block.access.token.enable = TRUE
+
+[yarn.base]
+yarn.resourcemanager.scheduler.class = org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler
+
+[yarn.non]
+
+[yarn.ha]
+
+[yarn.kerberos]
+hadoop.security.authentication = kerberos
+hadoop.proxyuser.yarn.groups = *
+hadoop.proxyuser.yarn.hosts = *
+hadoop.proxyuser.postgres.hosts = *
+hadoop.proxyuser.postgres.groups = *
+
+[yarn.ha.kerberos]
+hadoop.security.authentication = kerberos
+hadoop.proxyuser.yarn.groups = *
+hadoop.proxyuser.yarn.hosts = *
+hadoop.proxyuser.postgres.hosts = *
+hadoop.proxyuser.postgres.groups = *
+
+[hawq.base]
+dfs.client.read.shortcircuit = true
+
+[hawq.kerberos]
+hadoop.security.authentication = kerberos
+
+[hawq.yarn]
+hawq_global_rm_type = yarn

@@ -31,7 +31,7 @@ try:
     from gppylib.gpparseopts import OptParser, OptChecker
     from gppylib.gpcheckutil import ApplianceOutputData, GenericLinuxOutputData, GenericSolarisOutputData
     from gppylib.gpcheckutil import chkconfig, omreport, grubconf, mounts, GpMount, GpMount, inittab, ntp
-    from gppylib.gpcheckutil import securetty, ioschedulers, blockdev, bcu, rclocal, sysctl, limitsconf, limitsconf_entry, uname, connectemc, diskusage, diskusage_entry, hdfs, machine
+    from gppylib.gpcheckutil import securetty, ioschedulers, blockdev, bcu, rclocal, sysctl, limitsconf, limitsconf_entry, uname, connectemc, diskusage, diskusage_entry, hdfs, hawq,  machine
     from gppylib.gpcheckutil import solaris_etc_system, solaris_etc_project, solaris_etc_user_attr
 except ImportError, e:    
     sys.exit('Cannot import modules.  Please check that you have sourced greenplum_path.sh.  Detail: ' + str(e))
@@ -413,15 +413,53 @@ def collectCPUandMemoryInfo():
     return data
 
 
+def collectHAWQ():
+    if not options.hawq:
+        return None
+    data = hawq()
+    hawq_config_dir = os.environ.get('GPHOME')
+    if hawq_config_dir is None:
+        print "Please export GPHOME first, exit"
+        sys.exit(1)
+    hdfs_client_file = os.path.join(hawq_config_dir, "etc/hdfs-client.xml")
+    yarn_client_file = os.path.join(hawq_config_dir, "etc/yarn-client.xml")
+    hawq_site_file = os.path.join(hawq_config_dir, "etc/hawq-site.xml")
+
+    # collect HDFS site config
+    getPropName =  lambda node: node.getElementsByTagName('name')[0].childNodes[0].data
+    getPropValue = lambda node: node.getElementsByTagName('value')[0].childNodes[0].data
+    hawq_config_file_list = [hdfs_client_file, hawq_site_file]
+    if options.yarn:
+        hawq_config_file_list.append(yarn_client_file)
+    for filename in hawq_config_file_list:
+        try:
+            with open(filename) as f:
+                xmldoc = minidom.parse(f)
+            for node in xmldoc.getElementsByTagName('property'):
+                try:
+                    data.site_config[getPropName(node)] = getPropValue(node).strip()
+                except IndexError:
+                    pass # the <value> tag may be empty, which causes IndexError in getPropValue
+
+        except Exception, e:
+            data.errormsg = "Failed to read HAWQ config file '%s': %s" % (filename, e)
+
+    return data
+
+
 def collectHDFS():
     if not options.hadoop:
         return None
     data = hdfs()
+    hawq_config_dir = os.environ.get('GPHOME')
+    if hawq_config_dir is None:
+        print "Please export GPHOME first, exit"
+        sys.exit(1)
     hadoop_config_file = os.path.join(options.hadoop, "libexec/hadoop-config.sh")
     hadoop_env_file = os.path.join(options.hadoop, "etc/hadoop/hadoop-env.sh")
     hdfs_site_file = os.path.join(options.hadoop, "etc/hadoop/hdfs-site.xml")
+    yarn_site_file = os.path.join(options.hadoop, "etc/hadoop/yarn-site.xml")
     core_site_file = os.path.join(options.hadoop, "etc/hadoop/core-site.xml")
-    libhdfs3_site_file = os.environ.get("LIBHDFS3_CONF")
 
     # collect java heap size config
     p = subprocess.Popen(". %s; echo $JAVA_HEAP_MAX" % hadoop_config_file, shell = True,
@@ -457,7 +495,10 @@ def collectHDFS():
     # collect HDFS site config
     getPropName =  lambda node: node.getElementsByTagName('name')[0].childNodes[0].data
     getPropValue = lambda node: node.getElementsByTagName('value')[0].childNodes[0].data
-    for filename in (hdfs_site_file, core_site_file, libhdfs3_site_file):
+    hdfs_config_file_list = [hdfs_site_file, core_site_file]
+    if options.yarn:
+        hdfs_config_file_list.append(yarn_site_file)
+    for filename in hdfs_config_file_list:
         try:
             with open(filename) as f:
                 xmldoc = minidom.parse(f)
@@ -804,6 +845,7 @@ def processGenericLinuxServer():
     output = GenericLinuxOutputData()
 
     output.hdfs = collectHDFS()
+    output.hawq = collectHAWQ()
     output.uname = collectUname()
     output.machine = collectCPUandMemoryInfo()
     output.diskusage = collectDiskUsage()
@@ -844,6 +886,8 @@ def parseargs():
     parser.remove_option('-h')
     parser.add_option('-h', '-?', '--help', action='store_true')
     parser.add_option('--hadoop', type='string')
+    parser.add_option('--hawq', action='store_true')
+    parser.add_option('--yarn', action='store_true')
     parser.add_option('--sysctl', type='string')
     parser.add_option('--appliance',  action='store_true')
     parser.add_option('--linux',  action='store_true')

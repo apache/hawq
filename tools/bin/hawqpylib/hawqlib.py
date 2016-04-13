@@ -131,6 +131,24 @@ def check_property_exist_xml(xml_file, property_name):
     return property_exist, property_name, property_value
 
 
+def get_xml_values(xmlfile):
+    xml_dict = {}
+    with open(xmlfile) as f:
+        xmldoc = minidom.parse(f)
+
+    for node in xmldoc.getElementsByTagName('property'):
+        name = node.getElementsByTagName('name')[0].childNodes[0].data.encode('ascii')
+
+        try:
+            value = node.getElementsByTagName('value')[0].childNodes[0].data.encode('ascii')
+        except:
+            value = None
+
+        xml_dict[name] = value
+
+    return xml_dict
+
+
 class HawqXMLParser:
     def __init__(self, GPHOME):
         self.GPHOME = GPHOME
