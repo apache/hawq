@@ -1386,6 +1386,7 @@ void *generateResourceRefreshHeartBeat(void *arg)
 	static char messagetail[8]  = {'M' ,'S' ,'G' ,'E' ,'N' ,'D' ,'S' ,'!' };
 
 	int fd = -1;
+	int sleepTimes = 0;
 
 	HeartBeatThreadArg tharg = arg;
 	Assert(arg != NULL);
@@ -1402,162 +1403,171 @@ void *generateResourceRefreshHeartBeat(void *arg)
 
 	while( ResourceHeartBeatRunning )
 	{
-		resetSelfMaintainBuffer(&sendbuffer);
-		resetSelfMaintainBuffer(&contbuffer);
-		bool sendcontent = false;
+#define SLEEP_TIME (0.1) // in seconds
+		// the following check is used to avoid sleeping too long time
+		// without checking ResourceHeartBeatRunning
+		if (sleepTimes * SLEEP_TIME < rm_session_lease_heartbeat_interval) {
+			pg_usleep(SLEEP_TIME * 1000000L);
+			sleepTimes++;
+		} else {
+			sleepTimes = 0;
 
-		/* Lock to access array of resource sets */
-		pthread_mutex_lock(&ResourceSetsMutex);
+			resetSelfMaintainBuffer(&sendbuffer);
+			resetSelfMaintainBuffer(&contbuffer);
+			bool sendcontent = false;
 
-		RPCRequestHeadRefreshResourceHeartBeatData request;
-		request.ConnIDCount = QD2RM_ResourceSetCount;
-		request.Reserved    = 0;
-		appendSMBVar(&contbuffer, request);
+			/* Lock to access array of resource sets */
+			pthread_mutex_lock(&ResourceSetsMutex);
 
-		/* Get all current in-use resource set IDs and build into request. */
-	    for ( int i = 0 ; i < QD2RM_ResourceSetSize ; ++i ) {
-	        if ( QD2RM_ResourceSets[i] == NULL ||
-	        	 QD2RM_ResourceSets[i]->QD_Conn_ID == INVALID_CONNID )
-	        {
-	        	continue;
-	        }
-	        appendSMBVar(&contbuffer, QD2RM_ResourceSets[i]->QD_Conn_ID);
-	        sendcontent = true;
-	    }
-		/* Unlock */
-		pthread_mutex_unlock(&ResourceSetsMutex);
+			RPCRequestHeadRefreshResourceHeartBeatData request;
+			request.ConnIDCount = QD2RM_ResourceSetCount;
+			request.Reserved    = 0;
+			appendSMBVar(&contbuffer, request);
 
-		/* Build final request content and send out. */
-		appendSelfMaintainBufferTill64bitAligned(&contbuffer);
-
-		if ( sendcontent )
-		{
-			/* Connect to server only when necessary. */
-			if ( fd < 0 )
-			{
-				/* Connect to resource manager server. */
-				struct sockaddr_in server_addr;
-				fd = socket(AF_INET, SOCK_STREAM, 0);
-				if ( fd < 0 )
+			/* Get all current in-use resource set IDs and build into request. */
+			for ( int i = 0 ; i < QD2RM_ResourceSetSize ; ++i ) {
+				if ( QD2RM_ResourceSets[i] == NULL ||
+					 QD2RM_ResourceSets[i]->QD_Conn_ID == INVALID_CONNID )
 				{
-					write_log("ERROR generateResourceRefreshHeartBeat failed to open "
-							  "socket (errno %d)", errno);
-					break;
-				}
-				memset(&server_addr, 0, sizeof(server_addr));
-				server_addr.sin_family = AF_INET;
-				memcpy(&(server_addr.sin_addr.s_addr),
-					   tharg->HostAddrs[0],
-					   tharg->HostAddrLength);
-				server_addr.sin_port = htons(rm_master_port);
-
-				int sockres = 0;
-				while(true)
-				{
-					int on;
-					sockres = connect(fd,
-									  (struct sockaddr *)&server_addr,
-									  sizeof(server_addr));
-					if (sockres < 0)
-					{
-						if (errno == EINTR)
-						{
-							continue;
-						}
-						else
-						{
-							write_log("ERROR generateResourceRefreshHeartBeat "
-									  "failed to connect to resource manager, "
-									  "fd %d (errno %d)", fd, errno);
-							close(fd);
-							fd = -1;
-						}
-					}
-#ifdef	TCP_NODELAY
-					on = 1;
-					if (sockres == 0 &&
-						setsockopt(fd,
-								   IPPROTO_TCP, TCP_NODELAY,
-								   (char *) &on, sizeof(on)) < 0)
-					{
-						write_log("ERROR setsockopt(TCP_NODELAY) failed: %m");
-						close(fd);
-						fd = -1;
-						sockres = -1;
-					}
-#endif
-					on = 1;
-					if (sockres == 0 &&
-						setsockopt(fd,
-								   SOL_SOCKET, SO_KEEPALIVE,
-								   (char *) &on, sizeof(on)) < 0)
-					{
-						write_log("ERROR setsockopt(SO_KEEPALIVE) failed: %m");
-						close(fd);
-						fd = -1;
-						sockres = -1;
-					}
-
-					break;
-				}
-
-				if ( sockres < 0 )
-				{
-					pg_usleep(1000000L);
 					continue;
 				}
-
+				appendSMBVar(&contbuffer, QD2RM_ResourceSets[i]->QD_Conn_ID);
+				sendcontent = true;
 			}
+			/* Unlock */
+			pthread_mutex_unlock(&ResourceSetsMutex);
 
-			RMMessageHead phead = (RMMessageHead)messagehead;
-			RMMessageTail ptail = (RMMessageTail)messagetail;
-			phead->Mark1       = 0;
-			phead->Mark2       = 0;
-			phead->MessageID   = REQUEST_QD_REFRESH_RESOURCE;
-			phead->MessageSize = contbuffer.Cursor + 1;
+			/* Build final request content and send out. */
+			appendSelfMaintainBufferTill64bitAligned(&contbuffer);
 
-			appendSelfMaintainBuffer(&sendbuffer, (char *)phead, sizeof(*phead));
-			appendSelfMaintainBuffer(&sendbuffer,
-									 SMBUFF_CONTENT(&contbuffer),
-									 getSMBContentSize(&contbuffer));
-			appendSelfMaintainBuffer(&sendbuffer, (char *)ptail, sizeof(*ptail));
-
-			if ( sendWithRetry(fd,
-							   SMBUFF_CONTENT(&sendbuffer),
-							   getSMBContentSize(&sendbuffer),
-							   false) == FUNC_RETURN_OK)
+			if ( sendcontent )
 			{
-				RPCResponseRefreshResourceHeartBeatData response;
-				/* Do not care response at all. */
-				char recvbuf[sizeof(messagehead) +
-							 sizeof(messagetail) +
-							 sizeof(response)];
-
-				if ( recvWithRetry(fd,
-							       recvbuf,
-								   sizeof(recvbuf),
-								   false) != FUNC_RETURN_OK)
+				/* Connect to server only when necessary. */
+				if ( fd < 0 )
 				{
-					write_log("ERROR generateResourceRefreshHeartBeat recv error "
+					/* Connect to resource manager server. */
+					struct sockaddr_in server_addr;
+					fd = socket(AF_INET, SOCK_STREAM, 0);
+					if ( fd < 0 )
+					{
+						write_log("ERROR generateResourceRefreshHeartBeat failed to open "
+								  "socket (errno %d)", errno);
+						break;
+					}
+					memset(&server_addr, 0, sizeof(server_addr));
+					server_addr.sin_family = AF_INET;
+					memcpy(&(server_addr.sin_addr.s_addr),
+						   tharg->HostAddrs[0],
+						   tharg->HostAddrLength);
+					server_addr.sin_port = htons(rm_master_port);
+
+					int sockres = 0;
+					while(true)
+					{
+						int on;
+						sockres = connect(fd,
+										  (struct sockaddr *)&server_addr,
+										  sizeof(server_addr));
+						if (sockres < 0)
+						{
+							if (errno == EINTR)
+							{
+								continue;
+							}
+							else
+							{
+								write_log("ERROR generateResourceRefreshHeartBeat "
+										  "failed to connect to resource manager, "
+										  "fd %d (errno %d)", fd, errno);
+								close(fd);
+								fd = -1;
+							}
+						}
+	#ifdef	TCP_NODELAY
+						on = 1;
+						if (sockres == 0 &&
+							setsockopt(fd,
+									   IPPROTO_TCP, TCP_NODELAY,
+									   (char *) &on, sizeof(on)) < 0)
+						{
+							write_log("ERROR setsockopt(TCP_NODELAY) failed: %m");
+							close(fd);
+							fd = -1;
+							sockres = -1;
+						}
+	#endif
+						on = 1;
+						if (sockres == 0 &&
+							setsockopt(fd,
+									   SOL_SOCKET, SO_KEEPALIVE,
+									   (char *) &on, sizeof(on)) < 0)
+						{
+							write_log("ERROR setsockopt(SO_KEEPALIVE) failed: %m");
+							close(fd);
+							fd = -1;
+							sockres = -1;
+						}
+
+						break;
+					}
+
+					if ( sockres < 0 )
+					{
+						pg_usleep(1000000L);
+						continue;
+					}
+
+				}
+
+				RMMessageHead phead = (RMMessageHead)messagehead;
+				RMMessageTail ptail = (RMMessageTail)messagetail;
+				phead->Mark1       = 0;
+				phead->Mark2       = 0;
+				phead->MessageID   = REQUEST_QD_REFRESH_RESOURCE;
+				phead->MessageSize = contbuffer.Cursor + 1;
+
+				appendSelfMaintainBuffer(&sendbuffer, (char *)phead, sizeof(*phead));
+				appendSelfMaintainBuffer(&sendbuffer,
+										 SMBUFF_CONTENT(&contbuffer),
+										 getSMBContentSize(&contbuffer));
+				appendSelfMaintainBuffer(&sendbuffer, (char *)ptail, sizeof(*ptail));
+
+				if ( sendWithRetry(fd,
+								   SMBUFF_CONTENT(&sendbuffer),
+								   getSMBContentSize(&sendbuffer),
+								   false) == FUNC_RETURN_OK)
+				{
+					RPCResponseRefreshResourceHeartBeatData response;
+					/* Do not care response at all. */
+					char recvbuf[sizeof(messagehead) +
+								 sizeof(messagetail) +
+								 sizeof(response)];
+
+					if ( recvWithRetry(fd,
+									   recvbuf,
+									   sizeof(recvbuf),
+									   false) != FUNC_RETURN_OK)
+					{
+						write_log("ERROR generateResourceRefreshHeartBeat recv error "
+								  "(errno %d)", errno);
+						close(fd);
+						fd = -1;
+					}
+				}
+				else
+				{
+					write_log("ERROR generateResourceRefreshHeartBeat send error "
 							  "(errno %d)", errno);
 					close(fd);
 					fd = -1;
 				}
-			}
-			else
-			{
-				write_log("ERROR generateResourceRefreshHeartBeat send error "
-						  "(errno %d)", errno);
-				close(fd);
-				fd = -1;
-			}
 
-			if ( log_min_messages <= DEBUG3 )
-			{
-				write_log("generateResourceRefreshHeartBeat sent heart-beat.");
+				if ( log_min_messages <= DEBUG3 )
+				{
+					write_log("generateResourceRefreshHeartBeat sent heart-beat.");
+				}
 			}
 		}
-		pg_usleep(rm_session_lease_heartbeat_interval * 1000000L);
 	}
 
 	destroySelfMaintainBuffer(&sendbuffer);
