@@ -1302,6 +1302,7 @@ ExecutorEnd(QueryDesc *queryDesc)
 {
 	EState	   *estate;
 	MemoryContext oldcontext;
+	MemoryContext tmpcontext;
 
 	/* sanity checks */
 	Assert(queryDesc != NULL);
@@ -1360,14 +1361,14 @@ ExecutorEnd(QueryDesc *queryDesc)
 	}
 	PG_CATCH();
 	{
-	  /* Cleanup the global resource reference for spi/function resource inheritate. */
-    if (Gp_role == GP_ROLE_DISPATCH) {
-      // we need to free resource in old memory-context.
-      MemoryContextSwitchTo(oldcontext);
-      AutoFreeResource(queryDesc->resource);
-      queryDesc->resource = NULL;
-      oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
-    }
+		/* Cleanup the global resource reference for spi/function resource inheritate. */
+		if (Gp_role == GP_ROLE_DISPATCH) {
+			/* we need to free resource in old memory-context. */
+			tmpcontext = MemoryContextSwitchTo(oldcontext);
+			AutoFreeResource(queryDesc->resource);
+			queryDesc->resource = NULL;
+			oldcontext = MemoryContextSwitchTo(tmpcontext);
+		}
 
 		/*
 		 * we got an error. do all the necessary cleanup.
@@ -1391,11 +1392,11 @@ ExecutorEnd(QueryDesc *queryDesc)
 
 	/* Cleanup the global resource reference for spi/function resource inheritate. */
 	if ( Gp_role == GP_ROLE_DISPATCH ) {
-	  // we need to free resource in old memory-context.
-	  MemoryContextSwitchTo(oldcontext);
+		/* we need to free resource in old memory-context. */
+		tmpcontext = MemoryContextSwitchTo(oldcontext);
 		AutoFreeResource(queryDesc->resource);
 		queryDesc->resource = NULL;
-		oldcontext = MemoryContextSwitchTo(estate->es_query_cxt);
+		oldcontext = MemoryContextSwitchTo(tmpcontext);
 	}
 
 	/*
