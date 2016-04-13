@@ -3031,6 +3031,9 @@ prepareDfsAddressForDispatch(QueryContextInfo* cxt)
 	if (!enable_secure_filesystem)
 		return;
 	const char *namespace = cxt->sharedPath;
+	/*
+	 * Need to account for '\0' when dispatching length
+	 */
 	int size = strlen(namespace) + 1;
 	StringInfoData buffer;
 	initStringInfo(&buffer);
