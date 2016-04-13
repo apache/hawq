@@ -691,7 +691,7 @@ int registerAsyncConnectionFileDesc(const char				*address,
 							   methods,
 							   userdata,
 							   newcommbuffer);
-		goto exit;
+		return res;
 	}
 
 	/* Create socket FD */
@@ -725,27 +725,30 @@ int registerAsyncConnectionFileDesc(const char				*address,
 		if ( setConnectionLongTermNoDelay(fd) != FUNC_RETURN_OK )
 		{
 			close(fd);
-			res = UTIL_NETWORK_FAIL_CONNECT;
-			goto exit;
+			return UTIL_NETWORK_FAIL_CONNECT;
 		}
 		/*
 		 * New connection is created. Suppose domain socket and local socket
 		 * connection can be done now. Register a normal client FD in poll() to
 		 * perform content sending and receiving.
 		 */
-		res = registerFileDesc(fd,
-							   actionmask,
-							   methods,
-							   userdata,
-							   newcommbuffer);
-
-		/* Assign connection address. */
-		assignFileDescClientAddressInfo(*newcommbuffer,
-										address,
-										port,
-										&server_addr,
-										sizeof(server_addr));
-		goto exit;
+		res = registerFileDesc(fd, actionmask, methods, userdata, newcommbuffer);
+		if ( res == FUNC_RETURN_OK )
+		{
+			/* Assign connection address. */
+			assignFileDescClientAddressInfo(*newcommbuffer,
+											address,
+											port,
+											&server_addr,
+											sizeof(server_addr));
+		}
+		else
+		{
+			write_log("registerAsyncCommectionFileDesc failed registering fd %d.",
+					  fd);
+			close(fd);
+			res = UTIL_NETWORK_FAIL_CONNECT;
+		}
 	}
 	else if ( sockres < 0 && errno == EINPROGRESS )
 	{
@@ -758,27 +761,32 @@ int registerAsyncConnectionFileDesc(const char				*address,
 										   methods,
 										   userdata,
 										   newcommbuffer);
-
-		/* Assign connection address. */
-		assignFileDescClientAddressInfo(*newcommbuffer,
-										address,
-										port,
-										&server_addr,
-										sizeof(server_addr));
-
-		goto exit;
+		if ( res == FUNC_RETURN_OK )
+		{
+			/* Assign connection address. */
+			assignFileDescClientAddressInfo(*newcommbuffer,
+											address,
+											port,
+											&server_addr,
+											sizeof(server_addr));
+		}
+		else
+		{
+			write_log("registerAsyncCommectionFileDesc failed registering fd %d.",
+					  fd);
+			close(fd);
+			res = UTIL_NETWORK_FAIL_CONNECT;
+		}
 	}
 	else
 	{
 		/* Fail to build connection. */
-		 write_log("registerAsyncConnectionFileDesc connect socket failed, "
-				   "fd %d (errno %d)",
-				   fd,
-				   errno);
-		 close(fd);
-		 res = UTIL_NETWORK_FAIL_CONNECT;
+		write_log("registerAsyncConnectionFileDesc connect socket failed, "
+				  "fd %d (errno %d)",
+				  fd,
+				  errno);
+		close(fd);
+		res = UTIL_NETWORK_FAIL_CONNECT;
 	}
-
-exit:
 	return res;
 }
