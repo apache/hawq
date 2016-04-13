@@ -83,7 +83,7 @@ TEST_F(TestApplicationMaster,TestRegisterApplicationMaster){
 	EXPECT_EQ(it->getAcl(), "acl");
 }
 
-TEST_F(TestApplicationMaster,TestAllocate){
+TEST_F(TestApplicationMaster,DISABLED_TestAllocate){
 	Resource resource;
 	resource.setMemory(1024*8*10);
 	resource.setVirtualCores(1*8*10);
