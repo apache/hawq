@@ -463,7 +463,7 @@ extern int	Gp_interconnect_timer_period;
 extern int	Gp_interconnect_timer_checking_period;
 extern int	Gp_interconnect_default_rtt;
 extern int	Gp_interconnect_min_rto;
-extern int  Gp_interconnect_transmit_timeout;
+extern int64  Gp_interconnect_transmit_timeout;
 extern int	Gp_interconnect_min_retries_before_timeout;
 
 /* UDP recv buf size in KB.  For testing */

@@ -148,7 +148,7 @@ int			Gp_interconnect_timer_checking_period=20;
 int			Gp_interconnect_default_rtt=20;
 int			Gp_interconnect_min_rto=20;
 int			Gp_interconnect_fc_method=INTERCONNECT_FC_METHOD_LOSS;
-int			Gp_interconnect_transmit_timeout=3600;
+int64		Gp_interconnect_transmit_timeout=3600;
 int			Gp_interconnect_min_retries_before_timeout=100;
 
 int			Gp_interconnect_hash_multiplier=2;	/* sets the size of the hash table used by the UDP-IC */
