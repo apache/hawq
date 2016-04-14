@@ -305,6 +305,7 @@ cdbexplain_localExecStats(struct PlanState                 *planstate,
     ctx.send.notebuf = &showstatctx->extratextbuf;
 
     /* Set up a temporary StatHdr for both collecting and depositing stats. */
+    gethostname(ctx.send.hdr.hostname,SEGMENT_IDENTITY_NAME_LENGTH-1);
     ctx.msgptrs[0] = &ctx.send.hdr;
     ctx.send.hdr.segindex = GetQEIndex();
     ctx.send.hdr.nInst = 1;
@@ -921,7 +922,7 @@ cdbexplain_depStatAcc_upd(CdbExplain_DepStatAcc    *acc,
         acc->nsimax = nsi;
     }
 
-    if (acc->max_total < nsi->total)
+    if (acc->max_total <= nsi->total)
     {
 		acc->rshLast = rsh;
 		acc->rsiLast = rsi;
@@ -1424,7 +1425,7 @@ cdbexplain_formatSegNoParenthesis(char *outbuf, int bufsize, int segindex, int n
 	Assert(outbuf != NULL &&  "CDBEXPLAIN: char buffer is null");
 	Assert(bufsize > 0 &&  "CDBEXPLAIN: size of char buffer is zero");
 
-    if ( nInst > 1 && segindex >= 0){
+    if ( nInst >= 0 && segindex >= -1){
     	/*check if truncation occurs */
 #ifdef USE_ASSERT_CHECKING
     	int nchars_written =
@@ -1564,7 +1565,7 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
         case T_BitmapIndexScanState:
             s_row = "";
             s_rows = "";
-            if (ns->ntuples.vcnt > 1){
+            if (ns->ntuples.vcnt >= 0){
                 appendStringInfo(str,
                                  "Bitmaps out:  Avg %.1f x %d workers."
                                  "  Max/Last(%s/%s) %.0f/%.0f rows",
@@ -1574,15 +1575,9 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
 								ns->ntuples.vmax,ns->ntuples.vlast);
                 containMaxRowAndLast = true;
             }
-            else
-                appendStringInfo(str,
-                                 "Bitmaps out:  %s%.0f%s",
-								 noRowRequested,
-                                 ns->ntuples.vmax,
-								 segbufWithParenthese);
             break;
         case T_HashState:
-            if (ns->ntuples.vcnt > 1){
+            if (ns->ntuples.vcnt >= 0){
                 appendStringInfo(str,
                                  "Rows in:  Avg %.1f rows x %d workers."
                                  "  Max/Last(%s/%s) %.0f/%.0f rows",
@@ -1592,15 +1587,9 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
 								ns->ntuples.vmax,ns->ntuples.vlast);
                 containMaxRowAndLast = true;
             }
-            else
-                appendStringInfo(str,
-                                 "Rows in:  %s%.0f rows%s",
-								 noRowRequested,
-                                 ns->ntuples.vmax,
-								segbufWithParenthese);
             break;
         case T_MotionState:
-            if (ns->ntuples.vcnt > 1){
+            if (ns->ntuples.vcnt >= 0){
                 appendStringInfo(str,
                                  "Rows out:  Avg %.1f rows x %d workers"
                                  " at destination.  Max/Last(%s/%s) %.0f/%.0f rows",
@@ -1610,15 +1599,9 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
 								ns->ntuples.vmax,ns->ntuples.vlast);
                 containMaxRowAndLast = true;
             }
-            else
-                appendStringInfo(str,
-                                 "Rows out:  %s%.0f rows at destination%s",
-								 noRowRequested,
-                                 ns->ntuples.vmax,
-								segbufWithParenthese);
             break;
         default:
-            if (ns->ntuples.vcnt > 1){
+            if (ns->ntuples.vcnt >= 0){
                 appendStringInfo(str,
                                  "Rows out:  Avg %.1f rows x %d workers."
                                  "  Max/Last(%s/%s) %.0f/%.0f rows",
@@ -1628,12 +1611,6 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
                                  ns->ntuples.vmax,ns->ntuples.vlast);
                 containMaxRowAndLast = true;
             }
-            else
-                appendStringInfo(str,
-                                 "Rows out:  %s%.0f rows%s",
-								 noRowRequested,
-                                 ns->ntuples.vmax,
-								segbufWithParenthese);
     }
 
     if( containMaxRowAndLast ){

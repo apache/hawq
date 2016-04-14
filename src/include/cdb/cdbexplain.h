@@ -74,12 +74,22 @@ cdbexplain_agg_init1(CdbExplain_Agg *agg, double v, int id)
 static inline bool
 cdbexplain_agg_upd(CdbExplain_Agg *agg, double v, int id,char* hostname)
 {
-    if (v > 0)
+    if(v == 0){
+      if (agg->vcnt == 0)
+        {
+            agg->vmax = v;
+            agg->imax = id;
+            if(hostname!=NULL)
+                strncpy(agg->hostnamemax, hostname,SEGMENT_IDENTITY_NAME_LENGTH-1);
+            return true;
+        }
+    }
+    else if (v > 0)
     {
         agg->vsum += v;
         agg->vcnt++;
 
-        if (v > agg->vmax ||
+        if (v >= agg->vmax ||
             agg->vcnt == 0)
         {
             agg->vmax = v;
