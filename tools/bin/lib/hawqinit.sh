@@ -206,7 +206,7 @@ update_master_pg_hba(){
     # ${ECHO} "[INFO]:-Setting local host access"
     ${ECHO} "host     all         $USER         127.0.0.1/28    trust" >> ${hawq_data_directory}/${PG_HBA}
     get_master_ipv6_addresses
-    MASTER_HBA_IP_ADDRESS=(`${ECHO} ${master_ip_address_all[@]} ${MASTER_IPV6_LOCAL_ADDRESS_ALL[@]} ${standby_ip_address_all[@]}|tr ' ' '\n'|sort -u|tr '\n' ' '`)
+    MASTER_HBA_IP_ADDRESS=(`${ECHO} ${master_ip_address_all[@]} ${MASTER_IPV6_LOCAL_ADDRESS_ALL[@]}|tr ' ' '\n'|sort -u|tr '\n' ' '`)
     for ip_address in ${MASTER_HBA_IP_ADDRESS[@]}; do
         CIDR_MASTER_IP=$(GET_CIDRADDR ${ip_address})
         CHK_COUNT=`${GREP} -c ${CIDR_MASTER_IP} ${hawq_data_directory}/${PG_HBA}`
@@ -220,7 +220,23 @@ update_master_pg_hba(){
 
 update_standby_pg_hba(){
     # Updatepg_hba.conf for standby master.
-    ${ECHO} "host  all     all    0.0.0.0/0       trust" >> ${hawq_data_directory}/${PG_HBA}
+    STANDBY_HBA_IP_ADDRESSES=(`${ECHO} ${standby_ip_address_all[@]}|tr ' ' '\n'|sort -u|tr '\n' ' '`)
+    for ip_address in ${STANDBY_HBA_IP_ADDRESSES[@]}; do
+        CIDR_MASTER_IP=$(GET_CIDRADDR ${ip_address})
+        CHK_COUNT=`${GREP} -c ${CIDR_MASTER_IP} ${master_data_directory}/${PG_HBA}`
+        if [ "$CHK_COUNT" -eq "0" ];then
+            ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${master_host_name} \
+                      "${ECHO} \"host  all     ${USER}    ${CIDR_MASTER_IP}       trust\" >> ${master_data_directory}/${PG_HBA}"
+            ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${standby_host_name} \
+                      "${ECHO} \"host  all     ${USER}    ${CIDR_MASTER_IP}       trust\" >> ${master_data_directory}/${PG_HBA}"
+        fi
+
+        for segment_host_name in `cat ${GPHOME}/etc/slaves`; do
+            ${SSH} -o 'StrictHostKeyChecking no' ${hawqUser}@${segment_host_name} \
+                      "if [ -e ${segment_data_directory}/${PG_HBA} ]; then ${ECHO} \"host  all     all    ${CIDR_MASTER_IP}       trust\" >> ${segment_data_directory}/${PG_HBA}; fi"
+        done
+
+    done
 }
 
 update_segment_pg_hba(){
@@ -238,7 +254,7 @@ update_segment_pg_hba(){
         CIDR_MASTER_IP=$(GET_CIDRADDR ${ip_address})
         CHK_COUNT=`${GREP} -c ${CIDR_MASTER_IP} ${hawq_data_directory}/${PG_HBA}`
         if [ "$CHK_COUNT" -eq "0" ];then
-            ${ECHO} "host  all     ${USER} ${CIDR_MASTER_IP}       trust" >> ${hawq_data_directory}/${PG_HBA}
+            ${ECHO} "host  all     ${USER}     ${CIDR_MASTER_IP}       trust" >> ${hawq_data_directory}/${PG_HBA}
         fi
     done
 }
@@ -351,6 +367,9 @@ standby_init() {
         LOG_MSG "[FATAL]:-Sync master files to standby failed" verbose
         exit 1
     fi
+
+    LOG_MSG "[INFO]:-Update pg_hba configuration"
+    update_standby_pg_hba
 
     ${MKDIR} -p ${master_data_directory}/pg_log | tee -a ${STANDBY_LOG_FILE}
 
