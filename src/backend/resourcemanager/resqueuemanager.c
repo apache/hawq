@@ -3846,27 +3846,34 @@ int addNewResourceToResourceManager(int32_t memorymb, double core)
 	Assert( trunc(core) == core );
 	uint32_t ratio = trunc(1.0 * memorymb / core);
 	int32_t  ratioindex = getResourceQueueRatioIndex(ratio);
-	Assert( ratioindex >= 0 );
 
-	elog(RMLOG, "addNewResourceToResourceManager (%d MB, %lf CORE) "
-			    "plus (%d MB, %lf CORE)",
-				PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
-				PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core,
-				memorymb,
-				core);
+	if ( ratioindex >= 0 )
+	{
+		elog(RMLOG, "Allocated resource for ratio %d (%d MB, %lf CORE) plus "
+					"(%d MB, %lf CORE)",
+					ratio,
+					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
+					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core,
+					memorymb,
+					core);
 
-	addResourceBundleData(&(PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated),
-						  memorymb,
-						  core);
+		addResourceBundleData(&(PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated),
+							  memorymb,
+							  core);
 
-	elog(RMLOG, "addNewResourceToResourceManager leavs (%d MB, %lf CORE)",
-			  	PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
-				PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core);
+		elog(RMLOG, "Current allocated resource for ratio %d (%d MB, %lf CORE)",
+					ratio,
+					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
+					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core);
 
-
-	/* New resource is added. Try to dispatch resource to queries. */
-	PQUEMGR->toRunQueryDispatch = true;
-	return FUNC_RETURN_OK;
+		/* New resource is added. Try to dispatch resource to queries. */
+		PQUEMGR->toRunQueryDispatch = true;
+		return FUNC_RETURN_OK;
+	}
+	else
+	{
+		return RESOURCEPOOL_NO_RATIO;
+	}
 }
 
 int minusResourceFromResourceManagerByBundle(ResourceBundle bundle)
@@ -3889,24 +3896,31 @@ int minusResourceFromResourceManager(int32_t memorymb, double core)
 	Assert( trunc(core) == core );
 	uint32_t ratio = trunc(1.0 * memorymb / core);
 	int32_t  ratioindex = getResourceQueueRatioIndex(ratio);
-	Assert( ratioindex >= 0 );
 
-	elog(RMLOG, "minusResourceFromResourceManager (%d MB, %lf CORE) "
-			    "minus (%d MB, %lf CORE)",
-				PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
-				PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core,
-				memorymb,
-				core);
+	if ( ratioindex >= 0 )
+	{
+		elog(RMLOG, "Allocated resource for ratio %d (%d MB, %lf CORE) minus "
+					"(%d MB, %lf CORE)",
+					ratio,
+					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
+					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core,
+					memorymb,
+					core);
 
-	minusResourceBundleData(&(PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated),
-						  	memorymb,
-						  	core);
+		minusResourceBundleData(&(PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated),
+								memorymb,
+								core);
 
-	elog(RMLOG, "minusResourceFromResourceManager leavs (%d MB, %lf CORE)",
-			    PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
-				PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core);
-
-	return FUNC_RETURN_OK;
+		elog(RMLOG, "Current allocated resource for ratio %d (%d MB, %lf CORE)",
+					ratio,
+					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
+					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core);
+		return FUNC_RETURN_OK;
+	}
+	else
+	{
+		return RESOURCEPOOL_NO_RATIO;
+	}
 }
 
 void returnAllocatedResourceToLeafQueue(DynResourceQueueTrack track,
