@@ -264,6 +264,23 @@ int retrieveConnectionTrack(ConnectionTrack track, int32_t connid)
 
 	Assert( oldct != NULL );
 
+	/*
+	 * If the old connection track has an active connection, close it and cut
+	 * its relation with comm buffer.
+	 */
+	if ( oldct->CommBuffer != NULL )
+	{
+		AsyncCommBuffer 				commbuffer  = oldct->CommBuffer;
+		AsyncCommMessageHandlerContext 	context 	= commbuffer->UserData;
+		elog(WARNING, "Uncompleted resource negotiation is found, force FD %d "
+					  "closed.",
+					  commbuffer->FD);
+		/* Cut the reference between connection track and rmcomm buffer. */
+		oldct->CommBuffer = NULL;
+		context->UserData = NULL;
+		forceCloseFileDesc(commbuffer);
+	}
+
 	track->ConnID   				= oldct->ConnID;
 	track->Progress 				= oldct->Progress;
 	track->QueueID  				= oldct->QueueID;
