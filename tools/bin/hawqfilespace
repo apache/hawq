@@ -67,7 +67,7 @@ try:
     from gppylib.commands import unix
     from gppylib.db import dbconn
     from gppylib.db import catalog
-    import pg            # Database interaction
+    from pygresql import pg            # Database interaction
     from gppylib.gplog import *          # Greenplum logging facility
     from getpass import getpass
     from gppylib.parseutils import line_reader, parse_fspacename, parse_dfs_url, parse_fspacesys, parse_fspacereplica, parse_gpfilespace_line, \

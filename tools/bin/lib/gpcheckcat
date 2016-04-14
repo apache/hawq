@@ -46,8 +46,8 @@ try:
     from gppylib.gplog import *
     from gppylib.gpcatalog import *
     from gppylib.commands.unix import *
-    from pgdb import DatabaseError
-    import pg
+    from pygresql.pgdb import DatabaseError
+    from pygresql import pg
 except ImportError, e:
     sys.exit('Error: unable to import module: ' + str(e))
 

@@ -27,8 +27,8 @@ try:
     from gppylib.commands.base import WorkerPool, Command, REMOTE
     from gppylib.gpcheckutil import HostType, hosttype_str
     from hawqpylib.hawqlib import remote_ssh_output
-    from pgdb import DatabaseError
-    import pg
+    from pygresql.pgdb import DatabaseError
+    from pygresql import pg
     import stat
 
 except ImportError, e:    

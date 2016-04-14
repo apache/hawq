@@ -42,7 +42,7 @@ import time
 
 from gppylib import gplog
 from gppylib import gpsubprocess
-#from pg import DB
+from pygresql.pg import DB
 
 # paramiko prints deprecation warnings which are ugly to the end-user
 import warnings

@@ -27,7 +27,7 @@ from threading import Thread
 from Queue     import Queue
 import urllib    # for passing strings across gpssh
 import shutil    # for copying
-import pg              # Database interaction
+from pygresql import pg              # Database interaction
 from gppylib.gplog import *          # Greenplum logging facility
 from gppylib.commands import base    # Greenplum layer for worker pools
 from gppylib.commands import unix    # Greenplum layer for unix interaction

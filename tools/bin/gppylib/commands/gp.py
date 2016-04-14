@@ -27,7 +27,7 @@ from gppylib.db import catalog
 from gppylib import gparray
 from base import *
 from unix import *
-import pg
+from pygresql import pg
 from gppylib import pgconf
 from gppylib.utils import writeLinesToFile, createFromSingleHostFile
 from hawqpylib.hawqlib import HawqXMLParser
