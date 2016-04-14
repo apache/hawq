@@ -1199,8 +1199,9 @@ def hawq_activate_standby(opts, hawq_dict):
     else:
         logger.info("HAWQ master is not running, skip")
 
+    ignore_bad_hosts = '--ignore-bad-hosts' if opts.ignore_bad_hosts else ''
     logger.info("Stopping all the running segments")
-    cmd = "%s; hawq stop allsegments -a -M fast -q;" % source_hawq_env
+    cmd = "%s; hawq stop allsegments -a -M fast -q %s;" % (source_hawq_env, ignore_bad_hosts)
     result = remote_ssh(cmd, old_standby_host_name, '')
     if result != 0:
         logger.error("Stop segments failed, abort")
@@ -1220,7 +1221,6 @@ def hawq_activate_standby(opts, hawq_dict):
     
     # Set current standby host name as the new master host name in configuration.
     logger.info("Update master host name in hawq-site.xml")
-    ignore_bad_hosts = '--ignore-bad-hosts' if opts.ignore_bad_hosts else ''
     cmd = "%s; hawq config -c hawq_master_address_host -v %s --skipvalidation -q %s" % (source_hawq_env, hawq_dict['hawq_standby_address_host'], ignore_bad_hosts)
     check_return_code(remote_ssh(cmd, old_standby_host_name, ''), logger, "Set hawq_master_address_host failed")
 
