@@ -69,6 +69,7 @@ class HawqInit:
         self.shared_buffers = opts.shared_buffers
         self.default_hash_table_bucket_number = opts.default_hash_table_bucket_number
         self.lock = threading.Lock()
+        self.ignore_bad_hosts = opts.ignore_bad_hosts
         self._get_config()
         self._write_config()
         self._get_ips()
@@ -296,7 +297,8 @@ class HawqInit:
             logger.info("Stop HAWQ cluster")
             cmd = "%s; hawq stop master -a -M fast -q" % source_hawq_env
             check_return_code(local_ssh(cmd, logger), logger, "Stop HAWQ master failed, exit")
-            cmd = "%s; hawq stop allsegments -a -q" % source_hawq_env
+            ignore_bad_hosts = '--ignore-bad-hosts' if self.ignore_bad_hosts else ''
+            cmd = "%s; hawq stop allsegments -a -q %s" % (source_hawq_env, ignore_bad_hosts)
             check_return_code(local_ssh(cmd, logger), logger, "Stop HAWQ segments failed, exit")
             logger.info("Start HAWQ master")
             cmd = "%s; hawq start master -m -q" % source_hawq_env
