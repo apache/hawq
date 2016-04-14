@@ -74,7 +74,7 @@ cdbexplain_agg_init1(CdbExplain_Agg *agg, double v, int id)
 static inline bool
 cdbexplain_agg_upd(CdbExplain_Agg *agg, double v, int id,char* hostname)
 {
-    /*if(v == 0){
+    if(v == 0){
       if (agg->vcnt == 0)
         {
             agg->vmax = v;
@@ -84,7 +84,7 @@ cdbexplain_agg_upd(CdbExplain_Agg *agg, double v, int id,char* hostname)
             return true;
         }
     }
-    else */if (v > 0)
+    else if (v > 0)
     {
         agg->vsum += v;
         agg->vcnt++;

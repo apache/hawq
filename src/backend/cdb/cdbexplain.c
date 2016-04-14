@@ -306,7 +306,6 @@ cdbexplain_localExecStats(struct PlanState                 *planstate,
 
     /* Set up a temporary StatHdr for both collecting and depositing stats. */
     gethostname(ctx.send.hdr.hostname,SEGMENT_IDENTITY_NAME_LENGTH-1);
-    //strncpy(ctx.send.hdr.hostname,gethostname(),SEGMENT_IDENTITY_NAME_LENGTH-1);
     ctx.msgptrs[0] = &ctx.send.hdr;
     ctx.send.hdr.segindex = GetQEIndex();
     ctx.send.hdr.nInst = 1;
