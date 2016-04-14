@@ -29,14 +29,14 @@ using std::string;
 class TestMockApplicationClientProtocol: public ::testing::Test {
 public:
 	TestMockApplicationClientProtocol(){
+		string user_name("postgres");
 		string rmHost("localhost");
 		string rmPort("8032");
 		string tokenService = "";
 		Yarn::Config config;
 		Yarn::Internal::SessionConfig sessionConfig(config);
 		Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
-		Yarn::Internal::RpcAuth rpcAuth(user, Yarn::Internal::AuthMethod::SIMPLE);
-		protocol = new MockApplicationClientProtocol(rmHost,rmPort,tokenService, sessionConfig,rpcAuth);
+		protocol = new MockApplicationClientProtocol(user_name, rmHost,rmPort,tokenService, sessionConfig);
 }
 	~TestMockApplicationClientProtocol(){
 		delete protocol;

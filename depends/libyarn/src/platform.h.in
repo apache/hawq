@@ -30,7 +30,8 @@
 #cmakedefine ENABLE_FRAME_POINTER
 #cmakedefine HAVE_SYMBOLIZE
 #cmakedefine NEED_BOOST
-
+#cmakedefine STRERROR_R_RETURN_INT
+#cmakedefine HAVE_NESTED_EXCEPTION
 // defined by gcc
 #if defined(__ELF__) && defined(OS_LINUX)
 # define HAVE_SYMBOLIZE

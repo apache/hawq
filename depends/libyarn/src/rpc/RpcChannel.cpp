@@ -248,6 +248,7 @@ void RpcChannelImpl::connect() {
     exception_ptr lastError;
     const RpcConfig & conf = key.getConf();
     const RpcServerInfo & server = key.getServer();
+    std::string buffer;
 
     for (int i = 0; i < conf.getMaxRetryOnConnect(); ++i) {
         RpcAuth auth = key.getAuth();
@@ -294,19 +295,19 @@ void RpcChannelImpl::connect() {
             lastError = current_exception();
             LOG(LOG_ERROR,
                 "Failed to setup RPC connection to \"%s:%s\" caused by:\n%s",
-                server.getHost().c_str(), server.getPort().c_str(), GetExceptionDetail(e));
+                server.getHost().c_str(), server.getPort().c_str(), GetExceptionDetail(e, buffer));
         } catch (const YarnNetworkException & e) {
             sleep = 1;
             lastError = current_exception();
             LOG(LOG_ERROR,
                 "Failed to setup RPC connection to \"%s:%s\" caused by:\n%s",
-                server.getHost().c_str(), server.getPort().c_str(), GetExceptionDetail(e));
+                server.getHost().c_str(), server.getPort().c_str(), GetExceptionDetail(e, buffer));
         } catch (const YarnTimeoutException & e) {
             sleep = 1;
             lastError = current_exception();
             LOG(LOG_ERROR,
                 "Failed to setup RPC connection to \"%s:%s\" caused by:\n%s",
-                server.getHost().c_str(), server.getPort().c_str(), GetExceptionDetail(e));
+                server.getHost().c_str(), server.getPort().c_str(), GetExceptionDetail(e, buffer));
         }
 
         if (i + 1 < conf.getMaxRetryOnConnect()) {
@@ -429,11 +430,12 @@ void RpcChannelImpl::invoke(const RpcCall & call) {
 
                 if (!retry && call.isIdempotent()) {
                     retry = true;
+                    std::string buffer;
                     LOG(LOG_ERROR,
                         "Failed to invoke RPC call \"%s\" on server \"%s:%s\": \n%s",
                         call.getName(), key.getServer().getHost().c_str(),
                         key.getServer().getPort().c_str(),
-                        GetExceptionDetail(lastError));
+                        GetExceptionDetail(lastError, buffer));
                     LOG(INFO,
                         "Retry idempotent RPC call \"%s\" on server \"%s:%s\"",
                         call.getName(), key.getServer().getHost().c_str(),
@@ -598,12 +600,13 @@ bool RpcChannelImpl::checkIdle() {
                 sendPing();
             }
         } catch (...) {
+            std::string buffer;
             LOG(LOG_ERROR,
                 "Failed to send ping via idle RPC channel to server \"%s:%s\": "
                 "\n%s",
                 key.getServer().getHost().c_str(),
                 key.getServer().getPort().c_str(),
-                GetExceptionDetail(current_exception()));
+                GetExceptionDetail(current_exception(), buffer));
             sock->close();
             return true;
         }
@@ -751,8 +754,8 @@ void RpcChannelImpl::readOneResponse(bool writeLock) {
     std::vector<char> buffer(128);
     hadoop::common::RpcResponseHeaderProto curRespHeader;
     hadoop::common::RpcResponseHeaderProto::RpcStatusProto status;
-    uint32_t totalen, headerSize = 0, bodySize = 0;
-    totalen = in->readBigEndianInt32(readTimeout);
+    uint32_t headerSize = 0, bodySize = 0;
+    in->readBigEndianInt32(readTimeout);
     /*
      * read response header
      */
