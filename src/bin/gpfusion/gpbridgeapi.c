@@ -62,7 +62,6 @@ void 	build_uri_for_write(gphadoop_context* context, PxfServer* rest_server);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
 void	add_delegation_token(PxfInputData *inputData);
 void	free_token_resources(PxfInputData *inputData);
-void free_dfs_address();
 
 /* Custom protocol entry point for read
  */
@@ -242,8 +241,6 @@ void gpbridge_import_start(PG_FUNCTION_ARGS)
 
 	/* read some bytes to make sure the connection is established */
 	churl_read_check_connectivity(context->churl_handle);
-
-	free_dfs_address();
 }
 
 void gpbridge_export_start(PG_FUNCTION_ARGS)
@@ -273,8 +270,6 @@ void gpbridge_export_start(PG_FUNCTION_ARGS)
 
 	context->churl_handle = churl_init_upload(context->uri.data,
 											  context->churl_headers);
-
-	free_dfs_address();
 }
 
 /*
@@ -536,9 +531,4 @@ void free_token_resources(PxfInputData *inputData)
 		return;
 
 	pfree(inputData->token);
-}
-
-void free_dfs_address()
-{
-	free(dfs_address);
 }
