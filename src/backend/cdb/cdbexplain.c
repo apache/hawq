@@ -1424,7 +1424,7 @@ cdbexplain_formatSegNoParenthesis(char *outbuf, int bufsize, int segindex, int n
 	Assert(outbuf != NULL &&  "CDBEXPLAIN: char buffer is null");
 	Assert(bufsize > 0 &&  "CDBEXPLAIN: size of char buffer is zero");
 
-    if ( nInst >= 0 && segindex >= 0){
+    if ( nInst > 0 && segindex >= 0){
     	/*check if truncation occurs */
 #ifdef USE_ASSERT_CHECKING
     	int nchars_written =
@@ -1564,7 +1564,7 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
         case T_BitmapIndexScanState:
             s_row = "";
             s_rows = "";
-            if (ns->ntuples.vcnt >= 0){
+            if (ns->ntuples.vcnt > 0){
                 appendStringInfo(str,
                                  "Bitmaps out:  Avg %.1f x %d workers."
                                  "  Max/Last(%s/%s) %.0f/%.0f rows",
@@ -1576,7 +1576,7 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
             }
             break;
         case T_HashState:
-            if (ns->ntuples.vcnt >= 0){
+            if (ns->ntuples.vcnt > 0){
                 appendStringInfo(str,
                                  "Rows in:  Avg %.1f rows x %d workers."
                                  "  Max/Last(%s/%s) %.0f/%.0f rows",
@@ -1588,7 +1588,7 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
             }
             break;
         case T_MotionState:
-            if (ns->ntuples.vcnt >= 0){
+            if (ns->ntuples.vcnt > 0){
                 appendStringInfo(str,
                                  "Rows out:  Avg %.1f rows x %d workers"
                                  " at destination.  Max/Last(%s/%s) %.0f/%.0f rows",
@@ -1600,7 +1600,7 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
             }
             break;
         default:
-            if (ns->ntuples.vcnt >= 0){
+            if (ns->ntuples.vcnt > 0){
                 appendStringInfo(str,
                                  "Rows out:  Avg %.1f rows x %d workers."
                                  "  Max/Last(%s/%s) %.0f/%.0f rows",
