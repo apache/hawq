@@ -2634,7 +2634,8 @@ void setAllNodesGRMDown()
 
 		if (oldDesc != node->Stat->StatusDesc)
 		{
-			elog(WARNING, "Resource manager sets host %s DOWN in cleanup phase for resource broker error.",
+			elog(WARNING, "Resource manager sets host %s down in cleanup phase "
+						  "for resource broker error.",
 						  GET_SEGRESOURCE_HOSTNAME(node));
 		}
 	}
@@ -2644,8 +2645,6 @@ void setAllNodesGRMDown()
 		refreshResourceQueueCapacity(false);
 		refreshActualMinGRMContainerPerSeg();
 	}
-
-	validateResourcePoolStatus(true);
 }
 
 /**
