@@ -787,8 +787,10 @@ RebuildNamespace(QueryContextInfo *cxt)
 	binary = palloc(len);
 	if(ReadData(cxt, binary, len, TRUE))
 	{
+		elog(DEBUG2, "************************** BINARY LENGTH %d DESERIALIZED LENGTH %d ********************", strlen(binary), len);
 		StringInfoData buffer;
 		initStringInfoOfString(&buffer, binary, len);
+		elog(DEBUG2, "************************** DESERIALIZED NAMESPACE VALUE %s *******************", buffer.data);
 		dfs_address = strdup(buffer.data);
 	} else {
 		elog(ERROR, "Couldn't rebuild Namespace");
@@ -3031,6 +3033,7 @@ prepareDfsAddressForDispatch(QueryContextInfo* cxt)
 	if (!enable_secure_filesystem)
 		return;
 	const char *namespace = cxt->sharedPath;
+	elog(DEBUG2, "*********************** MASTER SHARED PATH VALUE %s *********************", cxt->sharedPath);
 	/*
 	 * Need to account for '\0' when dispatching length
 	 */
