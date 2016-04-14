@@ -305,6 +305,8 @@ cdbexplain_localExecStats(struct PlanState                 *planstate,
     ctx.send.notebuf = &showstatctx->extratextbuf;
 
     /* Set up a temporary StatHdr for both collecting and depositing stats. */
+    gethostname(ctx.send.hdr.hostname,SEGMENT_IDENTITY_NAME_LENGTH-1);
+    //strncpy(ctx.send.hdr.hostname,gethostname(),SEGMENT_IDENTITY_NAME_LENGTH-1);
     ctx.msgptrs[0] = &ctx.send.hdr;
     ctx.send.hdr.segindex = GetQEIndex();
     ctx.send.hdr.nInst = 1;
@@ -921,7 +923,7 @@ cdbexplain_depStatAcc_upd(CdbExplain_DepStatAcc    *acc,
         acc->nsimax = nsi;
     }
 
-    if (acc->max_total < nsi->total)
+    if (acc->max_total <= nsi->total)
     {
 		acc->rshLast = rsh;
 		acc->rsiLast = rsi;
@@ -1424,7 +1426,7 @@ cdbexplain_formatSegNoParenthesis(char *outbuf, int bufsize, int segindex, int n
 	Assert(outbuf != NULL &&  "CDBEXPLAIN: char buffer is null");
 	Assert(bufsize > 0 &&  "CDBEXPLAIN: size of char buffer is zero");
 
-    if ( nInst >= 0 && segindex >= 0){
+    if ( nInst >= 0 && segindex >= -1){
     	/*check if truncation occurs */
 #ifdef USE_ASSERT_CHECKING
     	int nchars_written =
