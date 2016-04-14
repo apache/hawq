@@ -788,14 +788,13 @@ RebuildNamespace(QueryContextInfo *cxt)
 	if(ReadData(cxt, binary, len, TRUE))
 	{
 		elog(DEBUG2, "************************** BINARY LENGTH %d DESERIALIZED LENGTH %d ********************", strlen(binary), len);
-		StringInfoData buffer;
-		initStringInfoOfString(&buffer, binary, len);
 		elog(DEBUG2, "************************** DESERIALIZED NAMESPACE VALUE %s *******************", buffer.data);
-		dfs_address = strdup(buffer.data);
+		dfs_address = strdup(binary);
+		pfree(binary);
 	} else {
+		pfree(binary);
 		elog(ERROR, "Couldn't rebuild Namespace");
 	}
-	pfree(binary);
 }
 
 /*
