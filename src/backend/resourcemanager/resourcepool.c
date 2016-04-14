@@ -3210,8 +3210,6 @@ void returnAllGRMResourceFromSegment(SegResource segres)
 	GRMContainerSet ctns  = NULL;
 	uint32_t 		count = 0;
 
-	minusResourceFromResourceManagerByBundle(&(segres->Allocated));
-
 	for ( int i = 0 ; i < PQUEMGR->RatioCount ; ++i )
 	{
 		ctns = segres->ContainerSets[i];
@@ -3462,6 +3460,15 @@ void moveAllAcceptedGRMContainersToResPool(void)
 		addNewResourceToResourceManager(ctn->MemoryMB, ctn->Core);
 		removePendingResourceRequestInRootQueue(ctn->MemoryMB, ctn->Core, true);
 
+		if ( !IS_SEGSTAT_FTSAVAILABLE(ctn->Resource->Stat) )
+		{
+			elog(WARNING, "The container accepted by resource manager belongs to "
+						  "a down segment %s. Drop this container at once.",
+						  GET_SEGRESOURCE_HOSTNAME(ctn->Resource));
+			minusResourceFromResourceManager(ctn->MemoryMB, ctn->Core);
+			returnAllGRMResourceFromSegment(ctn->Resource);
+		}
+
 		counter++;
 		if ( counter >= rm_container_batch_limit )
 		{
@@ -3556,8 +3563,8 @@ void timeoutIdleGRMResourceToRB(void)
 			if ( realretcontnum > 0 )
 			{
 				/* Notify resource queue manager to minus allocated resource.*/
-				minusResourceFromReourceManager(realretcontnum * ratio,
-												realretcontnum * 1);
+				minusResourceFromResourceManager(realretcontnum * ratio,
+												 realretcontnum * 1);
 
 				elog(LOG, "Resource manager chose %d resource containers to "
 						  "return actually.",
@@ -3582,8 +3589,8 @@ void forceReturnGRMResourceToRB(void)
 	if ( realretcontnum > 0 )
 	{
 		/* Notify resource queue manager to minus allocated resource.*/
-		minusResourceFromReourceManager(realretcontnum * PQUEMGR->RatioReverseIndex[0],
-										realretcontnum * 1);
+		minusResourceFromResourceManager(realretcontnum * PQUEMGR->RatioReverseIndex[0],
+										 realretcontnum * 1);
 
 		elog(LOG, "Resource manager forced %d resource containers to "
 				  "return actually.",
@@ -3911,7 +3918,7 @@ void checkGRMContainerStatus(RB_GRMContainerStat ctnstats, int size)
 								  "it is not tracked by YARN" :
 								  "it is not treated active in YARN");
 
-					minusResourceFromReourceManager(ctn->MemoryMB, ctn->Core);
+					minusResourceFromResourceManager(ctn->MemoryMB, ctn->Core);
 
 					segreschanged = true;
 
@@ -3952,9 +3959,6 @@ void dropAllResPoolGRMContainersToToBeKicked(void)
 	for(uint32_t idx = 0; idx < PRESPOOL->SegmentIDCounter; idx++)
 	{
 	    SegResource segres = getSegResource(idx);
-
-	    /* Minus resource from resource queue resource quota. */
-	    minusResourceFromResourceManagerByBundle(&(segres->Allocated));
 		/* This call makes resource pool remove unused containers. */
 		dropAllGRMContainersFromSegment(segres);
 	}
@@ -4117,6 +4121,8 @@ void validateResourcePoolStatus(bool refquemgr)
 		return;
 	}
 
+	elog(RMLOG, "Validation original size (%d MB, %d CORE)", mem, core);
+
 	/*
 	 * If we use global resource manager to manage resource, the total capacity
 	 * might not follow the cluster memory to core ratio.
@@ -4126,7 +4132,7 @@ void validateResourcePoolStatus(bool refquemgr)
 	if ( totalallocmem > mem || totalalloccore > core )
 	{
 		elog(WARNING, "HAWQ RM Validation. Allocated too much resource in resource "
-					  "pool (%d MB, %lf CORE), maximum capacity (%d MB, %lf CORE)",
+					  "pool (%d MB, %lf CORE), maximum capacity (%d MB, %d CORE)",
 					  totalallocmem,
 					  totalalloccore,
 					  core,

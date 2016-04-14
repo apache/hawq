@@ -216,7 +216,8 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 	}
 	else
 	{
-		elog(DEBUG3, "Resource manager finds host %s still up.");
+		elog(DEBUG3, "Resource manager finds host %s still up.",
+					 GET_SEGRESOURCE_HOSTNAME(segres));
 	}
 
 	setSegResRUAlivePending(segres, false);

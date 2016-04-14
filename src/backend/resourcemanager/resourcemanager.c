@@ -2614,10 +2614,6 @@ void setAllNodesGRMDown()
 			 * trackers' capacity.
 			 */
 			setSegResHAWQAvailability(node, RESOURCE_SEG_STATUS_UNAVAILABLE);
-			/*
-			 * This call makes resource pool remove unused containers.
-			 */
-			returnAllGRMResourceFromSegment(node);
 			changedstatus = true;
 		}
 
