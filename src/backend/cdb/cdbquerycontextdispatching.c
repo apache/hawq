@@ -787,8 +787,6 @@ RebuildNamespace(QueryContextInfo *cxt)
 	binary = palloc(len);
 	if(ReadData(cxt, binary, len, TRUE))
 	{
-		elog(DEBUG2, "************************** BINARY LENGTH %d DESERIALIZED LENGTH %d ********************", strlen(binary), len);
-		elog(DEBUG2, "************************** DESERIALIZED NAMESPACE VALUE %s *******************", buffer.data);
 		dfs_address = strdup(binary);
 		pfree(binary);
 	} else {
