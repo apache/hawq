@@ -779,20 +779,24 @@ static void
 RebuildNamespace(QueryContextInfo *cxt)
 {
 
+	MemoryContext oldContext;
 	int len;
 	char buffer[4], *binary;
+	oldContext = MemoryContextSwitchTo(MessageContext);
 	ReadData(cxt, buffer, sizeof(buffer), TRUE);
 
 	len = (int) ntohl(*(uint32 *) buffer);
 	binary = palloc(len);
 	if(ReadData(cxt, binary, len, TRUE))
 	{
-		dfs_address = strdup(binary);
-		pfree(binary);
+		dfs_address = pstrdup(binary);
 	} else {
 		pfree(binary);
+		MemoryContextSwitchTo(oldContext);
 		elog(ERROR, "Couldn't rebuild Namespace");
 	}
+	pfree(binary);
+	MemoryContextSwitchTo(oldContext);
 }
 
 /*
