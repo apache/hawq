@@ -430,7 +430,7 @@ UserInfo getUserByUserName( const char *userid, int useridlen, bool *exist);
 UserInfo getUserByUserOID ( int64_t useroid, bool *exist);
 
 int addNewResourceToResourceManager(int32_t memorymb, double core);
-int minusResourceFromReourceManager(int32_t memorymb, double core);
+int minusResourceFromResourceManager(int32_t memorymb, double core);
 int addNewResourceToResourceManagerByBundle(ResourceBundle bundle);
 int minusResourceFromResourceManagerByBundle(ResourceBundle bundle);
 
