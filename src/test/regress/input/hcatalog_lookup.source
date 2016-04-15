@@ -2,15 +2,8 @@
 -- test hcatalog lookup
 -- --------------------------------------
 
--- Negative test with GUC disabled
-SET hcatalog_enable = false;
-SELECT * from hcatalog.db.t;
-
 SELECT * FROM pxf_get_item_fields('Hive', '*');
  \d hcatalog.*.*
-
--- enable GUC
-SET hcatalog_enable = true;
 
 SELECT * FROM pxf_get_item_fields('Hive', '*abc*abc*');
 \d hcatalog.*abc*.*abc*
@@ -188,8 +181,6 @@ DROP FUNCTION convert_to_internal_schema(text);
 DROP FUNCTION trigger_func();
 DROP USER newuser;
 DROP TABLE hcatalog;
--- disable GUC
-SET hcatalog_enable = false;
 
 --negative test: cannot connect to "hcatalog" database
 \connect hcatalog;

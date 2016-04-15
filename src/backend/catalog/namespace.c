@@ -245,14 +245,6 @@ RangeVarGetRelid(const RangeVar *relation, bool failOK, bool allowHcatalog)
 						relation->catalogname, relation->schemaname,
 						relation->relname)));
 		}
-		if (!hcatalog_enable)
-		{
-			ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("HCatalog querying is not enabled, query for \"%s.%s.%s\" is not allowed in this context",
-						relation->catalogname, relation->schemaname,
-						relation->relname)));
-		}
 
 		/* Pull relation metadata via the hcat proxy(pxf) only if relation doesn't exist*/
 		if(!RelationExists(relation, dboid))
