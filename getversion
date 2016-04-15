@@ -18,7 +18,7 @@
 # under the License.
 #
 
-GP_VERSION="2.0.0.0_beta"
+GP_VERSION="2.0.0.0"
 
 GP_BUILDNUMBER=dev
 if [ -f BUILD_NUMBER ] ; then
