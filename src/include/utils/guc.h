@@ -513,9 +513,6 @@ extern bool   pxf_service_singlecluster;
 extern char   *pxf_remote_service_login;
 extern char   *pxf_remote_service_secret;
 
-/* Hcatalog GUC */
-extern bool   hcatalog_enable;
-
 /* Time based authentication GUC */
 extern char  *gp_auth_time_override_str;
 

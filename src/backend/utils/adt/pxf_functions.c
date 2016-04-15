@@ -94,14 +94,6 @@ Datum pxf_get_item_fields(PG_FUNCTION_ARGS)
 	text *profile = PG_GETARG_TEXT_P(0);
 	text *pattern = PG_GETARG_TEXT_P(1);
 
-
-	if (!hcatalog_enable)
-	{
-		ereport(ERROR,
-			(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			 errmsg("HCatalog querying is not enabled")));
-	}
-
 	/* stuff done only on the first call of the function */
 	if (SRF_IS_FIRSTCALL())
 	{

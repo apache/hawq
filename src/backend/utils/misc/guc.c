@@ -623,9 +623,6 @@ bool   pxf_service_singlecluster = false;
 char   *pxf_remote_service_login = NULL;
 char   *pxf_remote_service_secret = NULL;
 
-/* HCatalog GUC */
-bool   hcatalog_enable = false;
-
 /* Time based authentication GUC */
 char  *gp_auth_time_override_str = NULL;
 
@@ -4324,16 +4321,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&pxf_service_singlecluster,
 		false, NULL, NULL
     },
-
-	{
-		{"hcatalog_enable", PGC_USERSET, EXTERNAL_TABLES,
-			gettext_noop("Enables HCatalog querying"),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&hcatalog_enable,
-		false, NULL, NULL
-	},
 
 	{
 		{"gp_disable_catalog_access_on_segment", PGC_USERSET, DEVELOPER_OPTIONS,
