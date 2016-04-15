@@ -30,6 +30,7 @@ from unix import *
 import pg
 from gppylib import pgconf
 from gppylib.utils import writeLinesToFile, createFromSingleHostFile
+from hawqpylib.hawqlib import HawqXMLParser
 
 
 logger = get_default_logger()
@@ -978,11 +979,25 @@ def get_gphome():
 
 ######
 def get_masterdatadir():
-    logger.debug("Checking if MASTER_DATA_DIRECTORY env variable is set.")
-    master_datadir = os.environ.get('MASTER_DATA_DIRECTORY')
-    if master_datadir is None:
-        raise GpError("Environment Variable MASTER_DATA_DIRECTORY not set!")
+    logger.debug("Checking if GPHOME env variable is set.")
+    HAWQ_CONFIG_DIR = os.environ.get('GPHOME')
+    if HAWQ_CONFIG_DIR is None:
+        raise GpError("Environment Variable GPHOME not set!")
+    hawq_site = HawqXMLParser(HAWQ_CONFIG_DIR)
+    master_datadir = hawq_site.get_value_from_name('hawq_master_directory').strip()
+
     return master_datadir
+
+######
+def get_master_port():
+    logger.debug("Checking if GPHOME env variable is set.")
+    HAWQ_CONFIG_DIR = os.environ.get('GPHOME')
+    if HAWQ_CONFIG_DIR is None:
+        raise GpError("Environment Variable GPHOME not set!")
+    hawq_site = HawqXMLParser(HAWQ_CONFIG_DIR)
+    master_port = hawq_site.get_value_from_name('hawq_master_address_port').strip()
+
+    return master_port
 
 ######
 def get_masterport(datadir):

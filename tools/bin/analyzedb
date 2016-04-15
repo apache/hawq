@@ -47,10 +47,9 @@ try:
 except ImportError, e:
     sys.exit('Cannot import modules.  Please check that you have sourced greenplum_path.sh.  Detail: ' + str(e))
 
-
 EXECNAME = 'analyzedb'
-ANALYZE_SQL = """psql %s -c 'analyze %s'"""
-ANALYZE_ROOT_SQL = """psql %s -c 'analyze rootpartition %s'"""
+ANALYZE_SQL = """psql %s -p %s -c 'analyze %s'"""
+ANALYZE_ROOT_SQL = """psql %s -p %s -c 'analyze rootpartition %s'"""
 STATEFILE_DIR = 'db_analyze'
 logger = gplog.get_default_logger()
 CURR_TIME = None
@@ -64,8 +63,7 @@ LEFT JOIN pg_class cl3 ON pr2.parchildrelid = cl3.oid
 WHERE pp.paristemplate = false AND pp.parrelid = cl.oid AND pr1.paroid = pp.oid AND cl2.oid = pr1.parchildrelid AND cl.relnamespace = n.oid AND cl2.relnamespace = n2.oid
 """
 
-GET_ALL_DATA_TABLES_SQL = """
-select n.nspname as schemaname, c.relname as tablename from pg_class c, pg_namespace n where
+GET_ALL_DATA_TABLES_SQL = """ select n.nspname as schemaname, c.relname as tablename from pg_class c, pg_namespace n where
 c.relnamespace = n.oid and c.relkind='r'::char and (c.relnamespace > 16384 or n.nspname = 'public' or n.nspname = 'pg_catalog') and c.oid not in (select reloid from pg_exttable)
 EXCEPT
 select distinct schemaname, tablename from (%s) AS pps1
@@ -170,7 +168,7 @@ class AnalyzeDb(Operation):
             options.masterDataDirectory = gp.get_masterdatadir()
         self.master_datadir = options.masterDataDirectory
         self.analyze_dir = STATEFILE_DIR
-        self.pg_port = self._get_pgport()
+        self.pg_port = gp.get_master_port()
         self.dbname = options.dbname
         self.schema = options.schema
         self.single_table = options.single_table
@@ -355,10 +353,10 @@ class AnalyzeDb(Operation):
             for can in ordered_candidates:
                 if can in candidates:
                     target = self._get_tablename_with_cols(can, input_col_dict)
-                    cmd = Command('analyze %s' % target, ANALYZE_SQL % (self.dbname, quote_tbl(target)))
+                    cmd = Command('analyze %s' % target, ANALYZE_SQL % (self.dbname, self.pg_port, quote_tbl(target)))
                 else: # can in root_partition_col_dict
                     target = self._get_tablename_with_cols(can, root_partition_col_dict)
-                    cmd = Command('analyze rootpartition %s' % target, ANALYZE_ROOT_SQL % (self.dbname, quote_tbl(target)))
+                    cmd = Command('analyze rootpartition %s' % target, ANALYZE_ROOT_SQL % (self.dbname, self.pg_port, quote_tbl(target)))
                 pool.addCommand(cmd)
 
             wait_count = len(ordered_candidates)
@@ -398,17 +396,6 @@ class AnalyzeDb(Operation):
                 self.conn.close()
 
         return 0
-
-    def _get_pgport(self):
-        env_pgport = os.getenv('PGPORT')
-        if not env_pgport:
-            return self._get_master_port(self.master_datadir)
-        return env_pgport
-
-    def _get_master_port(self, datadir):
-        logger.debug("Obtaining master's port from master data directory")
-        pgconf_dict = pgconf.readfile(datadir + "/postgresql.conf")
-        return pgconf_dict.int('port')
 
     def _get_input_tables(self, col_dict):
         """
