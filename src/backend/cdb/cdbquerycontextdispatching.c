@@ -779,21 +779,24 @@ static void
 RebuildNamespace(QueryContextInfo *cxt)
 {
 
+	MemoryContext oldContext;
 	int len;
 	char buffer[4], *binary;
+	oldContext = MemoryContextSwitchTo(MessageContext);
 	ReadData(cxt, buffer, sizeof(buffer), TRUE);
 
 	len = (int) ntohl(*(uint32 *) buffer);
 	binary = palloc(len);
 	if(ReadData(cxt, binary, len, TRUE))
 	{
-		StringInfoData buffer;
-		initStringInfoOfString(&buffer, binary, len);
-		dfs_address = strdup(buffer.data);
+		dfs_address = pstrdup(binary);
 	} else {
+		pfree(binary);
+		MemoryContextSwitchTo(oldContext);
 		elog(ERROR, "Couldn't rebuild Namespace");
 	}
 	pfree(binary);
+	MemoryContextSwitchTo(oldContext);
 }
 
 /*
@@ -3031,7 +3034,11 @@ prepareDfsAddressForDispatch(QueryContextInfo* cxt)
 	if (!enable_secure_filesystem)
 		return;
 	const char *namespace = cxt->sharedPath;
-	int size = strlen(namespace);
+	elog(DEBUG2, "*********************** MASTER SHARED PATH VALUE %s *********************", cxt->sharedPath);
+	/*
+	 * Need to account for '\0' when dispatching length
+	 */
+	int size = strlen(namespace) + 1;
 	StringInfoData buffer;
 	initStringInfo(&buffer);
 
