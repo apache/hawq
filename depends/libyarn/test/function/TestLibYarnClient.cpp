@@ -29,15 +29,16 @@ using namespace libyarn;
 class TestLibYarnClient: public ::testing::Test {
 public:
 	TestLibYarnClient(){
+		string user_name("postgres");
 		string rmHost("localhost");
-		string rmPort("9980");
+		string rmPort("8032");
 		string schedHost("localhost");
-		string schedPort("9981");
+		string schedPort("8030");
 		string amHost("localhost");
 		int32_t amPort = 0;
 		string am_tracking_url("url");
 		int heartbeatInterval = 1000;
-		client = new LibYarnClient(rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval);
+		client = new LibYarnClient(user_name, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url, heartbeatInterval);
 	}
 	~TestLibYarnClient(){
 	}
@@ -47,33 +48,21 @@ protected:
 
 TEST_F(TestLibYarnClient,TestLibYarn){
 	string jobName("libyarn");
-	string queue("sample_queue");
+	string queue("default");
 	string jobId("");
 	int result = client->createJob(jobName, queue,jobId);
 	EXPECT_EQ(result,0);
 
-	ResourceRequest resRequest;
-	string host("*");
-	resRequest.setResourceName(host);
-	Resource capability;
-	capability.setVirtualCores(1);
-	capability.setMemory(1024);
-	resRequest.setCapability(capability);
-	resRequest.setNumContainers(3);
-	resRequest.setRelaxLocality(true);
-	Priority priority;
-	priority.setPriority(1);
-	resRequest.setPriority(priority);
 	list<string> blackListAdditions;
 	list<string> blackListRemovals;
 	list<Container> allocatedResourcesArray;
-	result = client->allocateResources(jobId, resRequest, blackListAdditions, blackListRemovals,allocatedResourcesArray,5);
+	result = client->allocateResources(jobId, blackListAdditions, blackListRemovals,allocatedResourcesArray,5);
 	EXPECT_EQ(result,0);
 
 	int allocatedResourceArraySize = allocatedResourcesArray.size();
-	int activeContainerIds[allocatedResourceArraySize];
-	int releaseContainerIds[allocatedResourceArraySize];
-	int statusContainerIds[allocatedResourceArraySize];
+	int64_t activeContainerIds[allocatedResourceArraySize];
+	int64_t releaseContainerIds[allocatedResourceArraySize];
+	int64_t statusContainerIds[allocatedResourceArraySize];
 	int i = 0;
 	for (list<Container>::iterator it = allocatedResourcesArray.begin();it != allocatedResourcesArray.end();it++){
 		activeContainerIds[i] = it->getId().getId();
@@ -86,7 +75,7 @@ TEST_F(TestLibYarnClient,TestLibYarn){
 
 	sleep(1);
 
-	set<int> activeFailIds;
+	set<int64_t> activeFailIds;
 	result = client->getActiveFailContainerIds(activeFailIds);
 	EXPECT_EQ(result,0);
 	EXPECT_EQ(activeFailIds.size(),0);

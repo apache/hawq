@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+#include "platform.h"
 
 #include "Exception.h"
 #include "ExceptionInternal.h"
@@ -40,24 +41,18 @@ bool CheckOperationCanceled() {
 }
 
 const char * GetSystemErrorInfo(int eno) {
-    static THREAD_LOCAL char buffer[64];
     static THREAD_LOCAL char message[64];
+    char buffer[64], *pbuffer;
+    pbuffer = buffer;
+#ifdef STRERROR_R_RETURN_INT
     strerror_r(eno, buffer, sizeof(buffer));
-    snprintf(message, sizeof(message), "(errno: %d) %s", eno, buffer);
+#else
+    pbuffer = strerror_r(eno, buffer, sizeof(buffer));
+#endif
+    snprintf(message, sizeof(message), "(errno: %d) %s", eno, pbuffer);
     return message;
 }
 
-static THREAD_LOCAL std::string * MessageBuffer = NULL;
-static THREAD_LOCAL once_flag once;
-
-static void CreateMessageBuffer() {
-    MessageBuffer = new std::string;
-}
-
-static void InitMessageBuffer() {
-    call_once(once, &CreateMessageBuffer);
-    assert(MessageBuffer != NULL);
-}
 
 static void GetExceptionDetailInternal(const Yarn::YarnException & e,
                                        std::stringstream & ss, bool topLevel);
@@ -104,25 +99,25 @@ static void GetExceptionDetailInternal(const Yarn::YarnException & e,
     }
 }
 
-const char * GetExceptionDetail(const Yarn::YarnException & e) {
-    std::stringstream ss;
-    GetExceptionDetailInternal(e, ss, true);
-
-    try {
-        InitMessageBuffer();
-        *MessageBuffer = ss.str();
-    } catch (const std::bad_alloc & e) {
+const char * GetExceptionDetail(const Yarn::YarnException & e,
+                                std::string& buffer) {
+   try {
+        std::stringstream ss;
+        ss.imbue(std::locale::classic());
+        GetExceptionDetailInternal(e, ss, true);
+        buffer = ss.str();
+    } catch (const std::bad_alloc& e) {
         return "Out of memory";
     }
 
-    return MessageBuffer->c_str();
+    return buffer.c_str();
 }
 
-const char * GetExceptionDetail(const exception_ptr e) {
+const char * GetExceptionDetail(const exception_ptr e, std::string& buffer) {
     std::stringstream ss;
+    ss.imbue(std::locale::classic());
 
     try {
-        InitMessageBuffer();
         Yarn::rethrow_exception(e);
     } catch (const Yarn::YarnException & nested) {
         GetExceptionDetailInternal(nested, ss, true);
@@ -131,12 +126,12 @@ const char * GetExceptionDetail(const exception_ptr e) {
     }
 
     try {
-        *MessageBuffer = ss.str();
-    } catch (const std::bad_alloc & e) {
+        buffer = ss.str();
+    } catch (const std::bad_alloc& e) {
         return "Out of memory";
     }
 
-    return MessageBuffer->c_str();
+    return buffer.c_str();
 }
 
 static void GetExceptionMessage(const std::exception & e,
@@ -156,7 +151,7 @@ static void GetExceptionMessage(const std::exception & e,
     }
 
     try {
-    		Yarn::rethrow_if_nested(e);
+        Yarn::rethrow_if_nested(e);
     } catch (const std::exception & nested) {
         GetExceptionMessage(nested, ss, recursive + 1);
     }
@@ -164,9 +159,10 @@ static void GetExceptionMessage(const std::exception & e,
 
 const char * GetExceptionMessage(const exception_ptr e, std::string & buffer) {
     std::stringstream ss;
+    ss.imbue(std::locale::classic());
 
     try {
-    		Yarn::rethrow_exception(e);
+        Yarn::rethrow_exception(e);
     } catch (const std::bad_alloc & e) {
         return "Out of memory";
     } catch (const std::exception & e) {

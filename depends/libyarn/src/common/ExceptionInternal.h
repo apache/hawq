@@ -56,10 +56,29 @@ namespace Yarn {
 using boost::exception_ptr;
 using boost::rethrow_exception;
 using boost::current_exception;
+}
 
+#else
+#include <exception>
+#include <stdexcept>
+
+namespace Yarn {
+using std::rethrow_exception;
+using std::current_exception;
+using std::make_exception_ptr;
+using std::exception_ptr;
+}
+#endif  //  include headers
+
+#if defined(NEED_BOOST) || !defined(HAVE_NESTED_EXCEPTION)  //  define nested exception
+namespace Yarn {
+#ifdef NEED_BOOST
 class nested_exception : virtual public boost::exception {
+#else
+class nested_exception : virtual public std::exception {
+#endif
 public:
-    nested_exception() : p(boost::current_exception()) {
+    nested_exception() : p(current_exception()) {
     }
 
     nested_exception(const nested_exception & other) : p(other.p) {
@@ -73,14 +92,14 @@ public:
     virtual ~nested_exception() throw() {}
 
     void rethrow_nested() const {
-        boost::rethrow_exception(p);
+        rethrow_exception(p);
     }
 
-    boost::exception_ptr nested_ptr() const {
+    exception_ptr nested_ptr() const {
         return p;
     }
 protected:
-    boost::exception_ptr p;
+    exception_ptr p;
 };
 
 template<typename BaseType>
@@ -96,7 +115,11 @@ static inline void throw_with_nested(T const & e) {
         std::terminate();
     }
 
+#ifdef NEED_BOOST
     boost::throw_exception(ExceptionWrapper<T>(static_cast < T const & >(e)));
+#else
+    throw ExceptionWrapper<T>(static_cast < T const & >(e));
+#endif
 }
 
 template<typename T>
@@ -113,6 +136,16 @@ static inline void rethrow_if_nested(const nested_exception & e) {
     e.rethrow_nested();
 }
 
+}  // namespace Yarn
+#else  //  not boost and have nested exception
+namespace Yarn {
+using std::throw_with_nested;
+using std::rethrow_if_nested;
+}  //  namespace Yarn
+#endif  //  define nested exception
+
+#ifdef NEED_BOOST
+namespace Yarn {
 namespace Internal {
 
 
@@ -150,24 +183,13 @@ void ThrowException(bool nested, const char * f, int l,
 
     throw std::logic_error("should not reach here.");
 }
-}
 
-}
+}  //  namespace Internal
+}  //  namespace Yarn
 
 #else
 
-#include <exception>
-#include <stdexcept>
-
 namespace Yarn {
-
-using std::rethrow_exception;
-using std::current_exception;
-using std::make_exception_ptr;
-using std::throw_with_nested;
-using std::rethrow_if_nested;
-using std::exception_ptr;
-
 namespace Internal {
 
 template<typename THROWABLE>
@@ -204,8 +226,8 @@ void ThrowException(bool nested, const char * f, int l,
     throw std::logic_error("should not reach here.");
 }
 
-}
-}
+}  //  namespace Internal
+}  //  namespace Yarn
 
 #endif
 
@@ -237,7 +259,8 @@ bool CheckOperationCanceled();
  * @param e The exception which detail message to be return.
  * @return The exception's detail message.
  */
-const char * GetExceptionDetail(const Yarn::YarnException & e);
+const char * GetExceptionDetail(const Yarn::YarnException & e,
+				std::string &buffer);
 
 /**
  * Get a exception's detail message.
@@ -245,7 +268,7 @@ const char * GetExceptionDetail(const Yarn::YarnException & e);
  * @param e The exception which detail message to be return.
  * @return The exception's detail message.
  */
-const char * GetExceptionDetail(const exception_ptr e);
+const char * GetExceptionDetail(const exception_ptr e, std::string &buffer);
 
 const char * GetExceptionMessage(const exception_ptr e, std::string & buffer);
 
