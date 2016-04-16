@@ -256,8 +256,9 @@ class HawqInit:
             self.default_hash_table_bucket_number = buckets
 
         logger.info("Set default_hash_table_bucket_number as: %s" % self.default_hash_table_bucket_number)
-        cmd = "hawq config -c default_hash_table_bucket_number -v %s --skipvalidation -q > /dev/null" % \
-               self.default_hash_table_bucket_number
+        ignore_bad_hosts = '--ignore-bad-hosts' if opts.ignore_bad_hosts else ''
+        cmd = "hawq config -c default_hash_table_bucket_number -v %s --skipvalidation -q %s > /dev/null" % \
+               (self.default_hash_table_bucket_number, ignore_bad_hosts)
         result = local_ssh(cmd, logger)
         if result != 0:
             logger.error("Set default_hash_table_bucket_number failed")
