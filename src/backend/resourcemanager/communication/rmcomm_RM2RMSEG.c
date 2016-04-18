@@ -349,7 +349,7 @@ int increaseMemoryQuota(char *seghostname, GRMContainerSet containerset)
         		  "on port %d to increase memory quota.",
                   seghostname,
 				  rm_segment_port);
-        processContainersAfterIncreaseMemoryQuota(containerset, false);
+        processContainersAfterIncreaseMemoryQuota(newctns, false);
 		freeGRMContainerSet(newctns);
         rm_pfree(AsyncCommContext, context);
         return res;
