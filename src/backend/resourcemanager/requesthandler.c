@@ -266,7 +266,7 @@ bool handleRMRequestConnectionUnReg(void **arg)
 	if ( (*conntrack)->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_WAIT )
 	{
 		cancelResourceAllocRequest((*conntrack), errorbuf, false);
-		transformConnectionTrackProgress(conntrack, CONN_PP_REGISTER_DONE);
+		transformConnectionTrackProgress((*conntrack), CONN_PP_REGISTER_DONE);
 	}
 	/* If this connection has resource allocated, return the resource. */
 	else if ( (*conntrack)->Progress == CONN_PP_RESOURCE_QUEUE_ALLOC_DONE )
