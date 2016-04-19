@@ -20,7 +20,7 @@ Package Contents
 ================
 
 PXF is distributed as a set of RPMs -
-git dif
+
     pxf/
         └── rpm
             ├── pxf-service-$version.noarch.rpm
