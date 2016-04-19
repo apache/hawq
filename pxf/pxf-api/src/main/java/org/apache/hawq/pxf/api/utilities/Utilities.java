@@ -19,12 +19,12 @@ package org.apache.hawq.pxf.api.utilities;
  * under the License.
  */
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * Utilities class exposes helper method for PXF classes
@@ -53,8 +53,9 @@ public class Utilities {
         try {
             cls = Class.forName(className);
         } catch (ClassNotFoundException e) {
-            // in case the class name uses the old "com.pivotal.pxf" package
-            // name, recommend using the new package "org.apache.hawq.pxf".
+            /* In case the class name uses the older and unsupported  "com.pivotal.pxf"
+             * package name, recommend using the new package "org.apache.hawq.pxf"
+             */
             if (className.startsWith("com.pivotal.pxf")) {
                 throw new Exception(
                         "Class "
