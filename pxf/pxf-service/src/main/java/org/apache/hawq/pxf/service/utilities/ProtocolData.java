@@ -154,7 +154,7 @@ public class ProtocolData extends InputData {
      * Constructs a ProtocolData. Parses X-GP-* configuration variables.
      *
      * @param paramsMap contains all query-specific parameters from Hawq
-     * @param profile contains the profile name
+     * @param profileString contains the profile name
      */
     public ProtocolData(Map<String, String> paramsMap, String profileString) {
         requestParametersMap = paramsMap;
