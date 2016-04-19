@@ -736,6 +736,9 @@ def testHAWQconfig(host):
     if hawq is None:
         return # skip HAWQ test when hawq is None
 
+    if hdfs is None:
+        return # skip HAWQ test when hdfs is None
+
     if options.verbose:
         logger.info("-- test HAWQ config")
 
@@ -743,7 +746,9 @@ def testHAWQconfig(host):
         checkFailed(host.hostname, "collect HAWQ configuration error: %s" % hawq.errormsg)
         return
 
-    datanode_list = parse_host_list_file("%s/etc/hadoop/slaves" % HADOOP_HOME)
+    datanode_list = list()
+    if HADOOP_HOME:
+        datanode_list = parse_host_list_file("%s/etc/hadoop/slaves" % HADOOP_HOME)
     is_datanode = False
     if host.hostname in datanode_list:
         is_datanode = True
@@ -819,7 +824,7 @@ def testHAWQconfig(host):
             else:
                 checkFailed(host.hostname, "HAWQ configuration dfs.domain.socket.path: %s, does not exist on %s" % (actual_config['dfs.domain.socket.path'], host.hostname))
 
-    if 'output.replace-datanode-on-failure' in actual_config:
+    if 'output.replace-datanode-on-failure' in actual_config and len(datanode_list) > 0:
         if len(datanode_list) < 4:
             if actual_config['output.replace-datanode-on-failure'] == 'true':
                 checkFailed(host.hostname, "HAWQ configuration: output.replace-datanode-on-failure expect false, current is true")
@@ -926,7 +931,9 @@ def testHDFSConfig(host):
 
     # Check if nodemanager direcotries exists
     directory_check_list = []
-    datanode_list = parse_host_list_file("%s/etc/hadoop/slaves" % HADOOP_HOME)
+    datanode_list = list()
+    if HADOOP_HOME:
+        datanode_list = parse_host_list_file("%s/etc/hadoop/slaves" % HADOOP_HOME)
     is_datanode = False
     if host.hostname in datanode_list:
         is_datanode = True
