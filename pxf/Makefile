@@ -59,9 +59,9 @@ rpm:
 clean:
 	./gradlew clean
 
+doc:
+	./gradlew aggregateJavadoc 
+
 .PHONY: tomcat
 tomcat:
 	./gradlew tomcatRpm $(BUILD_PARAMS)
-
-doc:
-    ./gradlew aggregateJavadoc
