@@ -42,6 +42,7 @@ public class MetadataResponseFormatter {
      * Converts list of {@link Metadata} to JSON String format.
      *
      * @param metadataList list of metadata objects to convert
+     * @param path path string
      * @return JSON formatted response
      * @throws IOException if converting the data to JSON fails
      */

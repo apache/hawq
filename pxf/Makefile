@@ -39,6 +39,7 @@ help:
 	@echo	"  -  -  VENDOR=<vendor name> - add vendor name to created RPMs"
 	@echo	"  - tomcat - builds tomcat rpm from downloaded tarball"
 	@echo	"  -  -  LICENSE and VENDOR parameters can be used as well"
+	@echo	"  - doc - creates aggregate javadoc under docs"
 
 all: 
 	./gradlew clean release $(BUILD_PARAMS)
@@ -62,3 +63,5 @@ clean:
 tomcat:
 	./gradlew tomcatRpm $(BUILD_PARAMS)
 
+doc:
+    ./gradlew aggregateJavadoc

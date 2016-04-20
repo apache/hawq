@@ -37,6 +37,7 @@ buildscript {
     dependencies {
         classpath "com.netflix.nebula:gradle-ospackage-plugin:2.2.6"
         classpath "de.undercouch:gradle-download-task:2.1.0"
+        classpath 'com.netflix.nebula:gradle-aggregate-javadocs-plugin:2.2.+'
     }   
 }
 
@@ -465,3 +466,7 @@ task tomcatRpm(type: Rpm) {
 }
 
 tomcatRpm.dependsOn tomcatGet
+
+
+buildDir = '.'
+apply plugin: 'nebula-aggregate-javadocs'
