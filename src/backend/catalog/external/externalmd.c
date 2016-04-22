@@ -125,6 +125,10 @@ static PxfItem *ParsePxfItem(struct json_object *pxfMD, char* profile)
 
 		struct json_object *fieldType = json_object_object_get(jsonCol, "type");
 		pxfField->type = pstrdup(json_object_get_string(fieldType));
+
+		struct json_object *sourceFieldType = json_object_object_get(jsonCol, "sourceType");
+		pxfField->sourceType = pstrdup(json_object_get_string(sourceFieldType));
+
 		pxfField->nTypeModifiers = 0;
 		
 		elog(DEBUG1, "Parsing field %s, type %s", pxfField->name, pxfField->type);

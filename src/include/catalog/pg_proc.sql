@@ -5348,7 +5348,7 @@
 
  CREATE FUNCTION bmoptions(_text, bool) RETURNS bytea LANGUAGE internal STABLE STRICT AS 'bmoptions' WITH (OID=3011, DESCRIPTION="btree(internal)");
 
- CREATE FUNCTION pxf_get_item_fields(IN profile text, IN pattern text, OUT path text, OUT itemname text, OUT fieldname text, OUT fieldtype text) RETURNS SETOF pg_catalog.record LANGUAGE internal VOLATILE STRICT AS 'pxf_get_object_fields' WITH (OID=9996, DESCRIPTION="Returns the metadata fields of external object from PXF");
+ CREATE FUNCTION pxf_get_item_fields(IN profile text, IN pattern text, OUT path text, OUT itemname text, OUT fieldname text, OUT fieldtype text, OUT sourcefieldtype text) RETURNS SETOF pg_catalog.record LANGUAGE internal VOLATILE STRICT AS 'pxf_get_object_fields' WITH (OID=9996, DESCRIPTION="Returns the metadata fields of external object from PXF");
 
 -- raises deprecation error
  CREATE FUNCTION gp_deprecated() RETURNS void LANGUAGE internal IMMUTABLE AS 'gp_deprecated' WITH (OID=9997, DESCRIPTION="raises function deprecation error");

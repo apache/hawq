@@ -41,6 +41,9 @@ typedef struct PxfField
 	/* type name */
 	char *type;
 	
+	/*source type name */
+	char *sourceType;
+
 	/* type modifiers, e.g. max length or precision */
 	int typeModifiers[2];
 	

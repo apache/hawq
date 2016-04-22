@@ -149,10 +149,10 @@ public class HiveMetadataFetcherTest {
         assertEquals(2, resultFields.size());
         Metadata.Field field = resultFields.get(0);
         assertEquals("field1", field.getName());
-        assertEquals("text", field.getType()); // converted type
+        assertEquals("text", field.getType().getTypeName()); // converted type
         field = resultFields.get(1);
         assertEquals("field2", field.getName());
-        assertEquals("int4", field.getType());
+        assertEquals("int4", field.getType().getTypeName());
     }
 
     @Test
@@ -204,10 +204,10 @@ public class HiveMetadataFetcherTest {
             assertEquals(2, resultFields.size());
             Metadata.Field field = resultFields.get(0);
             assertEquals("field1", field.getName());
-            assertEquals("text", field.getType()); // converted type
+            assertEquals("text", field.getType().getTypeName()); // converted type
             field = resultFields.get(1);
             assertEquals("field2", field.getName());
-            assertEquals("int4", field.getType());
+            assertEquals("int4", field.getType().getTypeName());
         }
     }
 
@@ -258,10 +258,10 @@ public class HiveMetadataFetcherTest {
         assertEquals(2, resultFields.size());
         Metadata.Field field = resultFields.get(0);
         assertEquals("field1", field.getName());
-        assertEquals("text", field.getType()); // converted type
+        assertEquals("text", field.getType().getTypeName()); // converted type
         field = resultFields.get(1);
         assertEquals("field2", field.getName());
-        assertEquals("int4", field.getType());
+        assertEquals("int4", field.getType().getTypeName());
     }
 
     private void prepareConstruction() throws Exception {

@@ -10129,8 +10129,8 @@ DESCR("bitmap(internal)");
 DATA(insert OID = 3011 ( bmoptions  PGNSP PGUID 12 f f t f s 2 17 f "1009 16" _null_ _null_ _null_ bmoptions - _null_ n ));
 DESCR("btree(internal)");
 
-/* pxf_get_item_fields(text, text, OUT text, OUT text, OUT text, OUT text) => SETOF pg_catalog.record */
-DATA(insert OID = 9996 ( pxf_get_item_fields  PGNSP PGUID 12 f f t t v 2 2249 f "25 25" "{25,25,25,25,25,25}" "{i,i,o,o,o,o}" "{profile,pattern,path,itemname,fieldname,fieldtype}" pxf_get_item_fields - _null_ r ));
+/* pxf_get_item_fields(text, text, OUT text, OUT text, OUT text, OUT text, OUT text) => SETOF pg_catalog.record */
+DATA(insert OID = 9996 ( pxf_get_item_fields  PGNSP PGUID 12 f f t t v 2 2249 f "25 25" "{25,25,25,25,25,25,25}" "{i,i,o,o,o,o,o}" "{profile,pattern,path,itemname,fieldname,fieldtype,sourcefieldtype}" pxf_get_item_fields - _null_ r ));
 DESCR("Returns the metadata fields of external object from PXF");
 
 /* raises deprecation error */

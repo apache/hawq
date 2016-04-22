@@ -22,9 +22,9 @@ package org.apache.hawq.pxf.service;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+
 import java.util.List;
 
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.StreamingOutput;
 
 import org.apache.commons.logging.Log;
@@ -61,10 +61,10 @@ public class MetadataResponse implements StreamingOutput {
      * Serializes the metadata list in JSON, To be used as the result string for HAWQ.
      */
     @Override
-    public void write(OutputStream output) throws IOException,
-            WebApplicationException {
+    public void write(OutputStream output) throws IOException {
         DataOutputStream dos = new DataOutputStream(output);
         ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(org.codehaus.jackson.map.SerializationConfig.Feature.USE_ANNOTATIONS, true); // enable annotations for serialization
         mapper.setSerializationInclusion(Inclusion.NON_EMPTY); // ignore empty fields
 
         if(metadataList == null || metadataList.isEmpty()) {
