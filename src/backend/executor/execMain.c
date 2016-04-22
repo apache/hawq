@@ -4333,7 +4333,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 
 			if (!IsA(e, DefElem))
 				continue;
-			if (!IsA(e->arg, String))
+			if (!e->arg || !IsA(e->arg, String))
 				continue;
 			if (pg_strcasecmp(e->defname, "appendonly"))
 				continue;
