@@ -4307,8 +4307,10 @@ describePxfTable(const char *profile, const char *pattern, bool verbose)
 
 		/* First row for current table */
 		if (previous_itemname == NULL
+				|| strlen(previous_itemname) != strlen(itemname)
 				|| strncmp(previous_itemname, itemname,
 						strlen(previous_itemname)) != 0
+				|| strlen(previous_path) != strlen(path)
 				|| strncmp(previous_path, path,
 						strlen(previous_path)) != 0)
 		{
