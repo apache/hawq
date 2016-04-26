@@ -37,6 +37,8 @@
 #include "gpopt/init.h"
 #include "gpos/_api.h"
 
+#include "naucrates/exception.h"
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CGPOptimizer::TouchLibraryInitializers
@@ -69,7 +71,19 @@ CGPOptimizer::PplstmtOptimize
 	bool *pfUnexpectedFailure // output : set to true if optimizer unexpectedly failed to produce plan
 	)
 {
-	return COptTasks::PplstmtOptimize(pquery, pfUnexpectedFailure);
+	GPOS_TRY
+	{
+		return COptTasks::PplstmtOptimize(pquery, pfUnexpectedFailure);
+	}
+	GPOS_CATCH_EX(ex)
+	{
+		if (GPOS_MATCH_EX(ex, gpdxl::ExmaGPDB, gpdxl::ExmiGPDBError))
+		{
+		  elog(ERROR, "GPDB exception. Aborting GPORCA plan generation.");
+		}
+	}
+	GPOS_CATCH_END;
+	return NULL;
 }
 
 
