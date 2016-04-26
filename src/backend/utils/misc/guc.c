@@ -766,6 +766,7 @@ bool        optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
 int		optimizer_parts_to_force_sort_on_insert;
+int		optimizer_join_arity_for_associativity_commutativity;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -6204,6 +6205,16 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&optimizer_parts_to_force_sort_on_insert,
 		160, 0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"optimizer_join_arity_for_associativity_commutativity", PGC_USERSET, QUERY_TUNING_METHOD,
+				gettext_noop("Maximum number of children n-ary-join have without disabling commutativity and associativity transform"),
+				NULL,
+				GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_join_arity_for_associativity_commutativity,
+		INT_MAX, 0, INT_MAX, NULL, NULL
 	},
 
 	{

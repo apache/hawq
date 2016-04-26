@@ -442,6 +442,7 @@ extern bool optimizer_enable_derive_stats_all_groups;
 extern bool optimizer_explain_show_status;
 extern bool optimizer_prefer_scalar_dqa_multistage_agg;
 extern int  optimizer_parts_to_force_sort_on_insert;
+extern int  optimizer_join_arity_for_associativity_commutativity;
 
 /**
  * Enable logging of DPE match in optimizer.

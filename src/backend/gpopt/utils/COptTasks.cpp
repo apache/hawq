@@ -129,7 +129,7 @@ using namespace gpdbcost;
 #define GPOPT_ERROR_BUFFER_SIZE 10 * 1024 * 1024
 
 // definition of default AutoMemoryPool
-#define AUTO_MEM_POOL(amp) CAutoMemoryPool amp(CAutoMemoryPool::ElcExc, CMemoryPoolManager::EatMalloc, optimizer_parallel)
+#define AUTO_MEM_POOL(amp) CAutoMemoryPool amp(CAutoMemoryPool::ElcExc, CMemoryPoolManager::EatTracker, optimizer_parallel)
 
 // default id for the source system
 const CSystemId sysidDefault(IMDId::EmdidGPDB, GPOS_WSZ_STR_LENGTH("GPDB"));
@@ -557,7 +557,7 @@ COptTasks::Execute
 
 	bool abort_flag = false;
 
-	CAutoMemoryPool amp(CAutoMemoryPool::ElcNone, CMemoryPoolManager::EatMalloc, optimizer_parallel);
+	CAutoMemoryPool amp(CAutoMemoryPool::ElcNone, CMemoryPoolManager::EatTracker, optimizer_parallel);
 	IMemoryPool *pmp = amp.Pmp();
 	CHAR *err_buf = SzAllocate(pmp, GPOPT_ERROR_BUFFER_SIZE);
 
@@ -775,6 +775,7 @@ COptTasks::PoconfCreate
 
 	ULONG ulCTEInliningCutoff =  (ULONG) optimizer_cte_inlining_bound;
 	ULONG ulPartsToForceSortOnInsert =  (ULONG) optimizer_parts_to_force_sort_on_insert;
+	ULONG ulJoinArityForAssociativityCommutativity =  (ULONG) optimizer_join_arity_for_associativity_commutativity;
 
 	return GPOS_NEW(pmp) COptimizerConfig
 						(
@@ -782,7 +783,7 @@ COptTasks::PoconfCreate
 						GPOS_NEW(pmp) CStatisticsConfig(pmp, dDampingFactorFilter, dDampingFactorJoin, dDampingFactorGroupBy),
 						GPOS_NEW(pmp) CCTEConfig(ulCTEInliningCutoff),
 						pcm,
-						GPOS_NEW(pmp) CHint(ulPartsToForceSortOnInsert)
+						GPOS_NEW(pmp) CHint(ulPartsToForceSortOnInsert /* optimizer_parts_to_force_sort_on_insert */, ulJoinArityForAssociativityCommutativity)
 						);
 }
 
