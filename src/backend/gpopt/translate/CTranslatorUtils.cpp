@@ -1587,7 +1587,7 @@ CTranslatorUtils::PdrgpbsGroupBy
 
 	if (GROUPINGTYPE_CUBE == pgrcl->groupType)
 	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT(“Cube”));
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Cube"));
 	}
 
 	DrgPbs *pdrgpbs = GPOS_NEW(pmp) DrgPbs(pmp);
