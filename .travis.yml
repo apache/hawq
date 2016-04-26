@@ -38,16 +38,18 @@ install:
   - brew uninstall postgresql
 
 before_script:
-  - wget -O "/tmp/libhdfs3" "https://github.com/Pivotal-DataFabric/libhdfs3/archive/apache-rpc-9.zip"
-  - unzip -d "/tmp" "/tmp/libhdfs3"
-  - cd "/tmp/libhdfs3-apache-rpc-9"
+  - cd $TRAVIS_BUILD_DIR/depends/thirdparty/googletest
+  - mkdir build
+  - cd build
+  - cmake ..
+  - make -j2
+  - sudo make install
+  - cd $TRAVIS_BUILD_DIR/depends/libhdfs3
   - mkdir build
   - cd build
   - ../bootstrap --prefix=/usr/local/
   - make -j2
   - sudo make install
-  - cd /tmp && rm -rf /tmp/libhdfs3*
-  - cd $TRAVIS_BUILD_DIR
   - cd $TRAVIS_BUILD_DIR/depends/libyarn
   - mkdir build
   - cd build
