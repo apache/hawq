@@ -1571,7 +1571,9 @@ CTranslatorUtils::PdrgpbsGroupBy
 	}
 
 	// grouping sets
-	if (1 != gpdb::UlListLength(plGroupClause))
+	const ULONG ulGroupClause = gpdb::UlListLength(plGroupClause);
+	GPOS_ASSERT(0 < ulGroupClause);
+	if (1 < ulGroupClause)
 	{
 		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Multiple grouping sets specifications"));
 	}
@@ -1583,9 +1585,9 @@ CTranslatorUtils::PdrgpbsGroupBy
 		return PdrgpbsRollup(pmp, pgrcl, ulCols, phmululGrpColPos, pbsGrpCols);
 	}
 
-	if (GROUPINGTYPE_GROUPING_SETS != pgrcl->groupType)
+	if (GROUPINGTYPE_CUBE == pgrcl->groupType)
 	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Rollup and cube"));
+		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT(“Cube”));
 	}
 
 	DrgPbs *pdrgpbs = GPOS_NEW(pmp) DrgPbs(pmp);
@@ -1606,7 +1608,7 @@ CTranslatorUtils::PdrgpbsGroupBy
 		}
 		else if (IsA(pnodeGroupingSet, GroupingClause))
 		{
-			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Rollup and cube"));
+			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("Multiple grouping sets specifications"));
 		}
 		else
 		{
