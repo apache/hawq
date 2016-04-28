@@ -17,7 +17,7 @@ dnl Read the Autoconf manual for details.
 dnl
 m4_pattern_forbid(^PGAC_)dnl to catch undefined macros
 
-AC_INIT([HAWQ], [8.2.15], [https://issues.apache.org/jira/browse/HAWQ])
+AC_INIT([HAWQ], [8.2.15], [support@greenplum.com])
 
 AC_PREREQ(2.63)
 dnl m4_if(m4_defn([m4_PACKAGE_VERSION]), [2.63], [], [m4_fatal([Autoconf version 2.63 is required.
@@ -310,7 +310,6 @@ elif test "$GCC" = yes; then
     CFLAGS="-O0"
   else
     CFLAGS="-O3"
-  fi
 else
   # if the user selected debug mode, don't use -O
   if test "$enable_debug" != yes; then
@@ -2056,7 +2055,7 @@ fi
 AC_SUBST(vpath_build)
 
 
-AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
+AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk src/Makefile.global src/pl/pljava/src/java/Makefile.global])
 
 AC_CONFIG_LINKS([
   src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c
