@@ -121,7 +121,7 @@ public class MetadataResponseFormatterTest {
                 .append("{\"name\":\"field1\",\"type\":\"float8\",\"sourceType\":\"double\"}")
                 .append("]}]}");
 
-//        assertEquals(expected.toString(), convertResponseToString(response));
+        assertEquals(expected.toString(), convertResponseToString(response));
     }
 
     @Test

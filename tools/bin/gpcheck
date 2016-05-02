@@ -26,8 +26,10 @@ try:
     from gppylib.commands.unix import getLocalHostname, getUserName, SYSTEM
     from gppylib.commands.base import WorkerPool, Command, REMOTE
     from gppylib.gpcheckutil import HostType, hosttype_str
+    from hawqpylib.hawqlib import remote_ssh_output
     from pgdb import DatabaseError
     import pg
+    import stat
 
 except ImportError, e:    
     sys.exit('Cannot import modules.  Please check that you have sourced greenplum_path.sh.  Detail: ' + str(e))
@@ -89,15 +91,29 @@ class GpCheckConfig:
         self.hdfs_expected = { # default value for HDFS configuration
                 "dfs.mem.namenode.heap": 8192,
                 "dfs.mem.datanode.heap": 8192 }
+        self.hdfs_non_expected = {}
+        self.hdfs_ha_expected = {}
+        self.hdfs_kerberos_expected = {}
+        self.hdfs_ha_kerberos_expected = {}
+
+        self.yarn_expected = {}
+        self.yarn_non_expected = {}
+        self.yarn_ha_expected = {}
+        self.yarn_kerberos_expected = {}
+        self.yarn_ha_kerberos_expected = {}
+
+        self.hawq_expected = {}
+        self.hawq_kerberos_expected = {}
+        self.hawq_yarn_expected = {}
+
 
     def readConfigFile(self, config_file):
         parsed_list = self.parser.read(config_file)
         if len(parsed_list) != 1:
             raise GpCheckError("cannot open file!")
 
-        for required_section in ("linux.sysctl", "hdfs"):
-            if not self.parser.has_section(required_section):
-                raise GpCheckError("require section '%s'" % required_section)
+        if not self.parser.has_section("linux.sysctl"):
+            raise GpCheckError("require section 'linux.sysctl'")
 
         section = "global"
         if self.parser.has_option(section, "configfile_version"):
@@ -136,15 +152,75 @@ class GpCheckConfig:
                 raise GpCheckError("Bad config entry value '%s' for 'diskusage.monitor.usagemax': %s" %
                         (self.diskusage_usagemax, e))
 
-        section = 'hdfs'
-        for opt in self.parser.options(section):
-            self.hdfs_expected[opt] = self.parser.get(section, opt)
-        try:
-            self.hdfs_expected["dfs.mem.namenode.heap"] = int(self.hdfs_expected["dfs.mem.namenode.heap"])
-            self.hdfs_expected["dfs.mem.datanode.heap"] = int(self.hdfs_expected["dfs.mem.datanode.heap"])
-        except ValueError, e:
-            raise GpCheckError("'dfs.mem.namenode.heap' or 'dfs.mem.namenode.heap' should be a number: %s" % e)
+        if not self.parser.has_section('hdfs.base'):
+            if not self.parser.has_section("hdfs"):
+                raise GpCheckError("require section 'hdfs'")
 
+            section = 'hdfs'
+            for opt in self.parser.options(section):
+                self.hdfs_expected[opt] = self.parser.get(section, opt)
+            try:
+                self.hdfs_expected["dfs.mem.namenode.heap"] = int(self.hdfs_expected["dfs.mem.namenode.heap"])
+                self.hdfs_expected["dfs.mem.datanode.heap"] = int(self.hdfs_expected["dfs.mem.datanode.heap"])
+            except ValueError, e:
+                raise GpCheckError("'dfs.mem.namenode.heap' or 'dfs.mem.namenode.heap' should be a number: %s" % e)
+        else:
+            section = 'hdfs.base'
+            for opt in self.parser.options(section):
+                self.hdfs_expected[opt] = self.parser.get(section, opt)
+            try:
+                self.hdfs_expected["dfs.mem.namenode.heap"] = int(self.hdfs_expected["dfs.mem.namenode.heap"])
+                self.hdfs_expected["dfs.mem.datanode.heap"] = int(self.hdfs_expected["dfs.mem.datanode.heap"])
+            except ValueError, e:
+                raise GpCheckError("'dfs.mem.namenode.heap' or 'dfs.mem.namenode.heap' should be a number: %s" % e)
+
+            section = 'hdfs.non'
+            for opt in self.parser.options(section):
+                self.hdfs_non_expected[opt] = self.parser.get(section, opt)
+
+            section = 'hdfs.ha'
+            for opt in self.parser.options(section):
+                self.hdfs_ha_expected[opt] = self.parser.get(section, opt)
+
+            section = 'hdfs.kerberos'
+            for opt in self.parser.options(section):
+                self.hdfs_kerberos_expected[opt] = self.parser.get(section, opt)
+
+            section = 'hdfs.ha.kerberos'
+            for opt in self.parser.options(section):
+                self.hdfs_ha_kerberos_expected[opt] = self.parser.get(section, opt)
+
+            section = 'yarn.base'
+            for opt in self.parser.options(section):
+                self.yarn_expected[opt] = self.parser.get(section, opt)
+
+            section = 'yarn.non'
+            for opt in self.parser.options(section):
+                self.yarn_non_expected[opt] = self.parser.get(section, opt)
+
+            section = 'yarn.ha'
+            for opt in self.parser.options(section):
+                self.yarn_ha_expected[opt] = self.parser.get(section, opt)
+
+            section = 'yarn.kerberos'
+            for opt in self.parser.options(section):
+                self.yarn_kerberos_expected[opt] = self.parser.get(section, opt)
+
+            section = 'yarn.ha.kerberos'
+            for opt in self.parser.options(section):
+                self.yarn_ha_kerberos_expected[opt] = self.parser.get(section, opt)
+
+            section = 'hawq.base'
+            for opt in self.parser.options(section):
+                self.hawq_expected[opt] = self.parser.get(section, opt)
+
+            section = 'hawq.kerberos'
+            for opt in self.parser.options(section):
+                self.hawq_kerberos_expected[opt] = self.parser.get(section, opt)
+
+            section = 'hawq.yarn'
+            for opt in self.parser.options(section):
+                self.hawq_yarn_expected[opt] = self.parser.get(section, opt)
 
 ###### Global Variables #############
 logger = get_default_logger()
@@ -176,6 +252,16 @@ def checkPlatform():
         raise GpCheckError("No tests exists for this platform in gpcheck")
 
 
+def parse_host_list_file(host_file):
+    host_list = list()
+    with open(host_file) as f:
+        hosts = f.readlines()
+    for host in hosts:
+        host = host.split("#",1)[0].strip()
+        if host:
+            host_list.append(host)
+    return host_list
+
 def parseargs():
     global options, GPHOME, HADOOP_HOME, GPCHECK_CONFIG_FILE
 
@@ -188,7 +274,12 @@ def parseargs():
     parser.add_option('--zipin', type='string')
     parser.add_option('--gphome', type='string')
     # for HDFS xml and memory check
-    parser.add_option('--hadoop', type='string')
+    parser.add_option('--hadoop', '--hadoop-home', type='string')
+    parser.add_option('--hdfs', action='store_true')
+    parser.add_option('--hdfs-ha', dest="hdfs_ha", action='store_true')
+    parser.add_option('--yarn', action='store_true')
+    parser.add_option('--yarn-ha', dest="yarn_ha", action='store_true')
+    parser.add_option('--kerberos', action='store_true')
 
     parser.add_option('-c', '--config', type='string') # optional: gpcheck config file path
     parser.add_option('-f', '--file',  type='string')  # host file, for testing a list of hosts
@@ -211,6 +302,10 @@ def parseargs():
 
     if not HADOOP_HOME:
         checkFailed(None, "utility will SKIP HDFS configuration check because HADOOP_HOME is not specified in environment variable or --hadoop")
+
+    if options.yarn and not HADOOP_HOME:
+        options.yarn = False
+        checkFailed(None, "utility will SKIP YARN configuration check because HADOOP_HOME is not specified in environment variable or --hadoop")
 
     # params check
     if not options.file and not options.host and not options.zipin:
@@ -242,6 +337,7 @@ def checkFailed(host, msg):
 
 def getHDFSNamenodeHost():
     core_site_file = os.path.join(HADOOP_HOME, "etc/hadoop/core-site.xml")
+    hdfs_site_file = os.path.join(HADOOP_HOME, "etc/hadoop/hdfs-site.xml")
     logger.info("try to detect namenode from %s" % core_site_file)
 
     # for processing property xml
@@ -255,12 +351,42 @@ def getHDFSNamenodeHost():
     for node in xmldoc.getElementsByTagName('property'):
         if getPropName(node) == 'fs.default.name' or getPropName(node) == 'fs.defaultFS':
             fsurl = getPropValue(node).strip()
-            namenode_addr = re.search(r"//([^:/]*)", fsurl).group(1)
+            namenode_list_alias = re.search(r"//([^:/]*)", fsurl).group(1)
+            if_ha_disabled = re.search(".*:[0-9]+$", fsurl)
+            if if_ha_disabled:
+                namenode_addr = namenode_list_alias
+            else:
+                namenode_addr = ''
             break
 
     # run hostname command on remote to get actual hostname
     if namenode_addr == '':
-        logger.error("cannot detect namenode from %s" % core_site_file)
+        ha_namenode_list = ''
+        default_namenode_alias = ''
+        with open(hdfs_site_file) as f:
+            xmldoc = minidom.parse(f)
+        for node in xmldoc.getElementsByTagName('property'):
+            if re.search('dfs.ha.namenodes.*', getPropName(node).strip()):
+                ha_namenode_list = getPropValue(node).strip()
+                default_namenode_alias = ha_namenode_list.split(',')[0].strip()
+                break
+
+        if ha_namenode_list == '':
+            logger.error("cannot detect namenode from %s" % core_site_file)
+            raise GpCheckError("cannot detect namenode from %s" % core_site_file)
+            #sys.exit(1)
+        else:
+            with open(hdfs_site_file) as f:
+                xmldoc = minidom.parse(f)
+            for node in xmldoc.getElementsByTagName('property'):
+                namenode_rpc_address = "dfs.namenode.rpc-address.%s.%s" % (namenode_list_alias,
+                                                                           default_namenode_alias)
+                if getPropName(node) == namenode_rpc_address:
+                    default_namenode_rpc_address = getPropValue(node).strip()
+                    namenode_addr = default_namenode_rpc_address.split(':')[0].strip()
+
+    if namenode_addr == '':
+        raise GpCheckError("cannot detect namenode from %s" % core_site_file)
     else:
         cmd = Command(namenode_addr, "hostname", REMOTE, namenode_addr)
         pool.addCommand(cmd)
@@ -345,10 +471,12 @@ def runCollectionOnServers():
         else:
             raise GpCheckError("unsupported host type")
 
-        cmd = "%s/sbin/gpcheck_hostdump %s" % (GPHOME, host_type_cl)
+        cmd = "%s/sbin/gpcheck_hostdump --hawq %s" % (GPHOME, host_type_cl)
         cmd += " --sysctl %s" % ",".join(gpcheck_config.sysctl_expected.keys())
         if HADOOP_HOME:
             cmd += " --hadoop %s" % HADOOP_HOME
+        if options.yarn or options.yarn_ha:
+            cmd += " --yarn"
         return cmd
 
     try:
@@ -537,7 +665,7 @@ def testSolarisEtcUserAttr(host):
         checkFailed(host.hostname, "/etc/user_attr is missing expected line '%s'" % line)
  
 
-def testHAWQ(host):
+def testHAWQGUC(host):
     if not gpcheck_info.hawq_collected_ok:
         return
 
@@ -567,7 +695,7 @@ def testHAWQ(host):
             return
 
         # check HAWQ master's memory size
-        expected_vmemory_size = 1024
+        expected_vmemory_size = 8192
         if guc_vmemsize_master != expected_vmemory_size:
             checkFailed(host.hostname, "HAWQ master's %s GUC value is %s, expected %s" % (
                 HAWQ_GUC_MEMORY, guc_vmemsize_master, expected_vmemory_size))
@@ -582,11 +710,130 @@ def testHAWQ(host):
             logger.warning("please change the expected data node memory 'dfs.mem.datanode.heap' in gpcheck.cnf file")
             logger.warning("SKIP '%s' check" %(HAWQ_GUC_MEMORY))
             return
-        expect_vmemsize_per_segment = 1024
+        expect_vmemsize_per_segment = 8192 
         if guc_vmemsize_master != expect_vmemsize_per_segment:
             checkFailed(host.hostname, "HAWQ segment's %s GUC value on this host is %s, expected %s" % (
                 HAWQ_GUC_MEMORY, guc_vmemsize_master, expect_vmemsize_per_segment))
         
+
+def testDiskCapacity(host):
+    if options.verbose:
+        logger.info("-- test Disk Capacity")
+
+    for line in host.data.diskusage.lines:
+        if len(gpcheck_config.diskusage_mounts) == 0 or line.mount in gpcheck_config.diskusage_mounts:
+            actual_usage = int(line.used_percent[:-1])
+            if actual_usage > gpcheck_config.diskusage_usagemax:
+                checkFailed(host.hostname,
+                           "potential disk full risk: %s mounted on %s has used %s space" % (
+                               line.fs, line.mount, line.used_percent))
+    return
+
+
+def testHAWQconfig(host):
+    hawq = host.data.hawq
+    hdfs = host.data.hdfs
+    if hawq is None:
+        return # skip HAWQ test when hawq is None
+
+    if hdfs is None:
+        return # skip HAWQ test when hdfs is None
+
+    if options.verbose:
+        logger.info("-- test HAWQ config")
+
+    if hawq.errormsg:
+        checkFailed(host.hostname, "collect HAWQ configuration error: %s" % hawq.errormsg)
+        return
+
+    datanode_list = list()
+    if HADOOP_HOME:
+        datanode_list = parse_host_list_file("%s/etc/hadoop/slaves" % HADOOP_HOME)
+    is_datanode = False
+    if host.hostname in datanode_list:
+        is_datanode = True
+
+    expect_config = gpcheck_config.hawq_expected
+
+    if options.kerberos:
+        expect_config.update(gpcheck_config.hawq_kerberos_expected)
+
+    if options.yarn or options.yarn_ha:
+        expect_config.update(gpcheck_config.hawq_yarn_expected)
+
+    actual_config = hawq.site_config
+    hdfs_actual_config = hdfs.site_config
+
+    for exp_key, exp_val in expect_config.items():
+        if exp_key not in actual_config:
+            checkFailed(host.hostname, "HAWQ configuration missing: '%s' needs to be set to '%s'" % (exp_key, exp_val))
+
+        else:
+            actual_val = actual_config[exp_key]
+            et = (exp_key, exp_val, actual_val)
+
+            if exp_key == "dfs.block.local-path-access.user":
+                if exp_val not in actual_val.split(','):
+                    checkFailed(host.hostname, "HDFS configuration: '%s' should include user '%s', actual value is '%s'" % et)
+            elif exp_key == "dfs.namenode.handler.count":
+                if int(exp_val) > int(actual_val):
+                    checkFailed(host.hostname, "HDFS configuration: '%s' should be at least '%s', actual value is '%s'" % et)
+            else:
+                if exp_val != actual_val:
+                    checkFailed(host.hostname, "HAWQ configuration: expected '%s' for '%s', actual value is '%s'" % et)
+
+    if not options.kerberos:
+        if 'hadoop.security.authentication' in actual_config:
+            if actual_config['hadoop.security.authentication'] != 'simple':
+                checkFailed(host.hostname, "HAWQ configuration: expected '%s' for '%s', actual value is '%s'" % ('simple', 'hadoop.security.authentication', actual_config[hadoop.security.authentication]))
+
+        if 'hadoop.security.authentication' in hdfs_actual_config:
+            if hdfs_actual_config['hadoop.security.authentication'] != 'simple':
+                checkFailed(host.hostname, "HAWQ configuration: expected '%s' for '%s', actual value is '%s'" % ('simple', 'hadoop.security.authentication', hdfs_actual_config[hadoop.security.authentication]))
+
+    if options.yarn or options.yarn_ha:
+        hawq_yarn_property_exist_list = ['hawq_rm_yarn_address', 'hawq_rm_yarn_scheduler_address', 'hawq_rm_yarn_app_name']
+        for item in hawq_yarn_property_exist_list:
+            if item in actual_config:
+                if not actual_config[item]:
+                        checkFailed(host.hostname, "HAWQ configuration: yarn.resourcemanager.address is empty")
+            else:
+                checkFailed(host.hostname, "HAWQ configuration: yarn.resourcemanager.address not defined")
+
+    if 'dfs.client.read.shortcircuit' not in actual_config:
+        checkFailed(host.hostname, "HAWQ configuration dfs.client.read.shortcircuit not defined")
+
+    if 'dfs.client.read.shortcircuit' not in hdfs_actual_config:
+        checkFailed(host.hostname, "HAWQ configuration dfs.client.read.shortcircuit not defined")
+
+    if 'dfs.domain.socket.path' not in actual_config:
+        checkFailed(host.hostname, "HAWQ configuration dfs.domain.socket.path not defined")
+
+    if 'dfs.domain.socket.path' not in hdfs_actual_config:
+        checkFailed(host.hostname, "HDFS configuration dfs.domain.socket.path not defined")
+
+    if is_datanode and 'dfs.domain.socket.path' in actual_config and 'dfs.domain.socket.path' in hdfs_actual_config:
+        if actual_config['dfs.domain.socket.path'] != hdfs_actual_config['dfs.domain.socket.path']:
+            checkFailed(host.hostname, "HAWQ configuration: dfs.domain.socket.path expect to have the same value with HDFS configuration")
+        else:
+            cmd = "ls -l %s" % actual_config['dfs.domain.socket.path']
+            (result, output, errmsg) = remote_ssh_output(cmd, host.hostname, '')
+            if result == 0:
+                if output.split(' ')[0][7:9] != 'rw':
+                    checkFailed(host.hostname, "HAWQ configuration dfs.domain.socket.path: %s should have R/W access for both hawq and HDFS on %s" % (actual_config['dfs.domain.socket.path'], host.hostname))
+            else:
+                checkFailed(host.hostname, "HAWQ configuration dfs.domain.socket.path: %s, does not exist on %s" % (actual_config['dfs.domain.socket.path'], host.hostname))
+
+    if 'output.replace-datanode-on-failure' in actual_config and len(datanode_list) > 0:
+        if len(datanode_list) < 4:
+            if actual_config['output.replace-datanode-on-failure'] == 'true':
+                checkFailed(host.hostname, "HAWQ configuration: output.replace-datanode-on-failure expect false, current is true")
+        else:
+            if actual_config['output.replace-datanode-on-failure'] == 'false':
+                checkFailed(host.hostname, "HAWQ configuration: output.replace-datanode-on-failure expect true, current is false")
+    else:
+        checkFailed(host.hostname, "HAWQ configuration: output.replace-datanode-on-failure not defined")
+
 
 def testDiskCapacity(host):
     if options.verbose:
@@ -615,6 +862,30 @@ def testHDFSConfig(host):
         return
 
     expect_config = gpcheck_config.hdfs_expected
+
+    if not options.hdfs_ha and not options.kerberos:
+        expect_config.update(gpcheck_config.hdfs_non_expected)
+
+    if options.hdfs_ha and not options.kerberos:
+        expect_config.update(gpcheck_config.hdfs_ha_expected)
+
+    if options.kerberos and not options.hdfs_ha:
+        expect_config.update(gpcheck_config.hdfs_kerberos_expected)
+
+    if options.kerberos and options.hdfs_ha:
+        expect_config.update(gpcheck_config.hdfs_ha_kerberos_expected)
+
+
+    if options.yarn or options.yarn_ha:
+        expect_config.update(gpcheck_config.yarn_expected)
+        if not options.yarn_ha and not options.kerberos:
+            expect_config.update(gpcheck_config.yarn_non_expected)
+
+        if options.yarn_ha:
+            expect_config.update(gpcheck_config.yarn_ha_expected)
+        if options.kerberos:
+            expect_config.update(gpcheck_config.yarn_kerberos_expected)
+
     actual_config = hdfs.site_config
     actual_heap_size = hdfs.namenode_heap_size if host.is_namenode else hdfs.datanode_heap_size
 
@@ -656,6 +927,66 @@ def testHDFSConfig(host):
     if not host.is_namenode and actual_heap_size < expect_datanode_heap:
         checkFailed(host.hostname, "Datanode Java heap size is only %sM, expect value is %sM" %
                                   (actual_heap_size, expect_datanode_heap))
+
+
+    # Check if nodemanager direcotries exists
+    directory_check_list = []
+    datanode_list = list()
+    if HADOOP_HOME:
+        datanode_list = parse_host_list_file("%s/etc/hadoop/slaves" % HADOOP_HOME)
+    is_datanode = False
+    if host.hostname in datanode_list:
+        is_datanode = True
+
+    if options.yarn or options.yarn_ha:
+        yarn_enabled = True
+    else:
+        yarn_enabled = False
+
+    if yarn_enabled and is_datanode:
+        if 'yarn.nodemanager.local-dirs' in actual_config: 
+            directory_check_list += actual_config['yarn.nodemanager.local-dirs'].split(',')
+        else:
+            checkFailed(host.hostname, "YARN configuration: yarn.nodemanager.local-dirs not defined")
+
+        if 'yarn.nodemanager.log-dirs' in actual_config: 
+            directory_check_list += actual_config['yarn.nodemanager.log-dirs'].split(',')
+        else:
+            checkFailed(host.hostname, "YARN configuration: yarn.nodemanager.log-dirs not defined")
+
+    for directory in directory_check_list:
+        cmd = "test -e %s" % directory
+        (result, output, errmsg) = remote_ssh_output(cmd, host.hostname, '')
+        if result != 0:
+            checkFailed(host.hostname, "YARN nodemanager directory %s does not exist" % directory)
+
+    # Check if resource manager property exists
+    if options.yarn:
+        yarn_property_exist_list = ['yarn.resourcemanager.address', 'yarn.resourcemanager.scheduler.address']
+
+    if options.yarn_ha:
+        yarn_property_exist_list = ['yarn.resourcemanager.address.rm1', 'yarn.resourcemanager.address.rm2', 'yarn.resourcemanager.scheduler.address.rm1', \
+                                    'yarn.resourcemanager.scheduler.address.rm2']
+
+    if yarn_enabled:
+        for item in yarn_property_exist_list:
+            if item in actual_config:
+                if not actual_config[item]:
+                        checkFailed(host.hostname, "YARN configuration: %s is empty" % item)
+            else:
+                checkFailed(host.hostname, "YARN configuration: %s not defined" % item)
+
+    # Check yarn kerberos properties
+    #yarn_kerberos_check_list = ['hadoop.proxyuser.yarn.groups', 'hadoop.proxyuser.yarn.hosts', 'hadoop.proxyuser.postgres.hosts', 'hadoop.proxyuser.postgres.groups']
+    if yarn_enabled and options.kerberos:
+        yarn_kerberos_check_list = ['yarn.nodemanager.keytab', 'yarn.nodemanager.principal','hadoop.proxyuser.postgres.groups', \
+                                    'yarn.resourcemanager.keytab', 'yarn.resourcemanager.principal']
+        for item in yarn_kerberos_check_list:
+            if item in actual_config:
+                if not actual_config[item]:
+                        checkFailed(host.hostname, "YARN configuration: %s is empty, expected non-empty" % item)
+            else:
+                checkFailed(host.hostname, "YARN configuration missing: %s" % item)
 
 
 def testIOSchedulers(host):
@@ -774,6 +1105,8 @@ def testNtp(host):
 def testGenericLinuxHost(host):
     logger.info("test on host: %s" % host.hostname)
     if host.is_namenode:
+        testHAWQGUC(host)
+        testHAWQconfig(host)
         testHDFSConfig(host)
         testDiskCapacity(host)
         testSysctl(host)
@@ -782,7 +1115,8 @@ def testGenericLinuxHost(host):
         testNtp(host)
 
     else:
-        testHAWQ(host)
+        testHAWQGUC(host)
+        testHAWQconfig(host)
         testDiskCapacity(host)
         testHDFSConfig(host)
         testIOSchedulers(host)

@@ -151,8 +151,8 @@ public class AvroResolver extends Plugin implements ReadResolver {
     /**
      * The record can arrive from one out of two different sources: a sequence
      * file or an AVRO file. If it comes from an AVRO file, then it was already
-     * obtained as a {@link GenericRecord} when when it was fetched from the
-     * file with the {@link AvroRecorReader} so in this case a cast is enough.
+     * obtained as a {@link GenericRecord} when it was fetched from the
+     * file so in this case a cast is enough.
      * On the other hand, if the source is a sequence file, then the input
      * parameter obj hides a bytes [] buffer which is in fact one Avro record
      * serialized. Here, we build the Avro record from the flat buffer, using

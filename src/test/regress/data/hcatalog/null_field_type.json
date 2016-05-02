@@ -1,0 +1,1 @@
+{"PXFMetadata":[{"item":{"path":"default","name":"mytable"},"fields":[{"name":"col1","type":"bytea","sourceType":"binary"}, {"name":"col2","sourceType":"binary"}]}]}

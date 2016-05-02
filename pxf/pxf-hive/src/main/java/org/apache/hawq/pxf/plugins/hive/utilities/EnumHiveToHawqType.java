@@ -96,12 +96,13 @@ public enum EnumHiveToHawqType {
     public static EnumHiveToHawqType getHiveToHawqType(String hiveType) {
         for (EnumHiveToHawqType t : values()) {
             String hiveTypeName = hiveType;
-            if (t.getSplitExpression() != null) {
-                String[] tokens = hiveType.split(t.getSplitExpression());
+            String splitExpression = t.getSplitExpression();
+            if (splitExpression != null) {
+                String[] tokens = hiveType.split(splitExpression);
                 hiveTypeName = tokens[0];
             }
 
-            if (t.getTypeName().equals(hiveTypeName)) {
+            if (t.getTypeName().toLowerCase().equals(hiveTypeName.toLowerCase())) {
                 return t;
             }
         }

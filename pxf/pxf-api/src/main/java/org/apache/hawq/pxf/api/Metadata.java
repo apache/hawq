@@ -76,21 +76,25 @@ public class Metadata {
     public static class Field {
         private String name;
         private EnumHawqType type; // field type which PXF exposes
-        private String sourceType; // filed type PXF reads from
+        private String sourceType; // field type PXF reads from
         private String[] modifiers; // type modifiers, optional field
 
-    public Field(String name, EnumHawqType type, String sourceType) {
-        if (StringUtils.isBlank(name) || StringUtils.isBlank(type.getTypeName())
-                || StringUtils.isBlank(sourceType)) {
-            throw new IllegalArgumentException("Field name, type and source type cannot be empty");
+        public Field(String name, EnumHawqType type, String sourceType) {
+            if (StringUtils.isBlank(name)
+                    || type == null
+                    || StringUtils.isBlank(sourceType)) {
+                throw new IllegalArgumentException(
+                        "Field name, type and source type cannot be empty");
+            }
+            this.name = name;
+            this.type = type;
+            this.sourceType = sourceType;
         }
-        this.name = name;
-        this.type = type;
-        this.sourceType = sourceType;
-    }
-    public Field(String name, EnumHawqType type, String sourceType, String[] modifiers) {
-        this(name, type, sourceType);
-        this.modifiers = modifiers;
+
+        public Field(String name, EnumHawqType type, String sourceType,
+                String[] modifiers) {
+            this(name, type, sourceType);
+            this.modifiers = modifiers;
         }
 
         public String getName() {

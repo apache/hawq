@@ -21,8 +21,10 @@ package org.apache.hawq.pxf.api;
 
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
+
 import org.junit.Test;
 
 public class MetadataTest {
@@ -37,6 +39,15 @@ public class MetadataTest {
         }
     }
 
+    @Test
+    public void createFieldNullType() {
+        try {
+            Metadata.Field field = new Metadata.Field("col1", null, "string");
+            fail("Empty name, type and source type shouldn't be allowed.");
+        } catch (IllegalArgumentException e) {
+            assertEquals("Field name, type and source type cannot be empty", e.getMessage());
+        }
+    }
     @Test
     public void createItemEmptyNameType() {
         try {

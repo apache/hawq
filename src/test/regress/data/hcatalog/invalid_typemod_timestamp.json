@@ -1,1 +1,1 @@
-{"PXFMetadata":[{"item":{"path":"default","name":"mytable3"},"fields":[{"name":"n5","type":"timestamp","modifiers":["30","40"]}]}]}
+{"PXFMetadata":[{"item":{"path":"default","name":"mytable3"},"fields":[{"name":"n5","type":"timestamp","modifiers":["30","40"],"sourceType":"decimal"}]}]}

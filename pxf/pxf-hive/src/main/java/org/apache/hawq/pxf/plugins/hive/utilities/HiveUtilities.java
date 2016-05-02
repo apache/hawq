@@ -24,8 +24,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
 
-import org.apache.hawq.pxf.api.utilities.EnumHawqType;
-import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -37,6 +35,8 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
+import org.apache.hawq.pxf.api.utilities.EnumHawqType;
+import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
 
 /**
  * Class containing helper functions connecting
@@ -85,34 +85,35 @@ public class HiveUtilities {
     }
 
     /**
-     * Checks if hive type is supported, and if so
-     * return its matching HAWQ type.
-     * Unsupported types will result in an exception.
-     * <br>
-     * The supported mappings are:<ul>
-         * <li>{@code tinyint -> int2}</li>
-         * <li>{@code smallint -> int2}</li>
-         * <li>{@code int -> int4}</li>
-         * <li>{@code bigint -> int8}</li>
-         * <li>{@code boolean -> bool}</li>
-         * <li>{@code float -> float4}</li>
-         * <li>{@code double -> float8}</li>
-         * <li>{@code string -> text}</li>
-         * <li>{@code binary -> bytea}</li>
-         * <li>{@code timestamp -> timestamp}</li>
-         * <li>{@code date -> date}</li>
-         * <li>{@code decimal(precision, scale) -> numeric(precision, scale)}</li>
-         * <li>{@code varchar(size) -> varchar(size)}</li>
-         * <li>{@code char(size) -> bpchar(size)}</li>
-         * <li>{@code array<dataType> -> text}</li>
-         * <li>{@code map<keyDataType, valueDataType> -> text}</li>
-         * <li>{@code struct<field1:dataType,...,fieldN:dataType> -> text}</li>
-         * <li>{@code uniontype<...> -> text}</li>
+     * Checks if hive type is supported, and if so return its matching HAWQ
+     * type. Unsupported types will result in an exception. <br>
+     * The supported mappings are:
+     * <ul>
+     * <li>{@code tinyint -> int2}</li>
+     * <li>{@code smallint -> int2}</li>
+     * <li>{@code int -> int4}</li>
+     * <li>{@code bigint -> int8}</li>
+     * <li>{@code boolean -> bool}</li>
+     * <li>{@code float -> float4}</li>
+     * <li>{@code double -> float8}</li>
+     * <li>{@code string -> text}</li>
+     * <li>{@code binary -> bytea}</li>
+     * <li>{@code timestamp -> timestamp}</li>
+     * <li>{@code date -> date}</li>
+     * <li>{@code decimal(precision, scale) -> numeric(precision, scale)}</li>
+     * <li>{@code varchar(size) -> varchar(size)}</li>
+     * <li>{@code char(size) -> bpchar(size)}</li>
+     * <li>{@code array<dataType> -> text}</li>
+     * <li>{@code map<keyDataType, valueDataType> -> text}</li>
+     * <li>{@code struct<field1:dataType,...,fieldN:dataType> -> text}</li>
+     * <li>{@code uniontype<...> -> text}</li>
      * </ul>
      *
-     * @param hiveColumn hive column schema
+     * @param hiveColumn
+     *            hive column schema
      * @return field with mapped HAWQ type and modifiers
-     * @throws UnsupportedTypeException if the column type is not supported
+     * @throws UnsupportedTypeException
+     *             if the column type is not supported
      * @see EnumHiveToHawqType
      */
     public static Metadata.Field mapHiveType(FieldSchema hiveColumn) throws UnsupportedTypeException {
@@ -137,7 +138,7 @@ public class HiveUtilities {
                                     + ", actual number of modifiers: "
                                     + modifiers.length);
                 }
-                if (hawqType.getValidateIntegerModifiers() && !verifyIntegerModifers(modifiers)) {
+                if (hawqType.getValidateIntegerModifiers() && !verifyIntegerModifiers(modifiers)) {
                     throw new UnsupportedTypeException("HAWQ does not support type " + hiveType + " (Field " + fieldName + "), modifiers should be integers");
                 }
             }
@@ -155,7 +156,7 @@ public class HiveUtilities {
      * @param modifiers type modifiers to be verified
      * @return whether modifiers are null or integers
      */
-    private static boolean verifyIntegerModifers(String[] modifiers) {
+    private static boolean verifyIntegerModifiers(String[] modifiers) {
         if (modifiers == null) {
             return true;
         }

@@ -184,15 +184,19 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
 
         //3. wait util AM is ACCEPTED and return the AMRMToken
         ApplicationReport report;
-        while (true) {
+        int retry = 10;
+        while (retry > 0) {
             report = applicationClient->getApplicationReport(appId);
             LOG(INFO,"LibYarnClient::createJob, appId[cluster_timestamp:%lld,id:%d], appState:%d",
                     appId.getClusterTimestamp(), appId.getId(), report.getYarnApplicationState());
             if ((report.getAMRMToken().getPassword() != "") && report.getYarnApplicationState() == YarnApplicationState::ACCEPTED) {
                 break;
             } else {
+                retry--;
                 usleep(1000000L);
             }
+            if (retry == 0)
+                THROW(AccessControlException, "can not register application to YARN");
         }
 
         clientAppId = appId;

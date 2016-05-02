@@ -55,9 +55,10 @@ public class HiveUtilitiesTest {
     };
 
     static String[][] complexTypes = {
-        {"array<string>", "text"},
-        {"map<string,float>", "text"},
-        {"struct<street:string,city:string,state:string,zip:int>", "text"},
+        {"ArraY<string>", "text"},
+        {"MaP<stRing, float>", "text"},
+        {"Struct<street:string, city:string, state:string, zip:int>", "text"},
+        {"UnionType<array<string>, string,int>", "text"}
     };
 
     @Test
@@ -175,6 +176,7 @@ public class HiveUtilitiesTest {
          * array<dataType> -> text
          * map<keyDataType, valueDataType> -> text
          * struct<fieldName1:dataType, ..., fieldNameN:dataType> -> text
+         * uniontype<...> -> text
          */
         for (String[] line: complexTypes) {
             String hiveType = line[0];
