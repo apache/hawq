@@ -5046,6 +5046,20 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"gp_vmem_idle_resource_timeout", PGC_USERSET, CLIENT_CONN_OTHER,
+			gettext_noop("Sets the time a session can be idle (in milliseconds) before we release gangs on the segment DBs to free resources."),
+			gettext_noop("A value of 0 turns off the timeout."),
+			GUC_UNIT_MS | GUC_GPDB_ADDOPT
+		},
+		&IdleSessionGangTimeout,
+#ifdef USE_ASSERT_CHECKING
+		600000, 0, INT_MAX, NULL, NULL /* 10 minutes by default on debug builds.*/
+#else
+		18000, 0, INT_MAX, NULL, NULL
+#endif
+	},
+
+	{
 		{"vacuum_freeze_min_age", PGC_USERSET, CLIENT_CONN_STATEMENT,
 			gettext_noop("Minimum age at which VACUUM should freeze a table row."),
 			NULL

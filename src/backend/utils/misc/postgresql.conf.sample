@@ -482,6 +482,7 @@ gp_segment_connect_timeout = 600s
 
 # - Resource limits -
 hawq_re_memory_overcommit_max = 8192  # Maximum quota of memory overcommit (in MB) per HAWQ physical segment in resource enforcement
+#gp_vmem_idle_resource_timeout = 18000 # idle-time before gang-release, in milliseconds (zero disables release).
 
 #------------------------------------------------------------------------------
 # CUSTOMIZED OPTIONS
