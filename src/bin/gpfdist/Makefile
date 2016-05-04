@@ -22,7 +22,8 @@ include $(top_builddir)/src/Makefile.global
 
 LIBS := -levent -lyaml -lz -lbz2 -lssl -lcrypto
 ifeq ($(BUILD_TYPE), gcov)
-LIBS := -lgcov $(LIBS)
+LIBS   := -lgcov $(LIBS)
+CFLAGS := -fprofile-arcs -ftest-coverage $(CFLAGS)
 endif
 
 code_dir     = $(CURDIR)/src/gpfdist/
@@ -61,7 +62,7 @@ mkgpfdist: mkdir
 	    ( $(CC) $(INCLUDES) $(CFLAGS) $(LIBS) -c $(code_dir)$${file}); \
 	done
 	# link
-	$(CC) -o $(code_dir)gpfdist $(OBJS)  $(LIBS)
+	$(CC) $(CFLAGS) -o $(code_dir)gpfdist $(OBJS)  $(LIBS)
 
 	mkdir -p build/bin
 	mv -f src/gpfdist/gpfdist build/bin/

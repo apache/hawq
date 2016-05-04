@@ -1509,7 +1509,7 @@ disable 64-bit integer date/time support
   --disable-spinlocks     do not use spinlocks
   --enable-debug          build with debugging symbols (-g)
   --enable-profiling      build with profiling enabled
-build with coverage testing instrumentation
+  --enable-coverage       build with coverage testing instrumentation
   --enable-dtrace         build with DTrace support
   --enable-depend         turn on automatic dependency tracking
   --enable-cassert        enable assertion checks (for debugging)

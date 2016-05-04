@@ -157,5 +157,14 @@ distcheck: $(distdir).tar.gz
 	-rm -rf $(distdir) $(dummy)
 	@echo "Distribution integrity checks out."
 
+coverage-show:
+	/usr/local/bin/lcov --directory . --capture --output-file CodeCoverage.info
+	/usr/local/bin/lcov --remove CodeCoverage.info 'test/*' 'mock/*' '/usr/*' '/opt/*' '*ext/rhel5_x86_64*' '*ext/osx*' --output-file CodeCoverage.info.cleaned
+	/usr/local/bin/genhtml -o CodeCoverageReport CodeCoverage.info.cleaned
+
+coverage-reset:
+	/usr/local/bin/lcov --directory . --zerocounters
+
+
 .PHONY: dist distdir distcheck
 unexport split-dist
