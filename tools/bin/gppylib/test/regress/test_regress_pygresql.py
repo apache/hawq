@@ -22,8 +22,8 @@ import logging
 import unittest2 as unittest
 
 
-import pg
-import pgdb
+from pygresql import pg
+from pygresql import pgdb
 
 from gppylib import gplog
 from gppylib.db.dbconn import *

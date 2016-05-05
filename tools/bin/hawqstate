@@ -21,7 +21,7 @@ import sys
 from optparse import Option, OptionParser
 from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, check_file_exist_list
 from gppylib.db import dbconn
-from pg import DatabaseError
+from pygresql.pg import DatabaseError
 from gppylib.gplog import get_default_logger, setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
 from gppylib.commands.unix import getLocalHostname, getUserName
 

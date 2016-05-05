@@ -36,7 +36,7 @@ PYLIB_SRC=$(SRC)/pythonSrc
 LIB_DIR=$(SRC)/lib
 PYLIB_DIR=$(SRC)/ext
 
-all: stream 
+all: stream pygresql
 
 #
 # Python Libraries
@@ -52,6 +52,18 @@ stream:
 	cd $(STREAM_DIR) && NO_M64=TRUE $(CC) $(CFLAGS) stream.c -o stream
 	cp $(STREAM_DIR)/stream lib/stream 
 
+#
+# PyGreSQL
+#
+PYGRESQL_VERSION=4.0
+PYGRESQL_DIR=PyGreSQL-$(PYGRESQL_VERSION)
+
+pygresql:
+	@echo "--- PyGreSQL"
+	cd $(PYLIB_SRC)/$(PYGRESQL_DIR) && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="-L$(top_builddir)/src/interfaces/libpq ${LDFLAGS}" python setup.py build
+	mkdir -p $(PYLIB_DIR)/pygresql
+	cp -r $(PYLIB_SRC)/$(PYGRESQL_DIR)/build/lib.*/* $(PYLIB_DIR)/pygresql
+	touch $(PYLIB_DIR)/__init__.py
 
 PYTHON_FILES=`grep -l --exclude=Makefile --exclude=gplogfilter --exclude=gpcheckos --exclude=gpgenfsmap.py --exclude=throttlingD.py "/bin/env python" *`\
 			 `grep -l "/bin/env python" $(SRC)/../sbin/*`\
@@ -98,16 +110,7 @@ docs: epydoc
 	@PYTHONPATH=$(PYTHONPATH):$(EPYDOC_PYTHONPATH) $(PYLIB_SRC)/$(EPYDOC_DIR)/build/scripts-2.6/epydoc --config=.epydoc.config
 
 clean :
-	rm -rf $(PYLIB_SRC)/$(LOCKFILE_DIR)
-	rm -rf $(PYLIB_SRC)/$(PARAMIKO_DIR)
-	rm -rf $(PYLIB_SRC)/$(PYCRYPTO_DIR)
-	rm -rf $(PYLIB_SRC)/$(PYLINT_DIR)
-	rm -rf $(PYLIB_SRC)/$(LOGILAB_COMMON_DIR)
-	rm -rf $(PYLIB_SRC)/$(LOGILAB_ASTNG_DIR)
-	rm -rf $(PYLIB_SRC)/$(PYGRESQL_DIR)/build
-	rm -rf $(PYLIB_SRC)/$(PSI_DIR)
-	rm -rf $(PYLIB_SRC)/$(PYCHECKER_DIR)
-	rm -rf $(PYLIB_SRC)/$(UNITTEST2_DIR)
+	[ "x$(PYGRESQL_DIR)" != "x" ] && rm -rf $(PYLIB_SRC)/$(PYGRESQL_DIR)/build; true
 	rm -rf $(STREAM_DIR)/stream lib/stream  
 	rm -rf *.pyc lib/*.pyc
 
@@ -119,6 +122,7 @@ install: all
 	for files in `find * -maxdepth 0 -type f | grep -x -v -E "${SKIP_INSTALL}"`; do ${INSTALL_SCRIPT} $${files} ${bindir}; done
 	${MAKE} -C gppylib $@
 	${MAKE} -C hawqpylib $@
+	${MAKE} -C ext $@
 	${INSTALL_SCRIPT} -d ${bindir}/lib
 	for files in `find lib -type f`; do ${INSTALL_SCRIPT} $${files} ${bindir}/lib; done
 	unset LIBPATH; ./generate-greenplum-path.sh $(prefix) > ${prefix}/greenplum_path.sh

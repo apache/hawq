@@ -93,8 +93,8 @@ try:
     from gppylib.db import dbconn
     from gppylib.gplog import get_default_logger, setup_tool_logging
     from gppylib.gpparseopts import OptParser, OptChecker
-    import pg
-    from pgdb import DatabaseError
+    from pygresql import pg
+    from pygresql.pgdb import DatabaseError
     import yaml
 except ImportError, e:
     print e

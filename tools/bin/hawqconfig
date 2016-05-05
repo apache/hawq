@@ -21,7 +21,7 @@ try:
     from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml, update_xml_property, local_ssh
     from gppylib.commands.unix import getLocalHostname, getUserName
     from gppylib.db import dbconn
-    from pg import DatabaseError
+    from pygresql.pg import DatabaseError
     from gppylib.gplog import setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
 except ImportError, e:
     sys.exit('ERROR: Cannot import modules.  Please check that you '

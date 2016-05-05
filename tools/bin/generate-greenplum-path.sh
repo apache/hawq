@@ -90,16 +90,9 @@ EOF
 fi
 
 #setup PYTHONPATH
-# OSX does NOT need pygresql/ path
-if [ "${PLAT}" = "Darwin" ] ; then
 cat <<EOF
 PYTHONPATH=\$GPHOME/lib/python:\$PYTHONPATH
 EOF
-else
-cat <<EOF
-PYTHONPATH=\$GPHOME/lib/python:\$GPHOME/lib/python/pygresql:\$PYTHONPATH
-EOF
-fi
 
 # openssl configuration file path
 cat <<EOF

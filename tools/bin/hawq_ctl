@@ -38,7 +38,7 @@ try:
     from hawqpylib.hawqlib import *
     from hawqpylib.HAWQ_HELP import *
     from gppylib.db import dbconn
-    from pg import DatabaseError
+    from pygresql.pg import DatabaseError
 except ImportError, e:
     sys.exit('ERROR: Cannot import modules.  Please check that you '
              'have sourced greenplum_path.sh.  Detail: ' + str(e))
