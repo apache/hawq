@@ -23,6 +23,8 @@
 # make `all' the default target
 all:
 
+feature_test:
+
 # Delete target files if the command fails after it has
 # started to update the file.
 .DELETE_ON_ERROR:
@@ -487,7 +489,7 @@ submake-libpgport:
 # reliable) method is to communicate what you want to do to the
 # configure script, and leave the makefiles alone.
 
--include $(top_srcdir)/src/Makefile.custom
+#-include $(top_srcdir)/src/Makefile.custom
 
 ifneq ($(CUSTOM_INSTALL),)
 INSTALL= $(CUSTOM_INSTALL)

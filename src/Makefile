@@ -26,6 +26,12 @@ all install installdirs uninstall distprep:
 	$(MAKE) -C test/regress $@
 	$(MAKE) -C tools/fsync $@
 
+feature_test:
+	$(MAKE) -C test feature_test
+
+feature_test_clean:
+	$(MAKE) -C test feature_test clean
+
 install: install-local
 
 install-local: installdirs-local
@@ -57,6 +63,7 @@ clean:
 	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/thread $@
 	$(MAKE) -C test/regress $@
+	$(MAKE) -C test/feature/example $@
 	$(MAKE) -C tools/fsync $@
 
 distclean maintainer-clean:
@@ -73,6 +80,7 @@ distclean maintainer-clean:
 	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/thread $@
 	$(MAKE) -C test/regress $@
+	$(MAKE) -C test/feature/example clean
 	$(MAKE) -C tools/fsync $@
 	rm -f Makefile.port Makefile.global
 
