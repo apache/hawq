@@ -11,5 +11,11 @@
 #
 #-------------------------------------------------------------------------
 
-.DEFAULT:
-	$(MAKE) -C regress $@
+#.DEFAULT:
+#	$(MAKE) -C regress $@
+
+feature_test:
+	$(MAKE) -C feature all
+
+clean:
+	$(MAKE) -C feature clean
