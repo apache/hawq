@@ -715,10 +715,10 @@ EGREP
 GREP
 with_rt
 ADDON_DIR
-with_libyarn
-with_libhdfs3
 with_zlib
 with_system_tzdata
+with_libhdfs3
+with_libyarn
 with_openssl
 with_bonjour
 with_ldap
@@ -863,10 +863,10 @@ with_ldap
 with_bonjour
 with_openssl
 with_readline
+with_libyarn
+with_libhdfs3
 with_libedit_preferred
 with_system_tzdata
-with_libhdfs3
-with_libyarn
 with_zlib
 with_rt
 with_gnu_ld
@@ -1551,9 +1551,9 @@ Optional Packages:
   --with-ldap             build with LDAP support
   --with-bonjour          build with Bonjour support
   --with-openssl          build with OpenSSL support
+  --without-readline      do not use GNU Readline nor BSD Libedit for editing
   --without-libyarn       do not build libyarn
   --without-libhdfs3      do not build libhdfs3
-  --without-readline      do not use GNU Readline nor BSD Libedit for editing
   --without-libedit-preferred  Don't prefer BSD Libedit over GNU Readline
   --with-system-tzdata=DIR  use system time zone data in DIR
   --without-zlib          do not use Zlib
@@ -5769,73 +5769,6 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_java" >&5
 $as_echo "$with_java" >&6; }
 
-#
-# Optionally build libhdfs3
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build libhdfs3" >&5
-$as_echo_n "checking whether to build libhdfs3" >&6; }
-
-pgac_args="$pgac_args with_libhdfs3"
-
-
-# Check whether --with-libhdfs3 was given.
-if test "${with_libhdfs3+set}" = set; then :
-  withval=$with_libhdfs3;
-  case $withval in
-    yes)
-      :
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-libhdfs3 option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_libhdfs3=yes
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_libhdfs3" >&5
-$as_echo "$with_libhdfs3" >&6; }
-
-
-#
-# Optionally build libyarn
-#
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build libyarn" >&5
-$as_echo_n "checking whether to build libyarn" >&6; }
-
-pgac_args="$pgac_args with_libyarn"
-
-
-# Check whether --with-libyarn was given.
-if test "${with_libyarn+set}" = set; then :
-  withval=$with_libyarn;
-  case $withval in
-    yes)
-      :
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-libyarn option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_libyarn=yes
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_libyarn" >&5
-$as_echo "$with_libyarn" >&6; }
-
 
 
 #
@@ -6174,6 +6107,65 @@ $as_echo "$as_me: WARNING: *** Readline does not work on MinGW --- disabling" >&
     with_readline=no
   fi
 fi
+
+#
+# libyarn
+#
+
+pgac_args="$pgac_args with_libyarn"
+
+
+# Check whether --with-libyarn was given.
+if test "${with_libyarn+set}" = set; then :
+  withval=$with_libyarn;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-libyarn option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_libyarn=yes
+
+fi
+
+
+
+
+#
+# libhdfs3
+#
+
+pgac_args="$pgac_args with_libhdfs3"
+
+
+# Check whether --with-libhdfs3 was given.
+if test "${with_libhdfs3+set}" = set; then :
+  withval=$with_libhdfs3;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-libhdfs3 option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_libhdfs3=yes
+
+fi
+
+
 
 
 #
