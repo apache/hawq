@@ -10,6 +10,8 @@ include $(top_builddir)/src/Makefile.global
 
 all:
 #	$(MAKE) -C doc all
+	$(MAKE) -C depends/libhdfs3 all
+	$(MAKE) -C depends/libyarn all
 	$(MAKE) -C src all
 	$(MAKE) -C config all
 	$(MAKE) -C contrib/formatter_fixedwidth all
@@ -22,6 +24,8 @@ all:
 
 install: 
 #	$(MAKE) -C doc $@
+	$(MAKE) -C depends/libhdfs3 $@
+	$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
@@ -59,6 +63,8 @@ feature_test_clean:
 clean:
 #	$(MAKE) -C doc $@
 	$(MAKE) -C contrib $@
+	$(MAKE) -C depends/libhdfs3 $@
+	$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
@@ -76,6 +82,8 @@ clean:
 distclean maintainer-clean:
 #	-$(MAKE) -C doc $@
 	-$(MAKE) -C contrib $@
+	-$(MAKE) -C depends/libhdfs3 $@
+	-$(MAKE) -C depends/libyarn $@
 	-$(MAKE) -C config $@
 	-$(MAKE) -C tools $@
 	-$(MAKE) -C src $@
