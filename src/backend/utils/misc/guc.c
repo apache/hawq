@@ -689,7 +689,6 @@ bool		optimizer_print_expression_properties;
 bool		optimizer_print_group_properties;
 bool		optimizer_print_optimization_context;
 bool		optimizer_print_optimization_stats;
-bool		optimizer_parallel;
 bool		optimizer_local;
 int 		optimizer_retries;
 bool  		optimizer_xforms[OPTIMIZER_XFORMS_COUNT] = {[0 ... OPTIMIZER_XFORMS_COUNT - 1] = false}; /* array of xforms disable flags */
@@ -3539,15 +3538,6 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
-	{
-		{"optimizer_parallel", PGC_USERSET, LOGGING_WHAT,
-			gettext_noop("Enable using threads in optimization engine."),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&optimizer_parallel,
-		false, NULL, NULL
-	},
  	{
 		{"optimizer_extract_dxl_stats", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Extract plan stats in dxl."),
