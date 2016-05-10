@@ -88,7 +88,7 @@ def main():
         if hawq_command == 'ssh-exkeys' and '-p' in sub_args_list:
             password_index = sub_args_list.index('-p') + 1
             if len(sub_args_list) > password_index:
-              sub_arg_list[password_index] = json.dumps(sub_args_list[password_index])
+              sub_args_list[password_index] = json.dumps(sub_args_list[password_index])
         sub_args = " ".join(sub_args_list)
     elif len(sys.argv) > 1:
         hawq_command = sys.argv[1]
