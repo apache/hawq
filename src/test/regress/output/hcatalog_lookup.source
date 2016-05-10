@@ -2,14 +2,14 @@
 -- test hcatalog lookup
 -- --------------------------------------
 SELECT * FROM pxf_get_item_fields('Hive', '*');
- path | itemname | fieldname | fieldtype 
-------+----------+-----------+-----------
+ path | itemname | fieldname | fieldtype | sourcefieldtype 
+------+----------+-----------+-----------+-----------------
 (0 rows)
 
 \d hcatalog.*.*
 SELECT * FROM pxf_get_item_fields('Hive', '*abc*abc*');
- path | itemname | fieldname | fieldtype 
-------+----------+-----------+-----------
+ path | itemname | fieldname | fieldtype | sourcefieldtype 
+------+----------+-----------+-----------+-----------------
 (0 rows)
 
 \d hcatalog.*abc*.*abc*

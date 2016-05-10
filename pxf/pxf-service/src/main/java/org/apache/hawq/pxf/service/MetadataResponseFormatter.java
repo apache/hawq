@@ -85,7 +85,8 @@ public class MetadataResponseFormatter {
                 for (Metadata.Field field : metadata.getFields()) {
                     result.append("Field #").append(++i).append(": [")
                             .append("Name: ").append(field.getName())
-                            .append(", Type: ").append(field.getType()).append("] ");
+                            .append(", Type: ").append(field.getType().getTypeName())
+                            .append(", Source type: ").append(field.getSourceType()).append("] ");
                 }
             }
             LOG.debug(result);

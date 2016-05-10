@@ -196,6 +196,41 @@ BEGIN TRANSACTION;
 SELECT load_json_data('@abs_builddir@/data/hcatalog/invalid_typemod_timestamp.json');
 ERROR:  Invalid typemod for imported column n5
 END TRANSACTION;
+-- negative test case: null "item" attribute
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/null_item.json');
+ERROR:  Could not parse PXF item, expected not null value for attribute "item"
+END TRANSACTION;
+-- negative test case: null "name" attribute
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/null_item_name.json');
+ERROR:  Could not parse PXF item, expected not null value for attribute "name"
+END TRANSACTION;
+-- negative test case: null "path" attribute
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/null_item_path.json');
+ERROR:  Could not parse PXF item, expected not null value for attribute "path"
+END TRANSACTION;
+-- negative test case: null "fields" attribute
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/null_fields.json');
+ERROR:  Could not parse PXF item, expected not null value for attribute "fields"
+END TRANSACTION;
+-- negative test case: null "name" attribute
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/null_field_name.json');
+ERROR:  Could not parse PXF item, expected not null value for attribute "name"
+END TRANSACTION;
+-- negative test case: null "type" attribute
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/null_field_type.json');
+ERROR:  Could not parse PXF item, expected not null value for attribute "type"
+END TRANSACTION;
+-- negative test case: null "sourceType" attribute
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/null_field_source_type.json');
+ERROR:  Could not parse PXF item, expected not null value for attribute "sourceType"
+END TRANSACTION;
 -- cleanup
 drop table mytable_internal;
 DROP FUNCTION load_json_data(filename text);

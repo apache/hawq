@@ -23,6 +23,7 @@ package org.apache.hawq.pxf.api;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -67,25 +68,32 @@ public class Metadata {
     }
 
     /**
-     * Class representing item field - name and type.
+     * Class representing item field - name, type, source type, modifiers.
+     * Type - exposed type of field
+     * Source type - type of field in underlying source
+     * Modifiers - additional attributes which describe type or field
      */
     public static class Field {
         private String name;
-        private String type; // TODO: change to enum
+        private EnumHawqType type; // field type which PXF exposes
+        private String sourceType; // field type PXF reads from
         private String[] modifiers; // type modifiers, optional field
 
-        public Field(String name, String type) {
-
-            if (StringUtils.isBlank(name) || StringUtils.isBlank(type)) {
-                throw new IllegalArgumentException("Field name and type cannot be empty");
+        public Field(String name, EnumHawqType type, String sourceType) {
+            if (StringUtils.isBlank(name)
+                    || type == null
+                    || StringUtils.isBlank(sourceType)) {
+                throw new IllegalArgumentException(
+                        "Field name, type and source type cannot be empty");
             }
-
             this.name = name;
             this.type = type;
+            this.sourceType = sourceType;
         }
 
-        public Field(String name, String type, String[] modifiers) {
-            this(name, type);
+        public Field(String name, EnumHawqType type, String sourceType,
+                String[] modifiers) {
+            this(name, type, sourceType);
             this.modifiers = modifiers;
         }
 
@@ -93,8 +101,12 @@ public class Metadata {
             return name;
         }
 
-        public String getType() {
+        public EnumHawqType getType() {
             return type;
+        }
+
+        public String getSourceType() {
+            return sourceType;
         }
 
         public String[] getModifiers() {

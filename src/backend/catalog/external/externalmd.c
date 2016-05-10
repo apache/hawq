@@ -96,6 +96,11 @@ List *ParsePxfEntries(StringInfo json, char *profile, Oid dboid)
  * ParsePxfItem
  * 		Parse the given json object representing a single PXF item into the internal
  * 		representation
+ * 		Reports error and exits if any of mandatory attributes in given json are missing
+ * 		Input JSON schema:
+ *
+ * 		{"PXFMetadata":[{"item":{"path":"<ITEM_PATH>","name":"<ITEM_NAME>"},"fields":[{"name":"<FIELD_NAME>","type":"<FIELD_TYPE>","sourceType":"<SOURCE_TYPE>"[,"modifiers":["<MODIFIER1>","<MODIFIER2>"]]},...]}, ...]}
+ *
  */
 static PxfItem *ParsePxfItem(struct json_object *pxfMD, char* profile)
 {
@@ -103,17 +108,37 @@ static PxfItem *ParsePxfItem(struct json_object *pxfMD, char* profile)
 
 	/* parse item name */
 	struct json_object *jsonItem = json_object_object_get(pxfMD, "item");
-	char *itemPath = pstrdup(json_object_get_string(json_object_object_get(jsonItem, "path")));
-	char *itemName = pstrdup(json_object_get_string(json_object_object_get(jsonItem, "name")));
-	
+	if (NULL == jsonItem)
+		ereport(ERROR,
+			(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+			 errmsg("Could not parse PXF item, expected not null value for attribute \"item\"")));
+
+	struct json_object *itemPath = json_object_object_get(jsonItem, "path");
+	if (NULL == itemPath)
+		ereport(ERROR,
+			(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+			 errmsg("Could not parse PXF item, expected not null value for attribute \"path\"")));
+
+	struct json_object *itemName = json_object_object_get(jsonItem, "name");
+	if (NULL == itemName)
+		ereport(ERROR,
+			(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+			 errmsg("Could not parse PXF item, expected not null value for attribute \"name\"")));
+
 	pxfItem->profile = profile;
-	pxfItem->path = itemPath;
-	pxfItem->name = itemName;
+	pxfItem->path = pstrdup(json_object_get_string(itemPath));
+	pxfItem->name = pstrdup(json_object_get_string(itemName));
 	
 	elog(DEBUG1, "Parsed item %s, namespace %s", itemName, itemPath);
 		
 	/* parse columns */
 	struct json_object *jsonFields = json_object_object_get(pxfMD, "fields");
+
+	if (NULL == jsonFields)
+		ereport(ERROR,
+			(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+			 errmsg("Could not parse PXF item, expected not null value for attribute \"fields\"")));
+
 	const int numFields = json_object_array_length(jsonFields);
 	for (int i = 0; i < numFields; i++)
 	{
@@ -121,10 +146,32 @@ static PxfItem *ParsePxfItem(struct json_object *pxfMD, char* profile)
 		struct json_object *jsonCol = json_object_array_get_idx(jsonFields, i);
 
 		struct json_object *fieldName = json_object_object_get(jsonCol, "name");
+
+		if (NULL == fieldName)
+			ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("Could not parse PXF item, expected not null value for attribute \"name\"")));
+
 		pxfField->name = pstrdup(json_object_get_string(fieldName));
 
 		struct json_object *fieldType = json_object_object_get(jsonCol, "type");
+
+		if (NULL == fieldType)
+			ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("Could not parse PXF item, expected not null value for attribute \"type\"")));
+
 		pxfField->type = pstrdup(json_object_get_string(fieldType));
+
+		struct json_object *sourceFieldType = json_object_object_get(jsonCol, "sourceType");
+
+		if (NULL == sourceFieldType)
+			ereport(ERROR,
+				(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+				 errmsg("Could not parse PXF item, expected not null value for attribute \"sourceType\"")));
+
+		pxfField->sourceType = pstrdup(json_object_get_string(sourceFieldType));
+
 		pxfField->nTypeModifiers = 0;
 		
 		elog(DEBUG1, "Parsing field %s, type %s", pxfField->name, pxfField->type);

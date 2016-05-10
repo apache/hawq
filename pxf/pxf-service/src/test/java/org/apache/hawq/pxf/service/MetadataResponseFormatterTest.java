@@ -25,8 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.*;
-import org.apache.hawq.pxf.api.Metadata;
 
+import org.apache.hawq.pxf.api.Metadata;
+import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.junit.Test;
 
 public class MetadataResponseFormatterTest {
@@ -49,14 +50,14 @@ public class MetadataResponseFormatterTest {
         List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
         Metadata.Item itemName = new Metadata.Item("default", "table1");
         Metadata metadata = new Metadata(itemName, fields);
-        fields.add(new Metadata.Field("field1", "int"));
-        fields.add(new Metadata.Field("field2", "text"));
+        fields.add(new Metadata.Field("field1", EnumHawqType.Int8Type, "bigint"));
+        fields.add(new Metadata.Field("field2", EnumHawqType.TextType, "string"));
         metadataList.add(metadata);
 
         response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
-                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}");
+                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\"}]}]}");
 
         assertEquals(expected.toString(), convertResponseToString(response));
     }
@@ -67,14 +68,14 @@ public class MetadataResponseFormatterTest {
         List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
         Metadata.Item itemName = new Metadata.Item("default", "table1");
         Metadata metadata = new Metadata(itemName, fields);
-        fields.add(new Metadata.Field("field1", "int", null));
-        fields.add(new Metadata.Field("field2", "text", new String[] {}));
+        fields.add(new Metadata.Field("field1", EnumHawqType.Int8Type, "bigint", null));
+        fields.add(new Metadata.Field("field2", EnumHawqType.TextType, "string", new String[] {}));
         metadataList.add(metadata);
 
         response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
-                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}]}");
+                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\"}]}]}");
 
         assertEquals(expected.toString(), convertResponseToString(response));
     }
@@ -85,10 +86,10 @@ public class MetadataResponseFormatterTest {
         List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
         Metadata.Item itemName = new Metadata.Item("default", "table1");
         Metadata metadata = new Metadata(itemName, fields);
-        fields.add(new Metadata.Field("field1", "int"));
-        fields.add(new Metadata.Field("field2", "numeric",
+        fields.add(new Metadata.Field("field1", EnumHawqType.Int8Type, "bigint"));
+        fields.add(new Metadata.Field("field2", EnumHawqType.NumericType, "decimal",
                 new String[] {"1349", "1789"}));
-        fields.add(new Metadata.Field("field3", "char",
+        fields.add(new Metadata.Field("field3", EnumHawqType.BpcharType, "char",
                 new String[] {"50"}));
         metadataList.add(metadata);
 
@@ -96,9 +97,28 @@ public class MetadataResponseFormatterTest {
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
                 .append("\"fields\":[")
-                .append("{\"name\":\"field1\",\"type\":\"int\"},")
-                .append("{\"name\":\"field2\",\"type\":\"numeric\",\"modifiers\":[\"1349\",\"1789\"]},")
-                .append("{\"name\":\"field3\",\"type\":\"char\",\"modifiers\":[\"50\"]}")
+                .append("{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},")
+                .append("{\"name\":\"field2\",\"type\":\"numeric\",\"sourceType\":\"decimal\",\"modifiers\":[\"1349\",\"1789\"]},")
+                .append("{\"name\":\"field3\",\"type\":\"bpchar\",\"sourceType\":\"char\",\"modifiers\":[\"50\"]}")
+                .append("]}]}");
+
+        assertEquals(expected.toString(), convertResponseToString(response));
+    }
+
+    @Test
+    public void formatResponseStringWithSourceType() throws Exception {
+        List<Metadata> metadataList = new ArrayList<Metadata>();
+        List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
+        Metadata.Item itemName = new Metadata.Item("default", "table1");
+        Metadata metadata = new Metadata(itemName, fields);
+        fields.add(new Metadata.Field("field1", EnumHawqType.Float8Type, "double"));
+        metadataList.add(metadata);
+
+        response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
+        StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
+        expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
+                .append("\"fields\":[")
+                .append("{\"name\":\"field1\",\"type\":\"float8\",\"sourceType\":\"double\"}")
                 .append("]}]}");
 
         assertEquals(expected.toString(), convertResponseToString(response));
@@ -146,7 +166,7 @@ public class MetadataResponseFormatterTest {
         List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
         Metadata.Item itemName = new Metadata.Item("default", "table1");
         Metadata metadata = new Metadata(itemName, fields);
-        fields.add(new Metadata.Field("field1", "int"));
+        fields.add(new Metadata.Field("field1", EnumHawqType.Int8Type, "bigint"));
         metadataList.add(null);
         metadataList.add(metadata);
         try {
@@ -165,8 +185,8 @@ public class MetadataResponseFormatterTest {
             List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
             Metadata.Item itemName = new Metadata.Item("default", "table"+i);
             Metadata metadata = new Metadata(itemName, fields);
-            fields.add(new Metadata.Field("field1", "int"));
-            fields.add(new Metadata.Field("field2", "text"));
+            fields.add(new Metadata.Field("field1", EnumHawqType.Int8Type, "bigint"));
+            fields.add(new Metadata.Field("field2", EnumHawqType.TextType, "string"));
             metdataList.add(metadata);
         }
         response = MetadataResponseFormatter.formatResponse(metdataList, "path.file");
@@ -179,7 +199,7 @@ public class MetadataResponseFormatterTest {
                 expected.append(",");
             }
             expected.append("{\"item\":{\"path\":\"default\",\"name\":\"table").append(i).append("\"},");
-            expected.append("\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}");
+            expected.append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\"}]}");
         }
         expected.append("]}");
 
@@ -193,8 +213,8 @@ public class MetadataResponseFormatterTest {
             List<Metadata.Field> fields = new ArrayList<Metadata.Field>();
             Metadata.Item itemName = new Metadata.Item("default"+i, "table"+i);
             Metadata metadata = new Metadata(itemName, fields);
-            fields.add(new Metadata.Field("field1", "int"));
-            fields.add(new Metadata.Field("field2", "text"));
+            fields.add(new Metadata.Field("field1", EnumHawqType.Int8Type, "bigint"));
+            fields.add(new Metadata.Field("field2", EnumHawqType.TextType, "string"));
             metdataList.add(metadata);
         }
         response = MetadataResponseFormatter.formatResponse(metdataList, "path.file");
@@ -206,7 +226,7 @@ public class MetadataResponseFormatterTest {
                 expected.append(",");
             }
             expected.append("{\"item\":{\"path\":\"default").append(i).append("\",\"name\":\"table").append(i).append("\"},");
-            expected.append("\"fields\":[{\"name\":\"field1\",\"type\":\"int\"},{\"name\":\"field2\",\"type\":\"text\"}]}");
+            expected.append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\"}]}");
         }
         expected.append("]}");
 

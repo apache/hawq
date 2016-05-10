@@ -24,9 +24,9 @@ import static org.junit.Assert.*;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.junit.Test;
-
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
+import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
 
 public class HiveUtilitiesTest {
 
@@ -54,17 +54,23 @@ public class HiveUtilitiesTest {
         {"char(40)", "bpchar", "40"},
     };
 
+    static String[][] complexTypes = {
+        {"ArraY<string>", "text"},
+        {"MaP<stRing, float>", "text"},
+        {"Struct<street:string, city:string, state:string, zip:int>", "text"},
+        {"UnionType<array<string>, string,int>", "text"}
+    };
+
     @Test
     public void mapHiveTypeUnsupported() throws Exception {
 
-        hiveColumn = new FieldSchema("complex", "array", null);
+        hiveColumn = new FieldSchema("complex", "someTypeWeDontSupport", null);
 
         try {
             HiveUtilities.mapHiveType(hiveColumn);
             fail("unsupported type");
         } catch (UnsupportedTypeException e) {
-            assertEquals("HAWQ does not support type " + hiveColumn.getType() + " (Field " + hiveColumn.getName() + ")",
-                    e.getMessage());
+            assertEquals("Unable to map Hive's type: " + hiveColumn.getType() + " to HAWQ's type", e.getMessage());
         }
     }
 
@@ -85,11 +91,11 @@ public class HiveUtilitiesTest {
          */
         for (String[] line: typesMappings) {
             String hiveType = line[0];
-            String expectedType = line[1];
+            String hawqTypeName = line[1];
             hiveColumn = new FieldSchema("field" + hiveType, hiveType, null);
             Metadata.Field result = HiveUtilities.mapHiveType(hiveColumn);
             assertEquals("field" + hiveType, result.getName());
-            assertEquals(expectedType, result.getType());
+            assertEquals(hawqTypeName, result.getType().getTypeName());
             assertNull(result.getModifiers());
         }
     }
@@ -109,7 +115,7 @@ public class HiveUtilitiesTest {
             hiveColumn = new FieldSchema("field" + hiveType, hiveType, null);
             Metadata.Field result = HiveUtilities.mapHiveType(hiveColumn);
             assertEquals("field" + hiveType, result.getName());
-            assertEquals(expectedType, result.getType());
+            assertEquals(expectedType, result.getType().getTypeName());
             assertArrayEquals(expectedModifiers, result.getModifiers());
         }
     }
@@ -124,7 +130,7 @@ public class HiveUtilitiesTest {
             fail("should fail with bad numeric type error");
         } catch (UnsupportedTypeException e) {
             String errorMsg = "HAWQ does not support type " + badHiveType + " (Field badNumeric), " +
-                "expected type of the form <type name>(<parameter>,<parameter>)";
+                "expected number of modifiers: 2, actual number of modifiers: 1";
             assertEquals(errorMsg, e.getMessage());
         }
 
@@ -135,7 +141,7 @@ public class HiveUtilitiesTest {
             fail("should fail with bad char type error");
         } catch (UnsupportedTypeException e) {
             String errorMsg = "HAWQ does not support type " + badHiveType + " (Field badChar), " +
-                "expected type of the form <type name>(<parameter>)";
+                    "expected number of modifiers: 1, actual number of modifiers: 3";
             assertEquals(errorMsg, e.getMessage());
         }
 
@@ -148,6 +154,38 @@ public class HiveUtilitiesTest {
             String errorMsg = "HAWQ does not support type " + badHiveType + " (Field badModifier), " +
                 "modifiers should be integers";
             assertEquals(errorMsg, e.getMessage());
+        }
+    }
+
+    @Test
+    public void mapHiveTypeInvalidModifiers() throws Exception {
+        String badHiveType = "decimal(abc, xyz)";
+        hiveColumn = new FieldSchema("numericColumn", badHiveType, null);
+        try {
+            HiveUtilities.mapHiveType(hiveColumn);
+            fail("should fail with bad modifiers error");
+        } catch (UnsupportedTypeException e) {
+            String errorMsg = "HAWQ does not support type " + badHiveType + " (Field numericColumn), modifiers should be integers";
+            assertEquals(errorMsg, e.getMessage());
+        }
+    }
+
+    @Test
+    public void mapHiveTypeComplex() throws Exception {
+        /*
+         * array<dataType> -> text
+         * map<keyDataType, valueDataType> -> text
+         * struct<fieldName1:dataType, ..., fieldNameN:dataType> -> text
+         * uniontype<...> -> text
+         */
+        for (String[] line: complexTypes) {
+            String hiveType = line[0];
+            String expectedType = line[1];
+            hiveColumn = new FieldSchema("field" + hiveType, hiveType, null);
+            Metadata.Field result = HiveUtilities.mapHiveType(hiveColumn);
+            assertEquals("field" + hiveType, result.getName());
+            assertEquals(expectedType, result.getType().getTypeName());
+            assertNull(result.getModifiers());
         }
     }
 

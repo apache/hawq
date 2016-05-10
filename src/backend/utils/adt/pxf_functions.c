@@ -86,8 +86,8 @@ Datum pxf_get_item_fields(PG_FUNCTION_ARGS)
 	FuncCallContext *funcctx;
 	HeapTuple tuple;
 	Datum result;
-	Datum values[4];
-	bool nulls[4];
+	Datum values[5];
+	bool nulls[5];
 
 	ItemContext *item_context;
 
@@ -126,7 +126,7 @@ Datum pxf_get_item_fields(PG_FUNCTION_ARGS)
 		 * build tupdesc for result tuples. This must match this function's
 		 * pg_proc entry!
 		 */
-		tupdesc = CreateTemplateTupleDesc(4, false);
+		tupdesc = CreateTemplateTupleDesc(5, false);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 1, "path",
 		TEXTOID, -1, 0);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 2, "itemname",
@@ -134,6 +134,8 @@ Datum pxf_get_item_fields(PG_FUNCTION_ARGS)
 		TupleDescInitEntry(tupdesc, (AttrNumber) 3, "fieldname",
 		TEXTOID, -1, 0);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 4, "fieldtype",
+		TEXTOID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 5, "sourcefieldtype",
 		TEXTOID, -1, 0);
 
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
@@ -169,6 +171,7 @@ Datum pxf_get_item_fields(PG_FUNCTION_ARGS)
 	values[1] = CStringGetTextDatum(item->name);
 	values[2] = CStringGetTextDatum(field->name);
 	values[3] = CStringGetTextDatum(field->type);
+	values[4] = CStringGetTextDatum(field->sourceType);
 
 	tuple = heap_form_tuple(funcctx->tuple_desc, values, nulls);
 	result = HeapTupleGetDatum(tuple);

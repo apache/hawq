@@ -20,6 +20,7 @@ package org.apache.hawq.pxf.plugins.hive.utilities;
  */
 
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -32,9 +33,10 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
-
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
+import org.apache.hawq.pxf.api.utilities.EnumHawqType;
+import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
 
 /**
  * Class containing helper functions connecting
@@ -83,11 +85,10 @@ public class HiveUtilities {
     }
 
     /**
-     * Checks if hive type is supported, and if so
-     * return its matching HAWQ type.
-     * Unsupported types will result in an exception.
-     * <br>
-     * The supported mappings are:<ul>
+     * Checks if hive type is supported, and if so return its matching HAWQ
+     * type. Unsupported types will result in an exception. <br>
+     * The supported mappings are:
+     * <ul>
      * <li>{@code tinyint -> int2}</li>
      * <li>{@code smallint -> int2}</li>
      * <li>{@code int -> int4}</li>
@@ -102,80 +103,49 @@ public class HiveUtilities {
      * <li>{@code decimal(precision, scale) -> numeric(precision, scale)}</li>
      * <li>{@code varchar(size) -> varchar(size)}</li>
      * <li>{@code char(size) -> bpchar(size)}</li>
+     * <li>{@code array<dataType> -> text}</li>
+     * <li>{@code map<keyDataType, valueDataType> -> text}</li>
+     * <li>{@code struct<field1:dataType,...,fieldN:dataType> -> text}</li>
+     * <li>{@code uniontype<...> -> text}</li>
      * </ul>
      *
-     * @param hiveColumn hive column schema
+     * @param hiveColumn
+     *            hive column schema
      * @return field with mapped HAWQ type and modifiers
-     * @throws UnsupportedTypeException if the column type is not supported
+     * @throws UnsupportedTypeException
+     *             if the column type is not supported
+     * @see EnumHiveToHawqType
      */
     public static Metadata.Field mapHiveType(FieldSchema hiveColumn) throws UnsupportedTypeException {
         String fieldName = hiveColumn.getName();
-        String hiveType = hiveColumn.getType();
-        String mappedType;
-        String[] modifiers = null;
+        String hiveType = hiveColumn.getType(); // Type name and modifiers if any
+        String hiveTypeName; // Type name
+        String[] modifiers = null; // Modifiers
+        EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getHiveToHawqType(hiveType);
+        EnumHawqType hawqType = hiveToHawqType.getHawqType();
 
-        // check parameterized types:
-        if (hiveType.startsWith("varchar(") ||
-                hiveType.startsWith("char(")) {
-            String[] toks = hiveType.split("[(,)]");
-            if (toks.length != 2) {
-                throw new UnsupportedTypeException( "HAWQ does not support type " + hiveType + " (Field " + fieldName + "), " +
-                        "expected type of the form <type name>(<parameter>)");
+        if (hiveToHawqType.getSplitExpression() != null) {
+            String[] tokens = hiveType.split(hiveToHawqType.getSplitExpression());
+            hiveTypeName = tokens[0];
+            if (hawqType.getModifiersNum() > 0) {
+                modifiers = Arrays.copyOfRange(tokens, 1, tokens.length);
+                if (modifiers.length != hawqType.getModifiersNum()) {
+                    throw new UnsupportedTypeException(
+                            "HAWQ does not support type " + hiveType
+                                    + " (Field " + fieldName + "), "
+                                    + "expected number of modifiers: "
+                                    + hawqType.getModifiersNum()
+                                    + ", actual number of modifiers: "
+                                    + modifiers.length);
+                }
+                if (hawqType.getValidateIntegerModifiers() && !verifyIntegerModifiers(modifiers)) {
+                    throw new UnsupportedTypeException("HAWQ does not support type " + hiveType + " (Field " + fieldName + "), modifiers should be integers");
+                }
             }
-            mappedType = toks[0];
-            if (mappedType.equals("char")) {
-                mappedType = "bpchar";
-            }
-            modifiers = new String[] {toks[1]};
-        } else if (hiveType.startsWith("decimal(")) {
-            String[] toks = hiveType.split("[(,)]");
-            if (toks.length != 3) {
-                throw new UnsupportedTypeException( "HAWQ does not support type " + hiveType + " (Field " + fieldName + "), " +
-                        "expected type of the form <type name>(<parameter>,<parameter>)");
-            }
-            mappedType = "numeric";
-            modifiers = new String[] {toks[1], toks[2]};
-        } else {
+        } else
+            hiveTypeName = hiveType;
 
-            switch (hiveType) {
-            case "tinyint":
-            case "smallint":
-            	mappedType = "int2";
-            	break;
-            case "int":
-            	mappedType = "int4";
-            	break;
-            case "bigint":
-            	mappedType = "int8";
-            	break;
-            case "boolean":
-            	mappedType = "bool";
-            	break;
-            case "timestamp":
-            case "date":
-                mappedType = hiveType;
-                break;
-            case "float":
-                mappedType = "float4";
-                break;
-            case "double":
-                mappedType = "float8";
-                break;
-            case "string":
-                mappedType = "text";
-                break;
-            case "binary":
-                mappedType = "bytea";
-                break;
-            default:
-                throw new UnsupportedTypeException(
-                        "HAWQ does not support type " + hiveType + " (Field " + fieldName + ")");
-            }
-        }
-        if (!verifyModifers(modifiers)) {
-            throw new UnsupportedTypeException("HAWQ does not support type " + hiveType + " (Field " + fieldName + "), modifiers should be integers");
-        }
-        return new Metadata.Field(fieldName, mappedType, modifiers);
+        return new Metadata.Field(fieldName, hawqType, hiveTypeName, modifiers);
     }
 
     /**
@@ -186,7 +156,7 @@ public class HiveUtilities {
      * @param modifiers type modifiers to be verified
      * @return whether modifiers are null or integers
      */
-    private static boolean verifyModifers(String[] modifiers) {
+    private static boolean verifyIntegerModifiers(String[] modifiers) {
         if (modifiers == null) {
             return true;
         }

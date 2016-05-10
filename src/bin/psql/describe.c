@@ -4263,8 +4263,12 @@ describePxfTable(const char *profile, const char *pattern, bool verbose)
 	printQueryOpt myopt = pset.popt;
 	printTableContent cont;
 	int			cols = 0;
+	if (verbose)
+		cols = 3;
+	else
+		cols = 2;
 	int			total_numrows = 0;
-	char	   *headers[2];
+	char	   *headers[cols];
 	bool		printTableInitialized = false;
 
 	char *previous_path = NULL;
@@ -4274,11 +4278,15 @@ describePxfTable(const char *profile, const char *pattern, bool verbose)
 	char *itemname;
 	char *fieldname;
 	char *fieldtype;
+	char *sourcefieldtype;
 	int total_fields = 0; //needed to know how much memory allocate for current table
 
 	initPQExpBuffer(&buf);
 
-	printfPQExpBuffer(&buf, "SELECT t.*, COUNT() OVER(PARTITION BY path, itemname) as total_fields FROM\n"
+	printfPQExpBuffer(&buf, "SELECT t.path, t.itemname, t.fieldname, t.fieldtype,");
+	if (verbose)
+		appendPQExpBuffer(&buf, " sourcefieldtype, ");
+	appendPQExpBuffer(&buf,"COUNT() OVER(PARTITION BY path, itemname) as total_fields FROM\n"
 			"pxf_get_item_fields('%s', '%s') t\n", profile, pattern);
 
 	res = PSQLexec(buf.data, false);
@@ -4294,7 +4302,9 @@ describePxfTable(const char *profile, const char *pattern, bool verbose)
 	/* Header */
 	headers[0] = gettext_noop("Column");
 	headers[1] = gettext_noop("Type");
-	cols = 2;
+	if (verbose)
+		headers[2] = gettext_noop("Source type");
+
 
 	for (int i = 0; i < total_numrows; i++)
 	{
@@ -4303,7 +4313,14 @@ describePxfTable(const char *profile, const char *pattern, bool verbose)
 		itemname = PQgetvalue(res, i, 1);
 		fieldname = PQgetvalue(res, i, 2);
 		fieldtype = PQgetvalue(res, i, 3);
-		total_fields = PQgetvalue(res, i, 4);
+		if (verbose)
+		{
+			sourcefieldtype = PQgetvalue(res, i, 4);
+			total_fields = PQgetvalue(res, i, 5);
+		} else
+		{
+			total_fields = PQgetvalue(res, i, 4);
+		}
 
 		/* First row for current table */
 		if (previous_itemname == NULL
@@ -4341,6 +4358,12 @@ describePxfTable(const char *profile, const char *pattern, bool verbose)
 
 		/* Type */
 		printTableAddCell(&cont, fieldtype, false, false);
+
+		if (verbose)
+		{
+			/*Source type */
+			printTableAddCell(&cont, sourcefieldtype, false, false);
+		}
 
 		previous_path = path;
 		previous_itemname = itemname;
