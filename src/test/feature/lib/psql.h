@@ -1,10 +1,11 @@
 #ifndef __PSQL_H__
 #define __PSQL_H__
 
-#include "libpq-fe.h"
-#include <vector>
-#include "command.h"
 
+#include <vector>
+
+#include "command.h"
+#include "libpq-fe.h"
 class PSQLQueryResult
 {
 public:
