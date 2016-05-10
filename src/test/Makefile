@@ -14,6 +14,8 @@
 #.DEFAULT:
 #	$(MAKE) -C regress $@
 
+.PHONY: feature_test clean
+
 feature_test:
 	$(MAKE) -C feature all
 

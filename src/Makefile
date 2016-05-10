@@ -30,7 +30,7 @@ feature_test:
 	$(MAKE) -C test feature_test
 
 feature_test_clean:
-	$(MAKE) -C test feature_test clean
+	$(MAKE) -C test clean
 
 install: install-local
 
