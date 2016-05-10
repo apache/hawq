@@ -224,7 +224,7 @@ AC_SUBST(enable_profiling)
 # --enable-coverage enables generation of code coverage metrics with gcov
 #
 PGAC_ARG_BOOL(enable, coverage, no,
-              [build with coverage testing instrumentation],
+              [  --enable-coverage       build with coverage testing instrumentation],
 [AC_CHECK_PROGS(GCOV, gcov)
 if test -z "$GCOV"; then
   AC_MSG_ERROR([gcov not found])
@@ -844,6 +844,19 @@ if test "$PORTNAME" = "win32"; then
   fi
 fi
 
+#
+# libyarn
+#
+PGAC_ARG_BOOL(with, libyarn, yes,
+              [  --without-libyarn       do not build libyarn])
+AC_SUBST(with_libyarn)
+
+#
+# libhdfs3
+#
+PGAC_ARG_BOOL(with, libhdfs3, yes,
+              [  --without-libhdfs3      do not build libhdfs3])
+AC_SUBST(with_libhdfs3)
 
 #
 # Prefer libedit
@@ -1295,17 +1308,6 @@ AC_SEARCH_LIBS(json_tokener_parse, json-c json, [], [AC_MSG_ERROR([json-c is req
 AM_PATH_XML2([2.7.6], [], [AC_MSG_ERROR([libxml2 is required])])
 pgac_args="$pgac_args with_xml_prefix with_xml_exec_prefix enable_xmltest"
 CFLAGS="$CFLAGS $XML_CPPFLAGS"
-
-# libhdfs3 
-
-AC_CHECK_HEADERS(hdfs/hdfs.h, [], [AC_MSG_ERROR([libhdfs3 is required])])
-AC_SEARCH_LIBS(hdfsOpenFile, hdfs3, [], [AC_MSG_ERROR([libhdfs3 is required])], [])
-
-
-# libyarn 
-
-AC_CHECK_HEADERS(libyarn/LibYarnClientC.h, [], [AC_MSG_ERROR([libyarn is required])])
-AC_SEARCH_LIBS(newLibYarnClient, yarn, [], [AC_MSG_ERROR([libyarn is required])], [])
 
 # apr for gpfdist
 AC_CHECK_PROG([APR_CONFIG], [apr-1-config],[yes])
