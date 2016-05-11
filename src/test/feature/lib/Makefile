@@ -8,7 +8,7 @@ override CPPFLAGS := -I/usr/include -I/usr/local/include -I/usr/include/libxml2 
 override LIBS := $(LIBS) -lpq -lxml2
 override LDFLAGS += -L/usr/local/lib -L/usr/lib
 
-PROG = sql-util.h string-util.cpp psql.cpp command.cpp xml-parser.cpp hawq-config.cpp
+PROG = string-util.cpp psql.cpp command.cpp xml-parser.cpp hawq-config.cpp
 
 all:
 	g++ $(CPPFLAGS) $(CXXFLAGS) $(PROG) 

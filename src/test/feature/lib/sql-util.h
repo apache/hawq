@@ -2,33 +2,41 @@
 #define SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
 
 #include <string>
-
 #include "gtest/gtest.h"
 #include "psql.h"
 
-#define HAWQ_DB (getenv("HAWQ_DB") ? getenv("HAWQ_DB") : "postgres")
-#define HAWQ_HOST (getenv("HAWQ_HOST") ? getenv("HAWQ_HOST") : "localhost")
-#define HAWQ_PORT (getenv("HAWQ_PORT") ? getenv("HAWQ_PORT") : "5432")
-#define HAWQ_USER (getenv("HAWQ_USER") ? getenv("HAWQ_USER") : "gpadmin")
-#define HAWQ_PASSWORD (getenv("HAWQ_PASSWORD") ? getenv("HAWQ_PASSWORD") : "")
+#define HAWQ_DB (getenv("PGDATABASE") ? getenv("PGDATABASE") : "postgres")
+#define HAWQ_HOST (getenv("PGHOST") ? getenv("PGHOST") : "localhost")
+#define HAWQ_PORT (getenv("PGPORT") ? getenv("PGPORT") : "5432")
+#define HAWQ_USER (getenv("PGUSER") ? getenv("PGUSER") : "taoz")
+#define HAWQ_PASSWORD (getenv("PGPASSWORD") ? getenv("PGPASSWORD") : "")
 
 class SQLUtility {
  public:
-  SQLUtility() : conn(getConnection()) {
-    const ::testing::TestInfo *const test_info =
-        ::testing::UnitTest::GetInstance()->current_test_info();
+  SQLUtility()
+      : conn(getConnection()),
+        test_info(::testing::UnitTest::GetInstance()->current_test_info()) {
     schemaName =
         std::string(test_info->test_case_name()) + "_" + test_info->name();
-    execute("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
-    execute("CREATE SCHEMA " + schemaName);
+    conn->runSQLCommand("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
+    conn->runSQLCommand("CREATE SCHEMA " + schemaName);
   }
 
-  ~SQLUtility() { execute("DROP SCHEMA " + schemaName + " CASCADE"); }
+  ~SQLUtility() {
+    if (!test_info->result()->Failed())
+      conn->runSQLCommand("DROP SCHEMA " + schemaName + " CASCADE");
+  }
 
   void execute(const std::string &sql) {
-    conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
-    // should check the return code, depends on PSQL return code implementation
-    // EXPECT_EQ(true, ret);
+    EXPECT_EQ(conn->runSQLCommand("SET SEARCH_PATH= " + schemaName + ";" + sql)
+                  .getLastStatus(),
+              0);
+  }
+
+  void query(const std::string &sql, int resultNum) {
+    PSQLQueryResult result =
+        conn->getQueryResult("SET SEARCH_PATH= " + schemaName + ";" + sql);
+    EXPECT_EQ(result.rowCount(), resultNum);
   }
 
  private:
@@ -41,6 +49,7 @@ class SQLUtility {
  private:
   std::string schemaName;
   std::unique_ptr<PSQL> conn;
+  const ::testing::TestInfo *const test_info;
 };
 
 #endif  // SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
