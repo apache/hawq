@@ -9,15 +9,14 @@
 #include "lib/command.h"
 #include "lib/common.h"
 #include "lib/hawq-config.h"
+#include "lib/sql-util.h"
 
 #include "gtest/gtest.h"
 
-class TestCommonLib: public ::testing::Test {
-  public:
-    TestCommonLib() {
-    }
-    ~TestCommonLib() {
-    }
+class TestCommonLib : public ::testing::Test {
+ public:
+  TestCommonLib() {}
+  ~TestCommonLib() {}
 };
 
 TEST_F(TestCommonLib, TestHawqConfig) {
@@ -67,21 +66,9 @@ TEST_F(TestCommonLib, TestCommand) {
   Command::getCommandStatus("date");
   Command::getCommandStatus("datewrong");
   Command::getCommandOutput("datewrong");
+}
 
-  PSQL psql("postgres", "localhost", "5432", "huanzhang");
-  psql.setOutputFile("/tmp/testlog");
-  psql.runSQLCommand("create table foo(i int)");
-  psql.runSQLCommand("SELECT * from foo LIMIT 1");
-
-  psql.setOutputFile("/tmp/testlog2");
-  psql.runSQLFile("/tmp/test.sql");
-
-  psql.checkDiff("/tmp/testlog", "/tmp/testlog");
-
-  PSQLQueryResult res = psql.getQueryResult("SELECT * from foo LIMIT 3");
-
-  const std::vector<std::vector<std::string> > rows = res.getRows();
-  const std::vector<std::string> fields = res.getFields();
-
-  psql.runSQLCommand("drop table foo");
+TEST_F(TestCommonLib, TestSqlUtil) {
+  SQLUtility util;
+  util.execute("create table test(p int)");
 }
