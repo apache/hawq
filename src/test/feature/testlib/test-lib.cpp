@@ -71,4 +71,6 @@ TEST_F(TestCommonLib, TestCommand) {
 TEST_F(TestCommonLib, TestSqlUtil) {
   SQLUtility util;
   util.execute("create table test(p int)");
+  util.execute("insert into test values(1),(2)");
+  util.query("select * from test", 2);
 }

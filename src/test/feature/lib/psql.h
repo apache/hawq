@@ -60,6 +60,9 @@ public:
     PSQL& setOutputFile(const std::string& out); 
     std::string getConnectionString() const;
 
+    int getLastStatus() const;
+    const std::string& getLastResult() const;
+
     static bool checkDiff(const std::string& expect_file, const std::string& result_file, bool save_diff = true);
 
 private:
@@ -77,6 +80,9 @@ private:
     std::string _password;
     std::string _output_file;
     PSQLQueryResult _result;
+
+    int _last_status;
+    std::string _last_result;
 };
 
 #endif

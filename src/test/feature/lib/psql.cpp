@@ -97,13 +97,16 @@ void PSQLQueryResult::reset()
 
 PSQL& PSQL::runSQLCommand(const std::string& sql_cmd)
 {
-    Command::getCommandStatus(this->_getPSQLQueryCommand(sql_cmd)); 
+    Command c(this->_getPSQLQueryCommand(sql_cmd));
+    c.run();
+    this->_last_status = c.getResultStatus();
+    this->_last_result = c.getResultOutput();
     return *this;
 }
 
 PSQL& PSQL::runSQLFile(const std::string& sql_file)
 {
-    Command::getCommandStatus(this->_getPSQLFileCommand(sql_file)); 
+    this->_last_status = Command::getCommandStatus(this->_getPSQLFileCommand(sql_file)); 
     return *this;
 }
 
@@ -185,6 +188,17 @@ std::string PSQL::getConnectionString() const
             .append(" dbname=").append(this->_dbname);
     return command; 
 }
+
+int PSQL::getLastStatus() const
+{
+    return this->_last_status;
+}
+
+const std::string& PSQL::getLastResult() const
+{
+    return this->_last_result;
+}
+
 
 const std::string PSQL::_getPSQLBaseCommand() const
 {
