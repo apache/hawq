@@ -63,7 +63,7 @@ clean:
 	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/thread $@
 	$(MAKE) -C test/regress $@
-	$(MAKE) -C test/feature/example $@
+	$(MAKE) -C test/feature $@
 	$(MAKE) -C tools/fsync $@
 
 distclean maintainer-clean:
@@ -80,7 +80,7 @@ distclean maintainer-clean:
 	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/thread $@
 	$(MAKE) -C test/regress $@
-	$(MAKE) -C test/feature/example clean
+	$(MAKE) -C test/feature clean
 	$(MAKE) -C tools/fsync $@
 	rm -f Makefile.port Makefile.global
 

@@ -5,6 +5,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <unistd.h>
 
 #include "command.h"
 #include "psql.h"
