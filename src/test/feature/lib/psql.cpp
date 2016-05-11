@@ -218,7 +218,7 @@ const std::string PSQL::_getPSQLBaseCommand() const
 const std::string PSQL::_getPSQLQueryCommand(const std::string& query) const
 {
     std::string command = this->_getPSQLBaseCommand();
-    return command.append(" -c '").append(query).append("'");
+    return command.append(" -c \"").append(query).append("\"");
 }
 
 const std::string PSQL::_getPSQLFileCommand(const std::string& file) const

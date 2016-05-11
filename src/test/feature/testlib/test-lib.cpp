@@ -8,6 +8,7 @@
 
 #include "lib/command.h"
 #include "lib/common.h"
+#include "lib/data-gen.h"
 #include "lib/hawq-config.h"
 #include "lib/sql-util.h"
 
@@ -73,4 +74,15 @@ TEST_F(TestCommonLib, TestSqlUtil) {
   util.execute("create table test(p int)");
   util.execute("insert into test values(1),(2)");
   util.query("select * from test", 2);
+}
+
+TEST_F(TestCommonLib, TestDataGenerator) {
+  DataGenerator dGen;
+  dGen.genSimpleTable("simpleAO");
+  dGen.genSimpleTable("simpleParquet", true, "parquet");
+
+  dGen.genTableWithFullTypes("fullTypeAO");
+  dGen.genTableWithSeries("tSeries");
+
+  dGen.genTableWithNull("tNull");
 }
