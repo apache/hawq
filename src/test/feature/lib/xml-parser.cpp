@@ -1,6 +1,7 @@
 #include "xml-parser.h"
 
 #include <limits>
+#include <unistd.h>
 
 XmlConfig::XmlConfig(const char *p) :
     path(p) {

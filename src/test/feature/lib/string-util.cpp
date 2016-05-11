@@ -42,7 +42,7 @@ std::string StringUtil::lower(const std::string &str) {
     result.append(&c, sizeof(char));
   }
 
-  return std::move(result);
+  return result;
 }
 
 std::string &StringUtil::trim(std::string &s) {  // NOLINT

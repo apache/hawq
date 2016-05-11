@@ -2058,7 +2058,7 @@ fi
 AC_SUBST(vpath_build)
 
 
-AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
+AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk src/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
 
 AC_CONFIG_LINKS([
   src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c
