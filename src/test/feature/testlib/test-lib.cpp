@@ -71,13 +71,16 @@ TEST_F(TestCommonLib, TestCommand) {
 
 TEST_F(TestCommonLib, TestSqlUtil) {
   SQLUtility util;
-  util.execute("create table test(p int)");
-  util.execute("insert into test values(1),(2)");
+  util.execute("create table test(p int, q float)");
+  util.execute("insert into test values(1,1.1),(2,2.2)");
   util.query("select * from test", 2);
+  util.query("select * from test", "1|1.1|\n2|2.2|\n");
+  util.execSQLFile("testlib/sql/sample.sql", "testlib/ans/sample.ans");
 }
 
 TEST_F(TestCommonLib, TestDataGenerator) {
-  DataGenerator dGen;
+  SQLUtility util;
+  DataGenerator dGen(&util);
   dGen.genSimpleTable("simpleAO");
   dGen.genSimpleTable("simpleParquet", true, "parquet");
 

@@ -2,53 +2,65 @@
 #define SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
 
 #include <string>
+
 #include "gtest/gtest.h"
 #include "psql.h"
 
 #define HAWQ_DB (getenv("PGDATABASE") ? getenv("PGDATABASE") : "postgres")
 #define HAWQ_HOST (getenv("PGHOST") ? getenv("PGHOST") : "localhost")
 #define HAWQ_PORT (getenv("PGPORT") ? getenv("PGPORT") : "5432")
-#define HAWQ_USER (getenv("PGUSER") ? getenv("PGUSER") : "taoz")
+#define HAWQ_USER (getenv("PGUSER") ? getenv("PGUSER") : "gpadmin")
 #define HAWQ_PASSWORD (getenv("PGPASSWORD") ? getenv("PGPASSWORD") : "")
+
+struct FilePath {
+  std::string path;
+  std::string fileBaseName;
+  std::string fileSuffix;
+};
 
 class SQLUtility {
  public:
-  SQLUtility()
-      : conn(getConnection()),
-        test_info(::testing::UnitTest::GetInstance()->current_test_info()) {
-    schemaName =
-        std::string(test_info->test_case_name()) + "_" + test_info->name();
-    conn->runSQLCommand("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
-    conn->runSQLCommand("CREATE SCHEMA " + schemaName);
-  }
+  SQLUtility();
+  ~SQLUtility();
 
-  ~SQLUtility() {
-    if (!test_info->result()->Failed())
-      conn->runSQLCommand("DROP SCHEMA " + schemaName + " CASCADE");
-  }
+  // Execute sql command
+  // @param sql The given sql command
+  // @return void
+  void execute(const std::string &sql);
 
-  void execute(const std::string &sql) {
-    EXPECT_EQ(conn->runSQLCommand("SET SEARCH_PATH= " + schemaName + ";" + sql)
-                  .getLastStatus(),
-              0);
-  }
+  // Execute query command and check the rowCount
+  // @param sql The given query command
+  // @expectNum The expected rowCount
+  // @return void
+  void query(const std::string &sql, int expectNum);
 
-  void query(const std::string &sql, int resultNum) {
-    PSQLQueryResult result =
-        conn->getQueryResult("SET SEARCH_PATH= " + schemaName + ";" + sql);
-    EXPECT_EQ(result.rowCount(), resultNum);
-  }
+  // Execute query command and check query result
+  // @param sql The given query command
+  // @expectStr The given query result
+  // @return void
+  void query(const std::string &sql, const std::string &expectStr);
+
+  // Execute sql file and diff with ans file
+  // @param sqlFile The given sqlFile which is relative path to test root dir
+  // @param ansFile The given ansFile which is relative path to test root dir
+  // @return void
+  void execSQLFile(const std::string &sqlFile, const std::string &ansFile);
+
+  // Get PSQL connection
+  // @return PSQL raw pointer
+  PSQL *getPSQL() const;
 
  private:
-  std::unique_ptr<PSQL> getConnection() {
-    std::unique_ptr<PSQL> psql(
-        new PSQL(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD));
-    return std::move(psql);
-  }
+  std::unique_ptr<PSQL> getConnection();
+  const std::string generateSQLFile(const std::string &sqlFile);
+  const PSQLQueryResult &executeQuery(const std::string &sql);
+  std::string getTestRootPath() const;
+  FilePath splitFilePath(const std::string &filePath) const;
 
  private:
   std::string schemaName;
   std::unique_ptr<PSQL> conn;
+  std::string testRootPath;
   const ::testing::TestInfo *const test_info;
 };
 

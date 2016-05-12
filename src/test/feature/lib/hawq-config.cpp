@@ -28,7 +28,7 @@ bool HawqConfig::LoadFromConfigFile() {
 
 bool HawqConfig::getMaster(std::string &hostname, int &port) {
   bool ret = LoadFromConfigFile();
-  if(!ret){
+  if (!ret) {
     return false;
   }
   hostname = xmlconf->getString("hawq_master_address_host");
@@ -37,7 +37,7 @@ bool HawqConfig::getMaster(std::string &hostname, int &port) {
 }
 
 void HawqConfig::getStandbyMaster(std::string &hostname, int &port) {
-  PSQLQueryResult result = psql.getQueryResult(
+  const PSQLQueryResult &result = psql.getQueryResult(
       "select hostname, port from gp_segment_configuration where role ='s'");
   std::vector<std::vector<std::string> > table = result.getRows();
   if (table.size() > 0) {
@@ -48,8 +48,8 @@ void HawqConfig::getStandbyMaster(std::string &hostname, int &port) {
 }
 
 void HawqConfig::getTotalSegments(std::vector<std::string> &hostname,
-    std::vector<int> &port) {
-  PSQLQueryResult result = psql.getQueryResult(
+                                  std::vector<int> &port) {
+  const PSQLQueryResult &result = psql.getQueryResult(
       "select hostname, port from gp_segment_configuration where role ='p'");
   std::vector<std::vector<std::string> > table = result.getRows();
   for (int i = 0; i < table.size(); i++) {
@@ -60,9 +60,8 @@ void HawqConfig::getTotalSegments(std::vector<std::string> &hostname,
 }
 
 void HawqConfig::getSlaves(std::vector<std::string> &hostname) {
-
   std::ifstream inFile;
-  char* GPHOME = getenv("GPHOME");
+  char *GPHOME = getenv("GPHOME");
   if (GPHOME == nullptr) {
     return;
   }
@@ -77,10 +76,10 @@ void HawqConfig::getSlaves(std::vector<std::string> &hostname) {
 }
 
 void HawqConfig::getUpSegments(std::vector<std::string> &hostname,
-    std::vector<int> &port) {
-  PSQLQueryResult result =
-      psql.getQueryResult(
-          "select hostname, port from gp_segment_configuration where role = 'p' and status = 'u'");
+                               std::vector<int> &port) {
+  const PSQLQueryResult &result = psql.getQueryResult(
+      "select hostname, port from gp_segment_configuration where role = 'p' "
+      "and status = 'u'");
   std::vector<std::vector<std::string> > table = result.getRows();
 
   if (table.size() > 0) {
@@ -91,10 +90,10 @@ void HawqConfig::getUpSegments(std::vector<std::string> &hostname,
 }
 
 void HawqConfig::getDownSegments(std::vector<std::string> &hostname,
-    std::vector<int> &port) {
-  PSQLQueryResult result =
-      psql.getQueryResult(
-          "select hostname, port from gp_segment_configuration where role = 'p' and status != 'u'");
+                                 std::vector<int> &port) {
+  const PSQLQueryResult &result = psql.getQueryResult(
+      "select hostname, port from gp_segment_configuration where role = 'p' "
+      "and status != 'u'");
   std::vector<std::vector<std::string> > table = result.getRows();
 
   if (table.size() > 0) {
@@ -132,8 +131,8 @@ std::string HawqConfig::setGucValue(std::string gucName, std::string gucValue) {
 }
 
 bool HawqConfig::isMasterMirrorSynchronized() {
-  PSQLQueryResult result = psql.getQueryResult(
-      "select summary_state from gp_master_mirroring");
+  const PSQLQueryResult &result =
+      psql.getQueryResult("select summary_state from gp_master_mirroring");
   if (result.getRows().size() > 0) {
     std::string syncInfo = result.getData(0, 0);
     syncInfo = StringUtil::trim(syncInfo);
@@ -147,8 +146,8 @@ bool HawqConfig::isMasterMirrorSynchronized() {
 }
 
 bool HawqConfig::isMultinodeMode() {
-  PSQLQueryResult result = psql.getQueryResult(
-      "select hostname from gp_segment_configuration");
+  const PSQLQueryResult &result =
+      psql.getQueryResult("select hostname from gp_segment_configuration");
   std::vector<std::vector<std::string> > table = result.getRows();
 
   std::set<std::string> hostnameMap;

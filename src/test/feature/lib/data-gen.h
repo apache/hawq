@@ -15,30 +15,25 @@
 
 class DataGenerator {
  public:
-  DataGenerator() {}
+  explicit DataGenerator(SQLUtility *sqlUtil) : sqlUtil(sqlUtil) {}
 
   ~DataGenerator() {}
 
-  void genSimpleTable(std::string tableName,
-                      bool appendonly = true,
+  void genSimpleTable(std::string tableName, bool appendonly = true,
                       std::string orientation = "row",
-                      std::string compresstype = "none",
-                      int compresslevel = 0);
+                      std::string compresstype = "none", int compresslevel = 0);
 
-  void genTableWithFullTypes(std::string tableName,
-                             bool appendonly = true,
+  void genTableWithFullTypes(std::string tableName, bool appendonly = true,
                              std::string orientation = "row",
                              std::string compresstype = "none",
                              int compresslevel = 0);
 
-  void genTableWithSeries(std::string tableName,
-                          bool appendonly = true,
+  void genTableWithSeries(std::string tableName, bool appendonly = true,
                           std::string orientation = "row",
                           std::string compresstype = "none",
                           int compresslevel = 0);
 
-  void genTableWithNull(std::string tableName,
-                        bool appendonly = true,
+  void genTableWithNull(std::string tableName, bool appendonly = true,
                         std::string orientation = "row",
                         std::string compresstype = "none",
                         int compresslevel = 0);
@@ -47,12 +42,8 @@ class DataGenerator {
   std::string genTableDesc(bool appendonly, std::string orientation,
                            std::string compresstype, int compresslevel);
 
-
  private:
-  SQLUtility sqlUtil;
+  SQLUtility *sqlUtil = nullptr;
 };
-
-
-
 
 #endif /* SRC_TEST_FEATURE_LIB_DATA_GEN_H_ */
