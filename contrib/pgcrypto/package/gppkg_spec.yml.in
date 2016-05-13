@@ -1,8 +1,0 @@
-Pkgname: pgcrypto-hawq
-Architecture: #arch
-Version: #hq_majorversion
-OS: #os
-GPDBVersion: 2.0.0.0
-Description: Pgcrypto provides cryptographic functions for the HAWQ Database. 
-PostInstall:
-- Master:  "echo 'Please run psql -d mydatabase -f $GPHOME/share/postgresql/contrib/pgcrypto.sql to enable the package.'"
