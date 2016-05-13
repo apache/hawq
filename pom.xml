@@ -77,7 +77,6 @@
               <exclude>Makefile</exclude>
               <exclude>config/*</exclude> <!-- This one is tricky since it is actually GPL -->
               <exclude>src/makefiles/*</exclude>
-              <exclude>contrib/pgcrypto/**/*</exclude>
               <exclude>src/DEVELOPERS</exclude>
               <exclude>src/backend/catalog/Makefile</exclude>
               <exclude>src/backend/port/beos/*.c</exclude>

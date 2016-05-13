@@ -1,3 +1,0 @@
-
--- zlib is disabled
-
