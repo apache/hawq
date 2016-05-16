@@ -23,7 +23,7 @@
 # make `all' the default target
 all:
 
-feature_test:
+feature-test:
 
 # Delete target files if the command fails after it has
 # started to update the file.
@@ -221,6 +221,7 @@ COLLATEINDEX	= @COLLATEINDEX@
 
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
+CPPFLAGS += -I$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/include -I$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/include
 
 ifdef PGXS
 override CPPFLAGS := -I$(includedir_server) -I$(includedir_internal) $(CPPFLAGS)
@@ -277,6 +278,8 @@ else
   LDFLAGS = -L$(top_builddir)/src/port
 endif
 LDFLAGS += @LDFLAGS@
+LDFLAGS += -L$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/lib
+LDFLAGS += -L$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/lib
 
 LDFLAGS_EX = @LDFLAGS_EX@
 # LDFLAGS_SL might have already been assigned by calling makefile

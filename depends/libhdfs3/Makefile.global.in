@@ -11,6 +11,7 @@ with_libhdfs3 = @with_libhdfs3@
 # Support for VPATH builds
 vpath_build = @vpath_build@
 abs_top_srcdir = @abs_top_srcdir@
+abs_top_builddir = @abs_top_builddir@
 
 ifneq ($(vpath_build),yes)
 top_srcdir = $(top_builddir)

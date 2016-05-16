@@ -26,10 +26,10 @@ all install installdirs uninstall distprep:
 	$(MAKE) -C test/regress $@
 	$(MAKE) -C tools/fsync $@
 
-feature_test:
-	$(MAKE) -C test feature_test
+feature-test:
+	$(MAKE) -C test feature-test
 
-feature_test_clean:
+feature-test-clean:
 	$(MAKE) -C test clean
 
 install: install-local

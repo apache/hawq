@@ -16,7 +16,7 @@
 .DEFAULT:
 	$(MAKE) -C regress $@
 
-feature_test:
+feature-test:
 	$(MAKE) -C feature all
 
 clean:

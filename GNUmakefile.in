@@ -10,6 +10,8 @@ include $(top_builddir)/src/Makefile.global
 
 all:
 #	$(MAKE) -C doc all
+# waiting for higher version of gcc ready
+#$(MAKE) -C depends/thirdparty/googletest all
 	$(MAKE) -C depends/libhdfs3 all
 	$(MAKE) -C depends/libyarn all
 	$(MAKE) -C src all
@@ -24,6 +26,8 @@ all:
 
 install: 
 #	$(MAKE) -C doc $@
+# waiting for higher version of gcc ready
+#$(MAKE) -C depends/thirdparty/googletest install
 	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C src $@
@@ -52,19 +56,21 @@ distprep:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
 
-feature_test:
-	$(MAKE) -C src feature_test
+feature-test:
+	$(MAKE) -C src feature-test
 
-feature_test_clean:
-	$(MAKE) -C src feature_test_clean
+feature-test-clean:
+	$(MAKE) -C src feature-test-clean
 
 # clean, distclean, etc should apply to contrib too, even though
 # it's not built by default
 clean:
 #	$(MAKE) -C doc $@
 	$(MAKE) -C contrib $@
-	$(MAKE) -C depends/libhdfs3 $@
-	$(MAKE) -C depends/libyarn $@
+# waiting for higher version of gcc ready
+#-$(MAKE) -C depends/thirdparty/googletest $@
+	-$(MAKE) -C depends/libhdfs3 $@
+	-$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib/formatter_fixedwidth $@
@@ -73,7 +79,7 @@ clean:
 	$(MAKE) -C contrib/gp_cancel_query $@
 	$(MAKE) -C contrib/hawq-hadoop $@
 	$(MAKE) -C tools $@
-	$(MAKE) -C src feature_test clean
+	-$(MAKE) -C src feature-test-clean
 # Garbage from autoconf:
 	@rm -rf autom4te.cache/
 
@@ -82,11 +88,13 @@ clean:
 distclean maintainer-clean:
 #	-$(MAKE) -C doc $@
 	-$(MAKE) -C contrib $@
+# waiting for higher version of gcc ready
+#-$(MAKE) -C depends/thirdparty/googletest $@
 	-$(MAKE) -C depends/libhdfs3 $@
 	-$(MAKE) -C depends/libyarn $@
 	-$(MAKE) -C config $@
 	-$(MAKE) -C tools $@
-	-$(MAKE) -C src feature_test clean
+	-$(MAKE) -C src feature-test-clean
 	-$(MAKE) -C src $@
 	-rm -f config.cache config.log config.status GNUmakefile
 # Garbage from autoconf:
@@ -183,4 +191,4 @@ coverage-reset:
 
 
 .PHONY: dist distdir distcheck
-unexport split-dist
+#unexport split-dist

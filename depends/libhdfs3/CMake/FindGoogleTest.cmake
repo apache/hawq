@@ -3,27 +3,38 @@ include(CheckCXXSourceRuns)
 find_path(GoogleTest_INCLUDE_DIR gtest/gtest.h
           NO_DEFAULT_PATH
           PATHS
+          "${PROJECT_SOURCE_DIR}/../thirdparty/googletest/googletest/include"
+          "/usr/local/include"
+          "/usr/include")
+
+find_path(GoogleMock_INCLUDE_DIR gmock/gmock.h
+          NO_DEFAULT_PATH
+          PATHS
+          "${PROJECT_SOURCE_DIR}/../thirdparty/googletest/googlemock/include"
           "/usr/local/include"
           "/usr/include")
 
 find_library(Gtest_LIBRARY
              NAMES libgtest.a
              HINTS
+             "${PROJECT_SOURCE_DIR}/../thirdparty/googletest/build/googlemock/gtest"
              "/usr/local/lib"
              "/usr/lib")
 
 find_library(Gmock_LIBRARY
              NAMES libgmock.a
              HINTS
+             "${PROJECT_SOURCE_DIR}/../thirdparty/googletest/build/googlemock"
              "/usr/local/lib"
              "/usr/lib")
 
 message(STATUS "Find GoogleTest include path: ${GoogleTest_INCLUDE_DIR}")
+message(STATUS "Find GoogleMock include path: ${GoogleMock_INCLUDE_DIR}")
 message(STATUS "Find Gtest library path: ${Gtest_LIBRARY}")
 message(STATUS "Find Gmock library path: ${Gmock_LIBRARY}")
 
-set(CMAKE_REQUIRED_INCLUDES ${GoogleTest_INCLUDE_DIR})
-set(CMAKE_REQUIRED_LIBRARIES ${Gtest_LIBRARY} ${Gmock_LIBRARY})
+set(CMAKE_REQUIRED_INCLUDES ${GoogleTest_INCLUDE_DIR} ${GoogleMock_INCLUDE_DIR})
+set(CMAKE_REQUIRED_LIBRARIES ${Gtest_LIBRARY} ${Gmock_LIBRARY} -lpthread)
 set(CMAKE_REQUIRED_FLAGS)
 check_cxx_source_runs("
 #include <gtest/gtest.h>

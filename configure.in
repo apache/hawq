@@ -652,38 +652,6 @@ AC_SUBST(ORCA_DEPENDS_DIR_INTER)
 AC_SUBST(ORCA_DEPENDS_OBJDIR_DEFAULT)
 
 #
-# Include directories
-#
-ac_save_IFS=$IFS
-IFS="${IFS}${PATH_SEPARATOR}"
-# SRCH_INC comes from the template file
-for dir in $with_includes $SRCH_INC; do
-  if test -d "$dir"; then
-    INCLUDES="$INCLUDES -I$dir"
-  else
-    AC_MSG_WARN([*** Include directory $dir does not exist.])
-  fi
-done
-IFS=$ac_save_IFS
-AC_SUBST(INCLUDES)
-
-
-#
-# Library directories
-#
-ac_save_IFS=$IFS
-IFS="${IFS}${PATH_SEPARATOR}"
-# LIBRARY_DIRS comes from command line, SRCH_LIB from template file.
-for dir in $LIBRARY_DIRS $SRCH_LIB; do
-  if test -d "$dir"; then
-    LIBDIRS="$LIBDIRS -L$dir"
-  else
-    AC_MSG_WARN([*** Library directory $dir does not exist.])
-  fi
-done
-IFS=$ac_save_IFS
-
-#
 # Enable thread-safe client libraries
 #
 AC_MSG_CHECKING([allow thread-safe client libraries])
@@ -916,6 +884,43 @@ else
   ELF_SYS=
 fi])
 AC_SUBST(ELF_SYS)
+
+#
+# Include directories
+#
+#INCLUDES="$INCLUDES -I$ac_pwd/depends/thirdparty/googletest/googletest/include -I$ac_pwd/depends/thirdparty/googletest/googlemock/include"
+
+ac_save_IFS=$IFS
+IFS="${IFS}${PATH_SEPARATOR}"
+# SRCH_INC comes from the template file
+for dir in $with_includes $SRCH_INC; do
+  if test -d "$dir"; then
+    INCLUDES="$INCLUDES -I$dir"
+  else
+    AC_MSG_WARN([*** Include directory $dir does not exist.])
+  fi
+done
+IFS=$ac_save_IFS
+AC_SUBST(INCLUDES)
+
+
+#
+# Library directories
+#
+#LIBDIRS="$LIBDIRS -L$ac_pwd/depends/thirdparty/googletest/build/googlemock/gtest -L$ac_pwd/depends/thirdparty/googletest/build/googlemock"
+
+ac_save_IFS=$IFS
+IFS="${IFS}${PATH_SEPARATOR}"
+# LIBRARY_DIRS comes from command line, SRCH_LIB from template file.
+for dir in $LIBRARY_DIRS $SRCH_LIB; do
+  if test -d "$dir"; then
+    LIBDIRS="$LIBDIRS -L$dir"
+  else
+    AC_MSG_WARN([*** Library directory $dir does not exist.])
+  fi
+done
+IFS=$ac_save_IFS
+
 
 #
 # Assignments
@@ -2057,8 +2062,7 @@ else
 fi
 AC_SUBST(vpath_build)
 
-
-AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk src/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
+AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
 
 AC_CONFIG_LINKS([
   src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c
@@ -2094,4 +2098,3 @@ AC_OUTPUT
 
 # Warn about unknown options
 PGAC_ARG_CHECK
-

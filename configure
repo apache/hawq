@@ -710,6 +710,7 @@ with_gnu_ld
 LD
 LDFLAGS_SL
 LDFLAGS_EX
+INCLUDES
 ELF_SYS
 EGREP
 GREP
@@ -732,7 +733,6 @@ with_python
 with_perl
 with_tcl
 enable_thread_safety
-INCLUDES
 ORCA_DEPENDS_OBJDIR_DEFAULT
 ORCA_DEPENDS_DIR_INTER
 enable_orca
@@ -5508,40 +5508,6 @@ fi
 
 
 #
-# Include directories
-#
-ac_save_IFS=$IFS
-IFS="${IFS}${PATH_SEPARATOR}"
-# SRCH_INC comes from the template file
-for dir in $with_includes $SRCH_INC; do
-  if test -d "$dir"; then
-    INCLUDES="$INCLUDES -I$dir"
-  else
-    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** Include directory $dir does not exist." >&5
-$as_echo "$as_me: WARNING: *** Include directory $dir does not exist." >&2;}
-  fi
-done
-IFS=$ac_save_IFS
-
-
-
-#
-# Library directories
-#
-ac_save_IFS=$IFS
-IFS="${IFS}${PATH_SEPARATOR}"
-# LIBRARY_DIRS comes from command line, SRCH_LIB from template file.
-for dir in $LIBRARY_DIRS $SRCH_LIB; do
-  if test -d "$dir"; then
-    LIBDIRS="$LIBDIRS -L$dir"
-  else
-    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** Library directory $dir does not exist." >&5
-$as_echo "$as_me: WARNING: *** Library directory $dir does not exist." >&2;}
-  fi
-done
-IFS=$ac_save_IFS
-
-#
 # Enable thread-safe client libraries
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking allow thread-safe client libraries" >&5
@@ -6453,6 +6419,45 @@ fi
 fi
 rm -f conftest*
 
+
+
+#
+# Include directories
+#
+#INCLUDES="$INCLUDES -I$ac_pwd/depends/thirdparty/googletest/googletest/include -I$ac_pwd/depends/thirdparty/googletest/googlemock/include"
+
+ac_save_IFS=$IFS
+IFS="${IFS}${PATH_SEPARATOR}"
+# SRCH_INC comes from the template file
+for dir in $with_includes $SRCH_INC; do
+  if test -d "$dir"; then
+    INCLUDES="$INCLUDES -I$dir"
+  else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** Include directory $dir does not exist." >&5
+$as_echo "$as_me: WARNING: *** Include directory $dir does not exist." >&2;}
+  fi
+done
+IFS=$ac_save_IFS
+
+
+
+#
+# Library directories
+#
+#LIBDIRS="$LIBDIRS -L$ac_pwd/depends/thirdparty/googletest/build/googlemock/gtest -L$ac_pwd/depends/thirdparty/googletest/build/googlemock"
+
+ac_save_IFS=$IFS
+IFS="${IFS}${PATH_SEPARATOR}"
+# LIBRARY_DIRS comes from command line, SRCH_LIB from template file.
+for dir in $LIBRARY_DIRS $SRCH_LIB; do
+  if test -d "$dir"; then
+    LIBDIRS="$LIBDIRS -L$dir"
+  else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: *** Library directory $dir does not exist." >&5
+$as_echo "$as_me: WARNING: *** Library directory $dir does not exist." >&2;}
+  fi
+done
+IFS=$ac_save_IFS
 
 
 #
@@ -16419,8 +16424,7 @@ $as_echo "done" >&6; }
 fi
 
 
-
-ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global"
+ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global"
 
 
 ac_config_links="$ac_config_links src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION} src/backend/port/pg_shmem.c:${SHMEM_IMPLEMENTATION} src/include/dynloader.h:src/backend/port/dynloader/${template}.h src/include/pg_config_os.h:src/include/port/${template}.h src/Makefile.port:src/makefiles/Makefile.${template}"
@@ -17140,6 +17144,7 @@ do
     "src/backend/port/tas.s") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/tas.s:src/backend/port/tas/${tas_file}" ;;
     "GNUmakefile") CONFIG_FILES="$CONFIG_FILES GNUmakefile" ;;
     "src/VERSIONS.mk") CONFIG_FILES="$CONFIG_FILES src/VERSIONS.mk" ;;
+    "depends/thirdparty/googletest/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/thirdparty/googletest/Makefile.global" ;;
     "depends/libhdfs3/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libhdfs3/Makefile.global" ;;
     "depends/libyarn/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libyarn/Makefile.global" ;;
     "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;
@@ -17806,4 +17811,3 @@ for pgac_var in `set | sed 's/=.*//' | $EGREP 'with_|enable_'`; do
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: option ignored: --$pgac_txt" >&5
 $as_echo "$as_me: WARNING: option ignored: --$pgac_txt" >&2;}
 done
-

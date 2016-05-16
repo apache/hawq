@@ -38,29 +38,14 @@ install:
   - brew uninstall postgresql
 
 before_script:
-  - cd $TRAVIS_BUILD_DIR/depends/thirdparty/googletest
-  - mkdir build
-  - cd build
-  - cmake ..
-  - make -j2
-  - sudo make install
-  - cd $TRAVIS_BUILD_DIR/depends/libhdfs3
-  - mkdir build
-  - cd build
-  - ../bootstrap --prefix=/usr/local/
-  - make -j2
-  - sudo make install
-  - cd $TRAVIS_BUILD_DIR/depends/libyarn
-  - mkdir build
-  - cd build
-  - ../bootstrap --prefix=/usr/local
-  - make -j2
-  - sudo make install
   - cd $TRAVIS_BUILD_DIR
   - ./configure
 
 script:
   - make -j2
+# waiting higher version of gcc ready
+#- make feature-test
+#- make feature-test-clean
 
 branches:
   except:
