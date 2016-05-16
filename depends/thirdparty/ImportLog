@@ -1,0 +1,2 @@
+2016-05-16
+  * import thrift(with version 0.9.3) from https://github.com/apache/thrift/archive/0.9.3.tar.gz
