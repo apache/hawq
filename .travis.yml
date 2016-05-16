@@ -23,6 +23,7 @@ install:
     snappy
     libevent
     python
+    bison
   - brew outdated libyaml || brew upgrade libyaml
   - brew outdated json-c || brew upgrade json-c
   - brew outdated boost || brew upgrade boost

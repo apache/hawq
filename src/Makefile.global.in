@@ -221,7 +221,12 @@ COLLATEINDEX	= @COLLATEINDEX@
 
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
-CPPFLAGS += -I$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/include -I$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/include
+with_thrift = @with_thrift@
+ifeq ($(with_thrift), yes)
+CPPFLAGS += -I$(abs_top_srcdir)/depends/thirdparty/thrift/install$(prefix)/include
+endif
+CPPFLAGS += -I$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/include
+CPPFLAGS += -I$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/include
 
 ifdef PGXS
 override CPPFLAGS := -I$(includedir_server) -I$(includedir_internal) $(CPPFLAGS)
@@ -278,6 +283,9 @@ else
   LDFLAGS = -L$(top_builddir)/src/port
 endif
 LDFLAGS += @LDFLAGS@
+ifeq ($(with_thrift), yes)
+LDFLAGS += -L$(abs_top_srcdir)/depends/thirdparty/thrift/install$(prefix)/lib
+endif
 LDFLAGS += -L$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/lib
 LDFLAGS += -L$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/lib
 
