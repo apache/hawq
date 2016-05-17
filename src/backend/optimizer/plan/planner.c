@@ -543,14 +543,16 @@ resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
     }else{
     		find_udf(my_parse, &udf_context);
     		if(udf_context.udf_exist){
-    			if ((resourceLife == QRL_ONCE) || (resourceLife == QRL_NONE)) {
+    			if ((resourceLife == QRL_ONCE)) {
     				int64 mincost = min_cost_for_each_query;
     				mincost <<= 20;
     				int avgSliceNum = 3;
     				(*result)->saResult.resource = AllocateResource(QRL_ONCE, avgSliceNum, mincost,
     						GetUserDefinedFunctionVsegNum(),GetUserDefinedFunctionVsegNum(),NULL, 0);
-    			}else{
+    			} else if (resourceLife == QRL_INHERIT) {
     				(*result)->saResult.resource = AllocateResource(resourceLife, 0, 0, 0, 0, NULL, 0);
+    			} else {
+    				/* Do not allocate resource for query with resourceLife = QRL_NONE */
     			}
     		}
     }
