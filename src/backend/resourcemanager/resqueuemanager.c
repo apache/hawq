@@ -4509,8 +4509,11 @@ void timeoutDeadResourceAllocation(void)
 			if ( curmsec - curcon->LastActTime >
 				 1000000L * rm_session_lease_timeout )
 			{
-				elog(LOG, "ConnID %d. The allocated resource timeout is detected.",
-						  curcon->ConnID);
+				elog(WARNING, "ConnID %d. The allocated resource timeout is "
+							  "detected. Last action time is "UINT64_FORMAT
+							  "msec ago.",
+						      curcon->ConnID,
+						      curmsec - curcon->LastActTime);
 				returnResourceToResQueMgr(curcon);
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
@@ -4530,9 +4533,11 @@ void timeoutDeadResourceAllocation(void)
 			if ( curmsec - curcon->LastActTime >
 				 1000000L * rm_session_lease_timeout )
 			{
-				elog(LOG, "ConnID %d. The queued resource request timeout is "
-						  "detected.",
-						  curcon->ConnID);
+				elog(WARNING, "ConnID %d. The queued resource request timeout is "
+						      "detected. Last action time is "UINT64_FORMAT
+							  "msec ago",
+						      curcon->ConnID,
+						      curmsec - curcon->LastActTime);
 
 				snprintf(errorbuf, sizeof(errorbuf),
 						 "queued resource request is timed out due to no session "
@@ -4558,8 +4563,10 @@ void timeoutDeadResourceAllocation(void)
 				 1000000L * rm_session_lease_timeout )
 			{
 				elog(WARNING, "The registered connection timeout is detected. "
-						  	  "ConnID %d",
-							  curcon->ConnID);
+						  	  "ConnID %d. Last action time is "UINT64_FORMAT
+							  "msec ago",
+							  curcon->ConnID,
+							  curmsec - curcon->LastActTime);
 				returnConnectionToQueue(curcon, true);
 				if ( curcon->CommBuffer != NULL )
 				{
