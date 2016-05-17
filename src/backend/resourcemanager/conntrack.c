@@ -103,7 +103,7 @@ void createEmptyConnectionTrack(ConnectionTrack *track)
 	(*track)->RegisterTime   			= 0;
 	(*track)->ResRequestTime 			= 0;
 	(*track)->ResAllocTime	 			= 0;
-	(*track)->LastActTime	 			= 0;
+	(*track)->LastActTime	 			= gettime_microsec();
 	(*track)->HeadQueueTime				= 0;
 
 	(*track)->MessageSize	 	 		= 0;
