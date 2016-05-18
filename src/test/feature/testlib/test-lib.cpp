@@ -23,12 +23,8 @@ class TestCommonLib : public ::testing::Test {
 TEST_F(TestCommonLib, TestHawqConfig) {
   std::string hostname = "";
   int port = 0;
-  struct passwd *pw;
-  uid_t uid;
-  uid = geteuid();
-  pw = getpwuid(uid);
-  std::string uname(pw->pw_name);
-  HawqConfig hc(uname);
+
+  HawqConfig hc;
   hc.getMaster(hostname, port);
 
   hostname = "";
