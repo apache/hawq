@@ -33,7 +33,7 @@ buildscript {
             url 'http://repository.jboss.org/nexus/content/groups/public'
         }
     }
-    
+
     dependencies {
         classpath "com.netflix.nebula:gradle-ospackage-plugin:2.2.6"
         classpath "de.undercouch:gradle-download-task:2.1.0"
@@ -87,7 +87,7 @@ subprojects { subProject ->
         testCompile 'org.powermock:powermock-api-mockito:1.5.1'
         testCompile 'org.mockito:mockito-core:1.9.5'
     }
-    
+
     configurations.all {
         resolutionStrategy {
             // force versions that were specified in dependencies:
@@ -337,6 +337,26 @@ project('pxf-hive') {
     }
 }
 
+project('pxf-json') {
+    dependencies {
+      compile(project(':pxf-hdfs'))
+      compile(project(':pxf-service'))
+      compile "org.apache.commons:commons-lang3:3.0"
+
+      testCompile 'pl.pragmatists:JUnitParams:1.0.2'
+    }
+
+    ospackage {
+      requires('pxf-hdfs', project.version, GREATER | EQUAL)
+
+      from(jar.outputs.files) {
+        into "/usr/lib/pxf-${project.version}"
+      }
+
+      link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+    }
+}
+
 project('pxf-hbase') {
     dependencies {
         compile(project(':pxf-api'))
@@ -404,15 +424,15 @@ task rpm(type: Copy, dependsOn: [subprojects.build, distSubprojects.buildRpm]) {
 def tomcatName = "apache-tomcat-${tomcatVersion}"
 def tomcatTargetDir = "tomcat/build/"
 
-    
+
 task tomcatGet << {
-    
+
     apply plugin: 'de.undercouch.download'
     
     def TarGzSuffix = ".tar.gz"
     def tomcatTar = "${tomcatName}${TarGzSuffix}"
     def tomcatUrl = "http://archive.apache.org/dist/tomcat/tomcat-7/v${tomcatVersion}/bin/${tomcatTar}"
-	    
+
     if (file("${tomcatTargetDir}/${tomcatName}").exists()) {
         println "${tomcatName} already exists, nothing to do"
         return 0
@@ -436,13 +456,13 @@ apply plugin: 'os-package'
 
 task tomcatRpm(type: Rpm) {
     buildDir = 'tomcat/build/'
-     
+
     // clean should not delete the downloaded tarball
     // and RPM, so this is a bogus directory to delete instead.
     clean {
         delete = 'tomcat/build/something'
     }
-     
+
     ospackage {
         packageName 'apache-tomcat'
         summary = 'Apache Tomcat RPM'

@@ -1,0 +1,14 @@
+{
+    "bintType" : 666,
+    "booleanType" : "true",
+    "charType" : "x",
+    "byteaType" : "a",
+    "float8Type" : 3.14,
+    "realType" : 3.15,
+    "integerType" :999,
+    "smallintType": 777,
+    "bpcharType" :"bpcharType",
+    "varcharType" :"varcharType",
+    "textType" : "textType"                          
+ }
+  
