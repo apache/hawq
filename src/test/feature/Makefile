@@ -15,14 +15,18 @@ override LDFLAGS += -L/usr/local/lib -L/usr/lib -L$(abs_top_srcdir)/src/test/fea
 PROG = test-main.cpp $(wildcard */*.cpp)
 RM = rm -rf
 
-.PHONY: all distclean  clean
+.PHONY: all distclean clean doc
 
 all:
 	$(MAKE) -C lib all
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(PROG) $(LDFLAGS) $(LIBS) -o feature-test
 
+doc:
+	doxygen doxygen_template
+
 clean distclean:
 	$(RM) feature-test
 	$(RM) feature-test.dSYM
+	$(RM) doc
 	$(MAKE) -C lib clean
 	
