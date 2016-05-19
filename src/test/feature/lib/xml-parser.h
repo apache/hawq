@@ -2,8 +2,8 @@
 #define SRC_TEST_FEATURE_LIB_XML_PARSER_H_
 
 
-#include <string>
 #include <cstring>
+#include <string>
 #include <unordered_map>
 
 #include "libxml/parser.h"
