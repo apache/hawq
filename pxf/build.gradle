@@ -474,10 +474,11 @@ task tomcatRpm(type: Rpm) {
         permissionGroup = 'root'
 
         preInstall file('tomcat/src/scripts/pre-install.sh')
+        postInstall file('tomcat/src/scripts/post-install.sh')
 
         from("${tomcatTargetDir}/${tomcatName}") {
-            user 'tomcat'
-            permissionGroup 'tomcat'
+            user 'root'
+            permissionGroup 'root'
             into "/opt/pivotal/${tomcatName}"
         }
     
