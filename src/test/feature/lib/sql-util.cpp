@@ -1,6 +1,5 @@
 #include "sql-util.h"
 
-#include <libproc.h>
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -10,6 +9,13 @@
 #include <vector>
 
 #include "string-util.h"
+
+#ifdef __linux__
+#include <limits.h>
+#include <unistd.h>
+#elif __APPLE__
+#include <libproc.h>
+#endif
 
 SQLUtility::SQLUtility()
     : conn(getConnection()),
@@ -135,6 +141,14 @@ const PSQLQueryResult &SQLUtility::executeQuery(const std::string &sql) {
 PSQL *SQLUtility::getPSQL() const { return conn.get(); }
 
 std::string SQLUtility::getTestRootPath() const {
+  std::string result;
+#ifdef __linux__
+  char pathbuf[PATH_MAX];
+  ssize_t count = readlink("/proc/self/exe", pathbuf, PATH_MAX);
+  if (count <= 0)
+    EXPECT_TRUE(false) << "readlink /proc/self/exe error: " << strerror(errno);
+  result = std::string(pathbuf, count);
+#elif __APPLE__
   int ret;
   pid_t pid;
   char pathbuf[PROC_PIDPATHINFO_MAXSIZE];
@@ -144,7 +158,9 @@ std::string SQLUtility::getTestRootPath() const {
   if (ret <= 0)
     EXPECT_TRUE(false) << "PID " << pid << ": proc_pidpath () "
                        << strerror(errno);
-  return splitFilePath(pathbuf).path;
+  result = std::string(pathbuf);
+#endif
+  return splitFilePath(result).path;
 }
 
 FilePath SQLUtility::splitFilePath(const std::string &filePath) const {
