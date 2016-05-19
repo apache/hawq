@@ -69,14 +69,10 @@ class HostList():
         for host in self.list:
             try:
                 fqdn = socket.getfqdn(host)
-                hostname = fqdn.partition('.')[0]
                 ''' Add fully qualified domain names '''
                 if fqdn not in self.list:
                     self.list.append(fqdn)
 
-                ''' Add short names '''
-                if hostname not in self.list:
-                    self.list.append(hostname)
             except socket.error, e:
                 print "Error while including hostname alternatives"
 
