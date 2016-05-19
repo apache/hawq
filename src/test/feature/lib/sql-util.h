@@ -26,7 +26,7 @@ class SQLUtility {
   // Execute sql command
   // @param sql The given sql command
   // @return void
-  void execute(const std::string &sql);
+  void execute(const std::string &sql, bool check = true);
 
   // Execute query command and check the rowCount
   // @param sql The given query command
@@ -50,12 +50,16 @@ class SQLUtility {
   // @return PSQL raw pointer
   PSQL *getPSQL() const;
 
+  // Get test root dir abs path
+  // @return path string
+  std::string getTestRootPath() const;
+
  private:
   std::unique_ptr<PSQL> getConnection();
   const std::string generateSQLFile(const std::string &sqlFile);
   const PSQLQueryResult &executeQuery(const std::string &sql);
-  std::string getTestRootPath() const;
   FilePath splitFilePath(const std::string &filePath) const;
+  void exec(const std::string &sql);
 
  private:
   std::string schemaName;

@@ -1,5 +1,6 @@
 #include "sql-util.h"
 
+#include <libproc.h>
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -16,20 +17,24 @@ SQLUtility::SQLUtility()
       test_info(::testing::UnitTest::GetInstance()->current_test_info()) {
   schemaName =
       std::string(test_info->test_case_name()) + "_" + test_info->name();
-  conn->runSQLCommand("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
-  conn->runSQLCommand("CREATE SCHEMA " + schemaName);
+  exec("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
+  exec("CREATE SCHEMA " + schemaName);
 }
 
 SQLUtility::~SQLUtility() {
   if (!test_info->result()->Failed())
-    conn->runSQLCommand("DROP SCHEMA " + schemaName + " CASCADE");
+    exec("DROP SCHEMA " + schemaName + " CASCADE");
 }
 
-void SQLUtility::execute(const std::string &sql) {
-  EXPECT_EQ((conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql))
-                .getLastStatus(),
-            0)
+void SQLUtility::exec(const std::string &sql) {
+  EXPECT_EQ((conn->runSQLCommand(sql)).getLastStatus(), 0)
       << conn->getLastResult();
+}
+
+void SQLUtility::execute(const std::string &sql, bool check) {
+  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
+  EXPECT_NE(conn.get(), nullptr);
+  if (check) EXPECT_EQ(conn->getLastStatus(), 0) << conn->getLastResult();
 }
 
 void SQLUtility::query(const std::string &sql, int expectNum) {
@@ -69,22 +74,27 @@ void SQLUtility::execSQLFile(const std::string &sqlFile,
   const std::string newSqlFile = generateSQLFile(sqlFile);
 
   // outFile is located in the same folder with ansFile
-  std::string outFile = fp.path + "/" + fp.fileBaseName + ".out";
-  conn->setOutputFile(outFile);
+  std::string outFileAbsPath = fp.path + "/" + fp.fileBaseName + ".out";
+  conn->setOutputFile(outFileAbsPath);
   EXPECT_EQ(conn->runSQLFile(newSqlFile).getLastStatus(), 0);
   conn->resetOutput();
-  if (remove(newSqlFile.c_str()))
-    ASSERT_TRUE(false) << "Error deleting file " << newSqlFile;
-  EXPECT_FALSE(conn->checkDiff(ansFile, outFile, true));
+  EXPECT_FALSE(conn->checkDiff(ansFileAbsPath, outFileAbsPath, true));
+  if (conn->checkDiff(ansFileAbsPath, outFileAbsPath, true) == false) {
+    // no diff, continue to delete the generated sql file
+    if (remove(newSqlFile.c_str()))
+      ASSERT_TRUE(false) << "Error deleting file " << newSqlFile;
+  } else {
+    EXPECT_FALSE(true);
+  }
 }
 
 std::unique_ptr<PSQL> SQLUtility::getConnection() {
   std::string user = HAWQ_USER;
-  if(user == ""){
+  if (user.empty()) {
     struct passwd *pw;
     uid_t uid = geteuid();
     pw = getpwuid(uid);
-    user.assign(pw->pw_name);;
+    user.assign(pw->pw_name);
   }
   std::unique_ptr<PSQL> psql(
       new PSQL(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, user, HAWQ_PASSWORD));
@@ -109,7 +119,7 @@ const std::string SQLUtility::generateSQLFile(const std::string &sqlFile) {
       << "-- end_ignore" << std::endl;
   std::string line;
   while (getline(in, line)) {
-    out << line;
+    out << line << std::endl;
   }
   in.close();
   out.close();
@@ -125,8 +135,16 @@ const PSQLQueryResult &SQLUtility::executeQuery(const std::string &sql) {
 PSQL *SQLUtility::getPSQL() const { return conn.get(); }
 
 std::string SQLUtility::getTestRootPath() const {
-  FilePath fp = splitFilePath(__FILE__);
-  return splitFilePath(__FILE__).path + "/..";
+  int ret;
+  pid_t pid;
+  char pathbuf[PROC_PIDPATHINFO_MAXSIZE];
+
+  pid = getpid();
+  ret = proc_pidpath(pid, pathbuf, sizeof(pathbuf));
+  if (ret <= 0)
+    EXPECT_TRUE(false) << "PID " << pid << ": proc_pidpath () "
+                       << strerror(errno);
+  return splitFilePath(pathbuf).path;
 }
 
 FilePath SQLUtility::splitFilePath(const std::string &filePath) const {
