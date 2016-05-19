@@ -9,7 +9,7 @@
 #define HAWQ_DB (getenv("PGDATABASE") ? getenv("PGDATABASE") : "postgres")
 #define HAWQ_HOST (getenv("PGHOST") ? getenv("PGHOST") : "localhost")
 #define HAWQ_PORT (getenv("PGPORT") ? getenv("PGPORT") : "5432")
-#define HAWQ_USER (getenv("PGUSER") ? getenv("PGUSER") : "gpadmin")
+#define HAWQ_USER (getenv("PGUSER") ? getenv("PGUSER") : "")
 #define HAWQ_PASSWORD (getenv("PGPASSWORD") ? getenv("PGPASSWORD") : "")
 
 struct FilePath {

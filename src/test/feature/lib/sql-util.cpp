@@ -1,5 +1,7 @@
 #include "sql-util.h"
 
+#include <pwd.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <fstream>
@@ -77,8 +79,15 @@ void SQLUtility::execSQLFile(const std::string &sqlFile,
 }
 
 std::unique_ptr<PSQL> SQLUtility::getConnection() {
+  std::string user = HAWQ_USER;
+  if(user == ""){
+    struct passwd *pw;
+    uid_t uid = geteuid();
+    pw = getpwuid(uid);
+    user.assign(pw->pw_name);;
+  }
   std::unique_ptr<PSQL> psql(
-      new PSQL(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD));
+      new PSQL(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, user, HAWQ_PASSWORD));
   return std::move(psql);
 }
 
