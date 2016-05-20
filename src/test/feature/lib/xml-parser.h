@@ -2,6 +2,7 @@
 #define SRC_TEST_FEATURE_LIB_XML_PARSER_H_
 
 
+#include <cstring>
 #include <string>
 #include <unordered_map>
 

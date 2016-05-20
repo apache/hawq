@@ -1,7 +1,9 @@
 #ifndef SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
 #define SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
 
+#include <memory>
 #include <string>
+#include <utility>
 
 #include "gtest/gtest.h"
 #include "psql.h"
