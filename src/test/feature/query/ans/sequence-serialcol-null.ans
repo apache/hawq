@@ -1,0 +1,2 @@
+INSERT INTO serialtest VALUES('wrong',NULL);
+psql:/tmp/TestQuerySequence_TestSequenceCreateSerialColumn.sql:4: ERROR:  null value in column "f2" violates not-null constraint  (seg0 dummy:40000 pid=32346)

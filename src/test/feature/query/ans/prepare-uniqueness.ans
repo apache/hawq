@@ -1,0 +1,43 @@
+SELECT name, statement, parameter_types FROM pg_prepared_statements ORDER BY 1,2,3;
+ name | statement | parameter_types 
+------+-----------+-----------------
+(0 rows)
+
+PREPARE q1 AS SELECT 1 AS a;
+PREPARE
+EXECUTE q1;
+ a 
+---
+ 1
+(1 row)
+
+PREPARE q1 AS SELECT 2;
+psql:/tmp/TestQueryPrepare_TestPrepareUniqueness.sql:9: ERROR:  prepared statement "q1" already exists
+DEALLOCATE q1;
+DEALLOCATE
+PREPARE q1 AS SELECT 2;
+PREPARE
+EXECUTE q1;
+ ?column? 
+----------
+        2
+(1 row)
+
+PREPARE q2 AS SELECT 2 AS b;
+PREPARE
+SELECT name, statement, parameter_types FROM pg_prepared_statements ORDER BY 1,2,3;
+ name |          statement           | parameter_types 
+------+------------------------------+-----------------
+ q1   | PREPARE q1 AS SELECT 2;      | {}
+ q2   | PREPARE q2 AS SELECT 2 AS b; | {}
+(2 rows)
+
+DEALLOCATE PREPARE q1;
+DEALLOCATE
+DEALLOCATE PREPARE q2;
+DEALLOCATE
+SELECT name, statement, parameter_types FROM pg_prepared_statements ORDER BY 1,2,3;
+ name | statement | parameter_types 
+------+-----------+-----------------
+(0 rows)
+
