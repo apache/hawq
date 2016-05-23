@@ -54,10 +54,7 @@ TEST_F(TestQueryPrepare, TestPrepareParameters) {
 		  	   "	name		text,"
 		  	   "	thepath		path)");
 
-  std::string pwd = Command::getCommandOutput("pwd");
-  while( pwd[pwd.size()-1] == '\n' || pwd[pwd.size()-1] == '\r') {
-	  pwd.pop_back();
-  }
+  std::string pwd = util.getTestRootPath();
   std::string cmd = "COPY test1 FROM '" + pwd + "/query/data/tenk.data'";
   std::cout << cmd << std::endl;
   util.execute(cmd);
