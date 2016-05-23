@@ -665,6 +665,7 @@ CXX
 CURL_LIBS
 CURL_CFLAGS
 CURL_CONFIG
+R_HOME
 ZIC
 JAVAC_FLAGS
 JAVADOC
@@ -728,14 +729,13 @@ with_pam
 krb_srvtab
 with_krb5
 with_gssapi
+with_pgcrypto
 with_r
 with_java
 with_python
 with_perl
 with_tcl
 enable_thread_safety
-ORCA_DEPENDS_OBJDIR_DEFAULT
-ORCA_DEPENDS_DIR_INTER
 enable_orca
 enable_email
 enable_gphdfs
@@ -856,6 +856,7 @@ with_perl
 with_python
 with_java
 with_r
+with_pgcrypto
 with_gssapi
 with_krb5
 with_krb_srvnam
@@ -1545,7 +1546,8 @@ Optional Packages:
   --with-perl             build Perl modules (PL/Perl)
   --with-python           build Python modules (PL/Python)
   --with-java             build Java modules (PL/Java)
-  --with-r             build R modules (PL/R)
+  --with-r                build R modules (PL/R)
+  --with-pgcrypto         build with pgcrypto
   --with-gssapi           build with GSSAPI support
   --with-krb5             build with Kerberos 5 support
   --with-krb-srvnam=NAME  default service principal name in Kerberos [postgres]
@@ -5502,14 +5504,6 @@ fi
 
 
 
-if test "$enable_orca" = yes ; then
-    ORCA_DEPENDS_DIR_INTER="$ORCA_DEPENDS_DIR"
-    ORCA_DEPENDS_OBJDIR_DEFAULT="$ORCA_OBJDIR_DEFAULT"
-fi
-
-
-
-
 #
 # Enable thread-safe client libraries
 #
@@ -5772,6 +5766,41 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_r" >&5
 $as_echo "$with_r" >&6; }
+
+
+
+#
+# Optionally build with pgcrypto.
+#
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build pgcrypto modules" >&5
+$as_echo_n "checking whether to build pgcrypto modules... " >&6; }
+
+pgac_args="$pgac_args with_pgcrypto"
+
+
+# Check whether --with-pgcrypto was given.
+if test "${with_pgcrypto+set}" = set; then :
+  withval=$with_pgcrypto;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-pgcrypto option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_pgcrypto=no
+
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_pgcrypto" >&5
+$as_echo "$with_pgcrypto" >&6; }
 
 
 #
@@ -8994,6 +9023,23 @@ If you have zlib already installed, see config.log for details on the
 failure.  It is possible the compiler isn't looking in the proper directory.
 Use --without-zlib to disable zlib support." "$LINENO" 5
 fi
+
+fi
+
+if test "$with_r" = yes; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking R_HOME" >&5
+$as_echo_n "checking R_HOME... " >&6; }
+  if test "x${R_HOME}" = x; then
+    r_home_guess=`pkg-config --variable=rhome libR 2>/dev/null`
+	if test "x${r_home_guess}" != "x"; then
+      R_HOME=$r_home_guess
+	else
+      as_fn_error $? "Failed to Set R_HOME. R is not installed? R_HOME is not set
+or pkg-config is not installed to find R_HOME automatically." "$LINENO" 5
+    fi
+  fi
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${R_HOME}" >&5
+$as_echo "${R_HOME}" >&6; }
 
 fi
 

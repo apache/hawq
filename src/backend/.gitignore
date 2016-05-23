@@ -1,2 +1,6 @@
 postgres
 postgres.def
+*timestamp
+gporca/
+gpos/
+gp-xerces/

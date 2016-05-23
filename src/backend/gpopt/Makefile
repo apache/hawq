@@ -39,29 +39,30 @@ else
 	GPOPT_UDF_FLAGS := -shared
 endif
 
-LIBGPOS_DIR = $(ORCA_DEPENDS_DIR_INTER)/libgpos
-LIBNAUCRATES_DIR = $(ORCA_DEPENDS_DIR_INTER)/libnaucrates
-LIBGPDBCOST_DIR = $(ORCA_DEPENDS_DIR_INTER)/libgpdbcost
-LIBGPOPT_DIR = $(ORCA_DEPENDS_DIR_INTER)/libgpopt
+LIBGPOS_DIR = ../gpos/build/install/$(prefix)/lib
+LIBXERCES_DIR = ../gp-xerces/build/install/$(prefix)/lib
+LIBNAUCRATES_DIR = ../gporca/build/install/$(prefix)/lib
+LIBGPDBCOST_DIR = ../gporca/build/install/$(prefix)/lib
+LIBGPOPT_DIR = ../gporca/build/install/$(prefix)/lib
 
 include $(top_srcdir)/src/backend/common.mk
 
 libdxltranslators.$(LDSFX): $(SUBDIROBJS) $(OBJS)
 	$(CXX) $(CXXFLAGS) $(LDLIBFLAGS) \
-	  -L$(LIBGPOS_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpos \
-	  -L$(ORCA_DEPENDS_DIR_INTER)/lib -lxerces-c \
-	  -L$(LIBNAUCRATES_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lnaucrates \
-	  -L$(LIBGPDBCOST_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpdbcost \
-	  -L$(LIBGPOPT_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpopt -lpthread -o $@ \
+	  -L$(LIBGPOS_DIR) -lgpos \
+	  -L$(LIBXERCES_DIR) -lxerces-c \
+	  -L$(LIBNAUCRATES_DIR) -lnaucrates \
+	  -L$(LIBGPDBCOST_DIR) -lgpdbcost \
+	  -L$(LIBGPOPT_DIR) -lgpopt -lpthread -o $@ \
 	  $(SUBDIROBJS) $(OBJS)
 
 libgpoptudf.$(LDSFX): $(SUBDIROBJS)
 	$(CXX) $(CXXFLAGS) $(GPOPT_UDF_FLAGS) \
-	  -L$(ORCA_DEPENDS_DIR_INTER)/lib -lxerces-c \
-	  -L$(LIBGPOS_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpos \
-	  -L$(LIBNAUCRATES_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lnaucrates \
-	  -L$(LIBGPDBCOST_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpdbcost \
-	  -L$(LIBGPOPT_DIR)/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpopt \
+	  -L$(LIBXERCES_DIR) -lxerces-c \
+	  -L$(LIBGPOS_DIR) -lgpos \
+	  -L$(LIBNAUCRATES_DIR) -lnaucrates \
+	  -L$(LIBGPDBCOST_DIR) -lgpdbcost \
+	  -L$(LIBGPOPT_DIR) -lgpopt \
 	  -o $@ ./utils/funcs.o
 
 install:

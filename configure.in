@@ -643,14 +643,6 @@ PGAC_ARG_BOOL(enable, orca, no, [  --enable-orca        enable Pivotal Query Opt
                          [Define to 1 to build with Pivotal Query Optimizer. (--enable-orca)])])
 AC_SUBST(enable_orca)
 
-if test "$enable_orca" = yes ; then
-    ORCA_DEPENDS_DIR_INTER="$ORCA_DEPENDS_DIR"
-    ORCA_DEPENDS_OBJDIR_DEFAULT="$ORCA_OBJDIR_DEFAULT"
-fi
-
-AC_SUBST(ORCA_DEPENDS_DIR_INTER)
-AC_SUBST(ORCA_DEPENDS_OBJDIR_DEFAULT)
-
 #
 # Enable thread-safe client libraries
 #
@@ -711,9 +703,18 @@ AC_SUBST(with_java)
 # Optionally build R modules (PL/R)
 #
 AC_MSG_CHECKING([whether to build R modules])
-PGAC_ARG_BOOL(with, r, no, [  --with-r             build R modules (PL/R)])
+PGAC_ARG_BOOL(with, r, no, [  --with-r                build R modules (PL/R)])
 AC_MSG_RESULT([$with_r])
 AC_SUBST(with_r)
+
+
+#
+# Optionally build with pgcrypto.
+#
+AC_MSG_CHECKING([whether to build pgcrypto modules])
+PGAC_ARG_BOOL(with, pgcrypto, no, [  --with-pgcrypto         build with pgcrypto ])
+AC_MSG_RESULT([$with_pgcrypto])
+AC_SUBST(with_pgcrypto)
 
 #
 # GSSAPI
@@ -1075,6 +1076,21 @@ if test "$with_zlib" = yes; then
 If you have zlib already installed, see config.log for details on the
 failure.  It is possible the compiler isn't looking in the proper directory.
 Use --without-zlib to disable zlib support.])])
+fi
+
+if test "$with_r" = yes; then
+  AC_MSG_CHECKING([R_HOME])
+  if test "x${R_HOME}" = x; then
+    r_home_guess=`pkg-config --variable=rhome libR 2>/dev/null`
+	if test "x${r_home_guess}" != "x"; then
+      R_HOME=$r_home_guess
+	else
+      AC_MSG_ERROR([Failed to Set R_HOME. R is not installed? R_HOME is not set
+or pkg-config is not installed to find R_HOME automatically.])
+    fi
+  fi
+  AC_MSG_RESULT(${R_HOME})
+  AC_SUBST(R_HOME)
 fi
 
 if test "$enable_spinlocks" = yes; then

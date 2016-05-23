@@ -9,20 +9,16 @@ top_builddir = .
 include $(top_builddir)/src/Makefile.global
 
 all:
-#	$(MAKE) -C doc all
+#	$(MAKE) -C doc $@
 # waiting for higher version of gcc ready
-#$(MAKE) -C depends/thirdparty/googletest all
-	$(MAKE) -C depends/thirdparty/thrift/hawqbuild all
-	$(MAKE) -C depends/libhdfs3 all
-	$(MAKE) -C depends/libyarn all
-	$(MAKE) -C src all
-	$(MAKE) -C config all
-	$(MAKE) -C contrib/formatter_fixedwidth all
-	$(MAKE) -C contrib/extprotocol all
-	$(MAKE) -C contrib/orafce all
-	$(MAKE) -C contrib/gp_cancel_query all
-	$(MAKE) -C contrib/hawq-hadoop all
-	$(MAKE) -C tools all
+#$(MAKE) -C depends/thirdparty/googletest $@
+	$(MAKE) -C depends/thirdparty/thrift/hawqbuild $@
+	$(MAKE) -C depends/libhdfs3 $@
+	$(MAKE) -C depends/libyarn $@
+	$(MAKE) -C src $@
+	$(MAKE) -C config $@
+	$(MAKE) -C contrib $@
+	$(MAKE) -C tools $@
 	@echo "All of HAWQ successfully made. Ready to install."
 
 install:
@@ -34,11 +30,7 @@ install:
 	$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
-	$(MAKE) -C contrib/formatter_fixedwidth $@
-	$(MAKE) -C contrib/extprotocol $@
-	$(MAKE) -C contrib/orafce $@
-	$(MAKE) -C contrib/gp_cancel_query $@
-	$(MAKE) -C contrib/hawq-hadoop $@
+	$(MAKE) -C contrib $@
 	$(MAKE) -C tools $@
 	@echo "HAWQ installation complete."
 
@@ -46,11 +38,7 @@ installdirs uninstall:
 #	$(MAKE) -C doc $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
-	$(MAKE) -C contrib/formatter_fixedwidth $@
-	$(MAKE) -C contrib/extprotocol $@
-	$(MAKE) -C contrib/orafce $@
-	$(MAKE) -C contrib/gp_cancel_query $@
-	$(MAKE) -C contrib/hawq-hadoop $@
+	$(MAKE) -C contrib $@
 
 distprep:
 #	$(MAKE) -C doc $@
@@ -76,11 +64,7 @@ clean:
 	-$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
-	$(MAKE) -C contrib/formatter_fixedwidth $@
-	$(MAKE) -C contrib/extprotocol $@
-	$(MAKE) -C contrib/orafce $@
-	$(MAKE) -C contrib/gp_cancel_query $@
-	$(MAKE) -C contrib/hawq-hadoop $@
+	$(MAKE) -C contrib $@
 	$(MAKE) -C tools $@
 	-$(MAKE) -C src feature-test-clean
 # Garbage from autoconf:

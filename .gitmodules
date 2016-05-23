@@ -1,0 +1,15 @@
+[submodule "src/backend/gp-xerces"]
+	path = src/backend/gp-xerces
+	url = https://github.com/greenplum-db/gp-xerces.git
+[submodule "src/backend/gpos"]
+	path = src/backend/gpos
+	url = https://github.com/greenplum-db/gpos.git
+[submodule "src/backend/gporca"]
+	path = src/backend/gporca
+	url = https://github.com/greenplum-db/gporca.git
+[submodule "src/pl/plr"]
+	path = src/pl/plr
+	url = https://github.com/jconway/plr.git
+[submodule "src/postgres"]
+	path = src/postgres
+	url = https://github.com/postgres/postgres.git

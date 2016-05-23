@@ -1,0 +1,32 @@
+diff --git a/contrib/pgcrypto/.gitignore b/contrib/pgcrypto/.gitignore
+index 5dcb3ff..dd80948 100644
+--- a/contrib/pgcrypto/.gitignore
++++ b/contrib/pgcrypto/.gitignore
+@@ -1,4 +1,9 @@
+ # Generated subdirectories
+-/log/
+-/results/
+-/tmp_check/
++libpgcrypto.a
++libpgcrypto.so
++libpgcrypto.so.0
++libpgcrypto.so.0.0
++pgcrypto.sql
++log
++results
++tmp_check
+diff --git a/contrib/pgcrypto/Makefile b/contrib/pgcrypto/Makefile
+index dadec95..3ec597d 100644
+--- a/contrib/pgcrypto/Makefile
++++ b/contrib/pgcrypto/Makefile
+@@ -41,8 +41,8 @@ PG_CONFIG = pg_config
+ PGXS := $(shell $(PG_CONFIG) --pgxs)
+ include $(PGXS)
+ else
+-subdir = contrib/pgcrypto
+-top_builddir = ../..
++subdir = src/postgresql/contrib/pgcrypto
++top_builddir = ../../../..
+ include $(top_builddir)/src/Makefile.global
+ include $(top_srcdir)/contrib/contrib-global.mk
+ endif

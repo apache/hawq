@@ -1,0 +1,28 @@
+diff --git a/Makefile b/Makefile
+index 65c6bbe..29f04cd 100755
+--- a/Makefile
++++ b/Makefile
+@@ -35,8 +35,8 @@ endif
+ PGXS := $(shell $(PG_CONFIG) --pgxs)
+ include $(PGXS)
+ else
+-subdir = contrib/plr
+-top_builddir = ../..
++subdir = src/pl/plr
++top_builddir = ../../..
+ include $(top_builddir)/src/Makefile.global
+ include $(top_srcdir)/contrib/contrib-global.mk
+ endif
+diff --git a/plr.h b/plr.h
+index 67f8dbe..9a457ee 100755
+--- a/plr.h
++++ b/plr.h
+@@ -366,7 +366,7 @@ extern void R_RunExitFinalizers(void);
+ 		tupdesc = lookup_rowtype_tupdesc(tupType, tupTypmod); \
+ 		tuple->t_len = HeapTupleHeaderGetDatumLength(tuple_hdr); \
+ 		ItemPointerSetInvalid(&(tuple->t_self)); \
+-		tuple->t_tableOid = InvalidOid; \
++		/* tuple->t_tableOid = InvalidOid; */ \
+ 		tuple->t_data = tuple_hdr; \
+ 		PROTECT(el = pg_tuple_get_r_frame(1, &tuple, tupdesc)); \
+ 		ReleaseTupleDesc(tupdesc); \

@@ -56,12 +56,18 @@ LIBS := -lprotobuf -lboost_system -lboost_date_time -lstdc++ -lhdfs3 -lgsasl -lx
 
 # adding orca libraries
 ifeq ($(enable_orca),yes)
-LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/libgpos/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpos
-LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/lib -lxerces-c
-LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/libnaucrates/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lnaucrates
-LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/libgpdbcost/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpdbcost
-LIBS := $(LIBS) -L$(ORCA_DEPENDS_DIR_INTER)/libgpopt/$(ORCA_DEPENDS_OBJDIR_DEFAULT) -lgpopt
-LIBS := $(LIBS) -L$(top_builddir)/src/backend/gpopt -ldxltranslators
+LIBGPOS_DIR = $(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/lib
+LIBXERCES_DIR = $(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/lib
+LIBNAUCRATES_DIR = $(abs_top_builddir)/$(subdir)/gporca/build/install/$(prefix)/lib
+LIBGPDBCOST_DIR = $(abs_top_builddir)/$(subdir)/gporca/build/install/$(prefix)/lib
+LIBGPOPT_DIR = $(abs_top_builddir)/$(subdir)/gporca/build/install/$(prefix)/lib
+
+LIBS := $(LIBS) -L$(LIBGPOS_DIR) -lgpos
+LIBS := $(LIBS) -L$(LIBXERCES_DIR) -lxerces-c
+LIBS := $(LIBS) -L$(LIBNAUCRATES_DIR) -lnaucrates
+LIBS := $(LIBS) -L$(LIBGPDBCOST_DIR) -lgpdbcost
+LIBS := $(LIBS) -L$(LIBGPOPT_DIR) -lgpopt
+LIBS := $(LIBS) -L$(abs_top_builddir)/$(subdir)/gpopt -ldxltranslators
 endif
 
 # HAWQ uses threads in the backend
@@ -74,19 +80,111 @@ SNAPPYLIB = -lsnappy
 LIBS := $(LIBS) $(SNAPPYLIB)
 ##########################################################################
 
-submake-libdxltranslators: 
 ifeq ($(enable_orca),yes)
-	$(MAKE) -C gpopt all
+
+ifeq ($(PORTNAME), darwin)
+XERCES_LIB_FILE=libxerces-c.dylib
+GPOS_LIB_FILE=libgpos.dylib
+else
+XERCES_LIB_FILE=libxerces-c.so
+GPOS_LIB_FILE=libgpos.so
 endif
 
-all: submake-libpgport submake-libdxltranslators  postgres $(POSTGRES_IMP)
+GPORCA_SRC_PATH := $(abs_top_srcdir)/$(subdir)/gporca
+GPOS_SRC_PATH := $(abs_top_srcdir)/$(subdir)/gpos
+GP_XERCES_SRC_PATH := $(abs_top_srcdir)/$(subdir)/gp-xerces
+
+submake-gporca: submake-gpos submake-gp-xerces gporca_prepare
+ifneq ($(prefix),)
+	if [ ! -f gporca_build_timestamp ]; then \
+		rm -rf gporca/build; mkdir -p gporca/build; cd gporca/build; \
+		cmake $(GPORCA_SRC_PATH) -DCMAKE_INSTALL_PREFIX=$(prefix) \
+			-DXERCES_INCLUDE_DIR=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/include \
+			-DXERCES_LIBRARY=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/lib/$(XERCES_LIB_FILE) \
+			-DGPOS_INCLUDE_DIR=$(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/include \
+			-DGPOS_LIBRARY=$(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/lib/$(GPOS_LIB_FILE) && \
+		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gporca/build/install install && \
+		touch ../../gporca_build_timestamp; \
+	fi
+else
+	if [ ! -f gporca_build_timestamp ]; then \
+		rm -rf gporca/build; mkdir -p gporca/build; cd gporca/build; \
+ 		cmake $(ORCA_SRC_PATH) \
+			-DXERCES_INCLUDE_DIR=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/include \
+			-DXERCES_LIBRARY=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/lib/$(XERCES_LIB_FILE) \
+			-DGPOS_INCLUDE_DIR=$(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/include \
+			-DGPOS_LIBRARY=$(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/lib/$(GPOS_LIB_FILE) && \
+		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gporca/build/install install && \
+		touch ../../gporca_build_timestamp; \
+	fi
+endif
+
+submake-gpos: gporca_prepare
+ifneq ($(prefix),)
+	if [ ! -f gpos_build_timestamp ]; then \
+		rm -rf gpos/build; mkdir -p gpos/build; cd gpos/build; mkdir -p install; \
+		cmake $(GPOS_SRC_PATH) -DCMAKE_INSTALL_PREFIX=$(prefix) && \
+		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gpos/build/install install && \
+		touch ../../gpos_build_timestamp; \
+	fi
+else
+	if [ ! -f gpos_build_timestamp ]; then \
+		rm -rf gpos/build; mkdir -p gpos/build; cd gpos/build; mkdir -p install; \
+		cmake $(GPOS_SRC_PATH) && \
+		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gpos/build/install install && \
+		touch ../../gpos_build_timestamp; \
+	fi
+endif
+
+submake-gp-xerces: submake-gpos gporca_prepare
+ifneq ($(prefix),)
+	if [ ! -f gp-xerces_build_timestamp ]; then \
+		rm -rf gp-xerces/build; mkdir -p gp-xerces/build; cd gp-xerces/build; mkdir -p install; \
+		$(GP_XERCES_SRC_PATH)/configure --prefix=$(prefix); \
+		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install install && \
+		touch ../../gp-xerces_build_timestamp; \
+	fi
+else
+	if [ ! -f gp-xerces_build_timestamp ]; then \
+		rm -rf gp-xerces/build; mkdir -p gp-xerces/build; cd gp-xerces/build; mkdir -p install; \
+		$(GP_XERCES_SRC_PATH)/configure --prefix=$(prefix); \
+		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install install && \ 
+		touch ../../gp-xerces_build_timestamp; \
+	fi
+endif
+
+gporca_prepare:
+	if [ ! -f $(abs_top_builddir)/$(subdir)/gporca_prepare_timestamp ]; then \
+			cd $(abs_top_srcdir); \
+			git submodule update --init $(subdir)/gporca && \
+			git submodule update --init $(subdir)/gp-xerces && \
+			git submodule update --init $(subdir)/gpos && \
+			touch $(abs_top_builddir)/$(subdir)/gporca_prepare_timestamp; \
+	fi
+
+submake-libdxltranslators: submake-gporca
+	$(MAKE) -C gpopt all
+
+# No distclean for gpor & gpos by now.
+distclean_gporca:
+	rm -rf gporca/build gporca_*_timestamp
+	rm -rf gpos/build gpos_*_timestamp
+	rm -rf gp-xerces/build gp-xerces_*_timestamp
+
+.PHONY: submake-gporca submake-gpos submake-gp-xerces distclean_gporca gporca_prepare
+
+else
+submake-libdxltranslators distclean_gporca:
+endif # enable_orca
+
+all: submake-libpgport postgres $(POSTGRES_IMP)
 
 ifneq ($(PORTNAME), cygwin)
 ifneq ($(PORTNAME), win32)
 ifneq ($(PORTNAME), aix)
 
-postgres: $(OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(export_dynamic) $(call expand_subsys,$^) $(LIBS) -o $@
+postgres: $(OBJS) submake-libdxltranslators
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(export_dynamic) $(call expand_subsys, $(filter-out submake-libdxltranslators, $^)) $(LIBS) -o $@
 
 endif
 endif
@@ -227,6 +325,7 @@ endif
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/gpcheck.cnf ${sysconfdir}
 ifeq ($(enable_orca), yes)
 	$(MAKE) -C gpopt $@ INSTLOC=$(DESTDIR)$(libdir)
+	$(MAKE) -C gporca/build $@
 endif
 
 install-bin: postgres $(POSTGRES_IMP) installdirs
@@ -303,7 +402,7 @@ endif
 	find gpopt -name *.so | xargs rm -rf
 	find gpopt -name *.dylib | xargs rm -rf
 
-distclean: clean
+distclean: clean distclean_gporca
 	rm -f port/tas.s port/dynloader.c port/pg_sema.c port/pg_shmem.c
 
 maintainer-clean: distclean

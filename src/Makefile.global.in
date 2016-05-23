@@ -45,6 +45,7 @@ ADDON_DIR = @ADDON_DIR@
 # Support for VPATH builds
 vpath_build = @vpath_build@
 abs_top_srcdir = @abs_top_srcdir@
+abs_top_builddir = @abs_top_builddir@
 
 ifneq ($(vpath_build),yes)
 top_srcdir = $(top_builddir)
@@ -170,6 +171,7 @@ with_perl	= @with_perl@
 with_python	= @with_python@
 with_tcl	= @with_tcl@
 with_r		= @with_r@
+with_pgcrypto = @with_pgcrypto@
 with_java   = @with_java@
 with_openssl	= @with_openssl@
 with_system_tzdata = @with_system_tzdata@
@@ -266,13 +268,6 @@ LD = @LD@
 with_gnu_ld = @with_gnu_ld@
 ld_R_works = @ld_R_works@
 
-# Dependencies
-ORCA_DEPENDS_DIR_INTER = @ORCA_DEPENDS_DIR_INTER@
-ORCA_DEPENDS_OBJDIR_DEFAULT = @ORCA_DEPENDS_OBJDIR_DEFAULT@
-ORCA_DEPENDS_XERCES_VER = @ORCA_DEPENDS_XERCES_VER@
-ORCA_DEPENDS_LIBGPOS_VER = @ORCA_DEPENDS_LIBGPOS_VER@
-ORCA_DEPENDS_OPTIMIZER_VER = @ORCA_DEPENDS_OPTIMIZER_VER@
-
 # We want -L for libpgport.a to be first in LDFLAGS.  We also need LDFLAGS
 # to be a "recursively expanded" variable, else adjustments to rpathdir
 # don't work right.  So we must NOT do LDFLAGS := something, meaning this has
@@ -327,6 +322,11 @@ else
 	JAVAH       = $(missing) javah
 	JAR         = $(missing) jar
 	JAVADOC     = $(missing) javadoc
+endif
+
+# R
+ifeq ($(with_r), yes)
+	R_HOME		= "@R_HOME@"
 endif
 
 # Miscellaneous
@@ -695,6 +695,14 @@ include $(top_srcdir)/src/nls-global.mk
 endif # nls.mk
 endif # enable_nls
 
+pg_prepare:
+ifneq "$(findstring yes, $(with_pgcrypto))" ""
+	if [ ! -e $(abs_top_builddir)/pg_prepare_timestamp ]; then \
+		cd $(abs_top_srcdir); \
+		git submodule update --init src/postgres && \
+		touch $(abs_top_builddir)/src/pg_prepare_timestamp; \
+	fi
+endif
 
 ##########################################################################
 #
@@ -727,7 +735,6 @@ lcov.info: $(gcda_files)
 
 %.c.gcov: %.gcda | lcov.info
 	$(GCOV) -b -f -p -o . $(GCOVFLAGS) $*.c >$*.c.gcov.out
-
 
 # hook for clean-up
 clean distclean maintainer-clean: clean-coverage

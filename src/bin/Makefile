@@ -16,7 +16,7 @@ include $(top_builddir)/src/Makefile.global
 DIRS = initdb ipcclean pg_ctl pg_dump pgbench \
 	psql scripts pg_config pg_controldata pg_resetxlog \
 	gpfilesystem/hdfs gpmirrortransition gpupgrade \
-	gpfusion gp_workfile_mgr gpcheckhdfs gpfdist gpoptutils
+	gpfusion gp_workfile_mgr gpcheckhdfs gpoptutils
 
 all install installdirs uninstall distprep clean distclean maintainer-clean:
 	@for dir in $(DIRS); do echo "build $$dir"; $(MAKE) -C $$dir $@ || exit; done
