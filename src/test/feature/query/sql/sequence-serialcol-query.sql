@@ -1,0 +1,1 @@
+select * from serialtest order by f2;

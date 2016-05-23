@@ -1,0 +1,8 @@
+select * from serialtest order by f2;
+  f1   | f2  
+-------+-----
+ foo   |   1
+ more  |   2
+ force | 100
+(3 rows)
+

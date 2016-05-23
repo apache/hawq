@@ -1,0 +1,14 @@
+CREATE TEMP SEQUENCE myseq2;
+CREATE TEMPORARY SEQUENCE myseq3;
+CREATE TEMP TABLE t1 (f1 SERIAL, 
+                      f2 INT DEFAULT NEXTVAL('myseq2'),
+                      f3 INT DEFAULT NEXTVAL('myseq3'::text)
+);
+
+DROP SEQUENCE t1_f1_seq;
+DROP SEQUENCE myseq2;
+DROP SEQUENCE myseq3;
+DROP TABLE t1;
+DROP SEQUENCE t1_f1_seq;
+DROP SEQUENCE myseq2;
+					  

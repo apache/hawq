@@ -1,0 +1,27 @@
+CREATE TEMP SEQUENCE myseq2;
+CREATE SEQUENCE
+CREATE TEMPORARY SEQUENCE myseq3;
+CREATE SEQUENCE
+CREATE TEMP TABLE t1 (f1 SERIAL, 
+                      f2 INT DEFAULT NEXTVAL('myseq2'),
+                      f3 INT DEFAULT NEXTVAL('myseq3'::text)
+);
+psql:/tmp/TestQuerySequence_TestSequenceDependency.sql:9: NOTICE:  CREATE TABLE will create implicit sequence "t1_f1_seq" for serial column "t1.f1"
+CREATE TABLE
+DROP SEQUENCE t1_f1_seq;
+psql:/tmp/TestQuerySequence_TestSequenceDependency.sql:11: NOTICE:  default for append only table t1 column f1 depends on sequence t1_f1_seq
+psql:/tmp/TestQuerySequence_TestSequenceDependency.sql:11: ERROR:  cannot drop sequence t1_f1_seq because other objects depend on it
+HINT:  Use DROP ... CASCADE to drop the dependent objects too.
+DROP SEQUENCE myseq2;
+psql:/tmp/TestQuerySequence_TestSequenceDependency.sql:12: NOTICE:  default for append only table t1 column f2 depends on sequence myseq2
+psql:/tmp/TestQuerySequence_TestSequenceDependency.sql:12: ERROR:  cannot drop sequence myseq2 because other objects depend on it
+HINT:  Use DROP ... CASCADE to drop the dependent objects too.
+DROP SEQUENCE myseq3;
+DROP SEQUENCE
+DROP TABLE t1;
+DROP TABLE
+DROP SEQUENCE t1_f1_seq;
+psql:/tmp/TestQuerySequence_TestSequenceDependency.sql:15: ERROR:  sequence "t1_f1_seq" does not exist
+DROP SEQUENCE myseq2;
+DROP SEQUENCE
+					  
