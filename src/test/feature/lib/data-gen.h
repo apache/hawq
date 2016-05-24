@@ -21,22 +21,23 @@ class DataGenerator {
 
   void genSimpleTable(std::string tableName, bool appendonly = true,
                       std::string orientation = "row",
-                      std::string compresstype = "none", int compresslevel = 0);
+                      std::string compresstype = "none",
+                      int compresslevel = -1);
 
   void genTableWithFullTypes(std::string tableName, bool appendonly = true,
                              std::string orientation = "row",
                              std::string compresstype = "none",
-                             int compresslevel = 0);
+                             int compresslevel = -1);
 
   void genTableWithSeries(std::string tableName, bool appendonly = true,
                           std::string orientation = "row",
                           std::string compresstype = "none",
-                          int compresslevel = 0);
+                          int compresslevel = -1);
 
   void genTableWithNull(std::string tableName, bool appendonly = true,
                         std::string orientation = "row",
                         std::string compresstype = "none",
-                        int compresslevel = 0);
+                        int compresslevel = -1);
 
  private:
   std::string genTableDesc(bool appendonly, std::string orientation,

@@ -50,7 +50,7 @@ class SQLUtility {
 
   // Get PSQL connection
   // @return PSQL raw pointer
-  PSQL *getPSQL() const;
+  const PSQL *getPSQL() const;
 
   // Get test root dir abs path
   // @return path string
