@@ -135,6 +135,9 @@ std::string DataGenerator::genTableDesc(bool appendonly,
   std::string desc = (appendonly ? "with (appendonly = true, orientation = "
                                  : "with (appendonly = false, orientation = ") +
                      orientation + ", compresstype = " + compresstype +
-                     ", compresslevel = " + std::to_string(compresslevel) + ")";
+                     (compresslevel != -1
+                          ? ", compresslevel = " + std::to_string(compresslevel)
+                          : "") +
+                     ")";
   return desc;
 }

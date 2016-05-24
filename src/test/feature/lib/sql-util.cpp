@@ -33,14 +33,14 @@ SQLUtility::~SQLUtility() {
 }
 
 void SQLUtility::exec(const std::string &sql) {
-  EXPECT_EQ((conn->runSQLCommand(sql)).getLastStatus(), 0)
+  EXPECT_EQ(0, (conn->runSQLCommand(sql)).getLastStatus())
       << conn->getLastResult();
 }
 
 void SQLUtility::execute(const std::string &sql, bool check) {
   conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
   EXPECT_NE(conn.get(), nullptr);
-  if (check) EXPECT_EQ(conn->getLastStatus(), 0) << conn->getLastResult();
+  if (check) EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
 }
 
 void SQLUtility::query(const std::string &sql, int expectNum) {
@@ -82,7 +82,7 @@ void SQLUtility::execSQLFile(const std::string &sqlFile,
   // outFile is located in the same folder with ansFile
   std::string outFileAbsPath = fp.path + "/" + fp.fileBaseName + ".out";
   conn->setOutputFile(outFileAbsPath);
-  EXPECT_EQ(conn->runSQLFile(newSqlFile).getLastStatus(), 0);
+  EXPECT_EQ(0, conn->runSQLFile(newSqlFile).getLastStatus());
   conn->resetOutput();
   EXPECT_FALSE(conn->checkDiff(ansFileAbsPath, outFileAbsPath, true));
   if (conn->checkDiff(ansFileAbsPath, outFileAbsPath, true) == false) {
@@ -138,7 +138,7 @@ const PSQLQueryResult &SQLUtility::executeQuery(const std::string &sql) {
   return result;
 }
 
-PSQL *SQLUtility::getPSQL() const { return conn.get(); }
+const PSQL *SQLUtility::getPSQL() const { return conn.get(); }
 
 std::string SQLUtility::getTestRootPath() const {
   std::string result;
