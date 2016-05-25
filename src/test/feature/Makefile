@@ -10,7 +10,7 @@ override CXX = g++
 override CXXFLAGS = -Wall -O0 -g -std=c++11
 override CPPFLAGS := -I/usr/include -I/usr/local/include -I/usr/include/libxml2 -I$(abs_top_srcdir)/src/test/feature/ -I$(abs_top_srcdir)/src/test/feature/lib/ -I$(abs_top_srcdir)/src/interfaces/libpq -I$(abs_top_srcdir)/src/interfaces -I$(abs_top_srcdir)/src/include  -I$(gtest_include) -I$(gmock_include)
 override LIBS := $(LIBS) -lgtest -lpq -lxml2 -ltest
-override LDFLAGS += -L/usr/local/lib -L/usr/lib -L$(abs_top_srcdir)/src/test/feature/lib -L$(gtest_lib_path) -L$(gmock_lib_path)
+override LDFLAGS += -L/usr/local/lib -L/usr/lib -L$(abs_top_srcdir)/src/test/feature/ -L$(abs_top_srcdir)/src/test/feature/lib/ -L$(abs_top_srcdir)/src/interfaces/libpq -L$(gtest_lib_path) -L$(gmock_lib_path)
 
 PROG = test-main.cpp $(wildcard */*.cpp)
 RM = rm -rf
