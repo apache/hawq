@@ -102,6 +102,8 @@ oid				objid_gpdbAlertSqlStmt[] = { 1, 3, 6, 1, 4, 1, 31327, 1, 5 };
 oid				objid_gpdbAlertSystemName[] = { 1, 3, 6, 1, 4, 1, 31327, 1, 6 };
 #endif
 
+static bool SplitString(char *rawstring, char delimiter, List **namelist);
+
 #ifdef USE_EMAIL
 
 static char * get_str_from_chunk(CSVChunkStr *chunkstr,
@@ -114,7 +116,6 @@ static int authinteract(auth_client_request_t request, char **result,
 static int tlsinteract(char *buf, int buflen, int rwflag  __attribute__((unused)), void *arg  __attribute__((unused)));
 static int handle_invalid_peer_certificate(long vfy_result);
 static void event_cb(smtp_session_t session, int event_no, void *arg, ...);
-static bool SplitMailString(char *rawstring, char delimiter, List **namelist);
 static void monitor_cb (const char *buf, int buflen, int writing, void *arg);
 
 static int send_alert_via_email(const GpErrorData * errorData, const char * subject, const char * email_priority);
@@ -360,7 +361,7 @@ static int send_snmp_inform_or_trap(const GpErrorData * errorData, const char * 
 	rawstring = pstrdup(gp_snmp_monitor_address);
 
 	/* Parse string into list of identifiers */
-	if (!SplitMailString(rawstring, ',', &elemlist))
+	if (!SplitString(rawstring, ';', &elemlist))
 	{
 		/* syntax error in list */
 		ereport(LOG,
@@ -715,7 +716,7 @@ static int send_alert_via_email(const GpErrorData * errorData,
 	rawstring = pstrdup(gp_email_to);
 
 	/* Parse string into list of identifiers */
-	if (!SplitMailString(rawstring, ';', &elemlist))
+	if (!SplitString(rawstring, ',', &elemlist))
 	{
 		/* syntax error in list */
 		ereport(LOG,
@@ -1690,8 +1691,20 @@ static void event_cb(smtp_session_t session, int event_no, void *arg, ...)
 	va_end(alist);
 }
 
+/*
+ * This routine is strictly for debugging... It dumps out our interaction with the SMTP server.
+ */
+static void
+monitor_cb (const char *buf, int buflen, int writing, void *arg)
+{
+  elog(DEBUG1, "SMTP %s: %.*s",(writing == SMTP_CB_HEADERS) ? "H" : writing ? "C" : "S", buflen, buf);
+}
+
+
+#endif
+
 static bool
-SplitMailString(char *rawstring, char delimiter,
+SplitString(char *rawstring, char delimiter,
 					  List **namelist)
 {
 	char	   *nextp = rawstring;
@@ -1748,16 +1761,3 @@ SplitMailString(char *rawstring, char delimiter,
 
 	return true;
 }
-
-/*
- * This routine is strictly for debugging... It dumps out our interaction with the SMTP server.
- */
-static void
-monitor_cb (const char *buf, int buflen, int writing, void *arg)
-{
-  elog(DEBUG1, "SMTP %s: %.*s",(writing == SMTP_CB_HEADERS) ? "H" : writing ? "C" : "S", buflen, buf);
-}
-
-
-#endif
-
