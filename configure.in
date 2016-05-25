@@ -817,7 +817,7 @@ fi
 # thrift
 #
 PGAC_ARG_BOOL(with, thrift, no,
-              [  --with-thrift       do not build thrift])
+              [  --with-thrift           build thrift])
 AC_SUBST(with_thrift)
 
 #

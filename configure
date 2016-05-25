@@ -1556,7 +1556,7 @@ Optional Packages:
   --with-bonjour          build with Bonjour support
   --with-openssl          build with OpenSSL support
   --without-readline      do not use GNU Readline nor BSD Libedit for editing
-  --with-thrift       do not build thrift
+  --with-thrift           build thrift
   --without-libyarn       do not build libyarn
   --without-libhdfs3      do not build libhdfs3
   --without-libedit-preferred  Don't prefer BSD Libedit over GNU Readline

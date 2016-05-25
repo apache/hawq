@@ -44,9 +44,8 @@ before_script:
 
 script:
   - make -j2
-# waiting higher version of gcc ready
-#- make feature-test
-#- make feature-test-clean
+  - make feature-test
+  - make feature-test-clean
 
 branches:
   except:

@@ -10,8 +10,7 @@ include $(top_builddir)/src/Makefile.global
 
 all:
 #	$(MAKE) -C doc $@
-# waiting for higher version of gcc ready
-#$(MAKE) -C depends/thirdparty/googletest $@
+	$(MAKE) -C depends/thirdparty/googletest $@
 	$(MAKE) -C depends/thirdparty/thrift/hawqbuild $@
 	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C depends/libyarn $@
@@ -23,8 +22,7 @@ all:
 
 install:
 #	$(MAKE) -C doc $@
-# waiting for higher version of gcc ready
-#$(MAKE) -C depends/thirdparty/googletest install
+	$(MAKE) -C depends/thirdparty/googletest $@ 
 	$(MAKE) -C depends/thirdparty/thrift/hawqbuild $@
 	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C depends/libyarn $@
@@ -57,8 +55,7 @@ feature-test-clean:
 clean:
 #	$(MAKE) -C doc $@
 	$(MAKE) -C contrib $@
-# waiting for higher version of gcc ready
-#-$(MAKE) -C depends/thirdparty/googletest $@
+	-$(MAKE) -C depends/thirdparty/googletest $@ 
 	-$(MAKE) -C depends/thirdparty/thrift/hawqbuild $@
 	-$(MAKE) -C depends/libhdfs3 $@
 	-$(MAKE) -C depends/libyarn $@
@@ -75,8 +72,7 @@ clean:
 distclean maintainer-clean:
 #	-$(MAKE) -C doc $@
 	-$(MAKE) -C contrib $@
-# waiting for higher version of gcc ready
-#-$(MAKE) -C depends/thirdparty/googletest $@
+	-$(MAKE) -C depends/thirdparty/googletest $@ 
 	-$(MAKE) -C depends/thirdparty/thrift/hawqbuild $@
 	-$(MAKE) -C depends/libhdfs3 $@
 	-$(MAKE) -C depends/libyarn $@
