@@ -926,30 +926,10 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 	res = getSegIDByHostName(hostname, hostnamelen, &segid);
 	if ( res != FUNC_RETURN_OK )
 	{
-		/* Try addresses of this machine. */
-		for ( int i = 0 ; i < segstat->Info.HostAddrCount ; ++i )
-		{
-			elog(DEBUG5, "Resource manager checks host ip (%d)th to get segment.", i);
-			AddressString addr = NULL;
-			getSegInfoHostAddrStr(&(segstat->Info), i, &addr);
-			if ( strcmp(addr->Address, IPV4_DOT_ADDR_LO) == 0 &&
-				 segstat->Info.HostAddrCount > 1 )
-			{
-				/*
-				 * If the host has only one address as 127.0.0.1, we have to
-				 * save it to track the only one segment, otherwise, we skip
-				 * 127.0.0.1 address in resource pool. Because, each node has
-				 * one entry of this address.
-				 */
-				continue;
-			}
+		AddressString addr = NULL;
+		getSegInfoHostAddrStr(&(segstat->Info), 0, &addr);
 
-			res = getSegIDByHostAddr((uint8_t *)(addr->Address), addr->Length, &segid);
-			if ( res == FUNC_RETURN_OK )
-			{
-				break;
-			}
-		}
+		res = getSegIDByHostAddr((uint8_t *)(addr->Address), addr->Length, &segid);
 	}
 
 	/* CASE 1. It is a new host. */
@@ -1015,6 +995,12 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 				elog(LOG, "Resource manager tracked ip address '%.*s' for host '%s'",
 						  hostaddrkey.Len, hostaddrkey.Array,
 						  hostname);
+			}
+			else
+			{
+				elog(WARNING, "Resource manager ignored ip address '%.*s' for host '%s'",
+						      hostaddrkey.Len, hostaddrkey.Array,
+							  hostname);
 			}
 		}
 		appendSMBStr(&logcontent, "");
