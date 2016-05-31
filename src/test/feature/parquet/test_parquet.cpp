@@ -1,7 +1,9 @@
 #include "gtest/gtest.h"
 
-#include "lib/data-gen.h"
-#include "lib/sql-util.h"
+#include "lib/data_gen.h"
+#include "lib/sql_util.h"
+
+using hawq::test::SQLUtility;
 
 class TestParquet : public ::testing::Test {
  public:
@@ -12,7 +14,7 @@ class TestParquet : public ::testing::Test {
 TEST_F(TestParquet, TestMultipleType) {
   SQLUtility util;
   util.execute("drop table if exists t1");
-  DataGenerator dGen(&util);
+  hawq::test::DataGenerator dGen(&util);
   dGen.genTableWithFullTypes("t1", true, "parquet");
   util.query(
       "select * from t1",
@@ -47,7 +49,7 @@ TEST_F(TestParquet, TestCompression) {
   SQLUtility util;
   util.execute("drop table if exists t21");
   util.execute("drop table if exists t22");
-  DataGenerator dGen(&util);
+  hawq::test::DataGenerator dGen(&util);
   dGen.genTableWithNull("t21", true, "parquet", "gzip", 9);
   dGen.genTableWithNull("t22", true, "parquet", "snappy");
   util.query("select * from t21,t22",

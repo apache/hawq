@@ -1,45 +1,48 @@
-#include "data-gen.h"
+#include <string>
+#include "data_gen.h"
+using std::string;
 
-#include <iostream>
+namespace hawq {
+namespace test {
 
-void DataGenerator::genSimpleTable(std::string tableName, bool appendonly,
-                                   std::string orientation,
-                                   std::string compresstype,
+void DataGenerator::genSimpleTable(string tableName, bool appendonly,
+                                   string orientation,
+                                   string compresstype,
                                    int compresslevel) {
-  std::string desc =
+  string desc =
       genTableDesc(appendonly, orientation, compresstype, compresslevel);
-  std::string createSql =
+  string createSql =
       "create table " + tableName + "(a int, b int) " + desc;
   sqlUtil->execute(createSql);
 
-  std::string insertSql =
+  string insertSql =
       "insert into " + tableName + " values(51,62), (14,15), (1,3);";
   sqlUtil->execute(insertSql);
 }
 
-void DataGenerator::genTableWithSeries(std::string tableName, bool appendonly,
-                                       std::string orientation,
-                                       std::string compresstype,
+void DataGenerator::genTableWithSeries(string tableName, bool appendonly,
+                                       string orientation,
+                                       string compresstype,
                                        int compresslevel) {
-  std::string desc =
+  string desc =
       genTableDesc(appendonly, orientation, compresstype, compresslevel);
-  std::string createSql =
+  string createSql =
       "create table " + tableName + "(a int, b varchar(20)) " + desc;
   sqlUtil->execute(createSql);
 
-  std::string insertSql =
+  string insertSql =
       "insert into " + tableName + " values(generate_series(1,10000), 'abc')";
   sqlUtil->execute(insertSql);
 }
 
-void DataGenerator::genTableWithFullTypes(std::string tableName,
+void DataGenerator::genTableWithFullTypes(string tableName,
                                           bool appendonly,
-                                          std::string orientation,
-                                          std::string compresstype,
+                                          string orientation,
+                                          string compresstype,
                                           int compresslevel) {
-  std::string desc =
+  string desc =
       genTableDesc(appendonly, orientation, compresstype, compresslevel);
-  std::string createSql =
+  string createSql =
       "create table " + tableName +
       "(c0 int4, c1 polygon, "
       "c2 text, c3 time, c4 timetz, c5 macaddr, c6 timestamptz, c7 char(10), "
@@ -50,7 +53,7 @@ void DataGenerator::genTableWithFullTypes(std::string tableName,
       desc;
   sqlUtil->execute(createSql);
 
-  std::string insertSql =
+  string insertSql =
       "insert into " + tableName +
       " values (2147483647, null, null, '00:00:00', null, 'FF:89:71:45:AE:01',"
       " '2000-01-01 08:00:00+09', null, 32767, 'true', '192.168.1.255/32', "
@@ -60,7 +63,7 @@ void DataGenerator::genTableWithFullTypes(std::string tableName,
       " '4277-12-31 AD', 128);";
   sqlUtil->execute(insertSql);
 
-  std::string insertSql2 =
+  string insertSql2 =
       "insert into " + tableName +
       " values (0, '((100,123),(5,10),(7,2),(4,5))', 'hello world', null, "
       "'04:45:05.0012+08:40', null, null, 'bbccddeeff', 128, null, "
@@ -71,7 +74,7 @@ void DataGenerator::genTableWithFullTypes(std::string tableName,
       "'-Infinity', POINT(1,2), '4277-12-31 AD', 'Infinity');";
   sqlUtil->execute(insertSql2);
 
-  std::string insertSql3 =
+  string insertSql3 =
       "insert into " + tableName +
       " values (null, null, 'abcd', '15:01:03', null, null, "
       " '2000-01-01 08:00:00+09', null, null, 'true', null, "
@@ -81,7 +84,7 @@ void DataGenerator::genTableWithFullTypes(std::string tableName,
       " '4277-12-31 AD', 128);";
   sqlUtil->execute(insertSql3);
 
-  std::string insertSql4 =
+  string insertSql4 =
       "insert into " + tableName +
       " values (0, '((100,123),(5,10),(7,2),(4,5))', 'hello world', null, "
       "'04:45:05.0012+08:40', null, null, 'bbccddeeff', 128, null, "
@@ -91,7 +94,7 @@ void DataGenerator::genTableWithFullTypes(std::string tableName,
       "'-Infinity', POINT(1,2), '4277-12-31 AD', 'Infinity');";
   sqlUtil->execute(insertSql4);
 
-  std::string insertSql5 =
+  string insertSql5 =
       "insert into " + tableName +
       " values (0, '((100,123),(5,10),(7,2),(4,5))', 'hello world', null, "
       "'04:45:05.0012+08:40', null, null, 'bbccddeeff', 128, null, "
@@ -101,7 +104,7 @@ void DataGenerator::genTableWithFullTypes(std::string tableName,
       "'-Infinity', POINT(1,2), '4277-12-31 AD', 'Infinity');";
   sqlUtil->execute(insertSql5);
 
-  std::string insertSql6 =
+  string insertSql6 =
       "insert into " + tableName +
       " values (0, '((100,123),(5,10),(7,2),(4,5))', 'hello world', null, "
       "'04:45:05.0012+08:40', null, null, 'bbccddeeff', 128, null, "
@@ -112,27 +115,27 @@ void DataGenerator::genTableWithFullTypes(std::string tableName,
   sqlUtil->execute(insertSql6);
 }
 
-void DataGenerator::genTableWithNull(std::string tableName, bool appendonly,
-                                     std::string orientation,
-                                     std::string compresstype,
+void DataGenerator::genTableWithNull(string tableName, bool appendonly,
+                                     string orientation,
+                                     string compresstype,
                                      int compresslevel) {
-  std::string desc =
+  string desc =
       genTableDesc(appendonly, orientation, compresstype, compresslevel);
-  std::string createSql =
+  string createSql =
       "create table " + tableName + " (a int, b float, c varchar(20)) " + desc;
   sqlUtil->execute(createSql);
 
-  std::string insertSql =
+  string insertSql =
       "insert into " + tableName +
       " values (15, null, 'aa'), (null, null, 'WET'), (null, 51, null);";
   sqlUtil->execute(insertSql);
 }
 
-std::string DataGenerator::genTableDesc(bool appendonly,
-                                        std::string orientation,
-                                        std::string compresstype,
-                                        int compresslevel) {
-  std::string desc = (appendonly ? "with (appendonly = true, orientation = "
+string DataGenerator::genTableDesc(bool appendonly,
+                                   string orientation,
+                                   string compresstype,
+                                   int compresslevel) {
+  string desc = (appendonly ? "with (appendonly = true, orientation = "
                                  : "with (appendonly = false, orientation = ") +
                      orientation + ", compresstype = " + compresstype +
                      (compresslevel != -1
@@ -141,3 +144,6 @@ std::string DataGenerator::genTableDesc(bool appendonly,
                      ")";
   return desc;
 }
+
+} // namespace test
+} // namespace hawq
