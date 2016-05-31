@@ -815,14 +815,12 @@ static int send_alert_via_email(const GpErrorData * errorData,
 	/* smtp_8bitmime_set_body(message, E8bitmime_8BITMIME); */
 
 	/* Initiate a connection to the SMTP server and transfer the message. */
-        int num_smtp_failures = 0;
-        int smtp_ret = smtp_start_session_with_timeout(session, gp_email_connect_timeout, &num_smtp_failures, NULL, 0); 
-	if (smtp_ret <= 0)
+	int smtp_ret = smtp_start_session(session);
+	if (smtp_ret == 0)
 	{
-                 if (num_smtp_failures > 0) { /* SMTP server issue */
-                     num_connect_failures++;
-                     last_connect_failure_ts = time(0);  
-                 }
+		num_connect_failures++;
+		last_connect_failure_ts = time(0);  
+
 		/*
 		 * If we get here, we can't talk to the SMTP server at all
 		 */
