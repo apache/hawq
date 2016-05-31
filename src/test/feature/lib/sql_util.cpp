@@ -1,14 +1,12 @@
-#include "sql-util.h"
-
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <fstream>
-#include <iostream>
 #include <vector>
 
-#include "string-util.h"
+#include "sql_util.h"
+#include "string_util.h"
 
 #ifdef __linux__
 #include <limits.h>
@@ -17,12 +15,28 @@
 #include <libproc.h>
 #endif
 
+using std::string;
+
+namespace hawq {
+namespace test {
+
 SQLUtility::SQLUtility()
-    : conn(getConnection()),
-      testRootPath(getTestRootPath()),
+    : testRootPath(getTestRootPath()),
       test_info(::testing::UnitTest::GetInstance()->current_test_info()) {
+  auto getConnection = [&] () {
+    string user = HAWQ_USER;
+    if(user.empty()) {
+      struct passwd *pw;
+      uid_t uid = geteuid();
+      pw = getpwuid(uid);
+      user.assign(pw->pw_name);
+    }
+    conn.reset(new hawq::test::PSQL(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, user, HAWQ_PASSWORD));
+  };
+  getConnection();
+
   schemaName =
-      std::string(test_info->test_case_name()) + "_" + test_info->name();
+      string(test_info->test_case_name()) + "_" + test_info->name();
   exec("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
   exec("CREATE SCHEMA " + schemaName);
 }
@@ -32,28 +46,28 @@ SQLUtility::~SQLUtility() {
     exec("DROP SCHEMA " + schemaName + " CASCADE");
 }
 
-void SQLUtility::exec(const std::string &sql) {
+void SQLUtility::exec(const string &sql) {
   EXPECT_EQ(0, (conn->runSQLCommand(sql)).getLastStatus())
       << conn->getLastResult();
 }
 
-void SQLUtility::execute(const std::string &sql, bool check) {
+void SQLUtility::execute(const string &sql, bool check) {
   conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
   EXPECT_NE(conn.get(), nullptr);
   if (check) EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
 }
 
-void SQLUtility::query(const std::string &sql, int expectNum) {
-  const PSQLQueryResult &result = executeQuery(sql);
+void SQLUtility::query(const string &sql, int expectNum) {
+  const hawq::test::PSQLQueryResult &result = executeQuery(sql);
   ASSERT_FALSE(result.isError()) << result.getErrorMessage();
   EXPECT_EQ(expectNum, result.rowCount());
 }
 
-void SQLUtility::query(const std::string &sql, const std::string &expectStr) {
-  const PSQLQueryResult &result = executeQuery(sql);
+void SQLUtility::query(const string &sql, const string &expectStr) {
+  const hawq::test::PSQLQueryResult &result = executeQuery(sql);
   ASSERT_FALSE(result.isError()) << result.getErrorMessage();
-  std::vector<std::vector<std::string> > resultString = result.getRows();
-  std::string resultStr;
+  std::vector<std::vector<string> > resultString = result.getRows();
+  string resultStr;
   for (auto row : result.getRows()) {
     for (auto column : row) resultStr += column + "|";
     resultStr += "\n";
@@ -61,14 +75,14 @@ void SQLUtility::query(const std::string &sql, const std::string &expectStr) {
   EXPECT_EQ(expectStr, resultStr);
 }
 
-void SQLUtility::execSQLFile(const std::string &sqlFile,
-                             const std::string &ansFile) {
+void SQLUtility::execSQLFile(const string &sqlFile,
+                             const string &ansFile) {
   // do precheck for sqlFile & ansFile
-  if (StringUtil::StartWith(sqlFile, "/") ||
-      StringUtil::StartWith(ansFile, "/"))
+  if (hawq::test::startsWith(sqlFile, "/") ||
+      hawq::test::startsWith(ansFile, "/"))
     ASSERT_TRUE(false) << "For sqlFile and ansFile, relative path to feature "
                           "test root dir is needed";
-  std::string ansFileAbsPath = testRootPath + "/" + ansFile;
+  string ansFileAbsPath = testRootPath + "/" + ansFile;
   if (!std::ifstream(ansFileAbsPath))
     ASSERT_TRUE(false) << ansFileAbsPath << " doesn't exist";
   FilePath fp = splitFilePath(ansFileAbsPath);
@@ -77,10 +91,10 @@ void SQLUtility::execSQLFile(const std::string &sqlFile,
     ASSERT_TRUE(false) << ansFileAbsPath << " is invalid";
 
   // generate new sql file with set search_path added at the begining
-  const std::string newSqlFile = generateSQLFile(sqlFile);
+  const string newSqlFile = generateSQLFile(sqlFile);
 
   // outFile is located in the same folder with ansFile
-  std::string outFileAbsPath = fp.path + "/" + fp.fileBaseName + ".out";
+  string outFileAbsPath = fp.path + "/" + fp.fileBaseName + ".out";
   conn->setOutputFile(outFileAbsPath);
   EXPECT_EQ(0, conn->runSQLFile(newSqlFile).getLastStatus());
   conn->resetOutput();
@@ -94,22 +108,9 @@ void SQLUtility::execSQLFile(const std::string &sqlFile,
   }
 }
 
-std::unique_ptr<PSQL> SQLUtility::getConnection() {
-  std::string user = HAWQ_USER;
-  if (user.empty()) {
-    struct passwd *pw;
-    uid_t uid = geteuid();
-    pw = getpwuid(uid);
-    user.assign(pw->pw_name);
-  }
-  std::unique_ptr<PSQL> psql(
-      new PSQL(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, user, HAWQ_PASSWORD));
-  return std::move(psql);
-}
-
-const std::string SQLUtility::generateSQLFile(const std::string &sqlFile) {
-  const std::string originSqlFile = testRootPath + "/" + sqlFile;
-  const std::string newSqlFile = "/tmp/" + schemaName + ".sql";
+const string SQLUtility::generateSQLFile(const string &sqlFile) {
+  const string originSqlFile = testRootPath + "/" + sqlFile;
+  const string newSqlFile = "/tmp/" + schemaName + ".sql";
   std::fstream in;
   in.open(originSqlFile, std::ios::in);
   if (!in.is_open()) {
@@ -123,7 +124,7 @@ const std::string SQLUtility::generateSQLFile(const std::string &sqlFile) {
   out << "-- start_ignore" << std::endl
       << "SET SEARCH_PATH=" + schemaName + ";" << std::endl
       << "-- end_ignore" << std::endl;
-  std::string line;
+  string line;
   while (getline(in, line)) {
     out << line << std::endl;
   }
@@ -132,22 +133,22 @@ const std::string SQLUtility::generateSQLFile(const std::string &sqlFile) {
   return newSqlFile;
 }
 
-const PSQLQueryResult &SQLUtility::executeQuery(const std::string &sql) {
-  const PSQLQueryResult &result =
+const hawq::test::PSQLQueryResult &SQLUtility::executeQuery(const string &sql) {
+  const hawq::test::PSQLQueryResult &result =
       conn->getQueryResult("SET SEARCH_PATH=" + schemaName + ";" + sql);
   return result;
 }
 
-const PSQL *SQLUtility::getPSQL() const { return conn.get(); }
+const hawq::test::PSQL *SQLUtility::getPSQL() const { return conn.get(); }
 
-std::string SQLUtility::getTestRootPath() const {
-  std::string result;
+string SQLUtility::getTestRootPath() const {
+  string result;
 #ifdef __linux__
   char pathbuf[PATH_MAX];
   ssize_t count = readlink("/proc/self/exe", pathbuf, PATH_MAX);
   if (count <= 0)
     EXPECT_TRUE(false) << "readlink /proc/self/exe error: " << strerror(errno);
-  result = std::string(pathbuf, count);
+  result = string(pathbuf, count);
 #elif __APPLE__
   int ret;
   pid_t pid;
@@ -158,12 +159,12 @@ std::string SQLUtility::getTestRootPath() const {
   if (ret <= 0)
     EXPECT_TRUE(false) << "PID " << pid << ": proc_pidpath () "
                        << strerror(errno);
-  result = std::string(pathbuf);
+  result = string(pathbuf);
 #endif
   return splitFilePath(result).path;
 }
 
-FilePath SQLUtility::splitFilePath(const std::string &filePath) const {
+FilePath SQLUtility::splitFilePath(const string &filePath) const {
   FilePath fp;
   size_t found1 = filePath.find_last_of("/");
   size_t found2 = filePath.find_last_of(".");
@@ -172,3 +173,6 @@ FilePath SQLUtility::splitFilePath(const std::string &filePath) const {
   fp.fileSuffix = filePath.substr(found2 + 1, filePath.length() - found2 - 1);
   return fp;
 }
+
+} // namespace test
+} // namespace hawq

@@ -8,10 +8,9 @@
 #include <iostream>
 
 #include "lib/command.h"
-#include "lib/common.h"
-#include "lib/data-gen.h"
-#include "lib/hawq-config.h"
-#include "lib/sql-util.h"
+#include "lib/data_gen.h"
+#include "lib/hawq_config.h"
+#include "lib/sql_util.h"
 
 #include "gtest/gtest.h"
 
@@ -21,9 +20,8 @@ class TestQuerySequence : public ::testing::Test {
   ~TestQuerySequence() {}
 };
 
-
 TEST_F(TestQuerySequence, TestSequenceCreateSerialColumn) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
 
   util.execute("drop table if exists serialtest");
   util.execute("create table serialtest (f1 text, f2 serial)");
@@ -49,7 +47,7 @@ TEST_F(TestQuerySequence, TestSequenceCreateSerialColumn) {
 }
 
 TEST_F(TestQuerySequence, TestSequenceBasicOperations) {
-	SQLUtility util;
+  hawq::test::SQLUtility util;
 
 	// prepare
 	util.execute("drop sequence if exists sequence_test");
@@ -77,7 +75,7 @@ TEST_F(TestQuerySequence, TestSequenceBasicOperations) {
 }
 
 TEST_F(TestQuerySequence, TestSequenceRenaming) {
-	SQLUtility util;
+  hawq::test::SQLUtility util;
 	// prepare
 	util.execute("drop sequence if exists foo_seq");
 	util.execute("create sequence foo_seq");
@@ -90,13 +88,13 @@ TEST_F(TestQuerySequence, TestSequenceRenaming) {
 }
 
 TEST_F(TestQuerySequence, TestSequenceDependency) {
-	SQLUtility util;
+  hawq::test::SQLUtility util;
 	util.execSQLFile("query/sql/sequence-dependency.sql",
 			  	  	 "query/ans/sequence-dependency.ans");
 }
 
 TEST_F(TestQuerySequence, TestSequenceAlternate) {
-	SQLUtility util;
+  hawq::test::SQLUtility util;
 	// prepare
 	util.execute("drop sequence if exists sequence_test2");
 	util.execute("create sequence sequence_test2 start with 32");

@@ -7,10 +7,9 @@
 #include <errno.h>
 
 #include "lib/command.h"
-#include "lib/common.h"
-#include "lib/data-gen.h"
-#include "lib/hawq-config.h"
-#include "lib/sql-util.h"
+#include "lib/data_gen.h"
+#include "lib/hawq_config.h"
+#include "lib/sql_util.h"
 
 #include "gtest/gtest.h"
 
@@ -24,7 +23,7 @@ TEST_F(TestCommonLib, TestHawqConfig) {
   std::string hostname = "";
   int port = 0;
 
-  HawqConfig hc;
+  hawq::test::HawqConfig hc;
   hc.getMaster(hostname, port);
 
   hostname = "";
@@ -56,17 +55,17 @@ TEST_F(TestCommonLib, TestHawqConfig) {
 }
 
 TEST_F(TestCommonLib, TestCommand) {
-  Command c("ls ./");
+  hawq::test::Command c("ls ./");
   c.run().getResultOutput();
 
-  Command::getCommandOutput("pwd");
-  Command::getCommandStatus("date");
-  Command::getCommandStatus("datewrong");
-  Command::getCommandOutput("datewrong");
+  hawq::test::Command::getCommandOutput("pwd");
+  hawq::test::Command::getCommandStatus("date");
+  hawq::test::Command::getCommandStatus("datewrong");
+  hawq::test::Command::getCommandOutput("datewrong");
 }
 
 TEST_F(TestCommonLib, TestSqlUtil) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   util.execute("create table test(p int, q float)");
   util.execute("insert into test values(1,1.1),(2,2.2)");
   util.query("select * from test", 2);
@@ -75,8 +74,8 @@ TEST_F(TestCommonLib, TestSqlUtil) {
 }
 
 TEST_F(TestCommonLib, TestDataGenerator) {
-  SQLUtility util;
-  DataGenerator dGen(&util);
+  hawq::test::SQLUtility util;
+  hawq::test::DataGenerator dGen(&util);
   dGen.genSimpleTable("simpleAO");
   dGen.genSimpleTable("simpleParquet", true, "parquet");
 

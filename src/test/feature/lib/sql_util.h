@@ -1,9 +1,8 @@
-#ifndef SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
-#define SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
+#ifndef HAWQ_SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
+#define HAWQ_SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
 
 #include <memory>
 #include <string>
-#include <utility>
 
 #include "gtest/gtest.h"
 #include "psql.h"
@@ -14,6 +13,9 @@
 #define HAWQ_USER (getenv("PGUSER") ? getenv("PGUSER") : "")
 #define HAWQ_PASSWORD (getenv("PGPASSWORD") ? getenv("PGPASSWORD") : "")
 
+namespace hawq {
+namespace test {
+ 
 struct FilePath {
   std::string path;
   std::string fileBaseName;
@@ -50,24 +52,27 @@ class SQLUtility {
 
   // Get PSQL connection
   // @return PSQL raw pointer
-  const PSQL *getPSQL() const;
+  const hawq::test::PSQL *getPSQL() const;
 
   // Get test root dir abs path
   // @return path string
   std::string getTestRootPath() const;
 
  private:
-  std::unique_ptr<PSQL> getConnection();
+  std::unique_ptr<hawq::test::PSQL> getConnection();
   const std::string generateSQLFile(const std::string &sqlFile);
-  const PSQLQueryResult &executeQuery(const std::string &sql);
+  const hawq::test::PSQLQueryResult &executeQuery(const std::string &sql);
   FilePath splitFilePath(const std::string &filePath) const;
   void exec(const std::string &sql);
 
  private:
   std::string schemaName;
-  std::unique_ptr<PSQL> conn;
+  std::unique_ptr<hawq::test::PSQL> conn;
   std::string testRootPath;
   const ::testing::TestInfo *const test_info;
-};
+}; // class SQLUtility
+
+} // namespace test
+} // namespace hawq
 
 #endif  // SRC_TEST_FEATURE_LIB_SQL_UTIL_H_
