@@ -275,5 +275,6 @@ test-driver
 /tutorial/java/build/
 /tutorial/js/build/
 /ylwrap
+/hawqbuild/Makefile.global
 
 /cmake_*
