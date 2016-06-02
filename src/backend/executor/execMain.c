@@ -2383,10 +2383,13 @@ initResultRelInfo(ResultRelInfo *resultRelInfo,
 						 RelationGetRelationName(resultRelationDesc))));
 			break;
 		case RELKIND_AOSEGMENTS:
-			ereport(ERROR,
+			/* Relax the constraint here to allow hawq register */
+			if (!allowSystemTableModsDML && IsSystemRelation(resultRelationDesc)) {
+				ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("cannot change AO segment listing relation \"%s\"",
 						 RelationGetRelationName(resultRelationDesc))));
+			}
 			break;
 		case RELKIND_AOBLOCKDIR:
 			ereport(ERROR,
