@@ -1,16 +1,21 @@
-#ifndef __PSQL_H__
-#define __PSQL_H__
+#ifndef HAWQ_SRC_TEST_FEATURE_PSQL_H_
+#define HAWQ_SRC_TEST_FEATURE_PSQL_H_
 
+#include <string>
 #include <vector>
 
 #include "command.h"
 #include "libpq-fe.h"
+
+namespace hawq {
+namespace test {
+
 class PSQLQueryResult {
  public:
   PSQLQueryResult() {}
 
   void savePGResult(const PGresult* res);
-  void setErrorMessage(const std::string errmsg);
+  void setErrorMessage(const std::string& errmsg);
   const std::string& getErrorMessage() const;
   bool isError() const;
 
@@ -41,11 +46,8 @@ class PSQL {
   PSQL(const std::string& db, const std::string& host = "localhost",
        const std::string& port = "5432", const std::string& user = "gpadmin",
        const std::string& password = "")
-      : _dbname(db),
-        _host(host),
-        _port(port),
-        _user(user),
-        _password(password) {}
+      : _dbname(db), _host(host), _port(port),
+      _user(user), _password(password) {}
   virtual ~PSQL(){};
 
   PSQL& runSQLCommand(const std::string& sql_cmd);
@@ -63,7 +65,8 @@ class PSQL {
   const std::string& getLastResult() const;
 
   static bool checkDiff(const std::string& expect_file,
-                        const std::string& result_file, bool save_diff = true);
+                        const std::string& result_file,
+                        bool save_diff = true);
 
   void resetOutput();
 
@@ -86,5 +89,8 @@ class PSQL {
   int _last_status;
   std::string _last_result;
 };
+
+} // namespace test
+} // namespace hawq
 
 #endif

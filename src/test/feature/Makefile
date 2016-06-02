@@ -12,7 +12,7 @@ override CPPFLAGS := -I/usr/include -I/usr/local/include -I/usr/include/libxml2 
 override LIBS := $(LIBS) -lgtest -lpq -lxml2 -ltest
 override LDFLAGS += -L/usr/local/lib -L/usr/lib -L$(abs_top_srcdir)/src/test/feature/ -L$(abs_top_srcdir)/src/test/feature/lib/ -L$(abs_top_srcdir)/src/interfaces/libpq -L$(gtest_lib_path) -L$(gmock_lib_path)
 
-PROG = test-main.cpp $(wildcard */*.cpp)
+PROG = test_main.cpp $(wildcard */*.cpp)
 RM = rm -rf
 
 .PHONY: all distclean clean doc

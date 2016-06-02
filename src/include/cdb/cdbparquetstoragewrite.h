@@ -235,4 +235,9 @@ void estimateColumnWidth(int *columnWidths,
 					Form_pg_attribute att,
 					bool expandEmbeddingType);
 
+/*
+ * Generate key_value_metadata filed used in FileMetaData.
+ */
+char * generateHAWQSchemaStr(ParquetFileField pfields,
+					int fieldCount);
 #endif /* CDBPARQUETSTORAGEWRITE_H_ */

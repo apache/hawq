@@ -175,6 +175,9 @@ def main():
     elif hawq_command == "scp":
         cmd = "%s; gpscp %s" % (source_hawq_env, sub_args)
         result = local_ssh(cmd)
+    elif hawq_command == "register":
+        cmd = "%s; hawqregister %s" % (source_hawq_env, sub_args)
+        result = local_ssh(cmd)
     elif hawq_command == "version" or hawq_command == "--version":
         print_version()
     else:

@@ -1,0 +1,2551 @@
+-- start_ignore
+SET SEARCH_PATH=TestPartition_TestPartitionNegativeAndBasics;
+SET
+-- end_ignore
+set enable_partition_rules = false;
+SET
+set gp_enable_hash_partitioned_tables = true;
+SET
+-- missing subpartition by
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash (b)
+(
+partition aa (subpartition cc, subpartition dd),
+partition bb (subpartition cc, subpartition dd)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:14: ERROR:  missing SUBPARTITION BY clause for subpartition specification
+LINE 5: partition aa (subpartition cc, subpartition dd),
+        ^
+-- missing subpartition spec
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d) 
+(
+partition aa ,
+partition bb 
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:24: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:24: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:24: ERROR:  hash partition requires PARTITIONS clause or partition specification
+LINE 4: subpartition by hash (d) 
+                        ^
+-- subpart spec conflict
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash (b) 
+subpartition by hash (d) subpartition template (subpartition jjj)
+(
+partition aa (subpartition cc, subpartition dd),
+partition bb (subpartition cc, subpartition dd)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:34: ERROR:  subpartition configuration conflicts with subpartition template
+LINE 4: subpartition by hash (d) subpartition template (subpartition...
+                        ^
+-- missing subpartition by
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d)
+(
+partition aa (subpartition cc, subpartition dd (subpartition iii)),
+partition bb (subpartition cc, subpartition dd)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:44: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:44: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:44: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:44: ERROR:  missing SUBPARTITION BY clause for subpartition specification (at depth 2)
+LINE 6: partition aa (subpartition cc, subpartition dd (subpartition...
+                                       ^
+-- Test column lookup works
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash(doesnotexist)
+partitions 3;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:50: ERROR:  column "doesnotexist" does not exist in relation "ggg"
+LINE 3: partition by hash(doesnotexist)
+                     ^
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash(b)
+partitions 3
+subpartition by list(alsodoesntexist)
+subpartition template (
+subpartition aa values(1)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:59: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:59: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:59: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_3" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:59: ERROR:  column "alsodoesntexist" does not exist in relation "ggg_1_prt_1"
+LINE 5: subpartition by list(alsodoesntexist)
+                        ^
+-- will not work since sql has no subpartition templates
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d) 
+(
+partition aa (subpartition cc, subpartition dd),
+partition bb (subpartition cc, subpartition dd)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:69: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:69: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:69: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:69: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:69: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:69: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+CREATE TABLE
+drop table if exists ggg cascade;
+DROP TABLE
+-- disable hash partitions
+set gp_enable_hash_partitioned_tables = false;
+SET
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d) 
+(
+partition aa (subpartition cc, subpartition dd),
+partition bb (subpartition cc, subpartition dd)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:83: ERROR:  PARTITION BY must specify RANGE or LIST
+drop table ggg cascade;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:85: ERROR:  table "ggg" does not exist
+set gp_enable_hash_partitioned_tables = true;
+SET
+-- should work
+create table ggg (a char(1), b char(2), d char(3), e int)
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d) 
+subpartition template ( 
+subpartition cc,
+subpartition dd
+), 
+subpartition by hash (e) 
+subpartition template ( 
+subpartition ee,
+subpartition ff
+) 
+(
+partition aa,
+partition bb
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ee" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ff" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ee" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ff" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ee" for table "ggg_1_prt_bb_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ff" for table "ggg_1_prt_bb_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ee" for table "ggg_1_prt_bb_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:106: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ff" for table "ggg_1_prt_bb_2_prt_dd"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- should not work since the first-level subpartitioning has no template
+create table ggg (a char(1), b char(2), d char(3), e int)
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d),
+subpartition by hash (e)
+subpartition template ( 
+subpartition ee,
+subpartition ff
+) 
+(
+partition aa (subpartition cc, subpartition dd),
+partition bb (subpartition cc, subpartition dd)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ee" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ff" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ee" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ff" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ee" for table "ggg_1_prt_bb_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ff" for table "ggg_1_prt_bb_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ee" for table "ggg_1_prt_bb_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:123: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ff" for table "ggg_1_prt_bb_2_prt_dd"
+CREATE TABLE
+drop table if exists ggg cascade;
+DROP TABLE
+-- doesn't work because cannot have nested declaration in template
+create table ggg (a char(1), b char(2), d char(3), e int)
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d) 
+subpartition template ( 
+subpartition cc (subpartition ee, subpartition ff),
+subpartition dd (subpartition ee, subpartition ff)
+), 
+subpartition by hash (e) 
+(
+partition aa,
+partition bb
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:140: ERROR:  template cannot contain specification for child partition
+drop table ggg cascade;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:142: ERROR:  table "ggg" does not exist
+--ERROR: Missing boundary specification in partition 'aa' of type LIST 
+create table fff (a char(1), b char(2), d char(3)) distributed by
+(a) partition by list (b) (partition aa ); 
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:146: ERROR:  missing boundary specification in partition "aa" of type LIST
+LINE 2: (a) partition by list (b) (partition aa );
+                                   ^
+-- ERROR: Invalid use of RANGE boundary specification in partition
+--   number 1 of type LIST
+create table fff (a char(1), b char(2), d char(3)) distributed by (a)
+partition by list (b) (start ('a') );
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:152: ERROR:  invalid boundary specification for LIST partition
+LINE 2: partition by list (b) (start ('a') );
+                               ^
+-- should work
+create table fff (a char(1), b char(2), d char(3)) distributed by (a)
+partition by list (b) (partition aa values ('2'));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:157: NOTICE:  CREATE TABLE will create partition "fff_1_prt_aa" for table "fff"
+CREATE TABLE
+drop table fff cascade;
+DROP TABLE
+-- Invalid use of RANGE boundary specification in partition "cc" of 
+-- type HASH (at depth 2) & subpartition at one level has no template
+create table ggg (a char(1), b char(2), d char(3), e int) distributed by (a)
+partition by hash (b) subpartition by hash (d),
+subpartition by hash (e) 
+subpartition template ( subpartition ee, subpartition ff ) (
+partition aa (subpartition cc, subpartition dd), partition bb
+(subpartition cc start ('a') , subpartition dd) );
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ee" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ff" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ee" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ff" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:168: ERROR:  invalid use of RANGE boundary specification in partition "cc" of type HASH (at depth 2)
+LINE 6: (subpartition cc start ('a') , subpartition dd) );
+                         ^
+-- this is subtly wrong -- it defines 4 partitions
+-- the problem is the comma before "end", which causes us to
+-- generate 2 anonymous partitions.
+-- This is an error: 
+-- ERROR:  invalid use of mixed named and unnamed RANGE boundary specifications
+create table ggg (a char(1), b int, d char(3))
+distributed by (a)
+partition by range (b)
+(
+partition aa start ('2007'), end ('2008'),
+partition bb start ('2008'), end ('2009')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:181: ERROR:  invalid use of mixed named and unnamed RANGE boundary specifications
+LINE 5: partition aa start ('2007'), end ('2008'),
+                                     ^
+create table ggg (a char(1), b int)
+distributed by (a)
+partition by range(b)
+(
+partition aa start ('2007'), end ('2008')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:188: ERROR:  invalid use of mixed named and unnamed RANGE boundary specifications
+LINE 5: partition aa start ('2007'), end ('2008')
+                                     ^
+drop table ggg cascade;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:190: ERROR:  table "ggg" does not exist
+create table ggg (a char(1), b date, d char(3))
+distributed by (a)
+partition by range (b)
+(
+partition aa start (date '2007-01-01') end (date '2008-01-01'),
+partition bb start (date '2008-01-01') end (date '2009-01-01')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:198: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:198: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- don't allow nonconstant expressions, even simple ones...
+create table ggg (a char(1), b numeric, d numeric)
+distributed by (a)
+partition by range (b,d)
+(
+partition aa start (2007,1) end (2008,2+2),
+partition bb start (2008,2) end (2009,3)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:210: ERROR:  syntax error at or near "+"
+LINE 5: partition aa start (2007,1) end (2008,2+2),
+                                               ^
+-- composite key
+create table ggg (a char(1), b numeric, d numeric)
+distributed by (a)
+partition by range (b,d)
+(
+partition aa start (2007,1) end (2008,2),
+partition bb start (2008,2) end (2009,3)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:219: ERROR:  Composite partition keys are not allowed
+-- demo starts here
+-- nested subpartitions
+create table ggg
+ (a char(1),   b date,
+  d char(3),  e numeric,
+  f numeric,  g numeric,
+  h numeric)
+distributed by (a)
+partition by hash(b)
+partitions 2
+subpartition by hash(d)
+subpartitions 2,
+subpartition by hash(e) subpartitions 2,
+subpartition by hash(f) subpartitions 2,
+subpartition by hash(g) subpartitions 2,
+subpartition by hash(h) subpartitions 2;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1" for table "ggg_1_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2" for table "ggg_1_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1" for table "ggg_1_prt_1_2_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2" for table "ggg_1_prt_1_2_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_1_6_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_1_6_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_2_6_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_2_6_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_1_6_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_1_6_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_2_6_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_2_6_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_1_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_1_6_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_1_6_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_2_6_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_2_6_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_1_6_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_1_6_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_2_6_prt_1" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_2_6_prt_2" for table "ggg_1_prt_1_2_prt_1_3_prt_2_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1" for table "ggg_1_prt_1_2_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2" for table "ggg_1_prt_1_2_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_1_6_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_1_6_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_2_6_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_2_6_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_1_6_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_1_6_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_2_6_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_2_6_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_1_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_1_6_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_1_6_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_2_6_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_2_6_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_1_6_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_1_6_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_2_6_prt_1" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_2_6_prt_2" for table "ggg_1_prt_1_2_prt_2_3_prt_2_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1" for table "ggg_1_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2" for table "ggg_1_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1" for table "ggg_1_prt_2_2_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2" for table "ggg_1_prt_2_2_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_1_6_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_1_6_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_2_6_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_2_6_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_1_6_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_1_6_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_2_6_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_2_6_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_1_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_1_6_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_1_6_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_2_6_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_2_6_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_1_6_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_1_6_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_2_6_prt_1" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_2_6_prt_2" for table "ggg_1_prt_2_2_prt_1_3_prt_2_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1" for table "ggg_1_prt_2_2_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2" for table "ggg_1_prt_2_2_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_1_6_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_1_6_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_2_6_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_2_6_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_1_6_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_1_6_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_2_6_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_2_6_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_1_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_1_6_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_1_6_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_2_6_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_2_6_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_1_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_1_6_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_1_6_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_2_6_prt_1" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:237: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_2_6_prt_2" for table "ggg_1_prt_2_2_prt_2_3_prt_2_4_prt_2_5_prt_2"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- named, inline subpartitions
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d) 
+(
+partition aa (subpartition cc, subpartition dd),
+partition bb (subpartition cc, subpartition dd)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:250: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:250: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:250: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:250: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:250: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:250: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- subpartitions with templates
+create table ggg (a char(1), b char(2), d char(3), e numeric)
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d) 
+subpartition template ( 
+subpartition cc,
+subpartition dd
+), 
+subpartition by hash (e) 
+subpartition template ( 
+subpartition ee,
+subpartition ff
+) 
+(
+partition aa,
+partition bb
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ee" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ff" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ee" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ff" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ee" for table "ggg_1_prt_bb_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ff" for table "ggg_1_prt_bb_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ee" for table "ggg_1_prt_bb_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:272: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ff" for table "ggg_1_prt_bb_2_prt_dd"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- mixed inline subpartition declarations with templates
+create table ggg (a char(1), b char(2), d char(3), e numeric)
+distributed by (a)
+partition by hash (b)
+subpartition by hash (d) , 
+subpartition by hash (e) 
+subpartition template ( 
+subpartition ee,
+subpartition ff
+) 
+(
+partition aa (subpartition cc, subpartition dd),
+partition bb (subpartition cc, subpartition dd)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ee" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_cc_3_prt_ff" for table "ggg_1_prt_aa_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ee" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_ff" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ee" for table "ggg_1_prt_bb_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_cc_3_prt_ff" for table "ggg_1_prt_bb_2_prt_cc"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ee" for table "ggg_1_prt_bb_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:290: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_ff" for table "ggg_1_prt_bb_2_prt_dd"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- basic list partition
+create table ggg (a char(1), b char(2), d char(3))
+distributed by (a)
+partition by LIST (b)
+(
+partition aa values ('a', 'b', 'c', 'd'),
+partition bb values ('e', 'f', 'g')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:302: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:302: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+CREATE TABLE
+insert into ggg values ('x', 'a');
+INSERT 0 1
+insert into ggg values ('x', 'b');
+INSERT 0 1
+insert into ggg values ('x', 'c');
+INSERT 0 1
+insert into ggg values ('x', 'd');
+INSERT 0 1
+insert into ggg values ('x', 'e');
+INSERT 0 1
+insert into ggg values ('x', 'f');
+INSERT 0 1
+insert into ggg values ('x', 'g');
+INSERT 0 1
+insert into ggg values ('x', 'a');
+INSERT 0 1
+insert into ggg values ('x', 'b');
+INSERT 0 1
+insert into ggg values ('x', 'c');
+INSERT 0 1
+insert into ggg values ('x', 'd');
+INSERT 0 1
+insert into ggg values ('x', 'e');
+INSERT 0 1
+insert into ggg values ('x', 'f');
+INSERT 0 1
+insert into ggg values ('x', 'g');
+INSERT 0 1
+select * from ggg order by 1, 2;
+ a | b  | d 
+---+----+---
+ x | a  | 
+ x | a  | 
+ x | b  | 
+ x | b  | 
+ x | c  | 
+ x | c  | 
+ x | d  | 
+ x | d  | 
+ x | e  | 
+ x | e  | 
+ x | f  | 
+ x | f  | 
+ x | g  | 
+ x | g  | 
+(14 rows)
+
+-- ok
+select * from ggg_1_prt_aa order by 1, 2;
+ a | b  | d 
+---+----+---
+ x | a  | 
+ x | a  | 
+ x | b  | 
+ x | b  | 
+ x | c  | 
+ x | c  | 
+ x | d  | 
+ x | d  | 
+(8 rows)
+
+select * from ggg_1_prt_bb order by 1, 2;
+ a | b  | d 
+---+----+---
+ x | e  | 
+ x | e  | 
+ x | f  | 
+ x | f  | 
+ x | g  | 
+ x | g  | 
+(6 rows)
+
+drop table ggg cascade;
+DROP TABLE
+-- documentation example - partition by list and range
+CREATE TABLE rank (id int, rank int, year date, gender 
+char(1)) DISTRIBUTED BY (id, gender, year)
+partition by list (gender)
+subpartition by range (year)
+subpartition template (
+start (date '2001-01-01'),
+start (date '2002-01-01'),
+start (date '2003-01-01'),
+start (date '2004-01-01'),
+start (date '2005-01-01')
+)
+(
+  partition boys values ('M'),
+  partition girls values ('F')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys" for table "rank"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls" for table "rank"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_1" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_2" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_3" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_4" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_5" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_1" for table "rank_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_2" for table "rank_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_3" for table "rank_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_4" for table "rank_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:342: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_5" for table "rank_1_prt_girls"
+CREATE TABLE
+insert into rank values (1, 1, date '2001-01-15', 'M');
+INSERT 0 1
+insert into rank values (2, 1, date '2002-02-15', 'M');
+INSERT 0 1
+insert into rank values (3, 1, date '2003-03-15', 'M');
+INSERT 0 1
+insert into rank values (4, 1, date '2004-04-15', 'M');
+INSERT 0 1
+insert into rank values (5, 1, date '2005-05-15', 'M');
+INSERT 0 1
+insert into rank values (6, 1, date '2001-01-15', 'F');
+INSERT 0 1
+insert into rank values (7, 1, date '2002-02-15', 'F');
+INSERT 0 1
+insert into rank values (8, 1, date '2003-03-15', 'F');
+INSERT 0 1
+insert into rank values (9, 1, date '2004-04-15', 'F');
+INSERT 0 1
+insert into rank values (10, 1, date '2005-05-15', 'F');
+INSERT 0 1
+select * from rank order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  1 |    1 | 2001-01-15 | M
+  2 |    1 | 2002-02-15 | M
+  3 |    1 | 2003-03-15 | M
+  4 |    1 | 2004-04-15 | M
+  5 |    1 | 2005-05-15 | M
+  6 |    1 | 2001-01-15 | F
+  7 |    1 | 2002-02-15 | F
+  8 |    1 | 2003-03-15 | F
+  9 |    1 | 2004-04-15 | F
+ 10 |    1 | 2005-05-15 | F
+(10 rows)
+
+select * from rank_1_prt_boys order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  1 |    1 | 2001-01-15 | M
+  2 |    1 | 2002-02-15 | M
+  3 |    1 | 2003-03-15 | M
+  4 |    1 | 2004-04-15 | M
+  5 |    1 | 2005-05-15 | M
+(5 rows)
+
+select * from rank_1_prt_girls order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  6 |    1 | 2001-01-15 | F
+  7 |    1 | 2002-02-15 | F
+  8 |    1 | 2003-03-15 | F
+  9 |    1 | 2004-04-15 | F
+ 10 |    1 | 2005-05-15 | F
+(5 rows)
+
+select * from rank_1_prt_girls_2_prt_1 order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  6 |    1 | 2001-01-15 | F
+(1 row)
+
+select * from rank_1_prt_girls_2_prt_2 order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  7 |    1 | 2002-02-15 | F
+(1 row)
+
+drop table rank cascade;
+DROP TABLE
+-- range list hash combo, but subpartitions has no templates
+create table ggg (a char(1), b date, d char(3), e numeric)
+distributed by (a)
+partition by range (b)
+subpartition by list(d),
+subpartition by hash(e) subpartitions 3
+(
+partition aa 
+start  (date '2007-01-01') 
+end (date '2008-01-01') 
+       (subpartition dd values ('1', '2', '3'), 
+	    subpartition ee values ('4', '5', '6')),
+partition bb
+start  (date '2008-01-01') 
+end (date '2009-01-01') 
+       (subpartition dd values ('1', '2', '3'),
+	    subpartition ee values ('4', '5', '6'))
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_ee" for table "ggg_1_prt_aa"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_1" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_2" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_dd_3_prt_3" for table "ggg_1_prt_aa_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_ee_3_prt_1" for table "ggg_1_prt_aa_2_prt_ee"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_ee_3_prt_2" for table "ggg_1_prt_aa_2_prt_ee"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa_2_prt_ee_3_prt_3" for table "ggg_1_prt_aa_2_prt_ee"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_ee" for table "ggg_1_prt_bb"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_1" for table "ggg_1_prt_bb_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_2" for table "ggg_1_prt_bb_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_dd_3_prt_3" for table "ggg_1_prt_bb_2_prt_dd"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_ee_3_prt_1" for table "ggg_1_prt_bb_2_prt_ee"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_ee_3_prt_2" for table "ggg_1_prt_bb_2_prt_ee"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:383: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2_prt_ee_3_prt_3" for table "ggg_1_prt_bb_2_prt_ee"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- demo ends here
+-- LIST validation
+-- duplicate partition name
+CREATE TABLE rank (id int, rank int, year date, gender
+char(1)) DISTRIBUTED BY (id, gender, year)
+partition by list (gender)
+(
+  partition boys values ('M'),
+  partition girls values ('a'),
+  partition girls values ('b'),
+  partition girls values ('c'),
+  partition girls values ('d'),
+  partition girls values ('e'),
+  partition bob values ('M')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:405: ERROR:  duplicate partition name for partition "girls"
+LINE 7:   partition girls values ('b'),
+          ^
+-- RANGE validation
+-- legal if end of aa not inclusive
+create table ggg (a char(1), b date, d char(3)) 
+distributed by (a)
+partition by range (b)
+(
+partition aa start (date '2007-01-01') end (date '2008-01-01'),
+partition bb start (date '2008-01-01') end (date '2009-01-01') 
+every (interval '10 days'));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_1" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_3" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_4" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_5" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_6" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_7" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_8" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_9" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_10" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_11" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_12" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_13" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_14" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_15" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_16" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_17" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_18" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_19" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_20" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_21" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_22" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_23" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_24" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_25" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_26" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_27" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_28" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_29" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_30" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_31" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_32" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_33" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_34" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_35" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_36" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:416: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_37" for table "ggg"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- bad - legal if end of aa not inclusive
+create table ggg (a char(1), b date, d char(3)) 
+distributed by (a)
+partition by range (b)
+(
+partition aa start (date '2007-01-01') end (date '2008-01-01') inclusive,
+partition bb start (date '2008-01-01') end (date '2009-01-01') 
+every (interval '10 days'));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:428: ERROR:  starting value of partition "bb_1" overlaps previous range
+LINE 6: partition bb start (date '2008-01-01') end (date '2009-01-01...
+                     ^
+drop table ggg cascade;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:430: ERROR:  table "ggg" does not exist
+-- legal because start of bb not inclusive
+create table ggg (a char(1), b date, d char(3)) 
+distributed by (a)
+partition by range (b)
+(
+partition aa start (date '2007-01-01') end (date '2008-01-01') inclusive,
+partition bb start (date '2008-01-01') exclusive end (date '2009-01-01') 
+every (interval '10 days'));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_1" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_2" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_3" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_4" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_5" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_6" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_7" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_8" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_9" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_10" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_11" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_12" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_13" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_14" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_15" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_16" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_17" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_18" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_19" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_20" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_21" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_22" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_23" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_24" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_25" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_26" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_27" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_28" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_29" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_30" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_31" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_32" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_33" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_34" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_35" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_36" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:439: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb_37" for table "ggg"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- legal if end of aa not inclusive
+create table ggg (a char(1), b date, d char(3)) 
+distributed by (a)
+partition by range (b)
+(
+partition bb start (date '2008-01-01') end (date '2009-01-01'),
+partition aa start (date '2007-01-01') end (date '2008-01-01')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:450: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:450: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- bad - legal if end of aa not inclusive
+create table ggg (a char(1), b date, d char(3)) 
+distributed by (a)
+partition by range (b)
+(
+partition bb start (date '2008-01-01') end (date '2009-01-01'),
+partition aa start (date '2007-01-01') end (date '2008-01-01') inclusive
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:461: ERROR:  starting value of partition "bb" overlaps previous range
+LINE 5: partition bb start (date '2008-01-01') end (date '2009-01-01...
+                     ^
+drop table ggg cascade;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:463: ERROR:  table "ggg" does not exist
+-- legal because start of bb not inclusive
+create table ggg (a char(1), b date, d char(3)) 
+distributed by (a)
+partition by range (b)
+(
+partition bb start (date '2008-01-01') exclusive end (date '2009-01-01'),
+partition aa start (date '2007-01-01') end (date '2008-01-01') inclusive
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:472: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:472: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- validate aa - start greater than end
+create table ggg (a char(1), b date, d char(3)) 
+distributed by (a)
+partition by range (b)
+(
+partition bb start (date '2008-01-01') end (date '2009-01-01'),
+partition aa start (date '2007-01-01') end (date '2006-01-01')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:483: ERROR:  START greater than END for partition "aa"
+LINE 6: partition aa start (date '2007-01-01') end (date '2006-01-01...
+                     ^
+drop table ggg cascade;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:485: ERROR:  table "ggg" does not exist
+-- formerly we could not set end of first partition because next is before
+-- but we can sort them now so this is legal.
+create table ggg (a char(1), b date, d char(3)) 
+distributed by (a)
+partition by range (b)
+(
+partition bb start (date '2008-01-01') ,
+partition aa start (date '2007-01-01') 
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:495: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:495: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_bb" for table "ggg"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- test cross type coercion
+-- int -> char(N)
+create table ggg (i int, a char(1))
+distributed by (i)
+partition by list(a)
+(partition aa values(1, 2));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:504: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- int -> numeric
+create table ggg (i int, n numeric(20, 2))
+distributed by (i)
+partition by list(n)
+(partition aa values(1.22, 4.1));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:512: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_aa" for table "ggg"
+CREATE TABLE
+drop table ggg cascade;
+DROP TABLE
+-- EVERY
+--  the documentation example, rewritten with EVERY in a template
+CREATE TABLE rank (id int,
+rank int, year date, gender char(1))
+DISTRIBUTED BY (id, gender, year)
+partition by list (gender)
+subpartition by range (year)
+subpartition template (
+start (date '2001-01-01')
+end (date '2006-01-01') every (interval '1 year')) (
+partition boys values ('M'),
+partition girls values ('F')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys" for table "rank"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls" for table "rank"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_1" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_2" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_3" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_4" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_boys_2_prt_5" for table "rank_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_1" for table "rank_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_2" for table "rank_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_3" for table "rank_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_4" for table "rank_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:528: NOTICE:  CREATE TABLE will create partition "rank_1_prt_girls_2_prt_5" for table "rank_1_prt_girls"
+CREATE TABLE
+insert into rank values (1, 1, date '2001-01-15', 'M');
+INSERT 0 1
+insert into rank values (2, 1, date '2002-02-15', 'M');
+INSERT 0 1
+insert into rank values (3, 1, date '2003-03-15', 'M');
+INSERT 0 1
+insert into rank values (4, 1, date '2004-04-15', 'M');
+INSERT 0 1
+insert into rank values (5, 1, date '2005-05-15', 'M');
+INSERT 0 1
+insert into rank values (6, 1, date '2001-01-15', 'F');
+INSERT 0 1
+insert into rank values (7, 1, date '2002-02-15', 'F');
+INSERT 0 1
+insert into rank values (8, 1, date '2003-03-15', 'F');
+INSERT 0 1
+insert into rank values (9, 1, date '2004-04-15', 'F');
+INSERT 0 1
+insert into rank values (10, 1, date '2005-05-15', 'F');
+INSERT 0 1
+select * from rank order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  1 |    1 | 2001-01-15 | M
+  2 |    1 | 2002-02-15 | M
+  3 |    1 | 2003-03-15 | M
+  4 |    1 | 2004-04-15 | M
+  5 |    1 | 2005-05-15 | M
+  6 |    1 | 2001-01-15 | F
+  7 |    1 | 2002-02-15 | F
+  8 |    1 | 2003-03-15 | F
+  9 |    1 | 2004-04-15 | F
+ 10 |    1 | 2005-05-15 | F
+(10 rows)
+
+select * from rank_1_prt_boys order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  1 |    1 | 2001-01-15 | M
+  2 |    1 | 2002-02-15 | M
+  3 |    1 | 2003-03-15 | M
+  4 |    1 | 2004-04-15 | M
+  5 |    1 | 2005-05-15 | M
+(5 rows)
+
+select * from rank_1_prt_girls order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  6 |    1 | 2001-01-15 | F
+  7 |    1 | 2002-02-15 | F
+  8 |    1 | 2003-03-15 | F
+  9 |    1 | 2004-04-15 | F
+ 10 |    1 | 2005-05-15 | F
+(5 rows)
+
+select * from rank_1_prt_girls_2_prt_1 order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  6 |    1 | 2001-01-15 | F
+(1 row)
+
+select * from rank_1_prt_girls_2_prt_2 order by 1, 2, 3, 4;
+ id | rank |    year    | gender 
+----+------+------------+--------
+  7 |    1 | 2002-02-15 | F
+(1 row)
+
+drop table rank cascade;
+DROP TABLE
+-- integer ranges work too
+create table ggg (id integer, a integer)
+distributed by (id)
+partition by range (a)
+(start (1) end (10) every (1));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_1" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_2" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_3" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_4" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_5" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_6" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_7" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_8" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:555: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_9" for table "ggg"
+CREATE TABLE
+insert into ggg values (1, 1);
+INSERT 0 1
+insert into ggg values (2, 2);
+INSERT 0 1
+insert into ggg values (3, 3);
+INSERT 0 1
+insert into ggg values (4, 4);
+INSERT 0 1
+insert into ggg values (5, 5);
+INSERT 0 1
+insert into ggg values (6, 6);
+INSERT 0 1
+insert into ggg values (7, 7);
+INSERT 0 1
+insert into ggg values (8, 8);
+INSERT 0 1
+insert into ggg values (9, 9);
+INSERT 0 1
+insert into ggg values (10, 10);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:566: ERROR:  no partition for partitioning key  (seg1 localhost:40000 pid=9097)
+select * from ggg order by 1, 2;
+ id | a 
+----+---
+  1 | 1
+  2 | 2
+  3 | 3
+  4 | 4
+  5 | 5
+  6 | 6
+  7 | 7
+  8 | 8
+  9 | 9
+(9 rows)
+
+select * from ggg_1_prt_1 order by 1, 2;
+ id | a 
+----+---
+  1 | 1
+(1 row)
+
+select * from ggg_1_prt_2 order by 1, 2;
+ id | a 
+----+---
+  2 | 2
+(1 row)
+
+select * from ggg_1_prt_3 order by 1, 2;
+ id | a 
+----+---
+  3 | 3
+(1 row)
+
+select * from ggg_1_prt_4 order by 1, 2;
+ id | a 
+----+---
+  4 | 4
+(1 row)
+
+drop table ggg cascade;
+DROP TABLE
+-- hash tests
+create table ggg (a char(1), b varchar(2), d varchar(2))
+distributed by (a)
+partition by hash(b)
+partitions 3
+(partition a, partition b, partition c);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:583: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_a" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:583: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_b" for table "ggg"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:583: NOTICE:  CREATE TABLE will create partition "ggg_1_prt_c" for table "ggg"
+CREATE TABLE
+insert into ggg values (1,1,1);
+INSERT 0 1
+insert into ggg values (2,2,1);
+INSERT 0 1
+insert into ggg values (1,3,1);
+INSERT 0 1
+insert into ggg values (2,2,3);
+INSERT 0 1
+insert into ggg values (1,4,5);
+INSERT 0 1
+insert into ggg values (2,2,4);
+INSERT 0 1
+insert into ggg values (1,5,6);
+INSERT 0 1
+insert into ggg values (2,7,3);
+INSERT 0 1
+insert into ggg values (1,'a','b');
+INSERT 0 1
+insert into ggg values (2,'c','c');
+INSERT 0 1
+select * from ggg order by 1, 2, 3;
+ a | b | d 
+---+---+---
+ 1 | 1 | 1
+ 1 | 3 | 1
+ 1 | 4 | 5
+ 1 | 5 | 6
+ 1 | a | b
+ 2 | 2 | 1
+ 2 | 2 | 3
+ 2 | 2 | 4
+ 2 | 7 | 3
+ 2 | c | c
+(10 rows)
+
+--select * from ggg_1_prt_a order by 1, 2, 3;
+--select * from ggg_1_prt_b order by 1, 2, 3;
+--select * from ggg_1_prt_c order by 1, 2, 3;
+drop table ggg cascade;
+DROP TABLE
+-- use multiple cols
+create table ggg (a char(1), b varchar(2), d varchar(2))
+distributed by (a)
+partition by hash(b,d)
+partitions 3
+(partition a, partition b, partition c);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:609: ERROR:  Composite partition keys are not allowed
+-- append only tests
+create table foz (i int, d date) with (appendonly = true) distributed by (i)
+partition by range (d) (start (date '2001-01-01') end (date '2005-01-01')
+every(interval '1 year'));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:614: NOTICE:  CREATE TABLE will create partition "foz_1_prt_1" for table "foz"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:614: NOTICE:  CREATE TABLE will create partition "foz_1_prt_2" for table "foz"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:614: NOTICE:  CREATE TABLE will create partition "foz_1_prt_3" for table "foz"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:614: NOTICE:  CREATE TABLE will create partition "foz_1_prt_4" for table "foz"
+CREATE TABLE
+insert into foz select i, '2001-01-01'::date + ('1 day'::interval * i) from
+generate_series(1, 1000) i;
+INSERT 0 1000
+select count(*) from foz;
+ count 
+-------
+  1000
+(1 row)
+
+select count(*) from foz_1_prt_1;
+ count 
+-------
+   364
+(1 row)
+
+select min(d), max(d) from foz;
+    min     |    max     
+------------+------------
+ 2001-01-02 | 2003-09-28
+(1 row)
+
+select min(d), max(d) from foz_1_prt_1;
+    min     |    max     
+------------+------------
+ 2001-01-02 | 2001-12-31
+(1 row)
+
+select min(d), max(d) from foz_1_prt_2;
+    min     |    max     
+------------+------------
+ 2002-01-01 | 2002-12-31
+(1 row)
+
+select min(d), max(d) from foz_1_prt_3;
+    min     |    max     
+------------+------------
+ 2003-01-01 | 2003-09-28
+(1 row)
+
+select min(d), max(d) from foz_1_prt_4;
+ min | max 
+-----+-----
+     | 
+(1 row)
+
+drop table foz cascade;
+DROP TABLE
+-- complain if create table as select (CTAS)
+CREATE TABLE rank1 (id int,
+rank int, year date, gender char(1));
+CREATE TABLE
+create table rank2 as select * from rank1
+DISTRIBUTED BY (id, gender, year)
+partition by list (gender)
+subpartition by range (year)
+subpartition template (
+start (date '2001-01-01')
+end (date '2006-01-01') every (interval '1 year')) (
+partition boys values ('M'),
+partition girls values ('F')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:644: ERROR:  Cannot create a partitioned table using CREATE TABLE AS SELECT
+HINT:  Use CREATE TABLE...LIKE (followed by INSERT...SELECT) instead
+-- like is ok
+create table rank2 (like rank1)
+DISTRIBUTED BY (id, gender, year)
+partition by list (gender)
+subpartition by range (year)
+subpartition template (
+start (date '2001-01-01')
+end (date '2006-01-01') every (interval '1 year')) (
+partition boys values ('M'),
+partition girls values ('F')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_boys" for table "rank2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_girls" for table "rank2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_boys_2_prt_1" for table "rank2_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_boys_2_prt_2" for table "rank2_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_boys_2_prt_3" for table "rank2_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_boys_2_prt_4" for table "rank2_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_boys_2_prt_5" for table "rank2_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_girls_2_prt_1" for table "rank2_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_girls_2_prt_2" for table "rank2_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_girls_2_prt_3" for table "rank2_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_girls_2_prt_4" for table "rank2_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:657: NOTICE:  CREATE TABLE will create partition "rank2_1_prt_girls_2_prt_5" for table "rank2_1_prt_girls"
+CREATE TABLE
+drop table rank1 cascade;
+DROP TABLE
+drop table rank2 cascade;
+DROP TABLE
+-- alter table testing
+create table hhh (a char(1), b date, d char(3))
+distributed by (a)
+partition by range (b)
+(
+partition aa start (date '2007-01-01') end (date '2008-01-01') 
+    with (appendonly=true),
+partition bb start (date '2008-01-01') end (date '2009-01-01')
+    with (appendonly=true)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:673: NOTICE:  CREATE TABLE will create partition "hhh_1_prt_aa" for table "hhh"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:673: NOTICE:  CREATE TABLE will create partition "hhh_1_prt_bb" for table "hhh"
+CREATE TABLE
+-- already exists
+alter table hhh add partition aa;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:676: ERROR:  partition "aa" of relation "hhh" already exists
+-- no partition spec
+alter table hhh add partition cc;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:679: ERROR:  missing boundary specification
+-- overlaps
+alter table hhh add partition cc start ('2008-01-01') end ('2010-01-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:682: ERROR:  new partition overlaps existing partition "bb"
+alter table hhh add partition cc end ('2008-01-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:683: ERROR:  new partition overlaps existing partition
+-- reversed (start > end)
+alter table hhh add partition cc start ('2010-01-01') end ('2009-01-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:686: ERROR:  START greater than END for partition "cc"
+-- works
+--alter table hhh add partition cc start ('2009-01-01') end ('2010-01-01');
+alter table hhh add partition cc end ('2010-01-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:690: NOTICE:  CREATE TABLE will create partition "hhh_1_prt_cc" for table "hhh"
+ALTER TABLE
+-- works - anonymous partition MPP-3350
+alter table hhh add partition end ('2010-02-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:693: NOTICE:  CREATE TABLE will create partition "hhh_1_prt_r418565524" for table "hhh"
+ALTER TABLE
+-- MPP-3607 - ADD PARTITION with open intervals
+create table no_end1 (aa int, bb int) partition by range (bb)
+(partition foo start(3));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:697: NOTICE:  CREATE TABLE will create partition "no_end1_1_prt_foo" for table "no_end1"
+CREATE TABLE
+-- fail overlap
+alter table no_end1 add partition baz end (4);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:700: ERROR:  new partition overlaps existing partition
+-- fail overlap (because prior partition has no end)
+alter table no_end1 add partition baz start (5);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:703: ERROR:  new partition overlaps existing partition
+-- ok (terminates on foo start)
+alter table no_end1 add partition baz start (2);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:706: NOTICE:  CREATE TABLE will create partition "no_end1_1_prt_baz" for table "no_end1"
+ALTER TABLE
+-- ok (because ends before baz start)
+alter table no_end1 add partition baz2 end (1);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:709: NOTICE:  CREATE TABLE will create partition "no_end1_1_prt_baz2" for table "no_end1"
+ALTER TABLE
+create table no_start1 (aa int, bb int) partition by range (bb)
+(partition foo end(3));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:712: NOTICE:  CREATE TABLE will create partition "no_start1_1_prt_foo" for table "no_start1"
+CREATE TABLE
+-- fail overlap (because next partition has no start)
+alter table no_start1 add partition baz start (2);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:715: ERROR:  new partition overlaps existing partition
+-- fail overlap (because next partition has no start)
+alter table no_start1 add partition baz end (1);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:718: ERROR:  new partition overlaps existing partition
+-- ok (starts on foo end)
+alter table no_start1 add partition baz end (4);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:721: NOTICE:  CREATE TABLE will create partition "no_start1_1_prt_baz" for table "no_start1"
+ALTER TABLE
+-- ok (because starts after baz end)
+alter table no_start1 add partition baz2 start (5);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:724: NOTICE:  CREATE TABLE will create partition "no_start1_1_prt_baz2" for table "no_start1"
+ALTER TABLE
+select tablename, partitionlevel, parentpartitiontablename,
+partitionname, partitionrank, partitionboundary from pg_partitions
+where tablename = 'no_start1' or tablename = 'no_end1' 
+order by tablename, partitionrank;
+ tablename | partitionlevel | parentpartitiontablename | partitionname | partitionrank |                   partitionboundary                    
+-----------+----------------+--------------------------+---------------+---------------+--------------------------------------------------------
+ no_end1   |              0 |                          | baz2          |             1 | PARTITION baz2  END (1) WITH (appendonly=true)
+ no_end1   |              0 |                          | baz           |             2 | PARTITION baz START (2) END (3) WITH (appendonly=true)
+ no_end1   |              0 |                          | foo           |             3 | PARTITION foo START (3) WITH (appendonly=true)
+ no_start1 |              0 |                          | foo           |             1 | PARTITION foo  END (3) WITH (appendonly=true)
+ no_start1 |              0 |                          | baz           |             2 | PARTITION baz START (3) END (4) WITH (appendonly=true)
+ no_start1 |              0 |                          | baz2          |             3 | PARTITION baz2 START (5) WITH (appendonly=true)
+(6 rows)
+
+drop table no_end1;
+DROP TABLE
+drop table no_start1;
+DROP TABLE
+-- hash partitions cannot have default partitions
+create table jjj (aa int, bb int) 
+partition by hash(bb) 
+(partition j1, partition j2);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:737: NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j1" for table "jjj"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:737: NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j2" for table "jjj"
+CREATE TABLE
+alter table jjj add default partition;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:739: ERROR:  syntax error at or near ";"
+LINE 1: alter table jjj add default partition;
+                                             ^
+drop table jjj cascade;
+DROP TABLE
+-- default partitions cannot have boundary specifications
+create table jjj (aa int, bb date) 
+partition by range(bb) 
+(partition j1 end (date '2008-01-01'), 
+partition j2 end (date '2009-01-01'));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:747: NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j1" for table "jjj"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:747: NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j2" for table "jjj"
+CREATE TABLE
+-- must have a name
+alter table jjj add default partition;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:750: ERROR:  syntax error at or near ";"
+LINE 1: alter table jjj add default partition;
+                                             ^
+alter table jjj add default partition for (rank(1));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:751: ERROR:  Can only ADD a partition by name
+-- cannot have boundary spec
+alter table jjj add default partition j3 end (date '2010-01-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:753: ERROR:  invalid use of boundary specification for DEFAULT partition "j3" of relation "jjj"
+drop table jjj cascade;
+DROP TABLE
+-- only one default partition
+create table jjj (aa int, bb date) 
+partition by range(bb) 
+(partition j1 end (date '2008-01-01'), 
+partition j2 end (date '2009-01-01'),
+default partition j3);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:762: NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j3" for table "jjj"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:762: NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j1" for table "jjj"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:762: NOTICE:  CREATE TABLE will create partition "jjj_1_prt_j2" for table "jjj"
+CREATE TABLE
+alter table jjj add default partition j3 ;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:764: ERROR:  partition "j3" of relation "jjj" already exists
+alter table jjj add default partition j4 ;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:765: ERROR:  DEFAULT partition "j3" for relation "jjj" already exists
+-- cannot add if have default, must split
+alter table jjj add partition j5 end (date '2010-01-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:768: ERROR:  cannot add RANGE partition "j5" to relation "jjj" with DEFAULT partition "j3"
+HINT:  need to SPLIT partition "j3"
+drop table jjj cascade;
+DROP TABLE
+alter table hhh alter partition cc set tablespace foo_p;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:772: ERROR:  tablespace "foo_p" does not exist
+alter table hhh alter partition aa set tablespace foo_p;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:774: ERROR:  tablespace "foo_p" does not exist
+alter table hhh coalesce partition cc;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:776: ERROR:  cannot COALESCE PARTITION for relation "hhh"
+alter table hhh coalesce partition aa;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:778: ERROR:  cannot COALESCE PARTITION for relation "hhh"
+alter table hhh drop partition cc;
+ALTER TABLE
+alter table hhh drop partition cc cascade;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:782: ERROR:  partition "cc" of relation "hhh" does not exist
+alter table hhh drop partition cc restrict;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:784: ERROR:  partition "cc" of relation "hhh" does not exist
+alter table hhh drop partition if exists cc;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:786: NOTICE:  partition "cc" of relation "hhh" does not exist, skipping
+ALTER TABLE
+-- fail (mpp-3265)
+alter table hhh drop partition for (rank(0));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:789: ERROR:  partition for rank 0 of relation "hhh" does not exist
+alter table hhh drop partition for (rank(-55));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:790: ERROR:  partition for rank -55 of relation "hhh" does not exist
+alter table hhh drop partition for ('2001-01-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:791: ERROR:  partition for value ('2001-01-01') of relation "hhh" does not exist
+create table hhh_r1 (a char(1), b date, d char(3))
+distributed by (a)
+partition by range (b)
+(
+partition aa start (date '2007-01-01') end (date '2008-01-01') 
+             every (interval '1 month')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_1" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_2" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_3" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_4" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_5" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_6" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_7" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_8" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_9" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_10" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_11" for table "hhh_r1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:800: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_aa_12" for table "hhh_r1"
+CREATE TABLE
+create table hhh_l1 (a char(1), b date, d char(3))
+distributed by (a)
+partition by list (b)
+(
+partition aa values ('2007-01-01'),
+partition bb values ('2008-01-01'),
+partition cc values ('2009-01-01') 
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:809: NOTICE:  CREATE TABLE will create partition "hhh_l1_1_prt_aa" for table "hhh_l1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:809: NOTICE:  CREATE TABLE will create partition "hhh_l1_1_prt_bb" for table "hhh_l1"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:809: NOTICE:  CREATE TABLE will create partition "hhh_l1_1_prt_cc" for table "hhh_l1"
+CREATE TABLE
+-- must have name or value for list partition
+alter table hhh_l1 drop partition;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:812: ERROR:  missing name or value for DROP for relation "hhh_l1"
+alter table hhh_l1 drop partition aa;
+ALTER TABLE
+alter table hhh_l1 drop partition for ('2008-01-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:814: NOTICE:  dropped partition "bb" for relation "hhh_l1"
+ALTER TABLE
+-- if not specified, drop first range partition...
+alter table hhh_r1 drop partition for ('2007-04-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:817: NOTICE:  dropped partition "aa_4" for relation "hhh_r1"
+ALTER TABLE
+alter table hhh_r1 drop partition;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:818: NOTICE:  dropped partition "aa_1" for relation "hhh_r1"
+ALTER TABLE
+alter table hhh_r1 drop partition;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:819: NOTICE:  dropped partition "aa_2" for relation "hhh_r1"
+ALTER TABLE
+alter table hhh_r1 drop partition;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:820: NOTICE:  dropped partition "aa_3" for relation "hhh_r1"
+ALTER TABLE
+alter table hhh_r1 drop partition;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:821: NOTICE:  dropped partition "aa_5" for relation "hhh_r1"
+ALTER TABLE
+alter table hhh_r1 drop partition;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:822: NOTICE:  dropped partition "aa_6" for relation "hhh_r1"
+ALTER TABLE
+-- more add partition tests
+-- start before first partition (fail because start equal end)
+alter table hhh_r1 add partition zaa start ('2007-07-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:827: ERROR:  new partition overlaps existing partition
+-- start before first partition (ok)
+alter table hhh_r1 add partition zaa start ('2007-06-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:829: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_zaa" for table "hhh_r1"
+ALTER TABLE
+-- start > last (fail because start equal end)
+alter table hhh_r1 add partition bb start ('2008-01-01') end ('2008-01-01') ;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:831: ERROR:  START equal to END for partition "bb"
+-- start > last (ok)
+alter table hhh_r1 add partition bb start ('2008-01-01') 
+end ('2008-02-01') inclusive;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:834: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_bb" for table "hhh_r1"
+ALTER TABLE
+-- start > last (fail because start == last end inclusive)
+alter table hhh_r1 add partition cc start ('2008-02-01') end ('2008-03-01') ;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:836: ERROR:  new partition overlaps existing partition "bb"
+-- start > last (ok [and leave a gap])
+alter table hhh_r1 add partition cc start ('2008-04-01') end ('2008-05-01') ;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:838: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_cc" for table "hhh_r1"
+ALTER TABLE
+-- overlap (fail)
+alter table hhh_r1 add partition dd start ('2008-01-01') end ('2008-05-01') ;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:840: ERROR:  new partition overlaps existing partition "bb"
+-- new partition in "gap" (ok)
+alter table hhh_r1 add partition dd start ('2008-03-01') end ('2008-04-01') ;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:842: NOTICE:  CREATE TABLE will create partition "hhh_r1_1_prt_dd" for table "hhh_r1"
+ALTER TABLE
+-- overlap all partitions (fail)
+alter table hhh_r1 add partition ee start ('2006-01-01') end ('2009-01-01') ;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:844: ERROR:  new partition overlaps existing partition
+-- start before first partition (fail because end in "gap" [and overlaps])
+alter table hhh_r1 add partition yaa start ('2007-05-01') end ('2007-07-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:846: ERROR:  new partition overlaps existing partition
+-- start before first partition (fail )
+alter table hhh_r1 add partition yaa start ('2007-05-01') 
+end ('2007-10-01') inclusive;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:849: ERROR:  new partition overlaps existing partition "aa_10"
+-- start before first partition (fail because end overlaps)
+alter table hhh_r1 add partition yaa start ('2007-05-01') 
+end ('2007-10-01') exclusive;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:852: ERROR:  new partition overlaps existing partition
+drop table hhh_r1 cascade;
+DROP TABLE
+drop table hhh_l1 cascade;
+DROP TABLE
+-- SPLIT tests
+-- basic sanity tests. All should pass.
+create table k (i int) partition by range(i) (start(1) end(10) every(2), 
+default partition mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:860: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:860: NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:860: NOTICE:  CREATE TABLE will create partition "k_1_prt_3" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:860: NOTICE:  CREATE TABLE will create partition "k_1_prt_4" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:860: NOTICE:  CREATE TABLE will create partition "k_1_prt_5" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:860: NOTICE:  CREATE TABLE will create partition "k_1_prt_6" for table "k"
+CREATE TABLE
+insert into k select i from generate_series(1, 100) i;
+INSERT 0 100
+alter table k split partition mydef at (20) into (partition mydef, 
+partition foo);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:863: ERROR:  AT clause cannot be used when splitting a default RANGE partition
+drop table k;
+DROP TABLE
+create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
+partition b values(5, 6, 7, 8));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:867: NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:867: NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
+CREATE TABLE
+insert into j select i from generate_series(1, 8) i;
+INSERT 0 8
+alter table j split partition for(1) at (2, 3) into (partition fa, partition
+fb);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_54636"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  dropped partition "a" for relation "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  CREATE TABLE will create partition "j_1_prt_fa" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  CREATE TABLE will create partition "j_1_prt_fb" for table "j"
+ALTER TABLE
+select * from j_1_prt_fa;
+ i 
+---
+ 1
+ 4
+(2 rows)
+
+select * from j_1_prt_fb;
+ i 
+---
+ 2
+ 3
+(2 rows)
+
+alter table j split partition for(5) at (6);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  exchanged partition "b" of relation "j" with relation "pg_temp_54636"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  dropped partition "b" for relation "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  CREATE TABLE will create partition "j_1_prt_r613391202" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  CREATE TABLE will create partition "j_1_prt_r1064781686" for table "j"
+ALTER TABLE
+select * from j;
+ i 
+---
+ 1
+ 4
+ 2
+ 3
+ 5
+ 7
+ 8
+ 6
+(8 rows)
+
+-- should fail
+alter table j split partition for (1) at (100);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:876: ERROR:  AT clause parameter is not a member of the target partition specification
+drop table j;
+DROP TABLE
+create table k (i int) partition by range(i) (start(1) end(10) every(2), 
+default partition mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:879: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:879: NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:879: NOTICE:  CREATE TABLE will create partition "k_1_prt_3" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:879: NOTICE:  CREATE TABLE will create partition "k_1_prt_4" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:879: NOTICE:  CREATE TABLE will create partition "k_1_prt_5" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:879: NOTICE:  CREATE TABLE will create partition "k_1_prt_6" for table "k"
+CREATE TABLE
+-- should fail
+alter table k split default partition start(30) end (300) into (partition mydef, partition mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:881: ERROR:  both INTO partitions already exist
+alter table k split partition for(3) at (20);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:882: ERROR:  AT clause parameter is not a member of the target partition specification
+drop table k;
+DROP TABLE
+-- should work
+create table k (i int) partition by range(i) (start(1) end(10) every(2), 
+default partition mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:886: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:886: NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:886: NOTICE:  CREATE TABLE will create partition "k_1_prt_3" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:886: NOTICE:  CREATE TABLE will create partition "k_1_prt_4" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:886: NOTICE:  CREATE TABLE will create partition "k_1_prt_5" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:886: NOTICE:  CREATE TABLE will create partition "k_1_prt_6" for table "k"
+CREATE TABLE
+insert into k select i from generate_series(1, 30) i;
+INSERT 0 30
+alter table k split default partition start(15) end(20) into
+(partition mydef, partition foo);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_54743"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  dropped partition "mydef" for relation "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  CREATE TABLE will create partition "k_1_prt_foo" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+ALTER TABLE
+select * from k_1_prt_foo;
+ i  
+----
+ 15
+ 16
+ 17
+ 18
+ 19
+(5 rows)
+
+alter table k split default partition start(22) exclusive end(25) inclusive
+into (partition bar, partition mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_54743"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  dropped partition "mydef" for relation "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  CREATE TABLE will create partition "k_1_prt_bar" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+ALTER TABLE
+select * from k_1_prt_bar;
+ i  
+----
+ 23
+ 24
+ 25
+(3 rows)
+
+alter table k split partition bar at (23) into (partition baz, partition foz);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  exchanged partition "bar" of relation "k" with relation "pg_temp_54743"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  dropped partition "bar" for relation "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  CREATE TABLE will create partition "k_1_prt_baz" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  CREATE TABLE will create partition "k_1_prt_foz" for table "k"
+ALTER TABLE
+select partitiontablename,partitionposition,partitionrangestart,
+       partitionrangeend from pg_partitions where tablename = 'k'
+	   order by partitionposition;
+ partitiontablename | partitionposition | partitionrangestart | partitionrangeend 
+--------------------+-------------------+---------------------+-------------------
+ k_1_prt_mydef      |                 0 |                     | 
+ k_1_prt_2          |                 2 | 1                   | 3
+ k_1_prt_3          |                 3 | 3                   | 5
+ k_1_prt_4          |                 4 | 5                   | 7
+ k_1_prt_5          |                 5 | 7                   | 9
+ k_1_prt_6          |                 6 | 9                   | 10
+ k_1_prt_foo        |                 7 | 15                  | 20
+ k_1_prt_baz        |                 8 | 22                  | 23
+ k_1_prt_foz        |                 9 | 23                  | 25
+(9 rows)
+
+drop table k;
+DROP TABLE
+-- Test errors for default handling
+create table k (i int) partition by range(i) (start(1) end(2), 
+default partition mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:901: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:901: NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
+CREATE TABLE
+alter table k split partition mydef at (25) into (partition foo, partition
+mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:903: ERROR:  AT clause cannot be used when splitting a default RANGE partition
+drop table k;
+DROP TABLE
+-- check that when we split a default, the INTO clause must named the default
+create table k (i date) partition by range(i) (start('2008-01-01')
+end('2009-01-01') every(interval '1 month'), default partition default_part);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_2" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_3" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_4" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_5" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_6" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_7" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_8" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_9" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_10" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_11" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_12" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:907: NOTICE:  CREATE TABLE will create partition "k_1_prt_13" for table "k"
+CREATE TABLE
+alter table k split default partition start ('2009-01-01') end ('2009-02-01')
+into (partition aa, partition nodate);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:909: ERROR:  default partition name missing from INTO clause
+alter table k split default partition start ('2009-01-01') end ('2009-02-01')
+into (partition aa, partition default_part);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_54865"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  dropped partition "default_part" for relation "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  CREATE TABLE will create partition "k_1_prt_aa" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
+ALTER TABLE
+-- check that it works without INTO
+alter table k split default partition start ('2009-02-01') end ('2009-03-01');
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_54865"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  dropped partition "default_part" for relation "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  CREATE TABLE will create partition "k_1_prt_r336210435" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
+ALTER TABLE
+drop table k;
+DROP TABLE
+-- List too
+create table k (i int) partition by list(i) (partition a values(1, 2),
+partition b values(3, 4), default partition mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:917: NOTICE:  CREATE TABLE will create partition "k_1_prt_a" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:917: NOTICE:  CREATE TABLE will create partition "k_1_prt_b" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:917: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+CREATE TABLE
+alter table k split partition mydef at (5) into (partition foo, partition bar);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:918: ERROR:  default partition name missing from INTO clause
+alter table k split partition mydef at (5) into (partition foo, partition mydef);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_54997"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  dropped partition "mydef" for relation "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  CREATE TABLE will create partition "k_1_prt_foo" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+ALTER TABLE
+alter table k split partition mydef at (10);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_54997"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  dropped partition "mydef" for relation "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  CREATE TABLE will create partition "k_1_prt_r1262328667" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
+ALTER TABLE
+drop table k;
+DROP TABLE
+-- For LIST, make sure that we reject AT() clauses which match all parameters
+create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
+ partition b values(5, 6, 7, 8));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:925: NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:925: NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
+CREATE TABLE
+alter table j split partition for(1) at (1,2) into (partition fa, partition fb);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_55059"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  dropped partition "a" for relation "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  CREATE TABLE will create partition "j_1_prt_fa" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  CREATE TABLE will create partition "j_1_prt_fb" for table "j"
+ALTER TABLE
+alter table j split partition for(1) at (1,2) 
+into (partition f1a, partition f1b); -- This has partition rules that overlaps
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:928: ERROR:  AT clause cannot contain all values in partition "fb"
+drop table j;
+DROP TABLE
+-- Check that we can split LIST partitions that have a default partition
+create table j (i int) partition by list(i) (partition a values(1, 2, 3, 4),
+partition b values(5, 6, 7, 8), default partition default_part);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:933: NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:933: NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:933: NOTICE:  CREATE TABLE will create partition "j_1_prt_default_part" for table "j"
+CREATE TABLE
+alter table j split partition for(1) at (1,2) into (partition f1a, partition
+f1b);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_55099"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  dropped partition "a" for relation "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
+ALTER TABLE
+drop table j;
+DROP TABLE
+-- Make sure range can too
+create table j (i int) partition by range(i) (partition a start(1) end(10),
+default partition default_part);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:939: NOTICE:  CREATE TABLE will create partition "j_1_prt_default_part" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:939: NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
+CREATE TABLE
+alter table j split partition for(1) at (5) into (partition f1a, partition f1b);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_55145"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  dropped partition "a" for relation "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
+ALTER TABLE
+drop table j;
+DROP TABLE
+-- GPSQL-285 -- GPSQL-277
+create table pt_table (a int, b int, c int, d int) distributed by (a) partition by range(b) (default partition others, start(1) end(5) every(1));
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:944: NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_others" for table "pt_table"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:944: NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_2" for table "pt_table"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:944: NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_3" for table "pt_table"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:944: NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_4" for table "pt_table"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:944: NOTICE:  CREATE TABLE will create partition "pt_table_1_prt_5" for table "pt_table"
+CREATE TABLE
+select partitionname, partitiontablename from pg_partitions where tablename='pt_table' order by partitionname;
+ partitionname |  partitiontablename   
+---------------+-----------------------
+               | pt_table_1_prt_5
+               | pt_table_1_prt_2
+               | pt_table_1_prt_3
+               | pt_table_1_prt_4
+ others        | pt_table_1_prt_others
+(5 rows)
+
+insert into pt_table values(1,1,1,1);
+INSERT 0 1
+insert into pt_table values(1,2,1,1);
+INSERT 0 1
+select * from pt_table_1_prt_2;
+ a | b | c | d 
+---+---+---+---
+ 1 | 1 | 1 | 1
+(1 row)
+
+select * from pt_table_1_prt_3;
+ a | b | c | d 
+---+---+---+---
+ 1 | 2 | 1 | 1
+(1 row)
+
+insert into pt_table_1_prt_2 values(1,1,2,2);
+INSERT 0 1
+select * from pt_table_1_prt_2 order by d;
+ a | b | c | d 
+---+---+---+---
+ 1 | 1 | 1 | 1
+ 1 | 1 | 2 | 2
+(2 rows)
+
+insert into pt_table_1_prt_others values(1,1,1,1);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:952: ERROR:  the data does not belong to partition: pt_table_1_prt_others  (seg0 localhost:40000 pid=9140)
+select * from pt_table order by b,d;
+ a | b | c | d 
+---+---+---+---
+ 1 | 1 | 1 | 1
+ 1 | 1 | 2 | 2
+ 1 | 2 | 1 | 1
+(3 rows)
+
+select * from pt_table_1_prt_2 order by b,d;
+ a | b | c | d 
+---+---+---+---
+ 1 | 1 | 1 | 1
+ 1 | 1 | 2 | 2
+(2 rows)
+
+select * from pt_table_1_prt_others order by b,d;
+ a | b | c | d 
+---+---+---+---
+(0 rows)
+
+drop table pt_table;
+DROP TABLE
+-- GPSQL-278
+-- GPSQL-278 - sanity
+drop table if exists pt_check;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:961: NOTICE:  table "pt_check" does not exist, skipping
+DROP TABLE
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_2" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_3" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_4" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_5" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_6" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_7" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_8" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_9" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_10" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_11" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_12" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:976: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_13" for table "pt_check"
+CREATE TABLE
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2010-01-10'::date, 'part 1');
+INSERT 0 1
+INSERT INTO pt_check values (2, '2010-01-21'::date, 'part 2');
+INSERT 0 1
+select * from pt_check order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 2010-01-10 | part 1
+       2 | 2010-01-21 | part 2
+(2 rows)
+
+--Split partition '2010-01-10' into 2 parts (Jan 1-15 and Jan 16-31).
+ALTER TABLE pt_check SPLIT PARTITION FOR ('2010-01-01')
+AT ('2010-01-16')
+INTO (PARTITION jan1thru15, PARTITION jan16thru31);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:984: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan1thru15" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:984: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan16thru31" for table "pt_check"
+ALTER TABLE
+-- Verify split result.
+Select * from pt_check_1_prt_jan1thru15 order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 2010-01-10 | part 1
+(1 row)
+
+Select * from pt_check_1_prt_jan16thru31 order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       2 | 2010-01-21 | part 2
+(1 row)
+
+-- GPSQL-278 - default partitions
+drop table if exists pt_check;
+DROP TABLE
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_2" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_3" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_4" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_5" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_6" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_7" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_8" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_9" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_10" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_11" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_12" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1005: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_13" for table "pt_check"
+CREATE TABLE
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2011-01-10'::date, 'part 1');
+INSERT 0 1
+INSERT INTO pt_check values (2, '2011-02-21'::date, 'part 2');
+INSERT 0 1
+select * from pt_check order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 2011-01-10 | part 1
+       2 | 2011-02-21 | part 2
+(2 rows)
+
+--Split default partition into 2 parts (Jan 2011 and default).
+ALTER TABLE pt_check SPLIT DEFAULT PARTITION
+	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
+	INTO (PARTITION jan2011, DEFAULT PARTITION);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_55357"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  dropped partition "defpt" for relation "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan2011" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+ALTER TABLE
+-- Verify split result.
+select * from pt_check_1_prt_jan2011 order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 2011-01-10 | part 1
+(1 row)
+
+select * from pt_check_1_prt_defpt order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       2 | 2011-02-21 | part 2
+(1 row)
+
+-- GPSQL-278 - default partitions
+drop table if exists pt_check;
+DROP TABLE
+create table pt_check
+(
+distcol int,
+ptcol date,
+col1 text,
+CONSTRAINT distcol_chk CHECK (distcol > 0)
+)
+distributed by (distcol)
+partition by range (ptcol)
+(
+default partition defpt,
+start (date '2010-01-01') inclusive
+end (date '2010-12-31') inclusive
+every (interval '1 month')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_2" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_3" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_4" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_5" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_6" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_7" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_8" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_9" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_10" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_11" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_12" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1034: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_13" for table "pt_check"
+CREATE TABLE
+--Insert 2 records to partitioned table.
+INSERT INTO pt_check values (1, '2011-01-10'::date, 'part 1');
+INSERT 0 1
+INSERT INTO pt_check values (2, '2011-02-21'::date, 'part 2');
+INSERT 0 1
+select * from pt_check order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 2011-01-10 | part 1
+       2 | 2011-02-21 | part 2
+(2 rows)
+
+--Split default partition into 2 parts (Jan 2011 and default).
+ALTER TABLE pt_check SPLIT DEFAULT PARTITION
+	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
+	INTO (DEFAULT PARTITION, PARTITION jan2011);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_55488"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  dropped partition "defpt" for relation "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan2011" for table "pt_check"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
+ALTER TABLE
+-- Verify split result.
+select * from pt_check_1_prt_jan2011 order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       1 | 2011-01-10 | part 1
+(1 row)
+
+select * from pt_check_1_prt_defpt order by col1;
+ distcol |   ptcol    |  col1  
+---------+------------+--------
+       2 | 2011-02-21 | part 2
+(1 row)
+
+--- allow the creation of multi-level partition tables with templates
+CREATE TABLE sales (id int, date date, amt decimal(10,2), region text)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (date)
+              SUBPARTITION BY LIST (region)
+                SUBPARTITION TEMPLATE (
+                  SUBPARTITION usa VALUES ('usa'),
+                  SUBPARTITION europe VALUES ('europe'),
+                  SUBPARTITION asia VALUES ('asia'))
+( PARTITION Jan08 START (date '2008-01-01') INCLUSIVE , 
+  PARTITION Feb08 START (date '2008-02-01') INCLUSIVE ,
+  PARTITION Mar08 START (date '2008-03-01') INCLUSIVE ,
+  PARTITION Apr08 START (date '2008-04-01') INCLUSIVE ,
+  PARTITION May08 START (date '2008-05-01') INCLUSIVE ,
+  PARTITION Jun08 START (date '2008-06-01') INCLUSIVE ,
+  PARTITION Jul08 START (date '2008-07-01') INCLUSIVE ,
+  PARTITION Aug08 START (date '2008-08-01') INCLUSIVE ,
+  PARTITION Sep08 START (date '2008-09-01') INCLUSIVE ,
+  PARTITION Oct08 START (date '2008-10-01') INCLUSIVE ,
+  PARTITION Nov08 START (date '2008-11-01') INCLUSIVE ,
+  PARTITION Dec08 START (date '2008-12-01') INCLUSIVE 
+                  END (date '2009-01-01') EXCLUSIVE )
+;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jan08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_feb08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_mar08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_apr08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_may08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jun08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jul08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_aug08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_sep08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_oct08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_nov08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_dec08" for table "sales"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jan08_2_prt_usa" for table "sales_1_prt_jan08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jan08_2_prt_europe" for table "sales_1_prt_jan08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jan08_2_prt_asia" for table "sales_1_prt_jan08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_feb08_2_prt_usa" for table "sales_1_prt_feb08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_feb08_2_prt_europe" for table "sales_1_prt_feb08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_feb08_2_prt_asia" for table "sales_1_prt_feb08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_mar08_2_prt_usa" for table "sales_1_prt_mar08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_mar08_2_prt_europe" for table "sales_1_prt_mar08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_mar08_2_prt_asia" for table "sales_1_prt_mar08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_apr08_2_prt_usa" for table "sales_1_prt_apr08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_apr08_2_prt_europe" for table "sales_1_prt_apr08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_apr08_2_prt_asia" for table "sales_1_prt_apr08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_may08_2_prt_usa" for table "sales_1_prt_may08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_may08_2_prt_europe" for table "sales_1_prt_may08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_may08_2_prt_asia" for table "sales_1_prt_may08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jun08_2_prt_usa" for table "sales_1_prt_jun08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jun08_2_prt_europe" for table "sales_1_prt_jun08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jun08_2_prt_asia" for table "sales_1_prt_jun08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jul08_2_prt_usa" for table "sales_1_prt_jul08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jul08_2_prt_europe" for table "sales_1_prt_jul08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_jul08_2_prt_asia" for table "sales_1_prt_jul08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_aug08_2_prt_usa" for table "sales_1_prt_aug08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_aug08_2_prt_europe" for table "sales_1_prt_aug08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_aug08_2_prt_asia" for table "sales_1_prt_aug08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_sep08_2_prt_usa" for table "sales_1_prt_sep08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_sep08_2_prt_europe" for table "sales_1_prt_sep08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_sep08_2_prt_asia" for table "sales_1_prt_sep08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_oct08_2_prt_usa" for table "sales_1_prt_oct08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_oct08_2_prt_europe" for table "sales_1_prt_oct08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_oct08_2_prt_asia" for table "sales_1_prt_oct08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_nov08_2_prt_usa" for table "sales_1_prt_nov08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_nov08_2_prt_europe" for table "sales_1_prt_nov08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_nov08_2_prt_asia" for table "sales_1_prt_nov08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_dec08_2_prt_usa" for table "sales_1_prt_dec08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_dec08_2_prt_europe" for table "sales_1_prt_dec08"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1068: NOTICE:  CREATE TABLE will create partition "sales_1_prt_dec08_2_prt_asia" for table "sales_1_prt_dec08"
+CREATE TABLE
+drop table sales;
+DROP TABLE
+--- allow the creation of multi-level partition tables with templates
+CREATE TABLE MPP10223pk
+(
+rnc VARCHAR(100),
+wbts VARCHAR(100),
+axc VARCHAR(100),
+vptt VARCHAR(100),
+vcct VARCHAR(100),
+agg_level CHAR(5),
+period_start_time TIMESTAMP WITH TIME ZONE,
+load_time TIMESTAMP WITH TIME ZONE DEFAULT now(),
+interval INTEGER,
+totcellsegress double precision,
+totcellsingress double precision
+)
+ 
+DISTRIBUTED BY (rnc,wbts,axc,vptt,vcct)
+ 
+PARTITION BY LIST (AGG_LEVEL)
+  SUBPARTITION BY RANGE (PERIOD_START_TIME)
+  SUBPARTITION TEMPLATE
+    (
+       SUBPARTITION P_FUTURE  START (date '2001-01-01') INCLUSIVE,
+       SUBPARTITION P_ENDPART START (date '2999-12-30') INCLUSIVE
+                              END (date '2999-12-31') EXCLUSIVE
+    )
+(
+  PARTITION min15part  VALUES ('15min'),
+  PARTITION hourpart   VALUES ('hour'),
+  PARTITION daypart    VALUES ('day')
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part" for table "mpp10223pk"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart" for table "mpp10223pk"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart" for table "mpp10223pk"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part_2_prt_p_future" for table "mpp10223pk_1_prt_min15part"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part_2_prt_p_endpart" for table "mpp10223pk_1_prt_min15part"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p_future" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p_endpart" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p_future" for table "mpp10223pk_1_prt_daypart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1100: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p_endpart" for table "mpp10223pk_1_prt_daypart"
+CREATE TABLE
+drop table MPP10223pk;
+DROP TABLE
+--- disallow the creation of multi-level partition tables without templates
+CREATE TABLE MPP10223pk
+(
+rnc VARCHAR(100),
+wbts VARCHAR(100),
+axc VARCHAR(100),
+vptt VARCHAR(100),
+vcct VARCHAR(100),
+agg_level CHAR(5),
+period_start_time TIMESTAMP WITH TIME ZONE,
+load_time TIMESTAMP WITH TIME ZONE DEFAULT now(),
+interval INTEGER,
+totcellsegress double precision,
+totcellsingress double precision
+)
+ 
+DISTRIBUTED BY (rnc,wbts,axc,vptt,vcct)
+ 
+PARTITION BY LIST (AGG_LEVEL)
+  SUBPARTITION BY RANGE (PERIOD_START_TIME)
+(
+  PARTITION min15part  VALUES ('15min')
+    (
+       SUBPARTITION P_FUTURE  START (date '2001-01-01') INCLUSIVE,
+       SUBPARTITION P_ENDPART START (date '2999-12-30') INCLUSIVE
+                              END (date '2999-12-31') EXCLUSIVE
+    ),
+  PARTITION hourpart   VALUES ('hour')
+    (
+               SUBPARTITION P20100622 START (date '2010-06-22') INCLUSIVE,
+               SUBPARTITION P20100623 START (date '2010-06-23') INCLUSIVE,
+               SUBPARTITION P20100624 START (date '2010-06-24') INCLUSIVE,
+               SUBPARTITION P20100625 START (date '2010-06-25') INCLUSIVE,
+               SUBPARTITION P20100626 START (date '2010-06-26') INCLUSIVE,
+               SUBPARTITION P_FUTURE  START (date '2001-01-01') INCLUSIVE,
+               SUBPARTITION P_ENDPART START (date '2999-12-30') INCLUSIVE
+                                      END (date '2999-12-31') EXCLUSIVE
+    ),
+  PARTITION daypart    VALUES ('day')
+    (
+               SUBPARTITION P20100622 START (date '2010-06-22') INCLUSIVE,
+               SUBPARTITION P20100623 START (date '2010-06-23') INCLUSIVE,
+               SUBPARTITION P20100624 START (date '2010-06-24') INCLUSIVE,
+               SUBPARTITION P20100625 START (date '2010-06-25') INCLUSIVE,
+               SUBPARTITION P20100626 START (date '2010-06-26') INCLUSIVE,
+               SUBPARTITION P_FUTURE  START (date '2001-01-01') INCLUSIVE,
+               SUBPARTITION P_ENDPART START (date '2999-12-30') INCLUSIVE
+                                      END (date '2999-12-31') EXCLUSIVE
+    )
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part" for table "mpp10223pk"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart" for table "mpp10223pk"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart" for table "mpp10223pk"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part_2_prt_p_future" for table "mpp10223pk_1_prt_min15part"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_min15part_2_prt_p_endpart" for table "mpp10223pk_1_prt_min15part"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p_future" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100622" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100623" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100624" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100625" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p20100626" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_hourpart_2_prt_p_endpart" for table "mpp10223pk_1_prt_hourpart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p_future" for table "mpp10223pk_1_prt_daypart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100622" for table "mpp10223pk_1_prt_daypart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100623" for table "mpp10223pk_1_prt_daypart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100624" for table "mpp10223pk_1_prt_daypart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100625" for table "mpp10223pk_1_prt_daypart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p20100626" for table "mpp10223pk_1_prt_daypart"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1153: NOTICE:  CREATE TABLE will create partition "mpp10223pk_1_prt_daypart_2_prt_p_endpart" for table "mpp10223pk_1_prt_daypart"
+CREATE TABLE
+--- disallow the creation of multi-level partition tables without templates
+CREATE TABLE rank3 (id int, rank int,
+year date, gender char(1),
+usstate char(2))
+DISTRIBUTED BY (id, gender, year, usstate)
+partition by list (gender)
+subpartition by range (year),
+subpartition by list (usstate)
+(
+  partition boys values ('M') 
+(
+subpartition jan01 start (date '2001-01-01') 
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+),
+subpartition jan02 start (date '2002-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+),
+subpartition jan03 start (date '2003-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+),
+subpartition jan04 start (date '2004-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+),
+subpartition jan05 start (date '2005-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+)
+)
+,
+  partition girls values ('F')
+(
+subpartition jan01 start (date '2001-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+),
+subpartition jan02 start (date '2002-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+),
+subpartition jan03 start (date '2003-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+),
+subpartition jan04 start (date '2004-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+),
+subpartition jan05 start (date '2005-01-01')
+(
+subpartition mass values ('MA'),
+subpartition cali values ('CA'),
+subpartition ohio values ('OH')
+)
+)
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys" for table "rank3"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls" for table "rank3"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan01" for table "rank3_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan02" for table "rank3_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan03" for table "rank3_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan04" for table "rank3_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan05" for table "rank3_1_prt_boys"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan01_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan01"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan01_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan01"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan01_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan01"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan02_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan02"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan02_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan02"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan02_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan02"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan03_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan03"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan03_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan03"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan03_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan03"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan04_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan04"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan04_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan04"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan04_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan04"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan05_3_prt_mass" for table "rank3_1_prt_boys_2_prt_jan05"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan05_3_prt_cali" for table "rank3_1_prt_boys_2_prt_jan05"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_boys_2_prt_jan05_3_prt_ohio" for table "rank3_1_prt_boys_2_prt_jan05"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan01" for table "rank3_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan02" for table "rank3_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan03" for table "rank3_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04" for table "rank3_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05" for table "rank3_1_prt_girls"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan01_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan01"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan01_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan01"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan01_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan01"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan02_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan02"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan02_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan02"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan02_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan02"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan03_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan03"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan03_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan03"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan03_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan03"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan04"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan04"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan04_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan04"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_mass" for table "rank3_1_prt_girls_2_prt_jan05"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_cali" for table "rank3_1_prt_girls_2_prt_jan05"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1232: NOTICE:  CREATE TABLE will create partition "rank3_1_prt_girls_2_prt_jan05_3_prt_ohio" for table "rank3_1_prt_girls_2_prt_jan05"
+CREATE TABLE
+-- Tests for sort operator before insert with AO and PARQUET tables (HAWQ-404)
+-- A GUC's value is set to less than the number of partitions in the example table, so that sort is activated.
+DROP TABLE IF EXISTS ch_sort_src, ch_sort_aodest, ch_sort_pqdest, ch_sort_aopqdest, ch_sort__pq_table;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1237: NOTICE:  table "ch_sort_src" does not exist, skipping
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1237: NOTICE:  table "ch_sort_aodest" does not exist, skipping
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1237: NOTICE:  table "ch_sort_pqdest" does not exist, skipping
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1237: NOTICE:  table "ch_sort_aopqdest" does not exist, skipping
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1237: NOTICE:  table "ch_sort__pq_table" does not exist, skipping
+DROP TABLE
+SET optimizer_parts_to_force_sort_on_insert = 5;
+SET
+CREATE TABLE ch_sort_src (id int, year int, month int, day int, region text)
+DISTRIBUTED BY (month); 
+CREATE TABLE
+INSERT INTO ch_sort_src select i, 2000 + i, i % 12, (2*i) % 30, i::text from generate_series(0, 99) i; 
+INSERT 0 100
+-- AO partitioned table
+CREATE TABLE ch_sort_aodest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_outlying_years" for table "ch_sort_aodest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_2" for table "ch_sort_aodest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_3" for table "ch_sort_aodest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_4" for table "ch_sort_aodest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_5" for table "ch_sort_aodest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_6" for table "ch_sort_aodest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_7" for table "ch_sort_aodest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_8" for table "ch_sort_aodest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1253: NOTICE:  CREATE TABLE will create partition "ch_sort_aodest_1_prt_9" for table "ch_sort_aodest"
+CREATE TABLE
+-- PARQUET partitioned table
+CREATE TABLE ch_sort_pqdest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE, ORIENTATION = PARQUET)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_outlying_years" for table "ch_sort_pqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_2" for table "ch_sort_pqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_3" for table "ch_sort_pqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_4" for table "ch_sort_pqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_5" for table "ch_sort_pqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_6" for table "ch_sort_pqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_7" for table "ch_sort_pqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_8" for table "ch_sort_pqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1263: NOTICE:  CREATE TABLE will create partition "ch_sort_pqdest_1_prt_9" for table "ch_sort_pqdest"
+CREATE TABLE
+-- AO/PARQUET mixed table
+CREATE TABLE ch_sort_aopqdest (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE)
+DISTRIBUTED BY (id)
+PARTITION BY RANGE (year)
+( 
+    START (2002) END (2010) EVERY (1),
+    DEFAULT PARTITION outlying_years
+);
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_outlying_years" for table "ch_sort_aopqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_2" for table "ch_sort_aopqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_3" for table "ch_sort_aopqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_4" for table "ch_sort_aopqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_5" for table "ch_sort_aopqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_6" for table "ch_sort_aopqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_7" for table "ch_sort_aopqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_8" for table "ch_sort_aopqdest"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1273: NOTICE:  CREATE TABLE will create partition "ch_sort_aopqdest_1_prt_9" for table "ch_sort_aopqdest"
+CREATE TABLE
+CREATE TABLE ch_sort__pq_table (id int, year int, month int, day int, region text)
+WITH (APPENDONLY=TRUE, ORIENTATION = PARQUET)
+DISTRIBUTED BY (id);
+CREATE TABLE
+ALTER TABLE ch_sort_aopqdest
+EXCHANGE PARTITION FOR(2006)
+WITH TABLE ch_sort__pq_table;
+ALTER TABLE
+-- Test that inserts work
+INSERT INTO ch_sort_aodest SELECT * FROM ch_sort_src;
+INSERT 0 100
+SELECT COUNT(*) FROM ch_sort_aodest;
+ count 
+-------
+   100
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_aodest_1_prt_6;
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_aodest_1_prt_outlying_years;
+ count 
+-------
+    92
+(1 row)
+
+INSERT INTO ch_sort_pqdest SELECT * FROM ch_sort_src;
+INSERT 0 100
+SELECT COUNT(*) FROM ch_sort_pqdest;
+ count 
+-------
+   100
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_pqdest_1_prt_6;
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_pqdest_1_prt_outlying_years;
+ count 
+-------
+    92
+(1 row)
+
+INSERT INTO ch_sort_aopqdest SELECT * FROM ch_sort_src;
+INSERT 0 100
+SELECT COUNT(*) FROM ch_sort_aopqdest;
+ count 
+-------
+   100
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_6;
+ count 
+-------
+     1
+(1 row)
+
+SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_outlying_years;
+ count 
+-------
+    92
+(1 row)
+
+RESET optimizer_parts_to_force_sort_on_insert;
+RESET

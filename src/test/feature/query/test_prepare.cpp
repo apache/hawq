@@ -8,10 +8,9 @@
 #include <iostream>
 
 #include "lib/command.h"
-#include "lib/common.h"
-#include "lib/data-gen.h"
-#include "lib/hawq-config.h"
-#include "lib/sql-util.h"
+#include "lib/data_gen.h"
+#include "lib/hawq_config.h"
+#include "lib/sql_util.h"
 
 #include "gtest/gtest.h"
 
@@ -21,15 +20,14 @@ class TestQueryPrepare : public ::testing::Test {
   ~TestQueryPrepare() {}
 };
 
-
 TEST_F(TestQueryPrepare, TestPrepareUniqueness) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   util.execSQLFile("query/sql/prepare-uniqueness.sql",
 		  	  	   "query/ans/prepare-uniqueness.ans");
 }
 
 TEST_F(TestQueryPrepare, TestPrepareParameters) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   // prepare
   util.execute("drop table if exists test1");
   util.execute("drop table if exists test2");

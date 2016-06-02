@@ -173,7 +173,8 @@ static int appendParquetColumn_Circle(
 		int r,
 		int d);
 
-static char *generateHAWQSchemaStr(
+/* Used by cdbparquetfooterserializer.c */
+char *generateHAWQSchemaStr(
 		ParquetFileField pfields,
 		int fieldCount);
 
@@ -216,7 +217,7 @@ static bool ensureBufferCapacity(ParquetDataPage page,
 
  What about Array?
  */
-static char *
+char *
 generateHAWQSchemaStr(ParquetFileField pfields,
 					  int fieldCount)
 {
