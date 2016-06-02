@@ -25,6 +25,7 @@
  */
 
 #include "cdb/cdbparquetfooterserializer.h"
+#include "cdb/cdbparquetstoragewrite.h"
 #include "access/parquetmetadata_c++/MetadataInterface.h"
 #include "lib/stringinfo.h"
 #include "postgres.h"
@@ -245,7 +246,21 @@ readParquetFileMetadata(
 				break;
 			}
 			break;
+		case 5:
+			/* Skip this optional field now */
+			if (ftype == T_LIST) {
+				xfer += skipType(prot, ftype);
+			}
+			break;
+		case 6:
+			/* Skip this optional field now */
+			if (ftype == T_STRING) {
+				xfer += skipType(prot, ftype);
+			}
+			break;
 		default:
+			ereport(ERROR,
+				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("file metadata field not recognized with fid: %d", fid)));
 			break;
 		}
 
@@ -491,7 +506,27 @@ readSchemaElement_Single(
 				xfer += skipType(prot, ftype);
 			}
 			break;
+		case 7:
+			/* Skip this optional field now */
+			if (ftype == T_I32) {
+				xfer += skipType(prot, ftype);
+			}
+			break;
+		case 8:
+			/* Skip this optional field now */
+			if (ftype == T_I32) {
+				xfer += skipType(prot, ftype);
+			}
+			break;
+		case 9:
+			/* Skip this optional field now */
+			if (ftype == T_I32) {
+				xfer += skipType(prot, ftype);
+			}
+			break;
 		default:
+			ereport(ERROR,
+				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("file metadata: schema element field not recognizd with fid: %d", fid)));
 			break;
 		}
 	}
@@ -567,7 +602,15 @@ readRowGroupInfo(
 				isset_num_rows = true;
 			}
 			break;
+		case 4:
+			/* Skip this optional field now */
+			if (ftype == T_LIST) {
+				xfer += skipType(prot, ftype);
+			}
+			break;
 		default:
+			ereport(ERROR,
+				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("file metadata: row group field not recognized with fid: %d", fid)));
 			break;
 		}
 	}
@@ -633,6 +676,8 @@ readColumnChunk(
 			}
 			break;
 		default:
+			ereport(ERROR,
+				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("file metadata: column chunk field not recognized with fid: %d", fid)));
 			break;
 		}
 	}
@@ -773,7 +818,21 @@ readColumnMetadata(
 				xfer += skipType(prot, ftype);
 			}
 			break;
+		case 12:
+			/* Skip this optional field now */
+			if (ftype == T_STRUCT) {
+				xfer += skipType(prot, ftype);
+			}
+			break;
+		case 13:
+			/* Skip this optional field now */
+			if (ftype == T_LIST) {
+				xfer += skipType(prot, ftype);
+			}
+			break;
 		default:
+			ereport(ERROR,
+				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("file metadata: column metadata field not recognized with fid: %d", fid)));
 			break;
 		}
 	}
@@ -864,14 +923,15 @@ uint32_t readKeyValue(
 			}
 			break;
 		default:
+			ereport(ERROR,
+				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("file metadata: key value field not recognized with fid: %d", fid)));
 			break;
 		}
 	}
 	readStructEnd(prot);
 
 	if (!isset_key)
-		ereport(ERROR,
-				(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("file metadata key value: key not set")));
+		ereport(ERROR, (errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("file metadata key value: key not set")));
 	return xfer;
 }
 
@@ -912,39 +972,43 @@ endDeserializerFooter(
 	int16_t fid;
 	int xfer = 0;
 
-	xfer += readFieldBegin(*prot, &ftype, &fid);
-	if (ftype != T_STOP) {
-		/*should remain the last field, keyvalue*/
-		if (fid != 5) {
-			ereport(ERROR,
-					(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("incorrect file metadata format")));
+
+	while (true) {
+		xfer += readFieldBegin(*prot, &ftype, &fid);
+		if (ftype == T_STOP) {
+			break;
 		}
+		switch (fid) {
+		case 5:
+			if (ftype == T_LIST) {
+				uint32_t lsize;
+				TType etype;
+				xfer += readListBegin(*prot, &etype, &lsize);
 
-		/* process keyvalue part*/
-		if (ftype == T_LIST) {
-			uint32_t lsize;
-			TType etype;
-			xfer += readListBegin(*prot, &etype, &lsize);
+				for (int i = 0; i < lsize; i++) {
+					char *key = NULL;
+					char *value = NULL;
+					xfer += readKeyValue(*prot, &key, &value);
 
-			for (int i = 0; i < lsize; i++) {
-				char *key = NULL;
-				char *value = NULL;
-				xfer += readKeyValue(*prot, &key, &value);
-
-				if ((key != NULL) && (strcmp(key, "hawq.schema") == 0)) {
-					int schemaLen = strlen(value);
-					parquetMetadata->hawqschemastr =
-							(char*) palloc0(schemaLen + 1);
-					strcpy(parquetMetadata->hawqschemastr, value);
+					if ((key != NULL) && (strcmp(key, "hawq.schema") == 0)) {
+						int schemaLen = strlen(value);
+						parquetMetadata->hawqschemastr =
+								(char*) palloc0(schemaLen + 1);
+						strcpy(parquetMetadata->hawqschemastr, value);
+					}
 				}
 			}
-		}
-
-		/*Then should read the T_STOP*/
-		readFieldBegin(*prot, &ftype, &fid);
-		if (ftype != T_STOP) {
+			break;
+		case 6:
+			/* Skip this optional field now */
+			if (ftype == T_STRING) {
+				xfer += skipType(*prot, ftype);
+			}
+			break;
+		default:
 			ereport(ERROR,
-					(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("incorrect file metadata format")));
+					(errcode(ERRCODE_GP_INTERNAL_ERROR), errmsg("incorrect file metadata format with fid: %d", fid)));
+			break;
 		}
 	}
 
@@ -1295,6 +1359,9 @@ writeEndofParquetMetadata(
 	xfer += writeString(prot, "hawq.schema", strlen("hawq.schema"));
 	/*write out value*/
 	xfer += writeFieldBegin(prot, T_STRING, 2);
+	if (parquetMetadata->hawqschemastr == NULL)
+		parquetMetadata->hawqschemastr = generateHAWQSchemaStr(parquetMetadata->pfield,
+							parquetMetadata->fieldCount);
 	xfer += writeString(prot, parquetMetadata->hawqschemastr, strlen(parquetMetadata->hawqschemastr));
 	/*write out end of key value*/
 	xfer += writeFieldStop(prot);
