@@ -326,6 +326,8 @@ endif
 ifeq ($(enable_orca), yes)
 	$(MAKE) -C gpopt $@ INSTLOC=$(DESTDIR)$(libdir)
 	$(MAKE) -C gporca/build $@
+	$(MAKE) -C gpos/build $@
+	$(MAKE) -C gp-xerces/build $@
 endif
 
 install-bin: postgres $(POSTGRES_IMP) installdirs
