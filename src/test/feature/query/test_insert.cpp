@@ -8,11 +8,7 @@
 #include <iostream>
 #include <string>
 
-#include "lib/command.h"
-#include "lib/common.h"
-#include "lib/data-gen.h"
-#include "lib/hawq-config.h"
-#include "lib/sql-util.h"
+#include "lib/sql_util.h"
 
 #include "gtest/gtest.h"
 
@@ -24,7 +20,7 @@ class TestQueryInsert : public ::testing::Test {
 
 
 TEST_F(TestQueryInsert, TestInsertWithDefault) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   // prepare
   util.execute("drop table if exists inserttest");
   util.execute("create table inserttest (col1 int4, "
@@ -47,7 +43,7 @@ TEST_F(TestQueryInsert, TestInsertWithDefault) {
 }
 
 TEST_F(TestQueryInsert, TestInsertWithDefaultNeg) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   // prepare
   util.execute("drop table if exists inserttest");
   util.execute("create table inserttest (col1 int4, "
@@ -66,7 +62,7 @@ TEST_F(TestQueryInsert, TestInsertWithDefaultNeg) {
 }
 
 TEST_F(TestQueryInsert, TestInsertUnmatchedColNumber) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   // prepare
   util.execute("drop table if exists inserttest");
   util.execute("create table inserttest (col1 int4, "
@@ -101,7 +97,7 @@ TEST_F(TestQueryInsert, TestInsertUnmatchedColNumber) {
 }
 
 TEST_F(TestQueryInsert, TestInsertValues) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   // prepare
   util.execute("drop table if exists inserttest");
   util.execute("create table inserttest (col1 int4, "
@@ -124,7 +120,7 @@ TEST_F(TestQueryInsert, TestInsertValues) {
 }
 
 TEST_F(TestQueryInsert, TestInsertAfterDropColumn) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   // prepare
   util.execute("drop table if exists bar");
   util.execute("drop table if exists foo");
@@ -144,7 +140,7 @@ TEST_F(TestQueryInsert, TestInsertAfterDropColumn) {
 }
 
 TEST_F(TestQueryInsert, TestInsertAfterAddDropColumn) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   // prepare
   util.execute("drop table if exists bar");
   util.execute("drop table if exists foo");
@@ -165,7 +161,7 @@ TEST_F(TestQueryInsert, TestInsertAfterAddDropColumn) {
 }
 
 TEST_F(TestQueryInsert, TestInsertAppendOnlyTrue) {
-  SQLUtility util;
+  hawq::test::SQLUtility util;
   // prepare
   util.execute("drop table if exists t");
   util.execSQLFile("query/sql/insert-appendonlytrue.sql",
