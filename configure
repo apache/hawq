@@ -5766,6 +5766,14 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_r" >&5
 $as_echo "$with_r" >&6; }
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:
+*** For license reason, we do not install pl/plr into hawq, instead please build the package
+*** yourself by running \"make -C src/pl plr_pkgbuild\" on the root workspace path.
+*** Then the package could be found under src/pl/build." >&5
+$as_echo "$as_me: WARNING:
+*** For license reason, we do not install pl/plr into hawq, instead please build the package
+*** yourself by running \"make -C src/pl plr_pkgbuild\" on the root workspace path.
+*** Then the package could be found under src/pl/build." >&2;}
 
 
 
