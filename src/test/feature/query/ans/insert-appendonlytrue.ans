@@ -1,0 +1,8 @@
+begin;
+BEGIN
+create table t (a int) with (appendonly=true);
+CREATE TABLE
+insert into t select * from generate_series(1,10);
+INSERT 0 10
+abort;
+ROLLBACK
