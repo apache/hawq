@@ -1,12 +1,13 @@
 #include <string>
 
 #include "lib/command.h"
-#include "lib/common.h"
-#include "lib/sql-util.h"
+#include "lib/sql_util.h"
 
 #include "gtest/gtest.h"
 
 using std::string;
+using hawq::test::SQLUtility;
+using hawq::test::Command;
 
 /* This test suite may consume more than 80 seconds. */
 class TestHawqRegister : public ::testing::Test {
