@@ -32,6 +32,7 @@ endif
 
 ifeq ($(with_r), yes)
 DIRS += plr
+endif
 
 # fixme: depend on plr.patch also.
 plr_prepare:
@@ -41,14 +42,24 @@ plr_prepare:
 		(cd $(abs_top_srcdir)/$(subdir)/plr; git apply ../plr.patch) && \
 		touch $(abs_top_builddir)/$(subdir)/plr_prepare_timestamp; \
 	fi
+
+ABS_PLR_SRCDIR = $(abs_top_srcdir)/$(subdir)/plr
+
+# rpm only so far.
+plr_pkgbuild: plr_prepare
+	if [ ! -f /etc/redhat-release ]; then echo "rpm build is not supported on the platform."; exit 1; fi
+	rm -rf plr/build; mkdir plr/build;
+	rpmbuild -bb plr.spec --define 'plr_srcdir $(ABS_PLR_SRCDIR)' --define '_topdir $(ABS_PLR_SRCDIR)/build' --define '__os_install_post \%{nil}'
+
+ifeq ($(with_r), yes)
+plr_prepare2: plr_prepare
 else
-plr_prepare:
+plr_prepare2:
 endif
 
-.PHONY: plr_prepare
+.PHONY: plr_prepare plr_prepare2 plr_pkgbuild
 
-# We need to fetch plrr if needed.
-all install installdirs uninstall distprep: plr_prepare
+all distprep install installdirs uninstall: plr_prepare2
 	@for dir in $(DIRS); do $(MAKE) -C $$dir $@ || exit 1; done
 
 clean distclean maintainer-clean:

@@ -705,6 +705,10 @@ AC_SUBST(with_java)
 AC_MSG_CHECKING([whether to build R modules])
 PGAC_ARG_BOOL(with, r, no, [  --with-r                build R modules (PL/R)])
 AC_MSG_RESULT([$with_r])
+AC_MSG_WARN([
+*** For license reason, we do not install pl/plr into hawq, instead please build the package
+*** yourself by running "make -C src/pl plr_pkgbuild" on the root workspace path.
+*** Then the package could be found under src/pl/build.])
 AC_SUBST(with_r)
 
 
