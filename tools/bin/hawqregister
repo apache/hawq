@@ -39,6 +39,7 @@ logger = get_default_logger()
 EXECNAME = os.path.split(__file__)[-1]
 setup_tool_logging(EXECNAME,getLocalHostname(),getUserName())
 
+
 def create_opt_parser(version):
     parser = OptParser(option_class=OptChecker,
                        usage='usage: %prog [options] database_name table_name file_or_dir_path_in_hdfs',
@@ -51,11 +52,20 @@ def create_opt_parser(version):
     return parser
 
 
+def check_hadoop_command():
+    hdfscmd = "hadoop"
+    result = local_ssh(hdfscmd);
+    if result != 0:
+        logger.error("command 'hadoop' is not available, please set environment variable $PATH to fix this")
+        sys.exit(1)
+
+
 def get_seg_name(options, databasename, tablename):
     try:
         relfilenode = 0
         relname = ""
-        query = "select pg_class2.relname from pg_class as pg_class1, pg_appendonly, pg_class as pg_class2 where pg_class1.relname ='%s' and  pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid;" % tablename
+        query = ("select pg_class2.relname from pg_class as pg_class1, pg_appendonly, pg_class as pg_class2 where pg_class1.relname ='%s' "
+                 "and  pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid;") % tablename
         dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
         conn = dbconn.connect(dburl, True)
         rows = dbconn.execSQL(conn, query)
@@ -103,6 +113,61 @@ def check_hash_type(options, databasename, tablename):
         sys.exit(1)
 
 
+def get_metadata_from_database(options, databasename, tablename, seg_name):
+    try:
+        query = "select segno from pg_aoseg.%s;" % seg_name
+        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
+        conn = dbconn.connect(dburl, False)
+        rows = dbconn.execSQL(conn, query)
+	conn.commit()
+        conn.close()
+
+    except DatabaseError, ex:
+        logger.error("Failed to connect to database, this script can only be run when the database is up")
+        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
+        sys.exit(1)
+
+    firstsegno = rows.rowcount + 1
+
+    # get the full path of correspoding file for target table
+    try:
+        query = ("select location, gp_persistent_tablespace_node.tablespace_oid, database_oid, relfilenode from pg_class, gp_persistent_relation_node, "
+                 "gp_persistent_tablespace_node, gp_persistent_filespace_node where relname = '%s' and pg_class.relfilenode = "
+                 "gp_persistent_relation_node.relfilenode_oid and gp_persistent_relation_node.tablespace_oid = gp_persistent_tablespace_node.tablespace_oid "
+                 "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % tablename
+        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
+        conn = dbconn.connect(dburl, False)
+        rows = dbconn.execSQL(conn, query)
+	conn.commit()
+        conn.close()
+
+    except DatabaseError, ex:
+        logger.error("Failed to connect to database, this script can only be run when the database is up")
+        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
+        sys.exit(1)
+
+    for row in rows:
+        tabledir = row[0].strip() + "/" + str(row[1]) + "/" + str(row[2]) + "/" + str(row[3]) + "/"
+
+    return firstsegno, tabledir
+
+
+def check_files_and_table_in_same_hdfs_cluster(filepath, tabledir):
+    # check whether the files to be registered is in hdfs
+    filesystem = filepath.split('://')
+    if filesystem[0] != 'hdfs':
+        logger.error("Only support to register file(s) in hdfs")
+        sys.exit(1)
+    fileroot = filepath.split('/')
+    tableroot = tabledir.split('/')
+    print fileroot
+    print tableroot
+    # check the root url of them. eg: for 'hdfs://localhost:8020/temp/tempfile', we check 'hdfs://localohst:8020'
+    if fileroot[0] != tableroot[0] or fileroot[1] != tableroot[1] or fileroot[2] != tableroot[2]:
+        logger.error("Files to be registered and the table are not in the same hdfs cluster.")
+        sys.exit(1)
+
+
 def get_files_in_hdfs(filepath):
     files = []
     sizes = []
@@ -143,48 +208,13 @@ def check_parquet_format(options, files):
             sys.exit(1)
 
 
-def get_metadata_from_database(options, databasename, seg_name):
-    try:
-        query = "select segno from pg_aoseg.%s;" % seg_name
-        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
-        conn = dbconn.connect(dburl, False)
-        rows = dbconn.execSQL(conn, query)
-	conn.commit()
-        conn.close()
-
-    except DatabaseError, ex:
-        logger.error("Failed to connect to database, this script can only be run when the database is up")
-        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
-        sys.exit(1)
-
-    return rows.rowcount + 1
-
-
-def move_files_in_hdfs(options, databasename, tablename, files, firstsegno, normal):
-    # get the full path of correspoding file for target table
-    try:
-        query = "select location, gp_persistent_tablespace_node.tablespace_oid, database_oid, relfilenode from pg_class, gp_persistent_relation_node, gp_persistent_tablespace_node, gp_persistent_filespace_node where relname = '%s' and pg_class.relfilenode = gp_persistent_relation_node.relfilenode_oid and gp_persistent_relation_node.tablespace_oid = gp_persistent_tablespace_node.tablespace_oid and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;" % tablename
-        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
-        conn = dbconn.connect(dburl, False)
-        rows = dbconn.execSQL(conn, query)
-	conn.commit()
-        conn.close()
-
-    except DatabaseError, ex:
-        logger.error("Failed to connect to database, this script can only be run when the database is up")
-        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
-        sys.exit(1)
-
-
+def move_files_in_hdfs(options, databasename, tablename, files, firstsegno, tabledir, normal):
     # move file(s) in src path into the folder correspoding to the target table
     if (normal == True):
-        for row in rows:
-            destdir = row[0].strip() + "/" + str(row[1]) + "/" + str(row[2]) + "/" + str(row[3]) + "/"
-
         segno = firstsegno
         for file in files:
             srcfile = file
-            dstfile = destdir + str(segno)
+            dstfile = tabledir + str(segno)
             segno += 1
             if srcfile != dstfile:
                 hdfscmd = "hadoop fs -mv %s %s" % (srcfile, dstfile)
@@ -194,13 +224,10 @@ def move_files_in_hdfs(options, databasename, tablename, files, firstsegno, norm
                     logger.error("Fail to move '%s' to '%s'" % (srcfile, dstfile))
                     sys.exit(1)
     else:
-        for row in rows:
-            srcdir = row[0].strip() + "/" + str(row[1]) + "/" + str(row[2]) + "/" + str(row[3]) + "/"
-
         segno = firstsegno
         for file in files:
             dstfile = file
-            srcfile = srcdir + str(segno)
+            srcfile = tabledir + str(segno)
             segno += 1
             if srcfile != dstfile:
                 hdfscmd = "hadoop fs -mv %s %s" % (srcfile, dstfile)
@@ -211,7 +238,7 @@ def move_files_in_hdfs(options, databasename, tablename, files, firstsegno, norm
                     sys.exit(1)
 
 
-def insert_metadata_into_database(options, databasename, tablename, seg_name, firstsegno, eofs):
+def insert_metadata_into_database(options, databasename, tablename, seg_name, firstsegno, tabledir, eofs):
     try:
         query = "SET allow_system_table_mods='dml';"
         segno = firstsegno
@@ -228,7 +255,7 @@ def insert_metadata_into_database(options, databasename, tablename, seg_name, fi
     except DatabaseError, ex:
         logger.error("Failed to connect to database, this script can only be run when the database is up")
         logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
-	move_files_in_hdfs(options, databasename, tablename, files, firstsegno, False)
+	move_files_in_hdfs(options, databasename, tablename, files, firstsegno, tabledir, False)
 
         sys.exit(1)
 
@@ -245,28 +272,37 @@ def main(args=None):
     tablename = args[1]
     filepath = args[2]
 
-    # 1. get the seg_name from database
+    # 1. check whether the path of shell command 'hadoop' is set.
+    check_hadoop_command()
+
+    # 2. get the seg_name from database
     seg_name = get_seg_name(options, databasename, tablename)
 
-    # 2. check whether target table is hash-typed, in that case simple insertion does not work
+    # 3. check whether target table is hash-typed, in that case simple insertion does not work
     result = check_hash_type(options, databasename, tablename)
 
-    # 3. get all the files refered by 'filepath', which could be a file or a directory containing all the files
+    # 4. get the metadata to be inserted from hdfs
+    firstsegno, tabledir = get_metadata_from_database(options, databasename, tablename, seg_name)
+
+    # 5. check whether all the files refered by 'filepath' and the location corresponding to the table are in the same hdfs cluster
+    check_files_and_table_in_same_hdfs_cluster(filepath, tabledir)
+
+    # 6. get all the files refered by 'filepath', which could be a file or a directory containing all the files
     files, sizes = get_files_in_hdfs(filepath)
     print "File(s) to be registered:"
     print files
 
-    # 4. check whether the file to be registered is parquet format
+    # 7. check whether the file to be registered is parquet format
     check_parquet_format(options, files)
 
-    # 5. get the metadata to be inserted from hdfs
-    firstsegno = get_metadata_from_database(options, databasename, seg_name)
+    # 8. move the file in hdfs to proper location
+    move_files_in_hdfs(options, databasename, tablename, files, firstsegno, tabledir, True)
 
-    # 6. move the file in hdfs to proper location
-    move_files_in_hdfs(options, databasename, tablename, files, firstsegno, True)
+    # 9. insert the metadata into database
+    insert_metadata_into_database(options, databasename, tablename, seg_name, firstsegno, tabledir, sizes)
 
-    # 7. insert the metadata into database
-    insert_metadata_into_database(options, databasename, tablename, seg_name, firstsegno, sizes)
+    # 10. report the final status of hawq register
+    logger.info("Hawq register succeed.")
 
 if __name__ == '__main__':
     sys.exit(main())
