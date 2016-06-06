@@ -10312,6 +10312,26 @@ DESCR("anytable type serialization input function");
 DATA(insert OID = 3055 ( anytable_out  PGNSP PGUID 12 f f t f i 1 2275 f "3053" _null_ _null_ _null_ anytable_out - _null_ n ));
 DESCR("anytable type serialization output function");
 
+/* gp_snappy_constructor(internal, internal, bool) => internal */
+DATA(insert OID = 5080 ( gp_snappy_constructor  PGNSP PGUID 12 f f f f v 3 2281 f "2281 2281 16" _null_ _null_ _null_ snappy_constructor - _null_ n ));
+DESCR("snappy constructor");
+
+/* gp_snappy_destructor(internal) => void */
+DATA(insert OID = 5081 ( gp_snappy_destructor  PGNSP PGUID 12 f f f f v 1 2278 f "2281" _null_ _null_ _null_ snappy_destructor - _null_ n ));
+DESCR("snappy destructor");
+
+/* gp_snappy_compress(internal, int4, internal, int4, internal, internal) => void */
+DATA(insert OID = 5082 ( gp_snappy_compress  PGNSP PGUID 12 f f f f i 6 2278 f "2281 23 2281 23 2281 2281" _null_ _null_ _null_ snappy_compress_internal - _null_ n ));
+DESCR("snappy compressor");
+
+/* gp_snappy_decompress(internal, int4, internal, int4, internal, internal) => void */
+DATA(insert OID = 5083 ( gp_snappy_decompress  PGNSP PGUID 12 f f f f i 6 2278 f "2281 23 2281 23 2281 2281" _null_ _null_ _null_ snappy_decompress_internal - _null_ n ));
+DESCR("snappy decompressor");
+
+/* gp_snappy_validator(internal) => void */
+DATA(insert OID = 9926 ( gp_snappy_validator  PGNSP PGUID 12 f f f f i 1 2278 f "2281" _null_ _null_ _null_ snappy_validator - _null_ n ));
+DESCR("snappy compression validator");
+
 /* gp_quicklz_constructor(internal, internal, bool) => internal */
 DATA(insert OID = 5076 ( gp_quicklz_constructor  PGNSP PGUID 12 f f f f v 3 2281 f "2281 2281 16" _null_ _null_ _null_ quicklz_constructor - _null_ n ));
 DESCR("quicklz constructor");

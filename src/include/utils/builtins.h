@@ -1164,6 +1164,12 @@ extern Datum quicklz_compress(PG_FUNCTION_ARGS);
 extern Datum quicklz_decompress(PG_FUNCTION_ARGS);
 extern Datum quicklz_validator(PG_FUNCTION_ARGS);
 
+extern Datum snappy_constructor(PG_FUNCTION_ARGS);
+extern Datum snappy_destructor(PG_FUNCTION_ARGS);
+extern Datum snappy_compress_internal(PG_FUNCTION_ARGS);
+extern Datum snappy_decompress_internal(PG_FUNCTION_ARGS);
+extern Datum snappy_validator(PG_FUNCTION_ARGS);
+
 extern Datum zlib_constructor(PG_FUNCTION_ARGS);
 extern Datum zlib_destructor(PG_FUNCTION_ARGS);
 extern Datum zlib_compress(PG_FUNCTION_ARGS);

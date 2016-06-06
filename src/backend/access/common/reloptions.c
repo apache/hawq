@@ -543,8 +543,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 						 errOmitLocation(true)));
 		}
 
-		if (!(columnstore == RELSTORAGE_PARQUET) && ((strcmp(compresstype, "snappy") == 0)
-				|| (strcmp(compresstype, "gzip") == 0)))
+		if (!(columnstore == RELSTORAGE_PARQUET) && (strcmp(compresstype, "gzip") == 0))
 		{
 			ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),

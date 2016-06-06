@@ -117,6 +117,8 @@ typedef FormData_pg_compression *Form_pg_compression;
 /* TIDYCAT_END_CODEGEN */
 
 /* Initial contents */
+DATA(insert OID = 3069 ( snappy gp_snappy_constructor gp_snappy_destructor gp_snappy_compress gp_snappy_decompress gp_snappy_validator PGUID ));
+
 DATA(insert OID = 3060 ( zlib gp_zlib_constructor gp_zlib_destructor gp_zlib_compress gp_zlib_decompress gp_zlib_validator PGUID ));
 
 DATA(insert OID = 3061 ( quicklz gp_quicklz_constructor gp_quicklz_destructor gp_quicklz_compress gp_quicklz_decompress gp_quicklz_validator PGUID ));
