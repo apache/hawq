@@ -160,11 +160,9 @@ def check_files_and_table_in_same_hdfs_cluster(filepath, tabledir):
         sys.exit(1)
     fileroot = filepath.split('/')
     tableroot = tabledir.split('/')
-    print fileroot
-    print tableroot
     # check the root url of them. eg: for 'hdfs://localhost:8020/temp/tempfile', we check 'hdfs://localohst:8020'
     if fileroot[0] != tableroot[0] or fileroot[1] != tableroot[1] or fileroot[2] != tableroot[2]:
-        logger.error("Files to be registered and the table are not in the same hdfs cluster.")
+        logger.error("Files to be registered and the table are not in the same hdfs cluster.\n Files to be registered are '%s'\n Table path in HDFS is '%s'" % (filepath, tabledir))
         sys.exit(1)
 
 
