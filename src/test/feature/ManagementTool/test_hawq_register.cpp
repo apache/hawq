@@ -54,6 +54,45 @@ TEST_F(TestHawqRegister, TestSingleHiveFile) {
 	util.execute("drop table hawqregister;");
 }
 
+TEST_F(TestHawqRegister, TestDataTypes) {
+	SQLUtility util;
+	string rootPath(util.getTestRootPath());
+	/* This parquet file is generate by HIVE, using the table created by */
+	/* 'create table parquet(a boolean, b tinyint, c smallint, d int, e bigint, f date, g float, h double, i string, j binary, k char(10), l varchar(10)) stored as parquet;' */
+	string relativePath("/ManagementTool/test_hawq_register_data_types.paq");
+	string filePath = rootPath + relativePath;
+
+	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put " + filePath + " hdfs://localhost:8020/hawq_register_data_types.paq"));
+
+	util.execute("create table hawqregister(a bool, b int2, c int2, d int4, e int8, f date, g float4, h float8, i varchar, j bytea, k char, l varchar) with (appendonly=true, orientation=parquet);");
+	util.query("select * from hawqregister;", 0);
+
+	EXPECT_EQ(0, Command::getCommandStatus("hawq register postgres hawqregister hdfs://localhost:8020/hawq_register_data_types.paq"));
+
+	util.query("select * from hawqregister;", 1);
+	util.execute("drop table hawqregister;");
+}
+
+TEST_F(TestHawqRegister, TestAllNULL) {
+	SQLUtility util;
+	string rootPath(util.getTestRootPath());
+	/* This parquet file is generate by HIVE, using the table created by */
+	/* 'create table parquet(a boolean, b tinyint, c smallint, d int, e bigint, f date, g float, h double, i string, j binary, k char(10), l varchar(10)) stored as parquet;' */
+	/* with all the values set to NULL */
+	string relativePath("/ManagementTool/test_hawq_register_null.paq");
+	string filePath = rootPath + relativePath;
+
+	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put " + filePath + " hdfs://localhost:8020/hawq_register_data_types.paq"));
+
+	util.execute("create table hawqregister(a bool, b int2, c int2, d int4, e int8, f date, g float4, h float8, i varchar, j bytea, k char, l varchar) with (appendonly=true, orientation=parquet);");
+	util.query("select * from hawqregister;", 0);
+
+	EXPECT_EQ(0, Command::getCommandStatus("hawq register postgres hawqregister hdfs://localhost:8020/hawq_register_data_types.paq"));
+
+	util.query("select * from hawqregister;", 1);
+	util.execute("drop table hawqregister;");
+}
+
 TEST_F(TestHawqRegister, TestFiles) {
 	SQLUtility util;
 	string rootPath(util.getTestRootPath());
