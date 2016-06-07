@@ -696,8 +696,8 @@ pg_prepare:
 ifneq "$(findstring yes, $(with_pgcrypto))" ""
 	if [ ! -e $(abs_top_builddir)/pg_prepare_timestamp ]; then \
 		cd $(abs_top_srcdir); \
-		git submodule update --init src/postgres && \
-		touch $(abs_top_builddir)/src/pg_prepare_timestamp; \
+		git submodule update --init depends/thirdparty/postgres && \
+		touch $(abs_top_builddir)/depends/thirdparty/pg_prepare_timestamp; \
 	fi
 endif
 
