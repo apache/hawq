@@ -590,8 +590,6 @@ backend/storage/file/fd.c
 backend/storage/file/filesystem.c
 backend/storage/file/gp_compress.c
 backend/storage/file/pipe.c
-backend/storage/file/quicklz1.c
-backend/storage/file/quicklz3.c
 backend/storage/freespace/freespace.c
 backend/storage/ipc/ipc.c
 backend/storage/ipc/ipci.c
@@ -1355,8 +1353,6 @@ include/storage/pmsignal.h
 include/storage/pos.h
 include/storage/proc.h
 include/storage/procarray.h
-include/storage/quicklz1.h
-include/storage/quicklz3.h
 include/storage/relfilenode.h
 include/storage/s_lock.h
 include/storage/shmem.h
