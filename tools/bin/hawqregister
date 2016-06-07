@@ -162,7 +162,7 @@ def check_files_and_table_in_same_hdfs_cluster(filepath, tabledir):
     tableroot = tabledir.split('/')
     # check the root url of them. eg: for 'hdfs://localhost:8020/temp/tempfile', we check 'hdfs://localohst:8020'
     if fileroot[0] != tableroot[0] or fileroot[1] != tableroot[1] or fileroot[2] != tableroot[2]:
-        logger.error("Files to be registered and the table are not in the same hdfs cluster.\n Files to be registered are '%s'\n Table path in HDFS is '%s'" % (filepath, tabledir))
+        logger.error("Files to be registered and the table are not in the same hdfs cluster.\nFile(s) to be registered: '%s'\nTable path in HDFS: '%s'" % (filepath, tabledir))
         sys.exit(1)
 
 
@@ -216,7 +216,7 @@ def move_files_in_hdfs(options, databasename, tablename, files, firstsegno, tabl
             segno += 1
             if srcfile != dstfile:
                 hdfscmd = "hadoop fs -mv %s %s" % (srcfile, dstfile)
-                sys.stdout.write("hafscmd: '%s'\n" % hdfscmd)
+                sys.stdout.write("hdfscmd: '%s'\n" % hdfscmd)
                 result = local_ssh(hdfscmd)
                 if result != 0:
                     logger.error("Fail to move '%s' to '%s'" % (srcfile, dstfile))
@@ -229,7 +229,7 @@ def move_files_in_hdfs(options, databasename, tablename, files, firstsegno, tabl
             segno += 1
             if srcfile != dstfile:
                 hdfscmd = "hadoop fs -mv %s %s" % (srcfile, dstfile)
-                sys.stdout.write("hafscmd: '%s'\n" % hdfscmd)
+                sys.stdout.write("hdfscmd: '%s'\n" % hdfscmd)
                 result = local_ssh(hdfscmd)
                 if result != 0:
                     logger.error("Fail to move '%s' to '%s'" % (srcfile, dstfile))
