@@ -17,7 +17,7 @@ WANTED_DIRS += pgcrypto
 # fixme: depend on pgcrypto.patch also.
 pgcrypto_prepare: pg_prepare
 	if [ ! -e $(abs_top_builddir)/$(subdir)/pgcrypto_prepare_timestamp ]; then \
-		(cd $(abs_top_srcdir)/src/postgres/contrib/pgcrypto; git apply $(abs_top_srcdir)/$(subdir)/pgcrypto.patch) && \
+		(cd $(abs_top_srcdir)/depends/thirdparty/postgres/contrib/pgcrypto; git apply $(abs_top_srcdir)/$(subdir)/pgcrypto.patch) && \
 		touch $(abs_top_builddir)/$(subdir)/pgcrypto_prepare_timestamp; \
 	fi
 else

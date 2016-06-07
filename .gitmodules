@@ -10,6 +10,6 @@
 [submodule "src/pl/plr"]
 	path = src/pl/plr
 	url = https://github.com/jconway/plr.git
-[submodule "src/postgres"]
-	path = src/postgres
+[submodule "depends/thirdparty/postgres"]
+	path = depends/thirdparty/postgres
 	url = https://github.com/postgres/postgres.git
