@@ -39,9 +39,6 @@ GP_MAJORVERSION = @GP_MAJORVERSION@
 # HAWQ version number
 HQ_MAJORVERSION = @HQ_MAJORVERSION@
 
-# addon
-ADDON_DIR = @ADDON_DIR@
-
 # Support for VPATH builds
 vpath_build = @vpath_build@
 abs_top_srcdir = @abs_top_srcdir@

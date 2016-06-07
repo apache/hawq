@@ -75,7 +75,7 @@ CATALOG(pg_appendonly,6105) BKI_WITHOUT_OIDS
 	int2			majorversion;		/* major version indicating what's stored in this table  */
 	int2			minorversion;		/* minor version indicating what's stored in this table  */
 	bool			checksum;			/* true if checksum is stored with data and checked */
-	text			compresstype;		/* the compressor used (zlib, or or snappy, quicklz) */
+	text			compresstype;		/* the compressor used (zlib or snappy) */
     bool            columnstore;        /* true if co or parquet table, false if ao table*/
     Oid             segrelid;           /* OID of aoseg table; 0 if none */
     Oid             segidxid;           /* if aoseg table, OID of segno index */

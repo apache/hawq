@@ -33,19 +33,6 @@
 #include <zlib.h>
 #endif
 
-
-/*
- *	Represents the compressor type used for an AO table.
- *	Note that we treat quicklz with compression levels 1 and 3 as
- *	two separate types of compressors, this is because we have to
- *	compile them separately and have a separate API for each. Zlib
- *	compression will have a compression level attached to it, checked
- *	separately.
- */
-
-// UNDONE: Is there a QLZ DEFINE for this?
-#define MAX_OVERRUN_QUICKLZ 400
-
 extern int gp_trycompress_new(
 		 uint8			*sourceData,
 		 int32			 sourceLen,

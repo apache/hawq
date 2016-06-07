@@ -612,23 +612,6 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 				compresstype = pstrdup(defaultParquetCompressor);
 		}
 
-		if (compresstype && (pg_strcasecmp(compresstype, "quicklz") == 0) &&
-		    (compresslevel != 1))
-		{
-		  /* allow quicklz level 3 only if the debug guc is on */
-		  if (!(compresslevel == 3 && Test_enable_broken_quicklz3))
-		  {
-		    if (validate)
-		      ereport(ERROR,
-		          (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-		           errmsg("compresslevel=%d is out of range for quicklz "
-		               "(should be 1)", compresslevel),
-		               errOmitLocation(true)));
-
-		      compresslevel = setDefaultCompressionLevel(compresstype);
-		  }
-		}
-
 		if (compresstype && (pg_strcasecmp(compresstype, "rle_type") == 0) &&
 			(compresslevel > 4))
 		{
@@ -1012,7 +995,7 @@ void validateAppendOnlyRelOptions(bool ao,
 	}
 
 	if (comptype &&
-		(pg_strcasecmp(comptype, "quicklz") == 0 ||
+		(pg_strcasecmp(comptype, "snappy") == 0 ||
 		 pg_strcasecmp(comptype, "zlib") == 0 ||
 		 pg_strcasecmp(comptype, "rle_type") == 0))
 	{
@@ -1025,15 +1008,6 @@ void validateAppendOnlyRelOptions(bool ao,
 							comptype)));			
 		}
 		
-		if ((colstore != RELSTORAGE_PARQUET) &&
-			pg_strcasecmp(comptype, "snappy") == 0)
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("%s can only be used with parquet relations",
-							comptype)));
-		}
-
 		if (comptype && (pg_strcasecmp(comptype, "snappy") != 0)&& complevel == 0)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
@@ -1045,18 +1019,6 @@ void validateAppendOnlyRelOptions(bool ao,
 					 errmsg("compresslevel=%d is out of range (should be between 0 and 9)",
 							complevel)));
 
-		if (comptype && (pg_strcasecmp(comptype, "quicklz") == 0) &&
-			(complevel != 1))
-		{
-			/* allow quicklz level 3 only if the debug guc is on */
-			if (!(complevel == 3 && Test_enable_broken_quicklz3))
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("compresslevel=%d is out of range for quicklz "
-								 "(should be 1)", complevel)));
-			}
-		}
 		if (comptype && (pg_strcasecmp(comptype, "rle_type") == 0) &&
 			(complevel > 4))
 		{
@@ -1098,7 +1060,7 @@ void validateAppendOnlyRelOptions(bool ao,
 
 /*
  * if no compressor type was specified, we set to no compression (level 0)
- * otherwise default for both zlib and quicklz is level 1. RLE_TYPE does
+ * otherwise default for both zlib is level 1. RLE_TYPE does
  * not have a compression level.
  */
 static int setDefaultCompressionLevel(char* compresstype)

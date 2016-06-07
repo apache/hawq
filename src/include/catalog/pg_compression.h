@@ -140,8 +140,7 @@ typedef struct CompressionState
 	/*
 	 * Allows a constructor to tell the calling level the maximum storage
 	 * required for input of the given size. Different algorithms need
-	 * different maximum buffers. For example, quicklz's compression
-	 * algorithm needs at most input size + 400 bytes.
+	 * different maximum buffers.
 	 */
 	size_t (*desired_sz)(size_t input);
 
