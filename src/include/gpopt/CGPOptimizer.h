@@ -57,13 +57,6 @@ class CGPOptimizer
 		// serialize planned statement into DXL
 		static
 		char *SzDXLPlan(Query *pquery);
-
-		// gpopt initialize and terminate
-		static
-		void InitGPOPT();
-
-		static
-		void TerminateGPOPT();
 };
 
 #endif // CGPOptimizer_H

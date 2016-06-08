@@ -62,11 +62,6 @@ static void InitCommunication(void);
 static void ShutdownPostgres(int code, Datum arg);
 static bool ThereIsAtLeastOneRole(void);
 
-#ifdef USE_ORCA
-extern void InitGPOPT();
-extern void TerminateGPOPT();
-#endif
-
 /*** InitPostgres support ***/
 
 /*
@@ -476,11 +471,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 	/* Initialize memory protection */
 	GPMemoryProtect_Init();
 
-#ifdef USE_ORCA
-	/* Initialize GPOPT */
-	InitGPOPT();
-#endif
-
 	/*
 	 * Initialize my entry in the shared-invalidation manager's array of
 	 * per-backend data.
@@ -736,10 +726,6 @@ ShutdownPostgres(int code, Datum arg)
 	 * our usage, report now.
 	 */
 	ReportOOMConsumption();
-
-#ifdef USE_ORCA
-	TerminateGPOPT();
-#endif
 
 	/* Disable memory protection */
 	GPMemoryProtect_Shutdown();
