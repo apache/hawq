@@ -175,28 +175,6 @@ const string& PSQL::getLastResult() const {
   return this->_last_result;
 }
 
-std::string PSQL::getLastResultAsGUCValue() const {
-  std::string content = getLastResult();
-  int newlinecnt = 0;
-  int pos1 = 0, pos2 = 0;
-  for (int i = 0 ; i < content.size() ; ++i) {
-    if (content[i] == '\n') {
-      newlinecnt++;
-      if (newlinecnt == 2) {
-        pos1 = i;
-      } else if (newlinecnt == 3) {
-        pos2 = i;
-        break;
-      }
-    }
-  }
-  if (pos1 > 0 && pos2 >= pos1+2) {
-	return content.substr(pos1+2,         // skip '\n' and ' '
-                          pos2-pos1-2);
-  }
-  return "";
-}
-
 const string PSQL::_getPSQLBaseCommand() const {
   string command = "psql";
   command.append(" -p ").append(this->_port);

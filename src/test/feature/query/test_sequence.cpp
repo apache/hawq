@@ -23,8 +23,7 @@ class TestQuerySequence : public ::testing::Test {
 TEST_F(TestQuerySequence, TestSequenceCreateSerialColumn) {
   hawq::test::SQLUtility util;
   bool orcaon = false;
-  util.execute("show optimizer");
-  if (util.getPSQL()->getLastResultAsGUCValue() == "on") {
+  if (util.getGUCValue("optimizer") == "on") {
 	std::cout << "NOTE: TestQuerySequence.TestSequenceCreateSerialColumn "
                  "uses answer file for optimizer on" << std::endl;
     orcaon = true;
