@@ -31,6 +31,7 @@ OBJS =  CMappingColIdVar.o \
 		CTranslatorDXLToScalar.o \
 		CTranslatorUtils.o \
 		CTranslatorRelcacheToDXL.o \
+		CTranslatorDXLToQuery.o \
 		CTranslatorQueryToDXL.o \
 		CTranslatorDXLToPlStmt.o \
 		CTranslatorPlStmtToDXL.o

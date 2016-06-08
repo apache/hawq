@@ -191,6 +191,10 @@ class COptTasks
 		static
 		void* PvDXLFromQueryTask(void *pv);
 
+		// task that does the translation from xml to dxl to pquery
+		static
+		void* PvQueryFromDXLTask(void *pv);
+
 		// dump relcache info for an object into DXL
 		static
 		void* PvDXLFromMDObjsTask(void *pv);
