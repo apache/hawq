@@ -69,7 +69,7 @@ class PSQL {
                         bool save_diff = true);
 
   void resetOutput();
-
+  std::string getLastResultAsGUCValue() const;
  private:
   PSQL(const PSQL&);
   const PSQL& operator=(const PSQL&);
