@@ -113,6 +113,24 @@ GetCompressionImplementation(char *comptype)
 
 	compname = comptype_to_name(comptype);
 
+	/*
+	 * This is a hack: We added the snappy support for row oriented storage, however
+	 * to make the feature friendly to upgradation in short term, we decide to not
+	 * modify the system table to implement this. Following ugly hack is to
+	 * complete this. Let's remove this piece of code after snappy support is
+	 * added to the related system tables.
+	 */
+	if (strcmp(NameStr(compname), "snappy") == 0)
+	{
+		funcs = palloc0(sizeof(PGFunction) * NUM_COMPRESS_FUNCS);
+		funcs[COMPRESSION_CONSTRUCTOR] = snappy_constructor;
+		funcs[COMPRESSION_DESTRUCTOR] = snappy_destructor;
+		funcs[COMPRESSION_COMPRESS] = snappy_compress_internal;
+		funcs[COMPRESSION_DECOMPRESS] = snappy_decompress_internal;
+		funcs[COMPRESSION_VALIDATOR] = snappy_validator;
+		return funcs;
+	}
+
 	tuple = caql_getfirst(
 			NULL,
 			cql("SELECT * FROM pg_compression "
@@ -555,10 +573,15 @@ compresstype_is_valid(char *comptype)
 						 " WHERE compname = :1 ",
 						 NameGetDatum(&compname))));
 
-	/* FIXME: This is a hack. Should register gzip handlers into pg_compression table. */
+	/*
+	 * FIXME: This is a hack. Should implement related handlers and register 
+	 * in system tables instead. snappy handlers have already been implemented
+	 * but not registerd in system tables (see comment in GetCompressionImplement()
+	 * for details).
+	 */
 	if(!found)
 	{
-		if(strcmp(comptype, "gzip") == 0)
+		if(strcmp(comptype, "snappy") == 0 || strcmp(comptype, "gzip") == 0)
 			found = true;
 	}
 
