@@ -285,6 +285,10 @@ class COptTasks
 		static
 		char *SzDXL(PlannedStmt *pplstmt);
 
+		// convert xml string to DXL and to Query
+		static
+		Query *PqueryFromXML(char *szXmlString);
+
 		// convert xml string to DXL and to PS
 		static
 		PlannedStmt *PplstmtFromXML(char *szXmlString);
