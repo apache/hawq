@@ -1,0 +1,21 @@
+ERROR:  RASTER_worldToRasterCoord: Latitude and longitude required for computing pixel row and column of a rotated raster
+ERROR:  Raster and geometry do not have the same SRID
+ERROR:  Raster and geometry do not have the same SRID
+ERROR:  Raster and geometry do not have the same SRID
+ERROR:  RASTER_worldToRasterCoord: Latitude and longitude required for computing pixel row and column of a rotated raster
+ERROR:  Raster and geometry do not have the same SRID
+ERROR:  Raster and geometry do not have the same SRID
+ERROR:  Raster and geometry do not have the same SRID
+ERROR:  RASTER_rasterToWorldCoord: Pixel row and column required for computing longitude and latitude of a rotated raster
+ERROR:  RASTER_rasterToWorldCoord: Pixel row and column required for computing longitude and latitude of a rotated raster
+test 11.1|t
+test 11.2|t
+test 11.3|t
+test 11.4|t
+test 11.5|t
+test 11.6|t
+test 11.7|t
+test 11.8|t
+test 11.9|t
+test 11.10|t
+test 11.11|t

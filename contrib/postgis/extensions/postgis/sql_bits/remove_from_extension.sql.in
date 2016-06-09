@@ -1,0 +1,25 @@
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+-- 
+-- $Id: remove_from_extension.sql.in 9385 2012-03-02 15:02:17Z robe $
+----
+-- PostGIS - Spatial Types for PostgreSQL
+-- http://www.postgis.org
+--
+-- Copyright (C) 2011 Regina Obe <lr@pcorp.us>
+--
+-- This is free software; you can redistribute and/or modify it under
+-- the terms of the GNU General Public Licence. See the COPYING file.
+--
+-- Author: Regina Obe <lr@pcorp.us>
+--  
+-- This drops extension helper functions
+-- and should be called at the end of the extension upgrade file
+-- removes all postgis_topology functions from postgis_topology extension since they will be readded 
+-- during upgrade
+SELECT postgis_extension_remove_objects('postgis', 'FUNCTION');
+SELECT postgis_extension_remove_objects('postgis', 'AGGREGATE');
+SELECT postgis_extension_drop_if_exists('postgis', 'DROP VIEW raster_columns');
+SELECT postgis_extension_drop_if_exists('postgis', 'DROP TYPE wktgeomval');
+SELECT postgis_extension_drop_if_exists('postgis', 'DROP TYPE _wktgeomval');
+SELECT postgis_extension_drop_if_exists('postgis', 'DROP TYPE raster_columns');
+SELECT postgis_extension_drop_if_exists('postgis', 'DROP TYPE _raster_columns');

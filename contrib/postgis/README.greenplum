@@ -1,0 +1,75 @@
+Building
+
+The Makefiles have been edited to configure and build against libgeos, libproj, and libxml2 under ext/<arch>/. So long as
+those dependencies are supported for a particular choice of <arch>, a simple `make` and `make install` should suffice.
+
+Caveats - Greenplum v. Postgres
+
+1. Analyze
+
+Greenplum does not support ANALYZE functions for user-defined data types.
+
+CREATE TYPE geometry (
+    internallength = variable,
+    input = ST_geometry_in,
+    output = ST_geometry_out,
+    send = ST_geometry_send,
+    receive = ST_geometry_recv,
+    delimiter = ':',
+    analyze = ST_geometry_analyze,        <<< We don't support this.
+    storage = main
+);
+
+ST_geometry_analyze, above, codes to the following API from PostgreSQL 8.2:
+
+static void compute_geometry_stats(VacAttrStats *stats, AnalyzeAttrFetchFunc fetchfunc, int samplerows, double totalrows)
+
+This difference will probably present itself in a number of areas that rely on certain pg_statistic behavior. I've
+only seen one thus far: "select estimated_extent(<table>, <column>)" will cause a segfault at lwgeom_estimate.c:1470.
+It assumes that ANALYZE would have been invoked and that pg_statistics would have been populated with the needed values
+for the given <column>.
+
+2. Triggers
+
+If a Greenplum trigger invokes a user-defined function on a segment, said function cannot execute a SQL query (unless
+it only accesses a pg_catalog relation.)
+
+PostGIS relies on triggers for long transaction support; it seeks to expose the following functionality:
+
+"""
+-- place the lock
+SELECT LockRow('test_locks', '1', 'auth1', now()::timestamp+'00:01');
+SELECT LockRow('test_locks', '2', 'auth2', now()::timestamp+'00:01');
+-- this should fail due to missing auth
+UPDATE test_locks SET state = 'unauthorized' where id = 1;
+BEGIN;
+    -- Add authorization for row 1
+    SELECT AddAuth('auth1');
+    -- we're authorized for row 1
+    UPDATE test_locks SET state = 'authorized' where id = 1;
+END;
+"""
+
+LockRow will record the table, row id, and pseudo-authtoken in its meta-table, public.authorization_table. Futhermore,
+it tries to place a trigger on that particular row, such that when that row is modified, a PostGIS function can consult
+public.authorization_table to determine whether access is permitted. At this point, Greenplum throws errors citing that
+the function cannot access the relation, authorization_table.
+
+Since this is a row-level mechanism, in theory, there could be a way to keep each segments' auth checks on that 
+segment itself, rather than accessing SQL on a cluster-level scope.
+
+Note: Long transaction support is needed for the OpenGIS Web Feature Service specification.
+
+3. Type modifiers
+
+Greenplum don't not support type modifier for user defined types, the work around is
+to use AddGeometryColumn for geometry and by pass it for geography type.
+
+For example, following SQL won't work:
+
+CREATE TABLE geometries(id INTEGER, geom geometry(LINESTRING));
+
+Use below SQL instead:
+
+CREATE TABLE geometries(id INTEGER);
+SELECT AddGeometryColumn('public', 'geometries', 'geom', 0, 'LINESTRING', 2);
