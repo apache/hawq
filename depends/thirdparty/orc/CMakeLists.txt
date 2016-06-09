@@ -103,6 +103,18 @@ enable_testing()
 
 set (EXAMPLE_DIRECTORY ${CMAKE_SOURCE_DIR}/examples)
 
+# switch for libhdfs3
+option(ENABLE_libhdfs3 "Enable HDFS support using libhdfs3 library" OFF)
+if (ENABLE_libhdfs3)
+  set (Libhdfs3_INCLUDE_DIR $ENV{LIBHDFS3_INCLUDE_DIR})
+  if (Libhdfs3_INCLUDE_DIR)
+    message(STATUS "Including local libhdfs3 library...")
+    include_directories(${Libhdfs3_INCLUDE_DIR})
+  else ()
+    message(FATAL_ERROR "You must specify libhdfs3 install path inside LIBHDFS3_INCLUDE_DIR environment variable!")
+  endif (Libhdfs3_INCLUDE_DIR)
+endif (ENABLE_libhdfs3)
+
 add_subdirectory(c++)
 add_subdirectory(tools)
 add_subdirectory(java)
