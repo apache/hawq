@@ -122,26 +122,50 @@ add_custom_command(OUTPUT orc_proto.pb.h orc_proto.pb.cc
         "${CMAKE_SOURCE_DIR}/proto/orc_proto.proto"
 )
 
-add_library (orc STATIC
-  "${CMAKE_CURRENT_BINARY_DIR}/Adaptor.hh"
-  orc_proto.pb.h
-  wrap/orc-proto-wrapper.cc
-  ByteRLE.cc
-  ColumnPrinter.cc
-  ColumnReader.cc
-  Compression.cc
-  Exceptions.cc
-  Int128.cc
-  MemoryPool.cc
-  OrcFile.cc
-  Reader.cc
-  RLEv1.cc
-  RLEv2.cc
-  RLE.cc
-  Timezone.cc
-  TypeImpl.cc
-  Vector.cc
+if (ENABLE_libhdfs3)
+  add_library (orc STATIC
+    "${CMAKE_CURRENT_BINARY_DIR}/Adaptor.hh"
+    orc_proto.pb.h
+    wrap/orc-proto-wrapper.cc
+    ByteRLE.cc
+    ColumnPrinter.cc
+    ColumnReader.cc
+    Compression.cc
+    Exceptions.cc
+    Int128.cc
+    MemoryPool.cc
+    OrcFile.cc
+    Reader.cc
+    RLEv1.cc
+    RLEv2.cc
+    RLE.cc
+    Timezone.cc
+    TypeImpl.cc
+    Vector.cc
+    hdfs/HdfsOrcFile.cc
   )
+else ()
+  add_library (orc STATIC
+    "${CMAKE_CURRENT_BINARY_DIR}/Adaptor.hh"
+    orc_proto.pb.h
+    wrap/orc-proto-wrapper.cc
+    ByteRLE.cc
+    ColumnPrinter.cc
+    ColumnReader.cc
+    Compression.cc
+    Exceptions.cc
+    Int128.cc
+    MemoryPool.cc
+    OrcFile.cc
+    Reader.cc
+    RLEv1.cc
+    RLEv2.cc
+    RLE.cc
+    Timezone.cc
+    TypeImpl.cc
+    Vector.cc
+  )
+endif (ENABLE_libhdfs3)
 
 install(TARGETS orc DESTINATION lib)
 

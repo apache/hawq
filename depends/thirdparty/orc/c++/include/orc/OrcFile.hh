@@ -24,6 +24,8 @@
 #include "orc/orc-config.hh"
 #include "orc/Reader.hh"
 
+#include "wrap/libhdfs3-wrapper.h"
+
 /** /file orc/OrcFile.hh
     @brief The top level interface to ORC.
 */
@@ -70,6 +72,16 @@ namespace orc {
    * @param path the name of the file in the local file system
    */
   ORC_UNIQUE_PTR<InputStream> readLocalFile(const std::string& path);
+
+  /**
+    * Create a stream to a hdfs file
+    * @param path the name of the file in hdfs
+    */
+  ORC_UNIQUE_PTR<InputStream> readHdfsFile(hdfsFS fs,
+                                           const std::string& path,
+                                           int bufferSize = 0,
+                                           int replication = 0,
+                                           tOffset blockSize = 0);
 
   /**
    * Create a reader to the for the ORC file.
