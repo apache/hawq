@@ -19,7 +19,7 @@ DATA_built=postgis.sql uninstall_postgis.sql postgis_upgrade_20_minor.sql legacy
 DATA=../spatial_ref_sys.sql
 
 # SQL preprocessor
-SQLPP = /usr/bin/cpp -traditional-cpp -P
+SQLPP = /usr/bin/cpp -traditional-cpp -P ${PG_CPPFLAGS}
 
 # SQL objects (files requiring pre-processing)
 SQL_OBJS=postgis.sql.in legacy.sql.in legacy_minimal.sql.in 
