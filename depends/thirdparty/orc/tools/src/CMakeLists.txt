@@ -74,8 +74,84 @@ target_link_libraries (timezone-dump
   ${PROTOBUF_LIBRARIES}
   )
 
-install(TARGETS
-   orc-contents
-   orc-metadata
-   orc-statistics
-   DESTINATION bin)
+if (ENABLE_libhdfs3)
+  set (LOCAL_Libhdfs3_LIBRARY $ENV{LIBHDFS3_LIBRARY})
+  if (LOCAL_Libhdfs3_LIBRARY)
+    find_library(Libhdfs3_LIBRARY
+                 NAMES hdfs3
+                 HINTS
+                 LOCAL_Libhdfs3_LIBRARY)
+    link_libraries(${Libhdfs3_LIBRARY})
+  else ()
+    message(FATAL_ERROR "You must specify libhdfs3 link library path inside LIBHDFS3_LIBRARY environment variable!")
+  endif (LOCAL_Libhdfs3_LIBRARY)
+
+  add_executable (hdfs-orc-contents
+    HdfsFileContents.cc
+    )
+
+  target_link_libraries (hdfs-orc-contents
+    orc
+    ${PROTOBUF_LIBRARIES}
+    ${Libhdfs3_LIBRARY}
+    )
+
+  add_executable (hdfs-orc-scan
+    HdfsFileScan.cc
+    )
+
+  target_link_libraries (hdfs-orc-scan
+    orc
+    ${PROTOBUF_LIBRARIES}
+    ${Libhdfs3_LIBRARY}
+    )
+
+  add_executable (hdfs-orc-metadata
+    HdfsFileMetadata.cc
+    )
+
+target_link_libraries (hdfs-orc-metadata
+    orc
+    ${PROTOBUF_LIBRARIES}
+    ${Libhdfs3_LIBRARY}
+    )
+
+  add_executable (hdfs-orc-statistics
+    HdfsFileStatistics.cc
+    )
+
+  target_link_libraries (hdfs-orc-statistics
+    orc
+    ${PROTOBUF_LIBRARIES}
+    ${Libhdfs3_LIBRARY}
+    )
+
+  add_executable (hdfs-orc-memory
+    HdfsFileMemory.cc
+    )
+
+  target_link_libraries (hdfs-orc-memory
+    orc
+    ${PROTOBUF_LIBRARIES}
+    ${Libhdfs3_LIBRARY}
+    )
+endif (ENABLE_libhdfs3)
+
+if (ENABLE_libhdfs3)
+  install(TARGETS
+     orc-contents
+     orc-metadata
+     orc-statistics
+     hdfs-orc-contents
+     hdfs-orc-scan
+     hdfs-orc-metadata
+     hdfs-orc-statistics
+     hdfs-orc-memory
+     DESTINATION bin)
+else ()
+  install(TARGETS
+     orc-contents
+     orc-metadata
+     orc-statistics
+     DESTINATION bin)
+endif (ENABLE_libhdfs3)
