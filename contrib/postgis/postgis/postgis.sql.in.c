@@ -1505,7 +1505,11 @@ $$ LANGUAGE SQL  STRICT;
 -- SPATIAL_REF_SYS
 -------------------------------------------------------------------
 CREATE TABLE spatial_ref_sys (
+#if defined (HQ_VERSION_NUM) && HQ_VERSION_NUM == 20000
+	 srid integer not null
+#else
 	 srid integer not null primary key
+#endif
 		check (srid > 0 and srid <= SRID_USR_MAX),
 	 auth_name varchar(256),
 	 auth_srid integer,
