@@ -210,11 +210,6 @@ ignore: orca_udfs
 #
 ignore: goh_tablespace
 ignore: hdfs_filesystem
-test: parquet_ddl
-test: parquet_multipletype
-test: parquet_pagerowgroup_size
-test: parquet_compression
-test: parquet_subpartition
 ignore: co_disabled
 # HCatalog tests
 test: caqlinmem
