@@ -164,6 +164,19 @@ string SQLUtility::getTestRootPath() const {
   return splitFilePath(result).path;
 }
 
+void SQLUtility::setGUCValue(const std::string &guc, const std::string &value) {
+  string sql = "set " + guc + " = " + value;
+  execute(sql, true);
+}
+
+std::string SQLUtility::getGUCValue(const std::string &guc) {
+  string sql = "show " + guc;
+  const hawq::test::PSQLQueryResult &result = executeQuery(sql);
+  EXPECT_EQ(result.rowCount(), 1);
+  std::vector<std::string> row = result.getRows()[0];
+  return row[0];
+}
+
 FilePath SQLUtility::splitFilePath(const string &filePath) const {
   FilePath fp;
   size_t found1 = filePath.find_last_of("/");

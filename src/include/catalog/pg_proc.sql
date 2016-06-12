@@ -5450,6 +5450,16 @@
 
  CREATE FUNCTION anytable_out(anytable) RETURNS cstring LANGUAGE internal IMMUTABLE STRICT AS 'anytable_out' WITH (OID=3055, DESCRIPTION="anytable type serialization output function");
 
+ CREATE FUNCTION gp_snappy_constructor(internal, internal, bool) RETURNS internal LANGUAGE internal VOLATILE AS 'snappy_constructor' WITH (OID=5080, DESCRIPTION="snappy constructor");
+
+ CREATE FUNCTION gp_snappy_destructor(internal) RETURNS void LANGUAGE internal VOLATILE AS 'snappy_destructor' WITH(OID=5081, DESCRIPTION="snappy destructor");
+
+ CREATE FUNCTION gp_snappy_compress(internal, int4, internal, int4, internal, internal) RETURNS void LANGUAGE internal IMMUTABLE AS 'snappy_compress_internal' WITH(OID=5082, DESCRIPTION="snappy compressor");
+
+ CREATE FUNCTION gp_snappy_decompress(internal, int4, internal, int4, internal, internal) RETURNS void LANGUAGE internal IMMUTABLE AS 'snappy_decompress_internal' WITH(OID=5083, DESCRIPTION="snappy decompressor");
+
+ CREATE FUNCTION gp_snappy_validator(internal) RETURNS void LANGUAGE internal IMMUTABLE AS 'snappy_validator' WITH(OID=9926, DESCRIPTION="snappy compression validator");
+
  CREATE FUNCTION gp_quicklz_constructor(internal, internal, bool) RETURNS internal LANGUAGE internal VOLATILE AS 'quicklz_constructor' WITH (OID=5076, DESCRIPTION="quicklz constructor");
 
  CREATE FUNCTION gp_quicklz_destructor(internal) RETURNS void LANGUAGE internal VOLATILE AS 'quicklz_destructor' WITH(OID=5077, DESCRIPTION="quicklz destructor");

@@ -46,6 +46,8 @@
 #include "utils/relcache.h"
 #include "utils/syscache.h"
 
+#include "snappy-c.h"
+
 /* names we expect to see in ENCODING clauses */
 char *storage_directive_names[] = {"compresstype", "compresslevel",
 								   "blocksize", NULL};
@@ -111,6 +113,24 @@ GetCompressionImplementation(char *comptype)
 
 	compname = comptype_to_name(comptype);
 
+	/*
+	 * This is a hack: We added the snappy support for row oriented storage, however
+	 * to make the feature friendly to upgradation in short term, we decide to not
+	 * modify the system table to implement this. Following ugly hack is to
+	 * complete this. Let's remove this piece of code after snappy support is
+	 * added to the related system tables.
+	 */
+	if (strcmp(NameStr(compname), "snappy") == 0)
+	{
+		funcs = palloc0(sizeof(PGFunction) * NUM_COMPRESS_FUNCS);
+		funcs[COMPRESSION_CONSTRUCTOR] = snappy_constructor;
+		funcs[COMPRESSION_DESTRUCTOR] = snappy_destructor;
+		funcs[COMPRESSION_COMPRESS] = snappy_compress_internal;
+		funcs[COMPRESSION_DECOMPRESS] = snappy_decompress_internal;
+		funcs[COMPRESSION_VALIDATOR] = snappy_validator;
+		return funcs;
+	}
+
 	tuple = caql_getfirst(
 			NULL,
 			cql("SELECT * FROM pg_compression "
@@ -124,7 +144,7 @@ GetCompressionImplementation(char *comptype)
 						comptype)));
 
 	funcs = palloc0(sizeof(PGFunction) * NUM_COMPRESS_FUNCS);
-	
+
 	ctup = (Form_pg_compression)GETSTRUCT(tuple);
 
 	Insist(OidIsValid(ctup->compconstructor));
@@ -350,6 +370,121 @@ zlib_validator(PG_FUNCTION_ARGS)
 }
 
 Datum
+snappy_constructor(PG_FUNCTION_ARGS)
+{
+	TupleDesc			td = PG_GETARG_POINTER(0);
+	StorageAttributes	*sa = PG_GETARG_POINTER(1);
+	CompressionState	*cs	= palloc0(sizeof(CompressionState));
+
+	cs->opaque = NULL;
+	cs->desired_sz = snappy_max_compressed_length;
+
+	Insist(PointerIsValid(td));
+	Insist(PointerIsValid(sa->comptype));
+
+	PG_RETURN_POINTER(cs);
+}
+
+Datum
+snappy_destructor(PG_FUNCTION_ARGS)
+{
+	CompressionState	*cs = PG_GETARG_POINTER(0);
+
+	if (cs->opaque)
+	{
+		Insist(PointerIsValid(cs->opaque));
+		pfree(cs->opaque);
+	}
+
+	PG_RETURN_VOID();
+}
+
+static void
+elog_snappy_error(snappy_status retval, char *func_name,
+				  int src_sz, int dst_sz, int dst_used)
+{
+	switch (retval)
+	{
+		case SNAPPY_INVALID_INPUT:
+			elog(ERROR, "invalid input for %s(): "
+				 "src_sz=%d dst_sz=%d dst_used=%d",
+				 func_name, src_sz, dst_sz, dst_used);
+			break;
+		case SNAPPY_BUFFER_TOO_SMALL:
+			elog(ERROR, "buffer is too small in %s(): "
+				 "src_sz=%d dst_sz=%d dst_used=%d",
+				 func_name, src_sz, dst_sz, dst_used);
+			break;
+		default:
+			elog(ERROR, "unknown failure (return value %d) for %s(): "
+				 "src_sz=%d dst_sz=%d dst_used=%d", retval, func_name,
+				 src_sz, dst_sz, dst_used);
+			break;
+	}
+}
+
+Datum
+snappy_compress_internal(PG_FUNCTION_ARGS)
+{
+	const char		*src = PG_GETARG_POINTER(0);
+	size_t			src_sz = PG_GETARG_INT32(1);
+	char			*dst = PG_GETARG_POINTER(2);
+	size_t			dst_sz = PG_GETARG_INT32(3);
+	size_t			*dst_used = PG_GETARG_POINTER(4);
+	size_t			compressed_length;
+	snappy_status	retval;
+
+	compressed_length = snappy_max_compressed_length(src_sz);
+	Insist(dst_sz >= compressed_length);
+
+	retval = snappy_compress(src, src_sz, dst, &compressed_length);
+	*dst_used = compressed_length;
+
+	if (retval != SNAPPY_OK)
+		elog_snappy_error(retval, "snappy_compress", src_sz, dst_sz, *dst_used);
+
+	PG_RETURN_VOID();
+}
+
+Datum
+snappy_decompress_internal(PG_FUNCTION_ARGS)
+{
+	const char		*src	= PG_GETARG_POINTER(0);
+	size_t			src_sz = PG_GETARG_INT32(1);
+	char			*dst	= PG_GETARG_POINTER(2);
+	int32			dst_sz = PG_GETARG_INT32(3);
+	int32			*dst_used = PG_GETARG_POINTER(4);
+	size_t			uncompressed_length;
+	snappy_status	retval;
+
+	Insist(src_sz > 0 && dst_sz > 0);
+
+	retval = snappy_uncompressed_length((char *) src, (size_t) src_sz,
+										&uncompressed_length);
+	if (retval != SNAPPY_OK)
+		elog_snappy_error(retval, "snappy_uncompressed_length",
+						  src_sz, dst_sz, *dst_used);
+
+	Insist(dst_sz >= uncompressed_length);
+
+	retval = snappy_uncompress((char *) src, src_sz, (char *) dst,
+							   &uncompressed_length);
+	*dst_used = uncompressed_length;
+
+	if (retval != SNAPPY_OK)
+		elog_snappy_error(retval, "snappy_uncompressed",
+						  src_sz, dst_sz, *dst_used);
+
+	PG_RETURN_VOID();
+}
+
+Datum
+snappy_validator(PG_FUNCTION_ARGS)
+{
+	PG_RETURN_VOID();
+}
+
+Datum
 rle_type_constructor(PG_FUNCTION_ARGS)
 {
 	elog(ERROR, "rle_type block compression not supported");
@@ -437,10 +572,16 @@ compresstype_is_valid(char *comptype)
 					 cql("SELECT COUNT(*) FROM pg_compression "
 						 " WHERE compname = :1 ",
 						 NameGetDatum(&compname))));
-		
+
+	/*
+	 * FIXME: This is a hack. Should implement related handlers and register 
+	 * in system tables instead. snappy handlers have already been implemented
+	 * but not registerd in system tables (see comment in GetCompressionImplement()
+	 * for details).
+	 */
 	if(!found)
 	{
-		if((strcmp(comptype, "snappy") == 0) || strcmp(comptype, "gzip") == 0)
+		if(strcmp(comptype, "snappy") == 0 || strcmp(comptype, "gzip") == 0)
 			found = true;
 	}
 

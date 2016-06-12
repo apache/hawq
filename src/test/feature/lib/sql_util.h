@@ -58,6 +58,11 @@ class SQLUtility {
   // @return path string
   std::string getTestRootPath() const;
 
+  // Set GUC value
+  void setGUCValue(const std::string &guc, const std::string &value);
+  // Get GUC value
+  std::string getGUCValue(const std::string &guc);
+
  private:
   std::unique_ptr<hawq::test::PSQL> getConnection();
   const std::string generateSQLFile(const std::string &sqlFile);
