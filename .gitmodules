@@ -11,5 +11,5 @@
 	path = src/pl/plr
 	url = https://github.com/jconway/plr.git
 [submodule "depends/thirdparty/postgres"]
-        path = depends/thirdparty/postgres
-        url = https://github.com/postgres/postgres.git
+	path = depends/thirdparty/postgres
+	url = https://github.com/postgres/postgres.git
