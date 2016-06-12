@@ -1,0 +1,3 @@
+INSERT INTO serialtest VALUES('wrong',NULL);
+psql:/tmp/TestQuerySequence_TestSequenceCreateSerialColumn.sql:4: ERROR:  One or more assertions failed  (seg0 localhost:40000 pid=11362)
+DETAIL:  Not null constraint for column f2 of table serialtest was violated
