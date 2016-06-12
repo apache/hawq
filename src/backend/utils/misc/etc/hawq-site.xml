@@ -52,13 +52,13 @@ under the License.
 
 	<property>
 		<name>hawq_master_directory</name>
-		<value>~/hawq-data-directory/masterdd</value>
+		<value>/data/hawq/master</value>
 		<description>The directory of hawq master.</description>
 	</property>
 
 	<property>
 		<name>hawq_segment_directory</name>
-		<value>~/hawq-data-directory/segmentdd</value>
+		<value>/data/hawq/segment</value>
 		<description>The directory of hawq segment.</description>
 	</property> 
 
