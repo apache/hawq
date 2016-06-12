@@ -275,6 +275,8 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 startKey = Bytes.toBytes(key);
                 endKey = Bytes.add(Bytes.toBytes(key), zeroByte);
                 break;
+            default:
+                throw new Exception("unsupported operation for filtering " + op);
         }
     }
 }
