@@ -29,8 +29,8 @@ class SQLUtility {
 
   // Execute sql command
   // @param sql The given sql command
-  // @return void
-  void execute(const std::string &sql, bool check = true);
+  // @return error or notice message if check is false, else return empty
+  std::string execute(const std::string &sql, bool check = true);
 
   // Execute query command and check the rowCount
   // @param sql The given query command
@@ -50,7 +50,7 @@ class SQLUtility {
   // @return void
   void execSQLFile(const std::string &sqlFile, const std::string &ansFile);
 
-  // Get PSQL connection
+  // Get PSQL connection: do not suggest to use
   // @return PSQL raw pointer
   const hawq::test::PSQL *getPSQL() const;
 
