@@ -166,7 +166,11 @@ distcheck: $(distdir).tar.gz
 	@echo "Distribution integrity checks out."
 
 coverage-show:
+ifneq ($(origin filter), undefined)
+	lcov --directory $(filter) --capture --output-file CodeCoverage.info
+else
 	lcov --directory . --capture --output-file CodeCoverage.info
+endif
 	lcov --remove CodeCoverage.info 'test/*' 'mock/*' '/usr/*' '/opt/*' '*ext/rhel5_x86_64*' '*ext/osx*' --output-file CodeCoverage.info.cleaned
 	genhtml -o CodeCoverageReport CodeCoverage.info.cleaned
 
