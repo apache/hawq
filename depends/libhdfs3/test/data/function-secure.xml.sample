@@ -2,7 +2,7 @@
 
 	<property>
 		<name>dfs.default.uri</name>
-		<value>hdfs://localhost:9000</value>
+		<value>hdfs://localhost:8020</value>
 	</property>
 
 	<property>
@@ -22,12 +22,12 @@
 	
 	<property>
 		<name>dfs.namenode.rpc-address.gphd-cluster.nn1</name>
-		<value>smdw:9000</value>
+		<value>smdw:8020</value>
 	</property>
 	
 	<property>
 		<name>dfs.namenode.rpc-address.gphd-cluster.nn2</name>
-		<value>mdw:9000</value>
+		<value>mdw:8020</value>
 	</property>
 
 	<property>

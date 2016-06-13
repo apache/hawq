@@ -1497,9 +1497,9 @@ TEST_F(TestCInterface, TestGetHANamenode) {
     EXPECT_TRUE(errno == EINVAL);
     ASSERT_TRUE(NULL != (namenodes = hdfsGetHANamenodes("phdcluster", &size)));
     ASSERT_EQ(2, size);
-    EXPECT_STREQ("mdw:9000", namenodes[0].rpc_addr);
+    EXPECT_STREQ("mdw:8020", namenodes[0].rpc_addr);
     EXPECT_STREQ("mdw:50070", namenodes[0].http_addr);
-    EXPECT_STREQ("smdw:9000", namenodes[1].rpc_addr);
+    EXPECT_STREQ("smdw:8020", namenodes[1].rpc_addr);
     EXPECT_STREQ("smdw:50070", namenodes[1].http_addr);
     EXPECT_NO_THROW(hdfsFreeNamenodeInformation(namenodes, size));
 }
