@@ -10,6 +10,7 @@
 #include "lib/data_gen.h"
 #include "lib/hawq_config.h"
 #include "lib/sql_util.h"
+#include "lib/string_util.h"
 
 #include "gtest/gtest.h"
 
@@ -78,6 +79,11 @@ TEST_F(TestCommonLib, TestSqlUtil) {
             "                                                             ^\n");
   err_msg = util.execute("drop table non_exist_tbl;", false);
   EXPECT_EQ(err_msg, "ERROR:  table \"non_exist_tbl\" does not exist\n");
+}
+
+TEST_F(TestCommonLib, TestStringFormat) {
+  auto s1 = hawq::test::stringFormat("%s are welcome to apache %s project", "you", "HAWQ");
+  EXPECT_EQ(s1, "you are welcome to apache HAWQ project");
 }
 
 TEST_F(TestCommonLib, TestDataGenerator) {
