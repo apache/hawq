@@ -51,10 +51,14 @@ void SQLUtility::exec(const string &sql) {
       << conn->getLastResult();
 }
 
-void SQLUtility::execute(const string &sql, bool check) {
+string SQLUtility::execute(const string &sql, bool check) {
   conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
   EXPECT_NE(conn.get(), nullptr);
-  if (check) EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
+  if (check) {
+    EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
+    return "";
+  }
+  return conn.get()->getLastResult();
 }
 
 void SQLUtility::query(const string &sql, int expectNum) {

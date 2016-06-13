@@ -71,6 +71,13 @@ TEST_F(TestCommonLib, TestSqlUtil) {
   util.query("select * from test", 2);
   util.query("select * from test", "1|1.1|\n2|2.2|\n");
   util.execSQLFile("testlib/sql/sample.sql", "testlib/ans/sample.ans");
+  auto err_msg = util.execute("select * from non_exist_tbl;", false);
+  EXPECT_EQ(err_msg,
+            "ERROR:  relation \"non_exist_tbl\" does not exist\n"
+            "LINE 1: ...ARCH_PATH=TestCommonLib_TestSqlUtil;select * from non_exist_...\n"
+            "                                                             ^\n");
+  err_msg = util.execute("drop table non_exist_tbl;", false);
+  EXPECT_EQ(err_msg, "ERROR:  table \"non_exist_tbl\" does not exist\n");
 }
 
 TEST_F(TestCommonLib, TestDataGenerator) {
