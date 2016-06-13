@@ -16,7 +16,7 @@ TEST_F(TestParquet, TestMultipleType) {
   util.execute("drop table if exists t1");
   hawq::test::DataGenerator dGen(&util);
   dGen.genTableWithFullTypes("t1", true, "parquet");
-  util.query("select count(*) from t1", 6);
+  util.query("select * from t1", 6);
 }
 
 TEST_F(TestParquet, TestCompression) {
