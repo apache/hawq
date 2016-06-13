@@ -52,3 +52,8 @@ env.sh
 ext/
 plr.tgz
 autom4te.cache/
+
+# coverage
+*.gcda
+*.gcno
+CodeCoverage*
