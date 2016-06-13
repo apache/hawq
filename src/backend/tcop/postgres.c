@@ -214,6 +214,8 @@ static PreparedStatement *unnamed_stmt_pstmt = NULL;
 
 static bool EchoQuery = false;	/* default don't echo */
 
+static bool DoingPqReading = false; /* in the middle of recv call of secure_read */
+
 extern pthread_t main_tid;
 #ifndef _WIN32
 pthread_t main_tid = (pthread_t)0;
@@ -599,6 +601,17 @@ ReadCommand(StringInfo inBuf)
  * non-reentrant libc functions.  This restriction makes it safe for us
  * to allow interrupt service routines to execute nontrivial code while
  * we are waiting for input.
+ *
+ * When waiting in the main loop, we can process any interrupt immediately
+ * in the signal handler. In any other read from the client, like in a COPY
+ * FROM STDIN, we can't safely process a query cancel signal, because we might
+ * be in the middle of sending a message to the client, and jumping out would
+ * violate the protocol. Or rather, pqcomm.c would detect it and refuse to
+ * send any more messages to the client. But handling a SIGTERM is OK, because
+ * we're terminating the backend and don't need to send any more messages
+ * anyway. That means that we might not be able to send an error message to
+ * the client, but that seems better than waiting indefinitely, in case the
+ * client is not responding.
  */
 void
 prepare_for_client_read(void)
@@ -619,6 +632,18 @@ prepare_for_client_read(void)
 		QueryCancelPending = false;
 		CHECK_FOR_INTERRUPTS();
 	}
+	else
+	{
+		DoingPqReading = true;
+		/* Allow die interrupts to be processed while waiting */
+		ImmediateDieOK = true;
+
+		/* Process the ones that already arrived */
+		if (ProcDiePending)
+		{
+			CHECK_FOR_INTERRUPTS();
+		}
+	}
 }
 
 /*
@@ -637,8 +662,48 @@ client_read_ended(void)
 		DisableNotifyInterrupt();
 		DisableCatchupInterrupt();
 	}
+	else
+	{
+		ImmediateDieOK = false;
+		DoingPqReading = false;
+	}
 }
 
+/*
+ * prepare_for_client_write -- set up to possibly block on client output
+ *
+ * Like prepare_for_client_read, but for writing.
+ *
+ * NOTE: this routine may be called in dispatch thread;
+ */
+void
+prepare_for_client_write(void)
+{
+	/* Only enable this on main thread */
+	if (pthread_equal(main_tid, pthread_self()))
+	{
+		/* Allow die interrupts to be processed while waiting */
+		ImmediateDieOK = true;
+
+		/* And don't forget to detect one that already arrived */
+		if (ProcDiePending)
+			CHECK_FOR_INTERRUPTS();
+	}
+}
+
+/*
+ * client_read_ended -- get out of the client-output state
+ *
+ * This is called just after low-level writes.
+ */
+void
+client_write_ended(void)
+{
+	if (pthread_equal(main_tid, pthread_self()))
+	{
+		ImmediateDieOK = false;
+	}
+}
 
 /*
  * Parse a query string and pass it through the rewriter.
@@ -3295,6 +3360,7 @@ die(SIGNAL_ARGS)
 	{
 		InterruptPending = true;
 		ProcDiePending = true;
+		TermSignalReceived = true;
 
 		/* although we don't strictly need to set this to true since the
 		 * ProcDiePending will occur first.  We set this anyway since the
@@ -3307,9 +3373,22 @@ die(SIGNAL_ARGS)
 		 * If it's safe to interrupt, and we're waiting for input or a lock,
 		 * service the interrupt immediately
 		 */
-		if (ImmediateInterruptOK && InterruptHoldoffCount == 0 &&
-			CritSectionCount == 0)
+		if ((ImmediateInterruptOK || ImmediateDieOK) &&
+			InterruptHoldoffCount == 0 && CritSectionCount == 0)
 		{
+			if (ImmediateDieOK && !DoingPqReading)
+			{
+				/*
+				 * Getting here indicates that we have been interrupted during a
+				 * data message is under sending to client, so close the connection
+				 * immediately, since sending any more bytes may cause self dead
+				 * lock(though we can handle this using pq_send_mutex_lock() now, it
+				 * is better to avoid the unnecessary cost).
+				 */
+				close(MyProcPort->sock);
+				whereToSendOutput = DestNone;
+			}
+
 			/* bump holdoff count to make ProcessInterrupts() a no-op */
 			/* until we are done getting ready for it */
 			InterruptHoldoffCount++;
@@ -3486,6 +3565,7 @@ ProcessInterrupts(void)
 		ProcDiePending = false;
 		QueryCancelPending = false;		/* ProcDie trumps QueryCancel */
 		ImmediateInterruptOK = false;	/* not idle anymore */
+		ImmediateDieOK = false;		/* prevent re-entry */
 		DisableNotifyInterrupt();
 		DisableCatchupInterrupt();
 
