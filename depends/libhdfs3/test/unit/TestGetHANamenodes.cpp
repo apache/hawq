@@ -52,9 +52,9 @@ TEST(TestGetHAANamenodes, GetHANamenodes) {
     Namenode * namenodes = NULL;
     ASSERT_TRUE(NULL != (namenodes = hdfsGetHANamenodesWithConfig("validha.xml", "phdcluster", &size)));
     ASSERT_EQ(2, size);
-    EXPECT_STREQ("mdw:9000", namenodes[0].rpc_addr);
+    EXPECT_STREQ("mdw:8020", namenodes[0].rpc_addr);
     EXPECT_STREQ("mdw:50070", namenodes[0].http_addr);
-    EXPECT_STREQ("smdw:9000", namenodes[1].rpc_addr);
+    EXPECT_STREQ("smdw:8020", namenodes[1].rpc_addr);
     EXPECT_EQ((char *)NULL, namenodes[1].http_addr);
     EXPECT_NO_THROW(hdfsFreeNamenodeInformation(namenodes, size));
 }

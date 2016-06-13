@@ -35,5 +35,5 @@ using namespace Hdfs::Internal;
 TEST(TestSessionConfig, TestSelect) {
     Config conf;
     SessionConfig session(conf);
-    ASSERT_STREQ("hdfs://localhost:9000", session.getDefaultUri().c_str());
+    ASSERT_STREQ("hdfs://localhost:8020", session.getDefaultUri().c_str());
 }

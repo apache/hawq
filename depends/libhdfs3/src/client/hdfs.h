@@ -660,7 +660,7 @@ int64_t hdfsRenewDelegationToken(hdfsFS fs, const char * token);
 int hdfsCancelDelegationToken(hdfsFS fs, const char * token);
 
 typedef struct Namenode {
-    char * rpc_addr;    // namenode rpc address and port, such as "host:9000"
+    char * rpc_addr;    // namenode rpc address and port, such as "host:8020"
     char * http_addr;   // namenode http address and port, such as "host:50070"
 } Namenode;
 
