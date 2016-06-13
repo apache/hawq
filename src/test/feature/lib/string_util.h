@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdio>
 
 namespace hawq {
 namespace test {
@@ -26,6 +27,15 @@ std::string regexReplace(std::string &, const std::string &, const std::string &
 bool startsWith(const std::string &, const std::string &);
 
 bool endsWith(const std::string &, const std::string &);
+
+template <typename... T>
+std::string stringFormat(const std::string &fmt, T... vs) {
+  char b;
+  unsigned required = std::snprintf(&b, 0, fmt.c_str(), vs...) + 1;
+  char bytes[required];
+  std::snprintf(bytes, required, fmt.c_str(), vs...);
+  return std::string(bytes);
+}
 
 } // namespace test
 } // namespace hawq 
