@@ -1,0 +1,47 @@
+create role super superuser;
+CREATE ROLE
+set session authorization super;
+SET
+create role u1;
+psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:6: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+create database u1;
+CREATE DATABASE
+create schema u1;
+CREATE SCHEMA
+select 
+    nspname, rolname 
+  from 
+    pg_namespace n, pg_authid a 
+  where 
+    n.nspowner = a.oid and nspname = 'u1';
+ nspname | rolname 
+---------+---------
+ u1      | super
+(1 row)
+
+select 
+    datname, rolname 
+  from 
+    pg_database d, pg_authid a 
+  where 
+    d.datdba = a.oid and datname = 'u1';
+ datname | rolname 
+---------+---------
+ u1      | super
+(1 row)
+
+alter database u1 owner to u1;
+psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:24: ERROR:  Cannot support alter database owner statement yet
+alter schema u1 owner to u1;
+psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:25: ERROR:  Cannot support alter schema owner statement yet
+reset session authorization;
+RESET
+drop database u1;
+DROP DATABASE
+drop schema u1;
+DROP SCHEMA
+drop role u1;
+DROP ROLE
+drop role super;
+DROP ROLE
