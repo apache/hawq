@@ -94,6 +94,7 @@
 #include "storage/ipc.h"
 #include "utils/guc.h"
 #include "cdb/cdbvars.h"
+#include "tcop/tcopprot.h"
 
 /*
  * Configuration options
@@ -133,6 +134,8 @@ static bool DoingCopyOut;
 static void pq_close(int code, Datum arg);
 static int	internal_putbytes(const char *s, size_t len);
 static int	internal_flush(void);
+static void pq_set_nonblocking(bool nonblocking);
+static bool pq_send_mutex_lock();
 
 #ifdef HAVE_UNIX_SOCKETS
 static int	Lock_AF_UNIX(unsigned short portNumber, char *unixSocketName);
@@ -752,6 +755,43 @@ TouchSocketFile(void)
  * --------------------------------
  */
 
+/* --------------------------------
+ *			  pq_set_nonblocking - set socket blocking/non-blocking
+ *
+ * Sets the socket non-blocking if nonblocking is TRUE, or sets it
+ * blocking otherwise.
+ * --------------------------------
+ */
+static void
+pq_set_nonblocking(bool nonblocking)
+{
+	if (MyProcPort->noblock == nonblocking)
+		return;
+
+#ifdef WIN32
+	pgwin32_noblock = nonblocking ? 1 : 0;
+#else
+
+	/*
+	 * Use COMMERROR on failure, because ERROR would try to send the error to
+	 * the client, which might require changing the mode again, leading to
+	 * infinite recursion.
+	 */
+	if (nonblocking)
+	{
+		if (!pg_set_noblock(MyProcPort->sock))
+			ereport(COMMERROR,
+				  (errmsg("could not set socket to non-blocking mode: %m")));
+	}
+	else
+	{
+		if (!pg_set_block(MyProcPort->sock))
+			ereport(COMMERROR,
+					(errmsg("could not set socket to blocking mode: %m")));
+	}
+#endif
+	MyProcPort->noblock = nonblocking;
+}
 
 /* --------------------------------
  *		pq_recvbuf - load some bytes into the input buffer
@@ -1191,6 +1231,77 @@ pq_getmessage(StringInfo s, int maxlen)
 	return 0;
 }
 
+/*
+ * Wrapper of simple pthread locking functionality, using pthread_mutex_trylock
+ * and loop to make it interruptible when waiting the lock;
+ *
+ * return true if successfuly acquires the lock, false if unable to get the lock
+ * and interrupted by SIGTERM, otherwise, infinitely loop to acquire the mutex.
+ *
+ * If we are going to return false, we close the socket to client; this is crucial
+ * for exiting dispatch thread if it is stuck on sending NOTICE to client, and hence
+ * avoid mutex deadlock;
+ *
+ * NOTE: should not call CHECK_FOR_INTERRUPTS and ereport in this routine, since
+ * it is in multi-thread context;
+ */
+static bool
+pq_send_mutex_lock()
+{
+	int count = PQ_BUSY_TEST_COUNT_IN_EXITING;
+	int mutex_res;
+
+	do
+	{
+		mutex_res = pthread_mutex_trylock(&send_mutex);
+
+		if (mutex_res == 0)
+		{
+			return true;
+		}
+
+		if (mutex_res == EBUSY)
+		{
+			/* No need to acquire lock for TermSignalReceived, since we are in
+ 			 * a loop here */
+			if (TermSignalReceived)
+			{
+				/*
+ 				 * try PQ_BUSY_TEST_COUNT_IN_EXITING times before going to
+ 				 * close the socket, in case real concurrent writing is in
+ 				 * progress(compared to stuck send call in secure_write);
+ 				 *
+ 				 * It cannot help completely eliminate the false negative
+ 				 * cases, but giving the process is exiting, it is acceptable
+ 				 * to discard some messages, contrasted with the chance of
+ 				 * infinite stuck;
+ 				 */
+				if (count-- < 0)
+				{
+					/* On Redhat and Suse, simple closing the socket would not get
+					 * send() out of hanging state, shutdown() can do this(though not
+					 * explicitly mentioned in manual page); however, if send over a
+					 * socket which has been shutdown, process would be terminated by
+					 * SIGPIPE; to avoid this race condition, we set the socket to be
+					 * invalid before calling shutdown()
+					 *
+					 * On OSX, close() can get send() out of hanging state, while
+					 * shutdown() would lead to SIGPIPE */
+					int saved_fd = MyProcPort->sock;
+					MyProcPort->sock = -1;
+					whereToSendOutput = DestNone;
+#ifndef __darwin__
+					shutdown(saved_fd, SHUT_WR);
+#endif
+					closesocket(saved_fd);
+					return false;
+				}
+			}
+		}
+		pg_usleep(1000L);
+	} while (true);
+}
+
 
 /* --------------------------------
  *		pq_putbytes		- send bytes to connection (not flushed until pq_flush)
@@ -1205,9 +1316,12 @@ pq_putbytes(const char *s, size_t len)
 
 	/* Should only be called by old-style COPY OUT */
 	Assert(DoingCopyOut);
-    pthread_mutex_lock(&send_mutex);
+	if (!pq_send_mutex_lock())
+	{
+		return EOF;
+	}
 	res = internal_putbytes(s, len);
-    pthread_mutex_unlock(&send_mutex);
+	pthread_mutex_unlock(&send_mutex);
 	return res;
 }
 
@@ -1246,7 +1360,13 @@ pq_flush(void)
 
 	/* No-op if reentrant call */
 	if ((Gp_role == GP_ROLE_DISPATCH) && IsUnderPostmaster)
-		pthread_mutex_lock(&send_mutex);
+	{
+		if (!pq_send_mutex_lock())
+		{
+			return EOF;
+		}
+	}
+	pq_set_nonblocking(false);
 	res = internal_flush();
 	if ((Gp_role == GP_ROLE_DISPATCH) && IsUnderPostmaster)
 		pthread_mutex_unlock(&send_mutex);
@@ -1287,6 +1407,7 @@ internal_flush(void)
 				
 				HOLD_INTERRUPTS();
 
+				/* we can use ereport here, for the protection of send mutex */
 				ereport(COMMERROR,
 						(errcode_for_socket_access(),
 						 errmsg("could not send data to client: %m")));
@@ -1340,9 +1461,7 @@ internal_flush(void)
  *
  *		We also suppress messages generated while pqcomm.c is busy.  This
  *		avoids any possibility of messages being inserted within other
- *		messages.  The only known trouble case arises if SIGQUIT occurs
- *		during a pqcomm.c routine --- quickdie() will try to send a warning
- *		message, and the most reasonable approach seems to be to drop it.
+ *		messages.
  *
  *		returns 0 if OK, EOF if trouble
  * --------------------------------
@@ -1350,21 +1469,25 @@ internal_flush(void)
 int
 pq_putmessage(char msgtype, const char *s, size_t len)
 {
-    int ret = EOF;
-	if ((Gp_role == GP_ROLE_DISPATCH) && IsUnderPostmaster)
-		pthread_mutex_lock(&send_mutex);
 
-    if (DoingCopyOut)
-    {
-        ret = 0;
-        goto fail;
-    }
-        
+	if (DoingCopyOut)
+	{
+		return EOF;
+	}
+
+	if ((Gp_role == GP_ROLE_DISPATCH) && IsUnderPostmaster)
+	{
+		if (!pq_send_mutex_lock())
+		{
+			return EOF;
+		}
+	}
+
 	if (msgtype)
-    {
+	{
 		if (internal_putbytes(&msgtype, 1))
 			goto fail;
-    }
+	}
 
 	if (PG_PROTOCOL_MAJOR(FrontendProtocol) >= 3)
 	{
@@ -1397,9 +1520,13 @@ fail:
 void
 pq_startcopyout(void)
 {
-    pthread_mutex_lock(&send_mutex);
+	if (!pq_send_mutex_lock())
+	{
+		/* no need to return a status, since socket has been closed in failed cases */
+		return;
+	}
 	DoingCopyOut = true;
-    pthread_mutex_unlock(&send_mutex);
+	pthread_mutex_unlock(&send_mutex);
 }
 
 /* --------------------------------
@@ -1420,9 +1547,12 @@ pq_endcopyout(bool errorAbort)
 	if (errorAbort)
 		pq_putbytes("\n\n\\.\n", 5);
 	/* in non-error case, copy.c will have emitted the terminator line */
-    pthread_mutex_lock(&send_mutex);
+	if (!pq_send_mutex_lock())
+	{
+		return;
+	}
 	DoingCopyOut = false;
-    pthread_mutex_unlock(&send_mutex);
+	pthread_mutex_unlock(&send_mutex);
 }
 
 
