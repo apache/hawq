@@ -86,6 +86,11 @@ TEST_F(TestCommonLib, TestStringFormat) {
   EXPECT_EQ(s1, "you are welcome to apache HAWQ project");
 }
 
+TEST_F(TestCommonLib, TestStringFormat) {
+  auto s1 = hawq::test::stringFormat("%s are welcome to apache %s project", "you", "HAWQ");
+  EXPECT_EQ(s1, "you are welcome to apache HAWQ project");
+}
+
 TEST_F(TestCommonLib, TestDataGenerator) {
   hawq::test::SQLUtility util;
   hawq::test::DataGenerator dGen(&util);
