@@ -69,6 +69,8 @@ TEST_F(TestCommonLib, TestSqlUtil) {
   hawq::test::SQLUtility util;
   util.execute("create table test(p int, q float)");
   util.execute("insert into test values(1,1.1),(2,2.2)");
+  util.execute("select * from no_exist_table;", false);
+  util.executeIgnore("select * from no_exist_table;");
   util.query("select * from test", 2);
   util.query("select * from test", "1|1.1|\n2|2.2|\n");
   util.execSQLFile("testlib/sql/sample.sql", "testlib/ans/sample.ans");

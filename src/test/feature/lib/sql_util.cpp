@@ -58,7 +58,13 @@ string SQLUtility::execute(const string &sql, bool check) {
     EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
     return "";
   }
+  EXPECT_NE(0,  conn->getLastStatus());
   return conn.get()->getLastResult();
+}
+
+void SQLUtility::executeIgnore(const string &sql) {
+  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
+  EXPECT_NE(conn.get(), nullptr);
 }
 
 void SQLUtility::query(const string &sql, int expectNum) {
