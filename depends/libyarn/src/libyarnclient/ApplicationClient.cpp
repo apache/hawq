@@ -53,23 +53,48 @@ std::vector<RMInfo> RMInfo::getHARMInfo(const Yarn::Config & conf, const char* n
         LOG(INFO, "Yarn RM HA is not configured.");
     }
 
-return retval;
+    return retval;
 }
 
 ApplicationClient::ApplicationClient(string &user, string &host, string &port) {
+    std::vector<RMInfo> rmConfInfos, rmInfos;
+    RMInfo activeRM;
     std::string tokenService = "";
+
     Yarn::Internal::shared_ptr<Yarn::Config> conf = DefaultConfig().getConfig();
     Yarn::Internal::SessionConfig sessionConfig(*conf);
-    LOG(INFO, "ApplicationClient session auth method : %s", sessionConfig.getRpcAuthMethod().c_str());
+    LOG(INFO, "ApplicationClient session auth method : %s",
+            sessionConfig.getRpcAuthMethod().c_str());
 
-    std::vector<RMInfo> rmInfos = RMInfo::getHARMInfo(*conf, YARN_RESOURCEMANAGER_HA);
+    activeRM.setHost(host);
+    activeRM.setPort(port);
+    rmInfos.push_back(activeRM);
+    rmConfInfos = RMInfo::getHARMInfo(*conf, YARN_RESOURCEMANAGER_HA);
+
+    /* build a list of candidate RMs without duplicate */
+    for (vector<RMInfo>::iterator it = rmConfInfos.begin();
+            it != rmConfInfos.end(); it++) {
+        bool found = false;
+        for (vector<RMInfo>::iterator it2 = rmInfos.begin();
+                it2 != rmInfos.end(); it2++) {
+            if (it2->getHost() == it->getHost()
+                    && it2->getPort() == it->getPort()) {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            rmInfos.push_back(*it);
+    }
 
     if (rmInfos.size() <= 1) {
         LOG(INFO, "ApplicationClient Resource Manager HA is disable.");
         enableRMHA = false;
         maxRMHARetry = 0;
     } else {
-        LOG(INFO, "ApplicationClient Resource Manager HA is enable. Number of RM: %d", rmInfos.size());
+        LOG(INFO,
+                "ApplicationClient Resource Manager HA is enable. Number of RM: %d",
+                rmInfos.size());
         enableRMHA = true;
         maxRMHARetry = sessionConfig.getRpcMaxHaRetry();
     }
@@ -88,7 +113,7 @@ ApplicationClient::ApplicationClient(string &user, string &host, string &port) {
                 std::shared_ptr<ApplicationClientProtocol>(
                     new ApplicationClientProtocol(
                         user, rmInfos[i].getHost(),rmInfos[i].getPort(), tokenService, sessionConfig)));
-            LOG(INFO, "ApplicationClient finds a standby RM, host:%s, port:%s",
+            LOG(INFO, "ApplicationClient finds a candidate RM, host:%s, port:%s",
                       rmInfos[i].getHost().c_str(), rmInfos[i].getPort().c_str());
         }
     }
