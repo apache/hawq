@@ -9,7 +9,6 @@ ignore: goh_vacuum
 ignore: goh_subselect
 ignore: goh_array
 ignore: goh_gphdfs
-test: goh_partition
 ignore: goh_dpe
 ignore: goh_gpic
 ignore: goh_eagerfree
@@ -63,8 +62,6 @@ ignore: geometry
 ignore: horology
 test: insert
 test: create_function_1
-test: function
-test: function_extensions
 test: subplan
 ignore: create_type
 test: create_table_test
@@ -129,7 +126,6 @@ ignore: plpgsql
 ignore: copy2
 test: temp
 ignore: domain
-test: set_functions
 ignore: rangefuncs
 ignore: table_functions
 ignore: rangefuncs_cdb
@@ -145,7 +141,7 @@ ignore: returning
 ignore: stats
 ignore: tablespace
 ignore: gpdiffcheck
-test: exttab1
+ignore: exttab1
 ignore: custom_format
 ignore: resource_queue
 ignore: gptokencheck
@@ -213,7 +209,7 @@ ignore: hdfs_filesystem
 ignore: co_disabled
 # HCatalog tests
 test: caqlinmem
-test: hcatalog_lookup
+ignore: hcatalog_lookup
 test: json_load
 test: external_oid
 test: validator_function

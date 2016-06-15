@@ -22,14 +22,27 @@ class TestQuerySequence : public ::testing::Test {
 
 TEST_F(TestQuerySequence, TestSequenceCreateSerialColumn) {
   hawq::test::SQLUtility util;
+  bool orcaon = false;
+  if (util.getGUCValue("optimizer") == "on") {
+	std::cout << "NOTE: TestQuerySequence.TestSequenceCreateSerialColumn "
+                 "uses answer file for optimizer on" << std::endl;
+    orcaon = true;
+  }
 
   util.execute("drop table if exists serialtest");
   util.execute("create table serialtest (f1 text, f2 serial)");
   util.execute("insert into serialtest values('foo')");
   util.execute("insert into serialtest values('force',100)");
   // expect failure due to null value in serial column
-  util.execSQLFile("query/sql/sequence-serialcol-null.sql",
-		  	  	   "query/ans/sequence-serialcol-null.ans");
+  if (orcaon) {
+    util.execSQLFile("query/sql/sequence-serialcol-null.sql",
+				     "query/ans/sequence-serialcol-null-orca.ans");
+  }
+  else {
+    util.execSQLFile("query/sql/sequence-serialcol-null.sql",
+				     "query/ans/sequence-serialcol-null.ans");
+
+  }
   // query table to check rows with generated and specified values in serial col
   util.execSQLFile("query/sql/sequence-serialcol-query.sql",
 		  	  	   "query/ans/sequence-serialcol-query.ans");

@@ -51,10 +51,14 @@ void SQLUtility::exec(const string &sql) {
       << conn->getLastResult();
 }
 
-void SQLUtility::execute(const string &sql, bool check) {
+string SQLUtility::execute(const string &sql, bool check) {
   conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
   EXPECT_NE(conn.get(), nullptr);
-  if (check) EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
+  if (check) {
+    EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
+    return "";
+  }
+  return conn.get()->getLastResult();
 }
 
 void SQLUtility::query(const string &sql, int expectNum) {
@@ -162,6 +166,19 @@ string SQLUtility::getTestRootPath() const {
   result = string(pathbuf);
 #endif
   return splitFilePath(result).path;
+}
+
+void SQLUtility::setGUCValue(const std::string &guc, const std::string &value) {
+  string sql = "set " + guc + " = " + value;
+  execute(sql, true);
+}
+
+std::string SQLUtility::getGUCValue(const std::string &guc) {
+  string sql = "show " + guc;
+  const hawq::test::PSQLQueryResult &result = executeQuery(sql);
+  EXPECT_EQ(result.rowCount(), 1);
+  std::vector<std::string> row = result.getRows()[0];
+  return row[0];
 }
 
 FilePath SQLUtility::splitFilePath(const string &filePath) const {

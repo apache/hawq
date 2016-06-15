@@ -32,18 +32,41 @@ const char * YARN_RESOURCEMANAGER_SCHEDULER_HA = "yarn.resourcemanager.scheduler
 
 ApplicationMaster::ApplicationMaster(string &schedHost, string &schedPort,
         UserInfo &user, const string &tokenService) {
+    std::vector<RMInfo> rmInfos, rmConfInfos;
     Yarn::Internal::shared_ptr<Yarn::Config> conf = DefaultConfig().getConfig();
     Yarn::Internal::SessionConfig sessionConfig(*conf);
     RpcAuth rpcAuth(user, AuthMethod::TOKEN);
 
-    std::vector<RMInfo> rmInfos = RMInfo::getHARMInfo(*conf, YARN_RESOURCEMANAGER_SCHEDULER_HA);
+    RMInfo activeRM;
+    activeRM.setHost(schedHost);
+    activeRM.setPort(schedPort);
+    rmInfos.push_back(activeRM);
+    rmConfInfos = RMInfo::getHARMInfo(*conf, YARN_RESOURCEMANAGER_SCHEDULER_HA);
+
+    /* build a list of candidate RMs without duplicate */
+    for (vector<RMInfo>::iterator it = rmConfInfos.begin();
+            it != rmConfInfos.end(); it++) {
+        bool found = false;
+        for (vector<RMInfo>::iterator it2 = rmInfos.begin();
+                it2 != rmInfos.end(); it2++) {
+            if (it2->getHost() == it->getHost()
+                    && it2->getPort() == it->getPort()) {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            rmInfos.push_back(*it);
+    }
 
     if (rmInfos.size() <= 1) {
         LOG(INFO, "ApplicationClient RM Scheduler HA is disable.");
         enableRMSchedulerHA = false;
         maxRMHARetry = 0;
     } else {
-        LOG(INFO, "ApplicationClient RM Scheduler HA is enable. Number of RM scheduler: %d", rmInfos.size());
+        LOG(INFO,
+                "ApplicationClient RM Scheduler HA is enable. Number of RM scheduler: %d",
+                rmInfos.size());
         enableRMSchedulerHA = true;
         maxRMHARetry = sessionConfig.getRpcMaxHaRetry();
     }
@@ -63,7 +86,7 @@ ApplicationMaster::ApplicationMaster(string &schedHost, string &schedPort,
                 std::shared_ptr<ApplicationMasterProtocol>(
                     new ApplicationMasterProtocol(rmInfos[i].getHost(),
                         rmInfos[i].getPort(), tokenService, sessionConfig, rpcAuth)));
-            LOG(INFO, "ApplicationMaster finds a standby RM scheduler, host:%s, port:%s",
+            LOG(INFO, "ApplicationMaster finds a candidate RM scheduler, host:%s, port:%s",
                       rmInfos[i].getHost().c_str(), rmInfos[i].getPort().c_str());
         }
     }

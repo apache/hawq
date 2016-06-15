@@ -80,6 +80,8 @@ extern volatile bool ClientConnectionLost;
 
 /* these are marked volatile because they are examined by signal handlers: */
 extern volatile bool ImmediateInterruptOK;
+extern volatile bool ImmediateDieOK;
+extern volatile bool TermSignalReceived;
 extern volatile bool InterruptWhenCallingPLUDF;
 extern PGDLLIMPORT volatile int32 InterruptHoldoffCount;
 extern PGDLLIMPORT volatile int32 CritSectionCount;

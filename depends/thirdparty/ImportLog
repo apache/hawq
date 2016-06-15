@@ -1,2 +1,5 @@
+2016-06-08
+  * import orc(with version 1.1.0rc3) from https://github.com/apache/orc/archive/release-1.1.0rc3.tar.gz
+
 2016-05-16
   * import thrift(with version 0.9.3) from https://github.com/apache/thrift/archive/0.9.3.tar.gz
