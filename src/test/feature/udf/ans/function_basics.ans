@@ -1045,8 +1045,20 @@ SELECT outer(0);
 (1 row)
 
 SELECT outer(0) FROM foo;
-psql:/tmp/TestUDF_TestUDFBasics.sql:423: ERROR:  function inner(integer) does not exist  (seg2 localhost:40000 pid=70512)
-DETAIL:  PL/pgSQL function "outer" line 2 at return
+ outer 
+-------
+     1
+     1
+     1
+     1
+     1
+     1
+     1
+     1
+     1
+     1
+(10 rows)
+
 DROP FUNCTION outer(int);
 DROP FUNCTION
 DROP FUNCTION inner(int);
