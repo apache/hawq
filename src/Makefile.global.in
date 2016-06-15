@@ -694,7 +694,7 @@ endif # enable_nls
 
 pg_prepare:
 ifneq "$(findstring yes, $(with_pgcrypto))" ""
-	if [ ! -e $(abs_top_builddir)/pg_prepare_timestamp ]; then \
+	if [ ! -e $(abs_top_builddir)/depends/thirdparty/pg_prepare_timestamp ]; then \
 		cd $(abs_top_srcdir); \
 		git submodule update --init depends/thirdparty/postgres && \
 		touch $(abs_top_builddir)/depends/thirdparty/pg_prepare_timestamp; \
