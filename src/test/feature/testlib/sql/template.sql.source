@@ -1,0 +1,11 @@
+-- start_ignore
+DROP TABLE IF EXISTS persons;
+-- end_ignore
+
+CREATE TABLE persons(id INT, name VARCHAR);
+
+COPY persons (id, name) FROM '@ABS_FEATURE_TEST_ROOT@/testlib/sql/template.csv' DELIMITER ',' CSV;
+
+SELECT * FROM persons ORDER BY id;
+
+DROP TABLE IF EXISTS persons;

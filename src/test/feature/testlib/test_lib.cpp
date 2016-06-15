@@ -11,6 +11,7 @@
 #include "lib/hawq_config.h"
 #include "lib/sql_util.h"
 #include "lib/string_util.h"
+#include "lib/file_replace.h"
 
 #include "gtest/gtest.h"
 
@@ -98,4 +99,26 @@ TEST_F(TestCommonLib, TestDataGenerator) {
   dGen.genTableWithSeries("tSeries");
 
   dGen.genTableWithNull("tNull");
+}
+
+TEST_F(TestCommonLib, TestFileReplace) {
+  // prepare file names
+  hawq::test::SQLUtility util;
+  std::string d_feature_test_root(util.getTestRootPath());
+  std::string f_sql_tpl(d_feature_test_root + "/testlib/sql/template.sql.source");
+  std::string f_ans_tpl(d_feature_test_root + "/testlib/ans/template.ans.source");
+  std::string f_sql(d_feature_test_root + "/testlib/sql/template.sql");
+  std::string f_ans(d_feature_test_root + "/testlib/ans/template.ans");
+
+  // preprocess source files to get sql/ans files
+  hawq::test::FileReplace frep;
+  std::unordered_map<std::string, std::string> strs_src_dst;
+  strs_src_dst.insert(std::make_pair("@ABS_FEATURE_TEST_ROOT@", d_feature_test_root));
+
+  frep.replace(f_sql_tpl, f_sql, strs_src_dst);
+  frep.replace(f_ans_tpl, f_ans, strs_src_dst);
+
+  // run sql file to get ans file and then diff it with out file
+  util.execSQLFile("testlib/sql/template.sql",
+                   "testlib/ans/template.ans");
 }
