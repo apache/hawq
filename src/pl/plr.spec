@@ -9,6 +9,12 @@ License:		GPL
 The PL/R modules provides Procedural language implementation of R for HAWQ.
 
 %install
+# Note:
+# 1. We do not use DESTDIR to specify the installation path since the binaries will be
+#    installed in $DESTDIR/$prefix instead of $DESTDIR.
+# 2. We build using the "configured" prefix at first and then install it using
+#    the new prefix.
+make -C %{plr_srcdir}
 make -C %{plr_srcdir} install prefix=%{buildroot}/usr/local
 
 %files
