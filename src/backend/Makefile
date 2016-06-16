@@ -49,13 +49,15 @@ LIBS := $(filter-out -lpgport, $(LIBS)) $(LDAP_LIBS_BE) $(CONNECTEMCLIB)
 LIBS := $(filter-out -lreadline -ledit -ltermcap -lncurses -lcurses, $(LIBS))
 LIBS := -lprotobuf -lboost_system -lboost_date_time -lstdc++ -lhdfs3 -lgsasl -lxml2 $(LIBS)
 
+ORCA_BLD_PATH=$(abs_top_builddir)/depends/thirdparty
+
 # adding orca libraries
 ifeq ($(enable_orca),yes)
-LIBGPOS_DIR = $(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/lib
-LIBXERCES_DIR = $(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/lib
-LIBNAUCRATES_DIR = $(abs_top_builddir)/$(subdir)/gporca/build/install/$(prefix)/lib
-LIBGPDBCOST_DIR = $(abs_top_builddir)/$(subdir)/gporca/build/install/$(prefix)/lib
-LIBGPOPT_DIR = $(abs_top_builddir)/$(subdir)/gporca/build/install/$(prefix)/lib
+LIBGPOS_DIR = $(ORCA_BLD_PATH)/gpos/build/install/$(prefix)/lib
+LIBXERCES_DIR = $(ORCA_BLD_PATH)/gp-xerces/build/install/$(prefix)/lib
+LIBNAUCRATES_DIR = $(ORCA_BLD_PATH)/gporca/build/install/$(prefix)/lib
+LIBGPDBCOST_DIR = $(ORCA_BLD_PATH)/gporca/build/install/$(prefix)/lib
+LIBGPOPT_DIR = $(ORCA_BLD_PATH)/gporca/build/install/$(prefix)/lib
 
 LIBS := $(LIBS) -L$(LIBGPOS_DIR) -lgpos
 LIBS := $(LIBS) -L$(LIBXERCES_DIR) -lxerces-c
@@ -85,91 +87,56 @@ XERCES_LIB_FILE=libxerces-c.so
 GPOS_LIB_FILE=libgpos.so
 endif
 
-GPORCA_SRC_PATH := $(abs_top_srcdir)/$(subdir)/gporca
-GPOS_SRC_PATH := $(abs_top_srcdir)/$(subdir)/gpos
-GP_XERCES_SRC_PATH := $(abs_top_srcdir)/$(subdir)/gp-xerces
+ORCA_SRC_PATH=$(abs_top_srcdir)/depends/thirdparty
 
-submake-gporca: submake-gpos submake-gp-xerces gporca_prepare
-ifneq ($(prefix),)
-	if [ ! -f gporca_build_timestamp ]; then \
-		rm -rf gporca/build; mkdir -p gporca/build; cd gporca/build; \
+GPORCA_SRC_PATH := $(ORCA_SRC_PATH)/gporca
+GPOS_SRC_PATH := $(ORCA_SRC_PATH)/gpos
+GP_XERCES_SRC_PATH := $(ORCA_SRC_PATH)/gp-xerces
+
+submake-gporca: submake-gpos submake-gp-xerces orca_prepare
+	if [ ! -f $(ORCA_BLD_PATH)/gporca_build_timestamp ]; then \
+		rm -rf $(ORCA_BLD_PATH)/gporca/build; mkdir -p $(ORCA_BLD_PATH)/gporca/build; cd $(ORCA_BLD_PATH)/gporca/build; mkdir -p install; \
 		cmake $(GPORCA_SRC_PATH) -DCMAKE_INSTALL_PREFIX=$(prefix) \
-			-DXERCES_INCLUDE_DIR=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/include \
-			-DXERCES_LIBRARY=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/lib/$(XERCES_LIB_FILE) \
-			-DGPOS_INCLUDE_DIR=$(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/include \
-			-DGPOS_LIBRARY=$(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/lib/$(GPOS_LIB_FILE) && \
-		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gporca/build/install install && \
-		touch ../../gporca_build_timestamp; \
+			-DXERCES_INCLUDE_DIR=$(ORCA_BLD_PATH)/gp-xerces/build/install/$(prefix)/include \
+			-DXERCES_LIBRARY=$(ORCA_BLD_PATH)/gp-xerces/build/install/$(prefix)/lib/$(XERCES_LIB_FILE) \
+			-DGPOS_INCLUDE_DIR=$(ORCA_BLD_PATH)/gpos/build/install/$(prefix)/include \
+			-DGPOS_LIBRARY=$(ORCA_BLD_PATH)/gpos/build/install/$(prefix)/lib/$(GPOS_LIB_FILE) && \
+		$(MAKE) DESTDIR=$(ORCA_BLD_PATH)/gporca/build/install install && \
+		touch $(ORCA_BLD_PATH)/gporca_build_timestamp; \
 	fi
-else
-	if [ ! -f gporca_build_timestamp ]; then \
-		rm -rf gporca/build; mkdir -p gporca/build; cd gporca/build; \
- 		cmake $(ORCA_SRC_PATH) \
-			-DXERCES_INCLUDE_DIR=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/include \
-			-DXERCES_LIBRARY=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install/$(prefix)/lib/$(XERCES_LIB_FILE) \
-			-DGPOS_INCLUDE_DIR=$(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/include \
-			-DGPOS_LIBRARY=$(abs_top_builddir)/$(subdir)/gpos/build/install/$(prefix)/lib/$(GPOS_LIB_FILE) && \
-		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gporca/build/install install && \
-		touch ../../gporca_build_timestamp; \
-	fi
-endif
 
-submake-gpos: gporca_prepare
-ifneq ($(prefix),)
-	if [ ! -f gpos_build_timestamp ]; then \
-		rm -rf gpos/build; mkdir -p gpos/build; cd gpos/build; mkdir -p install; \
+submake-gpos: orca_prepare
+	if [ ! -f $(ORCA_BLD_PATH)/gpos_build_timestamp ]; then \
+		rm -rf $(ORCA_BLD_PATH)/gpos/build; mkdir -p $(ORCA_BLD_PATH)/gpos/build; cd $(ORCA_BLD_PATH)/gpos/build; mkdir -p install; \
 		cmake $(GPOS_SRC_PATH) -DCMAKE_INSTALL_PREFIX=$(prefix) && \
-		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gpos/build/install install && \
-		touch ../../gpos_build_timestamp; \
+		$(MAKE) DESTDIR=$(ORCA_BLD_PATH)/gpos/build/install install && \
+		touch $(ORCA_BLD_PATH)/gpos_build_timestamp; \
 	fi
-else
-	if [ ! -f gpos_build_timestamp ]; then \
-		rm -rf gpos/build; mkdir -p gpos/build; cd gpos/build; mkdir -p install; \
-		cmake $(GPOS_SRC_PATH) && \
-		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gpos/build/install install && \
-		touch ../../gpos_build_timestamp; \
-	fi
-endif
 
-submake-gp-xerces: submake-gpos gporca_prepare
-ifneq ($(prefix),)
-	if [ ! -f gp-xerces_build_timestamp ]; then \
-		rm -rf gp-xerces/build; mkdir -p gp-xerces/build; cd gp-xerces/build; mkdir -p install; \
+submake-gp-xerces: submake-gpos orca_prepare
+	if [ ! -f $(ORCA_BLD_PATH)/gp-xerces_build_timestamp ]; then \
+		rm -rf $(ORCA_BLD_PATH)/gp-xerces/build; mkdir -p $(ORCA_BLD_PATH)/gp-xerces/build; cd $(ORCA_BLD_PATH)/gp-xerces/build; mkdir -p install; \
 		$(GP_XERCES_SRC_PATH)/configure --prefix=$(prefix); \
-		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install install && \
-		touch ../../gp-xerces_build_timestamp; \
+		$(MAKE) DESTDIR=$(ORCA_BLD_PATH)/gp-xerces/build/install install && \
+		touch $(ORCA_BLD_PATH)/gp-xerces_build_timestamp; \
 	fi
-else
-	if [ ! -f gp-xerces_build_timestamp ]; then \
-		rm -rf gp-xerces/build; mkdir -p gp-xerces/build; cd gp-xerces/build; mkdir -p install; \
-		$(GP_XERCES_SRC_PATH)/configure --prefix=$(prefix); \
-		$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/gp-xerces/build/install install && \ 
-		touch ../../gp-xerces_build_timestamp; \
-	fi
-endif
 
-gporca_prepare:
-	if [ ! -f $(abs_top_builddir)/$(subdir)/gporca_prepare_timestamp ]; then \
+orca_prepare:
+	if [ ! -f $(ORCA_BLD_PATH)/orca_prepare_timestamp ]; then \
 			cd $(abs_top_srcdir); \
-			git submodule update --init $(subdir)/gporca && \
-			git submodule update --init $(subdir)/gp-xerces && \
-			git submodule update --init $(subdir)/gpos && \
-			touch $(abs_top_builddir)/$(subdir)/gporca_prepare_timestamp; \
+			git submodule update --init depends/thirdparty/gporca && \
+			git submodule update --init depends/thirdparty/gp-xerces && \
+			git submodule update --init depends/thirdparty/gpos && \
+			touch $(ORCA_BLD_PATH)/orca_prepare_timestamp; \
 	fi
 
 submake-libdxltranslators: submake-gporca
 	$(MAKE) -C gpopt all
 
-# No distclean for gpor & gpos by now.
-distclean_gporca:
-	rm -rf gporca/build gporca_*_timestamp
-	rm -rf gpos/build gpos_*_timestamp
-	rm -rf gp-xerces/build gp-xerces_*_timestamp
-
-.PHONY: submake-gporca submake-gpos submake-gp-xerces distclean_gporca gporca_prepare
+.PHONY: submake-gporca submake-gpos submake-gp-xerces orca_prepare
 
 else
-submake-libdxltranslators distclean_gporca:
+submake-libdxltranslators:
 endif # enable_orca
 
 all: submake-libpgport postgres $(POSTGRES_IMP)
@@ -319,10 +286,10 @@ endif
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/template-hawq-site.xml ${sysconfdir}
 	${INSTALL_DATA} $(srcdir)/utils/misc/etc/gpcheck.cnf ${sysconfdir}
 ifeq ($(enable_orca), yes)
+	$(MAKE) -C $(ORCA_BLD_PATH)/gporca/build $@
+	$(MAKE) -C $(ORCA_BLD_PATH)/gpos/build $@
+	$(MAKE) -C $(ORCA_BLD_PATH)/gp-xerces/build $@
 	$(MAKE) -C gpopt $@ INSTLOC=$(DESTDIR)$(libdir)
-	$(MAKE) -C gporca/build $@
-	$(MAKE) -C gpos/build $@
-	$(MAKE) -C gp-xerces/build $@
 endif
 
 install-bin: postgres $(POSTGRES_IMP) installdirs
@@ -398,8 +365,12 @@ endif
 	find gpopt -name *.o | xargs rm -rf
 	find gpopt -name *.so | xargs rm -rf
 	find gpopt -name *.dylib | xargs rm -rf
+	rm -rf $(ORCA_BLD_PATH)/gporca/build $(ORCA_BLD_PATH)/gporca_build_timestamp
+	rm -rf $(ORCA_BLD_PATH)/gpos/build $(ORCA_BLD_PATH)/gpos_build_timestamp
+	rm -rf $(ORCA_BLD_PATH)/gp-xerces/build $(ORCA_BLD_PATH)/gp-xerces_build_timestamp
+	rm -f $(ORCA_BLD_PATH)/orca_prepare_timestamp
 
-distclean: clean distclean_gporca
+distclean: clean
 	rm -f port/tas.s port/dynloader.c port/pg_sema.c port/pg_shmem.c
 
 maintainer-clean: distclean

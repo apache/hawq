@@ -1,11 +1,11 @@
-[submodule "src/backend/gp-xerces"]
-	path = src/backend/gp-xerces
+[submodule "depends/thirdparty/gp-xerces"]
+	path = depends/thirdparty/gp-xerces
 	url = https://github.com/greenplum-db/gp-xerces.git
-[submodule "src/backend/gpos"]
-	path = src/backend/gpos
+[submodule "depends/thirdparty/gpos"]
+	path = depends/thirdparty/gpos
 	url = https://github.com/greenplum-db/gpos.git
-[submodule "src/backend/gporca"]
-	path = src/backend/gporca
+[submodule "depends/thirdparty/gporca"]
+	path = depends/thirdparty/gporca
 	url = https://github.com/greenplum-db/gporca.git
 [submodule "src/pl/plr"]
 	path = src/pl/plr
