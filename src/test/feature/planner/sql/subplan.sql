@@ -6,7 +6,7 @@
 
 -- SUITE: hash-vs-nl-not-in
 -- start_ignore
-drop schema subplan_tests cascade;
+drop schema if exists subplan_tests cascade;
 -- end_ignore
 create schema subplan_tests;
 set search_path=subplan_tests;
