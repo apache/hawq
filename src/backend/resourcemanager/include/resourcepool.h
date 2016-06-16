@@ -712,6 +712,11 @@ SimpStringPtr build_segment_status_description(SegStat segstat);
 #define VALIDATE_RATIO_BIAS 	0.005
 #define VALIDATE_RESOURCE_BIAS	0.0001
 
+#define EPSILON 1e-5
+#define IS_DOUBLE_ZERO(d)       (fabs(d) < EPSILON)
+/* see Knuth section 4.2.2 pages 217-218 */
+#define IS_DOUBLE_EQ(x, y)      ((fabs((x) - (y))) <= ((EPSILON) * fabs(x)))
+
 void validateResourcePoolStatus(bool refquemgr);
 
 /*

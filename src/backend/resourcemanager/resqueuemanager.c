@@ -2851,8 +2851,8 @@ void dispatchResourceToQueries(void)
 		DynMemoryCoreRatioTrack mctrack = PQUEMGR->RatioTrackers[i];
 
 		/* Ignore the memory/core ratio 1) not in use. 2) no resource allocated. */
-		if ( (mctrack->ClusterMemoryMaxMB == 0 || mctrack->ClusterVCoreMax == 0) ||
-			 (mctrack->TotalAllocated.MemoryMB == 0 && mctrack->TotalAllocated.Core == 0) )
+		if ( (mctrack->ClusterMemoryMaxMB == 0 || IS_DOUBLE_ZERO(mctrack->ClusterVCoreMax)) ||
+			 (mctrack->TotalAllocated.MemoryMB == 0 && IS_DOUBLE_ZERO(mctrack->TotalAllocated.Core)) )
 		{
 			elog(DEBUG3, "Resource manager skipped memory core ratio index %d, "
 						 "memory max limit %d MB, %lf CORE, "
@@ -3012,7 +3012,7 @@ void dispatchResourceToQueries(void)
 						 track->TotalAllocated.Core,
 						 track->QueueInfo->Name);
 
-			double evalcore = track->TotalAllocated.Core == 0 ?
+			double evalcore = IS_DOUBLE_ZERO(track->TotalAllocated.Core) ?
 							  VALIDATE_RESOURCE_BIAS :
 							  track->TotalAllocated.Core * (1+VALIDATE_RESOURCE_BIAS);
 			Assert(evalcore >= track->TotalUsed.Core);
