@@ -49,4 +49,15 @@ TEST_F(TestAggregate, TestCreateAggregate) {
   util.query("select newavg(b) as bavg from t group by a order by bavg","3|\n15|\n62|\n");
 }
 
+TEST_F(TestAggregate, TestAggregateWithGroupingsets) {
+  hawq::test::SQLUtility util;
+  util.execute("drop table if exists t");
+  hawq::test::DataGenerator dGen(&util);
+  dGen.genAggregateTable("t");
+
+  util.query("SELECT a, b, sum(c) sum_c FROM (SELECT a, b, c FROM t F1 "
+      "LIMIT 3) F2 GROUP BY GROUPING SETS((a, b), (b)) ORDER BY a,"
+      " sum_c;", "1|aa|10|\n1|bb|20|\n2|cc|20|\n|aa|10|\n|bb|20|\n|cc|20|\n");
+}
+
 

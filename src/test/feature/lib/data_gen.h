@@ -28,6 +28,12 @@ class DataGenerator {
                       std::string compresstype = "none",
                       int compresslevel = -1);
 
+  void genAggregateTable(std::string tableName,
+                         bool appendonly = true,
+                         std::string orientation = "row",
+                         std::string compresstype = "none",
+                         int compresslevel = -1);
+
   void genTableWithFullTypes(std::string tableName,
                              bool appendonly = true,
                              std::string orientation = "row",
