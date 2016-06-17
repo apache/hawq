@@ -56,7 +56,7 @@ TEST_F(TestAggregate, TestAggregateWithGroupingsets) {
   dGen.genAggregateTable("t");
 
   util.query("SELECT a, b, sum(c) sum_c FROM (SELECT a, b, c FROM t F1 "
-      "LIMIT 3) F2 GROUP BY GROUPING SETS((a, b), (b)) ORDER BY a,"
+      "LIMIT 3) F2 GROUP BY GROUPING SETS((a, b), (b)) ORDER BY a, b,"
       " sum_c;", "1|aa|10|\n1|bb|20|\n2|cc|20|\n|aa|10|\n|bb|20|\n|cc|20|\n");
 }
 
