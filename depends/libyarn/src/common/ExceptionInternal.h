@@ -218,7 +218,7 @@ void ThrowException(bool nested, const char * f, int l,
         throw THROWABLE(buffer.c_str(), SkipPathPrefix(f), l,
                         Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str());
     } else {
-        std::throw_with_nested(
+        Yarn::throw_with_nested(
             THROWABLE(buffer.c_str(), SkipPathPrefix(f), l,
                       Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str()));
     }
