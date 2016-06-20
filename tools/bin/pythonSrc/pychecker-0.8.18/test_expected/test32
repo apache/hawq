@@ -1,0 +1,6 @@
+Processing module test32 (test_input/test32.py)...
+
+Warnings...
+
+test_input/test32.py:10: self is not first method argument
+test_input/test32.py:15: Invalid arguments to (__init__), got 0, expected 1

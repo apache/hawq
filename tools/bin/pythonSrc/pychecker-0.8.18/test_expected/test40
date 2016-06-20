@@ -1,0 +1,15 @@
+Processing module test40 (test_input/test40.py)...
+
+Warnings...
+
+test_input/test40.py:8: Parameter (args) not used
+test_input/test40.py:8: Parameter (kw) not used
+test_input/test40.py:11: Parameter (kw) not used
+test_input/test40.py:17: Parameter (a) not used
+test_input/test40.py:17: Parameter (args) not used
+test_input/test40.py:17: Parameter (b) not used
+test_input/test40.py:17: Parameter (c) not used
+test_input/test40.py:17: Parameter (kw) not used
+test_input/test40.py:33: Parameter (a) not used
+test_input/test40.py:33: Parameter (args) not used
+test_input/test40.py:33: Parameter (kw) not used

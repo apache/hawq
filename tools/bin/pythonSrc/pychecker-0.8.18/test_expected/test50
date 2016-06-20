@@ -1,0 +1,8 @@
+Processing module test50 (test_input/test50.py)...
+
+Warnings...
+
+test_input/test50.py:7: Function (C) has too many arguments (5)
+test_input/test50.py:8: Function (D) has too many arguments (6)
+test_input/test50.py:14: Function (F) has too many local variables (4)
+test_input/test50.py:18: Function (G) has too many local variables (5)

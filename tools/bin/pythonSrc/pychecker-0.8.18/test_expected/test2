@@ -1,0 +1,8 @@
+Processing module test2 (test_input/test2.py)...
+
+Warnings...
+
+test_input/test2.py:4: Imported module (time) not used
+test_input/test2.py:9: No doc string for class X
+test_input/test2.py:16: Base class (test2.X) __init__() not called
+test_input/test2.py:16: No doc string for class Y

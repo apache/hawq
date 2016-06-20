@@ -1,0 +1,9 @@
+Processing module test14 (test_input/test14.py)...
+
+Warnings...
+
+test_input/test14.py:4: Module (string) re-imported
+test_input/test14.py:7: Variable (_unused) not used
+test_input/test14.py:10: Local variable (jj) not used
+test_input/test14.py:10: Module (string) re-imported
+test_input/test14.py:18: Variable (_noglobal) not used

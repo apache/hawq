@@ -1,0 +1,6 @@
+Processing module test60 (test_input/test60.py)...
+
+Warnings...
+
+test_input/test60.py:3: self is argument in function
+test_input/test60.py:9: Using `self` in __repr__ method

@@ -1,0 +1,6 @@
+Processing module test45 (test_input/test45.py)...
+
+Warnings...
+
+test_input/test45.py:17: Parameter (other) not used
+test_input/test45.py:19: Parameter (other1) not used

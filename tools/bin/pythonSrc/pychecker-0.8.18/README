@@ -1,0 +1,152 @@
+
+PyChecker is a tool for finding bugs in python source code.
+It finds problems that are typically caught by a compiler for less
+dynamic languages, like C and C++.  It is similar to lint.
+Because of the dynamic nature of python, some warnings
+may be incorrect; however, spurious warnings should be fairly infrequent.
+
+PyChecker works in a combination of ways.  First, it imports each
+module.  If there is an import error, the module cannot be processed.
+The import provides some basic information about the module.  The code
+for each function, class, and method is checked for possible problems.
+
+Types of problems that can be found include:
+
+  * No global found (e.g., using a module without importing it)
+  * Passing the wrong number of parameters to functions/methods/constructors
+  * Passing the wrong number of parameters to builtin functions & methods
+  * Using format strings that don't match arguments
+  * Using class methods and attributes that don't exist
+  * Changing signature when overriding a method
+  * Redefining a function/class/method in the same scope
+  * Using a variable before setting it
+  * self not the first parameter to a method
+  * Unused globals and locals (module or variable)
+  * Unused function/method arguments (can ignore self)
+  * No doc strings in modules, classes, functions, and methods
+
+Using PyChecker
+---------------
+To use PyChecker, pass the python source files you want to check
+on the command line:
+
+	pychecker file1.py file2.py ...
+
+Note:  On Windows, use pychecker.bat.  You may also need to add
+python/scripts to your PATH.
+
+pychecker and pychecker.bat will only exist if pychecker has been
+installed.  To install, do:  python setup.py install
+
+Note:  If you haven't installed pychecker, it can be run by doing:
+python pychecker/checker.py
+
+An alternate way to use PyChecker is to import it in your code.
+See 'Importing PyChecker' below for more details.
+
+If there are import dependencies in your source files, you should
+import those files first on the command line in order to get as many
+files checked as possible.
+
+PyChecker works with Python 2.0 through 2.3.
+Some features don't work on earlier versions of Python.
+I only regularly test with versions 2.2 and 2.3.
+
+You can use the test files as examples:
+
+	pychecker [options] test_input/*.py
+
+If you want to change the default behaviour, you can pass command line options
+or define a .pycheckrc file.  For an example, look at pycheckrc.
+
+To show the available options, do:
+
+	pychecker -h
+
+Some of the most common options are:
+
+      --only         only warn about files passed on the command line [off]
+  -#, --limit        the maximum number of warnings to be displayed [10]
+  -s, --shadowbuiltin check if a variable shadows a builtin [on]
+  -q, --stdlib       ignore warnings from files under standard library [off]
+  -T, --argsused     unused method/function arguments [on]
+
+There is a simple GUI which is not maintained much.  It is good
+for showing all the options and also allows you to run pychecker.
+To run options, you will need to start it manually:
+
+	python pychecker/options.py
+
+If you want to suppress warnings on a module/function/class/method,
+you can define a suppressions dictionary in .pycheckrc.
+Examples of keys are:  'module', 'module.function',
+		       'module.class', 'module.class.method', etc.
+
+You can also define suppressions in your code by doing:
+
+	__pychecker__ = 'no-namedargs maxreturns=0 unusednames=foo,bar'
+
+The format for __pychecker__ values and values in the suppressions dictionary
+are the same.  Dashes (--) are optional when preceding long option names.
+
+Importing PyChecker
+-------------------
+You can import PyChecker in your code's main module, by doing:
+
+        import pychecker.checker
+
+This will allow each module imported after PyChecker to be checked 
+(other than the main module).  NOTE:  Modules imported before PyChecker
+will not be checked.  Warnings will be displayed on stdout 
+(ie, PyChecker uses print).
+
+Since you can't pass command line parameters, you can do:
+
+        os.environ['PYCHECKER'] = 'command line options here'
+
+This is equivalent of setting PYCHECKER in the shell environment:
+
+        PYCHECKER='no-namedargs maxreturns=0' /path/to/your/program
+
+If you want to disable the warnings (and processing done by PyChecker), 
+prior to importing PyChecker, do:
+
+        os.environ['PYCHECKER_DISABLED'] = 1
+
+This is equivalent of setting PYCHECKER_DISABLED in the shell environment:
+
+        PYCHECKER_DISABLED=1 /path/to/your/program
+
+Internal Errors
+---------------
+If you find a bug in PyChecker, meaning you see something like:
+
+	pychecker myfile.py
+
+	myfile.py:13 INTERNAL ERROR -- STOPPED PROCESSING FUNCTION --
+        Traceback (most recent call last):
+          File "./pychecker/warn.py", line 364, in _checkFunction
+            stack, oparg, lastLineNum)
+          File "./pychecker/warn.py", line 195, in _handleFunctionCall
+            kwArgs.append(stack[i].data)
+        IndexError: list index out of range
+
+Please post a bug in the SourceForge Tracker
+(https://sourceforge.net/tracker/?atid=382217&group_id=24686&func=browse)
+or send mail indicating the version of PyChecker, *your source file*
+which broke PyChecker (myfile.py in the example above), and the traceback.
+It is very helpful to provide a simple test case to demonstrate the problem.
+It helps to have the entire file and all the dependencies if you cannot
+produce a simple test case.  But if you can't provide a test case nor
+the file(s), I may be able to figure out the problem with just the line
+which broke PyChecker (myfile.py:13 in the example above).
+
+Good Luck!  As always, feedback is greatly appreciated.
+
+Neal
+pychecker-list@lists.sourceforge.net
+
+PyChecker can be found on SourceForge at:
+	http://pychecker.sourceforge.net/
+	http://sourceforge.net/projects/pychecker
+

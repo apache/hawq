@@ -1,0 +1,72 @@
+* Mark all symbols not needed by Python as hidden
+
+   The ELF standard allows you to mark symbols as hidden.  These
+   symbols are global since they might be needed by other object
+   files, however once the object files are linked into a Dynamic
+   Shared Object (DSO) the hidden symbols are no longer visable.  The
+   equivalent of this on XCOFF would have to be found too.
+
+* Improve finding the terminal on Linux
+
+   A scheme like aix_process.c uses should be used, but it should be
+   improved slightly so that it will check the device id of the
+   finally found device file.  And this code should probably be shared
+   between all POSIX systems.
+
+* Consider using PSI_STATUS_NA instead of ifdeffing around
+
+   All the #ifdef blocks around descriptors/attributes and their
+   respective getter functions is just going to spiral out of
+   control.  Maybe all attributes should just be always available but
+   raise an AttrNotApplicableError when accessed?
+
+* Create a libpsi.a static library
+
+   All utility functions should go into libpsi.a to simplify getting
+   the correct dependencies in setup.py, this is arleady turning into
+   an unmaintainable hell.  The setup.py script should then use
+   distutils.ccompiler.has_function() and friends to produce a
+   config.h for libpsi to know what to build.  This library can be
+   built using the build_clib command from distutils.
+
+   This will also mean that individual modules will be smaller since
+   only the used symbols will exist in the sofiles, intead of all of
+   them.
+
+* Simplify module sources
+
+   Code that is shared between archs should end up in libpsi.a.  And
+   each arch must have it's <arch>_<thing>.c file, even if it is just
+   calling the shared function an no more.
+
+* Introduce procfs_read_struct()?
+
+   For SunOS and AIX /proc files it could be possible, and safer and
+   faster, not to dynamically allocate the memory but rather read into
+   a statically allocated space.  You'd use it like:
+
+     struct psinfo psinfo;
+
+     if (procfs_read_struct(&psinfo, sizeof(struct psinfo), pid, "psinfo") < 0)
+         return -1;
+
+* Consider renaming the arch module
+
+   The arch module really describes the whole system, not just the
+   architecture.  Therefore the name is a bit misleading.  However
+   calling it `sys' would clash with the stdlib sys module and
+   `system' seems a bit long.
+
+   How about `plat' or `platform'?  Note that `platform' is an stdlib
+   module, so that might be a bad idea.
+
+* Improve InsufficientPrivs error message
+
+   It would be good if psi_checkattr() could also say what process the
+   error message is for instead of just the attribute.
+
+* Consider having ArchLinux24 and ArchLinux26 sub-types
+
+   In the unittests I find myself having to say `if isinstance(arch,
+   ArchLinux) and arch.release[:3] == "2.6"' often.  Maybe it would be
+   easier if we could say `if isinstance(arch, ArchLinux26)'?

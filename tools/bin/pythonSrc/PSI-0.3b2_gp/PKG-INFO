@@ -1,0 +1,129 @@
+Metadata-Version: 1.0
+Name: PSI
+Version: 0.3b2
+Summary: Python System Information
+Home-page: http://bitbucket.org/chrismiles/psi
+Author: Chris Miles, Floris Bruynooghe, Erick Tryzelaar
+Author-email: psi-discuss@googlegroups.com
+License: MIT
+Download-URL: http://pypi.python.org/pypi/PSI/
+Description: 
+        -------------------------
+        Python System Information
+        -------------------------
+        
+        ``psi`` is a Python module providing direct access to real-time system
+        and process information.  It is made of of several sub-modules.
+        
+        The ``arch`` module gives some information about the system such as
+        the sytem name and version, the machine architecture etc.  It has a
+        class representing each system and a factory function that will return
+        an instance of the class which ``psi`` is running on currently.
+        
+        The experimental ``mount`` module gives information about the various
+        mounted filesystems on the system.  It has a class representing local
+        or remote filesystems.
+        
+        The ``process`` module provides an interface to information about
+        processes currently running on the system.  Each process is
+        represented as an instance of the ``Process`` class and additionally
+        there is a ``ProcessTable`` class which is a dictionary of all running
+        processes.  To know exactly what attributes are available and what
+        they mean you should look at the docstrings and examples in the
+        ``REAME`` file and ``examples/`` directory, but important to note is
+        that all the information is collected at instatiation time.  So the
+        contents of ``ProcessTable`` and ``Process`` instances are really
+        snapshots and will still contain all information even after the actual
+        process has gone.
+        
+        Lastly there are some general functions available directly under the
+        ``psi`` namespace such as ``loadavg()``, ``getzoneid()`` etc.  Once
+        more see the docstrings for detailed information.
+        
+        Some information may not be available on all platforms, rather then
+        trying to emulate this information these parts of the API just don't
+        exist on those platforms.  Examples of these are:
+        ``psi.process.Process.pcpu`` which is not available on Linux,
+        ``psi.getzoneid()`` which is only available on SunOS 10 and above etc.
+        
+        
+        Supported Platforms
+        ===================
+        
+        Python: 2.2 and above, including 3.x.
+        
+        Linux: all 2.4 and 2.6 kernels.
+        
+        SunOS: Solaris 8 and above, including OpenSolaris (SunOS 11).
+        
+        AIX: 5.3
+        
+        Darwin: 10.3 and above.
+        
+        
+        Documentation
+        =============
+        
+        Care is taken to provide complete and accurate docstrings, so use
+        Python's ``pydoc`` tool and the interactive prompt should get you on
+        your way.
+        
+        We also have a wiki (http://bitbucket.org/chrismiles/psi/wiki/Home)
+        and a mailing list (http://groups.google.com/group/psi-discuss
+        psi-discuss@googlegroups.com).  Don't hesitate to ask questions or
+        give feedback.
+        
+        
+        Bugs
+        ====
+        
+        Please use our issue tracker:
+        http://bitbucket.org/chrismiles/psi/issues
+        
+        
+        Extra setup.py features
+        =======================
+        
+        New ``build_ext`` option: ``--devel``.  This uses ``-Werror`` and
+        enables many more warnings as well as disables optimisation.
+        
+        Using ``--undef PYMALLOC`` or ``-U PYMALLOC`` to ``build_ext`` will
+        use libc's memory heap for allocation instead of Python's.
+        
+        
+        The ``test`` command will run the testsuite.  Some tests will only be
+        run when running the test suite as root.  Currently these are the
+        tests that try to run a simple test application under specific
+        schedulers and priorities to assert psi detects these process
+        attributes correctly.
+        
+        
+        The ``valgrind`` command does run the testsuite under the valgrind
+        memory checker.  For this you need to have a specially compiled
+        python::
+        
+        ./configure --with-pydebug --without-pymalloc --prefix=/opt/pydebug
+        make
+        make install
+        
+        
+        The ``tags`` command will build an emacs TAGS file using ``grind``
+        (which is a binary of the python grin_ package).
+        
+        .. _grin: http://pypi.python.org/pypi/grin
+        
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: POSIX :: AIX
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Operating System :: POSIX :: SunOS/Solaris
+Classifier: Programming Language :: C
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: System :: Operating System Kernels
+Classifier: Topic :: System :: Systems Administration

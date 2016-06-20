@@ -1,0 +1,6 @@
+Processing module test96 (test_input/test96.py)...
+
+Warnings...
+
+test_input/test96.py:7: string.find() returns an integer, consider checking >= 0 or < 0 for not found
+test_input/test96.py:9: string.find() returns an integer, consider checking >= 0 or < 0 for not found

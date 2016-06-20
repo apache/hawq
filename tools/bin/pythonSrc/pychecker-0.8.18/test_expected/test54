@@ -1,0 +1,9 @@
+Processing module test54 (test_input/test54.py)...
+
+Warnings...
+
+test_input/test54.py:7: Variable (z) deleted before being set
+test_input/test54.py:9: Local variable (a) has already been deleted on line 6
+test_input/test54.py:12: (a) cannot be used after being deleted on line 9
+test_input/test54.py:15: No global (no_global) found
+test_input/test54.py:18: No global (another_non_existant_global) found

@@ -1,0 +1,33 @@
+Error: option -? not recognized
+Usage:
+ ./../pychecker2/main.py [options] [--] file1.py file2.py ...
+available options:
+
+Error:
+ --no-duplicateImport   Report/ignore duplicate imports
+ --no-hasAttribute      Report unknown object attributes in methods
+ --no-importError       Report/ignore imports that may fail
+ --no-main              Ignore module-level code protected by __name__ == "__main__"
+ --no-methodRedefined   Report the redefinition of class methods
+ --no-missingSelf       Report methods without "self"
+ --no-operator          Check for (++) and (--) which are legal, but not useful
+ --no-operatorPlus      Check for unary +
+ --no-redefinedScope    Report redefined scopes
+ --reportUnusedSelf     Ignore unused method "self" parameter
+ --no-selfName          Report any methods whose first argument is not self
+ --selfNames            Name of self parameter
+                        ['self', 'this', 's']
+ --shadowBuiltins       Report names that shadow builtins
+ --no-shadowIdentifier  Report names already defined in outer scopes
+ --no-shadowImport      Report imports which shadow names from other imports
+ --no-syntaxErrors      Report/ignore syntax errors
+ --no-unknown           Report names that are not defined
+ --no-unpackedUsed      Do not treat variables used in tuple assignment as used
+ --no-unused            Report names not used
+ --unusedPrefixes       Ignore unused identifiers that start with these values
+                        ['unused', 'empty', 'dummy', '__pychecker__', '__all__', '__version__', 'ignored']
+
+Miscellaneous:
+ --incremental          print warnings as they are created
+ --profile              print a profile of pychecker
+ --verbose              turn on verbose messages

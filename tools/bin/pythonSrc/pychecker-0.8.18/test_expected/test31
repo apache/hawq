@@ -1,0 +1,10 @@
+Processing module test31 (test_input/test31.py)...
+
+Warnings...
+
+test_input/test31.py:21: Instantiating an object with arguments, but no constructor
+test_input/test31.py:22: Instantiating an object with arguments, but no constructor
+test_input/test31.py:23: Instantiating an object with arguments, but no constructor
+test_input/test31.py:24: Instantiating an object with arguments, but no constructor
+test_input/test31.py:25: Function (__init__) doesn't support **kwArgs
+test_input/test31.py:26: Invalid arguments to (__init__), got 2, expected 1

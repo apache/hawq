@@ -1,0 +1,8 @@
+Processing module test25 (test_input/test25.py)...
+
+Warnings...
+
+test_input/test25.py:11: Invalid arguments to (x), got 0, expected 1
+test_input/test25.py:13: No class attribute (a) found
+test_input/test25.py:14: No class attribute (y) found
+test_input/test25.py:15: No module attribute (lkjsdflksjasdlf) found

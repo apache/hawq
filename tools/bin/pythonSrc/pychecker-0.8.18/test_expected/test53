@@ -1,0 +1,9 @@
+Processing module test53 (test_input/test53.py)...
+
+Warnings...
+
+test_input/test53.py:5: Operator (~~) doesn't exist, statement has no effect
+test_input/test53.py:7: Operator (--) doesn't exist, statement has no effect
+test_input/test53.py:9: Operator (++) doesn't exist, statement has no effect
+test_input/test53.py:22: Format string argument count (2) doesn't match arguments (3)
+test_input/test53.py:26: Unary positive (+) usually has no effect

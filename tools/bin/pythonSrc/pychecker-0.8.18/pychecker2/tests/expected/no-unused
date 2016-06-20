@@ -1,0 +1,36 @@
+tests/badparse.py:1 Unable to parse: could not parse string
+
+tests/class.py:20 Method x defined at line 28 in class A redefined
+tests/class.py:21 Class A has no attribute w
+tests/class.py:28 Method x is missing self parameter
+tests/class.py:38 Class A has no attribute w
+
+tests/global.py:3 Unknown identifier: y
+
+tests/import.py:7 Import of "join" is duplicate of import in parent scope <ModuleScope: global>
+tests/import.py:9 Unknown identifier: __all__
+tests/import.py:13 Error trying to import xYzZy: No module named xYzZy
+tests/import.py:14 Unknown identifier: z
+tests/import.py:17 Import of "getopt" is duplicate in current scope
+tests/import.py:18 Import of "join" duplicates import from module posixpath at 4
+tests/import.py:18 Import of "split" duplicates import from module posixpath at 4
+
+tests/not_there.py:[unknown line] Unable to parse: [Errno 2] No such file or directory: 'tests/not_there.py'
+
+tests/op.py:2 Operator (++) doesn't exist, statement has no effect
+tests/op.py:4 Scope (g) is redefined at line 7
+tests/op.py:5 Operator (+) normally has no effect
+tests/op.py:8 Operator (--) doesn't exist, statement has no effect
+
+tests/self.py:9 First argument to method f (x) is not in ['self', 'this', 's']
+
+tests/shadow.py:2 Scope (f) is redefined at line 8
+tests/shadow.py:4 Identifier (a) shadows definition in scope <ModuleScope: global>
+tests/shadow.py:16 Identifier (f) shadows definition in scope <ModuleScope: global>
+tests/shadow.py:17 Identifier (a) shadows definition in scope <FunctionScope: g>
+tests/shadow.py:17 Identifier (a) shadows definition in scope <ModuleScope: global>
+tests/shadow.py:18 Identifier (b) shadows definition in scope <FunctionScope: g>
+tests/shadow.py:19 Unknown identifier: c
+tests/shadow.py:19 Unknown identifier: d
+tests/shadow.py:22 Identifier (a) shadows definition in scope <ModuleScope: global>
+

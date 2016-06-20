@@ -1,0 +1,6 @@
+Processing module test35 (test_input/test35.py)...
+
+Warnings...
+
+test_input/test35.py:9: No doc string for function x
+test_input/test35.py:11: No doc string for function y

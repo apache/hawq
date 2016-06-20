@@ -1,0 +1,8 @@
+Processing module test98 (test_input/test98.py)...
+
+Warnings...
+
+test_input/import98.py:11: Cannot return a value from __init__
+
+test_input/test98.py:15: Cannot return a value from __init__
+test_input/test98.py:29: Cannot return a value from __init__

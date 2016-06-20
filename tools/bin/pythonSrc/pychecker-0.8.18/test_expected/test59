@@ -1,0 +1,9 @@
+Processing module test59 (test_input/test59.py)...
+
+Warnings...
+
+test_input/test59.py:4: Modifying parameter (c) with a default value may have unexpected consequences
+test_input/test59.py:5: Modifying parameter (d) with a default value may have unexpected consequences
+test_input/test59.py:19: Modifying parameter (x) with a default value may have unexpected consequences
+test_input/test59.py:22: Modifying parameter (a) with a default value may have unexpected consequences
+test_input/test59.py:23: Modifying parameter (b) with a default value may have unexpected consequences

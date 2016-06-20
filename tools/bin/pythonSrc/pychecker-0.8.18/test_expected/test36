@@ -1,0 +1,7 @@
+Processing module test36 (test_input/test36.py)...
+
+Warnings...
+
+test_input/test36.py:1: No doc string for class NoneType
+test_input/test36.py:31: Function (int) doesn't support **kwArgs for name (args)
+test_input/test36.py:36: [].append() only takes 1 argument in Python 1.6 and above for (n)

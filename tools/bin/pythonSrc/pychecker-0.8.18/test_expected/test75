@@ -1,0 +1,6 @@
+Processing module test75 (test_input/test75.py)...
+
+Warnings...
+
+test_input/test75.py:5: Using __slots__ in classic class A has no effect, consider deriving from object
+test_input/test75.py:8: No global (object) found

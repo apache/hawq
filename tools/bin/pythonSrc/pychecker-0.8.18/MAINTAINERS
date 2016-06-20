@@ -1,0 +1,81 @@
+
+Neal Norwitz            nnorwitz@gmail.com
+Eric C. Newton          ecn@metaslash.com
+
+
+Other Contributors:
+
+Barry Scott             barry@scottb.demon.co.uk
+                                Fix Base class not init spurious warning
+                                Other misc suggestions and fixes
+
+Shakeeb Alireza                 bug reports
+Andy Anderson                   many bug reports and fixes
+Erwin S. Andreasen              bug reports
+Anthony Baxter                  bug reports
+Alexander Belchenko             bug reports and fixes
+Jeff Bellegarde                 bug reports and fixes
+Andrew Bennetts                 suggestion: check for modifying def arg values
+Riaan Booysen                   bug reports, suggestions, etc.
+John Bowe                       bug reports, suggestions, etc.
+Mike Brown                      bug report
+Gary Capell                     bug reports and refactoring suggestions
+Loris Caren                     testing, etc.
+Charles Cazabon                 bug report
+Nicolas Chauvat                 setup.py
+Allan Crooks                    bug reports
+Jeff Collins                    checker.findModule
+Tom Culliton                    bug reports and suggestions
+André Dahlqvist                 bug reports
+Walter Doerwald                 bug reports and fixes
+Mika Eloranta                   bug reports
+Jeff Epler                      bug reports
+Mark Favas                      bug reports
+Erik Max Francis                bug reports and suggestions
+Dan Fandrich                    bug reports
+Alexandre Fayolle               bug reports
+Jeremy Fincher                  bug reports
+Horst Gassner                   bug reports and suggestions
+Stuart D. Gathman               bug reports and suggestions
+Geoff Gerrietts                 bug reports
+Johannes Gijsbers               bug reports
+Hartmut Goebel                  patches
+Joel Gould                      bug reports
+greep                           bug reports
+John-Mark Gurney                bug reports
+Thomas Heller                   bug reports and suggestions
+Raymond Hettinger               suggestions
+Tim Hochberg                    bug reports
+Eric Huss                       bug reports
+Ben Hutchings                   bug reports
+Jeremy Hylton                   bug reports and suggestions
+Garth T Kidd                    bug reports and suggestions
+Bastian Kleineidam              patches
+Brad Knotwell                   bug reports
+John Machin                     bug reports
+Jonathan Mark                   bug reports and suggestions
+Evelyn Mitchell                 bug reports
+Skip Montanaro                  bug reports and suggestions
+Michele Moore                   many suggestions
+Jon Nelson                      fix setup.py, add MANIFEST.in
+Jason Orendorff                 suggestions
+Ian Parker                      suggestions
+Fernando Pérez                  bug reports
+Kenneth Pronovici               debian maintainer, bug reports, patches, setup.py
+Eric S. Raymond                 bug reports and suggestions
+Terry Reedy                     suggestions
+Jon Ribbens                     bugs, bugs, bugs
+Guido van Rossum                bug reports and suggestions
+Jim Rutledge                    bug reports and suggestions
+Rich Salz                       bug reports and suggestions
+John Shue                       patches, etc.
+Stephan A. Terre                bug reports
+Lucio Torre                     suggestions
+Miloslav Trmac                  bug reports and patches
+Sheng-Te Tsao                   bug reports and suggestions
+Kevin Turner                    bug report
+Joe VanAndel                    bug reports
+Greg Ward                       bug reports, patches, etc
+Barry Warsaw                    bug reports
+Matt Wilson                     bug reports and fixes
+Andy Wingo                      bug reports and fixes

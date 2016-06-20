@@ -1,0 +1,11 @@
+Processing module test89 (test_input/test89.py)...
+  Caught exception importing module test89:
+    File "./pychecker/checker.py", line 536, in setupMainCode()
+      module = imp.load_module(self.moduleName, file, filename, smt)
+    File "test_input/test89.py", line 3
+      class Newbie(object):
+  NameError: name 'object' is not defined
+
+Warnings...
+
+test89:1: NOT PROCESSED UNABLE TO IMPORT
