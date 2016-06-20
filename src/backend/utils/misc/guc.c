@@ -663,7 +663,7 @@ bool        gp_enable_groupext_distinct_pruning = true;
 bool        gp_enable_groupext_distinct_gather = true;
 bool		gp_dynamic_partition_pruning = true;
 bool		gp_log_dynamic_partition_pruning = false;
-bool		gp_cte_sharing = false;
+bool		gp_cte_sharing = true;
 
 char	   *gp_idf_deduplicate_str;
 
@@ -3323,7 +3323,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&gp_cte_sharing,
-		false, NULL, NULL
+		true, NULL, NULL
 	},
 
 	{
