@@ -129,7 +129,10 @@ class MockFile(object):
         out_dir = os.path.join(out_dir, os.path.dirname(relpath))
         (stem, ext) = os.path.splitext(os.path.basename(relpath))
         if not os.path.exists(out_dir):
-            os.makedirs(out_dir)
+            try:
+                os.makedirs(out_dir)
+            except OSError:
+                pass
         return os.path.join(out_dir, '{stem}_mock.c'.format(stem=stem))
 
     def mock(self):
