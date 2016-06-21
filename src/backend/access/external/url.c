@@ -1028,16 +1028,6 @@ url_fopen(char *url,
 			}
 		}
 
-        if (CURLE_OK != (e = curl_multi_add_handle(multi_handle, file->u.curl.handle)))
-		{
-			if (CURLM_CALL_MULTI_PERFORM != e)
-			{
-				url_fclose(file, false, pstate->cur_relname);
-				elog(ERROR, "internal error: curl_multi_add_handle failed (%d - %s)",
-					 e, curl_easy_strerror(e));
-			}
-		}
-
         /* 
          * lets check our connection.
          * start the fetch if we're SELECTing (GET request), or write an
@@ -1045,6 +1035,15 @@ url_fopen(char *url,
          */
         if (!forwrite)
         {
+          if (CURLE_OK != (e = curl_multi_add_handle(multi_handle, file->u.curl.handle)))
+		      {
+			      if (CURLM_CALL_MULTI_PERFORM != e)
+			      {
+				      url_fclose(file, false, pstate->cur_relname);
+				      elog(ERROR, "internal error: curl_multi_add_handle failed (%d - %s)",
+					        e, curl_easy_strerror(e));
+			      }
+		      }
             
     		while (CURLM_CALL_MULTI_PERFORM ==
     			   (e = curl_multi_perform(multi_handle, &file->u.curl.still_running)));
