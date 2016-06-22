@@ -292,6 +292,134 @@ optimize_query(Query *parse, ParamListInfo boundParams)
 }
 #endif
 
+/**
+ * in PBE, plan will be cached, but splitAllocResult and resource maybe dynamic
+ * we need to refine cached plan, with new splitAllocResult and resource
+ * also note that plan need to be regenerated when resource number changed.
+ */
+PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
+              Query *parse,
+              int cursorOptions,
+              ParamListInfo boundParams)
+{
+  PlannedStmt *result = plannedstmt;
+  ResourceNegotiatorResult *ppResult = (ResourceNegotiatorResult *) palloc(sizeof(ResourceNegotiatorResult));
+  SplitAllocResult initResult = {NULL, NULL, NIL, 0, NIL, NULL};
+  ppResult->saResult = initResult;
+  ppResult->stmt = plannedstmt;
+  instr_time  starttime, endtime;
+
+  SplitAllocResult *allocResult = NULL;
+  Query *my_parse = copyObject(parse);
+
+  /* If this is a parallel plan. request resource and allocate split again*/
+  if (plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
+  {
+    /*
+     * Now, we want to allocate resource.
+     */
+    allocResult = calculate_planner_segment_num(my_parse, plannedstmt->resource->life,
+                                        plannedstmt->rtable, plannedstmt->intoPolicy,
+                                        plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1,
+                                        -1);
+
+    Assert(allocResult);
+
+    ppResult->saResult = *allocResult;
+    pfree(allocResult);
+  } else {
+    return plannedstmt;
+  }
+
+  /* if vseg number changed, we need to regenerate plan. */
+  if(plannedstmt->planner_segments != ppResult->saResult.planner_segments) {
+    gp_segments_for_planner = ppResult->saResult.planner_segments;
+    int optimizer_segments_saved_value = optimizer_segments;
+
+#ifdef USE_ORCA
+    /**
+    * If the new optimizer is enabled, try that first. If it does not return a plan,
+    * then fall back to the planner.
+    * TODO: caragg 11/08/2013: Enable ORCA when running in utility mode (MPP-21841)
+    */
+    if (optimizer && AmIMaster() && (GP_ROLE_UTILITY != Gp_role) && isDispatchParallel)
+    {
+      if (gp_log_optimization_time)
+      {
+        INSTR_TIME_SET_CURRENT(starttime);
+      }
+      START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Optimizer));
+      {
+        if (optimizer_segments == 0) // value not set by user
+        {
+          optimizer_segments = gp_segments_for_planner;
+        }
+
+        result = optimize_query(parse, boundParams);
+        if (ppResult->stmt && ppResult->stmt->intoPolicy
+            && result && result->intoPolicy)
+        {
+          result->intoPolicy->bucketnum =
+              ppResult->stmt->intoPolicy->bucketnum;
+        }
+        optimizer_segments = optimizer_segments_saved_value;
+      }
+      END_MEMORY_ACCOUNT();
+
+      if (gp_log_optimization_time)
+      {
+        INSTR_TIME_SET_CURRENT(endtime);
+        INSTR_TIME_SUBTRACT(endtime, starttime);
+        elog(LOG, "Optimizer Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
+      }
+    }
+#endif
+
+    if (!result)
+    {
+      if (gp_log_optimization_time)
+      {
+        INSTR_TIME_SET_CURRENT(starttime);
+      }
+      START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Planner));
+      {
+        if (NULL != planner_hook)
+        {
+          result = (*planner_hook) (parse, cursorOptions, boundParams, plannedstmt->resource->life);
+        }
+        else
+        {
+          result = standard_planner(parse, cursorOptions, boundParams);
+        }
+
+        if (gp_log_optimization_time)
+        {
+          INSTR_TIME_SET_CURRENT(endtime);
+          INSTR_TIME_SUBTRACT(endtime, starttime);
+          elog(LOG, "Planner Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
+        }
+      }
+      END_MEMORY_ACCOUNT();
+    }
+  }
+
+  /* add resource and split information to it*/
+  result->resource = ppResult->saResult.resource;
+  result->resource_parameters = ppResult->saResult.resource_parameters;
+  result->scantable_splits = ppResult->saResult.alloc_results;
+  result->planner_segments = ppResult->saResult.planner_segments;
+  result->datalocalityInfo = ppResult->saResult.datalocalityInfo;
+  result->datalocalityTime = ppResult->saResult.datalocalityTime;
+
+  if ((ppResult != NULL))
+  {
+    pfree(ppResult);
+    ppResult = NULL;
+  }
+
+  return result;
+}
+
 /*****************************************************************************
  *
  *	   Query optimizer entry point
