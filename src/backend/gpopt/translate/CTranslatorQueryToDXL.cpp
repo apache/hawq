@@ -433,15 +433,6 @@ CTranslatorQueryToDXL::CheckSupportedCmdType
 		return;
 	}
 
-	if (CMD_INSERT == pquery->commandType || CMD_DELETE == pquery->commandType || CMD_UPDATE == pquery->commandType)
-	{
-		if (NULL != pquery->resultRelations)
-		{
-			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, GPOS_WSZ_LIT("DML on partitioned tables"));
-		}
-		return;
-	}
-
 	SCmdNameElem rgStrMap[] =
 		{
 		{CMD_UTILITY, GPOS_WSZ_LIT("UTILITY command")}
