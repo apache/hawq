@@ -5,6 +5,8 @@ Release:		0
 Prefix:         /usr/local
 License:		GPL
 
+%define _unpackaged_files_terminate_build 0
+
 %description
 The PL/R modules provides Procedural language implementation of R for HAWQ.
 
@@ -18,4 +20,6 @@ make -C %{plr_srcdir}
 make -C %{plr_srcdir} install prefix=%{buildroot}/usr/local
 
 %files
-/usr/local
+/usr/local/docs/contrib/README.plr
+/usr/local/lib/postgresql/plr.so*
+/usr/local/share/postgresql/contrib/plr.sql
