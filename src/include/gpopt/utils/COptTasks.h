@@ -179,10 +179,6 @@ class COptTasks
 		static
 		void Execute ( void *(*pfunc) (void *), void *pfuncArg);
 
-		// task that does the translation from planned stmt to XML
-		static
-		void* PvDXLFromPlstmtTask(void *pv);
-
 		// task that does the translation from xml to dxl to pplstmt
 		static
 		void* PvPlstmtFromDXLTask(void *pv);
@@ -284,10 +280,6 @@ class COptTasks
 		// convert query to DXL to xml string.
 		static
 		char *SzDXL(Query *pquery);
-
-		// convert planned statement to DXL to xml string.
-		static
-		char *SzDXL(PlannedStmt *pplstmt);
 
 		// convert xml string to DXL and to Query
 		static
