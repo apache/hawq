@@ -52,6 +52,11 @@ static void
 log_incomplete_split(RelFileNode node, BlockNumber leftblk,
 					 BlockNumber rightblk, bool is_root)
 {
+	if (! CanEmitXLogRecords)	/*  only log incomplete split if could emit xlog */
+	{
+		return;
+	}
+
 	bt_incomplete_action *action = palloc(sizeof(bt_incomplete_action));
 
 	action->node = node;
@@ -88,6 +93,11 @@ forget_matching_split(RelFileNode node, BlockNumber downlink, bool is_root)
 static void
 log_incomplete_deletion(RelFileNode node, BlockNumber delblk)
 {
+	if (! CanEmitXLogRecords)	/*  only log incomplete deletion if could emit xlog */
+	{
+		return;
+	}
+
 	bt_incomplete_action *action = palloc(sizeof(bt_incomplete_action));
 
 	action->node = node;
