@@ -2882,7 +2882,7 @@ void processResourceBrokerTasks(void)
 		if ( (PRESPOOL->Segments.NodeCount > 0 ) &&
 			 (curtime - PRESPOOL->LastUpdateTime  >
 			  rm_cluster_report_period * 1000000LL ||
-			  hasSegmentGRMCapacityNotUpdated() ) &&
+			  requireInstantClusterReport() ) &&
 			 (curtime - PRESPOOL->LastRequestTime > 5LL * 1000000LL) )
 		{
 			double  maxcap  = 0.0;
