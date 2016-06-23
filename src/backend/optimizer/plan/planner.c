@@ -342,7 +342,7 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
     * then fall back to the planner.
     * TODO: caragg 11/08/2013: Enable ORCA when running in utility mode (MPP-21841)
     */
-    if (optimizer && AmIMaster() && (GP_ROLE_UTILITY != Gp_role) && isDispatchParallel)
+    if (optimizer && AmIMaster() && (GP_ROLE_UTILITY != Gp_role) && plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
     {
       if (gp_log_optimization_time)
       {
