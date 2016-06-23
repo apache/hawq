@@ -36,7 +36,7 @@ PYLIB_SRC=$(SRC)/pythonSrc
 LIB_DIR=$(SRC)/lib
 PYLIB_DIR=$(SRC)/ext
 
-all: lockfile pygresql stream pychecker psi unittest2
+all: lockfile pygresql stream pychecker psi unittest2 pycrypto
 
 #
 # Python Libraries
