@@ -3711,7 +3711,7 @@ void timeoutIdleGRMResourceToRBByRatio(int 		 ratioindex,
 	validateResourcePoolStatus(false);
 }
 
-bool hasSegmentGRMCapacityNotUpdated(void)
+bool requireInstantClusterReport(void)
 {
 	if (DRMGlobalInstance->ImpType == NONE_HAWQ2)
 	{
@@ -3738,6 +3738,10 @@ bool hasSegmentGRMCapacityNotUpdated(void)
 		if ( segresource->Stat->GRMTotalMemoryMB == 0 ||
 			 segresource->Stat->GRMTotalCore == 0 )
 		{
+			res = true;
+			break;
+		}
+		else if ( segresource->Stat->StatusDesc & SEG_STATUS_NO_GRM_NODE_REPORT ) {
 			res = true;
 			break;
 		}
