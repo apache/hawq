@@ -617,7 +617,7 @@ void timeoutIdleGRMResourceToRB(void);
 void forceReturnGRMResourceToRB(void);
 
 /* Check if some hosts are not updated from GRM cluster report. */
-bool hasSegmentGRMCapacityNotUpdated(void);
+bool requireInstantClusterReport(void);
 bool allSegmentHasNoGRMContainersAllocated(void);
 
 int addOrderedResourceAllocTreeIndexByRatio(uint32_t ratio, BBST *tree);
