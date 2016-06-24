@@ -328,6 +328,11 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
     ppResult->saResult = *allocResult;
     pfree(allocResult);
   } else {
+    if ((ppResult != NULL))
+    {
+      pfree(ppResult);
+      ppResult = NULL;
+    }
     return plannedstmt;
   }
 
