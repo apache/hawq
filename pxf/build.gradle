@@ -474,14 +474,14 @@ task tomcatRpm(type: Rpm) {
         permissionGroup = 'root'
 
         preInstall file('tomcat/src/scripts/pre-install.sh')
-        postInstall file('tomcat/src/scripts/post-install.sh')
 
         from("${tomcatTargetDir}/${tomcatName}") {
-            user 'root'
-            permissionGroup 'root'
+            user 'tomcat'
+            permissionGroup 'tomcat'
+            addParentDirs false
             into "/opt/pivotal/${tomcatName}"
         }
-    
+
         link("/opt/pivotal/${packageName}", "${tomcatName}")
     }
 }
