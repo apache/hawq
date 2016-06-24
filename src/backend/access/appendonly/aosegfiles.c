@@ -1425,9 +1425,9 @@ get_ao_distribution_name(PG_FUNCTION_ARGS)
 		 * assemble our query string
 		 */
 		initStringInfo(&sqlstmt);
-		appendStringInfo(&sqlstmt, "select gp_segment_id,sum(tupcount) "
-						"from gp_dist_random('pg_aoseg.%s') "
-						"group by (gp_segment_id)", aoseg_relname);
+		appendStringInfo(&sqlstmt, "select segno,sum(tupcount) "
+						"from pg_aoseg.%s "
+						"group by (segno)", aoseg_relname);
 
 		PG_TRY();
 		{
