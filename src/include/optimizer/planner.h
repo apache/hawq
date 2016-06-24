@@ -36,6 +36,11 @@ extern PlannedStmt *planner(Query *parse,
 							ParamListInfo boundParams,
 							QueryResourceLife resourceLife);
 
+extern PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
+              Query *parse,
+              int cursorOptions,
+              ParamListInfo boundParams);
+
 extern Plan *subquery_planner(PlannerGlobal *glob,
 							  Query *parse,
 							  PlannerInfo *parent_root,
