@@ -857,6 +857,7 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 
 	MemoryContextSwitchTo(context->datalocality_memorycontext);
 
+	ActiveSnapshot = GetTransactionSnapshot();
 	ActiveSnapshot = CopySnapshot(ActiveSnapshot);
 	ActiveSnapshot->curcid = GetCurrentCommandId();
 
