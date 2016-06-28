@@ -60,6 +60,7 @@ mkgpfdist: mkdir
 
 	for file in $(GPFDISTFILES); do \
 	    ( $(CC) $(INCLUDES) $(CFLAGS) $(LIBS) -c $(code_dir)$${file}); \
+	    if [[ $$? -ne 0 ]]; then exit 1; fi \
 	done
 	# link
 	$(CC) $(CFLAGS) -o $(code_dir)gpfdist $(OBJS)  $(LIBS)
