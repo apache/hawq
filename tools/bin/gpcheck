@@ -965,8 +965,7 @@ def testHDFSConfig(host):
         yarn_property_exist_list = ['yarn.resourcemanager.address', 'yarn.resourcemanager.scheduler.address']
 
     if options.yarn_ha:
-        yarn_property_exist_list = ['yarn.resourcemanager.address.rm1', 'yarn.resourcemanager.address.rm2', 'yarn.resourcemanager.scheduler.address.rm1', \
-                                    'yarn.resourcemanager.scheduler.address.rm2']
+        yarn_property_exist_list = ['yarn.resourcemanager.hostname.rm1', 'yarn.resourcemanager.hostname.rm2']
 
     if yarn_enabled:
         for item in yarn_property_exist_list:
