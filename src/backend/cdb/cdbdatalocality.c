@@ -739,8 +739,6 @@ static void check_keep_hash_and_external_table(
 		{
 			context->keep_hash = true;
 			context->resultRelationHashSegNum = targetPolicy->bucketnum;
-			pfree(targetPolicy);
-			return;
 		}
 		pfree(targetPolicy);
 	}
@@ -752,7 +750,6 @@ static void check_keep_hash_and_external_table(
 	{
 		context->keep_hash = true;
 		context->resultRelationHashSegNum = intoPolicy->bucketnum;
-		return;
 	}
 
 	foreach(lc, context->rtc_context.range_tables)
