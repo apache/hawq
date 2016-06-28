@@ -3,10 +3,11 @@
 [Website](http://hawq.incubator.apache.org/) |
 [Wiki](https://cwiki.apache.org/confluence/display/HAWQ/Apache+HAWQ+Home) |
 [Documentation](http://hdb.docs.pivotal.io/) |
-[Devolper Mailing List](mailto://dev@hawq.incubator.apache.org) |
-[User Mailing List](mailto://user@hawq.incubator.apache.org) |
+[Devolper Mailing List](mailto:dev@hawq.incubator.apache.org) |
+[User Mailing List](mailto:user@hawq.incubator.apache.org) |
 [Q&A Collections](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=65144284) |
 [Open Defect](https://issues.apache.org/jira/browse/HAWQ) |
+
 
 # Apache HAWQ
 ---
