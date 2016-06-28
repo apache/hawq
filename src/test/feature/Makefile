@@ -15,16 +15,22 @@ override LDFLAGS += -L/usr/local/lib -L/usr/lib -L$(abs_top_srcdir)/src/test/fea
 PROG = test_main.cpp $(wildcard */*.cpp)
 RM = rm -rf
 
-.PHONY: all distclean clean doc
+.PHONY: all sharelib sharelibclean distclean clean doc
 
-all:
+all: sharelib
 	$(MAKE) -C lib all
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(PROG) $(LDFLAGS) $(LIBS) -o feature-test
+
+sharelib:
+	cd UDF/lib || exit 1; $(MAKE) || exit 2; $(MAKE) clean || exit 3
+
+sharelibclean:
+	cd UDF/lib || exit 1; $(RM) *.o *.so || exit 2
 
 doc:
 	doxygen doxygen_template
 
-clean distclean:
+clean distclean: sharelibclean
 	$(RM) feature-test
 	$(RM) feature-test.dSYM
 	$(RM) doc
