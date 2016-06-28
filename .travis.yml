@@ -43,7 +43,7 @@ before_script:
   - ./configure
 
 script:
-  - make -j2
+  - make -j$(sysctl -n hw.ncpu)
   - make feature-test
   - make feature-test-clean
 
