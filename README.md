@@ -1,3 +1,13 @@
+![HAWQ](http://hawq.incubator.apache.org/images/logo-hawq.png)
+
+[Website](http://hawq.incubator.apache.org/) |
+[Wiki](https://cwiki.apache.org/confluence/display/HAWQ/Apache+HAWQ+Home) |
+[Documentation](http://hdb.docs.pivotal.io/) |
+[Devolper Mailing List](mailto://dev@hawq.incubator.apache.org) |
+[User Mailing List](mailto://user@hawq.incubator.apache.org) |
+[Q&A Collections](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=65144284) |
+[Open Defect](https://issues.apache.org/jira/browse/HAWQ) |
+
 # Apache HAWQ
 ---
 Apache HAWQ is a Hadoop native SQL query engine that combines the key technological advantages of MPP database with the scalability and convenience of Hadoop. HAWQ reads data from and writes data to HDFS natively. HAWQ delivers industry-leading performance and linear scalability. It provides users the tools to confidently and successfully interact with petabyte range data sets. HAWQ provides users with a complete, standards compliant SQL interface. More specifically, HAWQ has the following features:
