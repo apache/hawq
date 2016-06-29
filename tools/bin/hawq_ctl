@@ -757,6 +757,13 @@ class HawqStop:
         self.timeout = opts.timeout_seconds
         self.hawq_dict = hawq_dict
         self.hawq_reload = opts.hawq_reload
+        if self.hawq_reload:
+            self.stop_action = 'reload'
+            self.stop_action_past = 'reloaded'
+        else:
+            self.stop_action = 'stop'
+            self.stop_action_past = 'stopped'
+
         self.lock = threading.Lock()
         self.dburl = None
         self.conn = None
@@ -830,7 +837,7 @@ class HawqStop:
         pass
 
     def _stop_master_cmd(self):
-        logger.info("Stop hawq master")
+        logger.info("%s hawq master" % self.stop_action.title())
         if self.hawq_reload:
             cmd_str = "%s; %s/bin/pg_ctl reload -D %s >> %s" % \
                       (source_hawq_env, self.GPHOME, self.master_data_directory, log_filename)
@@ -844,7 +851,7 @@ class HawqStop:
     def _stop_master(self):
         master_host, master_running = check_hawq_running(self.master_host_name, self.master_data_directory, self.master_port, self.user, logger)
         if master_running:
-            if self.stop_mode != 'immediate':
+            if self.stop_mode != 'immediate' and not self.hawq_reload:
                 self._stop_master_checks()
             cmd = self._stop_master_cmd()
             result = remote_ssh(cmd, self.master_host_name, self.user)
@@ -854,7 +861,7 @@ class HawqStop:
             return 0
 
     def _stop_segment_cmd(self):
-        logger.info("Stop hawq segment")
+        logger.info("%s hawq segment" % self.stop_action.title())
         if self.hawq_reload:
             cmd_str = "%s; %s/bin/pg_ctl reload -D %s >> %s" % \
                       (source_hawq_env, self.GPHOME, self.segment_data_directory, log_filename)
@@ -876,7 +883,7 @@ class HawqStop:
             return 0
 
     def _stop_standby_cmd(self):
-        logger.info("Stop hawq standby master")
+        logger.info("%s hawq standby master" % self.stop_action.title())
         if self.hawq_reload:
             cmd_str = "%s; %s/bin/pg_ctl reload -D %s >> %s" % \
                       (source_hawq_env, self.GPHOME, self.master_data_directory, log_filename)
@@ -897,29 +904,29 @@ class HawqStop:
             return 0
 
     def _stopAll(self):
-        logger.info("Stop hawq cluster")
+        logger.info("%s hawq cluster" % self.stop_action.title())
         master_result = 0
         standby_result = 0
         segments_return_flag = 0
         master_result = self._stop_master()
         if master_result != 0:
-            logger.error("Master stop failed")
+            logger.error("Master %s failed" % self.stop_action)
         else:
-            logger.info("Master stopped successfully")
+            logger.info("Master %s successfully" % self.stop_action_past)
         if self.standby_host_name.lower() not in ('', 'none'):
             standby_result = self._stop_standby()
             if standby_result != 0:
-                logger.error("Standby master stop failed")
+                logger.error("Standby master %s failed" % self.stop_action)
             else:
-                logger.info("Standby master stopped successfully")
+                logger.info("Standby master %s successfully" % self.stop_action_past)
 
         # Execute segment stop command on each node.
         segments_return_flag = self._stopAllSegments()
         cluster_result = master_result + standby_result + segments_return_flag
         if cluster_result != 0:
-            logger.error("Cluster stop failed")
+            logger.error("Cluster %s failed" % self.stop_action)
         else:
-            logger.info("Cluster stopped successfully")
+            logger.info("Cluster %s successfully" % self.stop_action_past)
         return cluster_result
 
     def _running_segments_list(self, host_list):
@@ -948,11 +955,11 @@ class HawqStop:
         bad_hosts = []
         working_hosts = self.host_list
         segment_cmd_str = self._stop_segment_cmd()
-        logger.info("Stop segments in list: %s" % self.host_list)
+        logger.info("%s segments in list: %s" % (self.stop_action.title(), self.host_list))
 
         working_hosts, bad_hosts = exclude_bad_hosts(self.host_list)
         if len(bad_hosts) == len(self.host_list):
-            logger.error("Unable to SSH on any of the hosts, skipping segment stop operation")
+            logger.error("Unable to SSH on any of the hosts, skipping segment %s operation" % self.stop_action)
             return 1
 
         process_running_host, stopped_host = self._running_segments_list(working_hosts)
@@ -960,7 +967,7 @@ class HawqStop:
         # Execute segment stop command on specified nodes.
         if self.ignore_bad_hosts:
             if len(bad_hosts) > 0:
-                logger.warning("Skipping stop segments in the list {0}, SSH test failed".format(bad_hosts))
+                logger.warning("Skipping {1} segments in the list {0}, SSH test failed".format(bad_hosts, self.stop_action))
             skip_host_list = bad_hosts + stopped_host
         else:
             skip_host_list = stopped_host
@@ -970,34 +977,34 @@ class HawqStop:
         for host in process_running_host:
             work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
         logger.info("Total segment number is: %s" % len(self.host_list))
-        work_list.append({"func":check_progress,"args":(q, len(process_running_host), 'stop', len(skip_host_list), self.quiet)})
-        node_init = HawqCommands(name = 'HAWQ', action_name = 'stop', logger = logger)
+        work_list.append({"func":check_progress,"args":(q, len(process_running_host), self.stop_action, len(skip_host_list), self.quiet)})
+        node_init = HawqCommands(name = 'HAWQ', action_name = self.stop_action, logger = logger)
         node_init.get_function_list(work_list)
         node_init.start()
         if self.ignore_bad_hosts:
             total_return_flag = node_init.return_flag
         else:
             if len(bad_hosts) > 0:
-                logger.error("%s segment stop failed, SSH test failed on %s" % (len(bad_hosts), bad_hosts))
+                logger.error("%s segment %s failed, SSH test failed on %s" % (len(bad_hosts), self.stop_action,  bad_hosts))
             total_return_flag = node_init.return_flag + len(bad_hosts)
 
         if total_return_flag != 0:
-            logger.error("Segments stop failed")
+            logger.error("Segments %s failed" % self.stop_action)
         else:
-            logger.info("Segments stopped successfully")
+            logger.info("Segments %s successfully" % self.stop_action_past)
         return total_return_flag
 
     def run(self):
         if self.node_type == "master":
             check_return_code(self._stop_master(), logger, \
-                              "Master stop failed, exit", "Master stopped successfully")
+                              "Master %s failed, exit" % self.stop_action, "Master %s successfully" % self.stop_action_past)
         elif self.node_type == "standby":
             if self.standby_host_name.lower() not in ('', 'none'):
                 check_return_code(self._stop_standby(), logger, \
-                                  "Standby master stop failed, exit", "Standby master stopped successfully")
+                                  "Standby master %s failed, exit" % self.stop_action, "Standby master %s successfully" % self.stop_action_past)
         elif self.node_type == "segment":
             check_return_code(self._stop_segment(), logger, \
-                              "Segment stop failed, exit", "Segment stopped successfully")
+                              "Segment %s failed, exit" % self.stop_action, "Segment %s successfully" % self.stop_action_past)
         elif self.node_type == "cluster":
             check_return_code(self._stopAll())
         elif self.node_type == "allsegments":
@@ -1096,8 +1103,10 @@ def get_args():
             logger.error("Create log directory %s failed on hosts %s" % (opts.log_dir, create_failed_host))
             logger.error("Please check directory permission")
 
-    Capital_Action = opts.hawq_command.title()
-    logger.info("%s hawq with args: %s" % (Capital_Action, ARGS))
+    hawq_action_name = opts.hawq_command.title()
+    if opts.hawq_reload:
+        hawq_action_name = 'Reload'
+    logger.info("%s hawq with args: %s" % (hawq_action_name, ARGS))
     return opts, hawq_dict
 
 
