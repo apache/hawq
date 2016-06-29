@@ -1,0 +1,6 @@
+-- start_matchignore
+m/.*{compresstype=none,.*/
+m/.*compression_ratio .*\d+(.\d+)?/
+
+
+-- end_matchignore
