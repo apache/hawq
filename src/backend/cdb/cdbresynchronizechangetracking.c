@@ -201,23 +201,30 @@ void ChangeTracking_GetRelationChangeInfoFromXlog(
 		case RM_MMXLOG_ID:
 			switch (info)
 			{
-				// relation dirs and node files create/drop need to be tracked down
-                // so that we can skip at recovery pass3
-                case MMXLOG_CREATE_DIR:
-				case MMXLOG_CREATE_FILE:
-                case MMXLOG_REMOVE_DIR:
+				// relation dirs and node files create/drop on hdfs need to be tracked down
+				// so that we can skip at recovery pass3
+				case MMXLOG_CREATE_DIR:
+				case MMXLOG_REMOVE_DIR:
 				case MMXLOG_REMOVE_FILE:
+				case MMXLOG_CREATE_FILE:
 				{
-					xl_heap_freeze *xlrec = (xl_heap_freeze *) data;
-
-					ChangeTracking_AddRelationChangeInfo(
-													   relationChangeInfoArray,
-													   relationChangeInfoArrayCount,
-													   relationChangeInfoMaxSize,
-													   &(xlrec->heapnode.node),
-													   InvalidBlockNumber,
-													   &xlrec->heapnode.persistentTid,
-													   xlrec->heapnode.persistentSerialNum);
+					xl_mm_fs_obj *xlrec = (xl_mm_fs_obj *) data;
+					if(xlrec->shared) // it is hdfs
+					{
+						// Only hdfs file/dir need to be skip
+						RelFileNode rfn;
+						rfn.spcNode = xlrec->tablespace;
+						rfn.dbNode = xlrec->database;
+						rfn.relNode = xlrec->relfilenode;
+						ChangeTracking_AddRelationChangeInfo(
+															relationChangeInfoArray,
+															relationChangeInfoArrayCount,
+															relationChangeInfoMaxSize,
+															&(rfn),
+															InvalidBlockNumber,
+															&xlrec->persistentTid,
+															xlrec->persistentSerialNum);
+					}
 					break;
 				}
 				default:
