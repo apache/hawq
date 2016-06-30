@@ -34,12 +34,19 @@ ifeq ($(with_r), yes)
 DIRS += plr
 endif
 
-# fixme: depend on plr.patch also.
-plr_prepare:
-	if [ ! -e $(abs_top_builddir)/$(subdir)/plr_prepare_timestamp ]; then \
-		cd $(abs_top_srcdir); \
-		git submodule update --init $(subdir)/plr && \
-		(cd $(abs_top_srcdir)/$(subdir)/plr; git apply ../plr.patch) && \
+plr_commit := $(shell cat $(abs_top_srcdir)/$(subdir)/plr.commit)
+
+plr_prepare_timestamp: plr.patch plr.commit
+	rm -f plr_prepare_timestamp
+
+plr_prepare: plr_prepare_timestamp
+	if [ ! -f $(abs_top_builddir)/$(subdir)/plr_prepare_timestamp ]; then \
+		[ "x$(plr_commit)" != "x" ] || exit 1; \
+		cd $(abs_top_srcdir)/$(subdir); mkdir -p plr; cd plr; \
+		rm -f git_keep_empty_directory.readme; \
+		[ ! -d .git ] && git clone https://github.com/jconway/plr.git .; \
+		git reset --hard $(plr_commit) || (echo Now fetch from upstream and try again; git fetch origin master; git reset --hard $(plr_commit)) || exit 2; \
+		git apply ../plr.patch || exit 3; \
 		touch $(abs_top_builddir)/$(subdir)/plr_prepare_timestamp; \
 	fi
 
@@ -48,7 +55,7 @@ ABS_PLR_SRCDIR = $(abs_top_srcdir)/$(subdir)/plr
 # rpm only so far.
 plr_pkgbuild: plr_prepare
 	if [ ! -f /etc/redhat-release ]; then echo "rpm build is not supported on the platform."; exit 1; fi
-	rm -rf plr/build; mkdir plr/build;
+	rm -rf plr/build; mkdir -p plr/build;
 	rpmbuild -bb plr.spec --define 'plr_srcdir $(ABS_PLR_SRCDIR)' --define '_topdir $(ABS_PLR_SRCDIR)/build' --define '__os_install_post \%{nil}'
 
 ifeq ($(with_r), yes)

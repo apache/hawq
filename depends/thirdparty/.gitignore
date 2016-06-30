@@ -1,5 +1,5 @@
-pg_prepare_timestamp
-orca_prepare_timestamp
-gp-xerces_build_timestamp
-gporca_build_timestamp
-gpos_build_timestamp
+*_timestamp
+gp-xerces/
+gporca/
+gpos/
+postgres/

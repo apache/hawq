@@ -1,16 +1,3 @@
-diff --git a/contrib/pgcrypto/.gitignore b/contrib/pgcrypto/.gitignore
-index 5dcb3ff..0b66753 100644
---- a/contrib/pgcrypto/.gitignore
-+++ b/contrib/pgcrypto/.gitignore
-@@ -2,3 +2,8 @@
- /log/
- /results/
- /tmp_check/
-+libpgcrypto.a
-+libpgcrypto.so
-+libpgcrypto.so.0
-+libpgcrypto.so.0.0
-+pgcrypto.sql
 diff --git a/contrib/pgcrypto/Makefile b/contrib/pgcrypto/Makefile
 index dadec95..cfae9c9 100644
 --- a/contrib/pgcrypto/Makefile

@@ -1,0 +1,8 @@
+This is a file to keep the "empty" directory in git repo to remind
+developers to avoid manipulating it himself/herself.
+
+This directory is for git-clone, git patch and then build of related git
+repo when building related features. Please do not write any files into the
+directory if it is empty, and if you are not developing related features
+and are not familiar with the related build mechanism you'd better not
+modify/add/delete files under this directory.

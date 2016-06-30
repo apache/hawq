@@ -2,4 +2,3 @@ Makefile.global
 Makefile.port
 Makefile.custom
 VERSIONS.mk
-pl/plr_prepare_timestamp
