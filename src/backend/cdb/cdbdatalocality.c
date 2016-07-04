@@ -4218,7 +4218,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			int maxTargetSegmentNumber = 0;
 			/* we keep resultRelationHashSegNum in the highest priority*/
 			if (context.resultRelationHashSegNum != 0) {
-				if ((context.resultRelationHashSegNum != context.externTableForceSegNum
+				if ((context.resultRelationHashSegNum < context.externTableForceSegNum
 						&& context.externTableForceSegNum != 0)
 						|| (context.resultRelationHashSegNum < context.externTableLocationSegNum)) {
 					cleanup_allocation_algorithm(&context);
