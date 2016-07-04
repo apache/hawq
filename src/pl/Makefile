@@ -43,8 +43,9 @@ plr_prepare: plr_prepare_timestamp
 	if [ ! -f $(abs_top_builddir)/$(subdir)/plr_prepare_timestamp ]; then \
 		[ "x$(plr_commit)" != "x" ] || exit 1; \
 		cd $(abs_top_srcdir)/$(subdir); mkdir -p plr; cd plr; \
-		rm -f git_keep_empty_directory.readme; \
+		mv -f plr.git_keep_empty_directory.readme ..; \
 		[ ! -d .git ] && git clone https://github.com/jconway/plr.git .; \
+		mv -f ../plr.git_keep_empty_directory.readme .; \
 		git reset --hard $(plr_commit) || (echo Now fetch from upstream and try again; git fetch origin master; git reset --hard $(plr_commit)) || exit 2; \
 		git apply ../plr.patch || exit 3; \
 		touch $(abs_top_builddir)/$(subdir)/plr_prepare_timestamp; \
