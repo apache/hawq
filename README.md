@@ -1,4 +1,4 @@
-![HAWQ](http://hawq.incubator.apache.org/images/logo-hawq.png)
+![HAWQ](http://hawq.incubator.apache.org/images/logo-hawq.png) [![https://travis-ci.org/apache/incubator-hawq.png](https://travis-ci.org/apache/incubator-hawq.png)](https://travis-ci.org/apache/incubator-hawq)
 
 [Website](http://hawq.incubator.apache.org/) |
 [Wiki](https://cwiki.apache.org/confluence/display/HAWQ/Apache+HAWQ+Home) |
