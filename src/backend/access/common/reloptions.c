@@ -519,7 +519,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("compresstype \"%s\" is not supported anymore", compresstype),
+					 errmsg("compresstype \"%s\" is not supported", compresstype),
 					 errOmitLocation(true)));
 		}
 
