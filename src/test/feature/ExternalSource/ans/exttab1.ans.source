@@ -93,7 +93,7 @@ select * from gpfdist_start;
 select * from gpfdist_status;
                                     x
 -------------------------------------------------------------------------
- Okay, gpfdist version "2.0.0.0 build dev" is running on @hostname@:7070.
+ Okay, gpfdist version "2.0.1.0 build dev" is running on @hostname@:7070.
 (1 row)
 
 -- end_ignore
@@ -182,7 +182,7 @@ SELECT * FROM EXT_REGION as r, EXT_NATION as n WHERE n.N_REGIONKEY = r.R_REGIONK
 select * from gpfdist_status;
                                     x
 -------------------------------------------------------------------------
- Okay, gpfdist version "2.0.0.0 build dev" is running on @hostname@:7070.
+ Okay, gpfdist version "2.0.1.0 build dev" is running on @hostname@:7070.
 (1 row)
 
 select * from gpfdist_stop;
@@ -249,7 +249,7 @@ select * from gpfdist_csv_start;
 select * from gpfdist_status;
                                     x
 -------------------------------------------------------------------------
- Okay, gpfdist version "2.0.0.0 build dev" is running on @hostname@:7070.
+ Okay, gpfdist version "2.0.1.0 build dev" is running on @hostname@:7070.
 (1 row)
 
 -- end_ignore
@@ -633,8 +633,7 @@ psql:/tmp/TestExternalTable_TestExternalTableAll.sql:411: ERROR:  the ON segment
 -- SELECT from WET (negative)
 --
 select * from wet_pos1;
-psql:/tmp/TestExternalTable_TestExternalTableAll.sql:416: ERROR:  it is not possible to read from a WRITABLE external table.
-HINT:  Create the table as READABLE instead
+psql:/tmp/TestExternalTable_TestExternalTableAll.sql:416: ERROR:  External scan error: It is not possible to read from a WRITABLE external table. Create the table as READABLE instead. (COptTasks.cpp:1617)
 --
 -- WET: export some data with INSERT SELECT, INSERT and COPY.
 --
@@ -659,7 +658,7 @@ INSERT 0 0
 select * from gpfdist_status;
                                     x
 -------------------------------------------------------------------------
- Okay, gpfdist version "2.0.0.0 build dev" is running on @hostname@:7070.
+ Okay, gpfdist version "2.0.1.0 build dev" is running on @hostname@:7070.
 (1 row)
 
 select * from gpfdist_stop;
@@ -681,7 +680,7 @@ select * from gpfdist_status;
 -- get an error for missing gpfdist
 --
 select count(*) from ext_whois;
-psql:/tmp/TestExternalTable_TestExternalTableAll.sql:449: ERROR:  connection with gpfdist failed for gpfdist://@hostname@:7070/whois.csv. effective url: http://127.0.0.1:7070/whois.csv. error code = 61 (Connection refused)  (seg4 @hostname@:40000 pid=35904)
+psql:/tmp/TestExternalTable_TestExternalTableAll.sql:448: ERROR:  connection with gpfdist failed for gpfdist://@hostname@:7070/whois.csv. effective url: http://127.0.0.1:7070/whois.csv. error code = 61 (Connection refused)  (seg4 @hostname@:40000 pid=35904)
 --
 -- test CREATE EXTERNAL TABLE privileges
 --
@@ -788,7 +787,7 @@ select * from gpfdist_start;
 select * from gpfdist_status;
                                     x
 -------------------------------------------------------------------------
- Okay, gpfdist version "2.0.0.0 build dev" is running on @hostname@:7070.
+ Okay, gpfdist version "2.0.1.0 build dev" is running on @hostname@:7070.
 (1 row)
 
 -- end_ignore
@@ -861,7 +860,7 @@ DROP TABLE
 select * from gpfdist_status;
                                     x
 -------------------------------------------------------------------------
- Okay, gpfdist version "2.0.0.0 build dev" is running on @hostname@:7070.
+ Okay, gpfdist version "2.0.1.0 build dev" is running on @hostname@:7070.
 (1 row)
 
 select * from gpfdist_stop;

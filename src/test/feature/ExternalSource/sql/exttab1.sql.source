@@ -411,7 +411,6 @@ create writable external web table wet_pos5(a text, b text) execute 'some comman
 -- SELECT from WET (negative)
 --
 select * from wet_pos1;
-
 --
 -- WET: export some data with INSERT SELECT, INSERT and COPY. 
 --
