@@ -27,12 +27,12 @@ TARGET = function.so
 
 RM = rm -rf 
 
-all: $(OBJS) $(TARGET)
+all: $(TARGET)
 
 $(OBJS): $(PROG)
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $(OBJS) $(PROG)
 
-$(TARGET):
+$(TARGET): $(OBJS)
 ifeq ($(OS),Darwin)
 	$(CXX) $(CXXFLAGS) -bundle $(OBJS) -bundle_loader $(POSTGRES) $(LDFLAGS) -o $@
 else
