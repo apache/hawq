@@ -1,4 +1,6 @@
 *_timestamp
+
+# Do not remove them since they are auto-created but ignored when building related features.
 gp-xerces/
 gporca/
 gpos/

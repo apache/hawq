@@ -25,7 +25,6 @@ pgcrypto_prepare: pgcrypto_prepare_timestamp
 	if [ ! -f $(abs_top_builddir)/$(subdir)/pgcrypto_prepare_timestamp ]; then \
 		[ "x$(pgcrypto_commit)" != "x" ] || exit 1; \
 		cd $(abs_top_srcdir)/depends/thirdparty; mkdir -p postgres; cd postgres; \
-		rm -f git_keep_empty_directory.readme; \
 		[ ! -d .git ] && git clone https://github.com/postgres/postgres.git .; \
 		git reset --hard $(pgcrypto_commit) || (echo Now fetch from upstream and try again; git fetch origin master; git reset --hard $(pgcrypto_commit)) || exit 2; \
 		rm -f contrib/pgcrypto/pgcrypto.sql.in contrib/pgcrypto/uninstall_pgcrypto.sql; \
