@@ -135,7 +135,6 @@ ignore: returning
 ignore: stats
 ignore: tablespace
 ignore: gpdiffcheck
-ignore: exttab1
 ignore: custom_format
 ignore: resource_queue
 ignore: gptokencheck
@@ -203,7 +202,7 @@ ignore: hdfs_filesystem
 ignore: co_disabled
 # HCatalog tests
 test: caqlinmem
-ignore: hcatalog_lookup
+test: hcatalog_lookup
 test: json_load
 test: external_oid
 test: validator_function
