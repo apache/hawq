@@ -785,11 +785,11 @@ def testHAWQconfig(host):
     if not options.kerberos:
         if 'hadoop.security.authentication' in actual_config:
             if actual_config['hadoop.security.authentication'] != 'simple':
-                checkFailed(host.hostname, "HAWQ configuration: expected '%s' for '%s', actual value is '%s'" % ('simple', 'hadoop.security.authentication', actual_config[hadoop.security.authentication]))
+                checkFailed(host.hostname, "HAWQ configuration: expected '%s' for '%s', actual value is '%s'" % ('simple', 'hadoop.security.authentication', actual_config['hadoop.security.authentication']))
 
         if 'hadoop.security.authentication' in hdfs_actual_config:
             if hdfs_actual_config['hadoop.security.authentication'] != 'simple':
-                checkFailed(host.hostname, "HAWQ configuration: expected '%s' for '%s', actual value is '%s'" % ('simple', 'hadoop.security.authentication', hdfs_actual_config[hadoop.security.authentication]))
+                checkFailed(host.hostname, "HAWQ configuration: expected '%s' for '%s', actual value is '%s'" % ('simple', 'hadoop.security.authentication', hdfs_actual_config['hadoop.security.authentication']))
 
     if options.yarn or options.yarn_ha:
         hawq_yarn_property_exist_list = ['hawq_rm_yarn_address', 'hawq_rm_yarn_scheduler_address', 'hawq_rm_yarn_app_name']
