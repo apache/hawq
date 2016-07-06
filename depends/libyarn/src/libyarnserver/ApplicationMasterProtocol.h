@@ -73,7 +73,7 @@ public:
 			FinishApplicationMasterRequest &request);
 
 private:
-	void invoke(const RpcCall & call);
+	virtual void invoke(const RpcCall & call);
 
 private:
     RpcAuth auth;

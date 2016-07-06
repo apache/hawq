@@ -17,6 +17,10 @@
  * under the License.
  */
 
+#include <list>
+#include <map>
+#include <string>
+
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
@@ -47,7 +51,7 @@ TEST(TestContainerManagement,TestStartContainer){
 	Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
 	Yarn::Internal::RpcAuth rpcAuth(user, Yarn::Internal::AuthMethod::SIMPLE);
 	MockContainerManagementProtocol *protocol =new MockContainerManagementProtocol(nmHost,nmPort,tokenService,sessionConfig,rpcAuth);
-	
+
 	StringBytesMap map;
 	string key("key");
 	string value("value");
@@ -125,7 +129,7 @@ TEST(TestContainerManagement,TestGetContainerStatus){
 	Yarn::Internal::UserInfo user = Yarn::Internal::UserInfo::LocalUser();
 	Yarn::Internal::RpcAuth rpcAuth(user, Yarn::Internal::AuthMethod::SIMPLE);
 	MockContainerManagementProtocol *protocol =new MockContainerManagementProtocol(nmHost,nmPort,tokenService,sessionConfig,rpcAuth);
-	
+
 	GetContainerStatusesResponse getResponse;
 	ContainerId containerId;
 	containerId.setId(501);
@@ -134,13 +138,21 @@ TEST(TestContainerManagement,TestGetContainerStatus){
 	list<ContainerStatus> statuses;
 	statuses.push_back(status);
 	getResponse.setContainerStatuses(statuses);
-	EXPECT_CALL(*protocol, getContainerStatuses(_)).Times(AnyNumber()).WillOnce(Return(getResponse));
+	EXPECT_CALL(*protocol, getContainerStatuses(_)).Times(1).WillOnce(Return(getResponse));
 	client.stub = &stub;
-	EXPECT_CALL(stub, getContainerManagementProtocol()).Times(AnyNumber()).WillOnce(Return(protocol));
+	EXPECT_CALL(stub, getContainerManagementProtocol()).Times(1).WillRepeatedly(Return(protocol));
 
 	Container container;
 	libyarn::Token nmToken;
 	ContainerStatus retStatus = client.getContainerStatus(container,nmToken);
-	EXPECT_EQ(status.getContainerId().getId(), 501);
+	EXPECT_EQ(retStatus.getContainerId().getId(), 501);
+
+	GetContainerStatusesResponse getEmptyResponse;
+	protocol =new MockContainerManagementProtocol(nmHost,nmPort,tokenService,sessionConfig,rpcAuth);
+	EXPECT_CALL(*protocol, getContainerStatuses(_)).Times(1).WillOnce(Return(getEmptyResponse));
+	EXPECT_CALL(stub, getContainerManagementProtocol()).Times(1).WillRepeatedly(Return(protocol));
+
+	retStatus = client.getContainerStatus(container, nmToken);
+	EXPECT_EQ(retStatus.getContainerId().getId(), 0);
 }
 

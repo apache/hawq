@@ -99,7 +99,7 @@ public:
 	const string getPrincipal() {return auth.getUser().getPrincipal();};
 
 private:
-	void invoke(const RpcCall & call);
+	virtual void invoke(const RpcCall & call);
 
 private:
 	RpcAuth auth;

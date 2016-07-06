@@ -37,7 +37,7 @@ KillApplicationRequestProto& KillApplicationRequest::getProto() {
 	return requestProto;
 }
 
-void KillApplicationRequest::setApplicationId(ApplicationID &applicationId) {
+void KillApplicationRequest::setApplicationId(ApplicationId &applicationId) {
 	ApplicationIdProto* appId = new ApplicationIdProto();
 	appId->CopyFrom(applicationId.getProto());
 	requestProto.set_allocated_application_id(appId);

@@ -17,6 +17,8 @@
  * under the License.
  */
 
+#include <string>
+
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
@@ -118,7 +120,7 @@ TEST_F(TestLibYarnClientC,TestAllocateResources){
 
 	LibYarnResource_t *allocatedResourcesArray;
 	int allocatedResourceArraySize;
-	
+
 	int result = allocateResources(client, jobId, 1, 1, 1024, 2, blackListAdditions,
 			blacklistAddsSize, blackListRemovals, blackListRemovalsSize, NULL, 0, &allocatedResourcesArray, &allocatedResourceArraySize);
 	EXPECT_EQ(result,FUNCTION_FAILED);

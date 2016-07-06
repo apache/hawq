@@ -27,7 +27,7 @@
 
 #include "Token.h"
 #include "YarnApplicationState.h"
-#include "ApplicationID.h"
+#include "ApplicationId.h"
 #include "YarnApplicationState.h"
 #include "FinalApplicationStatus.h"
 #include "ApplicationResourceUsageReport.h"
@@ -69,8 +69,8 @@ public:
 
 	ApplicationReportProto& getProto();
 
-	void setApplicationId(ApplicationID &appId);
-	ApplicationID getApplicationId();
+	void setApplicationId(ApplicationId &appId);
+	ApplicationId getApplicationId();
 
 	void setUser(string &user);
 	string getUser();
@@ -105,7 +105,7 @@ public:
 	void setFinishTime(int64_t time);
 	int64_t getFinishTime();
 
-	void setFinalAppStatus(FinalApplicationStatus status);
+	void setFinalApplicationStatus(FinalApplicationStatus status);
 	FinalApplicationStatus getFinalApplicationStatus();
 
 	void setAppResourceUsage(ApplicationResourceUsageReport &usage);

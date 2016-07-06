@@ -17,6 +17,9 @@
  * under the License.
  */
 
+#include <list>
+#include <string>
+
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
@@ -40,7 +43,7 @@ public:
 		Yarn::Internal::SessionConfig sessionConfig(config);
 		MockApplicationClientProtocol *protocol = new MockApplicationClientProtocol(user,rmHost,rmPort,tokenService, sessionConfig);
 
-		ApplicationID appId;
+		ApplicationId appId;
 		appId.setId(100);
 		appId.setClusterTimestamp(1454307175682);
 		GetNewApplicationResponse getNewApplicationResponse;
@@ -80,7 +83,7 @@ public:
 		GetContainersResponse getContainersResponse;
 		getContainersResponse.setContainersReportList(reportList);
 		EXPECT_CALL((*protocol),getContainers(_)).Times(AnyNumber()).WillOnce(Return(getContainersResponse));
-		
+
 		NodeId nodeId;
 		string nodeHost("node1");
 		nodeId.setHost(nodeHost);
@@ -131,7 +134,7 @@ public:
 		GetClusterMetricsResponse clusterMetricsResponse;
 		clusterMetricsResponse.setClusterMetrics(metrics);
 		EXPECT_CALL((*protocol),getClusterMetrics(_)).Times(AnyNumber()).WillOnce(Return(clusterMetricsResponse));
-	
+
 		GetApplicationsResponse applicationsResponse;
 		applicationsResponse.setApplicationList(appReportList);
 		EXPECT_CALL((*protocol),getApplications(_)).Times(AnyNumber()).WillOnce(Return(applicationsResponse));
@@ -152,17 +155,17 @@ public:
 
 		client = new ApplicationClient(protocol);
 	}
-	
+
 	~TestApplicationClient(){
 		delete client;
 	}
-	
+
 protected:
 	ApplicationClient *client;
 };
 
 TEST_F(TestApplicationClient, TestGetNewApplication){
-	ApplicationID response = client->getNewApplication();
+	ApplicationId response = client->getNewApplication();
 	EXPECT_EQ(response.getId(), 100);
 	EXPECT_EQ(response.getClusterTimestamp(), 1454307175682);
 }
@@ -173,14 +176,14 @@ TEST_F(TestApplicationClient,TestSubmitApplication){
 }
 
 TEST_F(TestApplicationClient,TestGetApplicationReport){
-	ApplicationID appId;
+	ApplicationId appId;
 	ApplicationReport report = client->getApplicationReport(appId);
 	EXPECT_EQ(report.getUser(), "postgres");
 	EXPECT_EQ(report.getQueue(), "default");
 	EXPECT_EQ(report.getName(), "hawq");
 	EXPECT_EQ(report.getHost(), "master");
 	EXPECT_EQ(report.getRpcPort(), 8090);
-	EXPECT_FLOAT_EQ(report.getProgress(), 0.5); 
+	EXPECT_FLOAT_EQ(report.getProgress(), 0.5);
 }
 
 TEST_F(TestApplicationClient,TestGetContainers){
@@ -230,7 +233,7 @@ TEST_F(TestApplicationClient,TestGetQueueInfo){
 }
 
 TEST_F(TestApplicationClient,TestForceKillApplication){
-	ApplicationID appId;
+	ApplicationId appId;
 	client->forceKillApplication(appId);
 }
 
@@ -262,3 +265,13 @@ TEST_F(TestApplicationClient,TestGetQueueAclsInfo){
 	EXPECT_EQ(*queueACL, QueueACL::QACL_SUBMIT_APPLICATIONS);
 }
 
+TEST_F(TestApplicationClient, TestRMInfo){
+	string rmHost("localhost");
+	string rmPort("8032");
+
+	RMInfo rmInfo = RMInfo();
+	rmInfo.setHost(rmHost);
+	rmInfo.setPort(rmPort);
+	EXPECT_EQ(rmInfo.getHost(), rmHost);
+	EXPECT_EQ(rmInfo.getPort(), rmPort);
+}

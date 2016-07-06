@@ -37,14 +37,14 @@ ApplicationSubmissionContextProto& ApplicationSubmissionContext::getProto() {
 	return submitCtxProto;
 }
 
-void ApplicationSubmissionContext::setApplicationId(ApplicationID &appId) {
+void ApplicationSubmissionContext::setApplicationId(ApplicationId &appId) {
 	ApplicationIdProto *proto = new ApplicationIdProto();
 	proto->CopyFrom(appId.getProto());
 	submitCtxProto.set_allocated_application_id(proto);
 }
 
-ApplicationID ApplicationSubmissionContext::getApplicationId() {
-	return ApplicationID(submitCtxProto.application_id());
+ApplicationId ApplicationSubmissionContext::getApplicationId() {
+	return ApplicationId(submitCtxProto.application_id());
 }
 
 void ApplicationSubmissionContext::setApplicationName(string &applicationName) {

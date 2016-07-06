@@ -17,6 +17,11 @@
  * under the License.
  */
 
+#include <list>
+#include <map>
+#include <set>
+#include <string>
+
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 //#include "Thread.h"
@@ -30,6 +35,8 @@
 using std::string;
 using std::list;
 using std::set;
+using std::map;
+using std::pair;
 using namespace libyarn;
 using namespace testing;
 using namespace Mock;
@@ -45,7 +52,7 @@ public:
 
 class TestLibYarnClient: public ::testing::Test {
 public:
-	TestLibYarnClient(){		
+	TestLibYarnClient(){
 		amUser = "postgres";
 		rmHost = "localhost";
 		rmPort = "8032";
@@ -90,19 +97,22 @@ static ResourceRequest BuildRequest(int requestContainer) {
 	return resRequest;
 }
 
-static list<ContainerReport> BuildContainerReportList(int containerSize){
+static list<ContainerReport> BuildContainerReportList(int containerSize, int startPos = 0){
 	list<ContainerReport> containerReports;
-	for (int i = 0; i < containerSize; i++) {
+	for (int i = startPos; i < containerSize + startPos; i++) {
 		ContainerReport report;
+		ContainerId containerId;
+		containerId.setId(i+1);
+		report.setId(containerId);
 		containerReports.push_back(report);
 	}
 	return containerReports;
 }
-static AllocateResponse BuildAllocateResponse(int containerNumber){
+static AllocateResponse BuildAllocateResponse(int containerNumber, int startPos = 0){
 	AllocateResponse allocateResponse;
 	allocateResponse.setResponseId(10);
 	list<Container> containers;
-	for (int i=0;i<containerNumber;i++){
+	for (int i=startPos;i<containerNumber+startPos;i++){
 		Container container;
 		ContainerId containerId;
 		containerId.setId(i+1);
@@ -110,7 +120,7 @@ static AllocateResponse BuildAllocateResponse(int containerNumber){
 		containers.push_back(container);
 	}
 	list<NMToken> nmTokens;
-	for (int i=0;i<containerNumber;i++){
+	for (int i=startPos;i<containerNumber+startPos;i++){
 		NMToken token;
 		nmTokens.push_back(token);
 	}
@@ -129,8 +139,8 @@ static ApplicationReport BuildApplicationReport(string passwordStr,YarnApplicati
 	return applicationReport;
 }
 
-static ApplicationID BuildApplicationID(int id){
-	ApplicationID appId;
+static ApplicationId BuildApplicationId(int id){
+	ApplicationId appId;
 	appId.setId(id);
 	return appId;
 }
@@ -177,12 +187,121 @@ TEST_F(TestLibYarnClient,TestCreateJob){
 	MockContainerManagement *nmclient = new MockContainerManagement();
 	MockLibYarnClientStub stub;
 
-	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationID(1)));
+	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationId(1)));
 	EXPECT_CALL((*appclient),submitApplication(_)).Times(AnyNumber()).WillOnce(Return());
 	EXPECT_CALL((*appclient),getApplicationReport(_)).Times(AtLeast(3))
 			.WillOnce(Return(BuildApplicationReport("",YarnApplicationState::FAILED)))
 			.WillOnce(Return(BuildApplicationReport("",YarnApplicationState::ACCEPTED)))
 			.WillRepeatedly(Return(BuildApplicationReport("pass",YarnApplicationState::ACCEPTED)));
+	EXPECT_CALL((*appclient), getMethod()).Times(AnyNumber()).WillRepeatedly(Return(SIMPLE));
+
+	EXPECT_CALL((*amrmclient),registerApplicationMaster(_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildRegisterResponse()));
+	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildAllocateResponse(0)));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval, &stub);
+	string jobName("libyarn");
+	string queue("default");
+	string jobId("");
+	int result = client.createJob(jobName,queue,jobId);
+	EXPECT_EQ(result, 0);
+	bool bool_result = client.isJobHealthy();
+	EXPECT_FALSE(bool_result);
+}
+
+TEST_F(TestLibYarnClient,TestCreateJobCanNotRegister){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationId(1)));
+	EXPECT_CALL((*appclient),submitApplication(_)).Times(AnyNumber()).WillOnce(Return());
+	EXPECT_CALL((*appclient),getApplicationReport(_)).Times(AnyNumber())
+			.WillRepeatedly(Return(BuildApplicationReport("",YarnApplicationState::FAILED)));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval, &stub);
+	string jobName("libyarn");
+	string queue("default");
+	string jobId("");
+	int result = client.createJob(jobName, queue, jobId);
+	EXPECT_EQ(result, 1);
+}
+
+TEST_F(TestLibYarnClient,TestCreateJobException){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser, rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationId(1)));
+
+	EXPECT_CALL((*appclient),submitApplication(_)).Times(AnyNumber())
+			.WillOnce(Throw(YarnNetworkConnectException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+	string jobName("libyarn");
+	string queue("default");
+	string jobId("");
+	int result = client.createJob(jobName,queue,jobId);
+	EXPECT_EQ(result, 1);
+}
+
+TEST_F(TestLibYarnClient,TestCreateJobRepeatedCreate){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationId(1)));
+	EXPECT_CALL((*appclient),submitApplication(_)).Times(AnyNumber()).WillOnce(Return());
+	EXPECT_CALL((*appclient),getApplicationReport(_)).Times(AtLeast(3))
+			.WillOnce(Return(BuildApplicationReport("",YarnApplicationState::FAILED)))
+			.WillOnce(Return(BuildApplicationReport("",YarnApplicationState::ACCEPTED)))
+			.WillRepeatedly(Return(BuildApplicationReport("pass",YarnApplicationState::ACCEPTED)));
+	EXPECT_CALL((*appclient), getMethod()).Times(AnyNumber()).WillRepeatedly(Return(SIMPLE));
+
+	EXPECT_CALL((*amrmclient),registerApplicationMaster(_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildRegisterResponse()));
+	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildAllocateResponse(0)));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval, &stub);
+	string jobName("libyarn");
+	string queue("default");
+	string jobId("");
+	int result = client.createJob(jobName, queue, jobId);
+	EXPECT_EQ(result, 0);
+	result = client.createJob(jobName, queue, jobId);
+	EXPECT_EQ(result, 1);
+}
+
+TEST_F(TestLibYarnClient,TestCreateJobWithUnknownMethod){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationId(1)));
+	EXPECT_CALL((*appclient),submitApplication(_)).Times(AnyNumber()).WillOnce(Return());
+	EXPECT_CALL((*appclient),getApplicationReport(_)).Times(AtLeast(3))
+			.WillOnce(Return(BuildApplicationReport("",YarnApplicationState::FAILED)))
+			.WillOnce(Return(BuildApplicationReport("",YarnApplicationState::ACCEPTED)))
+			.WillRepeatedly(Return(BuildApplicationReport("pass",YarnApplicationState::ACCEPTED)));
+	EXPECT_CALL((*appclient), getMethod()).Times(AtLeast(2)).WillRepeatedly(Return(UNKNOWN));
 
 	EXPECT_CALL((*amrmclient),registerApplicationMaster(_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildRegisterResponse()));
 	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildAllocateResponse(0)));
@@ -199,29 +318,92 @@ TEST_F(TestLibYarnClient,TestCreateJob){
 	EXPECT_EQ(result, 0);
 }
 
-TEST_F(TestLibYarnClient,TestCreateJobException){
-	MockApplicationClient *appclient = new MockApplicationClient(amUser, rmHost,rmHost);
+TEST_F(TestLibYarnClient,TestForceKillJob){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
 	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
 	MockContainerManagement *nmclient = new MockContainerManagement();
 	MockLibYarnClientStub stub;
 
-	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationID(1)));
-	EXPECT_CALL((*appclient),submitApplication(_)).Times(AnyNumber())
-			.WillOnce(Throw(std::invalid_argument("Exist an application for the client")));
+	EXPECT_CALL((*nmclient), stopContainer(_, _)).Times(AnyNumber()).WillRepeatedly(Return());
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	EXPECT_CALL((*appclient), forceKillApplication(_)).Times(AnyNumber()).WillRepeatedly(Return());
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval, &stub);
+	map<int64_t, Container *> jobIdContainers;
+	Container *container = new Container();
+	NodeId nodeId;
+	string rmHost("localhost");
+	int rmPort = 8030;
+	nodeId.setHost(rmHost);
+	nodeId.setPort(rmPort);
+	container->setNodeId(nodeId);
+	jobIdContainers.insert(pair<int64_t, Container *>(0, container));
+	client.jobIdContainers = jobIdContainers;
+
+	string jobName("libyarn");
+	string queue("default");
+	string jobId("");
+	int result = client.forceKillJob(jobId);
+	EXPECT_EQ(result, 0);
+}
+
+TEST_F(TestLibYarnClient,TestForceKillJobInvalidId){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval, &stub);
+	string jobId("InvalidId");
+	int result = client.forceKillJob(jobId);
+	EXPECT_EQ(result, 1);
+}
+
+TEST_F(TestLibYarnClient,TestDummyAllocate){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildAllocateResponse(5)));
 
 	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
 	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
 	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
 
 	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
-	string jobName("libyarn");
-	string queue("default");
-	string jobId("");
-	int result = client.createJob(jobName,queue,jobId);
-	EXPECT_EQ(result, 1);
+	client.dummyAllocate();
+
+	SUCCEED();
 }
 
-TEST_F(TestLibYarnClient,TestCreateJobInvalidId){
+TEST_F(TestLibYarnClient,TestDummyAllocateException){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber())
+			.WillRepeatedly(Throw(YarnIOException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+	EXPECT_THROW(client.dummyAllocate(), YarnException);
+}
+
+
+TEST_F(TestLibYarnClient,TestAddResourceRequest){
 	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
 	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
 	MockContainerManagement *nmclient = new MockContainerManagement();
@@ -232,18 +414,6 @@ TEST_F(TestLibYarnClient,TestCreateJobInvalidId){
 	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
 
 	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
-	string jobName("libyarn");
-	string queue("default");
-	string jobId("test");
-	int result = client.createJob(jobName,queue,jobId);
-	EXPECT_EQ(result,1);
-}
-
-TEST_F(TestLibYarnClient,TestAddResourceRequest){
-	MockLibYarnClientStub stub;
-	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost,
-			amPort, am_tracking_url, heartbeatInterval, &stub);
-
 	Resource resource;
 	resource.setMemory(1024);
 	resource.setVirtualCores(1);
@@ -258,10 +428,18 @@ TEST_F(TestLibYarnClient,TestAddResourceRequest){
 	EXPECT_EQ(it->getResourceName(), host);
 }
 
-TEST_F(TestLibYarnClient,TestaddContainerRequests) {
+TEST_F(TestLibYarnClient,TestAddContainerRequests) {
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
 	MockLibYarnClientStub stub;
-	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost,
-			amPort, am_tracking_url, heartbeatInterval, &stub);
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
 	string jobId("");
 	Resource resource;
 	resource.setMemory(1024);
@@ -277,10 +455,10 @@ TEST_F(TestLibYarnClient,TestaddContainerRequests) {
 	EXPECT_EQ(it->getResourceName(), "*");
 	client.clearAskRequests();
 	EXPECT_EQ(client.getAskRequests().size(), 0);
-	
+
 	/* test preferred hosts */
-	LibYarnNodeInfo info1("node1", NULL, 3);
-	LibYarnNodeInfo info2("node2", NULL, 2);
+	LibYarnNodeInfo info1("node1", "", 3);
+	LibYarnNodeInfo info2("node2", "", 2);
 	preferred.push_back(info1);
 	preferred.push_back(info2);
 	ret = client.addContainerRequests(jobId, resource, 8, preferred, 1, false);
@@ -300,10 +478,31 @@ TEST_F(TestLibYarnClient,TestaddContainerRequests) {
 			EXPECT_EQ(it->getRelaxLocality(), false);
 		} else {
 			ASSERT_TRUE(false);
-		} 
+		}
 		EXPECT_EQ(it->getCapability().getMemory(), 1024);
 		EXPECT_EQ(it->getCapability().getVirtualCores(), 1);
 	}
+}
+
+TEST_F(TestLibYarnClient,TestAddContainerRequestsInvalidId) {
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("InvalidId");
+	Resource resource;
+	resource.setMemory(1024);
+	resource.setVirtualCores(1);
+	list<struct LibYarnNodeInfo> preferred;
+	int ret = client.addContainerRequests(jobId, resource, 8, preferred, 1, true);
+	EXPECT_EQ(ret, 1);
 }
 
 TEST_F(TestLibYarnClient,TestAllocateResources){
@@ -312,9 +511,16 @@ TEST_F(TestLibYarnClient,TestAllocateResources){
 	MockContainerManagement *nmclient = new MockContainerManagement();
 	MockLibYarnClientStub stub;
 
-	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildAllocateResponse(5)));
-	EXPECT_CALL((*appclient),getContainers(_)).Times(AnyNumber())
-				.WillRepeatedly(Return(BuildContainerReportList(0)));
+	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(4)
+			.WillOnce(Return(BuildAllocateResponse(5, 0)))
+			.WillOnce(Return(BuildAllocateResponse(0)))
+			.WillOnce(Return(BuildAllocateResponse(5, 2)))
+			.WillOnce(Return(BuildAllocateResponse(0)));
+	EXPECT_CALL((*appclient),getContainers(_)).Times(4)
+			.WillOnce(Return(BuildContainerReportList(0)))
+			.WillOnce(Return(BuildContainerReportList(5, 0)))
+			.WillOnce(Return(BuildContainerReportList(2, 0)))
+			.WillOnce(Return(BuildContainerReportList(7, 0)));
 
 	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
 	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
@@ -325,13 +531,36 @@ TEST_F(TestLibYarnClient,TestAllocateResources){
 	string jobId("");
 	list<string> blackListAdditions;
 	list<string> blackListRemovals;
-	ResourceRequest resRequest;
 	list<Container> allocatedResourcesArray;
 	int result;
 
-	result = client.allocateResources(jobId, blackListAdditions, blackListRemovals,allocatedResourcesArray,5);
-	EXPECT_EQ(allocatedResourcesArray.size(), 5);
+	result = client.allocateResources(jobId, blackListAdditions, blackListRemovals,allocatedResourcesArray,2);
+	EXPECT_EQ(allocatedResourcesArray.size(), 2);
 	EXPECT_EQ(result,0);
+	result = client.allocateResources(jobId, blackListAdditions, blackListRemovals, allocatedResourcesArray, 2);
+	EXPECT_EQ(allocatedResourcesArray.size(), 2);
+	EXPECT_EQ(result,0);
+}
+
+TEST_F(TestLibYarnClient,TestAllocateResourcesInvalidId){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser, rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser,rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("InvalidId");
+	list<string> blackListAdditions;
+	list<string> blackListRemovals;
+	list<Container> allocatedResourcesArray;
+	int result;
+	result = client.allocateResources(jobId, blackListAdditions, blackListRemovals, allocatedResourcesArray, 2);
+	EXPECT_EQ(result,1);
 }
 
 TEST_F(TestLibYarnClient,TestAllocateResourcesRetry){
@@ -341,10 +570,35 @@ TEST_F(TestLibYarnClient,TestAllocateResourcesRetry){
 	MockLibYarnClientStub stub;
 
 	EXPECT_CALL((*appclient),getContainers(_)).Times(AnyNumber())
-					.WillRepeatedly(Return(BuildContainerReportList(0)));
+			.WillRepeatedly(Return(BuildContainerReportList(0)));
 	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber())
-			.WillOnce(Return(BuildAllocateResponse(5)))
-			.WillOnce(Return(BuildAllocateResponse(5)))
+			.WillOnce(Return(BuildAllocateResponse(0)))
+			.WillRepeatedly(Return(BuildAllocateResponse(5)));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser,rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("");
+	list<string> blackListAdditions;
+	list<string> blackListRemovals;
+	list<Container> allocatedResourcesArray;
+	int result;
+	result = client.allocateResources(jobId, blackListAdditions, blackListRemovals, allocatedResourcesArray, 2);
+	EXPECT_EQ(result,0);
+}
+
+TEST_F(TestLibYarnClient,TestAllocateResourcesRetryFailed){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser, rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL((*appclient),getContainers(_)).Times(AnyNumber())
+			.WillRepeatedly(Return(BuildContainerReportList(0)));
+	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber())
 			.WillRepeatedly(Return(BuildAllocateResponse(0)));
 
 	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
@@ -356,12 +610,36 @@ TEST_F(TestLibYarnClient,TestAllocateResourcesRetry){
 	string jobId("");
 	list<string> blackListAdditions;
 	list<string> blackListRemovals;
-	ResourceRequest resRequest;
 	list<Container> allocatedResourcesArray;
 	int result;
-	resRequest = BuildRequest(11);
 	result = client.allocateResources(jobId, blackListAdditions, blackListRemovals, allocatedResourcesArray, 2);
 	EXPECT_EQ(result,0);
+}
+
+TEST_F(TestLibYarnClient,TestAllocateResourcesException){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser, rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL((*appclient),getContainers(_)).Times(AnyNumber())
+			.WillRepeatedly(Return(BuildContainerReportList(0)));
+	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(1)
+			.WillOnce(Throw(ApplicationMasterNotRegisteredException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser,rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("");
+	list<string> blackListAdditions;
+	list<string> blackListRemovals;
+	list<Container> allocatedResourcesArray;
+	int result;
+	result = client.allocateResources(jobId, blackListAdditions, blackListRemovals, allocatedResourcesArray, 2);
+	EXPECT_EQ(result,1);
 }
 
 TEST_F(TestLibYarnClient,TestActiveResources){
@@ -386,6 +664,27 @@ TEST_F(TestLibYarnClient,TestActiveResources){
 	EXPECT_EQ(result,0);
 }
 
+TEST_F(TestLibYarnClient,TestActiveResourcesInvalidId){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser,rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("InvalidId");
+	int activeContainerSize = 3;
+	int64_t activeContainerIds[activeContainerSize];
+	for (int i = 0;i < activeContainerSize;i++){
+		activeContainerIds[i] = i;
+	}
+	int result = client.activeResources(jobId,activeContainerIds,activeContainerSize);
+	EXPECT_EQ(result,1);
+}
 
 TEST_F(TestLibYarnClient,TestReleaseResources){
 	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
@@ -411,6 +710,28 @@ TEST_F(TestLibYarnClient,TestReleaseResources){
 	EXPECT_EQ(result,0);
 }
 
+TEST_F(TestLibYarnClient,TestReleaseResourcesInvalidId){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("InvalidId");
+	int releaseContainerSize = 3;
+	int64_t releaseContainerIds[releaseContainerSize];
+	for (int i = 0;i < releaseContainerSize;i++){
+		releaseContainerIds[i] = i;
+	}
+	int result = client.releaseResources(jobId,releaseContainerIds,releaseContainerSize);
+	EXPECT_EQ(result,1);
+}
+
 TEST_F(TestLibYarnClient,TestFinishJob){
 	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
 	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
@@ -427,6 +748,22 @@ TEST_F(TestLibYarnClient,TestFinishJob){
 	string jobId("");
 	int result = client.finishJob(jobId,FinalApplicationStatus::APP_SUCCEEDED);
 	EXPECT_EQ(result,0);
+}
+
+TEST_F(TestLibYarnClient,TestFinishJobInvalidId){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("InvalidId");
+	int result = client.finishJob(jobId,FinalApplicationStatus::APP_SUCCEEDED);
+	EXPECT_EQ(result,1);
 }
 
 TEST_F(TestLibYarnClient,TestGetApplicationReport){
@@ -447,6 +784,23 @@ TEST_F(TestLibYarnClient,TestGetApplicationReport){
 	ApplicationReport applicationReport;
 	int result = client.getApplicationReport(jobId,applicationReport);
 	EXPECT_EQ(result,0);
+}
+
+TEST_F(TestLibYarnClient,TestGetApplicationReportInvalidId){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("InvalidId");
+	ApplicationReport applicationReport;
+	int result = client.getApplicationReport(jobId,applicationReport);
+	EXPECT_EQ(result,1);
 }
 
 TEST_F(TestLibYarnClient,TestGetContainerReports){
@@ -471,6 +825,23 @@ TEST_F(TestLibYarnClient,TestGetContainerReports){
 	EXPECT_EQ(int(reports.size()),containerSize);
 }
 
+TEST_F(TestLibYarnClient,TestGetContainerReportsInvalidId){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("InvalidId");
+	list<ContainerReport> reports;
+	int result = client.getContainerReports(jobId,reports);
+	EXPECT_EQ(result,1);
+}
+
 TEST_F(TestLibYarnClient,TestGetContainerStatuses){
 	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
 	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
@@ -492,6 +863,28 @@ TEST_F(TestLibYarnClient,TestGetContainerStatuses){
 	int result = client.getContainerStatuses(jobId,containerIds,containerSize,containerStatues);
 	EXPECT_EQ(result,0);
 	EXPECT_EQ(int(containerStatues.size()),0);
+}
+
+TEST_F(TestLibYarnClient,TestGetContainerStatusesInvalidId){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string jobId("InvalidId");
+	list<ContainerStatus> containerStatues;
+	int containerSize = 3;
+	int64_t containerIds[containerSize];
+	for (int i = 0;i < containerSize;i++){
+		containerIds[i] = i;
+	}
+	int result = client.getContainerStatuses(jobId,containerIds,containerSize,containerStatues);
+	EXPECT_EQ(result,1);
 }
 
 TEST_F(TestLibYarnClient,TestGetQueueInfo){
@@ -521,6 +914,26 @@ TEST_F(TestLibYarnClient,TestGetQueueInfo){
 	EXPECT_EQ(int(resultQueue.getChildQueues().size()),childNum);
 }
 
+TEST_F(TestLibYarnClient,TestGetQueueInfoException){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL((*appclient),getQueueInfo(_,_,_,_)).Times(AnyNumber())
+			.WillRepeatedly(Throw(YarnIOException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	string queue("test");
+	QueueInfo resultQueue;
+	int result = client.getQueueInfo(queue,true,true,true,resultQueue);
+	EXPECT_EQ(result,1);
+}
+
 TEST_F(TestLibYarnClient,TestGetClusterNodes){
 	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
 	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
@@ -548,6 +961,26 @@ TEST_F(TestLibYarnClient,TestGetClusterNodes){
 	EXPECT_EQ(int(nodeResult.size()),nodeSize);
 }
 
+TEST_F(TestLibYarnClient,TestGetClusterNodesException){
+	MockApplicationClient *appclient = new MockApplicationClient(amUser,rmHost,rmHost);
+	MockApplicationMaster *amrmclient = new MockApplicationMaster(schedHost,schedPort,user,tokenService);
+	MockContainerManagement *nmclient = new MockContainerManagement();
+	MockLibYarnClientStub stub;
+
+	EXPECT_CALL((*appclient),getClusterNodes(_)).Times(AnyNumber())
+			.WillRepeatedly(Throw(YarnIOException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
+
+	EXPECT_CALL(stub, getApplicationClient()).Times(AnyNumber()).WillOnce(Return(appclient));
+	EXPECT_CALL(stub, getApplicationMaster()).Times(AnyNumber()).WillOnce(Return(amrmclient));
+	EXPECT_CALL(stub, getContainerManagement()).Times(AnyNumber()).WillOnce(Return(nmclient));
+	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval,&stub);
+
+	list<NodeState> states;
+	list<NodeReport> nodeResult;
+	int result = client.getClusterNodes(states,nodeResult);
+	EXPECT_EQ(result,1);
+}
+
 TEST_F(TestLibYarnClient,TestGetErrorMessage){
 	LibYarnClient client(amUser, rmHost, rmPort, schedHost, schedPort, amHost, amPort, am_tracking_url,heartbeatInterval);
 	EXPECT_STREQ("",client.getErrorMessage().c_str());
@@ -568,7 +1001,7 @@ TEST_F(TestLibYarnClient,TestLibYarn){
 	MockContainerManagement *nmclient = new MockContainerManagement();
 	MockLibYarnClientStub stub;
 
-	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationID(1)));
+	EXPECT_CALL(*appclient, getNewApplication()).Times(AnyNumber()).WillOnce(Return(BuildApplicationId(1)));
 	EXPECT_CALL((*appclient),submitApplication(_)).Times(AnyNumber()).WillOnce(Return());
 	EXPECT_CALL((*appclient),getApplicationReport(_)).Times(AtLeast(3))
 			.WillOnce(Return(BuildApplicationReport("",YarnApplicationState::FAILED)))
@@ -576,6 +1009,7 @@ TEST_F(TestLibYarnClient,TestLibYarn){
 			.WillRepeatedly(Return(BuildApplicationReport("pass",YarnApplicationState::ACCEPTED)));
 	EXPECT_CALL((*appclient),getContainers(_)).Times(AnyNumber())
 					.WillRepeatedly(Return(BuildContainerReportList(0)));
+	EXPECT_CALL((*appclient), getMethod()).Times(AnyNumber()).WillRepeatedly(Return(SIMPLE));
 
 	EXPECT_CALL((*amrmclient),registerApplicationMaster(_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildRegisterResponse()));
 	EXPECT_CALL((*amrmclient),allocate(_,_,_,_,_)).Times(AnyNumber()).WillRepeatedly(Return(BuildAllocateResponse(5)));

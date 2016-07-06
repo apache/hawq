@@ -33,7 +33,7 @@ GetApplicationReportResponse::GetApplicationReportResponse(
 GetApplicationReportResponse::~GetApplicationReportResponse() {
 }
 
-GetApplicationReportResponseProto& GetApplicationReportResponse::proto() {
+GetApplicationReportResponseProto& GetApplicationReportResponse::getProto() {
 	return responseProto;
 }
 

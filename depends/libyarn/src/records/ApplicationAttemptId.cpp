@@ -36,14 +36,14 @@ ApplicationAttemptIdProto& ApplicationAttemptId::getProto(){
 	return attemptIdProto;
 }
 
-void ApplicationAttemptId::setApplicationId(ApplicationID &appId) {
+void ApplicationAttemptId::setApplicationId(ApplicationId &appId) {
 	ApplicationIdProto *proto = new ApplicationIdProto();
 	proto->CopyFrom(appId.getProto());
 	attemptIdProto.set_allocated_application_id(proto);
 }
 
-ApplicationID ApplicationAttemptId::getApplicationId() {
-	return ApplicationID(attemptIdProto.application_id());
+ApplicationId ApplicationAttemptId::getApplicationId() {
+	return ApplicationId(attemptIdProto.application_id());
 }
 
 void ApplicationAttemptId::setAttemptId(int32_t attemptId) {

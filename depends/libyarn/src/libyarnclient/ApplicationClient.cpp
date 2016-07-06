@@ -206,7 +206,7 @@ static void HandleYarnFailoverException(const Yarn::YarnFailoverException & e) {
  optional ResourceProto maximumCapability = 2;
  }
  */
-ApplicationID ApplicationClient::getNewApplication() {
+ApplicationId ApplicationClient::getNewApplication() {
     GetNewApplicationRequest request;
     GetNewApplicationResponse response;
 
@@ -250,7 +250,7 @@ void ApplicationClient::submitApplication(
  */
 
 ApplicationReport ApplicationClient::getApplicationReport(
-        ApplicationID &appId) {
+        ApplicationId &appId) {
     GetApplicationReportRequest request;
     GetApplicationReportResponse response;
 
@@ -302,7 +302,7 @@ QueueInfo ApplicationClient::getQueueInfo(string &queue, bool includeApps,
     return response.getQueueInfo();
 }
 
-void ApplicationClient::forceKillApplication(ApplicationID &appId) {
+void ApplicationClient::forceKillApplication(ApplicationId &appId) {
     KillApplicationRequest request;
     request.setApplicationId(appId);
 

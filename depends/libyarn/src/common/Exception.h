@@ -102,73 +102,6 @@ public:
     static const char * ReflexName;
 };
 
-class AlreadyBeingCreatedException: public YarnException {
-public:
-    AlreadyBeingCreatedException(const std::string & arg, const char * file,
-                                 int line, const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~AlreadyBeingCreatedException() throw () {
-    }
-
-public:
-    static const char * ReflexName;
-};
-
-class ChecksumException: public YarnException {
-public:
-    ChecksumException(const std::string & arg, const char * file, int line,
-                      const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~ChecksumException() throw () {
-    }
-};
-
-class DSQuotaExceededException: public YarnException {
-public:
-    DSQuotaExceededException(const std::string & arg, const char * file,
-                             int line, const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~DSQuotaExceededException() throw () {
-    }
-
-public:
-    static const char * ReflexName;
-};
-
-class FileAlreadyExistsException: public YarnException {
-public:
-    FileAlreadyExistsException(const std::string & arg, const char * file,
-                               int line, const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~FileAlreadyExistsException() throw () {
-    }
-
-public:
-    static const char * ReflexName;
-};
-
-class FileNotFoundException: public YarnException {
-public:
-    FileNotFoundException(const std::string & arg, const char * file, int line,
-                          const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~FileNotFoundException() throw () {
-    }
-
-public:
-    static const char * ReflexName;
-};
-
 class YarnBadBoolFormat: public YarnException {
 public:
     YarnBadBoolFormat(const std::string & arg, const char * file, int line,
@@ -213,17 +146,6 @@ public:
     }
 };
 
-class YarnFileSystemClosed: public YarnException {
-public:
-    YarnFileSystemClosed(const std::string & arg, const char * file, int line,
-                         const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~YarnFileSystemClosed() throw () {
-    }
-};
-
 class YarnConfigInvalid: public YarnException {
 public:
     YarnConfigInvalid(const std::string & arg, const char * file, int line,
@@ -255,20 +177,6 @@ public:
 
     ~YarnEndOfStream() throw () {
     }
-};
-
-class YarnInvalidBlockToken: public YarnException {
-public:
-    YarnInvalidBlockToken(const std::string & arg, const char * file, int line,
-                          const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~YarnInvalidBlockToken() throw () {
-    }
-
-public:
-    static const char * ReflexName;
 };
 
 /**
@@ -355,73 +263,6 @@ public:
 
     ~InvalidParameter() throw () {
     }
-};
-
-class InvalidPath: public YarnException {
-public:
-    InvalidPath(const std::string & arg, const char * file, int line,
-                const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~InvalidPath() throw () {
-    }
-};
-
-class NotReplicatedYetException: public YarnException {
-public:
-    NotReplicatedYetException(const std::string & arg, const char * file,
-                              int line, const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~NotReplicatedYetException() throw () {
-    }
-
-public:
-    static const char * ReflexName;
-};
-
-class NSQuotaExceededException: public YarnException {
-public:
-    NSQuotaExceededException(const std::string & arg, const char * file,
-                             int line, const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~NSQuotaExceededException() throw () {
-    }
-
-public:
-    static const char * ReflexName;
-};
-
-class ParentNotDirectoryException: public YarnException {
-public:
-    ParentNotDirectoryException(const std::string & arg, const char * file,
-                                int line, const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~ParentNotDirectoryException() throw () {
-    }
-
-public:
-    static const char * ReflexName;
-};
-
-class ReplicaNotFoundException: public YarnException {
-public:
-    ReplicaNotFoundException(const std::string & arg, const char * file,
-                             int line, const char * stack) :
-        YarnException(arg, file, line, stack) {
-    }
-
-    ~ReplicaNotFoundException() throw () {
-    }
-
-public:
-    static const char * ReflexName;
 };
 
 class SafeModeException: public YarnException {

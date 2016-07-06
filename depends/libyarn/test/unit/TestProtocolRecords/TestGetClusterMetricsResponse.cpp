@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,40 +17,23 @@
  * under the License.
  */
 
-#ifndef APPLICATIONIDS_H_
-#define APPLICATIONIDS_H_
+#include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
-#include "YARN_yarn_protos.pb.h"
+#include "protocolrecords/GetClusterMetricsResponse.h"
 
-using namespace hadoop::yarn;
+using namespace libyarn;
+using namespace testing;
 
-namespace libyarn {
-
-/*
-message ApplicationIdProto {
-  optional int32 id = 1;
-  optional int64 cluster_timestamp = 2;
-}
- */
-
-class ApplicationID {
-public:
-	ApplicationID();
-	ApplicationID(const ApplicationIdProto &proto);
-	ApplicationID(const ApplicationID &applicationId);
-	virtual ~ApplicationID();
-
-	ApplicationIdProto& getProto();
-
-	void setId(int32_t id);
-	int32_t getId();
-
-	void setClusterTimestamp(int64_t timestamp);
-	int64_t getClusterTimestamp();
-
-private:
-	ApplicationIdProto appIdProto;
+class TestGetClusterMetricsResponse: public ::testing::Test {
+protected:
+	GetClusterMetricsResponse getResponse;
 };
 
-} /* namespace libyarn */
-#endif /* APPLICATIONIDS_H_ */
+TEST_F(TestGetClusterMetricsResponse, TestGetClusterMetricsResponse)
+{
+	GetClusterMetricsResponseProto getResponseProto;
+	getResponse = GetClusterMetricsResponse(getResponseProto);
+
+	SUCCEED();
+}

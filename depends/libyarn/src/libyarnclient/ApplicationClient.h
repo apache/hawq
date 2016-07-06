@@ -23,7 +23,7 @@
 #include <list>
 
 #include "libyarnserver/ApplicationClientProtocol.h"
-#include "records/ApplicationID.h"
+#include "records/ApplicationId.h"
 #include "records/ApplicationReport.h"
 #include "records/ContainerReport.h"
 #include "records/ApplicationSubmissionContext.h"
@@ -122,11 +122,11 @@ public:
 
     virtual ~ApplicationClient();
 
-    virtual ApplicationID getNewApplication();
+    virtual ApplicationId getNewApplication();
 
     virtual void submitApplication(ApplicationSubmissionContext &appContext);
 
-    virtual ApplicationReport getApplicationReport(ApplicationID &appId);
+    virtual ApplicationReport getApplicationReport(ApplicationId &appId);
 
     virtual list<ContainerReport> getContainers(ApplicationAttemptId &appAttempId);
 
@@ -135,7 +135,7 @@ public:
     virtual QueueInfo getQueueInfo(string &queue, bool includeApps,
             bool includeChildQueues, bool recursive);
 
-    virtual void forceKillApplication(ApplicationID &appId);
+    virtual void forceKillApplication(ApplicationId &appId);
 
     virtual YarnClusterMetrics getClusterMetrics();
 
@@ -146,7 +146,7 @@ public:
 
     const std::string & getUser(){uint32_t old=0; return getActiveAppClientProto(old)->getUser();};
 
-    const AuthMethod getMethod(){uint32_t old=0; return getActiveAppClientProto(old)->getMethod();};
+    virtual const AuthMethod getMethod(){uint32_t old=0; return getActiveAppClientProto(old)->getMethod();};
 
     const std::string getPrincipal(){uint32_t old=0; return getActiveAppClientProto(old)->getPrincipal();};
 

@@ -22,7 +22,7 @@
 
 #include "YARN_yarn_protos.pb.h"
 #include "YARN_yarn_service_protos.pb.h"
-#include "records/ApplicationID.h"
+#include "records/ApplicationId.h"
 #include "records/Resource.h"
 
 using namespace hadoop::yarn;
@@ -40,8 +40,8 @@ public:
 	GetNewApplicationResponse(const GetNewApplicationResponseProto &proto);
 	virtual ~GetNewApplicationResponse();
 
-	void setApplicationId(ApplicationID &appId);
-	ApplicationID getApplicationId();
+	void setApplicationId(ApplicationId &appId);
+	ApplicationId getApplicationId();
 
 	void setResource(Resource &resource);
 	Resource getResource();

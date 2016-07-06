@@ -45,7 +45,7 @@ ContainerId ContainerStatus::getContainerId() {
 	return ContainerId(statusProto.container_id());
 }
 
-void ContainerStatus::setContaierState(ContainerState state) {
+void ContainerStatus::setContainerState(ContainerState state) {
 	statusProto.set_state((ContainerStateProto)state);
 }
 

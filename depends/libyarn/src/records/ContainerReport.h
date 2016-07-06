@@ -79,7 +79,7 @@ public:
 	void setContainerExitStatus(ContainerExitStatus container_exit_status);
 	ContainerExitStatus getContainerExitStatus();
 
-	void setContaierState(ContainerState state);
+	void setContainerState(ContainerState state);
 	ContainerState getContainerState();
 
 	void setDiagnostics(string &diagnostics);

@@ -224,8 +224,8 @@ extern "C" {
 		list<LibYarnNodeInfo> preferredHostsList;
 		if (preferredHosts != NULL && preferredHostSize > 0) {
 			for (i = 0; i < preferredHostSize; i++) {
-				LibYarnNodeInfo *info = new LibYarnNodeInfo(preferredHosts[i].hostname,
-															preferredHosts[i].rackname,
+				LibYarnNodeInfo *info = new LibYarnNodeInfo(string(preferredHosts[i].hostname),
+															string(preferredHosts[i].rackname),
 															preferredHosts[i].num_containers);
 				preferredHostsList.push_back(*info);
 				totalPreferred += preferredHosts[i].num_containers;

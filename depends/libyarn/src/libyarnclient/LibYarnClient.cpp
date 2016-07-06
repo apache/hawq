@@ -160,7 +160,7 @@ int LibYarnClient::createJob(string &jobName, string &queue,string &jobId) {
         ApplicationClient *applicationClient = (ApplicationClient*)appClient;
 
         //1. getNewApplication
-        ApplicationID appId = applicationClient->getNewApplication();
+        ApplicationId appId = applicationClient->getNewApplication();
         LOG(INFO, "LibYarnClient::createJob, getNewApplication finished, appId:[clusterTimeStamp:%lld,id:%d]",
                 appId.getClusterTimestamp(), appId.getId());
 
@@ -425,13 +425,13 @@ void LibYarnClient::addResourceRequest(Resource capability,
 int LibYarnClient::addContainerRequests(string &jobId, Resource &capability, int32_t num_containers,
 									   list<LibYarnNodeInfo> &preferred, int32_t priority, bool relax_locality)
 {
-	if (jobId != clientJobId) {
-		throw std::invalid_argument("The jobId is wrong, check the jobId argument");
-	}
-
-	map<string, int32_t> inferredRacks;
-
 	try {
+		if (jobId != clientJobId) {
+			throw std::invalid_argument("The jobId is wrong, check the jobId argument");
+		}
+
+		map<string, int32_t> inferredRacks;
+
 		for (list<LibYarnNodeInfo>::iterator iter = preferred.begin();
 				iter != preferred.end(); iter++) {
 			LOG(INFO, "LibYarnClient::addContainerRequests, "
