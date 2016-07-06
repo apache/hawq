@@ -1103,10 +1103,10 @@ def get_args():
             logger.error("Create log directory %s failed on hosts %s" % (opts.log_dir, create_failed_host))
             logger.error("Please check directory permission")
 
-    hawq_action_name = opts.hawq_command.title()
     if opts.hawq_reload:
-        hawq_action_name = 'Reload'
-    logger.info("%s hawq with args: %s" % (hawq_action_name, ARGS))
+        logger.info("Reloading configuration without restarting hawq cluster")
+    else:
+        logger.info("%s hawq with args: %s" % (opts.hawq_command.title(), ARGS))
     return opts, hawq_dict
 
 
