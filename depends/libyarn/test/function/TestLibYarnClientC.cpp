@@ -18,9 +18,7 @@
  */
 
 #include "gtest/gtest.h"
-#include "libyarn/LibYarnClientC.h"
-
-extern "C" {
+#include "libyarnclient/LibYarnClientC.h"
 
 class TestLibYarnClientC: public ::testing::Test {
 public:
@@ -135,5 +133,4 @@ TEST_F(TestLibYarnClientC,TestLibYarn){
 
 	result = finishJob(client, jobId, APPLICATION_SUCCEEDED);
 	EXPECT_EQ(result, FUNCTION_SUCCEEDED);
-}
 }
