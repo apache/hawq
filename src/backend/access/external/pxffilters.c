@@ -78,6 +78,7 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{665 /* text_le */, PXFOP_LE},
 	{667 /* text_ge */, PXFOP_GE},
 	{531 /* textlt  */, PXFOP_NE},
+	{1209 /* textlike  */, PXFOP_LIKE},
 
 	/* int2 to int4 */
 	{Int24EqualOperator /* int24eq */, PXFOP_EQ},
@@ -125,7 +126,48 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{1871 /* int82gt */, PXFOP_GT},
 	{1872 /* int82le */, PXFOP_LE},
 	{1873 /* int82ge */, PXFOP_GE},
-	{1869 /* int82ne */, PXFOP_NE}
+	{1869 /* int82ne */, PXFOP_NE},
+
+	/**************FLOAT****************/
+	/* float4 */
+	{Float4EqualOperator  /* float4eq */, PXFOP_EQ},
+	{622  /* float4lt */, PXFOP_LT},
+	{623 /* float4gt */, PXFOP_GT},
+	{624 /* float4le */, PXFOP_LE},
+	{625 /* float4ge */, PXFOP_GE},
+	{621 /* float4ne */, PXFOP_NE},
+
+	/* float8 */
+	{Float8EqualOperator  /* float8eq */, PXFOP_EQ},
+	{672  /* float8lt */, PXFOP_LT},
+	{674 /* float8gt */, PXFOP_GT},
+	{673 /* float8le */, PXFOP_LE},
+	{675 /* float8ge */, PXFOP_GE},
+	{671 /* float8ne */, PXFOP_NE},
+
+	/* float48 */
+	{1120  /* float48eq */, PXFOP_EQ},
+	{1122  /* float48lt */, PXFOP_LT},
+	{1123 /* float48gt */, PXFOP_GT},
+	{1124 /* float48le */, PXFOP_LE},
+	{1125 /* float48ge */, PXFOP_GE},
+	{1121 /* float48ne */, PXFOP_NE},
+
+	/* float84 */
+	{1130  /* float84eq */, PXFOP_EQ},
+	{1132  /* float84lt */, PXFOP_LT},
+	{1133 /* float84gt */, PXFOP_GT},
+	{1134 /* float84le */, PXFOP_LE},
+	{1135 /* float84ge */, PXFOP_GE},
+	{1131 /* float84ne */, PXFOP_NE},
+
+	/**********DATE************/
+	{DateEqualOperator  /* eq */, PXFOP_EQ},
+	{1095  /* date_lt */, PXFOP_LT},
+	{1097 /* date_gt */, PXFOP_GT},
+	{1096 /* date_le */, PXFOP_LE},
+	{1098 /* date_ge */, PXFOP_GE},
+	{1094 /* date_ne */, PXFOP_NE}
 
 };
 
@@ -142,7 +184,8 @@ Oid pxf_supported_types[] =
 	BPCHAROID,
 	CHAROID,
 	BYTEAOID,
-	BOOLOID
+	BOOLOID,
+	DATEOID
 };
 
 /*
@@ -513,6 +556,7 @@ const_to_str(Const *constval, StringInfo buf)
 		case BPCHAROID:
 		case CHAROID:
 		case BYTEAOID:
+		case DATEOID:
 			appendStringInfo(buf, "\\\"%s\\\"", extval);
 			break;
 
