@@ -602,11 +602,12 @@ load_expected_statuses(char *filename)
 		strncpy(test, buf, sep_index);
 		test[sep_index+1] = '\0';
 
-		char status_str[strlen(buf)-sep_index];
+		int status_str_length = strlen(buf)-sep_index;
+		char status_str[status_str_length];
 		memset(status_str, 0, sizeof(status_str));
 
-		strncpy(status_str, buf + sep_index +1, strlen(buf));
-		status_str[sep_index+1] = '\0';
+		strncpy(status_str, buf + sep_index +1, status_str_length);
+		status_str[status_str_length] = '\0';
 
 		line_valid = (sscanf(status_str, "%d", (int *) (&status)) == 1);
 
