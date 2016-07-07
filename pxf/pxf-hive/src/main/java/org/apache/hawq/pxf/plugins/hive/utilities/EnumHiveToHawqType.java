@@ -89,7 +89,7 @@ public enum EnumHiveToHawqType {
     /**
      * Returns Hive to HAWQ type mapping entry for given Hive type 
      * 
-     * @param hiveType full Hive type with modifiers, for example - decimal(10, 0), char(5), binary, array<string>, map<string,float> etc
+     * @param hiveType full Hive type with modifiers, for example - decimal(10, 0), char(5), binary, array&lt;string&gt;, map&lt;string,float&gt; etc
      * @return corresponding Hive to HAWQ type mapping entry
      * @throws UnsupportedTypeException if there is no corresponding HAWQ type
      */

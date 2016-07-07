@@ -42,6 +42,7 @@ test__supported_filter_type(void **state)
 		CHAROID,
 		BYTEAOID,
 		BOOLOID,
+        DATEOID,
 		CIRCLEOID /* unsupported type */
 	};
 
@@ -61,7 +62,7 @@ test__supported_filter_type(void **state)
 
 	/* go over pxf_supported_types array */
 	int nargs = sizeof(pxf_supported_types) / sizeof(Oid);
-	assert_int_equal(nargs, 12);
+	assert_int_equal(nargs, 13);
 	for (i = 0; i < nargs; ++i)
 	{
 		assert_true(supported_filter_type(pxf_supported_types[i]));
