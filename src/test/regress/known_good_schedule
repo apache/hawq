@@ -138,7 +138,6 @@ ignore: gpdiffcheck
 ignore: custom_format
 ignore: resource_queue
 ignore: gptokencheck
-test: gpcopy
 ignore: sreh
 ignore: olap_setup
 ignore: olap_group
