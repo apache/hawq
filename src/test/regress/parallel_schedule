@@ -63,7 +63,6 @@ ignore: tablespace
 test: gpdiffcheck
 test: resource_queue
 test: gptokencheck
-test: gpcopy
 test: sreh
 test: olap_setup
 test: olap_group
