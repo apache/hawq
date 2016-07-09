@@ -13,16 +13,20 @@ override LIBS := $(LIBS) -lgtest -lpq -lxml2 -ltest
 override LDFLAGS += -L/usr/local/lib -L/usr/lib -L$(abs_top_srcdir)/src/test/feature/ -L$(abs_top_srcdir)/src/test/feature/lib/ -L$(abs_top_srcdir)/src/interfaces/libpq -L$(gtest_lib_path) -L$(gmock_lib_path)
 
 PROG = test_main.cpp $(wildcard */*.cpp)
+OBJS = $(patsubst %.cpp,%.o,$(PROG))
 RM = rm -rf
 
 .PHONY: all sharelib sharelibclean distclean clean doc
 
-all: sharelib
+all: $(OBJS) sharelib
 	$(MAKE) -C lib all
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(PROG) $(LDFLAGS) $(LIBS) -o feature-test
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(OBJS) $(LDFLAGS) $(LIBS) -o feature-test
+
+%.o: %.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $? -o $@
 
 sharelib:
-	cd UDF/lib || exit 1; $(MAKE) || exit 2; $(MAKE) clean || exit 3
+	cd UDF/lib || exit 1; $(MAKE) || exit 2
 
 sharelibclean:
 	cd UDF/lib || exit 1; $(RM) *.o *.so || exit 2
@@ -35,4 +39,4 @@ clean distclean: sharelibclean
 	$(RM) feature-test.dSYM
 	$(RM) doc
 	$(MAKE) -C lib clean
-	
+	$(RM) $(OBJS)
