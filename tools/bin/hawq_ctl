@@ -638,7 +638,7 @@ class HawqStart:
         cmd = self._start_standby_cmd()
         check_return_code(remote_ssh(cmd, self.standby_host_name, self.user))
         cmd = "%s; %s/sbin/hawqstandbywatch.py %s debug" % (source_hawq_env, self.GPHOME, self.master_data_directory)
-        result = remote_ssh(cmd, self.standby_host_name, self.user)
+        result = remote_ssh_nowait(cmd, self.standby_host_name, self.user)
         return result
 
     def _check_standby_sync(self):
