@@ -27,9 +27,11 @@ all: $(OBJS) sharelib
 
 sharelib:
 	cd UDF/lib || exit 1; $(MAKE) || exit 2
+	cd ExternalSource/lib || exit 1; $(MAKE) || exit 2
 
 sharelibclean:
 	cd UDF/lib || exit 1; $(RM) *.o *.so || exit 2
+	cd ExternalSource/lib || exit 1; $(MAKE) || exit 2
 
 doc:
 	doxygen doxygen_template
