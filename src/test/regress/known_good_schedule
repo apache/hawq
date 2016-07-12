@@ -202,5 +202,4 @@ ignore: co_disabled
 test: caqlinmem
 test: hcatalog_lookup
 test: json_load
-test: external_oid
 test: validator_function
