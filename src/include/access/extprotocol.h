@@ -33,6 +33,8 @@
 
 /* ------------------------- I/O function API -----------------------------*/
 
+struct ExternalSelectDescData;
+typedef struct ExternalSelectDescData *ExternalSelectDesc;
 /*
  * ExtProtocolData is the node type that is passed as fmgr "context" info
  * when a function is called by the External Table protocol manager.
@@ -47,6 +49,7 @@ typedef struct ExtProtocolData
 	void		   *prot_user_ctx;
 	bool			prot_last_call;
 	List		   *prot_scanquals;
+	ExternalSelectDesc desc;
 
 } ExtProtocolData;
 
@@ -61,12 +64,12 @@ typedef ExtProtocolData *ExtProtocol;
 #define EXTPROTOCOL_GET_DATALEN(fcinfo)    (((ExtProtocolData*) fcinfo->context)->prot_maxbytes)
 #define EXTPROTOCOL_GET_SCANQUALS(fcinfo)    (((ExtProtocolData*) fcinfo->context)->prot_scanquals)
 #define EXTPROTOCOL_GET_USER_CTX(fcinfo)   (((ExtProtocolData*) fcinfo->context)->prot_user_ctx)
+#define EXTPROTOCOL_GET_PROJINFO(fcinfo) (((ExtProtocolData*) fcinfo->context)->desc->projInfo)
 #define EXTPROTOCOL_IS_LAST_CALL(fcinfo)   (((ExtProtocolData*) fcinfo->context)->prot_last_call)
 
 #define EXTPROTOCOL_SET_LAST_CALL(fcinfo)  (((ExtProtocolData*) fcinfo->context)->prot_last_call = true)
 #define EXTPROTOCOL_SET_USER_CTX(fcinfo, p) \
 	(((ExtProtocolData*) fcinfo->context)->prot_user_ctx = p)
-
 
 /* ------------------------- Validator function API -----------------------------*/
 
