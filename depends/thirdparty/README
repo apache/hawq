@@ -1,3 +1,6 @@
+thrift(with version 0.9.3):
+	https://github.com/apache/thrift/archive/0.9.3.tar.gz
+
 Please do not create following directories yourselves:
 	gporca, gp-xerces, gpos, postgres
 since they are auto-created and used when building some related features, i.e.

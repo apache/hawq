@@ -37,8 +37,26 @@
               <!-- stream benchmark under BSD-like license with a few exceptions around benchmarking results -->
               <exclude>tools/bin/src/stream/*</exclude> 
 
-              <!-- PyGreSQL an open-source Python module that interfaces to a PostgreSQL database under the Python license -->
+              <!-- PyGreSQL an open-source Python module that interfaces to a PostgreSQL database under the Python Software Foundation License -->
               <exclude>tools/bin/pythonSrc/PyGreSQL-4.0/**</exclude>
+
+              <!-- Open-source Pyton module with "public domain" license -->
+              <exclude>tools/bin/pythonSrc/pycrypto-2.0.1/**</exclude>
+
+              <!-- Open-source Python modules with MIT license -->
+              <exclude>tools/bin/pythonSrc/PSI-0.3b2_gp/**</exclude>
+              <exclude>tools/bin/pythonSrc/lockfile-0.9.1/**</exclude>
+              <exclude>tools/bin/ext/simplejson/**</exclude>
+              <exclude>tools/bin/ext/yaml/**</exclude>
+
+              <!-- Open-source Python modules with BSD license -->
+              <exclude>tools/bin/pythonSrc/pychecker-0.8.18/**</exclude>
+              <exclude>tools/bin/pythonSrc/unittest2-0.5.1/**</exclude>
+              <exclude>tools/bin/ext/figleaf/**</exclude>
+              <exclude>tools/bin/ext/pg8000/**</exclude>
+
+              <!-- Open-source packages with Apache license -->
+              <exclude>depends/thirdparty/thrift/**</exclude>
 
               <!-- BSD license -->
               <exclude>depends/libyarn/CMake/FindBoost.cmake</exclude>
@@ -56,13 +74,8 @@
               <exclude>src/bin/gpfdist/src/gpfdist/include/glob.h</exclude>
               <exclude>src/include/port/win32_msvc/glob.h</exclude>
               <exclude>src/include/port/win32_msvc/bzlib.h</exclude>
+              <exclude>depends/thirdparty/googletest/**</exclude>
               
-              <!-- Google BSD license -->
-              <exclude>depends/libyarn/gmock/**</exclude>
-              <exclude>depends/libyarn/gtest/**</exclude>
-			  <exclude>depends/libhdfs3/gmock/**</exclude>
-			  <exclude>depends/libhdfs3/gtest/**</exclude>
-
               <!-- Oraface Project BSD license https://github.com/orafce -->
               <exclude>contrib/orafce/*</exclude>
 
@@ -107,6 +120,10 @@
               <exclude>src/timezone/**/*</exclude>
               <exclude>doc/src/sgml/fixrtf</exclude>
               <exclude>doc/**/*.sgml</exclude>
+
+              <!-- Files which are not easy to have license headers. -->
+              <exclude>depends/libhdfs3/test/data/*</exclude>
+              <exclude>depends/libhdfs3/debian/**</exclude>
 
               <!-- Following files are licensed to ASF via the initial HAWQ SGA,
                    however it is tricky to maintain headers in them -->
@@ -155,8 +172,11 @@
               <exclude>**/*.cnf</exclude>
               <exclude>**/*.stx</exclude>
               <exclude>**/*.gdb</exclude>
+              <exclude>**/*.patch</exclude>
+              <exclude>**/*.commit</exclude>
               <exclude>**/__init__.py</exclude>
               <exclude>**/*README*</exclude>
+              <exclude>**/.travis.yml</exclude>
               <exclude>pxf/**/*.classpath</exclude>	 
             </excludes>
             <licenses>
