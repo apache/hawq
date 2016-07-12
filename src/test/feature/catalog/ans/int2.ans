@@ -4,29 +4,35 @@
 -- Some of these answers are consequently numerically incorrect.
 --
 CREATE TABLE INT2_TBL(f1 int2);
+CREATE TABLE
 INSERT INTO INT2_TBL(f1) VALUES ('0   ');
+INSERT 0 1
 INSERT INTO INT2_TBL(f1) VALUES ('  1234 ');
+INSERT 0 1
 INSERT INTO INT2_TBL(f1) VALUES ('    -1234');
+INSERT 0 1
 INSERT INTO INT2_TBL(f1) VALUES ('34.5');
-ERROR:  invalid input syntax for integer: "34.5"
+psql:/tmp/TestType_int2.sql:18: ERROR:  invalid input syntax for integer: "34.5"
 -- largest and smallest values
 INSERT INTO INT2_TBL(f1) VALUES ('32767');
+INSERT 0 1
 INSERT INTO INT2_TBL(f1) VALUES ('-32767');
+INSERT 0 1
 -- bad input values -- should give errors
 INSERT INTO INT2_TBL(f1) VALUES ('100000');
-ERROR:  value "100000" is out of range for type smallint
+psql:/tmp/TestType_int2.sql:26: ERROR:  value "100000" is out of range for type smallint
 INSERT INTO INT2_TBL(f1) VALUES ('asdf');
-ERROR:  invalid input syntax for integer: "asdf"
+psql:/tmp/TestType_int2.sql:27: ERROR:  invalid input syntax for integer: "asdf"
 INSERT INTO INT2_TBL(f1) VALUES ('    ');
-ERROR:  invalid input syntax for integer: "    "
+psql:/tmp/TestType_int2.sql:28: ERROR:  invalid input syntax for integer: "    "
 INSERT INTO INT2_TBL(f1) VALUES ('- 1234');
-ERROR:  invalid input syntax for integer: "- 1234"
+psql:/tmp/TestType_int2.sql:29: ERROR:  invalid input syntax for integer: "- 1234"
 INSERT INTO INT2_TBL(f1) VALUES ('4 444');
-ERROR:  invalid input syntax for integer: "4 444"
+psql:/tmp/TestType_int2.sql:30: ERROR:  invalid input syntax for integer: "4 444"
 INSERT INTO INT2_TBL(f1) VALUES ('123 dt');
-ERROR:  invalid input syntax for integer: "123 dt"
+psql:/tmp/TestType_int2.sql:31: ERROR:  invalid input syntax for integer: "123 dt"
 INSERT INTO INT2_TBL(f1) VALUES ('');
-ERROR:  invalid input syntax for integer: ""
+psql:/tmp/TestType_int2.sql:32: ERROR:  invalid input syntax for integer: ""
 SELECT '' AS five, * FROM INT2_TBL order by f1;
  five |   f1   
 ------+--------
@@ -144,7 +150,7 @@ SELECT '' AS three, i.* FROM INT2_TBL i WHERE (i.f1 % int4 '2') = int2 '0' order
 (3 rows)
 
 SELECT '' AS five, i.f1, i.f1 * int2 '2' AS x FROM INT2_TBL i order by f1;
-ERROR:  smallint out of range
+psql:/tmp/TestType_int2.sql:67: ERROR:  smallint out of range
 SELECT '' AS five, i.f1, i.f1 * int2 '2' AS x FROM INT2_TBL i
 WHERE abs(f1) < 16384 order by f1;
  five |  f1   |   x   
@@ -165,7 +171,7 @@ SELECT '' AS five, i.f1, i.f1 * int4 '2' AS x FROM INT2_TBL i order by f1;
 (5 rows)
 
 SELECT '' AS five, i.f1, i.f1 + int2 '2' AS x FROM INT2_TBL i order by f1;
-ERROR:  smallint out of range
+psql:/tmp/TestType_int2.sql:74: ERROR:  smallint out of range
 SELECT '' AS five, i.f1, i.f1 + int2 '2' AS x FROM INT2_TBL i
 WHERE f1 < 32766 order by f1;
  five |   f1   |   x    
@@ -187,7 +193,7 @@ SELECT '' AS five, i.f1, i.f1 + int4 '2' AS x FROM INT2_TBL i order by f1;
 (5 rows)
 
 SELECT '' AS five, i.f1, i.f1 - int2 '2' AS x FROM INT2_TBL i order by f1;
-ERROR:  smallint out of range
+psql:/tmp/TestType_int2.sql:81: ERROR:  smallint out of range
 SELECT '' AS five, i.f1, i.f1 - int2 '2' AS x FROM INT2_TBL i
 WHERE f1 > -32767 order by f1;
  five |  f1   |   x   

@@ -2,47 +2,51 @@
 -- FLOAT8
 --
 CREATE TABLE FLOAT8_TBL(i INT DEFAULT 1, f1 float8);
-NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'i' as the Greenplum Database data distribution key for this table.
-HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+CREATE TABLE
 INSERT INTO FLOAT8_TBL(f1) VALUES ('    0.0   ');
+INSERT 0 1
 INSERT INTO FLOAT8_TBL(f1) VALUES ('1004.30  ');
+INSERT 0 1
 INSERT INTO FLOAT8_TBL(f1) VALUES ('   -34.84');
+INSERT 0 1
 INSERT INTO FLOAT8_TBL(f1) VALUES ('1.2345678901234e+200');
+INSERT 0 1
 INSERT INTO FLOAT8_TBL(f1) VALUES ('1.2345678901234e-200');
+INSERT 0 1
 -- test for underflow and overflow handling
 SELECT '10e400'::float8;
-ERROR:  "10e400" is out of range for type double precision
+psql:/tmp/TestType_float8.sql:17: ERROR:  "10e400" is out of range for type double precision
 LINE 1: SELECT '10e400'::float8;
                ^
 SELECT '-10e400'::float8;
-ERROR:  "-10e400" is out of range for type double precision
+psql:/tmp/TestType_float8.sql:18: ERROR:  "-10e400" is out of range for type double precision
 LINE 1: SELECT '-10e400'::float8;
                ^
 SELECT '10e-400'::float8;
-ERROR:  "10e-400" is out of range for type double precision
+psql:/tmp/TestType_float8.sql:19: ERROR:  "10e-400" is out of range for type double precision
 LINE 1: SELECT '10e-400'::float8;
                ^
 SELECT '-10e-400'::float8;
-ERROR:  "-10e-400" is out of range for type double precision
+psql:/tmp/TestType_float8.sql:20: ERROR:  "-10e-400" is out of range for type double precision
 LINE 1: SELECT '-10e-400'::float8;
                ^
 -- bad input
 INSERT INTO FLOAT8_TBL(f1) VALUES ('');
-ERROR:  invalid input syntax for type double precision: ""
+psql:/tmp/TestType_float8.sql:23: ERROR:  invalid input syntax for type double precision: ""
 INSERT INTO FLOAT8_TBL(f1) VALUES ('     ');
-ERROR:  invalid input syntax for type double precision: "     "
+psql:/tmp/TestType_float8.sql:24: ERROR:  invalid input syntax for type double precision: "     "
 INSERT INTO FLOAT8_TBL(f1) VALUES ('xyz');
-ERROR:  invalid input syntax for type double precision: "xyz"
+psql:/tmp/TestType_float8.sql:25: ERROR:  invalid input syntax for type double precision: "xyz"
 INSERT INTO FLOAT8_TBL(f1) VALUES ('5.0.0');
-ERROR:  invalid input syntax for type double precision: "5.0.0"
+psql:/tmp/TestType_float8.sql:26: ERROR:  invalid input syntax for type double precision: "5.0.0"
 INSERT INTO FLOAT8_TBL(f1) VALUES ('5 . 0');
-ERROR:  invalid input syntax for type double precision: "5 . 0"
+psql:/tmp/TestType_float8.sql:27: ERROR:  invalid input syntax for type double precision: "5 . 0"
 INSERT INTO FLOAT8_TBL(f1) VALUES ('5.   0');
-ERROR:  invalid input syntax for type double precision: "5.   0"
+psql:/tmp/TestType_float8.sql:28: ERROR:  invalid input syntax for type double precision: "5.   0"
 INSERT INTO FLOAT8_TBL(f1) VALUES ('    - 3');
-ERROR:  invalid input syntax for type double precision: "    - 3"
+psql:/tmp/TestType_float8.sql:29: ERROR:  invalid input syntax for type double precision: "    - 3"
 INSERT INTO FLOAT8_TBL(f1) VALUES ('123           5');
-ERROR:  invalid input syntax for type double precision: "123           5"
+psql:/tmp/TestType_float8.sql:30: ERROR:  invalid input syntax for type double precision: "123           5"
 -- special inputs
 SELECT 'NaN'::float8;
  float8 
@@ -76,15 +80,15 @@ SELECT '          -INFINiTY   '::float8;
 
 -- bad special inputs
 SELECT 'N A N'::float8;
-ERROR:  invalid input syntax for type double precision: "N A N"
+psql:/tmp/TestType_float8.sql:39: ERROR:  invalid input syntax for type double precision: "N A N"
 LINE 1: SELECT 'N A N'::float8;
                ^
 SELECT 'NaN x'::float8;
-ERROR:  invalid input syntax for type double precision: "NaN x"
+psql:/tmp/TestType_float8.sql:40: ERROR:  invalid input syntax for type double precision: "NaN x"
 LINE 1: SELECT 'NaN x'::float8;
                ^
 SELECT ' INFINITY    x'::float8;
-ERROR:  invalid input syntax for type double precision: " INFINITY    x"
+psql:/tmp/TestType_float8.sql:41: ERROR:  invalid input syntax for type double precision: " INFINITY    x"
 LINE 1: SELECT ' INFINITY    x'::float8;
                ^
 SELECT 'Infinity'::float8 + 100.0;
@@ -361,52 +365,64 @@ SELECT '' AS five, f1 FROM FLOAT8_TBL ORDER BY 2;
 UPDATE FLOAT8_TBL
    SET f1 = FLOAT8_TBL.f1 * '-1'
    WHERE FLOAT8_TBL.f1 > '0.0';
+psql:/tmp/TestType_float8.sql:129: ERROR:  Update append-only table statement not supported yet
 SELECT '' AS bad, f.f1 * '1e200' from FLOAT8_TBL f;
-ERROR:  value out of range: overflow  (seg0 slice1 localhost:50001 pid=1946)
+psql:/tmp/TestType_float8.sql:131: ERROR:  value out of range: overflow
 SELECT '' AS bad, f.f1 ^ '1e200' from FLOAT8_TBL f;
-ERROR:  value out of range: overflow  (seg0 slice1 localhost:50001 pid=1946)
+psql:/tmp/TestType_float8.sql:133: ERROR:  value out of range: overflow
 SELECT '' AS bad, ln(f.f1) from FLOAT8_TBL f where f.f1 = '0.0' ;
-ERROR:  cannot take logarithm of zero  (seg0 slice1 localhost:50001 pid=1946)
+psql:/tmp/TestType_float8.sql:135: ERROR:  cannot take logarithm of zero
 SELECT '' AS bad, ln(f.f1) from FLOAT8_TBL f where f.f1 < '0.0' ;
-ERROR:  cannot take logarithm of a negative number  (seg0 slice1 localhost:50001 pid=1946)
+psql:/tmp/TestType_float8.sql:137: ERROR:  cannot take logarithm of a negative number
 SELECT '' AS bad, exp(f.f1) from FLOAT8_TBL f;
-ERROR:  value out of range: underflow  (seg0 slice1 localhost:50001 pid=1946)
+psql:/tmp/TestType_float8.sql:139: ERROR:  value out of range: overflow
 SELECT '' AS bad, f.f1 / '0.0' from FLOAT8_TBL f;
-ERROR:  division by zero  (seg0 slice1 localhost:50001 pid=1946)
+psql:/tmp/TestType_float8.sql:141: ERROR:  division by zero
 SELECT '' AS five, f1 FROM FLOAT8_TBL ORDER BY 2;
- five |          f1           
-------+-----------------------
-      | -1.2345678901234e+200
-      |               -1004.3
-      |                -34.84
-      | -1.2345678901234e-200
-      |                     0
+ five |          f1          
+------+----------------------
+      |               -34.84
+      |                    0
+      | 1.2345678901234e-200
+      |               1004.3
+      | 1.2345678901234e+200
 (5 rows)
 
 -- test for over- and underflow 
 INSERT INTO FLOAT8_TBL(f1) VALUES ('10e400');
-ERROR:  "10e400" is out of range for type double precision
+psql:/tmp/TestType_float8.sql:146: ERROR:  "10e400" is out of range for type double precision
 INSERT INTO FLOAT8_TBL(f1) VALUES ('-10e400');
-ERROR:  "-10e400" is out of range for type double precision
+psql:/tmp/TestType_float8.sql:148: ERROR:  "-10e400" is out of range for type double precision
 INSERT INTO FLOAT8_TBL(f1) VALUES ('10e-400');
-ERROR:  "10e-400" is out of range for type double precision
+psql:/tmp/TestType_float8.sql:150: ERROR:  "10e-400" is out of range for type double precision
 INSERT INTO FLOAT8_TBL(f1) VALUES ('-10e-400');
-ERROR:  "-10e-400" is out of range for type double precision
+psql:/tmp/TestType_float8.sql:152: ERROR:  "-10e-400" is out of range for type double precision
 -- maintain external table consistency across platforms
 -- delete all values and reinsert well-behaved ones
 DELETE FROM FLOAT8_TBL;
+psql:/tmp/TestType_float8.sql:157: ERROR:  Delete append-only table statement not supported yet
 INSERT INTO FLOAT8_TBL(f1) VALUES ('0.0');
+INSERT 0 1
 INSERT INTO FLOAT8_TBL(f1) VALUES ('-34.84');
+INSERT 0 1
 INSERT INTO FLOAT8_TBL(f1) VALUES ('-1004.30');
+INSERT 0 1
 INSERT INTO FLOAT8_TBL(f1) VALUES ('-1.2345678901234e+200');
+INSERT 0 1
 INSERT INTO FLOAT8_TBL(f1) VALUES ('-1.2345678901234e-200');
+INSERT 0 1
 SELECT '' AS five, f1 FROM FLOAT8_TBL ORDER BY 2;
  five |          f1           
 ------+-----------------------
       | -1.2345678901234e+200
       |               -1004.3
       |                -34.84
+      |                -34.84
       | -1.2345678901234e-200
       |                     0
-(5 rows)
+      |                     0
+      |  1.2345678901234e-200
+      |                1004.3
+      |  1.2345678901234e+200
+(10 rows)
 

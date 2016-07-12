@@ -2,10 +2,15 @@
 -- MONEY
 --
 CREATE TABLE MONEY_TBL (f1  money);
+CREATE TABLE
 INSERT INTO MONEY_TBL(f1) VALUES ('    0.0');
+INSERT 0 1
 INSERT INTO MONEY_TBL(f1) VALUES ('1004.30   ');
+INSERT 0 1
 INSERT INTO MONEY_TBL(f1) VALUES ('     -34.84    ');
+INSERT 0 1
 INSERT INTO MONEY_TBL(f1) VALUES ('123456789012345.67');
+INSERT 0 1
 -- test money over and under flow
 SELECT '12345678901234567890.12'::money = '-13639628150831692.60'::money as x;
  x 
@@ -21,15 +26,15 @@ SELECT '123.001'::money = '123'::money as x;
 
 -- bad input
 INSERT INTO MONEY_TBL(f1) VALUES ('xyz');
-ERROR:  invalid input syntax for type money: "xyz"
+psql:/tmp/TestType_money.sql:20: ERROR:  invalid input syntax for type money: "xyz"
 INSERT INTO MONEY_TBL(f1) VALUES ('5.0.0');
-ERROR:  invalid input syntax for type money: "5.0.0"
+psql:/tmp/TestType_money.sql:21: ERROR:  invalid input syntax for type money: "5.0.0"
 INSERT INTO MONEY_TBL(f1) VALUES ('5 . 0');
-ERROR:  invalid input syntax for type money: "5 . 0"
+psql:/tmp/TestType_money.sql:22: ERROR:  invalid input syntax for type money: "5 . 0"
 INSERT INTO MONEY_TBL(f1) VALUES ('5.   0');
-ERROR:  invalid input syntax for type money: "5.   0"
+psql:/tmp/TestType_money.sql:23: ERROR:  invalid input syntax for type money: "5.   0"
 INSERT INTO MONEY_TBL(f1) VALUES ('123            5');
-ERROR:  invalid input syntax for type money: "123            5"
+psql:/tmp/TestType_money.sql:24: ERROR:  invalid input syntax for type money: "123            5"
 -- queries
 SELECT '' AS five, * FROM MONEY_TBL ORDER BY 2;
  five |           f1            
@@ -124,7 +129,7 @@ SELECT SUM(f.f1) AS x FROM MONEY_TBL f;
 
 -- test divide by zero
 SELECT '' AS bad, f.f1 / '0.0' from MONEY_TBL f;
-ERROR:  division by zero  (seg0 localhost:40000 pid=281608)
+psql:/tmp/TestType_money.sql:56: ERROR:  division by zero
 SELECT '' AS five, * FROM MONEY_TBL ORDER BY 2;
  five |           f1            
 ------+-------------------------
@@ -136,10 +141,15 @@ SELECT '' AS five, * FROM MONEY_TBL ORDER BY 2;
 
 -- parquet table
 CREATE TABLE MONEY_TBL_P (f1 money) with (appendonly=true, orientation=parquet);
+CREATE TABLE
 INSERT INTO MONEY_TBL_P(f1) VALUES ('    0.0');
+INSERT 0 1
 INSERT INTO MONEY_TBL_P(f1) VALUES ('1004.30   ');
+INSERT 0 1
 INSERT INTO MONEY_TBL_P(f1) VALUES ('     -34.84    ');
+INSERT 0 1
 INSERT INTO MONEY_TBL_P(f1) VALUES ('123456789012345.67');
+INSERT 0 1
 SELECT f1 FROM MONEY_TBL_P f
    ORDER BY f1;
            f1            
