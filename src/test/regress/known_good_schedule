@@ -68,6 +68,7 @@ ignore: triggers
 ignore: create_misc
 test: create_aggregate
 test: aggregate_with_groupingsets
+test: aggregates_null
 test: nested_case_null
 ignore: create_operator
 ignore: create_index
