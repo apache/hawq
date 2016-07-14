@@ -128,7 +128,6 @@ ignore: without_oid
 ignore: conversion
 ignore: truncate
 ignore: alter_table
-test: polymorphism
 test: rowtypes
 ignore: returning
 ignore: stats
