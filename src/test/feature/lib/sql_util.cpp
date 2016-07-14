@@ -39,6 +39,16 @@ SQLUtility::SQLUtility()
       string(test_info->test_case_name()) + "_" + test_info->name();
   exec("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
   exec("CREATE SCHEMA " + schemaName);
+
+  preCmd = "SET SEARCH_PATH=" + schemaName + "; " +
+      "SET lc_messages='C'; "
+      "SET lc_monetary='C'; "
+      "SET lc_numeric='C'; "
+      "SET lc_time='C'; "
+      "SET lc_messages='C'; "
+      "SET timezone_abbreviations='Default'; "
+      "SET timezone='PST8PDT'; "
+      "SET datestyle='Postgres, MDY';";
 }
 
 SQLUtility::~SQLUtility() {
@@ -52,7 +62,7 @@ void SQLUtility::exec(const string &sql) {
 }
 
 string SQLUtility::execute(const string &sql, bool check) {
-  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
+  conn->runSQLCommand(preCmd + sql);
   EXPECT_NE(conn.get(), nullptr);
   if (check) {
     EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
@@ -69,7 +79,7 @@ void SQLUtility::executeExpectErrorMsgStartWith(const std::string &sql,
 }
 
 void SQLUtility::executeIgnore(const string &sql) {
-  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
+  conn->runSQLCommand(preCmd + sql);
   EXPECT_NE(conn.get(), nullptr);
 }
 
@@ -157,7 +167,7 @@ const string SQLUtility::generateSQLFile(const string &sqlFile) {
     EXPECT_TRUE(false) << "Error opening file " << newSqlFile;
   }
   out << "-- start_ignore" << std::endl
-      << "SET SEARCH_PATH=" + schemaName + ";" << std::endl
+      << preCmd << std::endl
       << "-- end_ignore" << std::endl;
   string line;
   while (getline(in, line)) {
@@ -170,7 +180,7 @@ const string SQLUtility::generateSQLFile(const string &sqlFile) {
 
 const hawq::test::PSQLQueryResult &SQLUtility::executeQuery(const string &sql) {
   const hawq::test::PSQLQueryResult &result =
-      conn->getQueryResult("SET SEARCH_PATH=" + schemaName + ";" + sql);
+      conn->getQueryResult(preCmd + sql);
   return result;
 }
 

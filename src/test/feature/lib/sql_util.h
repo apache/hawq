@@ -76,7 +76,6 @@ class SQLUtility {
   // @return void
   void executeExpectErrorMsgStartWith(const std::string &sql, const std::string &errmsg);
 
-
  private:
   std::unique_ptr<hawq::test::PSQL> getConnection();
   const std::string generateSQLFile(const std::string &sqlFile);
@@ -85,6 +84,7 @@ class SQLUtility {
   void exec(const std::string &sql);
 
  private:
+  std::string preCmd;
   std::string schemaName;
   std::unique_ptr<hawq::test::PSQL> conn;
   std::string testRootPath;
