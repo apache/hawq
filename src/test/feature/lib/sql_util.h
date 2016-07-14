@@ -70,6 +70,13 @@ class SQLUtility {
   // Get GUC value
   std::string getGUCValue(const std::string &guc);
 
+  // execute expect error message
+  // @param sql the given sql command
+  // @param errmsg the expected sql error message
+  // @return void
+  void executeExpectErrorMsgStartWith(const std::string &sql, const std::string &errmsg);
+
+
  private:
   std::unique_ptr<hawq::test::PSQL> getConnection();
   const std::string generateSQLFile(const std::string &sqlFile);

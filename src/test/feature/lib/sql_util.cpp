@@ -62,6 +62,12 @@ string SQLUtility::execute(const string &sql, bool check) {
   return conn.get()->getLastResult();
 }
 
+void SQLUtility::executeExpectErrorMsgStartWith(const std::string &sql,
+                                                const std::string &errmsg) {
+  std::string errout = execute(sql, false);
+  EXPECT_STREQ(errmsg.c_str(), errout.substr(0, errmsg.size()).c_str());
+}
+
 void SQLUtility::executeIgnore(const string &sql) {
   conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
   EXPECT_NE(conn.get(), nullptr);
