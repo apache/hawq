@@ -3,9 +3,6 @@ language: c
 os:
   - osx
 
-env:
-  - PYCHECKER_VERSION=0.8.19 FIGLEAF_VERSION=0.6.1
-
 compiler:
   - clang
 
@@ -30,13 +27,7 @@ install:
   - brew outdated maven || brew upgrade maven
   - brew tap brona/iproute2mac
   - brew install iproute2mac
-  - sudo pip install pygresql
-  - sudo pip install unittest2 pycrypto lockfile paramiko psi
-  - sudo pip install
-    "http://sourceforge.net/projects/pychecker/files/pychecker/${PYCHECKER_VERSION}/pychecker-${PYCHECKER_VERSION}.tar.gz/download"
-  - sudo pip install
-    "http://darcs.idyll.org/~t/projects/figleaf-${FIGLEAF_VERSION}.tar.gz"
-  - brew uninstall postgresql
+  - sudo pip install pycrypto paramiko
 
 before_script:
   - cd $TRAVIS_BUILD_DIR
