@@ -21,7 +21,7 @@ libdir=${prefix}/lib
 includedir=${prefix}/include
 
 Name: libhdfs
-Description: Pivotal native C/C++ HDFS client
+Description: Native C/C++ HDFS client
 Version: @libhdfs3_VERSION_STRING@
 Libs: -L${libdir} -lhdfs3
 Cflags: -I${includedir}
