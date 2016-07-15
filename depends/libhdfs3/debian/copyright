@@ -1,9 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: libhdfs3
-Source: https://github.com/PivotalRD/libhdfs3
 
 Files: *
-Copyright: 2015 Pivotal
 License: Apache-2.0
 
 License: Apache-2.0

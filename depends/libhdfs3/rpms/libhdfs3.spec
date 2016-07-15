@@ -44,8 +44,6 @@ HDFS data transfer protocol.
 It gets rid of the drawbacks of JNI, and it has a lightweight,
 small memory footprint code base. In addition, it is easy to use and deploy.
 .
-Libhdfs3 is developed by Pivotal and used in HAWQ, which is a massive parallel
-database engine in Pivotal Hadoop Distribution.
 
 %package devel
 Summary: Native C/C++ HDFS Client - development files
