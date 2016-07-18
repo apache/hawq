@@ -834,8 +834,8 @@ SELECT date '1999 08 01';
  1999-08-01
 (1 row)
 
-RESET datestyle;
-RESET
+SET datestyle TO 'Postgres,MDY';
+SET
 --
 -- Simple math
 -- Leave most of it for the horology tests

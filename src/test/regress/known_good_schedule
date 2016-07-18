@@ -1,6 +1,5 @@
 # $PostgreSQL: pgsql/src/test/regress/serial_schedule,v 1.33 2006/08/30 23:34:22 tgl Exp $
 # This should probably be in an order similar to parallel_schedule.
-test: type_sanity
 test: errortbl
 test: goh_create_type_composite
 ignore: goh_create_table
@@ -19,18 +18,6 @@ test: goh_gp_dist_random
 ignore: gpsql_fault_tolerance
 test: goh_portals
 ignore: goh_set_schema
-test: boolean
-test: char
-test: name
-test: varchar
-test: text
-test: int2
-test: int4
-test: int8
-test: oid
-test: float4
-ignore: float8
-test: money
 ignore: bit
 ignore: numeric
 ignore: strings
@@ -41,8 +28,6 @@ ignore: box
 ignore: path
 ignore: polygon
 ignore: circle
-test: date
-test: time
 ignore: timetz
 ignore: timestamp
 ignore: timestamptz

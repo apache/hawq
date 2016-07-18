@@ -186,7 +186,7 @@ SELECT date '01 08 1999';
 SELECT date '99 08 01';
 SELECT date '1999 08 01';
 
-RESET datestyle;
+SET datestyle TO 'Postgres,MDY';
 
 --
 -- Simple math
