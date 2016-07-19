@@ -312,6 +312,14 @@ CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
 	context->upload = true;
 	clear_error_buffer(context);
 
+	/* needed to resolve pxf service address */
+	struct curl_slist *resolve_hosts = NULL;
+	char *pxf_host_entry = (char *) palloc0(strlen(pxf_service_address) + strlen(LocalhostIpV4Entry) + 1);
+	strcat(pxf_host_entry, pxf_service_address);
+	strcat(pxf_host_entry, LocalhostIpV4Entry);
+	resolve_hosts = curl_slist_append(NULL, pxf_host_entry);
+	set_curl_option(context, CURLOPT_RESOLVE, resolve_hosts);
+
 	set_curl_option(context, CURLOPT_URL, url);
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
 	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
@@ -340,6 +348,14 @@ CHURL_HANDLE churl_init_download(const char* url, CHURL_HEADERS headers)
 	create_curl_handle(context);
 	context->upload = false;
 	clear_error_buffer(context);
+
+	/* needed to resolve pxf service address */
+	struct curl_slist *resolve_hosts = NULL;
+	char *pxf_host_entry = (char *) palloc0(strlen(pxf_service_address) + strlen(LocalhostIpV4Entry) + 1);
+	strcat(pxf_host_entry, pxf_service_address);
+	strcat(pxf_host_entry, LocalhostIpV4Entry);
+	resolve_hosts = curl_slist_append(NULL, pxf_host_entry);
+	set_curl_option(context, CURLOPT_RESOLVE, resolve_hosts);
 
 	set_curl_option(context, CURLOPT_URL, url);
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
