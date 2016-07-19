@@ -11,10 +11,10 @@ Table of Contents
 Introduction
 ============
 
-PXF is an extensible framework that allows HAWQ to query external system data.
+PXF is an extensible framework that allows HAWQ to query external data files, whose metadata is not managed by HAWQ.
 PXF includes built-in connectors for accessing data that exists inside HDFS files, Hive tables, HBase tables and more.
-Users can also create their own connectors to other parallel data stores or processing engines.
-To create these connectors using JAVA plugins, see the Pivotal Extension Framework API and Reference Guide .
+Users can also create their own connectors to other data storages or processing engines.
+To create these connectors using JAVA plugins, see the PXF API and Reference Guide online.
 
 Package Contents
 ================
@@ -26,8 +26,8 @@ PXF is distributed as a set of RPMs -
             ├── pxf-service-$version.noarch.rpm
             ├── pxf-hdfs-$version.noarch.rpm
             ├── pxf-hive-$version.noarch.rpm
-            └── pxf-hbase-$version.noarch.rpm
-
+            ├── pxf-hbase-$version.noarch.rpm
+            └── pxf-json-$version.noarch.rpm
 
 Building
 ========
