@@ -15105,6 +15105,11 @@ cat >>confdefs.h <<_ACEOF
 _ACEOF
 
 
+# Define the length of char bytes needed to represent int32
+
+$as_echo "#define INT32_CHAR_SIZE 12" >>confdefs.h
+
+
 # Now we have checked all the reasons to replace snprintf
 if test $pgac_need_repl_snprintf = yes; then
 

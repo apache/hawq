@@ -1898,6 +1898,10 @@ AC_DEFINE_UNQUOTED(INT64_FORMAT, $INT64_FORMAT,
 AC_DEFINE_UNQUOTED(UINT64_FORMAT, $UINT64_FORMAT,
                    [Define to the appropriate snprintf format for unsigned 64-bit ints, if any.])
 
+# Define the length of char bytes needed to represent int32
+AC_DEFINE(INT32_CHAR_SIZE, 12,
+	  [Define number of bytes required to represent an Int32 in Char format])
+
 # Now we have checked all the reasons to replace snprintf
 if test $pgac_need_repl_snprintf = yes; then
   AC_DEFINE(USE_REPL_SNPRINTF, 1, [Use replacement snprintf() functions.])
