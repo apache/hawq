@@ -78,7 +78,7 @@ TEST_F(TestCommonLib, TestSqlUtil) {
   auto err_msg = util.execute("select * from non_exist_tbl;", false);
   EXPECT_EQ(err_msg,
             "ERROR:  relation \"non_exist_tbl\" does not exist\n"
-            "LINE 1: ...ARCH_PATH=TestCommonLib_TestSqlUtil;select * from non_exist_...\n"
+            "LINE 1: ...PDT'; SET datestyle='Postgres, MDY';select * from non_exist_...\n"
             "                                                             ^\n");
   err_msg = util.execute("drop table non_exist_tbl;", false);
   EXPECT_EQ(err_msg, "ERROR:  table \"non_exist_tbl\" does not exist\n");
