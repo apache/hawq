@@ -470,7 +470,12 @@ int RB_LIBYARN_handleNotification(void)
 	uint32_t		messagehead[2];
 	uint32_t		messageid;
 
-
+	/* refresh kerberos ticket */
+	if (enable_secure_filesystem && !login())
+	{
+		elog(WARNING, "Resource broker failed to refresh kerberos ticket.");
+		return RESBROK_FAIL_REFRESH_KRB_TICKET;
+	}
 
 	FD_ZERO(&rfds);
 	FD_SET(fd, &rfds);
