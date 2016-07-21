@@ -145,3 +145,4 @@ void print_http_headers(CHURL_HEADERS headers);
 #endif
 
 #define LocalhostIpV4Entry ":127.0.0.1"
+#define LocalhostIpV4 "localhost"

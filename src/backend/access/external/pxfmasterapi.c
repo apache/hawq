@@ -434,5 +434,5 @@ List* get_and_cache_external_metadata(GPHDUri* hadoop_uri, char *profile, char *
 
 List* get_no_cache_external_metadata(GPHDUri* hadoop_uri, char *profile, char *pattern, ClientContext *client_context)
 {
-	return get_external_metadata(hadoop_uri, profile, pattern, client_context, NULL);
+	return get_external_metadata(hadoop_uri, profile, pattern, client_context, InvalidOid);
 }

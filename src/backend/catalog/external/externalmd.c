@@ -84,7 +84,7 @@ List *ParsePxfEntries(StringInfo json, char *profile, Oid dboid)
 	{
 		struct json_object *jsonItem = json_object_array_get_idx(jsonItems, i);
 		PxfItem *pxfItem = ParsePxfItem(jsonItem, profile);
-		if (dboid != NULL)
+		if (dboid != InvalidOid)
 			LoadPxfItem(pxfItem, dboid);
 		tables = lappend(tables, pxfItem);
 	}
