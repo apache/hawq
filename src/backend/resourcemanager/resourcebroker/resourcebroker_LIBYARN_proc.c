@@ -339,71 +339,63 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
 	char *priName = NULL, *retval = NULL;
 	const char *errorMsg = NULL;
 
-    /*
-     * refresh kerberos ticket
-     */
-    if (!login()) {
-        elog(WARNING, "Cannot login kerberos.");
-        return NULL;
-    }
+	if (cache) {
+		if (0 != setenv("KRB5CCNAME", cache, 1)) {
+			elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
+			return NULL;
+		}
+	}
 
-    if (cache) {
-        if (0 != setenv("KRB5CCNAME", cache, 1)) {
-            elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
-            return NULL;
-        }
-    }
+	do {
+		if (0 != (ec = krb5_init_context(&cxt))) {
+			break;
+		}
 
-    do {
-        if (0 != (ec = krb5_init_context(&cxt))) {
-            break;
-        }
+		if (0 != (ec = krb5_cc_default(cxt, &ccache))) {
+			break;
+		}
 
-        if (0 != (ec = krb5_cc_default(cxt, &ccache))) {
-            break;
-        }
+		if (0 != (ec = krb5_cc_get_principal(cxt, ccache, &principal))) {
+			break;
+		}
 
-        if (0 != (ec = krb5_cc_get_principal(cxt, ccache, &principal))) {
-            break;
-        }
+		if (0 != (ec = krb5_unparse_name(cxt, principal, &priName))) {
+			break;
+		}
+	} while (0);
 
-        if (0 != (ec = krb5_unparse_name(cxt, principal, &priName))) {
-            break;
-        }
-    } while (0);
+	if (!ec) {
+		retval = strdup(priName);
+	} else {
+		if (cxt) {
+			errorMsg = krb5_get_error_message(cxt, ec);
+		} else {
+			errorMsg = "Cannot initialize kerberos context";
+		}
+	}
 
-    if (!ec) {
-        retval = strdup(priName);
-    } else {
-        if (cxt) {
-        	errorMsg = krb5_get_error_message(cxt, ec);
-        } else {
-        	errorMsg = "Cannot initialize kerberos context";
-        }
-    }
+	if (priName != NULL) {
+		krb5_free_unparsed_name(cxt, priName);
+	}
 
-    if (priName != NULL) {
-        krb5_free_unparsed_name(cxt, priName);
-    }
+	if (principal != NULL) {
+		krb5_free_principal(cxt, principal);
+	}
 
-    if (principal != NULL) {
-        krb5_free_principal(cxt, principal);
-    }
+	if (ccache != NULL) {
+		krb5_cc_close(cxt, ccache);
+	}
 
-    if (ccache != NULL) {
-        krb5_cc_close(cxt, ccache);
-    }
+	if (cxt != NULL) {
+		krb5_free_context(cxt);
+	}
 
-    if (cxt != NULL) {
-        krb5_free_context(cxt);
-    }
+	if (errorMsg != NULL) {
+		elog(WARNING, "Fail to extract principal from cache, because : %s", errorMsg);
+		return NULL;
+	}
 
-    if (errorMsg != NULL) {
-    	elog(WARNING, "Fail to extract principal from cache, because : %s", errorMsg);
-    	return NULL;
-    }
-
-    return retval;
+	return retval;
 }
 
 int  loadParameters(void)
