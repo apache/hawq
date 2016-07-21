@@ -237,59 +237,70 @@ int ResBrokerMainInternal(void)
 			}
 			else if ( readres != sizeof(messagehead) ) {
 				elog(WARNING, "YARN mode resource broker pipe cannot read expect "
-						  	  "data.");
+							  "data.");
 				ResBrokerKeepRun = false;
-			    continue;
+				continue;
 			}
 
 			messageid = messagehead[0];
-            elog(DEBUG3, "YARN mode resource broker gets request %d from "
-            			 "resource manager main process.",
-            			 messageid);
+			elog(DEBUG3, "YARN mode resource broker gets request %d from "
+						 "resource manager main process.",
+						 messageid);
 
-            res = FUNC_RETURN_OK;
-            switch(messageid) {
-            case RM2RB_GET_CLUSTERREPORT:
-				res = handleRM2RB_GetClusterReport();
-				break;
-            case RM2RB_ALLOC_RESOURCE:
-            	res = handleRM2RB_AllocateResource();
-            	break;
-            case RM2RB_RETURN_RESOURCE:
-            	res = handleRM2RB_ReturnResource();
-            	break;
-            case RM2RB_GET_CONTAINERREPORT:
-            	res = handleRM2RB_GetContainerReport();
-            	break;
-            default:
-            	elog(WARNING, "YARN mode resource broker received wrong message "
-            				  "id %d",
-							  messageid);
-            	ResBrokerKeepRun = false;
-            	res = RESBROK_WRONG_MESSAGE_ID;
+			res = FUNC_RETURN_OK;
+
+			/* refresh kerberos ticket */
+			if (enable_secure_filesystem && !login())
+			{
+				elog(WARNING, "Resource broker failed to refresh kerberos ticket.");
+				res = RESBROK_FAIL_REFRESH_KRB_TICKET;
 			}
 
-            if ( res != FUNC_RETURN_OK ) {
-            	elog(WARNING, "YARN mode resource broker failed to process request. "
-            			  	  "Message id = %d, result = %d.",
+			if (res == FUNC_RETURN_OK)
+			{
+				switch(messageid) {
+				case RM2RB_GET_CLUSTERREPORT:
+					res = handleRM2RB_GetClusterReport();
+					break;
+				case RM2RB_ALLOC_RESOURCE:
+					res = handleRM2RB_AllocateResource();
+					break;
+				case RM2RB_RETURN_RESOURCE:
+					res = handleRM2RB_ReturnResource();
+					break;
+				case RM2RB_GET_CONTAINERREPORT:
+					res = handleRM2RB_GetContainerReport();
+					break;
+				default:
+					elog(WARNING, "YARN mode resource broker received wrong message "
+								  "id %d",
+								  messageid);
+					ResBrokerKeepRun = false;
+					res = RESBROK_WRONG_MESSAGE_ID;
+				}
+			}
+
+			if ( res != FUNC_RETURN_OK ) {
+				elog(WARNING, "YARN mode resource broker failed to process request. "
+							  "Message id = %d, result = %d.",
 							  messageid,
 							  res);
-            	/* If this is a pipe error between RM and RB or YARN remove error.
-            	 * Exit RB and let RM restart RB process. */
-                if ( res == RESBROK_ERROR_GRM )
-                {
-                    if ( LIBYARNClient != NULL && YARNJobID != NULL ) {
-                        forceKillJob(LIBYARNClient, YARNJobID);
-                        RB2YARN_disconnectFromYARN();
-                        elog(LOG, "YARN mode resource broker disconnects from YARN. "
-                                  "Resource broker will retry to register soon.");
-                    }
-                }
-            	else
-            	{
-            		ResBrokerKeepRun = false;
-            	}
-            }
+				/* If this is a pipe error between RM and RB or YARN remove error.
+				 * Exit RB and let RM restart RB process. */
+				if ( res == RESBROK_ERROR_GRM )
+				{
+					if ( LIBYARNClient != NULL && YARNJobID != NULL ) {
+						forceKillJob(LIBYARNClient, YARNJobID);
+						RB2YARN_disconnectFromYARN();
+						elog(LOG, "YARN mode resource broker disconnects from YARN. "
+								  "Resource broker will retry to register soon.");
+					}
+				}
+				else
+				{
+					ResBrokerKeepRun = false;
+				}
+			}
 		}
 		else if ( res < 0 ) {
 			if ( errno != EAGAIN && errno != EINTR ) {
