@@ -43,7 +43,6 @@ ignore: geometry
 ignore: horology
 ignore: create_type
 test: create_table_test
-test: create_table_distribution
 ignore: create_function_2
 test: copy
 ignore: copyselect
