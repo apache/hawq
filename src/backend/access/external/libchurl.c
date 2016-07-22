@@ -304,12 +304,10 @@ void churl_headers_cleanup(CHURL_HEADERS headers)
 	pfree(settings);
 }
 
-
-CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
+CHURL_HANDLE churl_init(const char* url, CHURL_HEADERS headers)
 {
 	churl_context* context = churl_new_context();
 	create_curl_handle(context);
-	context->upload = true;
 	clear_error_buffer(context);
 
 	/* needed to resolve localhost */
@@ -327,16 +325,10 @@ CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
 	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
 	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);
-	set_curl_option(context, CURLOPT_POST, (const void*)TRUE);
-	set_curl_option(context, CURLOPT_READFUNCTION, read_callback);
-	set_curl_option(context, CURLOPT_READDATA, context);
 	set_curl_option(context, CURLOPT_WRITEFUNCTION, write_callback);
 	set_curl_option(context, CURLOPT_WRITEDATA, context);
 	set_curl_option(context, CURLOPT_HEADERFUNCTION, header_callback);
 	set_curl_option(context, CURLOPT_HEADERDATA, context);
-	churl_headers_append(headers, "Content-Type", "application/octet-stream");
-	churl_headers_append(headers, "Transfer-Encoding", "chunked");
-	churl_headers_append(headers, "Expect", "100-continue");
 	churl_headers_set(context, headers);
 
 	print_http_headers(headers);
@@ -345,36 +337,27 @@ CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
 	return (CHURL_HANDLE)context;
 }
 
+CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
+{
+	churl_context* context = churl_init(url, headers);
+
+	context->upload = true;
+
+	set_curl_option(context, CURLOPT_POST, (const void*) TRUE);
+	set_curl_option(context, CURLOPT_READFUNCTION, read_callback);
+	set_curl_option(context, CURLOPT_READDATA, context);
+	churl_headers_append(headers, "Content-Type", "application/octet-stream");
+	churl_headers_append(headers, "Transfer-Encoding", "chunked");
+	churl_headers_append(headers, "Expect", "100-continue");
+
+	return (CHURL_HANDLE)context;
+}
+
 CHURL_HANDLE churl_init_download(const char* url, CHURL_HEADERS headers)
 {
-	churl_context* context = churl_new_context();
-	create_curl_handle(context);
+	churl_context* context = churl_init(url, headers);
+
 	context->upload = false;
-	clear_error_buffer(context);
-
-	/* needed to resolve localhost */
-	if (strstr(url, LocalhostIpV4) != NULL) {
-		struct curl_slist *resolve_hosts = NULL;
-		char *pxf_host_entry = (char *) palloc0(strlen(pxf_service_address) + strlen(LocalhostIpV4Entry) + 1);
-		strcat(pxf_host_entry, pxf_service_address);
-		strcat(pxf_host_entry, LocalhostIpV4Entry);
-		resolve_hosts = curl_slist_append(NULL, pxf_host_entry);
-		set_curl_option(context, CURLOPT_RESOLVE, resolve_hosts);
-		pfree(pxf_host_entry);
-	}
-
-	set_curl_option(context, CURLOPT_URL, url);
-	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
-	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
-	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);
-	set_curl_option(context, CURLOPT_WRITEFUNCTION, write_callback);
-	set_curl_option(context, CURLOPT_WRITEDATA, context);
-	set_curl_option(context, CURLOPT_HEADERFUNCTION, header_callback);
-	set_curl_option(context, CURLOPT_HEADERDATA, context);
-	churl_headers_set(context, headers);
-
-	print_http_headers(headers);
-	setup_multi_handle(context);
 
 	return (CHURL_HANDLE)context;
 }
