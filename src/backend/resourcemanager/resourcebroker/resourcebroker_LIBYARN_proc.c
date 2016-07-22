@@ -195,6 +195,12 @@ int ResBrokerMainInternal(void)
 			continue;
 		}
 
+		/* refresh kerberos ticket */
+		if (enable_secure_filesystem && !login())
+		{
+			elog(WARNING, "Resource broker failed to refresh kerberos ticket.");
+		}
+
 		/*
 		 * If the connection between YARN and YARN resource broker is not
 		 * created, try to build up connection and register application.
@@ -338,11 +344,6 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
 	krb5_error_code ec = 0;
 	char *priName = NULL, *retval = NULL;
 	const char *errorMsg = NULL;
-
-	if (!login()) {
-		elog(WARNING, "Cannot login kerberos.");
-		return NULL;
-	}
 
 	if (cache) {
 		if (0 != setenv("KRB5CCNAME", cache, 1)) {
