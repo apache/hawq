@@ -136,28 +136,30 @@ int ResBrokerMain(void)
 
 	ResBrokerKeepRun = true;
 
-    /* Load parameters */
-    int res = loadParameters();
-    if ( res != FUNC_RETURN_OK ) {
-        elog(WARNING, "Resource broker loads invalid yarn parameters");
-    }
+	/* Load parameters */
+	int res = loadParameters();
+	if ( res != FUNC_RETURN_OK ) {
+		elog(WARNING, "Resource broker loads invalid yarn parameters");
+	}
 
-    /* Set signal behavior */
-    PG_SETMASK(&BlockSig);
-    pqsignal(SIGHUP , SIG_IGN);
-    pqsignal(SIGINT , quitResBroker);
-    pqsignal(SIGTERM, quitResBroker);
-    pqsignal(SIGQUIT, SIG_DFL);
-    pqsignal(SIGPIPE, SIG_IGN);
-    pqsignal(SIGUSR1, SIG_IGN);
-    pqsignal(SIGUSR2, SIG_IGN);
-    pqsignal(SIGCHLD, SIG_IGN);
-    pqsignal(SIGTTIN, SIG_IGN);
-    pqsignal(SIGTTOU, SIG_IGN);
-    PG_SETMASK(&UnBlockSig);
+	/* Set signal behavior */
+	PG_SETMASK(&BlockSig);
+	pqsignal(SIGHUP , SIG_IGN);
+	pqsignal(SIGINT , quitResBroker);
+	pqsignal(SIGTERM, quitResBroker);
+	pqsignal(SIGQUIT, SIG_DFL);
+	pqsignal(SIGPIPE, SIG_IGN);
+	pqsignal(SIGUSR1, SIG_IGN);
+	pqsignal(SIGUSR2, SIG_IGN);
+	/* call system() needs set SIG_DFL for SIGCHLD */
+	pqsignal(SIGCHLD, SIG_DFL);
+	pqsignal(SIGTTIN, SIG_IGN);
+	pqsignal(SIGTTOU, SIG_IGN);
+	PG_SETMASK(&UnBlockSig);
 
 	res = ResBrokerMainInternal();
 
+	pqsignal(SIGCHLD, SIG_IGN);
 	elog(LOG, "YARN mode resource broker goes into exit phase.");
 	return res;
 }
