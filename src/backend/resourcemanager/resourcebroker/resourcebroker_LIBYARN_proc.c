@@ -339,6 +339,11 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
 	char *priName = NULL, *retval = NULL;
 	const char *errorMsg = NULL;
 
+	if (!login()) {
+		elog(WARNING, "Cannot login kerberos.");
+		return NULL;
+	}
+
 	if (cache) {
 		if (0 != setenv("KRB5CCNAME", cache, 1)) {
 			elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
