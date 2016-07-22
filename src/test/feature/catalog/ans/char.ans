@@ -71,12 +71,11 @@ SELECT '' AS five, c.*
    WHERE c.f1 < 'a';
  five | f1 
 ------+----
-      | A
       | 1
       | 2
       | 3
       |  
-(5 rows)
+(4 rows)
 
 SELECT '' AS six, c.*
    FROM CHAR_TBL c
@@ -84,20 +83,20 @@ SELECT '' AS six, c.*
  six | f1 
 -----+----
      | a
-     | A
      | 1
      | 2
      | 3
      |  
-(6 rows)
+(5 rows)
 
 SELECT '' AS one, c.*
    FROM CHAR_TBL c
    WHERE c.f1 > 'a';
  one | f1 
 -----+----
+     | A
      | c
-(1 row)
+(2 rows)
 
 SELECT '' AS two, c.*
    FROM CHAR_TBL c
@@ -105,8 +104,9 @@ SELECT '' AS two, c.*
  two | f1 
 -----+----
      | a
+     | A
      | c
-(2 rows)
+(3 rows)
 
 DROP TABLE CHAR_TBL;
 DROP TABLE
