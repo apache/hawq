@@ -19,6 +19,7 @@
 
 #include "postgres.h"
 
+#include "access/hd_work_mgr.h"
 #include "catalog/external/externalmd.h"
 #include "fmgr.h"
 #include "funcapi.h"
@@ -43,7 +44,7 @@ pxf_item_fields_enum_start(text *profile, text *pattern)
 	char *profile_cstr = text_to_cstring(profile);
 	char *pattern_cstr = text_to_cstring(pattern);
 
-	items = get_pxf_item_metadata(profile_cstr, pattern_cstr, NULL);
+	items = get_pxf_item_metadata(profile_cstr, pattern_cstr, InvalidOid);
 
 	if (items == NIL)
 		return NULL;
