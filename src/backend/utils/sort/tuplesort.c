@@ -915,11 +915,13 @@ tuplesort_end(Tuplesortstate *state)
 	if (state->tapeset)
 	{
 		LogicalTapeSetClose(state->tapeset, NULL /* workset */);
+		state->tapeset = NULL;
 
 		if (state->pfile_rwfile_state)
         {
 			workfile_mgr_close_file(NULL /* workset */, state->pfile_rwfile_state, true);
         }
+		state->pfile_rwfile_state = NULL;
 	}
 
 	tuplesort_finalize_stats(state);
