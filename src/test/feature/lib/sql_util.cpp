@@ -143,6 +143,27 @@ void SQLUtility::execSQLFile(const string &sqlFile,
   }
 }
 
+bool SQLUtility::execSQLFile(const string &sqlFile) {
+  // do precheck for sqlFile
+  if (hawq::test::startsWith(sqlFile, "/"))
+    return false;
+
+  // double check to avoid empty fileBaseName
+  FilePath fp = splitFilePath(sqlFile);
+  if (fp.fileBaseName.empty())
+    return false;
+
+  // outFile is located in the same folder with ansFile
+  string outFileAbsPath = "/tmp/" + fp.fileBaseName + ".out";
+
+  // generate new sql file with set search_path added at the begining
+  const string newSqlFile = generateSQLFile(sqlFile);
+
+  // run sql file and store its result in output file
+  conn->setOutputFile(outFileAbsPath);
+  return conn->runSQLFile(newSqlFile).getLastStatus() == 0 ? true : false;
+}
+
 const string SQLUtility::generateSQLFile(const string &sqlFile) {
   const string originSqlFile = testRootPath + "/" + sqlFile;
   const string newSqlFile = "/tmp/" + schemaName + ".sql";
@@ -210,6 +231,18 @@ std::string SQLUtility::getGUCValue(const std::string &guc) {
   EXPECT_EQ(result.rowCount(), 1);
   std::vector<std::string> row = result.getRows()[0];
   return row[0];
+}
+
+std::string SQLUtility::getQueryResult(const std::string &query) {
+  const hawq::test::PSQLQueryResult &result = executeQuery(query);
+  EXPECT_LE(result.rowCount(), 1);
+  std::string value;
+  if (result.rowCount() == 1)
+  {
+    value = result.getRows()[0][0];
+  }
+
+  return value;
 }
 
 FilePath SQLUtility::splitFilePath(const string &filePath) const {
