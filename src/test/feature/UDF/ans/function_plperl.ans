@@ -1,0 +1,35 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFPlperl;
+SET
+-- end_ignore
+CREATE OR REPLACE FUNCTION plperl_max (INTEGER, INTEGER)
+RETURNS INTEGER
+AS $$
+    my ($x, $y) = @_;
+    if (not defined $x) {
+        return undef if not defined $y;
+        return $y;
+    }
+    return $x if not defined $y;
+    return $x if $x > $y;
+    return $y;
+$$ LANGUAGE plperl;
+CREATE FUNCTION
+SELECT plperl_max(1, 10);
+ plperl_max 
+------------
+         10
+(1 row)
+
+CREATE OR REPLACE FUNCTION plperl_returns_array()
+RETURNS TEXT[][]
+AS $$
+    return [['a"b','c,d'],['e\\f','g']];
+$$ LANGUAGE plperl;
+CREATE FUNCTION
+SELECT plperl_returns_array();
+    plperl_returns_array     
+-----------------------------
+ {{"a\"b","c,d"},{"e\\f",g}}
+(1 row)
+

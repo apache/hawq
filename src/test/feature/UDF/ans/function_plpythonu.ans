@@ -1,0 +1,18 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFPlpythonu;
+SET
+-- end_ignore
+CREATE OR REPLACE FUNCTION plpythonu_max (a INTEGER, b INTEGER)
+RETURNS INTEGER
+AS $$
+  if a > b:
+    return a
+  return b
+$$ LANGUAGE plpythonu;
+CREATE FUNCTION
+SELECT plpythonu_max(1, 10);
+ plpythonu_max 
+---------------
+            10
+(1 row)
+
