@@ -137,30 +137,6 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{625 /* float4ge */, PXFOP_GE},
 	{621 /* float4ne */, PXFOP_NE},
 
-	/* float8 */
-	{Float8EqualOperator  /* float8eq */, PXFOP_EQ},
-	{672  /* float8lt */, PXFOP_LT},
-	{674 /* float8gt */, PXFOP_GT},
-	{673 /* float8le */, PXFOP_LE},
-	{675 /* float8ge */, PXFOP_GE},
-	{671 /* float8ne */, PXFOP_NE},
-
-	/* float48 */
-	{1120  /* float48eq */, PXFOP_EQ},
-	{1122  /* float48lt */, PXFOP_LT},
-	{1123 /* float48gt */, PXFOP_GT},
-	{1124 /* float48le */, PXFOP_LE},
-	{1125 /* float48ge */, PXFOP_GE},
-	{1121 /* float48ne */, PXFOP_NE},
-
-	/* float84 */
-	{1130  /* float84eq */, PXFOP_EQ},
-	{1132  /* float84lt */, PXFOP_LT},
-	{1133 /* float84gt */, PXFOP_GT},
-	{1134 /* float84le */, PXFOP_LE},
-	{1135 /* float84ge */, PXFOP_GE},
-	{1131 /* float84ne */, PXFOP_NE},
-
 	/**********DATE************/
 	{DateEqualOperator  /* eq */, PXFOP_EQ},
 	{1095  /* date_lt */, PXFOP_LT},
