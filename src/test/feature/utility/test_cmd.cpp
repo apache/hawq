@@ -10,6 +10,6 @@ class TestCommand: public ::testing::Test {
 
 TEST_F(TestCommand, TestCOPY) {
  hawq::test::SQLUtility util;
- util.execSQLFile("UtilityCommand/sql/gpcopy.sql",
-                  "UtilityCommand/ans/gpcopy.ans");
+ util.execSQLFile("utility/sql/gpcopy.sql",
+                  "utility/ans/gpcopy.ans");
 }

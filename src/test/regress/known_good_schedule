@@ -44,7 +44,6 @@ ignore: horology
 ignore: create_type
 test: create_table_test
 ignore: create_function_2
-test: copy
 ignore: copyselect
 ignore: constraints
 ignore: triggers
