@@ -1146,7 +1146,7 @@ static char** create_pxf_plan(char **segdb_file_map, RelOptInfo *rel, int total_
 	Relation relation = RelationIdGetRelation(planner_rt_fetch(scan_relid, ctx->root)->relid);
 	segdb_work_map = map_hddata_2gp_segments(uri_str, 
 											 total_segs, segs_participating,
-											 relation, ctx->root->parse->jointree->quals);
+											 relation, NULL);
 	Assert(segdb_work_map != NULL);
 	RelationClose(relation);
 	
