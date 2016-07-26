@@ -1,0 +1,165 @@
+create temp table copytest3 (
+	c1 int, 
+	"col with , comma" text, 
+	"col with "" quote"  int) distributed by (c1);
+CREATE TABLE
+copy copytest3 from stdin csv header;
+copy copytest3 to stdout csv header;
+c1,"col with , comma","col with "" quote"
+1,a,1
+2,b,2
+-- copy with error table
+CREATE TABLE number (a INT) DISTRIBUTED BY (a);
+CREATE TABLE
+COPY number FROM STDIN LOG ERRORS INTO err_copy SEGMENT REJECT LIMIT 10 ROWS;
+psql:/tmp/TestCopy_TestCOPY2.sql:19: NOTICE:  Error table "err_copy" does not exist. Auto generating an error table with the same name
+psql:/tmp/TestCopy_TestCOPY2.sql:19: WARNING:  The error table was created in the same transaction as this operation. It will get dropped if transaction rolls back even if bad rows are present
+HINT:  To avoid this create the error table ahead of time using: CREATE TABLE <name> (cmdtime timestamp with time zone, relname text, filename text, linenum integer, bytenum integer, errmsg text, rawdata text, rawbytes bytea)
+psql:/tmp/TestCopy_TestCOPY2.sql:29: NOTICE:  Found 9 data formatting errors (9 or more input rows). Errors logged into error table "err_copy"
+select relname,filename,linenum,bytenum,errmsg,rawdata,rawbytes from err_copy order by linenum;
+ relname | filename | linenum | bytenum |                                                 errmsg                                                  |                          rawdata                          | rawbytes 
+---------+----------+---------+---------+---------------------------------------------------------------------------------------------------------+-----------------------------------------------------------+----------
+ number  | <stdin>  |       1 |         | invalid input syntax for integer: "these are invalid line should be insert into error table.", column a | these are invalid line should be insert into error table. | 
+ number  | <stdin>  |       2 |         | invalid input syntax for integer: "a", column a                                                         | a                                                         | 
+ number  | <stdin>  |       3 |         | invalid input syntax for integer: "b", column a                                                         | b                                                         | 
+ number  | <stdin>  |       4 |         | invalid input syntax for integer: "c", column a                                                         | c                                                         | 
+ number  | <stdin>  |       5 |         | invalid input syntax for integer: "d", column a                                                         | d                                                         | 
+ number  | <stdin>  |       6 |         | invalid input syntax for integer: "e", column a                                                         | e                                                         | 
+ number  | <stdin>  |       7 |         | invalid input syntax for integer: "f", column a                                                         | f                                                         | 
+ number  | <stdin>  |       8 |         | invalid input syntax for integer: "g", column a                                                         | g                                                         | 
+ number  | <stdin>  |       9 |         | invalid input syntax for integer: "h", column a                                                         | h                                                         | 
+(9 rows)
+
+select * from number; --should be empty
+ a 
+---
+(0 rows)
+
+\d err_copy
+ Append-Only Table "testcopy_testcopy2.err_copy"
+  Column  |           Type           | Modifiers 
+----------+--------------------------+-----------
+ cmdtime  | timestamp with time zone | 
+ relname  | text                     | 
+ filename | text                     | 
+ linenum  | integer                  | 
+ bytenum  | integer                  | 
+ errmsg   | text                     | 
+ rawdata  | text                     | 
+ rawbytes | bytea                    | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+
+DROP TABLE err_copy;
+DROP TABLE
+COPY number FROM STDIN LOG ERRORS INTO err_copy SEGMENT REJECT LIMIT 10 ROWS;
+psql:/tmp/TestCopy_TestCOPY2.sql:37: NOTICE:  Error table "err_copy" does not exist. Auto generating an error table with the same name
+psql:/tmp/TestCopy_TestCOPY2.sql:37: WARNING:  The error table was created in the same transaction as this operation. It will get dropped if transaction rolls back even if bad rows are present
+HINT:  To avoid this create the error table ahead of time using: CREATE TABLE <name> (cmdtime timestamp with time zone, relname text, filename text, linenum integer, bytenum integer, errmsg text, rawdata text, rawbytes bytea)
+psql:/tmp/TestCopy_TestCOPY2.sql:54: NOTICE:  Found 9 data formatting errors (9 or more input rows). Errors logged into error table "err_copy"
+select relname,filename,linenum,bytenum,errmsg,rawdata,rawbytes from err_copy order by linenum;
+ relname | filename | linenum | bytenum |                                                 errmsg                                                  |                          rawdata                          | rawbytes 
+---------+----------+---------+---------+---------------------------------------------------------------------------------------------------------+-----------------------------------------------------------+----------
+ number  | <stdin>  |       1 |         | invalid input syntax for integer: "these are invalid line should be insert into error table.", column a | these are invalid line should be insert into error table. | 
+ number  | <stdin>  |       2 |         | invalid input syntax for integer: "a", column a                                                         | a                                                         | 
+ number  | <stdin>  |       4 |         | invalid input syntax for integer: "b", column a                                                         | b                                                         | 
+ number  | <stdin>  |       6 |         | invalid input syntax for integer: "c", column a                                                         | c                                                         | 
+ number  | <stdin>  |       8 |         | invalid input syntax for integer: "d", column a                                                         | d                                                         | 
+ number  | <stdin>  |      10 |         | invalid input syntax for integer: "e", column a                                                         | e                                                         | 
+ number  | <stdin>  |      12 |         | invalid input syntax for integer: "f", column a                                                         | f                                                         | 
+ number  | <stdin>  |      14 |         | invalid input syntax for integer: "g", column a                                                         | g                                                         | 
+ number  | <stdin>  |      16 |         | invalid input syntax for integer: "h", column a                                                         | h                                                         | 
+(9 rows)
+
+select count(*) from number; --should be 7
+ count 
+-------
+     7
+(1 row)
+
+DROP TABLE err_copy;
+DROP TABLE
+TRUNCATE number;
+TRUNCATE TABLE
+COPY number FROM STDIN LOG ERRORS INTO err_copy SEGMENT REJECT LIMIT 10 ROWS;
+psql:/tmp/TestCopy_TestCOPY2.sql:62: NOTICE:  Error table "err_copy" does not exist. Auto generating an error table with the same name
+psql:/tmp/TestCopy_TestCOPY2.sql:62: WARNING:  The error table was created in the same transaction as this operation. It will get dropped if transaction rolls back even if bad rows are present
+HINT:  To avoid this create the error table ahead of time using: CREATE TABLE <name> (cmdtime timestamp with time zone, relname text, filename text, linenum integer, bytenum integer, errmsg text, rawdata text, rawbytes bytea)
+psql:/tmp/TestCopy_TestCOPY2.sql:80: ERROR:  Segment reject limit reached. Aborting operation. Last error was: invalid input syntax for integer: "i", column a
+CONTEXT:  COPY number, line 17, column a
+select relname,filename,linenum,bytenum,errmsg,rawdata,rawbytes from err_copy order by linenum; -- should not exist
+psql:/tmp/TestCopy_TestCOPY2.sql:82: ERROR:  relation "err_copy" does not exist
+LINE 1: ...name,linenum,bytenum,errmsg,rawdata,rawbytes from err_copy o...
+                                                             ^
+select count(*) from number; --should be empty
+ count 
+-------
+     0
+(1 row)
+
+TRUNCATE number;
+TRUNCATE TABLE
+CREATE TABLE err_copy (cmdtime timestamp with time zone, relname text, filename text, linenum integer, bytenum integer, errmsg text, rawdata text, rawbytes bytea) distributed randomly;
+CREATE TABLE
+COPY number FROM STDIN LOG ERRORS INTO err_copy SEGMENT REJECT LIMIT 10 ROWS;
+psql:/tmp/TestCopy_TestCOPY2.sql:105: NOTICE:  Found 9 data formatting errors (9 or more input rows). Errors logged into error table "err_copy"
+select relname,filename,linenum,bytenum,errmsg,rawdata,rawbytes from err_copy order by linenum;
+ relname | filename | linenum | bytenum |                                                 errmsg                                                  |                          rawdata                          | rawbytes 
+---------+----------+---------+---------+---------------------------------------------------------------------------------------------------------+-----------------------------------------------------------+----------
+ number  | <stdin>  |       1 |         | invalid input syntax for integer: "these are invalid line should be insert into error table.", column a | these are invalid line should be insert into error table. | 
+ number  | <stdin>  |       2 |         | invalid input syntax for integer: "a", column a                                                         | a                                                         | 
+ number  | <stdin>  |       4 |         | invalid input syntax for integer: "b", column a                                                         | b                                                         | 
+ number  | <stdin>  |       6 |         | invalid input syntax for integer: "c", column a                                                         | c                                                         | 
+ number  | <stdin>  |       8 |         | invalid input syntax for integer: "d", column a                                                         | d                                                         | 
+ number  | <stdin>  |      10 |         | invalid input syntax for integer: "e", column a                                                         | e                                                         | 
+ number  | <stdin>  |      12 |         | invalid input syntax for integer: "f", column a                                                         | f                                                         | 
+ number  | <stdin>  |      14 |         | invalid input syntax for integer: "g", column a                                                         | g                                                         | 
+ number  | <stdin>  |      16 |         | invalid input syntax for integer: "h", column a                                                         | h                                                         | 
+(9 rows)
+
+select count(*) from number; --should be 7
+ count 
+-------
+     7
+(1 row)
+
+DROP TABLE err_copy;
+DROP TABLE
+-- invalid error table schema
+TRUNCATE number;
+TRUNCATE TABLE
+create table invalid_error_table1 (a int) distributed randomly;
+CREATE TABLE
+create table invalid_error_table3 (cmdtime timestamp with time zone, relname text, filename text, linenum integer, bytenum integer, errmsg text, rawdata text, rawbytes bytea)
+		distributed by (cmdtime);
+CREATE TABLE
+		
+COPY number FROM STDIN LOG ERRORS INTO invalid_error_table1 SEGMENT REJECT LIMIT 10 ROWS; -- should fail
+psql:/tmp/TestCopy_TestCOPY2.sql:117: ERROR:  Relation "invalid_error_table1" already exists and is not of a valid error table format (expected 8 attributes, found 1)
+these are invalid line should be insert into error table.
+1
+\.
+psql:/tmp/TestCopy_TestCOPY2.sql:120: invalid command \.
+;
+psql:/tmp/TestCopy_TestCOPY2.sql:122: ERROR:  syntax error at or near "these"
+LINE 1: these are invalid line should be insert into error table.
+        ^
+COPY number FROM STDIN LOG ERRORS INTO invalid_error_table3 SEGMENT REJECT LIMIT 10 ROWS; -- should fail
+psql:/tmp/TestCopy_TestCOPY2.sql:124: ERROR:  Relation "invalid_error_table3" already exists and is not of a valid error table format. It appears to not distributed randomly
+these are invalid line should be insert into error table.
+1
+\.
+psql:/tmp/TestCopy_TestCOPY2.sql:127: invalid command \.
+;
+psql:/tmp/TestCopy_TestCOPY2.sql:129: ERROR:  syntax error at or near "these"
+LINE 1: these are invalid line should be insert into error table.
+        ^
+DROP TABLE invalid_error_table1;
+DROP TABLE
+DROP TABLE invalid_error_table3;
+DROP TABLE
+DROP TABLE number;
+DROP TABLE
