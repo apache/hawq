@@ -64,6 +64,7 @@ typedef ExtProtocolData *ExtProtocol;
 #define EXTPROTOCOL_GET_DATALEN(fcinfo)    (((ExtProtocolData*) fcinfo->context)->prot_maxbytes)
 #define EXTPROTOCOL_GET_SCANQUALS(fcinfo)    (((ExtProtocolData*) fcinfo->context)->prot_scanquals)
 #define EXTPROTOCOL_GET_USER_CTX(fcinfo)   (((ExtProtocolData*) fcinfo->context)->prot_user_ctx)
+#define EXTPROTOCOL_GET_SELECTDESC(fcinfo)   (((ExtProtocolData*) fcinfo->context)->desc)
 #define EXTPROTOCOL_GET_PROJINFO(fcinfo) (((ExtProtocolData*) fcinfo->context)->desc->projInfo)
 #define EXTPROTOCOL_IS_LAST_CALL(fcinfo)   (((ExtProtocolData*) fcinfo->context)->prot_last_call)
 

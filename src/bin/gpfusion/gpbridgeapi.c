@@ -182,7 +182,8 @@ void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	inputData.gphduri = context->gphd_uri;
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
 	inputData.filterstr = serializePxfFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
-	inputData.proj_info = EXTPROTOCOL_GET_PROJINFO(fcinfo);
+	if (EXTPROTOCOL_GET_SELECTDESC(fcinfo))
+		inputData.proj_info = EXTPROTOCOL_GET_PROJINFO(fcinfo);
 	add_delegation_token(&inputData);
 	
 	build_http_header(&inputData);
