@@ -12,6 +12,7 @@
 #define HAWQ_PORT (getenv("PGPORT") ? getenv("PGPORT") : "5432")
 #define HAWQ_USER (getenv("PGUSER") ? getenv("PGUSER") : "")
 #define HAWQ_PASSWORD (getenv("PGPASSWORD") ? getenv("PGPASSWORD") : "")
+#define HAWQ_DEFAULT_SCHEMA ("public")
 
 namespace hawq {
 namespace test {
@@ -22,9 +23,15 @@ struct FilePath {
   std::string fileSuffix;
 };
 
+enum SQLUtilityMode {
+    MODE_SCHEMA,
+    MODE_DATABASE,
+    MODE_MAX_NUM
+};
+
 class SQLUtility {
  public:
-  SQLUtility();
+  SQLUtility(SQLUtilityMode mode = MODE_SCHEMA);
   ~SQLUtility();
 
   // Execute sql command
@@ -86,6 +93,7 @@ class SQLUtility {
 
  private:
   std::string schemaName;
+  std::string databaseName;
   std::unique_ptr<hawq::test::PSQL> conn;
   std::string testRootPath;
   const ::testing::TestInfo *const test_info;
