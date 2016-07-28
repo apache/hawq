@@ -215,10 +215,6 @@ public class FilterParserTest {
         filter = "a1c2o7";
         op = Operation.HDOP_AND;
         runParseOneOperation("this filter was build from HDOP_AND", filter, op);
-
-        filter = "a1c2o8";
-        op = Operation.HDOP_LIKE;
-        runParseOneOperation("this filter was build from HDOP_LIKE", filter, op);
     }
 
     @Test
@@ -251,10 +247,6 @@ public class FilterParserTest {
         filter = "c2a1o7";
         op = Operation.HDOP_AND;
         runParseOneOperation("this filter was build from HDOP_AND using reverse!", filter, op);
-
-        filter = "c2a1o8";
-        op = Operation.HDOP_LIKE;
-        runParseOneOperation("this filter was build from HDOP_LIKE using reverse!", filter, op);
     }
 
     @Test

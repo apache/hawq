@@ -61,8 +61,7 @@ public class FilterParser {
         HDOP_GE,
         HDOP_EQ,
         HDOP_NE,
-        HDOP_AND,
-        HDOP_LIKE
+        HDOP_AND
     }
 
     /**
@@ -393,7 +392,6 @@ public class FilterParser {
         operatorTranslationMap.put(5, Operation.HDOP_EQ);
         operatorTranslationMap.put(6, Operation.HDOP_NE);
         operatorTranslationMap.put(7, Operation.HDOP_AND);
-        operatorTranslationMap.put(8, Operation.HDOP_LIKE);
         return operatorTranslationMap;
     }
 }

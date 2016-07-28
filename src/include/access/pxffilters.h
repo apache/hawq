@@ -44,8 +44,7 @@ typedef enum PxfOperatorCode
 	PXFOP_GE,
 	PXFOP_EQ,
 	PXFOP_NE,
-	PXFOP_AND,
-	PXFOP_LIKE
+	PXFOP_AND
 
 } PxfOperatorCode;
 
