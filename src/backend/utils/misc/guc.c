@@ -764,6 +764,7 @@ bool 		optimizer_multilevel_partitioning;
 bool        optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
+bool 		optimizer_parallel_union;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -4385,6 +4386,16 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&optimizer_prefer_scalar_dqa_multistage_agg,
 		true, NULL, NULL
+	},
+
+	{
+		{"optimizer_parallel_union", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable parallel execution for UNION/UNION ALL queries."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_parallel_union,
+		false, NULL, NULL
 	},
 
 	/* End-of-list marker */
