@@ -20,7 +20,7 @@ using std::string;
 namespace hawq {
 namespace test {
 
-SQLUtility::SQLUtility()
+SQLUtility::SQLUtility(SQLUtilityMode mode)
     : testRootPath(getTestRootPath()),
       test_info(::testing::UnitTest::GetInstance()->current_test_info()) {
   auto getConnection = [&] () {
@@ -35,15 +35,30 @@ SQLUtility::SQLUtility()
   };
   getConnection();
 
-  schemaName =
-      string(test_info->test_case_name()) + "_" + test_info->name();
-  exec("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
-  exec("CREATE SCHEMA " + schemaName);
+  if (MODE_SCHEMA == mode) {
+    schemaName = string(test_info->test_case_name()) + "_" + test_info->name();
+    exec("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
+    exec("CREATE SCHEMA " + schemaName);
+  
+  } else {
+    schemaName = HAWQ_DEFAULT_SCHEMA;
+    databaseName = "db_" + string(test_info->test_case_name()) + "_" + test_info->name();
+    std::transform(databaseName.begin(), databaseName.end(), databaseName.begin(), ::tolower);
+    exec("DROP DATABASE IF  EXISTS " + databaseName);
+    exec("CREATE DATABASE " + databaseName);
+  }
 }
 
 SQLUtility::~SQLUtility() {
-  if (!test_info->result()->Failed())
-    exec("DROP SCHEMA " + schemaName + " CASCADE");
+  if (!test_info->result()->Failed()) {
+    if (schemaName != HAWQ_DEFAULT_SCHEMA) {
+      exec("DROP SCHEMA " + schemaName + " CASCADE");
+    }
+
+    if (!databaseName.empty()) {
+      exec("DROP DATABASE " + databaseName);
+    }
+  }
 }
 
 void SQLUtility::exec(const string &sql) {
@@ -145,7 +160,7 @@ void SQLUtility::execSQLFile(const string &sqlFile,
 
 const string SQLUtility::generateSQLFile(const string &sqlFile) {
   const string originSqlFile = testRootPath + "/" + sqlFile;
-  const string newSqlFile = "/tmp/" + schemaName + ".sql";
+  const string newSqlFile = "/tmp/" + string(test_info->test_case_name()) + "_" + test_info->name() + ".sql";
   std::fstream in;
   in.open(originSqlFile, std::ios::in);
   if (!in.is_open()) {
@@ -156,9 +171,12 @@ const string SQLUtility::generateSQLFile(const string &sqlFile) {
   if (!out.is_open()) {
     EXPECT_TRUE(false) << "Error opening file " << newSqlFile;
   }
-  out << "-- start_ignore" << std::endl
-      << "SET SEARCH_PATH=" + schemaName + ";" << std::endl
-      << "-- end_ignore" << std::endl;
+  out << "-- start_ignore" << std::endl;
+  out << "SET SEARCH_PATH=" + schemaName + ";" << std::endl;
+  if (!databaseName.empty()) {
+    out << "\\c " << databaseName << std::endl;
+  }
+  out << "-- end_ignore" << std::endl;
   string line;
   while (getline(in, line)) {
     out << line << std::endl;
