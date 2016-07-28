@@ -14,6 +14,6 @@ class TestTemp: public ::testing::Test
 TEST_F(TestTemp, BasicTest)
 {
 	hawq::test::SQLUtility util(hawq::test::MODE_DATABASE);
-	util.execSQLFile("temp/sql/temp.sql",
-	                 "temp/ans/temp.ans");
+	util.execSQLFile("query/sql/temp.sql",
+	                 "query/ans/temp.ans");
 }
