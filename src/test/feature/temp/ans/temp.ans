@@ -1,9 +1,3 @@
--- start_ignore
-SET SEARCH_PATH=public;
-SET
-\c db_testtemp_basictest
-You are now connected to database "db_testtemp_basictest" as user "ivan".
--- end_ignore
 --
 -- TEMP
 -- Test temp relations and indexes
