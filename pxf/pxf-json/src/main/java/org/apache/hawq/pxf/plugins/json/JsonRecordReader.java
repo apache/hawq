@@ -67,7 +67,7 @@ public class JsonRecordReader implements RecordReader<LongWritable, Text> {
 	 *            Hadoop context
 	 * @param split
 	 *            HDFS split to start the reading from
-	 * @throws IOException IOException
+	 * @throws IOException
 	 */
 	public JsonRecordReader(JobConf conf, FileSplit split) throws IOException {
 

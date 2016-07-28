@@ -34,6 +34,7 @@ import org.apache.hawq.pxf.plugins.json.parser.JsonLexer.JsonLexerState;
  * stream (which is assumed to be positioned at any arbitrary position inside some JSON text) until it finds the first
  * JSON begin-object "{". From this point on it will keep reading JSON objects until it finds one containing a member
  * string that the user supplies.
+ * <p/>
  * It is not recommended to use this with JSON text where individual JSON objects that can be large (MB's or larger).
  */
 public class PartitionedJsonParser {
@@ -87,7 +88,7 @@ public class PartitionedJsonParser {
 	 *            Indicates the member name used to determine the encapsulating object to return.
 	 * @return Returns next json object that contains a member attribute with name: memberName. Returns null if no such
 	 *         object is found or the end of the stream is reached.
-	 * @throws IOException IOException
+	 * @throws IOException
 	 */
 	public String nextObjectContainingMember(String memberName) throws IOException {
 

@@ -250,7 +250,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * Currently, multiple calls to this function might change
      * previous assignments.
      */
-    private void storeStartEndKeys(FilterParser.Operation op, Object data) throws Exception{
+    private void storeStartEndKeys(FilterParser.Operation op, Object data) {
         String key = (String) data;
 
         // Adding a zero byte to endkey, makes it inclusive
