@@ -438,8 +438,8 @@ executormgr_dispatch_and_run(struct DispatchData *data, QueryExecutor *executor)
 								parms->seqServerHost, parms->seqServerHostlen, parms->seqServerPort,
 								parms->primary_gang_id,
 								GetCurrentStatementStartTimestamp(),
-								BOOTSTRAP_SUPERUSERID,
-								true,
+								GetSessionUserId(),	/* For external tools who want this info on segments. */
+								IsAuthenticatedUserSuperUser(),
 								BOOTSTRAP_SUPERUSERID,
 								true,
 								BOOTSTRAP_SUPERUSERID,
