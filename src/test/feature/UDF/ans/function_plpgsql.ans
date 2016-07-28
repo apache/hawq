@@ -1,0 +1,18 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFPlpgsql;
+SET
+-- end_ignore
+CREATE OR REPLACE FUNCTION plpgsql_increment(i INTEGER)
+RETURNS INTEGER
+AS $$
+    BEGIN
+        RETURN i + 1;
+    END;
+$$ LANGUAGE plpgsql;
+CREATE FUNCTION
+SELECT plpgsql_increment(6);
+ plpgsql_increment 
+-------------------
+                 7
+(1 row)
+

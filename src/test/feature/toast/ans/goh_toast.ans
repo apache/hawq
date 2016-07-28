@@ -1,7 +1,3 @@
--- start_ignore
-SET SEARCH_PATH=TestToast_BasicTest;
-SET
--- end_ignore
 CREATE TABLE toastable_ao(a text, b varchar, c int) with(appendonly=true, compresslevel=1) distributed randomly;
 CREATE TABLE
 -- INSERT 

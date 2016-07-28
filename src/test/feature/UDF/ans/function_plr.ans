@@ -1,0 +1,20 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFPlr;
+SET
+-- end_ignore
+CREATE OR REPLACE FUNCTION r_max (INTEGER, INTEGER)
+RETURNS INTEGER
+AS $$
+	if (arg1 > arg2)
+		return(arg1)
+	else
+		return(arg2)
+$$
+LANGUAGE plr STRICT;
+CREATE FUNCTION
+SELECT r_max(1, 10);
+ r_max 
+-------
+    10
+(1 row)
+

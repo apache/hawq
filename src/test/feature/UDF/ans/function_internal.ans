@@ -1,0 +1,16 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFInternal;
+SET
+-- end_ignore
+CREATE OR REPLACE FUNCTION internal_sqrt(DOUBLE PRECISION)
+RETURNS DOUBLE PRECISION
+AS 'dsqrt'
+LANGUAGE internal
+STRICT;
+CREATE FUNCTION
+SELECT internal_sqrt(25.0);
+ internal_sqrt 
+---------------
+             5
+(1 row)
+

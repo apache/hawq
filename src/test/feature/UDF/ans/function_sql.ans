@@ -1,0 +1,24 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFSql;
+SET
+-- end_ignore
+CREATE OR REPLACE FUNCTION sql_add(INTEGER, INTEGER)
+RETURNS INTEGER
+AS $$
+    SELECT $1 + $2;
+$$ LANGUAGE SQL;
+CREATE FUNCTION
+SELECT sql_add(1, 2);
+ sql_add 
+---------
+       3
+(1 row)
+
+CREATE OR REPLACE FUNCTION sql_add_invalid(x INTEGER, y INTEGER)
+RETURNS INTEGER
+AS $$
+    SELECT x + y;
+$$ LANGUAGE SQL;
+psql:/tmp/TestUDF_TestUDFSql.sql:16: ERROR:  column "x" does not exist
+LINE 4:     SELECT x + y;
+                   ^
