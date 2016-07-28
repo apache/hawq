@@ -20,23 +20,15 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 
-import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.ColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
-import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hawq.pxf.api.FilterParser;
-import org.apache.hawq.pxf.api.OneRow;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.orc.Reader;
-import org.apache.orc.RecordReader;
-import org.apache.orc.TypeDescription;
 import org.apache.commons.lang.StringUtils;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -50,10 +42,6 @@ import static org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIV
  * Use together with {@link HiveInputFormatFragmenter}/{@link HiveColumnarSerdeResolver}
  */
 public class HiveORCAccessor extends HiveAccessor {
-
-    private RecordReader batchReader = null;
-    private Reader reader = null;
-    private VectorizedRowBatch batch = null;
 
     private final String READ_COLUMN_IDS_CONF_STR = "hive.io.file.readcolumn.ids";
     private final String READ_ALL_COLUMNS = "hive.io.file.read.all.columns";
