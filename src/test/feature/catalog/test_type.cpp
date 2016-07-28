@@ -50,6 +50,11 @@ TEST_F_FILE_TYPE(text)
 
 TEST_F_FILE_TYPE(time)
 
-TEST_F_FILE_TYPE(type_sanity)
+TEST_F(TestType, type_sanity)
+{
+	hawq::test::SQLUtility util(hawq::test::MODE_DATABASE);
+	util.execSQLFile("catalog/sql/type_sanity.sql",
+	                 "catalog/ans/type_sanity.ans");
+}
 
 TEST_F_FILE_TYPE(varchar)
