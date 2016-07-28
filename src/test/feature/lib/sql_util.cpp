@@ -58,7 +58,6 @@ string SQLUtility::execute(const string &sql, bool check) {
     EXPECT_EQ(0, conn->getLastStatus()) << conn->getLastResult();
     return "";
   }
-  EXPECT_NE(0,  conn->getLastStatus());
   return conn.get()->getLastResult();
 }
 
