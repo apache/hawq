@@ -117,9 +117,9 @@ public class ColumnDescriptor {
     @Override
 	public String toString() {
 		return "ColumnDescriptor [gpdbColumnTypeCode=" + gpdbColumnTypeCode
-				+ ", gpdbColumnName=" + gpdbColumnName
-				+ ", gpdbColumnTypeName=" + gpdbColumnTypeName
-				+ ", gpdbColumnIndex=" + gpdbColumnIndex
-                + ", isProjected=" + isProjected + "]";
+                        + ", gpdbColumnName=" + gpdbColumnName
+                        + ", gpdbColumnTypeName=" + gpdbColumnTypeName
+                        + ", gpdbColumnIndex=" + gpdbColumnIndex
+                        + ", isProjected=" + isProjected + "]";
 	}
 }
