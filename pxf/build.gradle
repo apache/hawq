@@ -314,7 +314,6 @@ project('pxf-hive') {
         compile "org.apache.hive:hive-metastore:$hiveVersion"
         compile "org.apache.hive:hive-common:$hiveVersion"
         compile "org.apache.hive:hive-serde:$hiveVersion"
-        compile "org.apache.orc:orc-core:$orcVersion"
         testCompile 'pl.pragmatists:JUnitParams:1.0.2'
         configurations {
             // Remove hive-exec from unit tests as it causes VerifyError

@@ -412,7 +412,7 @@ public class ProtocolData extends InputData {
             String columnTypeName = getProperty("ATTR-TYPENAME" + i);
             ColumnDescriptor column;
             if(columnProjStr != null) {
-                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName, columnProjList.contains(i));
+                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName, columnProjList.contains(Integer.valueOf(i)));
             } else {
                 /* For data formats that don't support column projection */
                 column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName);

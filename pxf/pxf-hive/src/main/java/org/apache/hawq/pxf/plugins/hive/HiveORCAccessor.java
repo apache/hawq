@@ -49,7 +49,7 @@ public class HiveORCAccessor extends HiveAccessor {
     private final String SARG_PUSHDOWN = "sarg.pushdown";
 
     /**
-     * Constructs a HiveRCFileAccessor.
+     * Constructs a HiveORCFileAccessor.
      *
      * @param input input containing user data
      * @throws Exception if user data was wrong
@@ -68,23 +68,17 @@ public class HiveORCAccessor extends HiveAccessor {
         return super.openForRead();
     }
 
-    @Override
-    protected Object getReader(JobConf jobConf, InputSplit split)
-            throws IOException {
-        return inputFormat.getRecordReader(split, jobConf, Reporter.NULL);
-    }
-
     /**
      * Adds the table tuple description to JobConf ojbect
      * so only these columns will be returned.
      */
     private void addColumns() throws Exception {
 
-        List<String> colIds = new ArrayList<String>();
+        List<Integer> colIds = new ArrayList<Integer>();
         List<String> colNames = new ArrayList<String>();
         for(ColumnDescriptor col: inputData.getTupleDescription()) {
             if(col.isProjected()) {
-                colIds.add(String.valueOf(col.columnIndex()));
+                colIds.add(col.columnIndex());
                 colNames.add(col.columnName());
             }
         }
