@@ -62,7 +62,7 @@ void build_http_header(PxfInputData *input)
 		add_tuple_desc_httpheader(headers, rel);
 	}
 	
-	if (proj_info != NULL)
+	if (proj_info != NULL && proj_info->pi_isVarList)
 	{
 		add_projection_desc_httpheader(headers, proj_info);
 	}
