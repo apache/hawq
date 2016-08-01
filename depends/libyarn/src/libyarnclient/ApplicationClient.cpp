@@ -50,7 +50,7 @@ std::vector<RMInfo> RMInfo::getHARMInfo(const Yarn::Config & conf, const char* n
             retval[i].setPort(rm[1]);
         }
     } catch (const Yarn::YarnConfigNotFound &e) {
-        LOG(INFO, "Yarn RM HA is not configured.");
+        LOG(DEBUG1, "Yarn RM HA is not configured.");
     }
 
     return retval;
@@ -63,6 +63,7 @@ ApplicationClient::ApplicationClient(string &user, string &host, string &port) {
 
     Yarn::Internal::shared_ptr<Yarn::Config> conf = DefaultConfig().getConfig();
     Yarn::Internal::SessionConfig sessionConfig(*conf);
+    RootLogger.setLogSeverity(sessionConfig.getLogSeverity());
     LOG(INFO, "ApplicationClient session auth method : %s",
             sessionConfig.getRpcAuthMethod().c_str());
 
@@ -135,7 +136,7 @@ std::shared_ptr<ApplicationClientProtocol>
     ApplicationClient::getActiveAppClientProto(uint32_t & oldValue) {
     lock_guard<mutex> lock(this->mut);
 
-    LOG(INFO, "ApplicationClient::getActiveAppClientProto is called.");
+    LOG(DEBUG2, "ApplicationClient::getActiveAppClientProto is called.");
 
     if (appClientProtos.empty()) {
         LOG(WARNING, "The vector of ApplicationClientProtocol is empty.");
@@ -143,7 +144,8 @@ std::shared_ptr<ApplicationClientProtocol>
     }
 
     oldValue = currentAppClientProto;
-    LOG(INFO, "ApplicationClient::getActiveAppClientProto, current is %d.", currentAppClientProto);
+    LOG(DEBUG1, "ApplicationClient::getActiveAppClientProto, current is %d.",
+            currentAppClientProto);
     return appClientProtos[currentAppClientProto % appClientProtos.size()];
 }
 
@@ -156,12 +158,13 @@ void ApplicationClient::failoverToNextAppClientProto(uint32_t oldValue){
 
     ++currentAppClientProto;
     currentAppClientProto = currentAppClientProto % appClientProtos.size();
-    LOG(INFO, "ApplicationClient::failoverToNextAppClientProto, current is %d.", currentAppClientProto);
+    LOG(INFO, "ApplicationClient::failoverToNextAppClientProto, current is %d.",
+            currentAppClientProto);
 }
 
 static void HandleYarnFailoverException(const Yarn::YarnFailoverException & e) {
     try {
-		Yarn::rethrow_if_nested(e);
+        Yarn::rethrow_if_nested(e);
     } catch (...) {
         NESTED_THROW(Yarn::YarnRpcException, "%s", e.what());
     }

@@ -86,8 +86,9 @@ ApplicationMaster::ApplicationMaster(string &schedHost, string &schedPort,
                 std::shared_ptr<ApplicationMasterProtocol>(
                     new ApplicationMasterProtocol(rmInfos[i].getHost(),
                         rmInfos[i].getPort(), tokenService, sessionConfig, rpcAuth)));
-            LOG(INFO, "ApplicationMaster finds a candidate RM scheduler, host:%s, port:%s",
-                      rmInfos[i].getHost().c_str(), rmInfos[i].getPort().c_str());
+            LOG(INFO,
+                    "ApplicationMaster finds a candidate RM scheduler, host:%s, port:%s",
+                    rmInfos[i].getHost().c_str(), rmInfos[i].getPort().c_str());
         }
     }
     currentAppMasterProto = 0;
@@ -111,7 +112,8 @@ std::shared_ptr<ApplicationMasterProtocol>
     }
 
     oldValue = currentAppMasterProto;
-    LOG(INFO, "ApplicationMaster::getActiveAppMasterProto, current is %d.", currentAppMasterProto);
+    LOG(DEBUG2, "ApplicationMaster::getActiveAppMasterProto, current is %d.",
+            currentAppMasterProto);
     return appMasterProtos[currentAppMasterProto % appMasterProtos.size()];
 }
 
@@ -124,12 +126,13 @@ void ApplicationMaster::failoverToNextAppMasterProto(uint32_t oldValue){
 
     ++currentAppMasterProto;
     currentAppMasterProto = currentAppMasterProto % appMasterProtos.size();
-    LOG(INFO, "ApplicationMaster::failoverToNextAppMasterProto, current is %d.", currentAppMasterProto);
+    LOG(INFO, "ApplicationMaster::failoverToNextAppMasterProto, current is %d.",
+            currentAppMasterProto);
 }
 
 static void HandleYarnFailoverException(const Yarn::YarnFailoverException & e) {
     try {
-		Yarn::rethrow_if_nested(e);
+        Yarn::rethrow_if_nested(e);
     } catch (...) {
         NESTED_THROW(Yarn::YarnRpcException, "%s", e.what());
     }

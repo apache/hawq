@@ -67,7 +67,7 @@ StartContainerResponse ContainerManagement::startContainer(Container &container,
 	oss << container.getNodeId().getPort();
 	string port(oss.str());
 
-	LOG(INFO,
+	LOG(DEBUG1,
 			"ContainerManagement::startContainer, is going to connect to NM [%s:%s] to start container",
 			host.c_str(), port.c_str());
 
@@ -101,7 +101,7 @@ StartContainerResponse ContainerManagement::startContainer(Container &container,
 	StartContainerResponse scResponse;
 	scResponse.setServicesMetaData(scsResponse.getServicesMetaData());
 
-	LOG(INFO,
+	LOG(DEBUG1,
 			"ContainerManagement::startContainer, after start a container, id:%ld on NM [%s:%s]",
 			container.getId().getId(), host.c_str(), port.c_str());
 
@@ -131,7 +131,7 @@ void ContainerManagement::stopContainer(Container &container, Token &nmToken) {
 	oss << container.getNodeId().getPort();
 	string port(oss.str());
 
-	LOG(INFO,
+	LOG(DEBUG1,
 			"ContainerManagement::stopContainer, is going to connect to NM [%s:%s] to stop container",
 			host.c_str(), port.c_str());
 
@@ -174,7 +174,7 @@ ContainerStatus ContainerManagement::getContainerStatus(Container &container,
 	oss << container.getNodeId().getPort();
 	string port(oss.str());
 
-	LOG(INFO,
+	LOG(DEBUG1,
 			"ContainerManagement, is going to connect to NM [%s:%s] to getContainerStatus container",
 			host.c_str(), port.c_str());
 
