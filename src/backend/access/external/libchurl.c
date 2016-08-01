@@ -331,9 +331,6 @@ CHURL_HANDLE churl_init(const char* url, CHURL_HEADERS headers)
 	set_curl_option(context, CURLOPT_HEADERDATA, context);
 	churl_headers_set(context, headers);
 
-	print_http_headers(headers);
-	setup_multi_handle(context);
-
 	return (CHURL_HANDLE)context;
 }
 
@@ -350,6 +347,8 @@ CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
 	churl_headers_append(headers, "Transfer-Encoding", "chunked");
 	churl_headers_append(headers, "Expect", "100-continue");
 
+	print_http_headers(headers);
+	setup_multi_handle(context);
 	return (CHURL_HANDLE)context;
 }
 
@@ -359,6 +358,8 @@ CHURL_HANDLE churl_init_download(const char* url, CHURL_HEADERS headers)
 
 	context->upload = false;
 
+	print_http_headers(headers);
+	setup_multi_handle(context);
 	return (CHURL_HANDLE)context;
 }
 
