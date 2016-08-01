@@ -758,13 +758,14 @@ bool		optimizer_static_partition_selection;
 bool		optimizer_enable_partial_index;
 bool		optimizer_dml_triggers;
 bool		optimizer_dml_constraints;
-bool 		optimizer_enable_master_only_queries;
-bool sort_segments_enable;
-bool 		optimizer_multilevel_partitioning;
-bool        optimizer_enable_derive_stats_all_groups;
+bool		optimizer_enable_master_only_queries;
+bool		sort_segments_enable;
+bool		optimizer_multilevel_partitioning;
+bool		optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
-bool 		optimizer_parallel_union;
+bool		optimizer_parallel_union;
+bool		optimizer_enable_array_derivation;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -4395,6 +4396,16 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_parallel_union,
+		false, NULL, NULL
+	},
+
+	{
+		{"optimizer_enable_array_derivation", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Allows the constraint framework to derive array constraints in the optimizer."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_enable_array_derivation,
 		false, NULL, NULL
 	},
 
