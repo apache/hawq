@@ -346,6 +346,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
      * representing a composite sub-object (map, list,..) is null - then
      * BadRecordException will be thrown. If a primitive field value is null,
      * then a null will appear for the field in the record in the query result.
+     * flatten is true only when we are dealing with a non primitive field
      */
     private void traverseTuple(Object obj, ObjectInspector objInspector,
                                List<OneField> record, boolean toFlatten)
@@ -417,7 +418,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
         return listRecord;
     }
 
-    private List<OneField> traverseStruct(Object struct,
+    protected List<OneField> traverseStruct(Object struct,
                                           StructObjectInspector soi,
                                           boolean toFlatten)
             throws BadRecordException, IOException {
