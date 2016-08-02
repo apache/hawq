@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.plugins.hive;
 
 import org.apache.hawq.pxf.api.*;
 import org.apache.hawq.pxf.api.io.DataType;
+import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 import org.apache.hawq.pxf.api.utilities.Utilities;
@@ -352,37 +353,50 @@ public class HiveResolver extends Plugin implements ReadResolver {
                                List<OneField> record, boolean toFlatten)
             throws IOException, BadRecordException {
         ObjectInspector.Category category = objInspector.getCategory();
-        if ((obj == null) && (category != ObjectInspector.Category.PRIMITIVE)) {
-            throw new BadRecordException("NULL Hive composite object");
-        }
         switch (category) {
             case PRIMITIVE:
                 resolvePrimitive(obj, (PrimitiveObjectInspector) objInspector,
                         record, toFlatten);
                 break;
             case LIST:
-                List<OneField> listRecord = traverseList(obj,
-                        (ListObjectInspector) objInspector);
-                addOneFieldToRecord(record, TEXT, String.format("[%s]",
-                        HdfsUtilities.toString(listRecord, collectionDelim)));
+                if(obj == null) {
+                    addOneFieldToRecord(record, TEXT, null);
+                } else {
+                    List<OneField> listRecord = traverseList(obj,
+                            (ListObjectInspector) objInspector);
+                    addOneFieldToRecord(record, TEXT, String.format("[%s]",
+                            HdfsUtilities.toString(listRecord, collectionDelim)));
+                }
                 break;
             case MAP:
-                List<OneField> mapRecord = traverseMap(obj,
-                        (MapObjectInspector) objInspector);
-                addOneFieldToRecord(record, TEXT, String.format("{%s}",
-                        HdfsUtilities.toString(mapRecord, collectionDelim)));
+                if(obj == null) {
+                    addOneFieldToRecord(record, TEXT, null);
+                } else {
+                    List<OneField> mapRecord = traverseMap(obj,
+                            (MapObjectInspector) objInspector);
+                    addOneFieldToRecord(record, TEXT, String.format("{%s}",
+                            HdfsUtilities.toString(mapRecord, collectionDelim)));
+                }
                 break;
             case STRUCT:
-                List<OneField> structRecord = traverseStruct(obj,
-                        (StructObjectInspector) objInspector, true);
-                addOneFieldToRecord(record, TEXT, String.format("{%s}",
-                        HdfsUtilities.toString(structRecord, collectionDelim)));
+                if(obj == null) {
+                    addOneFieldToRecord(record, TEXT, null);
+                } else {
+                    List<OneField> structRecord = traverseStruct(obj,
+                            (StructObjectInspector) objInspector, true);
+                    addOneFieldToRecord(record, TEXT, String.format("{%s}",
+                            HdfsUtilities.toString(structRecord, collectionDelim)));
+                }
                 break;
             case UNION:
-                List<OneField> unionRecord = traverseUnion(obj,
-                        (UnionObjectInspector) objInspector);
-                addOneFieldToRecord(record, TEXT, String.format("[%s]",
-                        HdfsUtilities.toString(unionRecord, collectionDelim)));
+                if(obj == null) {
+                    addOneFieldToRecord(record, TEXT, null);
+                } else {
+                    List<OneField> unionRecord = traverseUnion(obj,
+                            (UnionObjectInspector) objInspector);
+                    addOneFieldToRecord(record, TEXT, String.format("[%s]",
+                            HdfsUtilities.toString(unionRecord, collectionDelim)));
+                }
                 break;
             default:
                 throw new UnsupportedTypeException("Unknown category type: "
@@ -430,10 +444,18 @@ public class HiveResolver extends Plugin implements ReadResolver {
         }
         List<OneField> structRecord = new LinkedList<>();
         List<OneField> complexRecord = new LinkedList<>();
+        List<ColumnDescriptor> colData = inputData.getTupleDescription();
         for (int i = 0; i < structFields.size(); i++) {
             if (toFlatten) {
                 complexRecord.add(new OneField(TEXT.getOID(), String.format(
                         "\"%s\"", fields.get(i).getFieldName())));
+            } else if (!colData.get(i).isProjected()) {
+                // Non-projected fields will be sent as null values.
+                // This case is invoked only in the top level of fields and
+                // not when interpreting fields of type struct.
+                traverseTuple(null, fields.get(i).getFieldObjectInspector(),
+                        complexRecord, toFlatten);
+                continue;
             }
             traverseTuple(structFields.get(i),
                     fields.get(i).getFieldObjectInspector(), complexRecord,
