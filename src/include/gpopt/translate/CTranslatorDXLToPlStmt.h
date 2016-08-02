@@ -275,7 +275,7 @@ namespace gpdxl
 				);
 
 			// main translation routine for DXL tree -> PlannedStmt
-			PlannedStmt *PplstmtFromDXL(const CDXLNode *pdxln, const Query *pquery);
+			PlannedStmt *PplstmtFromDXL(const CDXLNode *pdxln);
 
 			// translate the join types from its DXL representation to the GPDB one
 			static JoinType JtFromEdxljt(EdxlJoinType edxljt);
