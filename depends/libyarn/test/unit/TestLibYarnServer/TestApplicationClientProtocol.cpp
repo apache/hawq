@@ -139,7 +139,7 @@ TEST_F(TestApplicationClientProtocol, TestGetClusterNodesException){
 
 	EXPECT_THROW(macp.getClusterNodes(gcnreq), YarnFailoverException);
 	EXPECT_THROW(macp.getClusterNodes(gcnreq), YarnIOException);
-	EXPECT_THROW(macp.getClusterNodes(gcnreq), YarnIOException);
+	EXPECT_THROW(macp.getClusterNodes(gcnreq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestGetQueueInfoException){
