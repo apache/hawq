@@ -1,2 +1,5 @@
 doc/
+
+# test generated files
 **/*.out
+**/*.diff
