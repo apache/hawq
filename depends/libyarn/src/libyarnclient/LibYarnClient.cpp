@@ -895,7 +895,7 @@ int LibYarnClient::getApplicationReport(string &jobId,ApplicationReport &applica
                     applicationReport.getCurrentAppAttemptId().getAttemptId());
 
         return FR_SUCCEEDED;
-	} catch (std::exception& e) {
+    } catch (std::exception& e) {
         stringstream errorMsg;
         errorMsg << "LibYarnClient::getApplicationReport, Catch the Exception:"
                 << e.what();
@@ -925,7 +925,7 @@ int LibYarnClient::getContainerReports(string &jobId,list<ContainerReport> &cont
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
         stringstream errorMsg;
-        errorMsg << "LibYarnClient::getContainerReports, Catch the Exception:" << e.what();
+        errorMsg << "LibYarnClient::getContainerReports, catch the Exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
