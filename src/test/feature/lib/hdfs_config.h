@@ -24,7 +24,7 @@ class HdfsConfig {
     HdfsConfig(): psql(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD) {}
 
     /**
-     * HdfsConfig desstructor
+     * HdfsConfig destructor
      */
     ~HdfsConfig() {}
 
@@ -36,9 +36,9 @@ class HdfsConfig {
 
     /**
      * whether HDFS is kerbos
-     * @return true if HDFS is kerbos
+     * @return true if HDFS is kerberos
      */
-    bool isKerbos();
+    bool isConfigKerberos();
 
     /**
      * whether HDFS supports truncate operation
@@ -134,7 +134,7 @@ class HdfsConfig {
 
   private:
     /**
-     * @return yarn user
+     * @return hdfs user
      */
     std::string getHdfsUser();
     /**
@@ -165,6 +165,9 @@ class HdfsConfig {
     std::unique_ptr<XmlConfig> hdfsxmlconf;
     hawq::test::PSQL psql;
 };
+
+class GetHawqHomeException {};
+class GetHadoopHomeException {};
 
 } // namespace test
 } // namespace hawq

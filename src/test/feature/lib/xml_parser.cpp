@@ -107,7 +107,7 @@ void XmlConfig::readConfigItem(xmlNodePtr root) {
 
 bool XmlConfig::setString(const string &key,
                           const string &value,
-                          const bool &save) {
+                          bool save) {
   bool result = false;
 
   if (save) {

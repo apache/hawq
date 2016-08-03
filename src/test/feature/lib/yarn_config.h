@@ -7,6 +7,7 @@
 #include "psql.h"
 #include "sql_util.h"
 #include "xml_parser.h"
+#include "hdfs_config.h"
 
 namespace hawq {
 namespace test {
@@ -24,9 +25,15 @@ class YarnConfig {
     YarnConfig(): psql(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD) {}
 
     /**
-      * YarnConfig desstructor
+      * YarnConfig destructor
       */
     ~YarnConfig()  {}
+
+    /**
+     * whether YARN is configured
+     * @return true if YARN is configured; if return false, following functions should not be called
+     */
+    bool isConfigYarn();
 
     /**
      * whether YARN is in HA mode
@@ -35,10 +42,10 @@ class YarnConfig {
     bool isHA();
 
     /**
-     * whether YARN is kerbos
+     * whether YARN is kerberos
      * @return true if YARN is kerbos
      */
-    bool isKerbos();
+    bool isConfigKerberos();
 
     /**
      * get HADOOP working directory

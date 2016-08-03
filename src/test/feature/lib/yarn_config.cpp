@@ -28,7 +28,7 @@ string YarnConfig::getYarnUser() {
 bool YarnConfig::LoadFromHawqConfigFile() {
   const char *env = getenv("GPHOME");
   string confPath = env ? env : "";
-  if (!confPath.empty()) {
+  if (confPath != "") {
     confPath.append("/etc/yarn-client.xml");
   } else {
     return false;
@@ -41,31 +41,48 @@ bool YarnConfig::LoadFromHawqConfigFile() {
 
 bool YarnConfig::LoadFromYarnConfigFile() {
   string confPath=getHadoopHome();
-  if (confPath == "")
+  if (confPath == "") {
     return false;
+  }
   confPath.append("/etc/hadoop/yarn-site.xml");
   yarnxmlconf.reset(new XmlConfig(confPath));
   yarnxmlconf->parse();
   return true;
 }
 
-bool YarnConfig::isHA() {
-  bool ret = LoadFromHawqConfigFile();
+bool YarnConfig::isConfigYarn() {
+  bool ret = LoadFromYarnConfigFile();
   if (!ret) {
+    throw GetHadoopHomeException();
+  }
+  string rm = yarnxmlconf->getString("yarn.resourcemanager.address.rm1");
+  if (rm == "") {
     return false;
   }
-  string nameservice = hawqxmlconf->getString("yarn.resourcemanager.ha");
-  if (nameservice.length() > 0) {
-    return true;
-  } else {
-    return false;
-  }
+  return true;
 }
 
-bool YarnConfig::isKerbos() {
+bool YarnConfig::isHA() {
+  const hawq::test::PSQLQueryResult &result = psql.getQueryResult(
+       "SELECT substring(fselocation from length('hdfs:// ') for (position('/' in substring(fselocation from length('hdfs:// ')))-1)::int) "
+       "FROM pg_filespace pgfs, pg_filespace_entry pgfse "
+       "WHERE pgfs.fsname = 'dfs_system' AND pgfse.fsefsoid=pgfs.oid ;");
+  std::vector<std::vector<string>> table = result.getRows();
+  if (table.size() > 0) {
+    int find = table[0][0].find(":");
+    if (find < 0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+  return false;
+}
+
+bool YarnConfig::isConfigKerberos() {
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    return false;
+    throw GetHawqHomeException();
   }
   string authentication = hawqxmlconf->getString("hadoop.security.authentication");
   if (authentication == "kerberos") {
@@ -108,8 +125,9 @@ bool YarnConfig::getStandbyRM(string &standbyRM,
 bool YarnConfig::getHARM(const string &RMtype,
                                string &RM,
                                int &port) {
-  if (!isHA())
+  if (!isHA()) {
     return false;
+  }
   string RMService = "";
   string haRMValue = "rm1,rm2";
   auto haRMs = hawq::test::split(haRMValue, ',');
@@ -132,7 +150,7 @@ bool YarnConfig::getHARM(const string &RMtype,
   }
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    return false;
+    throw GetHadoopHomeException();
   }
   string rpcAddressName = "yarn.resourcemanager.address.";
   rpcAddressName.append(RMService);
@@ -159,13 +177,14 @@ bool YarnConfig::getRMList(std::vector<string> &RMList,
 
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    return false;
+    throw GetHadoopHomeException();
   }
 
   string RMAddressName = "yarn.resourcemanager.address";
   string RMAddressValue = yarnxmlconf->getString(RMAddressName);
-  if (RMAddressValue == "")
+  if (RMAddressValue == "") {
     return false;
+  }
   auto RMInfo = hawq::test::split(RMAddressValue, ':');
   RM = hawq::test::trim(RMInfo[0]);
   port = std::stoi(hawq::test::trim(RMInfo[1]));
@@ -222,7 +241,7 @@ void YarnConfig::getActiveNodeManagers(std::vector<string> &nodemanagers,
 string YarnConfig::getParameterValue(const string &parameterName) {
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    return NULL;
+    throw GetHadoopHomeException();
   }
 
   return yarnxmlconf->getString(parameterName);
@@ -230,11 +249,12 @@ string YarnConfig::getParameterValue(const string &parameterName) {
 
 string YarnConfig::getParameterValue(const string &parameterName,
                                      const string &conftype) {
-  if (conftype == "yarn" || conftype == "YARN")
+  if (conftype == "yarn" || conftype == "YARN") {
     return getParameterValue(parameterName);
+  }
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    return NULL;
+    throw GetHadoopHomeException();
   }
 
   return hawqxmlconf->getString(parameterName);
@@ -244,7 +264,7 @@ bool YarnConfig::setParameterValue(const string &parameterName,
                                    const string &parameterValue) {
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    return false;
+    throw GetHadoopHomeException();
   }
 
   return yarnxmlconf->setString(parameterName, parameterValue);
@@ -253,11 +273,12 @@ bool YarnConfig::setParameterValue(const string &parameterName,
 bool YarnConfig::setParameterValue(const string &parameterName,
                                    const string &parameterValue,
                                    const string &conftype) {
-  if (conftype == "yarn" || conftype == "YARN")
+  if (conftype == "yarn" || conftype == "YARN") {
     return setParameterValue(parameterName, parameterValue);
+  }
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    return false;
+    throw GetHawqHomeException();
   }
 
   return hawqxmlconf->setString(parameterName, parameterValue);

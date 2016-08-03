@@ -33,7 +33,7 @@ class XmlConfig {
   // @param value The updated value
   // @param save whether save the updated document to disk, if save is false, open() and closeAndSave() should be called additionally
   // @ return The value of configuration item
-  bool setString(const std::string &key, const std::string &value, const bool &save);
+  bool setString(const std::string &key, const std::string &value, bool save);
   
   bool setString(const std::string &, const std::string &);
 

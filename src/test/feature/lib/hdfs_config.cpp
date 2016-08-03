@@ -28,7 +28,7 @@ string HdfsConfig::getHdfsUser() {
 bool HdfsConfig::LoadFromHawqConfigFile() {
   const char *env = getenv("GPHOME");
   string confPath = env ? env : "";
-  if (!confPath.empty()) {
+  if (confPath != "") {
     confPath.append("/etc/hdfs-client.xml");
   } else {
     return false;
@@ -41,8 +41,9 @@ bool HdfsConfig::LoadFromHawqConfigFile() {
 
 bool HdfsConfig::LoadFromHdfsConfigFile() {
   string confPath=getHadoopHome();
-  if (confPath == "")
+  if (confPath == "") {
     return false;
+  }
   confPath.append("/etc/hadoop/hdfs-site.xml");
   hdfsxmlconf.reset(new XmlConfig(confPath));
   hdfsxmlconf->parse();
@@ -50,22 +51,26 @@ bool HdfsConfig::LoadFromHdfsConfigFile() {
 }
 
 bool HdfsConfig::isHA() {
-  bool ret = LoadFromHawqConfigFile();
-  if (!ret) {
-    return false;
+  const hawq::test::PSQLQueryResult &result = psql.getQueryResult(
+       "SELECT substring(fselocation from length('hdfs:// ') for (position('/' in substring(fselocation from length('hdfs:// ')))-1)::int) "
+       "FROM pg_filespace pgfs, pg_filespace_entry pgfse "
+       "WHERE pgfs.fsname = 'dfs_system' AND pgfse.fsefsoid=pgfs.oid ;");
+  std::vector<std::vector<string>> table = result.getRows();
+  if (table.size() > 0) {
+    int find = table[0][0].find(":");
+    if (find < 0) {
+      return true;
+    } else {
+      return false;
+    }
   }
-  string nameservice = hawqxmlconf->getString("dfs.nameservices");
-  if (nameservice.length() > 0) {
-    return true;
-  } else {
-    return false;
-  }
+  return false;
 }
 
-bool HdfsConfig::isKerbos() {
+bool HdfsConfig::isConfigKerberos() {
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    return false;
+    throw GetHawqHomeException();
   }
   string authentication = hawqxmlconf->getString("hadoop.security.authentication");
   if (authentication == "kerberos") {
@@ -83,8 +88,9 @@ bool HdfsConfig::isTruncate() {
   if (lines.size() >= 1) {
     string valueLine = lines[0];
     int find = valueLine.find("-truncate: Unknown command");
-    if (find < 0)
+    if (find < 0) {
       return true;
+    }
   }
   return false;
 }
@@ -122,8 +128,9 @@ bool HdfsConfig::getStandbyNamenode(string &standbynamenode,
 bool HdfsConfig::getHANamenode(const string &namenodetype,
                                string &namenode,
                                int &port) {
-  if (!isHA())
+  if (!isHA()) {
     return false;
+  }
   string namenodeService = "";
   string nameServiceValue = hawqxmlconf->getString("dfs.nameservices");
   string haNamenodesName = "dfs.ha.namenodes.";
@@ -227,8 +234,9 @@ bool HdfsConfig::isSafemode() {
   if (lines.size() >= 1) {
     string valueLine = lines[0];
     int find = valueLine.find("Name node is in safe mode.");
-    if (find >= 0)
+    if (find >= 0) {
       return true;
+    }
   }
   cmd = "hadoop fs -rm -r /tmp_hawq_test";
   Command c_teardown(cmd);
@@ -239,7 +247,7 @@ bool HdfsConfig::isSafemode() {
 string HdfsConfig::getParameterValue(const string &parameterName) {
   bool ret = LoadFromHdfsConfigFile();
   if (!ret) {
-    return NULL;
+    throw GetHadoopHomeException();
   }
 
   return hdfsxmlconf->getString(parameterName);
@@ -251,7 +259,7 @@ string HdfsConfig::getParameterValue(const string &parameterName,
     return getParameterValue(parameterName);
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    return NULL;
+    throw GetHawqHomeException();
   }
 
   return hawqxmlconf->getString(parameterName);
@@ -261,7 +269,7 @@ bool HdfsConfig::setParameterValue(const string &parameterName,
                                    const string &parameterValue) { 
   bool ret = LoadFromHdfsConfigFile();
   if (!ret) {
-    return false;
+    throw GetHadoopHomeException();
   }
 
   return hdfsxmlconf->setString(parameterName, parameterValue);
@@ -270,11 +278,12 @@ bool HdfsConfig::setParameterValue(const string &parameterName,
 bool HdfsConfig::setParameterValue(const string &parameterName,
                                    const string &parameterValue,
                                    const string &conftype) {
-  if (conftype == "hdfs" || conftype == "HDFS")
+  if (conftype == "hdfs" || conftype == "HDFS") {
     return setParameterValue(parameterName, parameterValue);
+  }
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    return false;
+    throw GetHawqHomeException();
   }
 
   return hawqxmlconf->setString(parameterName, parameterValue);
