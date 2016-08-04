@@ -12202,6 +12202,7 @@ ProcessGUCArray(ArrayType *array, GucSource source)
 					(errcode(ERRCODE_SYNTAX_ERROR),
 			  errmsg("could not parse setting for parameter \"%s\"", name)));
 			free(name);
+			pfree(s);
 			continue;
 		}
 
@@ -12216,12 +12217,49 @@ ProcessGUCArray(ArrayType *array, GucSource source)
 		 * GPSQL needs to dispatch the database/user config to segments.
 		 */
 		if (Gp_role == GP_ROLE_DISPATCH)
-			appendStringInfo(&MyProcPort->override_options, "-c %s=%s ", name, value);
-		elog(DEBUG1, "gpsql guc: %s = %s", name , value);
+		{
+			unsigned int	 j, start, size;
+			char			*temp, *new_temp;
+
+			size = 256;
+			temp = palloc(size + 8);
+			if (temp == NULL)
+				ereport(ERROR,
+						(errcode(ERRCODE_OUT_OF_MEMORY),
+						 errmsg("out of memory")));
+
+			j = 0;
+			for (start = 0; start < strlen(value); ++start)
+			{
+				if (j == size)
+				{
+					size *= 2;
+					new_temp = repalloc(temp, size + 8);
+					if (new_temp == NULL)
+						ereport(ERROR,
+								(errcode(ERRCODE_OUT_OF_MEMORY),
+								 errmsg("out of memory")));
+					temp = new_temp;
+				}
+
+				if (value[start] == ' ')
+				{
+					temp[j++] = '\\';
+					temp[j++] = '\\';
+				} else if (value[start] == '"' || value[start] == '\'')
+					temp[j++] = '\\';
+
+				temp[j++] = value[start];
+			}
+
+			temp[j] = '\0';
+			appendStringInfo(&MyProcPort->override_options, "-c %s=%s ", name, temp);
+			elog(DEBUG1, "gpsql guc: %s = %s", name, temp);
+			pfree(temp);
+		}
 
 		free(name);
-		if (value)
-			free(value);
+		free(value);
 		pfree(s);
 	}
 }
