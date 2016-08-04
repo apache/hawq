@@ -864,29 +864,44 @@ addOneOption(PQExpBufferData *buffer, struct config_generic * guc)
 			{
 				struct config_string *sguc = (struct config_string *) guc;
 				const char *str = *sguc->variable;
-				int			j,
-							start,
-							end;
-				char		temp[1024];
+				unsigned int	 j, start, size;
+				char			*temp, *new_temp;
 
-				end = strlen(str);
+				size = 256;
+				temp = palloc(size + 8);
+				if (temp == NULL)
+					ereport(ERROR,
+							(errcode(ERRCODE_OUT_OF_MEMORY),
+							 errmsg("out of memory")));
 
 				j = 0;
-				for (start = 0; start < end; ++start)
+				for (start = 0; start < strlen(str); ++start)
 				{
+					if (j == size)
+					{
+						size *= 2;
+						new_temp = repalloc(temp, size + 8);
+						if (new_temp == NULL)
+							ereport(ERROR,
+									(errcode(ERRCODE_OUT_OF_MEMORY),
+									 errmsg("out of memory")));
+						temp = new_temp;
+					}
+
 					if (str[start] == ' ')
-						continue;
-
-					if (str[start] == '"' || str[start] == '\'')
+					{
 						temp[j++] = '\\';
+						temp[j++] = '\\';
+					} else if (str[start] == '"' || str[start] == '\'')
+						temp[j++] = '\\';
+
 					temp[j++] = str[start];
-
-					if (j >= 1023)
-						return false;
 				}
-				temp[j] = '\0';
 
+				temp[j] = '\0';
 				appendPQExpBuffer(buffer, " -c %s=%s", guc->name, temp);
+				pfree(temp);
+
 				return true;
 			}
 	}

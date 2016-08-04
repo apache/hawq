@@ -5555,34 +5555,61 @@ report_fork_failure_to_client(Port *port, int errnum)
 
 
 /*
- * split_opts -- split a string of options and append it to an argv array
+ * pg_split_opts -- split a string of options and append it to an argv array
  *
- * NB: the string is destructively modified!
+ * The caller is responsible for ensuring the argv array is large enough.  The
+ * maximum possible number of arguments added by this routine is
+ * (strlen(optstr) + 1) / 2.
  *
- * Since no current POSTGRES arguments require any quoting characters,
- * we can use the simple-minded tactic of assuming each set of space-
- * delimited characters is a separate argv element.
- *
- * If you don't like that, well, we *used* to pass the whole option string
- * as ONE argument to execl(), which was even less intelligent...
+ * Because some option values can contain spaces we allow escaping using
+ * backslashes, with \\ representing a literal backslash.
  */
 static void
-split_opts(char **argv, int *argcp, char *s)
+pg_split_opts(char **argv, int *argcp, const char *optstr)
 {
-	while (s && *s)
-	{
-		while (isspace((unsigned char) *s))
-			++s;
-		if (*s == '\0')
-			break;
-		argv[(*argcp)++] = s;
-		while (*s && !isspace((unsigned char) *s))
-			++s;
-		if (*s)
-			*s++ = '\0';
-	}
-}
+	StringInfoData s;
 
+	initStringInfo(&s);
+
+	while (*optstr)
+	{
+		bool		last_was_escape = false;
+
+		resetStringInfo(&s);
+
+		/* skip over leading space */
+		while (isspace((unsigned char) *optstr))
+			optstr++;
+
+		if (*optstr == '\0')
+			break;
+
+		/*
+		 * Parse a single option, stopping at the first space, unless it's
+		 * escaped.
+		 */
+		while (*optstr)
+		{
+			if (isspace((unsigned char) *optstr) && !last_was_escape)
+				break;
+
+			if (!last_was_escape && *optstr == '\\')
+				last_was_escape = true;
+			else
+			{
+				last_was_escape = false;
+				appendStringInfoChar(&s, *optstr);
+			}
+
+			optstr++;
+		}
+
+		/* now store the option in the next argv[] position */
+		argv[(*argcp)++] = pstrdup(s.data);
+	}
+
+	pfree(s.data);
+}
 
 /*
  * BackendInitialize -- initialize an interactive (postmaster-child)
@@ -5815,7 +5842,7 @@ BackendRun(Port *port)
 	 *
 	 * The maximum possible number of commandline arguments that could come
 	 * from ExtraOptions or port->cmdline_options is (strlen + 1) / 2; see
-	 * split_opts().
+	 * pg_split_opts().
 	 * ----------------
 	 */
 	maxac = 10;					/* for fixed args supplied below */
@@ -5831,10 +5858,9 @@ BackendRun(Port *port)
 
 	/*
 	 * Pass any backend switches specified with -o in the postmaster's own
-	 * command line.  We assume these are secure.  (It's OK to mangle
-	 * ExtraOptions now, since we're safely inside a subprocess.)
+	 * command line.  We assume these are secure.
 	 */
-	split_opts(av, &ac, ExtraOptions);
+	pg_split_opts(av, &ac, ExtraOptions);
 
 	/* Tell the backend what protocol the frontend is using. */
 	snprintf(protobuf, sizeof(protobuf), "-v%u", port->proto);
@@ -5848,11 +5874,10 @@ BackendRun(Port *port)
 	av[ac++] = port->database_name;
 
 	/*
-	 * Pass the (insecure) option switches from the connection request. (It's
-	 * OK to mangle port->cmdline_options now.)
+	 * Pass the (insecure) option switches from the connection request.
 	 */
 	if (port->cmdline_options)
-		split_opts(av, &ac, port->cmdline_options);
+		pg_split_opts(av, &ac, port->cmdline_options);
 
 	av[ac] = NULL;
 
