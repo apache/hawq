@@ -165,6 +165,14 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         ByteArrayComparable comparator = getComparator(hbaseColumn.columnTypeCode(),
                 constant.constant());
 
+        if(operatorsMap.get(opId) == null){
+            //HBase does not support HDOP_LIKE, use 'NOT NULL' comparator
+            return new SingleColumnValueFilter(hbaseColumn.columnFamilyBytes(),
+                    hbaseColumn.qualifierBytes(),
+                    CompareFilter.CompareOp.NOT_EQUAL,
+                    new NullComparator());
+        }
+
         /**
          * If row key is of type TEXT, allow filter in start/stop row key API in
          * HBaseAccessor/Scan object.

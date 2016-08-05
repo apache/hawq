@@ -42,6 +42,7 @@ test__supported_filter_type(void **state)
 		CHAROID,
 		BYTEAOID,
 		BOOLOID,
+		DATEOID,
 		CIRCLEOID /* unsupported type */
 	};
 
@@ -61,7 +62,7 @@ test__supported_filter_type(void **state)
 
 	/* go over pxf_supported_types array */
 	int nargs = sizeof(pxf_supported_types) / sizeof(Oid);
-	assert_int_equal(nargs, 12);
+	assert_int_equal(nargs, 13);
 	for (i = 0; i < nargs; ++i)
 	{
 		assert_true(supported_filter_type(pxf_supported_types[i]));
@@ -184,6 +185,7 @@ test__const_to_str__text(void **state)
 	verify__const_to_str(false, "isn't", BPCHAROID, "\\\"isn't\\\"");
 	verify__const_to_str(false, "funny", CHAROID, "\\\"funny\\\"");
 	verify__const_to_str(false, "anymore", BYTEAOID, "\\\"anymore\\\"");
+	verify__const_to_str(false, "iamdate", DATEOID, "\\\"iamdate\\\"");
 }
 
 void
@@ -523,6 +525,10 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 			PXF_ATTR_CODE, 5, NULL,
 			PXF_CONST_CODE, 0, "\"Winston\"",
 			PXFOP_GE);
+	PxfFilterDesc* filter5 = build_filter(
+			PXF_ATTR_CODE, 6, NULL,
+			PXF_CONST_CODE, 0, "\"Eric-%\"",
+			PXFOP_LIKE);
 
 	filter_list = lappend(filter_list, filter1);
 	filter_list = lappend(filter_list, filter2);
@@ -541,6 +547,12 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 
 	result = pxf_serialize_filter_list(filter_list);
 	assert_string_equal(result, "a1c1983o2a2c1985o1o7a3c\"George Orwell\"o5o7a4c\"Winston\"o4o7");
+	pfree(result);
+
+	filter_list = lappend(filter_list, filter5);
+
+	result = pxf_serialize_filter_list(filter_list);
+	assert_string_equal(result, "a1c1983o2a2c1985o1o7a3c\"George Orwell\"o5o7a4c\"Winston\"o4o7a5c\"Eric-%\"o8o7");
 	pfree(result);
 
 	pxf_free_filter_list(filter_list);

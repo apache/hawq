@@ -25,6 +25,8 @@ import java.util.ListIterator;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -37,6 +39,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputFormat;
@@ -48,6 +51,7 @@ import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.FragmentsStats;
 import org.apache.hawq.pxf.api.Metadata;
+import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
@@ -87,6 +91,7 @@ public class HiveDataFragmenter extends Fragmenter {
     // partition filtering
     private Set<String> setPartitions = new TreeSet<String>(
             String.CASE_INSENSITIVE_ORDER);
+    private Map<String, String> partitionkeyTypes = new HashMap<>();
 
     /**
      * A Hive table unit - means a subset of the HIVE table, where we can say
@@ -191,6 +196,7 @@ public class HiveDataFragmenter extends Fragmenter {
             // Save all hive partition names in a set for later filter match
             for (FieldSchema fs : tbl.getPartitionKeys()) {
                 setPartitions.add(fs.getName());
+				partitionkeyTypes.put(fs.getName(), fs.getType());
             }
 
             LOG.debug("setPartitions :" + setPartitions);
@@ -447,6 +453,12 @@ public class HiveDataFragmenter extends Fragmenter {
         // to filter list)
         if (!setPartitions.contains(filterColumnName)) {
             LOG.debug("Filter name is not a partition , ignore this filter for hive: "
+                    + filter);
+            return false;
+        }
+
+		if (!partitionkeyTypes.get(filterColumnName).equalsIgnoreCase(serdeConstants.STRING_TYPE_NAME)) {
+            LOG.debug("Filter type is not string type , ignore this filter for hive: "
                     + filter);
             return false;
         }
