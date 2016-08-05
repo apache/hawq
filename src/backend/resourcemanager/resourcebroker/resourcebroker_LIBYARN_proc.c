@@ -755,7 +755,7 @@ int sendRBGetClusterReportErrorData(int errorcode)
 		return RESBROK_PIPE_ERROR;
 	}
 
-	return FUNC_RETURN_OK;
+	return errorcode;
 }
 
 /**
