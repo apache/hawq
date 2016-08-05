@@ -40,6 +40,10 @@
               <!-- PyGreSQL an open-source Python module that interfaces to a PostgreSQL database under the Python Software Foundation License -->
               <exclude>tools/bin/pythonSrc/PyGreSQL-4.0/**</exclude>
 
+              <!-- Open-source Python modules with ISC license -->
+              <exclude>tools/bin/pythonSrc/pexpect-4.2/**</exclude>
+              <exclude>tools/bin/pythonSrc/ptyprocess-0.5.1/**</exclude>
+
               <!-- Open-source Python modules with MIT license -->
               <exclude>tools/bin/pythonSrc/PSI-0.3b2_gp/**</exclude>
               <exclude>tools/bin/pythonSrc/lockfile-0.9.1/**</exclude>
