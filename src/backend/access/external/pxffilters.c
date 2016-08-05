@@ -78,6 +78,7 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{665 /* text_le */, PXFOP_LE},
 	{667 /* text_ge */, PXFOP_GE},
 	{531 /* textlt  */, PXFOP_NE},
+	{1209 /* textlike  */, PXFOP_LIKE},
 
 	/* int2 to int4 */
 	{Int24EqualOperator /* int24eq */, PXFOP_EQ},
@@ -125,7 +126,15 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{1871 /* int82gt */, PXFOP_GT},
 	{1872 /* int82le */, PXFOP_LE},
 	{1873 /* int82ge */, PXFOP_GE},
-	{1869 /* int82ne */, PXFOP_NE}
+	{1869 /* int82ne */, PXFOP_NE},
+
+	/* date */
+	{DateEqualOperator  /* eq */, PXFOP_EQ},
+	{1095  /* date_lt */, PXFOP_LT},
+	{1097 /* date_gt */, PXFOP_GT},
+	{1096 /* date_le */, PXFOP_LE},
+	{1098 /* date_ge */, PXFOP_GE},
+	{1094 /* date_ne */, PXFOP_NE}
 
 };
 
@@ -142,7 +151,8 @@ Oid pxf_supported_types[] =
 	BPCHAROID,
 	CHAROID,
 	BYTEAOID,
-	BOOLOID
+	BOOLOID,
+	DATEOID
 };
 
 /*
@@ -513,6 +523,7 @@ const_to_str(Const *constval, StringInfo buf)
 		case BPCHAROID:
 		case CHAROID:
 		case BYTEAOID:
+		case DATEOID:
 			appendStringInfo(buf, "\\\"%s\\\"", extval);
 			break;
 
