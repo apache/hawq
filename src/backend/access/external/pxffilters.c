@@ -536,6 +536,33 @@ const_to_str(Const *constval, StringInfo buf)
 	pfree(extval);
 }
 
+
+static List*
+pxf_extract_attributes(List *filters) {
+	ListCell *lc = NULL;
+	List *result = NIL;
+
+	if (list_length(filters) == 0)
+		return NIL;
+
+	foreach (lc, filters)
+	{
+		PxfFilterDesc *filter = (PxfFilterDesc *) lfirst(lc);
+		PxfOperand l = filter->l;
+		PxfOperand r = filter->r;
+
+		if (pxfoperand_is_attr(l)) {
+			result = lappend_int(result, l.attnum - 1);
+		}
+
+		if (pxfoperand_is_attr(r)) {
+			result = lappend_int(result, r.attnum - 1);
+		}
+	}
+
+	return result;
+}
+
 /*
  * serializePxfFilterQuals
  *
@@ -563,3 +590,12 @@ char *serializePxfFilterQuals(List *quals)
 	return result;
 }
 
+List* extractPxfAttributes(List* quals)
+{
+
+	List *filters = pxf_make_filter_list(quals);
+
+	List *attributes = pxf_extract_attributes(filters);
+
+	return attributes;
+}
