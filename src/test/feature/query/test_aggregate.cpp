@@ -45,7 +45,7 @@ TEST_F(TestAggregate, TestCreateAggregate) {
   util.execute("drop table if exists t");
   hawq::test::DataGenerator dGen(&util);
   dGen.genSimpleTable("t");
-  util.query("select avg(b) as bavg from t group by a order by bavg","3|\n15|\n62|\n");
+  util.query("select sum2(a,b) as absum from t group by a,b order by absum","4|\n29|\n113|\n");
   util.query("select newavg(b) as bavg from t group by a order by bavg","3|\n15|\n62|\n");
 }
 
