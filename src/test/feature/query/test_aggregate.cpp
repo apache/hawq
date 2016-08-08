@@ -60,4 +60,16 @@ TEST_F(TestAggregate, TestAggregateWithGroupingsets) {
       " sum_c;", "1|aa|10|\n1|bb|20|\n2|cc|20|\n|aa|10|\n|bb|20|\n|cc|20|\n");
 }
 
+TEST_F(TestAggregate, TestAggregateWithNull) {
+  hawq::test::SQLUtility util;
+  util.execute("drop table if exists t");
+  hawq::test::DataGenerator dGen(&util);
+  dGen.genTableWithNull("t");
+
+  util.query(
+      "select SUM(CASE WHEN a = 15 THEN 1 ELSE 0 END), b ,c from t group by "
+      "b,c",
+      "1||aa|\n0||WET|\n0|51||\n");
+}
+
 
