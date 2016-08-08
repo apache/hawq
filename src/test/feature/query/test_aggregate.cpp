@@ -72,4 +72,8 @@ TEST_F(TestAggregate, TestAggregateWithNull) {
       "1||aa|\n0||WET|\n0|51||\n");
 }
 
-
+TEST_F(TestAggregate, TestAggregateDerivedWin) {
+  hawq::test::SQLUtility util;
+  util.execSQLFile("query/sql/agg-derived-win.sql",
+                   "query/ans/agg-derived-win.ans");
+}

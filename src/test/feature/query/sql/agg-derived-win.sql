@@ -155,7 +155,7 @@ SELECT a,b,mysum(b) over (w) FROM t1 WINDOW w as (PARTITION BY a); -- mvd 1,2->3
 SELECT a,b,mysum(b) over (w) FROM t1 WINDOW w as (ORDER BY b); -- mvd 1,2->3
 SELECT a,b,mysum(b) over (w) FROM t1 WINDOW w as (PARTITION BY a ORDER BY b); -- mvd 1,2->3
 SELECT a,b,mysum(b) over (w) FROM t1 WINDOW w as
-  (PARTITION BY a ORDER BY b ROWS BETWEEN 1 preceding and current row); -- mvd 1,2->3
+  (PARTITION BY a ORDER BY b ROWS BETWEEN 1 preceding and current row) order by a,b; -- mvd 1,2->3
 
-select a,b,mylag(b, 1) over (partition by a order by b) from t1; -- mvd 1,2->3
+select a,b,mylag(b, 1) over (partition by a order by b) from t1 order by a,b; -- mvd 1,2->3
 

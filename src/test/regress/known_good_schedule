@@ -170,7 +170,6 @@ ignore: percentile
 ignore: resource_queue_function
 ignore: gp_optimizer
 ignore: co_nestloop_idxscan
-test: agg_derived_win
 ignore: orca_udfs
 #
 # the following test needs some special filespace/tablespace.
