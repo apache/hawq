@@ -31,7 +31,7 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static List* pxf_make_filter_list(List* quals);
+static List* pxf_make_filter_list(List* quals, bool extractAttrs);
 static void pxf_free_filter(PxfFilterDesc* filter);
 static void pxf_free_filter_list(List *filters);
 static char* pxf_serialize_filter_list(List *filters);
@@ -155,7 +155,7 @@ Oid pxf_supported_types[] =
  * Caller is responsible for pfreeing the returned PxfFilterDesc List.
  */
 static List *
-pxf_make_filter_list(List *quals)
+pxf_make_filter_list(List *quals, bool extractAttrs)
 {
 	List			*result = NIL;
 	ListCell		*lc = NULL;
@@ -196,10 +196,11 @@ pxf_make_filter_list(List *quals)
 				elog(DEBUG5, "pxf_make_filter_list: node tag %d (T_BoolExpr), bool node type %d %s",
 						tag, boolType, boolType==AND_EXPR ? "(AND_EXPR)" : "");
 
-				/* only AND_EXPR is supported */
-				if (expr->boolop == AND_EXPR)
+				/* only AND_EXPR is supported for filter push-down*/
+				/* AND_EXPR, OR_EXPR, NOT_EXPR are supported for extracting attributes from WHERE clause*/
+				if (expr->boolop == AND_EXPR || extractAttrs)
 				{
-					List *inner_result = pxf_make_filter_list(expr->args);
+					List *inner_result = pxf_make_filter_list(expr->args, extractAttrs);
 					elog(DEBUG5, "pxf_make_filter_list: inner result size %d", list_length(inner_result));
 					result = list_concat(result, inner_result);
 				}
@@ -580,7 +581,7 @@ char *serializePxfFilterQuals(List *quals)
 
 	if (pxf_enable_filter_pushdown)
 	{
-		List *filters = pxf_make_filter_list(quals);
+		List *filters = pxf_make_filter_list(quals, false);
 
 		result  = pxf_serialize_filter_list(filters);
 		pxf_free_filter_list(filters);
@@ -593,7 +594,7 @@ char *serializePxfFilterQuals(List *quals)
 List* extractPxfAttributes(List* quals)
 {
 
-	List *filters = pxf_make_filter_list(quals);
+	List *filters = pxf_make_filter_list(quals, true);
 
 	List *attributes = pxf_extract_attributes(filters);
 
