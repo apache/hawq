@@ -67,9 +67,9 @@ TEST_F(TestAggregate, TestAggregateWithNull) {
   dGen.genTableWithNull("t");
 
   util.query(
-      "select SUM(CASE WHEN a = 15 THEN 1 ELSE 0 END), b ,c from t group by "
-      "b,c",
-      "1||aa|\n0||WET|\n0|51||\n");
+      "select SUM(CASE WHEN a = 15 THEN 1 ELSE 0 END) as aa, b ,c from t group by b, c "
+      "order by aa, b, c",
+      "0|51||\n0||WET|\n1||aa|\n");
 }
 
 TEST_F(TestAggregate, TestAggregateDerivedWin) {
