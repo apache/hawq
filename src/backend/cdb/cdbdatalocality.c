@@ -3791,12 +3791,16 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
 		bool isRelationHash = is_relation_hash(targetPolicy);
 
+		int fileCountInRelation = list_length(rel_data->files);
 		/* change the virtual segment order when keep hash.
 		 * order of idMap should also be changed.
+		 * if file count of the table is not equal to or multiple of
+		 * bucket number, we should process it as random table.
 		 */
 		if (isRelationHash && context->keep_hash
 				&& assignment_context.virtual_segment_num == targetPolicy->bucketnum
-				&& !vSegOrderChanged) {
+				&& !vSegOrderChanged
+				&& fileCountInRelation % targetPolicy->bucketnum == 0) {
 			change_hash_virtual_segments_order(resourcePtr, rel_data,
 					&assignment_context, &idMap);
 			for (int p = 0; p < idMap.target_segment_num; p++) {
@@ -3822,8 +3826,13 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		uint64_t before_run_allocate_hash_or_random = gettime_microsec();
 		/*allocate hash relation*/
 		if (isRelationHash) {
-			if (context->keep_hash && assignment_context.virtual_segment_num
-						== targetPolicy->bucketnum) {
+		  /*
+		   * if file count of the table is not equal to or multiple of
+		   * bucket number, we should process it as random table.
+	     */
+			if (context->keep_hash
+			    && assignment_context.virtual_segment_num== targetPolicy->bucketnum
+			    && fileCountInRelation % targetPolicy->bucketnum == 0) {
 				ListCell* parlc;
 				bool parentIsHashExist=false;
 				bool parentIsHash =false;
