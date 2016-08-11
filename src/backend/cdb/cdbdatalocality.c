@@ -3829,7 +3829,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		  /*
 		   * if file count of the table is not equal to or multiple of
 		   * bucket number, we should process it as random table.
-	     */
+		   */
 			if (context->keep_hash
 			    && assignment_context.virtual_segment_num== targetPolicy->bucketnum
 			    && fileCountInRelation % targetPolicy->bucketnum == 0) {
