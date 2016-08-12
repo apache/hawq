@@ -844,7 +844,6 @@ drop table orca_exc_handle;
 -- Test B-Tree index scan with in list
 CREATE TABLE btree_test as SELECT * FROM generate_series(1,100) as a distributed randomly;
 CREATE INDEX btree_test_index ON btree_test(a);
-EXPLAIN SELECT * FROM btree_test WHERE a in (select 1);
 EXPLAIN SELECT * FROM btree_test WHERE a in (1, 47);
 EXPLAIN SELECT * FROM btree_test WHERE a in ('2', 47);
 EXPLAIN SELECT * FROM btree_test WHERE a in ('1', '2');
@@ -853,10 +852,7 @@ EXPLAIN SELECT * FROM btree_test WHERE a in ('1', '2', 47);
 -- Test Bitmap index scan with in list
 CREATE TABLE bitmap_test as SELECT * FROM generate_series(1,100) as a distributed randomly;
 CREATE INDEX bitmap_index ON bitmap_test USING BITMAP(a);
--- The following query should fall back to planner. 
--- Update the result file when this has been fixed in ORCA.
 EXPLAIN SELECT * FROM bitmap_test WHERE a in (select 1);
--- The following queries should work without falling back to planner.
 EXPLAIN SELECT * FROM bitmap_test WHERE a in (1, 47);
 EXPLAIN SELECT * FROM bitmap_test WHERE a in ('2', 47);
 EXPLAIN SELECT * FROM bitmap_test WHERE a in ('1', '2');
