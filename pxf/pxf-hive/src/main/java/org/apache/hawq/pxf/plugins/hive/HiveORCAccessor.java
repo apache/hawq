@@ -143,6 +143,11 @@ public class HiveORCAccessor extends HiveAccessor {
             case HDOP_NE:
                 builder.startNot().equals(filterColumnName, filterValue).end();
                 break;
+<<<<<<< HEAD
+=======
+            case HDOP_LIKE:
+                break;
+>>>>>>> 71fd7a7a0d06ebf4dc3fcf87c2015bb33b3669bd
         }
         return;
     }
