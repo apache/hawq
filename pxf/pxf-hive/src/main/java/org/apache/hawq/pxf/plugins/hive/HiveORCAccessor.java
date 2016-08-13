@@ -56,7 +56,7 @@ public class HiveORCAccessor extends HiveAccessor {
      */
     public HiveORCAccessor(InputData input) throws Exception {
         super(input, new OrcInputFormat());
-        String[] toks = HiveInputFormatFragmenter.parseToks(input, PXF_HIVE_SERDES.COLUMNAR_SERDE.name(), PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name(), PXF_HIVE_SERDES.ORC_SERDE.name(), PXF_HIVE_SERDES.VECTORIZED_ORC_SERDE.name());
+        String[] toks = HiveInputFormatFragmenter.parseToks(input, PXF_HIVE_SERDES.ORC_SERDE.name());
         initPartitionFields(toks[HiveInputFormatFragmenter.TOK_KEYS]);
         filterInFragmenter = new Boolean(toks[HiveInputFormatFragmenter.TOK_FILTER_DONE]);
     }
@@ -142,8 +142,6 @@ public class HiveORCAccessor extends HiveAccessor {
                 break;
             case HDOP_NE:
                 builder.startNot().equals(filterColumnName, filterValue).end();
-                break;
-            case HDOP_LIKE:
                 break;
         }
         return;

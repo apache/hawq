@@ -165,9 +165,10 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     }
 
     private void compareTypes(DataType type, String hiveType, String fieldName) {
-        String convertedHive = toHiveType(type, fieldName);
+        String convertedHive = toHiveType(type, fieldName, null);
         if (!convertedHive.equals(hiveType)
-                && !(convertedHive.equals("smallint") && hiveType.equals("tinyint"))) {
+                && !(convertedHive.equals("smallint") && hiveType.equals("tinyint"))
+                && !hiveType.startsWith(convertedHive)) {
             throw new UnsupportedTypeException(
                     "Schema mismatch definition: Field " + fieldName
                             + " (Hive type " + hiveType + ", HAWQ type "
@@ -193,13 +194,14 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
      * <li>{@code FLOAT8 -> double}</li>
      * </ul>
      * All other types (both in HAWQ and in HIVE) are not supported.
+     * For varchar and char types, typeMod will have the length info along with type.
      *
      * @param type HAWQ data type
      * @param name field name
      * @return Hive type
      * @throws UnsupportedTypeException if type is not supported
      */
-    public static String toHiveType(DataType type, String name) {
+    public static String toHiveType(DataType type, String name, String typeMod) {
         switch (type) {
             case BOOLEAN:
             case SMALLINT:
@@ -220,6 +222,23 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
                 return "double";
             case TIME:
                 return "timestamp";
+            case DATE:
+                return "date";
+            case VARCHAR:
+                if(typeMod != null)
+                    return typeMod;
+                else
+                    return "varchar";
+            case BPCHAR:
+                if(typeMod != null)
+                    return typeMod.substring(2);
+                else
+                    return "char";
+            case CHAR:
+                if(typeMod != null)
+                    return typeMod;
+                else
+                    return "char";
             default:
                 throw new UnsupportedTypeException(
                         type.toString()

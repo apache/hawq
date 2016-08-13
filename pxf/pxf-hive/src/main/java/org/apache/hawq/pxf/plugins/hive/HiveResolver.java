@@ -19,6 +19,7 @@ package org.apache.hawq.pxf.plugins.hive;
  * under the License.
  */
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hawq.pxf.api.*;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
@@ -35,9 +36,9 @@ import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.*;
+import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.*;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.*;
-import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 
@@ -507,7 +508,11 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 break;
             }
             case SHORT: {
-                val = (o != null) ? ((ShortObjectInspector) oi).get(o) : null;
+                if( o.getClass().getSimpleName().equals("ByteWritable") ) {
+                    val = (o != null) ? new Short(((ByteWritable) o).get()) : null;
+                } else {
+                    val = (o != null) ? ((ShortObjectInspector) oi).get(o) : null;
+                }
                 addOneFieldToRecord(record, SMALLINT, val);
                 break;
             }
