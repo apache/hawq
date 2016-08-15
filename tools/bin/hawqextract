@@ -434,7 +434,8 @@ def extract_metadata(conn, tbname):
                                                          p_pgclass['relfilenode'])
                 }
                 file_locations['Partitions'].append(par_info)
-
+        logger.info('-- extract Parquet_Schema')
+        metadata['Parquet_Schema'] = accessor.get_schema(relid)
         metadata['Parquet_FileLocations'] = file_locations
 
     # extract AO/Parquet specific metadata
