@@ -472,6 +472,10 @@ task tomcatRpm(type: Rpm) {
         license = project.license
         user = 'root'
         permissionGroup = 'root'
+        packager = 'dev@hawq.incubator.apache.org'
+        packageDescription = 'Apache Tomcat is an open source software implementation of the Java Servlet and JavaServer Pages technologies.'
+        packageGroup = 'Development/Libraries'
+        release = project.osFamily
 
         preInstall file('tomcat/src/scripts/pre-install.sh')
 
