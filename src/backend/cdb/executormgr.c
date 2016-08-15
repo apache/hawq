@@ -868,11 +868,9 @@ addOneOption(PQExpBufferData *buffer, struct config_generic * guc)
 				char			*temp, *new_temp;
 
 				size = 256;
-				temp = palloc(size + 8);
+				temp = malloc(size + 8);
 				if (temp == NULL)
-					ereport(ERROR,
-							(errcode(ERRCODE_OUT_OF_MEMORY),
-							 errmsg("out of memory")));
+					return false;
 
 				j = 0;
 				for (start = 0; start < strlen(str); ++start)
@@ -880,11 +878,12 @@ addOneOption(PQExpBufferData *buffer, struct config_generic * guc)
 					if (j == size)
 					{
 						size *= 2;
-						new_temp = repalloc(temp, size + 8);
+						new_temp = realloc(temp, size + 8);
 						if (new_temp == NULL)
-							ereport(ERROR,
-									(errcode(ERRCODE_OUT_OF_MEMORY),
-									 errmsg("out of memory")));
+						{
+							free(temp);
+							return false;
+						}
 						temp = new_temp;
 					}
 
@@ -900,7 +899,7 @@ addOneOption(PQExpBufferData *buffer, struct config_generic * guc)
 
 				temp[j] = '\0';
 				appendPQExpBuffer(buffer, " -c %s=%s", guc->name, temp);
-				pfree(temp);
+				free(temp);
 
 				return true;
 			}
