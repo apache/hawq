@@ -3179,7 +3179,7 @@ static struct config_bool ConfigureNamesBool[] =
 	{
 	    {"allow_file_count_bucket_num_mismatch", PGC_POSTMASTER, CLIENT_CONN_LOCALE,
 	          gettext_noop("allow hash table to be treated as random when file count and"
-	              " bucket number are mismathced"),
+	              " bucket number are mismatched"),
 	          NULL,
 	          GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 	    },
