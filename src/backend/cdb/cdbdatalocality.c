@@ -3792,6 +3792,15 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		bool isRelationHash = is_relation_hash(targetPolicy);
 
 		int fileCountInRelation = list_length(rel_data->files);
+		bool FileCountBucketNumMismatch = fileCountInRelation %
+		    targetPolicy->bucketnum == 0 ? false : true;
+		if (FileCountBucketNumMismatch && !allow_file_count_bucket_num_mismatch) {
+		  elog(ERROR, "file count in catalog is not in proportion to the bucket number "
+		      "of hash table with oid=%u, some data maybe lost, if you still want to "
+		      "continue the query by considering the table as random, set GUC "
+		      "allow_file_count_bucket_num_mismatch to on and try again.",
+		      myrelid);
+		}
 		/* change the virtual segment order when keep hash.
 		 * order of idMap should also be changed.
 		 * if file count of the table is not equal to or multiple of
@@ -3799,8 +3808,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		 */
 		if (isRelationHash && context->keep_hash
 				&& assignment_context.virtual_segment_num == targetPolicy->bucketnum
-				&& !vSegOrderChanged
-				&& fileCountInRelation % targetPolicy->bucketnum == 0) {
+				&& !vSegOrderChanged && !FileCountBucketNumMismatch) {
 			change_hash_virtual_segments_order(resourcePtr, rel_data,
 					&assignment_context, &idMap);
 			for (int p = 0; p < idMap.target_segment_num; p++) {
@@ -3832,7 +3840,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		   */
 			if (context->keep_hash
 			    && assignment_context.virtual_segment_num== targetPolicy->bucketnum
-			    && fileCountInRelation % targetPolicy->bucketnum == 0) {
+			    && !FileCountBucketNumMismatch) {
 				ListCell* parlc;
 				bool parentIsHashExist=false;
 				bool parentIsHash =false;
