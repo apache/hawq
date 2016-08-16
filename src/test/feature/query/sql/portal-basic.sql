@@ -1,14 +1,3 @@
---
--- Cursor regression tests
---
--- setup
-ALTER RESOURCE QUEUE pg_default WITH (active_statements=30);
-
-CREATE TABLE test1 (a int, b int, c int, d int);
-CREATE TABLE test2 (a int, b int, c int, d int);
-INSERT INTO test1 SELECT x, 2 * x, 3 * x, 4 * x FROM generate_series(1, 1000) x;
-INSERT INTO test2 SELECT x, 2 * x, 3 * x, 4 * x FROM generate_series(1, 1000) x;
-
 BEGIN;
 
 DECLARE foo1 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
@@ -198,9 +187,3 @@ SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors OR
 DECLARE bc BINARY CURSOR FOR SELECT * FROM test1;
 SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
 ROLLBACK;
-
--- teardown
-DROP TABLE test1;
-DROP TABLE test2;
-
-ALTER RESOURCE QUEUE pg_default WITH (active_statements=20);

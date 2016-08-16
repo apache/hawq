@@ -1,36 +1,51 @@
---
--- Cursor regression tests
---
--- setup
-ALTER RESOURCE QUEUE pg_default WITH (active_statements=30);
-CREATE TABLE test1 (a int, b int, c int, d int);
-CREATE TABLE test2 (a int, b int, c int, d int);
-INSERT INTO test1 SELECT x, 2 * x, 3 * x, 4 * x FROM generate_series(1, 1000) x;
-INSERT INTO test2 SELECT x, 2 * x, 3 * x, 4 * x FROM generate_series(1, 1000) x;
 BEGIN;
+BEGIN
 DECLARE foo1 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo2 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo3 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo4 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo5 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo6 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo7 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo8 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo9 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo10 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo11 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo12 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo13 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo14 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo15 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo16 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo17 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo18 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo19 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo20 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo21 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo22 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 DECLARE foo23 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 FETCH 1 in foo1;
  a | b | c | d 
 ---+---+---+---
@@ -423,17 +438,29 @@ FETCH 23 in foo23;
 (23 rows)
 
 CLOSE foo1;
+CLOSE CURSOR
 CLOSE foo2;
+CLOSE CURSOR
 CLOSE foo3;
+CLOSE CURSOR
 CLOSE foo4;
+CLOSE CURSOR
 CLOSE foo5;
+CLOSE CURSOR
 CLOSE foo6;
+CLOSE CURSOR
 CLOSE foo7;
+CLOSE CURSOR
 CLOSE foo8;
+CLOSE CURSOR
 CLOSE foo9;
+CLOSE CURSOR
 CLOSE foo10;
+CLOSE CURSOR
 CLOSE foo11;
+CLOSE CURSOR
 CLOSE foo12;
+CLOSE CURSOR
 -- leave some cursors open, to test that auto-close works.
 -- record this in the system view as well (don't query the time field there
 -- however)
@@ -454,6 +481,7 @@ SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors OR
 (11 rows)
 
 END;
+COMMIT
 SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
  name | statement | is_holdable | is_binary | is_scrollable 
 ------+-----------+-------------+-----------+---------------
@@ -463,7 +491,9 @@ SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors OR
 -- NO SCROLL disallows backward fetching
 --
 BEGIN;
+BEGIN
 DECLARE foo24 NO SCROLL CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 FETCH 1 FROM foo24;
  a | b | c | d 
 ---+---+---+---
@@ -471,8 +501,9 @@ FETCH 1 FROM foo24;
 (1 row)
 
 FETCH BACKWARD 1 FROM foo24; -- should fail
-ERROR:  backward scan is not supported in this version of Greenplum Database
+psql:/tmp/TestQueryPortal_TestBasic1.sql:143: ERROR:  backward scan is not supported in this version of Greenplum Database
 END;
+ROLLBACK
 --
 -- Cursors outside transaction blocks
 --
@@ -482,7 +513,9 @@ SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors OR
 (0 rows)
 
 BEGIN;
+BEGIN
 DECLARE foo25 CURSOR WITH HOLD FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 FETCH FROM foo25;
  a | b | c | d 
 ---+---+---+---
@@ -496,6 +529,7 @@ FETCH FROM foo25;
 (1 row)
 
 COMMIT;
+COMMIT
 FETCH FROM foo25;
  a | b | c | d  
 ---+---+---+----
@@ -511,23 +545,29 @@ SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors OR
 (1 row)
 
 CLOSE foo25;
+CLOSE CURSOR
 --
 -- ROLLBACK should close holdable cursors
 --
 BEGIN;
+BEGIN
 DECLARE foo26 CURSOR WITH HOLD FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
 ROLLBACK;
+ROLLBACK
 -- should fail
 FETCH FROM foo26;
-ERROR:  cursor "foo26" does not exist
+psql:/tmp/TestQueryPortal_TestBasic1.sql:185: ERROR:  cursor "foo26" does not exist
 -- Create a cursor with the BINARY option and check the pg_cursors view
 BEGIN;
+BEGIN
 SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
  name | statement | is_holdable | is_binary | is_scrollable 
 ------+-----------+-------------+-----------+---------------
 (0 rows)
 
 DECLARE bc BINARY CURSOR FOR SELECT * FROM test1;
+DECLARE CURSOR
 SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
  name |                     statement                     | is_holdable | is_binary | is_scrollable 
 ------+---------------------------------------------------+-------------+-----------+---------------
@@ -535,7 +575,4 @@ SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors OR
 (1 row)
 
 ROLLBACK;
--- teardown
-DROP TABLE test1;
-DROP TABLE test2;
-ALTER RESOURCE QUEUE pg_default WITH (active_statements=20);
+ROLLBACK
