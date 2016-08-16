@@ -450,6 +450,7 @@ char       *Debug_dtm_action_protocol_str;
 
 /* Enable check for compatibility of encoding and locale in createdb */
 bool		gp_encoding_check_locale_compatibility;
+bool  allow_file_count_bucket_num_mismatch;
 
 char	   *pgstat_temp_directory;
 
@@ -3173,6 +3174,17 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&gp_encoding_check_locale_compatibility,
 		true, NULL, NULL
+	},
+
+	{
+	    {"allow_file_count_bucket_num_mismatch", PGC_POSTMASTER, CLIENT_CONN_LOCALE,
+	          gettext_noop("allow hash table to be treated as random when file count and"
+	              " bucket number are mismatched"),
+	          NULL,
+	          GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+	    },
+	    &allow_file_count_bucket_num_mismatch,
+	    false, NULL, NULL
 	},
 
 	{
