@@ -3797,7 +3797,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		  FileCountBucketNumMismatch = fileCountInRelation %
 		    targetPolicy->bucketnum == 0 ? false : true;
 		}
-		if (FileCountBucketNumMismatch && !allow_file_count_bucket_num_mismatch) {
+		if (isRelationHash && FileCountBucketNumMismatch && !allow_file_count_bucket_num_mismatch) {
 		  elog(ERROR, "file count %d in catalog is not in proportion to the bucket "
 		      "number %d of hash table with oid=%u, some data may be lost, if you "
 		      "still want to continue the query by considering the table as random, set GUC "
