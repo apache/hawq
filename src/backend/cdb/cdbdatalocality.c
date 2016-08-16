@@ -3798,11 +3798,11 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		    targetPolicy->bucketnum == 0 ? false : true;
 		}
 		if (FileCountBucketNumMismatch && !allow_file_count_bucket_num_mismatch) {
-		  elog(ERROR, "file count in catalog is not in proportion to the bucket number "
-		      "of hash table with oid=%u, some data maybe lost, if you still want to "
-		      "continue the query by considering the table as random, set GUC "
+		  elog(ERROR, "file count %d in catalog is not in proportion to the bucket "
+		      "number %d of hash table with oid=%u, some data may be lost, if you "
+		      "still want to continue the query by considering the table as random, set GUC "
 		      "allow_file_count_bucket_num_mismatch to on and try again.",
-		      myrelid);
+		      fileCountInRelation, targetPolicy->bucketnum, myrelid);
 		}
 		/* change the virtual segment order when keep hash.
 		 * order of idMap should also be changed.
