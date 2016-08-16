@@ -16,7 +16,6 @@ ignore: goh_column_compression
 test: goh_database
 test: goh_gp_dist_random
 ignore: gpsql_fault_tolerance
-test: goh_portals
 ignore: goh_set_schema
 ignore: bit
 ignore: numeric
