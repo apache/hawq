@@ -294,6 +294,9 @@ project('pxf-hdfs') {
     ospackage {
         summary = 'HAWQ Extension Framework (PXF), HDFS plugin'
         description = 'Querying external data stored in HDFS'
+        packager = 'dev@hawq.incubator.apache.org'
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
 
         requires('pxf-service', project.version, GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
