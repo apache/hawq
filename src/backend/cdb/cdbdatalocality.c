@@ -3792,8 +3792,11 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		bool isRelationHash = is_relation_hash(targetPolicy);
 
 		int fileCountInRelation = list_length(rel_data->files);
-		bool FileCountBucketNumMismatch = fileCountInRelation %
+		bool FileCountBucketNumMismatch = false;
+		if (targetPolicy->bucketnum > 0) {
+		  FileCountBucketNumMismatch = fileCountInRelation %
 		    targetPolicy->bucketnum == 0 ? false : true;
+		}
 		if (FileCountBucketNumMismatch && !allow_file_count_bucket_num_mismatch) {
 		  elog(ERROR, "file count in catalog is not in proportion to the bucket number "
 		      "of hash table with oid=%u, some data maybe lost, if you still want to "
