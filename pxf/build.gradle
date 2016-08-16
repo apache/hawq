@@ -193,6 +193,9 @@ project('pxf-service') {
     ospackage {
         summary = 'HAWQ Extension Framework (PXF), service REST API'
         description = 'Rest API for the HAWQ Extenstion framework'
+        packager = 'dev@hawq.incubator.apache.org'
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
 
         requires('apache-tomcat', "$tomcatVersion", GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
@@ -325,6 +328,9 @@ project('pxf-hive') {
 
         summary = 'HAWQ Extension Framework (PXF), Hive plugin'
         description = 'Querying external data stored in Hive'
+        packager = 'dev@hawq.incubator.apache.org'
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
 
         requires('pxf-hdfs', project.version, GREATER | EQUAL)
         requires('hive', "$hiveVersion", GREATER | EQUAL)
@@ -348,6 +354,11 @@ project('pxf-json') {
 
     ospackage {
       requires('pxf-hdfs', project.version, GREATER | EQUAL)
+        summary = 'HAWQ Extension Framework (PXF), Json plugin'
+        description = 'Querying external data stored in HDFS in Json format'
+        packager = 'dev@hawq.incubator.apache.org'
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
 
       from(jar.outputs.files) {
         into "/usr/lib/pxf-${project.version}"
@@ -367,6 +378,9 @@ project('pxf-hbase') {
     ospackage {
         summary = 'HAWQ Extension Framework (PXF), HBase plugin'
         description = 'Querying external data stored in HBase'
+        packager = 'dev@hawq.incubator.apache.org'
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
 
         requires('pxf-service', project.version, GREATER | EQUAL)
         requires('hbase', "$hbaseVersionRPM", GREATER | EQUAL)
