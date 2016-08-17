@@ -51,19 +51,49 @@ def option_parser():
     parser.add_option('-d', '--database', default = 'postgres', dest = 'database', help='database name')
     parser.add_option('-f', '--filepath', dest = 'filepath', help='file name in HDFS')
     parser.add_option('-c', '--config', dest = 'yml_config', default = '', help='configuration file in YAML format')
-    return parser.parse_args()
+    return parser
 
 
 def option_parser_yml(yml_file):
     import yaml
     with open(yml_file, 'r') as f:
         params = yaml.load(f)
+    # check if valid configuration yaml file
+    attrs = ['FileFormat', 'DFS_URL', 'Distribution_Policy']
+    for attr in attrs:
+        if attr not in params.keys():
+            logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
+            sys.exit(1)
     if params['FileFormat'] == 'Parquet':
+        attrs = ['Parquet_FileLocations', 'Parquet_Schema']
+        for attr in attrs:
+            if attr not in params.keys():
+                logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
+                sys.exit(1)
+        if not params['Parquet_FileLocations'].get('Files'):
+            logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
+            sys.exit(1)
+        if not len(params['Parquet_FileLocations']['Files']):
+            return 'Parquet', '', params['Parquet_Schema'], params['Distribution_Policy']
         offset = params['Parquet_FileLocations']['Files'][0]['path'].rfind('/')
-        filepath = params['DFS_URL'] + params['Parquet_FileLocations']['Files'][0]['path'][:offset] if len(params['Parquet_FileLocations']['Files']) != 1 else params['DFS_URL'] + params['Parquet_FileLocations']['Files'][0]['path']
+        filepath = (params['DFS_URL'] + params['Parquet_FileLocations']['Files'][0]['path'][:offset]
+                    if len(params['Parquet_FileLocations']['Files']) != 1
+                    else params['DFS_URL'] + params['Parquet_FileLocations']['Files'][0]['path'])
         return 'Parquet', filepath, params['Parquet_Schema'], params['Distribution_Policy']
+    attrs = ['AO_FileLocations', 'AO_Schema']
+    for attr in attrs:
+        if attr not in params.keys():
+            logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
+            sys.exit(1)
+    if not (params['AO_FileLocations']['Files']):
+        return 'AO', '', params['AO_Schema'], params['Distribution_Policy']
+    if not params['AO_FileLocations'].get('Files'):
+        logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
+        sys.exit(1)
     offset = params['AO_FileLocations']['Files'][0]['path'].rfind('/')
-    filepath = params['DFS_URL'] + params['AO_FileLocations']['Files'][0]['path'][:offset] if len(params['AO_FileLocations']['Files']) != 1 else params['DFS_URL'] + params['AO_FileLocations']['Files'][0]['path']
+    filepath = (params['DFS_URL'] + params['AO_FileLocations']['Files'][0]['path'][:offset]
+                if len(params['AO_FileLocations']['Files']) != 1
+                else params['DFS_URL'] + params['AO_FileLocations']['Files'][0]['path'])
     return 'AO', filepath, params['AO_Schema'], params['Distribution_Policy']
 
 
@@ -107,18 +137,18 @@ def get_seg_name(dburl, tablename, database, fmt):
 
 
 def check_hash_type(dburl, tablename):
-    '''Check whether target table is hash-typed, in that case simple insertion does not work'''
+    '''Check whether target table is hash distributed, in that case simple insertion does not work'''
     try:
         query = "select attrnums from gp_distribution_policy, pg_class where pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;" % tablename
         conn = dbconn.connect(dburl, False)
         rows = dbconn.execSQL(conn, query)
         conn.commit()
         if not rows.rowcount:
-            logger.error('Target not found in table gp_distribution_policy.')
+            logger.error('Table not found in table gp_distribution_policy.' % tablename)
             sys.exit(1)
         for row in rows:
             if row[0]:
-                logger.error('Cannot register file(s) to a table which is hash-typed.')
+                logger.error('Cannot register file(s) to a table which is hash distribuetd.')
                 sys.exit(1)
         conn.close()
     except DatabaseError, ex:
@@ -154,8 +184,7 @@ def get_metadata_from_database(dburl, tablename, seg_name):
         logger.error('Failed to execute query "%s"' % query)
         sys.exit(1)
     for row in rows:
-        tabledir = row[0].strip() + "/" + str(row[1]) + "/" + str(row[2]) + "/" + str(row[3]) + "/"
-        #tabledir = '/'.join([row[0], str(row[1]), str(row[2]), str(row[3]), ''])
+        tabledir = '/'.join([row[0].strip(), str(row[1]), str(row[2]), str(row[3]), ''])
     return firstsegno, tabledir
 
 
@@ -263,9 +292,10 @@ def insert_metadata_into_database(dburl, databasename, tablename, seg_name, firs
 
 
 if __name__ == '__main__':
-    options, args = option_parser()
+    parser = option_parser()
+    options, args = parser.parse_args()
     if len(args) != 1 or (options.yml_config and options.filepath):
-        logger.error('Incorrect usage!\n Correct usage: "hawq register [-h hostname] [-p port] [-U username] [-d database] [-f filepath] tablename"\n or "hawq register [-h hostname] [-p port] [-U username] [-d database] [-c config] tablename"\n')
+        parser.print_help(sys.stderr)
         sys.exit(1)
     if local_ssh('hadoop'):
         logger.error('command "hadoop" is not available.')
