@@ -80,9 +80,10 @@ def create_table(dburl, tablename, schema_info, fmt, distrbution_policy):
         sys.exit(1)
 
 
-def get_seg_name(dburl, tablename, database):
+def get_seg_name(dburl, tablename, database, fmt):
     try:
         relname = ''
+        tablename = tablename.split('.')[-1]
         query = ("select pg_class2.relname from pg_class as pg_class1, pg_appendonly, pg_class as pg_class2 "
                  "where pg_class1.relname ='%s' and pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid;") % tablename
         conn = dbconn.connect(dburl, True)
@@ -97,6 +98,11 @@ def get_seg_name(dburl, tablename, database):
     except DatabaseError, ex:
         logger.error('Failed to run query "%s" with dbname "%s"' % (query, database))
         sys.exit(1)
+    if fmt == 'Parquet':
+        if relname.find("paq") == -1:
+            logger.error("table '%s' is not parquet format" % tablename)
+            sys.exit(1)
+
     return relname
 
 
@@ -139,7 +145,7 @@ def get_metadata_from_database(dburl, tablename, seg_name):
         query = ("select location, gp_persistent_tablespace_node.tablespace_oid, database_oid, relfilenode from pg_class, gp_persistent_relation_node, "
              "gp_persistent_tablespace_node, gp_persistent_filespace_node where relname = '%s' and pg_class.relfilenode = "
              "gp_persistent_relation_node.relfilenode_oid and gp_persistent_relation_node.tablespace_oid = gp_persistent_tablespace_node.tablespace_oid "
-             "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % tablename
+             "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % tablename.split('.')[-1]
         conn = dbconn.connect(dburl, False)
         rows = dbconn.execSQL(conn, query)
         conn.commit()
@@ -178,7 +184,6 @@ def get_files_in_hdfs(filepath):
         logger.error("Path '%s' does not exist in hdfs" % filepath)
         sys.exit(1)
     hdfscmd = "hadoop fs -ls -R %s" % filepath
-    print filepath
     result, out, err = local_ssh_output(hdfscmd)
     outlines = out.splitlines()
     # recursively search all the files under path 'filepath'
@@ -276,7 +281,7 @@ if __name__ == '__main__':
         fileformat = 'Parquet'
         check_hash_type(dburl, tablename) # Usage1 only support randomly distributed table
 
-    seg_name = get_seg_name(dburl, tablename, database)
+    seg_name = get_seg_name(dburl, tablename, database, fileformat)
     firstsegno, tabledir = get_metadata_from_database(dburl, tablename, seg_name)
     check_files_and_table_in_same_hdfs_cluster(filepath, tabledir)
 
