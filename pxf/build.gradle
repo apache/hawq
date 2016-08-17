@@ -196,6 +196,7 @@ project('pxf-service') {
         packager = ' '
         packageGroup = 'Development/Libraries'
         release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
         requires('apache-tomcat', "$tomcatVersion", GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
@@ -297,6 +298,7 @@ project('pxf-hdfs') {
         packager = ' '
         packageGroup = 'Development/Libraries'
         release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
         requires('pxf-service', project.version, GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
@@ -334,6 +336,7 @@ project('pxf-hive') {
         packager = ' '
         packageGroup = 'Development/Libraries'
         release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
         requires('pxf-hdfs', project.version, GREATER | EQUAL)
         requires('hive', "$hiveVersion", GREATER | EQUAL)
@@ -362,6 +365,7 @@ project('pxf-json') {
         packager = ' '
         packageGroup = 'Development/Libraries'
         release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
       from(jar.outputs.files) {
         into "/usr/lib/pxf-${project.version}"
@@ -384,6 +388,7 @@ project('pxf-hbase') {
         packager = ' '
         packageGroup = 'Development/Libraries'
         release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
         requires('pxf-service', project.version, GREATER | EQUAL)
         requires('hbase', "$hbaseVersionRPM", GREATER | EQUAL)
@@ -493,6 +498,7 @@ task tomcatRpm(type: Rpm) {
         packageDescription = 'Apache Tomcat is an open source software implementation of the Java Servlet and JavaServer Pages technologies.'
         packageGroup = 'Development/Libraries'
         release = project.osFamily
+        buildHost = ' '
 
         preInstall file('tomcat/src/scripts/pre-install.sh')
 
