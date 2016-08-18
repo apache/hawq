@@ -228,7 +228,7 @@ TEST_F(TestHawqRegister, TestUsage1ParquetRandomly2) {
   string filePath = rootPath + relativePath;
   EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_hawq.paq"));
   util.execute("drop table if exists nt;");
-  util.execute("create table nt(i int) with (appendonly=true, orientation=parquet);");
+  util.execute("create table nt(i int) with (appendonly=true, orientation=parquet) distributed randomly;");
   EXPECT_EQ(0, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -f hdfs://localhost:8020/hawq_register_hawq.paq nt"));
 	util.query("select * from nt;", 3);
 	util.execute("insert into nt values(1);");
