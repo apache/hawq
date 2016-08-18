@@ -349,6 +349,7 @@ bool		Debug_datumstream_write_use_small_initial_buffers = false;
 bool		gp_temporary_files_filespace_repair = false;
 bool		filesystem_support_truncate = true;
 bool		gp_allow_non_uniform_partitioning_ddl = true;
+bool  enable_ranger = false;
 
 int			explain_memory_verbosity = 0;
 char* 		memory_profiler_run_id = "none";
@@ -4321,6 +4322,16 @@ static struct config_bool ConfigureNamesBool[] =
 		&enable_secure_filesystem,
 		false, NULL, NULL
 	},
+
+	{
+    {"enable_ranger", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
+     gettext_noop("support to using ranger to manage hawq privilege."),
+     NULL,
+     GUC_SUPERUSER_ONLY
+    },
+    &enable_ranger,
+    false, NULL, NULL
+  },
 
 	{
 		{"filesystem_support_truncate", PGC_USERSET, APPENDONLY_TABLES,
