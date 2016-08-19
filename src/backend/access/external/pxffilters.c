@@ -31,7 +31,7 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static List* pxf_make_filter_list(List* quals, bool extractAttrs);
+static List* pxf_make_filter_list(List* quals);
 static void pxf_free_filter(PxfFilterDesc* filter);
 static void pxf_free_filter_list(List *filters);
 static char* pxf_serialize_filter_list(List *filters);
@@ -155,7 +155,7 @@ Oid pxf_supported_types[] =
  * Caller is responsible for pfreeing the returned PxfFilterDesc List.
  */
 static List *
-pxf_make_filter_list(List *quals, bool extractAttrs)
+pxf_make_filter_list(List *quals)
 {
 	List			*result = NIL;
 	ListCell		*lc = NULL;
@@ -197,10 +197,9 @@ pxf_make_filter_list(List *quals, bool extractAttrs)
 						tag, boolType, boolType==AND_EXPR ? "(AND_EXPR)" : "");
 
 				/* only AND_EXPR is supported for filter push-down*/
-				/* AND_EXPR, OR_EXPR, NOT_EXPR are supported for extracting attributes from WHERE clause*/
-				if (expr->boolop == AND_EXPR || extractAttrs)
+				if (expr->boolop == AND_EXPR)
 				{
-					List *inner_result = pxf_make_filter_list(expr->args, extractAttrs);
+					List *inner_result = pxf_make_filter_list(expr->args);
 					elog(DEBUG5, "pxf_make_filter_list: inner result size %d", list_length(inner_result));
 					result = list_concat(result, inner_result);
 				}
@@ -452,6 +451,43 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	return false;
 }
 
+List* append_attr_from_var(Var* var, List* attrs)
+{
+	AttrNumber varattno = var->varattno;
+	/* system attr not supported */
+	if (varattno > InvalidAttrNumber)
+		return lappend_int(attrs, varattno - 1);
+
+	return attrs;
+}
+
+static List*
+get_attrs_from_opexpr(OpExpr *expr)
+{
+	Node	*leftop 	= NULL;
+	Node	*rightop	= NULL;
+	List	*attrs = NIL;
+
+	if ((!expr))
+		return attrs;
+
+	leftop = get_leftop((Expr*)expr);
+	rightop	= get_rightop((Expr*)expr);
+
+	/* arguments must be VAR and CONST */
+	if (IsA(leftop, Var))
+	{
+		attrs = append_attr_from_var((Var *) leftop, attrs);
+	}
+	if (IsA(leftop, Const))
+	{
+		attrs = append_attr_from_var((Var *) rightop, attrs);
+	}
+
+	return attrs;
+
+}
+
 /*
  * supported_filter_type
  *
@@ -538,32 +574,6 @@ const_to_str(Const *constval, StringInfo buf)
 }
 
 
-static List*
-pxf_extract_attributes(List *filters) {
-	ListCell *lc = NULL;
-	List *result = NIL;
-
-	if (list_length(filters) == 0)
-		return NIL;
-
-	foreach (lc, filters)
-	{
-		PxfFilterDesc *filter = (PxfFilterDesc *) lfirst(lc);
-		PxfOperand l = filter->l;
-		PxfOperand r = filter->r;
-
-		if (pxfoperand_is_attr(l)) {
-			result = lappend_int(result, l.attnum - 1);
-		}
-
-		if (pxfoperand_is_attr(r)) {
-			result = lappend_int(result, r.attnum - 1);
-		}
-	}
-
-	return result;
-}
-
 /*
  * serializePxfFilterQuals
  *
@@ -581,7 +591,7 @@ char *serializePxfFilterQuals(List *quals)
 
 	if (pxf_enable_filter_pushdown)
 	{
-		List *filters = pxf_make_filter_list(quals, false);
+		List *filters = pxf_make_filter_list(quals);
 
 		result  = pxf_serialize_filter_list(filters);
 		pxf_free_filter_list(filters);
@@ -591,12 +601,50 @@ char *serializePxfFilterQuals(List *quals)
 	return result;
 }
 
+
+
 List* extractPxfAttributes(List* quals)
 {
 
-	List *filters = pxf_make_filter_list(quals, true);
+	ListCell		*lc = NULL;
+	List *attributes = NIL;
 
-	List *attributes = pxf_extract_attributes(filters);
+	if (list_length(quals) == 0)
+		return NIL;
+
+	foreach (lc, quals)
+	{
+		Node *node = (Node *) lfirst(lc);
+		NodeTag tag = nodeTag(node);
+
+		switch (tag)
+		{
+			case T_OpExpr:
+			{
+				OpExpr			*expr 	= (OpExpr *) node;
+				List			*attrs = get_attrs_from_opexpr(expr);
+				attributes = lappend(attributes, attrs);
+				break;
+			}
+			case T_NullTest:
+			{
+				NullTest	*expr = (NullTest *) node;
+				attributes = append_attr_from_var((Var *) expr->arg, attributes);
+				break;
+			}
+			case T_BoolExpr:
+			{
+				BoolExpr	*expr = (BoolExpr *) node;
+				List *inner_result = extractPxfAttributes(expr->args);
+				attributes = list_concat(attributes, inner_result);
+				break;
+			}
+			default:
+				/* expression not supported */
+				elog(ERROR, "pxf_make_filter_list: unsupported node tag %d", tag);
+				break;
+		}
+	}
 
 	return attributes;
 }
