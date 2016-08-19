@@ -38,6 +38,7 @@ static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
 static void const_to_str(Const *constval, StringInfo buf);
+static List* append_attr_from_var(Var* var, List* attrs);
 
 /*
  * All supported HAWQ operators, and their respective HFDS operator code.
@@ -196,7 +197,7 @@ pxf_make_filter_list(List *quals)
 				elog(DEBUG5, "pxf_make_filter_list: node tag %d (T_BoolExpr), bool node type %d %s",
 						tag, boolType, boolType==AND_EXPR ? "(AND_EXPR)" : "");
 
-				/* only AND_EXPR is supported for filter push-down*/
+				/* only AND_EXPR is supported */
 				if (expr->boolop == AND_EXPR)
 				{
 					List *inner_result = pxf_make_filter_list(expr->args);
@@ -451,7 +452,8 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	return false;
 }
 
-List* append_attr_from_var(Var* var, List* attrs)
+static List*
+append_attr_from_var(Var* var, List* attrs)
 {
 	AttrNumber varattno = var->varattno;
 	/* system attr not supported */
@@ -462,7 +464,7 @@ List* append_attr_from_var(Var* var, List* attrs)
 }
 
 static List*
-get_attrs_from_opexpr(OpExpr *expr)
+get_attrs_from_expr(Expr *expr)
 {
 	Node	*leftop 	= NULL;
 	Node	*rightop	= NULL;
@@ -471,10 +473,17 @@ get_attrs_from_opexpr(OpExpr *expr)
 	if ((!expr))
 		return attrs;
 
-	leftop = get_leftop((Expr*)expr);
-	rightop	= get_rightop((Expr*)expr);
+	if (IsA(expr, OpExpr))
+	{
+		leftop = get_leftop(expr);
+		rightop	= get_rightop(expr);
+	} else if (IsA(expr, ScalarArrayOpExpr))
+	{
+		ScalarArrayOpExpr *saop = (ScalarArrayOpExpr *) expr;
+		leftop = (Node *) linitial(saop->args);
+		rightop = (Node *) lsecond(saop->args);
+	}
 
-	/* arguments must be VAR and CONST */
 	if (IsA(leftop, Var))
 	{
 		attrs = append_attr_from_var((Var *) leftop, attrs);
@@ -620,28 +629,29 @@ List* extractPxfAttributes(List* quals)
 		switch (tag)
 		{
 			case T_OpExpr:
+			case T_ScalarArrayOpExpr:
 			{
-				OpExpr			*expr 	= (OpExpr *) node;
-				List			*attrs = get_attrs_from_opexpr(expr);
-				attributes = lappend(attributes, attrs);
-				break;
-			}
-			case T_NullTest:
-			{
-				NullTest	*expr = (NullTest *) node;
-				attributes = append_attr_from_var((Var *) expr->arg, attributes);
+				Expr* expr = (Expr *) node;
+				List			*attrs = get_attrs_from_expr(expr);
+				attributes = list_concat(attributes, attrs);
 				break;
 			}
 			case T_BoolExpr:
 			{
-				BoolExpr	*expr = (BoolExpr *) node;
+				BoolExpr* expr = (BoolExpr *) node;
 				List *inner_result = extractPxfAttributes(expr->args);
 				attributes = list_concat(attributes, inner_result);
 				break;
 			}
+			case T_NullTest:
+			{
+				NullTest* expr = (NullTest *) node;
+				attributes = append_attr_from_var((Var *) expr->arg, attributes);
+				break;
+			}
 			default:
 				/* expression not supported */
-				elog(ERROR, "pxf_make_filter_list: unsupported node tag %d", tag);
+				elog(ERROR, "extractPxfAttributes: unsupported node tag %d, unable to extract column from WHERE clause", tag);
 				break;
 		}
 	}
