@@ -45,9 +45,6 @@ def parseargs():
     parser.add_option("-v", "--value",
                       dest="property_value",
                       help="Set HAWQ Property value.")
-    parser.add_option("-d",
-                      dest="hawq_home",
-                      help="HAWQ home directory.")
     (options, args) = parser.parse_args()
 
     if options.quiet:
@@ -184,10 +181,9 @@ def sync_hawq_site(config_dir, host_list, ignore_bad_hosts):
 if __name__ == '__main__':
     options, args = parseargs()
 
-    if options.hawq_home is None:
-        GPHOME = os.getenv('GPHOME')
-    else:
-        GPHOME = options.hawq_home
+    GPHOME = os.getenv('GPHOME')
+    if not GPHOME:
+        sys.exit("GPHOME environment variable not set, exit")
     hawq_site = HawqXMLParser(GPHOME)
     hawq_site.get_all_values()
     org_config_file = "%s/etc/hawq-site.xml" % GPHOME
