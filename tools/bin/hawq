@@ -130,7 +130,7 @@ def main():
         result = local_ssh(cmd)
     elif hawq_command == "restart":
         if second_arg not in cluster_type_list:
-            print START_HELP
+            print RESTART_HELP
             sys.exit(1)
         cmd = "%s; hawq_ctl stop %s" % (source_hawq_env, sub_args)
         check_return_code(local_ssh(cmd))
