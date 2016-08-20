@@ -27,7 +27,7 @@ class XmlConfig {
   void closeAndSave();
 
   // parse the configuration file
-  void parse();
+  bool parse();
 
   // @param key The key of the configuration item
   // @param value The updated value

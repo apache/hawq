@@ -14,10 +14,62 @@ using std::string;
 namespace hawq {
 namespace test {
 
-string YarnConfig::getYarnUser() {
-  string cmd = "ps aux|grep yarn.server|grep -v grep";
+void YarnConfig::runCommand(const string &command, 
+                            bool isyarnuser, 
+                            string &result) {
+  string cmd = "";
+  if (isyarnuser) {
+    cmd = "sudo -u ";
+    cmd.append(getYarnUser());
+    cmd.append(" ");
+    cmd.append(command);
+  } else {
+    cmd = command;
+  }
   Command c(cmd);
-  string result = c.run().getResultOutput();
+  result = c.run().getResultOutput();
+}
+
+bool YarnConfig::runCommandAndFind(const string &command, 
+                                   bool isyarnuser, 
+                                   const string &findstring) {
+  string result = "";
+  runCommand(command, isyarnuser, result);
+  auto lines = hawq::test::split(result, '\n');
+  for (size_t i=0; i<lines.size(); i++) {
+    string valueLine = lines[i];
+    int find = valueLine.find(findstring);
+    if (find >= 0) {
+        return true;
+    }
+  }
+  return false;
+}
+
+void YarnConfig::runCommandAndGetNodesPorts(const string &command,
+                                            bool isyarnuser,
+                                            std::vector<string> &nodemanagers,
+                                            std::vector<int> &port) {
+  string result = "";
+  runCommand(command, isyarnuser, result);
+  auto lines = hawq::test::split(result, '\n');
+  bool begin = false;
+  for (size_t i=0; i<lines.size(); i++) {
+    if (!begin) {
+      if (lines[i].find("Node-Id") != string::npos) {
+        begin = true;
+      }
+    } else {
+      string values = hawq::test::split(lines[i], '\t')[0];
+      nodemanagers.push_back(hawq::test::trim(hawq::test::split(values, ':')[0]));
+      port.push_back(std::stoi(hawq::test::trim(hawq::test::split(values, ':')[1])));
+    }
+  }
+}
+
+string YarnConfig::getYarnUser() {
+  string result = "";
+  runCommand("ps aux|grep yarn.server|grep -v grep", false, result);
   auto lines = hawq::test::split(result, '\n');
   if (lines.size() >= 1) {
     return hawq::test::trim(hawq::test::split(lines[lines.size()-1], ' ')[0]);
@@ -26,6 +78,9 @@ string YarnConfig::getYarnUser() {
 }
 
 bool YarnConfig::LoadFromHawqConfigFile() {
+  if (isLoadFromHawqConfigFile) {
+    return true;
+  }
   const char *env = getenv("GPHOME");
   string confPath = env ? env : "";
   if (confPath != "") {
@@ -35,34 +90,39 @@ bool YarnConfig::LoadFromHawqConfigFile() {
   }
 
   hawqxmlconf.reset(new XmlConfig(confPath));
-  hawqxmlconf->parse();
+  if (!hawqxmlconf->parse())
+    return false;
   return true;
 }
 
 bool YarnConfig::LoadFromYarnConfigFile() {
+  if (isLoadFromYarnConfigFile) {
+    return true;
+  }
   string confPath=getHadoopHome();
   if (confPath == "") {
     return false;
   }
   confPath.append("/etc/hadoop/yarn-site.xml");
   yarnxmlconf.reset(new XmlConfig(confPath));
-  yarnxmlconf->parse();
+  if (!yarnxmlconf->parse())
+    return false;
   return true;
 }
 
-bool YarnConfig::isConfigYarn() {
+int YarnConfig::isConfigYarn() {
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    throw GetHadoopHomeException();
+    return -1;
   }
   string rm = yarnxmlconf->getString("yarn.resourcemanager.address.rm1");
   if (rm == "") {
-    return false;
+    return 0;
   }
-  return true;
+  return 1;
 }
 
-bool YarnConfig::isHA() {
+int YarnConfig::isHA() {
   const hawq::test::PSQLQueryResult &result = psql.getQueryResult(
        "SELECT substring(fselocation from length('hdfs:// ') for (position('/' in substring(fselocation from length('hdfs:// ')))-1)::int) "
        "FROM pg_filespace pgfs, pg_filespace_entry pgfse "
@@ -71,31 +131,30 @@ bool YarnConfig::isHA() {
   if (table.size() > 0) {
     int find = table[0][0].find(":");
     if (find < 0) {
-      return true;
+      return 1;
     } else {
-      return false;
+      return 0;
     }
   }
-  return false;
+  return -1;
 }
 
-bool YarnConfig::isConfigKerberos() {
+int YarnConfig::isConfigKerberos() {
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    throw GetHawqHomeException();
+    return -1;
   }
   string authentication = hawqxmlconf->getString("hadoop.security.authentication");
   if (authentication == "kerberos") {
-    return true;
+    return 1;
   } else {
-    return false;
+    return 0;
   }
 }
 
 string YarnConfig::getHadoopHome() {
-  string cmd = "ps -ef|grep hadoop";
-  Command c(cmd);
-  string result = c.run().getResultOutput();
+  string result = "";
+  runCommand("ps -ef|grep hadoop", false, result);
   string hadoopHome = "";
   auto lines = hawq::test::split(result, '\n');
   for (size_t i=0; i<lines.size()-1; i++) {
@@ -133,24 +192,16 @@ bool YarnConfig::getHARM(const string &RMtype,
   auto haRMs = hawq::test::split(haRMValue, ',');
   for (size_t i = 0; i < haRMs.size(); i++) {
     string haRM = hawq::test::trim(haRMs[i]);
-    string cmd ="sudo -u ";
-    cmd.append(getYarnUser());
-    cmd.append(" yarn rmadmin -getServiceState ");
+    string cmd = "yarn rmadmin -getServiceState ";
     cmd.append(haRM);
-    Command c(cmd);
-    string result = c.run().getResultOutput();
-    auto lines = hawq::test::split(result, '\n');
-    if (lines.size() >= 2) {
-      string valueLine = lines[1];
-      if (valueLine == RMtype) {
-        RMService = haRM;
-        break;
-      }
+    if (runCommandAndFind(cmd, true, RMtype)) {
+      RMService = haRM;
+      break;
     }
   }
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    throw GetHadoopHomeException();
+    return false;
   }
   string rpcAddressName = "yarn.resourcemanager.address.";
   rpcAddressName.append(RMService);
@@ -177,7 +228,7 @@ bool YarnConfig::getRMList(std::vector<string> &RMList,
 
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    throw GetHadoopHomeException();
+    return false;
   }
 
   string RMAddressName = "yarn.resourcemanager.address";
@@ -195,53 +246,19 @@ bool YarnConfig::getRMList(std::vector<string> &RMList,
 
 void YarnConfig::getNodeManagers(std::vector<string> &nodemanagers,
                                  std::vector<int> &port) {
-  string cmd = "sudo -u ";
-  cmd.append(getYarnUser());
-  cmd.append(" yarn node -list -all");
-  Command c(cmd);
-  string result = c.run().getResultOutput();
-  auto lines = hawq::test::split(result, '\n');
-  bool begin = false;
-  for (size_t i=0; i<lines.size(); i++) {
-    if (!begin) {
-      if (lines[i].find("Node-Id") != string::npos) {
-        begin = true;
-      }
-    } else {
-      string values = hawq::test::split(lines[i], '\t')[0];
-      nodemanagers.push_back(hawq::test::trim(hawq::test::split(values, ':')[0]));
-      port.push_back(std::stoi(hawq::test::trim(hawq::test::split(values, ':')[1])));
-    }
-  }
+  runCommandAndGetNodesPorts("yarn node -list -all", true, nodemanagers, port);
 }
 
 void YarnConfig::getActiveNodeManagers(std::vector<string> &nodemanagers,
                                  std::vector<int> &port) {
-  string cmd = "sudo -u ";
-  cmd.append(getYarnUser());
-  cmd.append(" yarn node -list -states RUNNING");
-  Command c(cmd);
-  string result = c.run().getResultOutput();
-  auto lines = hawq::test::split(result, '\n');
-  bool begin = false;
-  for (size_t i=0; i<lines.size(); i++) {
-    if (!begin) {
-      if (lines[i].find("Node-Id") != string::npos) {
-        begin = true;
-      }
-    } else {
-      string values = hawq::test::split(lines[i], '\t')[0];
-      nodemanagers.push_back(hawq::test::trim(hawq::test::split(values, ':')[0]));
-      port.push_back(std::stoi(hawq::test::trim(hawq::test::split(values, ':')[1])));
-    }
-  }
+  runCommandAndGetNodesPorts("yarn node -list -states RUNNING", true, nodemanagers, port);
 }
 
 
 string YarnConfig::getParameterValue(const string &parameterName) {
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    throw GetHadoopHomeException();
+    return "Error: failed to load from YARN configuration file";
   }
 
   return yarnxmlconf->getString(parameterName);
@@ -249,12 +266,12 @@ string YarnConfig::getParameterValue(const string &parameterName) {
 
 string YarnConfig::getParameterValue(const string &parameterName,
                                      const string &conftype) {
-  if (conftype == "yarn" || conftype == "YARN") {
+  if (hawq::test::lower(conftype) == "yarn") {
     return getParameterValue(parameterName);
   }
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    throw GetHadoopHomeException();
+    return "Error: failed to load from HAWQ configuration file";
   }
 
   return hawqxmlconf->getString(parameterName);
@@ -264,7 +281,7 @@ bool YarnConfig::setParameterValue(const string &parameterName,
                                    const string &parameterValue) {
   bool ret = LoadFromYarnConfigFile();
   if (!ret) {
-    throw GetHadoopHomeException();
+    return false;
   }
 
   return yarnxmlconf->setString(parameterName, parameterValue);
@@ -273,12 +290,12 @@ bool YarnConfig::setParameterValue(const string &parameterName,
 bool YarnConfig::setParameterValue(const string &parameterName,
                                    const string &parameterValue,
                                    const string &conftype) {
-  if (conftype == "yarn" || conftype == "YARN") {
+  if (hawq::test::lower(conftype) == "yarn") {
     return setParameterValue(parameterName, parameterValue);
   }
   bool ret = LoadFromHawqConfigFile();
   if (!ret) {
-    throw GetHawqHomeException();
+    return false;
   }
 
   return hawqxmlconf->setString(parameterName, parameterValue);

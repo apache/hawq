@@ -7,7 +7,6 @@
 #include "psql.h"
 #include "sql_util.h"
 #include "xml_parser.h"
-#include "hdfs_config.h"
 
 namespace hawq {
 namespace test {
@@ -22,7 +21,10 @@ class YarnConfig {
     /**
       * YarnConfig constructor
       */
-    YarnConfig(): psql(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD) {}
+    YarnConfig(): psql(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD) {
+      isLoadFromHawqConfigFile = false;
+      isLoadFromYarnConfigFile = false;
+    }
 
     /**
       * YarnConfig destructor
@@ -31,21 +33,21 @@ class YarnConfig {
 
     /**
      * whether YARN is configured
-     * @return true if YARN is configured; if return false, following functions should not be called
+     * @return 1 if YARN is configured; 0 and following functions should not be called; -1 if failed to load from YARN configuration file
      */
-    bool isConfigYarn();
+    int isConfigYarn();
 
     /**
      * whether YARN is in HA mode
-     * @return true if YARN is HA
+     * @return 1 if YARN is HA, 0 if YARN is not HA, -1 if there is an error
      */
-    bool isHA();
+    int isHA();
 
     /**
      * whether YARN is kerberos
-     * @return true if YARN is kerbos
+     * @return 1 if YARN is kerberos, 0 if YARN is not kerberos, -1 if failed to load from HAWQ configuration file 
      */
-    bool isConfigKerberos();
+    int isConfigKerberos();
 
     /**
      * get HADOOP working directory
@@ -123,10 +125,17 @@ class YarnConfig {
     bool setParameterValue(const std::string &parameterName, const std::string &parameterValue, const std::string &conftype);
 
   private:
+    void runCommand(const std::string &command, bool ishdfsuser, std::string &result);
+    
+    bool runCommandAndFind(const std::string &command, bool ishdfsuser, const std::string &findstring);
+    
+    void runCommandAndGetNodesPorts(const std::string &command, bool isyarnuser, std::vector<std::string> &nodemanagers, std::vector<int> &port);
+    
     /**
      * @return yarn user
      */
     std::string getYarnUser();
+    
     /**
      * load key-value parameters in ./etc/yarn-client.xml
      * @return true if succeeded
@@ -151,6 +160,8 @@ class YarnConfig {
   private:
     std::unique_ptr<XmlConfig> hawqxmlconf;
     std::unique_ptr<XmlConfig> yarnxmlconf;
+    bool isLoadFromHawqConfigFile;
+    bool isLoadFromYarnConfigFile;
     hawq::test::PSQL psql;
 };
 

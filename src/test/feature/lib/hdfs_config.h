@@ -21,7 +21,10 @@ class HdfsConfig {
     /**
      * HdfsConfig constructor
      */
-    HdfsConfig(): psql(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD) {}
+    HdfsConfig(): psql(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD) {
+      isLoadFromHawqConfigFile = false;
+      isLoadFromHdfsConfigFile = false;
+    }
 
     /**
      * HdfsConfig destructor
@@ -30,21 +33,21 @@ class HdfsConfig {
 
     /**
      * whether HDFS is in HA mode
-     * @return true if HDFS is HA
+     * @return 1 if HDFS is HA, 0 if HDFS is not HA, -1 if there is an error
      */
-    bool isHA();
+    int isHA();
 
     /**
      * whether HDFS is kerbos
-     * @return true if HDFS is kerberos
+     * @return 1 if HDFS is configured kerberos, 0 if HDFS is not configured kerberos, -1 if failed to load from HAWQ configuration file
      */
-    bool isConfigKerberos();
+    int isConfigKerberos();
 
     /**
      * whether HDFS supports truncate operation
-     * @return true if HDFS supports truncate operation
+     * @return 1 if HDFS supports truncate operation, 0 if HDFS does not support truncate operation
      */
-    bool isTruncate();
+    int isTruncate();
 
     /**
      * get HADOOP working directory
@@ -96,9 +99,9 @@ class HdfsConfig {
 
     /**
      * whether HDFS is in safe mode
-     * @return true if HDFS is in safe node
+     * @return 1 if HDFS is in safe node, 0 if HDFS is in not safe node
      */
-    bool isSafemode();
+    int isSafemode();
 
     /**
      * get parameter value in ./etc/hdfs-client.xml or ./etc/hadoop/hdfs-site.xml according to parameter name
@@ -133,10 +136,17 @@ class HdfsConfig {
     bool setParameterValue(const std::string &parameterName, const std::string &parameterValue);
 
   private:
+    void runCommand(const std::string &command, bool ishdfsuser, std::string &result);
+    
+    bool runCommandAndFind(const std::string &command, bool ishdfsuser, const std::string &findstring);
+    
+    void runCommandAndGetNodesPorts(const std::string &command, std::vector<std::string> &datanodelist, std::vector<int> &port);
+    
     /**
      * @return hdfs user
      */
     std::string getHdfsUser();
+
     /**
      * load key-value parameters in ./etc/hdfs-client.xml
      * @return true if succeeded
@@ -156,18 +166,15 @@ class HdfsConfig {
      * @param port, namenode port reference which will be set
      * @return true if getHANamenode succeeded
      */
-    bool getHANamenode(const std::string &namenodetype,
-                       std::string &namenode,
-                                   int &port);
+    bool getHANamenode(const std::string &namenodetype, std::string &namenode, int &port);
 
   private:
     std::unique_ptr<XmlConfig> hawqxmlconf;
     std::unique_ptr<XmlConfig> hdfsxmlconf;
+    bool isLoadFromHawqConfigFile;
+    bool isLoadFromHdfsConfigFile;
     hawq::test::PSQL psql;
 };
-
-class GetHawqHomeException {};
-class GetHadoopHomeException {};
 
 } // namespace test
 } // namespace hawq

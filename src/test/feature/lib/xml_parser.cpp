@@ -36,18 +36,20 @@ void XmlConfig::closeAndSave() {
     xmlFreeDoc(doc);
 }
 
-void XmlConfig::parse() {
+bool XmlConfig::parse() {
   LIBXML_TEST_VERSION kv
   .clear();
 
   if (!open()) {
-    return;
+    return false;
   }
   try {
     readConfigItems(doc);
     closeNotSave();
+    return true;
   } catch (...) {
     closeNotSave();
+    return false;
   }
 }
 

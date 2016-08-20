@@ -60,80 +60,68 @@ TEST_F(TestCommonLib, TestHawqConfig) {
 
 TEST_F(TestCommonLib, TestHdfsConfig) {
   hawq::test::HdfsConfig hc;
-  try {
-    hc.isHA();
-    hc.isConfigKerberos();
-    hc.isTruncate();
-    std::string hadoopHome = hc.getHadoopHome();
+  hc.isHA();
+  hc.isConfigKerberos();
+  hc.isTruncate();
+  std::string hadoopHome = hc.getHadoopHome();
 
-    std::string hostname = "";
-    int port = 0;
-    hc.getActiveNamenode(hostname, port);
+  std::string hostname = "";
+  int port = 0;
+  hc.getActiveNamenode(hostname, port);
 
-    hostname = "";
-    port = 0;
-    hc.getStandbyNamenode(hostname, port);
+  hostname = "";
+  port = 0;
+  hc.getStandbyNamenode(hostname, port);
 
-    std::vector<std::string> hostList;
-    std::vector<int> portList;
-    hc.getNamenodes(hostList, portList);
+  std::vector<std::string> hostList;
+  std::vector<int> portList;
+  hc.getNamenodes(hostList, portList);
 
-    hostList.clear();
-    portList.clear();
-    hc.getDatanodelist(hostList, portList);
+  hostList.clear();
+  portList.clear();
+  hc.getDatanodelist(hostList, portList);
 
-    hostList.clear();
-    portList.clear();
-    hc.getActiveDatanodes(hostList, portList);
+  hostList.clear();
+  portList.clear();
+  hc.getActiveDatanodes(hostList, portList);
 
-    hc.isSafemode();
+  hc.isSafemode();
 
-    hc.getParameterValue("dfs.replication");
-    hc.setParameterValue("dfs.replication", "1");
-  } catch (hawq::test::GetHawqHomeException &e) {
-    printf("Failed to get HAWQ home!");
-  } catch (hawq::test::GetHadoopHomeException &e) {
-    printf("Failed to get HADOOP home!");
-  }
+  hc.getParameterValue("dfs.replication");
+  hc.setParameterValue("dfs.replication", "1");
 }
 
 TEST_F(TestCommonLib, TestYarnConfig) {
   hawq::test::YarnConfig hc;
-  if (!hc.isConfigYarn()) {
+  if (hc.isConfigYarn() == 0) {
     return;
   }
-  try {
-    hc.isHA();
-    hc.isConfigKerberos();
-    std::string hadoopHome = hc.getHadoopHome();
+  hc.isHA();
+  hc.isConfigKerberos();
+  std::string hadoopHome = hc.getHadoopHome();
 
-    std::string hostname = "";
-    int port = 0;
-    hc.getActiveRM(hostname, port);
+  std::string hostname = "";
+  int port = 0;
+  hc.getActiveRM(hostname, port);
 
-    hostname = "";
-    port = 0;
-    hc.getStandbyRM(hostname, port);
+  hostname = "";
+  port = 0;
+  hc.getStandbyRM(hostname, port);
 
-    std::vector<std::string> hostList;
-    std::vector<int> portList;
-    hc.getRMList(hostList, portList);
+  std::vector<std::string> hostList;
+  std::vector<int> portList;
+  hc.getRMList(hostList, portList);
 
-    hostList.clear();
-    portList.clear();
-    hc.getNodeManagers(hostList, portList);
+  hostList.clear();
+  portList.clear();
+  hc.getNodeManagers(hostList, portList);
 
-    hostList.clear();
-    portList.clear();
-    hc.getActiveNodeManagers(hostList, portList);
+  hostList.clear();
+  portList.clear();
+  hc.getActiveNodeManagers(hostList, portList);
 
-    hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
-    hc.setParameterValue("yarn.scheduler.minimum-allocation-mb", "1024");
-  } catch (hawq::test::GetHawqHomeException &e) {
-    printf("Failed to get HAWQ home!");
-  } catch (hawq::test::GetHadoopHomeException &e) {
-    printf("Failed to get HADOOP home!");
-  }
+  hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
+  hc.setParameterValue("yarn.scheduler.minimum-allocation-mb", "1024");
 }
 
 TEST_F(TestCommonLib, TestCommand) {
