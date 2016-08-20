@@ -611,7 +611,13 @@ char *serializePxfFilterQuals(List *quals)
 }
 
 
-
+/*
+ * Returns a list of attributes, extracted from quals.
+ * Supports AND, OR, NOT operations.
+ * Supports =, <, <=, >, >=, IS NULL, IS NOT NULL, BETWEEN, IN operators.
+ * List might contain duplicates.
+ * Caller should release memory once result is not needed.
+ */
 List* extractPxfAttributes(List* quals)
 {
 
@@ -650,8 +656,13 @@ List* extractPxfAttributes(List* quals)
 				break;
 			}
 			default:
-				/* expression not supported */
-				elog(ERROR, "extractPxfAttributes: unsupported node tag %d, unable to extract column from WHERE clause", tag);
+				/*
+				 * tag is not supported, it's risk of having:
+				 * 1) false-positive tuples
+				 * 2) unable to join tables
+				 * 3) etc
+				 */
+				elog(ERROR, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
 				break;
 		}
 	}
