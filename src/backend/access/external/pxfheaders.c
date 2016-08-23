@@ -161,6 +161,32 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
         resetStringInfo(&formatter);
         appendStringInfo(&formatter, "X-GP-ATTR-TYPENAME%u", i);
         churl_headers_append(headers, formatter.data, TypeOidGetTypename(tuple->attrs[i]->atttypid));
+
+        /* Add attribute type modifiers if any*/
+		switch (tuple->attrs[i]->atttypid)
+		{
+			case NUMERICOID:
+			{
+				if (tuple->attrs[i]->atttypmod > -1)
+
+					/* precision */
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR%u-TYPEMOD%u", i, 0);
+					pg_ltoa((tuple->attrs[i]->atttypmod >> 16) & 0xffff, long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+
+					/* scale */
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR%u-TYPEMOD%u", i, 1);
+					pg_ltoa((tuple->attrs[i]->atttypmod) & 0xffff, long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+
+				break;
+			}
+			default:
+				break;
+		}
+
     }
 	
 	pfree(formatter.data);
