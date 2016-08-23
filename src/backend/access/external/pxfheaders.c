@@ -162,12 +162,12 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
         appendStringInfo(&formatter, "X-GP-ATTR-TYPENAME%u", i);
         churl_headers_append(headers, formatter.data, TypeOidGetTypename(tuple->attrs[i]->atttypid));
 
-        /* Add attribute type modifiers if any*/
-		switch (tuple->attrs[i]->atttypid)
+		/* Add attribute type modifiers if any*/
+		if (tuple->attrs[i]->atttypmod > -1)
 		{
-			case NUMERICOID:
+			switch (tuple->attrs[i]->atttypid)
 			{
-				if (tuple->attrs[i]->atttypmod > -1)
+				case NUMERICOID: {
 
 					/* precision */
 					resetStringInfo(&formatter);
@@ -178,16 +178,22 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 					/* scale */
 					resetStringInfo(&formatter);
 					appendStringInfo(&formatter, "X-GP-ATTR%u-TYPEMOD%u", i, 1);
-					pg_ltoa((tuple->attrs[i]->atttypmod) & 0xffff, long_number);
+					pg_ltoa((tuple->attrs[i]->atttypmod - VARHDRSZ) & 0xffff, long_number);
 					churl_headers_append(headers, formatter.data, long_number);
-
-				break;
+					break;
+				}
+				case VARCHAROID:
+				case BPCHAROID:
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR%u-TYPEMOD%u", i, 0);
+					pg_ltoa((tuple->attrs[i]->atttypmod - VARHDRSZ), long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+					break;
+				default:
+					break;
 			}
-			default:
-				break;
 		}
-
-    }
+	}
 	
 	pfree(formatter.data);
 }
