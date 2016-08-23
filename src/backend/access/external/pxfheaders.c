@@ -168,7 +168,6 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 			switch (tuple->attrs[i]->atttypid)
 			{
 				case NUMERICOID: {
-
 					/* precision */
 					resetStringInfo(&formatter);
 					appendStringInfo(&formatter, "X-GP-ATTR%u-TYPEMOD%u", i, 0);
@@ -182,11 +181,24 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 					churl_headers_append(headers, formatter.data, long_number);
 					break;
 				}
-				case VARCHAROID:
+				case CHAROID:
 				case BPCHAROID:
+				case VARCHAROID:
 					resetStringInfo(&formatter);
 					appendStringInfo(&formatter, "X-GP-ATTR%u-TYPEMOD%u", i, 0);
 					pg_ltoa((tuple->attrs[i]->atttypmod - VARHDRSZ), long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+					break;
+				case VARBITOID:
+				case BITOID:
+				case TIMESTAMPOID:
+				case TIMESTAMPTZOID:
+				//case INTERVALOID:
+				case TIMEOID:
+				case TIMETZOID:
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR%u-TYPEMOD%u", i, 0);
+					pg_ltoa((tuple->attrs[i]->atttypmod), long_number);
 					churl_headers_append(headers, formatter.data, long_number);
 					break;
 				default:
