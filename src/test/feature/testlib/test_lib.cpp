@@ -87,8 +87,10 @@ TEST_F(TestCommonLib, TestHdfsConfig) {
 
   hc.isSafemode();
 
-  hc.getParameterValue("dfs.replication");
+  std::string defaultValue = hc.getParameterValue("dfs.replication");
   hc.setParameterValue("dfs.replication", "1");
+  hc.getParameterValue("dfs.replication");
+  hc.setParameterValue("dfs.replication", defaultValue);
 }
 
 TEST_F(TestCommonLib, TestYarnConfig) {
@@ -120,8 +122,10 @@ TEST_F(TestCommonLib, TestYarnConfig) {
   portList.clear();
   hc.getActiveNodeManagers(hostList, portList);
 
-  hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
+  std::string defaultValue =hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
   hc.setParameterValue("yarn.scheduler.minimum-allocation-mb", "1024");
+  defaultValue =hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
+  hc.setParameterValue("yarn.scheduler.minimum-allocation-mb", defaultValue);
 }
 
 TEST_F(TestCommonLib, TestCommand) {
