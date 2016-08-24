@@ -172,7 +172,7 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 				case NUMERICOID:
 				{
 					resetStringInfo(&formatter);
-					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMODX-COUNT");
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-COUNT", i);
 					pg_ltoa(2, long_number);
 					churl_headers_append(headers, formatter.data, long_number);
 
@@ -195,7 +195,7 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 				case VARCHAROID:
 				{
 					resetStringInfo(&formatter);
-					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMODX-COUNT");
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-COUNT", i);
 					pg_ltoa(1, long_number);
 					churl_headers_append(headers, formatter.data, long_number);
 
@@ -213,7 +213,7 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 				case TIMETZOID:
 				{
 					resetStringInfo(&formatter);
-					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMODX-COUNT");
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-COUNT", i);
 					pg_ltoa(1, long_number);
 					churl_headers_append(headers, formatter.data, long_number);
 
@@ -226,7 +226,7 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 				case INTERVALOID:
 				{
 					resetStringInfo(&formatter);
-					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMODX-COUNT");
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-COUNT", i);
 					pg_ltoa(1, long_number);
 					churl_headers_append(headers, formatter.data, long_number);
 
