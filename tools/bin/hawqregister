@@ -54,25 +54,52 @@ def option_parser():
     return parser
 
 
+def register_yaml_dict_check(D):
+    # check exists
+    check_list = ['DFS_URL', 'Distribution_Policy', 'FileFormat', 'TableName']
+    for attr in check_list:
+        if not D.get(attr):
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
+            sys.exit(1)
+    if D['FileFormat'] in ['Parquet', 'AO']:
+        prefix = D['FileFormat']
+        local_check_list = ['%s_FileLocations' % prefix, '%s_Schema' % prefix]
+        for attr in local_check_list:
+            if not D.get(attr):
+                logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
+                sys.exit(1)
+        if not D['%s_FileLocations' % prefix].get('Files'):
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_FileLocations.Files' % prefix)
+            sys.exit(1)
+        for d in D['%s_FileLocations' % prefix]['Files']:
+            if not d.get('path'):
+                logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_FileLocations.Files.path' % prefix)
+                sys.exit(1)
+            if not d.get('size'):
+                logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_FileLocations.Files.size' % prefix)
+                sys.exit(1)
+    else:
+        logger.error('hawq register only support Parquet and AO formats. Format %s is not supported.' % D['FileFormat'])
+        sys.exit(1)
+    prefix = D['FileFormat']
+    if not D.get('%s_Schema' % prefix):
+        logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_Schema' % prefix)
+        sys.exit(1)
+    for d in D['%s_Schema' % prefix]:
+        if not d.get('name'):
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_Schema.name' % prefix)
+            sys.exit(1)
+        if not d.get('type'):
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_Schema.type' % prefix)
+            sys.exit(1)
+
+
 def option_parser_yml(yml_file):
     import yaml
     with open(yml_file, 'r') as f:
         params = yaml.load(f)
-    # check if valid configuration yaml file
-    attrs = ['FileFormat', 'DFS_URL', 'Distribution_Policy']
-    for attr in attrs:
-        if attr not in params.keys():
-            logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
-            sys.exit(1)
+    register_yaml_dict_check(params)
     if params['FileFormat'] == 'Parquet':
-        attrs = ['Parquet_FileLocations', 'Parquet_Schema']
-        for attr in attrs:
-            if attr not in params.keys():
-                logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
-                sys.exit(1)
-        if not params['Parquet_FileLocations'].get('Files'):
-            logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
-            sys.exit(1)
         if not len(params['Parquet_FileLocations']['Files']):
             return 'Parquet', '', params['Parquet_Schema'], params['Distribution_Policy']
         offset = params['Parquet_FileLocations']['Files'][0]['path'].rfind('/')
@@ -80,16 +107,8 @@ def option_parser_yml(yml_file):
                     if len(params['Parquet_FileLocations']['Files']) != 1
                     else params['DFS_URL'] + params['Parquet_FileLocations']['Files'][0]['path'])
         return 'Parquet', filepath, params['Parquet_Schema'], params['Distribution_Policy']
-    attrs = ['AO_FileLocations', 'AO_Schema']
-    for attr in attrs:
-        if attr not in params.keys():
-            logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
-            sys.exit(1)
-    if not (params['AO_FileLocations']['Files']):
+    if not len(params['AO_FileLocations']['Files']):
         return 'AO', '', params['AO_Schema'], params['Distribution_Policy']
-    if not params['AO_FileLocations'].get('Files'):
-        logger.error('Wrong configuration yaml file format, see example in "hawq register --help"')
-        sys.exit(1)
     offset = params['AO_FileLocations']['Files'][0]['path'].rfind('/')
     filepath = (params['DFS_URL'] + params['AO_FileLocations']['Files'][0]['path'][:offset]
                 if len(params['AO_FileLocations']['Files']) != 1
