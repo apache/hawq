@@ -26,6 +26,7 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_exttable.h"
 #include "access/pxfheaders.h"
+#include "access/pxffilters.h"
 #include "utils/guc.h"
 
 static void add_alignment_size_httpheader(CHURL_HEADERS headers);
@@ -34,7 +35,7 @@ static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphd
 static char* prepend_x_gp(const char* key);
 static void add_delegation_token_headers(CHURL_HEADERS headers, PxfInputData *inputData);
 static void add_remote_credentials(CHURL_HEADERS headers);
-static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo);
+static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo, List *qualsAttributes);
 
 /* 
  * Add key/value pairs to connection header. 
@@ -64,7 +65,9 @@ void build_http_header(PxfInputData *input)
 	
 	if (proj_info != NULL && proj_info->pi_isVarList)
 	{
-		add_projection_desc_httpheader(headers, proj_info);
+		List* qualsAttributes = extractPxfAttributes(input->quals);
+
+		add_projection_desc_httpheader(headers, proj_info, qualsAttributes);
 	}
 
 	/* GP cluster configuration */
@@ -166,7 +169,7 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 	pfree(formatter.data);
 }
 
-static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo) {
+static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo, List *qualsAttributes) {
     int i;
     char long_number[sizeof(int32) * 8];
     int *varNumbers = projInfo->pi_varNumbers;
@@ -174,7 +177,7 @@ static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo
     initStringInfo(&formatter);
 
     /* Convert the number of projection columns to a string */
-    pg_ltoa(list_length(projInfo->pi_targetlist), long_number);
+    pg_ltoa(list_length(projInfo->pi_targetlist) + list_length(qualsAttributes), long_number);
     churl_headers_append(headers, "X-GP-ATTRS-PROJ", long_number);
 
     for(i = 0; i < list_length(projInfo->pi_targetlist); i++) {
@@ -186,6 +189,21 @@ static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo
         churl_headers_append(headers, formatter.data,long_number);
     }
 
+	ListCell *attribute = NULL;
+
+	foreach(attribute, qualsAttributes)
+	{
+		AttrNumber attrNumber = lfirst_int(attribute);
+
+		pg_ltoa(attrNumber, long_number);
+		resetStringInfo(&formatter);
+		appendStringInfo(&formatter, "X-GP-ATTRS-PROJ-IDX");
+
+		churl_headers_append(headers, formatter.data,long_number);
+	}
+
+
+    list_free(qualsAttributes);
     pfree(formatter.data);
 }
 

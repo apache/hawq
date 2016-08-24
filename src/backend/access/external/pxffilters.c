@@ -38,6 +38,7 @@ static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
 static void const_to_str(Const *constval, StringInfo buf);
+static List* append_attr_from_var(Var* var, List* attrs);
 
 /*
  * All supported HAWQ operators, and their respective HFDS operator code.
@@ -451,6 +452,51 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	return false;
 }
 
+static List*
+append_attr_from_var(Var* var, List* attrs)
+{
+	AttrNumber varattno = var->varattno;
+	/* system attr not supported */
+	if (varattno > InvalidAttrNumber)
+		return lappend_int(attrs, varattno - 1);
+
+	return attrs;
+}
+
+static List*
+get_attrs_from_expr(Expr *expr)
+{
+	Node	*leftop 	= NULL;
+	Node	*rightop	= NULL;
+	List	*attrs = NIL;
+
+	if ((!expr))
+		return attrs;
+
+	if (IsA(expr, OpExpr))
+	{
+		leftop = get_leftop(expr);
+		rightop	= get_rightop(expr);
+	} else if (IsA(expr, ScalarArrayOpExpr))
+	{
+		ScalarArrayOpExpr *saop = (ScalarArrayOpExpr *) expr;
+		leftop = (Node *) linitial(saop->args);
+		rightop = (Node *) lsecond(saop->args);
+	}
+
+	if (IsA(leftop, Var))
+	{
+		attrs = append_attr_from_var((Var *) leftop, attrs);
+	}
+	if (IsA(leftop, Const))
+	{
+		attrs = append_attr_from_var((Var *) rightop, attrs);
+	}
+
+	return attrs;
+
+}
+
 /*
  * supported_filter_type
  *
@@ -536,6 +582,7 @@ const_to_str(Const *constval, StringInfo buf)
 	pfree(extval);
 }
 
+
 /*
  * serializePxfFilterQuals
  *
@@ -563,3 +610,62 @@ char *serializePxfFilterQuals(List *quals)
 	return result;
 }
 
+
+/*
+ * Returns a list of attributes, extracted from quals.
+ * Supports AND, OR, NOT operations.
+ * Supports =, <, <=, >, >=, IS NULL, IS NOT NULL, BETWEEN, IN operators.
+ * List might contain duplicates.
+ * Caller should release memory once result is not needed.
+ */
+List* extractPxfAttributes(List* quals)
+{
+
+	ListCell		*lc = NULL;
+	List *attributes = NIL;
+
+	if (list_length(quals) == 0)
+		return NIL;
+
+	foreach (lc, quals)
+	{
+		Node *node = (Node *) lfirst(lc);
+		NodeTag tag = nodeTag(node);
+
+		switch (tag)
+		{
+			case T_OpExpr:
+			case T_ScalarArrayOpExpr:
+			{
+				Expr* expr = (Expr *) node;
+				List			*attrs = get_attrs_from_expr(expr);
+				attributes = list_concat(attributes, attrs);
+				break;
+			}
+			case T_BoolExpr:
+			{
+				BoolExpr* expr = (BoolExpr *) node;
+				List *inner_result = extractPxfAttributes(expr->args);
+				attributes = list_concat(attributes, inner_result);
+				break;
+			}
+			case T_NullTest:
+			{
+				NullTest* expr = (NullTest *) node;
+				attributes = append_attr_from_var((Var *) expr->arg, attributes);
+				break;
+			}
+			default:
+				/*
+				 * tag is not supported, it's risk of having:
+				 * 1) false-positive tuples
+				 * 2) unable to join tables
+				 * 3) etc
+				 */
+				elog(ERROR, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
+				break;
+		}
+	}
+
+	return attributes;
+}
