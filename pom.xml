@@ -132,6 +132,8 @@
 
               <exclude>contrib/hawq-hadoop/hawq-mapreduce-tool/src/test/resources/dataset</exclude>
               <exclude>contrib/hawq-hadoop/**/*.yaml</exclude>
+              <exclude>contrib/hawq-ambari-plugin/build.properties</exclude>
+              <exclude>contrib/hawq-ambari-plugin/README.md</exclude>
 
               <exclude>src/backend/access/index/caql.files</exclude>
               <exclude>src/backend/gpopt/library.ver</exclude>
