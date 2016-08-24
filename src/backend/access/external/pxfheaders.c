@@ -127,7 +127,7 @@ static void add_alignment_size_httpheader(CHURL_HEADERS headers)
  * X-GP-ATTR-NAMEX - attribute X's name 
  * X-GP-ATTR-TYPECODEX - attribute X's type OID (e.g, 16)
  * X-GP-ATTR-TYPENAMEX - attribute X's type name (e.g, "boolean")
- * optional - X-GP-ATTR-TYPEMODX-COUNT - total number of modifier for attribute X's modifiers
+ * optional - X-GP-ATTR-TYPEMODX-COUNT - total number of modifier for attribute X
  * optional - X-GP-ATTR-TYPEMODX-Y - attribute X's modifiers Y (types which have precision info, like numeric(p,s))
  */
 static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
