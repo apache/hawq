@@ -359,7 +359,7 @@ if __name__ == '__main__':
     print 'File(s) to be registered:', files
     if fileformat == 'Parquet':
         check_parquet_format(files)
-        print files
+    print files
     move_files_in_hdfs(database, tablename, files, firstsegno, tabledir, True)
     insert_metadata_into_database(dburl, database, tablename, seg_name, firstsegno, tabledir, sizes)
     logger.info('Hawq Register Succeed.')
