@@ -207,6 +207,7 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 					churl_headers_append(headers, formatter.data, long_number);
 					break;
 				default:
+					elog(DEBUG5, "add_tuple_desc_httpheader: unsupported type %d ", tuple->attrs[i]->atttypid);
 					break;
 			}
 		}
