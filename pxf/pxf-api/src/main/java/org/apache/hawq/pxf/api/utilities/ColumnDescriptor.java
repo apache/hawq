@@ -30,6 +30,7 @@ public class ColumnDescriptor {
     String gpdbColumnName;
     String gpdbColumnTypeName;
     int gpdbColumnIndex;
+    String[] gpdbColumnTypeModifiers;
 
     /**
      * Reserved word for a table record key.
@@ -44,12 +45,14 @@ public class ColumnDescriptor {
      * @param typecode OID
      * @param index column index
      * @param typename type name
+     * @param typemods type modifiers
      */
-    public ColumnDescriptor(String name, int typecode, int index, String typename) {
+    public ColumnDescriptor(String name, int typecode, int index, String typename, String[] typemods) {
         gpdbColumnTypeCode = typecode;
         gpdbColumnTypeName = typename;
         gpdbColumnName = name;
         gpdbColumnIndex = index;
+        gpdbColumnTypeModifiers = typemods;
     }
 
     /**
@@ -62,6 +65,9 @@ public class ColumnDescriptor {
         this.gpdbColumnName = copy.gpdbColumnName;
         this.gpdbColumnIndex = copy.gpdbColumnIndex;
         this.gpdbColumnTypeName = copy.gpdbColumnTypeName;
+        System.arraycopy(this.gpdbColumnTypeModifiers, 0,
+                copy.gpdbColumnTypeModifiers, 0,
+                this.gpdbColumnTypeModifiers.length);
     }
 
     public String columnName() {
@@ -80,6 +86,10 @@ public class ColumnDescriptor {
         return gpdbColumnTypeName;
     }
 
+    public String[] columnTypeModifiers() {
+        return gpdbColumnTypeModifiers;
+    }
+
     /**
      * Returns <tt>true</tt> if {@link #gpdbColumnName} is a {@link #RECORD_KEY_NAME}.
      *
@@ -94,6 +104,7 @@ public class ColumnDescriptor {
 		return "ColumnDescriptor [gpdbColumnTypeCode=" + gpdbColumnTypeCode
 				+ ", gpdbColumnName=" + gpdbColumnName
 				+ ", gpdbColumnTypeName=" + gpdbColumnTypeName
-				+ ", gpdbColumnIndex=" + gpdbColumnIndex + "]";
+				+ ", gpdbColumnIndex=" + gpdbColumnIndex
+				+ ", gpdbColumnTypeModifiers=" + gpdbColumnTypeModifiers + "]";
 	}
 }

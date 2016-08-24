@@ -19,6 +19,7 @@
 
 package org.apache.hawq.pxf.plugins.hive.utilities;
 
+import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 
@@ -110,4 +111,15 @@ public enum EnumHiveToHawqType {
                 + hiveType + " to HAWQ's type");
     }
 
+    public static EnumHiveToHawqType getHawqToHiveType(DataType dataType) {
+
+        for (EnumHiveToHawqType t : values()) {
+
+            if (t.getHawqType().getDataType().equals(dataType)) {
+                return t;
+            }
+        }
+        throw new UnsupportedTypeException("Unable to map HAWQ's type: "
+                + dataType + " to Hive's type");
+    }
 }

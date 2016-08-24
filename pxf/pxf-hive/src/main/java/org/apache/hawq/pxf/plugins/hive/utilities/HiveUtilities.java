@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
+import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
 
 /**
@@ -254,6 +255,48 @@ public class HiveUtilities {
 
         } catch (MetaException cause) {
             throw new RuntimeException("Failed connecting to Hive MetaStore service: " + cause.getMessage(), cause);
+        }
+    }
+
+
+    /**
+     * Converts HAWQ type to hive type. The supported mappings are:<ul>
+     * <li>{@code BOOLEAN -> boolean}</li>
+     * <li>{@code SMALLINT -> smallint (tinyint is converted to smallint)}</li>
+     * <li>{@code BIGINT -> bigint}</li>
+     * <li>{@code TIMESTAMP, TIME -> timestamp}</li>
+     * <li>{@code NUMERIC -> decimal}</li>
+     * <li>{@code BYTEA -> binary}</li>
+     * <li>{@code INTERGER -> int}</li>
+     * <li>{@code TEXT -> string}</li>
+     * <li>{@code REAL -> float}</li>
+     * <li>{@code FLOAT8 -> double}</li>
+     * </ul>
+     * All other types (both in HAWQ and in HIVE) are not supported.
+     *
+     * @param type HAWQ data type
+     * @param name field name
+     * @return Hive type
+     * @throws UnsupportedTypeException if type is not supported
+     */
+    public static String toHiveType(DataType type) {
+
+        EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getHawqToHiveType(type);
+        return hiveToHawqType.getTypeName();
+    }
+
+    public static void compareTypes(DataType type, String hiveType, String columnName) {
+        String convertedHive = toHiveType(type);
+        if (!convertedHive.equals(hiveType)
+                && !(convertedHive.equals("smallint") && hiveType.equals("tinyint"))) {
+            throw new UnsupportedTypeException(
+                    "Schema mismatch definition:" 
+                            + " (Hive type " + hiveType + ", HAWQ type "
+                            + type.toString() + ")");
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug(" Hive type " + hiveType
+                    + ", HAWQ type " + type.toString());
         }
     }
 }

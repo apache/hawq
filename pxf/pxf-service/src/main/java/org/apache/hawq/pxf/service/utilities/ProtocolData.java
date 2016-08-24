@@ -29,7 +29,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
-
 import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
@@ -390,15 +389,28 @@ public class ProtocolData extends InputData {
             String columnName = getProperty("ATTR-NAME" + i);
             int columnTypeCode = getIntProperty("ATTR-TYPECODE" + i);
             String columnTypeName = getProperty("ATTR-TYPENAME" + i);
+            String[] columnTypeMods = parseTypeMods(i);
 
             ColumnDescriptor column = new ColumnDescriptor(columnName,
-                    columnTypeCode, i, columnTypeName);
+                    columnTypeCode, i, columnTypeName, columnTypeMods);
             tupleDescription.add(column);
 
             if (columnName.equalsIgnoreCase(ColumnDescriptor.RECORD_KEY_NAME)) {
                 recordkeyColumn = column;
             }
         }
+    }
+
+    private String[] parseTypeMods(int columnIndex) {
+        Integer typeModeCount = Integer.parseInt(getOptionalProperty("ATTR-TYPEMOD" + columnIndex + "COUNT"));
+        String[] result = null;
+        if (typeModeCount > 0) {
+            result = new String[typeModeCount];
+            for (int i = 0; i < typeModeCount; i++) {
+                result[i] = getProperty("ATTR-TYPEMOD" + columnIndex + "-" + i);
+            }
+        }
+        return result;
     }
 
     /**
