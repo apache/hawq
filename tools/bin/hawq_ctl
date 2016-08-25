@@ -435,7 +435,7 @@ class HawqInit:
         for host in self.host_list:
             logger.debug("Start to init segment on node '%s'" % host)
             scpcmd = "scp %s/etc/_mgmt_config %s:%s/etc/_mgmt_config > /dev/null" % (self.GPHOME, host, self.GPHOME)
-            local_ssh(scpcmd)
+            local_ssh(scpcmd, logger)
             work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
         logger.info("Total segment number is: %s" % len(self.host_list))
         work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'init', 0, self.quiet)})

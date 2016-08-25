@@ -247,7 +247,7 @@ def get_files_in_hdfs(filepath):
     files = []
     sizes = []
     hdfscmd = "hadoop fs -test -e %s" % filepath
-    result = local_ssh(hdfscmd)
+    result = local_ssh(hdfscmd, logger)
     if result != 0:
         logger.error("Path '%s' does not exist in hdfs" % filepath)
         sys.exit(1)
@@ -274,9 +274,9 @@ def check_parquet_format(files):
         if out == '0':
             continue
         hdfscmd = 'hadoop fs -cat %s | head -c 4 | grep PAR1' % f
-        result1 = local_ssh(hdfscmd)
+        result1 = local_ssh(hdfscmd, logger)
         hdfscmd = 'hadoop fs -cat %s | tail -c 4 | grep PAR1' % f
-        result2 = local_ssh(hdfscmd)
+        result2 = local_ssh(hdfscmd, logger)
         if result1 or result2:
             logger.error('File %s is not parquet format' % f)
             sys.exit(1)
@@ -293,7 +293,7 @@ def move_files_in_hdfs(databasename, tablename, files, firstsegno, tabledir, nor
             if srcfile != dstfile:
                 hdfscmd = 'hadoop fs -mv %s %s' % (srcfile, dstfile)
                 sys.stdout.write('hdfscmd: "%s"\n' % hdfscmd)
-                result = local_ssh(hdfscmd)
+                result = local_ssh(hdfscmd, logger)
                 if result != 0:
                     logger.error('Fail to move %s to %s' % (srcfile, dstfile))
                     sys.exit(1)
@@ -306,7 +306,7 @@ def move_files_in_hdfs(databasename, tablename, files, firstsegno, tabledir, nor
             if srcfile != dstfile:
                 hdfscmd = 'hadoop fs -mv %s %s' % (srcfile, dstfile)
                 sys.stdout.write('hdfscmd: "%s"\n' % hdfscmd)
-                result = local_ssh(hdfscmd)
+                result = local_ssh(hdfscmd, logger)
                 if result != 0:
                     logger.error('Fail to move "%s" to "%s"' % (srcfile, dstfile))
                     sys.exit(1)
@@ -336,7 +336,7 @@ if __name__ == '__main__':
     if len(args) != 1 or (options.yml_config and options.filepath):
         parser.print_help(sys.stderr)
         sys.exit(1)
-    if local_ssh('hadoop'):
+    if local_ssh('hadoop', logger):
         logger.error('command "hadoop" is not available.')
         sys.exit(1)
 
