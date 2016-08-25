@@ -106,7 +106,6 @@ def register_yaml_dict_check(D):
                 sys.exit(1)
 
 
-
 def option_parser_yml(yml_file):
     import yaml
     with open(yml_file, 'r') as f:
@@ -130,6 +129,18 @@ def option_parser_yml(yml_file):
 
 
 def create_table(dburl, tablename, schema_info, fmt, distrbution_policy, file_locations):
+    try:
+        query = "select count(*) from pg_class where relname = '%s'" % tablename.split('.')[-1].lower()
+        conn = dbconn.connect(dburl, False)
+        rows = dbconn.execSQL(conn, query)
+        conn.commit()
+        for row in rows:
+            if row[0] != 0:
+                logger.error("Register failed: table %s has already existed." % tablename)
+                sys.exit(1)
+    except DatabaseError, ex:
+        logger.error('Failed to execute query "%s"' % query)
+        sys.exit(1)
     try:
         schema = ','.join([k['name'] + ' ' + k['type'] for k in schema_info])
         fmt = 'ROW' if fmt == 'AO' else fmt
