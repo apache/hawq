@@ -35,35 +35,34 @@
 
 #include <ctype.h>
 
-#include "access/genam.h"
-#include "access/heapam.h"
 #include "catalog/catquery.h"
+#include "access/genam.h"
 #include "catalog/heap.h"
+#include "access/heapam.h"
+#include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_exttable.h"
 #include "catalog/pg_proc_callback.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_type.h"
-#include "catalog/indexing.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/relation.h"                 /* CdbRelColumnInfo */
 #include "optimizer/pathnode.h"             /* cdb_rte_find_pseudo_column() */
 #include "parser/parsetree.h"
+#include "parser/parse_coerce.h"
 #include "parser/parse_expr.h"
 #include "parser/parse_relation.h"
 #include "parser/parse_type.h"
-#include "parser/parse_coerce.h"
 #include "utils/acl.h"
+#include "utils/array.h"
 #include "utils/builtins.h"
+#include "utils/fmgroids.h"
+#include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
-#include "utils/array.h"
-#include "utils/fmgroids.h"
-
-
 /* GUC parameter */
 bool		add_missing_from;
 
@@ -2762,15 +2761,32 @@ ExecCheckRTEPerms(RangeTblEntry *rte)
 	/*
 	 * We must have *all* the requiredPerms bits, so use aclmask not aclcheck.
 	 */
-	if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
-		!= requiredPerms)
+	if (enable_ranger)
 	{
-		/*
-		 * If the table is a partition, return an error message that includes
-		 * the name of the parent table.
-		 */
-		const char *rel_name = get_rel_name_partition(relOid);
-		aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+	  /* ranger check required permission should all be approved.*/
+    if (pg_rangercheck(relOid, userid, requiredPerms, ACLMASK_ALL)
+        != ACLCHECK_OK)
+    {
+      /*
+       * If the table is a partition, return an error message that includes
+       * the name of the parent table.
+       */
+      const char *rel_name = get_rel_name_partition(relOid);
+      aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+    }
+	}
+	else
+	{
+	  if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
+	        != requiredPerms)
+    {
+      /*
+       * If the table is a partition, return an error message that includes
+       * the name of the parent table.
+       */
+      const char *rel_name = get_rel_name_partition(relOid);
+      aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+    }
 	}
 }
 

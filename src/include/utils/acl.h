@@ -288,6 +288,21 @@ extern AclResult pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mod
 extern AclResult pg_extprotocol_aclcheck(Oid ptc_oid, Oid roleid, AclMode mode);
 extern AclResult pg_filesystem_aclcheck(Oid fsys_oid, Oid roleid, AclMode mode);
 
+extern AclResult pg_class_nativecheck(Oid table_oid, Oid roleid, AclMode mode);
+extern AclResult pg_database_nativecheck(Oid db_oid, Oid roleid, AclMode mode);
+extern AclResult pg_proc_nativecheck(Oid proc_oid, Oid roleid, AclMode mode);
+extern AclResult pg_language_nativecheck(Oid lang_oid, Oid roleid, AclMode mode);
+extern AclResult pg_namespace_nativecheck(Oid nsp_oid, Oid roleid, AclMode mode);
+extern AclResult pg_tablespace_nativecheck(Oid spc_oid, Oid roleid, AclMode mode);
+extern AclResult pg_foreign_data_wrapper_nativecheck(Oid fdw_oid, Oid roleid, AclMode mode);
+extern AclResult pg_foreign_server_nativecheck(Oid srv_oid, Oid roleid, AclMode mode);
+extern AclResult pg_extprotocol_nativecheck(Oid ptc_oid, Oid roleid, AclMode mode);
+extern AclResult pg_filesystem_nativecheck(Oid fsys_oid, Oid roleid, AclMode mode);
+
+extern AclResult
+pg_rangercheck(Oid table_oid, Oid roleid,
+         AclMode mask, AclMaskHow how);
+
 extern void aclcheck_error(AclResult aclerr, AclObjectKind objectkind,
 			   const char *objectname);
 

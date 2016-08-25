@@ -225,10 +225,18 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 	 */
 	if (avail_goptions == ACL_NO_RIGHTS)
 	{
-		if (pg_aclmask(objkind, objectId, grantorId,
-					   whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
-					   ACLMASK_ANY) == ACL_NO_RIGHTS)
-			aclcheck_error(ACLCHECK_NO_PRIV, objkind, objname);
+	  if (enable_ranger) {
+	    if (pg_rangercheck(objectId, grantorId,
+	        whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
+	        ACLMASK_ANY) != ACLCHECK_OK)
+	      aclcheck_error(ACLCHECK_NO_PRIV, objkind, objname);
+	  }
+	  else {
+	    if (pg_aclmask(objkind, objectId, grantorId,
+	        whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
+	        ACLMASK_ANY) == ACL_NO_RIGHTS)
+	      aclcheck_error(ACLCHECK_NO_PRIV, objkind, objname);
+	  }
 	}
 
 	/*
@@ -2240,6 +2248,14 @@ has_rolcatupdate(Oid roleid)
 	return rolcatupdate;
 }
 
+AclResult
+pg_rangercheck(Oid table_oid, Oid roleid,
+         AclMode mask, AclMaskHow how)
+{
+  return ACLCHECK_OK;
+}
+
+
 /*
  * Relay for the various pg_*_mask routines depending on object kind
  */
@@ -3085,6 +3101,135 @@ pg_filesystem_aclmask(Oid fsysOid, Oid roleid,
 	return result;
 }
 
+
+/*
+ * Exported routine for checking a user's access privileges to a table
+ *
+ * Returns ACLCHECK_OK if the user has any of the privileges identified by
+ * 'mode'; otherwise returns a suitable error code (in practice, always
+ * ACLCHECK_NO_PRIV).
+ */
+AclResult
+pg_class_nativecheck(Oid table_oid, Oid roleid, AclMode mode)
+{
+  if (pg_class_aclmask(table_oid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to a database
+ */
+AclResult
+pg_database_nativecheck(Oid db_oid, Oid roleid, AclMode mode)
+{
+  if (pg_database_aclmask(db_oid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to a function
+ */
+AclResult
+pg_proc_nativecheck(Oid proc_oid, Oid roleid, AclMode mode)
+{
+  if (pg_proc_aclmask(proc_oid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to a language
+ */
+AclResult
+pg_language_nativecheck(Oid lang_oid, Oid roleid, AclMode mode)
+{
+  if (pg_language_aclmask(lang_oid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to a namespace
+ */
+AclResult
+pg_namespace_nativecheck(Oid nsp_oid, Oid roleid, AclMode mode)
+{
+  if (pg_namespace_aclmask(nsp_oid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to a tablespace
+ */
+AclResult
+pg_tablespace_nativecheck(Oid spc_oid, Oid roleid, AclMode mode)
+{
+  if (pg_tablespace_aclmask(spc_oid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to a foreign
+ * data wrapper
+ */
+AclResult
+pg_foreign_data_wrapper_nativecheck(Oid fdw_oid, Oid roleid, AclMode mode)
+{
+  if (pg_foreign_data_wrapper_aclmask(fdw_oid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to a foreign
+ * server
+ */
+AclResult
+pg_foreign_server_nativecheck(Oid srv_oid, Oid roleid, AclMode mode)
+{
+  if (pg_foreign_server_aclmask(srv_oid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to an
+ * external protocol
+ */
+AclResult
+pg_extprotocol_nativecheck(Oid ptcid, Oid roleid, AclMode mode)
+{
+  if (pg_extprotocol_aclmask(ptcid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+/*
+ * Exported routine for checking a user's access privileges to a filesystem
+ */
+AclResult
+pg_filesystem_nativecheck(Oid fsysid, Oid roleid, AclMode mode)
+{
+  if (pg_filesystem_aclmask(fsysid, roleid, mode, ACLMASK_ANY) != 0)
+    return ACLCHECK_OK;
+  else
+    return ACLCHECK_NO_PRIV;
+}
+
+
 /*
  * Exported routine for checking a user's access privileges to a table
  *
@@ -3095,10 +3240,14 @@ pg_filesystem_aclmask(Oid fsysOid, Oid roleid,
 AclResult
 pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 {
-	if (pg_class_aclmask(table_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(table_oid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_class_nativecheck(table_oid, roleid, mode);
+  }
 }
 
 /*
@@ -3107,10 +3256,14 @@ pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 AclResult
 pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
 {
-	if (pg_database_aclmask(db_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+   {
+     return pg_rangercheck(db_oid, roleid, mode, ACLMASK_ANY);
+   }
+   else
+   {
+     return pg_database_nativecheck(db_oid, roleid, mode);
+   }
 }
 
 /*
@@ -3119,10 +3272,14 @@ pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
 AclResult
 pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
 {
-	if (pg_proc_aclmask(proc_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(proc_oid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_proc_nativecheck(proc_oid, roleid, mode);
+  }
 }
 
 /*
@@ -3131,10 +3288,14 @@ pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
 {
-	if (pg_language_aclmask(lang_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(lang_oid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_language_nativecheck(lang_oid, roleid, mode);
+  }
 }
 
 /*
@@ -3143,10 +3304,14 @@ pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
 AclResult
 pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
 {
-	if (pg_namespace_aclmask(nsp_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(nsp_oid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_namespace_nativecheck(nsp_oid, roleid, mode);
+  }
 }
 
 /*
@@ -3155,10 +3320,14 @@ pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
 AclResult
 pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 {
-	if (pg_tablespace_aclmask(spc_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(spc_oid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_tablespace_nativecheck(spc_oid, roleid, mode);
+  }
 }
 
 /*
@@ -3168,10 +3337,14 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 {
-	if (pg_foreign_data_wrapper_aclmask(fdw_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(fdw_oid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_foreign_data_wrapper_nativecheck(fdw_oid, roleid, mode);
+  }
 }
 
 /*
@@ -3181,10 +3354,14 @@ pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
 {
-	if (pg_foreign_server_aclmask(srv_oid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(srv_oid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_foreign_server_nativecheck(srv_oid, roleid, mode);
+  }
 }
 
 /*
@@ -3194,10 +3371,14 @@ pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
 AclResult
 pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
 {
-	if (pg_extprotocol_aclmask(ptcid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(ptcid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_extprotocol_nativecheck(ptcid, roleid, mode);
+  }
 }
 
 /*
@@ -3206,10 +3387,14 @@ pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
 AclResult
 pg_filesystem_aclcheck(Oid fsysid, Oid roleid, AclMode mode)
 {
-	if (pg_filesystem_aclmask(fsysid, roleid, mode, ACLMASK_ANY) != 0)
-		return ACLCHECK_OK;
-	else
-		return ACLCHECK_NO_PRIV;
+  if(enable_ranger)
+  {
+    return pg_rangercheck(fsysid, roleid, mode, ACLMASK_ANY);
+  }
+  else
+  {
+    return pg_filesystem_nativecheck(fsysid, roleid, mode);
+  }
 }
 
 /*
