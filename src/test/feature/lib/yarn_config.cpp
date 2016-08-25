@@ -19,9 +19,9 @@ void YarnConfig::runCommand(const string &command,
                             string &result) {
   string cmd = "";
   if (isyarnuser) {
-    cmd = "sudo -u ";
+    cmd = "/usr/bin/sudo -Eu ";
     cmd.append(getYarnUser());
-    cmd.append(" ");
+    cmd.append(" env \"PATH=$PATH\" ");
     cmd.append(command);
   } else {
     cmd = command;
@@ -184,7 +184,7 @@ bool YarnConfig::getStandbyRM(string &standbyRM,
 bool YarnConfig::getHARM(const string &RMtype,
                                string &RM,
                                int &port) {
-  if (!isHA()) {
+  if (isHA() <= 0) {
     return false;
   }
   string RMService = "";
