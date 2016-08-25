@@ -19,9 +19,9 @@ void HdfsConfig::runCommand(const string &command,
                             string &result) {
   string cmd = "";
   if (ishdfsuser) {
-    cmd = "sudo -u ";
+    cmd = "/usr/bin/sudo -Eu ";
     cmd.append(getHdfsUser());
-    cmd.append(" ");
+    cmd.append(" env \"PATH=$PATH\" ");
     cmd.append(command);
   } else {
     cmd = command;
@@ -154,7 +154,7 @@ int HdfsConfig::isTruncate() {
 
 string HdfsConfig::getHadoopHome() {
   string result = "";
-  runCommand("ps -ef|grep hadoop", true, result);
+  runCommand("ps -ef|grep hadoop", false, result);
   string hadoopHome = "";
   auto lines = hawq::test::split(result, '\n');
   for (size_t i=0; i<lines.size()-1; i++) {
@@ -185,7 +185,7 @@ bool HdfsConfig::getStandbyNamenode(string &standbynamenode,
 bool HdfsConfig::getHANamenode(const string &namenodetype,
                                string &namenode,
                                int &port) {
-  if (!isHA()) {
+  if (isHA() <= 0) {
     return false;
   }
   string namenodeService = "";

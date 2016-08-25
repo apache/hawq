@@ -64,6 +64,13 @@ TEST_F(TestCommonLib, TestHdfsConfig) {
   hc.isConfigKerberos();
   hc.isTruncate();
   std::string hadoopHome = hc.getHadoopHome();
+  /* chmod 777 $HADOOP_HOME/etc/hadoop/hdfs-site.xml */
+  std::string confPath = hadoopHome;
+  confPath.append("/etc/hadoop/hdfs-site.xml");
+  std::string cmd = "/usr/bin/sudo -Eu root env \"PATH=$PATH\" chmod 777 ";
+  cmd.append(confPath);
+  hawq::test::Command c(cmd);
+  std::string result = c.run().getResultOutput();
 
   std::string hostname = "";
   int port = 0;
@@ -87,8 +94,10 @@ TEST_F(TestCommonLib, TestHdfsConfig) {
 
   hc.isSafemode();
 
-  hc.getParameterValue("dfs.replication");
+  std::string defaultValue = hc.getParameterValue("dfs.replication");
   hc.setParameterValue("dfs.replication", "1");
+  hc.getParameterValue("dfs.replication");
+  hc.setParameterValue("dfs.replication", defaultValue);
 }
 
 TEST_F(TestCommonLib, TestYarnConfig) {
@@ -99,6 +108,13 @@ TEST_F(TestCommonLib, TestYarnConfig) {
   hc.isHA();
   hc.isConfigKerberos();
   std::string hadoopHome = hc.getHadoopHome();
+  /* chmod 777 $HADOOP_HOME/etc/hadoop/yarn-site.xml */
+  std::string confPath = hadoopHome;
+  confPath.append("/etc/hadoop/yarn-site.xml");
+  std::string cmd = "/usr/bin/sudo -Eu root env \"PATH=$PATH\" chmod 777 ";
+  cmd.append(confPath);
+  hawq::test::Command c(cmd);
+  std::string result = c.run().getResultOutput();
 
   std::string hostname = "";
   int port = 0;
@@ -120,8 +136,10 @@ TEST_F(TestCommonLib, TestYarnConfig) {
   portList.clear();
   hc.getActiveNodeManagers(hostList, portList);
 
-  hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
+  std::string defaultValue =hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
   hc.setParameterValue("yarn.scheduler.minimum-allocation-mb", "1024");
+  defaultValue =hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
+  hc.setParameterValue("yarn.scheduler.minimum-allocation-mb", defaultValue);
 }
 
 TEST_F(TestCommonLib, TestCommand) {
