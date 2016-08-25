@@ -64,6 +64,13 @@ TEST_F(TestCommonLib, TestHdfsConfig) {
   hc.isConfigKerberos();
   hc.isTruncate();
   std::string hadoopHome = hc.getHadoopHome();
+  /* chmod 777 $HADOOP_HOME/etc/hadoop/hdfs-site.xml */
+  std::string confPath = hadoopHome;
+  confPath.append("/etc/hadoop/hdfs-site.xml");
+  std::string cmd = "/usr/bin/sudo -Eu root env \"PATH=$PATH\" chmod 777 ";
+  cmd.append(confPath);
+  hawq::test::Command c(cmd);
+  std::string result = c.run().getResultOutput();
 
   std::string hostname = "";
   int port = 0;
@@ -101,6 +108,13 @@ TEST_F(TestCommonLib, TestYarnConfig) {
   hc.isHA();
   hc.isConfigKerberos();
   std::string hadoopHome = hc.getHadoopHome();
+  /* chmod 777 $HADOOP_HOME/etc/hadoop/yarn-site.xml */
+  std::string confPath = hadoopHome;
+  confPath.append("/etc/hadoop/yarn-site.xml");
+  std::string cmd = "/usr/bin/sudo -Eu root env \"PATH=$PATH\" chmod 777 ";
+  cmd.append(confPath);
+  hawq::test::Command c(cmd);
+  std::string result = c.run().getResultOutput();
 
   std::string hostname = "";
   int port = 0;

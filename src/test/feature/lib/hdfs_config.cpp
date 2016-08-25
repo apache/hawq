@@ -185,7 +185,7 @@ bool HdfsConfig::getStandbyNamenode(string &standbynamenode,
 bool HdfsConfig::getHANamenode(const string &namenodetype,
                                string &namenode,
                                int &port) {
-  if (!isHA()) {
+  if (isHA() <= 0) {
     return false;
   }
   string namenodeService = "";

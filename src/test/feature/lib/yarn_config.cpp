@@ -184,7 +184,7 @@ bool YarnConfig::getStandbyRM(string &standbyRM,
 bool YarnConfig::getHARM(const string &RMtype,
                                string &RM,
                                int &port) {
-  if (!isHA()) {
+  if (isHA() <= 0) {
     return false;
   }
   string RMService = "";
