@@ -56,23 +56,27 @@ public enum EnumHawqType {
     DateType("date", DataType.DATE),
     TimestampType("timestamp", DataType.TIMESTAMP),
     BoolType("bool", DataType.BOOLEAN),
-    NumericType("numeric", DataType.NUMERIC, (byte) 2, true),
+    NumericType("numeric", DataType.NUMERIC, (byte) 2, false),
     BpcharType("bpchar", DataType.BPCHAR, (byte) 1, true);
 
     private DataType dataType;
     private String typeName;
     private byte modifiersNum;
-    private boolean validateIntegerModifiers;
+    private boolean mandatoryModifiers;
 
     EnumHawqType(String typeName, DataType dataType) {
         this.typeName = typeName;
         this.dataType = dataType;
     }
 
-    EnumHawqType(String typeName, DataType dataType, byte modifiersNum, boolean validateIntegerModifiers) {
+    EnumHawqType(String typeName, DataType dataType, byte modifiersNum) {
         this(typeName, dataType);
         this.modifiersNum = modifiersNum;
-        this.validateIntegerModifiers = validateIntegerModifiers;
+    }
+
+    EnumHawqType(String typeName, DataType dataType, byte modifiersNum, boolean mandatoryModifiers) {
+        this(typeName, dataType, modifiersNum);
+        this.setMandatoryModifiers(mandatoryModifiers);
     }
 
     /**
@@ -93,18 +97,18 @@ public enum EnumHawqType {
 
     /**
      * 
-     * @return whether modifiers should be integers
-     */
-    public boolean getValidateIntegerModifiers() {
-        return this.validateIntegerModifiers;
-    }
-
-    /**
-     * 
      * @return data type
      */
     public DataType getDataType() {
         return this.dataType;
+    }
+
+    public boolean isMandatoryModifiers() {
+        return mandatoryModifiers;
+    }
+
+    public void setMandatoryModifiers(boolean mandatoryModifiers) {
+        this.mandatoryModifiers = mandatoryModifiers;
     }
 }
 

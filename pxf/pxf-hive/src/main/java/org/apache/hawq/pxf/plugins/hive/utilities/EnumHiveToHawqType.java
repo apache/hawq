@@ -19,6 +19,11 @@
 
 package org.apache.hawq.pxf.plugins.hive.utilities;
 
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
@@ -30,8 +35,8 @@ import org.apache.hawq.pxf.api.UnsupportedTypeException;
  */
 public enum EnumHiveToHawqType {
 
-    TinyintType("tinyint", EnumHawqType.Int2Type),
-    SmallintType("smallint", EnumHawqType.Int2Type),
+    TinyintType("tinyint", EnumHawqType.Int2Type, (byte) 1),
+    SmallintType("smallint", EnumHawqType.Int2Type, (byte) 2),
     IntType("int", EnumHawqType.Int4Type),
     BigintType("bigint", EnumHawqType.Int8Type),
     BooleanType("boolean", EnumHawqType.BoolType),
@@ -52,10 +57,16 @@ public enum EnumHiveToHawqType {
     private String typeName;
     private EnumHawqType hawqType;
     private String splitExpression;
+    private byte size;
 
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType) {
         this.typeName = typeName;
         this.hawqType = hawqType;
+    }
+    
+    EnumHiveToHawqType(String typeName, EnumHawqType hawqType, byte size) {
+        this(typeName, hawqType);
+        this.setSize(size);
     }
 
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType, String splitExpression) {
@@ -111,15 +122,51 @@ public enum EnumHiveToHawqType {
                 + hiveType + " to HAWQ's type");
     }
 
-    public static EnumHiveToHawqType getHawqToHiveType(DataType dataType) {
+    public static EnumHiveToHawqType getCompatibleHawqToHiveType(DataType dataType) {
+
+        SortedSet<EnumHiveToHawqType> types = new TreeSet<EnumHiveToHawqType>(new Comparator<EnumHiveToHawqType>() {
+
+            public int compare(EnumHiveToHawqType a, EnumHiveToHawqType b){
+                return Byte.compare(a.getSize(), b.getSize());
+            }
+        });
 
         for (EnumHiveToHawqType t : values()) {
-
             if (t.getHawqType().getDataType().equals(dataType)) {
-                return t;
+                types.add(t);
             }
         }
-        throw new UnsupportedTypeException("Unable to map HAWQ's type: "
-                + dataType + " to Hive's type");
+
+        if (types.size() == 0)
+            throw new UnsupportedTypeException("Unable to map HAWQ's type: "
+                    + dataType + " to Hive's type");
+
+        return types.last();
+    }
+
+    public static String[] extractModifiers(String hiveType) {
+        String[] result = null;
+        for (EnumHiveToHawqType t : values()) {
+            String hiveTypeName = hiveType;
+            String splitExpression = t.getSplitExpression();
+            if (splitExpression != null) {
+                String[] tokens = hiveType.split(splitExpression);
+                hiveTypeName = tokens[0];
+                result = Arrays.copyOfRange(tokens, 1, tokens.length);
+            }
+            if (t.getTypeName().toLowerCase().equals(hiveTypeName.toLowerCase())) {
+                return result;
+            }
+        }
+        throw new UnsupportedTypeException("Unable to map Hive's type: "
+                + hiveType + " to HAWQ's type");
+    }
+
+    public byte getSize() {
+        return size;
+    }
+
+    public void setSize(byte size) {
+        this.size = size;
     }
 }

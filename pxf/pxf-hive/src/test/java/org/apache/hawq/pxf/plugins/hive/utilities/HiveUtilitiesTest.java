@@ -22,11 +22,16 @@ package org.apache.hawq.pxf.plugins.hive.utilities;
 
 import static org.junit.Assert.*;
 
+import java.util.Arrays;
+
+import org.apache.hawq.pxf.api.io.DataType;
+import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.junit.Test;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 
 public class HiveUtilitiesTest {
 
@@ -118,6 +123,66 @@ public class HiveUtilitiesTest {
             assertEquals(expectedType, result.getType().getTypeName());
             assertArrayEquals(expectedModifiers, result.getModifiers());
         }
+    }
+
+    @Test
+    public void testCompatibleHiveType() {
+        String compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.SMALLINT);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.SmallintType.getTypeName());
+    }
+
+    @Test
+    public void validateSchema() throws Exception {
+        String columnName = "abc";
+
+        String[] hawqModifiers = {};
+        HiveUtilities.validateTypeCompatible(DataType.SMALLINT, hawqModifiers, EnumHiveToHawqType.TinyintType.getTypeName(), columnName);
+
+        HiveUtilities.validateTypeCompatible(DataType.SMALLINT, hawqModifiers, EnumHiveToHawqType.SmallintType.getTypeName(), columnName);
+
+        //Both Hive and HAWQ types have the same modifiers
+        hawqModifiers = new String[]{"38", "18"};
+        HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
+
+        //HAWQ datatype doesn't require modifiers, they are empty, Hive has non-empty modifiers
+        //Types are compatible in this case
+        hawqModifiers = new String[]{};
+        HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
+        hawqModifiers = null;
+        HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
+
+        //HAWQ datatype requires modifiers but they aren't provided
+        //Types aren't compatible
+        try {
+            hawqModifiers = new String[]{};
+            HiveUtilities.validateTypeCompatible(DataType.VARCHAR, hawqModifiers, "varchar", columnName);
+            fail("should fail with incompatible modifiers message");
+        }
+        catch (UnsupportedTypeException e) {
+            String errorMsg = "Invalid definition for column " + columnName +  ": modifiers are mandatory for type " + EnumHawqType.VarcharType.getTypeName();
+            assertEquals(errorMsg, e.getMessage());
+        }
+
+
+        //HAWQ has lesser modifiers than Hive, types aren't compatible
+        try {
+            hawqModifiers = new String[]{"38", "17"};
+            HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
+            fail("should fail with incompatible modifiers message");
+        }
+        catch (UnsupportedTypeException e) {
+            String errorMsg = "Invalid definition for column " + columnName 
+                    +  ": modifiers are not compatible, "
+                    + Arrays.toString(new String[]{"38", "18"}) + ", "
+                    + Arrays.toString(new String[]{"38", "17"});
+            assertEquals(errorMsg, e.getMessage());
+        }
+    }
+
+    @Test
+    public void extractModifiers() throws Exception {
+        String[] mods = EnumHiveToHawqType.extractModifiers("decimal(10,2)");
+        assertEquals(mods, new String[]{"10", "2"});
     }
 
     @Test

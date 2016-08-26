@@ -127,7 +127,7 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
         for (int i = 0; i < numberOfDataColumns; i++) {
             ColumnDescriptor column = input.getColumn(i);
             String columnName = column.columnName();
-            String columnType = HiveUtilities.toHiveType(DataType.get(column.columnTypeCode()));
+            String columnType = HiveUtilities.toCompatibleHiveType(DataType.get(column.columnTypeCode()));
             columnNames.append(delim).append(columnName);
             columnTypes.append(delim).append(columnType);
             delim = ",";
