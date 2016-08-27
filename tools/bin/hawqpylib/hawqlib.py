@@ -586,7 +586,7 @@ def get_host_status(hostlist):
     if not isinstance(hostlist, list):
         raise Exception("Input parameter should be of type list")
 
-    pool = WorkerPool()
+    pool = WorkerPool(min(len(hostlist), 16))
 
     for host in hostlist:
         cmd = Echo('ssh test', '', ctxt=REMOTE, remoteHost=host)
