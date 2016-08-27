@@ -79,7 +79,7 @@
         </executions>
 
         <configuration>
-          <copyright>2016 The Apache Software Foundation</copyright>
+          <copyright>ASL 2.0</copyright>
           <group>org.apache.hawq</group>
           <description>
             HAWQ plugin contains Ambari's stack definition for HAWQ.
