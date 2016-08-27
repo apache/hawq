@@ -163,6 +163,10 @@ public class HiveUtilitiesTest {
             assertEquals(errorMsg, e.getMessage());
         }
 
+        //HAWQ has wider modifiers than Hive, types are compatible
+        hawqModifiers = new String[]{"11", "3"};
+        HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(10,2)", columnName);
+
 
         //HAWQ has lesser modifiers than Hive, types aren't compatible
         try {

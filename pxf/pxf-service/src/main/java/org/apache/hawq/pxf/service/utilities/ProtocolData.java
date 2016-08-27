@@ -402,7 +402,7 @@ public class ProtocolData extends InputData {
     }
 
     private String[] parseTypeMods(int columnIndex) {
-        String typeModeCountStr = getOptionalProperty("ATTR-TYPEMOD" + columnIndex + "COUNT");
+        String typeModeCountStr = getOptionalProperty("ATTR-TYPEMOD" + columnIndex + "-COUNT");
         String[] result = null;
         if (typeModeCountStr != null) {
         Integer typeModeCount = Integer.parseInt(typeModeCountStr);

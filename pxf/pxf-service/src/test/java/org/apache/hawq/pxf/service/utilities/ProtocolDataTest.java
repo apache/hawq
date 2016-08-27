@@ -332,6 +332,29 @@ public class ProtocolDataTest {
         }
     }
 
+    @Test
+    public void typeMods() {
+
+        parameters.put("X-GP-ATTRS", "2");
+        parameters.put("X-GP-ATTR-NAME0", "vc1");
+        parameters.put("X-GP-ATTR-TYPECODE0", "1043");
+        parameters.put("X-GP-ATTR-TYPENAME0", "varchar");
+        parameters.put("X-GP-ATTR-TYPEMOD0-COUNT", "1");
+        parameters.put("X-GP-ATTR-TYPEMOD0-0", "5");
+
+        parameters.put("X-GP-ATTR-NAME1", "dec1");
+        parameters.put("X-GP-ATTR-TYPECODE1", "1700");
+        parameters.put("X-GP-ATTR-TYPENAME1", "numeric");
+        parameters.put("X-GP-ATTR-TYPEMOD1-COUNT", "2");
+        parameters.put("X-GP-ATTR-TYPEMOD1-0", "10");
+        parameters.put("X-GP-ATTR-TYPEMOD1-1", "2");
+
+        ProtocolData protocolData = new ProtocolData(parameters);
+
+        assertEquals(protocolData.getColumn(0).columnTypeModifiers(), new String[]{"5"});
+        assertEquals(protocolData.getColumn(1).columnTypeModifiers(), new String[]{"10", "2"});
+    }
+
     /*
      * setUp function called before each test
      */
