@@ -37,6 +37,9 @@ def parseargs():
                       help="Execute without prompt.")
     parser.add_option("-l", "--logdir", dest="logDir",
                       help="Sets the directory for log files")
+    # None used option, keep it to be compatible with Ambari.
+    parser.add_option("-d", "--datadir", dest="master_dir",
+                      help="Sets HAWQ Master data directory.")
     (options, args) = parser.parse_args()
     return (options, args)
 
