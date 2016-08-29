@@ -287,7 +287,7 @@ public class HiveUtilities {
 
 
 
-    public static void validateTypeCompatible(DataType hawqDataType, String[] hawqTypeMods, String hiveType, String hawqColumnName) {
+    public static void validateTypeCompatible(DataType hawqDataType, Integer[] hawqTypeMods, String hiveType, String hawqColumnName) {
 
         EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getHiveToHawqType(hiveType);
         EnumHawqType expectedHawqType = hiveToHawqType.getHawqType();
@@ -297,10 +297,9 @@ public class HiveUtilities {
 
         switch (hawqDataType) {
         case NUMERIC:
-            String[] hiveTypeModifiers = EnumHiveToHawqType.extractModifiers(hiveType);
+            Integer[] hiveTypeModifiers = EnumHiveToHawqType.extractModifiers(hiveType);
             for (int i = 0; hawqTypeMods != null && i < hawqTypeMods.length; i++) {
-                if (Integer.valueOf(hawqTypeMods[i]) < Integer
-                        .valueOf(hiveTypeModifiers[i]))
+                if (hawqTypeMods[i] < hiveTypeModifiers[i])
                     throw new UnsupportedTypeException(
                             "Invalid definition for column " + hawqColumnName 
                                     +  ": modifiers are not compatible, "

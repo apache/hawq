@@ -135,18 +135,18 @@ public class HiveUtilitiesTest {
     public void validateSchema() throws Exception {
         String columnName = "abc";
 
-        String[] hawqModifiers = {};
+        Integer[] hawqModifiers = {};
         HiveUtilities.validateTypeCompatible(DataType.SMALLINT, hawqModifiers, EnumHiveToHawqType.TinyintType.getTypeName(), columnName);
 
         HiveUtilities.validateTypeCompatible(DataType.SMALLINT, hawqModifiers, EnumHiveToHawqType.SmallintType.getTypeName(), columnName);
 
         //Both Hive and HAWQ types have the same modifiers
-        hawqModifiers = new String[]{"38", "18"};
+        hawqModifiers = new Integer[]{38, 18};
         HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
 
         //HAWQ datatype doesn't require modifiers, they are empty, Hive has non-empty modifiers
         //Types are compatible in this case
-        hawqModifiers = new String[]{};
+        hawqModifiers = new Integer[]{};
         HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
         hawqModifiers = null;
         HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
@@ -154,7 +154,7 @@ public class HiveUtilitiesTest {
         //HAWQ datatype requires modifiers but they aren't provided
         //Types aren't compatible
         try {
-            hawqModifiers = new String[]{};
+            hawqModifiers = new Integer[]{};
             HiveUtilities.validateTypeCompatible(DataType.VARCHAR, hawqModifiers, "varchar", columnName);
             fail("should fail with incompatible modifiers message");
         }
@@ -164,13 +164,13 @@ public class HiveUtilitiesTest {
         }
 
         //HAWQ has wider modifiers than Hive, types are compatible
-        hawqModifiers = new String[]{"11", "3"};
+        hawqModifiers = new Integer[]{11, 3};
         HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(10,2)", columnName);
 
 
         //HAWQ has lesser modifiers than Hive, types aren't compatible
         try {
-            hawqModifiers = new String[]{"38", "17"};
+            hawqModifiers = new Integer[]{38, 17};
             HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
             fail("should fail with incompatible modifiers message");
         }
@@ -185,8 +185,8 @@ public class HiveUtilitiesTest {
 
     @Test
     public void extractModifiers() throws Exception {
-        String[] mods = EnumHiveToHawqType.extractModifiers("decimal(10,2)");
-        assertEquals(mods, new String[]{"10", "2"});
+        Integer[] mods = EnumHiveToHawqType.extractModifiers("decimal(10,2)");
+        assertEquals(mods, new Integer[]{10, 2});
     }
 
     @Test

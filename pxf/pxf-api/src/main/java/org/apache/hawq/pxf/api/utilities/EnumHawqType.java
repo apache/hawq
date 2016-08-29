@@ -76,7 +76,7 @@ public enum EnumHawqType {
 
     EnumHawqType(String typeName, DataType dataType, byte modifiersNum, boolean mandatoryModifiers) {
         this(typeName, dataType, modifiersNum);
-        this.setMandatoryModifiers(mandatoryModifiers);
+        this.mandatoryModifiers = mandatoryModifiers;
     }
 
     /**
@@ -98,19 +98,18 @@ public enum EnumHawqType {
     /**
      * 
      * @return data type
+     * @see DataType
      */
     public DataType getDataType() {
         return this.dataType;
     }
 
+    /**
+     * 
+     * @return whether modifiers are mandatory for this type
+     */
     public boolean isMandatoryModifiers() {
         return mandatoryModifiers;
     }
 
-    public void setMandatoryModifiers(boolean mandatoryModifiers) {
-        this.mandatoryModifiers = mandatoryModifiers;
-    }
 }
-
-
-

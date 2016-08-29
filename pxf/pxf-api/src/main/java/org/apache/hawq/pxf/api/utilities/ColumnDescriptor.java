@@ -26,11 +26,11 @@ package org.apache.hawq.pxf.api.utilities;
  */
 public class ColumnDescriptor {
 
-	int gpdbColumnTypeCode;
-    String gpdbColumnName;
-    String gpdbColumnTypeName;
-    int gpdbColumnIndex;
-    String[] gpdbColumnTypeModifiers;
+	int dbColumnTypeCode;
+    String dbColumnName;
+    String dbColumnTypeName;
+    int dbColumnIndex;
+    Integer[] dbColumnTypeModifiers;
 
     /**
      * Reserved word for a table record key.
@@ -47,12 +47,12 @@ public class ColumnDescriptor {
      * @param typename type name
      * @param typemods type modifiers
      */
-    public ColumnDescriptor(String name, int typecode, int index, String typename, String[] typemods) {
-        gpdbColumnTypeCode = typecode;
-        gpdbColumnTypeName = typename;
-        gpdbColumnName = name;
-        gpdbColumnIndex = index;
-        gpdbColumnTypeModifiers = typemods;
+    public ColumnDescriptor(String name, int typecode, int index, String typename, Integer[] typemods) {
+        dbColumnTypeCode = typecode;
+        dbColumnTypeName = typename;
+        dbColumnName = name;
+        dbColumnIndex = index;
+        dbColumnTypeModifiers = typemods;
     }
 
     /**
@@ -61,50 +61,50 @@ public class ColumnDescriptor {
      * @param copy the ColumnDescriptor to copy
      */
     public ColumnDescriptor(ColumnDescriptor copy) {
-        this.gpdbColumnTypeCode = copy.gpdbColumnTypeCode;
-        this.gpdbColumnName = copy.gpdbColumnName;
-        this.gpdbColumnIndex = copy.gpdbColumnIndex;
-        this.gpdbColumnTypeName = copy.gpdbColumnTypeName;
-        System.arraycopy(this.gpdbColumnTypeModifiers, 0,
-                copy.gpdbColumnTypeModifiers, 0,
-                this.gpdbColumnTypeModifiers.length);
+        this.dbColumnTypeCode = copy.dbColumnTypeCode;
+        this.dbColumnName = copy.dbColumnName;
+        this.dbColumnIndex = copy.dbColumnIndex;
+        this.dbColumnTypeName = copy.dbColumnTypeName;
+        System.arraycopy(this.dbColumnTypeModifiers, 0,
+                copy.dbColumnTypeModifiers, 0,
+                this.dbColumnTypeModifiers.length);
     }
 
     public String columnName() {
-        return gpdbColumnName;
+        return dbColumnName;
     }
 
     public int columnTypeCode() {
-        return gpdbColumnTypeCode;
+        return dbColumnTypeCode;
     }
 
     public int columnIndex() {
-        return gpdbColumnIndex;
+        return dbColumnIndex;
     }
 
     public String columnTypeName() {
-        return gpdbColumnTypeName;
+        return dbColumnTypeName;
     }
 
-    public String[] columnTypeModifiers() {
-        return gpdbColumnTypeModifiers;
+    public Integer[] columnTypeModifiers() {
+        return dbColumnTypeModifiers;
     }
 
     /**
-     * Returns <tt>true</tt> if {@link #gpdbColumnName} is a {@link #RECORD_KEY_NAME}.
+     * Returns <tt>true</tt> if {@link #dbColumnName} is a {@link #RECORD_KEY_NAME}.
      *
      * @return whether column is a record key column
      */
     public boolean isKeyColumn() {
-        return RECORD_KEY_NAME.equalsIgnoreCase(gpdbColumnName);
+        return RECORD_KEY_NAME.equalsIgnoreCase(dbColumnName);
     }
 
     @Override
 	public String toString() {
-		return "ColumnDescriptor [gpdbColumnTypeCode=" + gpdbColumnTypeCode
-				+ ", gpdbColumnName=" + gpdbColumnName
-				+ ", gpdbColumnTypeName=" + gpdbColumnTypeName
-				+ ", gpdbColumnIndex=" + gpdbColumnIndex
-				+ ", gpdbColumnTypeModifiers=" + gpdbColumnTypeModifiers + "]";
+		return "ColumnDescriptor [dbColumnTypeCode=" + dbColumnTypeCode
+				+ ", dbColumnName=" + dbColumnName
+				+ ", dbColumnTypeName=" + dbColumnTypeName
+				+ ", dbColumnIndex=" + dbColumnIndex
+				+ ", dbColumnTypeModifiers=" + dbColumnTypeModifiers + "]";
 	}
 }

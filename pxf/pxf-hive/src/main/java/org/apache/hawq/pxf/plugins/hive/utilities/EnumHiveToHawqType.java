@@ -66,7 +66,7 @@ public enum EnumHiveToHawqType {
     
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType, byte size) {
         this(typeName, hawqType);
-        this.setSize(size);
+        this.size = size;
     }
 
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType, String splitExpression) {
@@ -122,14 +122,22 @@ public enum EnumHiveToHawqType {
                 + hiveType + " to HAWQ's type");
     }
 
+
+    /**
+     * 
+     * @param dataType Hawq data type
+     * @return compatible Hive type to given Hawq type, if there are more than one compatible types, it returns one with bigger size
+     * @throws UnsupportedTypeException if there is no corresponding Hive type for given Hawq type
+     */
     public static EnumHiveToHawqType getCompatibleHawqToHiveType(DataType dataType) {
 
-        SortedSet<EnumHiveToHawqType> types = new TreeSet<EnumHiveToHawqType>(new Comparator<EnumHiveToHawqType>() {
-
-            public int compare(EnumHiveToHawqType a, EnumHiveToHawqType b){
-                return Byte.compare(a.getSize(), b.getSize());
-            }
-        });
+        SortedSet<EnumHiveToHawqType> types = new TreeSet<EnumHiveToHawqType>(
+                new Comparator<EnumHiveToHawqType>() {
+                    public int compare(EnumHiveToHawqType a,
+                            EnumHiveToHawqType b) {
+                        return Byte.compare(a.getSize(), b.getSize());
+                    }
+                });
 
         for (EnumHiveToHawqType t : values()) {
             if (t.getHawqType().getDataType().equals(dataType)) {
@@ -138,23 +146,31 @@ public enum EnumHiveToHawqType {
         }
 
         if (types.size() == 0)
-            throw new UnsupportedTypeException("Unable to map HAWQ's type: "
-                    + dataType + " to Hive's type");
+            throw new UnsupportedTypeException("Unable to find compatible Hive type for given HAWQ's type: " + dataType);
 
         return types.last();
     }
 
-    public static String[] extractModifiers(String hiveType) {
-        String[] result = null;
+    /**
+     * 
+     * @param hiveType full Hive data type, i.e. varchar(10) etc
+     * @return array of type modifiers
+     * @throws UnsupportedTypeException if there is no such Hive type supported
+     */
+    public static Integer[] extractModifiers(String hiveType) {
+        Integer[] result = null;
         for (EnumHiveToHawqType t : values()) {
             String hiveTypeName = hiveType;
             String splitExpression = t.getSplitExpression();
             if (splitExpression != null) {
                 String[] tokens = hiveType.split(splitExpression);
                 hiveTypeName = tokens[0];
-                result = Arrays.copyOfRange(tokens, 1, tokens.length);
+                result = new Integer[tokens.length - 1];
+                for (int i = 0; i < tokens.length - 1; i++)
+                    result[i] = Integer.parseInt(tokens[i+1]);
             }
-            if (t.getTypeName().toLowerCase().equals(hiveTypeName.toLowerCase())) {
+            if (t.getTypeName().toLowerCase()
+                    .equals(hiveTypeName.toLowerCase())) {
                 return result;
             }
         }
@@ -162,11 +178,12 @@ public enum EnumHiveToHawqType {
                 + hiveType + " to HAWQ's type");
     }
 
+    /**
+     * This field is needed to find compatible Hive type when more than one Hive type mapped to HAWQ type
+     * @return size of this type in bytes or 0
+     */
     public byte getSize() {
         return size;
     }
 
-    public void setSize(byte size) {
-        this.size = size;
-    }
 }

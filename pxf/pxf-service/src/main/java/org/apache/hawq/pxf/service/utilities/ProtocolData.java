@@ -389,7 +389,7 @@ public class ProtocolData extends InputData {
             String columnName = getProperty("ATTR-NAME" + i);
             int columnTypeCode = getIntProperty("ATTR-TYPECODE" + i);
             String columnTypeName = getProperty("ATTR-TYPENAME" + i);
-            String[] columnTypeMods = parseTypeMods(i);
+            Integer[] columnTypeMods = parseTypeMods(i);
 
             ColumnDescriptor column = new ColumnDescriptor(columnName,
                     columnTypeCode, i, columnTypeName, columnTypeMods);
@@ -401,14 +401,27 @@ public class ProtocolData extends InputData {
         }
     }
 
-    private String[] parseTypeMods(int columnIndex) {
+    private Integer[] parseTypeMods(int columnIndex) {
         String typeModeCountStr = getOptionalProperty("ATTR-TYPEMOD" + columnIndex + "-COUNT");
-        String[] result = null;
+        Integer[] result = null;
+        Integer typeModeCount = null;
         if (typeModeCountStr != null) {
-        Integer typeModeCount = Integer.parseInt(typeModeCountStr);
-            result = new String[typeModeCount];
+        try {
+            typeModeCount = Integer.parseInt(typeModeCountStr);
+            if (typeModeCount < 0)
+                throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-COUNT cann't be negative");
+            result = new Integer[typeModeCount];
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-COUNT must be a positive integer");
+        }
             for (int i = 0; i < typeModeCount; i++) {
-                result[i] = getProperty("ATTR-TYPEMOD" + columnIndex + "-" + i);
+                try {
+                    result[i] = Integer.parseInt(getProperty("ATTR-TYPEMOD" + columnIndex + "-" + i));
+                    if (result[i] < 0)
+                        throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-" + i + " must be a positive integer");
+                }
             }
         }
         return result;

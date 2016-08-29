@@ -351,8 +351,63 @@ public class ProtocolDataTest {
 
         ProtocolData protocolData = new ProtocolData(parameters);
 
-        assertEquals(protocolData.getColumn(0).columnTypeModifiers(), new String[]{"5"});
-        assertEquals(protocolData.getColumn(1).columnTypeModifiers(), new String[]{"10", "2"});
+        assertEquals(protocolData.getColumn(0).columnTypeModifiers(), new Integer[]{5});
+        assertEquals(protocolData.getColumn(1).columnTypeModifiers(), new Integer[]{10, 2});
+    }
+
+    @Test
+    public void typeModsNegative() {
+
+        parameters.put("X-GP-ATTRS", "1");
+        parameters.put("X-GP-ATTR-NAME0", "vc1");
+        parameters.put("X-GP-ATTR-TYPECODE0", "1043");
+        parameters.put("X-GP-ATTR-TYPENAME0", "varchar");
+        parameters.put("X-GP-ATTR-TYPEMOD0-COUNT", "X");
+        parameters.put("X-GP-ATTR-TYPEMOD0-0", "Y");
+
+
+        try {
+            ProtocolData protocolData = new ProtocolData(parameters);
+            fail("should throw IllegalArgumentException when bad value received for X-GP-ATTR-TYPEMOD0-COUNT");
+        } catch (IllegalArgumentException iae) {
+            assertEquals(
+                    "ATTR-TYPEMOD0-COUNT must be a positive integer",
+                    iae.getMessage());
+        }
+
+        parameters.put("X-GP-ATTR-TYPEMOD0-COUNT", "-1");
+
+        try {
+            ProtocolData protocolData = new ProtocolData(parameters);
+            fail("should throw IllegalArgumentException when negative value received for X-GP-ATTR-TYPEMOD0-COUNT");
+        } catch (IllegalArgumentException iae) {
+            assertEquals(
+                    "ATTR-TYPEMOD0-COUNT cann't be negative",
+                    iae.getMessage());
+        }
+
+        parameters.put("X-GP-ATTR-TYPEMOD0-COUNT", "1");
+
+        try {
+            ProtocolData protocolData = new ProtocolData(parameters);
+            fail("should throw IllegalArgumentException when bad value received for X-GP-ATTR-TYPEMOD0-0");
+        } catch (IllegalArgumentException iae) {
+            assertEquals(
+                    "ATTR-TYPEMOD0-0 must be a positive integer",
+                    iae.getMessage());
+        }
+
+        parameters.put("X-GP-ATTR-TYPEMOD0-COUNT", "2");
+        parameters.put("X-GP-ATTR-TYPEMOD0-0", "42");
+
+        try {
+            ProtocolData protocolData = new ProtocolData(parameters);
+            fail("should throw IllegalArgumentException number of actual type modifiers is less than X-GP-ATTR-TYPEMODX-COUNT");
+        } catch (IllegalArgumentException iae) {
+            assertEquals(
+                    "Internal server error. Property \"ATTR-TYPEMOD0-1\" has no value in current request",
+                    iae.getMessage());
+        }
     }
 
     /*
