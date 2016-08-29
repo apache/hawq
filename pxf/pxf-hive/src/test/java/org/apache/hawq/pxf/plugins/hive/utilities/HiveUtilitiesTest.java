@@ -56,7 +56,7 @@ public class HiveUtilitiesTest {
     static String[][] typesWithModifiers = {
         {"decimal(19,84)", "numeric", "19,84"},
         {"varchar(13)", "varchar", "13"},
-        {"char(40)", "bpchar", "40"},
+        {"char(40)", "char", "40"},
     };
 
     static String[][] complexTypes = {
@@ -110,7 +110,7 @@ public class HiveUtilitiesTest {
         /*
          * decimal -> numeric
          * varchar -> varchar
-         * char -> bpchar
+         * char -> char
          */
         for (String[] line: typesWithModifiers) {
             String hiveType = line[0];
@@ -127,8 +127,56 @@ public class HiveUtilitiesTest {
 
     @Test
     public void testCompatibleHiveType() {
-        String compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.SMALLINT);
+
+        String compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.BOOLEAN);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.BooleanType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.BYTEA);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.BinaryType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.CHAR);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.CharType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.BIGINT);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.BigintType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.SMALLINT);
         assertEquals(compatibleTypeName, EnumHiveToHawqType.SmallintType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.INTEGER);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.IntType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.TEXT);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.StringType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.REAL);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.FloatType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.FLOAT8);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.DoubleType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.VARCHAR);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.VarcharType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.DATE);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.DateType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.TIMESTAMP);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.TimestampType.getTypeName());
+
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.NUMERIC);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.DecimalType.getTypeName());
+
+        try {
+            compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.UNSUPPORTED_TYPE);
+            fail("should fail because there is no mapped Hive type");
+        }
+        catch (UnsupportedTypeException e) {
+            String errorMsg = "Unable to find compatible Hive type for given HAWQ's type: " + DataType.UNSUPPORTED_TYPE;
+            assertEquals(errorMsg, e.getMessage());
+        }
+
+
     }
 
     @Test

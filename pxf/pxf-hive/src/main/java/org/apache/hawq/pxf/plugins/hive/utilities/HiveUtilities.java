@@ -264,7 +264,7 @@ public class HiveUtilities {
      * <li>{@code BOOLEAN -> boolean}</li>
      * <li>{@code SMALLINT -> smallint (tinyint is converted to smallint)}</li>
      * <li>{@code BIGINT -> bigint}</li>
-     * <li>{@code TIMESTAMP, TIME -> timestamp}</li>
+     * <li>{@code TIMESTAMP -> timestamp}</li>
      * <li>{@code NUMERIC -> decimal}</li>
      * <li>{@code BYTEA -> binary}</li>
      * <li>{@code INTERGER -> int}</li>

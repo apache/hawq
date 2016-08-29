@@ -57,7 +57,8 @@ public enum EnumHawqType {
     TimestampType("timestamp", DataType.TIMESTAMP),
     BoolType("bool", DataType.BOOLEAN),
     NumericType("numeric", DataType.NUMERIC, (byte) 2, false),
-    BpcharType("bpchar", DataType.BPCHAR, (byte) 1, true);
+    BpcharType("bpchar", DataType.BPCHAR, (byte) 1, true),
+    CharType("char", DataType.CHAR, (byte) 1, false);
 
     private DataType dataType;
     private String typeName;
