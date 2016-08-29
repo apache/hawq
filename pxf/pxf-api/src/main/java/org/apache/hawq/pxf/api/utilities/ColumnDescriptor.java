@@ -30,6 +30,7 @@ public class ColumnDescriptor {
     String gpdbColumnName;
     String gpdbColumnTypeName;
     int gpdbColumnIndex;
+    boolean isProjected;
 
     /**
      * Reserved word for a table record key.
@@ -50,6 +51,21 @@ public class ColumnDescriptor {
         gpdbColumnTypeName = typename;
         gpdbColumnName = name;
         gpdbColumnIndex = index;
+        isProjected = true;
+    }
+
+    /**
+     * Constructs a ColumnDescriptor.
+     *
+     * @param name column name
+     * @param typecode OID
+     * @param index column index
+     * @param typename type name
+     * @param isProj type boolean
+     */
+    public ColumnDescriptor(String name, int typecode, int index, String typename, boolean isProj) {
+        this(name, typecode, index, typename);
+        isProjected = isProj;
     }
 
     /**
@@ -62,6 +78,7 @@ public class ColumnDescriptor {
         this.gpdbColumnName = copy.gpdbColumnName;
         this.gpdbColumnIndex = copy.gpdbColumnIndex;
         this.gpdbColumnTypeName = copy.gpdbColumnTypeName;
+        this.isProjected = copy.isProjected;
     }
 
     public String columnName() {
@@ -89,11 +106,20 @@ public class ColumnDescriptor {
         return RECORD_KEY_NAME.equalsIgnoreCase(gpdbColumnName);
     }
 
+    public boolean isProjected() {
+        return isProjected;
+    }
+
+    public void setProjected(boolean projected) {
+        isProjected = projected;
+    }
+
     @Override
 	public String toString() {
 		return "ColumnDescriptor [gpdbColumnTypeCode=" + gpdbColumnTypeCode
-				+ ", gpdbColumnName=" + gpdbColumnName
-				+ ", gpdbColumnTypeName=" + gpdbColumnTypeName
-				+ ", gpdbColumnIndex=" + gpdbColumnIndex + "]";
+                        + ", gpdbColumnName=" + gpdbColumnName
+                        + ", gpdbColumnTypeName=" + gpdbColumnTypeName
+                        + ", gpdbColumnIndex=" + gpdbColumnIndex
+                        + ", isProjected=" + isProjected + "]";
 	}
 }

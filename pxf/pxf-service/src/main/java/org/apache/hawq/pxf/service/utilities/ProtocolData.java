@@ -383,16 +383,40 @@ public class ProtocolData extends InputData {
 
     /*
      * Sets the tuple description for the record
+     * Attribute Projection information is optional
      */
     void parseTupleDescription() {
+
+        /* Process column projection info */
+        String columnProjStr = getOptionalProperty("ATTRS-PROJ");
+        List<Integer> columnProjList = new ArrayList<Integer>();
+        if(columnProjStr != null) {
+            int columnProj = Integer.parseInt(columnProjStr);
+            if(columnProj > 0) {
+                String columnProjIndexStr = getProperty("ATTRS-PROJ-IDX");
+                String columnProjIdx[] = columnProjIndexStr.split(",");
+                for(int i = 0; i < columnProj; i++) {
+                    columnProjList.add(Integer.valueOf(columnProjIdx[i]));
+                }
+            } else {
+                /* This is a special case to handle aggregate queries not related to any specific column
+                * eg: count(*) queries. */
+                columnProjList.add(0);
+            }
+        }
+
         int columns = getIntProperty("ATTRS");
         for (int i = 0; i < columns; ++i) {
             String columnName = getProperty("ATTR-NAME" + i);
             int columnTypeCode = getIntProperty("ATTR-TYPECODE" + i);
             String columnTypeName = getProperty("ATTR-TYPENAME" + i);
-
-            ColumnDescriptor column = new ColumnDescriptor(columnName,
-                    columnTypeCode, i, columnTypeName);
+            ColumnDescriptor column;
+            if(columnProjStr != null) {
+                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName, columnProjList.contains(Integer.valueOf(i)));
+            } else {
+                /* For data formats that don't support column projection */
+                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName);
+            }
             tupleDescription.add(column);
 
             if (columnName.equalsIgnoreCase(ColumnDescriptor.RECORD_KEY_NAME)) {
