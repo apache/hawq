@@ -1,0 +1,141 @@
+CREATE DATABASE goh_database;
+CREATE DATABASE
+DROP DATABASE goh_database;
+DROP DATABASE
+-- should be a clean databse
+CREATE DATABASE goh_database1;
+CREATE DATABASE
+\c goh_database1
+You are now connected to database "goh_database1" as user "ivan".
+CREATE TABLE x(c int);
+CREATE TABLE
+INSERT INTO x VALUES(generate_series(1, 10));
+INSERT 0 10
+SELECT * FROM x ORDER BY c;
+ c  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+DROP TABLE x;
+DROP TABLE
+\c db_testdatabase_basictest 
+You are now connected to database "db_testdatabase_basictest" as user "ivan".
+-- table should be removed
+CREATE DATABASE goh_database2;
+CREATE DATABASE
+\c goh_database2
+You are now connected to database "goh_database2" as user "ivan".
+CREATE TABLE x(c int);
+CREATE TABLE
+INSERT INTO x VALUES(generate_series(1, 10));
+INSERT 0 10
+SELECT * FROM x ORDER BY c;
+ c  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+\c db_testdatabase_basictest 
+You are now connected to database "db_testdatabase_basictest" as user "ivan".
+CREATE TABLESPACE goh_regression_tablespace1 FILESPACE dfs_system;
+CREATE TABLESPACE
+CREATE DATABASE goh_database3 TABLESPACE goh_regression_tablespace1;
+CREATE DATABASE
+\c goh_database3
+You are now connected to database "goh_database3" as user "ivan".
+CREATE TABLE x(c int);
+CREATE TABLE
+INSERT INTO x VALUES(generate_series(1, 10));
+INSERT 0 10
+SELECT * FROM x ORDER BY c;
+ c  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+\d x
+ Append-Only Table "public.x"
+ Column |  Type   | Modifiers 
+--------+---------+-----------
+ c      | integer | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+
+\c db_testdatabase_basictest 
+You are now connected to database "db_testdatabase_basictest" as user "ivan".
+BEGIN;
+BEGIN
+CREATE TABLESPACE goh_regression_tablespace2 FILESPACE dfs_system;
+CREATE TABLESPACE
+CREATE TABLE x(c int) TABLESPACE goh_regression_tablespace2;
+CREATE TABLE
+INSERT INTO x VALUES(generate_series(1, 10));
+INSERT 0 10
+SELECT * FROM x ORDER BY c;
+ c  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+\d x
+ Append-Only Table "public.x"
+ Column |  Type   | Modifiers 
+--------+---------+-----------
+ c      | integer | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+Tablespace: "goh_regression_tablespace2"
+
+ROLLBACK;
+ROLLBACK
+DROP DATABASE goh_database1;
+DROP DATABASE
+DROP DATABASE goh_database2;
+DROP DATABASE
+DROP DATABASE goh_database3;
+DROP DATABASE
+DROP TABLESPACE goh_regression_tablespace1;
+DROP TABLESPACE
