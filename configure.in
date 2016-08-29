@@ -812,13 +812,6 @@ if test "$PORTNAME" = "win32"; then
 fi
 
 #
-# thrift
-#
-PGAC_ARG_BOOL(with, thrift, no,
-              [  --with-thrift           build thrift])
-AC_SUBST(with_thrift)
-
-#
 # libyarn
 #
 PGAC_ARG_BOOL(with, libyarn, yes,
@@ -1150,7 +1143,7 @@ AC_SEARCH_LIBS(snappy_max_compressed_length, snappy, [], [AC_MSG_ERROR([snappy i
 AC_LANG_PUSH([C++])
 
 # Check for thrift
-#AC_CHECK_HEADERS(thrift/protocol/TBinaryProtocol.h, [], [AC_MSG_ERROR([thrift is required])])
+AC_CHECK_HEADERS(thrift/protocol/TBinaryProtocol.h, [], [AC_MSG_ERROR([thrift is required])])
 
 # Check for boost
 AC_CHECK_HEADERS(boost/chrono.hpp, [], [AC_MSG_ERROR([boost is required])])
@@ -2078,7 +2071,7 @@ else
 fi
 AC_SUBST(vpath_build)
 
-AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/thirdparty/thrift/hawqbuild/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
+AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
 
 AC_CONFIG_LINKS([
   src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c
