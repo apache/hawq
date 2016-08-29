@@ -218,7 +218,7 @@ public class FilterParserTest {
         
         filter = "a1c2o8";
         op = Operation.HDOP_LIKE;
-        runParseOneOperation("this filter was build from HDOP_LIKE", filter, op);
+        runParseOneOperation("this filter was built from HDOP_LIKE", filter, op);
     }
 
     @Test
