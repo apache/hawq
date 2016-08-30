@@ -229,6 +229,20 @@ public class HiveUtilitiesTest {
                     + Arrays.toString(new String[]{"38", "17"});
             assertEquals(errorMsg, e.getMessage());
         }
+
+
+        //Different types, which are not mapped to each other
+        try {
+            hawqModifiers = new Integer[]{};
+            HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "boolean", columnName);
+            fail("should fail with incompatible types message");
+        }
+        catch (UnsupportedTypeException e) {
+            String errorMsg = "Invalid definition for column " + columnName
+                    + ": expected HAWQ type " + DataType.BOOLEAN
+                    + ", actual HAWQ type " + DataType.NUMERIC + ")";
+            assertEquals(errorMsg, e.getMessage());
+        }
     }
 
     @Test

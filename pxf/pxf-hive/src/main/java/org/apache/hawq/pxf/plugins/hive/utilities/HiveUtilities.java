@@ -309,10 +309,10 @@ public class HiveUtilities {
             break;
         }
 
-        if (!hiveToHawqType.getHawqType().equals(expectedHawqType)) {
+        if (!expectedHawqType.getDataType().equals(hawqDataType)) {
             throw new UnsupportedTypeException("Invalid definition for column " + hawqColumnName 
-                                    +  ": expected HAWQ type " + expectedHawqType.getTypeName() +
-                    ", actual HAWQ type " + hiveToHawqType.getHawqType().getTypeName() + ")");
+                                    +  ": expected HAWQ type " + expectedHawqType.getDataType() +
+                    ", actual HAWQ type " + hawqDataType + ")");
         }
     }
 }
