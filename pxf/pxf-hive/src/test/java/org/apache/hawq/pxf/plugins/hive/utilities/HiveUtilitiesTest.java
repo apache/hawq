@@ -240,7 +240,7 @@ public class HiveUtilitiesTest {
         catch (UnsupportedTypeException e) {
             String errorMsg = "Invalid definition for column " + columnName
                     + ": expected HAWQ type " + DataType.BOOLEAN
-                    + ", actual HAWQ type " + DataType.NUMERIC + ")";
+                    + ", actual HAWQ type " + DataType.NUMERIC;
             assertEquals(errorMsg, e.getMessage());
         }
     }

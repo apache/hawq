@@ -312,7 +312,7 @@ public class HiveUtilities {
         if (!expectedHawqType.getDataType().equals(hawqDataType)) {
             throw new UnsupportedTypeException("Invalid definition for column " + hawqColumnName 
                                     +  ": expected HAWQ type " + expectedHawqType.getDataType() +
-                    ", actual HAWQ type " + hawqDataType + ")");
+                    ", actual HAWQ type " + hawqDataType);
         }
     }
 }
