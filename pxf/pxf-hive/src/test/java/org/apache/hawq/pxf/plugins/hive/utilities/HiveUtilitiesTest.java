@@ -56,7 +56,7 @@ public class HiveUtilitiesTest {
     static String[][] typesWithModifiers = {
         {"decimal(19,84)", "numeric", "19,84"},
         {"varchar(13)", "varchar", "13"},
-        {"char(40)", "char", "40"},
+        {"char(40)", "bpchar", "40"},
     };
 
     static String[][] complexTypes = {
@@ -110,7 +110,7 @@ public class HiveUtilitiesTest {
         /*
          * decimal -> numeric
          * varchar -> varchar
-         * char -> char
+         * char -> bpchar
          */
         for (String[] line: typesWithModifiers) {
             String hiveType = line[0];
@@ -134,7 +134,7 @@ public class HiveUtilitiesTest {
         compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.BYTEA);
         assertEquals(compatibleTypeName, EnumHiveToHawqType.BinaryType.getTypeName());
 
-        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.CHAR);
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.BPCHAR);
         assertEquals(compatibleTypeName, EnumHiveToHawqType.CharType.getTypeName());
 
         compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.BIGINT);

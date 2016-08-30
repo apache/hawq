@@ -296,17 +296,21 @@ public class HiveUtilities {
             throw new UnsupportedTypeException("Invalid definition for column " + hawqColumnName +  ": modifiers are mandatory for type " + expectedHawqType.getTypeName());
 
         switch (hawqDataType) {
-        case NUMERIC:
-            Integer[] hiveTypeModifiers = EnumHiveToHawqType.extractModifiers(hiveType);
-            for (int i = 0; hawqTypeMods != null && i < hawqTypeMods.length; i++) {
-                if (hawqTypeMods[i] < hiveTypeModifiers[i])
-                    throw new UnsupportedTypeException(
-                            "Invalid definition for column " + hawqColumnName 
-                                    +  ": modifiers are not compatible, "
-                                    + Arrays.toString(hiveTypeModifiers) + ", "
-                                    + Arrays.toString(hawqTypeMods));
-            }
-            break;
+            case NUMERIC:
+            case VARCHAR:
+            case BPCHAR:
+            case CHAR:
+                Integer[] hiveTypeModifiers = EnumHiveToHawqType
+                        .extractModifiers(hiveType);
+                for (int i = 0; hawqTypeMods != null && i < hawqTypeMods.length; i++) {
+                    if (hawqTypeMods[i] < hiveTypeModifiers[i])
+                        throw new UnsupportedTypeException(
+                                "Invalid definition for column " + hawqColumnName
+                                        + ": modifiers are not compatible, "
+                                        + Arrays.toString(hiveTypeModifiers) + ", "
+                                        + Arrays.toString(hawqTypeMods));
+                }
+                break;
         }
 
         if (!expectedHawqType.getDataType().equals(hawqDataType)) {

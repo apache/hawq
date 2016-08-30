@@ -48,7 +48,7 @@ public enum EnumHiveToHawqType {
     DateType("date", EnumHawqType.DateType),
     DecimalType("decimal", EnumHawqType.NumericType, "[(,)]"),
     VarcharType("varchar", EnumHawqType.VarcharType, "[(,)]"),
-    CharType("char", EnumHawqType.CharType, "[(,)]"),
+    CharType("char", EnumHawqType.BpcharType, "[(,)]"),
     ArrayType("array", EnumHawqType.TextType, "[<,>]"),
     MapType("map", EnumHawqType.TextType, "[<,>]"),
     StructType("struct", EnumHawqType.TextType, "[<,>]"),
