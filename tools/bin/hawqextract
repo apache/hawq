@@ -259,6 +259,17 @@ class GpMetadataAccessor:
             cols_list = [cols[int(k)-1] for k in policy.strip('{}').split(',')]
             return 'DISTRIBUTED BY (' + ','.join(cols_list) + ')'
 
+    def get_bucket_number(self, oid):
+        '''
+        Get table's bucket number from gp_distribution_policy view.
+        '''
+        qry = """
+        SELECT bucketnum
+        FROM gp_distribution_policy
+        WHERE localoid = '%s'
+        """ % oid
+        return self.exec_query(qry)[0]['bucketnum']
+
 
 def connectdb(options):
     '''
@@ -405,12 +416,12 @@ def extract_metadata(conn, tbname):
                 }
                 file_locations['Partitions'].append(par_info)
         metadata['AO_FileLocations'] = file_locations
-
         logger.info('-- extract AO_Schema')
         metadata['AO_Schema'] = accessor.get_schema(relid)
-
         logger.info('-- extract Distribution_Policy')
         metadata['Distribution_Policy'] = accessor.get_distribution_policy_info(rel_pgclass['oid'], relid)
+        logger.info('-- extract bucket number')
+        metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
 
     def extract_Parquet_metadata():
         relid = rel_pgclass['oid']
@@ -455,12 +466,13 @@ def extract_metadata(conn, tbname):
                 }
                 file_locations['Partitions'].append(par_info)
         metadata['Parquet_FileLocations'] = file_locations
-
         logger.info('-- extract Parquet_Schema')
         metadata['Parquet_Schema'] = accessor.get_schema(relid)
-
         logger.info('-- extract Distribution_Policy')
         metadata['Distribution_Policy'] = accessor.get_distribution_policy_info(rel_pgclass['oid'], relid)
+        logger.info('-- extract bucket number')
+        metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
+
 
     # extract AO/Parquet specific metadata
     cases = { 'AO': extract_AO_metadata,
