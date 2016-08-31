@@ -199,18 +199,6 @@ public class HiveUtilitiesTest {
         hawqModifiers = null;
         HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(38,18)", columnName);
 
-        //HAWQ datatype requires modifiers but they aren't provided
-        //Types aren't compatible
-        try {
-            hawqModifiers = new Integer[]{};
-            HiveUtilities.validateTypeCompatible(DataType.VARCHAR, hawqModifiers, "varchar", columnName);
-            fail("should fail with incompatible modifiers message");
-        }
-        catch (UnsupportedTypeException e) {
-            String errorMsg = "Invalid definition for column " + columnName +  ": modifiers are mandatory for type " + EnumHawqType.VarcharType.getTypeName();
-            assertEquals(errorMsg, e.getMessage());
-        }
-
         //HAWQ has wider modifiers than Hive, types are compatible
         hawqModifiers = new Integer[]{11, 3};
         HiveUtilities.validateTypeCompatible(DataType.NUMERIC, hawqModifiers, "decimal(10,2)", columnName);

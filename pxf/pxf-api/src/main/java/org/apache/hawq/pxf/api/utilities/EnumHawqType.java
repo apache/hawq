@@ -51,14 +51,14 @@ public enum EnumHawqType {
     Float4Type("float4", DataType.REAL),
     Float8Type("float8", DataType.FLOAT8),
     TextType("text", DataType.TEXT),
-    VarcharType("varchar", DataType.VARCHAR, (byte) 1, true),
+    VarcharType("varchar", DataType.VARCHAR, (byte) 1, false),
     ByteaType("bytea", DataType.BYTEA),
     DateType("date", DataType.DATE),
     TimestampType("timestamp", DataType.TIMESTAMP),
     BoolType("bool", DataType.BOOLEAN),
     NumericType("numeric", DataType.NUMERIC, (byte) 2, false),
-    BpcharType("bpchar", DataType.BPCHAR, (byte) 1, true),
-    CharType("char", DataType.CHAR, (byte) 1, false);
+    BpcharType("bpchar", DataType.BPCHAR, (byte) 1, false),
+    CharType("char", DataType.CHAR, (byte) 1, true);
 
     private DataType dataType;
     private String typeName;

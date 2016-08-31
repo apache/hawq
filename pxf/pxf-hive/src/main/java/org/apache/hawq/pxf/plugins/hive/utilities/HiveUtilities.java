@@ -292,6 +292,12 @@ public class HiveUtilities {
         EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getHiveToHawqType(hiveType);
         EnumHawqType expectedHawqType = hiveToHawqType.getHawqType();
 
+        if (!expectedHawqType.getDataType().equals(hawqDataType)) {
+            throw new UnsupportedTypeException("Invalid definition for column " + hawqColumnName
+                                    +  ": expected HAWQ type " + expectedHawqType.getDataType() +
+                    ", actual HAWQ type " + hawqDataType);
+        }
+
         if ((hawqTypeMods == null || hawqTypeMods.length == 0) && expectedHawqType.isMandatoryModifiers())
             throw new UnsupportedTypeException("Invalid definition for column " + hawqColumnName +  ": modifiers are mandatory for type " + expectedHawqType.getTypeName());
 
@@ -300,23 +306,19 @@ public class HiveUtilities {
             case VARCHAR:
             case BPCHAR:
             case CHAR:
-                Integer[] hiveTypeModifiers = EnumHiveToHawqType
-                        .extractModifiers(hiveType);
-                for (int i = 0; hawqTypeMods != null && i < hawqTypeMods.length; i++) {
-                    if (hawqTypeMods[i] < hiveTypeModifiers[i])
-                        throw new UnsupportedTypeException(
-                                "Invalid definition for column " + hawqColumnName
-                                        + ": modifiers are not compatible, "
-                                        + Arrays.toString(hiveTypeModifiers) + ", "
-                                        + Arrays.toString(hawqTypeMods));
+                if (hawqTypeMods != null && hawqTypeMods.length > 0) {
+                    Integer[] hiveTypeModifiers = EnumHiveToHawqType
+                            .extractModifiers(hiveType);
+                    for (int i = 0; i < hiveTypeModifiers.length; i++) {
+                        if (hawqTypeMods[i] < hiveTypeModifiers[i])
+                            throw new UnsupportedTypeException(
+                                    "Invalid definition for column " + hawqColumnName
+                                            + ": modifiers are not compatible, "
+                                            + Arrays.toString(hiveTypeModifiers) + ", "
+                                            + Arrays.toString(hawqTypeMods));
+                    }
                 }
                 break;
-        }
-
-        if (!expectedHawqType.getDataType().equals(hawqDataType)) {
-            throw new UnsupportedTypeException("Invalid definition for column " + hawqColumnName 
-                                    +  ": expected HAWQ type " + expectedHawqType.getDataType() +
-                    ", actual HAWQ type " + hawqDataType);
         }
     }
 }
