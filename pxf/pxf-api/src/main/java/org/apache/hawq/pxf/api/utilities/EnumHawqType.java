@@ -58,6 +58,7 @@ public enum EnumHawqType {
     BoolType("bool", DataType.BOOLEAN),
     NumericType("numeric", DataType.NUMERIC, (byte) 2, false),
     BpcharType("bpchar", DataType.BPCHAR, (byte) 1, false),
+    //modifier is mandatory for this type because by default it's 1
     CharType("char", DataType.CHAR, (byte) 1, true);
 
     private DataType dataType;
