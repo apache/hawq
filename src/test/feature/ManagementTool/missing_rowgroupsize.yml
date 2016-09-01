@@ -13,7 +13,7 @@ Parquet_FileLocations:
   Files:
   - path: /hawq_default/16385/16387/35983/1
     size: 945
-  RowGroupSize: 8388608
+  PageSize: 1048576
 Parquet_Schema:
 - name: i
   type: int4
