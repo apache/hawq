@@ -335,17 +335,37 @@ TEST_F(TestHawqRegister, TestEmptyTable) {
 TEST_F(TestHawqRegister, TestIncorrectYaml) {
   SQLUtility util;
   string filePath = util.getTestRootPath() + "/ManagementTool/";
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect1.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect2.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect3.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect4.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect5.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect6.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect8.yml xx"));
+
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_pagesize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_rowgroupsize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_filesize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_schema.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_checksum.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_dfs_url.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_bucketnum.yml xx"));
 }
 
 TEST_F(TestHawqRegister, TestDismatchFileNumber) {
   SQLUtility util;
   string filePath = util.getTestRootPath() + "/ManagementTool/";
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect7.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "files_incomplete.yml xx"));
+}
+
+TEST_F(TestHawqRegister, TestUsage2Behavior2) {
+  SQLUtility util;
+  util.execute("drop table if exists simple_register_table;");
+  util.execute("create table simple_register_table(i int) with (appendonly=true, orientation=row) distributed randomly;");
+  util.execute("insert into simple_register_table values(1), (2), (3);");
+
+  EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o tmp.yml testhawqregister_testusage2behavior2.simple_register_table"));
+  EXPECT_EQ(0, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c tmp.yml testhawqregister_testusage2behavior2.new_simple_register_table"));
+  util.query("select * from new_simple_register_table;", 3);
+
+  EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o new_tmp.yml testhawqregister_testusage2behavior2.new_simple_register_table"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c new_tmp.yml testhawqregister_testusage2behavior2.new_simple_register_table"));
+
+  EXPECT_EQ(0, Command::getCommandStatus("rm -rf tmp.yml"));
+  EXPECT_EQ(0, Command::getCommandStatus("rm -rf new_tmp.yml"));
+  util.execute("drop table simple_register_table;");
+  util.execute("drop table new_simple_register_table;");
 }
