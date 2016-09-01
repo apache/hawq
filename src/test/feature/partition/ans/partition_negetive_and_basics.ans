@@ -1,3 +1,7 @@
+-- start_ignore
+SET SEARCH_PATH=TestPartition_TestPartitionNegativeAndBasics;
+SET
+-- end_ignore
 set enable_partition_rules = false;
 SET
 set gp_enable_hash_partitioned_tables = true;
@@ -1085,7 +1089,7 @@ INSERT 0 1
 insert into ggg values (9, 9);
 INSERT 0 1
 insert into ggg values (10, 10);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:566: ERROR:  no partition for partitioning key  (seg5 localhost:40000 pid=172591)
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:566: ERROR:  no partition for partitioning key  (seg1 localhost:40000 pid=35100)
 select * from ggg order by 1, 2;
  id | a 
 ----+---
@@ -1317,7 +1321,7 @@ psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:690: NOTICE:  CREATE 
 ALTER TABLE
 -- works - anonymous partition MPP-3350
 alter table hhh add partition end ('2010-02-01');
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:693: NOTICE:  CREATE TABLE will create partition "hhh_1_prt_r652516349" for table "hhh"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:693: NOTICE:  CREATE TABLE will create partition "hhh_1_prt_r1411808964" for table "hhh"
 ALTER TABLE
 -- MPP-3607 - ADD PARTITION with open intervals
 create table no_end1 (aa int, bb int) partition by range (bb)
@@ -1585,7 +1589,7 @@ insert into j select i from generate_series(1, 8) i;
 INSERT 0 8
 alter table j split partition for(1) at (2, 3) into (partition fa, partition
 fb);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_43517"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_116667"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  dropped partition "a" for relation "j"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  CREATE TABLE will create partition "j_1_prt_fa" for table "j"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:870: NOTICE:  CREATE TABLE will create partition "j_1_prt_fb" for table "j"
@@ -1605,10 +1609,10 @@ select * from j_1_prt_fb;
 (2 rows)
 
 alter table j split partition for(5) at (6);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  exchanged partition "b" of relation "j" with relation "pg_temp_43517"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  exchanged partition "b" of relation "j" with relation "pg_temp_116667"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  dropped partition "b" for relation "j"
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  CREATE TABLE will create partition "j_1_prt_r630513650" for table "j"
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  CREATE TABLE will create partition "j_1_prt_r1373370768" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  CREATE TABLE will create partition "j_1_prt_r508808810" for table "j"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:873: NOTICE:  CREATE TABLE will create partition "j_1_prt_r468322643" for table "j"
 ALTER TABLE
 select * from j;
  i 
@@ -1658,7 +1662,7 @@ insert into k select i from generate_series(1, 30) i;
 INSERT 0 30
 alter table k split default partition start(15) end(20) into
 (partition mydef, partition foo);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_43624"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_116774"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  dropped partition "mydef" for relation "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  CREATE TABLE will create partition "k_1_prt_foo" for table "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:889: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
@@ -1675,7 +1679,7 @@ select * from k_1_prt_foo;
 
 alter table k split default partition start(22) exclusive end(25) inclusive
 into (partition bar, partition mydef);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_43624"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_116774"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  dropped partition "mydef" for relation "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  CREATE TABLE will create partition "k_1_prt_bar" for table "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:892: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
@@ -1689,7 +1693,7 @@ select * from k_1_prt_bar;
 (3 rows)
 
 alter table k split partition bar at (23) into (partition baz, partition foz);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  exchanged partition "bar" of relation "k" with relation "pg_temp_43624"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  exchanged partition "bar" of relation "k" with relation "pg_temp_116774"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  dropped partition "bar" for relation "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  CREATE TABLE will create partition "k_1_prt_baz" for table "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:894: NOTICE:  CREATE TABLE will create partition "k_1_prt_foz" for table "k"
@@ -1745,16 +1749,16 @@ into (partition aa, partition nodate);
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:909: ERROR:  default partition name missing from INTO clause
 alter table k split default partition start ('2009-01-01') end ('2009-02-01')
 into (partition aa, partition default_part);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_43746"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_116896"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  dropped partition "default_part" for relation "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  CREATE TABLE will create partition "k_1_prt_aa" for table "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:911: NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
 ALTER TABLE
 -- check that it works without INTO
 alter table k split default partition start ('2009-02-01') end ('2009-03-01');
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_43746"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  exchanged partition "default_part" of relation "k" with relation "pg_temp_116896"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  dropped partition "default_part" for relation "k"
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  CREATE TABLE will create partition "k_1_prt_r1447646233" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  CREATE TABLE will create partition "k_1_prt_r89270952" for table "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:913: NOTICE:  CREATE TABLE will create partition "k_1_prt_default_part" for table "k"
 ALTER TABLE
 drop table k;
@@ -1769,15 +1773,15 @@ CREATE TABLE
 alter table k split partition mydef at (5) into (partition foo, partition bar);
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:918: ERROR:  default partition name missing from INTO clause
 alter table k split partition mydef at (5) into (partition foo, partition mydef);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_43878"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_117028"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  dropped partition "mydef" for relation "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  CREATE TABLE will create partition "k_1_prt_foo" for table "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:919: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 ALTER TABLE
 alter table k split partition mydef at (10);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_43878"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  exchanged partition "mydef" of relation "k" with relation "pg_temp_117028"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  dropped partition "mydef" for relation "k"
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  CREATE TABLE will create partition "k_1_prt_r14307969" for table "k"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  CREATE TABLE will create partition "k_1_prt_r1378900090" for table "k"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:920: NOTICE:  CREATE TABLE will create partition "k_1_prt_mydef" for table "k"
 ALTER TABLE
 drop table k;
@@ -1789,7 +1793,7 @@ psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:925: NOTICE:  CREATE 
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:925: NOTICE:  CREATE TABLE will create partition "j_1_prt_b" for table "j"
 CREATE TABLE
 alter table j split partition for(1) at (1,2) into (partition fa, partition fb);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_43940"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_117090"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  dropped partition "a" for relation "j"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  CREATE TABLE will create partition "j_1_prt_fa" for table "j"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:926: NOTICE:  CREATE TABLE will create partition "j_1_prt_fb" for table "j"
@@ -1808,7 +1812,7 @@ psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:933: NOTICE:  CREATE 
 CREATE TABLE
 alter table j split partition for(1) at (1,2) into (partition f1a, partition
 f1b);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_43980"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_117130"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  dropped partition "a" for relation "j"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:935: NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
@@ -1822,7 +1826,7 @@ psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:939: NOTICE:  CREATE 
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:939: NOTICE:  CREATE TABLE will create partition "j_1_prt_a" for table "j"
 CREATE TABLE
 alter table j split partition for(1) at (5) into (partition f1a, partition f1b);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_44026"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  exchanged partition "a" of relation "j" with relation "pg_temp_117176"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  dropped partition "a" for relation "j"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  CREATE TABLE will create partition "j_1_prt_f1a" for table "j"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:940: NOTICE:  CREATE TABLE will create partition "j_1_prt_f1b" for table "j"
@@ -1873,7 +1877,7 @@ select * from pt_table_1_prt_2 order by d;
 (2 rows)
 
 insert into pt_table_1_prt_others values(1,1,1,1);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:952: ERROR:  the data does not belong to partition: pt_table_1_prt_others  (seg0 localhost:40000 pid=173094)
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:952: ERROR:  the data does not belong to partition: pt_table_1_prt_others  (seg4 localhost:40000 pid=35103)
 select * from pt_table order by b,d;
  a | b | c | d 
 ---+---+---+---
@@ -2010,7 +2014,7 @@ select * from pt_check order by col1;
 ALTER TABLE pt_check SPLIT DEFAULT PARTITION
 	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
 	INTO (PARTITION jan2011, DEFAULT PARTITION);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_44238"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_117388"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  dropped partition "defpt" for relation "pt_check"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan2011" for table "pt_check"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1013: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
@@ -2076,7 +2080,7 @@ select * from pt_check order by col1;
 ALTER TABLE pt_check SPLIT DEFAULT PARTITION
 	START ('2011-01-01') INCLUSIVE END ('2011-02-01') EXCLUSIVE
 	INTO (DEFAULT PARTITION, PARTITION jan2011);
-psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_44369"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  exchanged partition "defpt" of relation "pt_check" with relation "pg_temp_117519"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  dropped partition "defpt" for relation "pt_check"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_jan2011" for table "pt_check"
 psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1042: NOTICE:  CREATE TABLE will create partition "pt_check_1_prt_defpt" for table "pt_check"
@@ -2545,3 +2549,53 @@ SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_outlying_years;
 
 RESET optimizer_parts_to_force_sort_on_insert;
 RESET
+drop table if exists sales2;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1302: NOTICE:  table "sales2" does not exist, skipping
+DROP TABLE
+CREATE TABLE sales2 (id int, date date, amt decimal(10,2))    
+DISTRIBUTED BY (id) 
+PARTITION BY RANGE (date) 
+( PARTITION Jan08 START (date '2008-01-01') INCLUSIVE ,
+PARTITION Feb08 START (date '2008-02-01') INCLUSIVE ,
+PARTITION Mar08 START (date '2008-03-01') INCLUSIVE , 
+PARTITION Apr08 START (date '2008-04-01') INCLUSIVE 
+END (date '2008-05-01') EXCLUSIVE );
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1310: NOTICE:  CREATE TABLE will create partition "sales2_1_prt_jan08" for table "sales2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1310: NOTICE:  CREATE TABLE will create partition "sales2_1_prt_feb08" for table "sales2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1310: NOTICE:  CREATE TABLE will create partition "sales2_1_prt_mar08" for table "sales2"
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1310: NOTICE:  CREATE TABLE will create partition "sales2_1_prt_apr08" for table "sales2"
+CREATE TABLE
+insert into sales2 values(1,'2008-01-03',1.2);
+INSERT 0 1
+select count(*) from sales2;
+ count 
+-------
+     1
+(1 row)
+
+alter table sales2 add partition START (date '2008-05-01') INCLUSIVE END (date '2008-06-01') EXCLUSIVE;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1316: NOTICE:  CREATE TABLE will create partition "sales2_1_prt_r835352148" for table "sales2"
+ALTER TABLE
+insert into sales2 values(1,'2008-05-03',1.2);
+INSERT 0 1
+select count(*) from sales2;
+ count 
+-------
+     2
+(1 row)
+
+set default_hash_table_bucket_number = 99;
+SET
+alter table sales2 add partition START (date '2008-06-01') INCLUSIVE END (date '2008-07-01') EXCLUSIVE;
+psql:/tmp/TestPartition_TestPartitionNegativeAndBasics.sql:1322: NOTICE:  CREATE TABLE will create partition "sales2_1_prt_r1303674792" for table "sales2"
+ALTER TABLE
+insert into sales2 values(1,'2008-06-03',1.2);
+INSERT 0 1
+select count(*) from sales2;
+ count 
+-------
+     3
+(1 row)
+
+drop table sales2;
+DROP TABLE
