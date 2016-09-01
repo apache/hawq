@@ -166,7 +166,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 constant.constant());
 
         if(operatorsMap.get(opId) == null){
-            //HBase not support HDOP_LIKE, use 'NOT NULL' Comarator
+            //HBase does not support HDOP_LIKE, use 'NOT NULL' comparator
             return new SingleColumnValueFilter(hbaseColumn.columnFamilyBytes(),
                     hbaseColumn.qualifierBytes(),
                     CompareFilter.CompareOp.NOT_EQUAL,
