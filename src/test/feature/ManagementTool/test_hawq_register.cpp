@@ -341,15 +341,11 @@ TEST_F(TestHawqRegister, TestIncorrectYaml) {
   EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect4.yml xx"));
   EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect5.yml xx"));
   EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect6.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect8.yml xx"));
 }
 
-TEST_F(TestHawqRegister, TestCreateExistedTable) {
+TEST_F(TestHawqRegister, TestDismatchFileNumber) {
   SQLUtility util;
-  util.execute("drop table if exists t10;");
-  util.execute("create table t10(i int) with (appendonly=true, orientation=row) distributed by (i);");
-  util.execute("insert into t10 values(1), (2), (3);");
-  EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o t10.yml testhawqregister_testcreateexistedtable.t10"));
-  auto tmp = Command::getCommandOutput("hawq register -d " + (string) HAWQ_DB + " -c t10.yml testhawqregister_testcreateexistedtable.t10");
-  auto out = hawq::test::trim(hawq::test::trimNewLine(tmp));
-  EXPECT_EQ(1, hawq::test::endsWith(out, "has already existed."));
+  string filePath = util.getTestRootPath() + "/ManagementTool/";
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "incorrect7.yml xx"));
 }

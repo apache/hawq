@@ -20,3 +20,4 @@ Encoding: UTF8
 FileFormat: AO
 TableName: public.t1
 Version: 1.0.0
+Bucketnum: 6

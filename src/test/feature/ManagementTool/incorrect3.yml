@@ -19,3 +19,4 @@ Parquet_Schema:
   type: int4
 TableName: public.hawqregister
 Version: 1.0.0
+Bucketnum: 6
