@@ -6623,7 +6623,7 @@ atpxPartAddList(Relation rel,
 				/* propagate owner */
 				((CreateStmt *)q->utilityStmt)->ownerid = ownerid;
 				/* child partition should have the same bucket number with parent partition */
-				if (parPolicy) {
+				if (parPolicy && parPolicy->ptype == POLICYTYPE_PARTITIONED) {
 				  ((CreateStmt *)q->utilityStmt)->policy->bucketnum = parPolicy->bucketnum;
 				}
 			}
