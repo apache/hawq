@@ -201,353 +201,269 @@
    limitations under the License.
 
 =======================================================================
+
 Apache HAWQ (incubating) Subcomponents:
 
-The Apache HAWQ (incubating) project contains subcomponents with separate 
-copyright notices and license terms. Your use of the source code for these
-subcomponents is subject to the terms and conditions of the following
-licenses.
+  The Apache HAWQ (incubating) project contains subcomponents with
+  separate copyright notices and license terms. Your use of the source
+  code for these subcomponents is subject to the terms and conditions
+  of the following licenses.
 
-***********************************************************************
-Source code under tools/bin/src/stream/ is taken from stream benchmark
-and is available under the following license:
+=======================================================================
+Stream License
+======================================================================
 
-*=======================================================================
-*-----------------------------------------------------------------------
-* Copyright 1991-2003: John D. McCalpin
-*-----------------------------------------------------------------------
-* License:
-*  1. You are free to use this program and/or to redistribute
-*     this program.
-*  2. You are free to modify this program for your own use,
-*     including commercial use, subject to the publication
-*     restrictions in item 3.
-*  3. You are free to publish results obtained from running this
-*     program, or from works that you derive from this program,
-*     with the following limitations:
-*     3a. In order to be referred to as "STREAM benchmark results",
-*         published results must be in conformance to the STREAM
-*         Run Rules, (briefly reviewed below) published at
-*         http://www.cs.virginia.edu/stream/ref.html
-*         and incorporated herein by reference.
-*         As the copyright holder, John McCalpin retains the
-*         right to determine conformity with the Run Rules.
-*     3b. Results based on modified source code or on runs not in
-*         accordance with the STREAM Run Rules must be clearly
-*         labelled whenever they are published.  Examples of
-*         proper labelling include:
-*         "tuned STREAM benchmark results" 
-*         "based on a variant of the STREAM benchmark code"
-*         Other comparable, clear and reasonable labelling is
-*         acceptable.
-*     3c. Submission of results to the STREAM benchmark web site
-*         is encouraged, but not required.
-*  4. Use of this program or creation of derived works based on this
-*     program constitutes acceptance of these licensing restrictions.
-*  5. Absolutely no warranty is expressed or implied.
-*-----------------------------------------------------------------------
+  The following files are used:
+  
+      tools/bin/src/stream
+  
+  This file is made available under the following Stream License:
+  
+      licenses/LICENSE-stream.txt
 
-***********************************************************************
-Source code under tools/bin/pythonSrc/PyGreSQL-4.0 is taken from PyGreSQL
-and is available under the following license:
+======================================================================
+PyGreSQL 4.0 License
+======================================================================
 
-Written by D’Arcy J.M. Cain (darcy@druid.net)
+  The following files are used:
+  
+      tools/bin/pythonSrc/PyGreSQL-4.0
+  
+  This file is made available under the following PyGreSQL License:
+  
+      licenses/LICENSE-pygresql.txt
 
-Based heavily on code written by Pascal Andre (andre@chimay.via.ecp.fr)
+======================================================================
+BSD-style licenses
+======================================================================
 
-Copyright (c) 1995, Pascal Andre
+  The following components are provided under a BSD-style license. See
+  project link for details.  The text of each license is also included
+  at licenses/LICENSE-[project].txt.
 
-Further modifications copyright (c) 1997-2008 by D’Arcy J.M. Cain (darcy@PyGreSQL.org)
+     (BSD 3 Clause) CMake (https://cmake.org)
+       depends/libyarn/CMake
+       depends/libhdfs3/CMake
 
-Further modifications copyright (c) 2009-2016 by the PyGreSQL team.
+     (BSD 4 Clause revised) dynloader
+       src/backend/port/dynloader/freebsd.c
+       src/backend/port/dynloader/netbsd.c
+       src/backend/port/dynloader/openbsd.c
+       src/backend/port/dynloader/ultrix4.h
 
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose, without fee, and without a written agreement is
-hereby granted, provided that the above copyright notice and this paragraph and
-the following two paragraphs appear in all copies. In this license the term
-“AUTHORS” refers to anyone who has contributed code to PyGreSQL.
+       Revised based on: ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change
+       
+     (BSD 4 Clause revised) glob
+       src/bin/gpfdist/src/gpfdist/glob.c
+       src/bin/gpfdist/src/gpfdist/include/glob.h
+       src/include/port/win32_msvc/glob.h
+       src/port/glob.c
 
-IN NO EVENT SHALL THE AUTHORS BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT,
-SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, ARISING
-OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF AUTHORS HAVE BEEN
-ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+       Revised based on: ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change
+      
+     (BSD License) pg_controldata 
+       src/bin/pg_controldata/pg_controldata.c 
+     
+     (BSD License) unittest2 (v2-0.5.1 - https://pypi.python.org/pypi/unittest2)
+       tools/bin/pythonSrc/unittest2-0.5.1
+     
+     (BSD License) pychecker (v0.8.18 - http://pychecker.sourceforge.net/)
+       tools/bin/pythonSrc/pychecker-0.8.18 
+     
+     (BSD License) pg8000
+       tools/bin/ext/pg8000
+      
+     (BSD License) figleaf (http://darcs.idyll.org/~t/projects/figleaf/)
+       tools/bin/ext/figleaf
+    
+     (BSD License) port
+       src/port/inet_aton.c
+       src/port/snprintf.c
+       src/port/crypt.c
+       src/port/memcmp.c
+       src/port/strlcpy.c
 
-THE AUTHORS SPECIFICALLY DISCLAIM ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
-THE SOFTWARE PROVIDED HEREUNDER IS ON AN “AS IS” BASIS, AND THE AUTHORS HAVE NO
-OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
-MODIFICATIONS.
+     (BSD License) wstrcmp
+       src/backend/utils/mb/wstrcmp.c
 
-***********************************************************************
-Source code under
-  depends/libyarn/CMake/FindBoost.cmake
-  depends/libyarn/CMake/FindGSasl.cmake
-  depends/libyarn/CMake/FindKERBEROS.cmake
-  depends/libhdfs3/CMake/FindBoost.cmake
-  depends/libhdfs3/CMake/CodeCoverage.cmake
-  depends/libhdfs3/CMake/FindGSasl.cmake
-  depends/libhdfs3/CMake/FindKERBEROS.cmake
-  depends/libhdfs3/CMake/FindLibUUID.cmake
-  depends/libhdfs3/CMake/Functions.cmake
-  depends/libhdfs3/CMake/Options.cmake
-  depends/libhdfs3/CMake/Platform.cmake
-is taken from CMake and is available under the following license:
+     (BSD License) libpq-sha2
+       src/backend/libpq/sha2
 
-CMake - Cross Platform Makefile Generator
-Copyright 2000-2014 Kitware, Inc.
-Copyright 2000-2011 Insight Software Consortium
-All rights reserved.
+======================================================================
+MIT License
+======================================================================
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
+  The following components are provided under a MIT license. See
+  project link for details.  The text of each license is also included
+  at licenses/LICENSE-[project].txt.
 
-* Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
+     lockfile (0.9.1)
+       tools/bin/pythonSrc/lockfile-0.9.1
 
-* Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
+     PSI (0.3b2_gp)
+       tools/bin/pythonSrc/PSI-0.3b2_gp
 
-* Neither the names of Kitware, Inc., the Insight Software Consortium,
-nor the names of their contributors may be used to endorse or promote
-products derived from this software without specific prior written
-permission.
+======================================================================
+Python Software Foundation (PSF) License
+======================================================================
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  The following components are provided under a PSF license. See
+  project link for details.  The text of each license is also included
+  at licenses/LICENSE-[project].txt.
 
+     pidlockfile
+       tools/bin/pythonSrc/lockfile-0.9.1/lockfile/pidlockfile.py
 
-***********************************************************************
-Source code under
-  src/bin/gpfdist/src/gpfdist/glob.c
-  src/bin/gpfdist/src/gpfdist/include/glob.h
-  src/include/port/win32_msvc/glob.h
-is taken from OpenBSD/NetBSD and is available under the following license:
+======================================================================
+BZIP2 License
+======================================================================
 
- * Copyright (c) 1989, 1993
- *      The Regents of the University of California.  All rights reserved.
- *
- * This code is derived from software contributed to Berkeley by
- * Guido van Rossum.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+  The following files are used:
+  
+      src/include/port/win32_msvc/bzlib.h
+  
+  This file is made available under the following bzip2 and libbzip2
+  License v1.0.5 license:
+  
+      licenses/LICENSE-bzip2.txt
 
-***********************************************************************
-Source code under src/include/port/win32_msvc/bzlib.h is taken from bzip2
-and is available under the following license:
+======================================================================
+Google Test License
+======================================================================
 
-This program, "bzip2", the associated library "libbzip2", and all
-documentation, are copyright (C) 1996-2010 Julian R Seward.  All
-rights reserved.
+  The following files are used:
+  
+      depends/thirdparty/googletest
+  
+  This file is made available under the following Google test license:
+  
+      licenses/LICENSE-googletest.txt
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
+======================================================================
+Oraface License
+======================================================================
 
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
+  The following files are used:
+  
+      contrib/orafce
+  
+  This file is made available under the following Oraface license:
+  
+      licenses/LICENSE-oraface.txt
 
-2. The origin of this software must not be misrepresented; you must
-   not claim that you wrote the original software.  If you use this
-   software in a product, an acknowledgment in the product
-   documentation would be appreciated but is not required.
+======================================================================
+Pexpect License
+======================================================================
 
-3. Altered source versions must be plainly marked as such, and must
-   not be misrepresented as being the original software.
+  The following files are used:
+  
+      tools/bin/lib/pexpect.py
+  
+  This file is made available under the following Pexpect license:
+  
+      licenses/LICENSE-pexect.txt
 
-4. The name of the author may not be used to endorse or promote
-   products derived from this software without specific prior written
-   permission.
+======================================================================
+PL/Java License
+======================================================================
 
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
-OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  The following files are used:
+  
+      src/pl/pljava
+  
+  This file is made available under the following PL/Java license:
+  
+      licenses/LICENSE-pljava.txt
 
-Julian Seward, jseward@bzip.org
-bzip2/libbzip2 version 1.0.6 of 6 September 2010
+======================================================================
+Perl LICENSE
+======================================================================
 
-***********************************************************************
-Source code under depends/thirdparty/googletest is taken from googletest
-and is available under the following license:
+  The following components are provided under a Perl Artistic
+  license. See project link for details.  The text of each license is
+  also included at licenses/LICENSE-[project].txt.
 
-Copyright 2008, Google Inc.
-All rights reserved.
+     JSON 
+       src/include/catalog/JSON
+  
+     plperl
+       src/pl/plperl
+      
+======================================================================
+test-ctype LICENSE
+======================================================================
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
+  The following files are used:
+  
+      src/test/locale/test-ctype.c
+  
+  This file is made available under the following test ctype license:
+  
+      licenses/LICENSE-test-ctype.txt
+ 
+======================================================================
+port-rand LICENSE
+======================================================================
 
-    * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-    * Neither the name of Google Inc. nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
+  The following files are used:
+  
+      src/port/rand.c 
+  
+  This file is made available under the following port-rand license:
+  
+      licenses/LICENSE-port-rand.txt
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+======================================================================
+Internet Systems Consortium/Internet Software Consortium (ISC) LICENSE
+======================================================================
 
-***********************************************************************
-Source code under contrib/orafce is taken from Oraface Project
-and is available under the following license:
+  The following files are used:
+  
+      src/backend/utils/adt/inet_net_ntop.c
+      src/backend/utils/adt/inet_net_pton.c 
+  
+  This file is made available under the following ISC license:
+  
+      licenses/LICENSE-isc.txt
 
-Orafce, Oracle API support
+======================================================================
+regex LICENSE
+======================================================================
 
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose, without fee, and without a written agreement
-is hereby granted, provided that the above copyright notice and this
-paragraph and the following two paragraphs appear in all copies.
+  The following files are used:
+  
+      src/backend/regex 
+  
+  This file is made available under the following regex license:
+  
+      licenses/LICENSE-regex.txt
 
-IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
-DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING
-LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
-DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
+======================================================================
+port-gettimeofday LICENSE
+======================================================================
 
-THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
-INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
-ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO
-PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+  The following files are used:
+  
+      src/port/gettimeofday.c 
+  
+  This file is made available under the following port-gettimeofday license:
+  
+      licenses/LICENSE-port-gettimeofday.txt
 
-***********************************************************************
-Source code under tools/bin/lib/pexpect.py is taken from Pexpect Python module
-and is available under the following license:
+======================================================================
+PostgreSQL LICENSE
+======================================================================
 
-http://opensource.org/licenses/isc-license.txt
-
-Copyright (c) 2013-2014, Pexpect development team
-Copyright (c) 2012, Noah Spurrier <noah@noah.org>
-
-PERMISSION TO USE, COPY, MODIFY, AND/OR DISTRIBUTE THIS SOFTWARE FOR ANY
-PURPOSE WITH OR WITHOUT FEE IS HEREBY GRANTED, PROVIDED THAT THE ABOVE
-COPYRIGHT NOTICE AND THIS PERMISSION NOTICE APPEAR IN ALL COPIES.
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-***********************************************************************
-Source code under src/pl/pljava/ is taken from PL/Java
-and is available under the following license:
-
-PL/Java, a backend Java integration for PostgreSQL
-
-Java� is a registered trademark of Sun Microsystems, Inc. in the United
-States and other countries.
-
-PL/Java Copyright (c) 2003 - 2013 Tada AB - Taby Sweden
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in
-      the documentation and/or other materials provided with the
-      distribution.
-    * Neither the name Tada AB nor the names of its contributors may be
-      used to endorse or promote products derived from this software
-      without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
-TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-***********************************************************************
 The rest of the source code without explicit ASF license headers was
-taken from PostgreSQL and is available under the following license:
+derived from PostgreSQL and is available under the following license:
 
-PostgreSQL Database Management System
-(formerly known as Postgres, then as Postgres95)
+      licenses/LICENSE-postgresql.txt
 
-Portions Copyright (c) 1996-2016, PostgreSQL Global Development Group
+  This includes the following explicitely listed source directories:
 
-Portions Copyright (c) 1994, The Regents of the University of California
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose, without fee, and without a written agreement
-is hereby granted, provided that the above copyright notice and this
-paragraph and the following two paragraphs appear in all copies.
-
-IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
-DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING
-LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
-DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGE.
-
-THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
-INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
-ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO
-PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+     src/backend/utils/mb/Unicode
+     src/interfaces/libpq/po
+     src/bin/pg_dump
+     src/backend/port/qnx4/shm.c
+     src/backend/port/beos/shm.c
+     
