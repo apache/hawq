@@ -59,18 +59,16 @@
               <!-- Open-source packages with Apache license -->
               <exclude>depends/thirdparty/thrift/**</exclude>
 
+              <!-- CMake BSD 3-clause license -->
+
+              <exclude>depends/libhdfs3/CMake/**</exclude>
+              <exclude>depends/libyarn/CMake/**</exclude>
+              
               <!-- BSD license -->
-              <exclude>depends/libyarn/CMake/FindBoost.cmake</exclude>
-              <exclude>depends/libyarn/CMake/FindGSasl.cmake</exclude>
-              <exclude>depends/libyarn/CMake/FindKERBEROS.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/FindBoost.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/CodeCoverage.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/FindGSasl.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/FindKERBEROS.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/FindLibUUID.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/Functions.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/Options.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/Platform.cmake</exclude>
+
+              <exclude>depends/libhdfs3/CMake/**</exclude>
+              <exclude>depends/libyarn/CMake/**</exclude>
+              
               <exclude>src/bin/gpfdist/src/gpfdist/glob.c</exclude>
               <exclude>src/bin/gpfdist/src/gpfdist/include/glob.h</exclude>
               <exclude>src/include/port/win32_msvc/glob.h</exclude>
