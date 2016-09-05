@@ -6418,7 +6418,7 @@ atpxPartAddList(Relation rel,
 	}
 	
 	GpPolicy * parPolicy = GpPolicyFetch(CurrentMemoryContext,
-	          RelationGetRelationName(par_rel));
+	    RelationGetRelid(par_rel));
 	{
 		List			*l1;
 		ListCell		*lc;
