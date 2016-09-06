@@ -51,20 +51,17 @@ public enum EnumHawqType {
     Float4Type("float4", DataType.REAL),
     Float8Type("float8", DataType.FLOAT8),
     TextType("text", DataType.TEXT),
-    VarcharType("varchar", DataType.VARCHAR, (byte) 1, false),
+    VarcharType("varchar", DataType.VARCHAR, (byte) 1),
     ByteaType("bytea", DataType.BYTEA),
     DateType("date", DataType.DATE),
     TimestampType("timestamp", DataType.TIMESTAMP),
     BoolType("bool", DataType.BOOLEAN),
-    NumericType("numeric", DataType.NUMERIC, (byte) 2, false),
-    BpcharType("bpchar", DataType.BPCHAR, (byte) 1, false),
-    //modifier is mandatory for this type because by default it's 1
-    CharType("char", DataType.CHAR, (byte) 1, true);
+    NumericType("numeric", DataType.NUMERIC, (byte) 2),
+    BpcharType("bpchar", DataType.BPCHAR, (byte) 1);
 
     private DataType dataType;
     private String typeName;
     private byte modifiersNum;
-    private boolean mandatoryModifiers;
 
     EnumHawqType(String typeName, DataType dataType) {
         this.typeName = typeName;
@@ -74,11 +71,6 @@ public enum EnumHawqType {
     EnumHawqType(String typeName, DataType dataType, byte modifiersNum) {
         this(typeName, dataType);
         this.modifiersNum = modifiersNum;
-    }
-
-    EnumHawqType(String typeName, DataType dataType, byte modifiersNum, boolean mandatoryModifiers) {
-        this(typeName, dataType, modifiersNum);
-        this.mandatoryModifiers = mandatoryModifiers;
     }
 
     /**
@@ -104,14 +96,6 @@ public enum EnumHawqType {
      */
     public DataType getDataType() {
         return this.dataType;
-    }
-
-    /**
-     * 
-     * @return whether modifiers are mandatory for this type
-     */
-    public boolean isMandatoryModifiers() {
-        return mandatoryModifiers;
     }
 
 }

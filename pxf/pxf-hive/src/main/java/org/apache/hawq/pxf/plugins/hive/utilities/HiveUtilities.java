@@ -298,14 +298,10 @@ public class HiveUtilities {
                     ", actual HAWQ type " + hawqDataType);
         }
 
-        if ((hawqTypeMods == null || hawqTypeMods.length == 0) && expectedHawqType.isMandatoryModifiers())
-            throw new UnsupportedTypeException("Invalid definition for column " + hawqColumnName +  ": modifiers are mandatory for type " + expectedHawqType.getTypeName());
-
         switch (hawqDataType) {
             case NUMERIC:
             case VARCHAR:
             case BPCHAR:
-            case CHAR:
                 if (hawqTypeMods != null && hawqTypeMods.length > 0) {
                     Integer[] hiveTypeModifiers = EnumHiveToHawqType
                             .extractModifiers(hiveType);

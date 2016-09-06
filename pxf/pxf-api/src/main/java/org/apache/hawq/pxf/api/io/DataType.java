@@ -31,10 +31,6 @@ import java.util.Map;
 public enum DataType {
     BOOLEAN(16),
     BYTEA(17),
-    /**
-     * single character
-     */
-    CHAR(18),
     BIGINT(20),
     SMALLINT(21),
     INTEGER(23),

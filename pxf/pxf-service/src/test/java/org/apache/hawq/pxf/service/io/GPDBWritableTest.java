@@ -140,9 +140,6 @@ public class GPDBWritableTest {
         typeName = GPDBWritable.getTypeName(DataType.BYTEA.getOID());
         assertEquals(typeName, DataType.BYTEA.name());
 
-        typeName = GPDBWritable.getTypeName(DataType.CHAR.getOID());
-        assertEquals(typeName, DataType.CHAR.name());
-
         typeName = GPDBWritable.getTypeName(DataType.BIGINT.getOID());
         assertEquals(typeName, DataType.BIGINT.name());
 
