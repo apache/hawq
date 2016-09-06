@@ -129,7 +129,7 @@ public enum EnumHiveToHawqType {
      * @return compatible Hive type to given Hawq type, if there are more than one compatible types, it returns one with bigger size
      * @throws UnsupportedTypeException if there is no corresponding Hive type for given Hawq type
      */
-    public static EnumHiveToHawqType getCompatibleHawqToHiveType(DataType dataType) {
+    public static EnumHiveToHawqType getCompatibleHiveToHawqType(DataType dataType) {
 
         SortedSet<EnumHiveToHawqType> types = new TreeSet<EnumHiveToHawqType>(
                 new Comparator<EnumHiveToHawqType>() {

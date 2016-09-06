@@ -269,12 +269,21 @@ public class HiveUtilities {
      */
     public static String toCompatibleHiveType(DataType type) {
 
-        EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getCompatibleHawqToHiveType(type);
+        EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getCompatibleHiveToHawqType(type);
         return hiveToHawqType.getTypeName();
     }
 
 
 
+    /**
+     * Validates whether given HAWQ and Hive data types are compatible
+     *
+     * @param hawqDataType HAWQ data type
+     * @param hawqTypeMods HAWQ type modifiers
+     * @param hiveType full Hive type, i.e. decimal(10,2)
+     * @param hawqColumnName Hive column name
+     * @throws UnsupportedTypeException if types are incompatible
+     */
     public static void validateTypeCompatible(DataType hawqDataType, Integer[] hawqTypeMods, String hiveType, String hawqColumnName) {
 
         EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getHiveToHawqType(hiveType);
