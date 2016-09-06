@@ -26,7 +26,7 @@ package org.apache.hawq.pxf.api.utilities;
  */
 public class ColumnDescriptor {
 
-	int dbColumnTypeCode;
+    int dbColumnTypeCode;
     String dbColumnName;
     String dbColumnTypeName;
     int dbColumnIndex;

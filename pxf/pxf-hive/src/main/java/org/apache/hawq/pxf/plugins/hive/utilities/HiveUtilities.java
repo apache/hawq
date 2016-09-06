@@ -260,20 +260,8 @@ public class HiveUtilities {
 
 
     /**
-     * Converts HAWQ type to hive type. The supported mappings are:<ul>
-     * <li>{@code BOOLEAN -> boolean}</li>
-     * <li>{@code SMALLINT -> smallint (tinyint is converted to smallint)}</li>
-     * <li>{@code BIGINT -> bigint}</li>
-     * <li>{@code TIMESTAMP -> timestamp}</li>
-     * <li>{@code NUMERIC -> decimal}</li>
-     * <li>{@code BYTEA -> binary}</li>
-     * <li>{@code INTERGER -> int}</li>
-     * <li>{@code TEXT -> string}</li>
-     * <li>{@code REAL -> float}</li>
-     * <li>{@code FLOAT8 -> double}</li>
-     * </ul>
-     * All other types (both in HAWQ and in HIVE) are not supported.
-     *
+     * Converts HAWQ type to hive type.
+     * @see EnumHiveToHawqType For supported mappings
      * @param type HAWQ data type
      * @param name field name
      * @return Hive type
