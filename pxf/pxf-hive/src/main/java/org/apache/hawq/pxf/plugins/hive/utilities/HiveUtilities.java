@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
+import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
 
 /**
@@ -138,7 +139,7 @@ public class HiveUtilities {
                                     + ", actual number of modifiers: "
                                     + modifiers.length);
                 }
-                if (hawqType.getValidateIntegerModifiers() && !verifyIntegerModifiers(modifiers)) {
+                if (!verifyIntegerModifiers(modifiers)) {
                     throw new UnsupportedTypeException("HAWQ does not support type " + hiveType + " (Field " + fieldName + "), modifiers should be integers");
                 }
             }
@@ -254,6 +255,76 @@ public class HiveUtilities {
 
         } catch (MetaException cause) {
             throw new RuntimeException("Failed connecting to Hive MetaStore service: " + cause.getMessage(), cause);
+        }
+    }
+
+
+    /**
+     * Converts HAWQ type to hive type.
+     * @see EnumHiveToHawqType For supported mappings
+     * @param type HAWQ data type
+     * @param name field name
+     * @return Hive type
+     * @throws UnsupportedTypeException if type is not supported
+     */
+    public static String toCompatibleHiveType(DataType type) {
+
+        EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getCompatibleHiveToHawqType(type);
+        return hiveToHawqType.getTypeName();
+    }
+
+
+
+    /**
+     * Validates whether given HAWQ and Hive data types are compatible.
+     * If data type could have modifiers, HAWQ data type is valid if it hasn't modifiers at all
+     * or HAWQ's modifiers are greater or equal to Hive's modifiers.
+     * <p>
+     * For example:
+     * <p>
+     * Hive type - varchar(20), HAWQ type varchar - valid.
+     * <p>
+     * Hive type - varchar(20), HAWQ type varchar(20) - valid.
+     * <p>
+     * Hive type - varchar(20), HAWQ type varchar(25) - valid.
+     * <p>
+     * Hive type - varchar(20), HAWQ type varchar(15) - invalid.
+     *
+     *
+     * @param hawqDataType HAWQ data type
+     * @param hawqTypeMods HAWQ type modifiers
+     * @param hiveType full Hive type, i.e. decimal(10,2)
+     * @param hawqColumnName Hive column name
+     * @throws UnsupportedTypeException if types are incompatible
+     */
+    public static void validateTypeCompatible(DataType hawqDataType, Integer[] hawqTypeMods, String hiveType, String hawqColumnName) {
+
+        EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getHiveToHawqType(hiveType);
+        EnumHawqType expectedHawqType = hiveToHawqType.getHawqType();
+
+        if (!expectedHawqType.getDataType().equals(hawqDataType)) {
+            throw new UnsupportedTypeException("Invalid definition for column " + hawqColumnName
+                                    +  ": expected HAWQ type " + expectedHawqType.getDataType() +
+                    ", actual HAWQ type " + hawqDataType);
+        }
+
+        switch (hawqDataType) {
+            case NUMERIC:
+            case VARCHAR:
+            case BPCHAR:
+                if (hawqTypeMods != null && hawqTypeMods.length > 0) {
+                    Integer[] hiveTypeModifiers = EnumHiveToHawqType
+                            .extractModifiers(hiveType);
+                    for (int i = 0; i < hiveTypeModifiers.length; i++) {
+                        if (hawqTypeMods[i] < hiveTypeModifiers[i])
+                            throw new UnsupportedTypeException(
+                                    "Invalid definition for column " + hawqColumnName
+                                            + ": modifiers are not compatible, "
+                                            + Arrays.toString(hiveTypeModifiers) + ", "
+                                            + Arrays.toString(hawqTypeMods));
+                    }
+                }
+                break;
         }
     }
 }

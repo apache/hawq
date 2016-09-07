@@ -26,6 +26,8 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -146,80 +148,16 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
         for (FieldSchema hiveCol : hiveColumns) {
             ColumnDescriptor colDesc = inputData.getColumn(index++);
             DataType colType = DataType.get(colDesc.columnTypeCode());
-            compareTypes(colType, hiveCol.getType(), colDesc.columnName());
+            HiveUtilities.validateTypeCompatible(colType, colDesc.columnTypeModifiers(), hiveCol.getType(), colDesc.columnName());
         }
         // check partition fields
         List<FieldSchema> hivePartitions = tbl.getPartitionKeys();
         for (FieldSchema hivePart : hivePartitions) {
             ColumnDescriptor colDesc = inputData.getColumn(index++);
             DataType colType = DataType.get(colDesc.columnTypeCode());
-            compareTypes(colType, hivePart.getType(), colDesc.columnName());
+            HiveUtilities.validateTypeCompatible(colType, colDesc.columnTypeModifiers(), hivePart.getType(), colDesc.columnName());
         }
 
-    }
-
-    private void compareTypes(DataType type, String hiveType, String fieldName) {
-        String convertedHive = toHiveType(type, fieldName);
-        if (!convertedHive.equals(hiveType)
-                && !(convertedHive.equals("smallint") && hiveType.equals("tinyint"))) {
-            throw new UnsupportedTypeException(
-                    "Schema mismatch definition: Field " + fieldName
-                            + " (Hive type " + hiveType + ", HAWQ type "
-                            + type.toString() + ")");
-        }
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Field " + fieldName + ": Hive type " + hiveType
-                    + ", HAWQ type " + type.toString());
-        }
-    }
-
-    /**
-     * Converts HAWQ type to hive type. The supported mappings are:<ul>
-     * <li>{@code BOOLEAN -> boolean}</li>
-     * <li>{@code SMALLINT -> smallint (tinyint is converted to smallint)}</li>
-     * <li>{@code BIGINT -> bigint}</li>
-     * <li>{@code TIMESTAMP, TIME -> timestamp}</li>
-     * <li>{@code NUMERIC -> decimal}</li>
-     * <li>{@code BYTEA -> binary}</li>
-     * <li>{@code INTERGER -> int}</li>
-     * <li>{@code TEXT -> string}</li>
-     * <li>{@code REAL -> float}</li>
-     * <li>{@code FLOAT8 -> double}</li>
-     * </ul>
-     * All other types (both in HAWQ and in HIVE) are not supported.
-     *
-     * @param type HAWQ data type
-     * @param name field name
-     * @return Hive type
-     * @throws UnsupportedTypeException if type is not supported
-     */
-    public static String toHiveType(DataType type, String name) {
-        switch (type) {
-            case BOOLEAN:
-            case SMALLINT:
-            case BIGINT:
-            case TIMESTAMP:
-                return type.toString().toLowerCase();
-            case NUMERIC:
-                return "decimal";
-            case BYTEA:
-                return "binary";
-            case INTEGER:
-                return "int";
-            case TEXT:
-                return "string";
-            case REAL:
-                return "float";
-            case FLOAT8:
-                return "double";
-            case TIME:
-                return "timestamp";
-            default:
-                throw new UnsupportedTypeException(
-                        type.toString()
-                                + " conversion is not supported by HiveInputFormatFragmenter (Field "
-                                + name + ")");
-        }
     }
 
     /*

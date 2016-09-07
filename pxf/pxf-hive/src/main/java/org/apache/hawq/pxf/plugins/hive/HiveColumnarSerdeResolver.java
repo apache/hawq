@@ -28,6 +28,7 @@ import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Utilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -126,7 +127,7 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
         for (int i = 0; i < numberOfDataColumns; i++) {
             ColumnDescriptor column = input.getColumn(i);
             String columnName = column.columnName();
-            String columnType = HiveInputFormatFragmenter.toHiveType(DataType.get(column.columnTypeCode()), columnName);
+            String columnType = HiveUtilities.toCompatibleHiveType(DataType.get(column.columnTypeCode()));
             columnNames.append(delim).append(columnName);
             columnTypes.append(delim).append(columnType);
             delim = ",";

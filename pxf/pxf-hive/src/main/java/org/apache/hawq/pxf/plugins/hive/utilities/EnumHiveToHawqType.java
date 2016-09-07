@@ -19,6 +19,12 @@
 
 package org.apache.hawq.pxf.plugins.hive.utilities;
 
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 
@@ -29,8 +35,8 @@ import org.apache.hawq.pxf.api.UnsupportedTypeException;
  */
 public enum EnumHiveToHawqType {
 
-    TinyintType("tinyint", EnumHawqType.Int2Type),
-    SmallintType("smallint", EnumHawqType.Int2Type),
+    TinyintType("tinyint", EnumHawqType.Int2Type, (byte) 1),
+    SmallintType("smallint", EnumHawqType.Int2Type, (byte) 2),
     IntType("int", EnumHawqType.Int4Type),
     BigintType("bigint", EnumHawqType.Int8Type),
     BooleanType("boolean", EnumHawqType.BoolType),
@@ -51,10 +57,16 @@ public enum EnumHiveToHawqType {
     private String typeName;
     private EnumHawqType hawqType;
     private String splitExpression;
+    private byte size;
 
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType) {
         this.typeName = typeName;
         this.hawqType = hawqType;
+    }
+    
+    EnumHiveToHawqType(String typeName, EnumHawqType hawqType, byte size) {
+        this(typeName, hawqType);
+        this.size = size;
     }
 
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType, String splitExpression) {
@@ -108,6 +120,70 @@ public enum EnumHiveToHawqType {
         }
         throw new UnsupportedTypeException("Unable to map Hive's type: "
                 + hiveType + " to HAWQ's type");
+    }
+
+
+    /**
+     * 
+     * @param dataType Hawq data type
+     * @return compatible Hive type to given Hawq type, if there are more than one compatible types, it returns one with bigger size
+     * @throws UnsupportedTypeException if there is no corresponding Hive type for given Hawq type
+     */
+    public static EnumHiveToHawqType getCompatibleHiveToHawqType(DataType dataType) {
+
+        SortedSet<EnumHiveToHawqType> types = new TreeSet<EnumHiveToHawqType>(
+                new Comparator<EnumHiveToHawqType>() {
+                    public int compare(EnumHiveToHawqType a,
+                            EnumHiveToHawqType b) {
+                        return Byte.compare(a.getSize(), b.getSize());
+                    }
+                });
+
+        for (EnumHiveToHawqType t : values()) {
+            if (t.getHawqType().getDataType().equals(dataType)) {
+                types.add(t);
+            }
+        }
+
+        if (types.size() == 0)
+            throw new UnsupportedTypeException("Unable to find compatible Hive type for given HAWQ's type: " + dataType);
+
+        return types.last();
+    }
+
+    /**
+     * 
+     * @param hiveType full Hive data type, i.e. varchar(10) etc
+     * @return array of type modifiers
+     * @throws UnsupportedTypeException if there is no such Hive type supported
+     */
+    public static Integer[] extractModifiers(String hiveType) {
+        Integer[] result = null;
+        for (EnumHiveToHawqType t : values()) {
+            String hiveTypeName = hiveType;
+            String splitExpression = t.getSplitExpression();
+            if (splitExpression != null) {
+                String[] tokens = hiveType.split(splitExpression);
+                hiveTypeName = tokens[0];
+                result = new Integer[tokens.length - 1];
+                for (int i = 0; i < tokens.length - 1; i++)
+                    result[i] = Integer.parseInt(tokens[i+1]);
+            }
+            if (t.getTypeName().toLowerCase()
+                    .equals(hiveTypeName.toLowerCase())) {
+                return result;
+            }
+        }
+        throw new UnsupportedTypeException("Unable to map Hive's type: "
+                + hiveType + " to HAWQ's type");
+    }
+
+    /**
+     * This field is needed to find compatible Hive type when more than one Hive type mapped to HAWQ type
+     * @return size of this type in bytes or 0
+     */
+    public byte getSize() {
+        return size;
     }
 
 }

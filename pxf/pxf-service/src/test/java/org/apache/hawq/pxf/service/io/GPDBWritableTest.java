@@ -21,6 +21,8 @@ package org.apache.hawq.pxf.service.io;
 
 
 import org.apache.commons.logging.Log;
+import org.apache.hawq.pxf.api.io.DataType;
+import org.apache.hawq.pxf.service.io.GPDBWritable;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -36,6 +38,7 @@ import java.io.EOFException;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -121,6 +124,58 @@ public class GPDBWritableTest {
             assertTrue(false);
         }
         assertFalse(gpdbWritable.isEmpty()); // len > 0
+    }
+
+    @Test
+    public void testGetType() {
+        String typeName = GPDBWritable.getTypeName(-1);
+        assertEquals(typeName, DataType.TEXT.name());
+
+        typeName = GPDBWritable.getTypeName(-7777);
+        assertEquals(typeName, DataType.TEXT.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.BOOLEAN.getOID());
+        assertEquals(typeName, DataType.BOOLEAN.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.BYTEA.getOID());
+        assertEquals(typeName, DataType.BYTEA.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.BIGINT.getOID());
+        assertEquals(typeName, DataType.BIGINT.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.SMALLINT.getOID());
+        assertEquals(typeName, DataType.SMALLINT.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.INTEGER.getOID());
+        assertEquals(typeName, DataType.INTEGER.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.TEXT.getOID());
+        assertEquals(typeName, DataType.TEXT.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.REAL.getOID());
+        assertEquals(typeName, DataType.REAL.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.FLOAT8.getOID());
+        assertEquals(typeName, DataType.FLOAT8.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.BPCHAR.getOID());
+        assertEquals(typeName, DataType.BPCHAR.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.VARCHAR.getOID());
+        assertEquals(typeName, DataType.VARCHAR.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.DATE.getOID());
+        assertEquals(typeName, DataType.DATE.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.TIME.getOID());
+        assertEquals(typeName, DataType.TIME.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.TIMESTAMP.getOID());
+        assertEquals(typeName, DataType.TIMESTAMP.name());
+
+        typeName = GPDBWritable.getTypeName(DataType.NUMERIC.getOID());
+        assertEquals(typeName, DataType.NUMERIC.name());
+
     }
 
 
