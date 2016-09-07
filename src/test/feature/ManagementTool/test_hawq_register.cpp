@@ -19,19 +19,9 @@ class TestHawqRegister : public ::testing::Test {
   ~TestHawqRegister() {}
   string getHdfsLocation() {
     HdfsConfig hc;
-    string hostname = "";
-    int port = 0;
-    if (hc.isHA()) {
-      hc.getActiveNamenode(hostname, port);
-    }
-    else {
-      std::vector<std::string> hostList;
-      std::vector<int> portList;
-      hc.getNamenodes(hostList, portList);
-      hostname = hostList[0];
-      port = portList[0];
-    }
-    return hawq::test::stringFormat("hdfs://%s:%d", hostname.c_str(), port);
+    string namenodehost = "";
+    EXPECT_EQ(true, hc.getNamenodeHost(namenodehost));
+    return hawq::test::stringFormat("hdfs://%s", namenodehost.c_str());
   }
 };
 

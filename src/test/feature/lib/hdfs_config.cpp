@@ -172,6 +172,20 @@ string HdfsConfig::getHadoopHome() {
   return hadoopHome;
 }
 
+bool HdfsConfig::getNamenodeHost(string &namenodehost) {
+  const hawq::test::PSQLQueryResult &result = psql.getQueryResult(
+       "SELECT substring(fselocation from length('hdfs:// ') for (position('/' in substring(fselocation from length('hdfs:// ')))-1)::int) "
+       "FROM pg_filespace pgfs, pg_filespace_entry pgfse "
+       "WHERE pgfs.fsname = 'dfs_system' AND pgfse.fsefsoid=pgfs.oid ;");
+  std::vector<std::vector<string>> table = result.getRows();
+  if (table.size() > 0) {
+    namenodehost = table[0][0];
+    return true;
+  }
+
+  return false;
+}
+
 bool HdfsConfig::getActiveNamenode(string &activenamenode,
                                    int &port) {
     return getHANamenode("active", activenamenode, port);
