@@ -121,6 +121,7 @@
               <exclude>src/timezone/**/*</exclude>
               <exclude>doc/src/sgml/fixrtf</exclude>
               <exclude>doc/**/*.sgml</exclude>
+              <exclude>contrib/pgcrypto/*</exclude>
 
               <!-- Files which are not easy to have license headers. -->
               <exclude>depends/libhdfs3/test/data/*</exclude>
