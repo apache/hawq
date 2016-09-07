@@ -276,7 +276,20 @@ public class HiveUtilities {
 
 
     /**
-     * Validates whether given HAWQ and Hive data types are compatible
+     * Validates whether given HAWQ and Hive data types are compatible.
+     * If data type could have modifiers, HAWQ data type is valid if it hasn't modifiers at all
+     * or HAWQ's modifiers are greater or equal to Hive's modifiers.
+     * <p>
+     * For example:
+     * <p>
+     * Hive type - varchar(20), HAWQ type varchar - valid.
+     * <p>
+     * Hive type - varchar(20), HAWQ type varchar(20) - valid.
+     * <p>
+     * Hive type - varchar(20), HAWQ type varchar(25) - valid.
+     * <p>
+     * Hive type - varchar(20), HAWQ type varchar(15) - invalid.
+     *
      *
      * @param hawqDataType HAWQ data type
      * @param hawqTypeMods HAWQ type modifiers
