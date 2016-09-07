@@ -349,7 +349,6 @@ bool		Debug_datumstream_write_use_small_initial_buffers = false;
 bool		gp_temporary_files_filespace_repair = false;
 bool		filesystem_support_truncate = true;
 bool		gp_allow_non_uniform_partitioning_ddl = true;
-bool  enable_ranger = false;
 
 int			explain_memory_verbosity = 0;
 char* 		memory_profiler_run_id = "none";
@@ -733,6 +732,7 @@ int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_limit;
+bool enable_ranger = false;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
@@ -4325,7 +4325,7 @@ static struct config_bool ConfigureNamesBool[] =
 
 	{
     {"enable_ranger", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
-     gettext_noop("support to using ranger to manage hawq privilege."),
+     gettext_noop("Enable Apache Ranger for HAWQ privilege management."),
      NULL,
      GUC_SUPERUSER_ONLY
     },
