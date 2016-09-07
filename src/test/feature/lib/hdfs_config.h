@@ -56,6 +56,13 @@ class HdfsConfig {
     std::string getHadoopHome();
 
     /**
+     * get HDFS namenode's host ('hostname:port' for non-HA, 'servicename' for HA)
+     * @ param namenodehost, namenode host reference which will be set
+     * @ return true if getNamenodeHost succeeded
+     */
+    bool getNamenodeHost(std::string &namenodehost);
+    
+    /**
      * get HDFS active namenode's hostname and port information
      * @param activenamenode, active namenode hostname reference which will be set
      * @param port, active namenode port reference which will be set
