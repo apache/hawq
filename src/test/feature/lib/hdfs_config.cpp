@@ -2,10 +2,10 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include <pwd.h>
 
 #include "hdfs_config.h"
 #include "command.h"
-#include "psql.h"
 #include "xml_parser.h"
 #include "string_util.h"
 
@@ -13,6 +13,19 @@ using std::string;
 
 namespace hawq {
 namespace test {
+
+HdfsConfig::HdfsConfig() {
+  std::string user = HAWQ_USER;
+  if(user.empty()) {
+    struct passwd *pw;
+    uid_t uid = geteuid();
+    pw = getpwuid(uid);
+    user.assign(pw->pw_name);
+  }
+  conn.reset(new hawq::test::PSQL(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, user, HAWQ_PASSWORD));
+  isLoadFromHawqConfigFile = false;
+  isLoadFromHdfsConfigFile = false;
+}
 
 void HdfsConfig::runCommand(const string &command, 
                             bool ishdfsuser, 
@@ -115,7 +128,7 @@ bool HdfsConfig::LoadFromHdfsConfigFile() {
 }
 
 int HdfsConfig::isHA() {
-  const hawq::test::PSQLQueryResult &result = psql.getQueryResult(
+  const hawq::test::PSQLQueryResult &result = conn->getQueryResult(
        "SELECT substring(fselocation from length('hdfs:// ') for (position('/' in substring(fselocation from length('hdfs:// ')))-1)::int) "
        "FROM pg_filespace pgfs, pg_filespace_entry pgfse "
        "WHERE pgfs.fsname = 'dfs_system' AND pgfse.fsefsoid=pgfs.oid ;");
@@ -173,7 +186,7 @@ string HdfsConfig::getHadoopHome() {
 }
 
 bool HdfsConfig::getNamenodeHost(string &namenodehost) {
-  const hawq::test::PSQLQueryResult &result = psql.getQueryResult(
+  const hawq::test::PSQLQueryResult &result = conn->getQueryResult(
        "SELECT substring(fselocation from length('hdfs:// ') for (position('/' in substring(fselocation from length('hdfs:// ')))-1)::int) "
        "FROM pg_filespace pgfs, pg_filespace_entry pgfse "
        "WHERE pgfs.fsname = 'dfs_system' AND pgfse.fsefsoid=pgfs.oid ;");
