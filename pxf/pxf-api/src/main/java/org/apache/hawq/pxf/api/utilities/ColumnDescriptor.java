@@ -65,9 +65,13 @@ public class ColumnDescriptor {
         this.dbColumnName = copy.dbColumnName;
         this.dbColumnIndex = copy.dbColumnIndex;
         this.dbColumnTypeName = copy.dbColumnTypeName;
-        System.arraycopy(this.dbColumnTypeModifiers, 0,
-                copy.dbColumnTypeModifiers, 0,
-                this.dbColumnTypeModifiers.length);
+        if (copy.dbColumnTypeModifiers != null
+                && copy.dbColumnTypeModifiers.length > 0) {
+            this.dbColumnTypeModifiers = new Integer[copy.dbColumnTypeModifiers.length];
+            System.arraycopy(copy.dbColumnTypeModifiers, 0,
+                    this.dbColumnTypeModifiers, 0,
+                    copy.dbColumnTypeModifiers.length);
+        }
     }
 
     public String columnName() {
