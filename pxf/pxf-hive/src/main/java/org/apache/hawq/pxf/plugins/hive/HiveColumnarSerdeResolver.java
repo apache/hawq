@@ -77,8 +77,6 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
             serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.COLUMNAR_SERDE;
         } else if (serdeEnumStr.equals(HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name())) {
             serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE;
-        } else if (serdeEnumStr.equals(HiveInputFormatFragmenter.PXF_HIVE_SERDES.VECTORIZED_ORC_SERDE.name())) {
-            serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.VECTORIZED_ORC_SERDE;
         } else {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
         }
