@@ -21,10 +21,7 @@ class HdfsConfig {
     /**
      * HdfsConfig constructor
      */
-    HdfsConfig(): psql(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, HAWQ_USER, HAWQ_PASSWORD) {
-      isLoadFromHawqConfigFile = false;
-      isLoadFromHdfsConfigFile = false;
-    }
+    HdfsConfig();
 
     /**
      * HdfsConfig destructor
@@ -180,7 +177,7 @@ class HdfsConfig {
     std::unique_ptr<XmlConfig> hdfsxmlconf;
     bool isLoadFromHawqConfigFile;
     bool isLoadFromHdfsConfigFile;
-    hawq::test::PSQL psql;
+    std::unique_ptr<hawq::test::PSQL> conn;
 };
 
 } // namespace test
