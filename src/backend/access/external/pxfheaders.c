@@ -138,10 +138,8 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
     char long_number[sizeof(int32) * 8];
 
     StringInfoData formatter;
-    StringInfoData typeInfo;
     TupleDesc tuple;		
     initStringInfo(&formatter);
-    initStringInfo(&typeInfo);
 	
     /* Get tuple description itself */	
     tuple = RelationGetDescr(rel);	
@@ -167,17 +165,6 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
         /* Add a key/value pair for attribute type name */
         resetStringInfo(&formatter);
         appendStringInfo(&formatter, "X-GP-ATTR-TYPENAME%u", i);
-
-        /* Add attribute type mod value if defined (valid for varchar,char,etc) */
-        resetStringInfo(&typeInfo);
-        if(tuple->attrs[i]->atttypmod != -1) {
-        	appendStringInfo(&typeInfo, "%s(%u)", TypeOidGetTypename(tuple->attrs[i]->atttypid), (tuple->attrs[i]->atttypmod - 4));
-        } else {
-        	appendStringInfo(&typeInfo, TypeOidGetTypename(tuple->attrs[i]->atttypid));
-        }
-
-        elog(DEBUG1, "------------- TYPE INFO %s", typeInfo.data);
-        churl_headers_append(headers, formatter.data, typeInfo.data);
     }
         churl_headers_append(headers, formatter.data, TypeOidGetTypename(tuple->attrs[i]->atttypid));
 
@@ -261,7 +248,6 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 	}
 	
 	pfree(formatter.data);
-	pfree(typeInfo.data);
 }
 
 static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo, List *qualsAttributes) {

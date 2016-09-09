@@ -40,6 +40,7 @@ import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -122,14 +123,17 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
         StringBuilder columnNames = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
         StringBuilder columnTypes = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
-        String delim = "";
+        String delim = ",";
         for (int i = 0; i < numberOfDataColumns; i++) {
             ColumnDescriptor column = input.getColumn(i);
             String columnName = column.columnName();
-            String columnType = HiveInputFormatFragmenter.toHiveType(DataType.get(column.columnTypeCode()), columnName, column.columnTypeName());
-            columnNames.append(delim).append(columnName);
-            columnTypes.append(delim).append(columnType);
-            delim = ",";
+            String columnType = HiveUtilities.toCompatibleHiveType(DataType.get(column.columnTypeCode()));
+            if(i > 0) {
+                columnNames.append(delim);
+                columnTypes.append(delim);
+            }
+            columnNames.append(columnName);
+            columnTypes.append(columnType);
         }
         serdeProperties.put(serdeConstants.LIST_COLUMNS, columnNames.toString());
         serdeProperties.put(serdeConstants.LIST_COLUMN_TYPES, columnTypes.toString());

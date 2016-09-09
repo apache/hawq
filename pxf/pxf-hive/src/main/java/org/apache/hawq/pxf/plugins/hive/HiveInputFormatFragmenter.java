@@ -62,7 +62,6 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     static final String STR_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe";
     static final String STR_LAZY_BINARY_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe";
     static final String STR_LAZY_SIMPLE_SERDE = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe";
-    static final String STR_VECTORIZED_ORC_SERDE = "org.apache.hadoop.hive.ql.io.orc.VectorizedOrcSerde";
     static final String STR_ORC_SERDE = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
     private static final int EXPECTED_NUM_OF_TOKS = 3;
     public static final int TOK_SERDE = 0;
@@ -81,8 +80,7 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
         COLUMNAR_SERDE,
         LAZY_BINARY_COLUMNAR_SERDE,
         LAZY_SIMPLE_SERDE,
-        ORC_SERDE,
-        VECTORIZED_ORC_SERDE
+        ORC_SERDE
     }
 
     /**
@@ -166,89 +164,6 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
 
     }
 
-    private void compareTypes(DataType type, String hiveType, String fieldName) {
-        String convertedHive = toHiveType(type, fieldName, null);
-        if (!convertedHive.equals(hiveType)
-                && !(convertedHive.equals("smallint") && hiveType.equals("tinyint"))
-                && !hiveType.startsWith(convertedHive)) {
-            throw new UnsupportedTypeException(
-                    "Schema mismatch definition: Field " + fieldName
-                            + " (Hive type " + hiveType + ", HAWQ type "
-                            + type.toString() + ")");
-        }
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Field " + fieldName + ": Hive type " + hiveType
-                    + ", HAWQ type " + type.toString());
-        }
-    }
-
-    /**
-     * Converts HAWQ type to hive type. The supported mappings are:<ul>
-     * <li>{@code BOOLEAN -> boolean}</li>
-     * <li>{@code SMALLINT -> smallint (tinyint is converted to smallint)}</li>
-     * <li>{@code BIGINT -> bigint}</li>
-     * <li>{@code TIMESTAMP, TIME -> timestamp}</li>
-     * <li>{@code NUMERIC -> decimal}</li>
-     * <li>{@code BYTEA -> binary}</li>
-     * <li>{@code INTERGER -> int}</li>
-     * <li>{@code TEXT -> string}</li>
-     * <li>{@code REAL -> float}</li>
-     * <li>{@code FLOAT8 -> double}</li>
-     * </ul>
-     * All other types (both in HAWQ and in HIVE) are not supported.
-     * For varchar and char types, typeMod will have the length info along with type.
-     *
-     * @param type HAWQ data type
-     * @param name field name
-     * @return Hive type
-     * @throws UnsupportedTypeException if type is not supported
-     */
-    public static String toHiveType(DataType type, String name, String typeMod) {
-        switch (type) {
-            case BOOLEAN:
-            case SMALLINT:
-            case BIGINT:
-            case TIMESTAMP:
-                return type.toString().toLowerCase();
-            case NUMERIC:
-                return "decimal";
-            case BYTEA:
-                return "binary";
-            case INTEGER:
-                return "int";
-            case TEXT:
-                return "string";
-            case REAL:
-                return "float";
-            case FLOAT8:
-                return "double";
-            case TIME:
-                return "timestamp";
-            case DATE:
-                return "date";
-            case VARCHAR:
-                if(typeMod != null)
-                    return typeMod;
-                else
-                    return "varchar";
-            case BPCHAR:
-                if(typeMod != null)
-                    return typeMod.substring(2);
-                else
-                    return "char";
-            case CHAR:
-                if(typeMod != null)
-                    return typeMod;
-                else
-                    return "char";
-            default:
-                throw new UnsupportedTypeException(
-                        type.toString()
-                                + " conversion is not supported by HiveInputFormatFragmenter (Field "
-                                + name + ")");
-        }
-    }
-
     /*
      * Validates that partition format corresponds to PXF supported formats and
      * transforms the class name to an enumeration for writing it to the
@@ -290,8 +205,6 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
                 return PXF_HIVE_SERDES.LAZY_SIMPLE_SERDE.name();
             case STR_ORC_SERDE:
                 return PXF_HIVE_SERDES.ORC_SERDE.name();
-            case STR_VECTORIZED_ORC_SERDE:
-                return PXF_HIVE_SERDES.VECTORIZED_ORC_SERDE.name();
             default:
                 throw new UnsupportedTypeException(
                         "HiveInputFormatFragmenter does not yet support  "

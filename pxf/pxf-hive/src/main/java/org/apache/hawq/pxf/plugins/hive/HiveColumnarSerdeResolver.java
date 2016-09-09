@@ -31,7 +31,6 @@ import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.ql.exec.vector.VectorizedColumnarSerDe;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDeBase;
@@ -76,7 +75,10 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
         String serdeEnumStr = toks[HiveInputFormatFragmenter.TOK_SERDE];
         if (serdeEnumStr.equals(HiveInputFormatFragmenter.PXF_HIVE_SERDES.COLUMNAR_SERDE.name())) {
             serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.COLUMNAR_SERDE;
-        } else {
+        } else if (serdeEnumStr.equals(HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name())) {
+            serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE;
+        }
+        else {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
         }
         parts = new StringBuilder();
@@ -141,8 +143,6 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
             deserializer = new ColumnarSerDe();
         } else if (serdeType == HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE) {
             deserializer = new LazyBinaryColumnarSerDe();
-        } else if (serdeType == HiveInputFormatFragmenter.PXF_HIVE_SERDES.VECTORIZED_ORC_SERDE) {
-            deserializer = new VectorizedColumnarSerDe();
         } else {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeType.name()); /* we should not get here */
         }
