@@ -48,7 +48,6 @@ test: copyselect
 test: constraints
 ignore: triggers
 test: create_misc
-test: create_aggregate
 test: create_operator
 test: create_index
 test: drop_if_exists

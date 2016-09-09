@@ -138,7 +138,7 @@ public class BridgeOutputBuilderTest {
     @Test
     public void testFillGPDBWritable() throws Exception {
         Map<String, String> parameters = new HashMap<String, String>();
-        parameters.put("X-GP-ATTRS", "14");
+        parameters.put("X-GP-ATTRS", "13");
 
         addColumn(parameters, 0, DataType.INTEGER, "col0");
         addColumn(parameters, 1, DataType.FLOAT8, "col1");
@@ -149,11 +149,10 @@ public class BridgeOutputBuilderTest {
         addColumn(parameters, 6, DataType.BYTEA, "col6");
         addColumn(parameters, 7, DataType.VARCHAR, "col7");
         addColumn(parameters, 8, DataType.BPCHAR, "col8");
-        addColumn(parameters, 9, DataType.CHAR, "col9");
-        addColumn(parameters, 10, DataType.TEXT, "col10");
-        addColumn(parameters, 11, DataType.NUMERIC, "col11");
-        addColumn(parameters, 12, DataType.TIMESTAMP, "col12");
-        addColumn(parameters, 13, DataType.DATE, "col13");
+        addColumn(parameters, 9, DataType.TEXT, "col9");
+        addColumn(parameters, 10, DataType.NUMERIC, "col10");
+        addColumn(parameters, 11, DataType.TIMESTAMP, "col11");
+        addColumn(parameters, 12, DataType.DATE, "col12");
 
         BridgeOutputBuilder builder = makeBuilder(parameters);
         output = builder.makeGPDBWritableOutput();
@@ -168,7 +167,6 @@ public class BridgeOutputBuilderTest {
                         DataType.BYTEA.getOID(), new byte[] { 0 }),
                 new OneField(DataType.VARCHAR.getOID(), "value"), new OneField(
                         DataType.BPCHAR.getOID(), "value"), new OneField(
-                        DataType.CHAR.getOID(), "value"), new OneField(
                         DataType.TEXT.getOID(), "value"), new OneField(
                         DataType.NUMERIC.getOID(), "0"), new OneField(
                         DataType.TIMESTAMP.getOID(), new Timestamp(0)),
@@ -185,10 +183,9 @@ public class BridgeOutputBuilderTest {
         assertEquals(output.getString(7), "value\0");
         assertEquals(output.getString(8), "value\0");
         assertEquals(output.getString(9), "value\0");
-        assertEquals(output.getString(10), "value\0");
-        assertEquals(output.getString(11), "0\0");
-        assertEquals(Timestamp.valueOf(output.getString(12)), new Timestamp(0));
-        assertEquals(Date.valueOf(output.getString(13).trim()).toString(),
+        assertEquals(output.getString(10), "0\0");
+        assertEquals(Timestamp.valueOf(output.getString(11)), new Timestamp(0));
+        assertEquals(Date.valueOf(output.getString(12).trim()).toString(),
                 new Date(1).toString());
     }
 

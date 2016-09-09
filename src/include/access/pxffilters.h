@@ -102,5 +102,6 @@ static inline bool pxfoperand_is_const(PxfOperand x)
 }
 
 char *serializePxfFilterQuals(List *quals);
+List* extractPxfAttributes(List* quals);
 
 #endif // _PXF_FILTERS_H_

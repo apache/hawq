@@ -37,6 +37,11 @@ doc:
 	doxygen doxygen_template
 
 clean distclean: sharelibclean
+	find . -type f -name "*.out" -exec $(RM) {} +
+	$(RM) ExternalSource/ans/external_oid.ans ExternalSource/ans/exttab1.ans ExternalSource/sql/external_oid.sql ExternalSource/sql/exttab1.sql
+	$(RM) UDF/ans/function_c.ans UDF/ans/function_creation.ans UDF/sql/function_c.sql UDF/sql/function_creation.sql
+	$(RM) testlib/ans/template.ans testlib/sql/template.sql
+	$(RM) utility/ans/copytest.csv utility/ans/onek.data
 	$(RM) feature-test
 	$(RM) feature-test.dSYM
 	$(RM) doc

@@ -720,7 +720,6 @@ with_zlib
 with_system_tzdata
 with_libhdfs3
 with_libyarn
-with_thrift
 with_openssl
 with_bonjour
 with_ldap
@@ -864,7 +863,6 @@ with_ldap
 with_bonjour
 with_openssl
 with_readline
-with_thrift
 with_libyarn
 with_libhdfs3
 with_libedit_preferred
@@ -1555,7 +1553,6 @@ Optional Packages:
   --with-bonjour          build with Bonjour support
   --with-openssl          build with OpenSSL support
   --without-readline      do not use GNU Readline nor BSD Libedit for editing
-  --with-thrift           build thrift
   --without-libyarn       do not build libyarn
   --without-libhdfs3      do not build libhdfs3
   --without-libedit-preferred  Don't prefer BSD Libedit over GNU Readline
@@ -6104,36 +6101,6 @@ $as_echo "$as_me: WARNING: *** Readline does not work on MinGW --- disabling" >&
 fi
 
 #
-# thrift
-#
-
-pgac_args="$pgac_args with_thrift"
-
-
-# Check whether --with-thrift was given.
-if test "${with_thrift+set}" = set; then :
-  withval=$with_thrift;
-  case $withval in
-    yes)
-      :
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-thrift option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_thrift=no
-
-fi
-
-
-
-
-#
 # libyarn
 #
 
@@ -9026,8 +8993,9 @@ $as_echo_n "checking R_HOME... " >&6; }
 	if test "x${r_home_guess}" != "x"; then
       R_HOME=$r_home_guess
 	else
-      as_fn_error $? "Failed to Set R_HOME. R is not installed? R_HOME is not set
-or pkg-config is not installed to find R_HOME automatically." "$LINENO" 5
+      as_fn_error $? "Failed to set R_HOME. R is not installed? Or R_HOME is not set
+or pkg-config is not installed to find R_HOME automatically.
+Check config.log for details or not use --with-r if you do not want the PL/R support." "$LINENO" 5
     fi
   fi
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${R_HOME}" >&5
@@ -9103,7 +9071,9 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "could not find function 'gss_init_sec_context' required for GSSAPI" "$LINENO" 5
+  as_fn_error $? "could not find function 'gss_init_sec_context' required for GSSAPI.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-gssapi if you don't want the GSSAPI support." "$LINENO" 5
 fi
 
   else
@@ -9168,7 +9138,9 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "could not find function 'com_err' required for Kerberos 5" "$LINENO" 5
+  as_fn_error $? "could not find function 'com_err' required for Kerberos 5.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-krb5 if you don't want the Kerberos 5 support." "$LINENO" 5
 fi
 
      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing krb5_sendauth" >&5
@@ -9226,7 +9198,9 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "could not find function 'krb5_sendauth' required for Kerberos 5" "$LINENO" 5
+  as_fn_error $? "could not find function 'krb5_sendauth' required for Kerberos 5.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-krb5 if you don't want the Kerberos 5 support." "$LINENO" 5
 fi
 
   else
@@ -9285,7 +9259,9 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "could not find function 'com_err' required for Kerberos 5" "$LINENO" 5
+  as_fn_error $? "could not find function 'com_err' required for Kerberos 5.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-krb5 if you don't want the Kerberos 5 support." "$LINENO" 5
 fi
 
   fi
@@ -9337,7 +9313,9 @@ _ACEOF
   LIBS="-lcrypto $LIBS"
 
 else
-  as_fn_error $? "library 'crypto' is required for OpenSSL" "$LINENO" 5
+  as_fn_error $? "library 'crypto' is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want the OpenSSL support." "$LINENO" 5
 fi
 
      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_library_init in -lssl" >&5
@@ -9384,7 +9362,9 @@ _ACEOF
   LIBS="-lssl $LIBS"
 
 else
-  as_fn_error $? "library 'ssl' is required for OpenSSL" "$LINENO" 5
+  as_fn_error $? "library 'ssl' is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want the OpenSSL support." "$LINENO" 5
 fi
 
   else
@@ -9432,7 +9412,9 @@ _ACEOF
   LIBS="-leay32 $LIBS"
 
 else
-  as_fn_error $? "library 'eay32' is required for OpenSSL" "$LINENO" 5
+  as_fn_error $? "library 'eay32' is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want the OpenSSL support." "$LINENO" 5
 fi
 
      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSL_library_init in -lssleay32" >&5
@@ -9479,7 +9461,9 @@ _ACEOF
   LIBS="-lssleay32 $LIBS"
 
 else
-  as_fn_error $? "library 'ssleay32' is required for OpenSSL" "$LINENO" 5
+  as_fn_error $? "library 'ssleay32' is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want the OpenSSL support." "$LINENO" 5
 fi
 
   fi
@@ -9530,8 +9514,12 @@ _ACEOF
   LIBS="-lrt $LIBS"
 
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Realtime library not found" >&5
-$as_echo "$as_me: WARNING: Realtime library not found" >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Realtime library not found.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --without-rt to avoid using the Realtime library." >&5
+$as_echo "$as_me: WARNING: Realtime library not found.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --without-rt to avoid using the Realtime library." >&2;}
 fi
 
 fi
@@ -9581,7 +9569,9 @@ _ACEOF
   LIBS="-lpam $LIBS"
 
 else
-  as_fn_error $? "library 'pam' is required for PAM" "$LINENO" 5
+  as_fn_error $? "library 'pam' is required for PAM.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-pam if you don't want the PAM support." "$LINENO" 5
 fi
 
 fi
@@ -9819,7 +9809,9 @@ if test "x$ac_cv_header_bzlib_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "bzip2-devel is required" "$LINENO" 5
+  as_fn_error $? "header file <bzlib.h> is required.
+'bzip2' is used for table compression. Check config.log for details.
+It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 done
@@ -9879,7 +9871,9 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "bzip2-devel is required" "$LINENO" 5
+  as_fn_error $? "library 'bzip2' is required.
+'bzip2' is used for table compression.  Check config.log for details.
+It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 
@@ -9893,7 +9887,9 @@ if test "x$ac_cv_header_snappy_c_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "snappy is required" "$LINENO" 5
+  as_fn_error $? "header file <snappy-c.h> is required.
+'snappy' is used for table compression. Check config.log for details.
+It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 done
@@ -9953,7 +9949,9 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "snappy is required" "$LINENO" 5
+  as_fn_error $? "library 'snappy' is required.
+'snappy' is used for table compression. Check config.log for details.
+It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 
@@ -9965,9 +9963,6 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
 
 # Check for thrift
-#AC_CHECK_HEADERS(thrift/protocol/TBinaryProtocol.h, [], [AC_MSG_ERROR([thrift is required])])
-
-# Check for boost
 ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -10360,6 +10355,22 @@ ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ex
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
 
+for ac_header in thrift/protocol/TBinaryProtocol.h
+do :
+  ac_fn_cxx_check_header_mongrel "$LINENO" "thrift/protocol/TBinaryProtocol.h" "ac_cv_header_thrift_protocol_TBinaryProtocol_h" "$ac_includes_default"
+if test "x$ac_cv_header_thrift_protocol_TBinaryProtocol_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_THRIFT_PROTOCOL_TBINARYPROTOCOL_H 1
+_ACEOF
+
+else
+  as_fn_error $? "thrift is required" "$LINENO" 5
+fi
+
+done
+
+
+# Check for boost
 for ac_header in boost/chrono.hpp
 do :
   ac_fn_cxx_check_header_mongrel "$LINENO" "boost/chrono.hpp" "ac_cv_header_boost_chrono_hpp" "$ac_includes_default"
@@ -10369,7 +10380,8 @@ if test "x$ac_cv_header_boost_chrono_hpp" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "boost is required" "$LINENO" 5
+  as_fn_error $? "boost is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 done
@@ -10392,7 +10404,8 @@ if test "x$ac_cv_header_yaml_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "libyaml is required" "$LINENO" 5
+  as_fn_error $? "header file <yaml.h> is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 done
@@ -10452,7 +10465,8 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "libyaml is required" "$LINENO" 5
+  as_fn_error $? "library 'libyaml' is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 
@@ -10466,7 +10480,8 @@ if test "x$ac_cv_header_event_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "libevent is required" "$LINENO" 5
+  as_fn_error $? "header file <event.h> is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 done
@@ -10526,7 +10541,8 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "libevent is required" "$LINENO" 5
+  as_fn_error $? "library 'libevent' is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 
@@ -10634,7 +10650,9 @@ _ACEOF
   LIBS="-lnetsnmp $LIBS"
 
 else
-  as_fn_error $? "library 'netsnmp' is required for snmp support" "$LINENO" 5
+  as_fn_error $? "library 'netsnmp' is required for snmp support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --enable-snmp if you don't want to enable the snmp support." "$LINENO" 5
 fi
 
 fi
@@ -10688,7 +10706,9 @@ _ACEOF
   LIBS="-lesmtp $LIBS"
 
 else
-  as_fn_error $? "library 'libesmtp' is required for email alert support" "$LINENO" 5
+  as_fn_error $? "library 'libesmtp' is required for email alert support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --enable-email if you don't want to enable the email alert support." "$LINENO" 5
 fi
 
 fi
@@ -10950,7 +10970,9 @@ if test "x$ac_cv_header_gssapi_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "gssapi.h header file is required for GSSAPI" "$LINENO" 5
+  as_fn_error $? "gssapi.h header file is required for GSSAPI.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-gssapi if you don't want the GSSAPI support." "$LINENO" 5
 fi
 
 done
@@ -10966,7 +10988,9 @@ if test "$with_krb5" = yes ; then
 if test "x$ac_cv_header_krb5_h" = xyes; then :
 
 else
-  as_fn_error $? "header file <krb5.h> is required for Kerberos 5" "$LINENO" 5
+  as_fn_error $? "header file <krb5.h> is required for Kerberos 5.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-krb5 if you don't want the Kerberos 5 support." "$LINENO" 5
 fi
 
 
@@ -10977,7 +11001,9 @@ if test "$with_openssl" = yes ; then
 if test "x$ac_cv_header_openssl_ssl_h" = xyes; then :
 
 else
-  as_fn_error $? "header file <openssl/ssl.h> is required for OpenSSL" "$LINENO" 5
+  as_fn_error $? "header file <openssl/ssl.h> is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want to the OpenSSL support." "$LINENO" 5
 fi
 
 
@@ -10985,7 +11011,9 @@ fi
 if test "x$ac_cv_header_openssl_err_h" = xyes; then :
 
 else
-  as_fn_error $? "header file <openssl/err.h> is required for OpenSSL" "$LINENO" 5
+  as_fn_error $? "header file <openssl/err.h> is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want to the OpenSSL support." "$LINENO" 5
 fi
 
 
@@ -11021,7 +11049,9 @@ if test "x$ac_cv_header_pam_pam_appl_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "header file <security/pam_appl.h> or <pam/pam_appl.h> is required for PAM." "$LINENO" 5
+  as_fn_error $? "header file <security/pam_appl.h> or <pam/pam_appl.h> is required for PAM.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --without-pam to disable the PAM support." "$LINENO" 5
 fi
 
 done
@@ -11043,7 +11073,8 @@ if test "x$ac_cv_header_ldap_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "header file <ldap.h> is required for LDAP" "$LINENO" 5
+  as_fn_error $? "header file <ldap.h> is required for LDAP.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 done
@@ -11074,7 +11105,8 @@ if test "$with_bonjour" = yes ; then
 if test "x$ac_cv_header_DNSServiceDiscovery_DNSServiceDiscovery_h" = xyes; then :
 
 else
-  as_fn_error $? "header file <DNSServiceDiscovery/DNSServiceDiscovery.h> is required for Bonjour" "$LINENO" 5
+  as_fn_error $? "header file <DNSServiceDiscovery/DNSServiceDiscovery.h> is required for Bonjour.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 
@@ -11157,13 +11189,14 @@ if test "x$ac_cv_header_net_snmp_net_snmp_config_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "header file <net-snmp/net-snmp-config.h> is required for snmp support" "$LINENO" 5
+  as_fn_error $? "header file <net-snmp/net-snmp-config.h> is required for snmp support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --disable-snmp to disable the snmp support." "$LINENO" 5
 fi
 
 done
 
 fi
-
 
 # email
 if test "$enable_email" = yes; then
@@ -11176,7 +11209,9 @@ if test "x$ac_cv_header_libesmtp_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "header file <libesnmp.h> is required for email alert support" "$LINENO" 5
+  as_fn_error $? "header file <libesnmp.h> is required for email alert support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --disable-email to disable the snmp support." "$LINENO" 5
 fi
 
 done
@@ -11190,7 +11225,9 @@ if test "x$ac_cv_header_auth_client_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "header file <auth-client.h> is required for email alert support" "$LINENO" 5
+  as_fn_error $? "header file <auth-client.h> is required for email alert support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --disable-email to disable the snmp support." "$LINENO" 5
 fi
 
 done
@@ -11208,7 +11245,9 @@ if test "x$ac_cv_header_time_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "header file <time.h> is required for realtime library support" "$LINENO" 5
+  as_fn_error $? "header file <time.h> is required for realtime library support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --without-rt to avoid using realtime library." "$LINENO" 5
 fi
 
 done
@@ -11216,7 +11255,6 @@ done
 fi
 
 # json-c
-
 for ac_header in json-c/json.h
 do :
   ac_fn_c_check_header_mongrel "$LINENO" "json-c/json.h" "ac_cv_header_json_c_json_h" "$ac_includes_default"
@@ -11226,7 +11264,8 @@ if test "x$ac_cv_header_json_c_json_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "json-c is required" "$LINENO" 5
+  as_fn_error $? "header file <json-c/json.h> is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 done
@@ -11286,12 +11325,12 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "json-c is required" "$LINENO" 5
+  as_fn_error $? "library 'json-c' is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 
 # libxml2
-
 
 
 # Check whether --with-xml-prefix was given.
@@ -11546,7 +11585,8 @@ rm -f core conftest.err conftest.$ac_objext \
 
      XML_CPPFLAGS=""
      XML_LIBS=""
-     as_fn_error $? "libxml2 is required" "$LINENO" 5
+     as_fn_error $? "libxml2 is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
   fi
 
 
@@ -15953,7 +15993,9 @@ eval TCL_SHARED_BUILD=\"$TCL_SHARED_BUILD\"
 if test "x$ac_cv_header_tcl_h" = xyes; then :
 
 else
-  as_fn_error $? "header file <tcl.h> is required for Tcl" "$LINENO" 5
+  as_fn_error $? "header file <tcl.h> is required for Tcl.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-tcl if you don't want to enable to PL/Tcl funciontality." "$LINENO" 5
 fi
 
 
@@ -16482,7 +16524,7 @@ $as_echo "done" >&6; }
 fi
 
 
-ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/thirdparty/thrift/hawqbuild/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global"
+ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global"
 
 
 ac_config_links="$ac_config_links src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION} src/backend/port/pg_shmem.c:${SHMEM_IMPLEMENTATION} src/include/dynloader.h:src/backend/port/dynloader/${template}.h src/include/pg_config_os.h:src/include/port/${template}.h src/Makefile.port:src/makefiles/Makefile.${template}"
@@ -17203,7 +17245,6 @@ do
     "GNUmakefile") CONFIG_FILES="$CONFIG_FILES GNUmakefile" ;;
     "src/VERSIONS.mk") CONFIG_FILES="$CONFIG_FILES src/VERSIONS.mk" ;;
     "depends/thirdparty/googletest/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/thirdparty/googletest/Makefile.global" ;;
-    "depends/thirdparty/thrift/hawqbuild/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/thirdparty/thrift/hawqbuild/Makefile.global" ;;
     "depends/libhdfs3/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libhdfs3/Makefile.global" ;;
     "depends/libyarn/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libyarn/Makefile.global" ;;
     "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;

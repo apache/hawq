@@ -17,8 +17,25 @@ class XmlConfig {
  public:
   explicit XmlConfig(std::string);
   
+  // read an XML file into a tree
+  bool open();
+
+  // only free the XML document pointer
+  void closeNotSave();
+
+  // save the updated document to disk and free the XML document pointer
+  void closeAndSave();
+
   // parse the configuration file
-  void parse();
+  bool parse();
+
+  // @param key The key of the configuration item
+  // @param value The updated value
+  // @param save whether save the updated document to disk, if save is false, open() and closeAndSave() should be called additionally
+  // @ return The value of configuration item
+  bool setString(const std::string &key, const std::string &value, bool save);
+  
+  bool setString(const std::string &, const std::string &);
 
   // @param key The key of the configuration item
   // @ def The default value
@@ -52,6 +69,7 @@ class XmlConfig {
  private:
   void readConfigItems(xmlDocPtr doc);
   void readConfigItem(xmlNodePtr root);
+  bool writeConfigItem(xmlDocPtr , const std::string &, const std::string &);
   int64_t strToInt64(const char *);
   int32_t strToInt32(const char *);
   bool strToBool(const char *);
@@ -60,6 +78,7 @@ class XmlConfig {
  private:
   std::string path;
   XmlConfigMap kv;  // key2Value
+  xmlDocPtr doc;
 }; // class XmlConfig
 
 } // namespace test

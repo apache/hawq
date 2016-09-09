@@ -7,9 +7,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,9 +17,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-'''
-hawq register [options] database_name table_name file_or_dir_path_in_hdfs
-'''
+# Usage1: hawq register [-h hostname] [-p port] [-U username] [-d database] [-f filepath] [-e eof] <tablename>
+# Usage2: hawq register [-h hostname] [-p port] [-U username] [-d database] [-c config] [--force] [--repair] <tablename>
+
 import os, sys, optparse, getpass, re, urlparse
 try:
     from gppylib.commands.unix import getLocalHostname, getUserName
@@ -40,267 +40,372 @@ EXECNAME = os.path.split(__file__)[-1]
 setup_tool_logging(EXECNAME,getLocalHostname(),getUserName())
 
 
-def create_opt_parser(version):
+def option_parser():
     parser = OptParser(option_class=OptChecker,
-                       usage='usage: %prog [options] database_name table_name file_or_dir_path_in_hdfs',
-                       version=version)
+                       usage='usage: %prog [options] table_name',
+                       version='%prog version $Revision: #1 $')
     parser.remove_option('-h')
-    parser.add_option('-?', '--help', action='help')
-    parser.add_option('-h', '--host', help="host of the target DB")
-    parser.add_option('-p', '--port', help="port of the target DB", type='int', default=0)
-    parser.add_option('-U', '--user', help="username of the target DB")
+    parser.add_option('-?', '--help', action = 'help')
+    parser.add_option('-h', '--host', help = 'host of the target DB')
+    parser.add_option('-p', '--port', help = 'port of the target DB', type = 'int', default = 0)
+    parser.add_option('-U', '--user', help = 'username of the target DB')
+    parser.add_option('-d', '--database', default = 'postgres', dest = 'database', help='database name')
+    parser.add_option('-f', '--filepath', dest = 'filepath', help = 'file name in HDFS')
+    parser.add_option('-e', '--eof', dest = 'filesize', type = 'int', default = 0, help = 'eof of the file to be registered')
+    parser.add_option('-c', '--config', dest = 'yml_config', default = '', help = 'configuration file in YAML format')
+    parser.add_option('--force', action = 'store_true', default = False)
+    parser.add_option('--repair', action = 'store_true', default = False)
     return parser
 
 
-def check_hadoop_command():
-    hdfscmd = "hadoop"
-    result = local_ssh(hdfscmd);
-    if result != 0:
-        logger.error("command 'hadoop' is not available, please set environment variable $PATH to fix this")
+def register_yaml_dict_check(D):
+    # check exists
+    check_list = ['DFS_URL', 'Distribution_Policy', 'FileFormat', 'TableName', 'Bucketnum']
+    for attr in check_list:
+        if D.get(attr) == None:
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
+            sys.exit(1)
+    if D['FileFormat'] in ['Parquet', 'AO']:
+        prefix = D['FileFormat']
+        local_check_list = ['%s_FileLocations' % prefix, '%s_Schema' % prefix]
+        for attr in local_check_list:
+            if D.get(attr) == None:
+                logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
+                sys.exit(1)
+        if D['%s_FileLocations' % prefix].get('Files') == None:
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_FileLocations.Files' % prefix)
+            sys.exit(1)
+        for d in D['%s_FileLocations' % prefix]['Files']:
+            if d.get('path') == None:
+                logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_FileLocations.Files.path' % prefix)
+                sys.exit(1)
+            if d.get('size') == None:
+                logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_FileLocations.Files.size' % prefix)
+                sys.exit(1)
+    else:
+        logger.error('hawq register only support Parquet and AO formats. Format %s is not supported.' % D['FileFormat'])
+        sys.exit(1)
+    prefix = D['FileFormat']
+    if D.get('%s_Schema' % prefix) == None:
+        logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_Schema' % prefix)
+        sys.exit(1)
+    for d in D['%s_Schema' % prefix]:
+        if d.get('name') == None:
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_Schema.name' % prefix)
+            sys.exit(1)
+        if d.get('type') == None:
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % '%s_Schema.type' % prefix)
+            sys.exit(1)
+    if D['FileFormat'] == 'Parquet':
+        sub_check_list = ['CompressionLevel', 'CompressionType', 'PageSize', 'RowGroupSize']
+        for attr in sub_check_list:
+            if not D['Parquet_FileLocations'].has_key(attr):
+                logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % 'Parquet_FileLocations.%s' % attr)
+                sys.exit(1)
+    else:
+        sub_check_list = ['Checksum', 'CompressionLevel', 'CompressionType']
+        for attr in sub_check_list:
+            if not D['AO_FileLocations'].has_key(attr):
+                logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % 'AO_FileLocations.%s' % attr)
+                sys.exit(1)
+
+
+def option_parser_yml(yml_file):
+    import yaml
+    with open(yml_file, 'r') as f:
+        params = yaml.load(f)
+    register_yaml_dict_check(params)
+    if params['FileFormat'] == 'Parquet':
+        if not len(params['Parquet_FileLocations']['Files']):
+            return 'Parquet', [], [], params['Parquet_Schema'], params['Distribution_Policy'], params['Parquet_FileLocations'], params['Bucketnum']
+        files, sizes = [params['DFS_URL'] + d['path'] for d in params['Parquet_FileLocations']['Files']], [d['size'] for d in params['Parquet_FileLocations']['Files']]
+        return 'Parquet', files, sizes, params['Parquet_Schema'], params['Distribution_Policy'], params['Parquet_FileLocations'], params['Bucketnum']
+    if not len(params['AO_FileLocations']['Files']):
+        return 'AO', [], [], params['AO_Schema'], params['Distribution_Policy'], params['AO_FileLocations'], params['Bucketnum']
+    files, sizes = [params['DFS_URL'] + d['path'] for d in params['AO_FileLocations']['Files']], [d['size'] for d in params['AO_FileLocations']['Files']]
+    return 'AO', files, sizes, params['AO_Schema'], params['Distribution_Policy'], params['AO_FileLocations'], params['Bucketnum']
+
+
+def create_table(dburl, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number):
+    try:
+        query = "select count(*) from pg_class where relname = '%s'" % tablename.split('.')[-1].lower()
+        conn = dbconn.connect(dburl, False)
+        rows = dbconn.execSQL(conn, query)
+        conn.commit()
+        for row in rows:
+            if row[0] != 0:
+                return False
+    except DatabaseError, ex:
+        logger.error('Failed to execute query "%s"' % query)
+        sys.exit(1)
+
+    try:
+        schema = ','.join([k['name'] + ' ' + k['type'] for k in schema_info])
+        fmt = 'ROW' if fmt == 'AO' else fmt
+        if fmt == 'ROW':
+            query = ('create table %s(%s) with (appendonly=true, orientation=%s, compresstype=%s, compresslevel=%s, checksum=%s, bucketnum=%s) %s;'
+                    % (tablename, schema, fmt, file_locations['CompressionType'], file_locations['CompressionLevel'], file_locations['Checksum'], bucket_number, distrbution_policy))
+        else: # Parquet
+            query = ('create table %s(%s) with (appendonly=true, orientation=%s, compresstype=%s, compresslevel=%s, pagesize=%s, rowgroupsize=%s, bucketnum=%s) %s;'
+                    % (tablename, schema, fmt, file_locations['CompressionType'], file_locations['CompressionLevel'], file_locations['PageSize'], file_locations['RowGroupSize'], bucket_number, distrbution_policy))
+        conn = dbconn.connect(dburl, False)
+        rows = dbconn.execSQL(conn, query)
+        conn.commit()
+        return True
+    except DatabaseError, ex:
+        print DatabaseError, ex
+        logger.error('Failed to execute query "%s"' % query)
         sys.exit(1)
 
 
-def get_seg_name(options, databasename, tablename):
+def get_seg_name(dburl, tablename, database, fmt):
     try:
-        relfilenode = 0
-        relname = ""
-        query = ("select pg_class2.relname from pg_class as pg_class1, pg_appendonly, pg_class as pg_class2 where pg_class1.relname ='%s' "
-                 "and  pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid;") % tablename
-        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
+        relname = ''
+        tablename = tablename.split('.')[-1]
+        query = ("select pg_class2.relname from pg_class as pg_class1, pg_appendonly, pg_class as pg_class2 "
+                 "where pg_class1.relname ='%s' and pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid;") % tablename
         conn = dbconn.connect(dburl, True)
         rows = dbconn.execSQL(conn, query)
-	conn.commit()
-        if rows.rowcount == 0:
-            logger.error("table '%s' not found in db '%s'" % (tablename, databasename));
+        conn.commit()
+        if not rows.rowcount:
+            logger.error('table "%s" not found in db "%s"' % (tablename, database))
             sys.exit(1)
         for row in rows:
             relname = row[0]
         conn.close()
-
     except DatabaseError, ex:
-        logger.error("Failed to connect to database, this script can only be run when the database is up")
-        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
+        logger.error('Failed to run query "%s" with dbname "%s"' % (query, database))
         sys.exit(1)
-
-    # check whether the target table is parquet format
-    if relname.find("paq") == -1:
-        logger.error("table '%s' is not parquet format" % tablename)
-        sys.exit(1)
+    if fmt == 'Parquet':
+        if relname.find("paq") == -1:
+            logger.error("table '%s' is not parquet format" % tablename)
+            sys.exit(1)
 
     return relname
 
 
-def check_hash_type(options, databasename, tablename):
+def check_hash_type(dburl, tablename):
+    '''Check whether target table is hash distributed, in that case simple insertion does not work'''
     try:
         query = "select attrnums from gp_distribution_policy, pg_class where pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;" % tablename
-        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
         conn = dbconn.connect(dburl, False)
         rows = dbconn.execSQL(conn, query)
-	conn.commit()
-        if rows.rowcount == 0:
-            logger.error("target not found in table gp_distribution_policy")
+        conn.commit()
+        if not rows.rowcount:
+            logger.error('Table not found in table gp_distribution_policy.' % tablename)
             sys.exit(1)
         for row in rows:
-            if row[0] != None:
-                logger.error("Cannot register file(s) to a table which is hash-typed")
+            if row[0]:
+                logger.error('Cannot register file(s) to a table which is hash distribuetd.')
                 sys.exit(1)
-
         conn.close()
-
     except DatabaseError, ex:
-        logger.error("Failed to connect to database, this script can only be run when the database is up")
-        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
+        logger.error('Failed to execute query "%s"' % query)
         sys.exit(1)
 
 
-def get_metadata_from_database(options, databasename, tablename, seg_name):
+def get_metadata_from_database(dburl, tablename, seg_name):
+    '''Get the metadata to be inserted from hdfs'''
     try:
-        query = "select segno from pg_aoseg.%s;" % seg_name
-        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
+        query = 'select segno from pg_aoseg.%s;' % seg_name
         conn = dbconn.connect(dburl, False)
         rows = dbconn.execSQL(conn, query)
-	conn.commit()
+        conn.commit()
         conn.close()
-
     except DatabaseError, ex:
-        logger.error("Failed to connect to database, this script can only be run when the database is up")
-        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
+        logger.error('Failed to execute query "%s"' % query)
         sys.exit(1)
 
     firstsegno = rows.rowcount + 1
 
-    # get the full path of correspoding file for target table
     try:
+        # get the full path of correspoding file for target table
         query = ("select location, gp_persistent_tablespace_node.tablespace_oid, database_oid, relfilenode from pg_class, gp_persistent_relation_node, "
                  "gp_persistent_tablespace_node, gp_persistent_filespace_node where relname = '%s' and pg_class.relfilenode = "
                  "gp_persistent_relation_node.relfilenode_oid and gp_persistent_relation_node.tablespace_oid = gp_persistent_tablespace_node.tablespace_oid "
-                 "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % tablename
-        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
+                 "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % tablename.split('.')[-1]
         conn = dbconn.connect(dburl, False)
         rows = dbconn.execSQL(conn, query)
-	conn.commit()
+        conn.commit()
         conn.close()
-
     except DatabaseError, ex:
-        logger.error("Failed to connect to database, this script can only be run when the database is up")
-        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
+        logger.error('Failed to execute query "%s"' % query)
         sys.exit(1)
-
     for row in rows:
-        tabledir = row[0].strip() + "/" + str(row[1]) + "/" + str(row[2]) + "/" + str(row[3]) + "/"
-
+        tabledir = '/'.join([row[0].strip(), str(row[1]), str(row[2]), str(row[3]), ''])
     return firstsegno, tabledir
 
 
 def check_files_and_table_in_same_hdfs_cluster(filepath, tabledir):
+    '''Check whether all the files refered by 'filepath' and the location corresponding to the table are in the same hdfs cluster'''
+    if not filepath:
+        return
     # check whether the files to be registered is in hdfs
     filesystem = filepath.split('://')
     if filesystem[0] != 'hdfs':
-        logger.error("Only support to register file(s) in hdfs")
+        logger.error('Only support to register file(s) in hdfs')
         sys.exit(1)
     fileroot = filepath.split('/')
     tableroot = tabledir.split('/')
     # check the root url of them. eg: for 'hdfs://localhost:8020/temp/tempfile', we check 'hdfs://localohst:8020'
-    if fileroot[0] != tableroot[0] or fileroot[1] != tableroot[1] or fileroot[2] != tableroot[2]:
+    if fileroot[0:3] != tableroot[0:3]:
         logger.error("Files to be registered and the table are not in the same hdfs cluster.\nFile(s) to be registered: '%s'\nTable path in HDFS: '%s'" % (filepath, tabledir))
         sys.exit(1)
 
 
 def get_files_in_hdfs(filepath):
+    '''Get all the files refered by 'filepath', which could be a file or a directory containing all the files'''
     files = []
     sizes = []
     hdfscmd = "hadoop fs -test -e %s" % filepath
-    result = local_ssh(hdfscmd)
+    result = local_ssh(hdfscmd, logger)
     if result != 0:
         logger.error("Path '%s' does not exist in hdfs" % filepath)
         sys.exit(1)
-
     hdfscmd = "hadoop fs -ls -R %s" % filepath
     result, out, err = local_ssh_output(hdfscmd)
     outlines = out.splitlines()
-
     # recursively search all the files under path 'filepath'
-    i = 0
     for line in outlines:
         lineargs = line.split()
         if len(lineargs) == 8 and lineargs[0].find ("d") == -1:
             files.append(lineargs[7])
             sizes.append(int(lineargs[4]))
-
     if len(files) == 0:
         logger.error("Dir '%s' is empty" % filepath)
         sys.exit(1)
-
     return files, sizes
 
 
-def check_parquet_format(options, files):
-    # check whether the files are parquet format by checking the first and last four bytes
-    for file in files:
-        hdfscmd = "hadoop fs -cat %s | head -c 4 | grep PAR1" % file
-        result1 = local_ssh(hdfscmd)
-        hdfscmd = "hadoop fs -cat %s | tail -c 4 | grep PAR1" % file
-        result2 = local_ssh(hdfscmd)
+def check_parquet_format(files):
+    '''Check whether the file to be registered is parquet format'''
+    for f in files:
+        hdfscmd = 'hadoop fs -du -h %s | head -c 1' % f
+        rc, out, err = local_ssh_output(hdfscmd)
+        if out == '0':
+            continue
+        hdfscmd = 'hadoop fs -cat %s | head -c 4 | grep PAR1' % f
+        result1 = local_ssh(hdfscmd, logger)
+        hdfscmd = 'hadoop fs -cat %s | tail -c 4 | grep PAR1' % f
+        result2 = local_ssh(hdfscmd, logger)
         if result1 or result2:
-            logger.error("File %s is not parquet format" % file)
+            logger.error('File %s is not parquet format' % f)
             sys.exit(1)
 
 
-def move_files_in_hdfs(options, databasename, tablename, files, firstsegno, tabledir, normal):
-    # move file(s) in src path into the folder correspoding to the target table
-    if (normal == True):
+def move_files_in_hdfs(databasename, tablename, files, firstsegno, tabledir, normal):
+    '''Move file(s) in src path into the folder correspoding to the target table'''
+    if normal:
         segno = firstsegno
-        for file in files:
-            srcfile = file
+        for f in files:
+            srcfile = f
             dstfile = tabledir + str(segno)
             segno += 1
             if srcfile != dstfile:
-                hdfscmd = "hadoop fs -mv %s %s" % (srcfile, dstfile)
-                sys.stdout.write("hdfscmd: '%s'\n" % hdfscmd)
-                result = local_ssh(hdfscmd)
+                hdfscmd = 'hadoop fs -mv %s %s' % (srcfile, dstfile)
+                sys.stdout.write('hdfscmd: "%s"\n' % hdfscmd)
+                result = local_ssh(hdfscmd, logger)
                 if result != 0:
-                    logger.error("Fail to move '%s' to '%s'" % (srcfile, dstfile))
+                    logger.error('Fail to move %s to %s' % (srcfile, dstfile))
                     sys.exit(1)
     else:
         segno = firstsegno
-        for file in files:
-            dstfile = file
+        for f in files:
+            dstfile = f
             srcfile = tabledir + str(segno)
             segno += 1
             if srcfile != dstfile:
-                hdfscmd = "hadoop fs -mv %s %s" % (srcfile, dstfile)
-                sys.stdout.write("hdfscmd: '%s'\n" % hdfscmd)
-                result = local_ssh(hdfscmd)
+                hdfscmd = 'hadoop fs -mv %s %s' % (srcfile, dstfile)
+                sys.stdout.write('hdfscmd: "%s"\n' % hdfscmd)
+                result = local_ssh(hdfscmd, logger)
                 if result != 0:
-                    logger.error("Fail to move '%s' to '%s'" % (srcfile, dstfile))
+                    logger.error('Fail to move "%s" to "%s"' % (srcfile, dstfile))
                     sys.exit(1)
 
 
-def insert_metadata_into_database(options, databasename, tablename, seg_name, firstsegno, tabledir, eofs):
+def insert_metadata_into_database(dburl, databasename, tablename, seg_name, firstsegno, tabledir, eofs):
+    '''Insert the metadata into database'''
     try:
         query = "SET allow_system_table_mods='dml';"
-        segno = firstsegno
-        for eof in eofs:
-            query += "insert into pg_aoseg.%s values(%d, %d, %d, %d);" % (seg_name, segno, eof, -1, -1)
-            segno += 1
-
-        dburl = dbconn.DbURL(hostname=options.host, port=options.port, username=options.user, dbname=databasename)
+        query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (seg_name, firstsegno, eofs[0], -1, -1)
+        for k, eof in enumerate(eofs[1:]):
+            query += ',(%d, %d, %d, %d)' % (firstsegno + k + 1, eof, -1, -1)
+        query += ';'
         conn = dbconn.connect(dburl, True)
         rows = dbconn.execSQL(conn, query)
-	conn.commit()
+        conn.commit()
         conn.close()
-
     except DatabaseError, ex:
-        logger.error("Failed to connect to database, this script can only be run when the database is up")
-        logger.error("host = %s, port = %d, user = %s, dbname = %s, query = %s" % (options.host, options.port, options.user, databasename, query))
-	move_files_in_hdfs(options, databasename, tablename, files, firstsegno, tabledir, False)
-
+        logger.error('Failed to connect to database, this script can only be run when the database is up')
+        move_files_in_hdfs(database, tablename, files, firstsegno, tabledir, False)
         sys.exit(1)
 
 
-def main(args=None):
-    parser = create_opt_parser('%prog version $Revision: #1 $')
-    options, args = parser.parse_args(args)
-    if len(args) != 3:
-        sys.stderr.write('Incorrect number of arguments\n\n')
+if __name__ == '__main__':
+
+    parser = option_parser()
+    options, args = parser.parse_args()
+
+    if len(args) != 1 or ((options.yml_config or options.force or options.repair) and options.filepath) or (options.force and options.repair):
         parser.print_help(sys.stderr)
-        return 1
+        sys.exit(1)
+    if local_ssh('hadoop', logger):
+        logger.error('command "hadoop" is not available.')
+        sys.exit(1)
 
-    databasename = args[0]
-    tablename = args[1]
-    filepath = args[2]
+    dburl = dbconn.DbURL(hostname = options.host, port = options.port, username = options.user, dbname = options.database)
+    filepath, database, tablename = options.filepath, options.database, args[0]
 
-    # 1. check whether the path of shell command 'hadoop' is set.
-    check_hadoop_command()
+    second_normal_mode, second_exist_mode, force_mode, repair_mode = False, False, False, False
+    if options.yml_config: # Usage2
+        if options.force:
+            force_mode = True
+        elif options.repair:
+            repair_mode = True
+        else:
+            second_normal_mode = True
+        fileformat, files, sizes, schema, distribution_policy, file_locations, bucket_number = option_parser_yml(options.yml_config)
+        filepath = files[0][:files[0].rfind('/')] if files else ''
+        if distribution_policy.startswith('DISTRIBUTED BY'):
+            if len(files) % bucket_number != 0:
+                logger.error('Files to be registered must be multiple times to the bucket number of hash table.')
+                sys.exit(1)
+        if not create_table(dburl, tablename, schema, fileformat, distribution_policy, file_locations, bucket_number):
+            second_normal_mode, second_exist_mode = False, True
+    else:
+        fileformat = 'Parquet'
+        check_hash_type(dburl, tablename) # Usage1 only support randomly distributed table
 
-    # 2. get the seg_name from database
-    seg_name = get_seg_name(options, databasename, tablename)
+    # check filepath
+    if not filepath:
+        sys.exit(0)
 
-    # 3. check whether target table is hash-typed, in that case simple insertion does not work
-    result = check_hash_type(options, databasename, tablename)
+    seg_name = get_seg_name(dburl, tablename, database, fileformat)
+    firstsegno, tabledir = get_metadata_from_database(dburl, tablename, seg_name)
 
-    # 4. get the metadata to be inserted from hdfs
-    firstsegno, tabledir = get_metadata_from_database(options, databasename, tablename, seg_name)
+    if second_exist_mode:
+        if tabledir.strip('/') == filepath.strip('/'):
+            logger.error('Files to be registered in this case should not be the same with table path.')
+            sys.exit(1)
 
-    # 5. check whether all the files refered by 'filepath' and the location corresponding to the table are in the same hdfs cluster
     check_files_and_table_in_same_hdfs_cluster(filepath, tabledir)
 
-    # 6. get all the files refered by 'filepath', which could be a file or a directory containing all the files
-    files, sizes = get_files_in_hdfs(filepath)
-    print "File(s) to be registered:"
-    print files
+    if not options.yml_config:
+        files, sizes = get_files_in_hdfs(filepath)
+    print 'File(s) to be registered:', files
 
-    # 7. check whether the file to be registered is parquet format
-    check_parquet_format(options, files)
+    # set specified eofs
+    if options.filesize:
+        if options.filesize != len(files):
+            logger.error('-e option is only supported with single file case.')
+            sys.exit(1)
+        sizes = [options.filesize]
 
-    # 8. move the file in hdfs to proper location
-    move_files_in_hdfs(options, databasename, tablename, files, firstsegno, tabledir, True)
+    if fileformat == 'Parquet':
+        check_parquet_format(files)
+    move_files_in_hdfs(database, tablename, files, firstsegno, tabledir, True)
 
-    # 9. insert the metadata into database
-    insert_metadata_into_database(options, databasename, tablename, seg_name, firstsegno, tabledir, sizes)
+    # update catalog table
+    insert_metadata_into_database(dburl, database, tablename, seg_name, firstsegno, tabledir, sizes)
 
-    # 10. report the final status of hawq register
-    logger.info("Hawq register succeed.")
-
-if __name__ == '__main__':
-    sys.exit(main())
+    logger.info('Hawq Register Succeed.')

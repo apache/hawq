@@ -29,7 +29,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
-
 import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
@@ -410,12 +409,13 @@ public class ProtocolData extends InputData {
             String columnName = getProperty("ATTR-NAME" + i);
             int columnTypeCode = getIntProperty("ATTR-TYPECODE" + i);
             String columnTypeName = getProperty("ATTR-TYPENAME" + i);
+            Integer[] columnTypeMods = parseTypeMods(i);
             ColumnDescriptor column;
             if(columnProjStr != null) {
-                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName, columnProjList.contains(Integer.valueOf(i)));
+                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName, columnTypeMods, columnProjList.contains(Integer.valueOf(i)));
             } else {
                 /* For data formats that don't support column projection */
-                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName);
+                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName, columnTypeMods);
             }
             tupleDescription.add(column);
 
@@ -423,6 +423,32 @@ public class ProtocolData extends InputData {
                 recordkeyColumn = column;
             }
         }
+    }
+
+    private Integer[] parseTypeMods(int columnIndex) {
+        String typeModeCountStr = getOptionalProperty("ATTR-TYPEMOD" + columnIndex + "-COUNT");
+        Integer[] result = null;
+        Integer typeModeCount = null;
+        if (typeModeCountStr != null) {
+        try {
+            typeModeCount = Integer.parseInt(typeModeCountStr);
+            if (typeModeCount < 0)
+                throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-COUNT cann't be negative");
+            result = new Integer[typeModeCount];
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-COUNT must be a positive integer");
+        }
+            for (int i = 0; i < typeModeCount; i++) {
+                try {
+                    result[i] = Integer.parseInt(getProperty("ATTR-TYPEMOD" + columnIndex + "-" + i));
+                    if (result[i] < 0)
+                        throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-" + i + " must be a positive integer");
+                }
+            }
+        }
+        return result;
     }
 
     /**

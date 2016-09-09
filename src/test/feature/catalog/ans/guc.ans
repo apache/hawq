@@ -1,0 +1,26 @@
+CREATE TABLE DATE_TBL (f1 date);
+CREATE TABLE
+INSERT INTO DATE_TBL VALUES ('1957-04-09');
+INSERT 0 1
+SELECT f1 FROM DATE_TBL;
+     f1     
+------------
+ 04/09/1957
+(1 row)
+
+SET DATESTYLE TO 'POSTGRES, MDY';
+SET
+SELECT f1 FROM DATE_TBL;
+     f1     
+------------
+ 04-09-1957
+(1 row)
+
+SET DATESTYLE TO 'POSTGRES, DMY';
+SET
+SELECT f1 FROM DATE_TBL;
+     f1     
+------------
+ 09-04-1957
+(1 row)
+

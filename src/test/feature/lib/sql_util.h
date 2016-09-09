@@ -34,6 +34,10 @@ class SQLUtility {
   SQLUtility(SQLUtilityMode mode = MODE_SCHEMA);
   ~SQLUtility();
 
+  // Get the test database name
+  // @return string of the test database name
+  std::string getDbName();
+
   // Execute sql command
   // @param sql The given sql command
   // @param check true(default) if expected correctly executing, false otherwise
@@ -104,6 +108,7 @@ class SQLUtility {
  private:
   std::string schemaName;
   std::string databaseName;
+  SQLUtilityMode sql_util_mode;
   std::unique_ptr<hawq::test::PSQL> conn;
   std::string testRootPath;
   const ::testing::TestInfo *const test_info;

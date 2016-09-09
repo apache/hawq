@@ -310,6 +310,7 @@ extern int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_limit;
+extern bool allow_file_count_bucket_num_mismatch;
 
 extern char *ConfigFileName;
 extern char *HbaFileName;

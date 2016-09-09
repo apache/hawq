@@ -72,7 +72,7 @@ TEST_F(TestContainerManagementProtocol,TestStartContainersException){
 			.WillOnce(Throw(YarnException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
 
 	EXPECT_THROW(scres = mcmp.startContainers(screq), YarnIOException);
-	EXPECT_THROW(scres = mcmp.startContainers(screq), YarnIOException);
+	EXPECT_THROW(scres = mcmp.startContainers(screq), YarnException);
 }
 
 TEST_F(TestContainerManagementProtocol,TestStopContainersException){
@@ -84,7 +84,7 @@ TEST_F(TestContainerManagementProtocol,TestStopContainersException){
 			.WillOnce(Throw(YarnException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
 
 	EXPECT_THROW(scres = mcmp.stopContainers(screq), YarnIOException);
-	EXPECT_THROW(scres = mcmp.stopContainers(screq), YarnIOException);
+	EXPECT_THROW(scres = mcmp.stopContainers(screq), YarnException);
 }
 
 
@@ -97,5 +97,5 @@ TEST_F(TestContainerManagementProtocol,getContainerStatusesException){
 			.WillOnce(Throw(YarnException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
 
 	EXPECT_THROW(gcsres = mcmp.getContainerStatuses(gcsreq), YarnIOException);
-	EXPECT_THROW(gcsres = mcmp.getContainerStatuses(gcsreq), YarnIOException);
+	EXPECT_THROW(gcsres = mcmp.getContainerStatuses(gcsreq), YarnException);
 }

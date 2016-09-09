@@ -39,6 +39,7 @@ try:
     from gppylib.datetimeutils import str_to_datetime, str_to_duration, DatetimeValueError
     from gppylib.logfilter import *
     from gppylib.gpcoverage import GpCoverage
+    from gppylib.commands import gp
 except ImportError, e:    
     sys.exit('ERROR: Cannot import modules.  Please check that you have sourced greenplum_path.sh.  Detail: ' + str(e))
 
@@ -84,7 +85,7 @@ file(s) or standard output.
 
 _help = ["""
 If no input file is specified, the value of the MASTER_DATA_DIRECTORY
-environment variable is used, if defined.  If an input file is a
+is used.  If an input file is a
 directory, the suffix ".log" is appended to obtain the input file name.
 To read from standard input, specify input file "-".
 ""","""
@@ -380,9 +381,9 @@ if (options.zip is None and
     options.zip = '9'
 
 try:
-    # If no inputfile arg, try MASTER_DATA_DIRECTORY environment variable
+    # If no inputfile arg, use MASTER_DATA_DIRECTORY variable as default
     if len(args) == 0:
-        s = os.getenv('MASTER_DATA_DIRECTORY')
+        s = gp.get_masterdatadir()
         if s:
             #we only support log rotation in pg_log dir.
             if os.path.exists(s + "/pg_log"):

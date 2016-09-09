@@ -36,7 +36,7 @@ PYLIB_SRC=$(SRC)/pythonSrc
 LIB_DIR=$(SRC)/lib
 PYLIB_DIR=$(SRC)/ext
 
-all: lockfile pygresql stream pychecker psi unittest2
+all: lockfile pygresql stream pychecker psi unittest2 pexpect
 
 #
 # Python Libraries
@@ -105,6 +105,18 @@ psi:
 	@echo "--- psi"
 	cd $(PYLIB_SRC)/$(PSI_DIR)/ && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" python setup.py build
 	cp -r $(PYLIB_SRC)/$(PSI_DIR)/build/lib.*/psi $(PYLIB_DIR)
+
+#
+# PEXPECT
+#
+PEXPECT_VERSION=4.2
+PEXPECT_DIR=pexpect-$(PEXPECT_VERSION)
+
+pexpect:
+	@echo "--- pexpect"
+	cd $(PYLIB_SRC)/$(PEXPECT_DIR)/ && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" python setup.py build
+	cp -r $(PYLIB_SRC)/$(PEXPECT_DIR)/build/lib/pexpect $(PYLIB_DIR)
+	cp -r $(PYLIB_SRC)/ptyprocess-0.5.1/ptyprocess $(PYLIB_DIR)
 
 #
 # PYCHECKER

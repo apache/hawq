@@ -488,6 +488,10 @@ int  loadParameters(void)
 	/* If kerberos is enable, fetch the principal from ticket cache file. */
 	if (enable_secure_filesystem)
 	{
+		if (!login())
+		{
+			elog(WARNING, "Resource broker failed to refresh kerberos ticket.");
+		}
 		YARNUser = ExtractPrincipalFromTicketCache(krb5_ccname);
 		YARNUserShouldFree = true;
 	}
@@ -503,13 +507,13 @@ int  loadParameters(void)
 			  "Scheduler server %s:%s "
 			  "Queue %s Application name %s, "
 			  "by user:%s",
-		      YARNServer.Str,
-		      YARNPort.Str,
-		      YARNSchedulerServer.Str,
-		      YARNSchedulerPort.Str,
-		      YARNQueueName.Str,
-		      YARNAppName.Str,
-		      YARNUser);
+			  YARNServer.Str,
+			  YARNPort.Str,
+			  YARNSchedulerServer.Str,
+			  YARNSchedulerPort.Str,
+			  YARNQueueName.Str,
+			  YARNAppName.Str,
+			  YARNUser);
 exit:
 	if ( res != FUNC_RETURN_OK ) {
 		elog(WARNING, "YARN mode resource broker failed to load YARN connection arguments.");
@@ -755,7 +759,7 @@ int sendRBGetClusterReportErrorData(int errorcode)
 		return RESBROK_PIPE_ERROR;
 	}
 
-	return FUNC_RETURN_OK;
+	return errorcode;
 }
 
 /**

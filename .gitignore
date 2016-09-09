@@ -41,6 +41,8 @@ objfiles.txt
 .pydevproject
 .cproject
 .settings
+# Ctags
+**/tags
 
 # Generated files
 BUILD_NUMBER

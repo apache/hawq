@@ -812,13 +812,6 @@ if test "$PORTNAME" = "win32"; then
 fi
 
 #
-# thrift
-#
-PGAC_ARG_BOOL(with, thrift, no,
-              [  --with-thrift           build thrift])
-AC_SUBST(with_thrift)
-
-#
 # libyarn
 #
 PGAC_ARG_BOOL(with, libyarn, yes,
@@ -1078,8 +1071,9 @@ if test "$with_r" = yes; then
 	if test "x${r_home_guess}" != "x"; then
       R_HOME=$r_home_guess
 	else
-      AC_MSG_ERROR([Failed to Set R_HOME. R is not installed? R_HOME is not set
-or pkg-config is not installed to find R_HOME automatically.])
+      AC_MSG_ERROR([Failed to set R_HOME. R is not installed? Or R_HOME is not set
+or pkg-config is not installed to find R_HOME automatically.
+Check config.log for details or not use --with-r if you do not want the PL/R support.])
     fi
   fi
   AC_MSG_RESULT(${R_HOME})
@@ -1096,7 +1090,9 @@ fi
 if test "$with_gssapi" = yes ; then
   if test "$PORTNAME" != "win32"; then
     AC_SEARCH_LIBS(gss_init_sec_context, [gssapi_krb5 gss 'gssapi -lkrb5 -lcrypto'], [],
-		 		  [AC_MSG_ERROR([could not find function 'gss_init_sec_context' required for GSSAPI])])
+                    [AC_MSG_ERROR([could not find function 'gss_init_sec_context' required for GSSAPI.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-gssapi if you don't want the GSSAPI support.])])
   else
     LIBS="$LIBS -lgssapi32"
   fi
@@ -1105,33 +1101,51 @@ fi
 if test "$with_krb5" = yes ; then
   if test "$PORTNAME" != "win32"; then
      AC_SEARCH_LIBS(com_err, [krb5 'krb5 -lcrypto -ldes -lasn1 -lroken' com_err 'com_err -lssl -lcrypto'], [],
-                    [AC_MSG_ERROR([could not find function 'com_err' required for Kerberos 5])])
+                    [AC_MSG_ERROR([could not find function 'com_err' required for Kerberos 5.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-krb5 if you don't want the Kerberos 5 support.])])
      AC_SEARCH_LIBS(krb5_sendauth, [krb5 'krb5 -lcrypto -ldes -lasn1 -lroken'], [],
-                    [AC_MSG_ERROR([could not find function 'krb5_sendauth' required for Kerberos 5])])
+                    [AC_MSG_ERROR([could not find function 'krb5_sendauth' required for Kerberos 5.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-krb5 if you don't want the Kerberos 5 support.])])
   else
      AC_SEARCH_LIBS(com_err, 'comerr32 -lkrb5_32', [],
-                    [AC_MSG_ERROR([could not find function 'com_err' required for Kerberos 5])])
+                    [AC_MSG_ERROR([could not find function 'com_err' required for Kerberos 5.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-krb5 if you don't want the Kerberos 5 support.])])
   fi
 fi
 
 if test "$with_openssl" = yes ; then
   dnl Order matters!
   if test "$PORTNAME" != "win32"; then
-     AC_CHECK_LIB(crypto, CRYPTO_new_ex_data, [], [AC_MSG_ERROR([library 'crypto' is required for OpenSSL])])
-     AC_CHECK_LIB(ssl,    SSL_library_init, [], [AC_MSG_ERROR([library 'ssl' is required for OpenSSL])])
+     AC_CHECK_LIB(crypto, CRYPTO_new_ex_data, [], [AC_MSG_ERROR([library 'crypto' is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want the OpenSSL support.])])
+     AC_CHECK_LIB(ssl,    SSL_library_init, [], [AC_MSG_ERROR([library 'ssl' is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want the OpenSSL support.])])
   else
-     AC_CHECK_LIB(eay32, CRYPTO_new_ex_data, [], [AC_MSG_ERROR([library 'eay32' is required for OpenSSL])])
-     AC_CHECK_LIB(ssleay32,    SSL_library_init, [], [AC_MSG_ERROR([library 'ssleay32' is required for OpenSSL])])
+     AC_CHECK_LIB(eay32, CRYPTO_new_ex_data, [], [AC_MSG_ERROR([library 'eay32' is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want the OpenSSL support.])])
+     AC_CHECK_LIB(ssleay32,    SSL_library_init, [], [AC_MSG_ERROR([library 'ssleay32' is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want the OpenSSL support.])])
   fi
 fi
 
 if test "$with_rt" = yes ; then
   AC_CHECK_LIB(rt, clock_gettime, [],
-                [AC_MSG_WARN([Realtime library not found])])
+                [AC_MSG_WARN([Realtime library not found.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --without-rt to avoid using the Realtime library.])])
 fi
 
 if test "$with_pam" = yes ; then
-  AC_CHECK_LIB(pam,    pam_start, [], [AC_MSG_ERROR([library 'pam' is required for PAM])])
+  AC_CHECK_LIB(pam,    pam_start, [], [AC_MSG_ERROR([library 'pam' is required for PAM.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-pam if you don't want the PAM support.])])
 fi
 
 # Check for curl.
@@ -1140,37 +1154,52 @@ CFLAGS="$CFLAGS $CURL_CFLAGS"
 LIBS="$LIBS $CURL_LIBS"
 
 # Check for bzip2
-AC_CHECK_HEADERS(bzlib.h, [], [AC_MSG_ERROR([bzip2-devel is required])])
-AC_SEARCH_LIBS(BZ2_bzDecompress, bz2, [], [AC_MSG_ERROR([bzip2-devel is required])])
+AC_CHECK_HEADERS(bzlib.h, [], [AC_MSG_ERROR([header file <bzlib.h> is required.
+'bzip2' is used for table compression. Check config.log for details.
+It is possible the compiler isn't looking in the proper directory.])])
+AC_SEARCH_LIBS(BZ2_bzDecompress, bz2, [], [AC_MSG_ERROR([library 'bzip2' is required.
+'bzip2' is used for table compression.  Check config.log for details.
+It is possible the compiler isn't looking in the proper directory.])])
 
 # Check for snappy
-AC_CHECK_HEADERS(snappy-c.h, [], [AC_MSG_ERROR([snappy is required])])
-AC_SEARCH_LIBS(snappy_max_compressed_length, snappy, [], [AC_MSG_ERROR([snappy is required])])
+AC_CHECK_HEADERS(snappy-c.h, [], [AC_MSG_ERROR([header file <snappy-c.h> is required.
+'snappy' is used for table compression. Check config.log for details.
+It is possible the compiler isn't looking in the proper directory.])])
+AC_SEARCH_LIBS(snappy_max_compressed_length, snappy, [], [AC_MSG_ERROR([library 'snappy' is required.
+'snappy' is used for table compression. Check config.log for details.
+It is possible the compiler isn't looking in the proper directory.])])
 
 AC_LANG_PUSH([C++])
 
 # Check for thrift
-#AC_CHECK_HEADERS(thrift/protocol/TBinaryProtocol.h, [], [AC_MSG_ERROR([thrift is required])])
+AC_CHECK_HEADERS(thrift/protocol/TBinaryProtocol.h, [], [AC_MSG_ERROR([thrift is required])])
 
 # Check for boost
-AC_CHECK_HEADERS(boost/chrono.hpp, [], [AC_MSG_ERROR([boost is required])])
+AC_CHECK_HEADERS(boost/chrono.hpp, [], [AC_MSG_ERROR([boost is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
 
 AC_LANG_POP([C++])
 
 # Check for libyaml
-AC_CHECK_HEADERS(yaml.h, [], [AC_MSG_ERROR([libyaml is required])])
-AC_SEARCH_LIBS(yaml_get_version, yaml, [], [AC_MSG_ERROR([libyaml is required])])
+AC_CHECK_HEADERS(yaml.h, [], [AC_MSG_ERROR([header file <yaml.h> is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
+AC_SEARCH_LIBS(yaml_get_version, yaml, [], [AC_MSG_ERROR([library 'libyaml' is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
 
 # Check for libevent
-AC_CHECK_HEADERS(event.h, [], [AC_MSG_ERROR([libevent is required])])
-AC_SEARCH_LIBS(event_init, event, [], [AC_MSG_ERROR([libevent is required])])
+AC_CHECK_HEADERS(event.h, [], [AC_MSG_ERROR([header file <event.h> is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
+AC_SEARCH_LIBS(event_init, event, [], [AC_MSG_ERROR([library 'libevent' is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
 
 # Check for sigar
 AC_SEARCH_LIBS(sigar_open, sigar)
 
 # Check for net-snmp
 if test "$enable_snmp" = yes ; then
-	AC_CHECK_LIB(netsnmp,  netsnmp_ds_set_string,  [], [AC_MSG_ERROR([library 'netsnmp' is required for snmp support])])
+	AC_CHECK_LIB(netsnmp,  netsnmp_ds_set_string,  [], [AC_MSG_ERROR([library 'netsnmp' is required for snmp support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --enable-snmp if you don't want to enable the snmp support.])])
 fi 
 
 # Check for libesmtp
@@ -1178,7 +1207,9 @@ if test "$enable_email" = yes ; then
 	if test "$with_openssl" != yes ; then
 		AC_MSG_ERROR([--enable-email requires --with-openssl])
 	fi
-	AC_CHECK_LIB(esmtp,  smtp_start_session,  [], [AC_MSG_ERROR([library 'libesmtp' is required for email alert support])])
+	AC_CHECK_LIB(esmtp,  smtp_start_session,  [], [AC_MSG_ERROR([library 'libesmtp' is required for email alert support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --enable-email if you don't want to enable the email alert support.])])
 fi
 
 ##
@@ -1251,29 +1282,40 @@ fi
 
 if test "$with_gssapi" = yes ; then
   AC_CHECK_HEADERS(gssapi/gssapi.h, [],
-	[AC_CHECK_HEADERS(gssapi.h, [], [AC_MSG_ERROR([gssapi.h header file is required for GSSAPI])])])
+	[AC_CHECK_HEADERS(gssapi.h, [], [AC_MSG_ERROR([gssapi.h header file is required for GSSAPI.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-gssapi if you don't want the GSSAPI support.])])])
 fi
 
 if test "$with_krb5" = yes ; then
-  AC_CHECK_HEADER(krb5.h, [], [AC_MSG_ERROR([header file <krb5.h> is required for Kerberos 5])])
+  AC_CHECK_HEADER(krb5.h, [], [AC_MSG_ERROR([header file <krb5.h> is required for Kerberos 5.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-krb5 if you don't want the Kerberos 5 support.])])
 fi
 
 if test "$with_openssl" = yes ; then
-  AC_CHECK_HEADER(openssl/ssl.h, [], [AC_MSG_ERROR([header file <openssl/ssl.h> is required for OpenSSL])])
-  AC_CHECK_HEADER(openssl/err.h, [], [AC_MSG_ERROR([header file <openssl/err.h> is required for OpenSSL])])
+  AC_CHECK_HEADER(openssl/ssl.h, [], [AC_MSG_ERROR([header file <openssl/ssl.h> is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want to the OpenSSL support.])])
+  AC_CHECK_HEADER(openssl/err.h, [], [AC_MSG_ERROR([header file <openssl/err.h> is required for OpenSSL.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-openssl if you don't want to the OpenSSL support.])])
   AC_CHECK_FUNCS([ERR_set_mark])
 fi
 
 if test "$with_pam" = yes ; then
   AC_CHECK_HEADERS(security/pam_appl.h, [],
                    [AC_CHECK_HEADERS(pam/pam_appl.h, [],
-                                     [AC_MSG_ERROR([header file <security/pam_appl.h> or <pam/pam_appl.h> is required for PAM.])])])
+                                     [AC_MSG_ERROR([header file <security/pam_appl.h> or <pam/pam_appl.h> is required for PAM.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --without-pam to disable the PAM support.])])])
 fi
 
 if test "$with_ldap" = yes ; then
   if test "$PORTNAME" != "win32"; then
      AC_CHECK_HEADERS(ldap.h, [],
-                      [AC_MSG_ERROR([header file <ldap.h> is required for LDAP])])
+                      [AC_MSG_ERROR([header file <ldap.h> is required for LDAP.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
   else
      AC_CHECK_HEADERS(winldap.h, [],
                       [AC_MSG_ERROR([header file <winldap.h> is required for LDAP])],
@@ -1284,7 +1326,8 @@ if test "$with_ldap" = yes ; then
 fi
 
 if test "$with_bonjour" = yes ; then
-  AC_CHECK_HEADER(DNSServiceDiscovery/DNSServiceDiscovery.h, [], [AC_MSG_ERROR([header file <DNSServiceDiscovery/DNSServiceDiscovery.h> is required for Bonjour])])
+  AC_CHECK_HEADER(DNSServiceDiscovery/DNSServiceDiscovery.h, [], [AC_MSG_ERROR([header file <DNSServiceDiscovery/DNSServiceDiscovery.h> is required for Bonjour.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
 fi
 
 # For processor affinity support in Linux on NUMA platforms such as
@@ -1301,32 +1344,40 @@ esac
 # net-snmp
 if test "$enable_snmp" = yes; then
 	AC_CHECK_HEADERS([net-snmp/net-snmp-config.h], [],
-					[AC_MSG_ERROR([header file <net-snmp/net-snmp-config.h> is required for snmp support])])
+					[AC_MSG_ERROR([header file <net-snmp/net-snmp-config.h> is required for snmp support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --disable-snmp to disable the snmp support.])])
 fi
-
 
 # email
 if test "$enable_email" = yes; then
 	AC_CHECK_HEADERS(libesmtp.h, [],
-					[AC_MSG_ERROR([header file <libesnmp.h> is required for email alert support])])
+					[AC_MSG_ERROR([header file <libesnmp.h> is required for email alert support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --disable-email to disable the snmp support.])])
 	AC_CHECK_HEADERS(auth-client.h, [],
-					[AC_MSG_ERROR([header file <auth-client.h> is required for email alert support])])
+					[AC_MSG_ERROR([header file <auth-client.h> is required for email alert support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --disable-email to disable the snmp support.])])
 fi
 
 # realtime library header
 if test "$with_rt" = yes; then
 	AC_CHECK_HEADERS([time.h], [],
-			 [AC_MSG_ERROR([header file <time.h> is required for realtime library support])])
+			 [AC_MSG_ERROR([header file <time.h> is required for realtime library support.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Use --without-rt to avoid using realtime library.])])
 fi
 
 # json-c 
-
-AC_CHECK_HEADERS(json-c/json.h, [], [AC_MSG_ERROR([json-c is required])])
-AC_SEARCH_LIBS(json_tokener_parse, json-c json, [], [AC_MSG_ERROR([json-c is required])], [])
+AC_CHECK_HEADERS(json-c/json.h, [], [AC_MSG_ERROR([header file <json-c/json.h> is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
+AC_SEARCH_LIBS(json_tokener_parse, json-c json, [], [AC_MSG_ERROR([library 'json-c' is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])], [])
 
 # libxml2
-
-AM_PATH_XML2([2.7.6], [], [AC_MSG_ERROR([libxml2 is required])])
+AM_PATH_XML2([2.7.6], [], [AC_MSG_ERROR([libxml2 is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
 pgac_args="$pgac_args with_xml_prefix with_xml_exec_prefix enable_xmltest"
 CFLAGS="$CFLAGS $XML_CPPFLAGS"
 
@@ -1970,7 +2021,9 @@ if test "$with_tcl" = yes; then
     # now that we have TCL_INCLUDE_SPEC, we can check for <tcl.h>
     ac_save_CPPFLAGS=$CPPFLAGS
     CPPFLAGS="$TCL_INCLUDE_SPEC $CPPFLAGS"
-    AC_CHECK_HEADER(tcl.h, [], [AC_MSG_ERROR([header file <tcl.h> is required for Tcl])])
+    AC_CHECK_HEADER(tcl.h, [], [AC_MSG_ERROR([header file <tcl.h> is required for Tcl.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.
+Don't use --with-tcl if you don't want to enable to PL/Tcl funciontality.])])
     CPPFLAGS=$ac_save_CPPFLAGS
 fi
 
@@ -2078,7 +2131,7 @@ else
 fi
 AC_SUBST(vpath_build)
 
-AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/thirdparty/thrift/hawqbuild/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
+AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
 
 AC_CONFIG_LINKS([
   src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c

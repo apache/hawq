@@ -9,6 +9,8 @@
 #include "lib/command.h"
 #include "lib/data_gen.h"
 #include "lib/hawq_config.h"
+#include "lib/hdfs_config.h"
+#include "lib/yarn_config.h"
 #include "lib/sql_util.h"
 #include "lib/string_util.h"
 #include "lib/file_replace.h"
@@ -54,6 +56,90 @@ TEST_F(TestCommonLib, TestHawqConfig) {
   hc.setGucValue("default_hash_table_bucket_number", "4");
   hc.getGucValue("default_hash_table_bucket_number");
   return;
+}
+
+TEST_F(TestCommonLib, TestHdfsConfig) {
+  hawq::test::HdfsConfig hc;
+  hc.isHA();
+  hc.isConfigKerberos();
+  hc.isTruncate();
+  std::string hadoopHome = hc.getHadoopHome();
+  /* grant privilege for $HADOOP_HOME/etc/hadoop/hdfs-site.xml */
+  std::string confPath = hadoopHome;
+  confPath.append("/etc/hadoop/hdfs-site.xml");
+  std::string cmd = "/usr/bin/sudo -Eu root env \"PATH=$PATH\" chmod 777 ";
+  cmd.append(confPath);
+  hawq::test::Command c(cmd);
+  std::string result = c.run().getResultOutput();
+
+  std::string hostname = "";
+  int port = 0;
+  hc.getActiveNamenode(hostname, port);
+
+  hostname = "";
+  port = 0;
+  hc.getStandbyNamenode(hostname, port);
+
+  std::vector<std::string> hostList;
+  std::vector<int> portList;
+  hc.getNamenodes(hostList, portList);
+
+  hostList.clear();
+  portList.clear();
+  hc.getDatanodelist(hostList, portList);
+
+  hostList.clear();
+  portList.clear();
+  hc.getActiveDatanodes(hostList, portList);
+
+  hc.isSafemode();
+
+  std::string defaultValue = hc.getParameterValue("dfs.replication");
+  hc.setParameterValue("dfs.replication", "1");
+  hc.getParameterValue("dfs.replication");
+  hc.setParameterValue("dfs.replication", defaultValue);
+}
+
+TEST_F(TestCommonLib, TestYarnConfig) {
+  hawq::test::YarnConfig hc;
+  if (hc.isConfigYarn() == 0) {
+    return;
+  }
+  hc.isHA();
+  hc.isConfigKerberos();
+  std::string hadoopHome = hc.getHadoopHome();
+  /* grant privilege for $HADOOP_HOME/etc/hadoop/yarn-site.xml */
+  std::string confPath = hadoopHome;
+  confPath.append("/etc/hadoop/yarn-site.xml");
+  std::string cmd = "/usr/bin/sudo -Eu root env \"PATH=$PATH\" chmod 777 ";
+  cmd.append(confPath);
+  hawq::test::Command c(cmd);
+  std::string result = c.run().getResultOutput();
+
+  std::string hostname = "";
+  int port = 0;
+  hc.getActiveRM(hostname, port);
+
+  hostname = "";
+  port = 0;
+  hc.getStandbyRM(hostname, port);
+
+  std::vector<std::string> hostList;
+  std::vector<int> portList;
+  hc.getRMList(hostList, portList);
+
+  hostList.clear();
+  portList.clear();
+  hc.getNodeManagers(hostList, portList);
+
+  hostList.clear();
+  portList.clear();
+  hc.getActiveNodeManagers(hostList, portList);
+
+  std::string defaultValue =hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
+  hc.setParameterValue("yarn.scheduler.minimum-allocation-mb", "1024");
+  defaultValue =hc.getParameterValue("yarn.scheduler.minimum-allocation-mb");
+  hc.setParameterValue("yarn.scheduler.minimum-allocation-mb", defaultValue);
 }
 
 TEST_F(TestCommonLib, TestCommand) {

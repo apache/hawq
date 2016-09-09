@@ -70,14 +70,14 @@ import static org.apache.hawq.pxf.api.io.DataType.*;
 @SuppressWarnings("deprecation")
 public class HiveResolver extends Plugin implements ReadResolver {
     private static final Log LOG = LogFactory.getLog(HiveResolver.class);
-    private static final String MAPKEY_DELIM = ":";
-    private static final String COLLECTION_DELIM = ",";
+    protected static final String MAPKEY_DELIM = ":";
+    protected static final String COLLECTION_DELIM = ",";
+    protected String collectionDelim;
+    protected String mapkeyDelim;
     private SerDe deserializer;
     private List<OneField> partitionFields;
     private String serdeName;
     private String propsString;
-    private String collectionDelim;
-    private String mapkeyDelim;
     String partitionKeys;
     char delimiter;
     String nullChar = "\\N";

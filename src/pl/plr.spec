@@ -4,8 +4,12 @@ Version:        08.03.00.14
 Release:		0
 Prefix:         /usr/local
 License:		GPL
+BuildRequires:  R-core-devel
+Requires:       R
 
 %define _unpackaged_files_terminate_build 0
+
+AutoReqProv:    no
 
 %description
 The PL/R modules provides Procedural language implementation of R for HAWQ.

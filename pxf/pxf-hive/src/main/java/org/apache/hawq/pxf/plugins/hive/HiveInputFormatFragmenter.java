@@ -26,6 +26,8 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -152,18 +154,19 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
         for (FieldSchema hiveCol : hiveColumns) {
             ColumnDescriptor colDesc = inputData.getColumn(index++);
             DataType colType = DataType.get(colDesc.columnTypeCode());
-            compareTypes(colType, hiveCol.getType(), colDesc.columnName());
+            HiveUtilities.validateTypeCompatible(colType, colDesc.columnTypeModifiers(), hiveCol.getType(), colDesc.columnName());
         }
         // check partition fields
         List<FieldSchema> hivePartitions = tbl.getPartitionKeys();
         for (FieldSchema hivePart : hivePartitions) {
             ColumnDescriptor colDesc = inputData.getColumn(index++);
             DataType colType = DataType.get(colDesc.columnTypeCode());
-            compareTypes(colType, hivePart.getType(), colDesc.columnName());
+            HiveUtilities.validateTypeCompatible(colType, colDesc.columnTypeModifiers(), hivePart.getType(), colDesc.columnName());
         }
 
     }
 
+<<<<<<< HEAD
     private void compareTypes(DataType type, String hiveType, String fieldName) {
         String convertedHive = toHiveType(type, fieldName, null);
         if (!convertedHive.equals(hiveType)

@@ -7,9 +7,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -28,7 +28,7 @@ Options:
     -o output file: the output metadata file, if not set, will output to terminal.
     -W: force password authentication
     -v: verbose
-    -?: help 
+    -?: help
 
 hawq extract output YAML file format:
 
@@ -38,7 +38,7 @@ FileFormat: string (AO/Parquet)
 TableName: string (schemaname.tablename)
 DFS_URL: string (hdfs://127.0.0.1:9000)
 Encoding: UTF8
-AO_Schema: 
+AO_Schema:
 - name: string
   type: string
 
@@ -51,7 +51,7 @@ AO_FileLocations:
   Files:
   - path: string (/gpseg0/16385/35469/35470.1)
     size: long
-  
+
   Partitions:
   - Blocksize: int
     Checksum: boolean
@@ -113,7 +113,7 @@ class GpExtractError(Exception): pass
 class GpMetadataAccessor:
     def __init__(self, conn):
         self.conn = conn
-        
+
         rows = self.exec_query("""
         SELECT oid, datname, dat2tablespace,
                pg_encoding_to_char(encoding) encoding
@@ -157,7 +157,7 @@ class GpMetadataAccessor:
         ...  {'fileno':'3', 'filesize':'160'}]
         '''
         qry = """
-        SELECT segno as fileno, eof as filesize 
+        SELECT segno as fileno, eof as filesize
         FROM pg_aoseg.pg_aoseg_%d
         ORDER by fileno;
         """ % oid
@@ -175,7 +175,7 @@ class GpMetadataAccessor:
         ...  {'fileno':'3', 'filesize':'160'}]
         '''
         qry = """
-        SELECT segno as fileno, eof as filesize 
+        SELECT segno as fileno, eof as filesize
         FROM pg_aoseg.pg_paqseg_%d
         ORDER by fileno;
         """ % oid
@@ -194,7 +194,7 @@ class GpMetadataAccessor:
         if not rows:
             raise GpExtractError('Table %s.%s not exists!' % (nspname, relname))
         return rows[0]
-    
+
     def get_schema(self, relid):
         '''
         Fetch schema of the table specified by oid `relid`.
@@ -241,6 +241,34 @@ class GpMetadataAccessor:
         ORDER BY position_in_partition_key
         """ % (nspname, relname)
         return self.exec_query(qry)
+
+    def get_distribution_policy_info(self, oid, relid):
+        '''
+        Get table's distribution policy from gp_distribution_policy view.
+        '''
+        qry = """
+        SELECT *
+        FROM gp_distribution_policy
+        WHERE localoid = '%s'
+        """ % oid
+        policy = self.exec_query(qry)[0]['attrnums']
+        if not policy:
+            return 'DISTRIBUTED RANDOMLY'
+        else:
+            cols = [d['name'] for d in self.get_schema(relid)]
+            cols_list = [cols[int(k)-1] for k in policy.strip('{}').split(',')]
+            return 'DISTRIBUTED BY (' + ','.join(cols_list) + ')'
+
+    def get_bucket_number(self, oid):
+        '''
+        Get table's bucket number from gp_distribution_policy view.
+        '''
+        qry = """
+        SELECT bucketnum
+        FROM gp_distribution_policy
+        WHERE localoid = '%s'
+        """ % oid
+        return self.exec_query(qry)[0]['bucketnum']
 
 
 def connectdb(options):
@@ -301,7 +329,7 @@ def extract_metadata(conn, tbname):
         '''
         Given AO table's oid and relfilenode, return path and size of all its
         data files on HDFS as [{'path': path1, 'size': size1}, {...}].
-        
+
         Path doesn't include DFS URL.
 
         Example:
@@ -331,7 +359,7 @@ def extract_metadata(conn, tbname):
             )
             files.append({'path': path, 'size': int(f['filesize'])})
         return files
-    
+
     def get_parquet_table_files(oid, relfilenode):
         '''
         The same with get_ao_table_files, except that it's for Parquet table.
@@ -349,7 +377,7 @@ def extract_metadata(conn, tbname):
             )
             files.append({'path': path, 'size': int(f['filesize'])})
         return files
-    
+
     def extract_AO_metadata():
         relid = rel_pgclass['oid']
         rel_appendonly = accessor.get_appendonly_attrs(relid)
@@ -369,7 +397,7 @@ def extract_metadata(conn, tbname):
             # fill Partitions
             file_locations['Partitions'] = []
             for p in partitions:
-                p_pgclass = accessor.get_pgclass(p['partitionschemaname'], 
+                p_pgclass = accessor.get_pgclass(p['partitionschemaname'],
                                                  p['partitiontablename'])
 
                 if get_table_format(p_pgclass['reloptions']) != file_format:
@@ -387,10 +415,13 @@ def extract_metadata(conn, tbname):
                         'Files': get_ao_table_files(p_pgclass['oid'], p_pgclass['relfilenode'])
                 }
                 file_locations['Partitions'].append(par_info)
-
+        metadata['AO_FileLocations'] = file_locations
         logger.info('-- extract AO_Schema')
         metadata['AO_Schema'] = accessor.get_schema(relid)
-        metadata['AO_FileLocations'] = file_locations
+        logger.info('-- extract Distribution_Policy')
+        metadata['Distribution_Policy'] = accessor.get_distribution_policy_info(rel_pgclass['oid'], relid)
+        logger.info('-- extract bucket number')
+        metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
 
     def extract_Parquet_metadata():
         relid = rel_pgclass['oid']
@@ -413,7 +444,7 @@ def extract_metadata(conn, tbname):
             # fill Partitions
             file_locations['Partitions'] = []
             for p in partitions:
-                p_pgclass = accessor.get_pgclass(p['partitionschemaname'], 
+                p_pgclass = accessor.get_pgclass(p['partitionschemaname'],
                                                  p['partitiontablename'])
 
                 if get_table_format(p_pgclass['reloptions']) != file_format:
@@ -434,8 +465,14 @@ def extract_metadata(conn, tbname):
                                                          p_pgclass['relfilenode'])
                 }
                 file_locations['Partitions'].append(par_info)
-
         metadata['Parquet_FileLocations'] = file_locations
+        logger.info('-- extract Parquet_Schema')
+        metadata['Parquet_Schema'] = accessor.get_schema(relid)
+        logger.info('-- extract Distribution_Policy')
+        metadata['Distribution_Policy'] = accessor.get_distribution_policy_info(rel_pgclass['oid'], relid)
+        logger.info('-- extract bucket number')
+        metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
+
 
     # extract AO/Parquet specific metadata
     cases = { 'AO': extract_AO_metadata,
@@ -505,7 +542,7 @@ def create_opt_parser(version):
 
 def main(args=None):
     parser = create_opt_parser('%prog version $Revision: #1 $')
-    
+
     options, args = parser.parse_args(args)
     if len(args) != 1:
         sys.stderr.write('Incorrect number of arguments: missing <tablename>.\n\n')

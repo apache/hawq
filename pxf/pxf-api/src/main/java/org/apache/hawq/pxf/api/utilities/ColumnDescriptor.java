@@ -26,10 +26,11 @@ package org.apache.hawq.pxf.api.utilities;
  */
 public class ColumnDescriptor {
 
-	int gpdbColumnTypeCode;
-    String gpdbColumnName;
-    String gpdbColumnTypeName;
-    int gpdbColumnIndex;
+    int dbColumnTypeCode;
+    String dbColumnName;
+    String dbColumnTypeName;
+    int dbColumnIndex;
+    Integer[] dbColumnTypeModifiers;
     boolean isProjected;
 
     /**
@@ -45,27 +46,21 @@ public class ColumnDescriptor {
      * @param typecode OID
      * @param index column index
      * @param typename type name
+     * @param typemods type modifiers
+     * @param isProj does the column need to be projected
      */
-    public ColumnDescriptor(String name, int typecode, int index, String typename) {
-        gpdbColumnTypeCode = typecode;
-        gpdbColumnTypeName = typename;
-        gpdbColumnName = name;
-        gpdbColumnIndex = index;
-        isProjected = true;
+    public ColumnDescriptor(String name, int typecode, int index, String typename, Integer[] typemods, boolean isProj) {
+        this(name, typecode, index, typename, typemods);
+        isProjected = isProj;
     }
 
-    /**
-     * Constructs a ColumnDescriptor.
-     *
-     * @param name column name
-     * @param typecode OID
-     * @param index column index
-     * @param typename type name
-     * @param isProj type boolean
-     */
-    public ColumnDescriptor(String name, int typecode, int index, String typename, boolean isProj) {
-        this(name, typecode, index, typename);
-        isProjected = isProj;
+    public ColumnDescriptor(String name, int typecode, int index, String typename, Integer[] typemods) {
+        dbColumnTypeCode = typecode;
+        dbColumnTypeName = typename;
+        dbColumnName = name;
+        dbColumnIndex = index;
+        dbColumnTypeModifiers = typemods;
+        isProjected = true;
     }
 
     /**
@@ -74,36 +69,47 @@ public class ColumnDescriptor {
      * @param copy the ColumnDescriptor to copy
      */
     public ColumnDescriptor(ColumnDescriptor copy) {
-        this.gpdbColumnTypeCode = copy.gpdbColumnTypeCode;
-        this.gpdbColumnName = copy.gpdbColumnName;
-        this.gpdbColumnIndex = copy.gpdbColumnIndex;
-        this.gpdbColumnTypeName = copy.gpdbColumnTypeName;
+        this.dbColumnTypeCode = copy.dbColumnTypeCode;
+        this.dbColumnName = copy.dbColumnName;
+        this.dbColumnIndex = copy.dbColumnIndex;
+        this.dbColumnTypeName = copy.dbColumnTypeName;
+        if (copy.dbColumnTypeModifiers != null
+                && copy.dbColumnTypeModifiers.length > 0) {
+            this.dbColumnTypeModifiers = new Integer[copy.dbColumnTypeModifiers.length];
+            System.arraycopy(copy.dbColumnTypeModifiers, 0,
+                    this.dbColumnTypeModifiers, 0,
+                    copy.dbColumnTypeModifiers.length);
+        }
         this.isProjected = copy.isProjected;
     }
 
     public String columnName() {
-        return gpdbColumnName;
+        return dbColumnName;
     }
 
     public int columnTypeCode() {
-        return gpdbColumnTypeCode;
+        return dbColumnTypeCode;
     }
 
     public int columnIndex() {
-        return gpdbColumnIndex;
+        return dbColumnIndex;
     }
 
     public String columnTypeName() {
-        return gpdbColumnTypeName;
+        return dbColumnTypeName;
+    }
+
+    public Integer[] columnTypeModifiers() {
+        return dbColumnTypeModifiers;
     }
 
     /**
-     * Returns <tt>true</tt> if {@link #gpdbColumnName} is a {@link #RECORD_KEY_NAME}.
+     * Returns <tt>true</tt> if {@link #dbColumnName} is a {@link #RECORD_KEY_NAME}.
      *
      * @return whether column is a record key column
      */
     public boolean isKeyColumn() {
-        return RECORD_KEY_NAME.equalsIgnoreCase(gpdbColumnName);
+        return RECORD_KEY_NAME.equalsIgnoreCase(dbColumnName);
     }
 
     public boolean isProjected() {
@@ -116,10 +122,11 @@ public class ColumnDescriptor {
 
     @Override
 	public String toString() {
-		return "ColumnDescriptor [gpdbColumnTypeCode=" + gpdbColumnTypeCode
-                        + ", gpdbColumnName=" + gpdbColumnName
-                        + ", gpdbColumnTypeName=" + gpdbColumnTypeName
-                        + ", gpdbColumnIndex=" + gpdbColumnIndex
-                        + ", isProjected=" + isProjected + "]";
+		return "ColumnDescriptor [dbColumnTypeCode=" + dbColumnTypeCode
+				+ ", dbColumnName=" + dbColumnName
+				+ ", dbColumnTypeName=" + dbColumnTypeName
+				+ ", dbColumnIndex=" + dbColumnIndex
+				+ ", dbColumnTypeModifiers=" + dbColumnTypeModifiers
+                + ", isProjected=" + isProjected + "]";
 	}
 }

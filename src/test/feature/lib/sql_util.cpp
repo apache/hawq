@@ -35,17 +35,19 @@ SQLUtility::SQLUtility(SQLUtilityMode mode)
   };
   getConnection();
 
-  if (MODE_SCHEMA == mode) {
+  if (mode == MODE_SCHEMA) {
     schemaName = string(test_info->test_case_name()) + "_" + test_info->name();
+    databaseName = HAWQ_DB;
     exec("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
     exec("CREATE SCHEMA " + schemaName);
-  
+    sql_util_mode = MODE_SCHEMA;
   } else {
     schemaName = HAWQ_DEFAULT_SCHEMA;
     databaseName = "db_" + string(test_info->test_case_name()) + "_" + test_info->name();
     std::transform(databaseName.begin(), databaseName.end(), databaseName.begin(), ::tolower);
-    exec("DROP DATABASE IF  EXISTS " + databaseName);
+    exec("DROP DATABASE IF EXISTS " + databaseName);
     exec("CREATE DATABASE " + databaseName);
+    sql_util_mode = MODE_DATABASE;
   }
 }
 
@@ -55,10 +57,14 @@ SQLUtility::~SQLUtility() {
       exec("DROP SCHEMA " + schemaName + " CASCADE");
     }
 
-    if (!databaseName.empty()) {
+    if (sql_util_mode ==  MODE_DATABASE) {
       exec("DROP DATABASE " + databaseName);
     }
   }
+}
+
+std::string SQLUtility::getDbName() {
+    return databaseName;
 }
 
 void SQLUtility::exec(const string &sql) {
@@ -193,7 +199,7 @@ const string SQLUtility::generateSQLFile(const string &sqlFile) {
   }
   out << "-- start_ignore" << std::endl;
   out << "SET SEARCH_PATH=" + schemaName + ";" << std::endl;
-  if (!databaseName.empty()) {
+  if (sql_util_mode ==  MODE_DATABASE) {
     out << "\\c " << databaseName << std::endl;
   }
   out << "-- end_ignore" << std::endl;

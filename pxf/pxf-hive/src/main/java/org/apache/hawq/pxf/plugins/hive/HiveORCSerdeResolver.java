@@ -61,10 +61,6 @@ public class HiveORCSerdeResolver extends HiveResolver {
     private StringBuilder parts;
     private int numberOfPartitions;
     private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
-    private static final String MAPKEY_DELIM = ":";
-    private static final String COLLECTION_DELIM = ",";
-    private String collectionDelim;
-    private String mapkeyDelim;
 
     public HiveORCSerdeResolver(InputData input) throws Exception {
         super(input);
@@ -80,7 +76,6 @@ public class HiveORCSerdeResolver extends HiveResolver {
         } else {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
         }
-        parts = new StringBuilder();
         partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
         parseDelimiterChar(input);
         collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM
@@ -91,6 +86,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
     @Override
     void initPartitionFields() {
+        parts = new StringBuilder();
         numberOfPartitions = initPartitionFields(parts);
     }
 

@@ -40,6 +40,10 @@
               <!-- PyGreSQL an open-source Python module that interfaces to a PostgreSQL database under the Python Software Foundation License -->
               <exclude>tools/bin/pythonSrc/PyGreSQL-4.0/**</exclude>
 
+              <!-- Open-source Python modules with ISC license -->
+              <exclude>tools/bin/pythonSrc/pexpect-4.2/**</exclude>
+              <exclude>tools/bin/pythonSrc/ptyprocess-0.5.1/**</exclude>
+
               <!-- Open-source Python modules with MIT license -->
               <exclude>tools/bin/pythonSrc/PSI-0.3b2_gp/**</exclude>
               <exclude>tools/bin/pythonSrc/lockfile-0.9.1/**</exclude>
@@ -55,18 +59,16 @@
               <!-- Open-source packages with Apache license -->
               <exclude>depends/thirdparty/thrift/**</exclude>
 
+              <!-- CMake BSD 3-clause license -->
+
+              <exclude>depends/libhdfs3/CMake/**</exclude>
+              <exclude>depends/libyarn/CMake/**</exclude>
+              
               <!-- BSD license -->
-              <exclude>depends/libyarn/CMake/FindBoost.cmake</exclude>
-              <exclude>depends/libyarn/CMake/FindGSasl.cmake</exclude>
-              <exclude>depends/libyarn/CMake/FindKERBEROS.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/FindBoost.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/CodeCoverage.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/FindGSasl.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/FindKERBEROS.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/FindLibUUID.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/Functions.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/Options.cmake</exclude>
-			  <exclude>depends/libhdfs3/CMake/Platform.cmake</exclude>
+
+              <exclude>depends/libhdfs3/CMake/**</exclude>
+              <exclude>depends/libyarn/CMake/**</exclude>
+              
               <exclude>src/bin/gpfdist/src/gpfdist/glob.c</exclude>
               <exclude>src/bin/gpfdist/src/gpfdist/include/glob.h</exclude>
               <exclude>src/include/port/win32_msvc/glob.h</exclude>
@@ -117,6 +119,7 @@
               <exclude>src/timezone/**/*</exclude>
               <exclude>doc/src/sgml/fixrtf</exclude>
               <exclude>doc/**/*.sgml</exclude>
+              <exclude>contrib/pgcrypto/*</exclude>
 
               <!-- Files which are not easy to have license headers. -->
               <exclude>depends/libhdfs3/test/data/*</exclude>
@@ -128,6 +131,8 @@
 
               <exclude>contrib/hawq-hadoop/hawq-mapreduce-tool/src/test/resources/dataset</exclude>
               <exclude>contrib/hawq-hadoop/**/*.yaml</exclude>
+              <exclude>contrib/hawq-ambari-plugin/build.properties</exclude>
+              <exclude>contrib/hawq-ambari-plugin/README.md</exclude>
 
               <exclude>src/backend/access/index/caql.files</exclude>
               <exclude>src/backend/gpopt/library.ver</exclude>
