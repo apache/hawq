@@ -259,7 +259,6 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 			}
 		}
 	}
->>>>>>> origin/master
 	
 	pfree(formatter.data);
 	pfree(typeInfo.data);

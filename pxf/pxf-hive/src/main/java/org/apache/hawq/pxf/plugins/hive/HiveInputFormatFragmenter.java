@@ -166,7 +166,6 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
 
     }
 
-<<<<<<< HEAD
     private void compareTypes(DataType type, String hiveType, String fieldName) {
         String convertedHive = toHiveType(type, fieldName, null);
         if (!convertedHive.equals(hiveType)
