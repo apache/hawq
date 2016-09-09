@@ -165,7 +165,6 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
         /* Add a key/value pair for attribute type name */
         resetStringInfo(&formatter);
         appendStringInfo(&formatter, "X-GP-ATTR-TYPENAME%u", i);
-    }
         churl_headers_append(headers, formatter.data, TypeOidGetTypename(tuple->attrs[i]->atttypid));
 
 		/* Add attribute type modifiers if any*/
