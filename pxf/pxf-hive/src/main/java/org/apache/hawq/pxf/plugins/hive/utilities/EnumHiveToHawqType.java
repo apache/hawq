@@ -177,7 +177,7 @@ public enum EnumHiveToHawqType {
             fullType.append(end);
             return fullType.toString();
         } else {
-            return hiveToHawqType.typeName;
+            return hiveToHawqType.getTypeName();
         }
     }
 
