@@ -25,6 +25,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.apache.hawq.pxf.api.io.DataType;
+import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 
@@ -149,6 +150,33 @@ public enum EnumHiveToHawqType {
             throw new UnsupportedTypeException("Unable to find compatible Hive type for given HAWQ's type: " + dataType);
 
         return types.last();
+    }
+
+    /**
+     *
+     * @return full type name including modifiers. eg: varchar(3)
+     */
+    public static String getFullTypeName(EnumHiveToHawqType hiveToHawqType, Integer[] modifiers) {
+        hiveToHawqType.getTypeName();
+        if(modifiers != null && modifiers.length > 0) {
+            String modExpression = hiveToHawqType.getSplitExpression();
+            StringBuilder fullType = new StringBuilder(hiveToHawqType.typeName);
+            Character start = modExpression.charAt(1);
+            Character separator = modExpression.charAt(2);
+            Character end = modExpression.charAt(modExpression.length()-2);
+            fullType.append(start);
+            int index = 0;
+            for (Integer modifier : modifiers) {
+                if(index++ > 0) {
+                    fullType.append(separator);
+                }
+                fullType.append(modifier);
+            }
+            fullType.append(end);
+            return fullType.toString();
+        } else {
+            return hiveToHawqType.typeName;
+        }
     }
 
     /**

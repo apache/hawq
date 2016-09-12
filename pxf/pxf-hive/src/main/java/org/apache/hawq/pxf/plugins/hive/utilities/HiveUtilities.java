@@ -267,10 +267,10 @@ public class HiveUtilities {
      * @return Hive type
      * @throws UnsupportedTypeException if type is not supported
      */
-    public static String toCompatibleHiveType(DataType type) {
+    public static String toCompatibleHiveType(DataType type, Integer[] modifiers) {
 
         EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getCompatibleHiveToHawqType(type);
-        return hiveToHawqType.getTypeName();
+        return EnumHiveToHawqType.getFullTypeName(hiveToHawqType, modifiers);
     }
 
 

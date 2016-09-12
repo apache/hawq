@@ -127,7 +127,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
         for (int i = 0; i < numberOfDataColumns; i++) {
             ColumnDescriptor column = input.getColumn(i);
             String columnName = column.columnName();
-            String columnType = HiveUtilities.toCompatibleHiveType(DataType.get(column.columnTypeCode()));
+            String columnType = HiveUtilities.toCompatibleHiveType(DataType.get(column.columnTypeCode()), column.columnTypeModifiers());
             if(i > 0) {
                 columnNames.append(delim);
                 columnTypes.append(delim);
