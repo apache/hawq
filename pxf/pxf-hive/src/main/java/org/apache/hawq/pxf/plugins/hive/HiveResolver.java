@@ -508,10 +508,12 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 break;
             }
             case SHORT: {
-                if( o.getClass().getSimpleName().equals("ByteWritable") ) {
-                    val = (o != null) ? new Short(((ByteWritable) o).get()) : null;
+                if(o == null) {
+                    val = null;
+                } else if( o.getClass().getSimpleName().equals("ByteWritable") ) {
+                    val = new Short(((ByteWritable) o).get());
                 } else {
-                    val = (o != null) ? ((ShortObjectInspector) oi).get(o) : null;
+                    val = ((ShortObjectInspector) oi).get(o);
                 }
                 addOneFieldToRecord(record, SMALLINT, val);
                 break;
