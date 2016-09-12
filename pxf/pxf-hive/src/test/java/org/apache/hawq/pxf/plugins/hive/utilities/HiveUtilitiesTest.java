@@ -24,8 +24,8 @@ import static org.junit.Assert.*;
 
 import java.util.Arrays;
 
+import com.google.common.base.Joiner;
 import org.apache.hawq.pxf.api.io.DataType;
-import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.junit.Test;
 import org.apache.hawq.pxf.api.Metadata;
@@ -169,6 +169,36 @@ public class HiveUtilitiesTest {
 
         try {
             compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.UNSUPPORTED_TYPE, null);
+            fail("should fail because there is no mapped Hive type");
+        }
+        catch (UnsupportedTypeException e) {
+            String errorMsg = "Unable to find compatible Hive type for given HAWQ's type: " + DataType.UNSUPPORTED_TYPE;
+            assertEquals(errorMsg, e.getMessage());
+        }
+
+
+    }
+
+    @Test
+    public void testCompatibleHiveTypeWithModifiers() {
+
+        Integer[] hawqModifiers;
+        String compatibleTypeName;
+
+        hawqModifiers = new Integer[]{5};
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.BPCHAR, hawqModifiers);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.CharType.getTypeName() + "(" + Joiner.on(",").join(hawqModifiers) + ")");
+
+        hawqModifiers = new Integer[]{10};
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.VARCHAR, hawqModifiers);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.VarcharType.getTypeName() + "(" + Joiner.on(",").join(hawqModifiers) + ")");
+
+        hawqModifiers = new Integer[]{38, 18};
+        compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.NUMERIC, hawqModifiers);
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.DecimalType.getTypeName() + "(" + Joiner.on(",").join(hawqModifiers) + ")");
+
+        try {
+            compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.UNSUPPORTED_TYPE, hawqModifiers);
             fail("should fail because there is no mapped Hive type");
         }
         catch (UnsupportedTypeException e) {
