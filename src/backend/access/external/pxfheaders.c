@@ -137,7 +137,7 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 {	
     char long_number[sizeof(int32) * 8];
 
-    StringInfoData formatter;	
+    StringInfoData formatter;
     TupleDesc tuple;		
     initStringInfo(&formatter);
 	

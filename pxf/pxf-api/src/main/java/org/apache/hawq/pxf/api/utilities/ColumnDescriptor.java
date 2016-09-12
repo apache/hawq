@@ -31,6 +31,7 @@ public class ColumnDescriptor {
     String dbColumnTypeName;
     int dbColumnIndex;
     Integer[] dbColumnTypeModifiers;
+    boolean isProjected;
 
     /**
      * Reserved word for a table record key.
@@ -46,13 +47,20 @@ public class ColumnDescriptor {
      * @param index column index
      * @param typename type name
      * @param typemods type modifiers
+     * @param isProj does the column need to be projected
      */
+    public ColumnDescriptor(String name, int typecode, int index, String typename, Integer[] typemods, boolean isProj) {
+        this(name, typecode, index, typename, typemods);
+        isProjected = isProj;
+    }
+
     public ColumnDescriptor(String name, int typecode, int index, String typename, Integer[] typemods) {
         dbColumnTypeCode = typecode;
         dbColumnTypeName = typename;
         dbColumnName = name;
         dbColumnIndex = index;
         dbColumnTypeModifiers = typemods;
+        isProjected = true;
     }
 
     /**
@@ -72,6 +80,7 @@ public class ColumnDescriptor {
                     this.dbColumnTypeModifiers, 0,
                     copy.dbColumnTypeModifiers.length);
         }
+        this.isProjected = copy.isProjected;
     }
 
     public String columnName() {
@@ -103,12 +112,21 @@ public class ColumnDescriptor {
         return RECORD_KEY_NAME.equalsIgnoreCase(dbColumnName);
     }
 
+    public boolean isProjected() {
+        return isProjected;
+    }
+
+    public void setProjected(boolean projected) {
+        isProjected = projected;
+    }
+
     @Override
 	public String toString() {
 		return "ColumnDescriptor [dbColumnTypeCode=" + dbColumnTypeCode
 				+ ", dbColumnName=" + dbColumnName
 				+ ", dbColumnTypeName=" + dbColumnTypeName
 				+ ", dbColumnIndex=" + dbColumnIndex
-				+ ", dbColumnTypeModifiers=" + dbColumnTypeModifiers + "]";
+				+ ", dbColumnTypeModifiers=" + dbColumnTypeModifiers
+                + ", isProjected=" + isProjected + "]";
 	}
 }

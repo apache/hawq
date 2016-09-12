@@ -37,7 +37,6 @@ import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.io.DataType;
-import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
 
 /**
  * Class containing helper functions connecting
@@ -267,10 +266,10 @@ public class HiveUtilities {
      * @return Hive type
      * @throws UnsupportedTypeException if type is not supported
      */
-    public static String toCompatibleHiveType(DataType type) {
+    public static String toCompatibleHiveType(DataType type, Integer[] modifiers) {
 
         EnumHiveToHawqType hiveToHawqType = EnumHiveToHawqType.getCompatibleHiveToHawqType(type);
-        return hiveToHawqType.getTypeName();
+        return EnumHiveToHawqType.getFullHiveTypeName(hiveToHawqType, modifiers);
     }
 
 

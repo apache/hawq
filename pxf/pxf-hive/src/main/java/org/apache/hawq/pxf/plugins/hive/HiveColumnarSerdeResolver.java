@@ -19,7 +19,6 @@ package org.apache.hawq.pxf.plugins.hive;
  * under the License.
  */
 
-
 import org.apache.hawq.pxf.api.BadRecordException;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
@@ -41,6 +40,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.*;
+
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 
@@ -77,7 +77,8 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
             serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.COLUMNAR_SERDE;
         } else if (serdeEnumStr.equals(HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name())) {
             serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE;
-        } else {
+        }
+        else {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
         }
         parts = new StringBuilder();
@@ -123,14 +124,17 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
 
         StringBuilder columnNames = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
         StringBuilder columnTypes = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
-        String delim = "";
+        String delim = ",";
         for (int i = 0; i < numberOfDataColumns; i++) {
             ColumnDescriptor column = input.getColumn(i);
             String columnName = column.columnName();
-            String columnType = HiveUtilities.toCompatibleHiveType(DataType.get(column.columnTypeCode()));
-            columnNames.append(delim).append(columnName);
-            columnTypes.append(delim).append(columnType);
-            delim = ",";
+            String columnType = HiveUtilities.toCompatibleHiveType(DataType.get(column.columnTypeCode()),column.columnTypeModifiers());
+            if(i > 0) {
+                columnNames.append(delim);
+                columnTypes.append(delim);
+            }
+            columnNames.append(columnName);
+            columnTypes.append(columnType);
         }
         serdeProperties.put(serdeConstants.LIST_COLUMNS, columnNames.toString());
         serdeProperties.put(serdeConstants.LIST_COLUMN_TYPES, columnTypes.toString());
