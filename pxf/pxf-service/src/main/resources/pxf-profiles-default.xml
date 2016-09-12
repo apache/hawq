@@ -28,8 +28,6 @@ under the License.
             <plugins>
                 <plugin_A>...</plugin_A>
                 <plugin_B>...</plugin_B>
-                ...:q
-
             </plugins>
          </profile>
 -->

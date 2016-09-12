@@ -19,13 +19,11 @@
 
 package org.apache.hawq.pxf.plugins.hive.utilities;
 
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.apache.hawq.pxf.api.io.DataType;
-import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 
@@ -154,9 +152,13 @@ public enum EnumHiveToHawqType {
 
     /**
      *
-     * @return full type name including modifiers. eg: varchar(3)
+     * @param hiveToHawqType EnumHiveToHawqType enum
+     * @param modifiers Array of Modifiers
+     * @return full Hive type name including modifiers. eg: varchar(3)
+     * This function is used for datatypes with modifier information
+     * such as varchar, char, decimal, etc.
      */
-    public static String getFullTypeName(EnumHiveToHawqType hiveToHawqType, Integer[] modifiers) {
+    public static String getFullHiveTypeName(EnumHiveToHawqType hiveToHawqType, Integer[] modifiers) {
         hiveToHawqType.getTypeName();
         if(modifiers != null && modifiers.length > 0) {
             String modExpression = hiveToHawqType.getSplitExpression();
