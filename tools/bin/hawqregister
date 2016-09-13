@@ -115,7 +115,7 @@ def option_parser_yml(yml_file):
     with open(yml_file, 'r') as f:
         params = yaml.load(f)
     register_yaml_dict_check(params)
-    if params['FileFormat'] == 'Parquet':
+    if params['FileFormat'].lower() == 'parquet':
         if not len(params['Parquet_FileLocations']['Files']):
             return 'Parquet', [], [], params['Parquet_Schema'], params['Distribution_Policy'], params['Parquet_FileLocations'], params['Bucketnum']
         files, sizes = [params['DFS_URL'] + d['path'] for d in params['Parquet_FileLocations']['Files']], [d['size'] for d in params['Parquet_FileLocations']['Files']]
