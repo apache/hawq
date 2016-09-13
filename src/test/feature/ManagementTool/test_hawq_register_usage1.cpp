@@ -24,8 +24,9 @@ TEST_F(TestHawqRegister, TestUsage1ExpectSuccess) {
 
   vector<string> ddl_orientation_matrix = {"parquet"};
   vector<string> distribution_policy_matrix = {"", "DISTRIBUTED RANDOMLY"};
+  vector<string> folder_matrix = {"/usage1tmp/", "/usage1tmp"};
   
-  for(int i = 0; i < ddl_orientation_matrix.size() * distribution_policy_matrix.size() * 4; ++i) {
+  for(int i = 0; i < ddl_orientation_matrix.size() * distribution_policy_matrix.size() * 2 + ddl_orientation_matrix.size() * distribution_policy_matrix.size() * folder_matrix.size(); ++i) {
     util.execute(hawq::test::stringFormat("drop table if exists t_%s;", std::to_string(i).c_str()));
   }
   auto register_lambda = [&] () {
@@ -71,54 +72,36 @@ TEST_F(TestHawqRegister, TestUsage1ExpectSuccess) {
     }
 
     // hawq register -d hawq_feature_test -f hdfs://localhost:8020/usage1tmp/ t_#
-    for(auto & ddl : ddl_orientation_matrix) {
-      for(auto & policy : distribution_policy_matrix) {
-        auto cmd = hawq::test::stringFormat("hdfs dfs -mkdir -p %s/usage1tmp/", getHdfsLocation().c_str());
-        EXPECT_EQ(0, Command::getCommandStatus(cmd));
-        cmd = hawq::test::stringFormat("hdfs dfs -put -f %s/*.paq %s/usage1tmp/", folderPath.c_str(), getHdfsLocation().c_str());
-        EXPECT_EQ(0, Command::getCommandStatus(cmd));
-        
-        auto sql = hawq::test::stringFormat("CREATE TABLE t_%s(i int) with (appendonly=true, orientation=%s) %s;", std::to_string(suffix).c_str(), ddl.c_str(), policy.c_str());
-        util.execute(sql); util.query(hawq::test::stringFormat("SELECT * from t_%s", std::to_string(suffix).c_str()), 0);
-        
-        cmd = hawq::test::stringFormat("hawq register -d %s -f %s/usage1tmp/ t_%s", HAWQ_DB, getHdfsLocation().c_str(), std::to_string(suffix).c_str());
-        EXPECT_EQ(0, Command::getCommandStatus(cmd));
-    
-        util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 200);
-        util.execute(hawq::test::stringFormat("insert into t_%s values(201);", std::to_string(suffix).c_str()));
-        util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 201);
-        
-        suffix ++;
-      }
-    }
-    
     // hawq register -d hawq_feature_test -f hdfs://localhost:8020/usage1tmp t_#
     for(auto & ddl : ddl_orientation_matrix) {
       for(auto & policy : distribution_policy_matrix) {
-        auto cmd = hawq::test::stringFormat("hdfs dfs -mkdir -p %s/usage1tmp/", getHdfsLocation().c_str());
-        EXPECT_EQ(0, Command::getCommandStatus(cmd));
-        cmd = hawq::test::stringFormat("hdfs dfs -put -f %s/*.paq %s/usage1tmp/", folderPath.c_str(), getHdfsLocation().c_str());
-        EXPECT_EQ(0, Command::getCommandStatus(cmd));
+        for(auto & folder : folder_matrix) {
+          auto cmd = hawq::test::stringFormat("hdfs dfs -mkdir -p %s/usage1tmp/", getHdfsLocation().c_str());
+          EXPECT_EQ(0, Command::getCommandStatus(cmd));
+          cmd = hawq::test::stringFormat("hdfs dfs -put -f %s/*.paq %s/usage1tmp/", folderPath.c_str(), getHdfsLocation().c_str());
+          EXPECT_EQ(0, Command::getCommandStatus(cmd));
         
-        auto sql = hawq::test::stringFormat("CREATE TABLE t_%s(i int) with (appendonly=true, orientation=%s) %s;", std::to_string(suffix).c_str(), ddl.c_str(), policy.c_str());
-        util.execute(sql); util.query(hawq::test::stringFormat("SELECT * from t_%s", std::to_string(suffix).c_str()), 0);
+          auto sql = hawq::test::stringFormat("CREATE TABLE t_%s(i int) with (appendonly=true, orientation=%s) %s;", std::to_string(suffix).c_str(), ddl.c_str(), policy.c_str());
+          util.execute(sql); util.query(hawq::test::stringFormat("SELECT * from t_%s", std::to_string(suffix).c_str()), 0);
         
-        cmd = hawq::test::stringFormat("hawq register -d %s -f %s/usage1tmp t_%s", HAWQ_DB, getHdfsLocation().c_str(), std::to_string(suffix).c_str());
-        EXPECT_EQ(0, Command::getCommandStatus(cmd));
+          cmd = hawq::test::stringFormat("hawq register -d %s -f %s%s t_%s", HAWQ_DB, getHdfsLocation().c_str(), folder.c_str(), std::to_string(suffix).c_str());
+          EXPECT_EQ(0, Command::getCommandStatus(cmd));
+    
+          util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 200);
+          util.execute(hawq::test::stringFormat("insert into t_%s values(201);", std::to_string(suffix).c_str()));
+          util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 201);
         
-        util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 200);
-        util.execute(hawq::test::stringFormat("insert into t_%s values(201);", std::to_string(suffix).c_str()));
-        util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 201);
-        
-        suffix ++;
+          suffix ++;
+        }
       }
     }
+    
   }; // register_lambda
 
   auto gc_lambda = [&] () {
     auto sql = hawq::test::stringFormat("hdfs dfs -rm -r %s/usage1tmp/", getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(sql));
-    for(int i = 0; i < ddl_orientation_matrix.size() * distribution_policy_matrix.size() * 4; ++i) {
+    for(int i = 0; i < ddl_orientation_matrix.size() * distribution_policy_matrix.size() * 2 + ddl_orientation_matrix.size() * distribution_policy_matrix.size() * folder_matrix.size(); ++i) {
       util.execute(hawq::test::stringFormat("drop table t_%s;", std::to_string(i).c_str()));
     }
   };

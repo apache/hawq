@@ -232,40 +232,6 @@ TEST_F(TestHawqRegister, TestUsage1NotHDFSPath) {
 	util.execute("drop table hawqregister;");
 }
 
-TEST_F(TestHawqRegister, TestUsage1ParquetRandomly) {
-  SQLUtility util;
-  string rootPath(util.getTestRootPath());
-  string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
-  string filePath = rootPath + relativePath;
-  auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hawq.paq", filePath.c_str(), getHdfsLocation().c_str());
-  EXPECT_EQ(0, Command::getCommandStatus(cmd));
-  util.execute("drop table if exists nt;");
-  util.execute("create table nt(i int) with (appendonly=true, orientation=parquet);");
-  cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq nt", HAWQ_DB, getHdfsLocation().c_str());
-  EXPECT_EQ(0, Command::getCommandStatus(cmd));
-	util.query("select * from nt;", 3);
-	util.execute("insert into nt values(1);");
-	util.query("select * from nt;", 4);
-  util.execute("drop table nt;");
-}
-
-TEST_F(TestHawqRegister, TestUsage1ParquetRandomly2) {
-  SQLUtility util;
-  string rootPath(util.getTestRootPath());
-  string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
-  string filePath = rootPath + relativePath;
-  auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hawq.paq", filePath.c_str(), getHdfsLocation().c_str());
-  EXPECT_EQ(0, Command::getCommandStatus(cmd));
-  util.execute("drop table if exists nt;");
-  util.execute("create table nt(i int) with (appendonly=true, orientation=parquet) distributed randomly;");
-  cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq nt", HAWQ_DB, getHdfsLocation().c_str());
-  EXPECT_EQ(0, Command::getCommandStatus(cmd));
-	util.query("select * from nt;", 3);
-	util.execute("insert into nt values(1);");
-	util.query("select * from nt;", 4);
-  util.execute("drop table nt;");
-}
-
 TEST_F(TestHawqRegister, TestUsage2ParquetRandomly) {
   SQLUtility util;
   util.execute("drop table if exists t;");
