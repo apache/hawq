@@ -460,12 +460,13 @@ if __name__ == '__main__':
                 do_not_move, files_update, sizes_update = True, files, sizes
                 files, sizes = [], []
         else:
-            for k, f in enumerate(files):
+            files_old, sizes_old = [f for f in files], [sz for sz in sizes]
+            for k, f in enumerate(files_old):
                 if f in existed_files:
-                    files_update.append(files[k])
-                    sizes_update.append(sizes[k])
-                    files.remove(files[k])
-                    sizes.remove(sizes[k])
+                    files_update.append(files_old[k])
+                    sizes_update.append(sizes_old[k])
+                    files.remove(files_old[k])
+                    sizes.remove(sizes_old[k])
 
     check_files_and_table_in_same_hdfs_cluster(filepath, tabledir)
 
@@ -488,7 +489,7 @@ if __name__ == '__main__':
         move_files_in_hdfs(database, tablename, files, firstsegno, tabledir, True)
 
     if (not do_not_move) and force_mode:
-        update_insert_metadata_into_database(dburl, database, tablename, seg_name, firstsegno, tabledir, sizes, fmt, files_update, sizes_update)
+        update_insert_metadata_into_database(dburl, database, tablename, seg_name, firstsegno, tabledir, sizes, fileformat, files_update, sizes_update)
     else:
         if force_mode:
             update_metadata_into_database(dburl, seg_name, files_update, sizes_update)
