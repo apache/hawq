@@ -128,10 +128,11 @@ def option_parser_yml(yml_file):
 
 def create_table(dburl, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number):
     try:
-        query = "select count(*) from pg_class where relname = '%s'" % tablename.split('.')[-1].lower()
+        query = "select count(*) from pg_class where relname = '%s';" % tablename.split('.')[-1].lower()
         conn = dbconn.connect(dburl, False)
         rows = dbconn.execSQL(conn, query)
         conn.commit()
+        conn.close()
         for row in rows:
             if row[0] != 0:
                 return False
@@ -151,6 +152,7 @@ def create_table(dburl, tablename, schema_info, fmt, distrbution_policy, file_lo
         conn = dbconn.connect(dburl, False)
         rows = dbconn.execSQL(conn, query)
         conn.commit()
+        conn.close()
         return True
     except DatabaseError, ex:
         print DatabaseError, ex
@@ -192,7 +194,7 @@ def check_hash_type(dburl, tablename):
         rows = dbconn.execSQL(conn, query)
         conn.commit()
         if not rows.rowcount:
-            logger.error('Table not found in table gp_distribution_policy.' % tablename)
+            logger.error('Table %s not found in table gp_distribution_policy.' % tablename)
             sys.exit(1)
         for row in rows:
             if row[0]:
@@ -323,21 +325,43 @@ def move_files_in_hdfs(databasename, tablename, files, firstsegno, tabledir, nor
                     sys.exit(1)
 
 
-def insert_metadata_into_database(dburl, databasename, tablename, seg_name, firstsegno, tabledir, eofs):
+def insert_metadata_into_database(dburl, databasename, tablename, seg_name, firstsegno, tabledir, eofs, fmt):
     '''Insert the metadata into database'''
     try:
-        query = "SET allow_system_table_mods='dml';"
-        query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (seg_name, firstsegno, eofs[0], -1, -1)
-        for k, eof in enumerate(eofs[1:]):
-            query += ',(%d, %d, %d, %d)' % (firstsegno + k + 1, eof, -1, -1)
+        query = "set allow_system_table_mods='dml';"
+        if fmt == 'Parquet':
+            query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (seg_name, firstsegno, eofs[0], -1, -1)
+            for k, eof in enumerate(eofs[1:]):
+                query += ',(%d, %d, %d, %d)' % (firstsegno + k + 1, eof, -1, -1)
+        else:
+            query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (seg_name, firstsegno, eofs[0], -1, -1, -1)
+            for k, eof in enumerate(eofs[1:]):
+                query += ',(%d, %d, %d, %d, %d)' % (firstsegno + k + 1, eof, -1, -1, -1)
         query += ';'
         conn = dbconn.connect(dburl, True)
         rows = dbconn.execSQL(conn, query)
         conn.commit()
         conn.close()
     except DatabaseError, ex:
-        logger.error('Failed to connect to database, this script can only be run when the database is up')
-        move_files_in_hdfs(database, tablename, files, firstsegno, tabledir, False)
+        logger.error('Failed to execute query "%s"' % query)
+        move_files_in_hdfs(databasename, tablename, files, firstsegno, tabledir, False)
+        sys.exit(1)
+
+def update_metadata_into_database(dburl, seg_name, files, eofs):
+    '''Update the catalog table in --force case'''
+    try:
+        query = "set allow_system_table_mods='dml';"
+        query += "begin transaction;"
+        segno_lst = [f.split('/')[-1] for f in files]
+        for i, eof in enumerate(eofs):
+            query += "update pg_aoseg.%s set eof = '%s' where segno = '%s';" % (seg_name, eof, segno_lst[i])
+        query += "end transaction;"
+        conn = dbconn.connect(dburl, True)
+        rows = dbconn.execSQL(conn, query)
+        conn.commit()
+        conn.close()
+    except DatabaseError, ex:
+        logger.error('Failed to execute query "%s"' % query)
         sys.exit(1)
 
 
@@ -366,15 +390,23 @@ if __name__ == '__main__':
             second_normal_mode = True
         fileformat, files, sizes, schema, distribution_policy, file_locations, bucket_number = option_parser_yml(options.yml_config)
         filepath = files[0][:files[0].rfind('/')] if files else ''
+        # check conflicting distributed policy
         if distribution_policy.startswith('DISTRIBUTED BY'):
             if len(files) % bucket_number != 0:
                 logger.error('Files to be registered must be multiple times to the bucket number of hash table.')
                 sys.exit(1)
-        if not create_table(dburl, tablename, schema, fileformat, distribution_policy, file_locations, bucket_number):
-            second_normal_mode, second_exist_mode = False, True
+        if not force_mode:
+            if not create_table(dburl, tablename, schema, fileformat, distribution_policy, file_locations, bucket_number):
+                second_normal_mode, second_exist_mode = False, True
     else:
         fileformat = 'Parquet'
         check_hash_type(dburl, tablename) # Usage1 only support randomly distributed table
+
+    if repair_mode:
+        # check distribution policy consistency
+        # check bucketnum, pagesize, rowgroupsize, etc
+        # check filesize smaller
+        pass
 
     # check filepath
     if not filepath:
@@ -388,24 +420,48 @@ if __name__ == '__main__':
             logger.error('Files to be registered in this case should not be the same with table path.')
             sys.exit(1)
 
+    do_not_move, files_update, sizes_update = False, [], []
+    if force_mode:
+        existed_files, _ = get_files_in_hdfs(tabledir)
+        if len(files) == len(existed_files):
+            if sorted(files) != sorted(existed_files):
+                logger.error('In this case, you should include previous table files.\nOtherwise you should drop the previous table before registering --force.')
+                sys.exit(1)
+            else:
+                do_not_move, files_update, sizes_update = True, files, sizes
+                files, sizes = [], []
+        else:
+            for k, f in enumerate(files):
+                if f in existed_files:
+                    files_update.append(files[k])
+                    sizes_update.append(sizes[k])
+                    files.remove(files[k])
+                    sizes.remove(sizes[k])
+
     check_files_and_table_in_same_hdfs_cluster(filepath, tabledir)
 
     if not options.yml_config:
         files, sizes = get_files_in_hdfs(filepath)
-    print 'File(s) to be registered:', files
+    print 'New file(s) to be registered:', files
+    if files_update:
+        print 'Files(s) catalog info need to be update:', files_update
 
     # set specified eofs
     if options.filesize:
-        if options.filesize != len(files):
+        if len(files) != 1:
             logger.error('-e option is only supported with single file case.')
             sys.exit(1)
         sizes = [options.filesize]
 
     if fileformat == 'Parquet':
         check_parquet_format(files)
-    move_files_in_hdfs(database, tablename, files, firstsegno, tabledir, True)
+    if not do_not_move:
+        move_files_in_hdfs(database, tablename, files, firstsegno, tabledir, True)
 
     # update catalog table
-    insert_metadata_into_database(dburl, database, tablename, seg_name, firstsegno, tabledir, sizes)
+    if not do_not_move:
+        insert_metadata_into_database(dburl, database, tablename, seg_name, firstsegno, tabledir, sizes, fileformat)
+    if force_mode:
+        update_metadata_into_database(dburl, seg_name, files_update, sizes_update)
 
     logger.info('Hawq Register Succeed.')
