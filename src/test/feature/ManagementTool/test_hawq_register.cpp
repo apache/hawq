@@ -1,29 +1,16 @@
 #include <string>
 
+#include "gtest/gtest.h"
 #include "lib/command.h"
 #include "lib/sql_util.h"
 #include "lib/string_util.h"
 #include "lib/hdfs_config.h"
-
-#include "gtest/gtest.h"
+#include "test_hawq_register.h"
 
 using std::string;
 using hawq::test::SQLUtility;
 using hawq::test::Command;
 using hawq::test::HdfsConfig;
-
-/* This test suite may consume more than 80 seconds. */
-class TestHawqRegister : public ::testing::Test {
- public:
-  TestHawqRegister() {}
-  ~TestHawqRegister() {}
-  string getHdfsLocation() {
-    HdfsConfig hc;
-    string namenodehost = "";
-    EXPECT_EQ(true, hc.getNamenodeHost(namenodehost));
-    return hawq::test::stringFormat("hdfs://%s", namenodehost.c_str());
-  }
-};
 
 TEST_F(TestHawqRegister, TestUsage1SingleHawqFile) {
 	SQLUtility util;
@@ -245,40 +232,6 @@ TEST_F(TestHawqRegister, TestUsage1NotHDFSPath) {
 	util.execute("drop table hawqregister;");
 }
 
-TEST_F(TestHawqRegister, TestUsage1ParquetRandomly) {
-  SQLUtility util;
-  string rootPath(util.getTestRootPath());
-  string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
-  string filePath = rootPath + relativePath;
-  auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hawq.paq", filePath.c_str(), getHdfsLocation().c_str());
-  EXPECT_EQ(0, Command::getCommandStatus(cmd));
-  util.execute("drop table if exists nt;");
-  util.execute("create table nt(i int) with (appendonly=true, orientation=parquet);");
-  cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq nt", HAWQ_DB, getHdfsLocation().c_str());
-  EXPECT_EQ(0, Command::getCommandStatus(cmd));
-	util.query("select * from nt;", 3);
-	util.execute("insert into nt values(1);");
-	util.query("select * from nt;", 4);
-  util.execute("drop table nt;");
-}
-
-TEST_F(TestHawqRegister, TestUsage1ParquetRandomly2) {
-  SQLUtility util;
-  string rootPath(util.getTestRootPath());
-  string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
-  string filePath = rootPath + relativePath;
-  auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hawq.paq", filePath.c_str(), getHdfsLocation().c_str());
-  EXPECT_EQ(0, Command::getCommandStatus(cmd));
-  util.execute("drop table if exists nt;");
-  util.execute("create table nt(i int) with (appendonly=true, orientation=parquet) distributed randomly;");
-  cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq nt", HAWQ_DB, getHdfsLocation().c_str());
-  EXPECT_EQ(0, Command::getCommandStatus(cmd));
-	util.query("select * from nt;", 3);
-	util.execute("insert into nt values(1);");
-	util.query("select * from nt;", 4);
-  util.execute("drop table nt;");
-}
-
 TEST_F(TestHawqRegister, TestUsage2ParquetRandomly) {
   SQLUtility util;
   util.execute("drop table if exists t;");
@@ -391,23 +344,4 @@ TEST_F(TestHawqRegister, TestDismatchFileNumber) {
   SQLUtility util;
   string filePath = util.getTestRootPath() + "/ManagementTool/";
   EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "files_incomplete.yml xx"));
-}
-
-TEST_F(TestHawqRegister, TestUsage2Behavior2) {
-  SQLUtility util;
-  util.execute("drop table if exists simple_register_table;");
-  util.execute("create table simple_register_table(i int) with (appendonly=true, orientation=row) distributed randomly;");
-  util.execute("insert into simple_register_table values(1), (2), (3);");
-
-  EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o tmp.yml testhawqregister_testusage2behavior2.simple_register_table"));
-  EXPECT_EQ(0, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c tmp.yml testhawqregister_testusage2behavior2.new_simple_register_table"));
-  util.query("select * from new_simple_register_table;", 3);
-
-  EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o new_tmp.yml testhawqregister_testusage2behavior2.new_simple_register_table"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c new_tmp.yml testhawqregister_testusage2behavior2.new_simple_register_table"));
-
-  EXPECT_EQ(0, Command::getCommandStatus("rm -rf tmp.yml"));
-  EXPECT_EQ(0, Command::getCommandStatus("rm -rf new_tmp.yml"));
-  util.execute("drop table simple_register_table;");
-  util.execute("drop table new_simple_register_table;");
 }
