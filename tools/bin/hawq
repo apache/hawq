@@ -6,9 +6,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -176,6 +176,12 @@ def main():
         cmd = "%s; gpscp %s" % (source_hawq_env, sub_args)
         result = local_run(cmd)
     elif hawq_command == "register":
+        if second_arg in ['', 'help', '--help', '-h']:
+            doc_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../docs/cli_help/','hawqregister_help')
+            with open(doc_path, 'r') as f:
+                REGISTER_HELP = f.read()
+            print REGISTER_HELP
+            sys.exit(1)
         cmd = "%s; hawqregister %s" % (source_hawq_env, sub_args)
         result = local_run(cmd)
     elif hawq_command == "version" or hawq_command == "--version":
