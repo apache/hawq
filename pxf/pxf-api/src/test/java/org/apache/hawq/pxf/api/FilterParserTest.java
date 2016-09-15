@@ -22,13 +22,17 @@ package org.apache.hawq.pxf.api;
 
 import org.apache.hawq.pxf.api.FilterParser.FilterBuilder;
 import org.apache.hawq.pxf.api.FilterParser.Operation;
+import org.apache.hawq.pxf.api.FilterParser.LogicalOperation;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -281,6 +285,117 @@ public class FilterParserTest {
 
         assertEquals(lastOp, result);
     }
+
+    @Test
+    public void parseLogicalAndOperator() throws Exception {
+        filter = "l0";
+        Object op = "filter with 1 AND operator";
+
+        when(filterBuilder.build(eq(LogicalOperation.HDOP_AND),
+                any(),
+                any())).thenReturn(op);
+
+        Object result = filterParser.parse(filter);
+
+        assertEquals(op, result);
+    }
+
+    @Test
+    public void parseLogicalOrOperator() throws Exception {
+        filter = "l1";
+
+        Object op = "filter with 1 OR operator";
+
+        when(filterBuilder.build(eq(LogicalOperation.HDOP_OR),
+                any(),
+                any())).thenReturn(op);
+
+        Object result = filterParser.parse(filter);
+        assertEquals(op, result);
+    }
+
+    @Test
+    public void parseLogicalNotOperator() throws Exception {
+        filter = "l2";
+
+        Object op = "filter with NOT operator";
+
+        when(filterBuilder.build(eq(LogicalOperation.HDOP_NOT),
+                any(),
+                any())).thenReturn(op);
+
+        Object result = filterParser.parse(filter);
+        assertEquals(op, result);
+    }
+
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
+    @Test
+    public void parseLogicalUnknownCodeError() throws Exception {
+        thrown.expect(FilterParser.FilterStringSyntaxException.class);
+        thrown.expectMessage("unknown op ending at 2");
+
+        filter = "l7";
+        when(filterBuilder.build(eq(LogicalOperation.HDOP_AND),
+                any(),
+                any())).thenReturn(null);
+
+        Object result = filterParser.parse(filter);
+    }
+
+    @Test
+    public void parseLogicalOperatorWithExpressions() throws Exception {
+        filter = "a1c\"first\"o5a2c2o2l0";
+        Object firstOp = "first operation HDOP_EQ";
+        Object secondOp = "second operation HDOP_GT";
+        Object lastOp = "filter with 2 operations connected by AND";
+
+        when(filterBuilder.build(eq(Operation.HDOP_EQ),
+                any(),
+                any())).thenReturn(firstOp);
+
+
+        when(filterBuilder.build(eq(Operation.HDOP_GT),
+                any(),
+                any())).thenReturn(secondOp);
+
+        when(filterBuilder.build(eq(LogicalOperation.HDOP_AND),
+                any(),
+                any())).thenReturn(lastOp);
+
+
+        Object result = filterParser.parse(filter);
+        assertEquals(lastOp, result);
+    }
+
+    @Test
+    public void parseLogicalOperatorNotExpression() throws Exception {
+        filter = "a1c\"first\"o5a2c2o2l0l2";
+        Object firstOp = "first operation HDOP_EQ";
+        Object secondOp = "second operation HDOP_GT";
+        Object thirdOp = "filter with 2 operations connected by AND";
+        Object lastOp = "filter with 1 NOT operation";
+
+        when(filterBuilder.build(eq(Operation.HDOP_EQ),
+                any(),
+                any())).thenReturn(firstOp);
+
+
+        when(filterBuilder.build(eq(Operation.HDOP_GT),
+                any(),
+                any())).thenReturn(secondOp);
+
+        when(filterBuilder.build(eq(LogicalOperation.HDOP_AND),
+                any(),
+                any())).thenReturn(thirdOp);
+
+        when(filterBuilder.build(eq(LogicalOperation.HDOP_NOT),
+                any())).thenReturn(lastOp);
+
+        Object result = filterParser.parse(filter);
+        assertEquals(lastOp, result);
+    }
+
 
 	/*
      * Helper functions
