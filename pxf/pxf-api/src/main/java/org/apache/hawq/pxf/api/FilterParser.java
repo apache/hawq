@@ -52,6 +52,7 @@ public class FilterParser {
     private FilterBuilder filterBuilder;
 
     private static Map<Integer, Operation> operatorTranslationMap = initOperatorTransMap();
+    private static Map<Integer, LogicalOperation> logicalOperationTranslationMap = initLogicalOperatorTransMap();
 
     /** Supported operations by the parser. */
     public enum Operation {
@@ -62,6 +63,12 @@ public class FilterParser {
         HDOP_EQ,
         HDOP_NE,
         HDOP_AND
+    }
+
+    public enum LogicalOperation {
+        HDOP_AND,
+        HDOP_OR,
+        HDOP_NOT
     }
 
     /**
@@ -80,6 +87,8 @@ public class FilterParser {
          * @throws Exception if building the filter failed
          */
         public Object build(Operation operation, Object left, Object right) throws Exception;
+        public Object build(LogicalOperation operation, Object left, Object right) throws Exception;
+        public Object build(LogicalOperation operation, Object filter) throws Exception;
     }
 
     /** Represents a column index. */
@@ -104,42 +113,6 @@ public class FilterParser {
         }
 
         public Object constant() {
-            return constant;
-        }
-    }
-
-    /**
-     * Basic filter provided for cases where the target storage system does not provide it own filter
-     * For example: Hbase storage provides its own filter but for a Writable based record in a
-     * SequenceFile there is no filter provided and so we need to have a default
-     */
-    static public class BasicFilter {
-        private Operation oper;
-        private ColumnIndex column;
-        private Constant constant;
-
-        /**
-         * Constructs a BasicFilter.
-         *
-         * @param oper the parse operation to perform
-         * @param column the column index
-         * @param constant the constant object
-         */
-        public BasicFilter(Operation oper, ColumnIndex column, Constant constant) {
-            this.oper = oper;
-            this.column = column;
-            this.constant = constant;
-        }
-
-        public Operation getOperation() {
-            return oper;
-        }
-
-        public ColumnIndex getColumn() {
-            return column;
-        }
-
-        public Constant getConstant() {
             return constant;
         }
     }
@@ -217,6 +190,24 @@ public class FilterParser {
                             : filterBuilder.build(operation, leftOperand, rightOperand);
 
                     // Store result on stack
+                    operandsStack.push(result);
+                    break;
+                case 'l':
+                    LogicalOperation logicalOperation = logicalOperationTranslationMap.get(safeToInt(parseNumber()));
+
+                    if (logicalOperation == null) {
+                        throw new FilterStringSyntaxException("unknown op ending at " + index);
+                    }
+
+                    if (logicalOperation == LogicalOperation.HDOP_NOT) {
+                        Object exp = operandsStack.pop();
+                        result = filterBuilder.build(logicalOperation, exp);
+                    } else {
+                        rightOperand  = operandsStack.pop();
+                        leftOperand = operandsStack.pop();
+
+                        result = filterBuilder.build(logicalOperation, leftOperand, rightOperand);
+                    }
                     operandsStack.push(result);
                     break;
                 default:
@@ -393,5 +384,13 @@ public class FilterParser {
         operatorTranslationMap.put(6, Operation.HDOP_NE);
         operatorTranslationMap.put(7, Operation.HDOP_AND);
         return operatorTranslationMap;
+    }
+
+    static private Map<Integer, LogicalOperation> initLogicalOperatorTransMap() {
+        Map<Integer, LogicalOperation> integerLogicalOperationMap = new HashMap<>();
+        integerLogicalOperationMap.put(0, LogicalOperation.HDOP_AND);
+        integerLogicalOperationMap.put(1, LogicalOperation.HDOP_OR);
+        integerLogicalOperationMap.put(2, LogicalOperation.HDOP_NOT);
+        return integerLogicalOperationMap;
     }
 }

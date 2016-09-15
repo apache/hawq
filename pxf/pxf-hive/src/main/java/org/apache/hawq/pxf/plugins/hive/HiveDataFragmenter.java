@@ -43,6 +43,7 @@ import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TextInputFormat;
+import org.apache.hawq.pxf.api.BasicFilter;
 import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
@@ -427,7 +428,7 @@ public class HiveDataFragmenter extends Fragmenter {
             throws Exception {
 
         // Let's look first at the filter
-        FilterParser.BasicFilter bFilter = (FilterParser.BasicFilter) filter;
+        BasicFilter bFilter = (BasicFilter) filter;
 
         // In case this is not an "equality filter", we ignore this filter (no
         // add to filter list)
