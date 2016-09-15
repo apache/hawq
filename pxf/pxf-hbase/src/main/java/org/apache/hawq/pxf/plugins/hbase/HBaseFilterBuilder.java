@@ -29,8 +29,11 @@ import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.filter.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.apache.hawq.pxf.api.io.DataType.TEXT;
 
@@ -52,15 +55,30 @@ import static org.apache.hawq.pxf.api.io.DataType.TEXT;
  */
 public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     private Map<FilterParser.Operation, CompareFilter.CompareOp> operatorsMap;
+    private Map<FilterParser.LogicalOperation, FilterList.Operator> logicalOperatorsMap;
     private byte[] startKey;
     private byte[] endKey;
     private HBaseTupleDescription tupleDescription;
+    private static final String NOT_OP = "l2";
 
     public HBaseFilterBuilder(HBaseTupleDescription tupleDescription) {
         initOperatorsMap();
+        initLogicalOperatorsMap();
         startKey = HConstants.EMPTY_START_ROW;
         endKey = HConstants.EMPTY_END_ROW;
         this.tupleDescription = tupleDescription;
+    }
+
+    private boolean filterNotOpPresent(String filterString) {
+        if (filterString.contains(NOT_OP)) {
+            String regex = ".*[o\\d|l\\d]l2.*";
+            Pattern p = Pattern.compile(regex);
+            Matcher m = p.matcher(filterString);
+            return m.matches();
+        } else {
+            return false;
+        }
+
     }
 
     /**
@@ -71,11 +89,15 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * @throws Exception if parsing failed
      */
     public Filter getFilterObject(String filterString) throws Exception {
+        // First check for NOT, HBase does not support this
+        if (filterNotOpPresent(filterString))
+            return null;
+
         FilterParser parser = new FilterParser(this);
         Object result = parser.parse(filterString);
 
         if (!(result instanceof Filter)) {
-            throw new Exception("String " + filterString + " resolved to no filter");
+            throw new Exception("String " + filterString + " couldn't be resolved to any supported filter");
         }
 
         return (Filter) result;
@@ -122,18 +144,6 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     public Object build(FilterParser.Operation opId,
                         Object leftOperand,
                         Object rightOperand) throws Exception {
-        if (leftOperand instanceof Filter) {
-            if (opId != FilterParser.Operation.HDOP_AND ||
-                    !(rightOperand instanceof Filter)) {
-                throw new Exception("Only AND is allowed between compound expressions");
-            }
-
-            return handleCompoundOperations((Filter) leftOperand, (Filter) rightOperand);
-        }
-
-        if (!(rightOperand instanceof FilterParser.Constant)) {
-            throw new Exception("expressions of column-op-column are not supported");
-        }
 
         // Assume column is on the left
         return handleSimpleOperations(opId,
@@ -141,17 +151,33 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 (FilterParser.Constant) rightOperand);
     }
 
+    @Override
+    public Object build(FilterParser.LogicalOperation opId, Object leftOperand, Object rightOperand) {
+        return handleCompoundOperations(opId, (Filter) leftOperand, (Filter) rightOperand);
+    }
+
+    @Override
+    public Object build(FilterParser.LogicalOperation opId, Object leftOperand) {
+        return null;
+    }
+
     /**
      * Initializes the {@link #operatorsMap} with appropriate values.
      */
     private void initOperatorsMap() {
-        operatorsMap = new HashMap<FilterParser.Operation, CompareFilter.CompareOp>();
+        operatorsMap = new EnumMap<FilterParser.Operation, CompareFilter.CompareOp>(FilterParser.Operation.class);
         operatorsMap.put(FilterParser.Operation.HDOP_LT, CompareFilter.CompareOp.LESS); // "<"
         operatorsMap.put(FilterParser.Operation.HDOP_GT, CompareFilter.CompareOp.GREATER); // ">"
         operatorsMap.put(FilterParser.Operation.HDOP_LE, CompareFilter.CompareOp.LESS_OR_EQUAL); // "<="
         operatorsMap.put(FilterParser.Operation.HDOP_GE, CompareFilter.CompareOp.GREATER_OR_EQUAL); // ">="
         operatorsMap.put(FilterParser.Operation.HDOP_EQ, CompareFilter.CompareOp.EQUAL); // "="
         operatorsMap.put(FilterParser.Operation.HDOP_NE, CompareFilter.CompareOp.NOT_EQUAL); // "!="
+    }
+
+    private void initLogicalOperatorsMap() {
+        logicalOperatorsMap = new EnumMap<>(FilterParser.LogicalOperation.class);
+        logicalOperatorsMap.put(FilterParser.LogicalOperation.HDOP_AND, FilterList.Operator.MUST_PASS_ALL);
+        logicalOperatorsMap.put(FilterParser.LogicalOperation.HDOP_OR, FilterList.Operator.MUST_PASS_ONE);
     }
 
     /**
@@ -227,19 +253,8 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * <p>
      * Currently, 1, 2 can occur, since no parenthesis are used.
      */
-    private Filter handleCompoundOperations(Filter left, Filter right) {
-        FilterList result;
-
-        if (left instanceof FilterList) {
-            result = (FilterList) left;
-            result.addFilter(right);
-
-            return result;
-        }
-
-        result = new FilterList(FilterList.Operator.MUST_PASS_ALL, new Filter[] {left, right});
-
-        return result;
+    private Filter handleCompoundOperations(FilterParser.LogicalOperation opId, Filter left, Filter right) {
+        return new FilterList(logicalOperatorsMap.get(opId), new Filter[] {left, right});
     }
 
     /**

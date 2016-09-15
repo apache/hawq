@@ -51,18 +51,26 @@ public class FilterParser {
     private Stack<Object> operandsStack;
     private FilterBuilder filterBuilder;
 
-    private static Map<Integer, Operation> operatorTranslationMap = initOperatorTransMap();
-
     /** Supported operations by the parser. */
     public enum Operation {
+        NOOP,
         HDOP_LT,
         HDOP_GT,
         HDOP_LE,
         HDOP_GE,
         HDOP_EQ,
         HDOP_NE,
-        HDOP_AND,
         HDOP_LIKE
+    }
+
+    /**
+     * This enum was added to support filter pushdown with the logical operators OR and NOT
+     * HAWQ-964
+     */
+    public enum LogicalOperation {
+        HDOP_AND,
+        HDOP_OR,
+        HDOP_NOT
     }
 
     /**
@@ -72,15 +80,36 @@ public class FilterParser {
      */
     public interface FilterBuilder {
         /**
-         * Builds the filter.
+         * Builds the filter for an operation
          *
-         * @param operation the parse operation to perform
+         * @param operation the parsed operation to perform
          * @param left the left operand
          * @param right the right operand
          * @return the built filter
          * @throws Exception if building the filter failed
          */
         public Object build(Operation operation, Object left, Object right) throws Exception;
+
+        /**
+         * Builds the filter for a logical operation and two operands
+         *
+         * @param operation the parsed logical operation to perform
+         * @param left the left operand
+         * @param right the right operand
+         * @return the built filter
+         * @throws Exception if building the filter failed
+         */
+        public Object build(LogicalOperation operation, Object left, Object right) throws Exception;
+
+        /**
+         * Builds the filter for a logical operation and one operand
+         *
+         * @param operation the parsed unary logical operation to perform
+         * @param filter the single operand
+         * @return the built filter
+         * @throws Exception if building the filter failed
+         */
+        public Object build(LogicalOperation operation, Object filter) throws Exception;
     }
 
     /** Represents a column index. */
@@ -105,42 +134,6 @@ public class FilterParser {
         }
 
         public Object constant() {
-            return constant;
-        }
-    }
-
-    /**
-     * Basic filter provided for cases where the target storage system does not provide it own filter
-     * For example: Hbase storage provides its own filter but for a Writable based record in a
-     * SequenceFile there is no filter provided and so we need to have a default
-     */
-    static public class BasicFilter {
-        private Operation oper;
-        private ColumnIndex column;
-        private Constant constant;
-
-        /**
-         * Constructs a BasicFilter.
-         *
-         * @param oper the parse operation to perform
-         * @param column the column index
-         * @param constant the constant object
-         */
-        public BasicFilter(Operation oper, ColumnIndex column, Constant constant) {
-            this.oper = oper;
-            this.column = column;
-            this.constant = constant;
-        }
-
-        public Operation getOperation() {
-            return oper;
-        }
-
-        public ColumnIndex getColumn() {
-            return column;
-        }
-
-        public Constant getConstant() {
             return constant;
         }
     }
@@ -175,6 +168,7 @@ public class FilterParser {
     public Object parse(String filter) throws Exception {
         index = 0;
         filterString = filter;
+        int opNumber;
 
         if (filter == null) {
             throw new FilterStringSyntaxException("filter parsing ended with no result");
@@ -191,8 +185,8 @@ public class FilterParser {
                     operandsStack.push(new Constant(parseParameter()));
                     break;
                 case 'o':
-                    // Parse and translate opcode
-                    Operation operation = operatorTranslationMap.get(safeToInt(parseNumber()));
+                    opNumber = safeToInt(parseNumber());
+                    Operation operation = opNumber < Operation.values().length ? Operation.values()[opNumber] : null;
                     if (operation == null) {
                         throw new FilterStringSyntaxException("unknown op ending at " + index);
                     }
@@ -209,6 +203,10 @@ public class FilterParser {
                     }
                     Object leftOperand = operandsStack.pop();
 
+                    if (leftOperand instanceof BasicFilter || rightOperand instanceof BasicFilter) {
+                        throw new FilterStringSyntaxException("missing logical operator before op " + operation + " at " + index);
+                    }
+
                     // Normalize order, evaluate
                     // Column should be on the left
                     Object result = (leftOperand instanceof Constant)
@@ -218,6 +216,28 @@ public class FilterParser {
                             : filterBuilder.build(operation, leftOperand, rightOperand);
 
                     // Store result on stack
+                    operandsStack.push(result);
+                    break;
+                // Handle parsing logical operator (HAWQ-964)
+                case 'l':
+                    opNumber = safeToInt(parseNumber());
+                    LogicalOperation logicalOperation = opNumber < LogicalOperation.values().length ? LogicalOperation.values()[opNumber] : null;
+
+                    if (logicalOperation == null) {
+                        throw new FilterStringSyntaxException("unknown op ending at " + index);
+                    }
+
+                    if (logicalOperation == LogicalOperation.HDOP_NOT) {
+                        Object exp = operandsStack.pop();
+                        result = filterBuilder.build(logicalOperation, exp);
+                    } else if (logicalOperation == LogicalOperation.HDOP_AND || logicalOperation == LogicalOperation.HDOP_OR){
+                        rightOperand  = operandsStack.pop();
+                        leftOperand = operandsStack.pop();
+
+                        result = filterBuilder.build(logicalOperation, leftOperand, rightOperand);
+                    } else {
+                        throw new FilterStringSyntaxException("unknown logical op code " + opNumber);
+                    }
                     operandsStack.push(result);
                     break;
                 default:
@@ -376,24 +396,5 @@ public class FilterParser {
         }
 
         return operation;
-    }
-
-    /**
-     * Create a translation table of opcodes to their enum meaning.
-     *
-     * These codes correspond to the codes in GPDB C code
-     * see gphdfilters.h in pxf protocol.
-     */
-    static private Map<Integer, Operation> initOperatorTransMap() {
-        Map<Integer, Operation> operatorTranslationMap = new HashMap<Integer, Operation>();
-        operatorTranslationMap.put(1, Operation.HDOP_LT);
-        operatorTranslationMap.put(2, Operation.HDOP_GT);
-        operatorTranslationMap.put(3, Operation.HDOP_LE);
-        operatorTranslationMap.put(4, Operation.HDOP_GE);
-        operatorTranslationMap.put(5, Operation.HDOP_EQ);
-        operatorTranslationMap.put(6, Operation.HDOP_NE);
-        operatorTranslationMap.put(7, Operation.HDOP_AND);
-        operatorTranslationMap.put(8, Operation.HDOP_LIKE);
-        return operatorTranslationMap;
     }
 }

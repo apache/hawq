@@ -23,11 +23,13 @@ package org.apache.hawq.pxf.plugins.hive;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
-import org.apache.hawq.pxf.api.FilterParser;
+import org.apache.hawq.pxf.api.BasicFilter;
+import org.apache.hawq.pxf.api.LogicalFilter;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.commons.lang.StringUtils;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_SERDES;
@@ -97,24 +99,49 @@ public class HiveORCAccessor extends HiveAccessor {
         String filterStr = inputData.getFilterString();
         HiveFilterBuilder eval = new HiveFilterBuilder(inputData);
         Object filter = eval.getFilterObject(filterStr);
-
         SearchArgument.Builder filterBuilder = SearchArgumentFactory.newBuilder();
-        filterBuilder.startAnd();
-        if (filter instanceof List) {
-            for (Object f : (List<?>) filter) {
-                buildArgument(filterBuilder, f);
-            }
-        } else {
+
+        /*
+         * If there is only a single filter it will be of type Basic Filter
+         * need special case logic to make sure to still wrap the filter in a
+         * startAnd() & end() block
+         */
+        if (filter instanceof LogicalFilter)
+            buildExpression(filterBuilder, Arrays.asList(filter));
+        else {
+            filterBuilder.startAnd();
             buildArgument(filterBuilder, filter);
+            filterBuilder.end();
         }
-        filterBuilder.end();
         SearchArgument sarg = filterBuilder.build();
         jobConf.set(SARG_PUSHDOWN, sarg.toKryo());
     }
 
+    private void buildExpression(SearchArgument.Builder builder, List<Object> filterList) {
+        for (Object f : filterList) {
+            if (f instanceof LogicalFilter) {
+                switch(((LogicalFilter) f).getOperator()) {
+                    case HDOP_OR:
+                        builder.startOr();
+                        break;
+                    case HDOP_AND:
+                        builder.startAnd();
+                        break;
+                    case HDOP_NOT:
+                        builder.startNot();
+                        break;
+                }
+                buildExpression(builder, ((LogicalFilter) f).getFilterList());
+                builder.end();
+            } else {
+                buildArgument(builder, f);
+            }
+        }
+    }
+
     private void buildArgument(SearchArgument.Builder builder, Object filterObj) {
         /* The below functions will not be compatible and requires update  with Hive 2.0 APIs */
-        FilterParser.BasicFilter filter = (FilterParser.BasicFilter) filterObj;
+        BasicFilter filter = (BasicFilter) filterObj;
         int filterColumnIndex = filter.getColumn().index();
         Object filterValue = filter.getConstant().constant();
         ColumnDescriptor filterColumn = inputData.getColumn(filterColumnIndex);

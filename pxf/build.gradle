@@ -350,10 +350,6 @@ project('pxf-hive') {
         compile "org.apache.hive:hive-common:$hiveVersion"
         compile "org.apache.hive:hive-serde:$hiveVersion"
         testCompile 'pl.pragmatists:JUnitParams:1.0.2'
-        configurations {
-            // Remove hive-exec from unit tests as it causes VerifyError
-            testRuntime.exclude module: 'hive-exec'
-        }
     }
 
     ospackage {
