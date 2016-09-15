@@ -494,13 +494,24 @@ get_attrs_from_expr(Expr *expr)
 		rightop = (Node *) lsecond(saop->args);
 	}
 
+	//Process left operand
 	if (IsA(leftop, Var))
 	{
 		attrs = append_attr_from_var((Var *) leftop, attrs);
 	}
-	if (IsA(leftop, Const))
+	if (IsA(leftop, RelabelType))
+	{
+		attrs = append_attr_from_var((Var *) ((RelabelType *) leftop)->arg, attrs);
+	}
+
+	//Process right operand
+	if (IsA(rightop, Var))
 	{
 		attrs = append_attr_from_var((Var *) rightop, attrs);
+	}
+	if (IsA(rightop, RelabelType))
+	{
+		attrs = append_attr_from_var((Var *) ((RelabelType *) rightop)->arg, attrs);
 	}
 
 	return attrs;
