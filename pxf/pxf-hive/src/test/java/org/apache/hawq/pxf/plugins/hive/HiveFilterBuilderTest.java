@@ -20,11 +20,12 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 
+import org.apache.hawq.pxf.api.FilterParser.LogicalOperation;
+import org.apache.hawq.pxf.api.LogicalFilter;
 import org.junit.Test;
 
-import java.util.List;
+import org.apache.hawq.pxf.api.BasicFilter;
 
-import static org.apache.hawq.pxf.api.FilterParser.BasicFilter;
 import static org.apache.hawq.pxf.api.FilterParser.Operation;
 import static org.apache.hawq.pxf.api.FilterParser.Operation.*;
 import static org.junit.Assert.assertEquals;
@@ -33,18 +34,33 @@ public class HiveFilterBuilderTest {
     @Test
     public void parseFilterWithThreeOperations() throws Exception {
         HiveFilterBuilder builder = new HiveFilterBuilder(null);
-        String[] consts = new String[] {"first", "2", "3"};
-        Operation[] ops = new Operation[] {HDOP_EQ, HDOP_GT, HDOP_LT};
-        int[] idx = new int[] {1, 2, 3};
+        String[] consts = new String[] {"first", "2"};
+        Operation[] ops = new Operation[] {HDOP_EQ, HDOP_GT};
+        int[] idx = new int[] {1, 2};
 
-        @SuppressWarnings("unchecked")
-        List<BasicFilter> filterList = (List) builder.getFilterObject("a1c\"first\"o5a2c2o2o7a3c3o1o7");
-        assertEquals(consts.length, filterList.size());
-        for (int i = 0; i < filterList.size(); i++) {
-            BasicFilter filter = filterList.get(i);
-            assertEquals(filter.getConstant().constant().toString(), consts[i]);
-            assertEquals(filter.getOperation(), ops[i]);
-            assertEquals(filter.getColumn().index(), idx[i]);
-        }
+        LogicalFilter filterList = (LogicalFilter) builder.getFilterObject("a1c\"first\"o5a2c2o2l0");
+        assertEquals(LogicalOperation.HDOP_AND, filterList.getOperator());
+        BasicFilter leftOperand = (BasicFilter) filterList.getFilterList().get(0);
+        assertEquals(consts[0], leftOperand.getConstant().constant());
+        assertEquals(idx[0], leftOperand.getColumn().index());
+        assertEquals(ops[0], leftOperand.getOperation());
     }
+
+    @Test
+    public void parseFilterWithLogicalOperation() throws Exception {
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c\"first\"o5a2c2o2l0");
+        assertEquals(LogicalOperation.HDOP_AND, filter.getOperator());
+        assertEquals(2, filter.getFilterList().size());
+    }
+
+    @Test
+    public void parseNestedExpressionWithLogicalOperation() throws Exception {
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c\"first\"o5a2c2o2l0a1c1o1l1");
+        assertEquals(LogicalOperation.HDOP_OR, filter.getOperator());
+        assertEquals(LogicalOperation.HDOP_AND, ((LogicalFilter) filter.getFilterList().get(0)).getOperator());
+        assertEquals(HDOP_LT, ((BasicFilter) filter.getFilterList().get(1)).getOperation());
+    }
+
 }

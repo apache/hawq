@@ -52,12 +52,15 @@ import static org.apache.hawq.pxf.api.io.DataType.TEXT;
  */
 public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     private Map<FilterParser.Operation, CompareFilter.CompareOp> operatorsMap;
+    private Map<FilterParser.LogicalOperation, FilterList.Operator> logicalOperatorsMap;
     private byte[] startKey;
     private byte[] endKey;
     private HBaseTupleDescription tupleDescription;
+    private static final String NOT_OP = "l2";
 
     public HBaseFilterBuilder(HBaseTupleDescription tupleDescription) {
         initOperatorsMap();
+        initLogicalOperatorsMap();
         startKey = HConstants.EMPTY_START_ROW;
         endKey = HConstants.EMPTY_END_ROW;
         this.tupleDescription = tupleDescription;
@@ -71,14 +74,19 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * @throws Exception if parsing failed
      */
     public Filter getFilterObject(String filterString) throws Exception {
-        FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString);
+        // First check for NOT, HBase does not support this
+        if (filterString.contains(NOT_OP)) {
+            return null;
+        } else {
+            FilterParser parser = new FilterParser(this);
+            Object result = parser.parse(filterString);
 
-        if (!(result instanceof Filter)) {
-            throw new Exception("String " + filterString + " resolved to no filter");
+            if (!(result instanceof Filter)) {
+                throw new Exception("String " + filterString + " resolved to no filter");
+            }
+
+            return (Filter) result;
         }
-
-        return (Filter) result;
     }
 
     /**
@@ -122,23 +130,21 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     public Object build(FilterParser.Operation opId,
                         Object leftOperand,
                         Object rightOperand) throws Exception {
-        if (leftOperand instanceof Filter) {
-            if (opId != FilterParser.Operation.HDOP_AND ||
-                    !(rightOperand instanceof Filter)) {
-                throw new Exception("Only AND is allowed between compound expressions");
-            }
-
-            return handleCompoundOperations((Filter) leftOperand, (Filter) rightOperand);
-        }
-
-        if (!(rightOperand instanceof FilterParser.Constant)) {
-            throw new Exception("expressions of column-op-column are not supported");
-        }
 
         // Assume column is on the left
         return handleSimpleOperations(opId,
                 (FilterParser.ColumnIndex) leftOperand,
                 (FilterParser.Constant) rightOperand);
+    }
+
+    @Override
+    public Object build(FilterParser.LogicalOperation opId, Object leftOperand, Object rightOperand) {
+        return handleCompoundOperations(opId, (Filter) leftOperand, (Filter) rightOperand);
+    }
+
+    @Override
+    public Object build(FilterParser.LogicalOperation opId, Object leftOperand) {
+        return null;
     }
 
     /**
@@ -152,6 +158,12 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         operatorsMap.put(FilterParser.Operation.HDOP_GE, CompareFilter.CompareOp.GREATER_OR_EQUAL); // ">="
         operatorsMap.put(FilterParser.Operation.HDOP_EQ, CompareFilter.CompareOp.EQUAL); // "="
         operatorsMap.put(FilterParser.Operation.HDOP_NE, CompareFilter.CompareOp.NOT_EQUAL); // "!="
+    }
+
+    private void initLogicalOperatorsMap() {
+        logicalOperatorsMap = new HashMap<>();
+        logicalOperatorsMap.put(FilterParser.LogicalOperation.HDOP_AND, FilterList.Operator.MUST_PASS_ALL);
+        logicalOperatorsMap.put(FilterParser.LogicalOperation.HDOP_OR, FilterList.Operator.MUST_PASS_ONE);
     }
 
     /**
@@ -227,7 +239,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * <p>
      * Currently, 1, 2 can occur, since no parenthesis are used.
      */
-    private Filter handleCompoundOperations(Filter left, Filter right) {
+    private Filter handleCompoundOperations(FilterParser.LogicalOperation opId, Filter left, Filter right) {
         FilterList result;
 
         if (left instanceof FilterList) {
@@ -237,7 +249,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
             return result;
         }
 
-        result = new FilterList(FilterList.Operator.MUST_PASS_ALL, new Filter[] {left, right});
+        result = new FilterList(logicalOperatorsMap.get(opId), new Filter[] {left, right});
 
         return result;
     }

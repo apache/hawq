@@ -19,6 +19,7 @@ package org.apache.hawq.pxf.plugins.hive;
  * under the License.
  */
 
+import org.apache.hawq.pxf.api.BasicFilter;
 import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
@@ -219,7 +220,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
     private boolean testOneFilter(List<HivePartition> partitionFields,
                                   Object filter, InputData input) {
         // Let's look first at the filter
-        FilterParser.BasicFilter bFilter = (FilterParser.BasicFilter) filter;
+        BasicFilter bFilter = (BasicFilter) filter;
 
         boolean isFilterOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
         if (!isFilterOperationEqual) /*
@@ -253,7 +254,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
     }
 
     private void printOneBasicFilter(Object filter) {
-        FilterParser.BasicFilter bFilter = (FilterParser.BasicFilter) filter;
+        BasicFilter bFilter = (BasicFilter) filter;
         boolean isOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
         int columnIndex = bFilter.getColumn().index();
         String value = bFilter.getConstant().constant().toString();
