@@ -31,7 +31,7 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static List* pxf_make_filter_list(List* quals);
+static List* pxf_make_expression_items_list(List *quals);
 static void pxf_free_filter(PxfFilterDesc* filter);
 static void pxf_free_filter_list(List *filters);
 static char* pxf_serialize_filter_list(List *filters);
@@ -157,7 +157,7 @@ Oid pxf_supported_types[] =
 };
 
 /*
- * pxf_make_filter_list
+ * pxf_make_expression_items_list
  *
  * Given a scan node qual list, find the filters that are eligible to be used
  * by PXF, construct a PxfFilterDesc list that describes the filter information,
@@ -166,7 +166,7 @@ Oid pxf_supported_types[] =
  * Caller is responsible for pfreeing the returned PxfFilterDesc List.
  */
 static List *
-pxf_make_filter_list(List *quals)
+pxf_make_expression_items_list(List *quals)
 {
 	List			*result = NIL;
 	ListCell		*lc = NULL;
@@ -174,10 +174,6 @@ pxf_make_filter_list(List *quals)
 	if (list_length(quals) == 0)
 		return NIL;
 
-	/*
-	 * Iterate over all implicitly ANDed qualifiers and add the ones
-	 * that are supported for push-down into the result filter list.
-	 */
 	foreach (lc, quals)
 	{
 		Node *node = (Node *) lfirst(lc);
@@ -187,38 +183,19 @@ pxf_make_filter_list(List *quals)
 		{
 			case T_OpExpr:
 			{
-				OpExpr			*expr 	= (OpExpr *) node;
-				PxfFilterDesc	*filter;
-
-				filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
-				elog(DEBUG5, "pxf_make_filter_list: node tag %d (T_OpExpr)", tag);
-
-				if (opexpr_to_pxffilter(expr, filter))
-					result = lappend(result, filter);
-				else
-					pfree(filter);
-
+				result = lappend(result, node);
 				break;
 			}
 			case T_BoolExpr:
 			{
 				BoolExpr	*expr = (BoolExpr *) node;
-				BoolExprType boolType = expr->boolop;
-				elog(DEBUG5, "pxf_make_filter_list: node tag %d (T_BoolExpr), bool node type %d %s",
-						tag, boolType, boolType==AND_EXPR ? "(AND_EXPR)" : "");
-
-				/* only AND_EXPR is supported */
-				if (expr->boolop == AND_EXPR)
-				{
-					List *inner_result = pxf_make_filter_list(expr->args);
-					elog(DEBUG5, "pxf_make_filter_list: inner result size %d", list_length(inner_result));
-					result = list_concat(result, inner_result);
-				}
+				List *inner_result = pxf_make_expression_items_list(expr->args);
+				result = list_concat(result, inner_result);
+				result = lappend(result, node);
 				break;
 			}
 			default:
-				/* expression not supported. ignore */
-				elog(DEBUG5, "pxf_make_filter_list: unsupported node tag %d", tag);
+				elog(DEBUG5, "pxf_make_expression_items_list: unsupported node tag %d", tag);
 				break;
 		}
 	}
@@ -297,19 +274,16 @@ pxf_free_filter_list(List *filters)
  *
  */
 static char *
-pxf_serialize_filter_list(List *filters)
+pxf_serialize_filter_list(List *expressionItems)
 {
 	StringInfo	 resbuf;
-	StringInfo	 curbuf;
 	ListCell	*lc = NULL;
 
-	if (list_length(filters) == 0)
+	if (list_length(expressionItems) == 0)
 		return NULL;
 
 	resbuf = makeStringInfo();
 	initStringInfo(resbuf);
-	curbuf = makeStringInfo();
-	initStringInfo(curbuf);
 
 	/*
 	 * Iterate through the filters in the list and serialize them one after
@@ -317,52 +291,70 @@ pxf_serialize_filter_list(List *filters)
 	 * typical small number of memcpy's this generates overall, there's no
 	 * point in optimizing, better keep it clear.
 	 */
-	foreach (lc, filters)
+	foreach (lc, expressionItems)
 	{
-		PxfFilterDesc		*filter	= (PxfFilterDesc *) lfirst(lc);
-		PxfOperand			 l		= filter->l;
-		PxfOperand			 r 		= filter->r;
-		PxfOperatorCode	 o 		= filter->op;
+		Node *node = (Node *) lfirst(lc);
+		NodeTag tag = nodeTag(node);
 
-		/* last result is stored in 'oldbuf'. start 'curbuf' clean */
-		resetStringInfo(curbuf);
-
-		/* format the operands */
-		if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
+		switch (tag)
 		{
-			appendStringInfo(curbuf, "%c%d%c%s",
-									 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
-									 PXF_CONST_CODE, (r.conststr)->data);
-		}
-		else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
-		{
-			appendStringInfo(curbuf, "%c%s%c%d",
-									 PXF_CONST_CODE, (l.conststr)->data,
-									 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
-		}
-		else
-		{
-			/* pxf_make_filter_list() should have never let this happen */
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("internal error in pxffilters.c:pxf_serialize_"
-							 "filter_list. Found a non const+attr filter")));
-		}
-
-		/* format the operator */
-		appendStringInfo(curbuf, "%c%d", PXF_OPERATOR_CODE, o);
-
-		/* append this result to the previous result */
-		appendBinaryStringInfo(resbuf, curbuf->data, curbuf->len);
-
-		/* if there was a previous result, append a trailing AND operator */
-		if(resbuf->len > curbuf->len)
-		{
-			appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, PXFOP_AND);
+			case T_OpExpr:
+			{
+				PxfFilterDesc *filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
+				OpExpr *expr = (OpExpr *) node;
+				if (opexpr_to_pxffilter(expr, filter))
+				{
+					PxfOperand l = filter->l;
+					PxfOperand r = filter->r;
+					PxfOperatorCode o = filter->op;
+					if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
+					{
+						appendStringInfo(resbuf, "%c%d%c%s",
+												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
+												 PXF_CONST_CODE, (r.conststr)->data);
+					}
+					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
+					{
+						appendStringInfo(resbuf, "%c%s%c%d",
+												 PXF_CONST_CODE, (l.conststr)->data,
+												 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
+					}
+					else
+					{
+						/* pxf_make_filter_list() should have never let this happen */
+						ereport(ERROR,
+								(errcode(ERRCODE_INTERNAL_ERROR),
+								 errmsg("internal error in pxffilters.c:pxf_serialize_"
+										 "filter_list. Found a non const+attr filter")));
+					}
+					appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, o);
+				}
+				else
+					pfree(filter);
+				break;
+			}
+			case T_BoolExpr:
+			{
+				BoolExpr *expr = (BoolExpr *) node;
+				BoolExprType boolType = expr->boolop;
+				PxfOperatorCode pxfOperandCode;
+				switch (boolType)
+				{
+					case AND_EXPR:
+						pxfOperandCode = PXFLOP_AND;
+						break;
+					case OR_EXPR:
+						pxfOperandCode = PXFLOP_OR;
+						break;
+					case NOT_EXPR:
+						pxfOperandCode = PXFLOP_NOT;
+						break;
+				}
+				appendStringInfo(resbuf, "%c%d", PXF_LOGICAL_OPERATOR_CODE, pxfOperandCode);
+				break;
+			}
 		}
 	}
-
-	pfree(curbuf->data);
 
 	return resbuf->data;
 }
@@ -626,10 +618,10 @@ char *serializePxfFilterQuals(List *quals)
 
 	if (pxf_enable_filter_pushdown)
 	{
-		List *filters = pxf_make_filter_list(quals);
 
-		result  = pxf_serialize_filter_list(filters);
-		pxf_free_filter_list(filters);
+		List *expressionItems = pxf_make_expression_items_list(quals);
+		result  = pxf_serialize_filter_list(expressionItems);
+		//pxf_free_filter_list(expressionItems);
 	}
 	elog(DEBUG2, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
 

@@ -44,10 +44,16 @@ typedef enum PxfOperatorCode
 	PXFOP_GE,
 	PXFOP_EQ,
 	PXFOP_NE,
-	PXFOP_AND,
 	PXFOP_LIKE
 
 } PxfOperatorCode;
+
+typedef enum PxfLogicalOperatorCode
+{
+	PXFLOP_AND = 0,
+	PXFLOP_OR,
+	PXFLOP_NOT,
+} PxfLogicalOperatorCode;
 
 /*
  * each supported operand from both sides of the operator is represented
@@ -57,6 +63,7 @@ typedef enum PxfOperatorCode
 #define PXF_ATTR_CODE		'a'
 #define PXF_CONST_CODE		'c'
 #define PXF_OPERATOR_CODE	'o'
+#define PXF_LOGICAL_OPERATOR_CODE	'l'
 
 /*
  * An Operand has any of the above codes, and the information specific to
