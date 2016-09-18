@@ -65,6 +65,9 @@ def register_yaml_dict_check(D):
         if D.get(attr) is None:
             logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
             sys.exit(1)
+    if D['Bucketnum'] <= 0:
+            logger.error('Bucketnum should not be zero, please check your yaml configuration file.')
+            sys.exit(1)
     if D['FileFormat'] in ['Parquet', 'AO']:
         prefix = D['FileFormat']
         local_check_list = ['%s_FileLocations' % prefix, '%s_Schema' % prefix]
@@ -198,6 +201,14 @@ class GpRegisterAccessor(object):
         tabledir = '/'.join([D['location'].strip(), str(D['tablespace_oid']), str(D['database_oid']), str(D['relfilenode']), ''])
         return firstsegno, tabledir
 
+    def get_database_encoding_indx(self, database):
+        query = "select encoding from pg_database where datname = '%s';" % database
+        return self.exec_query(query)[0]['encoding']
+
+    def get_database_encoding(self, encoding_indx):
+        query = "select pg_encoding_to_char(%s);" % encoding_indx
+        return self.exec_query(query)[0]['pg_encoding_to_char']
+
     def update_catalog(self, query):
         self.conn.query(query)
 
@@ -242,6 +253,13 @@ class HawqRegister(object):
                     logger.error('Files to be registered must be multiple times to the bucket number of hash table.')
                     sys.exit(1)
 
+        def check_database_encoding():
+            encoding_indx = self.accessor.get_database_encoding_indx(self.database)
+            encoding = self.accessor.get_database_encoding(encoding_indx)
+            if self.encoding.strip() != encoding:
+                logger.error('Database encoding from yaml configuration file(%s) is not consistent with encoding from input args(%s).' % (self.encoding, encoding))
+                sys.exit(1)
+
         def create_table():
             return self.accessor.do_create_table(self.tablename, self.schema, self.file_format, self.distribution_policy, self.file_locations, self.bucket_number)
 
@@ -282,7 +300,7 @@ class HawqRegister(object):
         
         def set_yml_dataa(file_format, files, sizes, schema, distribution_policy, file_locations,\
                           bucket_number, partitionby, partitions_constraint, partitions_name, partitions_compression_level,\
-                          partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes):
+                          partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding):
             self.file_format = file_format
             self.files = files
             self.sizes = sizes
@@ -298,6 +316,7 @@ class HawqRegister(object):
             self.partitions_checksum = partitions_checksum
             self.partitions_filepaths = partitions_filepaths 
             self.partitions_filesizes = partitions_filesizes
+            self.encoding = encoding
 
         def option_parser_yml(yml_file):
             import yaml
@@ -311,8 +330,7 @@ class HawqRegister(object):
             partitions_checksum = []
             partitions_compression_level = []
             partitions_compression_type = []
-            files = []
-            sizes = []
+            files, sizes = [], []
             
             if params['FileFormat'].lower() == 'parquet':
                 partitionby = params.get('Parquet_FileLocations').get('PartitionBy')
@@ -329,8 +347,9 @@ class HawqRegister(object):
                     partitions_name = [d['Name'] for d in params['Parquet_FileLocations']['Partitions']]
                 if len(params['Parquet_FileLocations']['Files']):
                     files, sizes = [params['DFS_URL'] + d['path'] for d in params['Parquet_FileLocations']['Files']], [d['size'] for d in params['Parquet_FileLocations']['Files']]
+                encoding = params['Encoding']
                 set_yml_dataa('Parquet', files, sizes, params['Parquet_Schema'], params['Distribution_Policy'], params['Parquet_FileLocations'], params['Bucketnum'], partitionby,\
-                              partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes)
+                              partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
                 
             else: #AO format
                 partitionby = params.get('AO_FileLocations').get('PartitionBy')
@@ -347,13 +366,15 @@ class HawqRegister(object):
                     partitions_name = [d['Name'] for d in params['AO_FileLocations']['Partitions']]
                 if len(params['AO_FileLocations']['Files']):
                     files, sizes = [params['DFS_URL'] + d['path'] for d in params['AO_FileLocations']['Files']], [d['size'] for d in params['AO_FileLocations']['Files']]
+                encoding = params['Encoding']
                 set_yml_dataa('AO', files, sizes, params['AO_Schema'], params['Distribution_Policy'], params['AO_FileLocations'], params['Bucketnum'], partitionby, partitions_constraint,\
-                              partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes)
+                              partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
                 
         if self.yml:
             option_parser_yml(options.yml_config)
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
             check_distribution_policy()
+            check_database_encoding()
             if self.mode != 'force' and self.mode != 'repair':
                 if not create_table():
                     self.mode = 'second_exist'
