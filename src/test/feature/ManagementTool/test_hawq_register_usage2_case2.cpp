@@ -43,7 +43,6 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
             strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
             strs_src_dst["@TABLE_OID@"]= getTableOid(t);
             frep.replace(t_yml_tpl, t_yml, strs_src_dst);
-            auto tmp = hawq::test::stringFormat("hawq register -d %s -c %s testhawqregister_testusage2case2expected.%s", HAWQ_DB, t_yml.c_str(), nt.c_str());
             EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c %s testhawqregister_testusage2case2expected.%s", HAWQ_DB, t_yml.c_str(), nt.c_str())));
             util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 200);
 
@@ -56,9 +55,13 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
             strs_src_dst["@TABLE_OID_OLD@"]= getTableOid(nt);
             strs_src_dst["@TABLE_OID_NEW@"]= getTableOid(t);
             frep.replace(t_yml_tpl_new, t_yml_new, strs_src_dst);
-            tmp = hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_testusage2case2expected.%s", HAWQ_DB, t_yml_new.c_str(), nt.c_str());
             EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_testusage2case2expected.%s", HAWQ_DB, t_yml_new.c_str(), nt.c_str())));
             util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 150);
+
+            EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
+            EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml_new.c_str())));
+            util.execute(hawq::test::stringFormat("drop table %s;", t.c_str()));
+            util.execute(hawq::test::stringFormat("drop table %s;", nt.c_str()));
         }
     }
 }

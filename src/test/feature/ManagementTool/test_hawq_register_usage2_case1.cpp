@@ -42,7 +42,8 @@ TEST_F(TestHawqRegister, TestUsage2Case1Expected) {
             EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_%s.yml testhawqregister_testusage2case1expected.%s", HAWQ_DB, std::to_string(suffix).c_str(), t.c_str())));
             EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_%s.yml testhawqregister_testusage2case1expected.%s", HAWQ_DB, std::to_string(suffix).c_str(), nt.c_str())));
             util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 150);
-            EXPECT_EQ(0, Command::getCommandStatus("rm -rf t.yml"));
+
+            EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf t_%s.yml", std::to_string(suffix).c_str())));
             util.execute(hawq::test::stringFormat("drop table %s;", t.c_str()));
             util.execute(hawq::test::stringFormat("drop table %s;", nt.c_str()));
         }
