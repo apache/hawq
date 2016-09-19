@@ -23,6 +23,7 @@ import Queue
 from xml.dom import minidom
 from xml.etree.ElementTree import ElementTree
 import shutil
+from pygresql.pg import DatabaseError
 from gppylib.db import dbconn
 from gppylib.commands.base import WorkerPool, REMOTE
 from gppylib.commands.unix import Echo
