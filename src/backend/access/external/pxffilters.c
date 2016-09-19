@@ -33,7 +33,6 @@
 
 static List* pxf_make_expression_items_list(List *quals);
 static void pxf_free_filter(PxfFilterDesc* filter);
-static void pxf_free_filter_list(List *filters);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
@@ -226,30 +225,6 @@ pxf_free_filter(PxfFilterDesc* filter)
 }
 
 /*
- * pxf_free_filter_list
- *
- * free all memory associated with the filters once no longer needed.
- * alternatively we could have allocated them in a shorter lifespan
- * memory context, however explicitly freeing them is easier and makes
- * more sense.
- */
-static void
-pxf_free_filter_list(List *filters)
-{
-	ListCell		*lc 	= NULL;
-	PxfFilterDesc 	*filter = NULL;
-
-	if (list_length(filters) == 0)
-		return;
-
-	foreach (lc, filters)
-	{
-		filter	= (PxfFilterDesc *) lfirst(lc);
-		pxf_free_filter(filter);
-	}
-}
-
-/*
  * pxf_serialize_filter_list
  *
  * Given a list of implicitly ANDed PxfFilterDesc objects, produce a
@@ -328,9 +303,10 @@ pxf_serialize_filter_list(List *expressionItems)
 										 "filter_list. Found a non const+attr filter")));
 					}
 					appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, o);
-				}
-				else
+					pxf_free_filter(filter);
+				} else{
 					pfree(filter);
+				}
 				break;
 			}
 			case T_BoolExpr:
@@ -621,7 +597,6 @@ char *serializePxfFilterQuals(List *quals)
 
 		List *expressionItems = pxf_make_expression_items_list(quals);
 		result  = pxf_serialize_filter_list(expressionItems);
-		//pxf_free_filter_list(expressionItems);
 	}
 	elog(DEBUG2, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
 
