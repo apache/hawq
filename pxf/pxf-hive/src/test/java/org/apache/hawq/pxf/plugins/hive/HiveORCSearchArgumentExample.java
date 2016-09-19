@@ -13,7 +13,6 @@ import java.util.List;
 
 public class HiveORCSearchArgumentExample {
 
-    @Test
     public void buildLogicalOperationTree() throws Exception {
 
         /* Predicate pushdown configuration */

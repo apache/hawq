@@ -288,40 +288,65 @@ public class FilterParserTest {
 
     @Test
     public void parseLogicalAndOperator() throws Exception {
-        filter = "l0";
-        Object op = "filter with 1 AND operator";
+        filter = "a1c0o5a2c3o2l0";
+
+        Object firstOp = "first operation HDOP_EQ";
+        Object secondOp = "second operation HDOP_GT";
+        Object lastOp = "filter with 2 operations connected by AND";
+
+        when(filterBuilder.build(eq(Operation.HDOP_EQ),
+                any(),
+                any())).thenReturn(firstOp);
+
+        when(filterBuilder.build(eq(Operation.HDOP_GT),
+                any(),
+                any())).thenReturn(secondOp);
 
         when(filterBuilder.build(eq(LogicalOperation.HDOP_AND),
                 any(),
-                any())).thenReturn(op);
+                any())).thenReturn(lastOp);
 
         Object result = filterParser.parse(filter);
 
-        assertEquals(op, result);
+        assertEquals(lastOp, result);
     }
 
     @Test
     public void parseLogicalOrOperator() throws Exception {
-        filter = "l1";
+        filter = "a1c0o5a2c3o2l1";
 
-        Object op = "filter with 1 OR operator";
+        Object firstOp = "first operation HDOP_EQ";
+        Object secondOp = "second operation HDOP_GT";
+        Object lastOp = "filter with 1 OR operator";
+
+        when(filterBuilder.build(eq(Operation.HDOP_EQ),
+                any(),
+                any())).thenReturn(firstOp);
+
+        when(filterBuilder.build(eq(Operation.HDOP_GT),
+                any(),
+                any())).thenReturn(secondOp);
 
         when(filterBuilder.build(eq(LogicalOperation.HDOP_OR),
                 any(),
-                any())).thenReturn(op);
+                any())).thenReturn(lastOp);
 
         Object result = filterParser.parse(filter);
-        assertEquals(op, result);
+        assertEquals(lastOp, result);
     }
 
     @Test
     public void parseLogicalNotOperator() throws Exception {
-        filter = "l2";
+        filter = "a1c0o5l2";
 
+        Object firstOp = "first operation HDOP_EQ";
         Object op = "filter with NOT operator";
 
-        when(filterBuilder.build(eq(LogicalOperation.HDOP_NOT),
+        when(filterBuilder.build(eq(Operation.HDOP_EQ),
                 any(),
+                any())).thenReturn(firstOp);
+
+        when(filterBuilder.build(eq(LogicalOperation.HDOP_NOT),
                 any())).thenReturn(op);
 
         Object result = filterParser.parse(filter);
@@ -341,31 +366,6 @@ public class FilterParserTest {
                 any())).thenReturn(null);
 
         Object result = filterParser.parse(filter);
-    }
-
-    @Test
-    public void parseLogicalOperatorWithExpressions() throws Exception {
-        filter = "a1c\"first\"o5a2c2o2l0";
-        Object firstOp = "first operation HDOP_EQ";
-        Object secondOp = "second operation HDOP_GT";
-        Object lastOp = "filter with 2 operations connected by AND";
-
-        when(filterBuilder.build(eq(Operation.HDOP_EQ),
-                any(),
-                any())).thenReturn(firstOp);
-
-
-        when(filterBuilder.build(eq(Operation.HDOP_GT),
-                any(),
-                any())).thenReturn(secondOp);
-
-        when(filterBuilder.build(eq(LogicalOperation.HDOP_AND),
-                any(),
-                any())).thenReturn(lastOp);
-
-
-        Object result = filterParser.parse(filter);
-        assertEquals(lastOp, result);
     }
 
     @Test
@@ -395,7 +395,6 @@ public class FilterParserTest {
         Object result = filterParser.parse(filter);
         assertEquals(lastOp, result);
     }
-
 
 	/*
      * Helper functions
