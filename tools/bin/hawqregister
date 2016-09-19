@@ -257,7 +257,7 @@ class HawqRegister(object):
             encoding_indx = self.accessor.get_database_encoding_indx(self.database)
             encoding = self.accessor.get_database_encoding(encoding_indx)
             if self.encoding.strip() != encoding:
-                logger.error('Database encoding is not consistent.')
+                logger.error('Database encoding from yaml configuration file(%s) is not consistent with encoding from input args(%s).' % (self.encoding, encoding))
                 sys.exit(1)
 
         def create_table():
