@@ -375,14 +375,24 @@ class HawqRegister(object):
                 set_yml_dataa('AO', files, sizes, params['AO_Schema'], params['Distribution_Policy'], params['AO_FileLocations'], params['Bucketnum'], partitionby, partitions_constraint,\
                               partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
                 
+        def check_file_not_folder():
+            for fn in self.files:
+                hdfscmd = 'hdfs dfs -test -f %s' % fn
+                if local_ssh(hdfscmd, logger):
+                    logger.info('%s is not a file in hdfs, please check the yaml configuration file.' % fn)
+                    sys.exit(1)
+
         if self.yml:
             option_parser_yml(options.yml_config)
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
-            check_distribution_policy()
+            check_file_not_folder()
             check_database_encoding()
             if self.mode != 'force' and self.mode != 'repair':
                 if not create_table():
                     self.mode = 'second_exist'
+            check_bucket_number()
+            check_distribution_policy()
+            check_policy_consistency()
         else:
             self.file_format = 'Parquet'
             check_hash_type() # Usage1 only support randomly distributed table
@@ -400,8 +410,6 @@ class HawqRegister(object):
             if self.tabledir.strip('/') != self.filepath.strip('/'):
                 logger.error("In repair mode, file path from yaml file should be the same with table's path.")
                 sys.exit(1)
-            check_policy_consistency()
-            check_bucket_number()
             existed_files, existed_sizes = self._get_files_in_hdfs(self.filepath)
             existed_info = {}
             for k, fn in enumerate(existed_files):
