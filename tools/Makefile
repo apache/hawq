@@ -27,6 +27,7 @@ include $(top_builddir)/src/Makefile.global
 
 all:
 	${MAKE} -C gpnetbench $@
+	${MAKE} -C bin $@
 
 install :
 	${MAKE} -C bin $@
