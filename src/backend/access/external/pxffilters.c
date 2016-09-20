@@ -159,10 +159,11 @@ Oid pxf_supported_types[] =
  * pxf_make_expression_items_list
  *
  * Given a scan node qual list, find the filters that are eligible to be used
- * by PXF, construct a PxfFilterDesc list that describes the filter information,
+ * by PXF, construct an expressions list, which consists of OpExpr or BoolExpr nodes
  * and return it to the caller.
  *
- * Caller is responsible for pfreeing the returned PxfFilterDesc List.
+ * Basically this function just transforms expression tree to Reversed Polish Notation list.
+ *
  */
 static List *
 pxf_make_expression_items_list(List *quals)
@@ -227,7 +228,7 @@ pxf_free_filter(PxfFilterDesc* filter)
 /*
  * pxf_serialize_filter_list
  *
- * Given a list of implicitly ANDed PxfFilterDesc objects, produce a
+ * Takes expression items list in RPN notation, produce a
  * serialized string representation in order to communicate this list
  * over the wire.
  *
@@ -239,9 +240,7 @@ pxf_free_filter(PxfFilterDesc* filter)
  *
  * Example filter list:
  *
- * Column(0) > 1
- * Column(0) < 5
- * Column(2) == "third"
+ * Column(0) > 1 AND Column(0) < 5 AND Column(2) == "third"
  *
  * Yields the following serialized string:
  *
@@ -261,10 +260,7 @@ pxf_serialize_filter_list(List *expressionItems)
 	initStringInfo(resbuf);
 
 	/*
-	 * Iterate through the filters in the list and serialize them one after
-	 * the other. We use buffer copying because it's clear. Considering the
-	 * typical small number of memcpy's this generates overall, there's no
-	 * point in optimizing, better keep it clear.
+	 * Iterate through the expression items in the list and serialize them one after the other.
 	 */
 	foreach (lc, expressionItems)
 	{
@@ -275,6 +271,7 @@ pxf_serialize_filter_list(List *expressionItems)
 		{
 			case T_OpExpr:
 			{
+				elog(DEBUG5, "pxf_serialize_filter_list: node tag %d (T_OpExpr)", tag);
 				PxfFilterDesc *filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
 				OpExpr *expr = (OpExpr *) node;
 				if (opexpr_to_pxffilter(expr, filter))
@@ -296,7 +293,7 @@ pxf_serialize_filter_list(List *expressionItems)
 					}
 					else
 					{
-						/* pxf_make_filter_list() should have never let this happen */
+						/* opexpr_to_pxffilter() should have never let this happen */
 						ereport(ERROR,
 								(errcode(ERRCODE_INTERNAL_ERROR),
 								 errmsg("internal error in pxffilters.c:pxf_serialize_"
@@ -313,20 +310,8 @@ pxf_serialize_filter_list(List *expressionItems)
 			{
 				BoolExpr *expr = (BoolExpr *) node;
 				BoolExprType boolType = expr->boolop;
-				PxfOperatorCode pxfOperandCode;
-				switch (boolType)
-				{
-					case AND_EXPR:
-						pxfOperandCode = PXFLOP_AND;
-						break;
-					case OR_EXPR:
-						pxfOperandCode = PXFLOP_OR;
-						break;
-					case NOT_EXPR:
-						pxfOperandCode = PXFLOP_NOT;
-						break;
-				}
-				appendStringInfo(resbuf, "%c%d", PXF_LOGICAL_OPERATOR_CODE, pxfOperandCode);
+				elog(DEBUG5, "pxf_serialize_filter_list: node tag %d (T_BoolExpr), bool node type %d", tag, boolType);
+				appendStringInfo(resbuf, "%c%d", PXF_LOGICAL_OPERATOR_CODE, boolType);
 				break;
 			}
 		}

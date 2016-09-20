@@ -48,13 +48,6 @@ typedef enum PxfOperatorCode
 
 } PxfOperatorCode;
 
-typedef enum PxfLogicalOperatorCode
-{
-	PXFLOP_AND = 0,
-	PXFLOP_OR,
-	PXFLOP_NOT,
-} PxfLogicalOperatorCode;
-
 /*
  * each supported operand from both sides of the operator is represented
  * by a code that will describe the operator type in the final serialized
