@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.plugins.hive;
 
 import org.apache.hawq.pxf.api.BasicFilter;
 import org.apache.hawq.pxf.api.FilterParser;
+import org.apache.hawq.pxf.api.LogicalFilter;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.HdfsSplittableDataAccessor;
@@ -32,6 +33,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -206,6 +208,59 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         return testOneFilter(partitionFields, filter, inputData);
     }
 
+    private boolean testForUnsupportedOperators(List<Object> filterList) {
+        boolean nonAndOp = true;
+        for (Object filter : filterList) {
+            if (filter instanceof LogicalFilter) {
+                if (((LogicalFilter) filter).getOperator() != FilterParser.LogicalOperation.HDOP_AND)
+                    return false;
+                if (((LogicalFilter) filter).getFilterList() != null)
+                    nonAndOp = testForUnsupportedOperators(((LogicalFilter) filter).getFilterList());
+            }
+        }
+        return nonAndOp;
+    }
+
+    private boolean testForPartitionEquality(List<HivePartition> partitionFields, List<Object> filterList, InputData input) {
+        boolean partitionAllowed = true;
+        for (Object filter : filterList) {
+            if (filter instanceof BasicFilter) {
+                BasicFilter bFilter = (BasicFilter) filter;
+                boolean isFilterOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
+                if (!isFilterOperationEqual) /*
+                                      * in case this is not an "equality filter"
+                                      * we ignore it here - in partition
+                                      * filtering
+                                      */{
+                    return true;
+                }
+
+                int filterColumnIndex = bFilter.getColumn().index();
+                String filterValue = bFilter.getConstant().constant().toString();
+                ColumnDescriptor filterColumn = input.getColumn(filterColumnIndex);
+                String filterColumnName = filterColumn.columnName();
+
+                for (HivePartition partition : partitionFields) {
+                    if (filterColumnName.equals(partition.name)) {
+
+                /*
+                 * the filter field matches a partition field, but the values do
+                 * not match
+                 */
+                        return filterValue.equals(partition.val);
+                    }
+                }
+
+        /*
+         * filter field did not match any partition field, so we ignore this
+         * filter and hence return true
+         */
+            } else if (filter instanceof LogicalFilter) {
+                partitionAllowed = testForPartitionEquality(partitionFields, ((LogicalFilter) filter).getFilterList(), input);
+            }
+        }
+        return partitionAllowed;
+    }
     /*
      * We are testing one filter against all the partition fields. The filter
      * has the form "fieldA = valueA". The partitions have the form
@@ -219,38 +274,11 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
      */
     private boolean testOneFilter(List<HivePartition> partitionFields,
                                   Object filter, InputData input) {
-        // Let's look first at the filter
-        BasicFilter bFilter = (BasicFilter) filter;
+        // Let's look first at the filter and escape if there are any OR or NOT ops
+        if (!testForUnsupportedOperators(Arrays.asList(filter)))
+            return false;
 
-        boolean isFilterOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
-        if (!isFilterOperationEqual) /*
-                                      * in case this is not an "equality filter"
-                                      * we ignore it here - in partition
-                                      * filtering
-                                      */{
-            return true;
-        }
-
-        int filterColumnIndex = bFilter.getColumn().index();
-        String filterValue = bFilter.getConstant().constant().toString();
-        ColumnDescriptor filterColumn = input.getColumn(filterColumnIndex);
-        String filterColumnName = filterColumn.columnName();
-
-        for (HivePartition partition : partitionFields) {
-            if (filterColumnName.equals(partition.name)) {
-                /*
-                 * the filter field matches a partition field, but the values do
-                 * not match
-                 */
-                return filterValue.equals(partition.val);
-            }
-        }
-
-        /*
-         * filter field did not match any partition field, so we ignore this
-         * filter and hence return true
-         */
-        return true;
+        return testForPartitionEquality(partitionFields, Arrays.asList(filter), input);
     }
 
     private void printOneBasicFilter(Object filter) {
