@@ -21,6 +21,7 @@ install:
     libevent
     python
     bison
+    cpanm
   - brew outdated libyaml || brew upgrade libyaml
   - brew outdated json-c || brew upgrade json-c
   - brew outdated boost || brew upgrade boost
@@ -28,6 +29,7 @@ install:
   - brew tap brona/iproute2mac
   - brew install iproute2mac
   - sudo pip install pycrypto paramiko
+  - sudo cpanm install JSON
 
 before_script:
   - cd $TRAVIS_BUILD_DIR
