@@ -402,7 +402,7 @@ class HawqRegister(object):
                 hdfscmd = 'hdfs dfs -du %s' % fn
                 _, out, _ = local_ssh_output(hdfscmd)
                 if self.sizes[k] > int(out.strip().split()[0]):
-                    logger.error('Incorrect filesize %s in yaml of file %s: out of range %s' % (self.sizes[k], fn, out.strip().split()[0]))
+                    logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))
                     sys.exit(1)
 
         if self.yml:
