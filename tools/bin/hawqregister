@@ -601,7 +601,7 @@ class HawqRegister(object):
         mappings = []
         for pos, constraint in enumerate(self.partitions_constraint):
             if partitions.has_key(constraint):
-                mappings = ([(partitions[constraint], (self.partitions_filepaths[pos][i], self.partitions_filesizes[pos][i]))
+                mappings.extend([(partitions[constraint], (self.partitions_filepaths[pos][i], self.partitions_filesizes[pos][i]))
                             for i in xrange(len(self.partitions_filepaths[pos]))])
         return mappings
 
