@@ -383,6 +383,9 @@ Perl LICENSE
   license. See project link for details.  The text of each license is
   also included at licenses/LICENSE-[project].txt.
 
+     JSON 
+       src/include/catalog/JSON
+  
      plperl
        src/pl/plperl
       
