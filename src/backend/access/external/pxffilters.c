@@ -639,7 +639,7 @@ char *serializePxfFilterQuals(List *quals)
 
 /*
  * Returns a list of attributes, extracted from quals.
- * Returns NULL if any error occurred.
+ * Returns NIL if any error occurred.
  * Supports AND, OR, NOT operations.
  * Supports =, <, <=, >, >=, IS NULL, IS NOT NULL, BETWEEN, IN operators.
  * List might contain duplicates.
@@ -689,6 +689,7 @@ List* extractPxfAttributes(List* quals)
 				break;
 			}
 			default:
+			{
 				/*
 				 * tag is not supported, it's risk of having:
 				 * 1) false-positive tuples
@@ -696,7 +697,8 @@ List* extractPxfAttributes(List* quals)
 				 * 3) etc
 				 */
 				elog(WARNING, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
-				return NULL;
+				return NIL;
+			}
 		}
 	}
 
