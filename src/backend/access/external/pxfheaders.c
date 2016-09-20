@@ -67,7 +67,12 @@ void build_http_header(PxfInputData *input)
 	{
 		List* qualsAttributes = extractPxfAttributes(input->quals);
 
-		add_projection_desc_httpheader(headers, proj_info, qualsAttributes);
+		/* projection information is incomplete if columns from WHERE clause wasn't extracted */
+
+		if (qualsAttributes != NULL)
+			add_projection_desc_httpheader(headers, proj_info, qualsAttributes);
+		else
+			elog(WARNING, "Query will not be optimized to use projection information");
 	}
 
 	/* GP cluster configuration */
