@@ -181,7 +181,7 @@ class GpRegisterAccessor(object):
         rows = self.exec_query(query)
         return rows[0]['attrnums']
 
-    def get_partitioninfo_by_tablename(self, tablename):
+    def get_partition_info(self, tablename):
         ''' Get partition information from pg_partitions, return a constraint-tablename dictionary '''
         query = "SELECT partitiontablename, partitionboundary FROM pg_partitions WHERE tablename = '%s'" % tablename
         return self.exec_query(query)
@@ -463,9 +463,9 @@ class HawqRegister(object):
         if self.file_format == 'Parquet':
             self._check_parquet_format(self.files)
 
-    def _get_partitioninfo_by_tablename(self):
+    def _get_partition_info(self):
         dic = {}
-        for ele in self.accessor.get_partitioninfo_by_tablename(self.tablename):
+        for ele in self.accessor.get_partition_info(self.tablename):
             dic[ele['partitionboundary']] = ele['partitiontablename']
         return dic
 
@@ -599,15 +599,10 @@ class HawqRegister(object):
     def _mapping_tablename_from_yml(self, partitions):
         ''' Mapping table name from yml file, return a list of (table_name,(file_path, file_size)) '''
         mappings = []
-        pos = 0
-        for constraint in self.partitions_constraint:
+        for pos, constraint in enumerate(self.partitions_constraint):
             if partitions.has_key(constraint):
-                for i in range(0, len(self.partitions_filepaths[pos])):
-                    value = (partitions[constraint], (self.partitions_filepaths[pos][i], self.partitions_filesizes[pos][i]))
-                    mappings.append(value)
-                    i += 1
-            pos += 1
-
+                mappings = ([(partitions[constraint], (self.partitions_filepaths[pos][i], self.partitions_filesizes[pos][i]))
+                            for i in xrange(len(self.partitions_filepaths[pos]))])
         return mappings
 
     def register(self):
