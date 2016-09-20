@@ -376,16 +376,24 @@ PL/Java License
       licenses/LICENSE-pljava.txt
 
 ======================================================================
-Perl LICENSE
+Perl Artistic License (exception)
 ======================================================================
 
-  The following components are provided under a Perl Artistic
-  license. See project link for details.  The text of each license is
-  also included at licenses/LICENSE-[project].txt.
+  src/pl/plperl/ppport.h
 
-     plperl
-       src/pl/plperl
-      
+    Pursuant to https://issues.apache.org/jira/browse/LEGAL-79 and
+    PL/Perl's use of a generated header file, we declare this file to
+    be an exception to the Perl Artistic License.  This file is
+    derived from the PostgreSQL code base.
+
+    For completeness sake, we have provided the Perl Artistic License
+    for the Perl Devel-PPPort module
+    (http://search.cpan.org/~wolfsage/Devel-PPPort-3.32/PPPort.pm).
+    This module was used to generate the src/pl/plperl/ppport.h header
+    file. The license is available:
+
+       licenses/LICENSE-ppport.txt
+
 ======================================================================
 test-ctype LICENSE
 ======================================================================
