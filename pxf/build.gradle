@@ -266,10 +266,7 @@ project('pxf-service') {
             into '/opt/pivotal/pxf/tomcat-templates'
         }
 
-        link('/usr/lib/pxf', "/usr/lib/pxf-${project.version}")
-
         link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
-        link('/etc/pxf', "pxf-${project.version}")
 
     }
 
@@ -280,6 +277,25 @@ project('pxf-service') {
         from('src/main/resources/pxf-public.classpath') { into 'conf' }
         from(project(':pxf-api').jar.outputs.files)
         from(war.outputs.files)
+    }
+}
+
+project('pxf') {
+    ospackage {
+        summary = 'HAWQ Extension Framework (PXF)'
+        description = 'HAWQ Extenstion framework'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
+
+        requires('pxf-hdfs', project.version, GREATER | EQUAL)
+        requires('pxf-hive', project.version, GREATER | EQUAL)
+        requires('pxf-hbase', project.version, GREATER | EQUAL)
+        requires('pxf-json', project.version, GREATER | EQUAL)
+
+        link('/usr/lib/pxf', "/usr/lib/pxf-${project.version}")
+        link('/etc/pxf', "pxf-${project.version}")
     }
 }
 
@@ -339,7 +355,6 @@ project('pxf-hive') {
         buildHost = ' '
 
         requires('pxf-hdfs', project.version, GREATER | EQUAL)
-        requires('hive', "$hiveVersion", GREATER | EQUAL)
 
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
@@ -391,7 +406,6 @@ project('pxf-hbase') {
         buildHost = ' '
 
         requires('pxf-service', project.version, GREATER | EQUAL)
-        requires('hbase', "$hbaseVersionRPM", GREATER | EQUAL)
 
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
