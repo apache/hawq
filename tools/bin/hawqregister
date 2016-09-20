@@ -561,8 +561,12 @@ class HawqRegister(object):
             query = "set allow_system_table_mods='dml';"
             query += "begin transaction;"
             segno_lst = [f.split('/')[-1] for f in self.files_update]
-            for i, eof in enumerate(eofs):
-                query += "update pg_aoseg.%s set eof = '%s' where segno = '%s';" % (self.seg_name, eof, segno_lst[i])
+            if self.file_format == 'Parquet':
+                for i, eof in enumerate(eofs):
+                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, segno_lst[i])
+            else:
+                for i, eof in enumerate(eofs):
+                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', varblockcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, -1, segno_lst[i])
             query += "end transaction;"
         else: # update_and_insert
             eofs = self.sizes
@@ -579,8 +583,12 @@ class HawqRegister(object):
             query += ';'
 
             segno_lst = [f.split('/')[-1] for f in self.files_update]
-            for i, eof in enumerate(self.sizes_update):
-                query += "update pg_aoseg.%s set eof = '%s' where segno = '%s';" % (self.seg_name, eof, segno_lst[i])
+            if self.file_format == 'Parquet':
+                for i, eof in enumerate(self.sizes_update):
+                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, segno_lst[i])
+            else:
+                for i, eof in enumerate(self.sizes_update):
+                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', varblockcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, -1, segno_lst[i])
             query += "end transaction;"
         return self.utility_accessor.update_catalog(query)
 
