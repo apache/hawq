@@ -66,8 +66,8 @@ def register_yaml_dict_check(D):
             logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
             sys.exit(1)
     if D['Bucketnum'] <= 0:
-            logger.error('Bucketnum should not be zero, please check your yaml configuration file.')
-            sys.exit(1)
+        logger.error('Bucketnum should not be zero, please check your yaml configuration file.')
+        sys.exit(1)
     if D['FileFormat'] in ['Parquet', 'AO']:
         prefix = D['FileFormat']
         local_check_list = ['%s_FileLocations' % prefix, '%s_Schema' % prefix]
@@ -139,9 +139,9 @@ class GpRegisterAccessor(object):
         schema = ','.join([k['name'] + ' ' + k['type'] for k in schema_info])
         partlist = ""
         for index in range(len(partitions_constraint)):
-          if index > 0:
-              partlist += ", "
-          partlist = partlist + "partition " + partitions_name[index] + " " + partitions_constraint[index]
+            if index > 0:
+                partlist += ", "
+            partlist = partlist + "partition " + partitions_name[index] + " " + partitions_constraint[index]
           
         fmt = 'ROW' if fmt == 'AO' else fmt
         if fmt == 'ROW':
@@ -150,7 +150,7 @@ class GpRegisterAccessor(object):
                          % (tablename, schema, fmt, file_locations['CompressionType'], file_locations['CompressionLevel'], file_locations['Checksum'], bucket_number, distrbution_policy))
             else:
                 query = ('create table %s(%s) with (appendonly=true, orientation=%s, compresstype=%s, compresslevel=%s, checksum=%s, bucketnum=%s) %s %s (%s);'
-                         % (tablename, schema,fmt, file_locations['CompressionType'], file_locations['CompressionLevel'], file_locations['Checksum'], bucket_number, distrbution_policy, partitionby, partlist))
+                         % (tablename, schema, fmt, file_locations['CompressionType'], file_locations['CompressionLevel'], file_locations['Checksum'], bucket_number, distrbution_policy, partitionby, partlist))
         else: # Parquet
             if partitionby is None:
                 query = ('create table %s(%s) with (appendonly=true, orientation=%s, compresstype=%s, compresslevel=%s, pagesize=%s, rowgroupsize=%s, bucketnum=%s) %s;'
@@ -168,7 +168,7 @@ class GpRegisterAccessor(object):
             logger.error('Table %s is not an append-only table. There is no record in gp_distribution_policy table.' % tablename)
             sys.exit(1)
         if rows[0]['attrnums']:
-            logger.error('Cannot register file(s) to a table which is hash distribuetd.')
+            logger.error('Cannot register file(s) to a table which is hash distributed.')
             sys.exit(1)
 
     # pg_paqseg_#
@@ -397,6 +397,14 @@ class HawqRegister(object):
                     logger.info('%s is not a file in hdfs, please check the yaml configuration file.' % fn)
                     sys.exit(1)
 
+        def check_sizes_valid():
+            for k, fn in enumerate(self.files):
+                hdfscmd = 'hdfs dfs -du %s' % fn
+                _, out, _ = local_ssh_output(hdfscmd)
+                if self.sizes[k] > int(out.strip().split()[0]):
+                    logger.error('Incorrect filesize %s in yaml of file %s: out of range %s' % (self.sizes[k], fn, out.strip().split()[0]))
+                    sys.exit(1)
+
         if self.yml:
             option_parser_yml(options.yml_config)
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
@@ -413,7 +421,7 @@ class HawqRegister(object):
             check_hash_type() # Usage1 only support randomly distributed table
         if not self.filepath:
             if self.mode == 'first':
-                logger('Please specify filepath with -f option.')
+                logger.info('Please specify filepath with -f option.')
             else:
                 logger.info('Hawq Register Succeed.')
             sys.exit(0)
@@ -482,6 +490,7 @@ class HawqRegister(object):
                 logger.error('-e option is only supported with single file case.')
                 sys.exit(1)
             self.sizes = [self.filesize]
+        check_sizes_valid()
 
         if self.file_format == 'Parquet':
             self._check_parquet_format(self.files)
@@ -633,7 +642,7 @@ class HawqRegister(object):
         for pos, constraint in enumerate(self.partitions_constraint):
             if partitions.has_key(constraint):
                 mappings.extend([(partitions[constraint], (self.partitions_filepaths[pos][i], self.partitions_filesizes[pos][i]))
-                            for i in xrange(len(self.partitions_filepaths[pos]))])
+                                for i in xrange(len(self.partitions_filepaths[pos]))])
         return mappings
 
     def register(self):
