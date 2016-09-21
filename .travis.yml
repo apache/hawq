@@ -27,7 +27,7 @@ install:
   - brew outdated maven || brew upgrade maven
   - brew tap brona/iproute2mac
   - brew install iproute2mac
-  - sudo pip install pycrypto paramiko
+  - sudo pip install pycrypto
 
 before_script:
   - cd $TRAVIS_BUILD_DIR

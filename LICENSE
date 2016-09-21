@@ -425,11 +425,21 @@ Internet Systems Consortium/Internet Software Consortium (ISC) LICENSE
   The following files are used:
   
       src/backend/utils/adt/inet_net_ntop.c
-      src/backend/utils/adt/inet_net_pton.c 
+      src/backend/utils/adt/inet_net_pton.c
   
-  This file is made available under the following ISC license:
+  These files are made available under the following ISC license:
   
       licenses/LICENSE-isc.txt
+
+  The following components are provided under the ISC license. See
+  project link for details.  The text of each license is also included
+  at licenses/LICENSE-[project].txt.
+
+     pexpect-4.2 (https://pypi.python.org/pypi/pexpect/4.2.0)
+       tools/bin/pythonSrc/pexpect-4.2
+
+     ptyprocess-0.5.1 (https://pypi.python.org/pypi/ptyprocess/0.5.1)
+       tools/bin/pythonSrc/ptyprocess-0.5.1
 
 ======================================================================
 regex LICENSE
