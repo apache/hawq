@@ -61,6 +61,11 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register %s -d %s -c %s testhawqregister_testusage2case2expected.%s", opt.c_str(), HAWQ_DB, t_yml_new.c_str(), nt.c_str())));
                 util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 150);
 
+                if (fmt == "row")
+                   checkPgAOSegValue(nt, "-1", "aoseg");
+                else 
+                   checkPgAOSegValue(nt, "-1", "paqseg");
+                
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml_new.c_str())));
                 util.execute(hawq::test::stringFormat("drop table %s;", t.c_str()));
