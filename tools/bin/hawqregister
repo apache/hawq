@@ -133,16 +133,23 @@ class GpRegisterAccessor(object):
         qry = """select count(*) from pg_class where relname = '%s';""" % tablename.split('.')[-1].lower()
         return self.exec_query(qry)[0]['count'] == 1
 
-    def do_create_table(self, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number, partitionby, partitions_constraint, partitions_name):
+    def do_create_table(self, src_table_name, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number, partitionby, partitions_constraint, partitions_name):
         if self.get_table_existed(tablename):
             return False
         schema = ','.join([k['name'] + ' ' + k['type'] for k in schema_info])
         partlist = ""
         for index in range(len(partitions_constraint)):
-            if index > 0:
-                partlist += ", "
-            partlist = partlist + "partition " + partitions_name[index] + " " + partitions_constraint[index]
-          
+          if index > 0:
+              partlist += ", "
+          partition_refine_name = partitions_name[index]
+          splitter =  src_table_name.split(".")[-1] + '_1_prt_'
+          partition_refine_name = partition_refine_name.split(splitter)[-1]
+          #in some case, constraint contains "partition XXX" but in other case, it doesn't contain. we need to treat them separately.
+          if partitions_constraint[index].strip().startswith("DEFAULT PARTITION") or partitions_constraint[index].strip().startswith("PARTITION") or (len(partition_refine_name) > 0 and partition_refine_name[0].isdigit()):
+              partlist = partlist + " " + partitions_constraint[index]
+          else:
+              partlist = partlist + "PARTITION " + partition_refine_name + " " + partitions_constraint[index]
+              
         fmt = 'ROW' if fmt == 'AO' else fmt
         if fmt == 'ROW':
             if partitionby is None:
@@ -158,6 +165,7 @@ class GpRegisterAccessor(object):
             else:
                 query = ('create table %s(%s) with (appendonly=true, orientation=%s, compresstype=%s, compresslevel=%s, pagesize=%s, rowgroupsize=%s, bucketnum=%s) %s %s (%s);'
                          % (tablename, schema, fmt, file_locations['CompressionType'], file_locations['CompressionLevel'], file_locations['PageSize'], file_locations['RowGroupSize'], bucket_number, distrbution_policy, partitionby, partlist))
+        print query
         self.conn.query(query)
         return True
 
@@ -280,7 +288,7 @@ class HawqRegister(object):
                 sys.exit(1)
 
         def create_table():
-            return self.accessor.do_create_table(self.tablename, self.schema, self.file_format, self.distribution_policy, self.file_locations, self.bucket_number,
+            return self.accessor.do_create_table(self.src_table_name, self.tablename, self.schema, self.file_format, self.distribution_policy, self.file_locations, self.bucket_number,
                                                  self.partitionby, self.partitions_constraint, self.partitions_name)
 
         def get_seg_name():
@@ -318,12 +326,13 @@ class HawqRegister(object):
                 logger.error('Bucket number of %s is not consistent with previous bucket number.' % self.tablename)
                 sys.exit(1)
         
-        def set_yml_dataa(file_format, files, sizes, schema, distribution_policy, file_locations,\
+        def set_yml_dataa(file_format, files, sizes, tablename, schema, distribution_policy, file_locations,\
                           bucket_number, partitionby, partitions_constraint, partitions_name, partitions_compression_level,\
                           partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding):
             self.file_format = file_format
             self.files = files
             self.sizes = sizes
+            self.src_table_name = tablename
             self.schema = schema
             self.distribution_policy = distribution_policy
             self.file_locations = file_locations
@@ -368,7 +377,7 @@ class HawqRegister(object):
                 if len(params['Parquet_FileLocations']['Files']):
                     files, sizes = [params['DFS_URL'] + d['path'] for d in params['Parquet_FileLocations']['Files']], [d['size'] for d in params['Parquet_FileLocations']['Files']]
                 encoding = params['Encoding']
-                set_yml_dataa('Parquet', files, sizes, params['Parquet_Schema'], params['Distribution_Policy'], params['Parquet_FileLocations'], params['Bucketnum'], partitionby,\
+                set_yml_dataa('Parquet', files, sizes, params['TableName'], params['Parquet_Schema'], params['Distribution_Policy'], params['Parquet_FileLocations'], params['Bucketnum'], partitionby,\
                               partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
                 
             else: #AO format
@@ -387,7 +396,7 @@ class HawqRegister(object):
                 if len(params['AO_FileLocations']['Files']):
                     files, sizes = [params['DFS_URL'] + d['path'] for d in params['AO_FileLocations']['Files']], [d['size'] for d in params['AO_FileLocations']['Files']]
                 encoding = params['Encoding']
-                set_yml_dataa('AO', files, sizes, params['AO_Schema'], params['Distribution_Policy'], params['AO_FileLocations'], params['Bucketnum'], partitionby, partitions_constraint,\
+                set_yml_dataa('AO', files, sizes, params['TableName'], params['AO_Schema'], params['Distribution_Policy'], params['AO_FileLocations'], params['Bucketnum'], partitionby, partitions_constraint,\
                               partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
                 
         def check_file_not_folder():
