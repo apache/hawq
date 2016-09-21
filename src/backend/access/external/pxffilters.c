@@ -696,7 +696,7 @@ List* extractPxfAttributes(List* quals)
 				 * 2) unable to join tables
 				 * 3) etc
 				 */
-				elog(WARNING, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
+				elog(INFO, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
 				return NIL;
 			}
 		}
