@@ -136,18 +136,6 @@ unittest2:
 	cd $(PYLIB_SRC)/$(UNITTEST2_DIR)/ && python setup.py build
 	cp -r $(PYLIB_SRC)/$(UNITTEST2_DIR)/build/lib/unittest2  $(PYLIB_DIR)/
 
-#
-# PARAMIKO
-#
-PARAMIKO_VERSION=1.7.6-9
-PARAMIKO_DIR=paramiko-$(PARAMIKO_VERSION)
-paramiko:
-	@echo "--- paramiko"
-	cd $(PYLIB_SRC)/ && $(TAR) xzf $(PARAMIKO_DIR).tar.gz
-	cd $(PYLIB_SRC)/$(PARAMIKO_DIR)/ && python setup.py build
-	cp -r $(PYLIB_SRC)/$(PARAMIKO_DIR)/build/lib/paramiko  $(PYLIB_DIR)/
-
-
 PYTHON_FILES=`grep -l --exclude=Makefile --exclude=gplogfilter --exclude=gpcheckos --exclude=gpgenfsmap.py --exclude=throttlingD.py "/bin/env python" *`\
 			 `grep -l "/bin/env python" $(SRC)/../sbin/*`\
 			 `find ./gppylib -name "*.py"`\

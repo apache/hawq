@@ -632,6 +632,7 @@ char *serializePxfFilterQuals(List *quals)
 
 /*
  * Returns a list of attributes, extracted from quals.
+ * Returns NIL if any error occurred.
  * Supports AND, OR, NOT operations.
  * Supports =, <, <=, >, >=, IS NULL, IS NOT NULL, BETWEEN, IN operators.
  * List might contain duplicates.
@@ -674,15 +675,23 @@ List* extractPxfAttributes(List* quals)
 				attributes = append_attr_from_var((Var *) expr->arg, attributes);
 				break;
 			}
+			case T_BooleanTest:
+			{
+				BooleanTest* expr = (BooleanTest *) node;
+				attributes = append_attr_from_var((Var *) expr->arg, attributes);
+				break;
+			}
 			default:
+			{
 				/*
 				 * tag is not supported, it's risk of having:
 				 * 1) false-positive tuples
 				 * 2) unable to join tables
 				 * 3) etc
 				 */
-				elog(ERROR, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
-				break;
+				elog(INFO, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
+				return NIL;
+			}
 		}
 	}
 
