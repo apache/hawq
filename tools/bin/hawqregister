@@ -51,7 +51,7 @@ def option_parser():
     parser.add_option('-U', '--user', help='username of the target DB')
     parser.add_option('-d', '--database', default='postgres', dest='database', help='database name')
     parser.add_option('-f', '--filepath', dest='filepath', help='file name in HDFS')
-    parser.add_option('-e', '--eof', dest='filesize', type='int', default=0, help='eof of the file to be registered')
+    parser.add_option('-e', '--eof', dest='filesize', type='int', default=None, help='eof of the file to be registered')
     parser.add_option('-c', '--config', dest='yml_config', default='', help='configuration file in YAML format')
     parser.add_option('-F', '--force', dest='force', action='store_true', default=False)
     parser.add_option('-R', '--repair', dest='repair', action='store_true', default=False)
@@ -457,6 +457,10 @@ class HawqRegister(object):
                     sys.exit(1)
 
         def check_sizes_valid():
+            for sz in self.sizes:
+                if sz < 0:
+                    logger.error('File size(%s) in yaml configuration file should not be less than 0.' % sz)
+                    sys.exit(1)
             for k, fn in enumerate(self.files):
                 hdfscmd = 'hdfs dfs -du %s' % fn
                 _, out, _ = local_ssh_output(hdfscmd)
@@ -551,7 +555,7 @@ class HawqRegister(object):
         if self.files_update:
             print 'Catalog info need to be updated for these files: ', self.files_update
 
-        if self.filesize:
+        if self.filesize is not None:
             if len(self.files) != 1:
                 logger.error('-e option is only supported with single file case.')
                 sys.exit(1)
