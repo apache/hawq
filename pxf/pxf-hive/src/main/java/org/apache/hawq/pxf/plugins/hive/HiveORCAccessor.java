@@ -100,7 +100,19 @@ public class HiveORCAccessor extends HiveAccessor {
         HiveFilterBuilder eval = new HiveFilterBuilder(inputData);
         Object filter = eval.getFilterObject(filterStr);
         SearchArgument.Builder filterBuilder = SearchArgumentFactory.newBuilder();
-        buildExpression(filterBuilder, Arrays.asList(filter));
+
+        /*
+         * If there is only a single filter it will be of type Basic Filter
+         * need special case logic to make sure to still wrap the filter in a
+         * startAnd() & end() block
+         */
+        if (filter instanceof LogicalFilter)
+            buildExpression(filterBuilder, Arrays.asList(filter));
+        else {
+            filterBuilder.startAnd();
+            buildArgument(filterBuilder, filter);
+            filterBuilder.end();
+        }
         SearchArgument sarg = filterBuilder.build();
         jobConf.set(SARG_PUSHDOWN, sarg.toKryo());
     }

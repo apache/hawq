@@ -276,7 +276,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
                                   Object filter, InputData input) {
         // Let's look first at the filter and escape if there are any OR or NOT ops
         if (!testForUnsupportedOperators(Arrays.asList(filter)))
-            return false;
+            return true;
 
         return testForPartitionEquality(partitionFields, Arrays.asList(filter), input);
     }
