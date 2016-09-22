@@ -301,8 +301,12 @@ pxf_serialize_filter_list(List *expressionItems)
 					}
 					appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, o);
 					pxf_free_filter(filter);
-				} else{
+				} else {
+					/* if at least one expression item is not supported, whole filter doesn't make sense*/
+					elog(INFO, "Query will not be optimized to use filter push-down.");
 					pfree(filter);
+					pfree(resbuf->data);
+					return NULL;
 				}
 				break;
 			}
