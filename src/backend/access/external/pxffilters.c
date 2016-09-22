@@ -317,6 +317,12 @@ pxf_serialize_filter_list(List *expressionItems)
 		}
 	}
 
+	if (resbuf->len == 0)
+	{
+		pfree(resbuf->data);
+		return NULL;
+	}
+
 	return resbuf->data;
 }
 
