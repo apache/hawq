@@ -142,7 +142,24 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{674 /* float8gt */, PXFOP_GT},
 	{673 /* float8le */, PXFOP_LE},
 	{675 /* float8ge */, PXFOP_GE},
-	{671 /* float8ne */, PXFOP_NE}
+	{671 /* float8ne */, PXFOP_NE},
+
+	/* bpchar */
+	{BPCharEqualOperator  /* bpchareq */, PXFOP_EQ},
+	{1058  /* bpcharlt */, PXFOP_LT},
+	{1060 /* bpchargt */, PXFOP_GT},
+	{1059 /* bpcharle */, PXFOP_LE},
+	{1061 /* bpcharge */, PXFOP_GE},
+	{1057 /* bpcharne */, PXFOP_NE},
+
+	/* bytea */
+	{ByteaEqualOperator  /* byteaeq */, PXFOP_EQ},
+	{1957  /* bytealt */, PXFOP_LT},
+	{1959 /* byteagt */, PXFOP_GT},
+	{1958 /* byteale */, PXFOP_LE},
+	{1960 /* byteage */, PXFOP_GE},
+	{1956 /* byteane */, PXFOP_NE}
+
 };
 
 Oid pxf_supported_types[] =
@@ -159,7 +176,8 @@ Oid pxf_supported_types[] =
 	CHAROID,
 	BYTEAOID,
 	BOOLOID,
-	DATEOID
+	DATEOID,
+	TIMESTAMPOID
 };
 
 /*
@@ -310,7 +328,7 @@ pxf_serialize_filter_list(List *expressionItems)
 					pxf_free_filter(filter);
 				} else {
 					/* if at least one expression item is not supported, whole filter doesn't make sense*/
-					elog(INFO, "Query will not be optimized to use filter push-down.");
+					elog(DEBUG1, "Query will not be optimized to use filter push-down.");
 					pfree(filter);
 					pfree(resbuf->data);
 					return NULL;
@@ -411,6 +429,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	}
 	else
 	{
+		elog(DEBUG1, "opexpr_to_pxffilter: expression is not a Var+Const");
 		return false;
 	}
 
@@ -426,9 +445,10 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		}
 	}
 
+	elog(DEBUG1, "opexpr_to_pxffilter: operator is not supported, operator code: %d", expr->opno);
+
 	/* NOTE: if more validation needed, add it before the operators test
 	 * or alternatively change it to use a false flag and return true below */
-
 	return false;
 }
 
@@ -510,6 +530,9 @@ supported_filter_type(Oid type)
 		if (type == pxf_supported_types[i])
 			return true;
 	}
+
+	elog(DEBUG1, "supported_filter_type: filter pushdown is not supported for datatype oid: %d", type);
+
 	return false;
 }
 
@@ -555,6 +578,7 @@ const_to_str(Const *constval, StringInfo buf)
 		case CHAROID:
 		case BYTEAOID:
 		case DATEOID:
+		case TIMESTAMPOID:
 			appendStringInfo(buf, "\\\"%s\\\"", extval);
 			break;
 
