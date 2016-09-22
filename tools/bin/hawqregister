@@ -316,7 +316,11 @@ class HawqRegister(object):
             else:
                 return 'usage2_table_not_exist'
         else:
-            return 'usage1'
+            if not table_existed():
+                logger.error('You should create table before registering the data.')
+                sys.exit(1)
+            else:
+                return 'usage1'
 
     def _init(self):
         def check_hash_type():
@@ -480,6 +484,18 @@ class HawqRegister(object):
                     logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))
                     sys.exit(1)
 
+        def check_no_regex_filepath(files):
+            for fn in files:
+                tmp_lst = fn.split('/')
+                for v in tmp_lst:
+                    if v == '.':
+                        logger.error('Hawq register does not support file path with regex: %s.' % fn)
+                        sys.exit(1)
+                for ch in ['..', '*']:
+                    if fn.find(ch) != -1:
+                        logger.error('Hawq register does not support file path with regex: %s.' % fn)
+                        sys.exit(1)
+
         if self.yml:
             option_parser_yml(options.yml_config)
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
@@ -491,6 +507,7 @@ class HawqRegister(object):
             check_bucket_number()
             check_distribution_policy()
             check_policy_consistency()
+            check_no_regex_filepath(self.files)
         else:
             self.file_format = 'Parquet'
             check_hash_type() # Usage1 only support randomly distributed table
@@ -562,6 +579,7 @@ class HawqRegister(object):
         self._check_files_and_table_in_same_hdfs_cluster(self.filepath, self.tabledir)
 
         if not self.yml:
+            check_no_regex_filepath([self.filepath])
             self.files, self.sizes = self._get_files_in_hdfs(self.filepath)
         print 'New file(s) to be registered: ', self.files
         if self.files_update:
