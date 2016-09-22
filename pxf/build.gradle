@@ -48,6 +48,12 @@ if (hddist != 'phd' && hddist != 'hdp') {
     throw new GradleException("hadoop distribution parameter (hd) set to invalid value: $hddist")
 }
 
+// Some package names need to be renamed to include the version number
+// as part of the package name to enable side by side install of two versions of the same package.
+def versionedPackageName(packageName) {
+    packageName + "_" + "${version}".replaceAll("-", "-")
+}
+
 subprojects { subProject ->
     group = 'org.apache.hawq.pxf'
     apply plugin: 'java'
@@ -191,6 +197,7 @@ project('pxf-service') {
     }
 
     ospackage {
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), service REST API'
         description = 'Rest API for the HAWQ Extenstion framework'
         packager = ' '
@@ -289,10 +296,10 @@ project('pxf') {
         release = buildNumber() + '.' + project.osFamily
         buildHost = ' '
 
-        requires('pxf-hdfs', project.version, GREATER | EQUAL)
-        requires('pxf-hive', project.version, GREATER | EQUAL)
-        requires('pxf-hbase', project.version, GREATER | EQUAL)
-        requires('pxf-json', project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-hdfs'), project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-hive'), project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-hbase'), project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-json'), project.version, GREATER | EQUAL)
 
         link('/usr/lib/pxf', "/usr/lib/pxf-${project.version}")
         link('/etc/pxf', "pxf-${project.version}")
@@ -309,6 +316,7 @@ project('pxf-hdfs') {
     }
 
     ospackage {
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), HDFS plugin'
         description = 'Querying external data stored in HDFS'
         packager = ' '
@@ -316,7 +324,7 @@ project('pxf-hdfs') {
         release = buildNumber() + '.' + project.osFamily
         buildHost = ' '
 
-        requires('pxf-service', project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-service'), project.version, GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
         requires('hadoop-mapreduce', "$hadoopVersion", GREATER | EQUAL)
 
@@ -346,7 +354,7 @@ project('pxf-hive') {
     }
 
     ospackage {
-
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), Hive plugin'
         description = 'Querying external data stored in Hive'
         packager = ' '
@@ -354,7 +362,7 @@ project('pxf-hive') {
         release = buildNumber() + '.' + project.osFamily
         buildHost = ' '
 
-        requires('pxf-hdfs', project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-hdfs'), project.version, GREATER | EQUAL)
 
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
@@ -374,7 +382,8 @@ project('pxf-json') {
     }
 
     ospackage {
-      requires('pxf-hdfs', project.version, GREATER | EQUAL)
+      requires(versionedPackageName('pxf-hdfs'), project.version, GREATER | EQUAL)
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), Json plugin'
         description = 'Querying external data stored in HDFS in Json format'
         packager = ' '
@@ -398,6 +407,7 @@ project('pxf-hbase') {
     }
 
     ospackage {
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), HBase plugin'
         description = 'Querying external data stored in HBase'
         packager = ' '
@@ -405,7 +415,7 @@ project('pxf-hbase') {
         release = buildNumber() + '.' + project.osFamily
         buildHost = ' '
 
-        requires('pxf-service', project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-service'), project.version, GREATER | EQUAL)
 
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
