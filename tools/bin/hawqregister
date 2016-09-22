@@ -296,6 +296,8 @@ class HawqRegister(object):
             if force:
                 return 'force'
             elif repair:
+                logger.info('--repair mode is not supported in current release of hawq register.')
+                sys.exit(0)
                 if not table_existed():
                     logger.error('--repair mode asserts the table has been already created.')
                     sys.exit(1)
@@ -405,6 +407,9 @@ class HawqRegister(object):
 
             if params['FileFormat'].lower() == 'parquet':
                 partitionby = params.get('Parquet_FileLocations').get('PartitionBy')
+                if partitionby:
+                    logger.info('Partition table is not supported in current release of hawq register.')
+                    sys.exit(0)
                 if params.get('Parquet_FileLocations').get('Partitions') and len(params['Parquet_FileLocations']['Partitions']):
                     partitions_checksum = [d['Checksum'] for d in params['Parquet_FileLocations']['Partitions']]
                     partitions_compression_level = [d['CompressionLevel'] for d in params['Parquet_FileLocations']['Partitions']]
@@ -424,6 +429,9 @@ class HawqRegister(object):
 
             else: #AO format
                 partitionby = params.get('AO_FileLocations').get('PartitionBy')
+                if partitionby:
+                    logger.info('Partition table is not supported in current release of hawq register.')
+                    sys.exit(0)
                 if params.get('AO_FileLocations').get('Partitions') and len(params['AO_FileLocations']['Partitions']):
                     partitions_checksum = [d['Checksum'] for d in params['AO_FileLocations']['Partitions']]
                     partitions_compressionLevel = [d['CompressionLevel'] for d in params['AO_FileLocations']['Partitions']]

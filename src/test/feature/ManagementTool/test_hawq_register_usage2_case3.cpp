@@ -14,7 +14,7 @@ using hawq::test::SQLUtility;
 using hawq::test::Command;
 using hawq::test::HdfsConfig;
 
-TEST_F(TestHawqRegister, TestUsage2Case3Expected) {
+TEST_F(TestHawqRegister, DISABLED_TestUsage2Case3Expected) {
     SQLUtility util;
     string test_root(util.getTestRootPath());
     std::vector<string> create_table_matrix = {"distributed by (i)", "distributed randomly"};
