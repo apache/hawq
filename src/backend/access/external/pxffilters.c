@@ -134,8 +134,15 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{1097 /* date_gt */, PXFOP_GT},
 	{1096 /* date_le */, PXFOP_LE},
 	{1098 /* date_ge */, PXFOP_GE},
-	{1094 /* date_ne */, PXFOP_NE}
+	{1094 /* date_ne */, PXFOP_NE},
 
+	/* float8 */
+	{Float8EqualOperator  /* float8eq */, PXFOP_EQ},
+	{672  /* float8lt */, PXFOP_LT},
+	{674 /* float8gt */, PXFOP_GT},
+	{673 /* float8le */, PXFOP_LE},
+	{675 /* float8ge */, PXFOP_GE},
+	{671 /* float8ne */, PXFOP_NE}
 };
 
 Oid pxf_supported_types[] =
