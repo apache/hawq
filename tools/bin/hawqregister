@@ -504,7 +504,7 @@ class HawqRegister(object):
             if self.tabledir.strip('/') != self.filepath.strip('/'):
                 logger.error("In repair mode, file path from yaml file should be the same with table's path.")
                 sys.exit(1)
-            existed_files, existed_sizes = self._get_files_in_hdfs(self.filepath, self.mode)
+            existed_files, existed_sizes = self._get_files_in_hdfs(self.filepath)
             existed_info = {}
             for k, fn in enumerate(existed_files):
                 existed_info[fn] = existed_sizes[k]
@@ -523,7 +523,7 @@ class HawqRegister(object):
 
         self.do_not_move, self.files_update, self.sizes_update = False, [], []
         if self.mode == 'force':
-            existed_files, _ = self._get_files_in_hdfs(self.tabledir, self.mode)
+            existed_files, _ = self._get_files_in_hdfs(self.tabledir)
             if len(self.files) == len(existed_files):
                 if sorted(self.files) != sorted(existed_files):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
@@ -558,7 +558,7 @@ class HawqRegister(object):
         self._check_files_and_table_in_same_hdfs_cluster(self.filepath, self.tabledir)
 
         if not self.yml:
-            self.files, self.sizes = self._get_files_in_hdfs(self.filepath, self.mode)
+            self.files, self.sizes = self._get_files_in_hdfs(self.filepath)
         print 'New file(s) to be registered: ', self.files
         if self.files_update:
             print 'Catalog info need to be updated for these files: ', self.files_update
@@ -595,7 +595,7 @@ class HawqRegister(object):
             logger.error("Files to be registered and the table are not in the same hdfs cluster.\nFile(s) to be registered: '%s'\nTable path in HDFS: '%s'." % (filepath, tabledir))
             sys.exit(1)
 
-    def _get_files_in_hdfs(self, filepath, mode):
+    def _get_files_in_hdfs(self, filepath):
         '''Get all the files refered by 'filepath', which could be a file or a directory containing all the files'''
         files, sizes = [], []
         hdfscmd = "hdfs dfs -test -e %s" % filepath
@@ -612,7 +612,7 @@ class HawqRegister(object):
             if len(lineargs) == 8 and lineargs[0].find("d") == -1:
                 files.append(lineargs[7])
                 sizes.append(int(lineargs[4]))
-        if len(files) == 0 and mode != 'force':
+        if len(files) == 0 and self.mode != 'force':
             logger.error("Dir '%s' is empty" % filepath)
             sys.exit(1)
         return files, sizes
