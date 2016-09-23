@@ -303,7 +303,7 @@ project('pxf') {
         requires(versionedPackageName('pxf-json'), project.version, GREATER | EQUAL)
 
         link('/usr/lib/pxf', "/usr/lib/pxf-${project.version}")
-        link('/etc/pxf', "pxf-${project.version}")
+        link('/etc/pxf', "/etc/pxf-${project.version}")
         link('/opt/pxf', "/opt/pxf-${project.version}")
         link('/etc/init.d/pxf-service', "/opt/pxf/pxf-service")
     }
