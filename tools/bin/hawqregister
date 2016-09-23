@@ -58,7 +58,7 @@ def option_parser():
     return parser
 
 
-def register_yaml_dict_check(D):
+def register_yaml_dict_check(D, table_column_num, src_tablename):
     '''check exists'''
     check_list = ['DFS_URL', 'Distribution_Policy', 'FileFormat', 'TableName', 'Bucketnum']
     for attr in check_list:
@@ -111,6 +111,13 @@ def register_yaml_dict_check(D):
             if not D['AO_FileLocations'].has_key(attr):
                 logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % 'AO_FileLocations.%s' % attr)
                 sys.exit(1)
+    if D['FileFormat'].lower() == 'parquet':
+        yml_column_num = len(D['Parquet_Schema'])
+    else:
+        yml_column_num = len(D['AO_Schema'])
+    if table_column_num != yml_column_num and table_column_num > 0:
+        logger.error('Column number of table in yaml file is not equals to the column number of table %s.' % src_tablename)
+        sys.exit(1)        
 
 
 class FailureHandler(object):
@@ -168,6 +175,10 @@ class GpRegisterAccessor(object):
     def get_table_existed(self, tablename):
         qry = """select count(*) from pg_class where relname = '%s';""" % tablename.split('.')[-1].lower()
         return self.exec_query(qry)[0]['count'] == 1
+        
+    def get_table_column_num(self, tablename):
+        qry = """select count(*) from pg_attribute ,pg_class where pg_class.relname = '%s' and pg_class.oid = pg_attribute.attrelid and attnum > 0;""" % tablename.split('.')[-1].lower()
+        return self.exec_query(qry)[0]['count']
 
     def do_create_table(self, src_table_name, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number, partitionby, partitions_constraint, partitions_name):
         if self.get_table_existed(tablename):
@@ -395,7 +406,8 @@ class HawqRegister(object):
             import yaml
             with open(yml_file, 'r') as f:
                 params = yaml.load(f)
-            register_yaml_dict_check(params)
+            table_column_num = self.accessor.get_table_column_num(self.tablename)
+            register_yaml_dict_check(params, table_column_num, self.tablename)
             partitions_filepaths = []
             partitions_filesizes = []
             partitions_constraint = []
@@ -469,8 +481,8 @@ class HawqRegister(object):
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
             check_file_not_folder()
             check_database_encoding()
-            if self.mode != 'force' and self.mode != 'repair':
-                if not create_table():
+            if self.mode != 'repair':
+                if not create_table() and self.mode != 'force':
                     self.mode = 'usage2_table_exist'
             check_bucket_number()
             check_distribution_policy()
@@ -600,7 +612,7 @@ class HawqRegister(object):
             if len(lineargs) == 8 and lineargs[0].find("d") == -1:
                 files.append(lineargs[7])
                 sizes.append(int(lineargs[4]))
-        if len(files) == 0:
+        if len(files) == 0 and self.mode != 'force':
             logger.error("Dir '%s' is empty" % filepath)
             sys.exit(1)
         return files, sizes
