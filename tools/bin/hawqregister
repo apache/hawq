@@ -136,7 +136,8 @@ class FailureHandler(object):
         return ' '.join(lst[:-2] + [lst[-1], lst[-2]])
 
     def rollback(self):
-        logger.info('Error found, Hawqregister starts to rollback...')
+        if len(self.operations) != 0:
+            logger.info('Error found, Hawqregister starts to rollback...')
         for (typ, cmd) in reversed(self.operations):
             if typ == 'SQL':
                 sql = self.assemble_SQL(cmd)
@@ -153,7 +154,8 @@ class FailureHandler(object):
                 if result != 0:
                     logger.error('Fail to rollback: %s.' % hdfscmd)
                     sys.exit(1)
-        logger.info('Hawq Register Rollback Succeed.')
+        if len(self.operations) != 0:
+            logger.info('Hawq Register Rollback Finished.')
 
 
 class GpRegisterAccessor(object):
