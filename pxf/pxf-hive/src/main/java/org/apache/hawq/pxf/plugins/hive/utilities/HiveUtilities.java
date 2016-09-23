@@ -262,7 +262,7 @@ public class HiveUtilities {
      * Converts HAWQ type to hive type.
      * @see EnumHiveToHawqType For supported mappings
      * @param type HAWQ data type
-     * @param name field name
+     * @param modifiers Integer array of modifier info
      * @return Hive type
      * @throws UnsupportedTypeException if type is not supported
      */
