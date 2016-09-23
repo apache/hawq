@@ -320,7 +320,7 @@ class HawqRegister(object):
                 return 'usage2_table_not_exist'
         else:
             if not table_existed():
-                logger.error('You should create table before registering the data.')
+                logger.error('Table %s does not exist.\nYou should create table before registering the data.' % self.tablename)
                 sys.exit(1)
             else:
                 return 'usage1'
@@ -368,6 +368,10 @@ class HawqRegister(object):
             policy = get_distribution_policy() # "" or "{1,3}"
             if policy is None:
                 return
+            if self.distribution_policy == 'DISTRIBUTED RANDOMLY':
+                logger.error('Distribution policy of %s from yaml is not consistent with the policy of existing table.' % self.tablename)
+                self.failure_handler.rollback()
+                sys.exit(1)
             tmp_dict = {}
             for i, d in enumerate(self.schema):
                 tmp_dict[d['name']] = i + 1
@@ -659,6 +663,10 @@ class HawqRegister(object):
             if len(lineargs) == 8 and lineargs[0].find("d") == -1:
                 files.append(lineargs[7])
                 sizes.append(int(lineargs[4]))
+        if len(files) == 0 and self.mode == 'usage1':
+            logger.info('No files to be registered.')
+            logger.info('Hawq Register Succeed.')
+            sys.exit(0)
         if len(files) == 0 and self.mode != 'force':
             logger.error("Dir '%s' is empty" % filepath)
             self.failure_handler.rollback()
