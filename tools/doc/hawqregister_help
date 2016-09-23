@@ -45,9 +45,13 @@ HAWQ register behaviors differently with different options:
    table pg_aoseg.pg_aoseg_$relid/pg_aoseg.pg_paqseg_$relid data for the table and 
    re-register according to .yml configuration file definition. Note. If there are
    files under table directory which are not specified in .yml configuration file, it will throw error out.
-Note. Without --force specified, if some file specified in .yml configuration file lie under the table directory, hawq register will throw error out.
-Note. With --force option specified, if there are files under table directory which are not specified in .yml configuration file, hawq register will throw error out.
-Note. For both the use cases of hawq register, if the table is hash distributed, hawq register just check the file number to be registered has to be integral multiple multiple times of this table’s bucket number, and check whether the distribution key specified in .yml configuration file is same as that of table. It does not check whether files are actually distributed by the key.
+Note. Without --force specified, if some file specified in .yml configuration file lie under the table directory,
+      hawq register will throw error out.
+Note. With --force option specified, if there are files under table directory which are not specified in .yml configuration file,
+      hawq register will throw error out.
+Note. In usage2, if the table is hash distributed, hawq register just check the file number to be registered
+      has to be multiple times of this table’s bucket number, and check whether the distribution key specified
+      in .yml configuration file is same as that of table. It does not check whether files are actually distributed by the key.
 
 To use "hawq register", HAWQ must have been started.
 Currently "hawq register" supports both AO and Parquet formats in this case.
@@ -130,7 +134,7 @@ $ hawq register --config paq1.yml paq2
 Finally, select the new table to look at whether the content has already been registered.
 $ select count(*) from paq2;
 
-In the above example, the final result must be return 1000.
+In the above example, the final result should be return 1000.
 
 *****************************************************
 DATA TYPES
