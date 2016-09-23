@@ -165,7 +165,7 @@ public class HiveUtilitiesTest {
         assertEquals(compatibleTypeName, EnumHiveToHawqType.TimestampType.getTypeName());
 
         compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.NUMERIC, null);
-        assertEquals(compatibleTypeName, EnumHiveToHawqType.DecimalType.getTypeName());
+        assertEquals(compatibleTypeName, EnumHiveToHawqType.DecimalType.getTypeName() + EnumHiveToHawqType.DecimalType.getDefaultModifier());
 
         try {
             compatibleTypeName = HiveUtilities.toCompatibleHiveType(DataType.UNSUPPORTED_TYPE, null);
