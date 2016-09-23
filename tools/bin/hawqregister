@@ -673,9 +673,9 @@ class HawqRegister(object):
             if out == '0':
                 continue
             hdfscmd = 'hdfs dfs -cat %s | head -c 4 | grep PAR1' % f
-            result1 = local_ssh(hdfscmd, logger)
+            result1 = local_ssh(hdfscmd)
             hdfscmd = 'hdfs dfs -cat %s | tail -c 4 | grep PAR1' % f
-            result2 = local_ssh(hdfscmd, logger)
+            result2 = local_ssh(hdfscmd)
             if result1 or result2:
                 logger.error('File %s is not parquet format' % f)
                 self.failure_handler.rollback()
