@@ -482,7 +482,7 @@ class HawqRegister(object):
             check_file_not_folder()
             check_database_encoding()
             if self.mode != 'repair':
-                if not create_table():
+                if not create_table() and self.mode != 'force':
                     self.mode = 'usage2_table_exist'
             check_bucket_number()
             check_distribution_policy()
