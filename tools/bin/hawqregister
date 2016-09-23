@@ -223,11 +223,9 @@ class GpRegisterAccessor(object):
         rows = self.exec_query(qry)
         if len(rows) == 0:
             logger.error('Table %s is not an append-only table. There is no record in gp_distribution_policy table.' % tablename)
-            self.failure_handler.rollback()
             sys.exit(1)
         if rows[0]['attrnums']:
             logger.error('Cannot register file(s) to a table which is hash distributed.')
-            self.failure_handler.rollback()
             sys.exit(1)
 
     # pg_paqseg_#
@@ -238,15 +236,13 @@ class GpRegisterAccessor(object):
         rows = self.exec_query(query)
         if len(rows) == 0:
             logger.error('table "%s" not found in db "%s"' % (tablename, database))
-            self.failure_handler.rollback()
-            sys.exit(1)
+            return ('', False)
         relname = rows[0]['relname']
         if fmt == 'Parquet':
             if relname.find('paq') == -1:
                 logger.error("table '%s' is not parquet format" % tablename)
-                self.failure_handler.rollback()
-                sys.exit(1)
-        return relname
+                return ('', False)
+        return (relname, True)
 
     def get_distribution_policy_info(self, tablename):
         query = "select oid from pg_class where relname = '%s';" % tablename.split('.')[-1].lower()
@@ -533,7 +529,10 @@ class HawqRegister(object):
                 logger.info('Hawq Register Succeed.')
             sys.exit(0)
 
-        self.seg_name = get_seg_name()
+        (self.seg_name, tmp_ret) = get_seg_name()
+        if not tmp_ret:
+            self.failure_handler.rollback()
+            sys.exit(1)
         self.firstsegno, self.tabledir = get_metadata()
 
         if self.mode == 'repair':
