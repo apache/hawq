@@ -51,7 +51,7 @@ if (hddist != 'phd' && hddist != 'hdp') {
 // Some package names need to be renamed to include the version number
 // as part of the package name to enable side by side install of two versions of the same package.
 def versionedPackageName(packageName) {
-    packageName + "_" + "${version}".replaceAll(".", "_")
+    packageName + "_" + "${version}".replace(".", "_")
 }
 
 subprojects { subProject ->
@@ -264,13 +264,13 @@ project('pxf-service') {
         //tomcat configuration files
         from('src/configs/tomcat') {
             fileType CONFIG | NOREPLACE
-            into '/opt/pxf-${project.version}/tomcat-templates'
+            into "/opt/pxf-${project.version}/tomcat-templates"
         }
 
         from('src/scripts/pxf-service') {
             fileMode 0755
             addParentDirs false
-            into '/opt/pxf-${project.version}/pxf-service'
+            into "/opt/pxf-${project.version}"
         }
 
         link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
