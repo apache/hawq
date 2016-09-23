@@ -483,6 +483,10 @@ class HawqRegister(object):
 
         def check_sizes_valid():
             for sz in self.sizes:
+                if type(sz) != type(1):
+                    logger.error('File size(%s) in yaml configuration file should be int type.' % sz)
+                    self.failure_handler.rollback()
+                    sys.exit(1)
                 if sz < 0:
                     logger.error('File size(%s) in yaml configuration file should not be less than 0.' % sz)
                     self.failure_handler.rollback()
