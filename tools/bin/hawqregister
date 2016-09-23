@@ -117,7 +117,7 @@ def register_yaml_dict_check(D, table_column_num, src_tablename):
         yml_column_num = len(D['AO_Schema'])
     if table_column_num != yml_column_num and table_column_num > 0:
         logger.error('Column number of table in yaml file is not equals to the column number of table %s.' % src_tablename)
-        sys.exit(1)        
+        sys.exit(1) 
 
 
 class FailureHandler(object):
@@ -353,7 +353,8 @@ class HawqRegister(object):
             except pg.DatabaseError as e:
                 print e
                 sys.exit(1)
-            self.failure_handler.commit(('SQL', query))
+            if ret:
+                self.failure_handler.commit(('SQL', query))
             return ret
 
         def get_seg_name():
@@ -368,12 +369,7 @@ class HawqRegister(object):
         def check_policy_consistency():
             policy = get_distribution_policy() # "" or "{1,3}"
             if policy is None:
-                if ' '.join(self.distribution_policy.strip().split()).lower() == 'distributed randomly':
-                    return
-                else:
-                    logger.error('Distribution policy of %s from yaml file is not consistent with the policy of existing table.' % self.tablename)
-                    self.failure_handler.rollback()
-                    sys.exit(1)
+                return
             tmp_dict = {}
             for i, d in enumerate(self.schema):
                 tmp_dict[d['name']] = i + 1
