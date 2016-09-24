@@ -234,6 +234,27 @@ PyGreSQL 4.0 License
       licenses/LICENSE-pygresql.txt
 
 ======================================================================
+MIT License
+======================================================================
+
+  The following components are provided under a MIT license. See
+  project link for details.  The text of each license is also included
+  at licenses/LICENSE-[project].txt.
+
+     lockfile (0.9.1)
+       tools/bin/pythonSrc/lockfile-0.9.1
+       tools/bin/pythonSrc/lockfile-0.9.1/lockfile/pidlockfile.py
+
+     PSI (0.3b2_gp)
+       tools/bin/pythonSrc/PSI-0.3b2_gp
+
+     simplejson (1.7.3)
+       tools/bin/ext/simplejson
+
+     PyYAML
+       tools/bin/ext/yaml
+
+======================================================================
 BSD-style licenses
 ======================================================================
 
@@ -245,75 +266,18 @@ BSD-style licenses
        depends/libyarn/CMake
        depends/libhdfs3/CMake
 
-     (BSD 4 Clause revised) dynloader
-       src/backend/port/dynloader/freebsd.c
-       src/backend/port/dynloader/netbsd.c
-       src/backend/port/dynloader/openbsd.c
-       src/backend/port/dynloader/ultrix4.h
-
-       Revised based on: ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change
-       
-     (BSD 4 Clause revised) glob
-       src/bin/gpfdist/src/gpfdist/glob.c
-       src/bin/gpfdist/src/gpfdist/include/glob.h
-       src/include/port/win32_msvc/glob.h
-       src/port/glob.c
-
-       Revised based on: ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change
-      
-     (BSD License) pg_controldata 
-       src/bin/pg_controldata/pg_controldata.c 
+     (BSD License) pychecker (v0.8.18 - http://pychecker.sourceforge.net/)
+       tools/bin/pythonSrc/pychecker-0.8.18 
      
      (BSD License) unittest2 (v2-0.5.1 - https://pypi.python.org/pypi/unittest2)
        tools/bin/pythonSrc/unittest2-0.5.1
      
-     (BSD License) pychecker (v0.8.18 - http://pychecker.sourceforge.net/)
-       tools/bin/pythonSrc/pychecker-0.8.18 
-     
-     (BSD License) pg8000
-       tools/bin/ext/pg8000
-      
      (BSD License) figleaf (http://darcs.idyll.org/~t/projects/figleaf/)
        tools/bin/ext/figleaf
     
-     (BSD License) port
-       src/port/inet_aton.c
-       src/port/snprintf.c
-       src/port/crypt.c
-       src/port/memcmp.c
-       src/port/strlcpy.c
-
-     (BSD License) wstrcmp
-       src/backend/utils/mb/wstrcmp.c
-
-     (BSD License) libpq-sha2
-       src/backend/libpq/sha2
-
-======================================================================
-MIT License
-======================================================================
-
-  The following components are provided under a MIT license. See
-  project link for details.  The text of each license is also included
-  at licenses/LICENSE-[project].txt.
-
-     lockfile (0.9.1)
-       tools/bin/pythonSrc/lockfile-0.9.1
-
-     PSI (0.3b2_gp)
-       tools/bin/pythonSrc/PSI-0.3b2_gp
-
-======================================================================
-Python Software Foundation (PSF) License
-======================================================================
-
-  The following components are provided under a PSF license. See
-  project link for details.  The text of each license is also included
-  at licenses/LICENSE-[project].txt.
-
-     pidlockfile
-       tools/bin/pythonSrc/lockfile-0.9.1/lockfile/pidlockfile.py
-
+     (BSD License) pg8000
+       tools/bin/ext/pg8000
+      
 ======================================================================
 BZIP2 License
 ======================================================================
@@ -364,108 +328,6 @@ Pexpect License
       licenses/LICENSE-pexect.txt
 
 ======================================================================
-PL/Java License
-======================================================================
-
-  The following files are used:
-  
-      src/pl/pljava
-  
-  This file is made available under the following PL/Java license:
-  
-      licenses/LICENSE-pljava.txt
-
-======================================================================
-Perl Artistic License (exception)
-======================================================================
-
-  src/pl/plperl/ppport.h
-
-    Pursuant to https://issues.apache.org/jira/browse/LEGAL-79 and
-    PL/Perl's use of a generated header file, we declare this file to
-    be an exception to the Perl Artistic License.  This file is
-    derived from the PostgreSQL code base.
-
-    For completeness sake, we have provided the Perl Artistic License
-    for the Perl Devel-PPPort module
-    (http://search.cpan.org/~wolfsage/Devel-PPPort-3.32/PPPort.pm).
-    This module was used to generate the src/pl/plperl/ppport.h header
-    file. The license is available:
-
-       licenses/LICENSE-ppport.txt
-
-======================================================================
-test-ctype LICENSE
-======================================================================
-
-  The following files are used:
-  
-      src/test/locale/test-ctype.c
-  
-  This file is made available under the following test ctype license:
-  
-      licenses/LICENSE-test-ctype.txt
- 
-======================================================================
-port-rand LICENSE
-======================================================================
-
-  The following files are used:
-  
-      src/port/rand.c 
-  
-  This file is made available under the following port-rand license:
-  
-      licenses/LICENSE-port-rand.txt
-
-======================================================================
-Internet Systems Consortium/Internet Software Consortium (ISC) LICENSE
-======================================================================
-
-  The following files are used:
-  
-      src/backend/utils/adt/inet_net_ntop.c
-      src/backend/utils/adt/inet_net_pton.c
-  
-  These files are made available under the following ISC license:
-  
-      licenses/LICENSE-isc.txt
-
-  The following components are provided under the ISC license. See
-  project link for details.  The text of each license is also included
-  at licenses/LICENSE-[project].txt.
-
-     pexpect-4.2 (https://pypi.python.org/pypi/pexpect/4.2.0)
-       tools/bin/pythonSrc/pexpect-4.2
-
-     ptyprocess-0.5.1 (https://pypi.python.org/pypi/ptyprocess/0.5.1)
-       tools/bin/pythonSrc/ptyprocess-0.5.1
-
-======================================================================
-regex LICENSE
-======================================================================
-
-  The following files are used:
-  
-      src/backend/regex 
-  
-  This file is made available under the following regex license:
-  
-      licenses/LICENSE-regex.txt
-
-======================================================================
-port-gettimeofday LICENSE
-======================================================================
-
-  The following files are used:
-  
-      src/port/gettimeofday.c 
-  
-  This file is made available under the following port-gettimeofday license:
-  
-      licenses/LICENSE-port-gettimeofday.txt
-
-======================================================================
 PostgreSQL LICENSE
 ======================================================================
 
@@ -481,4 +343,95 @@ derived from PostgreSQL and is available under the following license:
      src/bin/pg_dump
      src/backend/port/qnx4/shm.c
      src/backend/port/beos/shm.c
-     
+
+  (BSD 4 Clause revised) dynloader
+    src/backend/port/dynloader/freebsd.c
+    src/backend/port/dynloader/netbsd.c
+    src/backend/port/dynloader/openbsd.c
+    src/backend/port/dynloader/ultrix4.h
+
+    Revised based on: ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change
+    
+  (BSD 4 Clause revised) glob
+    src/bin/gpfdist/src/gpfdist/glob.c
+    src/bin/gpfdist/src/gpfdist/include/glob.h
+    src/include/port/win32_msvc/glob.h
+    src/port/glob.c
+
+    Revised based on: ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change
+
+  (BSD License) pg_controldata 
+    src/bin/pg_controldata/pg_controldata.c 
+
+  (BSD License) port
+    src/port/inet_aton.c
+    src/port/snprintf.c
+    src/port/crypt.c
+    src/port/memcmp.c
+    src/port/strlcpy.c
+
+  (BSD License) wstrcmp
+    src/backend/utils/mb/wstrcmp.c
+
+  (BSD License) libpq-sha2
+    src/backend/libpq/sha2.[ch]
+
+      licenses/LICENSE-sha2.txtLICENSE-sha2.txt
+
+  (BSD License)
+   src/pl/pljava
+
+      licenses/LICENSE-pljava.txt
+
+  (Perl Artistic License) (exception)
+    src/pl/plperl/ppport.h
+  
+      Pursuant to https://issues.apache.org/jira/browse/LEGAL-79 and
+      PL/Perl's use of a generated header file, we declare this file to
+      be an exception to the Perl Artistic License.  This file is
+      derived from the PostgreSQL code base.
+  
+      For completeness sake, we have provided the Perl Artistic License
+      for the Perl Devel-PPPort module
+      (http://search.cpan.org/~wolfsage/Devel-PPPort-3.32/PPPort.pm).
+      This module was used to generate the src/pl/plperl/ppport.h header
+      file. The license is available:
+  
+         licenses/LICENSE-ppport.txt
+
+  (test-ctype LICENSE)
+    src/test/locale/test-ctype.c
+  
+      licenses/LICENSE-test-ctype.txt
+ 
+  (port-rand LICENSE)
+    src/port/rand.c 
+  
+      licenses/LICENSE-port-rand.txt
+
+  (Internet Systems Consortium/Internet Software Consortium (ISC) LICENSE)
+    
+    src/backend/utils/adt/inet_net_ntop.c
+    src/backend/utils/adt/inet_net_pton.c 
+  
+      licenses/LICENSE-isc.txt
+
+    The following components are provided under the ISC license. See
+    project link for details.  The text of each license is also
+    included at licenses/LICENSE-[project].txt.
+  
+       pexpect-4.2 (https://pypi.python.org/pypi/pexpect/4.2.0)
+         tools/bin/pythonSrc/pexpect-4.2
+  
+       ptyprocess-0.5.1 (https://pypi.python.org/pypi/ptyprocess/0.5.1)
+         tools/bin/pythonSrc/ptyprocess-0.5.1
+
+  (regex LICENSE)
+    src/backend/regex 
+  
+      licenses/LICENSE-regex.txt
+
+  (port-gettimeofday LICENSE)
+    src/port/gettimeofday.c 
+  
+      licenses/LICENSE-port-gettimeofday.txt
