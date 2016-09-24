@@ -92,6 +92,14 @@ typedef struct dbop_pxfop_map
 
 } dbop_pxfop_map;
 
+
+typedef struct ExpressionItem
+{
+	Node	*node;
+	Node	*parent;
+	bool	processed;
+} ExpressionItem;
+
 static inline bool pxfoperand_is_attr(PxfOperand x)
 {
 	return (x.opcode == PXF_ATTR_CODE);
