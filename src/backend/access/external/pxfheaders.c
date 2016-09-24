@@ -72,7 +72,7 @@ void build_http_header(PxfInputData *input)
 			add_projection_desc_httpheader(headers, proj_info, qualsAttributes);
 		}
 		else
-			elog(INFO, "Query will not be optimized to use projection information");
+			elog(DEBUG2, "Query will not be optimized to use projection information");
 	}
 
 	/* GP cluster configuration */
