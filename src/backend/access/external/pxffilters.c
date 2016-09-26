@@ -266,7 +266,7 @@ pxf_make_expression_items_list(List *quals, Node *parent)
 				break;
 			}
 			default:
-				elog(DEBUG5, "pxf_make_expression_items_list: unsupported node tag %d", tag);
+				elog(DEBUG1, "pxf_make_expression_items_list: unsupported node tag %d", tag);
 				break;
 		}
 	}
@@ -343,7 +343,7 @@ pxf_serialize_filter_list(List *expressionItems)
 		{
 			case T_OpExpr:
 			{
-				elog(DEBUG5, "pxf_serialize_filter_list: node tag %d (T_OpExpr)", tag);
+				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_OpExpr)", tag);
 				PxfFilterDesc *filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
 				OpExpr *expr = (OpExpr *) node;
 				if (opexpr_to_pxffilter(expr, filter))
@@ -386,7 +386,7 @@ pxf_serialize_filter_list(List *expressionItems)
 			{
 				BoolExpr *expr = (BoolExpr *) node;
 				BoolExprType boolType = expr->boolop;
-				elog(DEBUG5, "pxf_serialize_filter_list: node tag %d (T_BoolExpr), bool node type %d", tag, boolType);
+				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_BoolExpr), bool node type %d", tag, boolType);
 				appendStringInfo(resbuf, "%c%d", PXF_LOGICAL_OPERATOR_CODE, boolType);
 				break;
 			}
@@ -430,12 +430,12 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	/* only binary oprs supported currently */
 	if (!rightop)
 	{
-		elog(DEBUG5, "opexpr_to_pxffilter: unary op! leftop_type: %d, op: %d",
+		elog(DEBUG1, "opexpr_to_pxffilter: unary op! leftop_type: %d, op: %d",
 			 leftop_type, expr->opno);
 		return false;
 	}
 
-	elog(DEBUG5, "opexpr_to_gphdfilter: leftop (expr type: %d, arg type: %d), "
+	elog(DEBUG1, "opexpr_to_gphdfilter: leftop (expr type: %d, arg type: %d), "
 			"rightop_type (expr type: %d, arg type %d), op: %d",
 			leftop_type, nodeTag(leftop),
 			rightop_type, nodeTag(rightop),
@@ -674,7 +674,7 @@ char *serializePxfFilterQuals(List *quals)
 	}
 
 
-	elog(DEBUG2, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
+	elog(DEBUG1, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
 
 	return result;
 }
