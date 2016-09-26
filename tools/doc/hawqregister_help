@@ -52,6 +52,7 @@ Note. With --force option specified, if there are files under table directory wh
 Note. In usage2, if the table is hash distributed, hawq register just check the file number to be registered
       has to be multiple times of this table’s bucket number, and check whether the distribution key specified
       in .yml configuration file is same as that of table. It does not check whether files are actually distributed by the key.
+Note. To register a hash distributed table through yaml file , please make sure the order of the files in yaml keeps the hash distribution.
 
 To use "hawq register", HAWQ must have been started.
 Currently "hawq register" supports both AO and Parquet formats in this case.
