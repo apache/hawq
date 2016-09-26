@@ -3265,7 +3265,7 @@ AttrDefaultFetch(Relation relation)
 	caql_endscan(pcqCtx);
 	heap_close(adrel, AccessShareLock);
 
-	if (found != ndef)
+	if (found != ndef && AmIMaster())
 		elog(WARNING, "%d attrdef record(s) missing for rel %s",
 			 ndef - found, RelationGetRelationName(relation));
 }
