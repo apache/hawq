@@ -1246,7 +1246,6 @@ if __name__ == '__main__':
         print "Exiting"
         sys.exit(1)
 
-    """
     # ### Force HDFS checkpoint and enable safemode on target
     print "Enabling HDFS safemode on target cluster" if options.verbose else None
     retVal, stderr = enableHdfsSafemode(namenodeHost=options.targetNamenode, isTesting=options.testMode)
@@ -1265,7 +1264,6 @@ if __name__ == '__main__':
         print "Error message was " + stderr
         print "Exiting"
         sys.exit(1)
-    """;
 
     # ### HDFS Fingerprint comparison
 
@@ -1300,17 +1298,7 @@ if __name__ == '__main__':
         print "This is bad, please check Falcon sync logs : " + falconOutput
         sys.exit(1)
     else:
-        print "HAWQ sync completed successfully!"
-        print """
-        ## Manual runbook during DR event
-        1. Copy MDD archive from HDFS to target master (CLI)
-        2. Restore archive in /data/hawq/ (CLI)
-        3. Disable HDFS safemode (CLI)
-        4. Start HAWQ (CLI)
-        5. Update hawq_segment_configuration (psql)
-        6. Deploy a HAWQ standby master in Ambari
-        """;
-        sys.exit(0)
+        print "Source and target HDFS fingerprints match."
 
     # Target
     # TODO - either use Ambari REST call or use SSH
@@ -1325,5 +1313,15 @@ if __name__ == '__main__':
         print "Exiting"
         sys.exit(1)
     else:
+        print "HAWQ sync completed successfully!"
+        print """
+        ## Manual runbook during DR event
+        1. Copy MDD archive from HDFS to target master (CLI)
+        2. Restore archive in /data/hawq/ (CLI)
+        3. Disable HDFS safemode (CLI)
+        4. Start HAWQ (CLI)
+        5. Update hawq_segment_configuration (psql)
+        6. Deploy a HAWQ standby master in Ambari
+        """;
         sys.exit(0)
 
