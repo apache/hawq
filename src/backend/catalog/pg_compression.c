@@ -430,7 +430,7 @@ snappy_compress_internal(PG_FUNCTION_ARGS)
 	size_t			src_sz = PG_GETARG_INT32(1);
 	char			*dst = PG_GETARG_POINTER(2);
 	size_t			dst_sz = PG_GETARG_INT32(3);
-	size_t			*dst_used = PG_GETARG_POINTER(4);
+	int32			*dst_used = PG_GETARG_POINTER(4);
 	size_t			compressed_length;
 	snappy_status	retval;
 
@@ -452,14 +452,14 @@ snappy_decompress_internal(PG_FUNCTION_ARGS)
 	const char		*src	= PG_GETARG_POINTER(0);
 	size_t			src_sz = PG_GETARG_INT32(1);
 	char			*dst	= PG_GETARG_POINTER(2);
-	int32			dst_sz = PG_GETARG_INT32(3);
+	size_t			dst_sz = PG_GETARG_INT32(3);
 	int32			*dst_used = PG_GETARG_POINTER(4);
 	size_t			uncompressed_length;
 	snappy_status	retval;
 
 	Insist(src_sz > 0 && dst_sz > 0);
 
-	retval = snappy_uncompressed_length((char *) src, (size_t) src_sz,
+	retval = snappy_uncompressed_length(src, src_sz,
 										&uncompressed_length);
 	if (retval != SNAPPY_OK)
 		elog_snappy_error(retval, "snappy_uncompressed_length",
@@ -467,8 +467,7 @@ snappy_decompress_internal(PG_FUNCTION_ARGS)
 
 	Insist(dst_sz >= uncompressed_length);
 
-	retval = snappy_uncompress((char *) src, src_sz, (char *) dst,
-							   &uncompressed_length);
+	retval = snappy_uncompress(src, src_sz, dst, &uncompressed_length);
 	*dst_used = uncompressed_length;
 
 	if (retval != SNAPPY_OK)
