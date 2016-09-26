@@ -59,6 +59,7 @@
               <exclude>depends/libyarn/CMake/**</exclude>
               
               <!-- Open-source Python modules with BSD license -->
+              
               <exclude>tools/bin/pythonSrc/pychecker-0.8.18/**</exclude>
               <exclude>tools/bin/pythonSrc/unittest2-0.5.1/**</exclude>
               <exclude>tools/bin/ext/figleaf/**</exclude>
