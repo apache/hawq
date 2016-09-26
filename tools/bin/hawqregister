@@ -588,8 +588,8 @@ class HawqRegister(object):
                     if f in existed_files:
                         self.files_update.append(self.files[k])
                         self.sizes_update.append(self.sizes[k])
-                        self.newfiles.remove(files_old[k])
-                        self.newsizes.remove(sizes_old[k])
+                        self.newfiles.remove(self.files[k])
+                        self.newsizes.remove(self.sizes[k])
                 if sorted(self.files_update) != sorted(existed_files):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                     self.failure_handler.rollback()
