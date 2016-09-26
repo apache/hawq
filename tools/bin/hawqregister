@@ -51,14 +51,14 @@ def option_parser():
     parser.add_option('-U', '--user', help='username of the target DB')
     parser.add_option('-d', '--database', default='postgres', dest='database', help='database name')
     parser.add_option('-f', '--filepath', dest='filepath', help='file name in HDFS')
-    parser.add_option('-e', '--eof', dest='filesize', type='int', default=0, help='eof of the file to be registered')
+    parser.add_option('-e', '--eof', dest='filesize', type='int', default=None, help='eof of the file to be registered')
     parser.add_option('-c', '--config', dest='yml_config', default='', help='configuration file in YAML format')
     parser.add_option('-F', '--force', dest='force', action='store_true', default=False)
     parser.add_option('-R', '--repair', dest='repair', action='store_true', default=False)
     return parser
 
 
-def register_yaml_dict_check(D):
+def register_yaml_dict_check(D, table_column_num, src_tablename):
     '''check exists'''
     check_list = ['DFS_URL', 'Distribution_Policy', 'FileFormat', 'TableName', 'Bucketnum']
     for attr in check_list:
@@ -111,6 +111,52 @@ def register_yaml_dict_check(D):
             if not D['AO_FileLocations'].has_key(attr):
                 logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % 'AO_FileLocations.%s' % attr)
                 sys.exit(1)
+    if D['FileFormat'].lower() == 'parquet':
+        yml_column_num = len(D['Parquet_Schema'])
+    else:
+        yml_column_num = len(D['AO_Schema'])
+    if table_column_num != yml_column_num and table_column_num > 0:
+        logger.error('Column number of table in yaml file is not equals to the column number of table %s.' % src_tablename)
+        sys.exit(1) 
+
+
+class FailureHandler(object):
+    def __init__(self, conn):
+        self.operations = []
+        self.conn = conn
+
+    def commit(self, cmd):
+        self.operations.append(cmd)
+
+    def assemble_SQL(self, cmd):
+        return 'DROP TABLE %s' % cmd[cmd.find('table')+6:cmd.find('(')]
+
+    def assemble_hdfscmd(self, cmd):
+        lst = cmd.strip().split()
+        return ' '.join(lst[:-2] + [lst[-1], lst[-2]])
+
+    def rollback(self):
+        if len(self.operations) != 0:
+            logger.info('Error found, Hawqregister starts to rollback...')
+        for (typ, cmd) in reversed(self.operations):
+            if typ == 'SQL':
+                sql = self.assemble_SQL(cmd)
+                try:
+                    self.conn.query(sql)
+                except pg.DatabaseError as e:
+                    logger.error('Rollback failure: %s.' % sql)
+                    print e
+                    sys.exit(1)
+            if typ == 'HDFSCMD':
+                hdfscmd = self.assemble_hdfscmd(cmd)
+                sys.stdout.write('Rollback hdfscmd: "%s"\n' % hdfscmd)
+                result = local_ssh(hdfscmd, logger)
+                if result != 0:
+                    logger.error('Fail to rollback: %s.' % hdfscmd)
+                    sys.exit(1)
+        if len(self.operations) != 0:
+            logger.info('Hawq Register Rollback Finished.')
+
 
 class GpRegisterAccessor(object):
     def __init__(self, conn):
@@ -132,17 +178,28 @@ class GpRegisterAccessor(object):
     def get_table_existed(self, tablename):
         qry = """select count(*) from pg_class where relname = '%s';""" % tablename.split('.')[-1].lower()
         return self.exec_query(qry)[0]['count'] == 1
+        
+    def get_table_column_num(self, tablename):
+        qry = """select count(*) from pg_attribute ,pg_class where pg_class.relname = '%s' and pg_class.oid = pg_attribute.attrelid and attnum > 0;""" % tablename.split('.')[-1].lower()
+        return self.exec_query(qry)[0]['count']
 
-    def do_create_table(self, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number, partitionby, partitions_constraint, partitions_name):
+    def do_create_table(self, src_table_name, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number, partitionby, partitions_constraint, partitions_name):
         if self.get_table_existed(tablename):
-            return False
+            return False, ''
         schema = ','.join([k['name'] + ' ' + k['type'] for k in schema_info])
         partlist = ""
         for index in range(len(partitions_constraint)):
             if index > 0:
                 partlist += ", "
-            partlist = partlist + "partition " + partitions_name[index] + " " + partitions_constraint[index]
-          
+            partition_refine_name = partitions_name[index]
+            splitter = src_table_name.split(".")[-1] + '_1_prt_'
+            partition_refine_name = partition_refine_name.split(splitter)[-1]
+            #in some case, constraint contains "partition XXX" but in other case, it doesn't contain. we need to treat them separately.
+            if partitions_constraint[index].strip().startswith("DEFAULT PARTITION") or partitions_constraint[index].strip().startswith("PARTITION") or (len(partition_refine_name) > 0 and partition_refine_name[0].isdigit()):
+                partlist = partlist + " " + partitions_constraint[index]
+            else:
+                partlist = partlist + "PARTITION " + partition_refine_name + " " + partitions_constraint[index]
+
         fmt = 'ROW' if fmt == 'AO' else fmt
         if fmt == 'ROW':
             if partitionby is None:
@@ -159,7 +216,7 @@ class GpRegisterAccessor(object):
                 query = ('create table %s(%s) with (appendonly=true, orientation=%s, compresstype=%s, compresslevel=%s, pagesize=%s, rowgroupsize=%s, bucketnum=%s) %s %s (%s);'
                          % (tablename, schema, fmt, file_locations['CompressionType'], file_locations['CompressionLevel'], file_locations['PageSize'], file_locations['RowGroupSize'], bucket_number, distrbution_policy, partitionby, partlist))
         self.conn.query(query)
-        return True
+        return True, query
 
     def check_hash_type(self, tablename):
         qry = """select attrnums from gp_distribution_policy, pg_class where pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;""" % tablename
@@ -179,13 +236,13 @@ class GpRegisterAccessor(object):
         rows = self.exec_query(query)
         if len(rows) == 0:
             logger.error('table "%s" not found in db "%s"' % (tablename, database))
-            sys.exit(1)
+            return ('', False)
         relname = rows[0]['relname']
         if fmt == 'Parquet':
             if relname.find('paq') == -1:
                 logger.error("table '%s' is not parquet format" % tablename)
-                sys.exit(1)
-        return relname
+                return ('', False)
+        return (relname, True)
 
     def get_distribution_policy_info(self, tablename):
         query = "select oid from pg_class where relname = '%s';" % tablename.split('.')[-1].lower()
@@ -233,7 +290,7 @@ class GpRegisterAccessor(object):
 
 
 class HawqRegister(object):
-    def __init__(self, options, table, utility_conn, conn):
+    def __init__(self, options, table, utility_conn, conn, failure_handler):
         self.yml = options.yml_config
         self.filepath = options.filepath
         self.database = options.database
@@ -241,6 +298,7 @@ class HawqRegister(object):
         self.filesize = options.filesize
         self.accessor = GpRegisterAccessor(conn)
         self.utility_accessor = GpRegisterAccessor(utility_conn)
+        self.failure_handler = failure_handler
         self.mode = self._init_mode(options.force, options.repair)
         self._init()
 
@@ -252,14 +310,20 @@ class HawqRegister(object):
             if force:
                 return 'force'
             elif repair:
+                logger.info('--repair mode is not supported in current release of hawq register.')
+                sys.exit(0)
                 if not table_existed():
                     logger.error('--repair mode asserts the table has been already created.')
                     sys.exit(1)
                 return 'repair'
             else:
-                return 'second_normal'
+                return 'usage2_table_not_exist'
         else:
-            return 'first'
+            if not table_existed():
+                logger.error('Table %s does not exist.\nYou should create table before registering the data.' % self.tablename)
+                sys.exit(1)
+            else:
+                return 'usage1'
 
     def _init(self):
         def check_hash_type():
@@ -270,6 +334,7 @@ class HawqRegister(object):
             if self.distribution_policy.startswith('DISTRIBUTED BY'):
                 if len(self.files) % self.bucket_number != 0:
                     logger.error('Files to be registered must be multiple times to the bucket number of hash table.')
+                    self.failure_handler.rollback()
                     sys.exit(1)
 
         def check_database_encoding():
@@ -280,8 +345,15 @@ class HawqRegister(object):
                 sys.exit(1)
 
         def create_table():
-            return self.accessor.do_create_table(self.tablename, self.schema, self.file_format, self.distribution_policy, self.file_locations, self.bucket_number,
-                                                 self.partitionby, self.partitions_constraint, self.partitions_name)
+            try:
+                (ret, query) = self.accessor.do_create_table(self.src_table_name, self.tablename, self.schema, self.file_format, self.distribution_policy, self.file_locations, self.bucket_number,
+                                                             self.partitionby, self.partitions_constraint, self.partitions_name)
+            except pg.DatabaseError as e:
+                print e
+                sys.exit(1)
+            if ret:
+                self.failure_handler.commit(('SQL', query))
+            return ret
 
         def get_seg_name():
             return self.utility_accessor.get_seg_name(self.tablename, self.database, self.file_format)
@@ -295,11 +367,11 @@ class HawqRegister(object):
         def check_policy_consistency():
             policy = get_distribution_policy() # "" or "{1,3}"
             if policy is None:
-                if ' '.join(self.distribution_policy.strip().split()).lower() == 'distributed randomly':
-                    return
-                else:
-                    logger.error('Distribution policy of %s from yaml file is not consistent with the policy of existing table.' % self.tablename)
-                    sys.exit(1)
+                return
+            if self.distribution_policy == 'DISTRIBUTED RANDOMLY':
+                logger.error('Distribution policy of %s from yaml is not consistent with the policy of existing table.' % self.tablename)
+                self.failure_handler.rollback()
+                sys.exit(1)
             tmp_dict = {}
             for i, d in enumerate(self.schema):
                 tmp_dict[d['name']] = i + 1
@@ -308,6 +380,7 @@ class HawqRegister(object):
             original_policy = ','.join([str(tmp_dict[col]) for col in cols])
             if policy.strip('{').strip('}') != original_policy:
                 logger.error('Distribution policy of %s from yaml file is not consistent with the policy of existing table.' % self.tablename)
+                self.failure_handler.rollback()
                 sys.exit(1)
 
         def check_bucket_number():
@@ -316,25 +389,27 @@ class HawqRegister(object):
 
             if self.bucket_number != get_bucket_number():
                 logger.error('Bucket number of %s is not consistent with previous bucket number.' % self.tablename)
+                self.failure_handler.rollback()
                 sys.exit(1)
-        
-        def set_yml_dataa(file_format, files, sizes, schema, distribution_policy, file_locations,\
+
+        def set_yml_dataa(file_format, files, sizes, tablename, schema, distribution_policy, file_locations,\
                           bucket_number, partitionby, partitions_constraint, partitions_name, partitions_compression_level,\
                           partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding):
             self.file_format = file_format
             self.files = files
             self.sizes = sizes
+            self.src_table_name = tablename
             self.schema = schema
             self.distribution_policy = distribution_policy
             self.file_locations = file_locations
             self.bucket_number = bucket_number
             self.partitionby = partitionby
             self.partitions_constraint = partitions_constraint
-            self.partitions_name = partitions_name 
+            self.partitions_name = partitions_name
             self.partitions_compression_level = partitions_compression_level
             self.partitions_compression_type = partitions_compression_type
             self.partitions_checksum = partitions_checksum
-            self.partitions_filepaths = partitions_filepaths 
+            self.partitions_filepaths = partitions_filepaths
             self.partitions_filesizes = partitions_filesizes
             self.encoding = encoding
 
@@ -342,7 +417,8 @@ class HawqRegister(object):
             import yaml
             with open(yml_file, 'r') as f:
                 params = yaml.load(f)
-            register_yaml_dict_check(params)
+            table_column_num = self.accessor.get_table_column_num(self.tablename)
+            register_yaml_dict_check(params, table_column_num, self.tablename)
             partitions_filepaths = []
             partitions_filesizes = []
             partitions_constraint = []
@@ -351,9 +427,12 @@ class HawqRegister(object):
             partitions_compression_level = []
             partitions_compression_type = []
             files, sizes = [], []
-            
+
             if params['FileFormat'].lower() == 'parquet':
                 partitionby = params.get('Parquet_FileLocations').get('PartitionBy')
+                if partitionby:
+                    logger.info('Partition table is not supported in current release of hawq register.')
+                    sys.exit(0)
                 if params.get('Parquet_FileLocations').get('Partitions') and len(params['Parquet_FileLocations']['Partitions']):
                     partitions_checksum = [d['Checksum'] for d in params['Parquet_FileLocations']['Partitions']]
                     partitions_compression_level = [d['CompressionLevel'] for d in params['Parquet_FileLocations']['Partitions']]
@@ -368,11 +447,14 @@ class HawqRegister(object):
                 if len(params['Parquet_FileLocations']['Files']):
                     files, sizes = [params['DFS_URL'] + d['path'] for d in params['Parquet_FileLocations']['Files']], [d['size'] for d in params['Parquet_FileLocations']['Files']]
                 encoding = params['Encoding']
-                set_yml_dataa('Parquet', files, sizes, params['Parquet_Schema'], params['Distribution_Policy'], params['Parquet_FileLocations'], params['Bucketnum'], partitionby,\
+                set_yml_dataa('Parquet', files, sizes, params['TableName'], params['Parquet_Schema'], params['Distribution_Policy'], params['Parquet_FileLocations'], params['Bucketnum'], partitionby,\
                               partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
-                
+
             else: #AO format
                 partitionby = params.get('AO_FileLocations').get('PartitionBy')
+                if partitionby:
+                    logger.info('Partition table is not supported in current release of hawq register.')
+                    sys.exit(0)
                 if params.get('AO_FileLocations').get('Partitions') and len(params['AO_FileLocations']['Partitions']):
                     partitions_checksum = [d['Checksum'] for d in params['AO_FileLocations']['Partitions']]
                     partitions_compressionLevel = [d['CompressionLevel'] for d in params['AO_FileLocations']['Partitions']]
@@ -387,9 +469,9 @@ class HawqRegister(object):
                 if len(params['AO_FileLocations']['Files']):
                     files, sizes = [params['DFS_URL'] + d['path'] for d in params['AO_FileLocations']['Files']], [d['size'] for d in params['AO_FileLocations']['Files']]
                 encoding = params['Encoding']
-                set_yml_dataa('AO', files, sizes, params['AO_Schema'], params['Distribution_Policy'], params['AO_FileLocations'], params['Bucketnum'], partitionby, partitions_constraint,\
+                set_yml_dataa('AO', files, sizes, params['TableName'], params['AO_Schema'], params['Distribution_Policy'], params['AO_FileLocations'], params['Bucketnum'], partitionby, partitions_constraint,\
                               partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
-                
+
         def check_file_not_folder():
             for fn in self.files:
                 hdfscmd = 'hdfs dfs -test -f %s' % fn
@@ -398,40 +480,69 @@ class HawqRegister(object):
                     sys.exit(1)
 
         def check_sizes_valid():
+            for sz in self.sizes:
+                if type(sz) != type(1):
+                    logger.error('File size(%s) in yaml configuration file should be int type.' % sz)
+                    self.failure_handler.rollback()
+                    sys.exit(1)
+                if sz < 0:
+                    logger.error('File size(%s) in yaml configuration file should not be less than 0.' % sz)
+                    self.failure_handler.rollback()
+                    sys.exit(1)
             for k, fn in enumerate(self.files):
                 hdfscmd = 'hdfs dfs -du %s' % fn
                 _, out, _ = local_ssh_output(hdfscmd)
                 if self.sizes[k] > int(out.strip().split()[0]):
                     logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))
+                    self.failure_handler.rollback()
                     sys.exit(1)
+
+        def check_no_regex_filepath(files):
+            for fn in files:
+                tmp_lst = fn.split('/')
+                for v in tmp_lst:
+                    if v == '.':
+                        logger.error('Hawq register does not support file path with regex: %s.' % fn)
+                        self.failure_handler.rollback()
+                        sys.exit(1)
+                for ch in ['..', '*']:
+                    if fn.find(ch) != -1:
+                        logger.error('Hawq register does not support file path with regex: %s.' % fn)
+                        self.failure_handler.rollback()
+                        sys.exit(1)
 
         if self.yml:
             option_parser_yml(options.yml_config)
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
             check_file_not_folder()
             check_database_encoding()
-            if self.mode != 'force' and self.mode != 'repair':
-                if not create_table():
-                    self.mode = 'second_exist'
+            if self.mode != 'repair':
+                if not create_table() and self.mode != 'force':
+                    self.mode = 'usage2_table_exist'
             check_bucket_number()
             check_distribution_policy()
             check_policy_consistency()
+            check_no_regex_filepath(self.files)
         else:
             self.file_format = 'Parquet'
             check_hash_type() # Usage1 only support randomly distributed table
         if not self.filepath:
-            if self.mode == 'first':
+            if self.mode == 'usage1':
                 logger.info('Please specify filepath with -f option.')
             else:
                 logger.info('Hawq Register Succeed.')
             sys.exit(0)
 
-        self.seg_name = get_seg_name()
+        (self.seg_name, tmp_ret) = get_seg_name()
+        if not tmp_ret:
+            self.failure_handler.rollback()
+            sys.exit(1)
         self.firstsegno, self.tabledir = get_metadata()
 
         if self.mode == 'repair':
             if self.tabledir.strip('/') != self.filepath.strip('/'):
                 logger.error("In repair mode, file path from yaml file should be the same with table's path.")
+                self.failure_handler.rollback()
                 sys.exit(1)
             existed_files, existed_sizes = self._get_files_in_hdfs(self.filepath)
             existed_info = {}
@@ -440,14 +551,17 @@ class HawqRegister(object):
             for k, fn in enumerate(self.files):
                 if fn not in existed_files:
                     logger.error('Can not register in repair mode since giving non-existing file: %s.' % fn)
+                    self.failure_handler.rollback()
                     sys.exit(1)
                 if self.sizes[k] > existed_info[fn]:
                     logger.error('Can not register in repair mode since giving larger file size: %s' % self.sizes[k])
+                    self.failure_handler.rollback()
                     sys.exit(1)
 
-        if self.mode == 'second_exist':
+        if self.mode == 'usage2_table_exist':
             if self.tabledir.strip('/') == self.filepath.strip('/'):
                 logger.error('Files to be registered should not be the same with table path.')
+                self.failure_handler.rollback()
                 sys.exit(1)
 
         self.do_not_move, self.files_update, self.sizes_update = False, [], []
@@ -456,10 +570,15 @@ class HawqRegister(object):
             if len(self.files) == len(existed_files):
                 if sorted(self.files) != sorted(existed_files):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
+                    self.failure_handler.rollback()
                     sys.exit(1)
                 else:
                     self.do_not_move, self.files_update, self.sizes_update = True, self.files, self.sizes
                     self.files, self.sizes = [], []
+            elif len(self.files) < len(existed_files):
+                logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
+                self.failure_handler.rollback()
+                sys.exit(1)
             else:
                 files_old, sizes_old = [f for f in self.files], [sz for sz in self.sizes]
                 for k, f in enumerate(files_old):
@@ -468,6 +587,11 @@ class HawqRegister(object):
                         self.sizes_update.append(sizes_old[k])
                         self.files.remove(files_old[k])
                         self.sizes.remove(sizes_old[k])
+                if sorted(self.files_update) != sorted(existed_files):
+                    logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
+                    self.failure_handler.rollback()
+                    sys.exit(1)
+
         elif self.mode == 'repair':
             self.do_not_move = True
             self.files_update, self.sizes_update = [fn for fn in self.files], [sz for sz in self.sizes]
@@ -480,14 +604,16 @@ class HawqRegister(object):
         self._check_files_and_table_in_same_hdfs_cluster(self.filepath, self.tabledir)
 
         if not self.yml:
+            check_no_regex_filepath([self.filepath])
             self.files, self.sizes = self._get_files_in_hdfs(self.filepath)
         print 'New file(s) to be registered: ', self.files
         if self.files_update:
             print 'Catalog info need to be updated for these files: ', self.files_update
 
-        if self.filesize:
+        if self.filesize is not None:
             if len(self.files) != 1:
                 logger.error('-e option is only supported with single file case.')
+                self.failure_handler.rollback()
                 sys.exit(1)
             self.sizes = [self.filesize]
         check_sizes_valid()
@@ -509,12 +635,14 @@ class HawqRegister(object):
         filesystem = filepath.split('://')
         if filesystem[0] != 'hdfs':
             logger.error('Only support registering file(s) in hdfs.')
+            self.failure_handler.rollback()
             sys.exit(1)
         fileroot = filepath.split('/')
         tableroot = tabledir.split('/')
         # check the root url of them. eg: for 'hdfs://localhost:8020/temp/tempfile', we check 'hdfs://localohst:8020'
         if fileroot[0:3] != tableroot[0:3]:
             logger.error("Files to be registered and the table are not in the same hdfs cluster.\nFile(s) to be registered: '%s'\nTable path in HDFS: '%s'." % (filepath, tabledir))
+            self.failure_handler.rollback()
             sys.exit(1)
 
     def _get_files_in_hdfs(self, filepath):
@@ -524,6 +652,7 @@ class HawqRegister(object):
         result = local_ssh(hdfscmd, logger)
         if result != 0:
             logger.error("Path '%s' does not exist in hdfs" % filepath)
+            self.failure_handler.rollback()
             sys.exit(1)
         hdfscmd = "hdfs dfs -ls -R %s" % filepath
         result, out, err = local_ssh_output(hdfscmd)
@@ -534,8 +663,13 @@ class HawqRegister(object):
             if len(lineargs) == 8 and lineargs[0].find("d") == -1:
                 files.append(lineargs[7])
                 sizes.append(int(lineargs[4]))
-        if len(files) == 0:
+        if len(files) == 0 and self.mode == 'usage1':
+            logger.info('No files to be registered.')
+            logger.info('Hawq Register Succeed.')
+            sys.exit(0)
+        if len(files) == 0 and self.mode != 'force':
             logger.error("Dir '%s' is empty" % filepath)
+            self.failure_handler.rollback()
             sys.exit(1)
         return files, sizes
 
@@ -547,11 +681,12 @@ class HawqRegister(object):
             if out == '0':
                 continue
             hdfscmd = 'hdfs dfs -cat %s | head -c 4 | grep PAR1' % f
-            result1 = local_ssh(hdfscmd, logger)
+            result1 = local_ssh(hdfscmd)
             hdfscmd = 'hdfs dfs -cat %s | tail -c 4 | grep PAR1' % f
-            result2 = local_ssh(hdfscmd, logger)
+            result2 = local_ssh(hdfscmd)
             if result1 or result2:
                 logger.error('File %s is not parquet format' % f)
+                self.failure_handler.rollback()
                 sys.exit(1)
 
     def _move_files_in_hdfs(self):
@@ -567,7 +702,9 @@ class HawqRegister(object):
                 result = local_ssh(hdfscmd, logger)
                 if result != 0:
                     logger.error('Fail to move %s to %s' % (srcfile, dstfile))
+                    self.failure_handler.rollback()
                     sys.exit(1)
+                self.failure_handler.commit(('HDFSCMD', hdfscmd))
 
     def _delete_files_in_hdfs(self):
         for fn in self.files_delete:
@@ -576,6 +713,7 @@ class HawqRegister(object):
             result = local_ssh(hdfscmd, logger)
             if result != 0:
                 logger.error('Fail to delete %s ' % fn)
+                self.failure_handler.rollback()
                 sys.exit(1)
 
     def _modify_metadata(self, mode):
@@ -625,7 +763,12 @@ class HawqRegister(object):
                 for i, eof in enumerate(self.sizes_update):
                     query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', varblockcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, -1, segno_lst[i])
             query += "end transaction;"
-        return self.utility_accessor.update_catalog(query)
+        try:
+            self.utility_accessor.update_catalog(query)
+        except pg.DatabaseError as e:
+            print e
+            self.failure_handler.rollback()
+            sys.exit(1)
 
     def _delete_metadata(self):
         query = "set allow_system_table_mods='dml';"
@@ -684,8 +827,10 @@ def main(options, args):
     except pg.InternalError:
         logger.error('Fail to connect to database, this script can only be run when database is up.')
         return 1
+
+    failure_handler = FailureHandler(conn)
     # register
-    ins = HawqRegister(options, args[0], utility_conn, conn)
+    ins = HawqRegister(options, args[0], utility_conn, conn, failure_handler)
     ins.register()
     conn.close()
 

@@ -28,22 +28,7 @@
           <osFamily>any</osFamily>
           <packages>
             <package>
-              <name>pxf-service</name>
-            </package>
-            <package>
-              <name>apache-tomcat</name>
-            </package>
-            <package>
-              <name>pxf-hive</name>
-            </package>
-            <package>
-              <name>pxf-hdfs</name>
-            </package>
-            <package>
-              <name>pxf-hbase</name>
-            </package>
-            <package>
-              <name>pxf-json</name>
+              <name>pxf</name>
             </package>
           </packages>
         </osSpecific>
