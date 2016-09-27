@@ -23,7 +23,7 @@ user=pxf
 group=pxf
 
 # load pxf-env.sh script
-if [ ! -f $env_script ]; then
+if [ ! -e $env_script ]; then
   echo WARNING: failed to find $env_script
 else
   source $env_script

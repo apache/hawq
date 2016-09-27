@@ -213,9 +213,6 @@ project('pxf-service') {
         obsoletes('pxf-core')
         obsoletes('pxf-api')
 
-        preInstall file('src/scripts/pre-install.sh')
-        postInstall file('src/scripts/post-install.sh')
-
         from('src/main/resources/pxf-profiles-default.xml') {
             fileType CONFIG | NOREPLACE
             into "/etc/pxf-${project.version}/conf"
@@ -301,6 +298,9 @@ project('pxf') {
         requires(versionedPackageName('pxf-hive'), project.version, GREATER | EQUAL)
         requires(versionedPackageName('pxf-hbase'), project.version, GREATER | EQUAL)
         requires(versionedPackageName('pxf-json'), project.version, GREATER | EQUAL)
+
+        preInstall file('src/scripts/pre-install.sh')
+        postInstall file('src/scripts/post-install.sh')
 
         link('/usr/lib/pxf', "/usr/lib/pxf-${project.version}")
         link('/etc/pxf', "/etc/pxf-${project.version}")
