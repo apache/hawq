@@ -18,12 +18,14 @@
 
 # Post installation script
 
+echo "Running post-install script!!!111222"
+
 env_script=/etc/pxf/conf/pxf-env.sh
 user=pxf
 group=pxf
 
 # load pxf-env.sh script
-if [ ! -f $env_script ]; then
+if [ ! -e $env_script ]; then
   echo WARNING: failed to find $env_script
 else
   source $env_script
