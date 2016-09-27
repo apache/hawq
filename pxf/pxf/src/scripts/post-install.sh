@@ -17,6 +17,7 @@
 # under the License.
 
 # Post installation script
+
 env_script=/etc/pxf/conf/pxf-env.sh
 user=pxf
 group=pxf
