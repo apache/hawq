@@ -17,9 +17,6 @@
 # under the License.
 
 # Post installation script
-
-echo "Running post-install script!!!111222"
-
 env_script=/etc/pxf/conf/pxf-env.sh
 user=pxf
 group=pxf
