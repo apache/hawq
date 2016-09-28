@@ -423,8 +423,14 @@ class HawqRegister(object):
 
         def option_parser_yml(yml_file):
             import yaml
-            with open(yml_file, 'r') as f:
-                params = yaml.load(f)
+            try:
+                with open(yml_file, 'r') as f:
+                    params = yaml.load(f)
+            except yaml.scanner.ScannerError as e:
+                print e
+                self.failure_handler.rollback()
+                sys.exit(1)
+            
             table_column_num = self.accessor.get_table_column_num(self.tablename)
             register_yaml_dict_check(params, table_column_num, self.tablename)
             partitions_filepaths = []
