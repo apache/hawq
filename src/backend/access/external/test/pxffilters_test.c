@@ -25,6 +25,9 @@
 #include "c.h"
 #include "../pxffilters.c"
 
+void run__const_to_str(Const* input, StringInfo result, char* expected);
+void run__const_to_str__negative(Const* input, StringInfo result, char* value);
+
 void
 test__supported_filter_type(void **state)
 {
