@@ -299,7 +299,7 @@ class HawqRegister(object):
         self.yml = options.yml_config
         self.filepath = options.filepath
         self.database = options.database
-        self.tablename = table
+        self.tablename = table.lower()
         self.filesize = options.filesize
         self.accessor = GpRegisterAccessor(conn)
         self.utility_accessor = GpRegisterAccessor(utility_conn)
@@ -488,13 +488,13 @@ class HawqRegister(object):
 
         def check_file_not_folder():
             for fn in self.files:
-                hdfscmd = 'hdfs dfs -test -f %s' % fn
+                hdfscmd = 'hadoop fs -test -f %s' % fn
                 if local_ssh(hdfscmd, logger):
                     logger.info('%s is not a file in hdfs, please check the yaml configuration file.' % fn)
                     sys.exit(1)
 
         def is_folder(filepath):
-            hdfscmd = 'hdfs dfs -test -d %s' % filepath
+            hdfscmd = 'hadoop fs -test -d %s' % filepath
             if local_ssh(hdfscmd, logger):
                 return False
             else:
@@ -511,7 +511,7 @@ class HawqRegister(object):
                     self.failure_handler.rollback()
                     sys.exit(1)
             for k, fn in enumerate(self.files):
-                hdfscmd = 'hdfs dfs -du %s' % fn
+                hdfscmd = 'hadoop fs -du %s' % fn
                 _, out, _ = local_ssh_output(hdfscmd)
                 if self.sizes[k] > int(out.strip().split()[0]):
                     logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))
@@ -673,13 +673,13 @@ class HawqRegister(object):
     def _get_files_in_hdfs(self, filepath):
         '''Get all the files refered by 'filepath', which could be a file or a directory containing all the files'''
         files, sizes = [], []
-        hdfscmd = "hdfs dfs -test -e %s" % filepath
+        hdfscmd = "hadoop fs -test -e %s" % filepath
         result = local_ssh(hdfscmd, logger)
         if result != 0:
             logger.error("Path '%s' does not exist in hdfs" % filepath)
             self.failure_handler.rollback()
             sys.exit(1)
-        hdfscmd = "hdfs dfs -ls -R %s" % filepath
+        hdfscmd = "hadoop fs -ls -R %s" % filepath
         result, out, err = local_ssh_output(hdfscmd)
         outlines = out.splitlines()
         # recursively search all the files under path 'filepath'
@@ -701,13 +701,13 @@ class HawqRegister(object):
     def _check_parquet_format(self, files):
         '''Check whether the file to be registered is parquet format'''
         for f in files:
-            hdfscmd = 'hdfs dfs -du -h %s | head -c 1' % f
+            hdfscmd = 'hadoop fs -du -h %s | head -c 1' % f
             rc, out, err = local_ssh_output(hdfscmd)
             if out == '0':
                 continue
-            hdfscmd = 'hdfs dfs -cat %s | head -c 4 | grep PAR1' % f
+            hdfscmd = 'hadoop fs -cat %s | head -c 4 | grep PAR1' % f
             result1 = local_ssh(hdfscmd)
-            hdfscmd = 'hdfs dfs -cat %s | tail -c 4 | grep PAR1' % f
+            hdfscmd = 'hadoop fs -cat %s | tail -c 4 | grep PAR1' % f
             result2 = local_ssh(hdfscmd)
             if result1 or result2:
                 logger.error('File %s is not parquet format' % f)
@@ -722,7 +722,7 @@ class HawqRegister(object):
             dstfile = self.tabledir + str(segno)
             segno += 1
             if srcfile != dstfile:
-                hdfscmd = 'hdfs dfs -mv %s %s' % (srcfile, dstfile)
+                hdfscmd = 'hadoop fs -mv %s %s' % (srcfile, dstfile)
                 sys.stdout.write('hdfscmd: "%s"\n' % hdfscmd)
                 result = local_ssh(hdfscmd, logger)
                 if result != 0:
@@ -733,7 +733,7 @@ class HawqRegister(object):
 
     def _delete_files_in_hdfs(self):
         for fn in self.files_delete:
-            hdfscmd = 'hdfs dfs -rm %s' % fn
+            hdfscmd = 'hadoop dfs -rm %s' % fn
             sys.stdout.write('hdfscmd: "%s"\n' % hdfscmd)
             result = local_ssh(hdfscmd, logger)
             if result != 0:
