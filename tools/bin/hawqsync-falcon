@@ -271,7 +271,7 @@ def getFalconStatus(falconUri="http://localhost:15000", entity="drSyncTest",
         return -1, str(e)
     except ValueError as e:
         print "ValueError in  getFalconStatus()", str(e), "\n", stdout
-	print "Is Falcon running at : {} ?".format(falconUri)
+	    print "Is Falcon running at : {} ?".format(falconUri)
         return -1, str(e)
 
     # Example output follows:
