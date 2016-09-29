@@ -420,6 +420,7 @@ extern int optimizer_segments;
 extern int optimizer_parts_to_force_sort_on_insert;
 extern int optimizer_join_arity_for_associativity_commutativity;
 extern int optimizer_array_expansion_threshold;
+extern int optimizer_join_order_threshold;
 extern bool optimizer_analyze_root_partition;
 extern bool optimizer_analyze_midlevel_partition;
 extern bool optimizer_enable_constant_expression_evaluation;

@@ -814,6 +814,7 @@ COptTasks::PoconfCreate
 	ULONG ulPartsToForceSortOnInsert =  (ULONG) optimizer_parts_to_force_sort_on_insert;
 	ULONG ulJoinArityForAssociativityCommutativity =  (ULONG) optimizer_join_arity_for_associativity_commutativity;
 	ULONG ulArrayExpansionThreshold =  (ULONG) optimizer_array_expansion_threshold;
+	ULONG ulJoinOrderThreshold = (ULONG) optimizer_join_order_threshold;
 
 	return GPOS_NEW(pmp) COptimizerConfig
 						(
@@ -821,9 +822,13 @@ COptTasks::PoconfCreate
 						GPOS_NEW(pmp) CStatisticsConfig(pmp, dDampingFactorFilter, dDampingFactorJoin, dDampingFactorGroupBy),
 						GPOS_NEW(pmp) CCTEConfig(ulCTEInliningCutoff),
 						pcm,
-						GPOS_NEW(pmp) CHint(ulPartsToForceSortOnInsert /* optimizer_parts_to_force_sort_on_insert */,
-										ulJoinArityForAssociativityCommutativity,
-										ulArrayExpansionThreshold)
+						GPOS_NEW(pmp) CHint
+								(
+								ulPartsToForceSortOnInsert /* optimizer_parts_to_force_sort_on_insert */,
+								ulJoinArityForAssociativityCommutativity,
+								ulArrayExpansionThreshold,
+								ulJoinOrderThreshold
+								)
 						);
 }
 
