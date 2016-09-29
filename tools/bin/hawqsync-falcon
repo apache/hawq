@@ -269,6 +269,10 @@ def getFalconStatus(falconUri="http://localhost:15000", entity="drSyncTest",
     except KeyError as e:
         print "KeyError in  getFalconStatus()", str(e), "\n", stdout
         return -1, str(e)
+    except ValueError as e:
+        print "ValueError in  getFalconStatus()", str(e), "\n", stdout
+	print "Is Falcon running at : {} ?".format(falconUri)
+        return -1, str(e)
 
     # Example output follows:
     else:
