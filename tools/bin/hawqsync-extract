@@ -1,0 +1,236 @@
+#!/usr/bin/env python
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+import os
+import sys
+from optparse import Option, OptionParser
+from subprocess import Popen, PIPE
+from hashlib import md5
+from json import loads
+from time import strftime, sleep, time
+
+def parseargs():
+    parser = OptionParser(usage="HAWQ sync options.")
+    parser.add_option('-v', '--verbose', action='store_true', default=False)
+    parser.add_option("-a", "--prompt", action="store_false",
+                      dest="prompt", default=True,
+                      help="Execute without prompt.")
+    parser.add_option("-l", "--logdir", dest="logDir",
+                      help="Sets the directory for log files")
+    parser.add_option('-d', '--dryRun', action='store_true', default=False,
+                      dest='testMode', help="Execute in test mode")
+    parser.add_option('-s', '--schemas', dest='schemas', default="",
+                      help="The schemas containing the tables "+\
+                            "to extract metadata for")
+    parser.add_option('--maxMaps', dest='distcpMaxMaps', default="10",
+                      help="The maximum number of map jobs to allow")
+
+
+def getSchemaObjectList(hawqUri, schemaList=[], isTesting=False):
+    """
+
+
+    """
+
+    retVal = -1
+
+    hawqHost = hawqUri.split(":")[0]
+    hawqPort, hawqDatabase = hawqUri.split(":")[-1].split("/")
+
+    objectListSql = """
+    SELECT n.nspname || '.' || c.relname
+    FROM pg_catalog.pg_class c
+         LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relkind IN ('r','s','')
+         AND c.relstorage IN ('h', 'a', 'c', 'p','')
+         AND n.nspname !~ '^pg_toast'
+         AND n.nspname ~ '^({schemas})$'
+    ORDER BY n.nspname, c.relname;
+    \q
+    """.format(schemas="|".join(schemaList))
+
+    psqlCommand = "psql -h {h} -p {p} -At {d}".format(h=hawqHost,
+                                                      p=hawqPort,
+                                                      d=hawqDatabase)
+
+
+    print psqlCommand
+
+    objectList = None
+    stderr = None
+    if not isTesting:
+        psqlProcess = Popen(psqlCommand.split(), stdin=PIPE, 
+                            stdout=PIPE, stderr=PIPE)
+
+        (objectList, stderr) = psqlProcess.communicate(objectListSql)
+
+        retVal = psqlProcess.returncode
+
+        if retVal != 0:
+            return retVal, stderr
+
+    # Sample output to follow
+    else:
+        objectList = """\
+        model.rsqauredCube
+        model.mungingScratchspace
+        model.postMunging
+        model.fancyAnalytics
+        development.testtable1
+        development.randomtable2
+        development.someOtherSweetTable
+        """;
+
+        retVal = 0
+
+    # sample yields: 342f414e7519f8c6a9eacce94777ba08
+    return retVal, objectList.split("\n")
+
+def saveMetadataForSchemaObjects(baseDirectory="/tmp", objectList=[], isTesting=False):
+    """
+
+
+    """
+
+    retVal = -1
+
+    mkdirCommand = "mkdir -p {d}/hawqExtract".format(d=baseDirectory)
+
+    hawqExtractCommand = "hawq extract {{o}} -o {d}/hawqExtract/{{o}}.yml".format(d=baseDirectory)
+
+    stdout = None
+    stderr = None
+    if not isTesting:
+        mkdirProcess = Popen(mkdirCommand.split(), stdout=PIPE, stderr=PIPE)
+
+        (stdout, stderr) = mkdirProcess.communicate()
+
+        retVal = mkdirProcess.returncode
+
+        if retVal != 0:
+            return retVal, stderr
+
+        for obj in objectList:
+
+            if len(obj) == 0:
+                continue
+
+            thisObjectCommand = hawqExtractCommand.format(o=obj)
+
+            print thisObjectCommand
+
+            hawqExtractProcess = Popen(thisObjectCommand.split(), 
+                                       stdout=PIPE, stderr=PIPE)
+
+            (stdout, stderr) = hawqExtractProcess.communicate()
+
+            rv = hawqExtractProcess.returncode
+
+            retVal |= rv
+
+            if rv != 0:
+                print rv, stderr
+
+    # Sample output to follow
+    else:
+
+        retVal = 0
+
+    return retVal 
+
+def createTarball(baseDirectory="/tmp", targetTarball="/tmp/hawqExtract-{t}.tar.bz2", isTesting=False):
+
+    retVal = -1
+    checksum = None
+
+    # Example invocation 
+    # tar cjf /tmp/test.tar.bz2 -C /tmp hawqExtract 
+
+    theTime = strftime("%Y-%m-%d-%H%M")
+
+    tarCommand = "tar -cjf {t} -C {c} hawqExtract".format(t=targetTarball.format(t=theTime), 
+                                                          c=baseDirectory)
+
+    stdout = None
+    stderr = None
+    if not isTesting:
+
+        try:
+            tarProcess = Popen(tarCommand.split(), stdout=PIPE, stderr=PIPE)
+
+            (stdout, stderr) = tarProcess.communicate()
+
+        except OSError as e:
+            return -1, str(e), -1
+
+
+        if tarProcess.returncode == 0:
+
+            md5Command = "md5sum {f}".format(f=targetTarball.format(t=theTime))
+
+            try:
+                md5Process = Popen(md5Command.split(), stdout=PIPE, stderr=PIPE)
+
+                (stdout2, stderr2) = md5Process.communicate()
+
+                checksum = stdout2.split()[0].strip()
+
+                if md5Process.returncode != 0:
+                    return -1, "md5 checksum creation failed : " + stderr2, -1
+                else:
+                    return 0, targetTarball.format(t=theTime), checksum
+
+            except OSError as e:
+                return -1, str(e), -1
+
+        else:
+            print "Tarball creation failed : " + stderr
+            return -1, stderr, -1
+
+    else:
+        return 0, "TESTING BRANCH", -1
+
+def copyToHdfs(source, dest, isTesting=False):
+
+    retVal = -1
+
+    hdfsCommand = "/usr/bin/hdfs dfs -copyFromLocal {s} {d}".format(s=source,
+                                                                    d=dest)
+
+    stdout = None
+    stderr = None
+    if not isTesting:
+        # Force HDFS commands to run as gpadmin user
+        env = os.environ.copy()
+        env['HADOOP_USER_NAME'] = 'gpadmin'
+        hdfsProcess = Popen(hdfsCommand.split(), env=env, stdout=PIPE, stderr=PIPE)
+
+        (stdout, stderr) = hdfsProcess.communicate()
+
+        return hdfsProcess.returncode, stderr
+
+    else:
+        return 0, "TESTING"
+
+retVal, objectList = getSchemaObjectList("localhost:5432/idp", schemaList=["staging"], isTesting=False)
+
+retVal = saveMetadataForSchemaObjects(objectList, isTesting=False)
+
+retVal, filenameOrStderr, checksum = createTarball(isTesting=False)
+
+retVal, stderr = copyToHdfs(filenameOrStderr, "/hawq_default", isTesting=False)
