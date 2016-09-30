@@ -31,6 +31,26 @@ if test -z "$PERL"; then
 fi
 ])# PGAC_PATH_PERL
 
+# PGAC_CHECK_PERL_MODULE(NAME)
+# ----------------------------
+AC_DEFUN([PGAC_CHECK_PERL_MODULE],
+[AC_REQUIRE([PGAC_PATH_PERL])
+AC_MSG_CHECKING([for Perl module $1])
+$PERL -MJSON -e 1
+perl_$1=$?
+if [[ $perl_$1 -ne 0 ]]; then
+	AC_MSG_ERROR([
+*** Perl JSON module is not installed. You could install it using the cpan utility.
+*** Or try to install the perl-JSON package if you are building on Linux. ])
+else
+	AC_MSG_RESULT([yes])
+fi
+]) # PGAC_CHECK_PERL_MODULE
+
+# PGAC_CHECK_PERL_MODULES(NAMES)
+# ------------------------------
+AC_DEFUN([PGAC_CHECK_PERL_MODULES],
+[m4_foreach([pgac_item], [$1], [PGAC_CHECK_PERL_MODULE(pgac_item)])])
 
 # PGAC_CHECK_PERL_CONFIG(NAME)
 # ----------------------------
