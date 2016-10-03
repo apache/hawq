@@ -25,6 +25,9 @@
 #include "c.h"
 #include "../pxffilters.c"
 
+void run__const_to_str(Const* input, StringInfo result, char* expected);
+void run__const_to_str__negative(Const* input, StringInfo result, char* value);
+
 void
 test__supported_filter_type(void **state)
 {
@@ -62,7 +65,7 @@ test__supported_filter_type(void **state)
 
 	/* go over pxf_supported_types array */
 	int nargs = sizeof(pxf_supported_types) / sizeof(Oid);
-	assert_int_equal(nargs, 13);
+	assert_int_equal(nargs, 14);
 	for (i = 0; i < nargs; ++i)
 	{
 		assert_true(supported_filter_type(pxf_supported_types[i]));
@@ -475,13 +478,28 @@ test__opexpr_to_pxffilter__unsupportedOpNot(void **state)
 void
 test__pxf_serialize_filter_list__oneFilter(void **state)
 {
+
+	printf("Entered one filter test 1\n");
+
+	 int c = 1, d = 1, f = 1;
+
+	   for ( c = 1 ; c <= 32767 ; c++ )
+	       for ( d = 1 ; d <= 32767 ; d++ )
+	    	   for ( f = 1 ; f <= 10 ; f++ )
+	       {}
+
 	List* filter_list = NIL;
+
+	printf("Entered one filter test 2\n");
 
 	PxfFilterDesc* filter = build_filter(
 			PXF_ATTR_CODE, 1, NULL,
 			PXF_CONST_CODE, 0, "1984",
 			PXFOP_GT);
+
+	printf("Entered one filter test 3\n");
 	filter_list = lappend(filter_list, filter);
+
 
 	char* result = pxf_serialize_filter_list(filter_list);
 	assert_string_equal(result, "a0c1984o2");
