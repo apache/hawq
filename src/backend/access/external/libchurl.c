@@ -21,6 +21,7 @@
 #include "lib/stringinfo.h"
 #include "utils/guc.h"
 #include "miscadmin.h"
+#include "access/pxfutils.h"
 
 /* include libcurl without typecheck.
  * This allows wrapping curl_easy_setopt to be wrapped
@@ -312,16 +313,21 @@ CHURL_HANDLE churl_init(const char* url, CHURL_HEADERS headers)
 
 	/* needed to resolve localhost */
 	if (strstr(url, LocalhostIpV4) != NULL) {
-		struct curl_slist *resolve_hosts = NULL;
-		char *pxf_host_entry = (char *) palloc0(strlen(pxf_service_address) + strlen(LocalhostIpV4Entry) + 1);
-		strcat(pxf_host_entry, pxf_service_address);
-		strcat(pxf_host_entry, LocalhostIpV4Entry);
-		resolve_hosts = curl_slist_append(NULL, pxf_host_entry);
-		set_curl_option(context, CURLOPT_RESOLVE, resolve_hosts);
-		pfree(pxf_host_entry);
-	}
+		char* loopback_addr = get_loopback_ip_addr();
+		char* start = strstr(url, LocalhostIpV4);
+		char* replaced_url = palloc(strlen(url) + strlen(loopback_addr) - strlen(LocalhostIpV4) + 1);
 
-	set_curl_option(context, CURLOPT_URL, url);
+		elog(DEBUG1, "Loopback interface IP address: %s", loopback_addr);
+
+		char* before_host = pnstrdup(url, start - url);
+		char* after_host = pstrdup(url + (start - url) + strlen(LocalhostIpV4));
+
+		sprintf(replaced_url, "%s%s%s", before_host, loopback_addr, after_host);
+
+		set_curl_option(context, CURLOPT_URL, replaced_url);
+	} else
+		set_curl_option(context, CURLOPT_URL, url);
+
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
 	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
 	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);

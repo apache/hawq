@@ -24,6 +24,10 @@
 #include "commands/dbcommands.h"
 #include "miscadmin.h"
 #include "utils/builtins.h"
+#include <net/if.h>
+#include <ifaddrs.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 /* Wrapper for libchurl */
 static void process_request(ClientContext* client_context, char *uri);
@@ -133,3 +137,55 @@ static void process_request(ClientContext* client_context, char *uri)
 
 
 }
+
+char* get_loopback_ip_addr() {
+	struct ifaddrs *ifaddr, *ifa;
+	int family, s, n;
+	char host[NI_MAXHOST];
+	char *loopback_addr;
+
+	if (getifaddrs(&ifaddr) == -1) {
+		elog(ERROR, "Unable to obtain list of network interfaces.");
+	}
+
+	for (ifa = ifaddr, n = 0; ifa != NULL; ifa = ifa->ifa_next, n++) {
+		if (ifa->ifa_addr == NULL)
+			continue;
+
+		family = ifa->ifa_addr->sa_family;
+
+		elog(DEBUG1, "Interface/family: %-8s %s (%d)\n",
+		ifa->ifa_name,
+		(family == AF_INET) ? "AF_INET" :
+		(family == AF_INET6) ? "AF_INET6" : "???",
+		family);
+
+		if (family == AF_INET || family == AF_INET6) {
+			s = getnameinfo(ifa->ifa_addr,
+					(family == AF_INET) ?
+							sizeof(struct sockaddr_in) :
+							sizeof(struct sockaddr_in6), host, NI_MAXHOST,
+					NULL, 0, NI_NUMERICHOST);
+			if (s != 0) {
+				elog(DEBUG1, "getnameinfo() failed: %s\n", gai_strerror(s));
+			}
+
+			elog(DEBUG1, "\t\taddress: <%s>\n", host);
+
+			if (ifa->ifa_flags & IFF_LOOPBACK) {
+				elog(DEBUG1, "It's loopback interface\n");
+				loopback_addr = host;
+				break;
+			}
+
+
+			elog(DEBUG1, "=======\n");
+
+		}
+	}
+
+	freeifaddrs(ifaddr);
+
+	return loopback_addr;
+}
+

@@ -45,4 +45,6 @@ void get_hdfs_location_from_filespace(char** path);
 /* Parse the REST message and issue the libchurl call */
 void call_rest(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);
 
+char* get_loopback_ip_addr();
+
 #endif	// _PXF_UTILS_H_
