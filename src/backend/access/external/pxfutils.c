@@ -143,11 +143,12 @@ static void process_request(ClientContext* client_context, char *uri)
  * Returns ip for ipv4 addresses and [ip] for ipv6 addresses.
  *
  */
-char* get_loopback_ip_addr() {
+char* get_loopback_ip_addr()
+{
 	struct ifaddrs *ifaddr, *ifa;
 	int family, s, n;
 	char host[NI_MAXHOST];
-	char *loopback_addr;
+	char *loopback_addr = NULL;
 
 	if (getifaddrs(&ifaddr) == -1) {
 		elog(ERROR, "Unable to obtain list of network interfaces.");
@@ -173,12 +174,12 @@ char* get_loopback_ip_addr() {
 			if (ifa->ifa_flags & IFF_LOOPBACK) {
 				if (family == AF_INET)
 				{
-					loopback_addr = palloc(strlen(host) + 1);
+					loopback_addr = palloc0(strlen(host) + 1);
 					sprintf(loopback_addr, "%s", host);
 				}
 				else
 				{
-					loopback_addr = palloc(strlen(host) + 3);
+					loopback_addr = palloc0(strlen(host) + 3);
 					sprintf(loopback_addr, "[%s]", host);
 				}
 				break;
@@ -192,5 +193,27 @@ char* get_loopback_ip_addr() {
 		elog(ERROR, "Unable to get loop back address");
 
 	return loopback_addr;
+}
+
+
+/*
+ * Replaces first occurrence of replace in string with replacement.
+ * Caller is responsible for releasing memory allocated for result.
+ *
+ */
+char* replace_string(const char* string, const char* replace, const char* replacement)
+{
+	char* start = strstr(string, replace);
+	char* before_token = pnstrdup(string, start - string);
+	char* after_token = pstrdup(string + (start - string) + strlen(replace));
+	char* replaced = palloc0(strlen(before_token) + strlen(replacement) + strlen(after_token) + 1);
+	sprintf(replaced, "%s%s%s", before_token, replacement, after_token);
+
+	//release memory
+	pfree(before_token);
+	pfree(after_token);
+
+	return replaced;
+
 }
 

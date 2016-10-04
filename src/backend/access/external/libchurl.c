@@ -311,31 +311,7 @@ CHURL_HANDLE churl_init(const char* url, CHURL_HEADERS headers)
 	create_curl_handle(context);
 	clear_error_buffer(context);
 
-	/* needed to resolve localhost */
-	if (strstr(url, LocalhostIpV4) != NULL) {
-		//get loopback interface ip address
-		char* loopback_addr = get_loopback_ip_addr();
-		elog(DEBUG1, "Loopback interface IP address: %s", loopback_addr);
-		//find host start position in url
-		char* start = strstr(url, LocalhostIpV4);
-		//allocate new url with replaced host
-		char* replaced_url = palloc(strlen(url) + strlen(loopback_addr) - strlen(LocalhostIpV4) + 1);
-		//token before host
-		char* before_host = pnstrdup(url, start - url);
-		//token after host
-		char* after_host = pstrdup(url + (start - url) + strlen(LocalhostIpV4));
-		//construct replaced url using loopback interface ip
-		sprintf(replaced_url, "%s%s%s", before_host, loopback_addr, after_host);
-		set_curl_option(context, CURLOPT_URL, replaced_url);
-
-		//release memory
-		pfree(before_host);
-		pfree(after_host);
-		pfree(replaced_url);
-		pfree(loopback_addr);
-	} else
-		set_curl_option(context, CURLOPT_URL, url);
-
+	set_curl_option(context, CURLOPT_URL, url);
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
 	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
 	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);
@@ -505,6 +481,29 @@ void create_curl_handle(churl_context* context)
 void set_curl_option(churl_context* context, CURLoption option, const void* data)
 {
 	int curl_error;
+
+	if (option == CURLOPT_URL)
+	{
+		const char* url = (char* )data;
+		/* needed to resolve localhost */
+		if (strstr(url, LocalhostIpV4) != NULL) {
+			//get loopback interface ip address
+			char* loopback_addr = get_loopback_ip_addr();
+			elog(DEBUG1, "Loopback interface IP address: %s", loopback_addr);
+			char* replaced_url = replace_string(url, LocalhostIpV4, loopback_addr);
+			elog(DEBUG1, "Replaced url: %s", replaced_url);
+			if (CURLE_OK != (curl_error = curl_easy_setopt(context->curl_handle, option, replaced_url)))
+				elog(ERROR, "internal error: curl_easy_setopt %d error (%d - %s)",
+					 option, curl_error, curl_easy_strerror(curl_error));
+
+			//release memory
+			pfree(replaced_url);
+			pfree(loopback_addr);
+			return;
+		}
+	}
+
+
 	if (CURLE_OK != (curl_error = curl_easy_setopt(context->curl_handle, option, data)))
 		elog(ERROR, "internal error: curl_easy_setopt %d error (%d - %s)",
 			 option, curl_error, curl_easy_strerror(curl_error));
