@@ -313,16 +313,22 @@ CHURL_HANDLE churl_init(const char* url, CHURL_HEADERS headers)
 
 	/* needed to resolve localhost */
 	if (strstr(url, LocalhostIpV4) != NULL) {
+		//get loopback interface ip address
 		char* loopback_addr = get_loopback_ip_addr();
-		char* start = strstr(url, LocalhostIpV4);
-		char* replaced_url = palloc(strlen(url) + strlen(loopback_addr) - strlen(LocalhostIpV4) + 1);
-
 		elog(DEBUG1, "Loopback interface IP address: %s", loopback_addr);
-
+		//find host start position in url
+		char* start = strstr(url, LocalhostIpV4);
+		//allocate new url with replaced host
+		char* replaced_url = palloc(strlen(url) + strlen(loopback_addr) - strlen(LocalhostIpV4) + 1);
+		//token before host
 		char* before_host = pnstrdup(url, start - url);
+		//token after host
 		char* after_host = pstrdup(url + (start - url) + strlen(LocalhostIpV4));
-
+		//construct replaced url using loopback interface ip
 		sprintf(replaced_url, "%s%s%s", before_host, loopback_addr, after_host);
+		//release memory
+		pfree(before_host);
+		pfree(after_host);
 
 		set_curl_option(context, CURLOPT_URL, replaced_url);
 	} else

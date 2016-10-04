@@ -138,6 +138,10 @@ static void process_request(ClientContext* client_context, char *uri)
 
 }
 
+/*
+ * Finds ip address of any available loopback interface(ipv4/ipv6),
+ * otherwise returns default value as 127.0.0.1
+ */
 char* get_loopback_ip_addr() {
 	struct ifaddrs *ifaddr, *ifa;
 	int family, s, n;
@@ -154,12 +158,6 @@ char* get_loopback_ip_addr() {
 
 		family = ifa->ifa_addr->sa_family;
 
-		elog(DEBUG1, "Interface/family: %-8s %s (%d)\n",
-		ifa->ifa_name,
-		(family == AF_INET) ? "AF_INET" :
-		(family == AF_INET6) ? "AF_INET6" : "???",
-		family);
-
 		if (family == AF_INET || family == AF_INET6) {
 			s = getnameinfo(ifa->ifa_addr,
 					(family == AF_INET) ?
@@ -167,24 +165,21 @@ char* get_loopback_ip_addr() {
 							sizeof(struct sockaddr_in6), host, NI_MAXHOST,
 					NULL, 0, NI_NUMERICHOST);
 			if (s != 0) {
-				elog(DEBUG1, "getnameinfo() failed: %s\n", gai_strerror(s));
+				elog(ERROR, "Unable to get name information for interface, getnameinfo() failed: %s\n", gai_strerror(s));
 			}
 
-			elog(DEBUG1, "\t\taddress: <%s>\n", host);
-
+			//get loopback interface
 			if (ifa->ifa_flags & IFF_LOOPBACK) {
-				elog(DEBUG1, "It's loopback interface\n");
 				loopback_addr = host;
 				break;
 			}
-
-
-			elog(DEBUG1, "=======\n");
-
 		}
 	}
 
 	freeifaddrs(ifaddr);
+
+	if (loopback_addr == NULL)
+		elog(ERROR, "Unable to get loop back address");
 
 	return loopback_addr;
 }
