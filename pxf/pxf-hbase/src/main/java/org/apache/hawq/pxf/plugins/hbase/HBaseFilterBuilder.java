@@ -240,18 +240,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * Currently, 1, 2 can occur, since no parenthesis are used.
      */
     private Filter handleCompoundOperations(FilterParser.LogicalOperation opId, Filter left, Filter right) {
-        FilterList result;
-
-        if (left instanceof FilterList) {
-            result = (FilterList) left;
-            result.addFilter(right);
-
-            return result;
-        }
-
-        result = new FilterList(logicalOperatorsMap.get(opId), new Filter[] {left, right});
-
-        return result;
+        return new FilterList(logicalOperatorsMap.get(opId), new Filter[] {left, right});
     }
 
     /**
