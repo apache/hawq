@@ -139,7 +139,8 @@ static void process_request(ClientContext* client_context, char *uri)
 }
 
 /*
- * Finds ip address of any available loopback interface(ipv4/ipv6)
+ * Finds ip address of any available loopback interface(ipv4/ipv6).
+ * Returns ip for ipv4 addresses and [ip] for ipv6 addresses.
  *
  */
 char* get_loopback_ip_addr() {
@@ -170,7 +171,16 @@ char* get_loopback_ip_addr() {
 
 			//get loopback interface
 			if (ifa->ifa_flags & IFF_LOOPBACK) {
-				loopback_addr = host;
+				if (family == AF_INET)
+				{
+					loopback_addr = palloc(strlen(host) + 1);
+					sprintf(loopback_addr, "%s", host);
+				}
+				else
+				{
+					loopback_addr = palloc(strlen(host) + 3);
+					sprintf(loopback_addr, "[%s]", host);
+				}
 				break;
 			}
 		}

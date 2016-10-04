@@ -326,11 +326,13 @@ CHURL_HANDLE churl_init(const char* url, CHURL_HEADERS headers)
 		char* after_host = pstrdup(url + (start - url) + strlen(LocalhostIpV4));
 		//construct replaced url using loopback interface ip
 		sprintf(replaced_url, "%s%s%s", before_host, loopback_addr, after_host);
+		set_curl_option(context, CURLOPT_URL, replaced_url);
+
 		//release memory
 		pfree(before_host);
 		pfree(after_host);
-
-		set_curl_option(context, CURLOPT_URL, replaced_url);
+		pfree(replaced_url);
+		pfree(loopback_addr);
 	} else
 		set_curl_option(context, CURLOPT_URL, url);
 
