@@ -43,7 +43,7 @@ buildscript {
 
 // Hadoop distribution (can be phd or hdp) - needed to set correct classpaths
 // can be set with -Dhd=<value>
-def hddist = System.properties['hd'] ?: 'phd';
+def hddist = System.properties['hd'] ?: 'hdp';
 if (hddist != 'phd' && hddist != 'hdp') {
     throw new GradleException("hadoop distribution parameter (hd) set to invalid value: $hddist")
 }
