@@ -189,7 +189,7 @@ char* get_loopback_ip_addr()
 
 	freeifaddrs(ifaddr);
 
-	if (loopback_addr == NULL)
+	if (loopback_addr == NULL || !loopback_addr[0])
 		elog(ERROR, "Unable to get loop back address");
 
 	return loopback_addr;
