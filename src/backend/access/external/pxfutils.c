@@ -139,8 +139,8 @@ static void process_request(ClientContext* client_context, char *uri)
 }
 
 /*
- * Finds ip address of any available loopback interface(ipv4/ipv6),
- * otherwise returns default value as 127.0.0.1
+ * Finds ip address of any available loopback interface(ipv4/ipv6)
+ *
  */
 char* get_loopback_ip_addr() {
 	struct ifaddrs *ifaddr, *ifa;
@@ -165,7 +165,7 @@ char* get_loopback_ip_addr() {
 							sizeof(struct sockaddr_in6), host, NI_MAXHOST,
 					NULL, 0, NI_NUMERICHOST);
 			if (s != 0) {
-				elog(ERROR, "Unable to get name information for interface, getnameinfo() failed: %s\n", gai_strerror(s));
+				elog(WARNING, "Unable to get name information for interface, getnameinfo() failed: %s\n", gai_strerror(s));
 			}
 
 			//get loopback interface
