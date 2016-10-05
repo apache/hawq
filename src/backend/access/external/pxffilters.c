@@ -31,9 +31,8 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static List* pxf_make_filter_list(List* quals);
+static List* pxf_make_expression_items_list(List *quals, Node *parent);
 static void pxf_free_filter(PxfFilterDesc* filter);
-static void pxf_free_filter_list(List *filters);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
@@ -135,7 +134,31 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{1097 /* date_gt */, PXFOP_GT},
 	{1096 /* date_le */, PXFOP_LE},
 	{1098 /* date_ge */, PXFOP_GE},
-	{1094 /* date_ne */, PXFOP_NE}
+	{1094 /* date_ne */, PXFOP_NE},
+
+	/* float8 */
+	{Float8EqualOperator  /* float8eq */, PXFOP_EQ},
+	{672  /* float8lt */, PXFOP_LT},
+	{674 /* float8gt */, PXFOP_GT},
+	{673 /* float8le */, PXFOP_LE},
+	{675 /* float8ge */, PXFOP_GE},
+	{671 /* float8ne */, PXFOP_NE},
+
+	/* bpchar */
+	{BPCharEqualOperator  /* bpchareq */, PXFOP_EQ},
+	{1058  /* bpcharlt */, PXFOP_LT},
+	{1060 /* bpchargt */, PXFOP_GT},
+	{1059 /* bpcharle */, PXFOP_LE},
+	{1061 /* bpcharge */, PXFOP_GE},
+	{1057 /* bpcharne */, PXFOP_NE},
+
+	/* bytea */
+	{ByteaEqualOperator  /* byteaeq */, PXFOP_EQ},
+	{1957  /* bytealt */, PXFOP_LT},
+	{1959 /* byteagt */, PXFOP_GT},
+	{1958 /* byteale */, PXFOP_LE},
+	{1960 /* byteage */, PXFOP_GE},
+	{1956 /* byteane */, PXFOP_NE}
 
 };
 
@@ -153,72 +176,97 @@ Oid pxf_supported_types[] =
 	CHAROID,
 	BYTEAOID,
 	BOOLOID,
-	DATEOID
+	DATEOID,
+	TIMESTAMPOID
 };
 
+static void
+pxf_free_filter_list(List *expressionItems)
+{
+	ListCell		*lc 	= NULL;
+	ExpressionItem 	*expressionItem = NULL;
+	int previousLength;
+
+	while (list_length(expressionItems) > 0)
+	{
+		expressionItem = (ExpressionItem *) lfirst(list_head(expressionItems));
+		pfree(expressionItem);
+
+		/* to avoid freeing already freed items - delete all occurrences of current expression*/
+		previousLength = expressionItems->length + 1;
+		while (expressionItems != NULL && previousLength > expressionItems->length)
+		{
+			previousLength = expressionItems->length;
+			expressionItems = list_delete_ptr(expressionItems, expressionItem);
+		}
+	}
+}
+
 /*
- * pxf_make_filter_list
+ * pxf_make_expression_items_list
  *
  * Given a scan node qual list, find the filters that are eligible to be used
- * by PXF, construct a PxfFilterDesc list that describes the filter information,
+ * by PXF, construct an expressions list, which consists of OpExpr or BoolExpr nodes
  * and return it to the caller.
  *
- * Caller is responsible for pfreeing the returned PxfFilterDesc List.
+ * Basically this function just transforms expression tree to Reversed Polish Notation list.
+ *
+ *
  */
 static List *
-pxf_make_filter_list(List *quals)
+pxf_make_expression_items_list(List *quals, Node *parent)
 {
+	ExpressionItem *expressionItem = NULL;
 	List			*result = NIL;
 	ListCell		*lc = NULL;
+	ListCell		*ilc = NULL;
 	
 	if (list_length(quals) == 0)
 		return NIL;
 
-	/*
-	 * Iterate over all implicitly ANDed qualifiers and add the ones
-	 * that are supported for push-down into the result filter list.
-	 */
 	foreach (lc, quals)
 	{
 		Node *node = (Node *) lfirst(lc);
 		NodeTag tag = nodeTag(node);
+		expressionItem = (ExpressionItem *) palloc0(sizeof(ExpressionItem));
+		expressionItem->node = node;
+		expressionItem->parent = parent;
+		expressionItem->processed = false;
 
 		switch (tag)
 		{
 			case T_OpExpr:
 			{
-				OpExpr			*expr 	= (OpExpr *) node;
-				PxfFilterDesc	*filter;
-
-				filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
-				elog(DEBUG5, "pxf_make_filter_list: node tag %d (T_OpExpr)", tag);
-
-				if (opexpr_to_pxffilter(expr, filter))
-					result = lappend(result, filter);
-				else
-					pfree(filter);
-
+				result = lappend(result, expressionItem);
 				break;
 			}
 			case T_BoolExpr:
 			{
 				BoolExpr	*expr = (BoolExpr *) node;
-				BoolExprType boolType = expr->boolop;
-				elog(DEBUG5, "pxf_make_filter_list: node tag %d (T_BoolExpr), bool node type %d %s",
-						tag, boolType, boolType==AND_EXPR ? "(AND_EXPR)" : "");
+				List *inner_result = pxf_make_expression_items_list(expr->args, node);
+				result = list_concat(result, inner_result);
 
-				/* only AND_EXPR is supported */
-				if (expr->boolop == AND_EXPR)
+				int childNodesNum = 0;
+
+				/* Find number of child nodes on first level*/
+				foreach (ilc, inner_result)
 				{
-					List *inner_result = pxf_make_filter_list(expr->args);
-					elog(DEBUG5, "pxf_make_filter_list: inner result size %d", list_length(inner_result));
-					result = list_concat(result, inner_result);
+					ExpressionItem *ei = (ExpressionItem *) lfirst(ilc);
+					if (!ei->processed && ei->parent == node)
+					{
+						ei->processed = true;
+						childNodesNum++;
+					}
+				}
+
+				for (int i = 0; i < childNodesNum - 1; i++)
+				{
+					result = lappend(result, expressionItem);
 				}
 				break;
 			}
 			default:
-				/* expression not supported. ignore */
-				elog(DEBUG5, "pxf_make_filter_list: unsupported node tag %d", tag);
+				elog(DEBUG1, "pxf_make_expression_items_list: unsupported node tag %d", tag);
 				break;
 		}
 	}
@@ -249,33 +297,9 @@ pxf_free_filter(PxfFilterDesc* filter)
 }
 
 /*
- * pxf_free_filter_list
- *
- * free all memory associated with the filters once no longer needed.
- * alternatively we could have allocated them in a shorter lifespan
- * memory context, however explicitly freeing them is easier and makes
- * more sense.
- */
-static void
-pxf_free_filter_list(List *filters)
-{
-	ListCell		*lc 	= NULL;
-	PxfFilterDesc 	*filter = NULL;
-
-	if (list_length(filters) == 0)
-		return;
-
-	foreach (lc, filters)
-	{
-		filter	= (PxfFilterDesc *) lfirst(lc);
-		pxf_free_filter(filter);
-	}
-}
-
-/*
  * pxf_serialize_filter_list
  *
- * Given a list of implicitly ANDed PxfFilterDesc objects, produce a
+ * Takes expression items list in RPN notation, produce a
  * serialized string representation in order to communicate this list
  * over the wire.
  *
@@ -287,9 +311,7 @@ pxf_free_filter_list(List *filters)
  *
  * Example filter list:
  *
- * Column(0) > 1
- * Column(0) < 5
- * Column(2) == "third"
+ * Column(0) > 1 AND Column(0) < 5 AND Column(2) == "third"
  *
  * Yields the following serialized string:
  *
@@ -297,72 +319,92 @@ pxf_free_filter_list(List *filters)
  *
  */
 static char *
-pxf_serialize_filter_list(List *filters)
+pxf_serialize_filter_list(List *expressionItems)
 {
+
+	printf("Serializing filter list 1\n");
+
 	StringInfo	 resbuf;
-	StringInfo	 curbuf;
 	ListCell	*lc = NULL;
 
-	if (list_length(filters) == 0)
+	if (list_length(expressionItems) == 0)
 		return NULL;
 
 	resbuf = makeStringInfo();
 	initStringInfo(resbuf);
-	curbuf = makeStringInfo();
-	initStringInfo(curbuf);
+
+	printf("Serializing filter list 2\n");
 
 	/*
-	 * Iterate through the filters in the list and serialize them one after
-	 * the other. We use buffer copying because it's clear. Considering the
-	 * typical small number of memcpy's this generates overall, there's no
-	 * point in optimizing, better keep it clear.
+	 * Iterate through the expression items in the list and serialize them one after the other.
 	 */
-	foreach (lc, filters)
+	foreach (lc, expressionItems)
 	{
-		PxfFilterDesc		*filter	= (PxfFilterDesc *) lfirst(lc);
-		PxfOperand			 l		= filter->l;
-		PxfOperand			 r 		= filter->r;
-		PxfOperatorCode	 o 		= filter->op;
+		ExpressionItem *expressionItem = (ExpressionItem *) lfirst(lc);
+		Node *node = expressionItem->node;
+		NodeTag tag = nodeTag(node);
 
-		/* last result is stored in 'oldbuf'. start 'curbuf' clean */
-		resetStringInfo(curbuf);
-
-		/* format the operands */
-		if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
+		switch (tag)
 		{
-			appendStringInfo(curbuf, "%c%d%c%s",
-									 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
-									 PXF_CONST_CODE, (r.conststr)->data);
-		}
-		else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
-		{
-			appendStringInfo(curbuf, "%c%s%c%d",
-									 PXF_CONST_CODE, (l.conststr)->data,
-									 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
-		}
-		else
-		{
-			/* pxf_make_filter_list() should have never let this happen */
-			ereport(ERROR,
-					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("internal error in pxffilters.c:pxf_serialize_"
-							 "filter_list. Found a non const+attr filter")));
-		}
-
-		/* format the operator */
-		appendStringInfo(curbuf, "%c%d", PXF_OPERATOR_CODE, o);
-
-		/* append this result to the previous result */
-		appendBinaryStringInfo(resbuf, curbuf->data, curbuf->len);
-
-		/* if there was a previous result, append a trailing AND operator */
-		if(resbuf->len > curbuf->len)
-		{
-			appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, PXFOP_AND);
+			case T_OpExpr:
+			{
+				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_OpExpr)", tag);
+				PxfFilterDesc *filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
+				OpExpr *expr = (OpExpr *) node;
+				if (opexpr_to_pxffilter(expr, filter))
+				{
+					PxfOperand l = filter->l;
+					PxfOperand r = filter->r;
+					PxfOperatorCode o = filter->op;
+					if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
+					{
+						appendStringInfo(resbuf, "%c%d%c%s",
+												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
+												 PXF_CONST_CODE, (r.conststr)->data);
+					}
+					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
+					{
+						appendStringInfo(resbuf, "%c%s%c%d",
+												 PXF_CONST_CODE, (l.conststr)->data,
+												 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
+					}
+					else
+					{
+						/* opexpr_to_pxffilter() should have never let this happen */
+						ereport(ERROR,
+								(errcode(ERRCODE_INTERNAL_ERROR),
+								 errmsg("internal error in pxffilters.c:pxf_serialize_"
+										 "filter_list. Found a non const+attr filter")));
+					}
+					appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, o);
+					pxf_free_filter(filter);
+				} else {
+					/* if at least one expression item is not supported, whole filter doesn't make sense*/
+					elog(DEBUG1, "Query will not be optimized to use filter push-down.");
+					pfree(filter);
+					pfree(resbuf->data);
+					return NULL;
+				}
+				break;
+			}
+			case T_BoolExpr:
+			{
+				BoolExpr *expr = (BoolExpr *) node;
+				BoolExprType boolType = expr->boolop;
+				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_BoolExpr), bool node type %d", tag, boolType);
+				appendStringInfo(resbuf, "%c%d", PXF_LOGICAL_OPERATOR_CODE, boolType);
+				break;
+			}
 		}
 	}
 
-	pfree(curbuf->data);
+	printf("Serializing filter list 30\n");
+
+	if (resbuf->len == 0)
+	{
+		pfree(resbuf->data);
+		return NULL;
+	}
 
 	return resbuf->data;
 }
@@ -395,12 +437,12 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	/* only binary oprs supported currently */
 	if (!rightop)
 	{
-		elog(DEBUG5, "opexpr_to_pxffilter: unary op! leftop_type: %d, op: %d",
+		elog(DEBUG1, "opexpr_to_pxffilter: unary op! leftop_type: %d, op: %d",
 			 leftop_type, expr->opno);
 		return false;
 	}
 
-	elog(DEBUG5, "opexpr_to_gphdfilter: leftop (expr type: %d, arg type: %d), "
+	elog(DEBUG1, "opexpr_to_gphdfilter: leftop (expr type: %d, arg type: %d), "
 			"rightop_type (expr type: %d, arg type %d), op: %d",
 			leftop_type, nodeTag(leftop),
 			rightop_type, nodeTag(rightop),
@@ -441,6 +483,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	}
 	else
 	{
+		elog(DEBUG1, "opexpr_to_pxffilter: expression is not a Var+Const");
 		return false;
 	}
 
@@ -456,9 +499,10 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		}
 	}
 
+	elog(DEBUG1, "opexpr_to_pxffilter: operator is not supported, operator code: %d", expr->opno);
+
 	/* NOTE: if more validation needed, add it before the operators test
 	 * or alternatively change it to use a false flag and return true below */
-
 	return false;
 }
 
@@ -540,6 +584,9 @@ supported_filter_type(Oid type)
 		if (type == pxf_supported_types[i])
 			return true;
 	}
+
+	elog(DEBUG1, "supported_filter_type: filter pushdown is not supported for datatype oid: %d", type);
+
 	return false;
 }
 
@@ -585,6 +632,7 @@ const_to_str(Const *constval, StringInfo buf)
 		case CHAROID:
 		case BYTEAOID:
 		case DATEOID:
+		case TIMESTAMPOID:
 			appendStringInfo(buf, "\\\"%s\\\"", extval);
 			break;
 
@@ -626,12 +674,14 @@ char *serializePxfFilterQuals(List *quals)
 
 	if (pxf_enable_filter_pushdown)
 	{
-		List *filters = pxf_make_filter_list(quals);
 
-		result  = pxf_serialize_filter_list(filters);
-		pxf_free_filter_list(filters);
+		List *expressionItems = pxf_make_expression_items_list(quals, NULL);
+		result  = pxf_serialize_filter_list(expressionItems);
+		pxf_free_filter_list(expressionItems);
 	}
-	elog(DEBUG2, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
+
+
+	elog(DEBUG1, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
 
 	return result;
 }
@@ -639,6 +689,7 @@ char *serializePxfFilterQuals(List *quals)
 
 /*
  * Returns a list of attributes, extracted from quals.
+ * Returns NIL if any error occurred.
  * Supports AND, OR, NOT operations.
  * Supports =, <, <=, >, >=, IS NULL, IS NOT NULL, BETWEEN, IN operators.
  * List might contain duplicates.
@@ -681,15 +732,23 @@ List* extractPxfAttributes(List* quals)
 				attributes = append_attr_from_var((Var *) expr->arg, attributes);
 				break;
 			}
+			case T_BooleanTest:
+			{
+				BooleanTest* expr = (BooleanTest *) node;
+				attributes = append_attr_from_var((Var *) expr->arg, attributes);
+				break;
+			}
 			default:
+			{
 				/*
 				 * tag is not supported, it's risk of having:
 				 * 1) false-positive tuples
 				 * 2) unable to join tables
 				 * 3) etc
 				 */
-				elog(ERROR, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
-				break;
+				elog(INFO, "extractPxfAttributes: unsupported node tag %d, unable to extract attribute from qualifier", tag);
+				return NIL;
+			}
 		}
 	}
 

@@ -376,19 +376,24 @@ PL/Java License
       licenses/LICENSE-pljava.txt
 
 ======================================================================
-Perl LICENSE
+Perl Artistic License (exception)
 ======================================================================
 
-  The following components are provided under a Perl Artistic
-  license. See project link for details.  The text of each license is
-  also included at licenses/LICENSE-[project].txt.
+  src/pl/plperl/ppport.h
 
-     JSON 
-       src/include/catalog/JSON
-  
-     plperl
-       src/pl/plperl
-      
+    Pursuant to https://issues.apache.org/jira/browse/LEGAL-79 and
+    PL/Perl's use of a generated header file, we declare this file to
+    be an exception to the Perl Artistic License.  This file is
+    derived from the PostgreSQL code base.
+
+    For completeness sake, we have provided the Perl Artistic License
+    for the Perl Devel-PPPort module
+    (http://search.cpan.org/~wolfsage/Devel-PPPort-3.32/PPPort.pm).
+    This module was used to generate the src/pl/plperl/ppport.h header
+    file. The license is available:
+
+       licenses/LICENSE-ppport.txt
+
 ======================================================================
 test-ctype LICENSE
 ======================================================================
@@ -420,11 +425,21 @@ Internet Systems Consortium/Internet Software Consortium (ISC) LICENSE
   The following files are used:
   
       src/backend/utils/adt/inet_net_ntop.c
-      src/backend/utils/adt/inet_net_pton.c 
+      src/backend/utils/adt/inet_net_pton.c
   
-  This file is made available under the following ISC license:
+  These files are made available under the following ISC license:
   
       licenses/LICENSE-isc.txt
+
+  The following components are provided under the ISC license. See
+  project link for details.  The text of each license is also included
+  at licenses/LICENSE-[project].txt.
+
+     pexpect-4.2 (https://pypi.python.org/pypi/pexpect/4.2.0)
+       tools/bin/pythonSrc/pexpect-4.2
+
+     ptyprocess-0.5.1 (https://pypi.python.org/pypi/ptyprocess/0.5.1)
+       tools/bin/pythonSrc/ptyprocess-0.5.1
 
 ======================================================================
 regex LICENSE

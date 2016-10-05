@@ -44,7 +44,6 @@ typedef enum PxfOperatorCode
 	PXFOP_GE,
 	PXFOP_EQ,
 	PXFOP_NE,
-	PXFOP_AND,
 	PXFOP_LIKE
 
 } PxfOperatorCode;
@@ -57,6 +56,7 @@ typedef enum PxfOperatorCode
 #define PXF_ATTR_CODE		'a'
 #define PXF_CONST_CODE		'c'
 #define PXF_OPERATOR_CODE	'o'
+#define PXF_LOGICAL_OPERATOR_CODE	'l'
 
 /*
  * An Operand has any of the above codes, and the information specific to
@@ -91,6 +91,14 @@ typedef struct dbop_pxfop_map
 	PxfOperatorCode	pxfop;
 
 } dbop_pxfop_map;
+
+
+typedef struct ExpressionItem
+{
+	Node	*node;
+	Node	*parent;
+	bool	processed;
+} ExpressionItem;
 
 static inline bool pxfoperand_is_attr(PxfOperand x)
 {
