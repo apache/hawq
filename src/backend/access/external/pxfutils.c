@@ -203,15 +203,23 @@ char* get_loopback_ip_addr()
  */
 char* replace_string(const char* string, const char* replace, const char* replacement)
 {
+	char* replaced = NULL;
 	char* start = strstr(string, replace);
-	char* before_token = pnstrdup(string, start - string);
-	char* after_token = pstrdup(string + (start - string) + strlen(replace));
-	char* replaced = palloc0(strlen(before_token) + strlen(replacement) + strlen(after_token) + 1);
-	sprintf(replaced, "%s%s%s", before_token, replacement, after_token);
+	if (start)
+	{
+		char* before_token = pnstrdup(string, start - string);
+		char* after_token = pstrdup(string + (start - string) + strlen(replace));
+		replaced = palloc0(strlen(before_token) + strlen(replacement) + strlen(after_token) + 1);
+		sprintf(replaced, "%s%s%s", before_token, replacement, after_token);
 
-	//release memory
-	pfree(before_token);
-	pfree(after_token);
+		//release memory
+		pfree(before_token);
+		pfree(after_token);
+	} else
+	{
+		replaced = palloc0(strlen(string) + 1);
+		sprintf(replaced, "%s", string);
+	}
 
 	return replaced;
 
