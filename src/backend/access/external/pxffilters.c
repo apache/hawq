@@ -322,8 +322,6 @@ static char *
 pxf_serialize_filter_list(List *expressionItems)
 {
 
-	printf("Serializing filter list 1\n");
-
 	StringInfo	 resbuf;
 	ListCell	*lc = NULL;
 
@@ -332,8 +330,6 @@ pxf_serialize_filter_list(List *expressionItems)
 
 	resbuf = makeStringInfo();
 	initStringInfo(resbuf);
-
-	printf("Serializing filter list 2\n");
 
 	/*
 	 * Iterate through the expression items in the list and serialize them one after the other.
@@ -397,8 +393,6 @@ pxf_serialize_filter_list(List *expressionItems)
 			}
 		}
 	}
-
-	printf("Serializing filter list 30\n");
 
 	if (resbuf->len == 0)
 	{
