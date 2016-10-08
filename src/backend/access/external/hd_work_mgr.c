@@ -158,7 +158,7 @@ char** map_hddata_2gp_segments(char* uri, int total_segs, int working_segs, Rela
 	inputData.headers = client_context.http_headers;
 	inputData.gphduri = hadoop_uri;
 	inputData.rel = relation;
-	inputData.filterstr = NULL; /* We do not supply filter data to the HTTP header */
+	inputData.filterstr = serializePxfFilterQuals(quals); /* We do supply filter data to the HTTP header */
     generate_delegation_token(&inputData);
 	build_http_header(&inputData);
 	

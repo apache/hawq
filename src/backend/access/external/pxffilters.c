@@ -31,13 +31,14 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static List* pxf_make_expression_items_list(List *quals, Node *parent);
+static List* pxf_make_expression_items_list(List *quals, Node *parent, bool *logicalOpsNum);
 static void pxf_free_filter(PxfFilterDesc* filter);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
 static void const_to_str(Const *constval, StringInfo buf);
 static List* append_attr_from_var(Var* var, List* attrs);
+static void enrichTrivialExpression(List *expressionItems);
 
 /*
  * All supported HAWQ operators, and their respective HFDS operator code.
@@ -150,15 +151,16 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{1060 /* bpchargt */, PXFOP_GT},
 	{1059 /* bpcharle */, PXFOP_LE},
 	{1061 /* bpcharge */, PXFOP_GE},
-	{1057 /* bpcharne */, PXFOP_NE},
+	{1057 /* bpcharne */, PXFOP_NE}
 
 	/* bytea */
-	{ByteaEqualOperator  /* byteaeq */, PXFOP_EQ},
-	{1957  /* bytealt */, PXFOP_LT},
-	{1959 /* byteagt */, PXFOP_GT},
-	{1958 /* byteale */, PXFOP_LE},
-	{1960 /* byteage */, PXFOP_GE},
-	{1956 /* byteane */, PXFOP_NE}
+	// TODO: uncomment ocne HAWQ-1085 is done
+	//,{ByteaEqualOperator  /* byteaeq */, PXFOP_EQ},
+	//{1957  /* bytealt */, PXFOP_LT},
+	//{1959 /* byteagt */, PXFOP_GT},
+	//{1958 /* byteale */, PXFOP_LE},
+	//{1960 /* byteage */, PXFOP_GE},
+	//{1956 /* byteane */, PXFOP_NE}
 
 };
 
@@ -181,7 +183,7 @@ Oid pxf_supported_types[] =
 };
 
 static void
-pxf_free_filter_list(List *expressionItems)
+pxf_free_filter_list(List *expressionItems, bool isTrivialExpression)
 {
 	ListCell		*lc 	= NULL;
 	ExpressionItem 	*expressionItem = NULL;
@@ -190,6 +192,10 @@ pxf_free_filter_list(List *expressionItems)
 	while (list_length(expressionItems) > 0)
 	{
 		expressionItem = (ExpressionItem *) lfirst(list_head(expressionItems));
+		if (isTrivialExpression)
+		{
+			pfree((BoolExpr *)expressionItem->node);
+		}
 		pfree(expressionItem);
 
 		/* to avoid freeing already freed items - delete all occurrences of current expression*/
@@ -214,7 +220,7 @@ pxf_free_filter_list(List *expressionItems)
  *
  */
 static List *
-pxf_make_expression_items_list(List *quals, Node *parent)
+pxf_make_expression_items_list(List *quals, Node *parent, bool *logicalOpsNum)
 {
 	ExpressionItem *expressionItem = NULL;
 	List			*result = NIL;
@@ -242,8 +248,9 @@ pxf_make_expression_items_list(List *quals, Node *parent)
 			}
 			case T_BoolExpr:
 			{
+				(*logicalOpsNum)++;
 				BoolExpr	*expr = (BoolExpr *) node;
-				List *inner_result = pxf_make_expression_items_list(expr->args, node);
+				List *inner_result = pxf_make_expression_items_list(expr->args, node, logicalOpsNum);
 				result = list_concat(result, inner_result);
 
 				int childNodesNum = 0;
@@ -669,9 +676,18 @@ char *serializePxfFilterQuals(List *quals)
 	if (pxf_enable_filter_pushdown)
 	{
 
-		List *expressionItems = pxf_make_expression_items_list(quals, NULL);
+		int logicalOpsNum = 0;
+		List *expressionItems = pxf_make_expression_items_list(quals, NULL, &logicalOpsNum);
+
+		//Trivial expression means list of OpExpr implicitly ANDed
+		bool isTrivialExpression = logicalOpsNum ==0 && expressionItems && expressionItems->length > 1;
+
+		if (isTrivialExpression)
+		{
+			enrichTrivialExpression(expressionItems);
+		}
 		result  = pxf_serialize_filter_list(expressionItems);
-		pxf_free_filter_list(expressionItems);
+		pxf_free_filter_list(expressionItems, isTrivialExpression);
 	}
 
 
@@ -680,6 +696,28 @@ char *serializePxfFilterQuals(List *quals)
 	return result;
 }
 
+/*
+ * Takes list of expression items which supposed to be just a list of OpExpr
+ * and adds needed number of AND items
+ *
+ */
+void enrichTrivialExpression(List *expressionItems) {
+
+	ExpressionItem *andExpressionItem = (ExpressionItem *) palloc0(sizeof(ExpressionItem));
+	BoolExpr *andExpr = makeNode(BoolExpr);
+
+	andExpr->boolop = AND_EXPR;
+
+	andExpressionItem->node = andExpr;
+	andExpressionItem->parent = NULL;
+	andExpressionItem->processed = false;
+
+	int logicalOpsNumNeeded = expressionItems->length - 1;
+
+	for (int i = 0; i < logicalOpsNumNeeded; i++) {
+		expressionItems = lappend(expressionItems, andExpressionItem);
+	}
+}
 
 /*
  * Returns a list of attributes, extracted from quals.
