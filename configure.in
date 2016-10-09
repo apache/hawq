@@ -1118,6 +1118,10 @@ Don't use --with-krb5 if you don't want the Kerberos 5 support.])])
 fi
 
 if test "$with_openssl" = yes ; then
+  dnl workaround for 'brew link openssl --force' error on MacOS 10.12
+  if test "$PORTNAME" == "darwin"; then
+	LDFLAGS = "$LDFLAGS -L/usr/local/opt/openssl/lib"
+  fi
   dnl Order matters!
   if test "$PORTNAME" != "win32"; then
      AC_CHECK_LIB(crypto, CRYPTO_new_ex_data, [], [AC_MSG_ERROR([library 'crypto' is required for OpenSSL.
@@ -1295,6 +1299,10 @@ Don't use --with-krb5 if you don't want the Kerberos 5 support.])])
 fi
 
 if test "$with_openssl" = yes ; then
+  dnl workaround for 'brew link openssl --force' error on MacOS 10.12 
+  if test "$PORTNAME" == "darwin"; then
+      CPPFLAGS="$CPPFLAGS -I/usr/local/opt/openssl/include"
+  fi
   AC_CHECK_HEADER(openssl/ssl.h, [], [AC_MSG_ERROR([header file <openssl/ssl.h> is required for OpenSSL.
 Check config.log for details. It is possible the compiler isn't looking in the proper directory.
 Don't use --with-openssl if you don't want to the OpenSSL support.])])
