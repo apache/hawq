@@ -9282,6 +9282,9 @@ fi
 fi
 
 if test "$with_openssl" = yes ; then
+    if test "$PORTNAME" == "darwin"; then
+	LDFLAGS = "$LDFLAGS -L/usr/local/opt/openssl/lib"
+  fi
     if test "$PORTNAME" != "win32"; then
      { $as_echo "$as_me:${as_lineno-$LINENO}: checking for CRYPTO_new_ex_data in -lcrypto" >&5
 $as_echo_n "checking for CRYPTO_new_ex_data in -lcrypto... " >&6; }
@@ -11011,6 +11014,9 @@ fi
 fi
 
 if test "$with_openssl" = yes ; then
+    if test "$PORTNAME" == "darwin"; then
+      CPPFLAGS="$CPPFLAGS -I/usr/local/opt/openssl/include"
+  fi
   ac_fn_c_check_header_mongrel "$LINENO" "openssl/ssl.h" "ac_cv_header_openssl_ssl_h" "$ac_includes_default"
 if test "x$ac_cv_header_openssl_ssl_h" = xyes; then :
 
