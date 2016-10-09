@@ -158,6 +158,9 @@ class MetadataYAMLAccessor extends MetadataAccessor {
 			Map<?, ?> file = (Map<?, ?>) files.get(i);
 			String filePath = file.get("path").toString();
 			long fileLen = Long.parseLong(file.get("size").toString());
+			if (fileLen == 0) {
+			  throw new IllegalStateException("Could not new HAWQAOFileStatus with a empty file.");
+			}
 
 			fileStatuses.add(new HAWQAOFileStatus(filePath, fileLen, checksum, compressType, blockSize));
 		}
@@ -198,6 +201,9 @@ class MetadataYAMLAccessor extends MetadataAccessor {
 			Map<?, ?> file = (Map<?, ?>) files.get(i);
 			final String filePath = file.get("path").toString();
 			final long fileLen = Long.parseLong(file.get("size").toString());
+			if (fileLen == 0) {
+			  throw new IllegalStateException("Could not new HAWQParquetFileStatus with a empty file.");
+			}
 			fileStatuses.add(new HAWQFileStatus(filePath, fileLen));
 		}
 		return fileStatuses;
