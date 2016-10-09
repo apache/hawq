@@ -394,8 +394,13 @@ class HawqRegister(object):
 
     def option_parser_yml(self, yml_file):
         import yaml
-        with open(yml_file, 'r') as f:
-            params = yaml.load(f)
+        try:
+            with open(yml_file, 'r') as f:
+                params = yaml.load(f)
+        except yaml.scanner.ScannerError as e:
+            print e
+            self.failure_handler.rollback()
+            sys.exit(1)
         table_column_num = self.accessor.get_table_column_num(self.tablename)
         register_yaml_dict_check(params, table_column_num, self.tablename)
         partitions_filepaths = []
@@ -470,6 +475,13 @@ class HawqRegister(object):
                 logger.info('%s is not a file in hdfs, please check the yaml configuration file.' % fn)
                 sys.exit(1)
 
+    def is_folder(filepath):
+        hdfscmd = 'hadoop fs -test -d %s' % filepath
+        if local_ssh(hdfscmd, logger):
+            return False
+        else:
+            return True
+
     def check_sizes_valid(self):
         for sz in self.sizes:
             if type(sz) != type(1):
@@ -512,6 +524,9 @@ class HawqRegister(object):
                 if not self.create_table() and self.mode != 'force':
                     self.mode = 'usage2_table_exist'
         else:
+            if is_folder(self.filepath) and self.filesize:
+                logger.error('-e option is only supported with single file case.')
+                sys.exit(1)
             self.file_format = 'Parquet'
             self.check_hash_type() # Usage1 only support randomly distributed table
         self.do_check()
@@ -824,6 +839,9 @@ class HawqRegister_Partition(HawqRegister):
         if self.yml:
             self.option_parser_yml(options.yml_config)
         else:
+            if is_folder(self.filepath) and self.filesize:
+                logger.error('-e option is only supported with single file case.')
+                sys.exit(1)
             self.file_format = 'Parquet'
             self.check_hash_type() # Usage1 only support randomly distributed table
         for k, pn in enumerate(self.partitions_name):
