@@ -191,7 +191,7 @@ Oid pxf_supported_types[] =
 };
 
 static void
-pxf_free_filter_list(List *expressionItems, bool freeBoolExprNodes)
+pxf_free_expression_items_list(List *expressionItems, bool freeBoolExprNodes)
 {
 	ListCell		*lc 	= NULL;
 	ExpressionItem 	*expressionItem = NULL;
@@ -695,7 +695,7 @@ char *serializePxfFilterQuals(List *quals)
 			enrichTrivialExpression(expressionItems);
 		}
 		result  = pxf_serialize_filter_list(expressionItems);
-		pxf_free_filter_list(expressionItems, isTrivialExpression);
+		pxf_free_expression_items_list(expressionItems, isTrivialExpression);
 	}
 
 
