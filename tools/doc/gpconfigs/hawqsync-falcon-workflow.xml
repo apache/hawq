@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!--
        Licensed to the Apache Software Foundation (ASF) under one
   or more contributor license agreements.  See the NOTICE file
@@ -15,41 +16,30 @@
   See the License for the specific language governing permissions and
   limitations under the License.
   -->
-<workflow-app xmlns='uri:oozie:workflow:0.3' name='falcon-dr-fs-workflow'>
-    <start to='dr-replication'/>
-    <!-- Replication action -->
-    <action name="dr-replication">
-        <distcp xmlns="uri:oozie:distcp-action:0.2">
-            <job-tracker>${jobTracker}</job-tracker>
-            <name-node>${nameNode}</name-node>
-            <configuration>
-                <property>
-                    <name>mapred.job.priority</name>
-                    <value>${jobPriority}</value>
-                </property>
-                <property>
-                    <name>mapred.job.queue.name</name>
-                    <value>${queueName}</value>
-                </property>
-            </configuration>
-            <arg>-update</arg>
-            <arg>-delete</arg>
-            <arg>-m</arg>
-            <arg>${distcpMaxMaps}</arg>
-            <arg>-bandwidth</arg>
-            <arg>${distcpMapBandwidth}</arg>
-            <arg>-strategy</arg>
-            <arg>dynamic</arg>
-            <arg>${drSourceClusterFS}${drSourceDir}</arg>
-            <arg>${drTargetClusterFS}${drTargetDir}</arg>
-        </distcp>
-        <ok to="end"/>
-        <error to="fail"/>
-    </action>
-    <kill name="fail">
-        <message>
-            Workflow action failed, error message[${wf:errorMessage(wf:lastErrorNode())}]
-        </message>
-    </kill>
-    <end name="end"/>
-</workflow-app>
+<process name="drSync" xmlns="uri:falcon:process:0.1">
+    <tags>_falcon_mirroring_type=HDFS</tags>
+    <clusters>
+        <cluster name="idpDev">
+            <validity start="2016-08-24T14:23Z" end="2046-01-01T14:23Z"/>
+        </cluster>
+    </clusters>
+    <parallel>1</parallel>
+    <order>LAST_ONLY</order>
+    <frequency>months(1)</frequency>
+    <timezone>GMT-07:00</timezone>
+    <properties>
+        <property name="oozie.wf.subworkflow.classpath.inheritance" value="true"/>
+        <property name="distcpMaxMaps" value="100"/>
+        <property name="distcpMapBandwidth" value="1000"/>
+        <property name="drSourceDir" value="/hawq_default"/>
+        <property name="drTargetDir" value="/hawq_default"/>
+        <property name="drTargetClusterFS" value="hdfs://source:8020"/>
+        <property name="drSourceClusterFS" value="hdfs://target:8020"/>
+        <property name="drNotificationReceivers" value="NA"/>
+        <property name="targetCluster" value="idpDR"/>
+        <property name="sourceCluster" value="idpDev"/>
+    </properties>
+    <workflow name="drSync-WF" engine="oozie" path="/apps/data-mirroring/workflows/hawqsync-oozie-workflow.xml" lib=""/>
+    <retry policy="periodic" delay="minutes(30)" attempts="3"/>
+    <ACL owner="gpadmin" group="users" permission="0777"/>
+</process>
