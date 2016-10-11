@@ -688,14 +688,14 @@ char *serializePxfFilterQuals(List *quals)
 		List *expressionItems = pxf_make_expression_items_list(quals, NULL, &logicalOpsNum);
 
 		//Trivial expression means list of OpExpr implicitly ANDed
-		bool isTrivialExpression = logicalOpsNum ==0 && expressionItems && expressionItems->length > 1;
+		bool isTrivialExpression = logicalOpsNum == 0 && expressionItems && expressionItems->length > 1;
 
 		if (isTrivialExpression)
 		{
 			enrichTrivialExpression(expressionItems);
 		}
 		result  = pxf_serialize_filter_list(expressionItems);
-		pxf_free_filter_list(expressionItems, isTrivialExpression);
+		//pxf_free_filter_list(expressionItems, isTrivialExpression);
 	}
 
 
