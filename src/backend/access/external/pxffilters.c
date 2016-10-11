@@ -711,19 +711,23 @@ char *serializePxfFilterQuals(List *quals)
  */
 void enrichTrivialExpression(List *expressionItems) {
 
-	ExpressionItem *andExpressionItem = (ExpressionItem *) palloc0(sizeof(ExpressionItem));
-	BoolExpr *andExpr = makeNode(BoolExpr);
-
-	andExpr->boolop = AND_EXPR;
-
-	andExpressionItem->node = andExpr;
-	andExpressionItem->parent = NULL;
-	andExpressionItem->processed = false;
 
 	int logicalOpsNumNeeded = expressionItems->length - 1;
 
-	for (int i = 0; i < logicalOpsNumNeeded; i++) {
-		expressionItems = lappend(expressionItems, andExpressionItem);
+	if (logicalOpsNumNeeded > 0)
+	{
+		ExpressionItem *andExpressionItem = (ExpressionItem *) palloc0(sizeof(ExpressionItem));
+		BoolExpr *andExpr = makeNode(BoolExpr);
+
+		andExpr->boolop = AND_EXPR;
+
+		andExpressionItem->node = andExpr;
+		andExpressionItem->parent = NULL;
+		andExpressionItem->processed = false;
+
+		for (int i = 0; i < logicalOpsNumNeeded; i++) {
+			expressionItems = lappend(expressionItems, andExpressionItem);
+		}
 	}
 }
 
