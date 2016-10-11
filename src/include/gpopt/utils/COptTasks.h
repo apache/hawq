@@ -114,10 +114,6 @@ class COptTasks
 			// ctor
 			SOptContext();
 
-			// If there is an error print as warning and throw exception to abort
-			// plan generation
-			void HandleError(BOOL *pfUnexpectedFailure);
-
 			// free all members except input and output pointers
 			void Free(EPin epinInput, EPin epinOutput);
 

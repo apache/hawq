@@ -447,6 +447,8 @@ CTranslatorQueryToDXL::CheckSupportedCmdType
 			GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiQuery2DXLUnsupportedFeature, mapelem.m_wsz);
 		}
 	}
+
+	GPOS_ASSERT(!"Unrecognized command type");
 }
 
 //---------------------------------------------------------------------------
