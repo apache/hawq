@@ -323,6 +323,21 @@ OpExpr* build_op_expr(void* left, void* right, int op)
 	return expr;
 }
 
+ExpressionItem* build_expression_item(int lattnum, Oid lattrtype, char* rconststr, Oid rattrtype, int op) {
+
+	ExpressionItem *expressionItem = (ExpressionItem*) palloc0(sizeof(ExpressionItem));
+
+	Var *leftop = build_var(lattrtype, lattnum);
+	Const *rightop = build_const(rattrtype, strdup(rconststr));
+	OpExpr *operationExpression = build_op_expr(leftop, rightop, op);
+
+	expressionItem->node = operationExpression;
+	expressionItem->processed = false;
+	expressionItem->parent = NULL;
+
+	return expressionItem;
+}
+
 void run__opexpr_to_pxffilter__positive(Oid dbop, PxfOperatorCode expectedPxfOp)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
@@ -475,106 +490,50 @@ test__opexpr_to_pxffilter__unsupportedOpNot(void **state)
 	pfree(expr);
 }
 
-void
-test__pxf_serialize_filter_list__oneFilter(void **state)
-{
+void test__pxf_serialize_filter_list__oneFilter(void **state) {
 
-	printf("Entered one filter test 1\n");
+	List* expressionItems = NIL;
 
-	 int c = 1, d = 1, f = 1;
+	ExpressionItem* filterExpressionItem = build_expression_item(1, TEXTOID, "1984", TEXTOID, TextEqualOperator);
 
-	   for ( c = 1 ; c <= 32767 ; c++ )
-	       for ( d = 1 ; d <= 32767 ; d++ )
-	    	   for ( f = 1 ; f <= 10 ; f++ )
-	       {}
+	expressionItems = lappend(expressionItems, filterExpressionItem);
 
-	List* filter_list = NIL;
+	char* result = pxf_serialize_filter_list(expressionItems);
+	assert_string_equal(result, "a0c\\\"1984\\\"o5");
 
-	printf("Entered one filter test 2\n");
-
-	PxfFilterDesc* filter = build_filter(
-			PXF_ATTR_CODE, 1, NULL,
-			PXF_CONST_CODE, 0, "1984",
-			PXFOP_GT);
-
-	printf("Entered one filter test 3\n");
-	filter_list = lappend(filter_list, filter);
-
-
-	char* result = pxf_serialize_filter_list(filter_list);
-	assert_string_equal(result, "a0c1984o2");
-
-	pxf_free_filter_list(filter_list);
-	filter_list = NIL;
+	pxf_free_filter_list(expressionItems, true);
+	expressionItems = NIL;
 	pfree(result);
 
-	filter = build_filter(
-			PXF_ATTR_CODE, 8, NULL,
-			PXF_CONST_CODE, 0, "\"George Orwell\"",
-			PXFOP_EQ);
-	filter_list = lappend(filter_list, filter);
-
-	result = pxf_serialize_filter_list(filter_list);
-	assert_string_equal(result, "a7c\"George Orwell\"o5");
-
-	pxf_free_filter_list(filter_list);
-	pfree(result);
 }
 
 void
 test__pxf_serialize_filter_list__manyFilters(void **state)
 {
 	char* result = NULL;
-	List* filter_list = NIL;
+	List* expressionItems = NIL;
 
-	PxfFilterDesc* filter1 = build_filter(
-			PXF_ATTR_CODE, 2, NULL,
-			PXF_CONST_CODE, 0, "1983",
-			PXFOP_GT);
-	PxfFilterDesc* filter2 = build_filter(
-			PXF_ATTR_CODE, 3, NULL,
-			PXF_CONST_CODE, 0, "1985",
-			PXFOP_LT);
-	PxfFilterDesc* filter3 = build_filter(
-			PXF_ATTR_CODE, 4, NULL,
-			PXF_CONST_CODE, 0, "\"George Orwell\"",
-			PXFOP_EQ);
-	PxfFilterDesc* filter4 = build_filter(
-			PXF_ATTR_CODE, 5, NULL,
-			PXF_CONST_CODE, 0, "\"Winston\"",
-			PXFOP_GE);
-	PxfFilterDesc* filter5 = build_filter(
-			PXF_ATTR_CODE, 6, NULL,
-			PXF_CONST_CODE, 0, "\"Eric-%\"",
-			PXFOP_LIKE);
+	ExpressionItem* expressionItem1 = build_expression_item(1, TEXTOID, "1984", TEXTOID, TextEqualOperator);
+	ExpressionItem* expressionItem2 = build_expression_item(2, TEXTOID, "\"George Orwell\"", TEXTOID, TextEqualOperator);
+	ExpressionItem* expressionItem3 = build_expression_item(3, TEXTOID, "\"Winston\"", TEXTOID, TextEqualOperator);
+	ExpressionItem* expressionItem4 = build_expression_item(4, TEXTOID, "\"Eric-%\"", TEXTOID, 1209);
 
-	filter_list = lappend(filter_list, filter1);
-	filter_list = lappend(filter_list, filter2);
 
-	result = pxf_serialize_filter_list(filter_list);
-	assert_string_equal(result, "a1c1983o2a2c1985o1o7");
+	expressionItems = lappend(expressionItems, expressionItem1);
+	expressionItems = lappend(expressionItems, expressionItem2);
+	expressionItems = lappend(expressionItems, expressionItem3);
+	expressionItems = lappend(expressionItems, expressionItem4);
+
+	result = pxf_serialize_filter_list(expressionItems);
+	assert_string_equal(result, "a0c\\\"1984\\\"o5a1c\\\"\"George Orwell\"\\\"o5a2c\\\"\"Winston\"\\\"o5a3c\\\"\"Eric-%\"\\\"o7");
 	pfree(result);
 
-	filter_list = lappend(filter_list, filter3);
+	enrichTrivialExpression(expressionItems);
 
-	result = pxf_serialize_filter_list(filter_list);
-	assert_string_equal(result, "a1c1983o2a2c1985o1o7a3c\"George Orwell\"o5o7");
-	pfree(result);
+	assert_int_equal(expressionItems->length, 7);
 
-	filter_list = lappend(filter_list, filter4);
-
-	result = pxf_serialize_filter_list(filter_list);
-	assert_string_equal(result, "a1c1983o2a2c1985o1o7a3c\"George Orwell\"o5o7a4c\"Winston\"o4o7");
-	pfree(result);
-
-	filter_list = lappend(filter_list, filter5);
-
-	result = pxf_serialize_filter_list(filter_list);
-	assert_string_equal(result, "a1c1983o2a2c1985o1o7a3c\"George Orwell\"o5o7a4c\"Winston\"o4o7a5c\"Eric-%\"o8o7");
-	pfree(result);
-
-	pxf_free_filter_list(filter_list);
-	filter_list = NIL;
+	pxf_free_filter_list(expressionItems, true);
+	expressionItems = NIL;
 }
 
 int 

@@ -191,7 +191,7 @@ Oid pxf_supported_types[] =
 };
 
 static void
-pxf_free_filter_list(List *expressionItems, bool isTrivialExpression)
+pxf_free_filter_list(List *expressionItems, bool freeNodes)
 {
 	ListCell		*lc 	= NULL;
 	ExpressionItem 	*expressionItem = NULL;
@@ -200,7 +200,7 @@ pxf_free_filter_list(List *expressionItems, bool isTrivialExpression)
 	while (list_length(expressionItems) > 0)
 	{
 		expressionItem = (ExpressionItem *) lfirst(list_head(expressionItems));
-		if (isTrivialExpression)
+		if (freeNodes)
 		{
 			pfree((BoolExpr *)expressionItem->node);
 		}
