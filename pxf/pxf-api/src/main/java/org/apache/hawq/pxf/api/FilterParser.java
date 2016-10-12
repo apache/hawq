@@ -63,7 +63,9 @@ public class FilterParser {
         HDOP_EQ,
         HDOP_NE,
         HDOP_AND,
-        HDOP_LIKE
+        HDOP_LIKE,
+        HDOP_ISNULL,
+        HDOP_ISNOTNULL
     }
 
     public enum LogicalOperation {
@@ -88,6 +90,7 @@ public class FilterParser {
          * @throws Exception if building the filter failed
          */
         public Object build(Operation operation, Object left, Object right) throws Exception;
+        public Object build(Operation operation, Object operand) throws Exception;
         public Object build(LogicalOperation operation, Object left, Object right) throws Exception;
         public Object build(LogicalOperation operation, Object filter) throws Exception;
     }
@@ -176,20 +179,26 @@ public class FilterParser {
                     }
                     Object rightOperand = operandsStack.pop();
 
-                    // Pop left operand
-                    if (operandsStack.empty()) {
-                        throw new FilterStringSyntaxException("missing operands for op " + operation + " at " + index);
+                    // all operations other than null checks require 2 operands
+                    Object result;
+                    if (operation == Operation.HDOP_ISNULL || operation == Operation.HDOP_ISNOTNULL) {
+                        result = filterBuilder.build(operation, rightOperand);
                     }
-                    Object leftOperand = operandsStack.pop();
+                    else {
+                        // Pop left operand
+                        if (operandsStack.empty()) {
+                            throw new FilterStringSyntaxException("missing operands for op " + operation + " at " + index);
+                        }
+                        Object leftOperand = operandsStack.pop();
 
-                    // Normalize order, evaluate
-                    // Column should be on the left
-                    Object result = (leftOperand instanceof Constant)
-                            // column on the right, reverse expression
-                            ? filterBuilder.build(reverseOp(operation), rightOperand, leftOperand)
-                            // no swap, column on the left
-                            : filterBuilder.build(operation, leftOperand, rightOperand);
-
+                        // Normalize order, evaluate
+                        // Column should be on the left
+                        result = (leftOperand instanceof Constant)
+                                // column on the right, reverse expression
+                                ? filterBuilder.build(reverseOp(operation), rightOperand, leftOperand)
+                                // no swap, column on the left
+                                : filterBuilder.build(operation, leftOperand, rightOperand);
+                    }
                     // Store result on stack
                     operandsStack.push(result);
                     break;
@@ -205,7 +214,7 @@ public class FilterParser {
                         result = filterBuilder.build(logicalOperation, exp);
                     } else {
                         rightOperand  = operandsStack.pop();
-                        leftOperand = operandsStack.pop();
+                        Object leftOperand = operandsStack.pop();
 
                         result = filterBuilder.build(logicalOperation, leftOperand, rightOperand);
                     }
@@ -385,6 +394,8 @@ public class FilterParser {
         operatorTranslationMap.put(6, Operation.HDOP_NE);
         operatorTranslationMap.put(7, Operation.HDOP_AND);
         operatorTranslationMap.put(8, Operation.HDOP_LIKE);
+        operatorTranslationMap.put(9, Operation.HDOP_ISNULL);
+        operatorTranslationMap.put(10, Operation.HDOP_ISNOTNULL);
         return operatorTranslationMap;
     }
 

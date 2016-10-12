@@ -29,6 +29,7 @@ import org.apache.hawq.pxf.api.BasicFilter;
 import static org.apache.hawq.pxf.api.FilterParser.Operation;
 import static org.apache.hawq.pxf.api.FilterParser.Operation.*;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class HiveFilterBuilderTest {
     @Test
@@ -61,6 +62,24 @@ public class HiveFilterBuilderTest {
         assertEquals(LogicalOperation.HDOP_OR, filter.getOperator());
         assertEquals(LogicalOperation.HDOP_AND, ((LogicalFilter) filter.getFilterList().get(0)).getOperator());
         assertEquals(HDOP_LT, ((BasicFilter) filter.getFilterList().get(1)).getOperation());
+    }
+
+    @Test
+    public void parseISNULLExpression() throws Exception {
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+        BasicFilter filter = (BasicFilter) builder.getFilterObject("a1o9");
+        assertEquals(Operation.HDOP_ISNULL, filter.getOperation());
+        assertEquals(1, filter.getColumn().index());
+        assertNull(filter.getConstant());
+    }
+
+    @Test
+    public void parseISNOTNULLExpression() throws Exception {
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+        BasicFilter filter = (BasicFilter) builder.getFilterObject("a1o10");
+        assertEquals(Operation.HDOP_ISNOTNULL, filter.getOperation());
+        assertEquals(1, filter.getColumn().index());
+        assertNull(filter.getConstant());
     }
 
 }
