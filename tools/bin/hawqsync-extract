@@ -25,26 +25,35 @@ from json import loads
 from time import strftime, sleep, time
 
 def parseargs():
-    parser = OptionParser(usage="HAWQ sync options.")
+    parser = OptionParser(usage="HAWQ extract options.")
     parser.add_option('-v', '--verbose', action='store_true', default=False)
     parser.add_option("-a", "--prompt", action="store_false",
                       dest="prompt", default=True,
                       help="Execute without prompt.")
     parser.add_option("-l", "--logdir", dest="logDir",
                       help="Sets the directory for log files")
-    parser.add_option('-d', '--dryRun', action='store_true', default=False,
+    parser.add_option('-t', '--testMode', action='store_true', default=False,
                       dest='testMode', help="Execute in test mode")
+    parser.add_option('-d', '--destinationOnHdfs', action='store_true', 
+                      default="/hawq_default", dest='hdfsDir', 
+                      help="HDFS directory to copy resulting tarball to")
     parser.add_option('-s', '--schemas', dest='schemas', default="",
-                      help="The schemas containing the tables "+\
-                            "to extract metadata for")
-    parser.add_option('--maxMaps', dest='distcpMaxMaps', default="10",
-                      help="The maximum number of map jobs to allow")
+                      help="A comma separated list of the schemas containing "+\
+                           "the tables to extract metadata for")
+    parser.add_option('-h', dest='hawqUri', default="localhost:5432/gpadmin",
+                      help="The HAWQ master URI. e.g. localhost:5432/gpadmin")
 
 
 def getSchemaObjectList(hawqUri, schemaList=[], isTesting=False):
-    """
-
-
+    """Utility function to generate a list of table objects for a list of schemas
+    Args:
+        hawqUri (str): the HAWQ master URI to use for connecting
+        schemaList (List): a list of schemas to find tables within
+        isTesting (bool): NOOP mode bypassing actual REST calls for testing
+    
+    Returns:
+        retVal (int): Zero for success, nonzero otherwise
+        objectList (str) or message (str): either a list of objects or stderr output
     """
 
     retVal = -1
@@ -102,9 +111,15 @@ def getSchemaObjectList(hawqUri, schemaList=[], isTesting=False):
     return retVal, objectList.split("\n")
 
 def saveMetadataForSchemaObjects(baseDirectory="/tmp", objectList=[], isTesting=False):
-    """
-
-
+    """Utility function to export table metadata in a schema to a set of files
+       (one per table)
+    Args:
+        baseDirectory (str): the base directory to create a tarball of
+        objectList (List): a list of objects to invoke hawq extract with
+        isTesting (bool): NOOP mode bypassing actual REST calls for testing
+    
+    Returns:
+        retVal (int) or message (str): Zero for success, non-zero otherwise
     """
 
     retVal = -1
@@ -146,7 +161,6 @@ def saveMetadataForSchemaObjects(baseDirectory="/tmp", objectList=[], isTesting=
             if rv != 0:
                 print rv, stderr
 
-    # Sample output to follow
     else:
 
         retVal = 0
@@ -154,6 +168,18 @@ def saveMetadataForSchemaObjects(baseDirectory="/tmp", objectList=[], isTesting=
     return retVal 
 
 def createTarball(baseDirectory="/tmp", targetTarball="/tmp/hawqExtract-{t}.tar.bz2", isTesting=False):
+    """Utility function to create a tarball of the extracted metadata 
+    Args:
+        baseDirectory (str): the base directory to create a tarball of
+        targetTarball (str): the target directory and filename of the tarball
+        isTesting (bool): NOOP mode bypassing actual REST calls for testing
+    
+    Returns:
+        retVal (int) or message (str): Zero for success, negative one otherwise
+        message (str): message contains status string
+        checksum (str): the MD5 checksum of the created tarball, if successful, 
+                        negative one otherwise
+    """
 
     retVal = -1
     checksum = None
@@ -206,6 +232,17 @@ def createTarball(baseDirectory="/tmp", targetTarball="/tmp/hawqExtract-{t}.tar.
         return 0, "TESTING BRANCH", -1
 
 def copyToHdfs(source, dest, isTesting=False):
+    """Utility function to copy a source file
+    to the destination HDFS directory/file
+    Args:
+        source (str): the source file on the local FS
+        dest (str): the target HDFS directory and filename
+        isTesting (bool): NOOP mode bypassing actual REST calls for testing
+    
+    Returns:
+        retVal (int) or message (str): Zero for success, negative one otherwise
+        message (str): message contains status string
+    """
 
     retVal = -1
 
@@ -227,10 +264,39 @@ def copyToHdfs(source, dest, isTesting=False):
     else:
         return 0, "TESTING"
 
-retVal, objectList = getSchemaObjectList("localhost:5432/idp", schemaList=["staging"], isTesting=False)
+if __name__ == '__main__':
+    options, args = parseargs()
 
-retVal = saveMetadataForSchemaObjects(objectList, isTesting=False)
+    #if options.verbose:
+    #    enable_verbose_logging()
 
-retVal, filenameOrStderr, checksum = createTarball(isTesting=False)
+    # TODO - switch prints to this once using gppylibs
+    #logger, log_filename = setup_hawq_tool_logging('hawq_sync',getLocalHostname(),getUserName(), options.logDir)
 
-retVal, stderr = copyToHdfs(filenameOrStderr, "/hawq_default", isTesting=False)
+    if options.prompt:
+        # TODO - switch to this once using gppylibs
+        #if not userinput.ask_yesno(None, "\nContinue with HAWQ standby master activate", 'N'):
+
+        # TODO - switch to gppylib-based logging
+        print "---------------------------------------------------------------"
+        print ""
+        print "This tool will extract metadata for every table in the schema list."
+        print ""
+        print "You must be gpadmin and have /usr/local/hawq/bin/psql in your PATH"
+        print ""
+        print "  Would you like to continue?"
+        print "---------------------------------------------------------------"
+        answer = raw_input("y or n: ")
+        if "y" not in answer and "Y" not in answer:
+            print "Exiting."
+            sys.exit(1)
+
+    retVal, objectList = getSchemaObjectList(options.hawqUri, 
+                                             schemaList=options.schemas.split(","), 
+                                             isTesting=False)
+
+    retVal = saveMetadataForSchemaObjects(objectList, isTesting=False)
+
+    retVal, filenameOrStderr, checksum = createTarball(isTesting=False)
+
+    retVal, stderr = copyToHdfs(filenameOrStderr, "/hawq_default", isTesting=False)
