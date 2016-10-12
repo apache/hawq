@@ -38,7 +38,7 @@ static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
 static void const_to_str(Const *constval, StringInfo buf);
 static List* append_attr_from_var(Var* var, List* attrs);
-static void enrichTrivialExpression(List *expressionItems);
+static void enrich_trivial_expression(List *expressionItems);
 
 /*
  * All supported HAWQ operators, and their respective HFDS operator code.
@@ -162,7 +162,7 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{1057 /* bpcharne */, PXFOP_NE}
 
 	/* bytea */
-	// TODO: uncomment ocne HAWQ-1085 is done
+	// TODO: uncomment once HAWQ-1085 is done
 	//,{ByteaEqualOperator  /* byteaeq */, PXFOP_EQ},
 	//{1957  /* bytealt */, PXFOP_LT},
 	//{1959 /* byteagt */, PXFOP_GT},
@@ -692,7 +692,7 @@ char *serializePxfFilterQuals(List *quals)
 
 		if (isTrivialExpression)
 		{
-			enrichTrivialExpression(expressionItems);
+			enrich_trivial_expression(expressionItems);
 		}
 		result  = pxf_serialize_filter_list(expressionItems);
 		pxf_free_expression_items_list(expressionItems, isTrivialExpression);
@@ -709,7 +709,7 @@ char *serializePxfFilterQuals(List *quals)
  * and adds needed number of AND items
  *
  */
-void enrichTrivialExpression(List *expressionItems) {
+void enrich_trivial_expression(List *expressionItems) {
 
 
 	int logicalOpsNumNeeded = expressionItems->length - 1;

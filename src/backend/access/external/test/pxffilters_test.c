@@ -501,7 +501,7 @@ void test__pxf_serialize_filter_list__oneFilter(void **state) {
 	char* result = pxf_serialize_filter_list(expressionItems);
 	assert_string_equal(result, "a0c\\\"1984\\\"o5");
 
-	pxf_free_filter_list(expressionItems, true);
+	pxf_free_expression_items_list(expressionItems, true);
 	expressionItems = NIL;
 	pfree(result);
 
@@ -528,11 +528,11 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	assert_string_equal(result, "a0c\\\"1984\\\"o5a1c\\\"\"George Orwell\"\\\"o5a2c\\\"\"Winston\"\\\"o5a3c\\\"\"Eric-%\"\\\"o7");
 	pfree(result);
 
-	enrichTrivialExpression(expressionItems);
+	enrich_trivial_expression(expressionItems);
 
 	assert_int_equal(expressionItems->length, 7);
 
-	pxf_free_filter_list(expressionItems, true);
+	pxf_free_expression_items_list(expressionItems, true);
 	expressionItems = NIL;
 }
 
