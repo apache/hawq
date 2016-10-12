@@ -4316,10 +4316,10 @@ describePxfTable(const char *profile, const char *pattern, bool verbose)
 		if (verbose)
 		{
 			sourcefieldtype = PQgetvalue(res, i, 4);
-			total_fields = PQgetvalue(res, i, 5);
+			total_fields = atoi(PQgetvalue(res, i, 5));
 		} else
 		{
-			total_fields = PQgetvalue(res, i, 4);
+			total_fields = atoi(PQgetvalue(res, i, 4));
 		}
 
 		/* First row for current table */
