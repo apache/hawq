@@ -19,9 +19,9 @@ install:
     ccache
     snappy
     libevent
-    python
     bison
     cpanm
+  - brew reinstall python
   - brew outdated libyaml || brew upgrade libyaml
   - brew outdated json-c || brew upgrade json-c
   - brew outdated boost || brew upgrade boost
