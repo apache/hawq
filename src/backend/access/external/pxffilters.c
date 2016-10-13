@@ -369,14 +369,18 @@ pxf_serialize_filter_list(List *expressionItems)
 					PxfOperatorCode o = filter->op;
 					if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
 					{
-						appendStringInfo(resbuf, "%c%d%c%s",
+						appendStringInfo(resbuf, "%c%d%c%d%c%d%c%s",
 												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
-												 PXF_CONST_CODE, (r.conststr)->data);
+												 PXF_CONST_CODE, r.consttype,
+												 PXF_LENGTH_TO_READ, strlen(r.conststr->data),
+												 PXF_CONST_DATA, (r.conststr)->data);
 					}
 					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
 					{
-						appendStringInfo(resbuf, "%c%s%c%d",
-												 PXF_CONST_CODE, (l.conststr)->data,
+						appendStringInfo(resbuf, "%c%d%c%d%c%s%c%d",
+												 PXF_CONST_CODE, l.consttype,
+												 PXF_LENGTH_TO_READ, strlen(l.conststr->data),
+												 PXF_CONST_DATA, (l.conststr)->data,
 												 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
 					}
 					else
@@ -468,6 +472,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	{
 		filter->l.opcode = PXF_ATTR_CODE;
 		filter->l.attnum = ((Var *) leftop)->varattno;
+		filter->l.consttype = InvalidOid;
 		if (filter->l.attnum <= InvalidAttrNumber)
 			return false; /* system attr not supported */
 
@@ -476,6 +481,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		filter->r.conststr = makeStringInfo();
 		initStringInfo(filter->r.conststr);
 		const_to_str((Const *)rightop, filter->r.conststr);
+		filter->r.consttype = ((Const *)rightop)->consttype;
 	}
 	else if (IsA(leftop, Const) && IsA(rightop, Var))
 	{
@@ -484,9 +490,11 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		filter->l.conststr = makeStringInfo();
 		initStringInfo(filter->l.conststr);
 		const_to_str((Const *)leftop, filter->l.conststr);
+		filter->l.consttype = ((Const *)leftop)->consttype;
 
 		filter->r.opcode = PXF_ATTR_CODE;
 		filter->r.attnum = ((Var *) rightop)->varattno;
+		filter->r.consttype = InvalidOid;
 		if (filter->r.attnum <= InvalidAttrNumber)
 			return false; /* system attr not supported */
 	}
@@ -632,9 +640,6 @@ const_to_str(Const *constval, StringInfo buf)
 		case FLOAT4OID:
 		case FLOAT8OID:
 		case NUMERICOID:
-			appendStringInfo(buf, "%s", extval);
-			break;
-
 		case TEXTOID:
 		case VARCHAROID:
 		case BPCHAROID:
@@ -642,14 +647,14 @@ const_to_str(Const *constval, StringInfo buf)
 		case BYTEAOID:
 		case DATEOID:
 		case TIMESTAMPOID:
-			appendStringInfo(buf, "\\\"%s\\\"", extval);
+			appendStringInfo(buf, "%s", extval);
 			break;
 
 		case BOOLOID:
 			if (strcmp(extval, "t") == 0)
-				appendStringInfo(buf, "\"true\"");
+				appendStringInfo(buf, "true");
 			else
-				appendStringInfo(buf, "\"false\"");
+				appendStringInfo(buf, "false");
 			break;
 
 		default:
