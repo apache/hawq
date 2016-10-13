@@ -183,19 +183,19 @@ test__const_to_str__int(void **state)
 void
 test__const_to_str__text(void **state)
 {
-	verify__const_to_str(false, "that", TEXTOID, "\\\"that\\\"");
-	verify__const_to_str(false, "joke", VARCHAROID, "\\\"joke\\\"");
-	verify__const_to_str(false, "isn't", BPCHAROID, "\\\"isn't\\\"");
-	verify__const_to_str(false, "funny", CHAROID, "\\\"funny\\\"");
-	verify__const_to_str(false, "anymore", BYTEAOID, "\\\"anymore\\\"");
-	verify__const_to_str(false, "iamdate", DATEOID, "\\\"iamdate\\\"");
+	verify__const_to_str(false, "that", TEXTOID, "that");
+	verify__const_to_str(false, "joke", VARCHAROID, "joke");
+	verify__const_to_str(false, "isn't", BPCHAROID, "isn't");
+	verify__const_to_str(false, "funny", CHAROID, "funny");
+	verify__const_to_str(false, "anymore", BYTEAOID, "anymore");
+	verify__const_to_str(false, "iamdate", DATEOID, "iamdate");
 }
 
 void
 test__const_to_str__boolean(void **state)
 {
-	verify__const_to_str(false, "t", BOOLOID, "\"true\"");
-	verify__const_to_str(false, "f", BOOLOID, "\"false\"");
+	verify__const_to_str(false, "t", BOOLOID, "true");
+	verify__const_to_str(false, "f", BOOLOID, "false");
 }
 
 void
@@ -499,7 +499,7 @@ void test__pxf_serialize_filter_list__oneFilter(void **state) {
 	expressionItems = lappend(expressionItems, filterExpressionItem);
 
 	char* result = pxf_serialize_filter_list(expressionItems);
-	assert_string_equal(result, "a0c\\\"1984\\\"o5");
+	assert_string_equal(result, "a0c25s4d1984o5");
 
 	pxf_free_expression_items_list(expressionItems, true);
 	expressionItems = NIL;
@@ -514,9 +514,9 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	List* expressionItems = NIL;
 
 	ExpressionItem* expressionItem1 = build_expression_item(1, TEXTOID, "1984", TEXTOID, TextEqualOperator);
-	ExpressionItem* expressionItem2 = build_expression_item(2, TEXTOID, "\"George Orwell\"", TEXTOID, TextEqualOperator);
-	ExpressionItem* expressionItem3 = build_expression_item(3, TEXTOID, "\"Winston\"", TEXTOID, TextEqualOperator);
-	ExpressionItem* expressionItem4 = build_expression_item(4, TEXTOID, "\"Eric-%\"", TEXTOID, 1209);
+	ExpressionItem* expressionItem2 = build_expression_item(2, TEXTOID, "George Orwell", TEXTOID, TextEqualOperator);
+	ExpressionItem* expressionItem3 = build_expression_item(3, TEXTOID, "Winston", TEXTOID, TextEqualOperator);
+	ExpressionItem* expressionItem4 = build_expression_item(4, TEXTOID, "Eric-%", TEXTOID, 1209);
 
 
 	expressionItems = lappend(expressionItems, expressionItem1);
@@ -525,7 +525,7 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	expressionItems = lappend(expressionItems, expressionItem4);
 
 	result = pxf_serialize_filter_list(expressionItems);
-	assert_string_equal(result, "a0c\\\"1984\\\"o5a1c\\\"\"George Orwell\"\\\"o5a2c\\\"\"Winston\"\\\"o5a3c\\\"\"Eric-%\"\\\"o7");
+	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7");
 	pfree(result);
 
 	enrich_trivial_expression(expressionItems);
