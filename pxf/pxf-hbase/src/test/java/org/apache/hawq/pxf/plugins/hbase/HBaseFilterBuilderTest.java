@@ -42,12 +42,18 @@ public class HBaseFilterBuilderTest {
 
     @Test
     public void parseNOTOpCodeInConstant() throws Exception {
-        String filter = "a1c\"l2\"o1a1c2o2l0";
+        String filter = "a1c25s2dl2o1a1c20s1d2o2l0";
         HBaseFilterBuilder builder = new HBaseFilterBuilder(null);
         //Testing that we get past the parsing stage
         //Very crude but it avoids instantiating all the necessary dependencies
         thrown.expect(NullPointerException.class);
         builder.getFilterObject(filter);
+    }
+
+    @Test
+    public void parseNullFilter() throws Exception {
+        HBaseFilterBuilder builder = new HBaseFilterBuilder(null);
+        assertNull(builder.getFilterObject(null));
     }
 
 }

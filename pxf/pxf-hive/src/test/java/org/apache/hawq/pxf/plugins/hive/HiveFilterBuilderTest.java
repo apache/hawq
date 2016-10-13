@@ -29,6 +29,7 @@ import org.apache.hawq.pxf.api.BasicFilter;
 import static org.apache.hawq.pxf.api.FilterParser.Operation;
 import static org.apache.hawq.pxf.api.FilterParser.Operation.*;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class HiveFilterBuilderTest {
     @Test
@@ -38,7 +39,7 @@ public class HiveFilterBuilderTest {
         Operation[] ops = new Operation[] {HDOP_EQ, HDOP_GT};
         int[] idx = new int[] {1, 2};
 
-        LogicalFilter filterList = (LogicalFilter) builder.getFilterObject("a1c\"first\"o5a2c2o2l0");
+        LogicalFilter filterList = (LogicalFilter) builder.getFilterObject("a1c25s5dfirsto5a2c20s1d2o2l0");
         assertEquals(LogicalOperation.HDOP_AND, filterList.getOperator());
         BasicFilter leftOperand = (BasicFilter) filterList.getFilterList().get(0);
         assertEquals(consts[0], leftOperand.getConstant().constant());
@@ -47,9 +48,16 @@ public class HiveFilterBuilderTest {
     }
 
     @Test
+    public void parseNullFilter() throws Exception {
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+        LogicalFilter filterList = (LogicalFilter) builder.getFilterObject(null);
+        assertNull(builder.getFilterObject(null));
+    }
+
+    @Test
     public void parseFilterWithLogicalOperation() throws Exception {
         HiveFilterBuilder builder = new HiveFilterBuilder(null);
-        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c\"first\"o5a2c2o2l0");
+        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c25s5dfirsto5a2c20s1d2o2l0");
         assertEquals(LogicalOperation.HDOP_AND, filter.getOperator());
         assertEquals(2, filter.getFilterList().size());
     }
@@ -57,7 +65,7 @@ public class HiveFilterBuilderTest {
     @Test
     public void parseNestedExpressionWithLogicalOperation() throws Exception {
         HiveFilterBuilder builder = new HiveFilterBuilder(null);
-        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c\"first\"o5a2c2o2l0a1c1o1l1");
+        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c25s5dfirsto5a2c20s1d2o2l0a1c20s1d1o1l1");
         assertEquals(LogicalOperation.HDOP_OR, filter.getOperator());
         assertEquals(LogicalOperation.HDOP_AND, ((LogicalFilter) filter.getFilterList().get(0)).getOperator());
         assertEquals(HDOP_LT, ((BasicFilter) filter.getFilterList().get(1)).getOperation());
