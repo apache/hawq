@@ -23,6 +23,7 @@ package org.apache.hawq.pxf.plugins.hbase;
 import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
+import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseFloatComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseIntegerComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseTupleDescription;
 import org.apache.hadoop.hbase.HConstants;
@@ -94,7 +95,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
             return null;
 
         FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString);
+        Object result = parser.parse(filterString.getBytes());
 
         if (!(result instanceof Filter)) {
             throw new Exception("String " + filterString + " couldn't be resolved to any supported filter");
@@ -229,8 +230,20 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 break;
             case SMALLINT:
             case INTEGER:
+                result = new HBaseIntegerComparator(((Integer) data).longValue());
+                break;
             case BIGINT:
-                result = new HBaseIntegerComparator((Long) data);
+                if (data instanceof Long) {
+                    result = new HBaseIntegerComparator((Long) data);
+                } else if (data instanceof Integer) {
+                    result = new HBaseIntegerComparator(((Integer) data).longValue());
+                } else {
+                    result = null;
+                }
+                break;
+            case FLOAT8:
+            case REAL:
+                result = new HBaseFloatComparator((float) data);
                 break;
             default:
                 throw new Exception("unsupported column type for filtering " + type);

@@ -20,8 +20,11 @@ package org.apache.hawq.pxf.api;
  */
 
 
-import java.util.HashMap;
-import java.util.Map;
+import org.apache.hawq.pxf.api.io.DataType;
+
+import java.sql.Date;
+import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.Stack;
 
 /**
@@ -47,7 +50,7 @@ import java.util.Stack;
  */
 public class FilterParser {
     private int index;
-    private String filterString;
+    private byte[] filterByteArr;
     private Stack<Object> operandsStack;
     private FilterBuilder filterBuilder;
 
@@ -144,7 +147,7 @@ public class FilterParser {
     @SuppressWarnings("serial")
     class FilterStringSyntaxException extends Exception {
         FilterStringSyntaxException(String desc) {
-            super(desc + " (filter string: '" + filterString + "')");
+            super(desc + " (filter string: '" + new String(filterByteArr) + "')");
         }
     }
 
@@ -165,17 +168,17 @@ public class FilterParser {
      * @return the parsed filter
      * @throws Exception if the filter string had wrong syntax
      */
-    public Object parse(String filter) throws Exception {
+    public Object parse(byte[] filter) throws Exception {
         index = 0;
-        filterString = filter;
+        filterByteArr = filter;
         int opNumber;
 
         if (filter == null) {
             throw new FilterStringSyntaxException("filter parsing ended with no result");
         }
 
-        while (index < filterString.length()) {
-            char op = filterString.charAt(index);
+        while (index < filterByteArr.length) {
+            char op = (char) filterByteArr[index];
             ++index; // skip op character
             switch (op) {
                 case 'a':
@@ -279,25 +282,108 @@ public class FilterParser {
         return value.intValue();
     }
 
+    private int parseConstDataType() throws Exception {
+        if (!Character.isDigit((char) filterByteArr[index])) {
+            throw new FilterStringSyntaxException("datatype OID should follow at " + index);
+        }
+
+        String digits = parseDigits();
+
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            throw new FilterStringSyntaxException("invalid numeric argument at " + digits);
+        }
+    }
+
+    private int parseDataLength() throws Exception {
+        if (((char) filterByteArr[index]) != 's') {
+            throw new FilterStringSyntaxException("data length delimiter 's' expected at " +  index);
+        }
+
+        index++;
+        return parseInt();
+    }
+
+    private int parseInt() throws Exception {
+        if (index == filterByteArr.length) {
+            throw new FilterStringSyntaxException("numeric argument expected at " + index);
+        }
+
+        String digits = parseDigits();
+
+        try {
+            return Integer.parseInt(digits);
+        } catch (NumberFormatException e) {
+            throw new FilterStringSyntaxException("invalid numeric argument " + digits);
+        }
+    }
+
+    private Object convertDataType(byte[] byteData, DataType dataType) throws Exception {
+        String data = new String(byteData);
+        try {
+            switch (dataType) {
+                case BIGINT:
+                    return Long.parseLong(data);
+                case INTEGER:
+                case SMALLINT:
+                    return Integer.parseInt(data);
+                case FLOAT8:
+                case REAL:
+                    return Float.parseFloat(data);
+                case NUMERIC:
+                    return Double.parseDouble(data);
+                case TEXT:
+                case VARCHAR:
+                case BPCHAR:
+                    return data;
+                case BOOLEAN:
+                    return Boolean.parseBoolean(data);
+                case DATE:
+                    return Date.valueOf(data);
+                case TIMESTAMP:
+                    return Timestamp.valueOf(data);
+                default:
+                    throw new FilterStringSyntaxException("DataType " + dataType.toString() + " unsupported");
+            }
+        } catch (NumberFormatException nfe) {
+            throw new FilterStringSyntaxException("failed to parse number data type starting at " + index);
+        }
+    }
     /**
      * Parses either a number or a string.
      */
     private Object parseParameter() throws Exception {
-        if (index == filterString.length()) {
+        if (index == filterByteArr.length) {
             throw new FilterStringSyntaxException("argument should follow at " + index);
         }
 
-        return senseString()
-                ? parseString()
-                : parseNumber();
-    }
+        DataType dataType = DataType.get(parseConstDataType());
+        if (dataType == DataType.UNSUPPORTED_TYPE) {
+            throw new FilterStringSyntaxException("invalid DataType OID at " + (index - 1));
+        }
 
-    private boolean senseString() {
-        return filterString.charAt(index) == '"';
+        int dataLength = parseDataLength();
+        if (dataLength < 1) {
+            throw new FilterStringSyntaxException("invalid data size " + dataLength + " at " + (index - 1));
+        }
+        if (index + dataLength > filterByteArr.length) {
+            throw new FilterStringSyntaxException("data size larger than filter string starting at " + index);
+        }
+
+        if (((char) filterByteArr[index]) != 'd') {
+            throw new FilterStringSyntaxException("data delimiter 'd' expected at " + index);
+        }
+
+        index++;
+
+        Object data = convertDataType(Arrays.copyOfRange(filterByteArr, index, index+dataLength), dataType);
+        index += dataLength;
+        return data;
     }
 
     private Long parseNumber() throws Exception {
-        if (index == filterString.length()) {
+        if (index == filterByteArr.length) {
             throw new FilterStringSyntaxException("numeric argument expected at " + index);
         }
 
@@ -318,17 +404,17 @@ public class FilterParser {
     private String parseDigits() throws Exception {
         String result;
         int i = index;
-        int filterLength = filterString.length();
+        int filterLength = filterByteArr.length;
 
         // allow sign
         if (filterLength > 0) {
-            int chr = filterString.charAt(i);
+            int chr = (char) filterByteArr[i];
             if (chr == '-' || chr == '+') {
                 ++i;
             }
         }
         for (; i < filterLength; ++i) {
-            int chr = filterString.charAt(i);
+            int chr = (char) filterByteArr[i];
             if (chr < '0' || chr > '9') {
                 break;
             }
@@ -338,7 +424,7 @@ public class FilterParser {
             throw new FilterStringSyntaxException("numeric argument expected at " + index);
         }
 
-        result = filterString.substring(index, i);
+        result = new String(Arrays.copyOfRange(filterByteArr, index, i));
         index = i;
         return result;
     }
@@ -356,8 +442,8 @@ public class FilterParser {
         int i;
 
         // starting from index + 1 to skip leading "
-        for (i = index + 1; i < filterString.length(); ++i) {
-            char chr = filterString.charAt(i);
+        for (i = index + 1; i < filterByteArr.length; ++i) {
+            char chr = (char) filterByteArr[i];
             if (chr == '"') {
                 ended = true;
                 break;

@@ -62,7 +62,7 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
      */
     public Object getFilterObject(String filterString) throws Exception {
         FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString);
+        Object result = parser.parse(filterString.getBytes());
 
         if (!(result instanceof LogicalFilter) && !(result instanceof BasicFilter)
                 && !(result instanceof List)) {
