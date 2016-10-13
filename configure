@@ -16555,6 +16555,14 @@ ac_config_commands="$ac_config_commands check_win32_symlinks"
 
 fi
 
+# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn
+rm -f depends/libhdfs3/build/libhdfs3_build_timestamp
+rm -f depends/libyarn/build/libyarn_build_timestamp
+rm -f depends/thirdparty/gporca_build_timestamp
+rm -f depends/thirdparty/gpos_build_timestamp
+rm -f depends/thirdparty/gp-xerces_build_timestamp
+rm -f depends/thirdparty/gpos_build_timestamp
+
 ac_config_headers="$ac_config_headers src/include/pg_config.h"
 
 

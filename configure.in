@@ -2163,6 +2163,14 @@ for FILE in $CONFIG_LINKS
 ])
 fi
 
+# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn 
+rm -f depends/libhdfs3/build/libhdfs3_build_timestamp
+rm -f depends/libyarn/build/libyarn_build_timestamp
+rm -f depends/thirdparty/gporca_build_timestamp
+rm -f depends/thirdparty/gpos_build_timestamp
+rm -f depends/thirdparty/gp-xerces_build_timestamp
+rm -f depends/thirdparty/gpos_build_timestamp
+
 AC_CONFIG_HEADERS([src/include/pg_config.h],
 [
 # Update timestamp for pg_config.h (see Makefile.global)
