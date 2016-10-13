@@ -54,7 +54,7 @@ maintainer-clean: distclean
 
 clean:
 	if [ -d $(top_builddir)/$(subdir)/build ]; then \
-		cd $(top_builddir)/$(subdir)/build && $(MAKE) clean && rm -f build.timestamp; \
+		cd $(top_builddir)/$(subdir)/build && $(MAKE) clean && rm -f libyarn_build_timestamp; \
 	fi
 
 build: pre-config
@@ -65,8 +65,8 @@ pre-config:
 	cd $(top_builddir)/$(subdir)/; \
 	mkdir -p build; \
 	cd build; \
-	if [ ! -f build.timestamp ]; then \
-		$(abs_top_srcdir)/$(subdir)/bootstrap --prefix=$(prefix) $(PRE_CFG_ARG) && touch build.timestamp; \
+	if [ ! -f libyarn_build_timestamp ]; then \
+		$(abs_top_srcdir)/$(subdir)/bootstrap --prefix=$(prefix) $(PRE_CFG_ARG) && touch libyarn_build_timestamp; \
 	fi
 
 else
