@@ -421,7 +421,8 @@ def extract_metadata(conn, tbname):
         logger.info('-- extract Distribution_Policy')
         metadata['Distribution_Policy'] = accessor.get_distribution_policy_info(rel_pgclass['oid'], relid)
         logger.info('-- extract bucket number')
-        metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
+        if accessor.get_distribution_policy_info(rel_pgclass['oid'], relid).startswith('DISTRIBUTED BY'):
+            metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
 
     def extract_Parquet_metadata():
         relid = rel_pgclass['oid']
@@ -471,7 +472,8 @@ def extract_metadata(conn, tbname):
         logger.info('-- extract Distribution_Policy')
         metadata['Distribution_Policy'] = accessor.get_distribution_policy_info(rel_pgclass['oid'], relid)
         logger.info('-- extract bucket number')
-        metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
+        if accessor.get_distribution_policy_info(rel_pgclass['oid'], relid).startswith('DISTRIBUTED BY'):
+            metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
 
 
     # extract AO/Parquet specific metadata

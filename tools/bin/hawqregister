@@ -60,14 +60,18 @@ def option_parser():
 
 def register_yaml_dict_check(D, table_column_num, src_tablename):
     '''check exists'''
-    check_list = ['DFS_URL', 'Distribution_Policy', 'FileFormat', 'TableName', 'Bucketnum']
+    check_list = ['DFS_URL', 'Distribution_Policy', 'FileFormat', 'TableName']
     for attr in check_list:
         if D.get(attr) is None:
             logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
             sys.exit(1)
-    if D['Bucketnum'] <= 0:
-        logger.error('Bucketnum should not be zero, please check your yaml configuration file.')
-        sys.exit(1)
+    if D['Distribution_Policy'].startswith('DISTRIBUTED BY'):
+        if D.get('Bucketnum') is None:
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
+            sys.exit(1)
+        if D['Bucketnum'] <= 0:
+            logger.error('Bucketnum should not be zero, please check your yaml configuration file.')
+            sys.exit(1)
     if D['FileFormat'] in ['Parquet', 'AO']:
         prefix = D['FileFormat']
         local_check_list = ['%s_FileLocations' % prefix, '%s_Schema' % prefix]
@@ -432,7 +436,8 @@ class HawqRegister(object):
         if len(params[Format_FileLocations]['Files']):
             files, sizes = [params['DFS_URL'] + d['path'] for d in params[Format_FileLocations]['Files']], [d['size'] for d in params[Format_FileLocations]['Files']]
         encoding = params['Encoding']
-        self._set_yml_dataa(Format, files, sizes, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], params['Bucketnum'], partitionby,\
+        bucketNum = params['Bucketnum'] if params['Distribution_Policy'].startswith('DISTRIBUTED BY') else 6
+        self._set_yml_dataa(Format, files, sizes, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], bucketNum, partitionby,\
                       partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
 
 
