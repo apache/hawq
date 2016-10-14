@@ -372,14 +372,14 @@ pxf_serialize_filter_list(List *expressionItems)
 						appendStringInfo(resbuf, "%c%d%c%d%c%d%c%s",
 												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
 												 PXF_CONST_CODE, r.consttype,
-												 PXF_LENGTH_TO_READ, strlen(r.conststr->data),
+												 PXF_SIZE_BYTES, strlen(r.conststr->data),
 												 PXF_CONST_DATA, (r.conststr)->data);
 					}
 					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
 					{
 						appendStringInfo(resbuf, "%c%d%c%d%c%s%c%d",
 												 PXF_CONST_CODE, l.consttype,
-												 PXF_LENGTH_TO_READ, strlen(l.conststr->data),
+												 PXF_SIZE_BYTES, strlen(l.conststr->data),
 												 PXF_CONST_DATA, (l.conststr)->data,
 												 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
 					}

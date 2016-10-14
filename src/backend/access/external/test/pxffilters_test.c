@@ -517,20 +517,23 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	ExpressionItem* expressionItem2 = build_expression_item(2, TEXTOID, "George Orwell", TEXTOID, TextEqualOperator);
 	ExpressionItem* expressionItem3 = build_expression_item(3, TEXTOID, "Winston", TEXTOID, TextEqualOperator);
 	ExpressionItem* expressionItem4 = build_expression_item(4, TEXTOID, "Eric-%", TEXTOID, 1209);
+	ExpressionItem* expressionItem5 = build_expression_item(5, TEXTOID, "\"Ugly\" string with quotes", TEXTOID, TextEqualOperator);
 
 
 	expressionItems = lappend(expressionItems, expressionItem1);
 	expressionItems = lappend(expressionItems, expressionItem2);
 	expressionItems = lappend(expressionItems, expressionItem3);
 	expressionItems = lappend(expressionItems, expressionItem4);
+	expressionItems = lappend(expressionItems, expressionItem5);
 
 	result = pxf_serialize_filter_list(expressionItems);
-	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7");
+	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7a4c25s25d\"Ugly\" string with quoteso5");
 	pfree(result);
 
+	int trivialExpressionItems = expressionItems->length;
 	enrich_trivial_expression(expressionItems);
 
-	assert_int_equal(expressionItems->length, 7);
+	assert_int_equal(expressionItems->length, 2*trivialExpressionItems - 1);
 
 	pxf_free_expression_items_list(expressionItems, true);
 	expressionItems = NIL;

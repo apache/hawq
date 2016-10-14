@@ -55,7 +55,7 @@ typedef enum PxfOperatorCode
  */
 #define PXF_ATTR_CODE				'a'
 #define PXF_CONST_CODE				'c'
-#define PXF_LENGTH_TO_READ			's'
+#define PXF_SIZE_BYTES				's'
 #define PXF_CONST_DATA				'd'
 #define PXF_OPERATOR_CODE			'o'
 #define PXF_LOGICAL_OPERATOR_CODE	'l'
