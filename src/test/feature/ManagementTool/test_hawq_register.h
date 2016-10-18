@@ -3,6 +3,7 @@
 
 #include <string>
 #include <pwd.h>
+#include <fstream>
 #include "lib/hdfs_config.h"
 #include "gtest/gtest.h"
 
@@ -47,6 +48,17 @@ class TestHawqRegister : public ::testing::Test {
             }
 
             return "";
+        }
+
+        int getFileSize(const char *file){
+            if (file == NULL)
+                return -1;
+            std::ifstream stream;
+            stream.open(file, std::ios_base::binary);
+            stream.seekg(0, std::ios_base::end);
+            int size = stream.tellg();
+            stream.close();
+            return size;
         }
 
         void checkPgAOSegValue(std::string relname, std::string value, std::string fmt) {
