@@ -20,6 +20,8 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
@@ -40,6 +42,8 @@ import static org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIV
  * Use together with {@link HiveInputFormatFragmenter}/{@link HiveColumnarSerdeResolver}
  */
 public class HiveORCAccessor extends HiveAccessor {
+
+    private static final Log LOG = LogFactory.getLog(HiveORCAccessor.class);
 
     private final String READ_COLUMN_IDS_CONF_STR = "hive.io.file.readcolumn.ids";
     private final String READ_ALL_COLUMNS = "hive.io.file.read.all.columns";
@@ -106,18 +110,23 @@ public class HiveORCAccessor extends HiveAccessor {
          * need special case logic to make sure to still wrap the filter in a
          * startAnd() & end() block
          */
-        if (filter instanceof LogicalFilter)
-            buildExpression(filterBuilder, Arrays.asList(filter));
+        if (filter instanceof LogicalFilter) {
+            if (!buildExpression(filterBuilder, Arrays.asList(filter))) {
+                return;
+            }
+        }
         else {
             filterBuilder.startAnd();
-            buildArgument(filterBuilder, filter);
+            if(!buildArgument(filterBuilder, filter)) {
+                return;
+            }
             filterBuilder.end();
         }
         SearchArgument sarg = filterBuilder.build();
         jobConf.set(SARG_PUSHDOWN, sarg.toKryo());
     }
 
-    private void buildExpression(SearchArgument.Builder builder, List<Object> filterList) {
+    private boolean buildExpression(SearchArgument.Builder builder, List<Object> filterList) {
         for (Object f : filterList) {
             if (f instanceof LogicalFilter) {
                 switch(((LogicalFilter) f).getOperator()) {
@@ -131,15 +140,21 @@ public class HiveORCAccessor extends HiveAccessor {
                         builder.startNot();
                         break;
                 }
-                buildExpression(builder, ((LogicalFilter) f).getFilterList());
-                builder.end();
+                if (buildExpression(builder, ((LogicalFilter) f).getFilterList())) {
+                    builder.end();
+                } else {
+                    return false;
+                }
             } else {
-                buildArgument(builder, f);
+                if (!buildArgument(builder, f)) {
+                    return false;
+                }
             }
         }
+        return true;
     }
 
-    private void buildArgument(SearchArgument.Builder builder, Object filterObj) {
+    private boolean buildArgument(SearchArgument.Builder builder, Object filterObj) {
         /* The below functions will not be compatible and requires update  with Hive 2.0 APIs */
         BasicFilter filter = (BasicFilter) filterObj;
         int filterColumnIndex = filter.getColumn().index();
@@ -166,8 +181,12 @@ public class HiveORCAccessor extends HiveAccessor {
             case HDOP_NE:
                 builder.startNot().equals(filterColumnName, filterValue).end();
                 break;
+            default: {
+                LOG.debug("Filter push-down is not supported for " + filter.getOperation() + "operation.");
+                return false;
+            }
         }
-        return;
+        return true;
     }
 
 }
