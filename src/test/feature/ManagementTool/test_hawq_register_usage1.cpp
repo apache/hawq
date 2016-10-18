@@ -203,7 +203,7 @@ TEST_F(TestHawqRegister, TestFiles) {
     relativePath = "/ManagementTool/test_hawq_register_hive.paq";
     string filePath2 = rootPath + relativePath;
 
-    auto cmd = hawq::test::stringFormat("hadoop fs -mkdir -p %s %s/hawq_register_test/t/t", filePath1.c_str(), getHdfsLocation().c_str());
+    auto cmd = hawq::test::stringFormat("hadoop fs -mkdir -p %s/hawq_register_test/t", getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
     cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_test/hawq1.paq", filePath1.c_str(), getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
