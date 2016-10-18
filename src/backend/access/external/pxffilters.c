@@ -31,7 +31,7 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static List* pxf_make_expression_items_list(List *quals, Node *parent, bool *logicalOpsNum);
+static List* pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum);
 static void pxf_free_filter(PxfFilterDesc* filter);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
@@ -193,7 +193,6 @@ Oid pxf_supported_types[] =
 static void
 pxf_free_expression_items_list(List *expressionItems, bool freeBoolExprNodes)
 {
-	ListCell		*lc 	= NULL;
 	ExpressionItem 	*expressionItem = NULL;
 	int previousLength;
 
@@ -228,7 +227,7 @@ pxf_free_expression_items_list(List *expressionItems, bool freeBoolExprNodes)
  *
  */
 static List *
-pxf_make_expression_items_list(List *quals, Node *parent, bool *logicalOpsNum)
+pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 {
 	ExpressionItem *expressionItem = NULL;
 	List			*result = NIL;
@@ -369,7 +368,7 @@ pxf_serialize_filter_list(List *expressionItems)
 					PxfOperatorCode o = filter->op;
 					if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
 					{
-						appendStringInfo(resbuf, "%c%d%c%d%c%d%c%s",
+						appendStringInfo(resbuf, "%c%d%c%d%c%lu%c%s",
 												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
 												 PXF_CONST_CODE, r.consttype,
 												 PXF_SIZE_BYTES, strlen(r.conststr->data),
@@ -377,7 +376,7 @@ pxf_serialize_filter_list(List *expressionItems)
 					}
 					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
 					{
-						appendStringInfo(resbuf, "%c%d%c%d%c%s%c%d",
+						appendStringInfo(resbuf, "%c%d%c%lu%c%s%c%d",
 												 PXF_CONST_CODE, l.consttype,
 												 PXF_SIZE_BYTES, strlen(l.conststr->data),
 												 PXF_CONST_DATA, (l.conststr)->data,
@@ -409,6 +408,10 @@ pxf_serialize_filter_list(List *expressionItems)
 				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_BoolExpr), bool node type %d", tag, boolType);
 				appendStringInfo(resbuf, "%c%d", PXF_LOGICAL_OPERATOR_CODE, boolType);
 				break;
+			}
+			default:
+			{
+				elog(DEBUG5, "Skipping tag: %d", tag);
 			}
 		}
 	}
@@ -726,7 +729,7 @@ void enrich_trivial_expression(List *expressionItems) {
 
 		andExpr->boolop = AND_EXPR;
 
-		andExpressionItem->node = andExpr;
+		andExpressionItem->node = (Node *) andExpr;
 		andExpressionItem->parent = NULL;
 		andExpressionItem->processed = false;
 
