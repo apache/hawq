@@ -501,7 +501,7 @@ class HawqRegister(object):
                 if self.mode == 'usage1':
                     logger.error('Specified file size(%s) should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))
                 else:
-                    logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %    s.' % (self.sizes[k], out.strip().split()[0], fn))    
+                    logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))    
                 self.failure_handler.rollback()
                 sys.exit(1)
 
