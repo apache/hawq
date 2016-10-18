@@ -73,14 +73,14 @@ void Command::_saveToFile() {
   out.close(); 
 }
 
-const string& Command::getCommandOutput(const string& cmd) {
+const string Command::getCommandOutput(const string& cmd) {
   return Command()
       .setCommand(cmd)
       .run()
       .getResultOutput();
 }
 
-const string& Command::getCommandOutput(const string& cmd,
+const string Command::getCommandOutput(const string& cmd,
                                         const string& out) {
   return Command()
       .setCommand(cmd)

@@ -36,7 +36,7 @@ extern Datum autoinc(PG_FUNCTION_ARGS);
 extern Datum funny_dup17(PG_FUNCTION_ARGS);
 extern Datum ttdummy(PG_FUNCTION_ARGS);
 extern Datum set_ttdummy(PG_FUNCTION_ARGS);
-
+extern Datum c_add(PG_FUNCTION_ARGS);
 
 #ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
@@ -1243,3 +1243,13 @@ Datum set_ttdummy(PG_FUNCTION_ARGS)
 
 	PG_RETURN_INT32(1);
 }
+
+PG_FUNCTION_INFO_V1(c_add);
+Datum c_add(PG_FUNCTION_ARGS)
+{
+	int32 x = PG_GETARG_INT32(0);
+	int32 y = PG_GETARG_INT32(1);
+
+	PG_RETURN_INT32(x+y);
+}
+

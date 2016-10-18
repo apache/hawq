@@ -1,33 +1,31 @@
 #include <string>
 
+#include "gtest/gtest.h"
 #include "lib/command.h"
 #include "lib/sql_util.h"
-
-#include "gtest/gtest.h"
+#include "lib/string_util.h"
+#include "lib/hdfs_config.h"
+#include "test_hawq_register.h"
 
 using std::string;
 using hawq::test::SQLUtility;
 using hawq::test::Command;
+using hawq::test::HdfsConfig;
 
-/* This test suite may consume more than 80 seconds. */
-class TestHawqRegister : public ::testing::Test {
- public:
-  TestHawqRegister() {}
-  ~TestHawqRegister() {}
-};
-
-TEST_F(TestHawqRegister, TestSingleHawqFile) {
+TEST_F(TestHawqRegister, TestUsage1SingleHawqFile) {
 	SQLUtility util;
 	string rootPath(util.getTestRootPath());
 	string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
 	string filePath = rootPath + relativePath;
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_hawq.paq"));
+    auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hawq.paq", filePath.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(0, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister hdfs://localhost:8020/hawq_register_hawq.paq"));
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.query("select * from hawqregister;", 3);
 	util.execute("insert into hawqregister values(1);");
@@ -35,18 +33,20 @@ TEST_F(TestHawqRegister, TestSingleHawqFile) {
 	util.execute("drop table hawqregister;");
 }
 
-TEST_F(TestHawqRegister, TestSingleHiveFile) {
+TEST_F(TestHawqRegister, TestUsage1SingleHiveFile) {
 	SQLUtility util;
 	string rootPath(util.getTestRootPath());
 	string relativePath("/ManagementTool/test_hawq_register_hive.paq");
 	string filePath = rootPath + relativePath;
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_hive.paq"));
+    auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hive.paq", filePath.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(0, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister hdfs://localhost:8020/hawq_register_hive.paq"));
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hive.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.query("select * from hawqregister;", 1);
 	util.execute("insert into hawqregister values(1);");
@@ -62,12 +62,14 @@ TEST_F(TestHawqRegister, TestDataTypes) {
 	string relativePath("/ManagementTool/test_hawq_register_data_types.paq");
 	string filePath = rootPath + relativePath;
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_data_types.paq"));
+    auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_data_types.paq", filePath.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.execute("create table hawqregister(a bool, b int2, c int2, d int4, e int8, f date, g float4, h float8, i varchar, j bytea, k char, l varchar) with (appendonly=true, orientation=parquet);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(0, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister hdfs://localhost:8020/hawq_register_data_types.paq"));
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_data_types.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.query("select * from hawqregister;", 1);
 	util.execute("drop table hawqregister;");
@@ -82,12 +84,14 @@ TEST_F(TestHawqRegister, TestAllNULL) {
 	string relativePath("/ManagementTool/test_hawq_register_null.paq");
 	string filePath = rootPath + relativePath;
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_data_types.paq"));
+    auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_data_types.paq", filePath.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.execute("create table hawqregister(a bool, b int2, c int2, d int4, e int8, f date, g float4, h float8, i varchar, j bytea, k char, l varchar) with (appendonly=true, orientation=parquet);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(0, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister hdfs://localhost:8020/hawq_register_data_types.paq"));
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_data_types.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.query("select * from hawqregister;", 1);
 	util.execute("drop table hawqregister;");
@@ -101,107 +105,139 @@ TEST_F(TestHawqRegister, TestFiles) {
 	relativePath = "/ManagementTool/test_hawq_register_hive.paq";
 	string filePath2 = rootPath + relativePath;
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -mkdir -p hdfs://localhost:8020/hawq_register_test/t/t"));
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath1 + " hdfs://localhost:8020/hawq_register_test/hawq1.paq"));
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath1 + " hdfs://localhost:8020/hawq_register_test/hawq2.paq"));
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath1 + " hdfs://localhost:8020/hawq_register_test/t/hawq.paq"));
+    auto cmd = hawq::test::stringFormat("hadoop fs -mkdir -p %s %s/hawq_register_test/t/t", filePath1.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
+    cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_test/hawq1.paq", filePath1.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
+    cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_test/hawq2.paq", filePath1.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
+    cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_test/t/hawq.paq", filePath1.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath2 + " hdfs://localhost:8020/hawq_register_test/hive1.paq"));
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath2 + " hdfs://localhost:8020/hawq_register_test/hive2.paq"));
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath2 + " hdfs://localhost:8020/hawq_register_test/t/hive.paq"));
+    cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_test/hive1.paq", filePath2.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
+    cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_test/hive2.paq", filePath2.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
+    cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_test/t/hive.paq", filePath2.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(0, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister hdfs://localhost:8020/hawq_register_test"));
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_test hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.query("select * from hawqregister;", 12);
 	util.execute("insert into hawqregister values(1);");
 	util.query("select * from hawqregister;", 13);
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -rm -r hdfs://localhost:8020/hawq_register_test"));
+    cmd = hawq::test::stringFormat("hadoop fs -rm -r %s/hawq_register_test", getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 	util.execute("drop table hawqregister;");
 }
 
-TEST_F(TestHawqRegister, TestHashDistributedTable) {
-	SQLUtility util;
-	string rootPath(util.getTestRootPath());
-	string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
-	string filePath = rootPath + relativePath;
-
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_hawq.paq"));
-
-	util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
-	util.query("select * from hawqregister;", 0);
-
-	EXPECT_EQ(1, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister hdfs://localhost:8020/hawq_register_hawq.paq"));
-	util.query("select * from hawqregister;", 0);
-
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -rm hdfs://localhost:8020/hawq_register_hawq.paq"));
-	util.execute("drop table hawqregister;");
-}
-
-TEST_F(TestHawqRegister, TestNotParquetFile) {
+TEST_F(TestHawqRegister, TestUsage1NotParquetFile) {
 	SQLUtility util;
 	string rootPath(util.getTestRootPath());
 	string relativePath("/ManagementTool/test_hawq_register_not_paq");
 	string filePath = rootPath + relativePath;
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_test_not_paq"));
+    auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_test_not_paq", filePath.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(1, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister hdfs://localhost:8020/hawq_register_test_not_paq"));
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_test_not_paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(1, Command::getCommandStatus(cmd));
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -rm hdfs://localhost:8020/hawq_register_test_not_paq"));
+    cmd = hawq::test::stringFormat("hadoop fs -rm %s/hawq_register_test_not_paq", getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 	util.execute("drop table hawqregister;");
 }
 
-TEST_F(TestHawqRegister, TestNotParquetTable) {
+TEST_F(TestHawqRegister, TestUsage1NotParquetTable) {
 	SQLUtility util;
 	string rootPath(util.getTestRootPath());
 	string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
 	string filePath = rootPath + relativePath;
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_hawq.paq"));
+    auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hawq.paq", filePath.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.execute("create table hawqregister(i int);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(1, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister hdfs://localhost:8020/hawq_register_hawq.paq"));
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(1, Command::getCommandStatus(cmd));
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -rm hdfs://localhost:8020/hawq_register_hawq.paq"));
+    cmd = hawq::test::stringFormat("hadoop fs -rm  %s/hawq_register_hawq.paq", getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 	util.execute("drop table hawqregister;");
 }
 
-TEST_F(TestHawqRegister, TestFileNotExist) {
+TEST_F(TestHawqRegister, TestUsage1FileNotExist) {
 	SQLUtility util;
 
 	util.execute("create table hawqregister(i int);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(1, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + " hawqregister /hdfs://localhost:8020hawq_register_file_not_exist"));
+    auto cmd = hawq::test::stringFormat("hawq register -d %s -f %shawq_register_file_not_exist hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(1, Command::getCommandStatus(cmd));
 	util.query("select * from hawqregister;", 0);
 
 	util.execute("drop table hawqregister;");
 }
 
-TEST_F(TestHawqRegister, TestNotHDFSPath) {
+TEST_F(TestHawqRegister, TestUsage1NotHDFSPath) {
 	SQLUtility util;
 	string rootPath(util.getTestRootPath());
 	string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
 	string filePath = rootPath + relativePath;
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -put -f " + filePath + " hdfs://localhost:8020/hawq_register_hawq.paq"));
+    auto cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hawq.paq", filePath.c_str(), getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
 	util.execute("create table hawqregister(i int);");
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(1, Command::getCommandStatus("hawq register " + (string) HAWQ_DB + "hawqregister /hawq_register_hawq.paq"));
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+	EXPECT_EQ(1, Command::getCommandStatus(cmd));
 	util.query("select * from hawqregister;", 0);
 
-	EXPECT_EQ(0, Command::getCommandStatus("hadoop fs -rm hdfs://localhost:8020/hawq_register_hawq.paq"));
+    cmd = hawq::test::stringFormat("hadoop fs -rm %s/hawq_register_hawq.paq", getHdfsLocation().c_str());
+	EXPECT_EQ(0, Command::getCommandStatus(cmd));
 	util.execute("drop table hawqregister;");
+}
+
+TEST_F(TestHawqRegister, TestEmptyTable) {
+  SQLUtility util;
+  util.execute("drop table if exists t9;");
+  util.execute("create table t9(i int) with (appendonly=true, orientation=row) distributed randomly;");
+  EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o t9.yml testhawqregister_testemptytable.t9"));
+  EXPECT_EQ(0, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c t9.yml testhawqregister_testemptytable.nt9"));
+  util.query("select * from nt9;", 0);
+  EXPECT_EQ(0, Command::getCommandStatus("rm -rf t9.yml"));
+  util.execute("drop table t9;");
+  util.execute("drop table nt9;");
+}
+
+TEST_F(TestHawqRegister, TestIncorrectYaml) {
+  SQLUtility util;
+  string filePath = util.getTestRootPath() + "/ManagementTool/";
+
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_pagesize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_rowgroupsize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_filesize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_schema.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_checksum.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_dfs_url.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_bucketnum.yml xx"));
+}
+
+TEST_F(TestHawqRegister, TestDismatchFileNumber) {
+  SQLUtility util;
+  string filePath = util.getTestRootPath() + "/ManagementTool/";
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "files_incomplete.yml xx"));
 }

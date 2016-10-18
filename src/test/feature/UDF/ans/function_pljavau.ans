@@ -1,0 +1,21 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFPljavau;
+SET
+-- end_ignore
+SELECT set_config('pljava_classpath', 'PLJavauAdd.jar', false);
+   set_config   
+----------------
+ PLJavauAdd.jar
+(1 row)
+
+CREATE OR REPLACE FUNCTION pljavau_add(x INT, y INT)
+RETURNS INT
+AS 'PLJavauAdd.add'
+LANGUAGE javau;
+CREATE FUNCTION
+SELECT pljavau_add(10, 20);
+ pljavau_add 
+-------------
+          30
+(1 row)
+

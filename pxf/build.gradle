@@ -43,9 +43,15 @@ buildscript {
 
 // Hadoop distribution (can be phd or hdp) - needed to set correct classpaths
 // can be set with -Dhd=<value>
-def hddist = System.properties['hd'] ?: 'phd';
+def hddist = System.properties['hd'] ?: 'hdp';
 if (hddist != 'phd' && hddist != 'hdp') {
     throw new GradleException("hadoop distribution parameter (hd) set to invalid value: $hddist")
+}
+
+// Some package names need to be renamed to include the version number
+// as part of the package name to enable side by side install of two versions of the same package.
+def versionedPackageName(packageName) {
+    packageName + "_" + "${version}".replace(".", "_")
 }
 
 subprojects { subProject ->
@@ -191,8 +197,13 @@ project('pxf-service') {
     }
 
     ospackage {
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), service REST API'
         description = 'Rest API for the HAWQ Extenstion framework'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
         requires('apache-tomcat', "$tomcatVersion", GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
@@ -201,9 +212,6 @@ project('pxf-service') {
         // Upgrades pxf-core, pxf-api to pxf-service
         obsoletes('pxf-core')
         obsoletes('pxf-api')
-
-        preInstall file('src/scripts/pre-install.sh')
-        postInstall file('src/scripts/post-install.sh')
 
         from('src/main/resources/pxf-profiles-default.xml') {
             fileType CONFIG | NOREPLACE
@@ -242,12 +250,6 @@ project('pxf-service') {
             into "/etc/pxf-${project.version}/conf"
         }
 
-        from('src/scripts/pxf-service') {
-            fileMode 0755
-            addParentDirs false
-            into '/etc/init.d'
-        }
-
         from(war.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
         }
@@ -259,13 +261,16 @@ project('pxf-service') {
         //tomcat configuration files
         from('src/configs/tomcat') {
             fileType CONFIG | NOREPLACE
-            into '/opt/pivotal/pxf/tomcat-templates'
+            into "/opt/pxf-${project.version}/tomcat-templates"
         }
 
-        link('/usr/lib/pxf', "/usr/lib/pxf-${project.version}")
+        from('src/scripts/pxf-service') {
+            fileMode 0755
+            addParentDirs false
+            into "/opt/pxf-${project.version}"
+        }
 
         link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
-        link('/etc/pxf', "pxf-${project.version}")
 
     }
 
@@ -279,6 +284,31 @@ project('pxf-service') {
     }
 }
 
+project('pxf') {
+    jar.enabled = false
+    ospackage {
+        summary = 'HAWQ Extension Framework (PXF)'
+        description = 'HAWQ Extension framework Virtual RPM'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
+
+        requires(versionedPackageName('pxf-hdfs'), project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-hive'), project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-hbase'), project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-json'), project.version, GREATER | EQUAL)
+
+        preInstall file('src/scripts/pre-install.sh')
+        postInstall file('src/scripts/post-install.sh')
+
+        link('/usr/lib/pxf', "/usr/lib/pxf-${project.version}")
+        link('/etc/pxf', "/etc/pxf-${project.version}")
+        link('/opt/pxf', "/opt/pxf-${project.version}")
+        link('/etc/init.d/pxf-service', "/opt/pxf/pxf-service")
+    }
+}
+
 project('pxf-hdfs') {
     dependencies {
         compile(project(':pxf-api'))
@@ -289,10 +319,15 @@ project('pxf-hdfs') {
     }
 
     ospackage {
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), HDFS plugin'
         description = 'Querying external data stored in HDFS'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
-        requires('pxf-service', project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-service'), project.version, GREATER | EQUAL)
         requires('hadoop', "$hadoopVersion", GREATER | EQUAL)
         requires('hadoop-mapreduce', "$hadoopVersion", GREATER | EQUAL)
 
@@ -315,19 +350,18 @@ project('pxf-hive') {
         compile "org.apache.hive:hive-common:$hiveVersion"
         compile "org.apache.hive:hive-serde:$hiveVersion"
         testCompile 'pl.pragmatists:JUnitParams:1.0.2'
-        configurations {
-            // Remove hive-exec from unit tests as it causes VerifyError
-            testRuntime.exclude module: 'hive-exec'
-        }
     }
 
     ospackage {
-
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), Hive plugin'
         description = 'Querying external data stored in Hive'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
-        requires('pxf-hdfs', project.version, GREATER | EQUAL)
-        requires('hive', "$hiveVersion", GREATER | EQUAL)
+        requires(versionedPackageName('pxf-hdfs'), project.version, GREATER | EQUAL)
 
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
@@ -347,7 +381,14 @@ project('pxf-json') {
     }
 
     ospackage {
-      requires('pxf-hdfs', project.version, GREATER | EQUAL)
+      requires(versionedPackageName('pxf-hdfs'), project.version, GREATER | EQUAL)
+        packageName = versionedPackageName("${project.name}")
+        summary = 'HAWQ Extension Framework (PXF), Json plugin'
+        description = 'Querying external data stored in HDFS in Json format'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
       from(jar.outputs.files) {
         into "/usr/lib/pxf-${project.version}"
@@ -365,11 +406,15 @@ project('pxf-hbase') {
     }
 
     ospackage {
+        packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), HBase plugin'
         description = 'Querying external data stored in HBase'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
 
-        requires('pxf-service', project.version, GREATER | EQUAL)
-        requires('hbase', "$hbaseVersionRPM", GREATER | EQUAL)
+        requires(versionedPackageName('pxf-service'), project.version, GREATER | EQUAL)
 
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
@@ -472,6 +517,11 @@ task tomcatRpm(type: Rpm) {
         license = project.license
         user = 'root'
         permissionGroup = 'root'
+        packager = ' '
+        packageDescription = 'Apache Tomcat is an open source software implementation of the Java Servlet and JavaServer Pages technologies.'
+        packageGroup = 'Development/Libraries'
+        release = project.osFamily
+        buildHost = ' '
 
         preInstall file('tomcat/src/scripts/pre-install.sh')
 
@@ -479,10 +529,10 @@ task tomcatRpm(type: Rpm) {
             user 'tomcat'
             permissionGroup 'tomcat'
             addParentDirs false
-            into "/opt/pivotal/${tomcatName}"
+            into "/opt/${tomcatName}"
         }
 
-        link("/opt/pivotal/${packageName}", "${tomcatName}")
+        link("/opt/${packageName}", "${tomcatName}")
     }
 }
 

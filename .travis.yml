@@ -19,15 +19,17 @@ install:
     ccache
     snappy
     libevent
-    python
     bison
+    cpanm
+  - brew reinstall python
   - brew outdated libyaml || brew upgrade libyaml
   - brew outdated json-c || brew upgrade json-c
   - brew outdated boost || brew upgrade boost
   - brew outdated maven || brew upgrade maven
   - brew tap brona/iproute2mac
   - brew install iproute2mac
-  - sudo pip install pycrypto paramiko
+  - sudo pip install pycrypto
+  - sudo cpanm install JSON
 
 before_script:
   - cd $TRAVIS_BUILD_DIR

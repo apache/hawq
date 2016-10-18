@@ -32,6 +32,15 @@ static extvar_t *mock_extvar = NULL;
 static char *old_pxf_remote_service_login = NULL;
 static char *old_pxf_remote_service_secret = NULL;
 
+void expect_churl_headers(const char *key, const char *value);
+void expect_churl_headers_alignment();
+void store_gucs();
+void setup_gphd_uri();
+void setup_input_data();
+void setup_external_vars();
+void expect_external_vars();
+void restore_gucs();
+
 void
 test__build_http_header__remote_login_is_null(void **state)
 {

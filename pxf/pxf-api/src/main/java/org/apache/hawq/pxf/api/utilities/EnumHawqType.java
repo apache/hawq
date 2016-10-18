@@ -20,6 +20,8 @@
 package org.apache.hawq.pxf.api.utilities;
 
 import java.io.IOException;
+
+import org.apache.hawq.pxf.api.io.DataType;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.map.JsonSerializer;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
@@ -43,37 +45,32 @@ class EnumHawqTypeSerializer extends JsonSerializer<EnumHawqType> {
  */
 @JsonSerialize(using = EnumHawqTypeSerializer.class)
 public enum EnumHawqType {
-    Int2Type("int2"),
-    Int4Type("int4"),
-    Int8Type("int8"),
-    Float4Type("float4"),
-    Float8Type("float8"),
-    TextType("text"),
-    VarcharType("varchar", (byte) 1, true),
-    ByteaType("bytea"),
-    DateType("date"),
-    TimestampType("timestamp"),
-    BoolType("bool"),
-    NumericType("numeric", (byte) 2, true),
-    BpcharType("bpchar", (byte) 1, true);
+    Int2Type("int2", DataType.SMALLINT),
+    Int4Type("int4", DataType.INTEGER),
+    Int8Type("int8", DataType.BIGINT),
+    Float4Type("float4", DataType.REAL),
+    Float8Type("float8", DataType.FLOAT8),
+    TextType("text", DataType.TEXT),
+    VarcharType("varchar", DataType.VARCHAR, (byte) 1),
+    ByteaType("bytea", DataType.BYTEA),
+    DateType("date", DataType.DATE),
+    TimestampType("timestamp", DataType.TIMESTAMP),
+    BoolType("bool", DataType.BOOLEAN),
+    NumericType("numeric", DataType.NUMERIC, (byte) 2),
+    BpcharType("bpchar", DataType.BPCHAR, (byte) 1);
 
+    private DataType dataType;
     private String typeName;
     private byte modifiersNum;
-    private boolean validateIntegerModifiers;
 
-    EnumHawqType(String typeName) {
+    EnumHawqType(String typeName, DataType dataType) {
         this.typeName = typeName;
+        this.dataType = dataType;
     }
 
-    EnumHawqType(String typeName, byte modifiersNum) {
-        this(typeName);
+    EnumHawqType(String typeName, DataType dataType, byte modifiersNum) {
+        this(typeName, dataType);
         this.modifiersNum = modifiersNum;
-    }
-
-    EnumHawqType(String typeName, byte modifiersNum, boolean validateIntegerModifiers) {
-        this(typeName);
-        this.modifiersNum = modifiersNum;
-        this.validateIntegerModifiers = validateIntegerModifiers;
     }
 
     /**
@@ -94,12 +91,11 @@ public enum EnumHawqType {
 
     /**
      * 
-     * @return whether modifiers should be integers
+     * @return data type
+     * @see DataType
      */
-    public boolean getValidateIntegerModifiers() {
-        return this.validateIntegerModifiers;
+    public DataType getDataType() {
+        return this.dataType;
     }
+
 }
-
-
-

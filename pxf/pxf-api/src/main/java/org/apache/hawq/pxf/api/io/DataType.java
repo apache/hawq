@@ -31,14 +31,19 @@ import java.util.Map;
 public enum DataType {
     BOOLEAN(16),
     BYTEA(17),
-    CHAR(18),
     BIGINT(20),
     SMALLINT(21),
     INTEGER(23),
     TEXT(25),
     REAL(700),
     FLOAT8(701),
+    /**
+     * char(length), blank-padded string, fixed storage length
+     */
     BPCHAR(1042),
+    /**
+     * varchar(length), non-blank-padded string, variable storage length
+     */
     VARCHAR(1043),
     DATE(1082),
     TIME(1083),

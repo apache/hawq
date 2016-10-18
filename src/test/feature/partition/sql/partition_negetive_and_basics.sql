@@ -1295,3 +1295,31 @@ SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_6;
 SELECT COUNT(*) FROM ch_sort_aopqdest_1_prt_outlying_years;
 
 RESET optimizer_parts_to_force_sort_on_insert;
+
+drop table if exists sales2;
+CREATE TABLE sales2 (id int, date date, amt decimal(10,2))    
+DISTRIBUTED BY (id) 
+PARTITION BY RANGE (date) 
+( PARTITION Jan08 START (date '2008-01-01') INCLUSIVE ,
+PARTITION Feb08 START (date '2008-02-01') INCLUSIVE ,
+PARTITION Mar08 START (date '2008-03-01') INCLUSIVE , 
+PARTITION Apr08 START (date '2008-04-01') INCLUSIVE 
+END (date '2008-05-01') EXCLUSIVE );
+
+
+insert into sales2 values(1,'2008-01-03',1.2);
+select count(*) from sales2;
+
+alter table sales2 add partition START (date '2008-05-01') INCLUSIVE END (date '2008-06-01') EXCLUSIVE;
+insert into sales2 values(1,'2008-05-03',1.2);
+select count(*) from sales2;
+
+set default_hash_table_bucket_number = 99;
+
+alter table sales2 add partition START (date '2008-06-01') INCLUSIVE END (date '2008-07-01') EXCLUSIVE;
+insert into sales2 values(1,'2008-06-03',1.2);
+select count(*) from sales2;
+
+drop table sales2;
+
+

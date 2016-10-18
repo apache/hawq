@@ -84,7 +84,7 @@ TEST_F(TestApplicationClientProtocol, TestGetNewApplicationException){
 
 	EXPECT_THROW(gnares = macp.getNewApplication(gnareq), YarnFailoverException);
 	EXPECT_THROW(gnares = macp.getNewApplication(gnareq), YarnIOException);
-	EXPECT_THROW(gnares = macp.getNewApplication(gnareq), YarnIOException);
+	EXPECT_THROW(gnares = macp.getNewApplication(gnareq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestSubmitApplicationException){
@@ -97,7 +97,7 @@ TEST_F(TestApplicationClientProtocol, TestSubmitApplicationException){
 
 	EXPECT_THROW(macp.submitApplication(sareq), YarnFailoverException);
 	EXPECT_THROW(macp.submitApplication(sareq), YarnIOException);
-	EXPECT_THROW(macp.submitApplication(sareq), YarnIOException);
+	EXPECT_THROW(macp.submitApplication(sareq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestGetApplicationReportException){
@@ -111,7 +111,7 @@ TEST_F(TestApplicationClientProtocol, TestGetApplicationReportException){
 
 	EXPECT_THROW(macp.getApplicationReport(garreq), YarnFailoverException);
 	EXPECT_THROW(macp.getApplicationReport(garreq), YarnIOException);
-	EXPECT_THROW(macp.getApplicationReport(garreq), YarnIOException);
+	EXPECT_THROW(macp.getApplicationReport(garreq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestGetContainersException){
@@ -125,7 +125,7 @@ TEST_F(TestApplicationClientProtocol, TestGetContainersException){
 
 	EXPECT_THROW(macp.getContainers(gcreq), YarnFailoverException);
 	EXPECT_THROW(macp.getContainers(gcreq), YarnIOException);
-	EXPECT_THROW(macp.getContainers(gcreq), YarnIOException);
+	EXPECT_THROW(macp.getContainers(gcreq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestGetClusterNodesException){
@@ -139,7 +139,7 @@ TEST_F(TestApplicationClientProtocol, TestGetClusterNodesException){
 
 	EXPECT_THROW(macp.getClusterNodes(gcnreq), YarnFailoverException);
 	EXPECT_THROW(macp.getClusterNodes(gcnreq), YarnIOException);
-	EXPECT_THROW(macp.getClusterNodes(gcnreq), YarnIOException);
+	EXPECT_THROW(macp.getClusterNodes(gcnreq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestGetQueueInfoException){
@@ -153,7 +153,7 @@ TEST_F(TestApplicationClientProtocol, TestGetQueueInfoException){
 
 	EXPECT_THROW(macp.getQueueInfo(gqireq), YarnFailoverException);
 	EXPECT_THROW(macp.getQueueInfo(gqireq), YarnIOException);
-	EXPECT_THROW(macp.getQueueInfo(gqireq), YarnIOException);
+	EXPECT_THROW(macp.getQueueInfo(gqireq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestGetClusterMetricsException){
@@ -167,7 +167,7 @@ TEST_F(TestApplicationClientProtocol, TestGetClusterMetricsException){
 
 	EXPECT_THROW(macp.getClusterMetrics(gcmreq), YarnFailoverException);
 	EXPECT_THROW(macp.getClusterMetrics(gcmreq), YarnIOException);
-	EXPECT_THROW(macp.getClusterMetrics(gcmreq), YarnIOException);
+	EXPECT_THROW(macp.getClusterMetrics(gcmreq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestForceKillApplicationException){
@@ -181,7 +181,7 @@ TEST_F(TestApplicationClientProtocol, TestForceKillApplicationException){
 
 	EXPECT_THROW(macp.forceKillApplication(kareq), YarnFailoverException);
 	EXPECT_THROW(macp.forceKillApplication(kareq), YarnIOException);
-	EXPECT_THROW(macp.forceKillApplication(kareq), YarnIOException);
+	EXPECT_THROW(macp.forceKillApplication(kareq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestGetApplicationsException){
@@ -195,7 +195,7 @@ TEST_F(TestApplicationClientProtocol, TestGetApplicationsException){
 
 	EXPECT_THROW(macp.getApplications(gareq), YarnFailoverException);
 	EXPECT_THROW(macp.getApplications(gareq), YarnIOException);
-	EXPECT_THROW(macp.getApplications(gareq), YarnIOException);
+	EXPECT_THROW(macp.getApplications(gareq), YarnException);
 }
 
 TEST_F(TestApplicationClientProtocol, TestGetQueueAclsInfoException){
@@ -209,5 +209,5 @@ TEST_F(TestApplicationClientProtocol, TestGetQueueAclsInfoException){
 
 	EXPECT_THROW(macp.getQueueAclsInfo(gquareq), YarnFailoverException);
 	EXPECT_THROW(macp.getQueueAclsInfo(gquareq), YarnIOException);
-	EXPECT_THROW(macp.getQueueAclsInfo(gquareq), YarnIOException);
+	EXPECT_THROW(macp.getQueueAclsInfo(gquareq), YarnException);
 }

@@ -111,6 +111,8 @@ public abstract class MetadataAccessor {
 		try {
 			return new MetadataYAMLAccessor(file);
 
+		} catch (IllegalStateException e) {
+		  throw new IllegalStateException(e.getMessage());
 		} catch (Exception e) {
 			throw new MetadataAccessException("error occurred when reading " + file, e);
 		}

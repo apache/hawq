@@ -25,6 +25,8 @@ import java.util.ListIterator;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -37,17 +39,21 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.mapred.FileInputFormat;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TextInputFormat;
+import org.apache.hawq.pxf.api.BasicFilter;
 import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.FragmentsStats;
+import org.apache.hawq.pxf.api.LogicalFilter;
 import org.apache.hawq.pxf.api.Metadata;
+import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
@@ -76,6 +82,11 @@ public class HiveDataFragmenter extends Fragmenter {
     static final String HIVE_NO_PART_TBL = "!HNPT!";
 
     static final String HIVE_API_EQ = " = ";
+    static final String HIVE_API_LT = " < ";
+    static final String HIVE_API_GT = " > ";
+    static final String HIVE_API_LTE = " <= ";
+    static final String HIVE_API_GTE = " >= ";
+    static final String HIVE_API_NE = " != ";
     static final String HIVE_API_DQUOTE = "\"";
 
     private JobConf jobConf;
@@ -87,6 +98,7 @@ public class HiveDataFragmenter extends Fragmenter {
     // partition filtering
     private Set<String> setPartitions = new TreeSet<String>(
             String.CASE_INSENSITIVE_ORDER);
+    private Map<String, String> partitionkeyTypes = new HashMap<>();
 
     /**
      * A Hive table unit - means a subset of the HIVE table, where we can say
@@ -191,6 +203,7 @@ public class HiveDataFragmenter extends Fragmenter {
             // Save all hive partition names in a set for later filter match
             for (FieldSchema fs : tbl.getPartitionKeys()) {
                 setPartitions.add(fs.getName());
+				partitionkeyTypes.put(fs.getName(), fs.getType());
             }
 
             LOG.debug("setPartitions :" + setPartitions);
@@ -398,22 +411,38 @@ public class HiveDataFragmenter extends Fragmenter {
         HiveFilterBuilder eval = new HiveFilterBuilder(inputData);
         Object filter = eval.getFilterObject(filterInput);
 
-        String prefix = "";
-
-        if (filter instanceof List) {
-
-            for (Object f : (List<?>) filter) {
-                if (buildSingleFilter(f, filtersString, prefix)) {
-                    // Set 'and' operator between each matched partition filter.
-                    prefix = " and ";
-                }
-            }
-
+        if (filter instanceof LogicalFilter) {
+            buildCompoundFilter((LogicalFilter) filter, filtersString);
         } else {
-            buildSingleFilter(filter, filtersString, prefix);
+            buildSingleFilter(filter, filtersString, "");
         }
 
         return filtersString.toString();
+    }
+
+    private void buildCompoundFilter(LogicalFilter filter, StringBuilder filterString) throws Exception{
+        String prefix;
+        switch(filter.getOperator()) {
+            case HDOP_AND:
+                prefix = " and ";
+                break;
+            case HDOP_OR:
+                prefix = " or ";
+                break;
+            case HDOP_NOT:
+                prefix = " not ";
+                break;
+            default:
+                prefix = "";
+        }
+
+        for (Object f : filter.getFilterList()) {
+            if (f instanceof LogicalFilter) {
+                buildCompoundFilter((LogicalFilter) f, filterString);
+            } else {
+                buildSingleFilter(f, filterString, prefix);
+            }
+        }
     }
 
     /*
@@ -427,7 +456,7 @@ public class HiveDataFragmenter extends Fragmenter {
             throws Exception {
 
         // Let's look first at the filter
-        FilterParser.BasicFilter bFilter = (FilterParser.BasicFilter) filter;
+        BasicFilter bFilter = (BasicFilter) filter;
 
         // In case this is not an "equality filter", we ignore this filter (no
         // add to filter list)
@@ -451,9 +480,37 @@ public class HiveDataFragmenter extends Fragmenter {
             return false;
         }
 
-        filtersString.append(prefix);
+		if (!partitionkeyTypes.get(filterColumnName).equalsIgnoreCase(serdeConstants.STRING_TYPE_NAME)) {
+            LOG.debug("Filter type is not string type , ignore this filter for hive: "
+                    + filter);
+            return false;
+        }
+
+        if (filtersString.length() != 0)
+            filtersString.append(prefix);
         filtersString.append(filterColumnName);
-        filtersString.append(HIVE_API_EQ);
+
+        switch(((BasicFilter) filter).getOperation()) {
+            case HDOP_EQ:
+                filtersString.append(HIVE_API_EQ);
+                break;
+            case HDOP_LT:
+                filtersString.append(HIVE_API_LT);
+                break;
+            case HDOP_GT:
+                filtersString.append(HIVE_API_GT);
+                break;
+            case HDOP_LE:
+                filtersString.append(HIVE_API_LTE);
+                break;
+            case HDOP_GE:
+                filtersString.append(HIVE_API_GTE);
+                break;
+            case HDOP_NE:
+                filtersString.append(HIVE_API_NE);
+                break;
+        }
+
         filtersString.append(HIVE_API_DQUOTE);
         filtersString.append(filterValue);
         filtersString.append(HIVE_API_DQUOTE);

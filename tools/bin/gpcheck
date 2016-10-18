@@ -976,9 +976,8 @@ def testHDFSConfig(host):
                 checkFailed(host.hostname, "YARN configuration: %s not defined" % item)
 
     # Check yarn kerberos properties
-    #yarn_kerberos_check_list = ['hadoop.proxyuser.yarn.groups', 'hadoop.proxyuser.yarn.hosts', 'hadoop.proxyuser.postgres.hosts', 'hadoop.proxyuser.postgres.groups']
     if yarn_enabled and options.kerberos:
-        yarn_kerberos_check_list = ['yarn.nodemanager.keytab', 'yarn.nodemanager.principal','hadoop.proxyuser.postgres.groups', \
+        yarn_kerberos_check_list = ['yarn.nodemanager.keytab', 'yarn.nodemanager.principal', \
                                     'yarn.resourcemanager.keytab', 'yarn.resourcemanager.principal']
         for item in yarn_kerberos_check_list:
             if item in actual_config:

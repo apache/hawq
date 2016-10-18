@@ -107,9 +107,7 @@ public class ChunkRecordReader implements
         codec = compressionCodecs.getCodec(file);
 
         // open the file and seek to the start of the split
-        job.setBoolean(DFS_CLIENT_READ_SHORTCIRCUIT_SKIP_CHECKSUM_KEY, true);
         final FileSystem fs = file.getFileSystem(job);
-        fs.setVerifyChecksum(false);
         fileIn = fs.open(file, ChunkReader.DEFAULT_BUFFER_SIZE);
         fileLength = getInputStream().getFileLength();
         if (isCompressedInput()) {

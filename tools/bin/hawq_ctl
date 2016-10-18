@@ -128,6 +128,11 @@ class HawqInit:
         else:
             self.krb_server_keyfile = ''
 
+        if 'krb_srvname' in self.hawq_dict:
+            self.krb_srvname = self.hawq_dict['krb_srvname']
+        else:
+            self.krb_srvname = 'postgres'
+    
     def _write_config(self):
         configFile = "%s/etc/_mgmt_config" % self.GPHOME
         # Clean configFile while the first write in.
@@ -165,8 +170,8 @@ class HawqInit:
             local_ssh(cmd, logger)
 
     def check_hdfs_path(self):
-        cmd = "%s/bin/gpcheckhdfs hdfs %s %s %s" % \
-              (self.GPHOME, self.dfs_url, self.enable_secure_filesystem, self.krb_server_keyfile)
+        cmd = "%s/bin/gpcheckhdfs hdfs %s %s %s %s" % \
+              (self.GPHOME, self.dfs_url, self.enable_secure_filesystem, self.krb_srvname, self.krb_server_keyfile)
         logger.info("Check if hdfs path is available")
         logger.debug("Check hdfs: %s" % cmd)
         check_return_code(local_ssh(cmd, logger, warning = True), logger, "Check hdfs failed, please verify your hdfs settings")
@@ -435,7 +440,7 @@ class HawqInit:
         for host in self.host_list:
             logger.debug("Start to init segment on node '%s'" % host)
             scpcmd = "scp %s/etc/_mgmt_config %s:%s/etc/_mgmt_config > /dev/null" % (self.GPHOME, host, self.GPHOME)
-            local_ssh(scpcmd)
+            local_ssh(scpcmd, logger)
             work_list.append({"func":remote_ssh,"args":(segment_cmd_str, host, self.user, q)})
         logger.info("Total segment number is: %s" % len(self.host_list))
         work_list.append({"func":check_progress,"args":(q, self.hosts_count_number, 'init', 0, self.quiet)})

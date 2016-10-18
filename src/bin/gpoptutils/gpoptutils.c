@@ -26,104 +26,85 @@
  *	LANGUAGE C STRICT;
  */
 
+#include "postgres_fe.h"
 #include "postgres.h"
 #include "funcapi.h"
 #include "utils/builtins.h"
-#include "gpopt/utils/nodeutils.h"
 #include "rewrite/rewriteHandler.h"
-#include "c.h"
+#include "tcop/tcopprot.h"
 
-extern
-List *pg_parse_and_rewrite(const char *query_string, Oid *paramTypes, int iNumParams);
-
-extern
-List *QueryRewrite(Query *parsetree);
-
-static
-Query *parseSQL(char *szSqlText);
-
-static
-void traverseQueryRTEs(Query *pquery, HTAB *phtab, StringInfoData *buf);
+#define atooid(x)  ((Oid) strtoul((x), NULL, 10))
 
 Datum gp_dump_query_oids(PG_FUNCTION_ARGS);
 
-#ifdef PG_MODULE_MAGIC
 PG_MODULE_MAGIC;
-#endif
-
 PG_FUNCTION_INFO_V1(gp_dump_query_oids);
 
-/*
- * Parse a query given as SQL text.
- */
-static Query *parseSQL(char *sqlText)
-{
-	Assert(sqlText);
-
-	List *queryTree = pg_parse_and_rewrite(sqlText, NULL, 0);
-
-	if (1 != list_length(queryTree))
-	{
-		elog(ERROR, "Cannot parse query. "
-				"Please make sure the input contains a single valid query. \n%s", sqlText);
-	}
-
-	Query *query = (Query *) lfirst(list_head(queryTree));
-
-	return query;
-}
-
-static void traverseQueryRTEs
+static void
+traverseQueryOids
 	(
-	Query *pquery,
-	HTAB *phtab,
-	StringInfoData *buf
+	Query          *pquery,
+	HTAB           *relhtab,
+	StringInfoData *relbuf,
+	HTAB           *funchtab,
+	StringInfoData *funcbuf
 	)
 {
-	ListCell *plc;
-	bool found;
-	foreach (plc, pquery->rtable)
-	{
-		RangeTblEntry *rte = (RangeTblEntry *) lfirst(plc);
+	bool	   found;
+	const char *whitespace = " \t\n\r";
+	char	   *query = nodeToString(pquery);
+	char	   *token = strtok(query, whitespace);
 
-		switch (rte->rtekind)
+	while (token)
+	{
+		if (pg_strcasecmp(token, ":relid") == 0)
 		{
-			case RTE_RELATION:
+			token = strtok(NULL, whitespace);
+			if (token)
 			{
-				hash_search(phtab, (void *)&rte->relid, HASH_ENTER, &found);
+				Oid relid = atooid(token);
+				hash_search(relhtab, (void *)&relid, HASH_ENTER, &found);
 				if (!found)
 				{
-					if (0 != buf->len)
-						appendStringInfo(buf, "%s", ", ");
-					appendStringInfo(buf, "%u", rte->relid);
+					if (relbuf->len != 0)
+						appendStringInfo(relbuf, "%s", ",");
+					appendStringInfo(relbuf, "%u", relid);
 				}
 			}
-				break;
-			case RTE_SUBQUERY:
-				traverseQueryRTEs(rte->subquery, phtab, buf);
-				break;
-			default:
-				break;
 		}
+		else if (pg_strcasecmp(token, ":funcid") == 0)
+		{
+			token = strtok(NULL, whitespace);
+			if (token)
+			{
+				Oid funcid = atooid(token);
+				hash_search(funchtab, (void *)&funcid, HASH_ENTER, &found);
+				if (!found)
+				{
+					if (funcbuf->len != 0)
+						appendStringInfo(funcbuf, "%s", ",");
+					appendStringInfo(funcbuf, "%u", funcid);
+				}
+			}
+		}
+
+		token = strtok(NULL, whitespace);
 	}
 }
 
 /*
- * Function dumping dependent relation oids for a given SQL text
+ * Function dumping dependent relation & function oids for a given SQL text
  */
 Datum
 gp_dump_query_oids(PG_FUNCTION_ARGS)
 {
-	char *szSqlText = text_to_cstring(PG_GETARG_TEXT_P(0));
+	char *sqlText = text_to_cstring(PG_GETARG_TEXT_P(0));
+	List *queryList = pg_parse_and_rewrite(sqlText, NULL, 0);
+	ListCell *plc;
 
-	Query *pquery = parseSQL(szSqlText);
-	if (CMD_UTILITY == pquery->commandType && T_ExplainStmt == pquery->utilityStmt->type)
-	{
-		Query *pqueryExplain = ((ExplainStmt *)pquery->utilityStmt)->query;
-		List *plQueryTree = QueryRewrite(pqueryExplain);
-		Assert(1 == list_length(plQueryTree));
-		pquery = (Query *) lfirst(list_head(plQueryTree));
-	}
+	StringInfoData relbuf, funcbuf;
+	initStringInfo(&relbuf);
+	initStringInfo(&funcbuf);
 
 	typedef struct OidHashEntry
 	{
@@ -134,20 +115,32 @@ gp_dump_query_oids(PG_FUNCTION_ARGS)
 	ctl.keysize = sizeof(Oid);
 	ctl.entrysize = sizeof(OidHashEntry);
 	ctl.hash = oid_hash;
+	HTAB *relhtab = hash_create("relid hash table", 100, &ctl, HASH_ELEM | HASH_FUNCTION);
+	HTAB *funchtab = hash_create("funcid hash table", 100, &ctl, HASH_ELEM | HASH_FUNCTION);
 
-	StringInfoData buf;
-	initStringInfo(&buf);
+	foreach(plc, queryList)
+	{
+		Query *query = (Query *) lfirst(plc);
+		if (CMD_UTILITY == query->commandType && T_ExplainStmt == query->utilityStmt->type)
+		{
+			Query *queryExplain = ((ExplainStmt *)query->utilityStmt)->query;
+			List *queryTree = QueryRewrite(queryExplain);
+			Assert(1 == list_length(queryTree));
+			query = (Query *) lfirst(list_head(queryTree));
+		}
+		traverseQueryOids(query, relhtab, &relbuf, funchtab, &funcbuf);
+	}
 
-	HTAB *phtab = hash_create("relid hash table", 100, &ctl, HASH_ELEM | HASH_FUNCTION);
-	traverseQueryRTEs(pquery, phtab, &buf);
-	hash_destroy(phtab);
+	hash_destroy(relhtab);
+	hash_destroy(funchtab);
 
 	StringInfoData str;
 	initStringInfo(&str);
-	appendStringInfo(&str, "{\"relids\": [%s]}", buf.data);
+	appendStringInfo(&str, "{\"relids\": \"%s\", \"funcids\": \"%s\"}", relbuf.data, funcbuf.data);
 
 	text *result = cstring_to_text(str.data);
-	pfree(buf.data);
+	pfree(relbuf.data);
+	pfree(funcbuf.data);
 	pfree(str.data);
 
 	PG_RETURN_TEXT_P(result);

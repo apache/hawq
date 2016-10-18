@@ -26,6 +26,7 @@
 #include "catalog/namespace.h"
 #include "catalog/pg_exttable.h"
 #include "access/pxfheaders.h"
+#include "access/pxffilters.h"
 #include "utils/guc.h"
 
 static void add_alignment_size_httpheader(CHURL_HEADERS headers);
@@ -34,7 +35,7 @@ static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphd
 static char* prepend_x_gp(const char* key);
 static void add_delegation_token_headers(CHURL_HEADERS headers, PxfInputData *inputData);
 static void add_remote_credentials(CHURL_HEADERS headers);
-static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo);
+static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo, List *qualsAttributes);
 
 /* 
  * Add key/value pairs to connection header. 
@@ -62,9 +63,16 @@ void build_http_header(PxfInputData *input)
 		add_tuple_desc_httpheader(headers, rel);
 	}
 	
-	if (proj_info != NULL)
+	if (proj_info != NULL && proj_info->pi_isVarList)
 	{
-		add_projection_desc_httpheader(headers, proj_info);
+		List* qualsAttributes = extractPxfAttributes(input->quals);
+		/* projection information is incomplete if columns from WHERE clause wasn't extracted */
+		if (qualsAttributes !=  NIL || list_length(input->quals) == 0)
+		{
+			add_projection_desc_httpheader(headers, proj_info, qualsAttributes);
+		}
+		else
+			elog(DEBUG2, "Query will not be optimized to use projection information");
 	}
 
 	/* GP cluster configuration */
@@ -121,18 +129,20 @@ static void add_alignment_size_httpheader(CHURL_HEADERS headers)
 
 /* 
  * Report tuple description to remote component 
- * Currently, number of attributes, attributes names and types 
+ * Currently, number of attributes, attributes names, types and types modifiers
  * Each attribute has a pair of key/value 
  * where X is the number of the attribute
  * X-GP-ATTR-NAMEX - attribute X's name 
  * X-GP-ATTR-TYPECODEX - attribute X's type OID (e.g, 16)
  * X-GP-ATTR-TYPENAMEX - attribute X's type name (e.g, "boolean")
+ * optional - X-GP-ATTR-TYPEMODX-COUNT - total number of modifier for attribute X
+ * optional - X-GP-ATTR-TYPEMODX-Y - attribute X's modifiers Y (types which have precision info, like numeric(p,s))
  */
 static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
 {	
     char long_number[sizeof(int32) * 8];
 
-    StringInfoData formatter;	
+    StringInfoData formatter;
     TupleDesc tuple;		
     initStringInfo(&formatter);
 	
@@ -161,12 +171,90 @@ static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel)
         resetStringInfo(&formatter);
         appendStringInfo(&formatter, "X-GP-ATTR-TYPENAME%u", i);
         churl_headers_append(headers, formatter.data, TypeOidGetTypename(tuple->attrs[i]->atttypid));
-    }
+
+		/* Add attribute type modifiers if any*/
+		if (tuple->attrs[i]->atttypmod > -1)
+		{
+			switch (tuple->attrs[i]->atttypid)
+			{
+				case NUMERICOID:
+				{
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-COUNT", i);
+					pg_ltoa(2, long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+
+
+					/* precision */
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-%u", i, 0);
+					pg_ltoa((tuple->attrs[i]->atttypmod >> 16) & 0xffff, long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+
+					/* scale */
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-%u", i, 1);
+					pg_ltoa((tuple->attrs[i]->atttypmod - VARHDRSZ) & 0xffff, long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+					break;
+				}
+				case CHAROID:
+				case BPCHAROID:
+				case VARCHAROID:
+				{
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-COUNT", i);
+					pg_ltoa(1, long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-%u", i, 0);
+					pg_ltoa((tuple->attrs[i]->atttypmod - VARHDRSZ), long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+					break;
+				}
+				case VARBITOID:
+				case BITOID:
+				case TIMESTAMPOID:
+				case TIMESTAMPTZOID:
+				case TIMEOID:
+				case TIMETZOID:
+				{
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-COUNT", i);
+					pg_ltoa(1, long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-%u", i, 0);
+					pg_ltoa((tuple->attrs[i]->atttypmod), long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+					break;
+				}
+				case INTERVALOID:
+				{
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-COUNT", i);
+					pg_ltoa(1, long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+
+					resetStringInfo(&formatter);
+					appendStringInfo(&formatter, "X-GP-ATTR-TYPEMOD%u-%u", i, 0);
+					pg_ltoa(INTERVAL_PRECISION(tuple->attrs[i]->atttypmod), long_number);
+					churl_headers_append(headers, formatter.data, long_number);
+					break;
+				}
+				default:
+					elog(DEBUG5, "add_tuple_desc_httpheader: unsupported type %d ", tuple->attrs[i]->atttypid);
+					break;
+			}
+		}
+	}
 	
 	pfree(formatter.data);
 }
 
-static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo) {
+static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo, List *qualsAttributes) {
     int i;
     char long_number[sizeof(int32) * 8];
     int *varNumbers = projInfo->pi_varNumbers;
@@ -174,7 +262,7 @@ static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo
     initStringInfo(&formatter);
 
     /* Convert the number of projection columns to a string */
-    pg_ltoa(list_length(projInfo->pi_targetlist), long_number);
+    pg_ltoa(list_length(projInfo->pi_targetlist) + list_length(qualsAttributes), long_number);
     churl_headers_append(headers, "X-GP-ATTRS-PROJ", long_number);
 
     for(i = 0; i < list_length(projInfo->pi_targetlist); i++) {
@@ -186,6 +274,21 @@ static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo
         churl_headers_append(headers, formatter.data,long_number);
     }
 
+	ListCell *attribute = NULL;
+
+	foreach(attribute, qualsAttributes)
+	{
+		AttrNumber attrNumber = lfirst_int(attribute);
+
+		pg_ltoa(attrNumber, long_number);
+		resetStringInfo(&formatter);
+		appendStringInfo(&formatter, "X-GP-ATTRS-PROJ-IDX");
+
+		churl_headers_append(headers, formatter.data,long_number);
+	}
+
+
+    list_free(qualsAttributes);
     pfree(formatter.data);
 }
 

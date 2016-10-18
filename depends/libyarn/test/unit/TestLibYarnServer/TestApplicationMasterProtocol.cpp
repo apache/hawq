@@ -67,7 +67,7 @@ TEST_F(TestApplicationMasterProtocol, TestRegisterApplicationMasterException){
 
 	EXPECT_CALL(mamp, invoke(_)).Times(1).WillOnce(Throw(YarnException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
 
-	EXPECT_THROW(ramres = mamp.registerApplicationMaster(ramreq), YarnIOException);
+	EXPECT_THROW(ramres = mamp.registerApplicationMaster(ramreq), YarnException);
 }
 
 TEST_F(TestApplicationMasterProtocol, TestAllocateException){
@@ -77,7 +77,7 @@ TEST_F(TestApplicationMasterProtocol, TestAllocateException){
 
 	EXPECT_CALL(mamp, invoke(_)).Times(1).WillOnce(Throw(YarnException("", __FILE__, __LINE__, Yarn::Internal::PrintStack(1, STACK_DEPTH).c_str())));
 
-	EXPECT_THROW(ares = mamp.allocate(areq), YarnIOException);
+	EXPECT_THROW(ares = mamp.allocate(areq), YarnException);
 }
 
 TEST_F(TestApplicationMasterProtocol, TestFinishApplicationMasterException){
@@ -92,5 +92,5 @@ TEST_F(TestApplicationMasterProtocol, TestFinishApplicationMasterException){
 
 	EXPECT_THROW(famres = mamp.finishApplicationMaster(famreq), YarnFailoverException);
 	EXPECT_THROW(famres = mamp.finishApplicationMaster(famreq), YarnIOException);
-	EXPECT_THROW(famres = mamp.finishApplicationMaster(famreq), YarnIOException);
+	EXPECT_THROW(famres = mamp.finishApplicationMaster(famreq), YarnException);
 }

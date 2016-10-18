@@ -1,0 +1,12 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFPgcrypto;
+SET
+-- end_ignore
+SET search_path = public;
+SET
+SELECT crypt('abc', '123');
+     crypt     
+---------------
+ 12BWKETBcM70Q
+(1 row)
+

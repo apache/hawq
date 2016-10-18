@@ -63,7 +63,9 @@ void getHostAndPort(const char * dfs_url, char * host, char * port);
 /*
  * test whether hdfs can be connected while kerberos is on or not
  */
-int testHdfsConnect(hdfsFS * fs, const char * host, int port, const char * krbstatus, const char * krb_keytabfile);
+int testHdfsConnect(hdfsFS * fs, const char * host, int port,
+        const char * krbstatus, const char * krb_srvname,
+        const char * krb_keytabfile);
 
 /*
  * test whether the filepath which dfs_url defined in hdfs is existed or not.
@@ -81,25 +83,31 @@ int main(int argc, char * argv[]) {
     *  argv[1]:dfs_name
     *  argv[2]:dfs_url
     *  argv[3]:krb status
-    *  argv[4]:krb keytab file
+    *  argv[4]:krb service name
+    *  argv[5]:krb keytab file
     */
-    if (argc < 3 || argc > 5 || (argc == 4 && 0 != strcasecmp(argv[3],"off") && 0 != strcasecmp(argv[3],"false"))) {
-        fprintf(stderr, "ERROR: gpcheckhdfs parameter error, Please check your config file\n"
-            "\tDFS_NAME and DFS_URL are required, KERBEROS_KEYFILE and ENABLE_SECURE_FILESYSTEM are optional\n");
+    if (argc < 3 || argc > 6
+            || ((argc == 4 || argc == 5) && 0 != strcasecmp(argv[3], "off") && 0 != strcasecmp(argv[3], "false"))) {
+        fprintf(stderr,
+                "ERROR: gpcheckhdfs parameter error, Please check your config file\n"
+                        "\tDFS_NAME and DFS_URL are required, KERBEROS_SERVICENAME, KERBEROS_KEYFILE and "
+                        "ENABLE_SECURE_FILESYSTEM are optional\n");
         return GPCHKHDFS_ERR;
     } 
 
     char * dfs_name = argv[1];
     char * dfs_url = argv[2];
     char * krbstatus = NULL;
+    char * krb_srvname = NULL;
     char * krb_keytabfile = NULL;
 
     if (argc >= 4) {
         krbstatus = argv[3];
     }
 
-    if (argc >= 5) {
-        krb_keytabfile = argv[4];
+    if (argc >= 6) {
+        krb_srvname = argv[4];
+        krb_keytabfile = argv[5];
     }
 
     char * host = (char *)malloc(255 * sizeof(char));
@@ -113,7 +121,8 @@ int main(int argc, char * argv[]) {
     }
 
     hdfsFS fs;
-    int connErrCode = testHdfsConnect(&fs, host, iPort, krbstatus, krb_keytabfile);
+    int connErrCode = testHdfsConnect(&fs, host, iPort, krbstatus, krb_srvname,
+            krb_keytabfile);
 
     if (connErrCode) {
         return connErrCode;
@@ -189,7 +198,9 @@ int testHdfsOperateFile(hdfsFS fs, const char * filepath, const char * dfscomple
     return 0;
 }
 
-int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort, const char * krbstatus, const char * krb_keytabfile) {
+int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort,
+        const char * krbstatus, const char * krb_srvname,
+        const char * krb_keytabfile) {
     struct hdfsBuilder * builder = hdfsNewBuilder();
     hdfsBuilderSetNameNode(builder, host);
 
@@ -198,7 +209,6 @@ int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort, const char * k
 
     if (NULL != krbstatus && NULL != krb_keytabfile &&
             (!strcasecmp(krbstatus, "on") || !strcasecmp(krbstatus, "true"))) {   //Kerberos if On
-        char * krb_srvname = "postgres";
         char * krb5_ccname = "/tmp/postgres.ccname";
         char cmd[1024];
         snprintf(cmd, sizeof(cmd), "kinit -k -t %s -c %s %s",

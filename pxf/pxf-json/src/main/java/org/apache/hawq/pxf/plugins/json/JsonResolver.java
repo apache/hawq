@@ -196,9 +196,6 @@ public class JsonResolver extends Plugin implements ReadResolver {
 			case BOOLEAN:
 				oneField.val = val.asBoolean();
 				break;
-			case CHAR:
-				oneField.val = val.asText().charAt(0);
-				break;
 			case BYTEA:
 				oneField.val = val.asText().getBytes();
 				break;

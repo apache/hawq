@@ -48,7 +48,7 @@ public class HAWQPath
 	public HAWQPath(String value) throws HAWQException
 	{
 		boolean open;
-		value.replaceAll(" ", "");
+		value = value.replaceAll(" ", "");
 		if (value.startsWith("[") && value.endsWith("]"))
 		{
 			open = true;

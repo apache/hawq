@@ -12,7 +12,7 @@ Also, you could enter the `$HAWQ_HOME/src/test/feature` folder to `make` and `ma
 Before building the code of feature tests part, just make sure your compiler supports C++11 and you have apache HAWQ successfully compiled.
 
 # Run
-1. Make sure HAWQ is running correctly. If not, `init` or `start` HAWQ at first.
+1. Make sure HAWQ is running correctly. If not, `init` or `start` HAWQ at first. Note please don't set locale related arguments for hawq init.
 2. Load environment configuration by running `source $INSTALL_PREFIX/greenplum_path.sh`.
 3. Load hdfs configuration. For example, `export HADOOP_HOME=/Users/wuhong/hadoop-2.7.2 && export PATH=${PATH}:${HADOOP_HOME}/bin`. Since some test cases need `hdfs` and `hadoop` command, just ensure these commands work before running. Otherwise you will get failure.
 4. Run `./feature-test`, you could use `--gtest_filter` option to filter test cases(both positive and negative patterns are supported). Please see more options by running `./feature-test --help`.

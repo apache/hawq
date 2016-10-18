@@ -661,7 +661,8 @@ COptTasks::Pplstmt
 	(
 	IMemoryPool *pmp,
 	CMDAccessor *pmda,
-	const CDXLNode *pdxln
+	const CDXLNode *pdxln,
+	bool canSetTag
 	)
 {
 
@@ -687,7 +688,7 @@ COptTasks::Pplstmt
 	
 	// translate DXL -> PlannedStmt
 	CTranslatorDXLToPlStmt trdxltoplstmt(pmp, pmda, &ctxdxltoplstmt, gpdb::UlSegmentCountGP());
-	return trdxltoplstmt.PplstmtFromDXL(pdxln);
+	return trdxltoplstmt.PplstmtFromDXL(pdxln, canSetTag);
 }
 
 
@@ -763,6 +764,7 @@ COptTasks::PoconfCreate
 	ULONG ulCTEInliningCutoff =  (ULONG) optimizer_cte_inlining_bound;
 	ULONG ulPartsToForceSortOnInsert =  (ULONG) optimizer_parts_to_force_sort_on_insert;
 	ULONG ulJoinArityForAssociativityCommutativity =  (ULONG) optimizer_join_arity_for_associativity_commutativity;
+	ULONG ulArrayExpansionThreshold =  (ULONG) optimizer_array_expansion_threshold;
 
 	return GPOS_NEW(pmp) COptimizerConfig
 						(
@@ -770,7 +772,9 @@ COptTasks::PoconfCreate
 						GPOS_NEW(pmp) CStatisticsConfig(pmp, dDampingFactorFilter, dDampingFactorJoin, dDampingFactorGroupBy),
 						GPOS_NEW(pmp) CCTEConfig(ulCTEInliningCutoff),
 						pcm,
-						GPOS_NEW(pmp) CHint(ulPartsToForceSortOnInsert /* optimizer_parts_to_force_sort_on_insert */, ulJoinArityForAssociativityCommutativity)
+						GPOS_NEW(pmp) CHint(ulPartsToForceSortOnInsert /* optimizer_parts_to_force_sort_on_insert */,
+										ulJoinArityForAssociativityCommutativity,
+										ulArrayExpansionThreshold)
 						);
 }
 
@@ -1040,7 +1044,9 @@ COptTasks::PvOptimizeTask
 			// translate DXL->PlStmt only when needed
 			if (poctx->m_fGeneratePlStmt)
 			{
-				poctx->m_pplstmt = (PlannedStmt *) gpdb::PvCopyObject(Pplstmt(pmp, &mda, pdxlnPlan));
+				// always use poctx->m_pquery->canSetTag as the ptrquerytodxl->Pquery() is a mutated Query object
+				// that may not have the correct canSetTag
+				poctx->m_pplstmt = (PlannedStmt *) gpdb::PvCopyObject(Pplstmt(pmp, &mda, pdxlnPlan, poctx->m_pquery->canSetTag));
 			}
 
 			CStatisticsConfig *pstatsconf = pocconf->Pstatsconf();
@@ -1289,7 +1295,7 @@ COptTasks::PvPlstmtFromDXLTask
 
 		// translate DXL -> PlannedStmt
 		CTranslatorDXLToPlStmt trdxltoplstmt(pmp, amda.Pmda(), &ctxdxlplstmt, gpdb::UlSegmentCountGP());
-		PlannedStmt *pplstmt = trdxltoplstmt.PplstmtFromDXL(pdxlnOriginal);
+		PlannedStmt *pplstmt = trdxltoplstmt.PplstmtFromDXL(pdxlnOriginal, poctx->m_pquery->canSetTag);
 		if (optimizer_print_plan)
 		{
 			elog(NOTICE, "Plstmt: %s", gpdb::SzNodeToString(pplstmt));

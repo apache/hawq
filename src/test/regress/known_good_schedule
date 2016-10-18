@@ -16,7 +16,6 @@ ignore: goh_column_compression
 test: goh_database
 test: goh_gp_dist_random
 ignore: gpsql_fault_tolerance
-test: goh_portals
 ignore: goh_set_schema
 ignore: bit
 ignore: numeric
@@ -49,10 +48,6 @@ ignore: copyselect
 ignore: constraints
 ignore: triggers
 ignore: create_misc
-test: create_aggregate
-test: aggregate_with_groupingsets
-test: aggregates_null
-test: nested_case_null
 ignore: create_operator
 ignore: create_index
 ignore: drop_if_exists
@@ -173,7 +168,6 @@ ignore: percentile
 ignore: resource_queue_function
 ignore: gp_optimizer
 ignore: co_nestloop_idxscan
-test: agg_derived_win
 ignore: orca_udfs
 #
 # the following test needs some special filespace/tablespace.

@@ -45,7 +45,7 @@ TEST_F(TestAggregate, TestCreateAggregate) {
   util.execute("drop table if exists t");
   hawq::test::DataGenerator dGen(&util);
   dGen.genSimpleTable("t");
-  util.query("select avg(b) as bavg from t group by a order by bavg","3|\n15|\n62|\n");
+  util.query("select sum2(a,b) as absum from t group by a,b order by absum","4|\n29|\n113|\n");
   util.query("select newavg(b) as bavg from t group by a order by bavg","3|\n15|\n62|\n");
 }
 
@@ -60,4 +60,20 @@ TEST_F(TestAggregate, TestAggregateWithGroupingsets) {
       " sum_c;", "1|aa|10|\n1|bb|20|\n2|cc|20|\n|aa|10|\n|bb|20|\n|cc|20|\n");
 }
 
+TEST_F(TestAggregate, TestAggregateWithNull) {
+  hawq::test::SQLUtility util;
+  util.execute("drop table if exists t");
+  hawq::test::DataGenerator dGen(&util);
+  dGen.genTableWithNull("t");
 
+  util.query(
+      "select SUM(CASE WHEN a = 15 THEN 1 ELSE 0 END) as aa, b ,c from t group by b, c "
+      "order by aa, b, c",
+      "0|51||\n0||WET|\n1||aa|\n");
+}
+
+TEST_F(TestAggregate, TestAggregateDerivedWin) {
+  hawq::test::SQLUtility util;
+  util.execSQLFile("query/sql/agg-derived-win.sql",
+                   "query/ans/agg-derived-win.ans");
+}

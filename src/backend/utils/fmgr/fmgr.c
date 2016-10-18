@@ -2025,7 +2025,7 @@ OidSendFunctionCall(Oid functionId, Datum val)
 struct varlena *
 pg_detoast_datum(struct varlena * datum)
 {
-	if (VARATT_IS_EXTENDED(datum))
+	if (NULL!=datum && VARATT_IS_EXTENDED(datum))
 		return heap_tuple_untoast_attr(datum);
 	else
 		return datum;

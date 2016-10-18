@@ -19,7 +19,12 @@ package org.apache.hawq.pxf.plugins.hive;
  * under the License.
  */
 
+import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hawq.pxf.api.BasicFilter;
 import org.apache.hawq.pxf.api.FilterParser;
+import org.apache.hawq.pxf.api.LogicalFilter;
+import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.HdfsSplittableDataAccessor;
@@ -31,8 +36,15 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Reporter;
 
 import java.io.IOException;
+import java.sql.Date;
+import java.sql.Timestamp;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+
+import static org.apache.hawq.pxf.api.io.DataType.*;
+import static org.apache.hawq.pxf.api.io.DataType.BPCHAR;
+import static org.apache.hawq.pxf.api.io.DataType.BYTEA;
 
 /**
  * Accessor for Hive tables. The accessor will open and read a split belonging
@@ -47,6 +59,7 @@ import java.util.List;
 public class HiveAccessor extends HdfsSplittableDataAccessor {
     private static final Log LOG = LogFactory.getLog(HiveAccessor.class);
     List<HivePartition> partitions;
+    String HIVE_DEFAULT_PARTITION = "__HIVE_DEFAULT_PARTITION__";
 
     class HivePartition {
         public String name;
@@ -205,6 +218,117 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         return testOneFilter(partitionFields, filter, inputData);
     }
 
+    private boolean testForUnsupportedOperators(List<Object> filterList) {
+        boolean nonAndOp = true;
+        for (Object filter : filterList) {
+            if (filter instanceof LogicalFilter) {
+                if (((LogicalFilter) filter).getOperator() != FilterParser.LogicalOperation.HDOP_AND)
+                    return false;
+                if (((LogicalFilter) filter).getFilterList() != null)
+                    nonAndOp = testForUnsupportedOperators(((LogicalFilter) filter).getFilterList());
+            }
+        }
+        return nonAndOp;
+    }
+
+    private boolean testForPartitionEquality(List<HivePartition> partitionFields, List<Object> filterList, InputData input) {
+        boolean partitionAllowed = true;
+        for (Object filter : filterList) {
+            if (filter instanceof BasicFilter) {
+                BasicFilter bFilter = (BasicFilter) filter;
+                boolean isFilterOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
+                if (!isFilterOperationEqual) /*
+                                      * in case this is not an "equality filter"
+                                      * we ignore it here - in partition
+                                      * filtering
+                                      */{
+                    return true;
+                }
+
+                int filterColumnIndex = bFilter.getColumn().index();
+                String filterValue = bFilter.getConstant().constant().toString();
+                ColumnDescriptor filterColumn = input.getColumn(filterColumnIndex);
+                String filterColumnName = filterColumn.columnName();
+
+                for (HivePartition partition : partitionFields) {
+                    if (filterColumnName.equals(partition.name)) {
+
+                /*
+                 * the filter field matches a partition field, but the values do
+                 * not match
+                 */
+                        boolean keepPartition = filterValue.equals(partition.val);
+
+                        /*
+                         * If the string comparison fails then we should check the comparison of
+                         * the two operands as typed values
+                         * If the partition value equals HIVE_DEFAULT_PARTITION just skip
+                         */
+                        if (!keepPartition && !partition.val.equals(HIVE_DEFAULT_PARTITION)){
+                            keepPartition = testFilterByType(filterValue, partition);
+                        }
+                        return keepPartition;
+                    }
+                }
+
+        /*
+         * filter field did not match any partition field, so we ignore this
+         * filter and hence return true
+         */
+            } else if (filter instanceof LogicalFilter) {
+                partitionAllowed = testForPartitionEquality(partitionFields, ((LogicalFilter) filter).getFilterList(), input);
+            }
+        }
+        return partitionAllowed;
+    }
+
+    /*
+     * Given two values in String form and their type, convert each to the same type do an equality check
+     */
+    private boolean testFilterByType(String filterValue, HivePartition partition) {
+        boolean result;
+        switch (partition.type) {
+            case serdeConstants.BOOLEAN_TYPE_NAME:
+                result = Boolean.valueOf(filterValue).equals(Boolean.valueOf(partition.val));
+                break;
+            case serdeConstants.TINYINT_TYPE_NAME:
+            case serdeConstants.SMALLINT_TYPE_NAME:
+                result = (Short.parseShort(filterValue) == Short.parseShort(partition.val));
+                break;
+            case serdeConstants.INT_TYPE_NAME:
+                result = (Integer.parseInt(filterValue) == Integer.parseInt(partition.val));
+                break;
+            case serdeConstants.BIGINT_TYPE_NAME:
+                result = (Long.parseLong(filterValue) == Long.parseLong(partition.val));
+                break;
+            case serdeConstants.FLOAT_TYPE_NAME:
+                result = (Float.parseFloat(filterValue) == Float.parseFloat(partition.val));
+                break;
+            case serdeConstants.DOUBLE_TYPE_NAME:
+                result = (Double.parseDouble(filterValue) == Double.parseDouble(partition.val));
+                break;
+            case serdeConstants.TIMESTAMP_TYPE_NAME:
+                result = Timestamp.valueOf(filterValue).equals(Timestamp.valueOf(partition.val));
+                break;
+            case serdeConstants.DATE_TYPE_NAME:
+                result = Date.valueOf(filterValue).equals(Date.valueOf(partition.val));
+                break;
+            case serdeConstants.DECIMAL_TYPE_NAME:
+                result = HiveDecimal.create(filterValue).bigDecimalValue().equals(HiveDecimal.create(partition.val).bigDecimalValue());
+                break;
+            case serdeConstants.BINARY_TYPE_NAME:
+                result = filterValue.getBytes().equals(partition.val.getBytes());
+                break;
+            case serdeConstants.STRING_TYPE_NAME:
+            case serdeConstants.VARCHAR_TYPE_NAME:
+            case serdeConstants.CHAR_TYPE_NAME:
+            default:
+               result = false;
+        }
+
+        return result;
+    }
+
     /*
      * We are testing one filter against all the partition fields. The filter
      * has the form "fieldA = valueA". The partitions have the form
@@ -218,42 +342,15 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
      */
     private boolean testOneFilter(List<HivePartition> partitionFields,
                                   Object filter, InputData input) {
-        // Let's look first at the filter
-        FilterParser.BasicFilter bFilter = (FilterParser.BasicFilter) filter;
-
-        boolean isFilterOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
-        if (!isFilterOperationEqual) /*
-                                      * in case this is not an "equality filter"
-                                      * we ignore it here - in partition
-                                      * filtering
-                                      */{
+        // Let's look first at the filter and escape if there are any OR or NOT ops
+        if (!testForUnsupportedOperators(Arrays.asList(filter)))
             return true;
-        }
 
-        int filterColumnIndex = bFilter.getColumn().index();
-        String filterValue = bFilter.getConstant().constant().toString();
-        ColumnDescriptor filterColumn = input.getColumn(filterColumnIndex);
-        String filterColumnName = filterColumn.columnName();
-
-        for (HivePartition partition : partitionFields) {
-            if (filterColumnName.equals(partition.name)) {
-                /*
-                 * the filter field matches a partition field, but the values do
-                 * not match
-                 */
-                return filterValue.equals(partition.val);
-            }
-        }
-
-        /*
-         * filter field did not match any partition field, so we ignore this
-         * filter and hence return true
-         */
-        return true;
+        return testForPartitionEquality(partitionFields, Arrays.asList(filter), input);
     }
 
     private void printOneBasicFilter(Object filter) {
-        FilterParser.BasicFilter bFilter = (FilterParser.BasicFilter) filter;
+        BasicFilter bFilter = (BasicFilter) filter;
         boolean isOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
         int columnIndex = bFilter.getColumn().index();
         String value = bFilter.getConstant().constant().toString();

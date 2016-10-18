@@ -178,8 +178,6 @@ The "options" are:
    -l --logdir         Sets log dir of management tools.
    -q --quiet          Run in quiet mode.
    -v --verbose        Displays detailed status, progress and error messages output by the utility.
-   -d --datadir        Specify HAWQ master data directory.
-   --hawqhome          Specify HAWQ install directory.
 
 See 'hawq --help' for more information on other commands.
 """

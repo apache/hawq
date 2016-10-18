@@ -93,7 +93,7 @@ GPORCA_SRC_PATH := $(ORCA_SRC_PATH)/gporca
 GPOS_SRC_PATH := $(ORCA_SRC_PATH)/gpos
 GP_XERCES_SRC_PATH := $(ORCA_SRC_PATH)/gp-xerces
 
-submake-gporca: submake-gpos submake-gp-xerces gporca_prepare
+submake-gporca: submake-gpos submake-gp-xerces $(ORCA_BLD_PATH)/gporca_prepare_timestamp
 	if [ ! -f $(ORCA_BLD_PATH)/gporca_build_timestamp ]; then \
 		rm -rf $(ORCA_BLD_PATH)/gporca/build; mkdir -p $(ORCA_BLD_PATH)/gporca/build; cd $(ORCA_BLD_PATH)/gporca/build; mkdir -p install; \
 		cmake $(GPORCA_SRC_PATH) -DCMAKE_INSTALL_PREFIX=$(prefix) \
@@ -105,7 +105,7 @@ submake-gporca: submake-gpos submake-gp-xerces gporca_prepare
 		touch $(ORCA_BLD_PATH)/gporca_build_timestamp; \
 	fi
 
-submake-gpos: gpos_prepare
+submake-gpos: $(ORCA_BLD_PATH)/gpos_prepare_timestamp
 	if [ ! -f $(ORCA_BLD_PATH)/gpos_build_timestamp ]; then \
 		rm -rf $(ORCA_BLD_PATH)/gpos/build; mkdir -p $(ORCA_BLD_PATH)/gpos/build; cd $(ORCA_BLD_PATH)/gpos/build; mkdir -p install; \
 		cmake $(GPOS_SRC_PATH) -DCMAKE_INSTALL_PREFIX=$(prefix) && \
@@ -113,7 +113,7 @@ submake-gpos: gpos_prepare
 		touch $(ORCA_BLD_PATH)/gpos_build_timestamp; \
 	fi
 
-submake-gp-xerces: submake-gpos gp-xerces_prepare
+submake-gp-xerces: $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp
 	if [ ! -f $(ORCA_BLD_PATH)/gp-xerces_build_timestamp ]; then \
 		rm -rf $(ORCA_BLD_PATH)/gp-xerces/build; mkdir -p $(ORCA_BLD_PATH)/gp-xerces/build; cd $(ORCA_BLD_PATH)/gp-xerces/build; mkdir -p install; \
 		$(GP_XERCES_SRC_PATH)/configure --prefix=$(prefix); \
@@ -133,46 +133,34 @@ gporca_commit := $(shell cat $(ORCA_SRC_PATH)/gporca.commit | awk '{print $$3}')
 gpos_commit := $(shell cat $(ORCA_SRC_PATH)/gpos.commit | awk '{print $$3}')
 gp_xerces_commit := $(shell cat $(ORCA_SRC_PATH)/gp-xerces.commit | awk '{print $$3}')
 
-$(ORCA_BLD_PATH)/gporca_prepare_timestamp: $(ORCA_SRC_PATH)/gporca.commit
-	rm -f $(ORCA_BLD_PATH)/gporca_prepare_timestamp
+$(ORCA_BLD_PATH)/gporca_prepare_timestamp: $(ORCA_SRC_PATH)/gporca.commit $(ORCA_BLD_PATH)/gpos_prepare_timestamp $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp
+	[ "x$(gporca_commit)" != "x" ] || exit 1; \
+	cd $(ORCA_SRC_PATH); mkdir -p gporca; cd gporca; \
+	[ ! -d .git ] && git clone $(gporca_git) . && git checkout $(gporca_branch); \
+	git reset --hard $(gporca_commit) || (echo Now fetch from upstream and try again; git fetch origin $(gporca_branch); git reset --hard $(gporca_commit)) || exit 2; \
+	touch $(ORCA_BLD_PATH)/gporca_prepare_timestamp; \
+	rm -f $(ORCA_BLD_PATH)/gporca_build_timestamp
 
 $(ORCA_BLD_PATH)/gpos_prepare_timestamp: $(ORCA_SRC_PATH)/gpos.commit
-	rm -f $(ORCA_BLD_PATH)/gpos_prepare_timestamp
+	[ "x$(gpos_commit)" != "x" ] || exit 1; \
+	cd $(ORCA_SRC_PATH); mkdir -p gpos; cd gpos; \
+	[ ! -d .git ] && git clone $(gpos_git) . && git checkout $(gpos_branch); \
+	git reset --hard $(gpos_commit) || (echo Now fetch from upstream and try again; git fetch origin $(gpos_branch); git reset --hard $(gpos_commit)) || exit 2; \
+	touch $(ORCA_BLD_PATH)/gpos_prepare_timestamp; \
+	rm -f $(ORCA_BLD_PATH)/gpos_build_timestamp
 
 $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp: $(ORCA_SRC_PATH)/gp-xerces.commit
-	rm -f $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp
-
-gporca_prepare: $(ORCA_BLD_PATH)/gporca_prepare_timestamp
-	if [ ! -f $(ORCA_BLD_PATH)/gporca_prepare_timestamp ]; then \
-		[ "x$(gporca_commit)" != "x" ] || exit 1; \
-		cd $(ORCA_SRC_PATH); mkdir -p gporca; cd gporca; \
-		[ ! -d .git ] && git clone $(gporca_git) . && git checkout $(gporca_branch); \
-		git reset --hard $(gporca_commit) || (echo Now fetch from upstream and try again; git fetch origin $(gporca_git); git reset --hard $(gporca_commit)) || exit 2; \
-		touch $(ORCA_BLD_PATH)/gporca_prepare_timestamp; \
-	fi
-
-gpos_prepare: $(ORCA_BLD_PATH)/gpos_prepare_timestamp
-	if [ ! -f $(ORCA_BLD_PATH)/gpos_prepare_timestamp ]; then \
-		[ "x$(gpos_commit)" != "x" ] || exit 1; \
-		cd $(ORCA_SRC_PATH); mkdir -p gpos; cd gpos; \
-		[ ! -d .git ] && git clone $(gpos_git) . && git checkout $(gpos_branch); \
-		git reset --hard $(gpos_commit) || (echo Now fetch from upstream and try again; git fetch origin $(gpos_git); git reset --hard $(gpos_commit)) || exit 2; \
-		touch $(ORCA_BLD_PATH)/gpos_prepare_timestamp; \
-	fi
-
-gp-xerces_prepare: $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp
-	if [ ! -f $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp ]; then \
-		[ "x$(gp_xerces_commit)" != "x" ] || exit 1; \
-		cd $(ORCA_SRC_PATH); mkdir -p gp-xerces; cd gp-xerces; \
-		[ ! -d .git ] && git clone $(gp_xerces_git) . && git checkout $(gp_xerces_branch); \
-		git reset --hard $(gp_xerces_commit) || (echo Now fetch from upstream and try again; git fetch origin $(gp_xerces_git); git reset --hard $(gp_xerces_commit)) || exit 2; \
-		touch $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp; \
-	fi
+	[ "x$(gp_xerces_commit)" != "x" ] || exit 1; \
+	cd $(ORCA_SRC_PATH); mkdir -p gp-xerces; cd gp-xerces; \
+	[ ! -d .git ] && git clone $(gp_xerces_git) . && git checkout $(gp_xerces_branch); \
+	git reset --hard $(gp_xerces_commit) || (echo Now fetch from upstream and try again; git fetch origin $(gp_xerces_branch); git reset --hard $(gp_xerces_commit)) || exit 2; \
+	touch $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp; \
+	rm -f $(ORCA_BLD_PATH)/gp-xerces_build_timestamp
 
 submake-libdxltranslators: submake-gporca
 	$(MAKE) -C gpopt all
 
-.PHONY: submake-gporca submake-gpos submake-gp-xerces gporca_prepare gpos_prepare gp-xerces_prepare
+.PHONY: submake-gporca submake-gpos submake-gp-xerces
 
 else
 submake-libdxltranslators:
