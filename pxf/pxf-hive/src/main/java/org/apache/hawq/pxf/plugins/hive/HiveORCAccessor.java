@@ -111,14 +111,15 @@ public class HiveORCAccessor extends HiveAccessor {
          * startAnd() & end() block
          */
         if (filter instanceof LogicalFilter) {
-            if (!buildExpression(filterBuilder, Arrays.asList(filter)))
+            if (!buildExpression(filterBuilder, Arrays.asList(filter))) {
                 return;
+            }
         }
         else {
             filterBuilder.startAnd();
-            if(!buildArgument(filterBuilder, filter))
+            if(!buildArgument(filterBuilder, filter)) {
                 return;
-
+            }
             filterBuilder.end();
         }
         SearchArgument sarg = filterBuilder.build();
@@ -139,16 +140,17 @@ public class HiveORCAccessor extends HiveAccessor {
                         builder.startNot();
                         break;
                 }
-                if (buildExpression(builder, ((LogicalFilter) f).getFilterList()))
+                if (buildExpression(builder, ((LogicalFilter) f).getFilterList())) {
                     builder.end();
-                else
+                } else {
                     return false;
+                }
             } else {
-                if (!buildArgument(builder, f))
+                if (!buildArgument(builder, f)) {
                     return false;
+                }
             }
         }
-
         return true;
     }
 
