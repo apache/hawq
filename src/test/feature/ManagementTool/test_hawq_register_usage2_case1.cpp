@@ -14,6 +14,38 @@ using hawq::test::SQLUtility;
 using hawq::test::Command;
 using hawq::test::HdfsConfig;
 
+TEST_F(TestHawqRegister, TestUsage2Case1EmptyTable) {
+  SQLUtility util;
+  util.execute("drop table if exists t9;");
+  util.execute("create table t9(i int) with (appendonly=true, orientation=row) distributed randomly;");
+  EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o t9.yml testhawqregister_testusage2case1emptytable.t9"));
+  EXPECT_EQ(0, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c t9.yml testhawqregister_testusage2case1emptytable.nt9"));
+  util.query("select * from nt9;", 0);
+  EXPECT_EQ(0, Command::getCommandStatus("rm -rf t9.yml"));
+  util.execute("drop table t9;");
+  util.execute("drop table nt9;");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case1IncorrectYaml) {
+  SQLUtility util;
+  string filePath = util.getTestRootPath() + "/ManagementTool/";
+
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_pagesize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_rowgroupsize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_filesize.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_schema.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_checksum.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_dfs_url.yml xx"));
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_bucketnum.yml xx"));
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case1MismatchFileNumber) {
+  SQLUtility util;
+  string filePath = util.getTestRootPath() + "/ManagementTool/";
+  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "files_incomplete.yml xx"));
+}
+
+
 TEST_F(TestHawqRegister, TestUsage2Case1Expected) {
     SQLUtility util;
     std::vector<string> create_table_matrix = {"distributed by (i)", "distributed randomly"};
