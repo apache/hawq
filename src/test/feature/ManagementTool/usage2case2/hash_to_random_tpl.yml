@@ -1,0 +1,35 @@
+Bucketnum: 6
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 2.0.1.0 build
+  dev) on x86_64-apple-darwin14.5.0, compiled by GCC Apple LLVM version 6.1.0 (clang-602.0.53)
+  (based on LLVM 3.6.0svn) compiled on Jul  6 2016 10:22:33
+DFS_URL: hdfs://@PORT@
+Distribution_Policy: DISTRIBUTED RANDOMLY
+Encoding: UTF8
+FileFormat: Parquet
+Parquet_FileLocations:
+  Checksum: false
+  CompressionLevel: 0
+  CompressionType: null
+  EnableDictionary: false
+  Files:
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID_OLD@/1
+    size: 596
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID_NEW@/1
+    size: 228
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID_NEW@/2
+    size: 215
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID_NEW@/3
+    size: 215
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID_NEW@/4
+    size: 220
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID_NEW@/5
+    size: 210
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID_NEW@/6
+    size: 215
+  PageSize: 1048576
+  RowGroupSize: 8388608
+Parquet_Schema:
+- name: i
+  type: int4
+TableName: public.t
+Version: 1.0.0

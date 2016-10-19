@@ -57,6 +57,10 @@ TEST_F(TestHawqRegister, DISABLED_TestUsage2Case3Expected) {
                 std::unordered_map<std::string, std::string> strs_src_dst;
                 strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
                 strs_src_dst["@TABLE_OID@"]= getTableOid(nt);
+                string hdfs_prefix;
+                hawq::test::HdfsConfig hc;
+                hc.getNamenodeHost(hdfs_prefix);
+                strs_src_dst["@PORT@"]= hdfs_prefix;
                 frep.replace(t_yml_tpl_old, t_yml_old, strs_src_dst);
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register %s -d %s -c %s testhawqregister_testusage2case3expected.%s", opt.c_str(), HAWQ_DB, t_yml_old.c_str(), nt.c_str())));
                 util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 100);
