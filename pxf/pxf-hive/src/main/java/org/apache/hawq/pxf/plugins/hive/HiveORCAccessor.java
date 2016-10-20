@@ -25,11 +25,14 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
+import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hawq.pxf.api.BasicFilter;
 import org.apache.hawq.pxf.api.LogicalFilter;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.commons.lang.StringUtils;
+
+import java.sql.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -161,6 +164,10 @@ public class HiveORCAccessor extends HiveAccessor {
         Object filterValue = filter.getConstant().constant();
         ColumnDescriptor filterColumn = inputData.getColumn(filterColumnIndex);
         String filterColumnName = filterColumn.columnName();
+
+        /* Need to convert java.sql.Date to Hive's DateWritable Format */
+        if (filterValue instanceof Date)
+            filterValue= new DateWritable((Date) filterValue);
 
         switch(filter.getOperation()) {
             case HDOP_LT:

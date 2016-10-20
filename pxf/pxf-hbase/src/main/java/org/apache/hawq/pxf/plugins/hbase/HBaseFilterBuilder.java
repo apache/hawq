@@ -90,6 +90,9 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * @throws Exception if parsing failed
      */
     public Filter getFilterObject(String filterString) throws Exception {
+        if (filterString == null)
+            return null;
+
         // First check for NOT, HBase does not support this
         if (filterNotOpPresent(filterString))
             return null;

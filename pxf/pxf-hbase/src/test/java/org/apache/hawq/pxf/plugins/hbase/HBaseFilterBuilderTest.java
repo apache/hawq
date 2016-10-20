@@ -50,4 +50,10 @@ public class HBaseFilterBuilderTest {
         builder.getFilterObject(filter);
     }
 
+    @Test
+    public void parseNullFilter() throws Exception {
+        HBaseFilterBuilder builder = new HBaseFilterBuilder(null);
+        assertNull(builder.getFilterObject(null));
+    }
+
 }

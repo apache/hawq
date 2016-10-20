@@ -32,7 +32,6 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
@@ -51,12 +50,6 @@ public class FilterParserTest {
     public void setUp() throws Exception {
         filterBuilder = mock(FilterBuilder.class);
         filterParser = new FilterParser(filterBuilder);
-    }
-
-    @Test
-    public void parseNegativeNull() {
-        filter = null;
-        runParseNegative("null string", null, "filter parsing ended with no result");
     }
 
     @Test

@@ -29,6 +29,7 @@ import org.apache.hawq.pxf.api.BasicFilter;
 import static org.apache.hawq.pxf.api.FilterParser.Operation;
 import static org.apache.hawq.pxf.api.FilterParser.Operation.*;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class HiveFilterBuilderTest {
     @Test
@@ -44,6 +45,13 @@ public class HiveFilterBuilderTest {
         assertEquals(consts[0], leftOperand.getConstant().constant());
         assertEquals(idx[0], leftOperand.getColumn().index());
         assertEquals(ops[0], leftOperand.getOperation());
+    }
+
+    @Test
+    public void parseNullFilter() throws Exception {
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+        LogicalFilter filterList = (LogicalFilter) builder.getFilterObject(null);
+        assertNull(builder.getFilterObject(null));
     }
 
     @Test
