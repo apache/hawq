@@ -124,7 +124,7 @@ verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expe
 
 void run__const_to_str(Const* input, StringInfo result, char* expected)
 {
-	const_to_str(input, result);
+	scalar_const_to_str(input, result);
 	assert_string_equal(result->data, expected);
 }
 
@@ -140,7 +140,7 @@ void run__const_to_str__negative(Const* input, StringInfo result, char* value)
 	PG_TRY();
 	{
 		/* This will throw a ereport(ERROR).*/
-		const_to_str(input, result);
+		scalar_const_to_str(input, result);
 	}
 	PG_CATCH();
 	{

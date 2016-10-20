@@ -36,7 +36,8 @@ static void pxf_free_filter(PxfFilterDesc* filter);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
-static void const_to_str(Const *constval, StringInfo buf);
+static void scalar_const_to_str(Const *constval, StringInfo buf);
+static void list_const_to_str(Const *constval, StringInfo buf);
 static List* append_attr_from_var(Var* var, List* attrs);
 static void enrich_trivial_expression(List *expressionItems);
 
@@ -249,6 +250,7 @@ pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 		switch (tag)
 		{
 			case T_OpExpr:
+			case T_ScalarArrayOpExpr:
 			{
 				result = lappend(result, expressionItem);
 				break;
@@ -401,6 +403,52 @@ pxf_serialize_filter_list(List *expressionItems)
 				}
 				break;
 			}
+			case T_ScalarArrayOpExpr:
+			{
+				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_ScalarArrayOpExpr)", tag);
+				ScalarArrayOpExpr *expr = (ScalarArrayOpExpr *) node;
+				PxfFilterDesc *filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
+				if (scalararrayopexpr_to_pxffilter(expr, filter))
+				{
+					PxfOperand l = filter->l;
+					PxfOperand r = filter->r;
+					PxfOperatorCode o = filter->op;
+					if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
+					{
+						appendStringInfo(resbuf, "%c%d%c%d%c%lu%c%s",
+												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
+												 PXF_CONST_CODE, r.consttype,
+												 PXF_SIZE_BYTES, strlen(r.conststr->data),
+												 PXF_CONST_DATA, (r.conststr)->data);
+					}
+					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
+					{
+						appendStringInfo(resbuf, "%c%d%c%lu%c%s%c%d",
+												 PXF_CONST_CODE, l.consttype,
+												 PXF_SIZE_BYTES, strlen(l.conststr->data),
+												 PXF_CONST_DATA, (l.conststr)->data,
+												 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
+					}
+					else
+					{
+						/* opexpr_to_pxffilter() should have never let this happen */
+						ereport(ERROR,
+								(errcode(ERRCODE_INTERNAL_ERROR),
+								 errmsg("internal error in pxffilters.c:pxf_serialize_"
+										 "filter_list. Found a non const+attr filter")));
+					}
+					appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, o);
+					pxf_free_filter(filter);
+				} else {
+					/* if at least one expression item is not supported, whole filter doesn't make sense*/
+					elog(DEBUG1, "Query will not be optimized to use filter push-down.");
+					pfree(filter);
+					pfree(resbuf->data);
+					return NULL;
+				}
+				break;
+				}
+			}
 			case T_BoolExpr:
 			{
 				BoolExpr *expr = (BoolExpr *) node;
@@ -483,7 +531,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		filter->r.attnum = InvalidAttrNumber;
 		filter->r.conststr = makeStringInfo();
 		initStringInfo(filter->r.conststr);
-		const_to_str((Const *)rightop, filter->r.conststr);
+		scalar_const_to_str((Const *)rightop, filter->r.conststr);
 		filter->r.consttype = ((Const *)rightop)->consttype;
 	}
 	else if (IsA(leftop, Const) && IsA(rightop, Var))
@@ -492,7 +540,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		filter->l.attnum = InvalidAttrNumber;
 		filter->l.conststr = makeStringInfo();
 		initStringInfo(filter->l.conststr);
-		const_to_str((Const *)leftop, filter->l.conststr);
+		scalar_const_to_str((Const *)leftop, filter->l.conststr);
 		filter->l.consttype = ((Const *)leftop)->consttype;
 
 		filter->r.opcode = PXF_ATTR_CODE;
@@ -524,6 +572,33 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	/* NOTE: if more validation needed, add it before the operators test
 	 * or alternatively change it to use a false flag and return true below */
 	return false;
+}
+
+scalararrayopexpr_to_pxffilter()
+{
+
+	Node	*leftop 	= NULL;
+	Node	*rightop	= NULL;
+	StringInfo	serializedconst = makeStringInfo();
+
+	leftop = (Node *) linitial(expr->args);
+	rightop = (Node *) lsecond(expr->args);
+
+	if (IsA(leftop, Var) && IsA(rightop, Const))
+	{
+		list_const_to_str((Const *)rightop, serializedconst);
+	}
+	else if (IsA(leftop, Const) && IsA(rightop, Var))
+	{
+		list_const_to_str((Const *)leftop, serializedconst);
+	}
+	else
+	{
+		elog(DEBUG1, "pxf_serialize_filter_list: expression is not a Var+Const");
+		pfree(resbuf->data);
+		return NULL;
+	}
+	break;
 }
 
 static List*
@@ -617,7 +692,7 @@ supported_filter_type(Oid type)
  * type is text based, make sure to escape the value with surrounding quotes.
  */
 static void
-const_to_str(Const *constval, StringInfo buf)
+scalar_const_to_str(Const *constval, StringInfo buf)
 {
 	Oid			typoutput;
 	bool		typIsVarlena;
@@ -652,19 +727,80 @@ const_to_str(Const *constval, StringInfo buf)
 		case TIMESTAMPOID:
 			appendStringInfo(buf, "%s", extval);
 			break;
-
 		case BOOLOID:
 			if (strcmp(extval, "t") == 0)
 				appendStringInfo(buf, "true");
 			else
 				appendStringInfo(buf, "false");
 			break;
-
 		default:
 			/* should never happen. we filter on types earlier */
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
-					 errmsg("internal error in pxffilters.c:const_to_str. "
+					 errmsg("internal error in pxffilters.c:scalar_const_to_str. "
+							"Using unsupported data type (%d) (value %s)",
+							constval->consttype, extval)));
+
+	}
+
+	pfree(extval);
+}
+
+
+/*
+ * list_const_to_str
+ *
+ */
+static void
+list_const_to_str(Const *constval, StringInfo buf)
+{
+	Oid			typoutput;
+	bool		typIsVarlena;
+	char		*extval;
+
+	if (constval->constisnull)
+	{
+		return;
+	}
+
+	if (constval->constbyval) {
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+						errmsg("internal error in pxffilters.c:list_const_to_str. "
+								"Constant passed by value instead of Datum")));
+	}
+
+
+	getTypeOutputInfo(constval->consttype,
+					  &typoutput, &typIsVarlena);
+
+	extval = OidOutputFunctionCall(typoutput, constval->constvalue);
+
+	switch (constval->consttype)
+	{
+		case INT4ARRAYOID:
+		{
+			char *token = strtok(extval, ",");
+			appendStringInfo(buf, "%c%d%c%lu%c%s",
+					PXF_LIST_CONST_CODE, constval->consttype,
+					PXF_SIZE_BYTES, strlen(token),
+					PXF_CONST_DATA, token);
+
+			while(token)
+			{
+				token = strtok(NULL, ",");
+				if (token)
+					appendStringInfo(buf, "%c%lu%c%s",
+							PXF_SIZE_BYTES, strlen(token),
+							PXF_CONST_DATA, token);
+			}
+			break;
+		}
+		default:
+			/* should never happen. we filter on types earlier */
+			ereport(ERROR,
+					(errcode(ERRCODE_INTERNAL_ERROR),
+					 errmsg("internal error in pxffilters.c:list_const_to_str. "
 							"Using unsupported data type (%d) (value %s)",
 							constval->consttype, extval)));
 

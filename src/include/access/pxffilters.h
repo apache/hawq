@@ -59,6 +59,7 @@ typedef enum PxfOperatorCode
 #define PXF_CONST_DATA				'd'
 #define PXF_OPERATOR_CODE			'o'
 #define PXF_LOGICAL_OPERATOR_CODE	'l'
+#define PXF_LIST_CONST_CODE			'm'
 
 /*
  * An Operand has any of the above codes, and the information specific to
