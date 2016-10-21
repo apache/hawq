@@ -392,6 +392,9 @@ class HawqRegister(object):
         self.partitions_filepaths = partitions_filepaths
         self.partitions_filesizes = partitions_filesizes
         self.encoding = encoding
+        self.files_same_path = []
+        self.sizes_same_path = []
+        self.segnos_same_path = []
 
     def _option_parser_yml(self, yml_file):
         import yaml
@@ -563,9 +566,8 @@ class HawqRegister(object):
         existed_files = [self.tabledir + seg for seg in seg_list]
         # check if file numbers in hdfs is consistent with the record count of pg_aoseg.
         hdfs_file_no_lst = [f.split('/')[-1] for f in existed_files]
-        sort_hdfs_file_no_lst = sorted([int(x) for x in hdfs_file_no_lst])
         for k in range(1, self.firstsegno - 1):
-            if self.firstsegno - 1 != len(existed_files) or k != sort_hdfs_file_no_lst[k-1]:
+            if self.firstsegno - 1 > len(existed_files) or str(k) not in hdfs_file_no_lst:
                 logger.error("Hawq aoseg metadata doesn't consistent with file numbers in hdfs.")
                 self.failure_handler.rollback()
                 sys.exit(1)
@@ -714,6 +716,30 @@ class HawqRegister(object):
 
     def _set_move_files_in_hdfs(self):
         segno = self.firstsegno
+        # set self.files_same_path, self.sizes_same_path and self.segnos_same_path, which are for files existed in HDFS but not in catalog metadata
+        update_segno_lst = [f.split('/')[-1] for f in self.files_update]
+        catalog_lst = [str(i) for i in range(1, segno)]
+        new_catalog_lst = [str(i) for i in range(segno, len(self.files_update) + 1)]
+        exist_catalog_lst = []
+        for k, seg in enumerate(update_segno_lst):
+            if seg not in catalog_lst:
+                self.files_same_path.append(self.files_update[k])
+                self.sizes_same_path.append(self.sizes_update[k])
+            if seg in new_catalog_lst:
+                exist_catalog_lst.append(seg)
+        for seg in update_segno_lst:
+            if seg not in catalog_lst:
+                if seg in exist_catalog_lst:
+                    self.segnos_same_path.append(int(seg))
+                else:
+                    while (str(segno) in exist_catalog_lst):
+                        segno += 1
+                    self.segnos_same_path.append(segno)
+
+        for k, f in enumerate(self.files_same_path):
+            self.srcfiles.append(f)
+            self.dstfiles.append(self.tabledir + str(self.segnos_same_path[k]))
+
         for f in self.files_append:
             self.srcfiles.append(f)
             self.dstfiles.append(self.tabledir + str(segno))
@@ -744,30 +770,49 @@ class HawqRegister(object):
                 sys.exit(1)
 
     def _set_modify_metadata(self, mode):
+        segno = self.firstsegno
         append_eofs = self.sizes_append
         update_eofs = self.sizes_update
+        same_path_eofs = self.sizes_same_path
         update_segno_lst = [f.split('/')[-1] for f in self.files_update]
+        same_path_segno_lst = [seg for seg in self.segnos_same_path]
         query = ""
         if mode == 'force':
             query += "delete from pg_aoseg.%s;" % (self.seg_name)
         
         if self.file_format == 'Parquet': 
-            for k, eof in enumerate(update_eofs):
-                if int(update_segno_lst[k]) < self.firstsegno:
-                    query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d);' % (self.seg_name, update_segno_lst[k], update_eofs[k], -1, -1)
+            if len(update_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d)' % (self.seg_name, update_segno_lst[0], update_eofs[0], -1, -1)
+                for k, update_eof in enumerate(update_eofs[1:]):
+                    query += ',(%s, %d, %d, %d)' % (update_segno_lst[k + 1], update_eof, -1, -1)
+                query += ';'
+            if len(same_path_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], -1, -1)
+                for k, same_path_eof in enumerate(same_path_eofs[1:]):
+                    query += ',(%d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, -1, -1)
+                query += ';'
+            segno += len(same_path_eofs)
             if len(append_eofs) > 0:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, self.firstsegno, append_eofs[0], -1, -1)
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], -1, -1)
                 for k, append_eof in enumerate(append_eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (self.firstsegno + k + 1, append_eof, -1, -1)
+                    query += ',(%d, %d, %d, %d)' % (segno + k + 1, append_eof, -1, -1)
                 query += ';'
         else:
-            for k, eof in enumerate(update_eofs):
-                if int(update_segno_lst[k]) < self.firstsegno:
-                    query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d, %d);' % (self.seg_name, update_segno_lst[k], update_eofs[k], -1, -1, -1)
+            if len(update_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d, %d)' % (self.seg_name, update_segno_lst[0], update_eofs[0], -1, -1, -1)
+                for k, update_eof in enumerate(update_eofs[1:]):
+                    query += ',(%s, %d, %d, %d, %d)' % (update_segno_lst[k + 1], update_eof, -1, -1, -1)
+                query += ';'
+            if len(same_path_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], -1, -1, -1)
+                for k, same_path_eof in enumerate(same_path_eofs[1:]):
+                    query += ',(%d, %d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, -1, -1, -1)
+                query += ';'
+            segno += len(same_path_eofs)
             if len(append_eofs) > 0:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, self.firstsegno, append_eofs[0], -1, -1, -1)
-                for k, eof in enumerate(append_eofs[1:]):
-                    query += ',(%d, %d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1, -1)
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], -1, -1, -1)
+                for k, append_eof in enumerate(append_eofs[1:]):
+                    query += ',(%d, %d, %d, %d, %d)' % (segno + k + 1, append_eof, -1, -1, -1)
                 query += ';'
         self.queries += query
     
