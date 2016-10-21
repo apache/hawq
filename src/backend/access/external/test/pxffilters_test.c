@@ -348,7 +348,7 @@ void run__opexpr_to_pxffilter__positive(Oid dbop, PxfOperatorCode expectedPxfOp)
 	OpExpr *expr = build_op_expr(arg_var, arg_const, dbop);
 	PxfFilterDesc* expected = build_filter(
 			PXF_ATTR_CODE, 1, NULL,
-			PXF_CONST_CODE, 0, "1984",
+			PXF_SCALAR_CONST_CODE, 0, "1984",
 			expectedPxfOp);
 
 	/* run test */
@@ -396,7 +396,7 @@ test__opexpr_to_pxffilter__attributeIsNull(void **state)
 
 	PxfFilterDesc* expected = build_filter(
 				PXF_ATTR_CODE, 1, NULL,
-				PXF_CONST_CODE, 0, "\"NULL\"",
+				PXF_SCALAR_CONST_CODE, 0, "\"NULL\"",
 				PXFOP_EQ);
 
 	/* run test */
@@ -428,7 +428,7 @@ test__opexpr_to_pxffilter__differentTypes(void **state)
 	/* run test */
 	assert_true(opexpr_to_pxffilter(expr, filter));
 	PxfFilterDesc *expected = build_filter(
-			PXF_CONST_CODE, 0, "13",
+			PXF_SCALAR_CONST_CODE, 0, "13",
 			PXF_ATTR_CODE, 3, NULL,
 			PXFOP_LT);
 	compare_filters(filter, expected);

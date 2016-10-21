@@ -54,7 +54,7 @@ typedef enum PxfOperatorCode
  * string that gets pushed down.
  */
 #define PXF_ATTR_CODE				'a'
-#define PXF_CONST_CODE				'c'
+#define PXF_SCALAR_CONST_CODE		'c'
 #define PXF_SIZE_BYTES				's'
 #define PXF_CONST_DATA				'd'
 #define PXF_OPERATOR_CODE			'o'
@@ -68,10 +68,10 @@ typedef enum PxfOperatorCode
  */
 typedef struct PxfOperand
 {
-	char		opcode;		/* PXF_ATTR_CODE or PXF_CONST_CODE*/
+	char		opcode;		/* PXF_ATTR_CODE, PXF_SCALAR_CONST_CODE, PXF_LIST_CONST_CODE*/
 	AttrNumber 	attnum;		/* used when opcode is PXF_ATTR_CODE */
-	StringInfo 	conststr;	/* used when opcode is PXF_CONST_CODE */
-	Oid 		consttype; 	/* used when opcode is PXF_CONST_CODE */
+	StringInfo 	conststr;	/* used when opcode is PXF_SCALAR_CONST_CODE or PXF_LIST_CONST_CODE*/
+	Oid 		consttype; 	/* used when opcode is PXF_SCALAR_CONST_CODE or PXF_LIST_CONST_CODE*/
 
 } PxfOperand;
 
@@ -111,7 +111,7 @@ static inline bool pxfoperand_is_attr(PxfOperand x)
 
 static inline bool pxfoperand_is_const(PxfOperand x)
 {
-	return (x.opcode == PXF_CONST_CODE);
+	return (x.opcode == PXF_SCALAR_CONST_CODE);
 }
 
 char *serializePxfFilterQuals(List *quals);
