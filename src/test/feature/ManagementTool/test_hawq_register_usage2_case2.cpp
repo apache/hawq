@@ -246,12 +246,12 @@ TEST_F(TestHawqRegister, TestUsage2Case2TableExistNoData) {
     util.execute("drop table nt;");
 }
 
-TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2NormalYamlConfig) {
+TEST_F(TestHawqRegister, TestUsage2Case2NormalYamlConfig) {
     runYamlCaseForceMode("testusage2case2normalyamlconfig", "usage2case2/normal_yaml_config", 0, 50, 150);
 }
 
-TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2NormalYamlNoUpdateConfig) {
-    runYamlCaseForceMode("testusage2case2normalyamlnoupdateconfig", "usage2case2/normal_yaml_no_update_config", 0, 50, 150);
+TEST_F(TestHawqRegister, TestUsage2Case2NormalYamlNoUpdateConfig) {
+    runYamlCaseForceMode("testusage2case2normalyamlnoupdateconfig", "usage2case2/normal_yaml_no_update_config", 0, 50, 100);
 }
 
 TEST_F(TestHawqRegister, TestUsage2Case2FileNotIncludedInYamlConfig) {
@@ -270,8 +270,8 @@ TEST_F(TestHawqRegister, TestUsage2Case2HDFSFilePathContainErrorSymbol) {
     runYamlCaseForceMode("testusage2case2hdfsfilepathcontainerrorsymbol", "usage2case2/contain_error_symbol");
 }
 
-TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ZeroEof) {
-    runYamlCaseForceMode("testusage2case2zeroeof", "usage2case2/zero_eof", 0, 50, 150);
+TEST_F(TestHawqRegister, TestUsage2Case2ZeroEof) {
+    runYamlCaseForceMode("testusage2case2zeroeof", "usage2case2/zero_eof", 0, 50, 143);
 }
 
 TEST_F(TestHawqRegister, TestUsage2Case2LargerEof) {

@@ -558,14 +558,22 @@ class HawqRegister(object):
             self.failure_handler.rollback()
             sys.exit(1)
         self.firstsegno, self.tabledir = self._get_metadata()
-
+        
+        seg_list, existed_sizes = self._get_metadata_from_table()
+        existed_files = [self.tabledir + seg for seg in seg_list]
+        # check if file numbers in hdfs is consistent with the record count of pg_aoseg.
+        hdfs_file_no_lst = [f.split('/')[-1] for f in existed_files]
+        sort_hdfs_file_no_lst = sorted([int(x) for x in hdfs_file_no_lst])
+        for k in range(1, self.firstsegno - 1):
+            if self.firstsegno - 1 != len(existed_files) or k != sort_hdfs_file_no_lst[k-1]:
+                logger.error("Hawq aoseg metadata doesn't consistent with file numbers in hdfs.")
+                self.failure_handler.rollback()
+                sys.exit(1)
         if self.mode == 'repair':
             if self.tabledir.strip('/') != self.filepath.strip('/'):
                 logger.error("In repair mode, file path from yaml file should be the same with table's path.")
                 self.failure_handler.rollback()
                 sys.exit(1)
-            seg_list, existed_sizes = self._get_metadata_from_table()
-            existed_files = [self.tabledir + seg for seg in seg_list]
             existed_info = {}
             for k, fn in enumerate(existed_files):
                 existed_info[fn] = existed_sizes[k]
@@ -590,10 +598,8 @@ class HawqRegister(object):
             self.files, self.sizes = self._get_files_in_hdfs(self.filepath)
 
         self.do_not_move, self.files_update, self.sizes_update = False, [], []
-        self.newfiles, self.newsizes = [f for f in self.files], [sz for sz in self.sizes]
+        self.files_append, self.sizes_append = [f for f in self.files], [sz for sz in self.sizes]
         if self.mode == 'force':
-            seg_list, _ = self._get_metadata_from_table()
-            existed_files = [self.tabledir + seg for seg in seg_list]
             if len(self.files) == len(existed_files):
                 if sorted(self.files) != sorted(existed_files):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
@@ -601,6 +607,7 @@ class HawqRegister(object):
                     sys.exit(1)
                 else:
                     self.do_not_move, self.files_update, self.sizes_update = True, self.files, self.sizes
+                self.files_append, self.sizes_append = [],[]
             elif len(self.files) < len(existed_files):
                 logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                 self.failure_handler.rollback()
@@ -610,8 +617,8 @@ class HawqRegister(object):
                     if f in existed_files:
                         self.files_update.append(self.files[k])
                         self.sizes_update.append(self.sizes[k])
-                        self.newfiles.remove(self.files[k])
-                        self.newsizes.remove(self.sizes[k])
+                        self.files_append.remove(self.files[k])
+                        self.sizes_append.remove(self.sizes[k])
                 if sorted(self.files_update) != sorted(existed_files):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                     self.failure_handler.rollback()
@@ -623,11 +630,11 @@ class HawqRegister(object):
             for fn in existed_files:
                 if fn not in self.files:
                     self.files_delete.append(fn)
-            self.files, self.sizes = [], []
+            self.files_append, self.sizes_append = [], []
 
         self._check_files_and_table_in_same_hdfs_cluster(self.filepath, self.tabledir)
 
-        print 'New file(s) to be registered: ', self.newfiles
+        print 'New file(s) to be registered: ', self.files_append
         if self.files_update:
             print 'Catalog info need to be updated for these files: ', self.files_update
 
@@ -636,6 +643,7 @@ class HawqRegister(object):
                 logger.error('-e option is only supported with single file case.')
                 self.failure_handler.rollback()
                 sys.exit(1)
+            self.sizes_append = [self.filesize]
             self.sizes = [self.filesize]
         self._check_sizes_valid()
 
@@ -706,7 +714,7 @@ class HawqRegister(object):
 
     def _set_move_files_in_hdfs(self):
         segno = self.firstsegno
-        for f in self.newfiles:
+        for f in self.files_append:
             self.srcfiles.append(f)
             self.dstfiles.append(self.tabledir + str(segno))
             segno += 1
@@ -736,68 +744,34 @@ class HawqRegister(object):
                 sys.exit(1)
 
     def _set_modify_metadata(self, mode):
-        if mode == 'insert':
-            eofs = self.sizes
-            query = ""
-            if self.file_format == 'Parquet':
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, self.firstsegno, eofs[0], -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1)
-            else:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, self.firstsegno, eofs[0], -1, -1, -1)
-                for k, eof in enumerate(eofs[1:]):
+        append_eofs = self.sizes_append
+        update_eofs = self.sizes_update
+        update_segno_lst = [f.split('/')[-1] for f in self.files_update]
+        query = ""
+        if mode == 'force':
+            query += "delete from pg_aoseg.%s;" % (self.seg_name)
+        
+        if self.file_format == 'Parquet': 
+            for k, eof in enumerate(update_eofs):
+                if int(update_segno_lst[k]) < self.firstsegno:
+                    query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d);' % (self.seg_name, update_segno_lst[k], update_eofs[k], -1, -1)
+            if len(append_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, self.firstsegno, append_eofs[0], -1, -1)
+                for k, append_eof in enumerate(append_eofs[1:]):
+                    query += ',(%d, %d, %d, %d)' % (self.firstsegno + k + 1, append_eof, -1, -1)
+                query += ';'
+        else:
+            for k, eof in enumerate(update_eofs):
+                if int(update_segno_lst[k]) < self.firstsegno:
+                    query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d, %d);' % (self.seg_name, update_segno_lst[k], update_eofs[k], -1, -1, -1)
+            if len(append_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, self.firstsegno, append_eofs[0], -1, -1, -1)
+                for k, eof in enumerate(append_eofs[1:]):
                     query += ',(%d, %d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1, -1)
-            query += ';'
-            self.queries += query
-        elif mode == 'force':
-            eofs = self.sizes
-            segno_lst = [f.split('/')[-1] for f in self.files]
-            query = "delete from pg_aoseg.%s;" % (self.seg_name)
-            firstsegno = 1
-            if self.file_format == 'Parquet':
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, firstsegno, eofs[0], -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (firstsegno + k + 1, eof, -1, -1)
-            else:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, firstsegno, eofs[0], -1, -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d, %d)' % (firstsegno + k + 1, eof, -1, -1, -1)
-            query += ';'
-            self.queries += query
-        elif mode == 'update':
-            eofs = self.sizes_update
-            query = ""
-            segno_lst = [f.split('/')[-1] for f in self.files_update]
-            if self.file_format == 'Parquet':
-                for i, eof in enumerate(eofs):
-                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, segno_lst[i])
-            else:
-                for i, eof in enumerate(eofs):
-                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', varblockcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, -1, segno_lst[i])
-            self.queries += query
-        else: # update_and_insert
-            eofs = self.sizes
-            query = ""
-            if self.file_format == 'Parquet':
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, self.firstsegno, eofs[0], -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1)
-            else:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, self.firstsegno, eofs[0], -1, -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1, -1)
-            query += ';'
-
-            segno_lst = [f.split('/')[-1] for f in self.files_update]
-            if self.file_format == 'Parquet':
-                for i, eof in enumerate(self.sizes_update):
-                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, segno_lst[i])
-            else:
-                for i, eof in enumerate(self.sizes_update):
-                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', varblockcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, -1, segno_lst[i])
-            self.queries += query
+                query += ';'
+        self.queries += query
     
-    def _modify_metadata(self, mode):
+    def _modify_metadata(self):
         try:
             self.utility_accessor.update_catalog(self.queries)
         except pg.DatabaseError as e:
@@ -817,31 +791,19 @@ class HawqRegister(object):
     def _prepare_register(self):
         if not self.do_not_move:
             self._set_move_files_in_hdfs()
-        if (not self.do_not_move) and self.mode == 'force':
+        if self.mode == 'force' or self.mode == 'repair':
             self._set_modify_metadata('force')
         else:
-            if self.mode == 'force':
-                self._set_modify_metadata('force')
-            elif self.mode == 'repair':
-                self._set_modify_metadata('update')
-            else:
-                self._set_modify_metadata('insert')
+            self._set_modify_metadata('insert')
 
     def register(self):
         if not self.do_not_move:
             self._move_files_in_hdfs()
-        if (not self.do_not_move) and self.mode == 'force':
-            self._modify_metadata('force')
-        else:
-            if self.mode == 'force':
-                self._modify_metadata('force')
-            elif self.mode == 'repair':
-                self._modify_metadata('update')
-                if self.files_delete:
-                    self._delete_files_in_hdfs()
-                    self._delete_metadata()
-            else:
-                self._modify_metadata('insert')
+        self._modify_metadata()
+        if self.mode == 'repair':
+            if self.files_delete:
+                self._delete_files_in_hdfs()
+                self._delete_metadata()
         logger.info('Hawq Register Succeed.')
 
 
