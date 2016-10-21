@@ -65,7 +65,7 @@ test__supported_filter_type(void **state)
 
 	/* go over pxf_supported_types array */
 	int nargs = sizeof(pxf_supported_types) / sizeof(Oid);
-	assert_int_equal(nargs, 14);
+	assert_int_equal(nargs, 15);
 	for (i = 0; i < nargs; ++i)
 	{
 		assert_true(supported_filter_type(pxf_supported_types[i]));
@@ -133,7 +133,7 @@ void run__const_to_str__negative(Const* input, StringInfo result, char* value)
 
 	StringInfo err_msg = makeStringInfo();
 	appendStringInfo(err_msg,
-			"internal error in pxffilters.c:const_to_str. "
+			"internal error in pxffilters.c:scalar_const_to_str. "
 			"Using unsupported data type (%d) (value %s)", input->consttype, value);
 
 	/* Setting the test -- code omitted -- */
@@ -350,6 +350,13 @@ void run__opexpr_to_pxffilter__positive(Oid dbop, PxfOperatorCode expectedPxfOp)
 			PXF_ATTR_CODE, 1, NULL,
 			PXF_SCALAR_CONST_CODE, 0, "1984",
 			expectedPxfOp);
+
+	int c = 1, d = 1, n = 1;
+
+	for ( n = 1 ; n <= 10 ; n++ )
+	   for ( c = 1 ; c <= 32767 ; c++ )
+	       for ( d = 1 ; d <= 32767 ; d++ )
+	       {}
 
 	/* run test */
 	assert_true(opexpr_to_pxffilter(expr, filter));

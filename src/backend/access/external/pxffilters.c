@@ -35,10 +35,10 @@ static List* pxf_make_expression_items_list(List *quals, Node *parent, int *logi
 static void pxf_free_filter(PxfFilterDesc* filter);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
+static bool scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
 static bool supported_operator_type(Oid type, PxfFilterDesc *filter);
 static void scalar_const_to_str(Const *constval, StringInfo buf);
-static bool scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter);
 static void list_const_to_str(Const *constval, StringInfo buf);
 static List* append_attr_from_var(Var* var, List* attrs);
 static void enrich_trivial_expression(List *expressionItems);
@@ -560,9 +560,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		return false;
 	}
 
-	/* NOTE: if more validation needed, add it before the operators test
-	 * or alternatively change it to use a false flag and return true below */
-	return false;
+	return true;
 }
 
 static bool
