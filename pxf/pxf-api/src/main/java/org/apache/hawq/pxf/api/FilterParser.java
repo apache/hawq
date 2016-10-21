@@ -23,6 +23,7 @@ package org.apache.hawq.pxf.api;
 import org.apache.hawq.pxf.api.io.DataType;
 
 import java.sql.Date;
+import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.Stack;
@@ -53,6 +54,12 @@ public class FilterParser {
     private byte[] filterByteArr;
     private Stack<Object> operandsStack;
     private FilterBuilder filterBuilder;
+    public static final char COL_OP = 'a';
+    public static final char CONST_OP = 'c';
+    public static final char CONST_LEN = 's';
+    public static final char CONST_DATA = 'd';
+    public static final char COMP_OP = 'o';
+    public static final char LOG_OP = 'l';
 
     /** Supported operations by the parser. */
     public enum Operation {
@@ -181,13 +188,13 @@ public class FilterParser {
             char op = (char) filterByteArr[index];
             ++index; // skip op character
             switch (op) {
-                case 'a':
+                case COL_OP:
                     operandsStack.push(new ColumnIndex(safeToInt(parseNumber())));
                     break;
-                case 'c':
+                case CONST_OP:
                     operandsStack.push(new Constant(parseParameter()));
                     break;
-                case 'o':
+                case COMP_OP:
                     opNumber = safeToInt(parseNumber());
                     Operation operation = opNumber < Operation.values().length ? Operation.values()[opNumber] : null;
                     if (operation == null) {
@@ -222,7 +229,7 @@ public class FilterParser {
                     operandsStack.push(result);
                     break;
                 // Handle parsing logical operator (HAWQ-964)
-                case 'l':
+                case LOG_OP:
                     opNumber = safeToInt(parseNumber());
                     LogicalOperation logicalOperation = opNumber < LogicalOperation.values().length ? LogicalOperation.values()[opNumber] : null;
 
@@ -297,7 +304,7 @@ public class FilterParser {
     }
 
     private int parseDataLength() throws Exception {
-        if (((char) filterByteArr[index]) != 's') {
+        if (((char) filterByteArr[index]) != CONST_LEN) {
             throw new FilterStringSyntaxException("data length delimiter 's' expected at " +  index);
         }
 
@@ -343,6 +350,10 @@ public class FilterParser {
                     return Date.valueOf(data);
                 case TIMESTAMP:
                     return Timestamp.valueOf(data);
+                case TIME:
+                    return Time.valueOf(data);
+                case BYTEA:
+                    return data.getBytes();
                 default:
                     throw new FilterStringSyntaxException("DataType " + dataType.toString() + " unsupported");
             }
@@ -371,7 +382,7 @@ public class FilterParser {
             throw new FilterStringSyntaxException("data size larger than filter string starting at " + index);
         }
 
-        if (((char) filterByteArr[index]) != 'd') {
+        if (((char) filterByteArr[index]) != CONST_DATA) {
             throw new FilterStringSyntaxException("data delimiter 'd' expected at " + index);
         }
 
