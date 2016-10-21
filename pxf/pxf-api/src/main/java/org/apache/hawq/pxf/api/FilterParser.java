@@ -34,17 +34,25 @@ import java.util.Stack;
  * interface with two pop-ed operands.
  * <br>
  * A string of filters looks like this:
- * <code>a2c5o1a1c"abc"o2o7</code>
+ * <code>a2c23s1d5o1a1c25s3dabco2o7</code>
  * which means {@code column#2 < 5 AND column#1 > "abc"}
  * <br>
  * It is a RPN serialized representation of a filters tree in GPDB where
  * <ul>
  * <li> a means an attribute (column)</li>
- * <li>c means a constant (either string or numeric)</li>
+ * <li>c means a constant followed by the datatype oid</li>
+ * <li>s means the length of the data in bytes</li>
+ * <li>d denotes the start of the constant data</li>
  * <li>o means operator</li>
  * </ul>
- *
- * Assuming all operators are binary, RPN representation allows it to be read left to right easily.
+ * <br>
+ * For constants all three portions are required in order to parse the data type, the length of the data in bytes
+ * and the data itself
+ * <br>
+ * The parsing operation parses each element of the filter (constants, columns, operations) and adds them to a stack.
+ * When the parser sees an op code 'o' or 'l' it pops off two elements from the stack assigns them as children of the op
+ * and pushses itself onto the stack. After parsing is complete there should only be one element in the stack, the root
+ * node of the filter's tree representation which is returned from this method
  * <br>
  * FilterParser only knows about columns and constants. The rest is up to the {@link FilterBuilder} implementer.
  * FilterParser makes sure column objects are always on the left of the expression (when relevant).

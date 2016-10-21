@@ -189,6 +189,17 @@ public class FilterParserTest {
     }
 
     @Test
+    public void parseNegativeValues() {
+        filter = "c700s3d-90";
+        exception = "filter parsing failed, missing operators?";
+        runParseNegative("const operand with decimal value", filter, exception);
+
+        filter = "c701s8d-10.0001";
+        exception = "filter parsing failed, missing operators?";
+        runParseNegative("const operand with decimal value", filter, exception);
+    }
+
+    @Test
     public void parseNegativeTwoParams() {
 
         filter = "c20s1d1c20s1d1";
