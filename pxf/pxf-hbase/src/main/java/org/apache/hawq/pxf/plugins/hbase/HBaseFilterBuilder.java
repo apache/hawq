@@ -23,6 +23,7 @@ package org.apache.hawq.pxf.plugins.hbase;
 import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
+import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseDoubleComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseFloatComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseIntegerComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseTupleDescription;
@@ -245,6 +246,8 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 }
                 break;
             case FLOAT8:
+                result = new HBaseDoubleComparator((double) data);
+                break;
             case REAL:
                 result = new HBaseFloatComparator((float) data);
                 break;

@@ -343,10 +343,10 @@ public class FilterParser {
                 case INTEGER:
                 case SMALLINT:
                     return Integer.parseInt(data);
-                case FLOAT8:
                 case REAL:
                     return Float.parseFloat(data);
                 case NUMERIC:
+                case FLOAT8:
                     return Double.parseDouble(data);
                 case TEXT:
                 case VARCHAR:
