@@ -25,7 +25,6 @@ import org.apache.hawq.pxf.api.io.DataType;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.util.Arrays;
 import java.util.Stack;
 
 /**
@@ -68,6 +67,7 @@ public class FilterParser {
     public static final char CONST_DATA = 'd';
     public static final char COMP_OP = 'o';
     public static final char LOG_OP = 'l';
+    public static final String DEFAULT_CHARSET = "UTF-8";
 
     /** Supported operations by the parser. */
     public enum Operation {
@@ -334,7 +334,7 @@ public class FilterParser {
     }
 
     private Object convertDataType(byte[] byteData, int start, int end, DataType dataType) throws Exception {
-        String data = new String(byteData, start, end-start);
+        String data = new String(byteData, start, end-start, DEFAULT_CHARSET);
         try {
             switch (dataType) {
                 case BIGINT:
