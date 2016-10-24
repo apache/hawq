@@ -60,7 +60,7 @@ public class HBaseDoubleComparator extends ByteArrayComparable{
             throw new DeserializationException(e);
         }
 
-        return new HBaseDoubleComparator(Bytes.toFloat(proto.getValue().toByteArray()));
+        return new HBaseDoubleComparator(Bytes.toDouble(proto.getValue().toByteArray()));
     }
 }
 
