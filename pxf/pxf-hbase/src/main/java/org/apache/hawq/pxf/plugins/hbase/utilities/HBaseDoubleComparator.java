@@ -30,7 +30,7 @@ public class HBaseDoubleComparator extends ByteArrayComparable{
 
     private Float val;
 
-    public HBaseFloatComparator(float inVal) {
+    public HBaseDoubleComparator(float inVal) {
         super(Bytes.toBytes(inVal));
         this.val = inVal;
     }
