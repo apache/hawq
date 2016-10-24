@@ -124,11 +124,6 @@ public class FilterParserTest {
         exception = "numeric argument expected at "  + index;
         runParseNegative("const operand with missing numeric data length", filter, exception);
 
-        filter = "c20s0";
-        index = 4;
-        exception = "invalid data size 0 at " + index;
-        runParseNegative("const operand with < 1 as data size", filter, exception);
-
         filter = "c20s1500";
         index = 8;
         exception = "data size larger than filter string starting at " + index;
@@ -175,6 +170,13 @@ public class FilterParserTest {
 
         filter = "c20s1d1";
         runParseNegative("filter with only numeric const", filter, "filter parsing failed, missing operators?");
+    }
+
+    @Test
+    public void parseEmptyString() {
+        filter = "c25s0d";
+        exception = "filter parsing failed, missing operators?";
+        runParseNegative("const operand with empty string", filter, exception);
     }
 
     @Test

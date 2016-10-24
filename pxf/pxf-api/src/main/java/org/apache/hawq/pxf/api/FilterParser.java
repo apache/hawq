@@ -193,8 +193,7 @@ public class FilterParser {
         }
 
         while (index < filterByteArr.length) {
-            char op = (char) filterByteArr[index];
-            ++index; // skip op character
+            char op = (char) filterByteArr[index++];
             switch (op) {
                 case COL_OP:
                     operandsStack.push(new ColumnIndex(safeToInt(parseNumber())));
@@ -334,8 +333,8 @@ public class FilterParser {
         }
     }
 
-    private Object convertDataType(byte[] byteData, DataType dataType) throws Exception {
-        String data = new String(byteData);
+    private Object convertDataType(byte[] byteData, int start, int end, DataType dataType) throws Exception {
+        String data = new String(byteData, start, end-start);
         try {
             switch (dataType) {
                 case BIGINT:
@@ -383,9 +382,7 @@ public class FilterParser {
         }
 
         int dataLength = parseDataLength();
-        if (dataLength < 1) {
-            throw new FilterStringSyntaxException("invalid data size " + dataLength + " at " + (index - 1));
-        }
+
         if (index + dataLength > filterByteArr.length) {
             throw new FilterStringSyntaxException("data size larger than filter string starting at " + index);
         }
@@ -396,7 +393,7 @@ public class FilterParser {
 
         index++;
 
-        Object data = convertDataType(Arrays.copyOfRange(filterByteArr, index, index+dataLength), dataType);
+        Object data = convertDataType(filterByteArr, index, index+dataLength, dataType);
         index += dataLength;
         return data;
     }
@@ -427,13 +424,13 @@ public class FilterParser {
 
         // allow sign
         if (filterLength > 0) {
-            int chr = (char) filterByteArr[i];
+            char chr = (char) filterByteArr[i];
             if (chr == '-' || chr == '+') {
                 ++i;
             }
         }
         for (; i < filterLength; ++i) {
-            int chr = (char) filterByteArr[i];
+            char chr = (char) filterByteArr[i];
             if (chr < '0' || chr > '9') {
                 break;
             }
@@ -443,39 +440,9 @@ public class FilterParser {
             throw new FilterStringSyntaxException("numeric argument expected at " + index);
         }
 
-        result = new String(Arrays.copyOfRange(filterByteArr, index, i));
+        result = new String(filterByteArr, index, i - index);
         index = i;
         return result;
-    }
-
-    /*
-     * Parses a string after its beginning '"' until its ending '"'
-     * advances the index accordingly
-     *
-     * Currently the string cannot contain '"' itself
-     * TODO add support for '"' inside the string
-     */
-    private String parseString() throws Exception {
-        StringBuilder result = new StringBuilder();
-        boolean ended = false;
-        int i;
-
-        // starting from index + 1 to skip leading "
-        for (i = index + 1; i < filterByteArr.length; ++i) {
-            char chr = (char) filterByteArr[i];
-            if (chr == '"') {
-                ended = true;
-                break;
-            }
-            result.append(chr);
-        }
-
-        if (!ended) {
-            throw new FilterStringSyntaxException("string started at " + index + " not ended with \"");
-        }
-
-        index = i + 1; // +1 to skip ending "
-        return result.toString();
     }
 
     /*
