@@ -31,7 +31,7 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static List* pxf_make_expression_items_list(List *quals, Node *parent, bool *logicalOpsNum);
+static List* pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum);
 static void pxf_free_filter(PxfFilterDesc* filter);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
@@ -193,7 +193,6 @@ Oid pxf_supported_types[] =
 static void
 pxf_free_expression_items_list(List *expressionItems, bool freeBoolExprNodes)
 {
-	ListCell		*lc 	= NULL;
 	ExpressionItem 	*expressionItem = NULL;
 	int previousLength;
 
@@ -228,7 +227,7 @@ pxf_free_expression_items_list(List *expressionItems, bool freeBoolExprNodes)
  *
  */
 static List *
-pxf_make_expression_items_list(List *quals, Node *parent, bool *logicalOpsNum)
+pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 {
 	ExpressionItem *expressionItem = NULL;
 	List			*result = NIL;
@@ -330,7 +329,27 @@ pxf_free_filter(PxfFilterDesc* filter)
  *
  * Yields the following serialized string:
  *
- * a0c1o2a0c5o1o7a2c"third"o5o7
+ * a0c23s1d1o2a1c23s1d5o1a2c25s5dthirdo5l0l0
+ *
+ * Where:
+ *
+ * a0     - first column of table
+ * c23    - scalar constant with type oid 23(INT4)
+ * s1     - size of constant in bytes
+ * d1     - serialized constant value
+ * o2     - greater than operation
+ * a1     - second column of table
+ * c23    - scalar constant with type oid 23(INT4)
+ * s1     - size of constant in bytes
+ * d5     - serialized constant value
+ * o1     - less than operation
+ * a2     - third column of table
+ * c25    - scalar constant with type oid 25(TEXT)
+ * s5     - size of constant in bytes
+ * dthird - serialized constant value
+ * o5     - equals operation
+ * l0     - AND operator
+ * l0     - AND operator
  *
  */
 static char *
@@ -369,14 +388,18 @@ pxf_serialize_filter_list(List *expressionItems)
 					PxfOperatorCode o = filter->op;
 					if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
 					{
-						appendStringInfo(resbuf, "%c%d%c%s",
+						appendStringInfo(resbuf, "%c%d%c%d%c%lu%c%s",
 												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
-												 PXF_CONST_CODE, (r.conststr)->data);
+												 PXF_CONST_CODE, r.consttype,
+												 PXF_SIZE_BYTES, strlen(r.conststr->data),
+												 PXF_CONST_DATA, (r.conststr)->data);
 					}
 					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
 					{
-						appendStringInfo(resbuf, "%c%s%c%d",
-												 PXF_CONST_CODE, (l.conststr)->data,
+						appendStringInfo(resbuf, "%c%d%c%lu%c%s%c%d",
+												 PXF_CONST_CODE, l.consttype,
+												 PXF_SIZE_BYTES, strlen(l.conststr->data),
+												 PXF_CONST_DATA, (l.conststr)->data,
 												 PXF_ATTR_CODE, r.attnum - 1); /* Java attrs are 0-based */
 					}
 					else
@@ -405,6 +428,10 @@ pxf_serialize_filter_list(List *expressionItems)
 				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_BoolExpr), bool node type %d", tag, boolType);
 				appendStringInfo(resbuf, "%c%d", PXF_LOGICAL_OPERATOR_CODE, boolType);
 				break;
+			}
+			default:
+			{
+				elog(DEBUG5, "Skipping tag: %d", tag);
 			}
 		}
 	}
@@ -468,6 +495,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	{
 		filter->l.opcode = PXF_ATTR_CODE;
 		filter->l.attnum = ((Var *) leftop)->varattno;
+		filter->l.consttype = InvalidOid;
 		if (filter->l.attnum <= InvalidAttrNumber)
 			return false; /* system attr not supported */
 
@@ -476,6 +504,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		filter->r.conststr = makeStringInfo();
 		initStringInfo(filter->r.conststr);
 		const_to_str((Const *)rightop, filter->r.conststr);
+		filter->r.consttype = ((Const *)rightop)->consttype;
 	}
 	else if (IsA(leftop, Const) && IsA(rightop, Var))
 	{
@@ -484,9 +513,11 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		filter->l.conststr = makeStringInfo();
 		initStringInfo(filter->l.conststr);
 		const_to_str((Const *)leftop, filter->l.conststr);
+		filter->l.consttype = ((Const *)leftop)->consttype;
 
 		filter->r.opcode = PXF_ATTR_CODE;
 		filter->r.attnum = ((Var *) rightop)->varattno;
+		filter->r.consttype = InvalidOid;
 		if (filter->r.attnum <= InvalidAttrNumber)
 			return false; /* system attr not supported */
 	}
@@ -632,9 +663,6 @@ const_to_str(Const *constval, StringInfo buf)
 		case FLOAT4OID:
 		case FLOAT8OID:
 		case NUMERICOID:
-			appendStringInfo(buf, "%s", extval);
-			break;
-
 		case TEXTOID:
 		case VARCHAROID:
 		case BPCHAROID:
@@ -642,14 +670,14 @@ const_to_str(Const *constval, StringInfo buf)
 		case BYTEAOID:
 		case DATEOID:
 		case TIMESTAMPOID:
-			appendStringInfo(buf, "\\\"%s\\\"", extval);
+			appendStringInfo(buf, "%s", extval);
 			break;
 
 		case BOOLOID:
 			if (strcmp(extval, "t") == 0)
-				appendStringInfo(buf, "\"true\"");
+				appendStringInfo(buf, "true");
 			else
-				appendStringInfo(buf, "\"false\"");
+				appendStringInfo(buf, "false");
 			break;
 
 		default:
@@ -721,7 +749,7 @@ void enrich_trivial_expression(List *expressionItems) {
 
 		andExpr->boolop = AND_EXPR;
 
-		andExpressionItem->node = andExpr;
+		andExpressionItem->node = (Node *) andExpr;
 		andExpressionItem->parent = NULL;
 		andExpressionItem->processed = false;
 

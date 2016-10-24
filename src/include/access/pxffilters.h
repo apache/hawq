@@ -53,9 +53,11 @@ typedef enum PxfOperatorCode
  * by a code that will describe the operator type in the final serialized
  * string that gets pushed down.
  */
-#define PXF_ATTR_CODE		'a'
-#define PXF_CONST_CODE		'c'
-#define PXF_OPERATOR_CODE	'o'
+#define PXF_ATTR_CODE				'a'
+#define PXF_CONST_CODE				'c'
+#define PXF_SIZE_BYTES				's'
+#define PXF_CONST_DATA				'd'
+#define PXF_OPERATOR_CODE			'o'
 #define PXF_LOGICAL_OPERATOR_CODE	'l'
 
 /*
@@ -68,6 +70,7 @@ typedef struct PxfOperand
 	char		opcode;		/* PXF_ATTR_CODE or PXF_CONST_CODE*/
 	AttrNumber 	attnum;		/* used when opcode is PXF_ATTR_CODE */
 	StringInfo 	conststr;	/* used when opcode is PXF_CONST_CODE */
+	Oid 		consttype; 	/* used when opcode is PXF_CONST_CODE */
 
 } PxfOperand;
 
