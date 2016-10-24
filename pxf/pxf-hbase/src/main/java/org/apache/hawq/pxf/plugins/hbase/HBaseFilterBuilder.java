@@ -23,8 +23,6 @@ package org.apache.hawq.pxf.plugins.hbase;
 import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
-import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseDoubleComparator;
-import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseFloatComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseIntegerComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseTupleDescription;
 import org.apache.hadoop.hbase.HConstants;
@@ -91,15 +89,12 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * @throws Exception if parsing failed
      */
     public Filter getFilterObject(String filterString) throws Exception {
-        if (filterString == null)
-            return null;
-
         // First check for NOT, HBase does not support this
         if (filterNotOpPresent(filterString))
             return null;
 
         FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
+        Object result = parser.parse(filterString);
 
         if (!(result instanceof Filter)) {
             throw new Exception("String " + filterString + " couldn't be resolved to any supported filter");
@@ -234,28 +229,8 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 break;
             case SMALLINT:
             case INTEGER:
-                result = new HBaseIntegerComparator(((Integer) data).longValue());
-                break;
             case BIGINT:
-                if (data instanceof Long) {
-                    result = new HBaseIntegerComparator((Long) data);
-                } else if (data instanceof Integer) {
-                    result = new HBaseIntegerComparator(((Integer) data).longValue());
-                } else {
-                    result = null;
-                }
-                break;
-            case FLOAT8:
-                result = new HBaseDoubleComparator((double) data);
-                break;
-            case REAL:
-                if (data instanceof Double) {
-                    result = new HBaseDoubleComparator((double) data);
-                } else if (data instanceof Float) {
-                    result = new HBaseFloatComparator((float) data);
-                } else {
-                    result = null;
-                }
+                result = new HBaseIntegerComparator((Long) data);
                 break;
             default:
                 throw new Exception("unsupported column type for filtering " + type);

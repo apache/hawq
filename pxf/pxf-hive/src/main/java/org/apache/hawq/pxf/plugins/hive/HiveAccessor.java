@@ -186,8 +186,10 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
             LOG.debug("segmentId: " + inputData.getSegmentId() + " "
                     + inputData.getDataSource() + "--" + filterStr
                     + " returnData: " + returnData);
-            if (filter instanceof LogicalFilter) {
-                printLogicalFilter((LogicalFilter) filter);
+            if (filter instanceof List) {
+                for (Object f : (List<?>) filter) {
+                    printOneBasicFilter(f);
+                }
             } else {
                 printOneBasicFilter(filter);
             }
@@ -345,16 +347,6 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
             return true;
 
         return testForPartitionEquality(partitionFields, Arrays.asList(filter), input);
-    }
-
-    private void printLogicalFilter(LogicalFilter filter) {
-        for (Object f : filter.getFilterList()) {
-            if (f instanceof LogicalFilter) {
-                printLogicalFilter((LogicalFilter) f);
-            } else {
-                printOneBasicFilter(f);
-            }
-        }
     }
 
     private void printOneBasicFilter(Object filter) {

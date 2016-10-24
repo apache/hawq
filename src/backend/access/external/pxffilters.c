@@ -335,27 +335,7 @@ pxf_free_filter(PxfFilterDesc* filter)
  *
  * Yields the following serialized string:
  *
- * a0c23s1d1o2a1c23s1d5o1a2c25s5dthirdo5l0l0
- *
- * Where:
- *
- * a0     - first column of table
- * c23    - scalar constant with type oid 23(INT4)
- * s1     - size of constant in bytes
- * d1     - serialized constant value
- * o2     - greater than operation
- * a1     - second column of table
- * c23    - scalar constant with type oid 23(INT4)
- * s1     - size of constant in bytes
- * d5     - serialized constant value
- * o1     - less than operation
- * a2     - third column of table
- * c25    - scalar constant with type oid 25(TEXT)
- * s5     - size of constant in bytes
- * dthird - serialized constant value
- * o5     - equals operation
- * l0     - AND operator
- * l0     - AND operator
+ * a0c1o2a0c5o1o7a2c"third"o5o7
  *
  */
 static char *
