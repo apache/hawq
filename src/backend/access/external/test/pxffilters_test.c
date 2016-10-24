@@ -25,8 +25,8 @@
 #include "c.h"
 #include "../pxffilters.c"
 
-void run__const_to_str(Const* input, StringInfo result, char* expected);
-void run__const_to_str__negative(Const* input, StringInfo result, char* value);
+void run__scalar_const_to_str(Const* input, StringInfo result, char* expected);
+void run__scalar_const_to_str__negative(Const* input, StringInfo result, char* value);
 
 void
 test__supported_filter_type(void **state)
@@ -74,10 +74,10 @@ test__supported_filter_type(void **state)
 }
 
 /*
- * const_value must be palloc'ed, it will be freed by const_to_str
+ * const_value must be palloc'ed, it will be freed by scalar_const_to_str
  */
 void
-mock__const_to_str(Oid const_type, char* const_value)
+mock__scalar_const_to_str(Oid const_type, char* const_value)
 {
 	expect_value(getTypeOutputInfo, type, const_type);
 	expect_any(getTypeOutputInfo, typOutput);
@@ -103,17 +103,17 @@ verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expe
 	{
 		value = strdup(const_value); /* will be free'd by const_to_str */
 
-		mock__const_to_str(const_type, value);
+		mock__scalar_const_to_str(const_type, value);
 	}
 
 	/* no expected value means it's a negative test */
 	if (expected)
 	{
-		run__const_to_str(input, result, expected);
+		run__scalar_const_to_str(input, result, expected);
 	}
 	else
 	{
-		run__const_to_str__negative(input, result, value);
+		run__scalar_const_to_str__negative(input, result, value);
 		pfree(value); /* value was not freed by const_to_str b/c of failure */
 	}
 
@@ -122,13 +122,13 @@ verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expe
 	pfree(input);
 }
 
-void run__const_to_str(Const* input, StringInfo result, char* expected)
+void run__scalar_const_to_str(Const* input, StringInfo result, char* expected)
 {
 	scalar_const_to_str(input, result);
 	assert_string_equal(result->data, expected);
 }
 
-void run__const_to_str__negative(Const* input, StringInfo result, char* value)
+void run__scalar_const_to_str__negative(Const* input, StringInfo result, char* value)
 {
 
 	StringInfo err_msg = makeStringInfo();
@@ -305,7 +305,7 @@ Const* build_const(Oid oid, char* value)
 	arg_const->consttype = oid;
 	if (value != NULL)
 	{
-		mock__const_to_str(oid, value);
+		mock__scalar_const_to_str(oid, value);
 	}
 
 	return arg_const;
@@ -351,13 +351,13 @@ void run__opexpr_to_pxffilter__positive(Oid dbop, PxfOperatorCode expectedPxfOp)
 			PXF_SCALAR_CONST_CODE, 0, "1984",
 			expectedPxfOp);
 
-	int c = 1, d = 1, n = 1;
+/*	int c = 1, d = 1, n = 1;
 
 	for ( n = 1 ; n <= 10 ; n++ )
 	   for ( c = 1 ; c <= 32767 ; c++ )
 	       for ( d = 1 ; d <= 32767 ; d++ )
 	       {}
-
+*/
 	/* run test */
 	assert_true(opexpr_to_pxffilter(expr, filter));
 
