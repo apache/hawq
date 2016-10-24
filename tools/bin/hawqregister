@@ -536,6 +536,9 @@ class HawqRegister(object):
                 logger.error('-e option is only supported with single file case.')
                 sys.exit(1)
             self.file_format = 'Parquet'
+            self.files_same_path = []
+            self.sizes_same_path = []
+            self.segnos_same_path = []
             self._check_hash_type() # Usage1 only support randomly distributed table
         self.queries = "set allow_system_table_mods='dml';"
         self.queries += "begin transaction;"
