@@ -90,7 +90,7 @@ mock__scalar_const_to_str(Oid const_type, char* const_value)
 }
 
 void
-verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expected)
+verify__scalar_const_to_str(bool is_null, char* const_value, Oid const_type, char* expected)
 {
 	StringInfo result = makeStringInfo();
 	char* value = NULL;
@@ -101,7 +101,7 @@ verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expe
 	/* need to prepare inner functions */
 	if (!is_null)
 	{
-		value = strdup(const_value); /* will be free'd by const_to_str */
+		value = strdup(const_value); /* will be free'd by scalar_const_to_str */
 
 		mock__scalar_const_to_str(const_type, value);
 	}
@@ -114,7 +114,7 @@ verify__const_to_str(bool is_null, char* const_value, Oid const_type, char* expe
 	else
 	{
 		run__scalar_const_to_str__negative(input, result, value);
-		pfree(value); /* value was not freed by const_to_str b/c of failure */
+		pfree(value); /* value was not freed by scalar_const_to_str b/c of failure */
 	}
 
 	pfree(result->data);
@@ -164,44 +164,44 @@ void run__scalar_const_to_str__negative(Const* input, StringInfo result, char* v
 
 
 void
-test__const_to_str__null(void **state)
+test__scalar_const_to_str__null(void **state)
 {
-	verify__const_to_str(true, NULL, 1, "\"NULL\"");
+	verify__scalar_const_to_str(true, NULL, 1, "\"NULL\"");
 }
 
 void
-test__const_to_str__int(void **state)
+test__scalar_const_to_str__int(void **state)
 {
-	verify__const_to_str(false, "1234", INT2OID, "1234");
-	verify__const_to_str(false, "1234", INT4OID, "1234");
-	verify__const_to_str(false, "1234", INT8OID, "1234");
-	verify__const_to_str(false, "1.234", FLOAT4OID, "1.234");
-	verify__const_to_str(false, "1.234", FLOAT8OID, "1.234");
-	verify__const_to_str(false, "1234", NUMERICOID, "1234");
+	verify__scalar_const_to_str(false, "1234", INT2OID, "1234");
+	verify__scalar_const_to_str(false, "1234", INT4OID, "1234");
+	verify__scalar_const_to_str(false, "1234", INT8OID, "1234");
+	verify__scalar_const_to_str(false, "1.234", FLOAT4OID, "1.234");
+	verify__scalar_const_to_str(false, "1.234", FLOAT8OID, "1.234");
+	verify__scalar_const_to_str(false, "1234", NUMERICOID, "1234");
 }
 
 void
-test__const_to_str__text(void **state)
+test__scalar_const_to_str__text(void **state)
 {
-	verify__const_to_str(false, "that", TEXTOID, "that");
-	verify__const_to_str(false, "joke", VARCHAROID, "joke");
-	verify__const_to_str(false, "isn't", BPCHAROID, "isn't");
-	verify__const_to_str(false, "funny", CHAROID, "funny");
-	verify__const_to_str(false, "anymore", BYTEAOID, "anymore");
-	verify__const_to_str(false, "iamdate", DATEOID, "iamdate");
+	verify__scalar_const_to_str(false, "that", TEXTOID, "that");
+	verify__scalar_const_to_str(false, "joke", VARCHAROID, "joke");
+	verify__scalar_const_to_str(false, "isn't", BPCHAROID, "isn't");
+	verify__scalar_const_to_str(false, "funny", CHAROID, "funny");
+	verify__scalar_const_to_str(false, "anymore", BYTEAOID, "anymore");
+	verify__scalar_const_to_str(false, "iamdate", DATEOID, "iamdate");
 }
 
 void
-test__const_to_str__boolean(void **state)
+test__scalar_const_to_str__boolean(void **state)
 {
-	verify__const_to_str(false, "t", BOOLOID, "true");
-	verify__const_to_str(false, "f", BOOLOID, "false");
+	verify__scalar_const_to_str(false, "t", BOOLOID, "true");
+	verify__scalar_const_to_str(false, "f", BOOLOID, "false");
 }
 
 void
-test__const_to_str__NegativeCircle(void **state)
+test__scalar_const_to_str__NegativeCircle(void **state)
 {
-	verify__const_to_str(false, "<3,3,9>", CIRCLEOID, NULL);
+	verify__scalar_const_to_str(false, "<3,3,9>", CIRCLEOID, NULL);
 }
 
 void
@@ -484,8 +484,7 @@ test__opexpr_to_pxffilter__unsupportedOpNot(void **state)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 3);
-	char* const_value = strdup("not"); /* will be free'd by const_to_str */
-	Const *arg_const = build_const(INT2OID, const_value);
+	Const *arg_const = build_const(INT2OID, NULL);
 	OpExpr *expr = build_op_expr(arg_const, arg_var, 1877 /* int2not */);
 
 	/* run test */
@@ -553,11 +552,11 @@ main(int argc, char* argv[])
 
 	const UnitTest tests[] = {
 			unit_test(test__supported_filter_type),
-			unit_test(test__const_to_str__null),
-			unit_test(test__const_to_str__int),
-			unit_test(test__const_to_str__text),
-			unit_test(test__const_to_str__boolean),
-			unit_test(test__const_to_str__NegativeCircle),
+			unit_test(test__scalar_const_to_str__null),
+			unit_test(test__scalar_const_to_str__int),
+			unit_test(test__scalar_const_to_str__text),
+			unit_test(test__scalar_const_to_str__boolean),
+			unit_test(test__scalar_const_to_str__NegativeCircle),
 			unit_test(test__opexpr_to_pxffilter__null),
 			unit_test(test__opexpr_to_pxffilter__unary_expr),
 			unit_test(test__opexpr_to_pxffilter__intGT),
