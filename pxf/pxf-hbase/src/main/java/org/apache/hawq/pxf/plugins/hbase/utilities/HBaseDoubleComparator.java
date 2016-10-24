@@ -28,9 +28,9 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 public class HBaseDoubleComparator extends ByteArrayComparable{
 
-    private Float val;
+    private Double val;
 
-    public HBaseDoubleComparator(float inVal) {
+    public HBaseDoubleComparator(Double inVal) {
         super(Bytes.toBytes(inVal));
         this.val = inVal;
     }
