@@ -32,7 +32,10 @@ import java.util.Stack;
  * Once an operation is read, the evaluate function is called for the {@link FilterBuilder}
  * interface with two pop-ed operands.
  * <br>
- * A string of filters looks like this:
+ * The filter string is of the pattern:
+ * <attcode><attnum><constcode><constval><constsizecode><constsize><constdata><constvalue><opercode><opernum>
+ * <br>
+ * A sample string of filters looks like this:
  * <code>a2c23s1d5o1a1c25s3dabco2o7</code>
  * which means {@code column#2 < 5 AND column#1 > "abc"}
  * <br>

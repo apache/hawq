@@ -65,7 +65,7 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
             return null;
 
         FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString.getBytes());
+        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
 
         if (!(result instanceof LogicalFilter) && !(result instanceof BasicFilter)
                 && !(result instanceof List)) {

@@ -99,7 +99,7 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
             return null;
 
         FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString.getBytes());
+        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
 
         if (!(result instanceof Filter)) {
             throw new Exception("String " + filterString + " couldn't be resolved to any supported filter");
@@ -249,7 +249,13 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 result = new HBaseDoubleComparator((double) data);
                 break;
             case REAL:
-                result = new HBaseFloatComparator((float) data);
+                if (data instanceof Double) {
+                    result = new HBaseDoubleComparator((double) data);
+                } else if (data instanceof Float) {
+                    result = new HBaseFloatComparator((float) data);
+                } else {
+                    result = null;
+                }
                 break;
             default:
                 throw new Exception("unsupported column type for filtering " + type);
