@@ -45,6 +45,10 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
                 std::unordered_map<std::string, std::string> strs_src_dst;
                 strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
                 strs_src_dst["@TABLE_OID@"]= getTableOid(t);
+                string hdfs_prefix;
+                hawq::test::HdfsConfig hc;
+                hc.getNamenodeHost(hdfs_prefix);
+                strs_src_dst["@PORT@"]= hdfs_prefix;
                 frep.replace(t_yml_tpl, t_yml, strs_src_dst);
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c %s testhawqregister_testusage2case2expected.%s", HAWQ_DB, t_yml.c_str(), nt.c_str())));
                 util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 200);
@@ -57,6 +61,7 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
                 strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
                 strs_src_dst["@TABLE_OID_OLD@"]= getTableOid(nt);
                 strs_src_dst["@TABLE_OID_NEW@"]= getTableOid(t);
+                strs_src_dst["@PORT@"]= hdfs_prefix;
                 frep.replace(t_yml_tpl_new, t_yml_new, strs_src_dst);
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register %s -d %s -c %s testhawqregister_testusage2case2expected.%s", opt.c_str(), HAWQ_DB, t_yml_new.c_str(), nt.c_str())));
                 util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 150);
@@ -73,5 +78,291 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
             }
         }
     }
+}
+
+void TestHawqRegister::runYamlCaseForceMode(std::string casename, std::string ymlname, int isexpectederror = 1, int rows = 50, int checknum = 200) {
+    SQLUtility util;
+    string test_root(util.getTestRootPath());
+    string t_yml_tpl(hawq::test::stringFormat("%s/ManagementTool/%s_tpl.yml", test_root.c_str(), ymlname.c_str()));
+    string t_yml(hawq::test::stringFormat("%s/ManagementTool/%s.yml", test_root.c_str(), ymlname.c_str()));
+    util.execute("drop table if exists t;");
+    util.execute("drop table if exists nt;");
+
+    util.execute("create table nt(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
+    util.execute("insert into nt select generate_series(1, 100);");
+    util.execute("insert into nt select generate_series(1, 100);");
+    util.query("select * from nt;", 200);
+
+    // hawq register --force/-F -d hawq_feature_test -c t_new_#.yml nt_usage2_case2_#
+    util.execute("create table t(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
+    util.execute(hawq::test::stringFormat("insert into t select generate_series(1, %s);", std::to_string(rows).c_str()));
+    util.query("select * from t;", rows);
+    hawq::test::FileReplace frep;
+    std::unordered_map<std::string, std::string> strs_src_dst;
+    strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    string hdfs_prefix;
+    hawq::test::HdfsConfig hc;
+    hc.getNamenodeHost(hdfs_prefix);
+    strs_src_dst["@PORT@"]= hdfs_prefix;
+    frep.replace(t_yml_tpl, t_yml, strs_src_dst);
+    //printf("%s\n", hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str()).c_str());
+    //sleep(60);
+    EXPECT_EQ(isexpectederror, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str())));
+    util.query("select * from nt;", checknum);
+
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
+    util.execute("drop table t;");
+    util.execute("drop table nt;");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2Hash2Random) {
+    SQLUtility util;
+    string test_root(util.getTestRootPath());
+    string t_yml_tpl(hawq::test::stringFormat("%s/ManagementTool/%s_tpl.yml", test_root.c_str(), "usage2case2/hash_to_random"));
+    string t_yml(hawq::test::stringFormat("%s/ManagementTool/%s.yml", test_root.c_str(), "usage2case2/hash_to_random"));
+    util.execute("drop table if exists t;");
+    util.execute("drop table if exists nt;");
+
+    util.execute("create table nt(i int) with (appendonly=true, orientation=parquet) distributed randomly;");
+    util.execute("insert into nt select generate_series(1, 100);");
+    util.execute("insert into nt select generate_series(1, 100);");
+    util.query("select * from nt;", 200);
+
+    // hawq register --force/-F -d hawq_feature_test -c t_new_#.yml nt_usage2_case2_#
+    util.execute("create table t(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
+    util.execute(hawq::test::stringFormat("insert into t select generate_series(1, %s);", std::to_string(50).c_str()));
+    util.query("select * from t;", 50);
+    hawq::test::FileReplace frep;
+    std::unordered_map<std::string, std::string> strs_src_dst;
+    strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    string hdfs_prefix;
+    hawq::test::HdfsConfig hc;
+    hc.getNamenodeHost(hdfs_prefix);
+    strs_src_dst["@PORT@"]= hdfs_prefix;
+    frep.replace(t_yml_tpl, t_yml, strs_src_dst);
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), "testusage2case2hash2random")));
+    util.query("select * from nt;", 150);
+
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
+    util.execute("drop table t;");
+    util.execute("drop table nt;");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2Random2Hash) {
+    SQLUtility util;
+    string test_root(util.getTestRootPath());
+    string t_yml_tpl(hawq::test::stringFormat("%s/ManagementTool/%s_tpl.yml", test_root.c_str(), "usage2case2/random_to_hash"));
+    string t_yml(hawq::test::stringFormat("%s/ManagementTool/%s.yml", test_root.c_str(), "usage2case2/random_to_hash"));
+    util.execute("drop table if exists t;");
+    util.execute("drop table if exists nt;");
+
+    util.execute("create table nt(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
+    util.execute("insert into nt select generate_series(1, 100);");
+    util.execute("insert into nt select generate_series(1, 100);");
+    util.query("select * from nt;", 200);
+
+    // hawq register --force/-F -d hawq_feature_test -c t_new_#.yml nt_usage2_case2_#
+    util.execute("create table t(i int) with (appendonly=true, orientation=parquet) distributed randomly;");
+    util.execute(hawq::test::stringFormat("insert into t select generate_series(1, %s);", std::to_string(50).c_str()));
+    util.query("select * from t;", 50);
+    hawq::test::FileReplace frep;
+    std::unordered_map<std::string, std::string> strs_src_dst;
+    strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    string hdfs_prefix;
+    hawq::test::HdfsConfig hc;
+    hc.getNamenodeHost(hdfs_prefix);
+    strs_src_dst["@PORT@"]= hdfs_prefix;
+    frep.replace(t_yml_tpl, t_yml, strs_src_dst);
+    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), "testusage2case2random2hash")));
+    util.query("select * from nt;", 200);
+
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
+    util.execute("drop table t;");
+    util.execute("drop table nt;");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2TableNotExist) {
+    SQLUtility util;
+    string test_root(util.getTestRootPath());
+    string t_yml_tpl(hawq::test::stringFormat("%s/ManagementTool/usage2case2/table_not_exists_tpl.yml", test_root.c_str()));
+    string t_yml(hawq::test::stringFormat("%s/ManagementTool/usage2case2/talbe_not_exists.yml", test_root.c_str()));
+    util.execute("drop table if exists t;");
+    util.execute("drop table if exists nt;");
+
+    // hawq register --force/-F -d hawq_feature_test -c t_new_#.yml nt_usage2_case2_#
+    util.execute("create table t(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
+    util.execute(hawq::test::stringFormat("insert into t select generate_series(1, %s);", std::to_string(50).c_str()));
+    util.query("select * from t;", 50);
+    hawq::test::FileReplace frep;
+    std::unordered_map<std::string, std::string> strs_src_dst;
+    strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    string hdfs_prefix;
+    hawq::test::HdfsConfig hc;
+    hc.getNamenodeHost(hdfs_prefix);
+    strs_src_dst["@PORT@"]= hdfs_prefix;
+    frep.replace(t_yml_tpl, t_yml, strs_src_dst);
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_testusage2case2tablenotexist.nt", HAWQ_DB, t_yml.c_str())));
+    util.query("select * from nt;", 50);
+
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
+    util.execute("drop table t;");
+    util.execute("drop table nt;");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2TableExistNoData) {
+    SQLUtility util;
+    string test_root(util.getTestRootPath());
+    string t_yml_tpl(hawq::test::stringFormat("%s/ManagementTool/usage2case2/table_exist_no_data_tpl.yml", test_root.c_str()));
+    string t_yml(hawq::test::stringFormat("%s/ManagementTool/usage2case2/table_exist_no_data.yml", test_root.c_str()));
+    util.execute("drop table if exists t;");
+    util.execute("drop table if exists nt;");
+
+    // hawq register --force/-F -d hawq_feature_test -c t_new_#.yml nt_usage2_case2_#
+    util.execute("create table t(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
+    util.execute(hawq::test::stringFormat("insert into t select generate_series(1, %s);", std::to_string(50).c_str()));
+    util.query("select * from t;", 50);
+    hawq::test::FileReplace frep;
+    std::unordered_map<std::string, std::string> strs_src_dst;
+    strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    util.execute("create table nt(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
+    string hdfs_prefix;
+    hawq::test::HdfsConfig hc;
+    hc.getNamenodeHost(hdfs_prefix);
+    strs_src_dst["@PORT@"]= hdfs_prefix;
+    frep.replace(t_yml_tpl, t_yml, strs_src_dst);
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_testusage2case2tableexistnodata.nt", HAWQ_DB, t_yml.c_str())));
+    util.query("select * from nt;", 50);
+
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
+    util.execute("drop table t;");
+    util.execute("drop table nt;");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2NormalYamlConfig) {
+    runYamlCaseForceMode("testusage2case2normalyamlconfig", "usage2case2/normal_yaml_config", 0, 50, 150);
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2NormalYamlNoUpdateConfig) {
+    runYamlCaseForceMode("testusage2case2normalyamlnoupdateconfig", "usage2case2/normal_yaml_no_update_config", 0, 50, 100);
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2FileNotIncludedInYamlConfig) {
+    runYamlCaseForceMode("testusage2case2filenotincludedinyamlconfig", "usage2case2/file_not_included_in_yaml_config");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2FileInYamlNotExist) {
+    runYamlCaseForceMode("testusage2case2fileinyamlnotexist", "usage2case2/file_in_yaml_not_exist");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2ErrorColumnNum) {
+    runYamlCaseForceMode("testusage2case2errorcolumnnum", "usage2case2/error_columnnum");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2HDFSFilePathContainErrorSymbol) {
+    runYamlCaseForceMode("testusage2case2hdfsfilepathcontainerrorsymbol", "usage2case2/contain_error_symbol");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2ZeroEof) {
+    runYamlCaseForceMode("testusage2case2zeroeof", "usage2case2/zero_eof", 0, 50, 143);
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2LargerEof) {
+    runYamlCaseForceMode("testusage2case2largereof", "usage2case2/larger_eof");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2FloatEof) {
+    runYamlCaseForceMode("testusage2case2floateof", "usage2case2/float_eof");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2MinusEof) {
+    runYamlCaseForceMode("testusage2case2minuseof", "usage2case2/minus_eof");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2WrongDistributionPolicy) {
+    runYamlCaseForceMode("testusage2case2wrongdistributionpolicy", "usage2case2/wrong_distributed_policy");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2Bucket0) {
+    runYamlCaseForceMode("testusage2case2bucket0", "usage2case2/bucket0");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2ErrorEncoding) {
+    runYamlCaseForceMode("testusage2case2errorencoding", "usage2case2/error_encoding");
+}
+
+TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorBlockSize) {
+    SQLUtility util;
+    string test_root(util.getTestRootPath());
+    string t_yml_tpl(hawq::test::stringFormat("%s/ManagementTool/%s_tpl.yml", test_root.c_str(), "usage2case2/error_blocksize"));
+    string t_yml(hawq::test::stringFormat("%s/ManagementTool/%s.yml", test_root.c_str(), "usage2case2/error_blocksize"));
+    util.execute("drop table if exists t;");
+    util.execute("drop table if exists nt;");
+
+    util.execute("create table nt(i int) with (appendonly=true, orientation=row) distributed by (i);");
+    util.execute("insert into nt select generate_series(1, 100);");
+    util.execute("insert into nt select generate_series(1, 100);");
+    util.query("select * from nt;", 200);
+
+    // hawq register --force/-F -d hawq_feature_test -c t_new_#.yml nt_usage2_case2_#
+    util.execute("create table t(i int) with (appendonly=true, orientation=row) distributed by (i);");
+    util.execute(hawq::test::stringFormat("insert into t select generate_series(1, %s);", std::to_string(50).c_str()));
+    util.query("select * from t;", 50);
+    hawq::test::FileReplace frep;
+    std::unordered_map<std::string, std::string> strs_src_dst;
+    strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    string hdfs_prefix;
+    hawq::test::HdfsConfig hc;
+    hc.getNamenodeHost(hdfs_prefix);
+    strs_src_dst["@PORT@"]= hdfs_prefix;
+    frep.replace(t_yml_tpl, t_yml, strs_src_dst);
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), "testusage2case2errorblocksize")));
+    util.query("select * from nt;", 150);
+
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
+    util.execute("drop table t;");
+    util.execute("drop table nt;");
+}
+
+TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorCompressType) {
+    runYamlCaseForceMode("testusage2case2errorcompresstype", "usage2case2/error_compresstype");
+}
+
+TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorCompressLevel) {
+    runYamlCaseForceMode("testusage2case2errorcompresslevel", "usage2case2/error_compresslevel");
+}
+
+TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorChecksum) {
+    runYamlCaseForceMode("testusage2case2errorchecksum", "usage2case2/error_checksum");
+}
+
+TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorPageSize) {
+    runYamlCaseForceMode("testusage2case2errorpagesize", "usage2case2/error_pagesize");
+}
+
+TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorRowgroupSize) {
+    runYamlCaseForceMode("testusage2case2errorrowgroupsize", "usage2case2/error_rowgroupsize");
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2IncludeDirectory) {
+    SQLUtility util;
+    string test_root(util.getTestRootPath());
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -put -f %s/ManagementTool/usage2case2 %s/", test_root.c_str(), getHdfsLocation().c_str())));
+    string t_yml(hawq::test::stringFormat("%s/ManagementTool/usage2case2/includedirectory.yml", test_root.c_str()));
+    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_testusage2case2includedirectory.nt", HAWQ_DB, t_yml.c_str())));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -rm -r %s/usage2case2", getHdfsLocation().c_str())));
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2ErrorFormat) {
+    runYamlCaseForceMode("testusage2case2errorformat", "usage2case2/error_format");
 }
 

@@ -351,13 +351,6 @@ void run__opexpr_to_pxffilter__positive(Oid dbop, PxfOperatorCode expectedPxfOp)
 			PXF_SCALAR_CONST_CODE, 0, "1984",
 			expectedPxfOp);
 
-/*	int c = 1, d = 1, n = 1;
-
-	for ( n = 1 ; n <= 10 ; n++ )
-	   for ( c = 1 ; c <= 32767 ; c++ )
-	       for ( d = 1 ; d <= 32767 ; d++ )
-	       {}
-*/
 	/* run test */
 	assert_true(opexpr_to_pxffilter(expr, filter));
 
@@ -524,6 +517,7 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	ExpressionItem* expressionItem3 = build_expression_item(3, TEXTOID, "Winston", TEXTOID, TextEqualOperator);
 	ExpressionItem* expressionItem4 = build_expression_item(4, TEXTOID, "Eric-%", TEXTOID, 1209);
 	ExpressionItem* expressionItem5 = build_expression_item(5, TEXTOID, "\"Ugly\" string with quotes", TEXTOID, TextEqualOperator);
+	ExpressionItem* expressionItem6 = build_expression_item(6, TEXTOID, "", TEXTOID, TextEqualOperator);
 
 
 	expressionItems = lappend(expressionItems, expressionItem1);
@@ -531,9 +525,11 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	expressionItems = lappend(expressionItems, expressionItem3);
 	expressionItems = lappend(expressionItems, expressionItem4);
 	expressionItems = lappend(expressionItems, expressionItem5);
+	expressionItems = lappend(expressionItems, expressionItem6);
 
 	result = pxf_serialize_filter_list(expressionItems);
-	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7a4c25s25d\"Ugly\" string with quoteso5");
+	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7a4c25s25d\"Ugly\" string with quoteso5a5c25s0do5");
+
 	pfree(result);
 
 	int trivialExpressionItems = expressionItems->length;
