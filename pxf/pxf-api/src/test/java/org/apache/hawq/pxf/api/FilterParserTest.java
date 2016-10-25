@@ -263,6 +263,15 @@ public class FilterParserTest {
         filter = "a1c20s1d1o7";
         op = Operation.HDOP_LIKE;
         runParseOneOperation("this filter was built from HDOP_LIKE", filter, op);
+
+        filter = "a1o8";
+        op = Operation.HDOP_IS_NULL;
+        runParseOneUnaryOperation("this filter was build from HDOP_IS_NULL", filter, op);
+
+        filter = "a1o9";
+        op = Operation.HDOP_IS_NOT_NULL;
+        runParseOneUnaryOperation("this filter was build from HDOP_IS_NULL", filter, op);
+
     }
 
     @Test
@@ -450,6 +459,14 @@ public class FilterParserTest {
         when(filterBuilder.build(eq(op),
                 any(),
                 any())).thenReturn(description);
+
+        Object result = filterParser.parse(filter.getBytes());
+
+        assertEquals(description, result);
+    }
+
+    private void runParseOneUnaryOperation(String description, String filter, Operation op) throws Exception {
+        when(filterBuilder.build(eq(op), any())).thenReturn(description);
 
         Object result = filterParser.parse(filter.getBytes());
 
