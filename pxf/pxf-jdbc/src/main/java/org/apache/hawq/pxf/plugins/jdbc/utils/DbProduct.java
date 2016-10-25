@@ -36,7 +36,16 @@ public abstract class DbProduct {
             return new MysqlProduct();
         else if (db_product.toUpperCase().contains("ORACLE"))
             return new OracleProduct();
+        else if (db_product.toUpperCase().contains("POSTGRES"))
+            return new PostgresProduct();
         else
-            throw new UnsupportedTypeException("Unkwon Database Product: " + db_product );
+            return new CommonProduct();
+            //throw new UnsupportedTypeException("Unkwon Database Product: " + db_product );
+    }
+}
+class CommonProduct extends DbProduct{
+    @Override
+    public String wrapDate(Object date_val) {
+        return "date'" + date_val + "'";
     }
 }
