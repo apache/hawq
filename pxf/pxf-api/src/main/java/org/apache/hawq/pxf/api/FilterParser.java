@@ -33,7 +33,7 @@ import java.util.Stack;
  * interface with two pop-ed operands.
  * <br>
  * The filter string is of the pattern:
- * <attcode><attnum><constcode><constval><constsizecode><constsize><constdata><constvalue><opercode><opernum>
+ * [attcode][attnum][constcode][constval][constsizecode][constsize][constdata][constvalue][opercode][opernum]
  * <br>
  * A sample string of filters looks like this:
  * <code>a2c23s1d5o1a1c25s3dabco2o7</code>
@@ -81,7 +81,9 @@ public class FilterParser {
         HDOP_GE,
         HDOP_EQ,
         HDOP_NE,
-        HDOP_LIKE
+        HDOP_LIKE,
+        HDOP_IS_NULL,
+        HDOP_IS_NOT_NULL
     }
 
     /**
@@ -101,7 +103,7 @@ public class FilterParser {
      */
     public interface FilterBuilder {
         /**
-         * Builds the filter for an operation
+         * Builds the filter for an operation with 2 operands
          *
          * @param operation the parsed operation to perform
          * @param left the left operand
@@ -110,6 +112,16 @@ public class FilterParser {
          * @throws Exception if building the filter failed
          */
         public Object build(Operation operation, Object left, Object right) throws Exception;
+
+        /**
+         * Builds the filter for an operation with one operand
+         *
+         * @param operation the parsed operation to perform
+         * @param operand the single operand
+         * @return the built filter
+         * @throws Exception if building the filter failed
+         */
+        public Object build(Operation operation, Object operand) throws Exception;
 
         /**
          * Builds the filter for a logical operation and two operands
@@ -217,24 +229,29 @@ public class FilterParser {
                     }
                     Object rightOperand = operandsStack.pop();
 
-                    // Pop left operand
-                    if (operandsStack.empty()) {
-                        throw new FilterStringSyntaxException("missing operands for op " + operation + " at " + index);
+                    // all operations other than null checks require 2 operands
+                    Object result;
+                    if (operation == Operation.HDOP_IS_NULL || operation == Operation.HDOP_IS_NOT_NULL) {
+                        result = filterBuilder.build(operation, rightOperand);
+                    } else {
+                        // Pop left operand
+                        if (operandsStack.empty()) {
+                            throw new FilterStringSyntaxException("missing operands for op " + operation + " at " + index);
+                        }
+                        Object leftOperand = operandsStack.pop();
+
+                        if (leftOperand instanceof BasicFilter || rightOperand instanceof BasicFilter) {
+                            throw new FilterStringSyntaxException("missing logical operator before op " + operation + " at " + index);
+                        }
+
+                        // Normalize order, evaluate
+                        // Column should be on the left
+                        result = (leftOperand instanceof Constant)
+                                // column on the right, reverse expression
+                                ? filterBuilder.build(reverseOp(operation), rightOperand, leftOperand)
+                                // no swap, column on the left
+                                : filterBuilder.build(operation, leftOperand, rightOperand);
                     }
-                    Object leftOperand = operandsStack.pop();
-
-                    if (leftOperand instanceof BasicFilter || rightOperand instanceof BasicFilter) {
-                        throw new FilterStringSyntaxException("missing logical operator before op " + operation + " at " + index);
-                    }
-
-                    // Normalize order, evaluate
-                    // Column should be on the left
-                    Object result = (leftOperand instanceof Constant)
-                            // column on the right, reverse expression
-                            ? filterBuilder.build(reverseOp(operation), rightOperand, leftOperand)
-                            // no swap, column on the left
-                            : filterBuilder.build(operation, leftOperand, rightOperand);
-
                     // Store result on stack
                     operandsStack.push(result);
                     break;
@@ -252,7 +269,7 @@ public class FilterParser {
                         result = filterBuilder.build(logicalOperation, exp);
                     } else if (logicalOperation == LogicalOperation.HDOP_AND || logicalOperation == LogicalOperation.HDOP_OR){
                         rightOperand  = operandsStack.pop();
-                        leftOperand = operandsStack.pop();
+                        Object leftOperand = operandsStack.pop();
 
                         result = filterBuilder.build(logicalOperation, leftOperand, rightOperand);
                     } else {

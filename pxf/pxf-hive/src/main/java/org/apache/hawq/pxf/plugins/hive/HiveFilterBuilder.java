@@ -96,6 +96,16 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
                 (FilterParser.Constant) rightOperand);
     }
 
+    @Override
+    public Object build(FilterParser.Operation operation, Object operand) throws Exception {
+        if (operation == FilterParser.Operation.HDOP_IS_NULL || operation == FilterParser.Operation.HDOP_IS_NOT_NULL) {
+            // use null for the constant value of null comparison
+            return handleSimpleOperations(operation, (FilterParser.ColumnIndex) operand, null);
+        } else {
+            throw new Exception("Unsupported unary operation " + operation);
+        }
+    }
+
     /*
      * Handles simple column-operator-constant expressions Creates a special
      * filter in the case the column is the row key column

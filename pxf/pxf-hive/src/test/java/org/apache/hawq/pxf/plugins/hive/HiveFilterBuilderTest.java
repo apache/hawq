@@ -71,4 +71,22 @@ public class HiveFilterBuilderTest {
         assertEquals(HDOP_LT, ((BasicFilter) filter.getFilterList().get(1)).getOperation());
     }
 
+    @Test
+    public void parseISNULLExpression() throws Exception {
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+        BasicFilter filter = (BasicFilter) builder.getFilterObject("a1o8");
+        assertEquals(Operation.HDOP_IS_NULL, filter.getOperation());
+        assertEquals(1, filter.getColumn().index());
+        assertNull(filter.getConstant());
+    }
+
+    @Test
+    public void parseISNOTNULLExpression() throws Exception {
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+        BasicFilter filter = (BasicFilter) builder.getFilterObject("a1o9");
+        assertEquals(Operation.HDOP_IS_NOT_NULL, filter.getOperation());
+        assertEquals(1, filter.getColumn().index());
+        assertNull(filter.getConstant());
+    }
+
 }

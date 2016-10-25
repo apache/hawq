@@ -157,6 +157,11 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     @Override
+    public Object build(FilterParser.Operation operation, Object operand) throws Exception {
+        return handleSimpleOperations(operation, (FilterParser.ColumnIndex) operand);
+    }
+
+    @Override
     public Object build(FilterParser.LogicalOperation opId, Object leftOperand, Object rightOperand) {
         return handleCompoundOperations(opId, (Filter) leftOperand, (Filter) rightOperand);
     }
@@ -183,6 +188,29 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         logicalOperatorsMap = new EnumMap<>(FilterParser.LogicalOperation.class);
         logicalOperatorsMap.put(FilterParser.LogicalOperation.HDOP_AND, FilterList.Operator.MUST_PASS_ALL);
         logicalOperatorsMap.put(FilterParser.LogicalOperation.HDOP_OR, FilterList.Operator.MUST_PASS_ONE);
+    }
+
+    private Object handleSimpleOperations(FilterParser.Operation opId,
+                                          FilterParser.ColumnIndex column) throws Exception {
+        HBaseColumnDescriptor hbaseColumn = tupleDescription.getColumn(column.index());
+        CompareFilter.CompareOp compareOperation;
+        ByteArrayComparable comparator;
+        switch (opId) {
+            case HDOP_IS_NULL:
+                compareOperation = CompareFilter.CompareOp.EQUAL;
+                comparator = new NullComparator();
+                break;
+            case HDOP_IS_NOT_NULL:
+                compareOperation = CompareFilter.CompareOp.NOT_EQUAL;
+                comparator = new NullComparator();
+                break;
+            default:
+                throw new Exception("unsupported unary operation for filtering " + opId);
+        }
+        return new SingleColumnValueFilter(hbaseColumn.columnFamilyBytes(),
+                hbaseColumn.qualifierBytes(),
+                compareOperation,
+                comparator);
     }
 
     /**
