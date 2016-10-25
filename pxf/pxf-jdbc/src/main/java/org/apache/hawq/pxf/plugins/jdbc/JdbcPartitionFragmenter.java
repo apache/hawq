@@ -41,7 +41,7 @@ import java.util.*;
  * <h4>The parameter Patterns </h4>
  * There are three  parameters,  the format is as follows:<p>
  * <pre>
- * <code>PARTITION_BY=column_name:column_type&RANGE=start_value[:end_value]&INTERVAL=interval_num:interval_unit'</code>
+ * <code>PARTITION_BY=column_name:column_type&RANGE=start_value[:end_value]&INTERVAL=interval_num[:interval_unit]</code>
  * </pre>
  * The <code>PARTITION_BY</code> parameter can be split by colon(':'),the <code>column_type</code> current supported : <code>date,int,enum</code> .
  * The Date format is 'yyyy-MM-dd'. <p>

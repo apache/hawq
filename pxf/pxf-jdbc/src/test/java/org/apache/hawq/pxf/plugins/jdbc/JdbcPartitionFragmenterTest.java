@@ -71,6 +71,19 @@ public class JdbcPartitionFragmenterTest {
     }
 
     @Test
+    public void testPartionByDate2() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+        when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
+        when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2011-01-01");
+        when(inputData.getUserProperty("INTERVAL")).thenReturn("1:year");
+
+        JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+        List<Fragment> fragments = fragment.getFragments();
+        assertEquals(fragments.size(), 3);
+    }
+
+    @Test
     public void testPartionByInt() throws Exception {
         prepareConstruction();
         when(inputData.getDataSource()).thenReturn("sales");

@@ -20,11 +20,11 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  */
 
 /**
- * Implements methods for Oracle Database.
+ * Implements methods for Postgres Database.
  */
 public class PostgresProduct extends DbProduct {
     @Override
     public String wrapDate(Object date_val) {
-        return "to_date('" + date_val + "','yyyy-mm-dd')";
+        return "date'" + date_val + "'";
     }
 }
