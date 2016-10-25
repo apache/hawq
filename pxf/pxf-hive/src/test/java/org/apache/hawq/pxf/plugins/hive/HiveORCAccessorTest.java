@@ -22,9 +22,7 @@ package org.apache.hawq.pxf.plugins.hive;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
-import org.apache.hadoop.mapred.InputFormat;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.RecordReader;
+import org.apache.hadoop.mapred.*;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
@@ -64,15 +62,15 @@ public class HiveORCAccessorTest {
         PowerMockito.whenNew(JobConf.class).withAnyArguments().thenReturn(jobConf);
 
         PowerMockito.mockStatic(HiveInputFormatFragmenter.class);
-        PowerMockito.when(HiveInputFormatFragmenter.parseToks(any(), any())).thenReturn(new String[]{"", HiveDataFragmenter.HIVE_NO_PART_TBL, "true"});
+        PowerMockito.when(HiveInputFormatFragmenter.parseToks(any(InputData.class), any(String[].class))).thenReturn(new String[]{"", HiveDataFragmenter.HIVE_NO_PART_TBL, "true"});
         PowerMockito.mockStatic(HdfsUtilities.class);
 
         PowerMockito.mockStatic(HiveDataFragmenter.class);
-        PowerMockito.when(HiveDataFragmenter.makeInputFormat(any(), any())).thenReturn(inputFormat);
+        PowerMockito.when(HiveDataFragmenter.makeInputFormat(any(String.class), any(JobConf.class))).thenReturn(inputFormat);
 
         PowerMockito.whenNew(OrcInputFormat.class).withNoArguments().thenReturn(orcInputFormat);
         RecordReader recordReader = mock(RecordReader.class);
-        PowerMockito.when(orcInputFormat.getRecordReader(any(), any(), any())).thenReturn(recordReader);
+        PowerMockito.when(orcInputFormat.getRecordReader(any(InputSplit.class), any(JobConf.class), any(Reporter.class))).thenReturn(recordReader);
 
         accessor = new HiveORCAccessor(inputData);
     }
