@@ -372,7 +372,7 @@ pxf_serialize_filter_list(List *expressionItems)
 					PxfOperand l = filter->l;
 					PxfOperand r = filter->r;
 					PxfOperatorCode o = filter->op;
-					if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
+					if (pxfoperand_is_attr(l) && pxfoperand_is_scalar_const(r))
 					{
 						appendStringInfo(resbuf, "%c%d%c%d%c%lu%c%s",
 												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
@@ -380,7 +380,7 @@ pxf_serialize_filter_list(List *expressionItems)
 												 PXF_SIZE_BYTES, strlen(r.conststr->data),
 												 PXF_CONST_DATA, (r.conststr)->data);
 					}
-					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
+					else if (pxfoperand_is_scalar_const(l) && pxfoperand_is_attr(r))
 					{
 						appendStringInfo(resbuf, "%c%d%c%lu%c%s%c%d",
 												 PXF_SCALAR_CONST_CODE, l.consttype,
@@ -417,14 +417,14 @@ pxf_serialize_filter_list(List *expressionItems)
 					PxfOperand l = filter->l;
 					PxfOperand r = filter->r;
 					PxfOperatorCode o = filter->op;
-					if (pxfoperand_is_attr(l) && pxfoperand_is_const(r))
+					if (pxfoperand_is_attr(l) && pxfoperand_is_list_const(r))
 					{
 						appendStringInfo(resbuf, "%c%d%c%d%s",
 												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
 												 PXF_LIST_CONST_CODE, r.consttype,
 												 r.conststr->data);
 					}
-					else if (pxfoperand_is_const(l) && pxfoperand_is_attr(r))
+					else if (pxfoperand_is_list_const(l) && pxfoperand_is_attr(r))
 					{
 						appendStringInfo(resbuf, "%c%d%s%c%d",
 												 PXF_SCALAR_CONST_CODE, l.consttype,
@@ -595,7 +595,7 @@ scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter
 		if (filter->l.attnum <= InvalidAttrNumber)
 			return false; /* system attr not supported */
 
-		filter->r.opcode = PXF_SCALAR_CONST_CODE;
+		filter->r.opcode = PXF_LIST_CONST_CODE;
 		filter->r.attnum = InvalidAttrNumber;
 		filter->r.conststr = makeStringInfo();
 		initStringInfo(filter->r.conststr);
@@ -604,7 +604,7 @@ scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter
 	}
 	else if (IsA(leftop, Const) && IsA(rightop, Var))
 	{
-		filter->l.opcode = PXF_SCALAR_CONST_CODE;
+		filter->l.opcode = PXF_LIST_CONST_CODE;
 		filter->l.attnum = InvalidAttrNumber;
 		filter->l.conststr = makeStringInfo();
 		initStringInfo(filter->l.conststr);

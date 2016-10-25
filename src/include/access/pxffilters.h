@@ -109,9 +109,14 @@ static inline bool pxfoperand_is_attr(PxfOperand x)
 	return (x.opcode == PXF_ATTR_CODE);
 }
 
-static inline bool pxfoperand_is_const(PxfOperand x)
+static inline bool pxfoperand_is_scalar_const(PxfOperand x)
 {
 	return (x.opcode == PXF_SCALAR_CONST_CODE);
+}
+
+static inline bool pxfoperand_is_list_const(PxfOperand x)
+{
+	return (x.opcode == PXF_LIST_CONST_CODE);
 }
 
 char *serializePxfFilterQuals(List *quals);

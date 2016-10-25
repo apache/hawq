@@ -73,6 +73,54 @@ test__supported_filter_type(void **state)
 
 }
 
+void
+test__supported_operator_type(void **state)
+{
+	Oid operator_oids[13][2] = {
+			{ Int2EqualOperator, PXFOP_EQ },
+			{ 95, PXFOP_LT },
+			{ 520, PXFOP_GT },
+			{ 522, PXFOP_LE },
+			{ 524, PXFOP_GE },
+			{ 519, PXFOP_NE },
+			{ Int4EqualOperator, PXFOP_EQ },
+			{ 97, PXFOP_LT },
+			{ 521, PXFOP_GT },
+			{ 523, PXFOP_LE },
+			{ 525, PXFOP_GE },
+			{ 518, PXFOP_NE },
+			{ InvalidOid, InvalidOid }
+	};
+
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
+
+	int array_size = sizeof(operator_oids) / sizeof(operator_oids[0]);
+	bool result = false;
+	int i = 0;
+
+	/* supported types */
+	for (; i < array_size-1; ++i)
+	{
+		result = supported_operator_type(operator_oids[i][0], filter);
+		assert_true(result);
+		assert_true(operator_oids[i][1] == filter->op);
+	}
+
+	/* unsupported type */
+	result = supported_operator_type(operator_oids[i][0], filter);
+	assert_false(result);
+
+	/* go over pxf_supported_opr array */
+	int nargs = sizeof(pxf_supported_opr) / sizeof(dbop_pxfop_map);
+	assert_int_equal(nargs, 85);
+	for (i = 0; i < nargs; ++i)
+	{
+		assert_true(supported_operator_type(pxf_supported_opr[i].dbop, filter));
+		assert_true(pxf_supported_opr[i].pxfop == filter->op);
+	}
+
+}
+
 /*
  * const_value must be palloc'ed, it will be freed by scalar_const_to_str
  */
@@ -351,13 +399,6 @@ void run__opexpr_to_pxffilter__positive(Oid dbop, PxfOperatorCode expectedPxfOp)
 			PXF_SCALAR_CONST_CODE, 0, "1984",
 			expectedPxfOp);
 
-/*	int c = 1, d = 1, n = 1;
-
-	for ( n = 1 ; n <= 10 ; n++ )
-	   for ( c = 1 ; c <= 32767 ; c++ )
-	       for ( d = 1 ; d <= 32767 ; d++ )
-	       {}
-*/
 	/* run test */
 	assert_true(opexpr_to_pxffilter(expr, filter));
 
@@ -552,6 +593,7 @@ main(int argc, char* argv[])
 
 	const UnitTest tests[] = {
 			unit_test(test__supported_filter_type),
+			unit_test(test__supported_operator_type),
 			unit_test(test__scalar_const_to_str__null),
 			unit_test(test__scalar_const_to_str__int),
 			unit_test(test__scalar_const_to_str__text),
