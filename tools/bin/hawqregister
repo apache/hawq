@@ -497,14 +497,15 @@ class HawqRegister(object):
                 logger.error('File size(%s) in yaml configuration file should not be less than 0.' % sz)
                 self.failure_handler.rollback()
                 sys.exit(1)
-        for k, fn in enumerate(self.files):
-            hdfscmd = 'hadoop fs -du %s' % fn
-            _, out, _ = local_ssh_output(hdfscmd)
+        hdfscmd = 'hadoop fs -du %s' % ' '.join(self.files)
+        _, outs, _ = local_ssh_output(hdfscmd)
+        outs = outs.split('\n')
+        for k, out in enumerate(outs):
             if self.sizes[k] > int(out.strip().split()[0]):
                 if self.mode == 'usage1':
-                    logger.error('Specified file size(%s) should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))
+                    logger.error('Specified file size(%s) should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], self.files[k]))
                 else:
-                    logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))    
+                    logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], self.files[k]))
                 self.failure_handler.rollback()
                 sys.exit(1)
 
