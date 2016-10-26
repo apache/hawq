@@ -558,24 +558,6 @@ void test__pxf_serialize_fillter_list__nullFilter(void **state)
 
 }
 
-void test__pxf_serialize_fillter_list__nullFilter(void **state)
-{
-
-	List* expressionItems = NIL;
-
-	ExpressionItem* filterExpressionItem = build_null_expression_item(1, TEXTOID, IS_NULL);
-
-	expressionItems = lappend(expressionItems, filterExpressionItem);
-
-	char* result = pxf_serialize_filter_list(expressionItems);
-	assert_string_equal(result, "a0o8");
-
-	pxf_free_expression_items_list(expressionItems, true);
-	expressionItems = NIL;
-	pfree(result);
-
-}
-
 void
 test__pxf_serialize_filter_list__manyFilters(void **state)
 {
@@ -599,7 +581,7 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	expressionItems = lappend(expressionItems, expressionItem7);
 
 	result = pxf_serialize_filter_list(expressionItems);
-	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7a4c25s25d\"Ugly\" string with quoteso5a5c25s0do5a4o9");
+	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7a4c25s25d\"Ugly\" string with quoteso5a5c25s0do5a6o9");
 	pfree(result);
 
 	int trivialExpressionItems = expressionItems->length;
