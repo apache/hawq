@@ -372,12 +372,15 @@ class HawqRegister(object):
             self.failure_handler.rollback()
             sys.exit(1)
 
-    def _set_yml_dataa(self, file_format, files, sizes, tablename, schema, distribution_policy, file_locations,\
+    def _set_yml_data(self, file_format, files, sizes, tupcounts, eofuncompresseds, varblockcounts, tablename, schema, distribution_policy, file_locations,\
                       bucket_number, partitionby, partitions_constraint, partitions_name, partitions_compression_level,\
                       partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding):
         self.file_format = file_format
         self.files = files
         self.sizes = sizes
+        self.tupcounts = tupcounts
+        self.eofuncompresseds = eofuncompresseds
+        self.varblockcounts = varblockcounts
         self.src_table_name = tablename
         self.schema = schema
         self.distribution_policy = distribution_policy
@@ -394,6 +397,9 @@ class HawqRegister(object):
         self.encoding = encoding
         self.files_same_path = []
         self.sizes_same_path = []
+        self.tupcounts_same_path = []
+        self.varblockcounts_same_path = []
+        self.eofuncompresseds_same_path = []
         self.segnos_same_path = []
 
     def _option_parser_yml(self, yml_file):
@@ -414,7 +420,7 @@ class HawqRegister(object):
         partitions_checksum = []
         partitions_compression_level = []
         partitions_compression_type = []
-        files, sizes = [], []
+        files, sizes, tupcounts, eofuncompresseds, varblockcounts = [], [], [], [], []
 
         if params['FileFormat'].lower() == 'parquet':
             Format = 'Parquet'
@@ -437,11 +443,16 @@ class HawqRegister(object):
                     partitions_filesizes.append([item['size'] for item in pfile])
             partitions_name = [d['Name'] for d in params[Format_FileLocations]['Partitions']]
         if len(params[Format_FileLocations]['Files']):
-            files, sizes = [params['DFS_URL'] + d['path'] for d in params[Format_FileLocations]['Files']], [d['size'] for d in params[Format_FileLocations]['Files']]
+            for ele in params[Format_FileLocations]['Files']:
+                files.append(params['DFS_URL'] + ele['path'])
+                sizes.append(ele['size'])
+                tupcounts.append(ele['tupcount'] if ele.has_key('tupcount') else -1)
+                eofuncompresseds.append(ele['eofuncompressed'] if ele.has_key('eofuncompressed') else -1)
+                varblockcounts.append(ele['varblockcount'] if ele.has_key('varblockcount') else -1)
+
         encoding = params['Encoding']
         bucketNum = params['Bucketnum'] if params['Distribution_Policy'].startswith('DISTRIBUTED BY') else 6
-        self._set_yml_dataa(Format, files, sizes, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], bucketNum, partitionby,\
-                      partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
+        self._set_yml_data(Format, files, sizes, tupcounts, eofuncompresseds, varblockcounts, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], bucketNum, partitionby, partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
 
 
     # check conflicting distributed policy
@@ -539,6 +550,9 @@ class HawqRegister(object):
             self.file_format = 'Parquet'
             self.files_same_path = []
             self.sizes_same_path = []
+            self.tupcounts_same_path = []
+            self.varblockcounts_same_path = []
+            self.eofuncompresseds_same_path = []
             self.segnos_same_path = []
             self._check_hash_type() # Usage1 only support randomly distributed table
         self.queries = "set allow_system_table_mods='dml';"
@@ -602,9 +616,10 @@ class HawqRegister(object):
         if not self.yml:
             self._check_no_regex_filepath([self.filepath])
             self.files, self.sizes = self._get_files_in_hdfs(self.filepath)
+            self.tupcounts = self.eofuncompresseds = self.varblockcounts = [-1 for i in range(len(self.files))]
 
-        self.do_not_move, self.files_update, self.sizes_update = False, [], []
-        self.files_append, self.sizes_append = [f for f in self.files], [sz for sz in self.sizes]
+        self.do_not_move, self.files_update, self.sizes_update, self.tupcounts_update, self.eofuncompresseds_update, self.varblockcounts_update = False, [], [], [], [], []
+        self.files_append, self.sizes_append, self.tupcounts_append, self.eofuncompresseds_append, self.varblockcounts_append = [f for f in self.files], [sz for sz in self.sizes], [tc for tc in self.tupcounts], [eof for eof in self.eofuncompresseds], [v for v in self.varblockcounts]
         if self.mode == 'force':
             if len(self.files) == len(existed_files):
                 if sorted(self.files) != sorted(existed_files):
@@ -612,8 +627,8 @@ class HawqRegister(object):
                     self.failure_handler.rollback()
                     sys.exit(1)
                 else:
-                    self.do_not_move, self.files_update, self.sizes_update = True, self.files, self.sizes
-                self.files_append, self.sizes_append = [],[]
+                    self.do_not_move, self.files_update, self.sizes_update, self.tupcounts_update, self.eofuncompresseds_update, self.varblockcounts_update = True, self.files, self.sizes, self.tupcounts, self.eofuncompresseds, self.varblockcounts
+                self.files_append, self.sizes_append, self.tupcounts_append, self.eofuncompresseds_append, self.varblockcounts_append = [], [], [], [], []
             elif len(self.files) < len(existed_files):
                 logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                 self.failure_handler.rollback()
@@ -623,8 +638,14 @@ class HawqRegister(object):
                     if f in existed_files:
                         self.files_update.append(self.files[k])
                         self.sizes_update.append(self.sizes[k])
+                        self.tupcounts_update.append(self.tupcounts[k])
+                        self.eofuncompresseds_update.append(self.eofuncompresseds[k])
+                        self.varblockcounts_update.append(self.varblockcounts[k])
                         self.files_append.remove(self.files[k])
                         self.sizes_append.remove(self.sizes[k])
+                        self.tupcounts_append.remove(self.tupcounts[k])
+                        self.eofuncompresseds_append.remove(self.eofuncompresseds[k])
+                        self.varblockcounts_append.remove(self.varblockcounts[k])
                 if sorted(self.files_update) != sorted(existed_files):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                     self.failure_handler.rollback()
@@ -729,6 +750,9 @@ class HawqRegister(object):
             if seg not in catalog_lst:
                 self.files_same_path.append(self.files_update[k])
                 self.sizes_same_path.append(self.sizes_update[k])
+                self.tupcounts_same_path.append(self.tupcounts_update[k])
+                self.eofuncompresseds_same_path.append(self.eofuncompresseds_update[k])
+                self.varblockcounts_same_path.append(self.varblockcounts_update[k])
             if seg in new_catalog_lst:
                 exist_catalog_lst.append(seg)
         for seg in update_segno_lst:
@@ -778,45 +802,67 @@ class HawqRegister(object):
         append_eofs = self.sizes_append
         update_eofs = self.sizes_update
         same_path_eofs = self.sizes_same_path
+        append_tupcounts = self.tupcounts_append
+        update_tupcounts = self.tupcounts_update
+        same_path_tupcounts = self.tupcounts_same_path
+        append_eofuncompresseds = self.eofuncompresseds_append
+        update_eofuncompresseds = self.eofuncompresseds_update
+        same_path_eofuncompresseds = self.eofuncompresseds_same_path
+        append_varblockcounts = self.varblockcounts_append
+        update_varblockcounts = self.varblockcounts_update
+        same_path_varblockcounts = self.varblockcounts_same_path
         update_segno_lst = [f.split('/')[-1] for f in self.files_update]
         same_path_segno_lst = [seg for seg in self.segnos_same_path]
         query = ""
+        
         if mode == 'force':
             query += "delete from pg_aoseg.%s;" % (self.seg_name)
         
         if self.file_format == 'Parquet': 
             if len(update_eofs) > 0:
-                query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d)' % (self.seg_name, update_segno_lst[0], update_eofs[0], -1, -1)
-                for k, update_eof in enumerate(update_eofs[1:]):
-                    query += ',(%s, %d, %d, %d)' % (update_segno_lst[k + 1], update_eof, -1, -1)
+                query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d)' % (self.seg_name, update_segno_lst[0], update_eofs[0], update_tupcounts[0], update_eofuncompresseds[0])
+                k = 0
+                for update_eof, update_tupcount, update_eofuncompressed in zip(update_eofs[1:], update_tupcounts[1:], update_eofuncompresseds[1:]):
+                    query += ',(%s, %d, %d, %d)' % (update_segno_lst[k + 1], update_eof, update_tupcount, update_eofuncompressed)
+                    k += 1
                 query += ';'
             if len(same_path_eofs) > 0:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], -1, -1)
-                for k, same_path_eof in enumerate(same_path_eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, -1, -1)
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], same_path_tupcounts[0], same_path_eofuncompresseds[0])
+                k = 0
+                for same_path_eof, same_path_tupcount, same_path_eofuncompressed in zip(same_path_eofs[1:], same_path_tupcounts[1:], same_path_eofuncompresseds[1]):
+                    query += ',(%d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, same_path_tupcount, same_path_eofuncompressed)
+                    k += 1
                 query += ';'
             segno += len(same_path_eofs)
             if len(append_eofs) > 0:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], -1, -1)
-                for k, append_eof in enumerate(append_eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (segno + k + 1, append_eof, -1, -1)
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], append_tupcounts[0], append_eofuncompresseds[0])
+                k = 0
+                for append_eof, append_tupcount, append_eofuncompressed in zip(append_eofs[1:], append_tupcounts[1:], append_eofuncompresseds[1:]):
+                    query += ',(%d, %d, %d, %d)' % (segno + k + 1, append_eof, append_tupcount, append_eofuncompressed)
+                    k += 1
                 query += ';'
         else:
             if len(update_eofs) > 0:
-                query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d, %d)' % (self.seg_name, update_segno_lst[0], update_eofs[0], -1, -1, -1)
-                for k, update_eof in enumerate(update_eofs[1:]):
-                    query += ',(%s, %d, %d, %d, %d)' % (update_segno_lst[k + 1], update_eof, -1, -1, -1)
+                query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d, %d)' % (self.seg_name, update_segno_lst[0], update_eofs[0], update_tupcounts[0], update_varblockcounts[0], update_eofuncompresseds[0])
+                k = 0
+                for update_eof, update_tupcount, update_varblockcount, update_eofuncompresseds in zip(update_eofs[1:], update_tupcounts[1:], update_varblockcounts[1:], update_eofuncompresseds[1:]):
+                    query += ',(%s, %d, %d, %d, %d)' % (update_segno_lst[k + 1], update_eof, update_tupcount, update_varblockcount, update_eofuncompresseds)
+                    k += 1
                 query += ';'
             if len(same_path_eofs) > 0:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], -1, -1, -1)
-                for k, same_path_eof in enumerate(same_path_eofs[1:]):
-                    query += ',(%d, %d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, -1, -1, -1)
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], same_path_tupcounts[0], same_path_varblockcounts[0], same_path_eofuncompresseds[0])
+                k = 0
+                for same_path_eof, same_path_tupcount, same_path_varblockcount, same_path_eofuncompressed in zip(same_path_eofs[1:], same_path_tupcounts[1:], same_path_varblockcounts[1:], same_path_eofuncompresseds[1:]):
+                    query += ',(%d, %d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, same_path_tupcount, same_path_varblockcount, same_path_eofuncompressed)
+                    k += 1
                 query += ';'
             segno += len(same_path_eofs)
             if len(append_eofs) > 0:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], -1, -1, -1)
-                for k, append_eof in enumerate(append_eofs[1:]):
-                    query += ',(%d, %d, %d, %d, %d)' % (segno + k + 1, append_eof, -1, -1, -1)
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], append_tupcounts[0], append_varblockcounts[0], append_eofuncompresseds[0])
+                k = 0
+                for append_eof, append_tupcount, append_varblockcount, append_eofuncompressed in zip(append_eofs[1:], append_tupcounts[1:], append_varblockcounts[1:], append_eofuncompresseds[1:]):
+                    query += ',(%d, %d, %d, %d, %d)' % (segno + k + 1, append_eof, append_tupcount, append_varblockcount, append_eofuncompressed)
+                    k += 1
                 query += ';'
         self.queries += query
     

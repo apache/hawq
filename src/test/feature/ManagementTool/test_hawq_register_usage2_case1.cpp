@@ -15,44 +15,54 @@ using hawq::test::Command;
 using hawq::test::HdfsConfig;
 
 TEST_F(TestHawqRegister, TestUsage2Case1EmptyTable) {
-  SQLUtility util;
-  util.execute("drop table if exists t9;");
-  util.execute("create table t9(i int) with (appendonly=true, orientation=row) distributed randomly;");
-  EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o t9.yml testhawqregister_testusage2case1emptytable.t9"));
-  EXPECT_EQ(0, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c t9.yml testhawqregister_testusage2case1emptytable.nt9"));
-  util.query("select * from nt9;", 0);
-  EXPECT_EQ(0, Command::getCommandStatus("rm -rf t9.yml"));
-  util.execute("drop table t9;");
-  util.execute("drop table nt9;");
+    SQLUtility util;
+    util.execute("drop table if exists t9;");
+    util.execute("create table t9(i int) with (appendonly=true, orientation=row) distributed randomly;");
+    EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o t9.yml testhawqregister_testusage2case1emptytable.t9"));
+    EXPECT_EQ(0, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c t9.yml testhawqregister_testusage2case1emptytable.nt9"));
+    util.query("select * from nt9;", 0);
+    std::string reloid = getTableOid("nt9");
+    /* An empty table has no row in pg_aoseg.pg_aoseg_xxx table */
+    util.query(hawq::test::stringFormat("select * from pg_aoseg.pg_aoseg_%s;", reloid.c_str()), 0);
+    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t9.yml"));
+    util.execute("drop table t9;");
+    util.execute("drop table nt9;");
 }
 
 TEST_F(TestHawqRegister, TestUsage2Case1IncorrectYaml) {
-  SQLUtility util;
-  string filePath = util.getTestRootPath() + "/ManagementTool/";
+    SQLUtility util;
+    string filePath = util.getTestRootPath() + "/ManagementTool/";
 
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_pagesize.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_rowgroupsize.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_filesize.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_schema.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_checksum.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_dfs_url.yml xx"));
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_bucketnum.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_pagesize.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_rowgroupsize.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_filesize.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_schema.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_checksum.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_dfs_url.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_bucketnum.yml xx"));
 }
 
 TEST_F(TestHawqRegister, TestUsage2Case1MismatchFileNumber) {
-  SQLUtility util;
-  string filePath = util.getTestRootPath() + "/ManagementTool/";
-  EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "files_incomplete.yml xx"));
+    SQLUtility util;
+    string filePath = util.getTestRootPath() + "/ManagementTool/";
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "files_incomplete.yml xx"));
 }
 
 
 TEST_F(TestHawqRegister, TestUsage2Case1Expected) {
     SQLUtility util;
+    string fmt_prefix;
     std::vector<string> create_table_matrix = {"distributed by (i)", "distributed randomly"};
     std::vector<string> fmt_matrix = {"row", "parquet"};
     int suffix=0;
+
     for (auto & ddl : create_table_matrix) {
         for (auto & fmt : fmt_matrix) {
+            if (fmt.compare("row") == 0)
+                fmt_prefix = "aoseg";
+            else
+                fmt_prefix = "paqseg";
+
             suffix++;
             auto t = hawq::test::stringFormat("t_usage2_case1_%s", std::to_string(suffix).c_str());
             auto nt = hawq::test::stringFormat("nt_usage2_case1_%s", std::to_string(suffix).c_str());
@@ -63,9 +73,19 @@ TEST_F(TestHawqRegister, TestUsage2Case1Expected) {
             util.execute(hawq::test::stringFormat("create table %s(i int) with (appendonly=true, orientation=%s) %s;", t.c_str(), fmt.c_str(), ddl.c_str()));
             util.execute(hawq::test::stringFormat("insert into %s select generate_series(1, 100);", t.c_str()));
             util.query(hawq::test::stringFormat("select * from %s;", t.c_str()), 100);
+
+            // get pg_aoseg.pg_xxxseg_xxx table
+            std::string reloid1 = getTableOid(t.c_str());
+            string result1 = util.getQueryResultSetString(hawq::test::stringFormat("select * from pg_aoseg.pg_%s_%s order by segno;", fmt_prefix.c_str(), reloid1.c_str()));
+
             EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_%s.yml testhawqregister_testusage2case1expected.%s", HAWQ_DB, std::to_string(suffix).c_str(), t.c_str())));
             EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_%s.yml testhawqregister_testusage2case1expected.%s", HAWQ_DB, std::to_string(suffix).c_str(), nt.c_str())));
             util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 100);
+
+            // check pg_aoseg.pg_xxxseg_xxx table
+            std::string reloid2 = getTableOid(nt.c_str());
+            string result2 = util.getQueryResultSetString(hawq::test::stringFormat("select * from pg_aoseg.pg_%s_%s order by segno;", fmt_prefix.c_str(), reloid2.c_str()));
+            EXPECT_EQ(result1, result2);
 
             // hawq register -d hawq_feature_test -c t_usage2_case1_#.yml nt_usage2_case1_#, where nt_usage2_case1_# exists
             util.execute(hawq::test::stringFormat("drop table if exists %s;", t.c_str()));
