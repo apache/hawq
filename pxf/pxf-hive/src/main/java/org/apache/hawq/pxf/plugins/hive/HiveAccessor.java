@@ -361,7 +361,7 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
         BasicFilter bFilter = (BasicFilter) filter;
         boolean isOperationEqual = (bFilter.getOperation() == FilterParser.Operation.HDOP_EQ);
         int columnIndex = bFilter.getColumn().index();
-        String value = bFilter.getConstant().constant().toString();
+        String value = bFilter.getConstant() == null ? null : bFilter.getConstant().constant().toString();
         LOG.debug("isOperationEqual: " + isOperationEqual + " columnIndex: "
                 + columnIndex + " value: " + value);
     }
