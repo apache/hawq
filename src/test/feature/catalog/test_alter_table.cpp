@@ -67,7 +67,7 @@ TEST_F(TestAlterTable, TestAlterTableAOColumnNOTNULL) {
   util.execute("alter table altable alter column c set not null");
 
   util.execute("insert into altable(a,b) values(13,'13')", false);
-  std::string errstr = "ERROR:  null value in column \"c\" violates "
+  std::string errstr = "WARNING:  null value in column \"c\" violates "
                        "not-null constraint";
   EXPECT_STREQ(errstr.c_str(),
                util.getPSQL()->getLastResult().substr(0, errstr.size()).c_str());
