@@ -395,12 +395,6 @@ class HawqRegister(object):
         self.partitions_filepaths = partitions_filepaths
         self.partitions_filesizes = partitions_filesizes
         self.encoding = encoding
-        self.files_same_path = []
-        self.sizes_same_path = []
-        self.tupcounts_same_path = []
-        self.varblockcounts_same_path = []
-        self.eofuncompresseds_same_path = []
-        self.segnos_same_path = []
 
     def _option_parser_yml(self, yml_file):
         import yaml
@@ -535,6 +529,12 @@ class HawqRegister(object):
                     sys.exit(1)
 
     def _init(self):
+        self.files_same_path = []
+        self.sizes_same_path = []
+        self.tupcounts_same_path = []
+        self.varblockcounts_same_path = []
+        self.eofuncompresseds_same_path = []
+        self.segnos_same_path = []
         if self.yml:
             self._option_parser_yml(options.yml_config)
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
@@ -548,12 +548,6 @@ class HawqRegister(object):
                 logger.error('-e option is only supported with single file case.')
                 sys.exit(1)
             self.file_format = 'Parquet'
-            self.files_same_path = []
-            self.sizes_same_path = []
-            self.tupcounts_same_path = []
-            self.varblockcounts_same_path = []
-            self.eofuncompresseds_same_path = []
-            self.segnos_same_path = []
             self._check_hash_type() # Usage1 only support randomly distributed table
         self.queries = "set allow_system_table_mods='dml';"
         self.queries += "begin transaction;"
