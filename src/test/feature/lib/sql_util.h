@@ -91,6 +91,8 @@ class SQLUtility {
   // @return the query result
   std::string getQueryResult(const std::string &query);
 
+  std::string getQueryResultSetString(const std::string &query);
+
   // execute expect error message
   // @param sql the given sql command
   // @param errmsg the expected sql error message

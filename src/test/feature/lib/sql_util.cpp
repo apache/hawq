@@ -268,6 +268,17 @@ std::string SQLUtility::getQueryResult(const std::string &query) {
   return value;
 }
 
+std::string SQLUtility::getQueryResultSetString(const std::string &query) {
+  const hawq::test::PSQLQueryResult &result = executeQuery(query);
+  std::vector<std::vector<string> > resultString = result.getRows();
+  string resultStr;
+  for (auto row : result.getRows()) {
+    for (auto column : row) resultStr += column + "|";
+    resultStr += "\n";
+  }
+  return resultStr;
+}
+
 FilePath SQLUtility::splitFilePath(const string &filePath) const {
   FilePath fp;
   size_t found1 = filePath.find_last_of("/");
