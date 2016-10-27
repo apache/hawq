@@ -53,7 +53,7 @@ TEST_F(TestQueryInsert, TestInsertWithDefaultNeg) {
   util.execute("insert into inserttest(col1, col2, col3) "
 							"values(default, default, default)",
 			   false);
-  std::string errstr = "ERROR:  null value in column \"col2\" "
+  std::string errstr = "WARNING:  null value in column \"col2\" "
 		               "violates not-null constraint";
   EXPECT_STREQ(errstr.c_str(),
                util.getPSQL()->getLastResult().substr(0, errstr.size()).c_str());
