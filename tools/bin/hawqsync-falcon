@@ -622,7 +622,7 @@ def hdfsFingerprintsMatch(reference, comparison):
         comparison (str): the comparison MD5 checksum string
     
     Returns:
-        isEqual (bool): Zero for success, negative one otherwise 
+        isEqual (bool): True for success, False otherwise 
 
     """
 
