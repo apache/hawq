@@ -28,7 +28,7 @@
 void run__scalar_const_to_str(Const* input, StringInfo result, char* expected);
 void run__scalar_const_to_str__negative(Const* input, StringInfo result, char* value);
 void run__list_const_to_str(Const* input, StringInfo result, char* expected);
-void run__list_const_to_str__negative(Const* input, StringInfo result, char* value);
+void run__list_const_to_str__negative(Const* input, StringInfo result, int len, Datum *dats);
 
 void
 test__supported_filter_type(void **state)
@@ -144,22 +144,14 @@ mock__scalar_const_to_str(Oid const_type, char* const_value)
  * const_value must be palloc'ed, it will be freed by list_const_to_str
  */
 void
-mock__list_const_to_str(Oid const_type, char* const_value)
-{
-
-	ArrayType  *arr;
-
+mock__list_const_to_str(Oid const_type, int len, Datum *dats) {
 	expect_value(getTypeOutputInfo, type, const_type);
 	expect_any(getTypeOutputInfo, typOutput);
 	expect_any(getTypeOutputInfo, typIsVarlena);
 	will_return(getTypeOutputInfo, NULL);
 
-	expect_any(OidOutputFunctionCall, functionId);
-	expect_any(OidOutputFunctionCall, val);
-	will_return(OidOutputFunctionCall, const_value);
-
 	expect_any(pg_detoast_datum, datum);
-	will_return(pg_detoast_datum, arr);
+	will_return(pg_detoast_datum, NULL);
 
 	expect_any(deconstruct_array, array);
 	expect_any(deconstruct_array, elmtype);
@@ -170,6 +162,18 @@ mock__list_const_to_str(Oid const_type, char* const_value)
 	expect_any(deconstruct_array, nullsp);
 	expect_any(deconstruct_array, nelemsp);
 	will_return(deconstruct_array, NULL);
+	will_assign_value(deconstruct_array, nelemsp, len);
+	will_assign_value(deconstruct_array, elemsp, dats);
+
+	if (const_type == TEXTARRAYOID)
+	{
+		for (int i = 0; i < len; i++)
+		{
+			expect_any(DirectFunctionCall1, func);
+			expect_any(DirectFunctionCall1, arg1);
+			will_return(DirectFunctionCall1, dats[i]);
+		}
+	}
 }
 
 void
@@ -206,17 +210,15 @@ verify__scalar_const_to_str(bool is_null, char* const_value, Oid const_type, cha
 }
 
 void
-verify__list_const_to_str(char* const_value, Oid const_type, char* expected)
+verify__list_const_to_str(Oid const_type, char* expected, int len, Datum *dats)
 {
 	StringInfo result = makeStringInfo();
-	char* value = NULL;
 	Const* input = (Const*) palloc0(sizeof(Const));
 	input->constisnull = false;
 	input->consttype = const_type;
 
 	/* need to prepare inner functions */
-	value = strdup(const_value); /* will be free'd by list_const_to_str */
-	mock__list_const_to_str(const_type, value);
+	mock__list_const_to_str(const_type, len, dats);
 
 	/* no expected value means it's a negative test */
 	if (expected)
@@ -225,8 +227,7 @@ verify__list_const_to_str(char* const_value, Oid const_type, char* expected)
 	}
 	else
 	{
-		run__list_const_to_str__negative(input, result, value);
-		pfree(value); /* value was not freed by scalar_const_to_str b/c of failure */
+		run__list_const_to_str__negative(input, result, len, dats);
 	}
 
 	pfree(result->data);
@@ -235,34 +236,45 @@ verify__list_const_to_str(char* const_value, Oid const_type, char* expected)
 }
 
 void
-test__list_const_to_str__int(void **state)
-{
-	verify__list_const_to_str("{1,2,3}", INT4ARRAYOID, "s1d1s1d2s1d3");
-	verify__list_const_to_str("{42}", INT4ARRAYOID, "s2d42");
+test__list_const_to_str__int(void **state) {
+
+	Datum dats8[3] = {Int8GetDatum(1), Int8GetDatum(2), Int8GetDatum(3)};
+
+	verify__list_const_to_str(INT2ARRAYOID, "s1d1s1d2s1d3", 3, dats8);
+
+	Datum dats16[1] = {Int16GetDatum(42)};
+	verify__list_const_to_str(INT4ARRAYOID, "s2d42", 1, dats16);
+
+	Datum dats32[2] = {Int32GetDatum(11), Int32GetDatum(22)};
+	verify__list_const_to_str(INT4ARRAYOID, "s2d11s2d22", 2, dats32);
 }
 
 
 void
 test__list_const_to_str__boolean(void **state)
 {
-	verify__list_const_to_str("{t,f}", BOOLARRAYOID, "s4dtrues5dfalse");
-	verify__list_const_to_str("{f,t}", BOOLARRAYOID, "s5dfalses4dtrue");
-	verify__list_const_to_str("{t}", BOOLARRAYOID, "s4dtrue");
+	Datum dats1[2] = {BoolGetDatum(true), BoolGetDatum(false)};
+	verify__list_const_to_str(BOOLARRAYOID, "s4dtrues5dfalse", 2, dats1);
+
+	Datum dats2[2] = {BoolGetDatum(false), BoolGetDatum(true)};
+	verify__list_const_to_str(BOOLARRAYOID, "s5dfalses4dtrue", 2, dats2);
+
+	Datum dats3[1] = {BoolGetDatum(true)};
+	verify__list_const_to_str(BOOLARRAYOID, "s4dtrue", 1, dats3);
+
+	Datum dats4[1] = {BoolGetDatum(false)};
+	verify__list_const_to_str(BOOLARRAYOID, "s5dfalse", 1, dats4);
 }
 
 void
 test__list_const_to_str__text(void **state)
 {
 
-	int c = 1, d = 1, n = 1;
+	Datum dats1[2] = {CStringGetDatum("row1"), CStringGetDatum("row2")};
+	verify__list_const_to_str(TEXTARRAYOID, "s4drow1s4drow2", 2, dats1);
 
-	/*for (n = 1; n <= 10; n++)
-		for (c = 1; c <= 32767; c++)
-			for (d = 1; d <= 32767; d++) {
-			}
-	*/
-
-	verify__list_const_to_str("{row1,row2}", TEXTARRAYOID, "s4drow1s4drow2");
+	Datum dats2[3] = {CStringGetDatum("r,o,w,1"), CStringGetDatum("r'o'w2"), CStringGetDatum("r\"o\"w3")};
+	verify__list_const_to_str(TEXTARRAYOID, "s7dr,o,w,1s6dr'o'w2s6dr\"o\"w3", 3, dats2);
 }
 
 void run__scalar_const_to_str(Const* input, StringInfo result, char* expected)
@@ -313,13 +325,13 @@ void run__list_const_to_str(Const* input, StringInfo result, char* expected)
 	assert_string_equal(result->data, expected);
 }
 
-void run__list_const_to_str__negative(Const* input, StringInfo result, char* value)
+void run__list_const_to_str__negative(Const* input, StringInfo result, int len, Datum *dats)
 {
 
 	StringInfo err_msg = makeStringInfo();
 	appendStringInfo(err_msg,
 			"internal error in pxffilters.c:list_const_to_str. "
-			"Using unsupported data type (%d) (value %s)", input->consttype, value);
+			"Using unsupported data type (%d) (len %d)", input->consttype, len);
 
 	/* Setting the test -- code omitted -- */
 	PG_TRY();

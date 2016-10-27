@@ -952,15 +952,15 @@ list_const_to_str(Const *constval, StringInfo buf)
 		case INT2ARRAYOID:
 		{
 			int16 value;
-			deconstruct_array(arr, INT2OID, -1, false, 's', &dats, NULL, &len);
+			deconstruct_array(arr, INT2OID, sizeof (value), true, 's', &dats, NULL, &len);
 
 			for (int i = 0; i < len; i++)
 			{
 				value = DatumGetInt16(dats[i]);
 
-				appendStringInfo(interm_buf, "%h", value);
+				appendStringInfo(interm_buf, "%hd", value);
 
-				appendStringInfo(buf, "%c%lu%c%s",
+				appendStringInfo(buf, "%c%d%c%s",
 						PXF_SIZE_BYTES, interm_buf->len,
 						PXF_CONST_DATA, interm_buf->data);
 				resetStringInfo(interm_buf);
@@ -978,7 +978,7 @@ list_const_to_str(Const *constval, StringInfo buf)
 
 				appendStringInfo(interm_buf, "%d", value);
 
-				appendStringInfo(buf, "%c%lu%c%s",
+				appendStringInfo(buf, "%c%d%c%s",
 						PXF_SIZE_BYTES, interm_buf->len,
 						PXF_CONST_DATA, interm_buf->data);
 				resetStringInfo(interm_buf);
@@ -994,9 +994,9 @@ list_const_to_str(Const *constval, StringInfo buf)
 			{
 				value = DatumGetInt64(dats[i]);
 
-				appendStringInfo(interm_buf, "%s", value);
+				appendStringInfo(interm_buf, "%ld", value);
 
-				appendStringInfo(buf, "%c%lu%c%s",
+				appendStringInfo(buf, "%c%d%c%s",
 						PXF_SIZE_BYTES, interm_buf->len,
 						PXF_CONST_DATA, interm_buf->data);
 				resetStringInfo(interm_buf);
@@ -1007,7 +1007,7 @@ list_const_to_str(Const *constval, StringInfo buf)
 		{
 			char *value;
 
-			deconstruct_array(arr, TEXTOID, -1, false, 'c', &dats, NULL, &len);
+			deconstruct_array(arr, TEXTOID, -1, false, 'i', &dats, NULL, &len);
 
 			for (int i = 0; i < len; i++)
 			{
@@ -1015,7 +1015,7 @@ list_const_to_str(Const *constval, StringInfo buf)
 
 				appendStringInfo(interm_buf, "%s", value);
 
-				appendStringInfo(buf, "%c%lu%c%s",
+				appendStringInfo(buf, "%c%d%c%s",
 						PXF_SIZE_BYTES, interm_buf->len,
 						PXF_CONST_DATA, interm_buf->data);
 				resetStringInfo(interm_buf);
