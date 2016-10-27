@@ -574,8 +574,10 @@ class HawqRegister(object):
             sys.exit(1)
         self.firstsegno, self.tabledir = self._get_metadata()
         
-        seg_list, existed_sizes = self._get_metadata_from_table()
-        existed_files = [self.tabledir + seg for seg in seg_list]
+        if self.yml and self.mode == 'force':
+            existed_files, existed_sizes = self._get_files_in_hdfs(self.tabledir)
+        else:
+            existed_files, existed_sizes = self._get_files_in_hdfs(self.filepath)
         # check if file numbers in hdfs is consistent with the record count of pg_aoseg.
         hdfs_file_no_lst = [f.split('/')[-1] for f in existed_files]
         for k in range(1, self.firstsegno - 1):
@@ -740,13 +742,28 @@ class HawqRegister(object):
         catalog_lst = [str(i) for i in range(1, segno)]
         new_catalog_lst = [str(i) for i in range(segno, len(self.files_update) + 1)]
         exist_catalog_lst = []
+        tmp_files_update = [f for f in self.files_update]
+        tmp_sizes_update = [f for f in self.sizes_update]
+
+        tmp_tupcounts_update = [f for f in self.tupcounts_update]
+        tmp_eofuncompresseds_update = [f for f in self.eofuncompresseds_update]
+        tmp_varblockcounts_update = [f for f in self.varblockcounts_update]
+         
         for k, seg in enumerate(update_segno_lst):
             if seg not in catalog_lst:
-                self.files_same_path.append(self.files_update[k])
-                self.sizes_same_path.append(self.sizes_update[k])
-                self.tupcounts_same_path.append(self.tupcounts_update[k])
+
+                self.files_same_path.append(tmp_files_update[k])
+                self.sizes_same_path.append(tmp_sizes_update[k])
+                self.tupcounts_same_path.append(tmp_tupcounts_update[k])
                 self.eofuncompresseds_same_path.append(self.eofuncompresseds_update[k])
                 self.varblockcounts_same_path.append(self.varblockcounts_update[k])
+           
+                self.files_update.remove(tmp_files_update[k])
+                self.sizes_update.remove(tmp_sizes_update[k])
+                self.tupcounts_update.remove(tmp_tupcounts_update[k])
+                self.eofuncompresseds_update.remove(tmp_eofuncompresseds_update[k])
+                self.varblockcounts_update.remove(tmp_varblockcounts_update[k])
+
             if seg in new_catalog_lst:
                 exist_catalog_lst.append(seg)
         for seg in update_segno_lst:
@@ -757,11 +774,13 @@ class HawqRegister(object):
                     while (str(segno) in exist_catalog_lst):
                         segno += 1
                     self.segnos_same_path.append(segno)
+                    segno += 1
 
         for k, f in enumerate(self.files_same_path):
             self.srcfiles.append(f)
             self.dstfiles.append(self.tabledir + str(self.segnos_same_path[k]))
 
+        segno = self.firstsegno + len(self.files_same_path)
         for f in self.files_append:
             self.srcfiles.append(f)
             self.dstfiles.append(self.tabledir + str(segno))
