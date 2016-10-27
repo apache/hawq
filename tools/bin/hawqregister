@@ -755,8 +755,8 @@ class HawqRegister(object):
                 self.files_same_path.append(tmp_files_update[k])
                 self.sizes_same_path.append(tmp_sizes_update[k])
                 self.tupcounts_same_path.append(tmp_tupcounts_update[k])
-                self.eofuncompresseds_same_path.append(self.eofuncompresseds_update[k])
-                self.varblockcounts_same_path.append(self.varblockcounts_update[k])
+                self.eofuncompresseds_same_path.append(tmp_eofuncompresseds_update[k])
+                self.varblockcounts_same_path.append(tmp_varblockcounts_update[k])
            
                 self.files_update.remove(tmp_files_update[k])
                 self.sizes_update.remove(tmp_sizes_update[k])
