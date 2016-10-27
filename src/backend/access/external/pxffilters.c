@@ -36,6 +36,7 @@ static void pxf_free_filter(PxfFilterDesc* filter);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter);
+static bool var_to_pxffilter(Var *var, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
 static bool supported_operator_type(Oid type, PxfFilterDesc *filter);
 static void scalar_const_to_str(Const *constval, StringInfo buf);
@@ -162,7 +163,16 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{1060 /* bpchargt */, PXFOP_GT},
 	{1059 /* bpcharle */, PXFOP_LE},
 	{1061 /* bpcharge */, PXFOP_GE},
-	{1057 /* bpcharne */, PXFOP_NE}
+	{1057 /* bpcharne */, PXFOP_NE},
+
+	/* boolean */
+	{BooleanEqualOperator  /* booleq */, PXFOP_EQ},
+	{58  /* boollt */, PXFOP_LT},
+	{59 /* boolgt */, PXFOP_GT},
+	{1694 /* boolle */, PXFOP_LE},
+	{1695 /* boolge */, PXFOP_GE},
+	{85 /* boolne */, PXFOP_NE}
+
 
 	/* bytea */
 	// TODO: uncomment once HAWQ-1085 is done
@@ -192,7 +202,11 @@ Oid pxf_supported_types[] =
 	DATEOID,
 	TIMESTAMPOID,
 	/* complex datatypes*/
-	INT4ARRAYOID
+	INT2ARRAYOID,
+	INT4ARRAYOID,
+	INT8ARRAYOID,
+	BOOLARRAYOID,
+	TEXTARRAYOID
 };
 
 static void
@@ -253,6 +267,7 @@ pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 
 		switch (tag)
 		{
+			case T_Var: // IN(single_value)
 			case T_OpExpr:
 			case T_ScalarArrayOpExpr:
 			{
@@ -279,10 +294,27 @@ pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 					}
 				}
 
-				for (int i = 0; i < childNodesNum - 1; i++)
+				if (expr->boolop == NOT_EXPR)
 				{
-					result = lappend(result, expressionItem);
+					for (int i = 0; i < childNodesNum; i++)
+					{
+						result = lappend(result, expressionItem);
+					}
+				} else if (expr->boolop == AND_EXPR || expr->boolop == OR_EXPR)
+				{
+					for (int i = 0; i < childNodesNum - 1; i++)
+					{
+						result = lappend(result, expressionItem);
+					}
+				} else
+				{
+					ereport(ERROR,
+						(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("internal error in pxffilters.c:pxf_make_expression_items_list. "
+								 "Found unknown boolean expression type")));
 				}
+
+
 				break;
 			}
 			default:
@@ -349,7 +381,6 @@ pxf_serialize_filter_list(List *expressionItems)
 		return NULL;
 
 	resbuf = makeStringInfo();
-	initStringInfo(resbuf);
 
 	/*
 	 * Iterate through the expression items in the list and serialize them one after the other.
@@ -362,6 +393,46 @@ pxf_serialize_filter_list(List *expressionItems)
 
 		switch (tag)
 		{
+			case T_Var:
+			{
+				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_Var)", tag);
+				PxfFilterDesc *filter = (PxfFilterDesc *) palloc0(sizeof(PxfFilterDesc));
+				Var *var = (Var *) node;
+				if (var_to_pxffilter(var, filter))
+				{
+					PxfOperand l = filter->l;
+					PxfOperand r = filter->r;
+					PxfOperatorCode o = filter->op;
+					if (pxfoperand_is_attr(l) && pxfoperand_is_scalar_const(r))
+					{
+						appendStringInfo(resbuf, "%c%d%c%d%c%lu%c%s",
+												 PXF_ATTR_CODE, l.attnum - 1, /* Java attrs are 0-based */
+												 PXF_SCALAR_CONST_CODE, r.consttype,
+												 PXF_SIZE_BYTES, strlen(r.conststr->data),
+												 PXF_CONST_DATA, (r.conststr)->data);
+					}
+					else
+					{
+						/* var_to_pxffilter() should have never let this happen */
+						ereport(ERROR,
+								(errcode(ERRCODE_INTERNAL_ERROR),
+								 errmsg("internal error in pxffilters.c:pxf_serialize_"
+										 "filter_list. Found a non const+attr filter")));
+					}
+					appendStringInfo(resbuf, "%c%d", PXF_OPERATOR_CODE, o);
+					pxf_free_filter(filter);
+
+				}
+				else
+				{
+					/* if at least one expression item is not supported, whole filter doesn't make sense*/
+					elog(DEBUG1, "Query will not be optimized to use filter push-down.");
+					pfree(filter);
+					pfree(resbuf->data);
+					return NULL;
+				}
+				break;
+			}
 			case T_OpExpr:
 			{
 				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_OpExpr)", tag);
@@ -535,7 +606,6 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		filter->r.opcode = PXF_SCALAR_CONST_CODE;
 		filter->r.attnum = InvalidAttrNumber;
 		filter->r.conststr = makeStringInfo();
-		initStringInfo(filter->r.conststr);
 		scalar_const_to_str((Const *)rightop, filter->r.conststr);
 		filter->r.consttype = ((Const *)rightop)->consttype;
 	}
@@ -544,7 +614,6 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 		filter->l.opcode = PXF_SCALAR_CONST_CODE;
 		filter->l.attnum = InvalidAttrNumber;
 		filter->l.conststr = makeStringInfo();
-		initStringInfo(filter->l.conststr);
 		scalar_const_to_str((Const *)leftop, filter->l.conststr);
 		filter->l.consttype = ((Const *)leftop)->consttype;
 
@@ -598,7 +667,6 @@ scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter
 		filter->r.opcode = PXF_LIST_CONST_CODE;
 		filter->r.attnum = InvalidAttrNumber;
 		filter->r.conststr = makeStringInfo();
-		initStringInfo(filter->r.conststr);
 		list_const_to_str((Const *)rightop, filter->r.conststr);
 		filter->r.consttype = ((Const *)rightop)->consttype;
 	}
@@ -607,7 +675,6 @@ scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter
 		filter->l.opcode = PXF_LIST_CONST_CODE;
 		filter->l.attnum = InvalidAttrNumber;
 		filter->l.conststr = makeStringInfo();
-		initStringInfo(filter->l.conststr);
 		list_const_to_str((Const *)leftop, filter->l.conststr);
 		filter->l.consttype = ((Const *)leftop)->consttype;
 
@@ -624,6 +691,52 @@ scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter
 	}
 
 
+
+	return true;
+}
+
+static bool
+var_to_pxffilter(Var *var, PxfFilterDesc *filter)
+{
+	Oid var_type = InvalidOid;
+
+	if ((!var) || (!filter))
+		return false;
+
+	var_type = exprType(var);
+
+	/*
+	 * check if supported type -
+	 */
+	if (!supported_filter_type(var_type))
+		return false;
+
+	/*
+	 * check if supported operator -
+	 */
+	if (!supported_operator_type(BooleanEqualOperator, filter))
+		return false;
+
+	/* arguments must be VAR and CONST */
+	if (IsA(var,  Var))
+	{
+		filter->l.opcode = PXF_ATTR_CODE;
+		filter->l.attnum = var->varattno;
+		filter->l.consttype = InvalidOid;
+		if (filter->l.attnum <= InvalidAttrNumber)
+			return false; /* system attr not supported */
+
+		filter->r.opcode = PXF_SCALAR_CONST_CODE;
+		filter->r.attnum = InvalidAttrNumber;
+		filter->r.conststr = makeStringInfo();
+		appendStringInfo(filter->r.conststr, TrueConstValue);
+		filter->r.consttype = BOOLOID;
+	}
+	else
+	{
+		elog(DEBUG1, "var_to_pxffilter: expression is not a Var");
+		return false;
+	}
 
 	return true;
 }
@@ -754,7 +867,7 @@ scalar_const_to_str(Const *constval, StringInfo buf)
 	if (constval->constisnull)
 	{
 		/* TODO: test this edge case and its consequences */
-		appendStringInfo(buf, "\"NULL\"");
+		appendStringInfo(buf, NullConstValue);
 		return;
 	}
 
@@ -782,9 +895,9 @@ scalar_const_to_str(Const *constval, StringInfo buf)
 			break;
 		case BOOLOID:
 			if (strcmp(extval, "t") == 0)
-				appendStringInfo(buf, "true");
+				appendStringInfo(buf, TrueConstValue);
 			else
-				appendStringInfo(buf, "false");
+				appendStringInfo(buf, FalseConstValue);
 			break;
 		default:
 			/* should never happen. we filter on types earlier */
@@ -809,8 +922,10 @@ list_const_to_str(Const *constval, StringInfo buf)
 {
 	Oid			typoutput;
 	bool		typIsVarlena;
-	char		*extval;
-	char		*trimmedValue;
+	StringInfo	interm_buf;
+	Datum *dats;
+	ArrayType  *arr;
+	int len;
 
 	if (constval->constisnull)
 	{
@@ -828,28 +943,103 @@ list_const_to_str(Const *constval, StringInfo buf)
 	getTypeOutputInfo(constval->consttype,
 					  &typoutput, &typIsVarlena);
 
-	extval = OidOutputFunctionCall(typoutput, constval->constvalue);
+	arr = DatumGetArrayTypeP(constval->constvalue);
 
-	trimmedValue = pnstrdup(extval + 1, strlen(extval) - 2);
-
-	pfree(extval);
+	interm_buf = makeStringInfo();
 
 	switch (constval->consttype)
 	{
+		case INT2ARRAYOID:
+		{
+			int16 value;
+			deconstruct_array(arr, INT2OID, -1, false, 's', &dats, NULL, &len);
+
+			for (int i = 0; i < len; i++)
+			{
+				value = DatumGetInt16(dats[i]);
+
+				appendStringInfo(interm_buf, "%h", value);
+
+				appendStringInfo(buf, "%c%lu%c%s",
+						PXF_SIZE_BYTES, interm_buf->len,
+						PXF_CONST_DATA, interm_buf->data);
+				resetStringInfo(interm_buf);
+			}
+			break;
+		}
 		case INT4ARRAYOID:
 		{
-			char *token = strtok(trimmedValue, ",");
-			appendStringInfo(buf, "%c%lu%c%s",
-					PXF_SIZE_BYTES, strlen(token),
-					PXF_CONST_DATA, token);
+			int32 value;
+			deconstruct_array(arr, INT4OID, sizeof (value), true, 'i', &dats, NULL, &len);
 
-			while(token)
+			for (int i = 0; i < len; i++)
 			{
-				token = strtok(NULL, ",");
-				if (token)
+				value = DatumGetInt32(dats[i]);
+
+				appendStringInfo(interm_buf, "%d", value);
+
+				appendStringInfo(buf, "%c%lu%c%s",
+						PXF_SIZE_BYTES, interm_buf->len,
+						PXF_CONST_DATA, interm_buf->data);
+				resetStringInfo(interm_buf);
+			}
+			break;
+		}
+		case INT8ARRAYOID:
+		{
+			int64 value;
+			deconstruct_array(arr, INT8OID, sizeof (value), true, 'd', &dats, NULL, &len);
+
+			for (int i = 0; i < len; i++)
+			{
+				value = DatumGetInt64(dats[i]);
+
+				appendStringInfo(interm_buf, "%s", value);
+
+				appendStringInfo(buf, "%c%lu%c%s",
+						PXF_SIZE_BYTES, interm_buf->len,
+						PXF_CONST_DATA, interm_buf->data);
+				resetStringInfo(interm_buf);
+			}
+			break;
+		}
+		case TEXTARRAYOID:
+		{
+			char *value;
+
+			deconstruct_array(arr, TEXTOID, -1, false, 'c', &dats, NULL, &len);
+
+			for (int i = 0; i < len; i++)
+			{
+				value = DatumGetCString(DirectFunctionCall1(textout, dats[i]));
+
+				appendStringInfo(interm_buf, "%s", value);
+
+				appendStringInfo(buf, "%c%lu%c%s",
+						PXF_SIZE_BYTES, interm_buf->len,
+						PXF_CONST_DATA, interm_buf->data);
+				resetStringInfo(interm_buf);
+			}
+			break;
+		}
+		case BOOLARRAYOID:
+		{
+			bool value;
+			deconstruct_array(arr, BOOLOID, sizeof (value), false, 'c', &dats, NULL, &len);
+
+			for (int i = 0; i < len; i++)
+			{
+				value = DatumGetBool(dats[i]);
+				if (value)
 					appendStringInfo(buf, "%c%lu%c%s",
-							PXF_SIZE_BYTES, strlen(token),
-							PXF_CONST_DATA, token);
+							PXF_SIZE_BYTES, strlen(TrueConstValue),
+							PXF_CONST_DATA, TrueConstValue);
+				else
+				{
+					appendStringInfo(buf, "%c%lu%c%s",
+							PXF_SIZE_BYTES, strlen(FalseConstValue),
+							PXF_CONST_DATA, FalseConstValue);
+				}
 			}
 			break;
 		}
@@ -858,12 +1048,12 @@ list_const_to_str(Const *constval, StringInfo buf)
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("internal error in pxffilters.c:list_const_to_str. "
-							"Using unsupported data type (%d) (value %s)",
-							constval->consttype, trimmedValue)));
+							"Using unsupported data type (%d)",
+							constval->consttype)));
 
 	}
 
-	pfree(trimmedValue);
+	pfree(interm_buf->data);
 }
 
 

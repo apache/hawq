@@ -61,6 +61,10 @@ typedef enum PxfOperatorCode
 #define PXF_OPERATOR_CODE			'o'
 #define PXF_LOGICAL_OPERATOR_CODE	'l'
 
+#define NullConstValue   "\"NULL\""
+#define TrueConstValue   "true"
+#define FalseConstValue   "false"
+
 /*
  * An Operand has any of the above codes, and the information specific to
  * its type. This could be compacted but filter structures are expected to

@@ -27,6 +27,8 @@
 
 void run__scalar_const_to_str(Const* input, StringInfo result, char* expected);
 void run__scalar_const_to_str__negative(Const* input, StringInfo result, char* value);
+void run__list_const_to_str(Const* input, StringInfo result, char* expected);
+void run__list_const_to_str__negative(Const* input, StringInfo result, char* value);
 
 void
 test__supported_filter_type(void **state)
@@ -65,7 +67,7 @@ test__supported_filter_type(void **state)
 
 	/* go over pxf_supported_types array */
 	int nargs = sizeof(pxf_supported_types) / sizeof(Oid);
-	assert_int_equal(nargs, 15);
+	assert_int_equal(nargs, 19);
 	for (i = 0; i < nargs; ++i)
 	{
 		assert_true(supported_filter_type(pxf_supported_types[i]));
@@ -112,7 +114,7 @@ test__supported_operator_type(void **state)
 
 	/* go over pxf_supported_opr array */
 	int nargs = sizeof(pxf_supported_opr) / sizeof(dbop_pxfop_map);
-	assert_int_equal(nargs, 85);
+	assert_int_equal(nargs, 91);
 	for (i = 0; i < nargs; ++i)
 	{
 		assert_true(supported_operator_type(pxf_supported_opr[i].dbop, filter));
@@ -135,6 +137,39 @@ mock__scalar_const_to_str(Oid const_type, char* const_value)
 	expect_any(OidOutputFunctionCall, functionId);
 	expect_any(OidOutputFunctionCall, val);
 	will_return(OidOutputFunctionCall, const_value);
+}
+
+
+/*
+ * const_value must be palloc'ed, it will be freed by list_const_to_str
+ */
+void
+mock__list_const_to_str(Oid const_type, char* const_value)
+{
+
+	ArrayType  *arr;
+
+	expect_value(getTypeOutputInfo, type, const_type);
+	expect_any(getTypeOutputInfo, typOutput);
+	expect_any(getTypeOutputInfo, typIsVarlena);
+	will_return(getTypeOutputInfo, NULL);
+
+	expect_any(OidOutputFunctionCall, functionId);
+	expect_any(OidOutputFunctionCall, val);
+	will_return(OidOutputFunctionCall, const_value);
+
+	expect_any(pg_detoast_datum, datum);
+	will_return(pg_detoast_datum, arr);
+
+	expect_any(deconstruct_array, array);
+	expect_any(deconstruct_array, elmtype);
+	expect_any(deconstruct_array, elmlen);
+	expect_any(deconstruct_array, elmbyval);
+	expect_any(deconstruct_array, elmalign);
+	expect_any(deconstruct_array, elemsp);
+	expect_any(deconstruct_array, nullsp);
+	expect_any(deconstruct_array, nelemsp);
+	will_return(deconstruct_array, NULL);
 }
 
 void
@@ -170,6 +205,66 @@ verify__scalar_const_to_str(bool is_null, char* const_value, Oid const_type, cha
 	pfree(input);
 }
 
+void
+verify__list_const_to_str(char* const_value, Oid const_type, char* expected)
+{
+	StringInfo result = makeStringInfo();
+	char* value = NULL;
+	Const* input = (Const*) palloc0(sizeof(Const));
+	input->constisnull = false;
+	input->consttype = const_type;
+
+	/* need to prepare inner functions */
+	value = strdup(const_value); /* will be free'd by list_const_to_str */
+	mock__list_const_to_str(const_type, value);
+
+	/* no expected value means it's a negative test */
+	if (expected)
+	{
+		run__list_const_to_str(input, result, expected);
+	}
+	else
+	{
+		run__list_const_to_str__negative(input, result, value);
+		pfree(value); /* value was not freed by scalar_const_to_str b/c of failure */
+	}
+
+	pfree(result->data);
+	pfree(result);
+	pfree(input);
+}
+
+void
+test__list_const_to_str__int(void **state)
+{
+	verify__list_const_to_str("{1,2,3}", INT4ARRAYOID, "s1d1s1d2s1d3");
+	verify__list_const_to_str("{42}", INT4ARRAYOID, "s2d42");
+}
+
+
+void
+test__list_const_to_str__boolean(void **state)
+{
+	verify__list_const_to_str("{t,f}", BOOLARRAYOID, "s4dtrues5dfalse");
+	verify__list_const_to_str("{f,t}", BOOLARRAYOID, "s5dfalses4dtrue");
+	verify__list_const_to_str("{t}", BOOLARRAYOID, "s4dtrue");
+}
+
+void
+test__list_const_to_str__text(void **state)
+{
+
+	int c = 1, d = 1, n = 1;
+
+	/*for (n = 1; n <= 10; n++)
+		for (c = 1; c <= 32767; c++)
+			for (d = 1; d <= 32767; d++) {
+			}
+	*/
+
+	verify__list_const_to_str("{row1,row2}", TEXTARRAYOID, "s4drow1s4drow2");
+}
+
 void run__scalar_const_to_str(Const* input, StringInfo result, char* expected)
 {
 	scalar_const_to_str(input, result);
@@ -189,6 +284,48 @@ void run__scalar_const_to_str__negative(Const* input, StringInfo result, char* v
 	{
 		/* This will throw a ereport(ERROR).*/
 		scalar_const_to_str(input, result);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		pfree(err_msg->data);
+		pfree(err_msg);
+
+		return;
+	}
+	PG_END_TRY();
+
+	assert_true(false);
+}
+
+
+
+void run__list_const_to_str(Const* input, StringInfo result, char* expected)
+{
+	list_const_to_str(input, result);
+	assert_string_equal(result->data, expected);
+}
+
+void run__list_const_to_str__negative(Const* input, StringInfo result, char* value)
+{
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg,
+			"internal error in pxffilters.c:list_const_to_str. "
+			"Using unsupported data type (%d) (value %s)", input->consttype, value);
+
+	/* Setting the test -- code omitted -- */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		list_const_to_str(input, result);
 	}
 	PG_CATCH();
 	{
@@ -251,6 +388,8 @@ test__scalar_const_to_str__NegativeCircle(void **state)
 {
 	verify__scalar_const_to_str(false, "<3,3,9>", CIRCLEOID, NULL);
 }
+
+
 
 void
 test__opexpr_to_pxffilter__null(void **state)
@@ -599,6 +738,9 @@ main(int argc, char* argv[])
 			unit_test(test__scalar_const_to_str__text),
 			unit_test(test__scalar_const_to_str__boolean),
 			unit_test(test__scalar_const_to_str__NegativeCircle),
+			unit_test(test__list_const_to_str__int),
+			unit_test(test__list_const_to_str__boolean),
+			unit_test(test__list_const_to_str__text),
 			unit_test(test__opexpr_to_pxffilter__null),
 			unit_test(test__opexpr_to_pxffilter__unary_expr),
 			unit_test(test__opexpr_to_pxffilter__intGT),
