@@ -80,7 +80,7 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
     }
 }
 
-void TestHawqRegister::runYamlCaseForceMode(std::string casename, std::string ymlname, int isexpectederror = 1, int rows = 50, int checknum = 200) {
+void TestHawqRegister::runYamlCaseForceMode(std::string casename, std::string ymlname, int isexpectederror = 1, int rows = 50, int checknum = 200, bool samepathfile = false) {
     SQLUtility util;
     string test_root(util.getTestRootPath());
     string t_yml_tpl(hawq::test::stringFormat("%s/ManagementTool/%s_tpl.yml", test_root.c_str(), ymlname.c_str()));
@@ -107,11 +107,17 @@ void TestHawqRegister::runYamlCaseForceMode(std::string casename, std::string ym
     hc.getNamenodeHost(hdfs_prefix);
     strs_src_dst["@PORT@"]= hdfs_prefix;
     frep.replace(t_yml_tpl, t_yml, strs_src_dst);
+    if(samepathfile) {
+        for(int i=8; i<=13; i++){
+          string file(hawq::test::stringFormat("%s/ManagementTool/usage2case2/", test_root.c_str()));
+          file.append(std::to_string(i));
+          EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -put %s /hawq_default/16385/%s/%s/", file.c_str(), strs_src_dst["@DATABASE_OID@"].c_str(),strs_src_dst["@TABLE_OID_OLD@"].c_str())));
+        }
+    }
     //printf("%s\n", hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str()).c_str());
     //sleep(60);
     EXPECT_EQ(isexpectederror, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str())));
     util.query("select * from nt;", checknum);
-
     EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
     util.execute("drop table t;");
     util.execute("drop table nt;");
@@ -248,6 +254,10 @@ TEST_F(TestHawqRegister, TestUsage2Case2TableExistNoData) {
 
 TEST_F(TestHawqRegister, TestUsage2Case2NormalYamlConfig) {
     runYamlCaseForceMode("testusage2case2normalyamlconfig", "usage2case2/normal_yaml_config", 0, 50, 150);
+}
+
+TEST_F(TestHawqRegister, TestUsage2Case2SamePathYamlConfig) {
+    runYamlCaseForceMode("testusage2case2samepathyamlconfig", "usage2case2/same_path_yaml_config", 0, 50, 332, true);
 }
 
 TEST_F(TestHawqRegister, TestUsage2Case2NormalYamlNoUpdateConfig) {
