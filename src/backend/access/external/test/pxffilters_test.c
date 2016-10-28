@@ -145,10 +145,6 @@ mock__scalar_const_to_str(Oid const_type, char* const_value)
  */
 void
 mock__list_const_to_str(Oid const_type, int len, Datum *dats) {
-	expect_value(getTypeOutputInfo, type, const_type);
-	expect_any(getTypeOutputInfo, typOutput);
-	expect_any(getTypeOutputInfo, typIsVarlena);
-	will_return(getTypeOutputInfo, NULL);
 
 	expect_any(pg_detoast_datum, datum);
 	will_return(pg_detoast_datum, NULL);

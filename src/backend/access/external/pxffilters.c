@@ -920,8 +920,6 @@ scalar_const_to_str(Const *constval, StringInfo buf)
 static void
 list_const_to_str(Const *constval, StringInfo buf)
 {
-	Oid			typoutput;
-	bool		typIsVarlena;
 	StringInfo	interm_buf;
 	Datum *dats;
 	ArrayType  *arr;
@@ -929,19 +927,14 @@ list_const_to_str(Const *constval, StringInfo buf)
 
 	if (constval->constisnull)
 	{
+		elog(DEBUG1, "Null constant is not expected in this context.");
 		return;
 	}
 
 	if (constval->constbyval) {
-		ereport(ERROR,
-				(errcode(ERRCODE_INTERNAL_ERROR),
-						errmsg("internal error in pxffilters.c:list_const_to_str. "
-								"Constant passed by value instead of Datum")));
+		elog(DEBUG1, "Constant passed by value is not expected in this context.");
+		return;
 	}
-
-
-	getTypeOutputInfo(constval->consttype,
-					  &typoutput, &typIsVarlena);
 
 	arr = DatumGetArrayTypeP(constval->constvalue);
 
