@@ -18,7 +18,7 @@
 # under the License.
 
 # Usage1: hawq register [-h hostname] [-p port] [-U username] [-d database] [-f filepath] [-e eof] <tablename>
-# Usage2: hawq register [-h hostname] [-p port] [-U username] [-d database] [-c config] [--force] [--repair] <tablename>
+# Usage2: hawq register [-h hostname] [-p port] [-U username] [-d database] [-c config] [--force] <tablename>
 
 import os
 import sys
@@ -54,7 +54,6 @@ def option_parser():
     parser.add_option('-e', '--eof', dest='filesize', type='int', default=None, help='eof of the file to be registered')
     parser.add_option('-c', '--config', dest='yml_config', default='', help='configuration file in YAML format')
     parser.add_option('-F', '--force', dest='force', action='store_true', default=False)
-    parser.add_option('-R', '--repair', dest='repair', action='store_true', default=False)
     return parser
 
 
@@ -340,7 +339,7 @@ class HawqRegister(object):
         self.accessor = GpRegisterAccessor(conn)
         self.utility_accessor = GpRegisterAccessor(utility_conn)
         self.failure_handler = failure_handler
-        self.mode = self._init_mode(options.force, options.repair)
+        self.mode = self._init_mode(options.force)
         self.srcfiles = []
         self.dstfiles = []
         self.files_same_path = []
@@ -351,20 +350,13 @@ class HawqRegister(object):
         self.eofuncompresseds_same_path = []
         self.segnos_same_path = []
 
-    def _init_mode(self, force, repair):
+    def _init_mode(self, force):
         def table_existed():
             return self.accessor.get_table_existed(self.dst_table_name)
 
         if self.yml:
             if force:
                 return 'force'
-            elif repair:
-                logger.info('--repair mode is not supported in current release of hawq register.')
-                sys.exit(0)
-                if not table_existed():
-                    logger.error('--repair mode asserts the table has been already created.')
-                    sys.exit(1)
-                return 'repair'
             else:
                 return 'usage2_table_not_exist'
         else:
@@ -583,9 +575,8 @@ class HawqRegister(object):
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
             self._check_file_not_folder()
             self._check_database_encoding()
-            if self.mode != 'repair':
-                if not self._create_table() and self.mode != 'force':
-                    self.mode = 'usage2_table_exist'
+            if not self._create_table() and self.mode != 'force':
+                self.mode = 'usage2_table_exist'
         else:
             if self._is_folder(self.filepath) and self.filesize:
                 logger.error('-e option is only supported with single file case.')
@@ -628,23 +619,6 @@ class HawqRegister(object):
                 logger.error("Hawq aoseg metadata doesn't consistent with file numbers in hdfs.")
                 self.failure_handler.rollback()
                 sys.exit(1)
-        if self.mode == 'repair':
-            if self.tabledir.strip('/') != self.filepath.strip('/'):
-                logger.error("In repair mode, file path from yaml file should be the same with table's path.")
-                self.failure_handler.rollback()
-                sys.exit(1)
-            existed_info = {}
-            for k, fn in enumerate(existed_files):
-                existed_info[fn] = existed_sizes[k]
-            for k, fn in enumerate(self.files):
-                if fn not in existed_files:
-                    logger.error('Can not register in repair mode since giving non-existing file: %s.' % fn)
-                    self.failure_handler.rollback()
-                    sys.exit(1)
-                if self.sizes[k] > existed_info[fn]:
-                    logger.error('Can not register in repair mode since giving larger file size: %s' % self.sizes[k])
-                    self.failure_handler.rollback()
-                    sys.exit(1)
 
         if self.mode == 'usage2_table_exist':
             if self.tabledir.strip('/') == self.filepath.strip('/'):
@@ -689,14 +663,6 @@ class HawqRegister(object):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                     self.failure_handler.rollback()
                     sys.exit(1)
-        elif self.mode == 'repair':
-            self.do_not_move = True
-            self.files_update, self.sizes_update = [fn for fn in self.files], [sz for sz in self.sizes]
-            self.files_delete = []
-            for fn in existed_files:
-                if fn not in self.files:
-                    self.files_delete.append(fn)
-            self.files_append, self.sizes_append = [], []
 
         self._check_files_and_table_in_same_hdfs_cluster(self.filepath, self.tabledir)
 
@@ -963,7 +929,7 @@ class HawqRegister(object):
     def _prepare_register(self):
         if not self.do_not_move:
             self._set_move_files_in_hdfs()
-        if self.mode == 'force' or self.mode == 'repair':
+        if self.mode == 'force':
             self._set_modify_metadata('force')
         else:
             self._set_modify_metadata('insert')
@@ -972,10 +938,6 @@ class HawqRegister(object):
         if not self.do_not_move:
             self._move_files_in_hdfs()
         self._modify_metadata()
-        if self.mode == 'repair':
-            if self.files_delete:
-                self._delete_files_in_hdfs()
-                self._delete_metadata()
         logger.info('Hawq Register Succeed.')
 
 
@@ -1033,11 +995,10 @@ class HawqRegisterPartition(HawqRegister):
                 self._check_file_not_folder()
         if self.yml:
             self._check_database_encoding()
-            if self.mode != 'repair':
-                if not self._create_table() and self.mode != 'force':
-                    self.mode = 'usage2_table_exist'
-                    self._check_partitionby()
-                    self._check_partition_num()
+            if not self._create_table() and self.mode != 'force':
+                self.mode = 'usage2_table_exist'
+                self._check_partitionby()
+                self._check_partition_num()
         partitions = self._get_partition_info()
         self.queries = "set allow_system_table_mods='dml';"
         self.queries += "begin transaction;"
@@ -1124,10 +1085,10 @@ def test(options, args):
 if __name__ == '__main__':
     parser = option_parser()
     options, args = parser.parse_args()
-    if len(args) != 1 or (options.force and options.repair):
+    if len(args) != 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    if (options.yml_config or options.force or options.repair) and options.filepath:
+    if (options.yml_config or options.force) and options.filepath:
         parser.print_help(sys.stderr)
         sys.exit(1)
     if local_ssh('hdfs'):
