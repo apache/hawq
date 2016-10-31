@@ -443,6 +443,7 @@ class HawqRegister(object):
             print e
             self.failure_handler.rollback()
             sys.exit(1)
+            
         table_column_num = self.accessor.get_table_column_num(self.tablename)
         register_yaml_dict_check(params, table_column_num, self.tablename)
         partitions_filepaths = []
@@ -457,37 +458,43 @@ class HawqRegister(object):
         partitions_varblockcounts = []
         files, sizes, tupcounts, eofuncompresseds, varblockcounts = [], [], [], [], []
 
-        if params['FileFormat'].lower() == 'parquet':
-            Format = 'Parquet'
-        else: #AO format
-            Format = 'AO'
-        Format_FileLocations = '%s_FileLocations' % Format
-        partitionby = params.get(Format_FileLocations).get('PartitionBy')
-        if params.get(Format_FileLocations).get('Partitions') and len(params[Format_FileLocations]['Partitions']):
-            partitions_checksum = [d['Checksum'] for d in params[Format_FileLocations]['Partitions']]
-            partitions_compression_level = [d['CompressionLevel'] for d in params[Format_FileLocations]['Partitions']]
-            partitions_compression_type = [d['CompressionType'] for d in params[Format_FileLocations]['Partitions']]
-            partitions_constraint = [d['Constraint'] for d in params[Format_FileLocations]['Partitions']]
-            partitions_files = [d['Files'] for d in params[Format_FileLocations]['Partitions']]
-            if len(partitions_files):
-                for pfile in partitions_files:
-                    partitions_filepaths.append([params['DFS_URL'] + item['path'] for item in pfile])
-                    partitions_filesizes.append([item['size'] for item in pfile])
-                    partitions_tupcounts.append([item['tupcount'] if item.has_key('tupcount') else -1 for item in pfile])
-                    partitions_eofuncompresseds.append([item['eofuncompressed'] if item.has_key('eofuncompressed') else -1 for item in pfile])
-                    partitions_varblockcounts.append([item['varblockcount'] if item.has_key('varblockcount') else -1 for item in pfile])
-            partitions_name = [d['Name'] for d in params[Format_FileLocations]['Partitions']]
-        if len(params[Format_FileLocations]['Files']):
-            for ele in params[Format_FileLocations]['Files']:
-                files.append(params['DFS_URL'] + ele['path'])
-                sizes.append(ele['size'])
-                tupcounts.append(ele['tupcount'] if ele.has_key('tupcount') else -1)
-                eofuncompresseds.append(ele['eofuncompressed'] if ele.has_key('eofuncompressed') else -1)
-                varblockcounts.append(ele['varblockcount'] if ele.has_key('varblockcount') else -1)
+        try:
+            if params['FileFormat'].lower() == 'parquet':
+                Format = 'Parquet'
+            else: #AO format
+                Format = 'AO'
+            Format_FileLocations = '%s_FileLocations' % Format
+            partitionby = params.get(Format_FileLocations).get('PartitionBy')
+            if params.get(Format_FileLocations).get('Partitions') and len(params[Format_FileLocations]['Partitions']):
+                partitions_checksum = [d['Checksum'] for d in params[Format_FileLocations]['Partitions']]
+                partitions_compression_level = [d['CompressionLevel'] for d in params[Format_FileLocations]['Partitions']]
+                partitions_compression_type = [d['CompressionType'] for d in params[Format_FileLocations]['Partitions']]
+                partitions_constraint = [d['Constraint'] for d in params[Format_FileLocations]['Partitions']]
+                partitions_files = [d['Files'] for d in params[Format_FileLocations]['Partitions']]
+                if len(partitions_files):
+                    for pfile in partitions_files:
+                        partitions_filepaths.append([params['DFS_URL'] + item['path'] for item in pfile])
+                        partitions_filesizes.append([item['size'] for item in pfile])
+                        partitions_tupcounts.append([item['tupcount'] if item.has_key('tupcount') else -1 for item in pfile])
+                        partitions_eofuncompresseds.append([item['eofuncompressed'] if item.has_key('eofuncompressed') else -1 for item in pfile])
+                        partitions_varblockcounts.append([item['varblockcount'] if item.has_key('varblockcount') else -1 for item in pfile])
+                partitions_name = [d['Name'] for d in params[Format_FileLocations]['Partitions']]
+            if len(params[Format_FileLocations]['Files']):
+                for ele in params[Format_FileLocations]['Files']:
+                    files.append(params['DFS_URL'] + ele['path'])
+                    sizes.append(ele['size'])
+                    tupcounts.append(ele['tupcount'] if ele.has_key('tupcount') else -1)
+                    eofuncompresseds.append(ele['eofuncompressed'] if ele.has_key('eofuncompressed') else -1)
+                    varblockcounts.append(ele['varblockcount'] if ele.has_key('varblockcount') else -1)
 
-        encoding = params['Encoding']
-        bucketNum = params['Bucketnum'] if params['Distribution_Policy'].startswith('DISTRIBUTED BY') else 6
-        self._set_yml_data(Format, files, sizes, tupcounts, eofuncompresseds, varblockcounts, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], bucketNum, partitionby, partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, partitions_tupcounts, partitions_eofuncompresseds, partitions_varblockcounts, encoding)
+            encoding = params['Encoding']
+            bucketNum = params['Bucketnum'] if params['Distribution_Policy'].startswith('DISTRIBUTED BY') else 6
+            self._set_yml_data(Format, files, sizes, tupcounts, eofuncompresseds, varblockcounts, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], bucketNum, partitionby, partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, partitions_tupcounts, partitions_eofuncompresseds, partitions_varblockcounts, encoding)
+
+        except KeyError as e:
+            print 'Invalid yaml file, %s is missing.' % e
+            self.failure_handler.rollback()
+            sys.exit(1)
 
 
     # check conflicting distributed policy
