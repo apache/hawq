@@ -31,7 +31,7 @@ import static org.junit.Assert.assertEquals;
 public class JdbcFilterBuilderTest {
     @Test
     public void parseFilterWithThreeOperations() throws Exception {
-        //orgin sql => col_1>'2008-02-01' and col_1<'2008-12-01' and col_2 > 1200
+        //orgin sql => col_1>'2008-02-01' and col_1<'2008-12-01' or col_2 > 1200
         String filterstr = "a1c\"2008-02-01\"o2a1c\"2008-12-01\"o1l0a2c1200o2l1";
         JdbcFilterBuilder builder = new JdbcFilterBuilder();
 
