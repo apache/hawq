@@ -95,6 +95,9 @@ class TestHawqRegister : public ::testing::Test {
         void runYamlCaseTableNotExists(std::string casename, std::string ymlname, int expectederror, int checknum);
         void runYamlCaseTableExists(std::string casename, std::string ymlname, int isexpectederror, int checknum);
         void runYamlCaseForceMode(std::string casename, std::string ymlname, int isexpectederror, int rows, int checknum, bool samepath);
+        void runYamlCaseTableNotExistsPartition(std::string casename, std::string ymlname, int expectederror, int checknum, int islistpartition);
+        void runYamlCaseTableExistsPartition(std::string casename, std::string ymlname, int isexpectederror, int checknum, int islistpartition);
+        void runYamlCaseForceModePartition(std::string casename, std::string ymlname, int isexpectederror, int rows, int checknum);
 
     private:
         std::unique_ptr<hawq::test::PSQL> conn;
