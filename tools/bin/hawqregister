@@ -130,7 +130,7 @@ def ispartition(yml_file):
             params = yaml.load(f)
     except yaml.scanner.ScannerError as e:
         print e
-        system.exit(1)
+        sys.exit(1)
 
     if params['FileFormat'].lower() == 'parquet':
         Format = 'Parquet'
@@ -727,6 +727,9 @@ class HawqRegister(object):
         self.files_update = ['1', '2', '3', '5', '6', 'a']
         self.sizes_update = [1, 2, 3, 4, 5, 6]
         self.files_append = ['1', '2', '3']
+        self.tupcounts_update = [1, 2, 3, 4, 5, 6]
+        self.eofuncompresseds_update = [1, 2, 3, 4, 5, 6]
+        self.varblockcounts_update = [1, 2, 3, 4, 5, 6]
         self.tabledir = ''
         self._set_move_files_in_hdfs()
         print self.files_update
@@ -1090,7 +1093,7 @@ def main(options, args):
     ins.register()
     conn.close()
 
-def test():
+def test(options, args):
     def connectdb(options):
         '''
         Trying to connect database, return a connection object.
