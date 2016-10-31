@@ -56,7 +56,6 @@ public class JdbcPlugin extends Plugin {
         super(input);
         jdbcDriver = input.getUserProperty("JDBC_DRIVER");
         dbUrl = input.getUserProperty("DB_URL");
-        //dbUrl = "jdbc:mysql://192.168.200.6:3306/demodb";
         user = input.getUserProperty("USER");
         pass = input.getUserProperty("PASS");
         String strBatch = input.getUserProperty("BATCH_SIZE");

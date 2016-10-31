@@ -46,14 +46,13 @@ public class JdbcReadResolver extends Plugin implements ReadResolver {
 
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
-        //LOG.info("getFields");
         ResultSet result = (ResultSet) row.getData();
-        LinkedList<OneField> fields = new LinkedList<OneField>();
+        LinkedList<OneField> fields = new LinkedList<>();
 
         for (int i = 0; i < columns.size(); i++) {
             ColumnDescriptor column = columns.get(i);
             String colname = column.columnName();
-            Object value = null;//result.getObject(column.columnName());
+            Object value = null;
 
             OneField oneField = new OneField();
             oneField.type = column.columnTypeCode();
@@ -78,17 +77,6 @@ public class JdbcReadResolver extends Plugin implements ReadResolver {
                     value = result.getBoolean(colname);
                     break;
                 case BYTEA:
-                    /*
-                    byte[] bts = null;
-                    if (val != null) {
-                        int length = Array.getLength(val);
-                        bts = new byte[length];
-                        for (int j = 0; j < length; j++) {
-                            bts[j] = Array.getByte(val, j);
-                        }
-                    }
-                    gpdbOutput.setBytes(colIdx, bts);
-                     */
                     value = result.getBytes(colname);
                     break;
                 case VARCHAR:
@@ -99,14 +87,12 @@ public class JdbcReadResolver extends Plugin implements ReadResolver {
                     break;
                 case TIMESTAMP:
                 case DATE:
-                    //value = result.getString(colname);
                     value = result.getDate(colname);
                     break;
                 default:
                     throw new UnsupportedOperationException("Unknwon Field Type : " + DataType.get(oneField.type).toString()
                             +", Column : " + column.toString());
             }
-            //oneField.val = convertToJavaObject(oneField.type, column.columnTypeName(), value);
             oneField.val = value;
             fields.add(oneField);
         }

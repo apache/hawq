@@ -19,9 +19,6 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  * under the License.
  */
 
-import org.apache.hawq.pxf.api.UnsupportedTypeException;
-import org.iq80.leveldb.DB;
-
 /**
  * As the syntax of different database products are not the same, such as the date type  field for processing, ORACLE use to_date () function, and mysql use Date () function.
  So we create this class to abstract public methods, the specific database products can implementation of these  methods.
@@ -39,8 +36,8 @@ public abstract class DbProduct {
         else if (db_product.toUpperCase().contains("POSTGRES"))
             return new PostgresProduct();
         else
+            //Unsupported databases may execute errors
             return new CommonProduct();
-            //throw new UnsupportedTypeException("Unkwon Database Product: " + db_product );
     }
 }
 class CommonProduct extends DbProduct{

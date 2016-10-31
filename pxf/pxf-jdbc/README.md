@@ -24,19 +24,19 @@ The following PXF table definition is valid for Jdbc Table.
         ( column_name data_type [, ...] | LIKE other_table )
     LOCATION ('pxf://namenode[:port]/jdbc-schema-name.jdbc-table-name?<pxf-parameters><&custom-parameters>')
     FORMAT 'CUSTOM' (formatter='pxfwritable_import')
-If `jdbc-schema-name` is omitted, pxf will default to the default schema.
+If `jdbc-schema-name` is omitted, pxf will default to the `default` schema.
 
 The `column_name` must exists in jdbc-table,`data_type` equals or similar to
 the jdbc-column type.
 
-where <pxf-parameters> is:
+where `<pxf-parameters>` is:
 
     [FRAGMENTER=org.apache.hawq.pxf.plugins.jdbc.JdbcPartitionFragmenter
     &ACCESSOR=org.apache.hawq.pxf.plugins.jdbc.JdbcReadAccessor
     &RESOLVER=org.apache.hawq.pxf.plugins.jdbc.JdbcReadResolver]
     | PROFILE=Jdbc
 
-where <custom-parameters> is:
+where `<custom-parameters>` is:
 
     JDBC_DRIVER=<jdbc-driver-class-name>
      &DB_URL=<jdbc-url>&USER=<database-user>&PASS=<password>
@@ -135,6 +135,6 @@ HAWQ Table:
                          '&DB_URL=jdbc:mysql://192.168.200.6:3306/demodb&USER=root&PASS=root'
                          '&PARTITION_BY=cdate:date&RANGE=2008-01-01:2010-01-01&INTERVAL=1:year'
                          )
-                 FORMAT 'CUSTOM' (Formatter='pxfwritable_import'",
+                 FORMAT 'CUSTOM' (Formatter='pxfwritable_import');
 At PXF-JDBC plugin,this will generate 2 fragments.Then HAWQ assign these fragments to 2 PXF-instance
 to access jdbc table data.

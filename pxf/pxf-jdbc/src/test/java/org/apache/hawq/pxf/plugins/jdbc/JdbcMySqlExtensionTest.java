@@ -45,10 +45,10 @@ import static org.mockito.Mockito.when;
 
 public class JdbcMySqlExtensionTest {
     private static final Log LOG = LogFactory.getLog(JdbcMySqlExtensionTest.class);
-    static String MYSQL_URL = "jdbc:mysql://localhost:3306/demodb";
+    static String MYSQL_URL = "jdbc:mysql://10.110.17.21:3306/demodb";
     InputData inputData;
 
-    @Before
+    //@Before
     public void setup() throws Exception {
         LOG.info("JdbcMySqlExtensionTest.setup()");
         prepareConstruction();
@@ -70,17 +70,17 @@ public class JdbcMySqlExtensionTest {
                 "INSERT INTO sales values (10, DATE('2008-10-01'), 800,'bad')",
                 "INSERT INTO sales values (11, DATE('2008-11-01'), 1250,'good')",
                 "INSERT INTO sales values (12, DATE('2008-12-01'), 1300,'excellent')",
-                "INSERT INTO sales values (15, DATE('2009-01-01'), 1500,'excellent')",
-                "INSERT INTO sales values (16, DATE('2009-02-01'), 1340,'excellent')",
                 "INSERT INTO sales values (13, DATE('2009-03-01'), 1250,'good')",
-                "INSERT INTO sales values (14, DATE('2009-04-01'), 1300,'excellent')"};
+                "INSERT INTO sales values (14, DATE('2009-04-01'), 1300,'excellent')",
+                "INSERT INTO sales values (15, DATE('2009-01-01'), 1500,'excellent')",
+                "INSERT INTO sales values (16, DATE('2009-02-01'), 1340,'excellent')"};
         for (String sql : inserts)
             writer.executeSQL(sql);
 
         writer.closeWrite();
     }
 
-    @After
+    //@After
     public void cleanup() throws Exception {
         LOG.info("JdbcMySqlExtensionTest.cleanup()");
         prepareConstruction();
@@ -230,6 +230,27 @@ public class JdbcMySqlExtensionTest {
         reader.closeForRead();
     }
 
+    @Test
+    public void testNoPartition() throws Exception {
+        prepareConstruction();
+        when(inputData.hasFilter()).thenReturn(false);
+        JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+        List<Fragment> fragments = fragment.getFragments();
+        assertEquals(1, fragments.size());
+
+        when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
+
+        JdbcReadAccessor reader = new JdbcReadAccessor(inputData);
+        reader.openForRead();
+
+        ArrayList<List<OneField>> row_list = readAllRows(reader);
+
+        //all data
+        assertEquals(16, row_list.size());
+
+        reader.closeForRead();
+    }
+
     private ArrayList<List<OneField>> readAllRows(JdbcReadAccessor reader) throws Exception {
         JdbcReadResolver resolver = new JdbcReadResolver(inputData);
         ArrayList<List<OneField>> row_list = new ArrayList<>();
@@ -263,7 +284,6 @@ public class JdbcMySqlExtensionTest {
         when(inputData.getColumn(1)).thenReturn(columns.get(1));
         when(inputData.getColumn(2)).thenReturn(columns.get(2));
         when(inputData.getColumn(3)).thenReturn(columns.get(3));
-        //*/
 
     }
 

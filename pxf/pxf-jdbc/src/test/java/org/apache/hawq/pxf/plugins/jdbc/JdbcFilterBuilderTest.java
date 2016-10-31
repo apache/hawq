@@ -31,15 +31,15 @@ import static org.junit.Assert.assertEquals;
 public class JdbcFilterBuilderTest {
     @Test
     public void parseFilterWithThreeOperations() throws Exception {
-        //orgin sql => cdate>'2008-02-01' and cdate<'2008-12-01' and amt > 1200
-        //filterstr="a1c\"first\"o5a2c2o2l0";//col_1=first and col_2=2
-        String filterstr = "a1c\"2008-02-01\"o2a1c\"2008-12-01\"o1l0a2c1200o2l1"; //col_1>'first' and col_1<'2008-12-01' or col_2 > 1200;
+        //orgin sql => col_1>'2008-02-01' and col_1<'2008-12-01' and col_2 > 1200
+        String filterstr = "a1c\"2008-02-01\"o2a1c\"2008-12-01\"o1l0a2c1200o2l1";
         JdbcFilterBuilder builder = new JdbcFilterBuilder();
 
         LogicalFilter filterList = (LogicalFilter) builder.getFilterObject(filterstr);
         assertEquals(LogicalOperation.HDOP_OR, filterList.getOperator());
         LogicalFilter l1_left = (LogicalFilter) filterList.getFilterList().get(0);
         BasicFilter l1_right = (BasicFilter) filterList.getFilterList().get(1);
+
         //column_2 > 1200
         assertEquals(2, l1_right.getColumn().index());
         assertEquals(HDOP_GT, l1_right.getOperation());
@@ -54,7 +54,7 @@ public class JdbcFilterBuilderTest {
         assertEquals(HDOP_GT, l2_left.getOperation());
         assertEquals("2008-02-01", l2_left.getConstant().constant());
 
-        //column_2 = 5
+        //column_2 < '2008-12-01'
         assertEquals(1, l2_right.getColumn().index());
         assertEquals(HDOP_LT, l2_right.getOperation());
         assertEquals("2008-12-01", l2_right.getConstant().constant());

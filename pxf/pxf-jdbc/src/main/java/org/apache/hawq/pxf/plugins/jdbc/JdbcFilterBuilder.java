@@ -50,10 +50,6 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder  {
      *             filter or list of basic filters
      */
     public Object getFilterObject(String filterString) throws Exception {
-        // First check for LogicalOperator, Jdbc currently only support HDOP_AND.
-      //  if (filterString.contains("l1") || filterString.contains("l2"))
-       //     return null;
-
         FilterParser parser = new FilterParser(this);
         Object result = parser.parse(filterString);
 

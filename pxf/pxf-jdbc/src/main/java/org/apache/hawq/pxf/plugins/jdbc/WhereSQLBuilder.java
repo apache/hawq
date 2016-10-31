@@ -64,7 +64,8 @@ public class WhereSQLBuilder extends JdbcFilterBuilder {
     }
 
     public String buildWhereSQL(String db_product) throws Exception {
-        if (!inputData.hasFilter()) return null;
+        if (!inputData.hasFilter())
+            return null;
         List<BasicFilter> filters = null;
         try {
             String filterString = inputData.getFilterString();
@@ -101,7 +102,7 @@ public class WhereSQLBuilder extends JdbcFilterBuilder {
                     default:
                         throw new UnsupportedFilterException("unsupported Filter operation : " + op);
                 }
-                //
+
                 DbProduct dbProduct = DbProduct.getDbProduct(db_product);
                 Object val = filter.getConstant().constant();
                 switch (DataType.get(column.columnTypeCode())) {
@@ -124,7 +125,6 @@ public class WhereSQLBuilder extends JdbcFilterBuilder {
                         throw new UnsupportedFilterException("unsupported column type for filtering : " + column.columnTypeCode());
                 }
 
-                sb.append("");
             }
             return sb.toString();
         } catch (UnsupportedFilterException ex) {

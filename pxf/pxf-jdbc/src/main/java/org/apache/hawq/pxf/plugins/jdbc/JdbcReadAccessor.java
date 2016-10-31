@@ -73,7 +73,6 @@ public class JdbcReadAccessor extends JdbcPlugin implements ReadAccessor {
             return true;
         super.openConnection();
 
-        //conn.setAutoCommit(false);
         statement = dbconn.createStatement();
 
         resultSet = executeQuery(querySql);
