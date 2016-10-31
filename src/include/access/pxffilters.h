@@ -61,7 +61,7 @@ typedef enum PxfOperatorCode
 #define PXF_OPERATOR_CODE			'o'
 #define PXF_LOGICAL_OPERATOR_CODE	'l'
 
-#define NullConstValue   "\"NULL\""
+#define NullConstValue   "NULL"
 #define TrueConstValue   "true"
 #define FalseConstValue   "false"
 
