@@ -33,20 +33,20 @@ TEST_F(TestHawqRegister, TestUsage2Case1IncorrectYaml) {
     SQLUtility util;
     string filePath = util.getTestRootPath() + "/ManagementTool/";
 
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_pagesize.yml xx"));
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_rowgroupsize.yml xx"));
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_filesize.yml xx"));
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_schema.yml xx"));
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_checksum.yml xx"));
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_dfs_url.yml xx"));
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_bucketnum.yml xx"));
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_constraint_partition.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_pagesize.yml testhawqregister_testusage2case1incorrectyaml.xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_rowgroupsize.yml testhawqregister_testusage2case1incorrectyaml.xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_filesize.yml testhawqregister_testusage2case1incorrectyaml.xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_schema.yml testhawqregister_testusage2case1incorrectyaml.xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_checksum.yml testhawqregister_testusage2case1incorrectyaml.xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "wrong_dfs_url.yml testhawqregister_testusage2case1incorrectyaml.xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_bucketnum.yml testhawqregister_testusage2case1incorrectyaml.xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "missing_constraint_partition.yml testhawqregister_testusage2case1incorrectyaml.xx"));
 }
 
 TEST_F(TestHawqRegister, TestUsage2Case1MismatchFileNumber) {
     SQLUtility util;
     string filePath = util.getTestRootPath() + "/ManagementTool/";
-    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "files_incomplete.yml xx"));
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c " + filePath + "files_incomplete.yml testhawqregister_testusage2case1mismatchfilenumber.xx"));
 }
 
 
@@ -317,7 +317,7 @@ TEST_F(TestHawqRegister, DISABLED_TestUsage2Case1ErrorRowgroupSize) {
 TEST_F(TestHawqRegister, TestUsage2Case1IncludeDirectory) {
     SQLUtility util;
     string test_root(util.getTestRootPath());
-    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -put -f %s/ManagementTool/usage2case1 %s/", test_root.c_str(), getHdfsLocation().c_str())));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hadoop fs -put -f %s/ManagementTool/usage2case1 %s/", test_root.c_str(), getHdfsLocation().c_str())));
     string t_yml(hawq::test::stringFormat("%s/ManagementTool/usage2case1/includedirectory.yml", test_root.c_str()));
     EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c %s testhawqregister_testusage2case1includedirectory.nt", HAWQ_DB, t_yml.c_str())));
     EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -rm -r %s/usage2case1", getHdfsLocation().c_str())));

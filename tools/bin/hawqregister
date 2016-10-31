@@ -142,6 +142,12 @@ def ispartition(yml_file):
             return True
     return False
 
+def tablename_handler(tablename):
+    tmp_lst = tablename.split('.')
+    if len(tmp_lst) > 1:
+        return tmp_lst[-2], tmp_lst[-1]
+    return 'public', tablename
+
 class FailureHandler(object):
     def __init__(self, conn):
         self.operations = []
@@ -197,12 +203,18 @@ class GpRegisterAccessor(object):
         '''execute query and return dict result'''
         return self.conn.query(sql).dictresult()
 
+    def get_schema_id(self, schemaname):
+        qry = """select oid from pg_namespace where nspname='%s';""" % schemaname
+        return self.exec_query(qry)[0]['oid']
+
     def get_table_existed(self, tablename):
-        qry = """select count(*) from pg_class where relname = '%s';""" % tablename.split('.')[-1].lower()
+        schemaname, tablename = tablename_handler(tablename)
+        qry = """select count(*) from pg_class where relnamespace = '%s' and relname = '%s';""" % (self.get_schema_id(schemaname), tablename)
         return self.exec_query(qry)[0]['count'] == 1
 
     def get_table_column_num(self, tablename):
-        qry = """select count(*) from pg_attribute ,pg_class where pg_class.relname = '%s' and pg_class.oid = pg_attribute.attrelid and attnum > 0;""" % tablename.split('.')[-1].lower()
+        schemaname, tablename = tablename_handler(tablename)
+        qry = """select count(*) from pg_attribute ,pg_class where pg_class.relnamespace = '%s' and pg_class.relname = '%s' and pg_class.oid = pg_attribute.attrelid and attnum > 0;""" % (self.get_schema_id(schemaname), tablename)
         return self.exec_query(qry)[0]['count']
 
     def do_create_table(self, src_table_name, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number, partitionby, partitions_constraint, partitions_name):
@@ -241,7 +253,8 @@ class GpRegisterAccessor(object):
         return True, query
 
     def check_hash_type(self, tablename):
-        qry = """select attrnums from gp_distribution_policy, pg_class where pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;""" % tablename
+        schemaname, tablename = tablename_handler(tablename)
+        qry = """select attrnums from gp_distribution_policy, pg_class where pg_class.relnamespace = '%s' and pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;""" % (self.get_schema_id(schemaname), tablename)
         rows = self.exec_query(qry)
         if len(rows) == 0:
             logger.error('Table %s is not an append-only table. There is no record in gp_distribution_policy table.' % tablename)
@@ -252,9 +265,9 @@ class GpRegisterAccessor(object):
 
     # pg_paqseg_#
     def get_seg_name(self, tablename, database, fmt):
-        tablename = tablename.split('.')[-1]
+        schemaname, tablename = tablename_handler(tablename)
         query = ("select pg_class2.relname from pg_class as pg_class1, pg_appendonly, pg_class as pg_class2 "
-                 "where pg_class1.relname ='%s' and pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid;") % tablename
+                 "where pg_class1.relname ='%s' and pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid and pg_class1.relnamespace = '%s';") % (tablename, self.get_schema_id(schemaname))
         rows = self.exec_query(query)
         if len(rows) == 0:
             logger.error('table "%s" not found in db "%s"' % (tablename, database))
@@ -267,7 +280,8 @@ class GpRegisterAccessor(object):
         return (relname, True)
 
     def get_distribution_policy_info(self, tablename):
-        query = "select oid from pg_class where relname = '%s';" % tablename.split('.')[-1].lower()
+        schemaname, tablename = tablename_handler(tablename)
+        query = "select oid from pg_class where relnamespace = '%s' and relname = '%s';" % (self.get_schema_id(schemaname), tablename)
         rows = self.exec_query(query)
         oid = rows[0]['oid']
         query = "select * from gp_distribution_policy where localoid = '%s';" % oid
@@ -276,23 +290,27 @@ class GpRegisterAccessor(object):
 
     def get_partition_info(self, tablename):
         ''' Get partition information from pg_partitions, return a constraint-tablename dictionary '''
-        query = "SELECT partitiontablename, partitionboundary FROM pg_partitions WHERE tablename = '%s'" % tablename
+        schemaname, tablename = tablename_handler(tablename)
+        query = "SELECT partitiontablename, partitionboundary FROM pg_partitions WHERE partitionschemaname = '%s' and tablename = '%s'" % (schemaname, tablename)
         return self.exec_query(query)
 
     def get_partitionby(self, tablename):
-        query = "SELECT partitionschemaname, partitiontablename, partitionname, partitiontype, parentpartitiontablename, partitionboundary FROM pg_partitions WHERE tablename='%s';" % tablename
+        schemaname, tablename = tablename_handler(tablename)
+        query = "SELECT partitionschemaname, partitiontablename, partitionname, partitiontype, parentpartitiontablename, partitionboundary FROM pg_partitions WHERE schemaname = '%s' and tablename='%s';" % (schemaname, tablename)
         parition_type = self.exec_query(query)[0]['partitiontype']
-        query = "SELECT columnname, partitionlevel FROM pg_partition_columns WHERE tablename='%s' ORDER BY position_in_partition_key;" % tablename
+        query = "SELECT columnname, partitionlevel FROM pg_partition_columns WHERE schemaname = '%s' and tablename='%s' ORDER BY position_in_partition_key;" % (schemaname, tablename)
         partition_columnname = self.exec_query(query)[0]['columnname']
         partitionby = 'PARTITION BY %s (%s)' % (parition_type, partition_columnname)
         return partitionby
 
     def get_partition_num(self, tablename):
-        query = "SELECT partitionschemaname from pg_partitions WHERE tablename='%s';" % tablename
+        schemaname, tablename = tablename_handler(tablename)
+        query = "SELECT partitionschemaname from pg_partitions WHERE schemaname = '%s' and tablename='%s';" % (schemaname, tablename)
         return len(self.exec_query(query))
 
     def get_bucket_number(self, tablename):
-        query = "select oid from pg_class where relname = '%s';" % tablename.split('.')[-1].lower()
+        schemaname, tablename = tablename_handler(tablename)
+        query = "select oid from pg_class where relnamespace = '%s' and relname = '%s';" % (self.get_schema_id(schemaname), tablename)
         rows = self.exec_query(query)
         oid = rows[0]['oid']
         query = "select * from gp_distribution_policy where localoid = '%s';" % oid
@@ -300,13 +318,14 @@ class GpRegisterAccessor(object):
         return rows[0]['bucketnum']
 
     def get_metadata_from_database(self, tablename, seg_name):
+        schemaname, tablename = tablename_handler(tablename) 
         query = 'select segno from pg_aoseg.%s;' % seg_name
         firstsegno = len(self.exec_query(query)) + 1
         # get the full path of correspoding file for target table
         query = ("select location, gp_persistent_tablespace_node.tablespace_oid, database_oid, relfilenode from pg_class, gp_persistent_relation_node, "
-                 "gp_persistent_tablespace_node, gp_persistent_filespace_node where relname = '%s' and pg_class.relfilenode = "
+                 "gp_persistent_tablespace_node, gp_persistent_filespace_node where relnamespace = '%s' and relname = '%s' and pg_class.relfilenode = "
                  "gp_persistent_relation_node.relfilenode_oid and gp_persistent_relation_node.tablespace_oid = gp_persistent_tablespace_node.tablespace_oid "
-                 "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % tablename.split('.')[-1]
+                 "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % (self.get_schema_id(schemaname), tablename)
         D = self.exec_query(query)[0]
         tabledir = '/'.join([D['location'].strip(), str(D['tablespace_oid']), str(D['database_oid']), str(D['relfilenode']), ''])
         return firstsegno, tabledir
@@ -837,16 +856,6 @@ class HawqRegister(object):
                     sys.exit(1)
                 self.failure_handler.commit(('HDFSCMD', hdfscmd))
 
-    def _delete_files_in_hdfs(self):
-        for fn in self.files_delete:
-            hdfscmd = 'hadoop fs -rm %s' % fn
-            sys.stdout.write('hdfscmd: "%s"\n' % hdfscmd)
-            result = local_ssh(hdfscmd, logger)
-            if result != 0:
-                logger.error('Fail to delete %s ' % fn)
-                self.failure_handler.rollback()
-                sys.exit(1)
-
     def _set_modify_metadata(self, mode):
         segno = self.firstsegno
         append_eofs = self.sizes_append
@@ -924,15 +933,6 @@ class HawqRegister(object):
             self.failure_handler.rollback()
             sys.exit(1)
 
-    def _delete_metadata(self):
-        query = "set allow_system_table_mods='dml';"
-        query += "begin transaction;"
-        segno_lst = [fn.strip().split('/')[-1] for fn in self.files_delete]
-        for seg in segno_lst:
-            query += "delete from pg_aoseg.%s where segno = '%s';" % (self.seg_name, seg)
-        query += "end transaction;"
-        return self.utility_accessor.update_catalog(query)
-
     def _prepare_register(self):
         if not self.do_not_move:
             self._set_move_files_in_hdfs()
@@ -954,13 +954,13 @@ class HawqRegisterPartition(HawqRegister):
 
     def _get_partition_info(self):
         dic = {}
-        for ele in self.accessor.get_partition_info(self.dst_table_name.split('.')[-1]):
+        for ele in self.accessor.get_partition_info(self.dst_table_name):
             dic[ele['partitionboundary']] = ele['partitiontablename']
         return dic
 
     def _check_partitionby(self):
         def get_partitionby():
-            return self.accessor.get_partitionby(self.dst_table_name.split('.')[-1])
+            return self.accessor.get_partitionby(self.dst_table_name)
 
         if self.partitionby != get_partitionby():
             logger.error('PartitionBy of %s is not consistent with previous partitionby.' % self.tablename)
@@ -969,7 +969,7 @@ class HawqRegisterPartition(HawqRegister):
 
     def _check_partition_num(self):
         def get_partition_num():
-            return self.accessor.get_partition_num(self.dst_table_name.split('.')[-1])
+            return self.accessor.get_partition_num(self.dst_table_name)
 
         if get_partition_num() < len(self.partitions_name):
             logger.error('Partition Number of %s is not consistent with previous partition number.' % self.tablename)
@@ -1010,13 +1010,14 @@ class HawqRegisterPartition(HawqRegister):
         self.queries = "set allow_system_table_mods='dml';"
         self.queries += "begin transaction;"
         self._check_duplicate_constraint()
+        schemaname, _ = tablename_handler(self.dst_table_name)
         for k, pn in enumerate(self.partitions_name):
             self.constraint = self.partitions_constraint[k]
             if not partitions.has_key(self.constraint):
                 logger.error('Partition Constraint "%s" is not in table %s' % (self.constraint, self.tablename))
                 self.failure_handler.rollback()
                 sys.exit(1)
-            self.tablename = partitions[self.constraint]
+            self.tablename = schemaname + '.' + partitions[self.constraint]
             self.files = self.partitions_filepaths[k]
             self.sizes = self.partitions_filesizes[k]
             self.tupcounts = self.partitions_tupcounts[k]

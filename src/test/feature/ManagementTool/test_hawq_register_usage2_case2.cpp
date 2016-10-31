@@ -111,7 +111,7 @@ void TestHawqRegister::runYamlCaseForceMode(std::string casename, std::string ym
         for(int i=8; i<=13; i++){
           string file(hawq::test::stringFormat("%s/ManagementTool/usage2case2/", test_root.c_str()));
           file.append(std::to_string(i));
-          EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -put %s /hawq_default/16385/%s/%s/", file.c_str(), strs_src_dst["@DATABASE_OID@"].c_str(),strs_src_dst["@TABLE_OID_OLD@"].c_str())));
+          EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hadoop fs -put %s /hawq_default/16385/%s/%s/", file.c_str(), strs_src_dst["@DATABASE_OID@"].c_str(),strs_src_dst["@TABLE_OID_OLD@"].c_str())));
         }
     }
     //printf("%s\n", hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str()).c_str());
@@ -366,7 +366,7 @@ TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorRowgroupSize) {
 TEST_F(TestHawqRegister, TestUsage2Case2IncludeDirectory) {
     SQLUtility util;
     string test_root(util.getTestRootPath());
-    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -put -f %s/ManagementTool/usage2case2 %s/", test_root.c_str(), getHdfsLocation().c_str())));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hadoop fs -put -f %s/ManagementTool/usage2case2 %s/", test_root.c_str(), getHdfsLocation().c_str())));
     string t_yml(hawq::test::stringFormat("%s/ManagementTool/usage2case2/includedirectory.yml", test_root.c_str()));
     EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_testusage2case2includedirectory.nt", HAWQ_DB, t_yml.c_str())));
     EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -rm -r %s/usage2case2", getHdfsLocation().c_str())));

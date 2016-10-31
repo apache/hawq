@@ -14,6 +14,32 @@ using hawq::test::SQLUtility;
 using hawq::test::Command;
 using hawq::test::HdfsConfig;
 
+TEST_F(TestHawqRegister, TestUsage1ExpectSuccessDifferentSchema) {
+  SQLUtility util;
+  string rootPath(util.getTestRootPath());
+  string filePath = rootPath + "/ManagementTool/data/parquet200/dat.paq";
+
+  util.execute("drop table if exists xz.t;");
+  util.execute("drop schema if exists xz;");
+  util.execute("create schema xz;");
+  util.execute("drop table if exists t;");
+  auto cmd = hawq::test::stringFormat("hdfs dfs -put -f %s %s/usage1dat.paq", filePath.c_str(), getHdfsLocation().c_str());
+  EXPECT_EQ(0, Command::getCommandStatus(cmd));
+  std::string policy = "DISTRIBUTED RANDOMLY";;
+  auto sql1 = hawq::test::stringFormat("CREATE TABLE t(i int) with (appendonly=true, orientation=parquet) %s;", policy.c_str());
+  auto sql2 = hawq::test::stringFormat("CREATE TABLE xz.t(i int) with (appendonly=true, orientation=parquet) %s;", policy.c_str());
+  util.execute(sql1); util.execute(sql2);
+  util.query("SELECT * from t", 0);
+  cmd = hawq::test::stringFormat("hawq register -d %s -f %s/usage1dat.paq testhawqregister_testusage1expectsuccessdifferentschema.t", HAWQ_DB, getHdfsLocation().c_str());
+  EXPECT_EQ(0, Command::getCommandStatus(cmd));
+  util.query("select * from t;", 200);
+  util.execute("insert into t values(201);");
+  util.query("select * from t;", 201);
+  util.execute("drop table xz.t;");
+  util.execute("drop table t;");
+  util.execute("drop schema xz;");
+}
+
 TEST_F(TestHawqRegister, TestUsage1ExpectSuccess) {
   // Register file/folder into HAWQ by specific file/folder name
 
@@ -40,7 +66,7 @@ TEST_F(TestHawqRegister, TestUsage1ExpectSuccess) {
         auto sql = hawq::test::stringFormat("CREATE TABLE t_%s(i int) with (appendonly=true, orientation=%s) %s;", std::to_string(suffix).c_str(), ddl.c_str(), policy.c_str());
         util.execute(sql); util.query(hawq::test::stringFormat("SELECT * from t_%s", std::to_string(suffix).c_str()), 0);
         
-        cmd = hawq::test::stringFormat("hawq register -d %s -f %s/usage1dat.paq t_%s", HAWQ_DB, getHdfsLocation().c_str(), std::to_string(suffix).c_str());
+        cmd = hawq::test::stringFormat("hawq register -d %s -f %s/usage1dat.paq testhawqregister_testusage1expectsuccess.t_%s", HAWQ_DB, getHdfsLocation().c_str(), std::to_string(suffix).c_str());
         EXPECT_EQ(0, Command::getCommandStatus(cmd));
         
         util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 200);
@@ -60,7 +86,7 @@ TEST_F(TestHawqRegister, TestUsage1ExpectSuccess) {
         auto sql = hawq::test::stringFormat("CREATE TABLE t_%s(i int) with (appendonly=true, orientation=%s) %s;", std::to_string(suffix).c_str(), ddl.c_str(), policy.c_str());
         util.execute(sql); util.query(hawq::test::stringFormat("SELECT * from t_%s", std::to_string(suffix).c_str()), 0);
         
-        cmd = hawq::test::stringFormat("hawq register -d %s -f %s/usage1dat.paq -e 596 t_%s", HAWQ_DB, getHdfsLocation().c_str(), std::to_string(suffix).c_str());
+        cmd = hawq::test::stringFormat("hawq register -d %s -f %s/usage1dat.paq -e 596 testhawqregister_testusage1expectsuccess.t_%s", HAWQ_DB, getHdfsLocation().c_str(), std::to_string(suffix).c_str());
         EXPECT_EQ(0, Command::getCommandStatus(cmd));
         
         util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 100);
@@ -84,7 +110,7 @@ TEST_F(TestHawqRegister, TestUsage1ExpectSuccess) {
           auto sql = hawq::test::stringFormat("CREATE TABLE t_%s(i int) with (appendonly=true, orientation=%s) %s;", std::to_string(suffix).c_str(), ddl.c_str(), policy.c_str());
           util.execute(sql); util.query(hawq::test::stringFormat("SELECT * from t_%s", std::to_string(suffix).c_str()), 0);
         
-          cmd = hawq::test::stringFormat("hawq register -d %s -f %s%s t_%s", HAWQ_DB, getHdfsLocation().c_str(), folder.c_str(), std::to_string(suffix).c_str());
+          cmd = hawq::test::stringFormat("hawq register -d %s -f %s%s testhawqregister_testusage1expectsuccess.t_%s", HAWQ_DB, getHdfsLocation().c_str(), folder.c_str(), std::to_string(suffix).c_str());
           EXPECT_EQ(0, Command::getCommandStatus(cmd));
     
           util.query(hawq::test::stringFormat("select * from t_%s;", std::to_string(suffix).c_str()), 200);
@@ -122,7 +148,7 @@ TEST_F(TestHawqRegister, TestUsage1SingleHawqFile) {
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0);
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1singlehawqfile.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     util.query("select * from hawqregister;", 3);
@@ -143,7 +169,7 @@ TEST_F(TestHawqRegister, TestUsage1SingleHiveFile) {
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0);
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hive.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hive.paq testhawqregister_testusage1singlehivefile.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     util.query("select * from hawqregister;", 1);
@@ -166,7 +192,7 @@ TEST_F(TestHawqRegister, TestDataTypes) {
     util.execute("create table hawqregister(a bool, b int2, c int2, d int4, e int8, f date, g float4, h float8, i varchar, j bytea, k char, l varchar) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0);
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_data_types.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_data_types.paq testhawqregister_testdatatypes.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     util.query("select * from hawqregister;", 1);
@@ -188,7 +214,7 @@ TEST_F(TestHawqRegister, TestAllNULL) {
     util.execute("create table hawqregister(a bool, b int2, c int2, d int4, e int8, f date, g float4, h float8, i varchar, j bytea, k char, l varchar) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0);
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_data_types.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_data_types.paq testhawqregister_testallnull.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     util.query("select * from hawqregister;", 1);
@@ -222,7 +248,7 @@ TEST_F(TestHawqRegister, TestFiles) {
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0);
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_test hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_test testhawqregister_testfiles.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     util.query("select * from hawqregister;", 12);
@@ -245,7 +271,7 @@ TEST_F(TestHawqRegister, TestUsage1NotParquetFile) {
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0);
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_test_not_paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_test_not_paq testhawqregister_testusage1notparquetfile.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
 
@@ -267,21 +293,21 @@ TEST_F(TestHawqRegister, TestUsage1NotParquetTable) {
     util.execute("create table hawqregister(i int);");
     util.query("select * from hawqregister;", 0);
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1notparquettable.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
     util.execute("drop table hawqregister;");
 
     /* register a parquet file to a row hash table, should fail */
     util.execute("create table hawqregister(i int) distributed by (i);");
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1notparquettable.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
     util.execute("drop table hawqregister;");
 
     /* register a parquet file to a parquet hash table, should fail */
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1notparquettable.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
     util.execute("drop table hawqregister;");
@@ -296,7 +322,7 @@ TEST_F(TestHawqRegister, TestUsage1FileNotExist) {
     util.execute("create table hawqregister(i int);");
     util.query("select * from hawqregister;", 0);
 
-    auto cmd = hawq::test::stringFormat("hawq register -d %s -f %shawq_register_file_not_exist hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    auto cmd = hawq::test::stringFormat("hawq register -d %s -f %shawq_register_file_not_exist testhawqregister_testusage1notparquettable.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
 
@@ -313,7 +339,7 @@ TEST_F(TestHawqRegister, TestUsage1NoTable) {
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     /* register a parquet file to a table not exist, should fail */
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s hawqregister", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s testhawqregister_testusage1notable.hawqregister", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
 }
 
@@ -327,7 +353,7 @@ TEST_F(TestHawqRegister, TestUsage1NotHDFSPath) {
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0);
 
-    auto cmd = hawq::test::stringFormat("hawq register -d %s -f %s hawqregister", HAWQ_DB, filePath.c_str());
+    auto cmd = hawq::test::stringFormat("hawq register -d %s -f %s testhawqregister_testusage1nothdfspath.hawqregister", HAWQ_DB, filePath.c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
 
@@ -347,7 +373,7 @@ TEST_F(TestHawqRegister, TestUsage1EofSuccess) {
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0); 
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister -e 0", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1eofsuccess.hawqregister -e 0", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
 
@@ -356,7 +382,7 @@ TEST_F(TestHawqRegister, TestUsage1EofSuccess) {
     cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/hawq_register_hawq.paq", filePath.c_str(), getHdfsLocation().c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister -e %d", HAWQ_DB, getHdfsLocation().c_str(), size);
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1eofsuccess.hawqregister -e %d", HAWQ_DB, getHdfsLocation().c_str(), size);
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 3);
     util.execute("drop table hawqregister;");
@@ -366,7 +392,7 @@ TEST_F(TestHawqRegister, TestUsage1EofSuccess) {
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister -e %d", HAWQ_DB, getHdfsLocation().c_str(), size/2);
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1eofsuccess.hawqregister -e %d", HAWQ_DB, getHdfsLocation().c_str(), size/2);
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
     util.execute("drop table hawqregister;");
 }
@@ -384,18 +410,18 @@ TEST_F(TestHawqRegister, TestUsage1EofFailure) {
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
     util.query("select * from hawqregister;", 0);
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister -e -1", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1eoffailure.hawqregister -e -1", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
 
     /* register a parquet file with eof > filesize, should success */
     int size = getFileSize(filePath.c_str());
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister -e %d", HAWQ_DB, getHdfsLocation().c_str(), size+1);
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1eoffailure.hawqregister -e %d", HAWQ_DB, getHdfsLocation().c_str(), size+1);
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.query("select * from hawqregister;", 0);
 
     /* register a parquet file with eof=float, should success */
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq hawqregister -e 11.1", HAWQ_DB, getHdfsLocation().c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/hawq_register_hawq.paq testhawqregister_testusage1eoffailure.hawqregister -e 11.1", HAWQ_DB, getHdfsLocation().c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
     util.execute("drop table hawqregister;");
 }
@@ -416,15 +442,15 @@ TEST_F(TestHawqRegister, TestUsage1FolderFailure) {
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");
 
     /* register a empty folder, should success */
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/%s hawqregister", HAWQ_DB, getHdfsLocation().c_str(), folderName.c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/%s testhawqregister_testUsage1folderfailure.hawqregister", HAWQ_DB, getHdfsLocation().c_str(), folderName.c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     /* register a not exist folder, should fail */
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/%s hawqregister", HAWQ_DB, getHdfsLocation().c_str(), folderNameNotExist.c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/%s testhawqregister_testUsage1folderfailure.hawqregister", HAWQ_DB, getHdfsLocation().c_str(), folderNameNotExist.c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
 
     /* register a folder with eof, should fail */
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/%s hawqregister -e 100", HAWQ_DB, getHdfsLocation().c_str(), folderName.c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/%s testhawqregister_testUsage1folderfailure.hawqregister -e 100", HAWQ_DB, getHdfsLocation().c_str(), folderName.c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
 
     /* register a folder containing parquet and non-parquet files, should fail */
@@ -434,7 +460,7 @@ TEST_F(TestHawqRegister, TestUsage1FolderFailure) {
     cmd = hawq::test::stringFormat("hadoop fs -put -f %s %s/%s/", filePath2.c_str(), getHdfsLocation().c_str(), folderName.c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
-    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/%s hawqregister", HAWQ_DB, getHdfsLocation().c_str(), folderName.c_str());
+    cmd = hawq::test::stringFormat("hawq register -d %s -f %s/%s testhawqregister_testUsage1folderfailure.hawqregister", HAWQ_DB, getHdfsLocation().c_str(), folderName.c_str());
     EXPECT_EQ(1, Command::getCommandStatus(cmd));
 
     util.execute("drop table hawqregister;");
