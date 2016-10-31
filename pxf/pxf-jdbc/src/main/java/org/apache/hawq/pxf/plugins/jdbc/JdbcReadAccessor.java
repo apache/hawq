@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.plugins.jdbc;
 
 import org.apache.hawq.pxf.api.OneRow;
 import org.apache.hawq.pxf.api.ReadAccessor;
+import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.commons.logging.Log;
@@ -45,7 +46,7 @@ public class JdbcReadAccessor extends JdbcPlugin implements ReadAccessor {
     private Statement statement = null;
     private ResultSet resultSet = null;
 
-    public JdbcReadAccessor(InputData input) throws Exception {
+    public JdbcReadAccessor(InputData input) throws UserDataException {
         super(input);
         filterBuilder = new WhereSQLBuilder(inputData);
 

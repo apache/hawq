@@ -101,6 +101,7 @@ where `<custom-parameters>` can use following partition parameters:
 The `PARTITION_BY` parameter indicates which  column to use as the partition column.
 It can be split by colon(':'),the `column_type` current supported : `date|int|enum` .
 The Date format is `yyyy-MM-dd`.
+The `PARTITION_BY` parameter can be null, and there will be only one fragment.
 
 The `RANGE` parameter indicates the range of data to be queried , it can be split by colon(':').
  The range is left-closed, ie: `>= start_value AND < end_value` .

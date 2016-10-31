@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.plugins.jdbc;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 
@@ -52,7 +53,7 @@ public class JdbcPlugin extends Plugin {
      *
      * @param input the input data
      */
-    public JdbcPlugin(InputData input) {
+    public JdbcPlugin(InputData input) throws UserDataException {
         super(input);
         jdbcDriver = input.getUserProperty("JDBC_DRIVER");
         dbUrl = input.getUserProperty("DB_URL");
@@ -64,15 +65,15 @@ public class JdbcPlugin extends Plugin {
         }
 
         if (jdbcDriver == null) {
-            throw new IllegalArgumentException("JDBC_DRIVER must be set");
+            throw new UserDataException("JDBC_DRIVER must be set");
         }
         if (dbUrl == null) {
-            throw new IllegalArgumentException("DB_URL must be set(read)");
+            throw new UserDataException("DB_URL must be set(read)");
         }
 
         tblName = input.getDataSource();
         if (tblName == null) {
-            throw new IllegalArgumentException("TABLE_NAME must be set as DataSource.");
+            throw new UserDataException("TABLE_NAME must be set as DataSource.");
         } else {
             tblName = tblName.toUpperCase();
         }
