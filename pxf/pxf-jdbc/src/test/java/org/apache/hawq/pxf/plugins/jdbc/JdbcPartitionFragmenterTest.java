@@ -20,9 +20,11 @@ package org.apache.hawq.pxf.plugins.jdbc;
  */
 
 import org.apache.hawq.pxf.api.Fragment;
+import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
 import org.junit.Test;
+import org.mockito.stubbing.OngoingStubbing;
 
 import java.text.ParseException;
 import java.util.Calendar;
@@ -37,7 +39,7 @@ public class JdbcPartitionFragmenterTest {
     InputData inputData;
 
     @Test
-    public void testPartionByDate() throws Exception {
+    public void testPartionByDateOfMonth() throws Exception {
         prepareConstruction();
         when(inputData.getDataSource()).thenReturn("sales");
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
@@ -71,7 +73,7 @@ public class JdbcPartitionFragmenterTest {
     }
 
     @Test
-    public void testPartionByDate2() throws Exception {
+    public void testPartionByDateOfYear() throws Exception {
         prepareConstruction();
         when(inputData.getDataSource()).thenReturn("sales");
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
@@ -148,7 +150,7 @@ public class JdbcPartitionFragmenterTest {
         try {
             new JdbcPartitionFragmenter(inputData);
             fail("Expected an IllegalArgumentException");
-        }catch (IllegalArgumentException ex){
+        }catch (UserDataException ex){
             assertTrue(ex.getMessage().contains("No enum constant"));
         }
     }
@@ -188,9 +190,35 @@ public class JdbcPartitionFragmenterTest {
         when(inputData.getUserProperty("INTERVAL")).thenReturn("-1:month");
         try {
             new JdbcPartitionFragmenter(inputData);
-            fail("Expected an JdbcFragmentException");
-        }catch (JdbcFragmentException ex){
+            fail("Expected an UserDataException");
+        }catch (UserDataException ex){
         }
+    }
+
+    @Test
+    public void inValidIntervaltype() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+        when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
+        when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2011-01-01");
+        when(inputData.getUserProperty("INTERVAL")).thenReturn("6:hour");
+
+        try {
+            JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+            fragment.getFragments();
+            fail("Expected an UserDataException");
+        }catch (UserDataException ex){
+        }
+    }
+
+    @Test
+    public void testNoPartition() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+
+        JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+        List<Fragment> fragments = fragment.getFragments();
+        assertEquals(fragments.size(), 1);
     }
 
     private void assertDateEquals(long date,int year, int month, int day) {

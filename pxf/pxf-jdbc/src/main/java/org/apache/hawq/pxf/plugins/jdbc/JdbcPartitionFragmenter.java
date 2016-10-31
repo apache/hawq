@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.plugins.jdbc;
 
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.FragmentsStats;
+import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.plugins.jdbc.utils.DbProduct;
 import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
 import org.apache.hawq.pxf.api.Fragment;
@@ -29,7 +30,6 @@ import org.apache.hawq.pxf.api.utilities.InputData;
 import java.net.InetAddress;
 import java.text.SimpleDateFormat;
 import java.util.*;
-
 
 /**
  * Fragmenter class for JDBC data resources.
@@ -62,7 +62,7 @@ import java.util.*;
  *
  */
 public class JdbcPartitionFragmenter extends Fragmenter {
-    String[] partition_by = null;
+    String[] partitionBy = null;
     String[] range = null;
     String[] interval = null;
     PartitionType partitionType = null;
@@ -95,36 +95,45 @@ public class JdbcPartitionFragmenter extends Fragmenter {
 
     static {
         intervals.put(IntervalType.DAY, (long) 24 * 60 * 60 * 1000);
-        intervals.put(IntervalType.MONTH, (long) 30 * 24 * 60 * 60 * 1000);//30 day
-        intervals.put(IntervalType.YEAR, (long) 365 * 30 * 24 * 60 * 60 * 1000);//365 day
+        //30 days
+        intervals.put(IntervalType.MONTH, (long) 30 * 24 * 60 * 60 * 1000);
+        //365 days
+        intervals.put(IntervalType.YEAR, (long) 365 * 30 * 24 * 60 * 60 * 1000);
     }
 
     /**
      * Constructor for JdbcPartitionFragmenter.
      *
      * @param inConf input data such as which Jdbc table to scan
-     * @throws JdbcFragmentException
+     * @throws UserDataException
      */
-    public JdbcPartitionFragmenter(InputData inConf) throws JdbcFragmentException {
+    public JdbcPartitionFragmenter(InputData inConf) throws UserDataException  {
         super(inConf);
         if(inConf.getUserProperty("PARTITION_BY") == null )
             return;
-        partition_by = inConf.getUserProperty("PARTITION_BY").split(":");
-        partitionColumn = partition_by[0];
-        partitionType = PartitionType.getType(partition_by[1]);
+        try {
+            partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
+            partitionColumn = partitionBy[0];
+            partitionType = PartitionType.getType(partitionBy[1]);
 
-        range = inConf.getUserProperty("RANGE").split(":");
+            range = inConf.getUserProperty("RANGE").split(":");
 
-        //parse and validate parameter-INTERVAL
-        if (inConf.getUserProperty("INTERVAL") != null) {
-            interval = inConf.getUserProperty("INTERVAL").split(":");
-            intervalNum = Integer.parseInt(interval[0]);
-            if (interval.length > 1)
-                intervalType = IntervalType.type(interval[1]);
+            //parse and validate parameter-INTERVAL
+            if (inConf.getUserProperty("INTERVAL") != null) {
+                interval = inConf.getUserProperty("INTERVAL").split(":");
+                intervalNum = Integer.parseInt(interval[0]);
+                if (interval.length > 1)
+                    intervalType = IntervalType.type(interval[1]);
+            }
+            if (intervalNum < 1)
+                throw new UserDataException("The parameter{INTERVAL} must > 1, but actual is '" + intervalNum+"'");
+        }catch (IllegalArgumentException e1){
+            throw new UserDataException(e1);
+        }catch (UserDataException e2){
+            throw e2;
         }
-        if (intervalNum < 1)
-            throw new JdbcFragmentException("The parameter{INTERVAL} must > 1, but actual is '" + intervalNum+"'");
     }
+
     /**
      * Returns statistics for Jdbc table. Currently it's not implemented.
      */
@@ -132,8 +141,6 @@ public class JdbcPartitionFragmenter extends Fragmenter {
     public FragmentsStats getFragmentsStats() throws Exception {
         throw new UnsupportedOperationException("ANALYZE for Jdbc plugin is not supported");
     }
-
-
 
     /**
      * Returns list of fragments containing all of the
@@ -143,6 +150,13 @@ public class JdbcPartitionFragmenter extends Fragmenter {
      */
     @Override
     public List<Fragment> getFragments() throws Exception {
+        if(partitionType == null ) {
+            byte[] fragmentMetadata = null;
+            byte[] userData = null;
+            Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
+            fragments.add(fragment);
+            return prepareHosts(fragments);
+        }
         switch (partitionType) {
             case DATE: {
                 SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
@@ -154,7 +168,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 Calendar c_end = Calendar.getInstance();
                 frag_start.setTime(t_start);
                 c_end.setTime(t_end);
-                while (frag_start.before(c_end)) {//|| frag_start.compareTo(c_end) == 0) {
+                while (frag_start.before(c_end)) {
                     Calendar frag_end = (Calendar) frag_start.clone();
                     switch (intervalType) {
                         case DAY:
@@ -163,12 +177,12 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                         case MONTH:
                             frag_end.add(Calendar.MONTH, curr_interval);
                             break;
-                        //case YEAR:
-                        default:
+                        case YEAR:
                             frag_end.add(Calendar.YEAR, curr_interval);
                             break;
                     }
-                    if (frag_end.after(c_end)) frag_end = (Calendar) c_end.clone();
+                    if (frag_end.after(c_end))
+                        frag_end = (Calendar) c_end.clone();
 
                     //make metadata of this fragment , converts the date to a millisecond,then get bytes.
                     byte[] ms_start = ByteUtil.getBytes(frag_start.getTimeInMillis());
