@@ -26,14 +26,14 @@ under the License.
 
 <!--
 	This is the PXF webapp xml descriptor
-	used by tcServer to load the webapp
+	used by tomcat to load the webapp
 
 	servlet-class	Jersey entrypoint class
 	init-param		com.sun.jersey.config.property.packages
 						Tells Jersey where are the REST components of this webapp
 					jersey.config.server.provider.scanning.recursive
 						Tells Jersey to recusively scan package for REST resources
-	load-on-startup	Initialize the webapp on tcServer startup
+	load-on-startup	Initialize the webapp on tomcat startup
 	servlet-mapping	Maps the path of the servlet (pxf/*)
 	listener		A class called after the webapp was initialized and before it's about
 					to go down
