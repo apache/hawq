@@ -26,6 +26,7 @@ import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
+
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.LinkedList;
@@ -51,7 +52,7 @@ public class JdbcReadResolver extends Plugin implements ReadResolver {
 
         for (int i = 0; i < columns.size(); i++) {
             ColumnDescriptor column = columns.get(i);
-            String colname = column.columnName();
+            String colName = column.columnName();
             Object value = null;
 
             OneField oneField = new OneField();
@@ -59,39 +60,39 @@ public class JdbcReadResolver extends Plugin implements ReadResolver {
 
             switch (DataType.get(oneField.type)) {
                 case INTEGER:
-                    value = result.getInt(colname);
+                    value = result.getInt(colName);
                     break;
                 case FLOAT8:
-                    value = result.getDouble(colname);
+                    value = result.getDouble(colName);
                     break;
                 case REAL:
-                    value = result.getFloat(colname);
+                    value = result.getFloat(colName);
                     break;
                 case BIGINT:
-                    value = result.getLong(colname);
+                    value = result.getLong(colName);
                     break;
                 case SMALLINT:
-                    value = result.getShort(colname);
+                    value = result.getShort(colName);
                     break;
                 case BOOLEAN:
-                    value = result.getBoolean(colname);
+                    value = result.getBoolean(colName);
                     break;
                 case BYTEA:
-                    value = result.getBytes(colname);
+                    value = result.getBytes(colName);
                     break;
                 case VARCHAR:
                 case BPCHAR:
                 case TEXT:
                 case NUMERIC:
-                    value = result.getString(colname);
+                    value = result.getString(colName);
                     break;
                 case TIMESTAMP:
                 case DATE:
-                    value = result.getDate(colname);
+                    value = result.getDate(colName);
                     break;
                 default:
                     throw new UnsupportedOperationException("Unknwon Field Type : " + DataType.get(oneField.type).toString()
-                            +", Column : " + column.toString());
+                            + ", Column : " + column.toString());
             }
             oneField.val = value;
             fields.add(oneField);

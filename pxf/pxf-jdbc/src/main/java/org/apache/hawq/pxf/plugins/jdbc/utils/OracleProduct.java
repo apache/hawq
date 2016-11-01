@@ -24,7 +24,7 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  */
 public class OracleProduct extends DbProduct {
     @Override
-    public String wrapDate(Object date_val) {
-        return "to_date('" + date_val + "','yyyy-mm-dd')";
+    public String wrapDate(Object dateVal) {
+        return "to_date('" + dateVal + "','yyyy-mm-dd')";
     }
 }

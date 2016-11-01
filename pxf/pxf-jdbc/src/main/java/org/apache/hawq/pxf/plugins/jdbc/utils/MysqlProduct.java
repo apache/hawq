@@ -25,7 +25,7 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
 public class MysqlProduct extends DbProduct {
 
     @Override
-    public String wrapDate(Object date_val){
-        return "DATE('" + date_val + "')";
+    public String wrapDate(Object dateVal){
+        return "DATE('" + dateVal + "')";
     }
 }

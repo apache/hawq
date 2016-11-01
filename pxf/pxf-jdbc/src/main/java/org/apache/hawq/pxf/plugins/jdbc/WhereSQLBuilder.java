@@ -69,9 +69,9 @@ public class WhereSQLBuilder extends JdbcFilterBuilder {
         List<BasicFilter> filters = null;
         try {
             String filterString = inputData.getFilterString();
-            Object filterobj = getFilterObject(filterString);
+            Object filterObj = getFilterObject(filterString);
 
-            filters = convertBasicFilterList(filterobj, filters);
+            filters = convertBasicFilterList(filterObj, filters);
             StringBuffer sb = new StringBuffer("1=1");
             for (Object obj : filters) {
                 BasicFilter filter = (BasicFilter) obj;

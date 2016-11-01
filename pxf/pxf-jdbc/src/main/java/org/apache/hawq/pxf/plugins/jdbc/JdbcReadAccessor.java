@@ -70,11 +70,11 @@ public class JdbcReadAccessor extends JdbcPlugin implements ReadAccessor {
      */
     @Override
     public boolean openForRead() throws Exception {
-        if (statement != null && !statement.isClosed() )
+        if (statement != null && !statement.isClosed())
             return true;
         super.openConnection();
 
-        statement = dbconn.createStatement();
+        statement = dbConn.createStatement();
 
         resultSet = executeQuery(querySql);
 
@@ -83,7 +83,7 @@ public class JdbcReadAccessor extends JdbcPlugin implements ReadAccessor {
 
     public ResultSet executeQuery(String sql) throws Exception {
         String query = sql;
-        if(inputData.hasFilter()) {
+        if (inputData.hasFilter()) {
             //parse filter string , build where statement
             String whereSql = filterBuilder.buildWhereSQL(dbProduct);
 

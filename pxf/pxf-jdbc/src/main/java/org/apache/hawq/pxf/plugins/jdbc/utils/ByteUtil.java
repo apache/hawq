@@ -33,13 +33,13 @@ public class ByteUtil {
 
     public static byte[][] splitBytes(byte[] bytes, int n) {
         int len = bytes.length / n;
-        byte[][] newb = new byte[len][];
+        byte[][] newBytes = new byte[len][];
         int j = 0;
         for (int i = 0; i < len; i++) {
-            newb[i] = new byte[n];
-            for (int k = 0; k < n; k++) newb[i][k] = bytes[j++];
+            newBytes[i] = new byte[n];
+            for (int k = 0; k < n; k++) newBytes[i][k] = bytes[j++];
         }
-        return newb;
+        return newBytes;
     }
 
     public static byte[] getBytes(long value) {
