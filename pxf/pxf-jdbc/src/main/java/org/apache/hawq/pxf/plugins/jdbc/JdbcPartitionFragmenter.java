@@ -270,23 +270,23 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 //parse metadata of this fragment
                 //validate：the length of metadata == 16 (long)
                 byte[][] newb = ByteUtil.splitBytes(meta, 8);
-                Date frag_start = new Date(ByteUtil.toLong(newb[0]));
-                Date frag_end = new Date(ByteUtil.toLong(newb[1]));
+                Date fragStart = new Date(ByteUtil.toLong(newb[0]));
+                Date fragEnd= new Date(ByteUtil.toLong(newb[1]));
 
-                sb.append(partitionColumn).append(" >= ").append(dbProduct.wrapDate(df.format(frag_start)));
+                sb.append(partitionColumn).append(" >= ").append(dbProduct.wrapDate(df.format(fragStart)));
                 sb.append(" AND ");
-                sb.append(partitionColumn).append(" < ").append(dbProduct.wrapDate(df.format(frag_end)));
+                sb.append(partitionColumn).append(" < ").append(dbProduct.wrapDate(df.format(fragEnd)));
 
                 break;
             }
             case INT: {
                 //validate：the length of metadata ==8 （int)
                 byte[][] newb = ByteUtil.splitBytes(meta, 4);
-                int frag_start = ByteUtil.toInt(newb[0]);
-                int frag_end = ByteUtil.toInt(newb[1]);
-                sb.append(partitionColumn).append(" >= ").append(frag_start);
+                int fragStart= ByteUtil.toInt(newb[0]);
+                int fragEnd = ByteUtil.toInt(newb[1]);
+                sb.append(partitionColumn).append(" >= ").append(fragStart);
                 sb.append(" AND ");
-                sb.append(partitionColumn).append(" < ").append(frag_end);
+                sb.append(partitionColumn).append(" < ").append(fragEnd);
                 break;
             }
             case ENUM:

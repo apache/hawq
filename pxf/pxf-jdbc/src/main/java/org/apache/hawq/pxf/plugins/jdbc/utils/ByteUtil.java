@@ -20,17 +20,15 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  */
 
 
+import org.apache.commons.lang.ArrayUtils;
+
 /**
  * A tool class, used to deal with byte array merging, split and other methods.
  */
 public class ByteUtil {
 
     public static byte[] mergeBytes(byte[] b1, byte[] b2) {
-        byte[] newb = new byte[b1.length + b2.length];
-        int i = 0;
-        for (byte b : b1) newb[i++] = b;
-        for (byte b : b2) newb[i++] = b;
-        return newb;
+        return ArrayUtils.addAll(b1,b2);
     }
 
     public static byte[][] splitBytes(byte[] bytes, int n) {
