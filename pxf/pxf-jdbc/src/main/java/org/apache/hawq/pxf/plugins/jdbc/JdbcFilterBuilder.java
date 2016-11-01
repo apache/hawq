@@ -26,8 +26,6 @@ import org.apache.hawq.pxf.api.LogicalFilter;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Uses the filter parser code to build a filter object, either simple - a
@@ -37,7 +35,7 @@ import java.util.regex.Pattern;
  * The subclass {@link org.apache.hawq.pxf.plugins.jdbc.WhereSQLBuilder} will use the filter for
  * generate WHERE statement.
  */
-public class JdbcFilterBuilder implements FilterParser.FilterBuilder  {
+public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
     /**
      * Translates a filterString into a {@link BasicFilter} or a
      * list of such filters.

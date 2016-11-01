@@ -28,21 +28,22 @@ public abstract class DbProduct {
     public abstract String wrapDate(Object date_val);
 
 
-    public static DbProduct getDbProduct(String db_product){
-        if (db_product.toUpperCase().contains("MYSQL"))
+    public static DbProduct getDbProduct(String dbName) {
+        if (dbName.toUpperCase().contains("MYSQL"))
             return new MysqlProduct();
-        else if (db_product.toUpperCase().contains("ORACLE"))
+        else if (dbName.toUpperCase().contains("ORACLE"))
             return new OracleProduct();
-        else if (db_product.toUpperCase().contains("POSTGRES"))
+        else if (dbName.toUpperCase().contains("POSTGRES"))
             return new PostgresProduct();
         else
             //Unsupported databases may execute errors
             return new CommonProduct();
     }
 }
-class CommonProduct extends DbProduct{
+
+class CommonProduct extends DbProduct {
     @Override
-    public String wrapDate(Object date_val) {
-        return "date'" + date_val + "'";
+    public String wrapDate(Object dateVal) {
+        return "date'" + dateVal + "'";
     }
 }

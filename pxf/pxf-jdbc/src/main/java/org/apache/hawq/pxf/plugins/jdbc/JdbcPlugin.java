@@ -44,7 +44,7 @@ public class JdbcPlugin extends Plugin {
     protected int batchSize = 100;
 
     //jdbc connection
-    protected Connection dbconn = null;
+    protected Connection dbConn = null;
     //database type，from DatabaseMetaData.getDatabaseProductName()
     protected String dbProduct = null;
 
@@ -88,24 +88,24 @@ public class JdbcPlugin extends Plugin {
             LOG.debug(String.format("Open JDBC: driver=%s,url=%s,user=%s,pass=%s,table=%s",
                     jdbcDriver, dbUrl, user, pass, tblName));
         }
-        if (dbconn == null || dbconn.isClosed()) {
+        if (dbConn == null || dbConn.isClosed()) {
             Class.forName(jdbcDriver);
             if (user != null) {
-                dbconn = DriverManager.getConnection(dbUrl, user, pass);
+                dbConn = DriverManager.getConnection(dbUrl, user, pass);
             } else {
-                dbconn = DriverManager.getConnection(dbUrl);
+                dbConn = DriverManager.getConnection(dbUrl);
             }
-            DatabaseMetaData meta = dbconn.getMetaData();
+            DatabaseMetaData meta = dbConn.getMetaData();
             dbProduct = meta.getDatabaseProductName();
         }
-        return dbconn;
+        return dbConn;
     }
 
     protected void closeConnection() {
         try {
-            if (dbconn != null) {
-                dbconn.close();
-                dbconn = null;
+            if (dbConn != null) {
+                dbConn.close();
+                dbConn = null;
             }
         } catch (SQLException e) {
             LOG.error("Close db connection error . ", e);

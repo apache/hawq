@@ -107,9 +107,9 @@ public class JdbcPartitionFragmenter extends Fragmenter {
      * @param inConf input data such as which Jdbc table to scan
      * @throws UserDataException
      */
-    public JdbcPartitionFragmenter(InputData inConf) throws UserDataException  {
+    public JdbcPartitionFragmenter(InputData inConf) throws UserDataException {
         super(inConf);
-        if(inConf.getUserProperty("PARTITION_BY") == null )
+        if (inConf.getUserProperty("PARTITION_BY") == null)
             return;
         try {
             partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
@@ -126,10 +126,10 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                     intervalType = IntervalType.type(interval[1]);
             }
             if (intervalNum < 1)
-                throw new UserDataException("The parameter{INTERVAL} must > 1, but actual is '" + intervalNum+"'");
-        }catch (IllegalArgumentException e1){
+                throw new UserDataException("The parameter{INTERVAL} must > 1, but actual is '" + intervalNum + "'");
+        } catch (IllegalArgumentException e1) {
             throw new UserDataException(e1);
-        }catch (UserDataException e2){
+        } catch (UserDataException e2) {
             throw e2;
         }
     }
@@ -150,7 +150,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
      */
     @Override
     public List<Fragment> getFragments() throws Exception {
-        if(partitionType == null ) {
+        if (partitionType == null) {
             byte[] fragmentMetadata = null;
             byte[] userData = null;
             Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
@@ -160,65 +160,64 @@ public class JdbcPartitionFragmenter extends Fragmenter {
         switch (partitionType) {
             case DATE: {
                 SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-                Date t_start = df.parse(range[0]);
-                Date t_end = df.parse(range[1]);
-                int curr_interval = intervalNum;
+                int currInterval = intervalNum;
 
-                Calendar frag_start = Calendar.getInstance();
-                Calendar c_end = Calendar.getInstance();
-                frag_start.setTime(t_start);
-                c_end.setTime(t_end);
-                while (frag_start.before(c_end)) {
-                    Calendar frag_end = (Calendar) frag_start.clone();
+                //start of range = start of first fragment
+                Calendar fragStart = Calendar.getInstance();
+                fragStart.setTime(df.parse(range[0]));
+                Calendar rangeEnd = Calendar.getInstance();
+                rangeEnd.setTime(df.parse(range[1]));
+                while (fragStart.before(rangeEnd)) {
+                    Calendar fragEnd = (Calendar) fragStart.clone();
                     switch (intervalType) {
                         case DAY:
-                            frag_end.add(Calendar.DAY_OF_MONTH, curr_interval);
+                            fragEnd.add(Calendar.DAY_OF_MONTH, currInterval);
                             break;
                         case MONTH:
-                            frag_end.add(Calendar.MONTH, curr_interval);
+                            fragEnd.add(Calendar.MONTH, currInterval);
                             break;
                         case YEAR:
-                            frag_end.add(Calendar.YEAR, curr_interval);
+                            fragEnd.add(Calendar.YEAR, currInterval);
                             break;
                     }
-                    if (frag_end.after(c_end))
-                        frag_end = (Calendar) c_end.clone();
+                    if (fragEnd.after(rangeEnd))
+                        fragEnd = (Calendar) rangeEnd.clone();
 
                     //make metadata of this fragment , converts the date to a millisecond,then get bytes.
-                    byte[] ms_start = ByteUtil.getBytes(frag_start.getTimeInMillis());
-                    byte[] ms_end = ByteUtil.getBytes(frag_end.getTimeInMillis());
-                    byte[] fragmentMetadata = ByteUtil.mergeBytes(ms_start, ms_end);
+                    byte[] msStart = ByteUtil.getBytes(fragStart.getTimeInMillis());
+                    byte[] msEnd = ByteUtil.getBytes(fragEnd.getTimeInMillis());
+                    byte[] fragmentMetadata = ByteUtil.mergeBytes(msStart, msEnd);
 
                     byte[] userData = new byte[0];
                     Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
                     fragments.add(fragment);
 
                     //continue next fragment.
-                    frag_start = frag_end;
+                    fragStart = fragEnd;
                 }
                 break;
             }
             case INT: {
-                int i_start = Integer.parseInt(range[0]);
-                int i_end = Integer.parseInt(range[1]);
-                int curr_interval = intervalNum;
+                int rangeStart = Integer.parseInt(range[0]);
+                int rangeEnd = Integer.parseInt(range[1]);
+                int currInterval = intervalNum;
 
                 //validate : curr_interval > 0
-                int frag_start = i_start;
-                while (frag_start < i_end) {
-                    int frag_end = frag_start + curr_interval;
-                    if (frag_end > i_end) frag_end = i_end;
+                int fragStart = rangeStart;
+                while (fragStart < rangeEnd) {
+                    int fragEnd = fragStart + currInterval;
+                    if (fragEnd > rangeEnd) fragEnd = rangeEnd;
 
-                    byte[] b_start = ByteUtil.getBytes(frag_start);
-                    byte[] b_end = ByteUtil.getBytes(frag_end);
-                    byte[] fragmentMetadata = ByteUtil.mergeBytes(b_start, b_end);
+                    byte[] bStart = ByteUtil.getBytes(fragStart);
+                    byte[] bEnd = ByteUtil.getBytes(fragEnd);
+                    byte[] fragmentMetadata = ByteUtil.mergeBytes(bStart, bEnd);
 
                     byte[] userData = new byte[0];
                     Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
                     fragments.add(fragment);
 
                     //continue next fragment.
-                    frag_start = frag_end;// + 1;
+                    fragStart = fragEnd;// + 1;
                 }
                 break;
             }
@@ -244,23 +243,23 @@ public class JdbcPartitionFragmenter extends Fragmenter {
      */
     public static List<Fragment> prepareHosts(List<Fragment> fragments) throws Exception {
         for (Fragment fragment : fragments) {
-            String pxfhost =  InetAddress.getLocalHost().getHostAddress();
-            String[] hosts = new String[]{pxfhost};
+            String pxfHost = InetAddress.getLocalHost().getHostAddress();
+            String[] hosts = new String[]{pxfHost};
             fragment.setReplicas(hosts);
         }
 
         return fragments;
     }
 
-    public String buildFragmenterSql(String db_product, String origin_sql) {
+    public String buildFragmenterSql(String dbName, String originSql) {
         byte[] meta = inputData.getFragmentMetadata();
         if (meta == null)
-            return origin_sql;
+            return originSql;
 
-        DbProduct dbProduct = DbProduct.getDbProduct(db_product);
+        DbProduct dbProduct = DbProduct.getDbProduct(dbName);
 
-        StringBuilder sb = new StringBuilder(origin_sql);
-        if (!origin_sql.contains("WHERE"))
+        StringBuilder sb = new StringBuilder(originSql);
+        if (!originSql.contains("WHERE"))
             sb.append(" WHERE 1=1 ");
 
         sb.append(" AND ");
@@ -271,7 +270,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 //validate：the length of metadata == 16 (long)
                 byte[][] newb = ByteUtil.splitBytes(meta, 8);
                 Date fragStart = new Date(ByteUtil.toLong(newb[0]));
-                Date fragEnd= new Date(ByteUtil.toLong(newb[1]));
+                Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
 
                 sb.append(partitionColumn).append(" >= ").append(dbProduct.wrapDate(df.format(fragStart)));
                 sb.append(" AND ");
@@ -282,7 +281,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
             case INT: {
                 //validate：the length of metadata ==8 （int)
                 byte[][] newb = ByteUtil.splitBytes(meta, 4);
-                int fragStart= ByteUtil.toInt(newb[0]);
+                int fragStart = ByteUtil.toInt(newb[0]);
                 int fragEnd = ByteUtil.toInt(newb[1]);
                 sb.append(partitionColumn).append(" >= ").append(fragStart);
                 sb.append(" AND ");

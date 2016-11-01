@@ -24,7 +24,7 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  */
 public class PostgresProduct extends DbProduct {
     @Override
-    public String wrapDate(Object date_val) {
-        return "date'" + date_val + "'";
+    public String wrapDate(Object dateVal) {
+        return "date'" + dateVal + "'";
     }
 }

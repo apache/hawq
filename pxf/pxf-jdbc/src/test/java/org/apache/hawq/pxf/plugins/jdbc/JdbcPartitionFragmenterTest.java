@@ -24,7 +24,6 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
 import org.junit.Test;
-import org.mockito.stubbing.OngoingStubbing;
 
 import java.text.ParseException;
 import java.util.Calendar;
@@ -51,25 +50,25 @@ public class JdbcPartitionFragmenterTest {
         assertEquals(fragments.size(), 12);
 
         //fragment - 1
-        byte[] frag_meta = fragments.get(0).getMetadata();
-        byte[][] newb = ByteUtil.splitBytes(frag_meta, 8);
-        long frag_start = ByteUtil.toLong(newb[0]);
-        long frag_end = ByteUtil.toLong(newb[1]);
-        assertDateEquals(frag_start, 2008, 1, 1);
-        assertDateEquals(frag_end, 2008, 2, 1);
+        byte[] fragMeta = fragments.get(0).getMetadata();
+        byte[][] newBytes = ByteUtil.splitBytes(fragMeta, 8);
+        long fragStart = ByteUtil.toLong(newBytes[0]);
+        long fragEnd = ByteUtil.toLong(newBytes[1]);
+        assertDateEquals(fragStart, 2008, 1, 1);
+        assertDateEquals(fragEnd, 2008, 2, 1);
 
         //fragment - 12
-        frag_meta = fragments.get(11).getMetadata();
-        newb = ByteUtil.splitBytes(frag_meta, 8);
-        frag_start = ByteUtil.toLong(newb[0]);
-        frag_end = ByteUtil.toLong(newb[1]);
-        assertDateEquals(frag_start, 2008, 12, 1);
-        assertDateEquals(frag_end, 2009, 1, 1);
+        fragMeta = fragments.get(11).getMetadata();
+        newBytes = ByteUtil.splitBytes(fragMeta, 8);
+        fragStart = ByteUtil.toLong(newBytes[0]);
+        fragEnd = ByteUtil.toLong(newBytes[1]);
+        assertDateEquals(fragStart, 2008, 12, 1);
+        assertDateEquals(fragEnd, 2009, 1, 1);
 
         //when end_date > start_date
         when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2001-01-01");
         fragment = new JdbcPartitionFragmenter(inputData);
-        assertEquals(0,fragment.getFragments().size());
+        assertEquals(0, fragment.getFragments().size());
     }
 
     @Test
@@ -98,25 +97,25 @@ public class JdbcPartitionFragmenterTest {
         assertEquals(fragments.size(), 6);
 
         //fragment - 1
-        byte[] frag_meta = fragments.get(0).getMetadata();
-        byte[][] newb = ByteUtil.splitBytes(frag_meta, 4);
-        int frag_start = ByteUtil.toInt(newb[0]);
-        int frag_end = ByteUtil.toInt(newb[1]);
-        assertEquals(frag_start, 2001);
-        assertEquals(frag_end, 2003);
+        byte[] fragMeta = fragments.get(0).getMetadata();
+        byte[][] newBytes = ByteUtil.splitBytes(fragMeta, 4);
+        int fragStart = ByteUtil.toInt(newBytes[0]);
+        int fragEnd = ByteUtil.toInt(newBytes[1]);
+        assertEquals(fragStart, 2001);
+        assertEquals(fragEnd, 2003);
 
         //fragment - 6
-        frag_meta = fragments.get(5).getMetadata();
-        newb = ByteUtil.splitBytes(frag_meta, 4);
-        frag_start = ByteUtil.toInt(newb[0]);
-        frag_end = ByteUtil.toInt(newb[1]);
-        assertEquals(frag_start, 2011);
-        assertEquals(frag_end, 2012);
+        fragMeta = fragments.get(5).getMetadata();
+        newBytes = ByteUtil.splitBytes(fragMeta, 4);
+        fragStart = ByteUtil.toInt(newBytes[0]);
+        fragEnd = ByteUtil.toInt(newBytes[1]);
+        assertEquals(fragStart, 2011);
+        assertEquals(fragEnd, 2012);
 
         //when end > start
         when(inputData.getUserProperty("RANGE")).thenReturn("2013:2012");
         fragment = new JdbcPartitionFragmenter(inputData);
-        assertEquals(0,fragment.getFragments().size());
+        assertEquals(0, fragment.getFragments().size());
 
     }
 
@@ -132,12 +131,12 @@ public class JdbcPartitionFragmenterTest {
         assertEquals(fragments.size(), 4);
 
         //fragment - 1
-        byte[] frag_meta = fragments.get(0).getMetadata();
-        assertEquals("excellent", new String(frag_meta));
+        byte[] fragMeta = fragments.get(0).getMetadata();
+        assertEquals("excellent", new String(fragMeta));
 
         //fragment - 4
-        frag_meta = fragments.get(3).getMetadata();
-        assertEquals("bad", new String(frag_meta));
+        fragMeta = fragments.get(3).getMetadata();
+        assertEquals("bad", new String(fragMeta));
     }
 
     @Test
@@ -150,7 +149,7 @@ public class JdbcPartitionFragmenterTest {
         try {
             new JdbcPartitionFragmenter(inputData);
             fail("Expected an IllegalArgumentException");
-        }catch (UserDataException ex){
+        } catch (UserDataException ex) {
             assertTrue(ex.getMessage().contains("No enum constant"));
         }
     }
@@ -166,7 +165,7 @@ public class JdbcPartitionFragmenterTest {
         try {
             new JdbcPartitionFragmenter(inputData);
             fail("Expected an ArrayIndexOutOfBoundsException");
-        }catch (ArrayIndexOutOfBoundsException ex){
+        } catch (ArrayIndexOutOfBoundsException ex) {
         }
 
         //date string must be yyyy-MM-dd
@@ -177,7 +176,7 @@ public class JdbcPartitionFragmenterTest {
             JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
             fragment.getFragments();
             fail("Expected an ParseException");
-        }catch (ParseException ex){
+        } catch (ParseException ex) {
         }
     }
 
@@ -191,7 +190,7 @@ public class JdbcPartitionFragmenterTest {
         try {
             new JdbcPartitionFragmenter(inputData);
             fail("Expected an UserDataException");
-        }catch (UserDataException ex){
+        } catch (UserDataException ex) {
         }
     }
 
@@ -207,7 +206,7 @@ public class JdbcPartitionFragmenterTest {
             JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
             fragment.getFragments();
             fail("Expected an UserDataException");
-        }catch (UserDataException ex){
+        } catch (UserDataException ex) {
         }
     }
 
@@ -221,12 +220,12 @@ public class JdbcPartitionFragmenterTest {
         assertEquals(fragments.size(), 1);
     }
 
-    private void assertDateEquals(long date,int year, int month, int day) {
+    private void assertDateEquals(long date, int year, int month, int day) {
         Calendar calendar = Calendar.getInstance();
         calendar.setTimeInMillis(date);
-        assertEquals(calendar.get(Calendar.YEAR),year);
-        assertEquals(calendar.get(Calendar.MONTH),month-1);
-        assertEquals(calendar.get(Calendar.DAY_OF_MONTH),day);
+        assertEquals(calendar.get(Calendar.YEAR), year);
+        assertEquals(calendar.get(Calendar.MONTH), month - 1);
+        assertEquals(calendar.get(Calendar.DAY_OF_MONTH), day);
     }
 
     private void prepareConstruction() throws Exception {

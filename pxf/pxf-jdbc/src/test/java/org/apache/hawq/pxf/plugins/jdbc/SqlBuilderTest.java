@@ -28,6 +28,7 @@ import org.apache.hawq.pxf.api.io.DataType;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
 import java.util.*;
 
 import static org.junit.Assert.assertEquals;
@@ -61,7 +62,7 @@ public class SqlBuilderTest {
         when(inputData.getFilterString()).thenReturn("a0c1o5");//id=1
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        assertEquals("1=1 AND id=1",builder.buildWhereSQL(DB_PRODUCT));
+        assertEquals("1=1 AND id=1", builder.buildWhereSQL(DB_PRODUCT));
     }
 
     @Test
@@ -73,7 +74,7 @@ public class SqlBuilderTest {
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
         assertEquals("1=1 AND cdate>DATE('2008-02-01') AND cdate<DATE('2008-12-01') AND amt>1200"
-                ,builder.buildWhereSQL(DB_PRODUCT));
+                , builder.buildWhereSQL(DB_PRODUCT));
     }
 
     @Test
@@ -84,7 +85,7 @@ public class SqlBuilderTest {
         when(inputData.getFilterString()).thenReturn("a3c\"bad\"o7");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        assertEquals(null,builder.buildWhereSQL(DB_PRODUCT));
+        assertEquals(null, builder.buildWhereSQL(DB_PRODUCT));
     }
 
     @Test
@@ -95,7 +96,7 @@ public class SqlBuilderTest {
         when(inputData.getFilterString()).thenReturn("a1c\"2008-02-01\"o2a2c1200o2l1");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        assertEquals(null,builder.buildWhereSQL(DB_PRODUCT));
+        assertEquals(null, builder.buildWhereSQL(DB_PRODUCT));
     }
 
     @Test
@@ -111,9 +112,9 @@ public class SqlBuilderTest {
 
         //partition-1 : cdate>=2008-01-01 and cdate<2008-03-01
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
-        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT,ORIGINAL_SQL);
+        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT, ORIGINAL_SQL);
         assertEquals(ORIGINAL_SQL + " WHERE 1=1  AND " +
-                "cdate >= DATE('2008-01-01') AND cdate < DATE('2008-03-01')",fragmentSql);
+                "cdate >= DATE('2008-01-01') AND cdate < DATE('2008-03-01')", fragmentSql);
     }
 
     @Test
@@ -126,7 +127,7 @@ public class SqlBuilderTest {
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
         String whereSql = builder.buildWhereSQL(DB_PRODUCT);
-        assertEquals("1=1 AND id>5",whereSql);
+        assertEquals("1=1 AND id>5", whereSql);
 
         JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
         List<Fragment> fragments = fragment.getFragments();
@@ -135,8 +136,8 @@ public class SqlBuilderTest {
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
 
         String filterSql = ORIGINAL_SQL + " WHERE " + whereSql;
-        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT,filterSql);
-        assertEquals(filterSql + " AND grade='excellent'",fragmentSql);
+        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT, filterSql);
+        assertEquals(filterSql + " AND grade='excellent'", fragmentSql);
     }
 
     @Test
@@ -149,8 +150,8 @@ public class SqlBuilderTest {
 
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
 
-        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT,ORIGINAL_SQL);
-        assertEquals(ORIGINAL_SQL,fragmentSql);
+        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT, ORIGINAL_SQL);
+        assertEquals(ORIGINAL_SQL, fragmentSql);
     }
 
 
