@@ -492,7 +492,7 @@ class HawqRegister(object):
             self._set_yml_data(Format, files, sizes, tupcounts, eofuncompresseds, varblockcounts, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], bucketNum, partitionby, partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, partitions_tupcounts, partitions_eofuncompresseds, partitions_varblockcounts, encoding)
 
         except KeyError as e:
-            print 'Invalid yaml file, %s is missing.' % e
+            logger.error('Invalid yaml file, %s is missing.' % e)
             self.failure_handler.rollback()
             sys.exit(1)
 
@@ -527,11 +527,13 @@ class HawqRegister(object):
             sys.exit(1)
 
     def _check_file_not_folder(self):
+        logger.info('Files check...')
         for fn in self.files:
             hdfscmd = 'hadoop fs -test -f %s' % fn
             if local_ssh(hdfscmd, logger):
                 logger.info('%s is not a file in hdfs, please check the yaml configuration file.' % fn)
                 sys.exit(1)
+        logger.info('Files check done...')
 
     def _is_folder(self, filepath):
         hdfscmd = 'hadoop fs -test -d %s' % filepath
@@ -673,9 +675,9 @@ class HawqRegister(object):
 
         self._check_files_and_table_in_same_hdfs_cluster(self.filepath, self.tabledir)
 
-        print 'New file(s) to be registered: ', self.files_append
+        logger.info('New file(s) to be registered: %s' % self.files_append)
         if self.files_update:
-            print 'Catalog info need to be updated for these files: ', self.files_update
+            logger.info('Catalog info need to be updated for these files: %s' % self.files_update)
 
         if self.filesize is not None:
             if len(self.files) != 1:
