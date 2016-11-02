@@ -29,8 +29,6 @@
 //
 //---------------------------------------------------------------------------
 
-#define ALLOW_appendStringInfo
-
 #include <sys/stat.h>
 #include "gpopt/utils/nodeutils.h"
 #include "gpopt/utils/CCatalogUtils.h"

@@ -29,12 +29,6 @@
 //
 //---------------------------------------------------------------------------
 
-#define ALLOW_DatumGetPointer
-#define ALLOW_ntohl
-#define ALLOW_memset
-#define ALLOW_printf
-
-#define ALLOW_isnan
 #include "postgres.h"
 #include "gpopt/translate/CTranslatorScalarToDXL.h"
 #include "gpopt/translate/CTranslatorQueryToDXL.h"
