@@ -5850,6 +5850,8 @@ BackendRun(Port *port)
 	if (port->cmdline_options)
 		maxac += (strlen(port->cmdline_options) + 1) / 2;
 
+	MemoryContextSwitchTo(TopMemoryContext);
+
 	av = (char **) MemoryContextAlloc(TopMemoryContext,
 									  maxac * sizeof(char *));
 	ac = 0;
@@ -5890,7 +5892,6 @@ BackendRun(Port *port)
 	 * data here.  Also, subsidiary data such as the username isn't lost
 	 * either; see ProcessStartupPacket().
 	 */
-	MemoryContextSwitchTo(TopMemoryContext);
 	MemoryContextDelete(PostmasterContext);
 	PostmasterContext = NULL;
 
