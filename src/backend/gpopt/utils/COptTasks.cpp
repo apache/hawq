@@ -29,8 +29,6 @@
 //
 //---------------------------------------------------------------------------
 
-#define ALLOW_strcasecmp
-
 #include "gpopt/utils/gpdbdefs.h"
 #include "gpopt/utils/CConstExprEvaluatorProxy.h"
 #include "gpopt/utils/COptTasks.h"
