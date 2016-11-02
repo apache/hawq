@@ -19,7 +19,6 @@ TEST_F(TestHawqRegister, TestUsage1ExpectSuccessDifferentSchema) {
   string rootPath(util.getTestRootPath());
   string filePath = rootPath + "/ManagementTool/data/parquet200/dat.paq";
 
-  util.execute("drop table if exists xz.t;");
   util.execute("drop schema if exists xz;");
   util.execute("create schema xz;");
   util.execute("drop table if exists t;");
