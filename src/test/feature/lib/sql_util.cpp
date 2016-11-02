@@ -67,6 +67,10 @@ std::string SQLUtility::getDbName() {
     return databaseName;
 }
 
+std::string SQLUtility::getSchemaName() {
+    return schemaName;
+}
+
 void SQLUtility::exec(const string &sql) {
   EXPECT_EQ(0, (conn->runSQLCommand(sql)).getLastStatus())
       << conn->getLastResult();
