@@ -545,14 +545,20 @@ class HawqRegister(object):
             self.failure_handler.rollback()
             sys.exit(1)
 
-    def _check_file_not_folder(self):
-        logger.info('Files check...')
+    def _check_file_not_folder(self, pn=''):
+        if pn:
+            logger.info('Files check for table %s...' % pn)
+        else:
+            logger.info('Files check...')
         for fn in self.files:
             hdfscmd = 'hadoop fs -test -f %s' % fn
             if local_ssh(hdfscmd, logger):
                 logger.info('%s is not a file in hdfs, please check the yaml configuration file.' % fn)
                 sys.exit(1)
-        logger.info('Files check done...')
+        if pn:
+            logger.info('Files check done for table %s.' % pn)
+        else:
+            logger.info('Files check done.')
 
     def _is_folder(self, filepath):
         hdfscmd = 'hadoop fs -test -d %s' % filepath
@@ -1001,7 +1007,7 @@ class HawqRegisterPartition(HawqRegister):
             self.sizes = self.partitions_filesizes[k]
             if self.yml:
                 self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
-                self._check_file_not_folder()
+                self._check_file_not_folder(pn)
         if self.yml:
             self._check_database_encoding()
             if not self._create_table() and self.mode != 'force':
