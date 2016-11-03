@@ -16,7 +16,7 @@
 #include "access/clog.h"
 #include "access/subtrans.h"
 #include "access/transam.h"
-#include "executor/spi.h"
+#include "catalog/catquery.h"
 #include "miscadmin.h"
 #include "postmaster/autovacuum.h"
 #include "storage/pmsignal.h"
@@ -416,6 +416,11 @@ GetNewExternalObjectId(void)
 		ResetExternalObjectId();
 	}
 
+	/*
+	 * This check is needed for upgrade from old HAWQ versions, which don't support
+	 * oid pool for HCatalog objects.
+	 * In current implementation max oid will be always less than FirstExternalObjectId.
+	 */
 	if (!IsValidExternalOidRange)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_RESOURCES),
@@ -474,7 +479,7 @@ ResetExternalObjectId(void)
 
 /*
  * master_highest_used_oid
- * 		Query the database to find the highest used Oid by
+ * 		Uses CAQL to find the highest used Oid by
  * 		1) Find all the relations that has Oids
  * 		2) Find max oid from those relations
  */
@@ -482,65 +487,45 @@ Oid
 master_highest_used_oid(void)
 {
 	Oid oidMax = InvalidOid;
+	Oid currentOid;
+	Form_pg_class classForm;
+	int fetchCount;
 
-	if (SPI_OK_CONNECT != SPI_connect())
+	cqContext *pcqOuterCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_class where relhasoids = :1",
+					BoolGetDatum(true)));
+
+	HeapTuple tuple = caql_getnext(pcqOuterCtx);
+
+	if (!HeapTupleIsValid(tuple))
 	{
-		ereport(ERROR, (errcode(ERRCODE_CDB_INTERNAL_ERROR),
-				errmsg("Unable to connect to execute internal query for HCatalog.")));
-	}
-
-	int ret = SPI_execute("SELECT relname FROM pg_class where relhasoids=true", true, 0);
-
-	int rows = SPI_processed;
-
-	char *tableNames[rows];
-
-	if (rows == 0 || ret <= 0 || NULL == SPI_tuptable)
-	{
-		SPI_finish();
+		caql_endscan(pcqOuterCtx);
+		elog(DEBUG1, "Unable to get list of tables having oids");
 		return oidMax;
 	}
 
-	TupleDesc tupdesc = SPI_tuptable->tupdesc;
-	SPITupleTable *tuptable = SPI_tuptable;
-
-	for (int i = 0; i < rows; i++)
-	{
-		HeapTuple tuple = tuptable->vals[i];
-		tableNames[i] = SPI_getvalue(tuple, tupdesc, 1);
-	}
-
 	/* construct query to get max oid from all tables with oids */
-	StringInfoData sqlstr;
-	initStringInfo(&sqlstr);
-	appendStringInfo(&sqlstr, "SELECT max(oid) FROM (");
-	for (int i = 0; i < rows; i++)
+	StringInfo sqlstr = makeStringInfo();
+	while (HeapTupleIsValid(tuple))
 	{
-		if (i > 0)
-		{
-			appendStringInfo(&sqlstr, " UNION ALL ");
-		}
-		appendStringInfo(&sqlstr, "SELECT max(oid) AS oid FROM %s", tableNames[i]);
-	}
-	appendStringInfo(&sqlstr, ") AS x");
+		classForm = (Form_pg_class) GETSTRUCT(tuple);
+		appendStringInfo(sqlstr, "SELECT oid FROM %s WHERE oid >= :1 ORDER BY oid", classForm->relname.data);
 
-	ret = SPI_execute(sqlstr.data, true, 1);
+		currentOid = caql_getoid_plus(NULL, &fetchCount, NULL, cql(sqlstr->data, oidMax));
 
-	if (ret > 0 && NULL != SPI_tuptable)
-	{
-		TupleDesc tupdesc = SPI_tuptable->tupdesc;
-		SPITupleTable *tuptable = SPI_tuptable;
-		HeapTuple tuple = tuptable->vals[0];
-		char *oidString = SPI_getvalue(tuple, tupdesc, 1);
-		if (NULL != oidString)
-		{
-			oidMax = DatumGetObjectId(DirectFunctionCall1(oidin, CStringGetDatum(oidString)));
-		}
+		elog(DEBUG1, "Max Oid in table %s: %d", classForm->relname.data, currentOid);
+
+		oidMax = currentOid > oidMax ? currentOid : oidMax;
+
+		tuple = caql_getnext(pcqOuterCtx);
+
+		resetStringInfo(sqlstr);
 	}
 
-	pfree(sqlstr.data);
+	caql_endscan(pcqOuterCtx);
 
-	SPI_finish();
+	pfree(sqlstr->data);
 
 	elog(DEBUG1, "Highest Oid currently in use: %u", oidMax);
 
