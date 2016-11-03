@@ -90,17 +90,6 @@ public class JdbcPartitionFragmenter extends Fragmenter {
         }
     }
 
-    //The unit interval, in milliseconds, that is used to estimate the number of slices for the date partition type
-    static Map<IntervalType, Long> intervals = new HashMap<IntervalType, Long>();
-
-    static {
-        intervals.put(IntervalType.DAY, (long) 24 * 60 * 60 * 1000);
-        //30 days
-        intervals.put(IntervalType.MONTH, (long) 30 * 24 * 60 * 60 * 1000);
-        //365 days
-        intervals.put(IntervalType.YEAR, (long) 365 * 30 * 24 * 60 * 60 * 1000);
-    }
-
     /**
      * Constructor for JdbcPartitionFragmenter.
      *
@@ -115,9 +104,16 @@ public class JdbcPartitionFragmenter extends Fragmenter {
             partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
             partitionColumn = partitionBy[0];
             partitionType = PartitionType.getType(partitionBy[1]);
+        }catch (IllegalArgumentException e1) {
+            throw new UserDataException("The parameter 'PARTITION_BY' invalid, the pattern is 'column_name:date|int|enum'" );
+        }
 
+        try {
             range = inConf.getUserProperty("RANGE").split(":");
-
+        }catch (IllegalArgumentException e1) {
+            throw new UserDataException("The parameter 'RANGE' invalid, the pattern is 'start_value[:end_value]'" );
+        }
+        try{
             //parse and validate parameter-INTERVAL
             if (inConf.getUserProperty("INTERVAL") != null) {
                 interval = inConf.getUserProperty("INTERVAL").split(":");
@@ -126,9 +122,9 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                     intervalType = IntervalType.type(interval[1]);
             }
             if (intervalNum < 1)
-                throw new UserDataException("The parameter{INTERVAL} must > 1, but actual is '" + intervalNum + "'");
+                throw new UserDataException("The parameter 'INTERVAL' must > 1, but actual is '" + intervalNum + "'");
         } catch (IllegalArgumentException e1) {
-            throw new UserDataException(e1);
+            throw new UserDataException("The parameter 'INTERVAL' invalid, the pattern is 'interval_num[:interval_unit]'");
         } catch (UserDataException e2) {
             throw e2;
         }

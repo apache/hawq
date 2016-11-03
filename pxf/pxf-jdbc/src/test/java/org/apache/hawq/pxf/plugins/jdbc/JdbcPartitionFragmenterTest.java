@@ -150,7 +150,7 @@ public class JdbcPartitionFragmenterTest {
             new JdbcPartitionFragmenter(inputData);
             fail("Expected an IllegalArgumentException");
         } catch (UserDataException ex) {
-            assertTrue(ex.getMessage().contains("No enum constant"));
+
         }
     }
 
