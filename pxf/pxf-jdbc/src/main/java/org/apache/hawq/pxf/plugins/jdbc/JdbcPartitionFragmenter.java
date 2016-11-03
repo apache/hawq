@@ -104,16 +104,16 @@ public class JdbcPartitionFragmenter extends Fragmenter {
             partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
             partitionColumn = partitionBy[0];
             partitionType = PartitionType.getType(partitionBy[1]);
-        }catch (IllegalArgumentException e1) {
-            throw new UserDataException("The parameter 'PARTITION_BY' invalid, the pattern is 'column_name:date|int|enum'" );
+        } catch (IllegalArgumentException e1) {
+            throw new UserDataException("The parameter 'PARTITION_BY' invalid, the pattern is 'column_name:date|int|enum'");
         }
 
         try {
             range = inConf.getUserProperty("RANGE").split(":");
-        }catch (IllegalArgumentException e1) {
-            throw new UserDataException("The parameter 'RANGE' invalid, the pattern is 'start_value[:end_value]'" );
+        } catch (IllegalArgumentException e1) {
+            throw new UserDataException("The parameter 'RANGE' invalid, the pattern is 'start_value[:end_value]'");
         }
-        try{
+        try {
             //parse and validate parameter-INTERVAL
             if (inConf.getUserProperty("INTERVAL") != null) {
                 interval = inConf.getUserProperty("INTERVAL").split(":");
