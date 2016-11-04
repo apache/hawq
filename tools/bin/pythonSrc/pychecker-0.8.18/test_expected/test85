@@ -1,0 +1,6 @@
+Processing module test85 (test_input/test85.py)...
+
+Warnings...
+
+test_input/test85.py:13: Using a conditional statement with a constant value (None)
+test_input/test85.py:17: Using a conditional statement with a constant value ([])

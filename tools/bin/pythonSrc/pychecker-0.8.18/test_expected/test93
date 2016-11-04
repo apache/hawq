@@ -1,0 +1,6 @@
+Processing module test93 (test_input/test93.py)...
+
+Warnings...
+
+test_input/test93.py:6: Passing a constant string to getattr, consider direct reference
+test_input/test93.py:11: Passing a constant string to setattr, consider direct reference

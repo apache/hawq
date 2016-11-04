@@ -86,7 +86,8 @@ static int32  InvokeExtProtocol(void		*ptr,
 								size_t 		nbytes, 
 								URL_FILE 	*file, 
 								CopyState 	pstate,
-								bool		last_call);
+								bool		last_call,
+								ExternalSelectDesc desc);
 void extract_http_domain(char* i_path, char* o_domain, int dlen);
 
 
@@ -1028,16 +1029,6 @@ url_fopen(char *url,
 			}
 		}
 
-        if (CURLE_OK != (e = curl_multi_add_handle(multi_handle, file->u.curl.handle)))
-		{
-			if (CURLM_CALL_MULTI_PERFORM != e)
-			{
-				url_fclose(file, false, pstate->cur_relname);
-				elog(ERROR, "internal error: curl_multi_add_handle failed (%d - %s)",
-					 e, curl_easy_strerror(e));
-			}
-		}
-
         /* 
          * lets check our connection.
          * start the fetch if we're SELECTing (GET request), or write an
@@ -1045,6 +1036,15 @@ url_fopen(char *url,
          */
         if (!forwrite)
         {
+          if (CURLE_OK != (e = curl_multi_add_handle(multi_handle, file->u.curl.handle)))
+		      {
+			      if (CURLM_CALL_MULTI_PERFORM != e)
+			      {
+				      url_fclose(file, false, pstate->cur_relname);
+				      elog(ERROR, "internal error: curl_multi_add_handle failed (%d - %s)",
+					        e, curl_easy_strerror(e));
+			      }
+		      }
             
     		while (CURLM_CALL_MULTI_PERFORM ==
     			   (e = curl_multi_perform(multi_handle, &file->u.curl.still_running)));
@@ -1271,7 +1271,7 @@ url_fclose(URL_FILE *file, bool failOnError, const char *relname)
 			
 			/* last call. let the user close custom resources */
 			if(file->u.custom.protocol_udf)
-				(void) InvokeExtProtocol(NULL, 0, file, NULL, true);
+				(void) InvokeExtProtocol(NULL, 0, file, NULL, true, NULL);
 
 			/* now clean up everything not cleaned by user */
 			MemoryContextDelete(file->u.custom.protcxt);
@@ -1775,7 +1775,7 @@ static size_t curl_fwrite(char *buf, int nbytes, URL_FILE* file, CopyState pstat
 
 
 size_t
-url_fread(void *ptr, size_t size, size_t nmemb, URL_FILE *file, CopyState pstate)
+url_fread(void *ptr, size_t size, size_t nmemb, URL_FILE *file, CopyState pstate, ExternalSelectDesc desc)
 {
     size_t 	want;
 	int 	n;
@@ -1822,7 +1822,7 @@ url_fread(void *ptr, size_t size, size_t nmemb, URL_FILE *file, CopyState pstate
 
 		case CFTYPE_CUSTOM:
 			
-			want = (size_t) InvokeExtProtocol(ptr, nmemb * size, file, pstate, false);
+			want = (size_t) InvokeExtProtocol(ptr, nmemb * size, file, pstate, false, desc);
 			break;
 				
 		default: /* unknown or supported type */
@@ -1860,7 +1860,7 @@ url_fwrite(void *ptr, size_t size, size_t nmemb, URL_FILE *file, CopyState pstat
 		
 		case CFTYPE_CUSTOM:
 						
-			want = (size_t) InvokeExtProtocol(ptr, nmemb * size, file, pstate, false);
+			want = (size_t) InvokeExtProtocol(ptr, nmemb * size, file, pstate, false, NULL);
 			break;
 			
 		default: /* unknown or unsupported type */
@@ -2297,7 +2297,8 @@ InvokeExtProtocol(void 	   		*ptr,
 				  size_t 		 nbytes, 
 				  URL_FILE 		*file, 
 				  CopyState 	 pstate,
-				  bool			 last_call)
+				  bool			 last_call,
+				  ExternalSelectDesc desc)
 {
 	FunctionCallInfoData	fcinfo;
 	ExtProtocolData*		extprotocol = file->u.custom.extprotocol;
@@ -2315,6 +2316,7 @@ InvokeExtProtocol(void 	   		*ptr,
 	extprotocol->prot_maxbytes = nbytes;
 	extprotocol->prot_scanquals = file->u.custom.scanquals;
 	extprotocol->prot_last_call = last_call;
+	extprotocol->desc = desc;
 	
 	InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo, 
 							 /* FmgrInfo */ extprotocol_udf, 

@@ -136,28 +136,30 @@ int ResBrokerMain(void)
 
 	ResBrokerKeepRun = true;
 
-    /* Load parameters */
-    int res = loadParameters();
-    if ( res != FUNC_RETURN_OK ) {
-        elog(WARNING, "Resource broker loads invalid yarn parameters");
-    }
+	/* Load parameters */
+	int res = loadParameters();
+	if ( res != FUNC_RETURN_OK ) {
+		elog(WARNING, "Resource broker loads invalid yarn parameters");
+	}
 
-    /* Set signal behavior */
-    PG_SETMASK(&BlockSig);
-    pqsignal(SIGHUP , SIG_IGN);
-    pqsignal(SIGINT , quitResBroker);
-    pqsignal(SIGTERM, quitResBroker);
-    pqsignal(SIGQUIT, SIG_DFL);
-    pqsignal(SIGPIPE, SIG_IGN);
-    pqsignal(SIGUSR1, SIG_IGN);
-    pqsignal(SIGUSR2, SIG_IGN);
-    pqsignal(SIGCHLD, SIG_IGN);
-    pqsignal(SIGTTIN, SIG_IGN);
-    pqsignal(SIGTTOU, SIG_IGN);
-    PG_SETMASK(&UnBlockSig);
+	/* Set signal behavior */
+	PG_SETMASK(&BlockSig);
+	pqsignal(SIGHUP , SIG_IGN);
+	pqsignal(SIGINT , quitResBroker);
+	pqsignal(SIGTERM, quitResBroker);
+	pqsignal(SIGQUIT, SIG_DFL);
+	pqsignal(SIGPIPE, SIG_IGN);
+	pqsignal(SIGUSR1, SIG_IGN);
+	pqsignal(SIGUSR2, SIG_IGN);
+	/* call system() needs set SIG_DFL for SIGCHLD */
+	pqsignal(SIGCHLD, SIG_DFL);
+	pqsignal(SIGTTIN, SIG_IGN);
+	pqsignal(SIGTTOU, SIG_IGN);
+	PG_SETMASK(&UnBlockSig);
 
 	res = ResBrokerMainInternal();
 
+	pqsignal(SIGCHLD, SIG_IGN);
 	elog(LOG, "YARN mode resource broker goes into exit phase.");
 	return res;
 }
@@ -193,6 +195,12 @@ int ResBrokerMainInternal(void)
 					  	  "Resource broker process will actively close.");
 			ResBrokerKeepRun = false;
 			continue;
+		}
+
+		/* refresh kerberos ticket */
+		if (enable_secure_filesystem && !login())
+		{
+			elog(WARNING, "Resource broker failed to refresh kerberos ticket.");
 		}
 
 		/*
@@ -339,71 +347,63 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
 	char *priName = NULL, *retval = NULL;
 	const char *errorMsg = NULL;
 
-    /*
-     * refresh kerberos ticket
-     */
-    if (!login()) {
-        elog(WARNING, "Cannot login kerberos.");
-        return NULL;
-    }
+	if (cache) {
+		if (0 != setenv("KRB5CCNAME", cache, 1)) {
+			elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
+			return NULL;
+		}
+	}
 
-    if (cache) {
-        if (0 != setenv("KRB5CCNAME", cache, 1)) {
-            elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
-            return NULL;
-        }
-    }
+	do {
+		if (0 != (ec = krb5_init_context(&cxt))) {
+			break;
+		}
 
-    do {
-        if (0 != (ec = krb5_init_context(&cxt))) {
-            break;
-        }
+		if (0 != (ec = krb5_cc_default(cxt, &ccache))) {
+			break;
+		}
 
-        if (0 != (ec = krb5_cc_default(cxt, &ccache))) {
-            break;
-        }
+		if (0 != (ec = krb5_cc_get_principal(cxt, ccache, &principal))) {
+			break;
+		}
 
-        if (0 != (ec = krb5_cc_get_principal(cxt, ccache, &principal))) {
-            break;
-        }
+		if (0 != (ec = krb5_unparse_name(cxt, principal, &priName))) {
+			break;
+		}
+	} while (0);
 
-        if (0 != (ec = krb5_unparse_name(cxt, principal, &priName))) {
-            break;
-        }
-    } while (0);
+	if (!ec) {
+		retval = strdup(priName);
+	} else {
+		if (cxt) {
+			errorMsg = krb5_get_error_message(cxt, ec);
+		} else {
+			errorMsg = "Cannot initialize kerberos context";
+		}
+	}
 
-    if (!ec) {
-        retval = strdup(priName);
-    } else {
-        if (cxt) {
-        	errorMsg = krb5_get_error_message(cxt, ec);
-        } else {
-        	errorMsg = "Cannot initialize kerberos context";
-        }
-    }
+	if (priName != NULL) {
+		krb5_free_unparsed_name(cxt, priName);
+	}
 
-    if (priName != NULL) {
-        krb5_free_unparsed_name(cxt, priName);
-    }
+	if (principal != NULL) {
+		krb5_free_principal(cxt, principal);
+	}
 
-    if (principal != NULL) {
-        krb5_free_principal(cxt, principal);
-    }
+	if (ccache != NULL) {
+		krb5_cc_close(cxt, ccache);
+	}
 
-    if (ccache != NULL) {
-        krb5_cc_close(cxt, ccache);
-    }
+	if (cxt != NULL) {
+		krb5_free_context(cxt);
+	}
 
-    if (cxt != NULL) {
-        krb5_free_context(cxt);
-    }
+	if (errorMsg != NULL) {
+		elog(WARNING, "Fail to extract principal from cache, because : %s", errorMsg);
+		return NULL;
+	}
 
-    if (errorMsg != NULL) {
-    	elog(WARNING, "Fail to extract principal from cache, because : %s", errorMsg);
-    	return NULL;
-    }
-
-    return retval;
+	return retval;
 }
 
 int  loadParameters(void)
@@ -488,6 +488,10 @@ int  loadParameters(void)
 	/* If kerberos is enable, fetch the principal from ticket cache file. */
 	if (enable_secure_filesystem)
 	{
+		if (!login())
+		{
+			elog(WARNING, "Resource broker failed to refresh kerberos ticket.");
+		}
 		YARNUser = ExtractPrincipalFromTicketCache(krb5_ccname);
 		YARNUserShouldFree = true;
 	}
@@ -503,13 +507,13 @@ int  loadParameters(void)
 			  "Scheduler server %s:%s "
 			  "Queue %s Application name %s, "
 			  "by user:%s",
-		      YARNServer.Str,
-		      YARNPort.Str,
-		      YARNSchedulerServer.Str,
-		      YARNSchedulerPort.Str,
-		      YARNQueueName.Str,
-		      YARNAppName.Str,
-		      YARNUser);
+			  YARNServer.Str,
+			  YARNPort.Str,
+			  YARNSchedulerServer.Str,
+			  YARNSchedulerPort.Str,
+			  YARNQueueName.Str,
+			  YARNAppName.Str,
+			  YARNUser);
 exit:
 	if ( res != FUNC_RETURN_OK ) {
 		elog(WARNING, "YARN mode resource broker failed to load YARN connection arguments.");
@@ -755,7 +759,7 @@ int sendRBGetClusterReportErrorData(int errorcode)
 		return RESBROK_PIPE_ERROR;
 	}
 
-	return FUNC_RETURN_OK;
+	return errorcode;
 }
 
 /**

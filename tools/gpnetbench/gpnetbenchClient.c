@@ -29,24 +29,10 @@
 #include <sys/time.h>
 
 #define INIT_RETRIES 5
+void usage(void);
 void send_buffer(int fd, char* buffer, int bytes);
-void print_headers();
+void print_headers(void);
 double subtractTimeOfDay(struct timeval* begin, struct timeval* end);
-
-void usage()
-{
-	fprintf(stdout, "usage: gpnetbench -p PORT -H HOST [-l SECONDS] [-t EXPERIMENT] [-f UNITS] [-P HEADERS] [-b KB] [-h]\n");
-	fprintf(stdout, "where\n");
-	fprintf(stdout, "       PORT is the port to connect to for the server\n");
-	fprintf(stdout, "       HOST is the hostname to connect to for the server\n");
-	fprintf(stdout, "       SECONDS is the number of seconds to sample the network, where the default is 60\n");
-	fprintf(stdout, "       EXPERIMENT is the experiment name to run, where the default is TCP_STREAM\n");
-	fprintf(stdout, "       UNITS is the output units, where the default is M megabytes\n");
-	fprintf(stdout, "       HEADERS is 0 (don't) or 1 (do) display headers in the output\n");
-	fprintf(stdout, "       KB is the size of the send buffer in kilobytes, where the default is 32\n");
-
-	fprintf(stdout, "       -h shows this help message\n");
-}
 
 int main(int argc, char** argv)
 {
@@ -188,9 +174,24 @@ int main(int argc, char** argv)
 	return 0;
 }
 
+void usage()
+{
+	fprintf(stdout, "usage: gpnetbench -p PORT -H HOST [-l SECONDS] [-t EXPERIMENT] [-f UNITS] [-P HEADERS] [-b KB] [-h]\n");
+	fprintf(stdout, "where\n");
+	fprintf(stdout, "       PORT is the port to connect to for the server\n");
+	fprintf(stdout, "       HOST is the hostname to connect to for the server\n");
+	fprintf(stdout, "       SECONDS is the number of seconds to sample the network, where the default is 60\n");
+	fprintf(stdout, "       EXPERIMENT is the experiment name to run, where the default is TCP_STREAM\n");
+	fprintf(stdout, "       UNITS is the output units, where the default is M megabytes\n");
+	fprintf(stdout, "       HEADERS is 0 (don't) or 1 (do) display headers in the output\n");
+	fprintf(stdout, "       KB is the size of the send buffer in kilobytes, where the default is 32\n");
+
+	fprintf(stdout, "       -h shows this help message\n");
+}
+
 void send_buffer(int fd, char* buffer, int bytes)
 {
-	size_t retval;
+	ssize_t retval;
 
 	while(bytes > 0)
 	{
@@ -235,3 +236,4 @@ void print_headers()
 	printf("               Size     Time     Throughput\n");
 	printf("n/a   n/a      bytes    secs.    MBytes/sec\n");
 }
+

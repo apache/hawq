@@ -1,0 +1,7 @@
+
+suppressions = { 'test39': 'no-moduledoc', 'test39.func2': 'funcdoc',
+		 'test39.X1': 'no-classdoc', 'test39.X2.x': 'self="s"' }
+
+suppressionRegexs = { 'test39.Y.': 'no-classdoc', 
+		      'test39.Y..a': 'funcdoc',
+		      'test39.NewStyle.f': 'no-local' }

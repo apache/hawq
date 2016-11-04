@@ -1,0 +1,25 @@
+Processing module test87 (test_input/test87.py)...
+
+Warnings...
+
+test_input/test87.py:3: (True) shadows builtin
+test_input/test87.py:3: Should not assign to True, it is (or will be) a builtin
+test_input/test87.py:4: (False) shadows builtin
+test_input/test87.py:4: Should not assign to False, it is (or will be) a builtin
+test_input/test87.py:6: Should not assign to true, it is similar to builtin True
+test_input/test87.py:7: Should not assign to false, it is similar to builtin False
+test_input/test87.py:9: Should not assign to TRUE, it is similar to builtin True
+test_input/test87.py:10: Should not assign to FALSE, it is similar to builtin False
+test_input/test87.py:14: Comparisons with TRUE are not necessary and may not work as expected
+test_input/test87.py:16: Comparisons with TRUE are not necessary and may not work as expected
+test_input/test87.py:16: Comparisons with True are not necessary and may not work as expected
+test_input/test87.py:16: Comparisons with true are not necessary and may not work as expected
+test_input/test87.py:20: Comparisons with false are not necessary and may not work as expected
+test_input/test87.py:22: Using is false, may not always work
+test_input/test87.py:24: Using is True, may not always work
+test_input/test87.py:26: Using is 53343, may not always work
+test_input/test87.py:28: Using is 10000000.0, may not always work
+test_input/test87.py:30: Using is not false, may not always work
+test_input/test87.py:32: Using is not True, may not always work
+test_input/test87.py:34: Using is not 53343, may not always work
+test_input/test87.py:36: Using is not 10000000.0, may not always work

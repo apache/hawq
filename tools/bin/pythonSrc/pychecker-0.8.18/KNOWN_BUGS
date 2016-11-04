@@ -1,0 +1,100 @@
+
+Crash when running on code that does:
+
+	from wxPython.wx import *
+
+The problem is in wxGTK-2.2.6 and earlier versions.
+
+Below is a patch to wxGTK 2.2.6 that fixes the problem.
+
+This problem has been reported:  
+http://sourceforge.net/tracker/?func=detail&atid=109863&aid=417923&group_id=9863
+
+-----------
+
+*** src/gtk/app.cpp.orig	Sat Apr 21 17:12:35 2001
+--- src/gtk/app.cpp	Sat Apr 21 17:14:46 2001
+***************
+*** 582,597 ****
+--- 582,600 ----
+  
+      // GL: I'm annoyed ... I don't know where to put this and I don't want to
+      // create a module for that as it's part of the core.
+  #if wxUSE_THREADS
+      delete wxPendingEvents;
++     wxPendingEvents = 0;
+      delete wxPendingEventsLocker;
++     wxPendingEventsLocker = 0;
+  #endif
+  
+      wxSystemSettings::Done();
+  
+      delete[] wxBuffer;
++     wxBuffer = 0;
+  
+      wxClassInfo::CleanUpClasses();
+  
+      // check for memory leaks
+  #if (defined(__WXDEBUG__) && wxUSE_MEMORY_TRACING) || wxUSE_DEBUG_CONTEXT
+*** src/common/resource.cpp.orig	Sat Apr 21 17:10:23 2001
+--- src/common/resource.cpp	Sat Apr 21 17:06:42 2001
+***************
+*** 110,121 ****
+--- 110,125 ----
+  }
+  
+  void wxCleanUpResourceSystem()
+  {
+      delete wxDefaultResourceTable;
++     wxDefaultResourceTable = 0;
+      if (wxResourceBuffer)
++     {
+          delete[] wxResourceBuffer;
++         wxResourceBuffer = 0;
++     }
+  }
+  
+  void wxLogWarning(char *msg)
+  {
+      wxMessageBox(msg, _("Warning"), wxOK);
+
+---------------------------------------------------------------------
+
+exec statements are not checked.  Therefore, variables and modules used in 
+exec statements may cause spurious warnings.  To avoid the warnings,
+consider rewriting your code to use eval() or getattr().
+
+For example, consider rewriting this code:
+
+	exec 'var = object.' + member
+	print var
+
+to:
+
+	var = eval('object.' + member)
+	print var
+
+or:
+
+	var = getattr(object, member)
+	print var
+
+---------------------------------------------------------------------
+
+The following code generates a spurious warning:
+
+	from XXX import *
+
+	class SameName:
+	    def __init__(self): pass
+
+And in the file XXX:
+
+	class SameName:
+	    def __init__(self, c): pass
+
+	class Anyname:
+	    def __init__(self):
+	        self.xxx = SameName(1)
+
+---------------------------------------------------------------------

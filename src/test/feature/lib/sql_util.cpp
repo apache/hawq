@@ -20,7 +20,7 @@ using std::string;
 namespace hawq {
 namespace test {
 
-SQLUtility::SQLUtility()
+SQLUtility::SQLUtility(SQLUtilityMode mode)
     : testRootPath(getTestRootPath()),
       test_info(::testing::UnitTest::GetInstance()->current_test_info()) {
   auto getConnection = [&] () {
@@ -35,15 +35,40 @@ SQLUtility::SQLUtility()
   };
   getConnection();
 
-  schemaName =
-      string(test_info->test_case_name()) + "_" + test_info->name();
-  exec("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
-  exec("CREATE SCHEMA " + schemaName);
+  if (mode == MODE_SCHEMA) {
+    schemaName = string(test_info->test_case_name()) + "_" + test_info->name();
+    databaseName = HAWQ_DB;
+    exec("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
+    exec("CREATE SCHEMA " + schemaName);
+    sql_util_mode = MODE_SCHEMA;
+  } else {
+    schemaName = HAWQ_DEFAULT_SCHEMA;
+    databaseName = "db_" + string(test_info->test_case_name()) + "_" + test_info->name();
+    std::transform(databaseName.begin(), databaseName.end(), databaseName.begin(), ::tolower);
+    exec("DROP DATABASE IF EXISTS " + databaseName);
+    exec("CREATE DATABASE " + databaseName);
+    sql_util_mode = MODE_DATABASE;
+  }
 }
 
 SQLUtility::~SQLUtility() {
-  if (!test_info->result()->Failed())
-    exec("DROP SCHEMA " + schemaName + " CASCADE");
+  if (!test_info->result()->Failed()) {
+    if (schemaName != HAWQ_DEFAULT_SCHEMA) {
+      exec("DROP SCHEMA " + schemaName + " CASCADE");
+    }
+
+    if (sql_util_mode ==  MODE_DATABASE) {
+      exec("DROP DATABASE " + databaseName);
+    }
+  }
+}
+
+std::string SQLUtility::getDbName() {
+    return databaseName;
+}
+
+std::string SQLUtility::getSchemaName() {
+    return schemaName;
 }
 
 void SQLUtility::exec(const string &sql) {
@@ -59,6 +84,17 @@ string SQLUtility::execute(const string &sql, bool check) {
     return "";
   }
   return conn.get()->getLastResult();
+}
+
+void SQLUtility::executeExpectErrorMsgStartWith(const std::string &sql,
+                                                const std::string &errmsg) {
+  std::string errout = execute(sql, false);
+  EXPECT_STREQ(errmsg.c_str(), errout.substr(0, errmsg.size()).c_str());
+}
+
+void SQLUtility::executeIgnore(const string &sql) {
+  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
+  EXPECT_NE(conn.get(), nullptr);
 }
 
 void SQLUtility::query(const string &sql, int expectNum) {
@@ -80,7 +116,10 @@ void SQLUtility::query(const string &sql, const string &expectStr) {
 }
 
 void SQLUtility::execSQLFile(const string &sqlFile,
-                             const string &ansFile) {
+                             const string &ansFile,
+                             const string &initFile) {
+  FilePath fp;
+
   // do precheck for sqlFile & ansFile
   if (hawq::test::startsWith(sqlFile, "/") ||
       hawq::test::startsWith(ansFile, "/"))
@@ -89,7 +128,7 @@ void SQLUtility::execSQLFile(const string &sqlFile,
   string ansFileAbsPath = testRootPath + "/" + ansFile;
   if (!std::ifstream(ansFileAbsPath))
     ASSERT_TRUE(false) << ansFileAbsPath << " doesn't exist";
-  FilePath fp = splitFilePath(ansFileAbsPath);
+  fp = splitFilePath(ansFileAbsPath);
   // double check to avoid empty fileBaseName
   if (fp.fileBaseName.empty())
     ASSERT_TRUE(false) << ansFileAbsPath << " is invalid";
@@ -102,8 +141,24 @@ void SQLUtility::execSQLFile(const string &sqlFile,
   conn->setOutputFile(outFileAbsPath);
   EXPECT_EQ(0, conn->runSQLFile(newSqlFile).getLastStatus());
   conn->resetOutput();
-  EXPECT_FALSE(conn->checkDiff(ansFileAbsPath, outFileAbsPath, true));
-  if (conn->checkDiff(ansFileAbsPath, outFileAbsPath, true) == false) {
+
+  // initFile if any
+  string initFileAbsPath;
+  if (!initFile.empty()) {
+    initFileAbsPath = testRootPath + "/" + initFile;
+    if (!std::ifstream(initFileAbsPath))
+      ASSERT_TRUE(false) << initFileAbsPath << " doesn't exist";
+    fp = splitFilePath(initFileAbsPath);
+    // double check to avoid empty fileBaseName
+    if (fp.fileBaseName.empty())
+      ASSERT_TRUE(false) << initFileAbsPath << " is invalid";
+  } else {
+    initFileAbsPath = "";
+  }
+
+  bool is_sql_ans_diff = conn->checkDiff(ansFileAbsPath, outFileAbsPath, true, initFileAbsPath);
+  EXPECT_FALSE(is_sql_ans_diff);
+  if (is_sql_ans_diff == false) {
     // no diff, continue to delete the generated sql file
     if (remove(newSqlFile.c_str()))
       ASSERT_TRUE(false) << "Error deleting file " << newSqlFile;
@@ -112,9 +167,30 @@ void SQLUtility::execSQLFile(const string &sqlFile,
   }
 }
 
+bool SQLUtility::execSQLFile(const string &sqlFile) {
+  // do precheck for sqlFile
+  if (hawq::test::startsWith(sqlFile, "/"))
+    return false;
+
+  // double check to avoid empty fileBaseName
+  FilePath fp = splitFilePath(sqlFile);
+  if (fp.fileBaseName.empty())
+    return false;
+
+  // outFile is located in the same folder with ansFile
+  string outFileAbsPath = "/tmp/" + fp.fileBaseName + ".out";
+
+  // generate new sql file with set search_path added at the begining
+  const string newSqlFile = generateSQLFile(sqlFile);
+
+  // run sql file and store its result in output file
+  conn->setOutputFile(outFileAbsPath);
+  return conn->runSQLFile(newSqlFile).getLastStatus() == 0 ? true : false;
+}
+
 const string SQLUtility::generateSQLFile(const string &sqlFile) {
   const string originSqlFile = testRootPath + "/" + sqlFile;
-  const string newSqlFile = "/tmp/" + schemaName + ".sql";
+  const string newSqlFile = "/tmp/" + string(test_info->test_case_name()) + "_" + test_info->name() + ".sql";
   std::fstream in;
   in.open(originSqlFile, std::ios::in);
   if (!in.is_open()) {
@@ -125,9 +201,12 @@ const string SQLUtility::generateSQLFile(const string &sqlFile) {
   if (!out.is_open()) {
     EXPECT_TRUE(false) << "Error opening file " << newSqlFile;
   }
-  out << "-- start_ignore" << std::endl
-      << "SET SEARCH_PATH=" + schemaName + ";" << std::endl
-      << "-- end_ignore" << std::endl;
+  out << "-- start_ignore" << std::endl;
+  out << "SET SEARCH_PATH=" + schemaName + ";" << std::endl;
+  if (sql_util_mode ==  MODE_DATABASE) {
+    out << "\\c " << databaseName << std::endl;
+  }
+  out << "-- end_ignore" << std::endl;
   string line;
   while (getline(in, line)) {
     out << line << std::endl;
@@ -179,6 +258,29 @@ std::string SQLUtility::getGUCValue(const std::string &guc) {
   EXPECT_EQ(result.rowCount(), 1);
   std::vector<std::string> row = result.getRows()[0];
   return row[0];
+}
+
+std::string SQLUtility::getQueryResult(const std::string &query) {
+  const hawq::test::PSQLQueryResult &result = executeQuery(query);
+  EXPECT_LE(result.rowCount(), 1);
+  std::string value;
+  if (result.rowCount() == 1)
+  {
+    value = result.getRows()[0][0];
+  }
+
+  return value;
+}
+
+std::string SQLUtility::getQueryResultSetString(const std::string &query) {
+  const hawq::test::PSQLQueryResult &result = executeQuery(query);
+  std::vector<std::vector<string> > resultString = result.getRows();
+  string resultStr;
+  for (auto row : result.getRows()) {
+    for (auto column : row) resultStr += column + "|";
+    resultStr += "\n";
+  }
+  return resultStr;
 }
 
 FilePath SQLUtility::splitFilePath(const string &filePath) const {

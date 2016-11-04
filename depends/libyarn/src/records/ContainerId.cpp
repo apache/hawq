@@ -35,14 +35,14 @@ ContainerIdProto& ContainerId::getProto(){
 	return containerIdProto;
 }
 
-void ContainerId::setApplicationId(ApplicationID &appId) {
+void ContainerId::setApplicationId(ApplicationId &appId) {
 	ApplicationIdProto *proto = new ApplicationIdProto();
 	proto->CopyFrom(appId.getProto());
 	containerIdProto.set_allocated_app_id(proto);
 }
 
-ApplicationID ContainerId::getApplicationId() {
-	return ApplicationID(containerIdProto.app_id());
+ApplicationId ContainerId::getApplicationId() {
+	return ApplicationId(containerIdProto.app_id());
 }
 
 void ContainerId::setApplicationAttemptId(ApplicationAttemptId &appAttemptId) {

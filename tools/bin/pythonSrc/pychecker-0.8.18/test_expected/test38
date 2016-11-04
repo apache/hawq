@@ -1,0 +1,22 @@
+Processing module test38 (test_input/test38.py)...
+
+Warnings...
+
+test_input/test38.py:23: Overridden method (m1) doesn't match signature in class (test38.X)
+test_input/test38.py:24: Overridden method (m2) doesn't match signature in class (test38.X)
+test_input/test38.py:25: Overridden method (m3) doesn't match signature in class (test38.X)
+test_input/test38.py:26: Overridden method (m4) doesn't match signature in class (test38.X)
+test_input/test38.py:27: Overridden method (m5) doesn't match signature in class (test38.X)
+test_input/test38.py:28: Overridden method (m6) doesn't match signature in class (test38.X)
+test_input/test38.py:32: Overridden method (m3) doesn't match signature in class (test38.X)
+test_input/test38.py:33: Overridden method (m6) doesn't match signature in class (test38.X)
+test_input/test38.py:37: Overridden method (m3) doesn't match signature in class (test38.X)
+test_input/test38.py:38: Overridden method (m6) doesn't match signature in class (test38.X)
+test_input/test38.py:42: Overridden method (m1) doesn't match signature in class (test38.X)
+test_input/test38.py:43: Overridden method (m2) doesn't match signature in class (test38.X)
+test_input/test38.py:44: Overridden method (m3) doesn't match signature in class (test38.X)
+test_input/test38.py:45: Overridden method (m4) doesn't match signature in class (test38.X)
+test_input/test38.py:46: Overridden method (m5) doesn't match signature in class (test38.X)
+test_input/test38.py:47: Overridden method (m6) doesn't match signature in class (test38.X)
+test_input/test38.py:53: Using the exec statement
+test_input/test38.py:54: Using the exec statement in global namespace

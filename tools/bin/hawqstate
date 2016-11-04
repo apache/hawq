@@ -35,12 +35,11 @@ def parseargs():
     parser.add_option("-a", "--prompt", action="store_false",
                       dest="prompt", default=True,
                       help="Execute without prompt.")
-    parser.add_option("-d", "--datadir", dest="master_dir",
-                      help="HAWQ Master data directory.")
-    parser.add_option("--hawqhome", dest="hawq_home",
-                      help="HAWQ Master data directory.")
     parser.add_option("-l", "--logdir", dest="logDir",
                       help="Sets the directory for log files")
+    # None used option, keep it to be compatible with Ambari.
+    parser.add_option("-d", "--datadir", dest="master_dir",
+                      help="Sets HAWQ Master data directory.")
     (options, args) = parser.parse_args()
     return (options, args)
 
@@ -132,10 +131,9 @@ if __name__ == '__main__':
 
     logger, log_filename = setup_hawq_tool_logging('hawq_state',getLocalHostname(),getUserName(), options.logDir) 
 
-    if options.hawq_home is None:
-        GPHOME = os.getenv('GPHOME')
-    else:
-        GPHOME = options.hawq_home
+    GPHOME = os.getenv('GPHOME')
+    if not GPHOME:
+        sys.exit("GPHOME environment variable not set, exit")
 
     hawq_site = HawqXMLParser(GPHOME)
     hawq_site.get_all_values()

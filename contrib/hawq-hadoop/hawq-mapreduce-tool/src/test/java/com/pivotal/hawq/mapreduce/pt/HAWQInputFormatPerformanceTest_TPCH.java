@@ -151,7 +151,7 @@ public class HAWQInputFormatPerformanceTest_TPCH extends Configured implements T
 		try {
 			conn = MRFormatTestUtils.getTestDBConnection();
 			Map<String, String> rs = HAWQJdbcUtils.executeSafeQueryForSingleRow(
-					conn, "SELECT COUNT(*) segnum FROM gp_segment_configuration WHERE content>=0;");
+					conn, "SELECT COUNT(*) segnum FROM gp_segment_configuration WHERE role='p';");
 			segnum = Integer.parseInt(rs.get("segnum"));
 		} finally {
 			HAWQJdbcUtils.closeConnection(conn);

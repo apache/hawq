@@ -1,0 +1,33 @@
+Processing module test22 (test_input/test22.py)...
+
+Warnings...
+
+test_input/test22.py:6: Format string argument count (4) doesn't match arguments (3)
+test_input/test22.py:9: Local variable (eee) not used
+test_input/test22.py:10: No local variable (ccc)
+test_input/test22.py:10: No local variable (ddd)
+test_input/test22.py:13: No local variable ()
+test_input/test22.py:15: Invalid format string, problem starts near: '(b) '
+test_input/test22.py:16: Invalid format string, problem starts near: '(b)'
+test_input/test22.py:19: Format string argument count (2) doesn't match arguments (3)
+test_input/test22.py:22: Format string argument count (3) doesn't match arguments (4)
+test_input/test22.py:24: Invalid format string, problem starts near: 'z '
+test_input/test22.py:25: Invalid format string, problem starts near: 'J '
+test_input/test22.py:26: Too many *s in format flags
+test_input/test22.py:28: Can't mix tuple/mapping (dictionary) formats in same format string
+test_input/test22.py:29: Can't use * in formats when using a mapping (dictionary), near: '*d'
+test_input/test22.py:31: Can't use * in formats when using a mapping (dictionary), near: '*.*f'
+test_input/test22.py:34: Format string argument count (3) doesn't match arguments (2)
+test_input/test22.py:40: Format string argument count (2) doesn't match arguments (1)
+test_input/test22.py:42: Format string argument count (2) doesn't match arguments (3)
+test_input/test22.py:46: Format string argument count (1) doesn't match arguments (3)
+test_input/test22.py:51: Format string argument count (1) doesn't match arguments (2)
+test_input/test22.py:65: Format string argument count (2) doesn't match arguments (3)
+test_input/test22.py:66: Format string argument count (3) doesn't match arguments (4)
+test_input/test22.py:67: Format string argument count (4) doesn't match arguments (2)
+test_input/test22.py:70: Local variable (c) not used
+test_input/test22.py:74: Local variable (a) not used
+test_input/test22.py:74: Local variable (b) not used
+test_input/test22.py:79: ... % 1 may be constant
+test_input/test22.py:81: ... % 1 may be constant
+test_input/test22.py:86: Invalid format string, problem starts near: '' (end of format string)

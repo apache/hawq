@@ -1,4 +1,21 @@
 #!/usr/bin/env python
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 # Line too long - pylint: disable=C0301
 # Invalid name  - pylint: disable=C0103
 
@@ -102,7 +119,7 @@ class SyncmasterWatcher:
 
         self.handles         = {}
         self.maxlines        = 1000
-        self.timelimit       = 5
+        self.timelimit       = 3
         self.delay           = 0.1
 
 
@@ -188,10 +205,20 @@ class SyncmasterWatcher:
                 break
 
         logger.info("checking if syncmaster is running")
-        pid = gp.getSyncmasterPID('localhost', self.datadir)
-        if not pid > 0:
-            logger.warning("syncmaster not running")
-            return 1
+        count = 0
+        counter = 20
+        while True:
+            pid = gp.getSyncmasterPID('localhost', self.datadir)
+            if not pid > 0:
+                if count >= counter:
+                    logger.error("Standby master start timeout")
+                    return 1
+                else:
+                    logger.warning("syncmaster not running, waiting...")
+            else:
+                break
+            count += 1
+            time.sleep(3)
 
         # syncmaster is running and there are no obvious errors in the log
         logger.info("syncmaster appears ok, pid %s" % pid)
@@ -219,7 +246,7 @@ if __name__ == '__main__':
 
     # watch syncmaster logs
     if len(sys.argv) > 2 and sys.argv[2] == 'debug':
-        print "Checking standby master status"
+        logger.info("Checking standby master status")
     watcher = SyncmasterWatcher( sys.argv[1] )
     rc = watcher.monitor_logs()
     watcher.close()

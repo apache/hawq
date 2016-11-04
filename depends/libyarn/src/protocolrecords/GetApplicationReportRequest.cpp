@@ -37,14 +37,14 @@ GetApplicationReportRequestProto& GetApplicationReportRequest::getProto() {
 	return requestProto;
 }
 
-void GetApplicationReportRequest::setApplicationId(ApplicationID &appId) {
+void GetApplicationReportRequest::setApplicationId(ApplicationId &appId) {
 	ApplicationIdProto* proto = new ApplicationIdProto();
 	proto->CopyFrom(appId.getProto());
 	requestProto.set_allocated_application_id(proto);
 }
 
-ApplicationID GetApplicationReportRequest::getApplicationId() {
-	return ApplicationID(requestProto.application_id());
+ApplicationId GetApplicationReportRequest::getApplicationId() {
+	return ApplicationId(requestProto.application_id());
 }
 
 } /* namespace libyarn */

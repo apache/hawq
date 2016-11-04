@@ -1,0 +1,8 @@
+Processing module test49 (test_input/test49.py)...
+
+Warnings...
+
+test_input/test49.py:5: Using integer division (d / e) may return integer or float
+test_input/test49.py:6: Using integer division (d / 3) may return integer or float
+test_input/test49.py:7: Using integer division (7 / e) may return integer or float
+test_input/test49.py:8: Using integer division (5 / 6) may return integer or float

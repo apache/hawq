@@ -1,0 +1,28 @@
+--
+-- TEXT
+--
+SELECT text 'this is a text string' = text 'this is a text string' AS true;
+ true 
+------
+ t
+(1 row)
+
+SELECT text 'this is a text string' = text 'this is a text strin' AS false;
+ false 
+-------
+ f
+(1 row)
+
+CREATE TABLE TEXT_TBL (f1 text);
+CREATE TABLE
+INSERT INTO TEXT_TBL VALUES ('doh!');
+INSERT 0 1
+INSERT INTO TEXT_TBL VALUES ('hi de ho neighbor');
+INSERT 0 1
+SELECT '' AS two, * FROM TEXT_TBL order by f1;
+ two |        f1         
+-----+-------------------
+     | doh!
+     | hi de ho neighbor
+(2 rows)
+

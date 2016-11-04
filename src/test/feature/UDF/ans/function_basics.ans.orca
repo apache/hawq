@@ -1,0 +1,1088 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFBasics;
+SET
+-- end_ignore
+-- SETUP
+DROP TABLE IF EXISTS foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:5: NOTICE:  table "foo" does not exist, skipping
+DROP TABLE
+CREATE TABLE foo AS SELECT * FROM generate_series(1, 10) x;
+SELECT 10
+CREATE FUNCTION f(x INT) RETURNS INT AS $$
+BEGIN
+RETURN x;
+END
+$$ LANGUAGE PLPGSQL;
+CREATE FUNCTION
+-- DDL, CREATE FUNCTION
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
+CREATE FUNCTION
+SELECT proname FROM pg_proc WHERE proname = 'g';
+ proname 
+---------
+ g
+(1 row)
+
+SELECT proname FROM gp_dist_random('pg_proc') WHERE proname = 'g';
+ proname 
+---------
+(0 rows)
+
+DROP FUNCTION g(int);
+DROP FUNCTION
+-- DDL, CREATE OR REPLACE FUNCTION
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
+CREATE FUNCTION
+SELECT proname FROM pg_proc WHERE proname = 'g';
+ proname 
+---------
+ g
+(1 row)
+
+SELECT proname FROM gp_dist_random('pg_proc') WHERE proname = 'g';
+ proname 
+---------
+(0 rows)
+
+CREATE OR REPLACE FUNCTION g(x INT) RETURNS INT AS $$
+BEGIN
+RETURN (-1) * x;
+END
+$$ LANGUAGE PLPGSQL;
+CREATE FUNCTION
+SELECT proname, prosrc FROM pg_proc WHERE proname = 'g';
+ proname |      prosrc      
+---------+------------------
+ g       |                  
+         : BEGIN            
+         : RETURN (-1) * x; 
+         : END              
+         : 
+(1 row)
+
+SELECT proname, prosrc FROM gp_dist_random('pg_proc') WHERE proname = 'g';
+ proname | prosrc 
+---------+--------
+(0 rows)
+
+DROP FUNCTION g(int);
+DROP FUNCTION
+-- DDL, DROP FUNCTION
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
+CREATE FUNCTION
+DROP FUNCTION g(int);
+DROP FUNCTION
+SELECT oid, proname FROM pg_proc WHERE proname = 'g';
+ oid | proname 
+-----+---------
+(0 rows)
+
+SELECT oid, proname FROM gp_dist_random('pg_proc') WHERE proname = 'g';
+ oid | proname 
+-----+---------
+(0 rows)
+
+-- DDL, DROP FUNCTION, NEGATIVE
+DROP FUNCTION g(int);
+psql:/tmp/TestUDF_TestUDFBasics.sql:47: ERROR:  function g(integer) does not exist
+-- DDL, CREATE FUNCTION, RECORD
+CREATE FUNCTION foo(int) RETURNS record AS 'SELECT * FROM foo WHERE x=$1' LANGUAGE SQL;
+CREATE FUNCTION
+SELECT foo(5);
+ foo 
+-----
+ (5)
+(1 row)
+
+DROP FUNCTION foo(int);
+DROP FUNCTION
+CREATE FUNCTION foo(int) RETURNS foo AS 'SELECT * FROM foo WHERE x=$1' LANGUAGE SQL;
+CREATE FUNCTION
+SELECT foo(5);
+ foo 
+-----
+ (5)
+(1 row)
+
+DROP FUNCTION foo(int);
+DROP FUNCTION
+-- DDL, CREATE FUNCTION, SRF
+CREATE FUNCTION g(x setof int) RETURNS INT
+    AS $$ SELECT 1 $$ LANGUAGE SQL;
+CREATE FUNCTION
+DROP FUNCTION g(setof int);
+DROP FUNCTION
+CREATE FUNCTION g() RETURNS setof INT
+    AS $$ SELECT 1 $$ LANGUAGE SQL;
+CREATE FUNCTION
+DROP FUNCTION g();
+DROP FUNCTION
+-- DDL, CREATE FUNCTION, TABLE, NEGATIVE
+CREATE FUNCTION g() RETURNS TABLE(x int)
+    AS $$ SELECT * FROM foo $$ LANGUAGE SQL;
+CREATE FUNCTION
+DROP FUNCTION g();
+DROP FUNCTION
+CREATE FUNCTION g(anytable) RETURNS int
+    AS 'does_not_exist', 'does_not_exist' LANGUAGE C;
+psql:/tmp/TestUDF_TestUDFBasics.sql:76: ERROR:  TABLE functions not supported
+-- DDL, CREATE FUNCTION, SECURITY DEFINER
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT 1' LANGUAGE SQL IMMUTABLE SECURITY DEFINER;
+CREATE FUNCTION
+DROP FUNCTION g(int);
+DROP FUNCTION
+-- DDL, ALTER FUNCTION
+-- DDL, STRICT
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT 1' LANGUAGE SQL IMMUTABLE;
+CREATE FUNCTION
+SELECT g(NULL);
+ g 
+---
+ 1
+(1 row)
+
+ALTER FUNCTION g(int) STRICT;
+ALTER FUNCTION
+SELECT g(NULL);
+ g 
+---
+  
+(1 row)
+
+DROP FUNCTION g(int);
+DROP FUNCTION
+-- DDL, ALTER FUNCTION, OWNER
+CREATE ROLE superuser SUPERUSER;
+CREATE ROLE
+CREATE ROLE u1;
+psql:/tmp/TestUDF_TestUDFBasics.sql:97: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+SET ROLE superuser;
+SET
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT 1' LANGUAGE SQL IMMUTABLE;
+CREATE FUNCTION
+SELECT a.rolname FROM pg_proc p, pg_authid a where p.proowner = a.oid and proname = 'g';
+  rolname  
+-----------
+ superuser
+(1 row)
+
+ALTER FUNCTION g(int) OWNER TO u1;
+ALTER FUNCTION
+SELECT a.rolname FROM pg_proc p, pg_authid a where p.proowner = a.oid and proname = 'g';
+ rolname 
+---------
+ u1
+(1 row)
+
+DROP FUNCTION g(int);
+DROP FUNCTION
+RESET ROLE;
+RESET
+DROP ROLE u1;
+DROP ROLE
+DROP ROLE superuser;
+DROP ROLE
+-- DDL, ALTER FUNCTION, RENAME
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT 1' LANGUAGE SQL IMMUTABLE;
+CREATE FUNCTION
+SELECT g(0);
+ g 
+---
+ 1
+(1 row)
+
+ALTER FUNCTION g(int) RENAME TO h;
+ALTER FUNCTION
+SELECT h(0);
+ h 
+---
+ 1
+(1 row)
+
+DROP FUNCTION h(int);
+DROP FUNCTION
+-- DDL, ALTER FUNCTION, SET SCHEMA
+CREATE SCHEMA bar;
+CREATE SCHEMA
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT 1' LANGUAGE SQL IMMUTABLE;
+CREATE FUNCTION
+SELECT g(0);
+ g 
+---
+ 1
+(1 row)
+
+ALTER FUNCTION g(int) SET SCHEMA bar;
+ALTER FUNCTION
+SELECT bar.g(0);
+ g 
+---
+ 1
+(1 row)
+
+DROP SCHEMA bar CASCADE;
+psql:/tmp/TestUDF_TestUDFBasics.sql:125: NOTICE:  drop cascades to function bar.g(integer)
+DROP SCHEMA
+-- DDL, ALTER FUNCTION, SECURITY DEFINER
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT 1' LANGUAGE SQL IMMUTABLE;
+CREATE FUNCTION
+ALTER FUNCTION g(int) SECURITY DEFINER;
+ALTER FUNCTION
+DROP FUNCTION g(int); 
+DROP FUNCTION
+-- DCL, GRANT/REVOKE
+-- GRANT { EXECUTE | ALL [ PRIVILEGES ] }
+--    ON FUNCTION funcname ( [ [ argmode ] [ argname ] argtype [, ...] ] ) [, ...]
+--    TO { username | GROUP groupname | PUBLIC } [, ...] [ WITH GRANT OPTION ]
+-- REVOKE [ GRANT OPTION FOR ]
+--    { EXECUTE | ALL [ PRIVILEGES ] }
+--    ON FUNCTION funcname ( [ [ argmode ] [ argname ] argtype [, ...] ] ) [, ...]
+--    FROM { username | GROUP groupname | PUBLIC } [, ...]
+--    [ CASCADE | RESTRICT ]
+-- DCL, GRANT/REVOKE, EXECUTE
+CREATE ROLE superuser SUPERUSER;
+CREATE ROLE
+SET ROLE superuser;
+SET
+CREATE ROLE u1;
+psql:/tmp/TestUDF_TestUDFBasics.sql:149: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+GRANT SELECT ON TABLE foo TO u1;
+GRANT
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
+CREATE FUNCTION
+SELECT proacl FROM pg_proc where proname = 'g';
+ proacl 
+--------
+ 
+(1 row)
+
+REVOKE ALL ON FUNCTION g(int) FROM PUBLIC;
+REVOKE
+SELECT proacl FROM pg_proc where proname = 'g';
+         proacl          
+-------------------------
+ {superuser=X/superuser}
+(1 row)
+
+SELECT g(1);
+ g 
+---
+ 1
+(1 row)
+
+SELECT count(g(x)) FROM foo;
+ count 
+-------
+    10
+(1 row)
+
+SET ROLE u1;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:158: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:159: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE superuser;
+SET
+GRANT EXECUTE ON FUNCTION g(int) TO u1;
+GRANT
+SELECT proacl FROM pg_proc where proname = 'g';
+                 proacl                 
+----------------------------------------
+ {superuser=X/superuser,u1=X/superuser}
+(1 row)
+
+SET ROLE u1;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:164: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:165: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE superuser;
+SET
+REVOKE EXECUTE ON FUNCTION g(int) FROM u1;
+REVOKE
+SELECT proacl FROM pg_proc where proname = 'g';
+         proacl          
+-------------------------
+ {superuser=X/superuser}
+(1 row)
+
+SET ROLE u1;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:170: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:171: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+RESET ROLE;
+RESET
+DROP FUNCTION g(int);
+DROP FUNCTION
+REVOKE SELECT ON TABLE foo FROM u1;
+REVOKE
+DROP ROLE u1;
+DROP ROLE
+DROP ROLE superuser;
+DROP ROLE
+-- DCL, GRANT/REVOKE, PUBLIC
+CREATE ROLE superuser SUPERUSER;
+CREATE ROLE
+SET ROLE superuser;
+SET
+CREATE ROLE u1;
+psql:/tmp/TestUDF_TestUDFBasics.sql:183: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+GRANT SELECT ON TABLE foo TO u1;
+GRANT
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
+CREATE FUNCTION
+SELECT proacl FROM pg_proc where proname = 'g';
+ proacl 
+--------
+ 
+(1 row)
+
+REVOKE ALL ON FUNCTION g(int) FROM PUBLIC;
+REVOKE
+SELECT proacl FROM pg_proc where proname = 'g';
+         proacl          
+-------------------------
+ {superuser=X/superuser}
+(1 row)
+
+SELECT g(1);
+ g 
+---
+ 1
+(1 row)
+
+SELECT count(g(x)) FROM foo;
+ count 
+-------
+    10
+(1 row)
+
+SET ROLE u1;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:192: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:193: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE superuser;
+SET
+GRANT EXECUTE ON FUNCTION g(int) TO PUBLIC;
+GRANT
+SELECT proacl FROM pg_proc where proname = 'g';
+                proacl                
+--------------------------------------
+ {superuser=X/superuser,=X/superuser}
+(1 row)
+
+SET ROLE u1;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:198: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:199: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE superuser;
+SET
+REVOKE EXECUTE ON FUNCTION g(int) FROM PUBLIC;
+REVOKE
+SELECT proacl FROM pg_proc where proname = 'g';
+         proacl          
+-------------------------
+ {superuser=X/superuser}
+(1 row)
+
+SET ROLE u1;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:204: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:205: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+RESET ROLE;
+RESET
+DROP FUNCTION g(int);
+DROP FUNCTION
+REVOKE SELECT ON TABLE foo FROM u1;
+REVOKE
+DROP ROLE u1;
+DROP ROLE
+DROP ROLE superuser;
+DROP ROLE
+-- DCL, GRANT/REVOKE, Groups
+CREATE ROLE superuser SUPERUSER;
+CREATE ROLE
+SET ROLE superuser;
+SET
+CREATE ROLE u1;
+psql:/tmp/TestUDF_TestUDFBasics.sql:217: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+CREATE ROLE u2 IN GROUP u1;
+psql:/tmp/TestUDF_TestUDFBasics.sql:218: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+GRANT SELECT ON TABLE foo TO u1;
+GRANT
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
+CREATE FUNCTION
+SELECT proacl FROM pg_proc where proname = 'g';
+ proacl 
+--------
+ 
+(1 row)
+
+REVOKE ALL ON FUNCTION g(int) FROM PUBLIC;
+REVOKE
+SELECT proacl FROM pg_proc where proname = 'g';
+         proacl          
+-------------------------
+ {superuser=X/superuser}
+(1 row)
+
+SELECT g(1);
+ g 
+---
+ 1
+(1 row)
+
+SELECT count(g(x)) FROM foo;
+ count 
+-------
+    10
+(1 row)
+
+SET ROLE u2;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:227: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:228: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE superuser;
+SET
+GRANT EXECUTE ON FUNCTION g(int) TO u1;
+GRANT
+SELECT proacl FROM pg_proc where proname = 'g';
+                 proacl                 
+----------------------------------------
+ {superuser=X/superuser,u1=X/superuser}
+(1 row)
+
+SET ROLE u2;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:233: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:234: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE superuser;
+SET
+REVOKE EXECUTE ON FUNCTION g(int) FROM u1;
+REVOKE
+SELECT proacl FROM pg_proc where proname = 'g';
+         proacl          
+-------------------------
+ {superuser=X/superuser}
+(1 row)
+
+SET ROLE u2;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:239: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:240: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+RESET ROLE;
+RESET
+DROP FUNCTION g(int);
+DROP FUNCTION
+REVOKE SELECT ON TABLE foo FROM u1;
+REVOKE
+DROP ROLE u1;
+DROP ROLE
+DROP ROLE u2;
+DROP ROLE
+DROP ROLE superuser;
+DROP ROLE
+-- DCL, GRANT/REVOKE, WITH GRANT OPTION
+CREATE ROLE superuser SUPERUSER;
+CREATE ROLE
+SET ROLE superuser;
+SET
+CREATE ROLE u1;
+psql:/tmp/TestUDF_TestUDFBasics.sql:253: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+CREATE ROLE u2;
+psql:/tmp/TestUDF_TestUDFBasics.sql:254: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+GRANT SELECT ON TABLE foo TO PUBLIC;
+GRANT
+CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
+CREATE FUNCTION
+SELECT proacl FROM pg_proc where proname = 'g';
+ proacl 
+--------
+ 
+(1 row)
+
+REVOKE ALL ON FUNCTION g(int) FROM PUBLIC;
+REVOKE
+SELECT proacl FROM pg_proc where proname = 'g';
+         proacl          
+-------------------------
+ {superuser=X/superuser}
+(1 row)
+
+SELECT g(1);
+ g 
+---
+ 1
+(1 row)
+
+SELECT count(g(x)) FROM foo;
+ count 
+-------
+    10
+(1 row)
+
+SET ROLE u2;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:263: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:264: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE superuser;
+SET
+GRANT ALL ON FUNCTION g(int) TO u1 WITH GRANT OPTION;
+GRANT
+SET ROLE u1;
+SET
+GRANT ALL ON FUNCTION g(int) TO u2;
+psql:/tmp/TestUDF_TestUDFBasics.sql:268: ERROR:  function g(integer) does not exist
+SELECT proacl FROM pg_proc where proname = 'g';
+                 proacl                  
+-----------------------------------------
+ {superuser=X/superuser,u1=X*/superuser}
+(1 row)
+
+SET ROLE u1;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:271: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:272: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE u2;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:274: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:275: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE superuser;
+SET
+REVOKE ALL ON FUNCTION g(int) FROM u1 CASCADE;
+REVOKE
+SELECT proacl FROM pg_proc where proname = 'g';
+         proacl          
+-------------------------
+ {superuser=X/superuser}
+(1 row)
+
+SET ROLE u1;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:280: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:281: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+SET ROLE u2;
+SET
+SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:283: ERROR:  function g(integer) does not exist
+LINE 1: SELECT g(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:284: ERROR:  relation "foo" does not exist
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
+RESET ROLE;
+RESET
+DROP FUNCTION g(int);
+DROP FUNCTION
+REVOKE SELECT ON TABLE foo FROM PUBLIC;
+REVOKE
+DROP ROLE u1;
+DROP ROLE
+DROP ROLE u2;
+DROP ROLE
+DROP ROLE superuser;
+DROP ROLE
+-- DML, CaseExpr
+SELECT CASE WHEN x % 2 = 0 THEN f(x) ELSE 0 END FROM foo ORDER BY x;
+ case 
+------
+    0
+    2
+    0
+    4
+    0
+    6
+    0
+    8
+    0
+   10
+(10 rows)
+
+-- DML, OpExpr
+SELECT f(x) + f(x) FROM foo ORDER BY x;
+ ?column? 
+----------
+        2
+        4
+        6
+        8
+       10
+       12
+       14
+       16
+       18
+       20
+(10 rows)
+
+SELECT f(x) + f(x) + f(x) FROM foo ORDER BY x;
+ ?column? 
+----------
+        3
+        6
+        9
+       12
+       15
+       18
+       21
+       24
+       27
+       30
+(10 rows)
+
+SELECT f(x) + f(x) - f(x) FROM foo ORDER BY x;
+ ?column? 
+----------
+        1
+        2
+        3
+        4
+        5
+        6
+        7
+        8
+        9
+       10
+(10 rows)
+
+-- DML, FuncExpr
+CREATE FUNCTION g(x INT) RETURNS INT AS $$
+BEGIN
+RETURN x;
+END
+$$ LANGUAGE PLPGSQL;
+CREATE FUNCTION
+SELECT g(f(x)) FROM foo ORDER BY x;
+ g  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+DROP FUNCTION g(int);
+DROP FUNCTION
+-- DML, BoolExpr
+SELECT x % 2 = 0 AND f(x) % 2 = 1 FROM foo ORDER BY x;
+ ?column? 
+----------
+ f
+ f
+ f
+ f
+ f
+ f
+ f
+ f
+ f
+ f
+(10 rows)
+
+-- DML, DistinctExpr
+SELECT x IS DISTINCT FROM f(x) from foo ORDER BY x;
+ ?column? 
+----------
+ f
+ f
+ f
+ f
+ f
+ f
+ f
+ f
+ f
+ f
+(10 rows)
+
+-- DML, PercentileExpr
+SELECT MEDIAN(f(x)) FROM foo;
+ median 
+--------
+    5.5
+(1 row)
+
+-- DML, Complex Expression
+CREATE FUNCTION g(x INT) RETURNS INT AS $$
+BEGIN
+RETURN x;
+END
+$$ LANGUAGE PLPGSQL;
+CREATE FUNCTION
+SELECT CASE
+	WHEN x % 2 = 0 THEN g(g(x)) + g(g(x))
+	WHEN f(x) % 2 = 1 THEN g(g(x)) - g(g(x))
+	END FROM foo ORDER BY x;
+ case 
+------
+    0
+    4
+    0
+    8
+    0
+   12
+    0
+   16
+    0
+   20
+(10 rows)
+
+DROP FUNCTION g(int);
+DROP FUNCTION
+-- DML, Qual
+SELECT x FROM foo WHERE f(x) % 2 = 0 ORDER BY x;
+ x  
+----
+  2
+  4
+  6
+  8
+ 10
+(5 rows)
+
+-- DML, FROM
+SELECT * FROM f(5);
+ f 
+---
+ 5
+(1 row)
+
+-- DML, Grouping
+SELECT DISTINCT f(x) FROM foo ORDER BY f(x);
+ f  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+SELECT f(x) FROM foo GROUP BY f(x) ORDER BY f(x);
+ f  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+-- DML, Join
+SELECT a.x FROM foo a, foo b WHERE f(a.x) = f(b.x) ORDER BY x;
+ x  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+SELECT a.x FROM foo a JOIN foo b ON f(a.x) = f(b.x) ORDER BY x;
+ x  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+-- DML, Windowing
+SELECT avg(x) OVER (PARTITION BY f(x)) FROM foo ORDER BY x;
+ avg 
+-----
+   1
+   2
+   3
+   4
+   5
+   6
+   7
+   8
+   9
+  10
+(10 rows)
+
+-- DML, CTE
+WITH t AS (SELECT x from foo)
+	SELECT f(x) from t ORDER BY x;
+ f  
+----
+  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+(10 rows)
+
+-- DML, InitPlan
+SELECT UNNEST(ARRAY(SELECT x FROM foo)) ORDER BY 1;
+ unnest 
+--------
+      1
+      2
+      3
+      4
+      5
+      6
+      7
+      8
+      9
+     10
+(10 rows)
+
+SELECT UNNEST(ARRAY(SELECT f(1)));
+ unnest 
+--------
+      1
+(1 row)
+
+-- PROPERTIES, VOLATILITY, IMMUTABLE
+CREATE FUNCTION g() RETURNS float AS 'SELECT random();' LANGUAGE SQL IMMUTABLE;
+CREATE FUNCTION
+SELECT COUNT(DISTINCT(g())) > 1 FROM foo;
+ ?column? 
+----------
+ f
+(1 row)
+
+DROP FUNCTION g();
+DROP FUNCTION
+-- PROPERTIES, VOLATILITY, STABLE
+CREATE FUNCTION g() RETURNS float AS 'SELECT random();' LANGUAGE SQL STABLE;
+CREATE FUNCTION
+SELECT COUNT(DISTINCT(g())) > 1 FROM foo;
+ ?column? 
+----------
+ f
+(1 row)
+
+DROP FUNCTION g();
+DROP FUNCTION
+-- PROPERTIES, VOLATILITY, VOLATILE
+CREATE FUNCTION g() RETURNS float AS 'SELECT random();' LANGUAGE SQL VOLATILE;
+CREATE FUNCTION
+SELECT COUNT(DISTINCT(g())) > 1 FROM foo;
+ ?column? 
+----------
+ t
+(1 row)
+
+DROP FUNCTION g();
+DROP FUNCTION
+-----------------
+-- NEGATIVE TESTS
+-----------------
+SELECT h(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:405: ERROR:  function h(integer) does not exist
+LINE 1: SELECT h(1);
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
+-- DML, InitPlan
+SELECT UNNEST(ARRAY(SELECT f(x) from foo));
+ unnest 
+--------
+      1
+      2
+      3
+      4
+      5
+      6
+      7
+      8
+      9
+     10
+(10 rows)
+
+-- LANGUAGES not yet supported
+-- CREATE LANGUAGE plr;
+-- CREATE LANGUAGE plpython;
+-- CREATE LANGUAGE pljava;
+-- CREATE LANGUAGE plperl;
+-- NESTED FUNCTION
+CREATE FUNCTION inner(int) RETURNS INTEGER AS 'SELECT 1' LANGUAGE SQL IMMUTABLE;
+CREATE FUNCTION
+CREATE FUNCTION outer(x INT) RETURNS INT AS $$
+BEGIN
+RETURN inner(x);
+END
+$$ LANGUAGE PLPGSQL;
+CREATE FUNCTION
+SELECT outer(0);
+ outer 
+-------
+     1
+(1 row)
+
+SELECT outer(0) FROM foo;
+ outer 
+-------
+     1
+     1
+     1
+     1
+     1
+     1
+     1
+     1
+     1
+     1
+(10 rows)
+
+DROP FUNCTION outer(int);
+DROP FUNCTION
+DROP FUNCTION inner(int);
+DROP FUNCTION
+-- TEARDOWN
+DROP TABLE foo;
+DROP TABLE
+-- HAWQ-510
+drop table if exists testEntryDB;
+psql:/tmp/TestUDF_TestUDFBasics.sql:435: NOTICE:  table "testentrydb" does not exist, skipping
+DROP TABLE
+create table testEntryDB(key int, value int) distributed randomly;
+CREATE TABLE
+insert into testEntryDB values(1, 0);
+INSERT 0 1
+select t2.key, t2.value
+from   (select key, value from testEntryDB where value = 0) as t1,
+       (select generate_series(1,2)::int as key, 0::int as value) as t2
+where  t1.value=t2.value;
+ key | value 
+-----+-------
+   1 |     0
+   2 |     0
+(2 rows)
+
+drop table testEntryDB;
+DROP TABLE

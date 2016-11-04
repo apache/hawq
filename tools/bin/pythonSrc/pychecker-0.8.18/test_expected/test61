@@ -1,0 +1,12 @@
+Processing module test61 (test_input/test61.py)...
+
+Warnings...
+
+test_input/test61.py:9: Invalid arguments to (x), got 0, expected 2
+test_input/test61.py:18: Invalid arguments to (get), got 3, expected between 1 and 2
+test_input/test61.py:20: Invalid arguments to (keys), got 3, expected 0
+test_input/test61.py:21: Using the return value from (d.clear) which is always None
+test_input/test61.py:22: Using the return value from (d.clear) which is always None
+test_input/test61.py:23: Using the return value from (d.clear) which is always None
+test_input/test61.py:26: Passing a constant string to setattr, consider direct reference
+test_input/test61.py:26: Using the return value from (setattr) which is always None

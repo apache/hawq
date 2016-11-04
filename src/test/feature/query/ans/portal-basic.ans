@@ -1,0 +1,578 @@
+BEGIN;
+BEGIN
+DECLARE foo1 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo2 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo3 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo4 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo5 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo6 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo7 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo8 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo9 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo10 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo11 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo12 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo13 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo14 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo15 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo16 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo17 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo18 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo19 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo20 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo21 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo22 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+DECLARE foo23 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+FETCH 1 in foo1;
+ a | b | c | d 
+---+---+---+---
+ 1 | 2 | 3 | 4
+(1 row)
+
+FETCH 2 in foo2;
+ a | b | c | d 
+---+---+---+---
+ 1 | 2 | 3 | 4
+ 2 | 4 | 6 | 8
+(2 rows)
+
+FETCH 3 in foo3;
+ a | b | c | d  
+---+---+---+----
+ 1 | 2 | 3 |  4
+ 2 | 4 | 6 |  8
+ 3 | 6 | 9 | 12
+(3 rows)
+
+FETCH 4 in foo4;
+ a | b | c  | d  
+---+---+----+----
+ 1 | 2 |  3 |  4
+ 2 | 4 |  6 |  8
+ 3 | 6 |  9 | 12
+ 4 | 8 | 12 | 16
+(4 rows)
+
+FETCH 5 in foo5;
+ a | b  | c  | d  
+---+----+----+----
+ 1 |  2 |  3 |  4
+ 2 |  4 |  6 |  8
+ 3 |  6 |  9 | 12
+ 4 |  8 | 12 | 16
+ 5 | 10 | 15 | 20
+(5 rows)
+
+FETCH 6 in foo6;
+ a | b  | c  | d  
+---+----+----+----
+ 1 |  2 |  3 |  4
+ 2 |  4 |  6 |  8
+ 3 |  6 |  9 | 12
+ 4 |  8 | 12 | 16
+ 5 | 10 | 15 | 20
+ 6 | 12 | 18 | 24
+(6 rows)
+
+FETCH 7 in foo7;
+ a | b  | c  | d  
+---+----+----+----
+ 1 |  2 |  3 |  4
+ 2 |  4 |  6 |  8
+ 3 |  6 |  9 | 12
+ 4 |  8 | 12 | 16
+ 5 | 10 | 15 | 20
+ 6 | 12 | 18 | 24
+ 7 | 14 | 21 | 28
+(7 rows)
+
+FETCH 8 in foo8;
+ a | b  | c  | d  
+---+----+----+----
+ 1 |  2 |  3 |  4
+ 2 |  4 |  6 |  8
+ 3 |  6 |  9 | 12
+ 4 |  8 | 12 | 16
+ 5 | 10 | 15 | 20
+ 6 | 12 | 18 | 24
+ 7 | 14 | 21 | 28
+ 8 | 16 | 24 | 32
+(8 rows)
+
+FETCH 9 in foo9;
+ a | b  | c  | d  
+---+----+----+----
+ 1 |  2 |  3 |  4
+ 2 |  4 |  6 |  8
+ 3 |  6 |  9 | 12
+ 4 |  8 | 12 | 16
+ 5 | 10 | 15 | 20
+ 6 | 12 | 18 | 24
+ 7 | 14 | 21 | 28
+ 8 | 16 | 24 | 32
+ 9 | 18 | 27 | 36
+(9 rows)
+
+FETCH 10 in foo10;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+(10 rows)
+
+FETCH 11 in foo11;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+(11 rows)
+
+FETCH 12 in foo12;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+(12 rows)
+
+FETCH 13 in foo13;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+(13 rows)
+
+FETCH 14 in foo14;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+(14 rows)
+
+FETCH 15 in foo15;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+(15 rows)
+
+FETCH 16 in foo16;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+ 16 | 32 | 48 | 64
+(16 rows)
+
+FETCH 17 in foo17;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+ 16 | 32 | 48 | 64
+ 17 | 34 | 51 | 68
+(17 rows)
+
+FETCH 18 in foo18;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+ 16 | 32 | 48 | 64
+ 17 | 34 | 51 | 68
+ 18 | 36 | 54 | 72
+(18 rows)
+
+FETCH 19 in foo19;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+ 16 | 32 | 48 | 64
+ 17 | 34 | 51 | 68
+ 18 | 36 | 54 | 72
+ 19 | 38 | 57 | 76
+(19 rows)
+
+FETCH 20 in foo20;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+ 16 | 32 | 48 | 64
+ 17 | 34 | 51 | 68
+ 18 | 36 | 54 | 72
+ 19 | 38 | 57 | 76
+ 20 | 40 | 60 | 80
+(20 rows)
+
+FETCH 21 in foo21;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+ 16 | 32 | 48 | 64
+ 17 | 34 | 51 | 68
+ 18 | 36 | 54 | 72
+ 19 | 38 | 57 | 76
+ 20 | 40 | 60 | 80
+ 21 | 42 | 63 | 84
+(21 rows)
+
+FETCH 22 in foo22;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+ 16 | 32 | 48 | 64
+ 17 | 34 | 51 | 68
+ 18 | 36 | 54 | 72
+ 19 | 38 | 57 | 76
+ 20 | 40 | 60 | 80
+ 21 | 42 | 63 | 84
+ 22 | 44 | 66 | 88
+(22 rows)
+
+FETCH 23 in foo23;
+ a  | b  | c  | d  
+----+----+----+----
+  1 |  2 |  3 |  4
+  2 |  4 |  6 |  8
+  3 |  6 |  9 | 12
+  4 |  8 | 12 | 16
+  5 | 10 | 15 | 20
+  6 | 12 | 18 | 24
+  7 | 14 | 21 | 28
+  8 | 16 | 24 | 32
+  9 | 18 | 27 | 36
+ 10 | 20 | 30 | 40
+ 11 | 22 | 33 | 44
+ 12 | 24 | 36 | 48
+ 13 | 26 | 39 | 52
+ 14 | 28 | 42 | 56
+ 15 | 30 | 45 | 60
+ 16 | 32 | 48 | 64
+ 17 | 34 | 51 | 68
+ 18 | 36 | 54 | 72
+ 19 | 38 | 57 | 76
+ 20 | 40 | 60 | 80
+ 21 | 42 | 63 | 84
+ 22 | 44 | 66 | 88
+ 23 | 46 | 69 | 92
+(23 rows)
+
+CLOSE foo1;
+CLOSE CURSOR
+CLOSE foo2;
+CLOSE CURSOR
+CLOSE foo3;
+CLOSE CURSOR
+CLOSE foo4;
+CLOSE CURSOR
+CLOSE foo5;
+CLOSE CURSOR
+CLOSE foo6;
+CLOSE CURSOR
+CLOSE foo7;
+CLOSE CURSOR
+CLOSE foo8;
+CLOSE CURSOR
+CLOSE foo9;
+CLOSE CURSOR
+CLOSE foo10;
+CLOSE CURSOR
+CLOSE foo11;
+CLOSE CURSOR
+CLOSE foo12;
+CLOSE CURSOR
+-- leave some cursors open, to test that auto-close works.
+-- record this in the system view as well (don't query the time field there
+-- however)
+SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
+ name  |                           statement                            | is_holdable | is_binary | is_scrollable 
+-------+----------------------------------------------------------------+-------------+-----------+---------------
+ foo13 | DECLARE foo13 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4; | f           | f         | f
+ foo14 | DECLARE foo14 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4; | f           | f         | f
+ foo15 | DECLARE foo15 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4; | f           | f         | f
+ foo16 | DECLARE foo16 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4; | f           | f         | f
+ foo17 | DECLARE foo17 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4; | f           | f         | f
+ foo18 | DECLARE foo18 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4; | f           | f         | f
+ foo19 | DECLARE foo19 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4; | f           | f         | f
+ foo20 | DECLARE foo20 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4; | f           | f         | f
+ foo21 | DECLARE foo21 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4; | f           | f         | f
+ foo22 | DECLARE foo22 CURSOR FOR SELECT * FROM test2 ORDER BY 1,2,3,4; | f           | f         | f
+ foo23 | DECLARE foo23 CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4; | f           | f         | f
+(11 rows)
+
+END;
+COMMIT
+SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
+ name | statement | is_holdable | is_binary | is_scrollable 
+------+-----------+-------------+-----------+---------------
+(0 rows)
+
+--
+-- NO SCROLL disallows backward fetching
+--
+BEGIN;
+BEGIN
+DECLARE foo24 NO SCROLL CURSOR FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+FETCH 1 FROM foo24;
+ a | b | c | d 
+---+---+---+---
+ 1 | 2 | 3 | 4
+(1 row)
+
+FETCH BACKWARD 1 FROM foo24; -- should fail
+psql:/tmp/TestQueryPortal_TestBasic1.sql:143: ERROR:  backward scan is not supported in this version of Greenplum Database
+END;
+ROLLBACK
+--
+-- Cursors outside transaction blocks
+--
+SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
+ name | statement | is_holdable | is_binary | is_scrollable 
+------+-----------+-------------+-----------+---------------
+(0 rows)
+
+BEGIN;
+BEGIN
+DECLARE foo25 CURSOR WITH HOLD FOR SELECT * FROM test2 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+FETCH FROM foo25;
+ a | b | c | d 
+---+---+---+---
+ 1 | 2 | 3 | 4
+(1 row)
+
+FETCH FROM foo25;
+ a | b | c | d 
+---+---+---+---
+ 2 | 4 | 6 | 8
+(1 row)
+
+COMMIT;
+COMMIT
+FETCH FROM foo25;
+ a | b | c | d  
+---+---+---+----
+ 3 | 6 | 9 | 12
+(1 row)
+
+--FETCH BACKWARD FROM foo25;
+--FETCH ABSOLUTE -1 FROM foo25;
+SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
+ name  |                                statement                                 | is_holdable | is_binary | is_scrollable 
+-------+--------------------------------------------------------------------------+-------------+-----------+---------------
+ foo25 | DECLARE foo25 CURSOR WITH HOLD FOR SELECT * FROM test2 ORDER BY 1,2,3,4; | t           | f         | f
+(1 row)
+
+CLOSE foo25;
+CLOSE CURSOR
+--
+-- ROLLBACK should close holdable cursors
+--
+BEGIN;
+BEGIN
+DECLARE foo26 CURSOR WITH HOLD FOR SELECT * FROM test1 ORDER BY 1,2,3,4;
+DECLARE CURSOR
+ROLLBACK;
+ROLLBACK
+-- should fail
+FETCH FROM foo26;
+psql:/tmp/TestQueryPortal_TestBasic1.sql:185: ERROR:  cursor "foo26" does not exist
+-- Create a cursor with the BINARY option and check the pg_cursors view
+BEGIN;
+BEGIN
+SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
+ name | statement | is_holdable | is_binary | is_scrollable 
+------+-----------+-------------+-----------+---------------
+(0 rows)
+
+DECLARE bc BINARY CURSOR FOR SELECT * FROM test1;
+DECLARE CURSOR
+SELECT name, statement, is_holdable, is_binary, is_scrollable FROM pg_cursors ORDER BY name;
+ name |                     statement                     | is_holdable | is_binary | is_scrollable 
+------+---------------------------------------------------+-------------+-----------+---------------
+ bc   | DECLARE bc BINARY CURSOR FOR SELECT * FROM test1; | f           | t         | f
+(1 row)
+
+ROLLBACK;
+ROLLBACK

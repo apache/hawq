@@ -12235,13 +12235,11 @@ setQryDistributionPolicy(SelectStmt *stmt, Query *qry)
 			} /*foreach */
 		}
 
-		if (policy->nattrs > 0)
-		{
-			policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetHashDistPartitionNum());
-		}
-		else
-		{
-			policy->bucketnum = GetRelOpt_bucket_num_fromOptions(stmt->intoClause->options, GetDefaultPartitionNum());
+		List *options = stmt->intoClause != NULL ? stmt->intoClause->options : NULL;
+		if (policy->nattrs > 0) {
+		  policy->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetHashDistPartitionNum());
+		} else {
+		  policy->bucketnum = GetRelOpt_bucket_num_fromOptions(options, GetDefaultPartitionNum());
 		}
 	}
 

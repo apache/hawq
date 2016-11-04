@@ -151,7 +151,7 @@ bool HawqConfig::isMultinodeMode() {
       psql.getQueryResult("select hostname from gp_segment_configuration");
   std::vector<std::vector<string> > table = result.getRows();
   std::unordered_set<string> hostnameMap;
-  for (int i = 0; i < table.size(); i++) {
+  for (unsigned int i = 0; i < table.size(); i++) {
     string hostname2 = table[i][0];
     if (hostname2 == "localhost") {
       char hostnamestr[256];

@@ -1,0 +1,13 @@
+Processing module test86 (test_input/test86.py)...
+
+Warnings...
+
+test_input/test86.py:34: Raising string exceptions are deprecated (strerr)
+test_input/test86.py:36: Raising string exceptions are deprecated (h)
+test_input/test86.py:38: Raising an exception on a non-Exception object (k)
+test_input/test86.py:70: Catching string exceptions are deprecated (strerr)
+test_input/test86.py:72: Catching string exceptions are deprecated (strerr1)
+test_input/test86.py:72: Catching string exceptions are deprecated (strerr2)
+test_input/test86.py:74: Catching string exceptions are deprecated (strerr1)
+test_input/test86.py:76: Catching string exceptions are deprecated (h)
+test_input/test86.py:78: Catching a non-Exception object (k)

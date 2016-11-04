@@ -48,7 +48,6 @@ test: copyselect
 test: constraints
 ignore: triggers
 test: create_misc
-test: create_aggregate
 test: create_operator
 test: create_index
 test: drop_if_exists
@@ -107,6 +106,5 @@ test: returning
 test: stats
 ignore: tablespace
 test: resource_queue
-test: gpcopy
 test: sreh
 test: appendonly

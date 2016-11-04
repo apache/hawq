@@ -1,0 +1,7 @@
+Processing module test21 (test_input/test21.py)...
+
+Warnings...
+
+test_input/test21.py:9: Function return types are inconsistent
+test_input/test21.py:15: Function return types are inconsistent
+test_input/test21.py:21: Function return types are inconsistent

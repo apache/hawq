@@ -1,0 +1,10 @@
+Processing module test46 (test_input/test46.py)...
+
+Warnings...
+
+test_input/test46.py:5: Imported module (test46) not used
+test_input/test46.py:5: Module (test46) imports itself
+test_input/test46.py:6: Module (test46) imports itself
+test_input/test46.py:6: Using import and from ... import for (test46)
+test_input/test46.py:7: Module (test46) imports itself
+test_input/test46.py:7: Using import and from ... import for (test46)

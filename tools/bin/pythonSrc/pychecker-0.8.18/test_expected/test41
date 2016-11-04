@@ -1,0 +1,7 @@
+Processing module test41 (test_input/test41.py)...
+
+Warnings...
+
+test_input/test41.py:4: Redefining attribute (x) original line (3)
+test_input/test41.py:8: Redefining attribute (X) original line (6)
+test_input/test41.py:14: Redefining attribute (x) original line (13)

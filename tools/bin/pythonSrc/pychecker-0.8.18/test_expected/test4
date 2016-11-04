@@ -1,0 +1,6 @@
+Processing module test4 (test_input/test4.py)...
+
+Warnings...
+
+test_input/test4.py:1: No module doc string
+test_input/test4.py:11: Base class (UserDict.UserDict) __init__() not called

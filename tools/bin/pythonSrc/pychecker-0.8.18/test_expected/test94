@@ -1,0 +1,16 @@
+Processing module test94 (test_input/test94.py)...
+
+Warnings...
+
+test_input/test94.py:4: Setting a to itself has no effect
+test_input/test94.py:5: Setting a.b to itself has no effect
+test_input/test94.py:6: Setting a.b.c to itself has no effect
+test_input/test94.py:7: Setting a.b.c.d to itself has no effect
+test_input/test94.py:8: a & a has no effect
+test_input/test94.py:9: a | a has no effect
+test_input/test94.py:10: a.b | a.b has no effect
+test_input/test94.py:11: a.b.c | a.b.c has no effect
+test_input/test94.py:12: a ^ a is always 0
+test_input/test94.py:13: a.b ^ a.b is always 0
+test_input/test94.py:14: a.b.c ^ a.b.c is always 0
+test_input/test94.py:15: a / a is always 1 or ZeroDivisionError

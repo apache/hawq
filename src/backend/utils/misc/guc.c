@@ -450,6 +450,7 @@ char       *Debug_dtm_action_protocol_str;
 
 /* Enable check for compatibility of encoding and locale in createdb */
 bool		gp_encoding_check_locale_compatibility;
+bool  allow_file_count_bucket_num_mismatch;
 
 char	   *pgstat_temp_directory;
 
@@ -689,7 +690,6 @@ bool		optimizer_print_expression_properties;
 bool		optimizer_print_group_properties;
 bool		optimizer_print_optimization_context;
 bool		optimizer_print_optimization_stats;
-bool		optimizer_parallel;
 bool		optimizer_local;
 int 		optimizer_retries;
 bool  		optimizer_xforms[OPTIMIZER_XFORMS_COUNT] = {[0 ... OPTIMIZER_XFORMS_COUNT - 1] = false}; /* array of xforms disable flags */
@@ -742,6 +742,10 @@ double 	optimizer_damping_factor_filter;
 double	optimizer_damping_factor_join;
 double 	optimizer_damping_factor_groupby;
 int		optimizer_segments;
+int		optimizer_parts_to_force_sort_on_insert;
+int		optimizer_join_arity_for_associativity_commutativity;
+int		optimizer_array_expansion_threshold;
+int		optimizer_join_order_threshold;
 bool		optimizer_analyze_root_partition;
 bool		optimizer_analyze_midlevel_partition;
 bool		optimizer_enable_constant_expression_evaluation;
@@ -755,14 +759,14 @@ bool		optimizer_static_partition_selection;
 bool		optimizer_enable_partial_index;
 bool		optimizer_dml_triggers;
 bool		optimizer_dml_constraints;
-bool 		optimizer_enable_master_only_queries;
-bool sort_segments_enable;
-bool 		optimizer_multilevel_partitioning;
-bool        optimizer_enable_derive_stats_all_groups;
+bool		optimizer_enable_master_only_queries;
+bool		sort_segments_enable;
+bool		optimizer_multilevel_partitioning;
+bool		optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
-int		optimizer_parts_to_force_sort_on_insert;
-int		optimizer_join_arity_for_associativity_commutativity;
+bool		optimizer_parallel_union;
+bool		optimizer_array_constraints;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -3176,6 +3180,17 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+	    {"allow_file_count_bucket_num_mismatch", PGC_POSTMASTER, CLIENT_CONN_LOCALE,
+	          gettext_noop("allow hash table to be treated as random when file count and"
+	              " bucket number are mismatched"),
+	          NULL,
+	          GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+	    },
+	    &allow_file_count_bucket_num_mismatch,
+	    false, NULL, NULL
+	},
+
+	{
 		{"gp_temporary_files_filespace_repair", PGC_SUSET, DEVELOPER_OPTIONS,
                         gettext_noop("Change the filespace inconsistency to a warning"),
                         NULL,
@@ -3539,15 +3554,6 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
-	{
-		{"optimizer_parallel", PGC_USERSET, LOGGING_WHAT,
-			gettext_noop("Enable using threads in optimization engine."),
-			NULL,
-			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
-		},
-		&optimizer_parallel,
-		false, NULL, NULL
-	},
  	{
 		{"optimizer_extract_dxl_stats", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Extract plan stats in dxl."),
@@ -4383,6 +4389,27 @@ static struct config_bool ConfigureNamesBool[] =
 		&optimizer_prefer_scalar_dqa_multistage_agg,
 		true, NULL, NULL
 	},
+
+	{
+		{"optimizer_parallel_union", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable parallel execution for UNION/UNION ALL queries."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_parallel_union,
+		false, NULL, NULL
+	},
+
+	{
+		{"optimizer_array_constraints", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Allows the optimizer's constraint framework to derive array constraints."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_array_constraints,
+		false, NULL, NULL
+	},
+
 
 	/* End-of-list marker */
 	{
@@ -6133,6 +6160,26 @@ static struct config_int ConfigureNamesInt[] =
 		&server_ticket_renew_interval,
 		43200000, 0, INT_MAX, NULL, NULL
 	},
+
+	{
+		{"optimizer_array_expansion_threshold", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Item limit for expansion of arrays in WHERE clause to disjunctive form."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_array_expansion_threshold,
+		25, 0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"optimizer_join_order_threshold", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Maximum number of join children to use dynamic programming based join ordering algorithm."),
+			NULL
+		},
+		&optimizer_join_order_threshold,
+		10, 0, INT_MAX, NULL, NULL
+	},
+
 	{
 		{"memory_profiler_dataset_size", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Set the size in GB"),
@@ -12202,6 +12249,7 @@ ProcessGUCArray(ArrayType *array, GucSource source)
 					(errcode(ERRCODE_SYNTAX_ERROR),
 			  errmsg("could not parse setting for parameter \"%s\"", name)));
 			free(name);
+			pfree(s);
 			continue;
 		}
 
@@ -12216,12 +12264,49 @@ ProcessGUCArray(ArrayType *array, GucSource source)
 		 * GPSQL needs to dispatch the database/user config to segments.
 		 */
 		if (Gp_role == GP_ROLE_DISPATCH)
-			appendStringInfo(&MyProcPort->override_options, "-c %s=%s ", name, value);
-		elog(DEBUG1, "gpsql guc: %s = %s", name , value);
+		{
+			unsigned int	 j, start, size;
+			char			*temp, *new_temp;
+
+			size = 256;
+			temp = palloc(size + 8);
+			if (temp == NULL)
+				ereport(ERROR,
+						(errcode(ERRCODE_OUT_OF_MEMORY),
+						 errmsg("out of memory")));
+
+			j = 0;
+			for (start = 0; start < strlen(value); ++start)
+			{
+				if (j == size)
+				{
+					size *= 2;
+					new_temp = repalloc(temp, size + 8);
+					if (new_temp == NULL)
+						ereport(ERROR,
+								(errcode(ERRCODE_OUT_OF_MEMORY),
+								 errmsg("out of memory")));
+					temp = new_temp;
+				}
+
+				if (value[start] == ' ')
+				{
+					temp[j++] = '\\';
+					temp[j++] = '\\';
+				} else if (value[start] == '"' || value[start] == '\'')
+					temp[j++] = '\\';
+
+				temp[j++] = value[start];
+			}
+
+			temp[j] = '\0';
+			appendStringInfo(&MyProcPort->override_options, "-c %s=%s ", name, temp);
+			elog(DEBUG1, "gpsql guc: %s = %s", name, temp);
+			pfree(temp);
+		}
 
 		free(name);
-		if (value)
-			free(value);
+		free(value);
 		pfree(s);
 	}
 }

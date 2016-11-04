@@ -1,0 +1,4 @@
+Please do not create following directories yourselves:
+	gporca, gp-xerces, gpos
+since they are auto-created and used when building some related features, i.e.
+orca support (enable-orca). See src/backend/Makefile for details.

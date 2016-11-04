@@ -1,0 +1,9 @@
+Processing module test68 (test_input/test68.py)...
+
+Warnings...
+
+test_input/test68.py:15: Function returns a value and also implicitly returns None
+test_input/test68.py:44: Function returns a value and also implicitly returns None
+test_input/test68.py:63: Function returns a value and also implicitly returns None
+test_input/test68.py:128: Function returns a value and also implicitly returns None
+test_input/test68.py:142: Function returns a value and also implicitly returns None

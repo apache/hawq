@@ -1,0 +1,8 @@
+Processing module test8 (test_input/test8.py)...
+  SyntaxError: invalid syntax (test_input/test8.py, line 4)
+        syntax error here
+                   ^
+
+Warnings...
+
+test8:1: NOT PROCESSED UNABLE TO IMPORT

@@ -1,0 +1,101 @@
+Goals for next minor release:
+-----------------------------
+* Add warning for duplicated elif conditions
+* Check for "if s.find(str):" s/b "if s.find(str) >= 0:" where s is a string
+* Add warning for: x % x is always 0
+* Add warning when using listcomp variable (x) outside of [... for x in ...]
+* Add warning for import overriding builtin (from os import *)
+* Add warning if defining a module name that's also in the stdlib
+* Add decorator so you can do:
+
+   @pychecker(maxlocals=42)
+   def myfunc():
+
+* Support function attributes in addition to __pychecker__
+* Add warning when iterating over a dict (keys, values, items) and mutating it
+* Add warning for __special_ or __special or _special__ etc.
+* Add warning about redefining a function/method with different signatures
+* Add warning when base class has similar name and same signature:
+
+  class Base:
+    def foobar():
+  class Sub(Base):
+    def foobaz(): # damn, I wanted to override foobar
+
+* If unknown name, suggest similar names
+
+* Check for return from finally (disables exception, default off?)
+* Add another boolean warning for:    if bool(xxx):
+* Need way to configure broken (and non-broken) versions of evil C extensions
+* Add estimated difficulty to research/fix error
+* Shouldn't warn about using return value for generators
+* Suppress argument (self) name warnings if func has no impl?
+* Add warning for a variable that is constant 
+    ie, initialized and used, but never changed
+
+* Add warning for catching AttributeError when there is no attr access
+	ZeroDivisionError w/no division?
+	KeyError UnboundLocalError IndexError IndentationError ImportError
+* Add warning for a import b & b import a (import loops)
+* Check that classes with __slots__ don't get/set any other attributes
+* Expectations of __methods__, constness (don't modify in __nonzero__)
+* Add warning if dict has duplicate keys when creating from literals
+* __new__ should use cls, not self???
+
+* If arg has default value of None, check that arg is assigned some value
+
+* check if returning self from __str__()
+* check for str1 in str2 == otherValue
+* Fix dependancy problem w/checkReturnValues & checkImplicitReturns
+* check for use of self.attr before setting self.attr in __init__ method
+* Handle sys.exit() as non-returnable condition
+* Warn about non-escaping backslashes???
+* vars() should use locals, like locals(), hmmm, it should already ...
+
+Goals for next major release (0.9):
+-----------------------------------
+* Improve handling when importing packages (ie, don't import modules)
+  - Make a base class to handle stack operations
+  - Override base class with classes to handle module scope, functions, etc.
+  - Process module and create Module/Class/Function objects w/o dir(), etc.
+  - Finish tests: 44
+* Add a config option to ignore certain cantankerous modules
+
+* Add warning for global statement inside a conditional
+* Fix spurious warnings for unreachable code checks
+* Fix most of the FIXMEs
+* Add check for import module (from within package p-should be import p.module)
+  - don't use relative imports, should always use absolute paths
+
+Longer Term goals:
+------------------
+* Add check for magic #s/consts
+	(need dict of consts, count, max count, consts to ignore)
+* Add check for unsupported operand type(s) for * + / etc
+* Store types of globals, class attributes, function & method return values
+* Output stats about pychecker's job, good, bad, otherwise...
+	annotate code for problem areas, well checked areas, etc.
+* Add original line warnings for those that refer to another place
+	(e.g., overridden method doesn't match signature)
+* Add capability to check features from a specified version of python
+	which is different from runtime interpreter
+* Security checks for known issues.  Adrian Likins @redhat recommends 
+  looking at http://www.securesw.com/rats/
+* Make check for 'self' a list instead of a string
+* Check function return values - partially complete
+* Add check that private functions are used in module/class
+* Add check for using object members outside of class
+* Add portability checks for win32/unix
+* Add check for except: pass
+* Spell check doc strings
+
+# need to read source code for these:
+* Add warning for unnecessary global stmts
+* Add check for implicit string concatentation
+* Add check for creating tuple when don't want a tuple, like: 1,
+            or not creating tuple when want one, like: (1)
+* Warn when using () with statements (assert, print, del, if, while)
+* Add check for <>, should use !=
+* Find lines that end w/semi-colons (;)
+* inconsistent camel-case
+

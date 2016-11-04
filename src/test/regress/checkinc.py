@@ -48,6 +48,7 @@ fileset = {
     'ia64/sys/inline.h': [],
     'io.h':              [],
     'ioctl.h':           [],
+    'intrin.h':          [],
     'kernel/OS.h':       [],
     'kernel/image.h':    [],
     'libintl.h':         [],

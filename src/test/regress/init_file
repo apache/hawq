@@ -10,3 +10,45 @@ m/^ Optimizer status:.*/
 s/^ Optimizer status:.*//
 
 -- end_matchignore
+
+-- start_matchsubs
+#entry db matches
+m/\s+\(entry db(.*)+\spid=\d+\)/
+s/\s+\(entry db(.*)+\spid=\d+\)//
+
+#remove unecessary diffs due to SOMEFILE:SOMEFUNC
+m/\(SOMEFILE:SOMEFUNC\)/
+s/\(SOMEFILE:SOMEFUNC\)//
+
+m/\(COptTasks\.cpp:\d+\)/
+s/\(COptTasks\.cpp:\d+\)//
+
+m/\(cdbdisp\.c:\d+\)/
+s/\(cdbdisp\.c:\d+\)//
+
+m/\(plpython\.c:\d+\)/
+s/\(plpython\.c:\d+\)//
+
+m/\(functions\.c:\d+\)/
+s/\(functions\.c:\d+\)//
+
+#In alter_table_distribution_policy tests, some test cases emit NOTICE message
+#like the following
+#drop cascades to function pg_atsdb_211851_2_4_out.
+#The name contains OID embedded in it and it can change with test runs. We want
+#to remove these and diff the rest.
+m/^NOTICE:.*drop cascades to.*/
+s/^NOTICE:.*drop cascades to.*/^NOTICE: drop cascades to /
+
+# Mask out some numbers (parts of partition names) that vary from run to run.
+m/overlaps existing partition "r\d+"/
+s/overlaps existing partition "r\d+"/partition "r##########"/
+
+# Mask out some numbers (part of temp table schema) that vary from run to run.
+m/Table "pg_temp_\d+.temp/
+s/Table "pg_temp_\d+.temp/Table "pg_temp_#####/
+
+# Mask out Log & timestamp for orca message that has feature not supported.
+m/^LOG.*\"Feature/
+s/^LOG.*\"Feature/\"Feature/
+-- end_matchsubs

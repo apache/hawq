@@ -1,7 +1,5 @@
 # $PostgreSQL: pgsql/src/test/regress/serial_schedule,v 1.33 2006/08/30 23:34:22 tgl Exp $
 # This should probably be in an order similar to parallel_schedule.
-test: type_sanity
-test: querycontext
 test: errortbl
 test: goh_create_type_composite
 ignore: goh_create_table
@@ -18,23 +16,7 @@ ignore: goh_column_compression
 test: goh_database
 test: goh_gp_dist_random
 ignore: gpsql_fault_tolerance
-test: gpsql_alter_table
-test: goh_portals
-test: goh_prepare
 ignore: goh_set_schema
-test: goh_alter_owner
-test: boolean
-test: char
-test: name
-test: varchar
-test: text
-test: int2
-test: int4
-test: int8
-test: oid
-test: float4
-ignore: float8
-test: money
 ignore: bit
 ignore: numeric
 ignore: strings
@@ -45,8 +27,6 @@ ignore: box
 ignore: path
 ignore: polygon
 ignore: circle
-test: date
-test: time
 ignore: timetz
 ignore: timestamp
 ignore: timestamptz
@@ -60,21 +40,14 @@ ignore: oidjoins
 ignore: opr_sanity
 ignore: geometry
 ignore: horology
-test: insert
-test: create_function_1
-test: subplan
 ignore: create_type
 test: create_table_test
-test: create_table_distribution
 ignore: create_function_2
 test: copy
 ignore: copyselect
 ignore: constraints
 ignore: triggers
 ignore: create_misc
-test: create_aggregate
-test: aggregate_with_groupingsets
-test: nested_case_null
 ignore: create_operator
 ignore: create_index
 ignore: drop_if_exists
@@ -134,18 +107,14 @@ ignore: without_oid
 ignore: conversion
 ignore: truncate
 ignore: alter_table
-test: sequence
-test: polymorphism
 test: rowtypes
 ignore: returning
 ignore: stats
 ignore: tablespace
 ignore: gpdiffcheck
-ignore: exttab1
 ignore: custom_format
 ignore: resource_queue
 ignore: gptokencheck
-test: gpcopy
 ignore: sreh
 ignore: olap_setup
 ignore: olap_group
@@ -199,7 +168,6 @@ ignore: percentile
 ignore: resource_queue_function
 ignore: gp_optimizer
 ignore: co_nestloop_idxscan
-test: agg_derived_win
 ignore: orca_udfs
 #
 # the following test needs some special filespace/tablespace.
@@ -209,7 +177,6 @@ ignore: hdfs_filesystem
 ignore: co_disabled
 # HCatalog tests
 test: caqlinmem
-ignore: hcatalog_lookup
+test: hcatalog_lookup
 test: json_load
-test: external_oid
 test: validator_function

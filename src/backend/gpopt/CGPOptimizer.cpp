@@ -37,6 +37,10 @@
 #include "gpopt/init.h"
 #include "gpos/_api.h"
 
+#include "naucrates/exception.h"
+
+extern MemoryContext MessageContext;
+
 //---------------------------------------------------------------------------
 //	@function:
 //		CGPOptimizer::TouchLibraryInitializers
@@ -48,7 +52,7 @@
 void
 CGPOptimizer::TouchLibraryInitializers()
 {
-	void (*gpos)() = gpos_init;
+	void (*gpos)(gpos_init_params*) = gpos_init;
 	void (*dxl)() = gpdxl_init;
 	void (*opt)() = gpopt_init;
 }
@@ -69,7 +73,47 @@ CGPOptimizer::PplstmtOptimize
 	bool *pfUnexpectedFailure // output : set to true if optimizer unexpectedly failed to produce plan
 	)
 {
-	return COptTasks::PplstmtOptimize(pquery, pfUnexpectedFailure);
+	SOptContext octx;
+	PlannedStmt* plStmt = NULL;
+	GPOS_TRY
+	{
+		plStmt = COptTasks::PplstmtOptimize(pquery, &octx, pfUnexpectedFailure);
+		// clean up context
+		octx.Free(octx.epinQuery, octx.epinPlStmt);
+	}
+	GPOS_CATCH_EX(ex)
+	{
+		// clone the error message before context free.
+		CHAR* szErrorMsg = octx.CloneErrorMsg(MessageContext);
+		// clean up context
+		octx.Free(octx.epinQuery, octx.epinPlStmt);
+		if (GPOS_MATCH_EX(ex, gpdxl::ExmaDXL, gpdxl::ExmiOptimizerError) ||
+			NULL != szErrorMsg)
+		{
+			Assert(NULL != szErrorMsg);
+			errstart(ERROR, ex.SzFilename(), ex.UlLine(), NULL, TEXTDOMAIN);
+			errfinish(errcode(ERRCODE_INTERNAL_ERROR),
+					errmsg("%s", szErrorMsg));
+		}
+		else if (GPOS_MATCH_EX(ex, gpdxl::ExmaGPDB, gpdxl::ExmiGPDBError))
+		{
+			PG_RE_THROW();
+		}
+		else if (GPOS_MATCH_EX(ex, gpdxl::ExmaDXL, gpdxl::ExmiNoAvailableMemory))
+		{
+			errstart(ERROR, ex.SzFilename(), ex.UlLine(), NULL, TEXTDOMAIN);
+			errfinish(errcode(ERRCODE_INTERNAL_ERROR),
+					errmsg("No available memory to allocate string buffer."));
+		}
+		else if (GPOS_MATCH_EX(ex, gpdxl::ExmaDXL, gpdxl::ExmiInvalidComparisonTypeCode))
+		{
+			errstart(ERROR, ex.SzFilename(), ex.UlLine(), NULL, TEXTDOMAIN);
+			errfinish(errcode(ERRCODE_INTERNAL_ERROR),
+					errmsg("Invalid comparison type code. Valid values are Eq, NEq, LT, LEq, GT, GEq."));
+		}
+	}
+	GPOS_CATCH_END;
+	return plStmt;
 }
 
 
@@ -90,6 +134,39 @@ CGPOptimizer::SzDXLPlan
 	return COptTasks::SzOptimize(pquery);
 }
 
+//---------------------------------------------------------------------------
+//	@function:
+//		InitGPOPT()
+//
+//	@doc:
+//		Initialize GPTOPT and dependent libraries
+//
+//---------------------------------------------------------------------------
+void
+CGPOptimizer::InitGPOPT ()
+{
+  // Use GPORCA's default allocators
+  struct gpos_init_params params = { NULL, NULL };
+  gpos_init(&params);
+  gpdxl_init();
+  gpopt_init();
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		TerminateGPOPT()
+//
+//	@doc:
+//		Terminate GPOPT and dependent libraries
+//
+//---------------------------------------------------------------------------
+void
+CGPOptimizer::TerminateGPOPT ()
+{
+  gpopt_terminate();
+  gpdxl_terminate();
+  gpos_terminate();
+}
 
 //---------------------------------------------------------------------------
 //	@function:
@@ -127,6 +204,38 @@ char *SzDXLPlan
 	)
 {
 	return CGPOptimizer::SzDXLPlan(pquery);
+}
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		InitGPOPT()
+//
+//	@doc:
+//		Initialize GPTOPT and dependent libraries
+//
+//---------------------------------------------------------------------------
+extern "C"
+{
+void InitGPOPT ()
+{
+	return CGPOptimizer::InitGPOPT();
+}
+}
+
+//---------------------------------------------------------------------------
+//	@function:
+//		TerminateGPOPT()
+//
+//	@doc:
+//		Terminate GPOPT and dependent libraries
+//
+//---------------------------------------------------------------------------
+extern "C"
+{
+void TerminateGPOPT ()
+{
+	return CGPOptimizer::TerminateGPOPT();
 }
 }
 

@@ -1,0 +1,16 @@
+Processing module test18 (test_input/test18.py)...
+
+Warnings...
+
+test_input/test18.py:21: Invalid arguments to (__init__), got 1, expected 0
+test_input/test18.py:23: Invalid arguments to (__init__), got 0, expected 1
+test_input/test18.py:25: Invalid arguments to (__init__), got 2, expected 1
+test_input/test18.py:26: Invalid arguments to (__init__), got 3, expected 1
+test_input/test18.py:27: Invalid arguments to (__init__), got 4, expected 1
+test_input/test18.py:29: Invalid arguments to (__init__), got 0, expected 3
+test_input/test18.py:30: Invalid arguments to (__init__), got 1, expected 3
+test_input/test18.py:31: Invalid arguments to (__init__), got 2, expected 3
+test_input/test18.py:33: Invalid arguments to (__init__), got 4, expected 3
+test_input/test18.py:35: Invalid arguments to (__init__), got 0, expected at least 3
+test_input/test18.py:36: Invalid arguments to (__init__), got 1, expected at least 3
+test_input/test18.py:37: Invalid arguments to (__init__), got 2, expected at least 3

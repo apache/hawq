@@ -33,14 +33,14 @@ GetNewApplicationResponse::GetNewApplicationResponse(
 GetNewApplicationResponse::~GetNewApplicationResponse() {
 }
 
-void GetNewApplicationResponse::setApplicationId(ApplicationID &appId) {
+void GetNewApplicationResponse::setApplicationId(ApplicationId &appId) {
 	ApplicationIdProto *proto = new ApplicationIdProto();
 	proto->CopyFrom(appId.getProto());
 	responseProto.set_allocated_application_id(proto);
 }
 
-ApplicationID GetNewApplicationResponse::getApplicationId() {
-	return ApplicationID(responseProto.application_id());
+ApplicationId GetNewApplicationResponse::getApplicationId() {
+	return ApplicationId(responseProto.application_id());
 }
 
 void GetNewApplicationResponse::setResource(Resource &resource) {

@@ -1,0 +1,93 @@
+-- --------------------------------------
+-- 'gpfdist' protocol
+-- --------------------------------------
+
+CREATE EXTERNAL WEB TABLE gpfdist_status (x text)
+execute E'( python $GPHOME/bin/lib/gppinggpfdist.py @hostname@:7070 2>&1 || echo) '
+on SEGMENT 0
+FORMAT 'text' (delimiter '|');
+
+CREATE EXTERNAL WEB TABLE gpfdist_start (x text)
+execute E'((@gpwhich_gpfdist@ -p 7070 -d @abs_srcdir@/data  </dev/null >/dev/null 2>&1 &); sleep 2; echo "starting...") '
+on SEGMENT 0
+FORMAT 'text' (delimiter '|');
+
+CREATE EXTERNAL WEB TABLE gpfdist_stop (x text)
+execute E'(/bin/pkill gpfdist || killall gpfdist) > /dev/null 2>&1; echo "stopping..."'
+on SEGMENT 0
+FORMAT 'text' (delimiter '|');
+-- start_ignore
+select * from gpfdist_stop;
+select * from gpfdist_status;
+select * from gpfdist_start;
+select * from gpfdist_status;
+-- end_ignore
+
+-- readable external table with error table
+
+CREATE EXTERNAL TABLE EXT_NATION1 ( N_NATIONKEY  INTEGER ,
+                            N_NAME       CHAR(25) ,
+                            N_REGIONKEY  INTEGER ,
+                            N_COMMENT    VARCHAR(152))
+location ('gpfdist://@hostname@:7070/nation_error50.tbl')
+FORMAT 'text' (delimiter '|')
+LOG ERRORS INTO EXT_NATION_ERROR1 SEGMENT REJECT LIMIT 51;
+
+CREATE EXTERNAL TABLE EXT_NATION2 ( N_NATIONKEY  INTEGER ,
+                            N_NAME       CHAR(25) ,
+                            N_REGIONKEY  INTEGER ,
+                            N_COMMENT    VARCHAR(152))
+location ('gpfdist://@hostname@:7070/nation_error50.tbl')
+FORMAT 'text' (delimiter '|')
+LOG ERRORS INTO EXT_NATION_ERROR2 SEGMENT REJECT LIMIT 50;
+
+CREATE EXTERNAL TABLE EXT_NATION3 ( N_NATIONKEY  INTEGER ,
+                            N_NAME       CHAR(25) ,
+                            N_REGIONKEY  INTEGER ,
+                            N_COMMENT    VARCHAR(152))
+location ('gpfdist://@hostname@:7070/nation.tbl')
+FORMAT 'text' (delimiter '|')
+LOG ERRORS INTO EXT_NATION_ERROR3 SEGMENT REJECT LIMIT 50;
+
+-- use existing error table
+CREATE EXTERNAL TABLE EXT_NATION_WITH_EXIST_ERROR_TABLE ( N_NATIONKEY  INTEGER ,
+                            N_NAME       CHAR(25) ,
+                            N_REGIONKEY  INTEGER ,
+                            N_COMMENT    VARCHAR(152))
+location ('gpfdist://@hostname@:7070/nation_error50.tbl')
+FORMAT 'text' (delimiter '|')
+LOG ERRORS INTO EXT_NATION_ERROR1 SEGMENT REJECT LIMIT 51;
+
+select * from EXT_NATION1;
+select count(*) from EXT_NATION_ERROR1; -- should be 50
+select * from EXT_NATION_WITH_EXIST_ERROR_TABLE;
+select count(*) from EXT_NATION_ERROR1; -- should be 100
+select * from EXT_NATION2; -- should fail
+select count(*) from EXT_NATION_ERROR2; -- should be empty
+select * from EXT_NATION3;
+select count(*) from EXT_NATION_ERROR3; -- should be empty
+
+truncate EXT_NATION_ERROR1;
+select * from EXT_NATION1 as x, EXT_NATION3 as y where x.n_nationkey = y.n_nationkey;
+select count(*) from EXT_NATION_ERROR1; -- should be 50
+
+select * from EXT_NATION1 as x, EXT_NATION1 as y where x.n_nationkey = y.n_nationkey; --should fail on self join
+select * from EXT_NATION1 as x, EXT_NATION_WITH_EXIST_ERROR_TABLE as y where x.n_nationkey = y.n_nationkey; --should fail with the same error table
+
+-- should fail on writable external table
+CREATE WRITABLE EXTERNAL TABLE EXT_NATION_WRITABLE ( N_NATIONKEY  INTEGER ,
+                            N_NAME       CHAR(25) ,
+                            N_REGIONKEY  INTEGER ,
+                            N_COMMENT    VARCHAR(152))
+LOCATION ('gpfdist://@hostname@:7070/nation_error50.tbl') 
+FORMAT 'text' (delimiter '|')
+LOG ERRORS INTO EXT_NATION_ERROR_WRITABLE SEGMENT REJECT LIMIT 5;
+
+-- start_ignore
+select * from gpfdist_stop;
+select * from gpfdist_status;
+-- end_ignore
+
+drop external table gpfdist_status;
+drop external table gpfdist_start;
+drop external table gpfdist_stop;

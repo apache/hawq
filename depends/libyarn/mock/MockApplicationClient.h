@@ -40,16 +40,17 @@ public:
     }
     ~MockApplicationClient(){
     }
-    MOCK_METHOD0(getNewApplication, ApplicationID ());
+    MOCK_METHOD0(getNewApplication, ApplicationId ());
     MOCK_METHOD1(submitApplication, void (ApplicationSubmissionContext &appContext));
-    MOCK_METHOD1(getApplicationReport, ApplicationReport (ApplicationID &appId));
+    MOCK_METHOD1(getApplicationReport, ApplicationReport (ApplicationId &appId));
     MOCK_METHOD1(getContainers, list<ContainerReport> (ApplicationAttemptId &appAttempId));
     MOCK_METHOD1(getClusterNodes, list<NodeReport> (list<NodeState> &state));
     MOCK_METHOD4(getQueueInfo, QueueInfo (string &queue, bool includeApps,bool includeChildQueues, bool recursive));
-    MOCK_METHOD1(forceKillApplication, void (ApplicationID &appId));
+    MOCK_METHOD1(forceKillApplication, void (ApplicationId &appId));
     MOCK_METHOD0(getClusterMetrics, YarnClusterMetrics ());
     MOCK_METHOD2(getApplications, list<ApplicationReport> (list<string> &applicationTypes,list<YarnApplicationState> &applicationStates));
     MOCK_METHOD0(getQueueAclsInfo, list<QueueUserACLInfo> ());
+    MOCK_METHOD0(getMethod, const AuthMethod ());
 };
 }
 

@@ -515,22 +515,20 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 
 		compresstype = values[5];
 
+		if (strcmp(compresstype, "quicklz") == 0)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("compresstype \"%s\" is not supported", compresstype),
+					 errOmitLocation(true)));
+		}
+
 		if (!compresstype_is_valid(compresstype))
 		{
-		  if (strcmp(compresstype, "quicklz") == 0)
-		  {
-		    ereport(ERROR,
-		        (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-		         errmsg("compresstype \"%s\" is not supported anymore", compresstype),
-		         errOmitLocation(true)));
-		  }
-		  else
-		  {
-		    ereport(ERROR,
-		        (errcode(ERRCODE_UNDEFINED_OBJECT),
-		         errmsg("unknown compresstype \"%s\"", compresstype),
-					   errOmitLocation(true)));
-		  }
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					 errmsg("unknown compresstype \"%s\"", compresstype),
+					 errOmitLocation(true)));
 		}
 
 		if ((columnstore == RELSTORAGE_PARQUET) && (strcmp(compresstype, "snappy") != 0)

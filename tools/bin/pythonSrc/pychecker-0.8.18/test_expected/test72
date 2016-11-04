@@ -1,0 +1,8 @@
+Processing module test72 (test_input/test72.py)...
+
+Warnings...
+
+test_input/test72.py:8: Setting class attribute (y) not set in __init__
+test_input/test72.py:13: Setting class attribute (z) not set in __init__
+test_input/test72.py:23: No class attribute (z) found
+test_input/test72.py:24: Setting class attribute (y) not set in __init__

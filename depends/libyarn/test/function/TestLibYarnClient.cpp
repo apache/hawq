@@ -17,6 +17,8 @@
  * under the License.
  */
 
+#include <string>
+
 #include "gtest/gtest.h"
 #include "libyarnclient/LibYarnClient.h"
 #include "records/FinalApplicationStatus.h"

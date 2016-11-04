@@ -1,0 +1,228 @@
+-- start_ignore
+SET SEARCH_PATH=TestPreparedStatement_TestPreparedStatementExecute;
+SET
+-- end_ignore
+drop function if exists f_load_exe();
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:4: NOTICE:  function f_load_exe() does not exist, skipping
+DROP FUNCTION
+drop table if exists src_table_exe;
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:5: NOTICE:  table "src_table_exe" does not exist, skipping
+DROP TABLE
+drop table if exists main_table_exe;
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:6: NOTICE:  table "main_table_exe" does not exist, skipping
+DROP TABLE
+drop table if exists map_table_exe;
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:7: NOTICE:  table "map_table_exe" does not exist, skipping
+DROP TABLE
+create table src_table_exe ( id_natural integer, value varchar, id_file int);
+CREATE TABLE
+create table main_table_exe (id_auto integer, id_natural integer, value varchar, record_type varchar, id_file integer);
+CREATE TABLE
+create table map_table_exe (id_auto integer, id_natural integer);
+CREATE TABLE
+insert into src_table_exe values ( 1, 'sth',        10);
+INSERT 0 1
+insert into src_table_exe values ( 1, 'sht else', 11);
+INSERT 0 1
+CREATE OR REPLACE FUNCTION f_load_exe()
+  RETURNS text
+  LANGUAGE plpgsql
+AS
+$body$
+DECLARE
+
+   l_count integer:=0;
+   l_rec record;
+   l_tuple integer;
+   l_item record;
+
+BEGIN
+
+RAISE NOTICE '--- Initial content of main_table_exe: begin ---';
+RAISE NOTICE 'id_auto, id_natural, value, record_type, id_file';
+FOR l_item IN SELECT * FROM main_table_exe LOOP
+    RAISE NOTICE '%, %, %, %, %', quote_ident(l_item.id_auto), quote_ident(l_item.id_natural), quote_ident(l_item.value), quote_ident(l_item.record_type), quote_ident(l_item.id_file);
+END LOOP;
+RAISE NOTICE '--- Initial content of main_table_exe: end ---';
+
+execute 'INSERT INTO main_table_exe
+              ( id_natural
+              , value
+              , record_type
+              , id_file
+              )
+         SELECT id_natural
+              , value
+              , ''P''
+              , id_file
+           FROM src_table_exe';
+
+GET DIAGNOSTICS l_tuple = ROW_COUNT;
+RAISE NOTICE 'INSERT INTO main_table_exe with seed data from src_table_exe: % tuple inserted', l_tuple;
+
+RAISE NOTICE '--- Content of main_table_exe after seed data inserted: begin ---';
+RAISE NOTICE 'id_auto, id_natural, value, record_type, id_file';
+FOR l_item IN SELECT * FROM main_table_exe LOOP
+    RAISE NOTICE '%, %, %, %, %', quote_ident(l_item.id_auto), quote_ident(l_item.id_natural), quote_ident(l_item.value), quote_ident(l_item.record_type), quote_ident(l_item.id_file);
+END LOOP;
+RAISE NOTICE '--- Content of main_table_exe after seed data inserted: end ---';
+
+FOR l_rec IN ( select id_file from main_table_exe group by id_file order by 1)
+  LOOP
+      l_count:=l_count+1;
+
+execute 'INSERT INTO main_table_exe
+              ( id_natural
+              , value
+              , record_type
+              , id_file
+              )
+         SELECT id_natural
+              , value
+              , ''N''
+              , '||l_rec.id_file||'
+           FROM main_table_exe pxf
+          WHERE pxf.id_file='||l_rec.id_file||' AND pxf.record_type=''P'''
+              ;
+
+GET DIAGNOSTICS l_tuple = ROW_COUNT;
+RAISE NOTICE 'Insert into main_table_exe in loop % with first insert statement: % tuple inserted', l_count, l_tuple;
+
+RAISE NOTICE '--- Content of main_table_exe after loop % with first insert statement: begin ---', l_count;
+RAISE NOTICE 'id_auto, id_natural, value, record_type, id_file';
+FOR l_item IN SELECT * FROM main_table_exe LOOP
+    RAISE NOTICE '%, %, %, %, %', quote_ident(l_item.id_auto), quote_ident(l_item.id_natural), quote_ident(l_item.value), quote_ident(l_item.record_type), quote_ident(l_item.id_file);
+END LOOP;
+RAISE NOTICE '--- Content of main_table_exe after loop % with first insert statement: end ---', l_count;
+
+execute 'INSERT INTO main_table_exe
+              ( id_auto
+              , id_natural
+              , value
+              , record_type
+              , id_file
+              )
+         SELECT '||l_count||'
+              , ma.id_natural
+              , value
+              , CASE WHEN mt.id_natural IS NULL THEN ''I'' ELSE ''U'' END AS record_type
+              , id_file
+           FROM main_table_exe ma
+           LEFT JOIN map_table_exe mt on mt.id_natural=ma.id_natural
+          WHERE ma.record_type=''N'' AND ma.id_file='||l_rec.id_file
+              ;
+
+        execute 'truncate table map_table_exe';
+
+GET DIAGNOSTICS l_tuple = ROW_COUNT;
+RAISE NOTICE 'Insert into main_table_exe in loop % with second insert statement: % tuple inserted', l_count, l_tuple;
+
+RAISE NOTICE '--- Content of main_table_exe after loop % with second insert statement: begin ---', l_count;
+RAISE NOTICE 'id_auto, id_natural, value, record_type, id_file';
+FOR l_item IN SELECT * FROM main_table_exe LOOP
+    RAISE NOTICE '%, %, %, %, %', quote_ident(l_item.id_auto), quote_ident(l_item.id_natural), quote_ident(l_item.value), quote_ident(l_item.record_type), quote_ident(l_item.id_file);
+END LOOP;
+RAISE NOTICE '--- Content of main_table_exe after loop % with second insert statement: end ---', l_count;
+
+execute 'INSERT INTO map_table_exe
+              ( id_auto
+              , id_natural
+              )
+         SELECT ma.id_auto
+              , ma.id_natural
+           FROM main_table_exe ma
+          WHERE record_type NOT IN (''N'',''P'') AND id_file='||l_rec.id_file
+              ;
+
+     END LOOP;
+
+RAISE NOTICE '--- Final content of main_table_exe: begin ---';
+RAISE NOTICE 'id_auto, id_natural, value, record_type, id_file';
+FOR l_item IN SELECT * FROM main_table_exe LOOP
+    RAISE NOTICE '%, %, %, %, %', quote_ident(l_item.id_auto), quote_ident(l_item.id_natural), quote_ident(l_item.value), quote_ident(l_item.record_type), quote_ident(l_item.id_file);
+END LOOP;
+RAISE NOTICE '--- Final content of main_table_exe: end ---';
+
+  RETURN 'done';
+
+END;
+$body$
+;
+CREATE FUNCTION
+select f_load_exe();
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Initial content of main_table_exe: begin ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  id_auto, id_natural, value, record_type, id_file
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Initial content of main_table_exe: end ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  INSERT INTO main_table_exe with seed data from src_table_exe: 2 tuple inserted
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after seed data inserted: begin ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  id_auto, id_natural, value, record_type, id_file
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "P", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "P", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after seed data inserted: end ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  Insert into main_table_exe in loop 1 with first insert statement: 1 tuple inserted
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after loop 1 with first insert statement: begin ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  id_auto, id_natural, value, record_type, id_file
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "P", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "P", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "N", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after loop 1 with first insert statement: end ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  Insert into main_table_exe in loop 1 with second insert statement: 0 tuple inserted
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after loop 1 with second insert statement: begin ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  id_auto, id_natural, value, record_type, id_file
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "P", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "P", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "N", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  "1", "1", sth, "I", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after loop 1 with second insert statement: end ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  Insert into main_table_exe in loop 2 with first insert statement: 1 tuple inserted
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after loop 2 with first insert statement: begin ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  id_auto, id_natural, value, record_type, id_file
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "P", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "P", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "N", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  "1", "1", sth, "I", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "N", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after loop 2 with first insert statement: end ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  Insert into main_table_exe in loop 2 with second insert statement: 0 tuple inserted
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after loop 2 with second insert statement: begin ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  id_auto, id_natural, value, record_type, id_file
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "N", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  "1", "1", sth, "I", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "N", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "P", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "P", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  "2", "1", "sht else", "U", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Content of main_table_exe after loop 2 with second insert statement: end ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Final content of main_table_exe: begin ---
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  id_auto, id_natural, value, record_type, id_file
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "P", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  "2", "1", "sht else", "U", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "P", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  "1", "1", sth, "I", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", "sht else", "N", "11"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  <NULL>, "1", sth, "N", "10"
+psql:/tmp/TestPreparedStatement_TestPreparedStatementExecute.sql:141: NOTICE:  --- Final content of main_table_exe: end ---
+ f_load_exe 
+------------
+ done
+(1 row)
+
+select * from main_table_exe;
+ id_auto | id_natural |  value   | record_type | id_file 
+---------+------------+----------+-------------+---------
+         |          1 | sht else | P           |      11
+         |          1 | sth      | P           |      10
+       2 |          1 | sht else | U           |      11
+         |          1 | sth      | N           |      10
+       1 |          1 | sth      | I           |      10
+         |          1 | sht else | N           |      11
+(6 rows)
+
+drop function if exists f_load_exe();
+DROP FUNCTION
+drop table if exists src_table_exe;
+DROP TABLE
+drop table if exists main_table_exe;
+DROP TABLE
+drop table if exists map_table_exe;
+DROP TABLE

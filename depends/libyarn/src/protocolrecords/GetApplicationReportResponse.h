@@ -39,7 +39,7 @@ public:
 	GetApplicationReportResponse(const GetApplicationReportResponseProto &proto);
 	virtual ~GetApplicationReportResponse();
 
-	GetApplicationReportResponseProto& proto();
+	GetApplicationReportResponseProto& getProto();
 
 	void setApplicationReport(ApplicationReport &appReport);
 	ApplicationReport getApplicationReport();

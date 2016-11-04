@@ -60,14 +60,10 @@ RegisterApplicationMasterResponse ApplicationMasterProtocol::registerApplication
         RegisterApplicationMasterRequestProto requestProto = request.getProto();
         invoke(RpcCall(true, "registerApplicationMaster", &requestProto, &responseProto));
         return RegisterApplicationMasterResponse(responseProto);
-    } catch (const YarnFailoverException & e) {
-         throw;
-    } catch (...) {
-        THROW(YarnIOException,
-              "Unexpected exception: when calling "
-              "ApplicationMasterProtocol::registerApplicationMaster in %s: %d",
-              __FILE__, __LINE__);
-	}
+    } catch (const YarnRpcServerException & e) {
+        UnWrapper<ApplicationMasterNotRegisteredException, YarnIOException> unwrapper(e);
+        unwrapper.unwrap(__FILE__, __LINE__);
+    }
 }
 
 
@@ -77,16 +73,9 @@ AllocateResponse ApplicationMasterProtocol::allocate(AllocateRequest &request) {
         AllocateResponseProto responseProto;
         invoke(RpcCall(true, "allocate", &requestProto, &responseProto));
         return AllocateResponse(responseProto);
-    } catch (const YarnFailoverException & e) {
-         throw;
     } catch (const YarnRpcServerException & e) {
         UnWrapper<ApplicationMasterNotRegisteredException, YarnIOException> unwrapper(e);
         unwrapper.unwrap(__FILE__, __LINE__);
-    } catch (...) {
-        THROW(YarnIOException,
-              "Unexpected exception: when calling "
-              "ApplicationMasterProtocol::allocate in %s: %d",
-              __FILE__, __LINE__);
     }
 }
 
@@ -97,16 +86,9 @@ FinishApplicationMasterResponse ApplicationMasterProtocol::finishApplicationMast
         FinishApplicationMasterResponseProto responseProto;
         invoke(RpcCall(true, "finishApplicationMaster", &requestProto, &responseProto));
         return FinishApplicationMasterResponse(responseProto);
-    } catch (const YarnFailoverException & e) {
-         throw;
     } catch (const YarnRpcServerException & e) {
         UnWrapper<ApplicationMasterNotRegisteredException, YarnIOException> unwrapper(e);
         unwrapper.unwrap(__FILE__, __LINE__);
-    } catch (...) {
-        THROW(YarnIOException,
-              "Unexpected exception: when calling "
-              "ApplicationMasterProtocol::finishApplicationMaster in %s: %d",
-              __FILE__, __LINE__);
     }
 }
 

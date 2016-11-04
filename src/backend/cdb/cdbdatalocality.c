@@ -739,8 +739,6 @@ static void check_keep_hash_and_external_table(
 		{
 			context->keep_hash = true;
 			context->resultRelationHashSegNum = targetPolicy->bucketnum;
-			pfree(targetPolicy);
-			return;
 		}
 		pfree(targetPolicy);
 	}
@@ -752,7 +750,6 @@ static void check_keep_hash_and_external_table(
 	{
 		context->keep_hash = true;
 		context->resultRelationHashSegNum = intoPolicy->bucketnum;
-		return;
 	}
 
 	foreach(lc, context->rtc_context.range_tables)
@@ -857,6 +854,10 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 
 	MemoryContextSwitchTo(context->datalocality_memorycontext);
 
+	if (ActiveSnapshot == NULL)
+	{
+		ActiveSnapshot = GetTransactionSnapshot();
+	}
 	ActiveSnapshot = CopySnapshot(ActiveSnapshot);
 	ActiveSnapshot->curcid = GetCurrentCommandId();
 
@@ -3790,12 +3791,27 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
 		bool isRelationHash = is_relation_hash(targetPolicy);
 
+		int fileCountInRelation = list_length(rel_data->files);
+		bool FileCountBucketNumMismatch = false;
+		if (targetPolicy->bucketnum > 0) {
+		  FileCountBucketNumMismatch = fileCountInRelation %
+		    targetPolicy->bucketnum == 0 ? false : true;
+		}
+		if (isRelationHash && FileCountBucketNumMismatch && !allow_file_count_bucket_num_mismatch) {
+		  elog(ERROR, "file count %d in catalog is not in proportion to the bucket "
+		      "number %d of hash table with oid=%u, some data may be lost, if you "
+		      "still want to continue the query by considering the table as random, set GUC "
+		      "allow_file_count_bucket_num_mismatch to on and try again.",
+		      fileCountInRelation, targetPolicy->bucketnum, myrelid);
+		}
 		/* change the virtual segment order when keep hash.
 		 * order of idMap should also be changed.
+		 * if file count of the table is not equal to or multiple of
+		 * bucket number, we should process it as random table.
 		 */
 		if (isRelationHash && context->keep_hash
 				&& assignment_context.virtual_segment_num == targetPolicy->bucketnum
-				&& !vSegOrderChanged) {
+				&& !vSegOrderChanged && !FileCountBucketNumMismatch) {
 			change_hash_virtual_segments_order(resourcePtr, rel_data,
 					&assignment_context, &idMap);
 			for (int p = 0; p < idMap.target_segment_num; p++) {
@@ -3821,8 +3837,13 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		uint64_t before_run_allocate_hash_or_random = gettime_microsec();
 		/*allocate hash relation*/
 		if (isRelationHash) {
-			if (context->keep_hash && assignment_context.virtual_segment_num
-						== targetPolicy->bucketnum) {
+		  /*
+		   * if file count of the table is not equal to or multiple of
+		   * bucket number, we should process it as random table.
+		   */
+			if (context->keep_hash
+			    && assignment_context.virtual_segment_num== targetPolicy->bucketnum
+			    && !FileCountBucketNumMismatch) {
 				ListCell* parlc;
 				bool parentIsHashExist=false;
 				bool parentIsHash =false;
@@ -4217,7 +4238,7 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			int maxTargetSegmentNumber = 0;
 			/* we keep resultRelationHashSegNum in the highest priority*/
 			if (context.resultRelationHashSegNum != 0) {
-				if ((context.resultRelationHashSegNum != context.externTableForceSegNum
+				if ((context.resultRelationHashSegNum < context.externTableForceSegNum
 						&& context.externTableForceSegNum != 0)
 						|| (context.resultRelationHashSegNum < context.externTableLocationSegNum)) {
 					cleanup_allocation_algorithm(&context);

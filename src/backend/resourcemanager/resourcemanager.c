@@ -1048,14 +1048,17 @@ int  loadDynamicResourceManagerConfigure(void)
 				 DRMGlobalInstance->SegmentMemoryMB,
 				 DRMGlobalInstance->SegmentCore);
 
-    // For temporary directories
-    InitTemporaryDirs(&DRMGlobalInstance->LocalHostTempDirectories, rm_seg_tmp_dirs);
+	if ( DRMGlobalInstance->Role == START_RM_ROLE_SEGMENT )
+	{
+		// For temporary directories
+		InitTemporaryDirs(&DRMGlobalInstance->LocalHostTempDirectories, rm_seg_tmp_dirs);
 
-	DQUEUE_LOOP_BEGIN(&DRMGlobalInstance->LocalHostTempDirectories, iter, SimpStringPtr, value)
-		elog(LOG, "HAWQ Segment RM :: Temporary directory %s", value->Str);
-	DQUEUE_LOOP_END
+		DQUEUE_LOOP_BEGIN(&DRMGlobalInstance->LocalHostTempDirectories, iter, SimpStringPtr, value)
+			elog(LOG, "HAWQ Segment RM :: Temporary directory %s", value->Str);
+		DQUEUE_LOOP_END
 
-	checkAndBuildFailedTmpDirList();
+		checkAndBuildFailedTmpDirList();
+	}
 
 	/****** Resource enforcement GUCs begins ******/
 
@@ -2882,7 +2885,7 @@ void processResourceBrokerTasks(void)
 		if ( (PRESPOOL->Segments.NodeCount > 0 ) &&
 			 (curtime - PRESPOOL->LastUpdateTime  >
 			  rm_cluster_report_period * 1000000LL ||
-			  hasSegmentGRMCapacityNotUpdated() ) &&
+			  requireInstantClusterReport() ) &&
 			 (curtime - PRESPOOL->LastRequestTime > 5LL * 1000000LL) )
 		{
 			double  maxcap  = 0.0;

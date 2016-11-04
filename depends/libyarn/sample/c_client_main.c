@@ -36,7 +36,7 @@ int main() {
 
 		//0. new client
 		LibYarnClient_t *client = NULL;
-		int result = newLibYarnClient(rmHost, rmPort, schedHost, schedPort,
+		int result = newLibYarnClient("postgres", rmHost, rmPort, schedHost, schedPort,
 						amHost, amPort, am_tracking_url,&client,heartbeatInterval);
 		printf("newLibYarnClient Result Code:%d\n",result);
 

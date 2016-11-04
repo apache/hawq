@@ -1,0 +1,349 @@
+2008-07-29  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* test/common.py:
+	* test/test_module.py:
+	* test/test_stdlib.py:
+	  Switch to mixedCase as Neil prefers.
+
+2008-07-14  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  Don't pollute sys.path by inserting every moduleDir into it.
+	  This allows projects to have for example a gtk.py file in a
+	  package that does not conflict with the gtk system library.
+	  Instead, pollute it right before loading the module, then clean up
+	  immediately after.
+
+2008-07-14  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* setup.py:
+	  If installing to a staging root, don't include this path in the
+	  install_lib dir.
+	* setup.cfg:
+	  Set optimize = 1 to make rpm not complain about installed but
+	  missing .pyo files.
+	  Fixes python setup.py bdist_rpm
+
+2008-07-14  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  Make sure args passed for checking now create PyCheckerModule
+	  instances with moduleDir set properly.  This triggers the new
+	  code behaviour where modules are stored as a moduleName, moduleDir
+	  tuple in pcmodules.py, making sure same-named modules get treated
+	  separately.
+	  New test suite now passes again.
+	  Fixes #1563572.
+
+2008-07-14  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* test/input/getmodule/A/C.py:
+	* test/input/getmodule/A/__init__.py:
+	* test/input/getmodule/B/C.py:
+	* test/input/getmodule/B/__init__.py:
+	* test/input/getmodule/__init__.py:
+	* test/input/test_getmodule.py:
+	* test/test_module.py:
+	* test/main.py:
+	  Add a test that shows how warnings in modules with the same name,
+	  but different directories, shadow each other. See
+	  http://sourceforge.net/tracker/index.php?func=detail&aid=1563572&group_id=24686&atid=382217
+
+2008-07-14  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* test/common.py:
+	  add check_multiple test method that allows checking more than one
+	  argument.
+	* test/expected/test_zope_interface:
+	  update expected string
+
+2008-07-14  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/pcmodules.py:
+	  New module; replaces checker._allModules
+	  Allows us to track and differentiate between modules with the same
+	  name but from different paths.
+	* pychecker/checker.py:
+	  Use it instead of _allModules
+	* pychecker/warn.py:
+	  Also use it in the code that checks if a base class's __init__ was
+	  called, instead of only checking sys.modules, which only works
+	  if we pollute sys.modules (which is what we're trying to fix)
+
+2008-07-13  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  Instantiate Class with the PycheckerModule instance instead of the
+	  real module; this allows us to see and act on presence of moduleDir.
+
+2008-07-13  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  Change _findModule to take an optional moduleDir keyword argument.
+	  Use it in setupMainCode
+	  Make sibling imports work by temporarily putting moduleDir on
+	  sys.path
+
+2008-07-13  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  Add self.moduleDir to filename() for PyCheckerModule.
+
+2008-07-13  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  Refactor code such that we can pass a moduleDir keyword argument to
+	  PyCheckerModule.  This will allow us to discern between modules
+	  with the same name, but in a different directory.
+	  Change allModules to be a dict of (moduleName, moduleDir) -> module
+	  No behaviour change yet.
+
+2008-07-13  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  When showing what we're processing, show module name and file name.
+	* test_expected/test1:
+	* test_expected/test1-2.3:
+	* test_expected/test1-2.4:
+	* test_expected/test1-2.5:
+	* test_expected/test10:
+	* test_expected/test100:
+	* test_expected/test101:
+	* test_expected/test11:
+	* test_expected/test12:
+	* test_expected/test13:
+	* test_expected/test14:
+	* test_expected/test15:
+	* test_expected/test16:
+	* test_expected/test17:
+	* test_expected/test17-2.4:
+	* test_expected/test18:
+	* test_expected/test19:
+	* test_expected/test2:
+	* test_expected/test20:
+	* test_expected/test20-2.4:
+	* test_expected/test20-2.5:
+	* test_expected/test21:
+	* test_expected/test22:
+	* test_expected/test23:
+	* test_expected/test24:
+	* test_expected/test25:
+	* test_expected/test26:
+	* test_expected/test27:
+	* test_expected/test27-2.2:
+	* test_expected/test27-2.3:
+	* test_expected/test27-2.4:
+	* test_expected/test27-2.5:
+	* test_expected/test28:
+	* test_expected/test29:
+	* test_expected/test3:
+	* test_expected/test3-2.2:
+	* test_expected/test3-2.3:
+	* test_expected/test3-2.4:
+	* test_expected/test3-2.5:
+	* test_expected/test30:
+	* test_expected/test31:
+	* test_expected/test32:
+	* test_expected/test33:
+	* test_expected/test34:
+	* test_expected/test34-2.2:
+	* test_expected/test34-2.3:
+	* test_expected/test34-2.4:
+	* test_expected/test34-2.5:
+	* test_expected/test35:
+	* test_expected/test36:
+	* test_expected/test37:
+	* test_expected/test38:
+	* test_expected/test39:
+	* test_expected/test39-2.2:
+	* test_expected/test39-2.3:
+	* test_expected/test39-2.4:
+	* test_expected/test39-2.5:
+	* test_expected/test4:
+	* test_expected/test40:
+	* test_expected/test41:
+	* test_expected/test42:
+	* test_expected/test43:
+	* test_expected/test44:
+	* test_expected/test45:
+	* test_expected/test46:
+	* test_expected/test47:
+	* test_expected/test48:
+	* test_expected/test49:
+	* test_expected/test5:
+	* test_expected/test50:
+	* test_expected/test51:
+	* test_expected/test52:
+	* test_expected/test53:
+	* test_expected/test54:
+	* test_expected/test55:
+	* test_expected/test56:
+	* test_expected/test57:
+	* test_expected/test58:
+	* test_expected/test58-2.2:
+	* test_expected/test58-2.3:
+	* test_expected/test58-2.4:
+	* test_expected/test58-2.5:
+	* test_expected/test59:
+	* test_expected/test6:
+	* test_expected/test60:
+	* test_expected/test61:
+	* test_expected/test62:
+	* test_expected/test63:
+	* test_expected/test64:
+	* test_expected/test65:
+	* test_expected/test66:
+	* test_expected/test67:
+	* test_expected/test68:
+	* test_expected/test68-2.4:
+	* test_expected/test68-2.5:
+	* test_expected/test69:
+	* test_expected/test7:
+	* test_expected/test70:
+	* test_expected/test71:
+	* test_expected/test71-2.4:
+	* test_expected/test71-2.5:
+	* test_expected/test72:
+	* test_expected/test73:
+	* test_expected/test74:
+	* test_expected/test74-2.4:
+	* test_expected/test74-2.5:
+	* test_expected/test75:
+	* test_expected/test75-2.2:
+	* test_expected/test75-2.3:
+	* test_expected/test75-2.4:
+	* test_expected/test75-2.5:
+	* test_expected/test76:
+	* test_expected/test77:
+	* test_expected/test78:
+	* test_expected/test79:
+	* test_expected/test8:
+	* test_expected/test80:
+	* test_expected/test80-2.2:
+	* test_expected/test80-2.3:
+	* test_expected/test80-2.4:
+	* test_expected/test80-2.5:
+	* test_expected/test81:
+	* test_expected/test82:
+	* test_expected/test83:
+	* test_expected/test84:
+	* test_expected/test85:
+	* test_expected/test86:
+	* test_expected/test87:
+	* test_expected/test88:
+	* test_expected/test88-2.4:
+	* test_expected/test89:
+	* test_expected/test89-2.2:
+	* test_expected/test89-2.3:
+	* test_expected/test89-2.4:
+	* test_expected/test89-2.5:
+	* test_expected/test9:
+	* test_expected/test90:
+	* test_expected/test92:
+	* test_expected/test93:
+	* test_expected/test94:
+	* test_expected/test95:
+	* test_expected/test96:
+	* test_expected/test97:
+	* test_expected/test98:
+	* test_expected/test99:
+	  Fix all expected test output for this change, without any
+	  regressions.
+
+2008-07-13  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  Document and change getModules such that, for each argument
+	  that is a file, it returns a moduleName, moduleDir tuple
+	  so that modules with the same name can still be treated separately.
+	  Change callers to follow.
+	  First step towards fixing the bug where modules with the same name
+	  shadow each other's pychecker warnings.
+
+2008-07-13  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* test/common.py:
+	  Document method.
+
+2008-07-12  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/warn.py:
+	  Change getStandardLibrary to getStandardLibraries (a list),
+	  so we can handle both the arch-invariant and arch-specific python
+	  site-packages.
+	  This makes sure that -q/--stdlib works the same way on 32-bit and
+	  64-bit systems.
+	  Fixes #1564614, and makes the new test suite pass.
+	  (Try it with python test/main.py)
+
+2008-07-12  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* test/test_stdlib.py:
+	  Rename and document test.
+
+2008-07-12  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* test/common.py:
+	* test/expected/test_zope_interface:
+	* test/input/test_zope_interface.py:
+	* test/main.py:
+	* test/test_stdlib.py:
+	  Add a first stab at a unittest-based testsuite.
+	  Add a test for bug #382217 that I wanted to fix that can't
+	  be tested in the current test suite.
+
+2008-07-04  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* test_input/test86.py:
+	  Add a test for except KeyboardInterrupt, which was fixed by Neil
+	  in pychecker/CodeChecks.py: 1.170 on 23-Apr-07.
+
+2008-07-02  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/CodeChecks.py:
+	  Allow using setattr with a static argument inside lambda calls,
+	  where the alternative is a syntax error since you're not allowed to
+	  do an assignment expression.
+	  Fixes #1565876.
+
+2008-07-01  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  Revert IDLE patch which breaks test42.py
+	  See #2007203.
+
+2008-07-01  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	* pychecker/warn.py:
+	  Respect the blacklist of modules when warning about classes for
+	  which the module cannot be found.
+	* test_check.sh:
+	* test_expected/test101:
+	* test_input/test101.py:
+	  Add a test for it.
+	  Fixes #1563495.
+
+2008-07-01  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* test_expected/test100:
+	* test_input/test100.py:
+	  Actually add the tests.
+
+2008-06-30  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* pychecker/checker.py:
+	  If an object looks like a class object because it has __bases__
+	  but it does not have __names__, make up a name.
+	  Fixes #1563494.
+	* test_check.sh:
+	  Add a test that previously failed.
+
+2008-06-30  Thomas Vander Stichele  <thomas at apestaart dot org>
+
+	* MANIFEST.in:
+	* CHANGELOG:
+	* NEWS:
+	  Moved CHANGELOG to NEWS since it really contains release news.
+	  Created real ChangeLog.
+

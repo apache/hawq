@@ -115,7 +115,7 @@ class HostList():
     def checkSSH(self):
         '''Check that ssh to hostlist is okay.'''
 
-        pool = WorkerPool()
+        pool = WorkerPool(min(len(self.list), 16))
 
         for h in self.list:
             cmd = Echo('ssh test', '', ctxt=REMOTE, remoteHost=h)
@@ -135,7 +135,7 @@ class HostList():
         '''For multiple host that is of the same node, keep only one in the hostlist.'''
         unique = {}
 
-        pool = WorkerPool()
+        pool = WorkerPool(min(len(self.list), 16))
         for h in self.list:
             cmd = Hostname('hostname', ctxt=REMOTE, remoteHost=h)
             pool.addCommand(cmd)
@@ -159,7 +159,7 @@ class HostList():
     def removeBadHosts(self):
         ''' Update list of host to include only the host on which SSH was successful'''
 
-        pool = WorkerPool()
+        pool = WorkerPool(min(len(self.list), 16))
 
         for h in self.list:
             cmd = Echo('ssh test', '', ctxt=REMOTE, remoteHost=h)

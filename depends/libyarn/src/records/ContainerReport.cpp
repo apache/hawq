@@ -97,7 +97,7 @@ ContainerExitStatus ContainerReport::getContainerExitStatus(){
 	return (ContainerExitStatus)reportProto.container_exit_status();
 }
 
-void ContainerReport::setContaierState(ContainerState state){
+void ContainerReport::setContainerState(ContainerState state){
 	reportProto.set_container_state((ContainerStateProto)state);
 }
 

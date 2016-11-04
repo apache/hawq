@@ -1,0 +1,283 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFSetReturning;
+SET
+-- end_ignore
+CREATE TABLE foo2(fooid int, f2 int);
+CREATE TABLE
+INSERT INTO foo2 VALUES(1, 11);
+INSERT 0 1
+INSERT INTO foo2 VALUES(2, 22);
+INSERT 0 1
+INSERT INTO foo2 VALUES(1, 111);
+INSERT 0 1
+CREATE FUNCTION foot(int) returns setof foo2 as 'SELECT * FROM foo2 WHERE fooid = $1;' LANGUAGE SQL;
+CREATE FUNCTION
+select foot.fooid, foot.f2 from foot(sin(pi()/2)::int) ORDER BY 1,2;
+ fooid | f2  
+-------+-----
+     1 |  11
+     1 | 111
+(2 rows)
+
+CREATE TABLE foo (fooid int, foosubid int, fooname text);
+CREATE TABLE
+INSERT INTO foo VALUES(1,1,'Joe');
+INSERT 0 1
+INSERT INTO foo VALUES(1,2,'Ed');
+INSERT 0 1
+INSERT INTO foo VALUES(2,1,'Mary');
+INSERT 0 1
+CREATE FUNCTION getfoo(int) RETURNS setof int AS 'SELECT fooid FROM foo WHERE fooid = $1;' LANGUAGE SQL;
+CREATE FUNCTION
+SELECT * FROM getfoo(1) AS t1;
+ t1 
+----
+  1
+  1
+(2 rows)
+
+CREATE VIEW vw_getfoo AS SELECT * FROM getfoo(1);
+CREATE VIEW
+SELECT * FROM vw_getfoo;
+ getfoo 
+--------
+      1
+      1
+(2 rows)
+
+DROP VIEW vw_getfoo;
+DROP VIEW
+DROP FUNCTION getfoo(int);
+DROP FUNCTION
+DROP FUNCTION foot(int);
+DROP FUNCTION
+DROP TABLE foo2;
+DROP TABLE
+DROP TABLE foo;
+DROP TABLE
+-- setof as a paramater --
+CREATE TYPE numtype as (i int, j int);
+CREATE TYPE
+CREATE FUNCTION g_numtype(x setof numtype) RETURNS setof numtype AS $$ select $1; $$ LANGUAGE SQL;
+CREATE FUNCTION
+DROP FUNCTION g_numtype(x setof numtype);
+DROP FUNCTION
+DROP TYPE numtype;
+DROP TYPE
+--
+-- Set functions samples from Madlib
+--
+create function combination(s text) returns setof text[] as $$
+x = s.split(',')
+
+def subset(myset, N):
+   left = []
+   right = []
+   for i in range(0, len(myset)):
+      if ((1 << i) & N) > 0:
+         left.append(myset[i])
+      else:
+         right.append(myset[i])
+   return (', '.join(left), ', '.join(right))
+
+for i in range(1, (1 << len(x)) - 2):
+   yield subset(x, i)
+$$ language plpythonu strict;
+CREATE FUNCTION
+select x[1] || ' => ' || x[2] from combination('a,b,c,d') x;
+   ?column?   
+--------------
+ a => b, c, d
+ b => a, c, d
+ a, b => c, d
+ c => a, b, d
+ a, c => b, d
+ b, c => a, d
+ a, b, c => d
+ d => a, b, c
+ a, d => b, c
+ b, d => a, c
+ a, b, d => c
+ c, d => a, b
+ a, c, d => b
+(13 rows)
+
+CREATE TABLE rules(rule text) distributed by (rule);
+CREATE TABLE
+insert into rules values('a,b,c');
+INSERT 0 1
+insert into rules values('d,e');
+INSERT 0 1
+insert into rules values('f,g,h,i,j');
+INSERT 0 1
+insert into rules values('k,l,m');
+INSERT 0 1
+SELECT rule, combination(rule) from rules order by 1,2;
+   rule    |    combination     
+-----------+--------------------
+ a,b,c     | {a,"b, c"}
+ a,b,c     | {"a, b",c}
+ a,b,c     | {"a, c",b}
+ a,b,c     | {b,"a, c"}
+ a,b,c     | {c,"a, b"}
+ d,e       | {d,e}
+ f,g,h,i,j | {f,"g, h, i, j"}
+ f,g,h,i,j | {"f, g","h, i, j"}
+ f,g,h,i,j | {"f, g, h","i, j"}
+ f,g,h,i,j | {"f, g, h, i",j}
+ f,g,h,i,j | {"f, g, h, j",i}
+ f,g,h,i,j | {"f, g, i","h, j"}
+ f,g,h,i,j | {"f, g, i, j",h}
+ f,g,h,i,j | {"f, g, j","h, i"}
+ f,g,h,i,j | {"f, h","g, i, j"}
+ f,g,h,i,j | {"f, h, i","g, j"}
+ f,g,h,i,j | {"f, h, i, j",g}
+ f,g,h,i,j | {"f, h, j","g, i"}
+ f,g,h,i,j | {"f, i","g, h, j"}
+ f,g,h,i,j | {"f, i, j","g, h"}
+ f,g,h,i,j | {"f, j","g, h, i"}
+ f,g,h,i,j | {g,"f, h, i, j"}
+ f,g,h,i,j | {"g, h","f, i, j"}
+ f,g,h,i,j | {"g, h, i","f, j"}
+ f,g,h,i,j | {"g, h, j","f, i"}
+ f,g,h,i,j | {"g, i","f, h, j"}
+ f,g,h,i,j | {"g, i, j","f, h"}
+ f,g,h,i,j | {"g, j","f, h, i"}
+ f,g,h,i,j | {h,"f, g, i, j"}
+ f,g,h,i,j | {"h, i","f, g, j"}
+ f,g,h,i,j | {"h, i, j","f, g"}
+ f,g,h,i,j | {"h, j","f, g, i"}
+ f,g,h,i,j | {i,"f, g, h, j"}
+ f,g,h,i,j | {"i, j","f, g, h"}
+ f,g,h,i,j | {j,"f, g, h, i"}
+ k,l,m     | {k,"l, m"}
+ k,l,m     | {"k, l",m}
+ k,l,m     | {"k, m",l}
+ k,l,m     | {l,"k, m"}
+ k,l,m     | {m,"k, l"}
+(40 rows)
+
+DROP TABLE IF EXISTS foo;
+psql:/tmp/TestUDF_TestUDFSetReturning.sql:69: NOTICE:  table "foo" does not exist, skipping
+DROP TABLE
+CREATE TABLE foo AS SELECT rule, combination(rule) from rules distributed by (rule);
+SELECT 40
+-- UDT as argument/return type of set returning UDF
+CREATE TYPE r_type as (a int, b text);
+CREATE TYPE
+CREATE FUNCTION f1(x r_type) returns setof text as $$ SELECT $1.b from generate_series(1, $1.a) $$ language sql;
+CREATE FUNCTION
+CREATE FUNCTION f2(x int) returns setof r_type as $$ SELECT i, 'hello'::text from generate_series(1, $1) i $$ language sql;
+CREATE FUNCTION
+CREATE FUNCTION f3(x r_type) returns setof r_type as $$ SELECT $1 from generate_series(1, $1.a) $$ language sql;
+CREATE FUNCTION
+SELECT f1(row(2, 'hello'));
+  f1   
+-------
+ hello
+ hello
+(2 rows)
+
+SELECT f2(2);
+    f2     
+-----------
+ (1,hello)
+ (2,hello)
+(2 rows)
+
+SELECT f3(row(2,'hello'));
+    f3     
+-----------
+ (2,hello)
+ (2,hello)
+(2 rows)
+
+SELECT * FROM f1(row(2,'hello'));
+  f1   
+-------
+ hello
+ hello
+(2 rows)
+
+SELECT * FROM f2(2);
+ a |   b   
+---+-------
+ 1 | hello
+ 2 | hello
+(2 rows)
+
+SELECT * FROM f3(row(2,'hello'));
+ a |   b   
+---+-------
+ 2 | hello
+ 2 | hello
+(2 rows)
+
+CREATE TABLE t1 as SELECT i from generate_series(1,5) i distributed by (i);
+SELECT 5
+SELECT i, f1(row(i, 'hello')) from t1;
+ i |  f1   
+---+-------
+ 1 | hello
+ 3 | hello
+ 3 | hello
+ 3 | hello
+ 5 | hello
+ 5 | hello
+ 5 | hello
+ 5 | hello
+ 5 | hello
+ 2 | hello
+ 2 | hello
+ 4 | hello
+ 4 | hello
+ 4 | hello
+ 4 | hello
+(15 rows)
+
+SELECT i, f2(i) from t1;
+ i |    f2     
+---+-----------
+ 1 | (1,hello)
+ 3 | (1,hello)
+ 3 | (2,hello)
+ 3 | (3,hello)
+ 5 | (1,hello)
+ 5 | (2,hello)
+ 5 | (3,hello)
+ 5 | (4,hello)
+ 5 | (5,hello)
+ 2 | (1,hello)
+ 2 | (2,hello)
+ 4 | (1,hello)
+ 4 | (2,hello)
+ 4 | (3,hello)
+ 4 | (4,hello)
+(15 rows)
+
+SELECT i, f3(row(i,'hello')) from t1;
+ i |    f3     
+---+-----------
+ 1 | (1,hello)
+ 4 | (4,hello)
+ 4 | (4,hello)
+ 4 | (4,hello)
+ 4 | (4,hello)
+ 3 | (3,hello)
+ 3 | (3,hello)
+ 3 | (3,hello)
+ 5 | (5,hello)
+ 5 | (5,hello)
+ 5 | (5,hello)
+ 5 | (5,hello)
+ 5 | (5,hello)
+ 2 | (2,hello)
+ 2 | (2,hello)
+(15 rows)
+
+CREATE TABLE o1 as SELECT f1(row(i, 'hello')) from t1;
+SELECT 15
+CREATE TABLE o2 as SELECT f2(i) from t1;
+SELECT 15
+CREATE TABLE o3 as SELECT f3(row(i,'hello')) from t1;
+SELECT 15

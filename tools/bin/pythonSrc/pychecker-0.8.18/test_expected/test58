@@ -1,0 +1,10 @@
+Processing module test58 (test_input/test58.py)...
+
+Warnings...
+
+test_input/test58.py:3: Using identifier (yield) which will become a keyword in version 2.2
+test_input/test58.py:6: Local variable (yield) shadows global defined on line 3
+test_input/test58.py:6: Using identifier (yield) which will become a keyword in version 2.2
+test_input/test58.py:7: Local variable (yield) shadows global defined on line 3
+test_input/test58.py:7: Using identifier (yield) which will become a keyword in version 2.2
+test_input/test58.py:10: Using identifier (yield) which will become a keyword in version 2.2

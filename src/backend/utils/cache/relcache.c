@@ -3265,7 +3265,7 @@ AttrDefaultFetch(Relation relation)
 	caql_endscan(pcqCtx);
 	heap_close(adrel, AccessShareLock);
 
-	if (found != ndef)
+	if (found != ndef && ( GP_ROLE_UTILITY==Gp_role || GP_ROLE_DISPATCH==Gp_role ))
 		elog(WARNING, "%d attrdef record(s) missing for rel %s",
 			 ndef - found, RelationGetRelationName(relation));
 }

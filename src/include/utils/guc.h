@@ -310,6 +310,7 @@ extern int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_limit;
+extern bool allow_file_count_bucket_num_mismatch;
 
 extern char *ConfigFileName;
 extern char *HbaFileName;
@@ -372,7 +373,6 @@ extern bool	optimizer_print_expression_properties;
 extern bool	optimizer_print_group_properties;
 extern bool	optimizer_print_optimization_context;
 extern bool optimizer_print_optimization_stats;
-extern bool	optimizer_parallel;
 extern bool	optimizer_local;
 extern int  optimizer_retries;
 extern bool  optimizer_xforms[OPTIMIZER_XFORMS_COUNT];
@@ -417,6 +417,10 @@ extern double optimizer_damping_factor_filter;
 extern double optimizer_damping_factor_join;
 extern double optimizer_damping_factor_groupby;
 extern int optimizer_segments;
+extern int optimizer_parts_to_force_sort_on_insert;
+extern int optimizer_join_arity_for_associativity_commutativity;
+extern int optimizer_array_expansion_threshold;
+extern int optimizer_join_order_threshold;
 extern bool optimizer_analyze_root_partition;
 extern bool optimizer_analyze_midlevel_partition;
 extern bool optimizer_enable_constant_expression_evaluation;
@@ -437,8 +441,8 @@ extern bool optimizer_multilevel_partitioning;
 extern bool optimizer_enable_derive_stats_all_groups;
 extern bool optimizer_explain_show_status;
 extern bool optimizer_prefer_scalar_dqa_multistage_agg;
-extern int  optimizer_parts_to_force_sort_on_insert;
-extern int  optimizer_join_arity_for_associativity_commutativity;
+extern bool optimizer_parallel_union;
+extern bool optimizer_array_constraints;
 
 /**
  * Enable logging of DPE match in optimizer.

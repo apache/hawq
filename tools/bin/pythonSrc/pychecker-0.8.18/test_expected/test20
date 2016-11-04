@@ -1,0 +1,7 @@
+Processing module test20 (test_input/test20.py)...
+
+Warnings...
+
+test_input/test20.py:11: Function returns a value and also implicitly returns None
+test_input/test20.py:21: Function return types are inconsistent
+test_input/test20.py:40: Function return types are inconsistent

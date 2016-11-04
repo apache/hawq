@@ -261,6 +261,11 @@ def getdir(prompt, hosts=[], primary=None, shared=False, fsysn=None, db=None):
                 rows = cursor.fetchall()
                 krbstatus = rows[0][0]
 
+                cursor = dbconn.execSQL(db, "show krb_srvname")
+                db.commit()
+                rows = cursor.fetchall();
+                krb_srvname = rows[0][0]
+
                 cursor = dbconn.execSQL(db, "show krb_server_keyfile")
                 db.commit()
                 rows = cursor.fetchall();
@@ -272,7 +277,7 @@ def getdir(prompt, hosts=[], primary=None, shared=False, fsysn=None, db=None):
             dfs_name = fsysn
             dfs_url = value
 
-            command = "gpcheckhdfs %s %s %s %s" % (dfs_name, dfs_url, krbstatus, krb_keyfile)
+            command = "gpcheckhdfs %s %s %s %s %s" % (dfs_name, dfs_url, krbstatus, krb_srvname, krb_keyfile)
             (status,returnCode) = commands.getstatusoutput(command)
             if status != 0:
                 print command

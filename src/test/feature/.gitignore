@@ -1,1 +1,21 @@
 doc/
+
+# test binaries
+feature-test
+
+# test generated files
+**/*.out
+**/*.diff
+
+ExternalSource/ans/external_oid.ans
+ExternalSource/ans/exttab1.ans
+ExternalSource/sql/external_oid.sql
+ExternalSource/sql/exttab1.sql
+UDF/ans/function_c.ans
+UDF/ans/function_creation.ans
+UDF/sql/function_c.sql
+UDF/sql/function_creation.sql
+testlib/ans/template.ans
+testlib/sql/template.sql
+utility/ans/copytest.csv
+utility/ans/onek.data

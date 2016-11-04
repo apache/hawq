@@ -54,24 +54,17 @@ else
 	ARCH_FLAGS = -m64
 endif
 
-GREP_SED_VAR = $(top_builddir)/src/backend/gpopt/ivy.xml | sed -e 's|\(.*\)rev="\(.*\)"[ ]*conf\(.*\)|\2|'
+ORCA_BLD_PATH=$(abs_top_builddir)/depends/thirdparty
 
-XERCES_VER  = $(shell grep "\"xerces-c\""   $(GREP_SED_VAR))
-LIBGPOS_VER = $(shell grep "\"libgpos\""    $(GREP_SED_VAR))
-OPTIMIZER_VER = $(shell grep "\"optimizer\""  $(GREP_SED_VAR))
-
-LIBGPOS_DIR = $(abs_top_builddir)/src/backend/gpos/build/install/$(prefix)
-LIBXERCES_DIR = $(abs_top_builddir)/src/backend/gp-xerces/build/install/$(prefix)
-LIBNAUCRATES_DIR = $(abs_top_builddir)/src/backend/gporca/build/install/$(prefix)
-LIBGPDBCOST_DIR = $(abs_top_builddir)/src/backend/gporca/build/install/$(prefix)
+LIBGPOS_DIR = $(ORCA_BLD_PATH)/gpos/build/install/$(prefix)
+LIBXERCES_DIR = $(ORCA_BLD_PATH)/gp-xerces/build/install/$(prefix)
+LIBNAUCRATES_DIR = $(ORCA_BLD_PATH)/gporca/build/install/$(prefix)
+LIBGPDBCOST_DIR = $(ORCA_BLD_PATH)/gporca/build/install/$(prefix)
 LIBGPOPT_DIR = $(abs_top_builddir)/src/backend/gpopt/build/install/$(prefix)
 
 BLD_FLAGS = $(ARCH_FLAGS) -D$(ARCH_BIT) -D$(ARCH_CPU) -D$(ARCH_OS) $(GPOPT_flags)
 override CPPFLAGS := -fPIC $(CPPFLAGS)
 override CPPFLAGS := $(BLD_FLAGS)  $(CPPFLAGS)
-override CPPFLAGS := -DGPOS_VERSION=\"$(LIBGPOS_VER)\" $(CPPFLAGS)
-override CPPFLAGS := -DGPOPT_VERSION=\"$(OPTIMIZER_VER)\" $(CPPFLAGS)
-override CPPFLAGS := -DXERCES_VERSION=\"$(XERCES_VER)\" $(CPPFLAGS)
 override CPPFLAGS := -I $(LIBGPOS_DIR)/include $(CPPFLAGS)
 override CPPFLAGS := -I $(LIBXERCES_DIR)/include $(CPPFLAGS)
 override CPPFLAGS := -I $(LIBGPOPT_DIR)/include $(CPPFLAGS)

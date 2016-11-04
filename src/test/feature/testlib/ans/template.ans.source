@@ -1,0 +1,22 @@
+-- start_ignore
+SET SEARCH_PATH=TestCommonLib_TestFileReplace;
+SET
+-- end_ignore
+-- start_ignore
+DROP TABLE IF EXISTS persons;
+psql:/tmp/TestCommonLib_TestFileReplace.sql:5: NOTICE:  table "persons" does not exist, skipping
+DROP TABLE
+-- end_ignore
+CREATE TABLE persons(id INT, name VARCHAR);
+CREATE TABLE
+COPY persons (id, name) FROM '@ABS_FEATURE_TEST_ROOT@/testlib/sql/template.csv' DELIMITER ',' CSV;
+COPY 2
+SELECT * FROM persons ORDER BY id;
+ id | name  
+----+-------
+  1 | Aiken
+  2 | Zack
+(2 rows)
+
+DROP TABLE IF EXISTS persons;
+DROP TABLE

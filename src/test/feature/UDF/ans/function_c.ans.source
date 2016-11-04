@@ -1,0 +1,15 @@
+-- start_ignore
+SET SEARCH_PATH=TestUDF_TestUDFC;
+SET
+-- end_ignore
+CREATE OR REPLACE FUNCTION c_add(x INT, y INT)
+RETURNS INT
+AS '@SHARE_LIBRARY_PATH@', 'c_add'
+LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION
+SELECT c_add(20, 30);
+ c_add 
+-------
+    50
+(1 row)
+

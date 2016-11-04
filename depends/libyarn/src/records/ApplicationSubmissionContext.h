@@ -23,7 +23,7 @@
 #include <iostream>
 #include "ContainerLaunchContext.h"
 #include "YARN_yarn_protos.pb.h"
-#include "ApplicationID.h"
+#include "ApplicationId.h"
 #include "Priority.h"
 #include "Resource.h"
 
@@ -53,8 +53,8 @@ public:
 
 	ApplicationSubmissionContextProto& getProto();
 
-	void setApplicationId(ApplicationID &appId);
-	ApplicationID getApplicationId();
+	void setApplicationId(ApplicationId &appId);
+	ApplicationId getApplicationId();
 
 	void setApplicationName(string &applicationName);
 	string getApplicationName();

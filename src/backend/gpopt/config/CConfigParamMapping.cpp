@@ -127,13 +127,6 @@ CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
 		},
 
 		{
-		EopttraceParallel,
-		&optimizer_parallel,
-		false, // m_fNegate
-		GPOS_WSZ_LIT("Enable using threads in optimization engine.")
-		},
-
-		{
 		EopttraceMinidump,
 		&optimizer_minidump,
 		false, // m_fNegate
@@ -391,6 +384,20 @@ CConfigParamMapping::SConfigMappingElem CConfigParamMapping::m_elem[] =
 		&optimizer_prefer_scalar_dqa_multistage_agg,
 		false, // m_fNegate
 		GPOS_WSZ_LIT("Prefer multistage aggregates for scalar distinct qualified aggregate in the optimizer.")
+		},
+
+		{
+		EopttraceEnableParallelAppend,
+		&optimizer_parallel_union,
+		false, // m_fNegate
+		GPOS_WSZ_LIT("Enable parallel execution for UNION/UNION ALL queries.")
+		},
+
+		{
+		EopttraceArrayConstraints,
+		&optimizer_array_constraints,
+		false, // m_fNegate
+		GPOS_WSZ_LIT("Allows the constraint framework to derive array constraints in the optimizer.")
 		}
 };
 

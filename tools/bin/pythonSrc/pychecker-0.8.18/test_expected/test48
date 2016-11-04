@@ -1,0 +1,40 @@
+Processing module test48 (test_input/test48.py)...
+
+Warnings...
+
+test_input/test48.py:10: Object (i) has no attribute (has_no_method)
+test_input/test48.py:11: Object (l) has no attribute (has_no_method)
+test_input/test48.py:12: Object (d) has no attribute (has_no_method)
+test_input/test48.py:13: Object (s) has no attribute (has_no_method)
+test_input/test48.py:14: Object (n) has no attribute (has_no_method)
+test_input/test48.py:15: Object (e) has no attribute (has_no_method)
+test_input/test48.py:17: Object (i) has no attribute (has_no_attr)
+test_input/test48.py:18: Object (l) has no attribute (has_no_attr)
+test_input/test48.py:19: Object (d) has no attribute (has_no_attr)
+test_input/test48.py:20: Object (s) has no attribute (has_no_attr)
+test_input/test48.py:21: Object (n) has no attribute (has_no_attr)
+test_input/test48.py:22: Object (e) has no attribute (has_no_attr)
+test_input/test48.py:28: Object (jj) has no attribute (a)
+test_input/test48.py:29: Object (jj) has no attribute (b)
+test_input/test48.py:46: Object (tt) has no attribute (a)
+test_input/test48.py:47: Object (tt) has no attribute (b)
+test_input/test48.py:53: Statement appears to have no effect
+test_input/test48.py:54: Statement appears to have no effect
+test_input/test48.py:55: Statement appears to have no effect
+test_input/test48.py:56: Statement appears to have no effect
+test_input/test48.py:57: Statement appears to have no effect
+test_input/test48.py:58: Statement appears to have no effect
+test_input/test48.py:59: Statement appears to have no effect
+test_input/test48.py:63: Statement appears to have no effect
+test_input/test48.py:65: Statement appears to have no effect
+test_input/test48.py:66: Statement appears to have no effect
+test_input/test48.py:70: Statement appears to have no effect
+test_input/test48.py:71: Statement appears to have no effect
+test_input/test48.py:72: Statement appears to have no effect
+test_input/test48.py:73: Statement appears to have no effect
+test_input/test48.py:74: Statement appears to have no effect
+test_input/test48.py:75: Statement appears to have no effect
+test_input/test48.py:76: Statement appears to have no effect
+test_input/test48.py:77: Statement appears to have no effect
+test_input/test48.py:78: Statement appears to have no effect
+test_input/test48.py:79: Statement appears to have no effect

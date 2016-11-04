@@ -1,0 +1,8 @@
+Processing module test23 (test_input/test23.py)...
+
+Warnings...
+
+test_input/test23.py:13: Using method (x) as an attribute (not invoked)
+test_input/test23.py:15: Using method (x) as an attribute (not invoked)
+test_input/test23.py:17: Using method (x) as an attribute (not invoked)
+test_input/test23.py:39: Using method (x) as an attribute (not invoked)

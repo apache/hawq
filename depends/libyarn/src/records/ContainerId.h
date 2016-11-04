@@ -22,7 +22,7 @@
 
 #include "YARN_yarn_protos.pb.h"
 
-#include "ApplicationID.h"
+#include "ApplicationId.h"
 #include "ApplicationAttemptId.h"
 
 using namespace hadoop::yarn;
@@ -45,8 +45,8 @@ public:
 
 	ContainerIdProto& getProto();
 
-	void setApplicationId(ApplicationID &appId);
-	ApplicationID getApplicationId();
+	void setApplicationId(ApplicationId &appId);
+	ApplicationId getApplicationId();
 
 	void setApplicationAttemptId(ApplicationAttemptId &appAttemptId);
 	ApplicationAttemptId getApplicationAttemptId();

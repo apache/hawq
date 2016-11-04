@@ -1,0 +1,9 @@
+Processing module test73 (test_input/test73.py)...
+
+Warnings...
+
+test_input/test73.py:12: Methods (f, g) in Abstract need to be overridden in a subclass
+test_input/test73.py:13: Methods (f) in ConcreteBad need to be overridden in a subclass
+test_input/test73.py:22: Methods (f) in AbstractInst need to be overridden in a subclass
+test_input/test73.py:36: Methods (abstract) in import73.AbstractLib need to be overridden in a subclass
+test_input/test73.py:37: Methods (abstract) in ImplAbstract need to be overridden in a subclass

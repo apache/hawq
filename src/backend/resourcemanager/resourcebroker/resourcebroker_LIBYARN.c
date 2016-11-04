@@ -470,8 +470,6 @@ int RB_LIBYARN_handleNotification(void)
 	uint32_t		messagehead[2];
 	uint32_t		messageid;
 
-
-
 	FD_ZERO(&rfds);
 	FD_SET(fd, &rfds);
 	timeout.tv_sec  = 0;

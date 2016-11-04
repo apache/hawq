@@ -1,0 +1,10 @@
+Processing module test24 (test_input/test24.py)...
+
+Warnings...
+
+test_input/import24.py:4: No doc string for class Aaa
+test_input/import24.py:8: Base class (import24.Aaa) __init__() not called
+test_input/import24.py:8: No doc string for class Bbb
+
+test_input/test24.py:8: Invalid arguments to (func24), got 1, expected 0
+test_input/test24.py:11: Local variable (shadow) shadows global defined on line 0 in file <unknown>

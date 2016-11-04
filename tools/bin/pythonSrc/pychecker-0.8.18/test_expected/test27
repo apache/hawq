@@ -1,0 +1,7 @@
+Processing module test27 (test_input/test27.py)...
+test_input/test27.py:12: SyntaxWarning: local name 'string' in 'd' shadows use of 'string' as global in nested scope 'lambda'
+  def d(lines):
+
+Warnings...
+
+None

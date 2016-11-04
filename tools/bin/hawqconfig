@@ -27,6 +27,7 @@ except ImportError, e:
     sys.exit('ERROR: Cannot import modules.  Please check that you '
                  'have sourced greenplum_path.sh.  Detail: ' + str(e))
 
+logger, log_filename = setup_hawq_tool_logging('hawq_config',getLocalHostname(),getUserName())
 
 def parseargs():
     parser = OptionParser(usage="HAWQ config options.")
@@ -45,15 +46,10 @@ def parseargs():
     parser.add_option("-v", "--value",
                       dest="property_value",
                       help="Set HAWQ Property value.")
-    parser.add_option("-d",
-                      dest="hawq_home",
-                      help="HAWQ home directory.")
     (options, args) = parser.parse_args()
 
     if options.quiet:
         quiet_stdout_logging()
-
-    logger, log_filename = setup_hawq_tool_logging('hawq_config',getLocalHostname(),getUserName())
 
     if options.change and options.remove:
         logger.error("Multiple actions specified.  See the --help info.")
@@ -177,17 +173,16 @@ def sync_hawq_site(config_dir, host_list, ignore_bad_hosts):
     sync_host_str = ""
     for node in host_list:
         sync_host_str += " -h %s" % node
-    result = local_ssh("hawq scp %s %s %s/etc/hawq-site.xml =:%s/etc/" % (sync_host_str, ignore_bad_hosts, config_dir, config_dir))
+    result = local_ssh("hawq scp %s %s %s/etc/hawq-site.xml =:%s/etc/" % (sync_host_str, ignore_bad_hosts, config_dir, config_dir), logger)
     if result != 0:
         sys.exit("sync hawq-site.xml failed.")
 
 if __name__ == '__main__':
     options, args = parseargs()
 
-    if options.hawq_home is None:
-        GPHOME = os.getenv('GPHOME')
-    else:
-        GPHOME = options.hawq_home
+    GPHOME = os.getenv('GPHOME')
+    if not GPHOME:
+        sys.exit("GPHOME environment variable not set, exit")
     hawq_site = HawqXMLParser(GPHOME)
     hawq_site.get_all_values()
     org_config_file = "%s/etc/hawq-site.xml" % GPHOME

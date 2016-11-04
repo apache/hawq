@@ -19,8 +19,10 @@ package org.apache.hawq.pxf.plugins.hive;
  * under the License.
  */
 
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hawq.pxf.api.*;
 import org.apache.hawq.pxf.api.io.DataType;
+import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 import org.apache.hawq.pxf.api.utilities.Utilities;
@@ -34,9 +36,9 @@ import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.*;
+import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.*;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.*;
-import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 
@@ -68,14 +70,14 @@ import static org.apache.hawq.pxf.api.io.DataType.*;
 @SuppressWarnings("deprecation")
 public class HiveResolver extends Plugin implements ReadResolver {
     private static final Log LOG = LogFactory.getLog(HiveResolver.class);
-    private static final String MAPKEY_DELIM = ":";
-    private static final String COLLECTION_DELIM = ",";
+    protected static final String MAPKEY_DELIM = ":";
+    protected static final String COLLECTION_DELIM = ",";
+    protected String collectionDelim;
+    protected String mapkeyDelim;
     private SerDe deserializer;
     private List<OneField> partitionFields;
     private String serdeName;
     private String propsString;
-    private String collectionDelim;
-    private String mapkeyDelim;
     String partitionKeys;
     char delimiter;
     String nullChar = "\\N";
@@ -346,42 +348,56 @@ public class HiveResolver extends Plugin implements ReadResolver {
      * representing a composite sub-object (map, list,..) is null - then
      * BadRecordException will be thrown. If a primitive field value is null,
      * then a null will appear for the field in the record in the query result.
+     * flatten is true only when we are dealing with a non primitive field
      */
     private void traverseTuple(Object obj, ObjectInspector objInspector,
                                List<OneField> record, boolean toFlatten)
             throws IOException, BadRecordException {
         ObjectInspector.Category category = objInspector.getCategory();
-        if ((obj == null) && (category != ObjectInspector.Category.PRIMITIVE)) {
-            throw new BadRecordException("NULL Hive composite object");
-        }
         switch (category) {
             case PRIMITIVE:
                 resolvePrimitive(obj, (PrimitiveObjectInspector) objInspector,
                         record, toFlatten);
                 break;
             case LIST:
-                List<OneField> listRecord = traverseList(obj,
-                        (ListObjectInspector) objInspector);
-                addOneFieldToRecord(record, TEXT, String.format("[%s]",
-                        HdfsUtilities.toString(listRecord, collectionDelim)));
+                if(obj == null) {
+                    addOneFieldToRecord(record, TEXT, null);
+                } else {
+                    List<OneField> listRecord = traverseList(obj,
+                            (ListObjectInspector) objInspector);
+                    addOneFieldToRecord(record, TEXT, String.format("[%s]",
+                            HdfsUtilities.toString(listRecord, collectionDelim)));
+                }
                 break;
             case MAP:
-                List<OneField> mapRecord = traverseMap(obj,
-                        (MapObjectInspector) objInspector);
-                addOneFieldToRecord(record, TEXT, String.format("{%s}",
-                        HdfsUtilities.toString(mapRecord, collectionDelim)));
+                if(obj == null) {
+                    addOneFieldToRecord(record, TEXT, null);
+                } else {
+                    List<OneField> mapRecord = traverseMap(obj,
+                            (MapObjectInspector) objInspector);
+                    addOneFieldToRecord(record, TEXT, String.format("{%s}",
+                            HdfsUtilities.toString(mapRecord, collectionDelim)));
+                }
                 break;
             case STRUCT:
-                List<OneField> structRecord = traverseStruct(obj,
-                        (StructObjectInspector) objInspector, true);
-                addOneFieldToRecord(record, TEXT, String.format("{%s}",
-                        HdfsUtilities.toString(structRecord, collectionDelim)));
+                if(obj == null) {
+                    addOneFieldToRecord(record, TEXT, null);
+                } else {
+                    List<OneField> structRecord = traverseStruct(obj,
+                            (StructObjectInspector) objInspector, true);
+                    addOneFieldToRecord(record, TEXT, String.format("{%s}",
+                            HdfsUtilities.toString(structRecord, collectionDelim)));
+                }
                 break;
             case UNION:
-                List<OneField> unionRecord = traverseUnion(obj,
-                        (UnionObjectInspector) objInspector);
-                addOneFieldToRecord(record, TEXT, String.format("[%s]",
-                        HdfsUtilities.toString(unionRecord, collectionDelim)));
+                if(obj == null) {
+                    addOneFieldToRecord(record, TEXT, null);
+                } else {
+                    List<OneField> unionRecord = traverseUnion(obj,
+                            (UnionObjectInspector) objInspector);
+                    addOneFieldToRecord(record, TEXT, String.format("[%s]",
+                            HdfsUtilities.toString(unionRecord, collectionDelim)));
+                }
                 break;
             default:
                 throw new UnsupportedTypeException("Unknown category type: "
@@ -417,7 +433,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
         return listRecord;
     }
 
-    private List<OneField> traverseStruct(Object struct,
+    protected List<OneField> traverseStruct(Object struct,
                                           StructObjectInspector soi,
                                           boolean toFlatten)
             throws BadRecordException, IOException {
@@ -429,10 +445,18 @@ public class HiveResolver extends Plugin implements ReadResolver {
         }
         List<OneField> structRecord = new LinkedList<>();
         List<OneField> complexRecord = new LinkedList<>();
+        List<ColumnDescriptor> colData = inputData.getTupleDescription();
         for (int i = 0; i < structFields.size(); i++) {
             if (toFlatten) {
                 complexRecord.add(new OneField(TEXT.getOID(), String.format(
                         "\"%s\"", fields.get(i).getFieldName())));
+            } else if (!colData.get(i).isProjected()) {
+                // Non-projected fields will be sent as null values.
+                // This case is invoked only in the top level of fields and
+                // not when interpreting fields of type struct.
+                traverseTuple(null, fields.get(i).getFieldObjectInspector(),
+                        complexRecord, toFlatten);
+                continue;
             }
             traverseTuple(structFields.get(i),
                     fields.get(i).getFieldObjectInspector(), complexRecord,
@@ -484,7 +508,13 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 break;
             }
             case SHORT: {
-                val = (o != null) ? ((ShortObjectInspector) oi).get(o) : null;
+                if(o == null) {
+                    val = null;
+                } else if( o.getClass().getSimpleName().equals("ByteWritable") ) {
+                    val = new Short(((ByteWritable) o).get());
+                } else {
+                    val = ((ShortObjectInspector) oi).get(o);
+                }
                 addOneFieldToRecord(record, SMALLINT, val);
                 break;
             }

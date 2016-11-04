@@ -627,7 +627,11 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	fts_client_ip_len = strlen(fts_client_ip);
 	inet_aton(fts_client_ip, &fts_client_addr);
 	fts_client_host = gethostbyaddr(&fts_client_addr, 4, AF_INET);
-	Assert(fts_client_host != NULL);
+	if (fts_client_host == NULL)
+	{
+		elog(WARNING, "Failed to reverse DNS lookup for ip %s.", fts_client_ip);
+		return true;
+	}
 
 	/* Get the received machine id instance start address. */
 	SegInfo fts_client_seginfo = (SegInfo)(SMBUFF_CONTENT(&(conntrack->MessageBuff)) +

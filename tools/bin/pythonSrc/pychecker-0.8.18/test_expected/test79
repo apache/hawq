@@ -1,0 +1,6 @@
+Processing module test79 (test_input/test79.py)...
+
+Warnings...
+
+test_input/test79.py:8: Iterating over a string (s)
+test_input/test79.py:15: Iterating over a string (s)

@@ -26,31 +26,11 @@ namespace Yarn {
 
 const char * YarnIOException::ReflexName = "java.io.IOException";
 
-const char * AlreadyBeingCreatedException::ReflexName =
-    "org.apache.hadoop.hdfs.protocol.AlreadyBeingCreatedException";
-
 const char * AccessControlException::ReflexName =
     "org.apache.hadoop.security.AccessControlException";
 
-const char * FileAlreadyExistsException::ReflexName =
-    "org.apache.hadoop.fs.FileAlreadyExistsException";
-
-const char * DSQuotaExceededException::ReflexName =
-    "org.apache.hadoop.hdfs.protocol.DSQuotaExceededException";
-
-const char * NSQuotaExceededException::ReflexName =
-    "org.apache.hadoop.hdfs.protocol.NSQuotaExceededException";
-
-const char * ParentNotDirectoryException::ReflexName =
-    "org.apache.hadoop.fs.ParentNotDirectoryException";
-
 const char * SafeModeException::ReflexName =
     "org.apache.hadoop.hdfs.server.namenode.SafeModeException";
-
-const char * NotReplicatedYetException::ReflexName =
-    "org.apache.hadoop.hdfs.server.namenode.NotReplicatedYetException";
-
-const char * FileNotFoundException::ReflexName = "java.io.FileNotFoundException";
 
 const char * UnresolvedLinkException::ReflexName =
     "org.apache.hadoop.fs.UnresolvedLinkException";
@@ -58,14 +38,8 @@ const char * UnresolvedLinkException::ReflexName =
 const char * UnsupportedOperationException::ReflexName =
     "java.lang.UnsupportedOperationException";
 
-const char * ReplicaNotFoundException::ReflexName =
-    "org.apache.hadoop.hdfs.server.datanode.ReplicaNotFoundException";
-
 const char * ResourceManagerStandbyException::ReflexName =
     "org.apache.hadoop.ipc.StandbyException";
-
-const char * YarnInvalidBlockToken::ReflexName =
-    "org.apache.hadoop.security.token.SecretManager$InvalidToken";
 
 const char * SaslException::ReflexName = "javax.security.sasl.SaslException";
 

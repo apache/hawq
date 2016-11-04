@@ -16,8 +16,8 @@
 # under the License.
 #
 CC=gcc
-CPPFLAGS=-g -Wall -std=gnu99 -I../dist/include
-LDFLAGS=-L../dist/lib -L/Users/yjin/greenplum-db-devel/lib -lyarn
+CPPFLAGS=-g -Wall -std=gnu99 -I/usr/local/hawq/include
+LDFLAGS=-L/usr/local/hawq/lib -lyarn
 #bin = c_client_main_profile
 bin = c_client_main
 

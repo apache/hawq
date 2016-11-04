@@ -1,0 +1,9 @@
+Processing module test55 (test_input/test55.py)...
+
+Warnings...
+
+test_input/test55.py:6: (RuntimeError) shadows builtin
+test_input/test55.py:6: Local variable (RuntimeError) not used
+test_input/test55.py:6: Setting exception to builtin (RuntimeError), consider () around exceptions
+test_input/test55.py:29: (RuntimeError) shadows builtin
+test_input/test55.py:29: Setting exception to builtin (RuntimeError), consider () around exceptions

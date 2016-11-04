@@ -1,0 +1,281 @@
+===============================
+PSI - Python System Information
+===============================
+
+Overview
+========
+
+PSI is a Python module providing direct access to real-time system and
+process information.  It is made up of several sub-modules.
+
+The ``arch`` module gives some information about the system such as the
+system name and version, the machine architecture etc.  It has a class
+representing each system and a factory function that will return an
+instance of the class which psi is running on currently.
+
+The ``process`` module provides an interface to information about
+processes currently running on the system.  Each process is
+represented as an instance of the Process class and additionally there
+is a ProcessTable class which is a dictionary of all running
+processes.  To know exactly what attributes are available and what
+they mean you should look at the docstrings and examples below but
+important to note is that all the information is collected at
+instantiation time.  So the contents of ProcessTable and Process
+instances are really snapshots and will still contain all information
+even after the actual process has gone.
+
+Lastly there are some general functions available directly under the
+``psi`` namespace such as ``loadavg()``, ``getzoneid()`` etc.  Once
+more see the docstrings for detailed information.
+
+Some information may not be available on all platforms, rather then
+trying to emulate this information these parts of the API just don't
+exists on those platforms.  Examples of these are:
+``psi.process.Process.pcpu`` which is not available on Linux,
+``psi.getzoneid()`` which is only available on SunOS 10 and above etc.
+If not all information can be found some attribute descriptors of
+objects might return subclasses of AttributeError, allowing you to use
+generic ``getattr()`` semantics as well as more specifically detect why
+an attribute is not available (insufficient privileges, not
+implemented, ...).
+
+
+Install
+=======
+
+You need to check if it's supported on your platform, check the
+docstring of setup.py for the exact supported platforms.
+
+You will also need a working C compiler and the python development
+files.  If a system is not supported yet the build will fail.  After
+building it is best to run the test suite, on some platforms not all
+tests will pass yet and you would rather know of these problems before
+starting to use PSI.
+
+So to fully install PSI from source::
+
+  $ python setup.py build
+  $ python setup.py test [--all]
+  $ python setup.py install [<your options>]
+
+See the Python documentation on installing Python module for more
+control: http://docs.python.org/install/index.html
+
+
+Here a rough list of packages you will need for some popular GNU/Linux
+distributions, this should give you an idea of what is needed.
+
+Debian/Ubuntu:
+
+ - python
+ - python-dev
+ - gcc
+
+Redhat/CentOS:
+
+ - python
+ - python-devel
+ - gcc
+
+
+
+Limitations
+===========
+
+Solaris
+-------
+
+If the module is compiled as 32-bit (which is what will usually happen
+since that tends to be how python is compiled) it will use the ILP32
+model and will not be able to read the address space of 64-bit
+processes as they use the LP64 model.  This means that the full
+argument list and the environment dictionary will not be available.
+The partial argument list can still be retrieved from the
+``psi.process.Process.command`` attribute.
+
+
+Unit Tests
+==========
+
+To run the unit tests::
+
+  $ python setup.py test [--all]
+
+The --all option will run tests that require superuser privileges,
+this is required to run some test applications under specific
+schedulers and priorities to test if psi does detect these correctly.
+To acquire superuser privileges sudo is used when available, falling
+back to "su -c".
+
+If any tests fail, please copy & paste the output and send operating
+system version, python version, python executable format (32/64-bit)
+and any other applicable details to the mailing list
+(psi-discuss@googlegroups.com).
+
+
+Examples
+========
+
+Examples are the best documentation.  :-)
+
+::
+
+  Python 2.5.2 (r252:60911, Oct  5 2008, 19:24:49)
+  [GCC 4.3.2] on linux2
+  Type "help", "copyright", "credits" or "license" for more information.
+  >>> import psi
+  >>>
+  >>> a = psi.arch.arch_type()
+  >>> a
+  psi.arch.ArchLinux()
+  >>> isinstance(a, psi.arch.ArchLinux)
+  True
+  >>> isinstance(a, psi.arch.ArchSunOS)
+  False
+  >>> a.sysname
+  'Linux'
+  >>> a.nodename
+  'signy'
+  >>> a.release
+  '2.6.27-9-generic'
+  >>> a.release_info
+  (2L, 6L, 26L)
+  >>> a.version
+  '#1 SMP Thu Nov 20 21:57:00 UTC 2008'
+  >>> a.machine
+  'i686'
+  >>>
+  >>> psi.loadavg()
+  (0.059999999999999998, 0.13, 0.13)
+  >>>
+  >>> import os
+  >>> mypid = os.getpid()
+  >>> mypid
+  21374
+  >>> p = psi.process.Process(mypid)
+  >>> p.args
+  ('python',)
+  >>> p.exe
+  '/usr/bin/python2.5'
+  >>> p.uid
+  1000
+  >>> import pwd
+  >>> pwd.getpwuid(p.uid)
+  pwd.struct_passwd(pw_name='flub', pw_passwd='x', pw_uid=1000,
+  pw_gid=1000, pw_gecos='Floris Bruynooghe,,,', pw_dir='/home/flub',
+  pw_shell='/bin/bash')
+  >>> p.start_time
+  datetime.datetime(2009, 5, 11, 20, 4, 31, 709993)
+  >>> help(psi.process.Process.start_time)
+  Help on getset descriptor psi.process.Process.start_time:
+
+  start_time
+    Start time of process as datetime.datetime object
+
+    Use .strftime('%s') to get seconds since epoch
+  >>> p.ppid
+  21304L
+  >>> parent = psi.process.Process(pid=p.ppid)
+  >>> parent.args
+  ('bash',)
+  >>> p.rss
+  2293L
+  >>>
+  >>> pt = psi.process.ProcessTable()
+  >>> len(pt)
+  145
+  >>> pt.keys()
+  [1L, 2L, 3L, 4L, 5L, 6L, 7L, 6152L, 5660L, 6687L, 4648L, 5674L,
+  5639L, 6834L, 46L, 48L, 50L, 51L, 5684L, 1081L, 2621L, 5184L, 6276L,
+  2627L, 6217L, 6220L, 6221L, 4877L, 6224L, 6227L, 6229L, 6235L,
+  6757L, 5729L, 6244L, 2149L, 6246L, 2152L, 2153L, 6763L, 6764L,
+  6254L, 6248L, 6259L, 5749L, 2166L, 6249L, 2169L, 5242L, 2683L,
+  6781L, 6273L, 6274L, 4740L, 6278L, 6279L, 5772L, 5776L, 6290L,
+  5779L, 5268L, 6296L, 6809L, 156L, 157L, 158L, 6341L, 6307L, 2212L,
+  6257L, 20654L, 6856L, 4786L, 4788L, 5814L, 5817L, 6263L, 5821L,
+  6261L, 6336L, 4811L, 118L, 200L, 1739L, 5837L, 1742L, 1743L, 6349L,
+  20693L, 6265L, 5852L, 122L, 4833L, 4834L, 1253L, 2793L, 1258L,
+  6382L, 21374L, 6393L, 5885L, 1278L, 5376L, 6401L, 5675L, 1290L,
+  1293L, 6445L, 5397L, 6262L, 5913L, 4385L, 4386L, 4392L, 4393L,
+  4394L, 1074L, 6449L, 5426L, 6456L, 6458L, 5951L, 19779L, 5963L,
+  5964L, 21327L, 21304L, 5466L, 4955L, 4444L, 2404L, 5501L, 6526L,
+  4992L, 4993L, 6032L, 6572L, 6442L, 5573L, 5576L, 2794L, 17357L,
+  4054L, 6397L, 6136L]
+  >>> q = pt[6856]
+  >>> q.args
+  ('emacs22-gtk',)
+  >>> q.env
+  {'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'LOGNAME':
+  'flub', 'USER': 'flub', 'HOME': '/home/flub', 'PATH':
+  '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games',
+  'DISPLAY': ':0.0', 'SSH_AGENT_PID': '6217', 'LANG': 'en_GB.UTF-8',
+  'SHELL': '/bin/bash', 'XDG_SESSION_COOKIE':
+  '26100f517aa94dec0dc7b4aa494948ea-1231927234.615881-1120709651',
+  'SESSION_MANAGER': 'local/signy:/tmp/.ICE-unix/6152',
+  'XDG_DATA_DIRS': '/usr/local/share/:/usr/share/:/usr/share/gdm/',
+  'WINDOWPATH': '7', 'GPG_AGENT_INFO':
+  '/tmp/seahorse-SWS6qW/S.gpg-agent:6235:1', 'USERNAME': 'flub',
+  'GDM_XSERVER_LOCATION': 'local', 'SSH_AUTH_SOCK':
+  '/tmp/keyring-AStyaD/ssh', 'DESKTOP_SESSION': 'gnome', 'GDMSESSION':
+  'gnome', 'DBUS_SESSION_BUS_ADDRESS':
+  'unix:abstract=/tmp/dbus-HFM6sYANYS,guid=916b5b81c03bda327eaaa293496db7c5',
+  'ORBIT_SOCKETDIR': '/tmp/orbit-flub', 'XAUTHORITY':
+  '/home/flub/.Xauthority', 'GNOME_KEYRING_SOCKET':
+  '/tmp/keyring-AStyaD/socket', 'GNOME_KEYRING_PID': '6246\n',
+  'GDM_LANG': 'en_GB.UTF-8', 'PWD': '/home/flub', 'GTK_RC_FILES':
+  '/etc/gtk/gtkrc:/home/flub/.gtkrc-1.2-gnome2'}
+  >>>
+  >>> r = []
+  >>> for pp in pt.values():
+  ...     if pp.args and 'evolution' in pp.args[0]:
+  ...         r.append(pp)
+  ...
+  >>> r
+  [psi.process.Process(pid=6336), psi.process.Process(pid=6572),
+  psi.process.Process(pid=6397)]
+  >>> for pp in r:
+  ...     print ' '.join(pp.args)
+  ...
+  /usr/lib/evolution/2.24/evolution-exchange-storage --oaf-activate-iid=OAFIID:GNOME_Evolution_Exchange_Connector_CalFactory:1.2 --oaf-ior-fd=22
+  evolution
+  /usr/lib/evolution/evolution-data-server-2.24 --oaf-activate-iid=OAFIID:GNOME_Evolution_DataServer_CalFactory:1.2 --oaf-ior-fd=23
+  >>>
+  >>> init = psi.process.Process(1)
+  >>> init.env
+  Traceback (most recent call last):
+    File "<stdin>", line 1, in <module>
+  psi.InsufficientPrivsError: Insufficient privileges for Process.env
+  >>>
+
+Some sample scripts are also available in the examples/ subdirectory.
+
+
+Development
+===========
+
+You should definitely read the DESIGN file, it will explain the ideas
+behind how the code is structured and how you should extend it.  Also
+very useful is the TODO file and the wiki
+(http://bitbucket.org/chrismiles/psi/wiki/Development).
+
+The setup.py has some extra features that help with development,
+these are explained in its docstring.
+
+The PSI source code is hosted at bitbucket in a Mercurial repository,
+http://bitbucket.org/chrismiles/psi/
+
+
+Porting
+=======
+
+If PSI does not yet work on your architecture/system then it needs to
+be ported, the design is aimed at making this easy for you.  There is
+no separate porting guide at the moment so you will have to read the
+DESIGN file for details of what to do.
+
+
+Help
+====
+
+There is a mailing list at psi-discuss@googlegroups.com where you can
+post questions, patches, hints, bugs, etc.  Your feedback is welcome!

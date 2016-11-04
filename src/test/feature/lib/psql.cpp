@@ -40,7 +40,7 @@ const string& PSQLQueryResult::getData(int ri, int ci) const {
 }
 
 string PSQLQueryResult::getData(int ri, const string& ck) const {
-  for (int ci = 0; ci < this->_fields.size(); ci++) {
+  for (unsigned int ci = 0; ci < this->_fields.size(); ci++) {
     if (ck == this->_fields[ci]) {
       return this->getData(ri, ci);
     }
@@ -199,12 +199,17 @@ const string PSQL::_getPSQLFileCommand(const string& file) const {
 
 bool PSQL::checkDiff(const string& expect_file,
                      const string& result_file,
-                     bool save_diff) {
+                     bool save_diff,
+                     const string& init_file) {
   string diff_file = result_file + ".diff";
   string command;
   command.append("gpdiff.pl ")
-      .append(PSQL_BASIC_DIFF_OPTS)
-      .append(" ")
+      .append(PSQL_BASIC_DIFF_OPTS);
+  if (!init_file.empty()) {
+      command.append(" -gpd_init ")
+      .append(init_file);
+  }
+  command.append(" ")
       .append(expect_file)
       .append(" ")
       .append(result_file)

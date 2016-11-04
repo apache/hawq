@@ -1,0 +1,9 @@
+Processing module test64 (test_input/test64.py)...
+
+Warnings...
+
+test_input/test64.py:1: No doc string for class _Anything
+test_input/test64.py:4: Imported module (re) not used
+test_input/test64.py:4: Imported module (sys) not used
+test_input/test64.py:5: Imported module (array) not used
+test_input/test64.py:14: Local variable (y) not used

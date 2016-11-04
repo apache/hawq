@@ -1,0 +1,9 @@
+Processing module test83 (test_input/test83.py)...
+
+Warnings...
+
+test_input/test83.py:9: Unpacking 2 values into 3 variables
+test_input/test83.py:14: Unpacking 2 values into 3 variables
+test_input/test83.py:18: Unpacking 2 values into 1 variables
+test_input/test83.py:22: Unpacking 1 values into 2 variables
+test_input/test83.py:26: Unpacking a non-sequence (5) of type int

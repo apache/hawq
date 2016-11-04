@@ -22,7 +22,7 @@
 
 #include "YARN_yarn_service_protos.pb.h"
 #include "YARN_yarn_protos.pb.h"
-#include "records/ApplicationID.h"
+#include "records/ApplicationId.h"
 
 using namespace hadoop::yarn;
 
@@ -39,7 +39,7 @@ public:
 	virtual ~KillApplicationRequest();
 
 	KillApplicationRequestProto& getProto();
-	void setApplicationId(ApplicationID &applicationId);
+	void setApplicationId(ApplicationId &applicationId);
 
 private:
 	KillApplicationRequestProto requestProto;

@@ -1,0 +1,8 @@
+Processing module test15 (test_input/test15.py)...
+
+Warnings...
+
+test_input/test15.py:19: Law of Demeter violated, more than 5 references for (obj.x.y.z.a.b)
+test_input/test15.py:20: Law of Demeter violated, more than 5 references for (obj.x.y.z.a.b.c)
+test_input/test15.py:30: Law of Demeter violated, more than 6 references for (self.xx.y.z.a.b)
+test_input/test15.py:38: Law of Demeter violated, more than 6 references for (self.xx.y.z.a.b.c)

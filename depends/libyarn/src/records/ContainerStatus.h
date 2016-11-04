@@ -46,7 +46,7 @@ public:
 	void setContainerId(ContainerId &containerId);
 	ContainerId getContainerId();
 
-	void setContaierState(ContainerState state);
+	void setContainerState(ContainerState state);
 	ContainerState getContainerState();
 
 	void setDiagnostics(string &diagnostics);

@@ -1,0 +1,16 @@
+Processing module test90 (test_input/test90.py)...
+
+Warnings...
+
+test_input/test90.py:4: Using is 1, may not always work
+test_input/test90.py:5: Using is s, may not always work
+test_input/test90.py:6: Using is 1.32, may not always work
+test_input/test90.py:7: Using is (), may not always work
+test_input/test90.py:8: Using is [], may not always work
+test_input/test90.py:9: Using is {}, may not always work
+test_input/test90.py:14: Using is not 1, may not always work
+test_input/test90.py:15: Using is not s, may not always work
+test_input/test90.py:16: Using is not 1.32, may not always work
+test_input/test90.py:17: Using is not (), may not always work
+test_input/test90.py:18: Using is not [], may not always work
+test_input/test90.py:19: Using is not {}, may not always work

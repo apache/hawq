@@ -29,7 +29,6 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
-
 import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
@@ -383,22 +382,73 @@ public class ProtocolData extends InputData {
 
     /*
      * Sets the tuple description for the record
+     * Attribute Projection information is optional
      */
     void parseTupleDescription() {
+
+        /* Process column projection info */
+        String columnProjStr = getOptionalProperty("ATTRS-PROJ");
+        List<Integer> columnProjList = new ArrayList<Integer>();
+        if(columnProjStr != null) {
+            int columnProj = Integer.parseInt(columnProjStr);
+            if(columnProj > 0) {
+                String columnProjIndexStr = getProperty("ATTRS-PROJ-IDX");
+                String columnProjIdx[] = columnProjIndexStr.split(",");
+                for(int i = 0; i < columnProj; i++) {
+                    columnProjList.add(Integer.valueOf(columnProjIdx[i]));
+                }
+            } else {
+                /* This is a special case to handle aggregate queries not related to any specific column
+                * eg: count(*) queries. */
+                columnProjList.add(0);
+            }
+        }
+
         int columns = getIntProperty("ATTRS");
         for (int i = 0; i < columns; ++i) {
             String columnName = getProperty("ATTR-NAME" + i);
             int columnTypeCode = getIntProperty("ATTR-TYPECODE" + i);
             String columnTypeName = getProperty("ATTR-TYPENAME" + i);
-
-            ColumnDescriptor column = new ColumnDescriptor(columnName,
-                    columnTypeCode, i, columnTypeName);
+            Integer[] columnTypeMods = parseTypeMods(i);
+            ColumnDescriptor column;
+            if(columnProjStr != null) {
+                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName, columnTypeMods, columnProjList.contains(Integer.valueOf(i)));
+            } else {
+                /* For data formats that don't support column projection */
+                column = new ColumnDescriptor(columnName, columnTypeCode, i, columnTypeName, columnTypeMods);
+            }
             tupleDescription.add(column);
 
             if (columnName.equalsIgnoreCase(ColumnDescriptor.RECORD_KEY_NAME)) {
                 recordkeyColumn = column;
             }
         }
+    }
+
+    private Integer[] parseTypeMods(int columnIndex) {
+        String typeModeCountStr = getOptionalProperty("ATTR-TYPEMOD" + columnIndex + "-COUNT");
+        Integer[] result = null;
+        Integer typeModeCount = null;
+        if (typeModeCountStr != null) {
+        try {
+            typeModeCount = Integer.parseInt(typeModeCountStr);
+            if (typeModeCount < 0)
+                throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-COUNT cann't be negative");
+            result = new Integer[typeModeCount];
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-COUNT must be a positive integer");
+        }
+            for (int i = 0; i < typeModeCount; i++) {
+                try {
+                    result[i] = Integer.parseInt(getProperty("ATTR-TYPEMOD" + columnIndex + "-" + i));
+                    if (result[i] < 0)
+                        throw new NumberFormatException();
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("ATTR-TYPEMOD" + columnIndex + "-" + i + " must be a positive integer");
+                }
+            }
+        }
+        return result;
     }
 
     /**

@@ -17,41 +17,41 @@
  * under the License.
  */
 
-#include "ApplicationID.h"
+#include "ApplicationId.h"
 
 namespace libyarn {
 
-ApplicationID::ApplicationID() {
+ApplicationId::ApplicationId() {
 	appIdProto = ApplicationIdProto::default_instance();
 }
 
-ApplicationID::ApplicationID(const ApplicationIdProto &proto) : appIdProto(proto) {
+ApplicationId::ApplicationId(const ApplicationIdProto &proto) : appIdProto(proto) {
 }
 
-ApplicationID::ApplicationID(const ApplicationID &applicationId){
+ApplicationId::ApplicationId(const ApplicationId &applicationId){
 	appIdProto = applicationId.appIdProto;
 }
 
-ApplicationID::~ApplicationID() {
+ApplicationId::~ApplicationId() {
 }
 
-ApplicationIdProto& ApplicationID::getProto() {
+ApplicationIdProto& ApplicationId::getProto() {
 	return appIdProto;
 }
 
-void ApplicationID::setId(int32_t id) {
+void ApplicationId::setId(int32_t id) {
 	appIdProto.set_id(id);
 }
 
-int ApplicationID::getId() {
+int ApplicationId::getId() {
 	return appIdProto.id();
 }
 
-void ApplicationID::setClusterTimestamp(int64_t timestamp) {
+void ApplicationId::setClusterTimestamp(int64_t timestamp) {
 	appIdProto.set_cluster_timestamp(timestamp);
 }
 
-int64_t ApplicationID::getClusterTimestamp() {
+int64_t ApplicationId::getClusterTimestamp() {
 	return appIdProto.cluster_timestamp();
 }
 

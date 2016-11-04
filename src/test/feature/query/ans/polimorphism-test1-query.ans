@@ -1,0 +1,190 @@
+select f3, myaggp01a(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp01a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggp03a(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp03a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggp03b(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp03b 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggp05a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp05a 
+----+-----------
+ a  | {1,4,7}
+ b  | {5,2,8}
+ c  | {3,6}
+(3 rows)
+
+select f3, myaggp06a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp06a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggp08a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp08a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggp09a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp09a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggp09b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp09b 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggp10a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp10a 
+----+-----------
+ a  | {1,4,7}
+ b  | {5,2,8}
+ c  | {3,6}
+(3 rows)
+
+select f3, myaggp10b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp10b 
+----+-----------
+ a  | {1,4,7}
+ b  | {5,2,8}
+ c  | {3,6}
+(3 rows)
+
+select f3, myaggp20a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp20a 
+----+-----------
+ a  | {1,4,7}
+ b  | {5,2,8}
+ c  | {3,6}
+(3 rows)
+
+select f3, myaggp20b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggp20b 
+----+-----------
+ a  | {1,4,7}
+ b  | {5,2,8}
+ c  | {3,6}
+(3 rows)
+
+select f3, myaggn01a(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn01a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggn01b(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn01b 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggn03a(*) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn03a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggn05a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn05a 
+----+-----------
+ a  | {1,4,7}
+ b  | {5,2,8}
+ c  | {3,6}
+(3 rows)
+
+select f3, myaggn05b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn05b 
+----+-----------
+ a  | {1,4,7}
+ b  | {5,2,8}
+ c  | {3,6}
+(3 rows)
+
+select f3, myaggn06a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn06a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggn06b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn06b 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggn08a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn08a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggn08b(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn08b 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggn09a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn09a 
+----+-----------
+ a  | {}
+ b  | {}
+ c  | {}
+(3 rows)
+
+select f3, myaggn10a(f1) from (select * from t order by f1 limit 10) as foo group by f3 order by f3;
+ f3 | myaggn10a 
+----+-----------
+ a  | {1,4,7}
+ b  | {5,2,8}
+ c  | {3,6}
+(3 rows)
+
+select mysum2(f1, f1 + 1) from t;
+ mysum2 
+--------
+     80
+(1 row)
+

@@ -137,7 +137,7 @@ static void MirroredBufferPool_DoOpen(
 		if (segmentFileNum == 0)
 			sprintf(path, "%s/%u", dbPath, relFileNode->relNode);
 		else
-			sprintf(path, "%s/%u.%u", dbPath, relFileNode->relNode, segmentFileNum);
+			sprintf(path, "%s/%u/%u", dbPath, relFileNode->relNode, segmentFileNum);
 
 		errno = 0;
 		
@@ -469,7 +469,7 @@ static void MirroredBufferPool_DoDrop(
 		if (segmentFileNum == 0)
 			sprintf(path, "%s/%u", dbPath, relFileNode->relNode);
 		else
-			sprintf(path, "%s/%u.%u", dbPath, relFileNode->relNode, segmentFileNum);
+			sprintf(path, "%s/%u/%u", dbPath, relFileNode->relNode, segmentFileNum);
 
 		errno = 0;
 		

@@ -1,0 +1,209 @@
+-- --------------------------------------
+-- test first external Oid initialization
+-- --------------------------------------
+-- start_matchsubs
+--
+-- # create a match/subs expression to handle ip addresses that change
+--
+-- m/.*inserted tuple to heap table pg_class \(oid \d+, relname table_xl\).*/
+-- s/oid \d+/oid SOME_OID/
+--
+-- m/.*deleted tuple oid=\d+ from heap table pg_class.*/
+-- s/oid=\d+/oid=OID/
+--
+-- end_matchsubs
+-- Create function that returns the first external Oid boundary
+CREATE OR REPLACE FUNCTION min_external_oid() RETURNS oid
+  AS '@SHARE_LIBRARY_PATH@', 'min_external_oid'
+  LANGUAGE C;
+CREATE FUNCTION
+-- Create function that returns the current external Oid
+CREATE OR REPLACE FUNCTION get_next_external_oid() RETURNS oid
+  AS '@SHARE_LIBRARY_PATH@', 'get_next_external_oid'
+  LANGUAGE C;
+CREATE FUNCTION
+-- Create function that sets the current external Oid
+CREATE OR REPLACE FUNCTION set_next_external_oid(ext_oid oid) RETURNS oid
+  AS '@SHARE_LIBRARY_PATH@', 'set_next_external_oid'
+  LANGUAGE C;
+CREATE FUNCTION
+-- Create function to insert and scan in-memory data to pg_class
+CREATE OR REPLACE FUNCTION load_json_data(filename text) RETURNS text
+  AS '@SHARE_LIBRARY_PATH@', 'load_json_data'
+  LANGUAGE C;
+CREATE FUNCTION
+-- Create function that inserts tuple with given Oid
+CREATE OR REPLACE FUNCTION caql_insert_into_heap_pg_class(relid oid, tblname text) RETURNS text
+  AS '@SHARE_LIBRARY_PATH@', 'caql_insert_into_heap_pg_class'
+  LANGUAGE C;
+CREATE FUNCTION
+-- Create function that inserts tuple with given Oid
+CREATE OR REPLACE FUNCTION caql_delete_from_heap_pg_class(relid oid) RETURNS text
+  AS '@SHARE_LIBRARY_PATH@', 'caql_delete_from_heap_pg_class'
+  LANGUAGE C;
+CREATE FUNCTION
+-- --------------------------------------
+-- Test hcat table external oid initialization
+-- --------------------------------------
+-- Boundary should be at FirstExternalObjectId
+--SELECT min_external_oid();
+-- NextExternalObjectId is uninitialized
+SELECT get_next_external_oid();
+ get_next_external_oid
+-----------------------
+                     0
+(1 row)
+
+SELECT load_json_data('@abs_datadir@/single_table.json');
+  load_json_data
+------------------
+ default.mytable
+(1 row)
+
+SELECT get_next_external_oid()::bigint - min_external_oid()::bigint;
+ ?column?
+----------
+        0
+(1 row)
+
+BEGIN TRANSACTION;
+BEGIN
+SELECT get_next_external_oid()::bigint - min_external_oid()::bigint;
+ ?column?
+----------
+        0
+(1 row)
+
+-- load default.mytable -> +3 oids
+-- 1 oid for namespace 'default', 1 oid for relation 'mytable', 1 oid for reltype
+SELECT load_json_data('@abs_datadir@/single_table.json');
+  load_json_data
+------------------
+ default.mytable
+(1 row)
+
+SELECT get_next_external_oid()::bigint - min_external_oid()::bigint;
+ ?column? 
+----------
+        3
+(1 row)
+
+-- load db1.ht1, db2.ht1, db2.ht2 -> +8 oids
+-- oids: db1, ht1(db1), db2, ht1(db2), ht2, reltype(ht1, ht1, ht2)
+SELECT load_json_data('@abs_datadir@/multi_table.json');
+      load_json_data
+--------------------------
+ db1.ht1 db2.ht1 db2.ht2
+(1 row)
+
+SELECT get_next_external_oid()::bigint - min_external_oid()::bigint;
+ ?column?
+----------
+       11
+(1 row)
+
+END TRANSACTION;
+COMMIT
+-- New transaction will reset external Oid start point
+-- Yields the same result as previous transaction
+BEGIN TRANSACTION;
+BEGIN
+SELECT get_next_external_oid()::bigint - min_external_oid()::bigint;
+ ?column?
+----------
+        0
+(1 row)
+
+SELECT load_json_data('@abs_datadir@/single_table.json');
+  load_json_data
+------------------
+ default.mytable
+(1 row)
+
+SELECT get_next_external_oid()::bigint - min_external_oid()::bigint;
+ ?column?
+----------
+        3
+(1 row)
+
+SELECT load_json_data('@abs_datadir@/multi_table.json');
+      load_json_data
+--------------------------
+ db1.ht1 db2.ht1 db2.ht2
+(1 row)
+
+SELECT get_next_external_oid()::bigint - min_external_oid()::bigint;
+ ?column?
+----------
+       11
+(1 row)
+
+END TRANSACTION;
+COMMIT
+-- --------------------------------------
+-- Test external oid rollover
+-- --------------------------------------
+BEGIN TRANSACTION;
+BEGIN
+SELECT get_next_external_oid()::bigint - min_external_oid()::bigint;
+ ?column?
+----------
+        0
+(1 row)
+
+SELECT set_next_external_oid( oid(min_external_oid()::bigint + (10*power(2,20))::bigint - 8 + 1) ) > 0;
+ ?column?
+----------
+ t
+(1 row)
+
+SELECT load_json_data('@abs_datadir@/multi_table.json');
+      load_json_data
+--------------------------
+ db1.ht1 db2.ht1 db2.ht2
+(1 row)
+
+-- Used up external Oids result in Oid overflow
+SELECT get_next_external_oid();
+ get_next_external_oid
+-----------------------
+                     0
+(1 row)
+
+-- Rollover disallowed!
+SELECT load_json_data('@abs_datadir@/single_table.json');
+psql:/tmp/TestExternalOid_TestExternalOidAll.sql:92: ERROR:  number of external objects from HCatalog exceeded 10M during transaction
+HINT:  Separate HCatalog queries into different transactions to process.
+END TRANSACTION;
+ROLLBACK
+-- --------------------------------------
+-- Test external Oid boundary
+-- --------------------------------------
+-- Create a tuple with Oid larger than FirstExternalObjectId
+-- Will fail during next session when try to query HCatalog
+-- Because external Oid boundary is violated
+SELECT caql_insert_into_heap_pg_class(min_external_oid()::bigint + 20, 'table_xl');
+                      caql_insert_into_heap_pg_class
+--------------------------------------------------------------------------
+ inserted tuple to heap table pg_class (oid 4284481555, relname table_xl)
+(1 row)
+
+-- cleanup
+SELECT caql_delete_from_heap_pg_class(min_external_oid()::bigint + 20);
+            caql_delete_from_heap_pg_class
+-------------------------------------------------------
+ deleted tuple oid=4284481555 from heap table pg_class
+(1 row)
+
+DROP FUNCTION caql_delete_from_heap_pg_class(relid oid);
+DROP FUNCTION
+DROP FUNCTION caql_insert_into_heap_pg_class(relid oid, tblname text);
+DROP FUNCTION
+DROP FUNCTION load_json_data(filename text);
+DROP FUNCTION
+DROP FUNCTION get_next_external_oid();
+DROP FUNCTION
+DROP FUNCTION set_next_external_oid(ext_oid oid);
+DROP FUNCTION
+DROP FUNCTION min_external_oid();
+DROP FUNCTION

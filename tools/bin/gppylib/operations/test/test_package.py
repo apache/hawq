@@ -118,7 +118,7 @@ class RPMSpec:
 %define __os_install_post %{nil}
 
 Summary:        Temporary test package
-License:        GPLv2        
+License:        ASF 2.0
 Name:           ''' + self.name + '''          
 Version:        ''' + self.version + '''
 Release:        ''' + self.release + ''' 

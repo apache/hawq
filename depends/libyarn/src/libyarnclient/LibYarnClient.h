@@ -124,7 +124,7 @@ namespace libyarn {
 		//ContainerManagement
 		void *nmClient;
 
-		ApplicationID clientAppId;
+		ApplicationId clientAppId;
 		ApplicationAttemptId clientAppAttempId;
 
 		// the user of running AM, default is postgres
@@ -161,9 +161,9 @@ namespace libyarn {
 
 	class LibYarnNodeInfo {
 		public:
-			LibYarnNodeInfo(char *host, char* rack, int32_t cnt)
+			LibYarnNodeInfo(const string &host, const string &rack, int32_t cnt)
 							:hostname(host), num_containers(cnt)
-			{ if(rack == NULL) rackname = DEFAULT_RACK; else rackname = string(rack);}
+			{ if(rack == "") rackname = DEFAULT_RACK; else rackname = rack;}
 
 			string getHost() { return hostname; }
 			string getRack() { return rackname; }

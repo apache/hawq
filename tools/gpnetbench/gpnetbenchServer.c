@@ -31,10 +31,7 @@ char* receiveBuffer = NULL;
 
 void handleIncomingConnection(int fd);
 
-void usage()
-{
-	fprintf(stdout, "usage: gpnetbenchServer -p PORT [-h]\n");
-}
+void usage(void);
 
 int main(int argc, char** argv)
 {
@@ -147,6 +144,11 @@ int main(int argc, char** argv)
 	}
 
 	return 0;
+}
+
+void usage()
+{
+	fprintf(stdout, "usage: gpnetbenchServer -p PORT [-h]\n");
 }
 
 void handleIncomingConnection(int fd)

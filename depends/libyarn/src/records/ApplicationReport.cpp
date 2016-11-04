@@ -36,14 +36,14 @@ ApplicationReportProto& ApplicationReport::getProto() {
 	return reportProto;
 }
 
-void ApplicationReport::setApplicationId(ApplicationID &appId) {
+void ApplicationReport::setApplicationId(ApplicationId &appId) {
 	ApplicationIdProto *proto = new ApplicationIdProto();
 	proto->CopyFrom(appId.getProto());
 	reportProto.set_allocated_applicationid(proto);
 }
 
-ApplicationID ApplicationReport::getApplicationId() {
-	return ApplicationID(reportProto.applicationid());
+ApplicationId ApplicationReport::getApplicationId() {
+	return ApplicationId(reportProto.applicationid());
 }
 
 void ApplicationReport::setUser(string &user) {
@@ -136,7 +136,7 @@ int64_t ApplicationReport::getFinishTime() {
 	return reportProto.finishtime();
 }
 
-void ApplicationReport::setFinalAppStatus(FinalApplicationStatus status) {
+void ApplicationReport::setFinalApplicationStatus(FinalApplicationStatus status) {
 	reportProto.set_final_application_status((FinalApplicationStatusProto)status);
 }
 

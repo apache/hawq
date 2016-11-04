@@ -1,0 +1,95 @@
+Design of PSI
+=============
+
+
+The C code of psi is split in two: (i) The Python modules and classes
+in src/ and (ii) the architecture or system dependent implementations
+that gather the required information in src/arch/.  These two parts
+communicate all the required information to each other using
+structures, i.e. each class will make a call to an arch_*() function
+that will return a new structure with all the required information in
+for that class.
+
+The reason for doing this is to shield the system implementations
+from any Python housekeeping like reference counting.  It is hoped
+that this greatly simplifies creating implementations (porting) and
+reduces the risk of hidden memory leaks etc.  There is one exception
+on this: error handling.  Error handling is done exactly as in Python,
+i.e. you set an exception using PyErr_*(PyExc_*, ...) and then return
+NULL or -1 as appropriate.  Therefore whenever a function returns NULL
+or -1 you can be assured an exception is set and you need to bail out
+too.
+
+An implication of using structures to communicate between different
+parts of the application is that the system implementations will have
+to allocate some things like strings etc.  For this reason there are
+utility functions that should always be used for memory management
+purposes: psi_malloc(), psi_calloc(), psi_realloc() and psi_free(),
+all defined in psi.h.  There are also more convenience functions
+available in psi.h, you should definitely read this file.
+
+Lastly the contents of the structures is important.  They are defined
+in the relevant header files and should have types who's size can be
+determined at compilation time to ensure that the classes and modules
+will be able to convert them to the appropriate Python types (and if
+not the compiler should complain).
+
+
+Exceptions
+----------
+
+At Process() initialisation time only two exceptions should be raised:
+(i) NoSuchProcessError if the process does not exist, (ii) OSError if
+something went wrong.  If a psi_*() function returns a negative number
+an OSError has been raised and you can use the errno attribute of the
+exception if present to fine-tune behaviour based on the context.  Some
+functions might try and help you with this fine-tuning by returning a
+specific negative value (other then -1) which indicates a certain
+class of errors (cf. psi_read_file() and psi_readlink()).
+
+XXX Flesh this out a bit and integrate it better where it belongs
+    instead of just being a random paragraph.
+
+
+Modules, APIs and Platforms
+---------------------------
+
+PSI supports many platforms and has several modules.  While we try to
+keep all APIs of all modules stable and fully implemented on all
+platforms this is not always possible.  But each module must compile
+on all platforms, this is easier than it sounds: chances are you will
+manage even if you don't have each platform available.  Since the
+platform depended implementation is always done via some psi_arch_*()
+functions (or sometimes just arch_*()) it is quite trivial to write
+stubs that will raise a NotImplementedError for all platforms.
+
+This technique also simplifies the source declaration in setup.py.  By
+having each feature in <plat>_<feature>.c files
+(e.g. ``linux_process.c``) the module declaration in setup.py can just
+do ``'src/arch/%s_foo.c' % PLATFORM`` for the "foo" feature.  If two
+platforms can share an implementation for "foo" it is then easiest for
+the <arch>_foo.c files to be skeletons using functions from the common
+implementation, e.g.::
+
+  foo_sources = ['src/util.c',
+                 'src/foomodule.c',
+                 'src/arch/%s_foo.c' % PLATFORM]
+  if PLATFORM in ['linux', 'darwin']:
+      foo_sources.append('src/arch/shared_foo_impl.c')
+
+
+C Coding Standard
+-----------------
+
+* PEP7
+
+* Functions follow the Python convention of returning -1 or NULL in
+  case of an error, in case of an error a Python exception is set.
+  Testing if an `int' function was successful is best done as `if
+  (some_function() < 0)' since some functions might add specific
+  meanings to errors by returning a value smaller then -1
+  (e.g. psi_read_file()).
+
+* Always include <Python.h> first.  Even if nothing of python is used,
+  it defines _POSIX_C_SOURCE and _XOPEN_SOURCE for us which are
+  required for POSIX compliance.

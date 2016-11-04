@@ -67,62 +67,67 @@ using namespace gpos;
 using namespace gpdxl;
 using namespace gpopt;
 
-class COptTasks
+// context of optimizer input and output objects
+struct SOptContext
 {
 
+	// mark which pointer member should NOT be released
+	// when calling Free() function
+	enum EPin
+	{
+		epinQueryDXL, // keep m_szQueryDXL
+		epinQuery, 	 // keep m_pquery
+		epinPlanDXL, // keep m_szPlanDXL
+		epinPlStmt, // keep m_pplstmt
+		epinErrorMsg // keep m_szErrorMsg
+	};
+
+	// query object serialized to DXL
+	CHAR *m_szQueryDXL;
+
+	// query object
+	Query *m_pquery;
+
+	// plan object serialized to DXL
+	CHAR *m_szPlanDXL;
+
+	// plan object
+	PlannedStmt *m_pplstmt;
+
+	// is generating a plan object required ?
+	BOOL m_fGeneratePlStmt;
+
+	// is serializing a plan to DXL required ?
+	BOOL m_fSerializePlanDXL;
+
+	// did the optimizer fail unexpectedly?
+	BOOL m_fUnexpectedFailure;
+
+	// buffer for optimizer error messages
+	CHAR *m_szErrorMsg;
+
+	// ctor
+	SOptContext();
+
+	// If there is an error print as warning and throw exception to abort
+	// plan generation
+	void HandleError(BOOL *pfUnexpectedFailure);
+
+	// free all members except input and output pointers
+	void Free(EPin epinInput, EPin epinOutput);
+
+	// Clone the error message in given context.
+	CHAR* CloneErrorMsg(MemoryContext context);
+
+	// casting function
+	static
+	SOptContext *PoptctxtConvert(void *pv);
+
+}; // struct SOptContext
+
+class COptTasks
+{
 	private:
-
-		// context of optimizer input and output objects
-		struct SOptContext
-		{
-
-			// mark which pointer member should NOT be released
-			// when calling Free() function
-			enum EPin
-			{
-				epinQueryDXL, // keep m_szQueryDXL
-				epinQuery, 	 // keep m_pquery
-				epinPlanDXL, // keep m_szPlanDXL
-				epinPlStmt, // keep m_pplstmt
-				epinErrorMsg // keep m_szErrorMsg
-			};
-
-			// query object serialized to DXL
-			CHAR *m_szQueryDXL;
-
-			// query object
-			Query *m_pquery;
-
-			// plan object serialized to DXL
-			CHAR *m_szPlanDXL;
-
-			// plan object
-			PlannedStmt *m_pplstmt;
-
-			// is generating a plan object required ?
-			BOOL m_fGeneratePlStmt;
-
-			// is serializing a plan to DXL required ?
-			BOOL m_fSerializePlanDXL;
-
-			// did the optimizer fail unexpectedly?
-			BOOL m_fUnexpectedFailure;
-
-			// buffer for optimizer error messages
-			CHAR *m_szErrorMsg;
-
-			// ctor
-			SOptContext();
-
-			// free all members except input and output pointers
-			void Free(EPin epinInput, EPin epinOutput);
-
-			// casting function
-			static
-			SOptContext *PoptctxtConvert(void *pv);
-
-		}; // struct SOptContext
-
 
 		// context of relcache input and output objects
 		struct SContextRelcacheToDXL
@@ -179,9 +184,9 @@ class COptTasks
 		static
 		void Execute ( void *(*pfunc) (void *), void *pfuncArg);
 
-		// task that does the translation from planned stmt to XML
+		// print error and delete the given error buffer
 		static
-		void* PvDXLFromPlstmtTask(void *pv);
+		void LogErrorAndDelete(CHAR* err_buf);
 
 		// task that does the translation from xml to dxl to pplstmt
 		static
@@ -190,10 +195,6 @@ class COptTasks
 		// task that does the translation from query to XML
 		static
 		void* PvDXLFromQueryTask(void *pv);
-
-		// task that does the translation from xml to dxl to pquery
-		static
-		void* PvQueryFromDXLTask(void *pv);
 
 		// dump relcache info for an object into DXL
 		static
@@ -229,7 +230,7 @@ class COptTasks
 
 		// translate a DXL tree into a planned statement
 		static
-		PlannedStmt *Pplstmt(IMemoryPool *pmp, CMDAccessor *pmda, const CDXLNode *pdxln);
+		PlannedStmt *Pplstmt(IMemoryPool *pmp, CMDAccessor *pmda, const CDXLNode *pdxln, bool canSetTag);
 
 		// load search strategy from given path
 		static
@@ -278,20 +279,13 @@ class COptTasks
 		PlannedStmt *PplstmtOptimize
 			(
 			Query *pquery,
+			SOptContext* octx,
 			BOOL *pfUnexpectedFailure // output : set to true if optimizer unexpectedly failed to produce plan
 			);
 
 		// convert query to DXL to xml string.
 		static
 		char *SzDXL(Query *pquery);
-
-		// convert planned statement to DXL to xml string.
-		static
-		char *SzDXL(PlannedStmt *pplstmt);
-
-		// convert xml string to DXL and to Query
-		static
-		Query *PqueryFromXML(char *szXmlString);
 
 		// convert xml string to DXL and to PS
 		static

@@ -76,7 +76,7 @@ SET(HEADER
 
 SET(RECORDS_HEADER 
    	records/ApplicationAttemptId.h
-    records/ApplicationID.h
+    records/ApplicationId.h
     records/ApplicationReport.h
     records/ApplicationResourceUsageReport.h
     records/FinalApplicationStatus.h

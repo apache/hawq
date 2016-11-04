@@ -68,6 +68,7 @@ void	free_token_resources(PxfInputData *inputData);
 Datum gpbridge_import(PG_FUNCTION_ARGS)
 {
 	gpbridge_check_inside_extproto(fcinfo, "gpbridge_import");
+//	ExternalSelectDesc desc = EXTPROTOCOL_GET_SELECTDESC(fcinfo);
 
 	if (gpbridge_last_call(fcinfo))
 		PG_RETURN_INT32(gpbridge_cleanup(fcinfo));
@@ -180,7 +181,10 @@ void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	inputData.headers = context->churl_headers;
 	inputData.gphduri = context->gphd_uri;
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
+	inputData.quals = EXTPROTOCOL_GET_SCANQUALS(fcinfo);
 	inputData.filterstr = serializePxfFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
+	if (EXTPROTOCOL_GET_SELECTDESC(fcinfo))
+		inputData.proj_info = EXTPROTOCOL_GET_PROJINFO(fcinfo);
 	add_delegation_token(&inputData);
 	
 	build_http_header(&inputData);

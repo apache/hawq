@@ -1,0 +1,374 @@
+-- start_ignore
+SET SEARCH_PATH=TestSubplan_TestSubplanAll;
+SET
+-- end_ignore
+--
+-- These tests are intended to cover GPSQL-1260.  Which means queries
+-- whose plan contains combinations of InitPlan and SubPlan nodes.
+--
+-- Derived from //cdbfast/main/subquery/mpp8334/
+-- SUITE: hash-vs-nl-not-in
+-- start_ignore
+drop schema if exists subplan_tests cascade;
+psql:/tmp/TestSubplan_TestSubplanAll.sql:12: NOTICE:  schema "subplan_tests" does not exist, skipping
+DROP SCHEMA
+-- end_ignore
+create schema subplan_tests;
+CREATE SCHEMA
+set search_path=subplan_tests;
+SET
+create table t1(a int, b int) distributed by (a);
+CREATE TABLE
+insert into t1 select i, i+10 from generate_series(-5,5)i;
+INSERT 0 11
+create table i3(a int not null, b int not null) distributed by (a);
+CREATE TABLE
+insert into i3 select i-1, i from generate_series(1,5)i;
+INSERT 0 5
+create table i4(a int, b int) distributed by (a);
+CREATE TABLE
+insert into i4 values(null,null);
+INSERT 0 1
+insert into i4 select i, i-10 from generate_series(-5,0)i;
+INSERT 0 6
+DROP LANGUAGE IF EXISTS plpythonu CASCADE;
+psql:/tmp/TestSubplan_TestSubplanAll.sql:27: NOTICE:  language "plpythonu" does not exist, skipping
+DROP LANGUAGE
+CREATE LANGUAGE plpythonu;
+CREATE LANGUAGE
+create or replace function twice(int) returns int as $$
+       select 2 * $1;
+$$ language sql;
+CREATE FUNCTION
+create or replace function half(int) returns int as $$
+begin
+	return $1 / 2;
+end;
+$$ language plpgsql;
+CREATE FUNCTION
+create or replace function thrice(x int) returns int as $$
+    if (x is None):
+        return 0
+    else:
+        return x * 3
+$$ language plpythonu;
+CREATE FUNCTION
+select t1.* from t1 where (t1.a, t1.b) not in
+   (select twice(i3.a), i3.b from i3 union select i4.a, thrice(i4.b) from i4);
+ a  | b  
+----+----
+ -2 |  8
+  3 | 13
+  5 | 15
+  4 | 14
+ -1 |  9
+  0 | 10
+  2 | 12
+ -5 |  5
+ -3 |  7
+ -4 |  6
+  1 | 11
+(11 rows)
+
+select t1.* from t1 where (t1.a, half(t1.b)) not in
+   (select twice(i3.a), i3.b from i3 union all select i4.a, i4.b from i4);
+ a | b 
+---+---
+(0 rows)
+
+select t1.a, half(t1.b) from t1 where (t1.a, t1.b) not in
+   (select 1, thrice(2) union select 3, 4);
+ a  | half 
+----+------
+  4 |    7
+ -5 |    2
+ -3 |    3
+ -4 |    3
+  1 |    5
+ -1 |    4
+  0 |    5
+  2 |    6
+ -2 |    4
+  3 |    6
+  5 |    7
+(11 rows)
+
+select t1.* from t1 where (half(t1.a), t1.b) not in
+   (select thrice(i3.a), i3.b from i3 union select i4.a, i4.b from i4);
+ a | b 
+---+---
+(0 rows)
+
+select t1.* from t1 where (t1.a, t1.b) not in
+   (select i3.a, half(i3.b) from i3 union all
+      select i4.a, thrice(i4.b) from i4);
+ a  | b  
+----+----
+  4 | 14
+ -1 |  9
+  0 | 10
+  2 | 12
+ -5 |  5
+ -3 |  7
+ -2 |  8
+  3 | 13
+  5 | 15
+ -4 |  6
+  1 | 11
+(11 rows)
+
+-- Two SubPlan nodes
+select t1.* from t1 where (t1.a, t1.b) not in (select i3.a, i3.b from i3) or
+   (t1.a, t1.b) not in (select i4.a, i4.b from i4);
+ a  | b  
+----+----
+ -2 |  8
+  3 | 13
+  5 | 15
+ -1 |  9
+  0 | 10
+  2 | 12
+ -4 |  6
+  1 | 11
+ -5 |  5
+ -3 |  7
+  4 | 14
+(11 rows)
+
+-- Two SubPlan nodes
+select t1.* from t1 where
+   (t1.a, twice(t1.b)) not in (select thrice(i3.a), i3.b from i3) or
+      (t1.a, half(t1.b)) not in (select i4.a, i4.b from i4);
+ a  | b  
+----+----
+ -4 |  6
+  1 | 11
+  4 | 14
+ -2 |  8
+  3 | 13
+  5 | 15
+ -5 |  5
+ -3 |  7
+ -1 |  9
+  0 | 10
+  2 | 12
+(11 rows)
+
+-- Two SubPlan nodes
+select t1.* from t1 where (t1.a, t1.b) not in (select i3.a,i3.b from i3) or
+   (t1.a, half(t1.b)) not in (select thrice(i4.a), i4.b from i4);
+ a  | b  
+----+----
+ -4 |  6
+  1 | 11
+  4 | 14
+ -1 |  9
+  0 | 10
+  2 | 12
+ -2 |  8
+  3 | 13
+  5 | 15
+ -5 |  5
+ -3 |  7
+(11 rows)
+
+-- SUITE: diff-rel-cols-not-in
+truncate table t1;
+TRUNCATE TABLE
+create table t2(a int, b int) distributed by (a);
+CREATE TABLE
+insert into t1 select i, i-10 from generate_series(-1,3)i;
+INSERT 0 5
+insert into t2 select i, i-10 from generate_series(2,5)i;
+INSERT 0 4
+create table i1(a int, b int) distributed by (a);
+CREATE TABLE
+insert into i1 select i, i-10 from generate_series(3,6)i;
+INSERT 0 4
+create or replace function twice(int) returns int as $$
+       select 2 * $1;
+$$ language sql;
+CREATE FUNCTION
+create or replace function half(int) returns int as $$
+begin
+	return $1 / 2;
+end;
+$$ language plpgsql;
+CREATE FUNCTION
+create or replace function thrice(x int) returns int as $$
+    if x is not None:
+        return x * 3
+    return 0
+$$ language plpythonu;
+CREATE FUNCTION
+select t1.a, twice(t2.b) from t1, t2 where t1.a = half(t2.a) or
+   ((t1.a, t2.b) not in (select i1.a, thrice(i1.b) from i1));
+ a  | twice 
+----+-------
+  3 |   -14
+  3 |   -10
+  1 |   -14
+  1 |   -10
+ -1 |   -14
+ -1 |   -10
+  0 |   -14
+  0 |   -10
+  2 |   -14
+  2 |   -10
+  3 |   -16
+  1 |   -16
+ -1 |   -16
+  0 |   -16
+  2 |   -16
+  3 |   -12
+  1 |   -12
+ -1 |   -12
+  0 |   -12
+  2 |   -12
+(20 rows)
+
+select t1.a, t2.b from t1 left join t2 on
+   (t1.a = t2.a and ((t1.a, half(t2.b)) not in (select i1.a, i1.b from i1)));
+ a  | b  
+----+----
+  1 |   
+ -1 |   
+  0 |   
+  2 | -8
+  3 | -7
+(5 rows)
+
+select t1.a, t2.b from t1, t2 where t1.a = t2.a or
+   ((t1.a, t2.b) not in (select thrice(i1.a), i1.b from i1));
+ a  | b  
+----+----
+  1 | -6
+ -1 | -6
+  0 | -6
+  2 | -6
+  3 | -6
+  1 | -8
+ -1 | -8
+  0 | -8
+  2 | -8
+  3 | -8
+  1 | -7
+  1 | -5
+ -1 | -7
+ -1 | -5
+  0 | -7
+  0 | -5
+  2 | -7
+  2 | -5
+  3 | -7
+  3 | -5
+(20 rows)
+
+select t1.a, t2.b from t1 left join t2 on
+   (thrice(t1.a) = thrice(t2.a) and
+      ((t1.a, t2.b) not in (select i1.a, i1.b from i1)));
+ a  | b  
+----+----
+  1 |   
+  3 |   
+ -1 |   
+  0 |   
+  2 | -8
+(5 rows)
+
+select t1.a, t2.b from t1, t2 where t1.a = t2.a or
+   ((t1.a, t2.b) not in (select i1.a, half(i1.b) from i1));
+ a  | b  
+----+----
+  3 | -6
+  1 | -6
+ -1 | -6
+  0 | -6
+  2 | -6
+  3 | -7
+  3 | -5
+  1 | -7
+  1 | -5
+ -1 | -7
+ -1 | -5
+  0 | -7
+  0 | -5
+  2 | -7
+  2 | -5
+  3 | -8
+  1 | -8
+ -1 | -8
+  0 | -8
+  2 | -8
+(20 rows)
+
+select t1.a, t2.b from t1 left join t2 on
+   (t1.a = t2.a and
+      ((t1.a, twice(t2.b)) not in (select i1.a, thrice(i1.b) from i1)));
+ a  | b  
+----+----
+  1 |   
+ -1 |   
+  0 |   
+  2 | -8
+  3 | -7
+(5 rows)
+
+-- From MPP-2869
+create table bug_data (domain integer, class integer, attr text, value integer)
+   distributed by (domain);
+CREATE TABLE
+insert into bug_data values(1, 1, 'A', 1);
+INSERT 0 1
+insert into bug_data values(2, 1, 'A', 0);
+INSERT 0 1
+insert into bug_data values(3, 0, 'B', 1);
+INSERT 0 1
+-- This one is contains one InitPlan without any SubPlan.
+create table foo as 
+SELECT attr, class, (select thrice(count(distinct class)::int) from bug_data)
+   as dclass FROM bug_data GROUP BY attr, class distributed by (attr);
+SELECT 2
+-- Query from GPSQL-1260, produces InitPlan and a SubPlan.
+create or replace function nop(a int) returns int as $$ return a $$
+language plpythonu;
+CREATE FUNCTION
+create table toy as select generate_series(1, 10) i distributed by (i);
+SELECT 10
+select * from toy; -- only for debugging
+ i  
+----
+  8
+ 10
+  2
+  1
+  9
+  4
+  6
+  3
+  5
+  7
+(10 rows)
+
+select array(select nop(i) from toy order by i);
+        ?column?        
+------------------------
+ {1,2,3,4,5,6,7,8,9,10}
+(1 row)
+
+-- start_ignore
+drop schema subplan_tests cascade;
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table toy
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to function nop(integer)
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table foo
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table bug_data
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to function thrice(integer)
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to function half(integer)
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to function twice(integer)
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table i1
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table t2
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table i4
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table i3
+psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table t1
+DROP SCHEMA
+-- end_ignore

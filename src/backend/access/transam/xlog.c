@@ -5299,6 +5299,8 @@ XLOGShmemInit(void)
 void
 XLogStartupInit(void)
 {
+	if (!IsBootstrapProcessingMode())
+		ReadControlFile();
 }
 
 /*
@@ -7403,6 +7405,12 @@ XLogStandbyRecoverRange(XLogRecPtr *redoCheckpointLoc, CheckPoint *redoCheckPoin
 	ShmemVariableCache->nextOid = redoCheckPoint->nextOid;
 	ShmemVariableCache->oidCount = 0;
 	MultiXactSetNextMXact(redoCheckPoint->nextMulti, redoCheckPoint->nextMultiOffset);
+
+	/*
+	 * Should not emit XLog during standby redo. This method is called only
+	 * by standby walredo process.
+	 */
+	CanEmitXLogRecords = false;
 
 	/* Start up the recovery environment */
 	XLogInitRelationCache();

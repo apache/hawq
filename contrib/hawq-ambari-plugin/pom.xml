@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.apache.hawq</groupId>
+  <artifactId>hawq-ambari-plugin</artifactId>
+  <version>2.0.1.0</version>
+  <name>hawq-ambari-plugin</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <release>${project.version}</release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <resources.temp>${basedir}/target/resources-temp</resources.temp>
+    <hawq.lib.dir>/var/lib/hawq</hawq.lib.dir>
+    <hawq.lib.staging.dir>${hawq.lib.dir}/staging</hawq.lib.staging.dir>
+  </properties>
+
+  <build>
+    <plugins>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.0.1</version>
+
+        <executions>
+          <execution>
+            <phase>none</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+          </execution>
+        </executions>
+
+        <configuration>
+          <filters>
+            <filter>${basedir}/build.properties</filter>
+          </filters>
+          <outputDirectory>${resources.temp}</outputDirectory>
+          <resources>
+            <resource>
+              <directory>${basedir}/src/main/resources/</directory>
+              <filtering>true</filtering>
+            </resource>
+          </resources>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>rpm-maven-plugin</artifactId>
+        <version>2.0.1</version>
+
+        <executions>
+          <execution>
+            <phase>none</phase>
+            <goals>
+              <goal>rpm</goal>
+            </goals>
+          </execution>
+        </executions>
+
+        <configuration>
+          <copyright>ASL 2.0</copyright>
+          <group>org.apache.hawq</group>
+          <description>
+            HAWQ plugin contains Ambari's stack definition for HAWQ.
+            When installed, Ambari will be able to support HAWQ as a service.
+          </description>
+          <needarch>x86_64</needarch>
+          <release>${build_number}%{?dist}</release>
+          <requires>
+            <require>ambari-server &gt;= 2.2</require>
+            <require>python &gt;= 2.6</require>
+          </requires>
+          <mappings>
+            <mapping>
+              <directory>${hawq.lib.staging.dir}</directory>
+              <sources>
+                <source>
+                  <location>${resources.temp}/services</location>
+                </source>
+              </sources>
+            </mapping>
+            <mapping>
+              <directory>${hawq.lib.dir}</directory>
+              <filemode>755</filemode>
+              <sources>
+                <source>
+                  <location>${resources.temp}/utils</location>
+                </source>
+              </sources>
+            </mapping>
+          </mappings>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>
+

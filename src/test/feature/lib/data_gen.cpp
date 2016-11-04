@@ -20,6 +20,22 @@ void DataGenerator::genSimpleTable(string tableName, bool appendonly,
   sqlUtil->execute(insertSql);
 }
 
+void DataGenerator::genAggregateTable(string tableName, bool appendonly,
+                                   string orientation,
+                                   string compresstype,
+                                   int compresslevel) {
+  string desc =
+      genTableDesc(appendonly, orientation, compresstype, compresslevel);
+  string createSql =
+      "create table " + tableName + "(a int, b VARCHAR, c int) " + desc;
+  sqlUtil->execute(createSql);
+
+  string insertSql =
+      "insert into " + tableName + " values(1, 'aa', 10), (1, 'bb', 20), "
+          "(2, 'cc', 20), (3, 'cc', 20);";
+  sqlUtil->execute(insertSql);
+}
+
 void DataGenerator::genTableWithSeries(string tableName, bool appendonly,
                                        string orientation,
                                        string compresstype,

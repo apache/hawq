@@ -1,0 +1,6 @@
+Processing module test13 (test_input/test13.py)...
+
+Warnings...
+
+test_input/test13.py:12: Global variable (x) not defined in module scope
+test_input/test13.py:29: No global (xxx) found

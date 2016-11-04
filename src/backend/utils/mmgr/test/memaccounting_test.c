@@ -40,6 +40,8 @@
 #define AllocPointerGetChunk(ptr)	\
 					((StandardChunkHeader *)(((char *)(ptr)) - ALLOC_CHUNKHDRSZ))
 
+void write_stderr_mock(const char *fmt,...);
+
 static StringInfoData outputBuffer;
 
 /* We will capture write_stderr output using write_stderr_mock */

@@ -1425,9 +1425,9 @@ get_ao_distribution_name(PG_FUNCTION_ARGS)
 		 * assemble our query string
 		 */
 		initStringInfo(&sqlstmt);
-		appendStringInfo(&sqlstmt, "select gp_segment_id,sum(tupcount) "
-						"from gp_dist_random('pg_aoseg.%s') "
-						"group by (gp_segment_id)", aoseg_relname);
+		appendStringInfo(&sqlstmt, "select segno,sum(tupcount) "
+						"from pg_aoseg.%s "
+						"group by (segno)", aoseg_relname);
 
 		PG_TRY();
 		{
@@ -1549,6 +1549,8 @@ get_ao_compression_ratio_name(PG_FUNCTION_ARGS)
 	Oid				relid;
 
 	/* Assert(Gp_role != GP_ROLE_EXECUTE); */
+	if (NULL == relname)
+		elog(ERROR, "failed to get relname for this function.");
 
 	parentrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	relid = RangeVarGetRelid(parentrv, false, true /*allowHcatalog*/);
@@ -1568,6 +1570,9 @@ get_ao_compression_ratio_oid(PG_FUNCTION_ARGS)
 	Oid			relid = PG_GETARG_OID(0);
 
 	/* Assert(Gp_role != GP_ROLE_EXECUTE); */
+
+	if (!OidIsValid(relid))
+		elog(ERROR, "failed to get valid relation id for this function.");
 
 	return ao_compression_ratio_internal(relid);
 }

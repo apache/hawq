@@ -1,0 +1,2 @@
+include COPYRIGHT VERSION ChangeLog KNOWN_BUGS MAINTAINERS NEWS TODO 
+include README pycheckrc 

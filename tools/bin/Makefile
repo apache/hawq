@@ -36,7 +36,7 @@ PYLIB_SRC=$(SRC)/pythonSrc
 LIB_DIR=$(SRC)/lib
 PYLIB_DIR=$(SRC)/ext
 
-all: stream pygresql
+all: lockfile pygresql stream pychecker psi unittest2 pexpect
 
 #
 # Python Libraries
@@ -64,6 +64,77 @@ pygresql:
 	mkdir -p $(PYLIB_DIR)/pygresql
 	cp -r $(PYLIB_SRC)/$(PYGRESQL_DIR)/build/lib.*/* $(PYLIB_DIR)/pygresql
 	touch $(PYLIB_DIR)/__init__.py
+
+#
+# LOCKFILE
+#
+# note the awk commands are used to eliminate references to code in __init__.py
+# that we don't use and also to insert a comment to tell pylint not to complain
+# about these files since we are not in a position to correct those warnings.
+#
+LOCKFILE_VERSION=0.9.1
+LOCKFILE_DIR=lockfile-$(LOCKFILE_VERSION)
+LOCKFILE_SRC=$(PYLIB_SRC)/$(LOCKFILE_DIR)/build/lib/lockfile
+LOCKFILE_DST=$(PYLIB_DIR)/lockfile
+lockfile:
+	@echo "--- lockfile"
+	cd $(PYLIB_SRC)/$(LOCKFILE_DIR)/ && python setup.py build
+	mkdir -p $(PYLIB_DIR)/lockfile
+	awk 'BEGIN{print "# pylint: disable-all"} /^if hasattr/ {exit} { print }' < $(LOCKFILE_SRC)/__init__.py    > $(LOCKFILE_DST)/__init__.py
+	awk 'BEGIN{print "# pylint: disable-all"} { print }'                      < $(LOCKFILE_SRC)/pidlockfile.py > $(LOCKFILE_DST)/pidlockfile.py
+
+#
+# PYCRYPTO
+#
+PYCRYPTO_VERSION=2.0.1
+PYCRYPTO_DIR=pycrypto-$(PYCRYPTO_VERSION)
+
+pycrypto:
+	@echo "--- pycrypto"
+	cd $(PYLIB_SRC)/ && $(TAR) xzf $(PYCRYPTO_DIR).tar.gz
+	cd $(PYLIB_SRC)/$(PYCRYPTO_DIR)/ && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" python setup.py build
+	cp -r $(PYLIB_SRC)/$(PYCRYPTO_DIR)/build/lib.*/Crypto $(PYLIB_DIR)
+
+#
+# PSI
+#
+PSI_VERSION=0.3b2_gp
+PSI_DIR=PSI-$(PSI_VERSION)
+
+psi:
+	@echo "--- psi"
+	cd $(PYLIB_SRC)/$(PSI_DIR)/ && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" python setup.py build
+	cp -r $(PYLIB_SRC)/$(PSI_DIR)/build/lib.*/psi $(PYLIB_DIR)
+
+#
+# PEXPECT
+#
+PEXPECT_VERSION=4.2
+PEXPECT_DIR=pexpect-$(PEXPECT_VERSION)
+
+pexpect:
+	@echo "--- pexpect"
+	cd $(PYLIB_SRC)/$(PEXPECT_DIR)/ && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" python setup.py build
+	cp -r $(PYLIB_SRC)/$(PEXPECT_DIR)/build/lib/pexpect $(PYLIB_DIR)
+	cp -r $(PYLIB_SRC)/ptyprocess-0.5.1/ptyprocess $(PYLIB_DIR)
+
+#
+# PYCHECKER
+#
+PYCHECKER_VERSION=0.8.18
+PYCHECKER_DIR=pychecker-$(PYCHECKER_VERSION)
+
+pychecker:
+	@echo "--- pychecker"
+	cd $(PYLIB_SRC)/$(PYCHECKER_DIR)/ && python setup.py build
+	cp -r $(PYLIB_SRC)/$(PYCHECKER_DIR)/build/lib/pychecker  $(PYLIB_DIR)/
+
+UNITTEST2_VERSION=0.5.1
+UNITTEST2_DIR=unittest2-${UNITTEST2_VERSION}
+unittest2:
+	@echo "--- unittest2"
+	cd $(PYLIB_SRC)/$(UNITTEST2_DIR)/ && python setup.py build
+	cp -r $(PYLIB_SRC)/$(UNITTEST2_DIR)/build/lib/unittest2  $(PYLIB_DIR)/
 
 PYTHON_FILES=`grep -l --exclude=Makefile --exclude=gplogfilter --exclude=gpcheckos --exclude=gpgenfsmap.py --exclude=throttlingD.py "/bin/env python" *`\
 			 `grep -l "/bin/env python" $(SRC)/../sbin/*`\

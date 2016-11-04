@@ -21,6 +21,7 @@
 #include "lib/stringinfo.h"
 #include "utils/guc.h"
 #include "miscadmin.h"
+#include "access/pxfutils.h"
 
 /* include libcurl without typecheck.
  * This allows wrapping curl_easy_setopt to be wrapped
@@ -304,56 +305,51 @@ void churl_headers_cleanup(CHURL_HEADERS headers)
 	pfree(settings);
 }
 
-
-CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
+CHURL_HANDLE churl_init(const char* url, CHURL_HEADERS headers)
 {
 	churl_context* context = churl_new_context();
 	create_curl_handle(context);
-	context->upload = true;
 	clear_error_buffer(context);
 
 	set_curl_option(context, CURLOPT_URL, url);
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
 	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
 	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);
-	set_curl_option(context, CURLOPT_POST, (const void*)TRUE);
-	set_curl_option(context, CURLOPT_READFUNCTION, read_callback);
-	set_curl_option(context, CURLOPT_READDATA, context);
 	set_curl_option(context, CURLOPT_WRITEFUNCTION, write_callback);
 	set_curl_option(context, CURLOPT_WRITEDATA, context);
 	set_curl_option(context, CURLOPT_HEADERFUNCTION, header_callback);
 	set_curl_option(context, CURLOPT_HEADERDATA, context);
+	churl_headers_set(context, headers);
+
+	return (CHURL_HANDLE)context;
+}
+
+CHURL_HANDLE churl_init_upload(const char* url, CHURL_HEADERS headers)
+{
+	churl_context* context = churl_init(url, headers);
+
+	context->upload = true;
+
+	set_curl_option(context, CURLOPT_POST, (const void*) TRUE);
+	set_curl_option(context, CURLOPT_READFUNCTION, read_callback);
+	set_curl_option(context, CURLOPT_READDATA, context);
 	churl_headers_append(headers, "Content-Type", "application/octet-stream");
 	churl_headers_append(headers, "Transfer-Encoding", "chunked");
 	churl_headers_append(headers, "Expect", "100-continue");
-	churl_headers_set(context, headers);
 
 	print_http_headers(headers);
 	setup_multi_handle(context);
-
 	return (CHURL_HANDLE)context;
 }
 
 CHURL_HANDLE churl_init_download(const char* url, CHURL_HEADERS headers)
 {
-	churl_context* context = churl_new_context();
-	create_curl_handle(context);
-	context->upload = false;
-	clear_error_buffer(context);
+	churl_context* context = churl_init(url, headers);
 
-	set_curl_option(context, CURLOPT_URL, url);
-	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
-	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
-	set_curl_option(context, CURLOPT_IPRESOLVE, (const void*)CURL_IPRESOLVE_V4);
-	set_curl_option(context, CURLOPT_WRITEFUNCTION, write_callback);
-	set_curl_option(context, CURLOPT_WRITEDATA, context);
-	set_curl_option(context, CURLOPT_HEADERFUNCTION, header_callback);
-	set_curl_option(context, CURLOPT_HEADERDATA, context);
-	churl_headers_set(context, headers);
+	context->upload = false;
 
 	print_http_headers(headers);
 	setup_multi_handle(context);
-
 	return (CHURL_HANDLE)context;
 }
 
@@ -485,6 +481,29 @@ void create_curl_handle(churl_context* context)
 void set_curl_option(churl_context* context, CURLoption option, const void* data)
 {
 	int curl_error;
+
+	if (option == CURLOPT_URL)
+	{
+		const char* url = (char* )data;
+		/* needed to resolve localhost */
+		if (strstr(url, LocalhostIpV4) != NULL) {
+			//get loopback interface ip address
+			char* loopback_addr = get_loopback_ip_addr();
+			elog(DEBUG1, "Loopback interface IP address: %s", loopback_addr);
+			char* replaced_url = replace_string(url, LocalhostIpV4, loopback_addr);
+			elog(DEBUG1, "Replaced url: %s", replaced_url);
+			if (CURLE_OK != (curl_error = curl_easy_setopt(context->curl_handle, option, replaced_url)))
+				elog(ERROR, "internal error: curl_easy_setopt %d error (%d - %s)",
+					 option, curl_error, curl_easy_strerror(curl_error));
+
+			//release memory
+			pfree(replaced_url);
+			pfree(loopback_addr);
+			return;
+		}
+	}
+
+
 	if (CURLE_OK != (curl_error = curl_easy_setopt(context->curl_handle, option, data)))
 		elog(ERROR, "internal error: curl_easy_setopt %d error (%d - %s)",
 			 option, curl_error, curl_easy_strerror(curl_error));

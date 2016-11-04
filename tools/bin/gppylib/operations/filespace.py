@@ -27,7 +27,7 @@ import urlparse
 from gppylib.db import dbconn, catalog
 from gppylib.db.dbconn import UnexpectedRowsError, executeUpdateOrInsert
 from gppylib import gplog
-from gppylib.commands.gp import GpStop, GpStart, get_local_db_mode
+from gppylib.commands.gp import GpStop, GpStart, get_local_db_mode, get_masterdatadir
 from gppylib.commands.unix import Ping, RemoveDirectory, RemoveFiles, MakeDirectory
 from gppylib.operations import Operation
 from gppylib.operations.utils import RemoteOperation, ParallelOperation
@@ -41,7 +41,7 @@ logger = gplog.get_default_logger()
 GP_TRANSACTION_FILES_FILESPACE = 'gp_transaction_files_filespace'
 GP_TEMPORARY_FILES_FILESPACE = 'gp_temporary_files_filespace'
 PG_SYSTEM_FILESPACE = 'pg_system'
-MASTER_DATA_DIR = os.environ.get('MASTER_DATA_DIRECTORY')
+MASTER_DATA_DIR = get_masterdatadir()
 NUM_WORKERS = 16  #Number of simultaneous parallel process that are started by ParallelOperation
 
 class FileType:

@@ -1,0 +1,12 @@
+Processing module test70 (test_input/test70.py)...
+
+Warnings...
+
+test_input/test70.py:18: Using a conditional statement with a constant value (1)
+test_input/test70.py:20: Using a conditional statement with a constant value (1)
+test_input/test70.py:27: Using a conditional statement with a constant value (21)
+test_input/test70.py:29: Using a conditional statement with a constant value (31)
+test_input/test70.py:31: Using a conditional statement with a constant value ((x, test))
+test_input/test70.py:32: Using a conditional statement with a constant value ((5, test))
+test_input/test70.py:33: Using a conditional statement with a constant value (5)
+test_input/test70.py:35: Using a conditional statement with a constant value (str)

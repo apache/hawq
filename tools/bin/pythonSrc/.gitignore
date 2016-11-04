@@ -1,1 +1,5 @@
 PyGreSQL-4.0
+*/build/
+
+# generated files
+*.pyc

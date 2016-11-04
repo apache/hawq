@@ -42,6 +42,13 @@ INCLUDES := $$($(APR_CFG) --includes) -I$(code_dir) -I$(CURDIR)/../../../src/inc
 CFLAGS   := $$($(APR_CFG) --cflags) -Wall $(GPFXDIST) $(CFLAGS)
 LIBS     := $$($(APR_CFG) --link-ld --libs) $(LIBS)
 
+# workaround for 'brew link openssl --force' error on MacOS 10.12
+UNAME = $(shell uname)
+ifeq (Darwin, $(UNAME))
+	INCLUDES := $(INCLUDES) -I/usr/local/opt/openssl/include
+	LIBS := $(LIBS) -L/usr/local/opt/openssl/lib
+endif
+
 sol10_sparc_32_CPPFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 sol9_sparc_32_CPPFLAGS  = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 sol8_sparc_32_CPPFLAGS  = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -56,10 +63,11 @@ mkgpfdist: mkdir
 	@echo --- gpfdist --------------------------------------------------
 	cd src/gpfdist/ && \
 	  ln -sf ../../../../../src/backend/utils/misc/fstream/*.c . && ls ../../../../../src/backend/utils/misc/fstream/*.c
-	perl -p -i -e 's,^prefix=.*$$,prefix="$(APR_DIR)",' $(APR_CFG)
+	#perl -p -i -e 's,^prefix=.*$$,prefix="$(APR_DIR)",' $(APR_CFG)
 
 	for file in $(GPFDISTFILES); do \
 	    ( $(CC) $(INCLUDES) $(CFLAGS) $(LIBS) -c $(code_dir)$${file}); \
+	    if [[ $$? -ne 0 ]]; then exit 1; fi \
 	done
 	# link
 	$(CC) $(CFLAGS) -o $(code_dir)gpfdist $(OBJS)  $(LIBS)
