@@ -213,3 +213,27 @@ TEST_F(TestHawqRegister, TestPartitionTableExistsTableFileNotExists) {
     runYamlCaseTableExistsPartition("testpartitiontableexiststablefilenotexists", "partition/table_exists_table_file_not_exists");
 }
 
+TEST_F(TestHawqRegister, TestPartitionTableMultilevel) {
+    SQLUtility util;
+    util.execute("drop table if exists sales;");
+    util.execute("drop table nsales;");
+    // create a partition table and extract it
+    util.execute("CREATE TABLE sales (trans_id int, date date, region text) DISTRIBUTED BY (trans_id) PARTITION BY RANGE (date) \ "
+                "(START (date '2011-01-01') INCLUSIVE END (date '2011-05-01') EXCLUSIVE EVERY (INTERVAL '1 month'), DEFAULT PARTITION outlying_dates );");
+    util.execute("insert into sales values(1, '2011-1-15', 'usa');");
+
+    EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o sales.yml testhawqregister_testpartitiontablemultilevel.sales"));
+
+    // create a two-level partition table
+    util.execute("CREATE TABLE nsales (trans_id int, date date, region text) DISTRIBUTED BY (trans_id) PARTITION BY RANGE (date) \ "
+                "SUBPARTITION BY LIST (region) SUBPARTITION TEMPLATE ( SUBPARTITION usa VALUES ('usa'), SUBPARTITION asia VALUES ('asia'),\ "
+                "SUBPARTITION europe VALUES ('europe'), DEFAULT SUBPARTITION other_regions) (START (date '2011-01-01') INCLUSIVE END (date '2011-06-01') EXCLUSIVE \ "
+                "EVERY (INTERVAL '1 month'), DEFAULT PARTITION outlying_dates );");
+
+    // should fail since multi-level partition is not supported
+    EXPECT_EQ(1, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c sales.yml testhawqregister_testpartitiontablemultilevel.nsales"));
+
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf sales.yml")));
+    util.execute("drop table nsales;");
+    util.execute("drop table sales;");
+}
