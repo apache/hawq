@@ -489,16 +489,16 @@ master_highest_used_oid(void)
 	Oid oidMax = InvalidOid;
 	Oid currentOid;
 	Form_pg_class classForm;
-	int fetchCount;
+	cqContext *pcqOuterCtx;
+	cqContext *pcqInnerCtx;
+	HeapTuple outerTuple;
+	HeapTuple innerTuple;
 
-	cqContext *pcqOuterCtx = caql_beginscan(
-			NULL,
-			cql("SELECT * FROM pg_class where relhasoids = :1",
-					BoolGetDatum(true)));
+	pcqOuterCtx = caql_beginscan(NULL, cql("SELECT relhasoids FROM pg_class where relhasoids = :1", BoolGetDatum(true)));
 
-	HeapTuple tuple = caql_getnext(pcqOuterCtx);
+	outerTuple = caql_getnext(pcqOuterCtx);
 
-	if (!HeapTupleIsValid(tuple))
+	if (!HeapTupleIsValid(outerTuple))
 	{
 		caql_endscan(pcqOuterCtx);
 		elog(DEBUG1, "Unable to get list of tables having oids");
@@ -507,18 +507,34 @@ master_highest_used_oid(void)
 
 	/* construct query to get max oid from all tables with oids */
 	StringInfo sqlstr = makeStringInfo();
-	while (HeapTupleIsValid(tuple))
+	while (HeapTupleIsValid(outerTuple))
 	{
-		classForm = (Form_pg_class) GETSTRUCT(tuple);
-		appendStringInfo(sqlstr, "SELECT oid FROM %s WHERE oid >= :1 ORDER BY oid", classForm->relname.data);
+		classForm = (Form_pg_class) GETSTRUCT(outerTuple);
+		appendStringInfo(sqlstr,
+				"SELECT oid FROM %s WHERE oid > :1 ORDER BY oid",
+				classForm->relname.data);
 
-		currentOid = caql_getoid_plus(NULL, &fetchCount, NULL, cql(sqlstr->data, oidMax));
+		pcqInnerCtx = caql_beginscan(NULL,
+				cql1(sqlstr->data, __FILE__, __LINE__,
+						ObjectIdGetDatum(oidMax)));
+
+		innerTuple = caql_getnext(pcqInnerCtx);
+
+		currentOid = InvalidOid;
+
+		while (HeapTupleIsValid(innerTuple))
+		{
+			currentOid = HeapTupleGetOid(innerTuple);
+			innerTuple = caql_getnext(pcqInnerCtx);
+		}
 
 		elog(DEBUG1, "Max Oid in table %s: %d", classForm->relname.data, currentOid);
 
+		caql_endscan(pcqInnerCtx);
+
 		oidMax = currentOid > oidMax ? currentOid : oidMax;
 
-		tuple = caql_getnext(pcqOuterCtx);
+		outerTuple = caql_getnext(pcqOuterCtx);
 
 		resetStringInfo(sqlstr);
 	}
