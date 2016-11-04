@@ -216,7 +216,7 @@ TEST_F(TestHawqRegister, TestPartitionTableExistsTableFileNotExists) {
 TEST_F(TestHawqRegister, TestPartitionTableMultilevel) {
     SQLUtility util;
     util.execute("drop table if exists sales;");
-    util.execute("drop table nsales;");
+    util.execute("drop table if exists nsales;");
     // create a partition table and extract it
     util.execute("CREATE TABLE sales (trans_id int, date date, region text) DISTRIBUTED BY (trans_id) PARTITION BY RANGE (date) \ "
                 "(START (date '2011-01-01') INCLUSIVE END (date '2011-05-01') EXCLUSIVE EVERY (INTERVAL '1 month'), DEFAULT PARTITION outlying_dates );");
