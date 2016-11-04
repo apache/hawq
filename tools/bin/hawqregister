@@ -294,6 +294,11 @@ class GpRegisterAccessor(object):
         query = "SELECT partitiontablename, partitionboundary FROM pg_partitions WHERE partitionschemaname = '%s' and tablename = '%s'" % (schemaname, tablename)
         return self.exec_query(query)
 
+    def get_partition_parent(self, tablename):
+        schemaname, tablename = tablename_handler(tablename)
+        query = "SELECT partitiontablename, parentpartitiontablename FROM pg_partitions WHERE partitionschemaname = '%s' and tablename = '%s'" % (schemaname, tablename)
+        return self.exec_query(query)
+
     def get_partitionby(self, tablename):
         schemaname, tablename = tablename_handler(tablename)
         query = "SELECT partitionschemaname, partitiontablename, partitionname, partitiontype, parentpartitiontablename, partitionboundary FROM pg_partitions WHERE schemaname = '%s' and tablename='%s';" % (schemaname, tablename)
@@ -966,6 +971,9 @@ class HawqRegisterPartition(HawqRegister):
             dic[ele['partitionboundary']] = ele['partitiontablename']
         return dic
 
+    def _get_partition_parent(self):
+        return self.accessor.get_partition_parent(self.dst_table_name)
+
     def _check_partitionby(self):
         def get_partitionby():
             return self.accessor.get_partitionby(self.dst_table_name)
@@ -1015,6 +1023,13 @@ class HawqRegisterPartition(HawqRegister):
                 self._check_partitionby()
                 self._check_partition_num()
         partitions = self._get_partition_info()
+        partitions_parents = self._get_partition_parent()
+        
+        # check if it is a multi-level partition table
+        if any(p['parentpartitiontablename'] for p in partitions_parents):
+            logger.error('Multi-level partition table is not supported!')
+            sys.exit(1)
+
         self.queries = "set allow_system_table_mods='dml';"
         self.queries += "begin transaction;"
         self._check_duplicate_constraint()
