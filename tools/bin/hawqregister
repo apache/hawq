@@ -1009,6 +1009,13 @@ class HawqRegisterPartition(HawqRegister):
                 sys.exit(1)
             self.file_format = 'Parquet'
             self._check_hash_type() # Usage1 only support randomly distributed table
+
+        # check if it is a multi-level partition table
+        partitions_parents = self._get_partition_parent()
+        if any(p['parentpartitiontablename'] for p in partitions_parents):
+            logger.error('Multi-level partition table is not supported!')
+            sys.exit(1)
+
         for k, pn in enumerate(self.partitions_name):
             self.tablename = pn
             self.files = self.partitions_filepaths[k]
@@ -1023,12 +1030,6 @@ class HawqRegisterPartition(HawqRegister):
                 self._check_partitionby()
                 self._check_partition_num()
         partitions = self._get_partition_info()
-        partitions_parents = self._get_partition_parent()
-        
-        # check if it is a multi-level partition table
-        if any(p['parentpartitiontablename'] for p in partitions_parents):
-            logger.error('Multi-level partition table is not supported!')
-            sys.exit(1)
 
         self.queries = "set allow_system_table_mods='dml';"
         self.queries += "begin transaction;"
