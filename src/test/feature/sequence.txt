@@ -1,1 +1,0 @@
-TestHawqRegister.*:TestExternalOid.TestExternalOidAll:TestTemp.BasicTest:TestExternalTable.TestExternalTableAll
