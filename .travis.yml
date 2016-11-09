@@ -26,7 +26,6 @@ install:
   - brew outdated json-c || brew upgrade json-c
   - brew outdated boost || brew upgrade boost
   - brew outdated maven || brew upgrade maven
-  - brew tap brona/iproute2mac
   - brew install iproute2mac
   - sudo pip install pycrypto
   - sudo cpanm install JSON
