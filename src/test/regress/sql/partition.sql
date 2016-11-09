@@ -4924,3 +4924,21 @@ insert into  t values(1,2,'a');
 select * from t;
 -- END MPP-19105
 reset optimizer_nestloop_factor;
+
+-- Test split default partition while per tuple memory context is reset
+-- Origin GPDB PR: https://github.com/greenplum-db/gpdb/pull/866
+drop table if exists test_split_part cascade;
+
+CREATE TABLE test_split_part ( log_id int NOT NULL, f_array int[] NOT NULL)
+DISTRIBUTED BY (log_id)
+PARTITION BY RANGE(log_id)
+(
+	START (1::int) END (100::int) EVERY (5),
+	PARTITION "old" START (101::int) END (201::int),
+	DEFAULT PARTITION other_log_ids
+);
+
+insert into test_split_part (log_id , f_array) select id, '{10}' from generate_series(1,1000) id;
+
+ALTER TABLE test_split_part SPLIT DEFAULT PARTITION START (201) INCLUSIVE END (301) EXCLUSIVE INTO (PARTITION "new", DEFAULT PARTITION);
+

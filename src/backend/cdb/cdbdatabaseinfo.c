@@ -49,7 +49,6 @@
 #include "cdb/cdbpersistentfilesysobj.h"
 #include "commands/dbcommands.h"
 
-
 /*-------------------------------------------------------------------------
  * Local static type declarations
  *------------------------------------------------------------------------- */
@@ -753,7 +752,9 @@ static void DatabaseInfo_AddFile(
 	HTAB 					*dbInfoRelHashTable,
 	Oid 					tablespace,
 	char					*dbDirPath,
-	char					*name)
+	char					*name,
+	bool                    isHdfs,
+	Oid                     table_oid)
 {
 	int64 eof;
 	int itemCount;
@@ -787,7 +788,7 @@ static void DatabaseInfo_AddFile(
 	}
 	FileClose(file);
 
-	itemCount = sscanf(name, "%u.%u", &relfilenode, &segmentFileNum);
+	itemCount = sscanf(name, isHdfs?"%u/%u":"%u.%u", &relfilenode, &segmentFileNum);
 
 	// UNDONE: sscanf is a rather poor scanner.
 	// UNDONE: For right now, just assume properly named files....
@@ -796,12 +797,16 @@ static void DatabaseInfo_AddFile(
 		DatabaseInfo_AddMiscEntry(info, tablespace, false, name);
 		return;
 	}
-	else if (itemCount == 1)
+	else if (itemCount == 1 && !isHdfs)
 		segmentFileNum = 0;
 	else
 		Assert(itemCount == 2);
 
-	DatabaseInfo_AddRelSegFile(info, dbInfoRelHashTable, tablespace, relfilenode, segmentFileNum, eof);
+	if(isHdfs){
+		DatabaseInfo_AddRelSegFile(info, dbInfoRelHashTable, tablespace, table_oid, relfilenode, eof);
+	}else{
+		DatabaseInfo_AddRelSegFile(info, dbInfoRelHashTable, tablespace, relfilenode, segmentFileNum, eof);
+	}
 }
 
 /*
@@ -818,9 +823,9 @@ DatabaseInfo_Scan(
 	Oid 				 database)
 {
 	char				*dbDirPath;
-	DIR					*xldir;
-	struct dirent		*xlde;
-	char				 fromfile[MAXPGPATH];
+	DIR					*xldir, *xldir1;
+	struct dirent		*xlde,*xlde1;
+	char				 fromfile[MAXPGPATH],fromfile1[MAXPGPATH];
 
 	/* Lookup the database path and allocate a directory scan structure */
 	dbDirPath = GetDatabasePath(
@@ -869,7 +874,9 @@ DatabaseInfo_Scan(
 									dbInfoRelHashTable,
 									tablespace,
 									dbDirPath,
-									xlde->d_name);
+									xlde->d_name,
+									false,
+									InvalidOid);
 			}
 		}else{//on hdfs
 			int ret = HdfsIsDirOrFile(fromfile);
@@ -878,18 +885,52 @@ DatabaseInfo_Scan(
 							(errcode_for_file_access(),
 							 errmsg("error to fetch info for path \"%s\": %m", fromfile)));
 			}else if(ret == 0){//direcotry
-				DatabaseInfo_AddMiscEntry(
+				if(strcmp(xlde->d_name, dbDirPath) == 0){ //database level
+					DatabaseInfo_AddMiscEntry(
 										info,
 										tablespace,
 										/* isDir */ true,
 										xlde->d_name);
+				}else{ //table level, need to recursive list file in this directory
+					xldir1 = AllocateDir(fromfile);
+					if (xldir1 == NULL)
+							ereport(ERROR,
+									(errcode_for_file_access(),
+									 errmsg("Could not open database directory \"%s\": %m", fromfile)));
+					while ((xlde1 = ReadDir(xldir1, fromfile)) != NULL)
+						{
+							if (strcmp(xlde1->d_name, ".") == 0 ||
+								strcmp(xlde1->d_name, "..") == 0)
+								continue;
+
+							/* Odd... On snow leopard, we get back "/" as a subdir, which is wrong. Ingore it */
+							if (xlde1->d_name[0] == '/' && xlde1->d_name[1] == '\0')
+								continue;
+
+							snprintf(fromfile1, MAXPGPATH, "%s/%s", fromfile, xlde1->d_name);
+
+							if(!IsLocalPath(fromfile1)){//on hdfs
+								int ret = HdfsIsDirOrFile(fromfile1);
+								if(ret != 1){//fetch info error
+										ereport(ERROR,
+													(errcode_for_file_access(),
+													 errmsg("error to fetch file path \"%s\": %m", fromfile1)));
+								}else{
+									DatabaseInfo_AddFile(
+														info,
+														dbInfoRelHashTable,
+														tablespace,
+														fromfile,
+														xlde1->d_name,
+														true,
+														pg_atoi(xlde->d_name, 4, 0));
+								}
+							}
+					}
+					FreeDir(xldir1);
+				}
 			}else if(ret == 1){//file
-				DatabaseInfo_AddFile(
-									info,
-									dbInfoRelHashTable,
-									tablespace,
-									dbDirPath,
-									xlde->d_name);
+				//just skip for PG_VERSION file
 			}
 		}
 	}
