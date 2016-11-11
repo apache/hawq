@@ -90,6 +90,7 @@ public class ReadBridge implements Bridge {
             while (outputQueue.isEmpty()) {
                 onerow = fileAccessor.readNextObject();
                 if (onerow == null) {
+                    fileAccessor.closeForRead();
                     output = outputBuilder.getPartialLine();
                     if (output != null) {
                         LOG.warn("A partial record in the end of the fragment");
@@ -109,6 +110,7 @@ public class ReadBridge implements Bridge {
             }
         } catch (IOException ex) {
             if (!isDataException(ex)) {
+                fileAccessor.closeForRead();
                 throw ex;
             }
             output = outputBuilder.getErrorOutput(ex);
@@ -125,22 +127,11 @@ public class ReadBridge implements Bridge {
             }
             output = outputBuilder.getErrorOutput(ex);
         } catch (Exception ex) {
+            fileAccessor.closeForRead();
             throw ex;
         }
 
         return output;
-    }
-
-    /**
-     * Close the underlying resource
-     */
-    public void endIteration() throws Exception {
-        try {
-            fileAccessor.closeForRead();
-        } catch (Exception e) {
-            LOG.error("Failed to close bridge resources: " + e.getMessage());
-            throw e;
-        }
     }
 
     public static ReadAccessor getFileAccessor(InputData inputData)

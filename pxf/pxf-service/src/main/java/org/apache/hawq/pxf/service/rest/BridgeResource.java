@@ -158,11 +158,6 @@ public class BridgeResource extends RestResource {
                     if (!threadSafe) {
                         unlock(dataDir);
                     }
-                    try {
-                        bridge.endIteration();
-                    } catch (Exception e) {
-                        // ignore ... any significant errors should already have been handled
-                    }
                 }
             }
         };

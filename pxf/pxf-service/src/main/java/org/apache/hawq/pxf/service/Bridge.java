@@ -37,6 +37,4 @@ public interface Bridge {
     boolean setNext(DataInputStream inputStream) throws Exception;
 
     boolean isThreadSafe();
-
-    void endIteration() throws Exception;
 }

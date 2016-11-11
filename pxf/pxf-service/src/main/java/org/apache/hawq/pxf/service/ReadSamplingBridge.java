@@ -125,11 +125,6 @@ public class ReadSamplingBridge implements Bridge {
     }
 
     @Override
-    public void endIteration() throws Exception {
-        bridge.endIteration();
-    }
-
-    @Override
     public boolean isThreadSafe() {
         return bridge.isThreadSafe();
     }
