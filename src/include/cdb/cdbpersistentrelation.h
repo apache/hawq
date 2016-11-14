@@ -68,6 +68,7 @@ extern void PersistentRelation_AddCreated(
 		RelFileNode *relFileNode,
 					/* The tablespace, database, and relation OIDs for the create. */
 		ItemPointer persistentTid,
+		int64 *persistentSerialNum,
 		bool flushToXLog);
 
 // -----------------------------------------------------------------------------
