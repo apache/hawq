@@ -222,6 +222,7 @@ static void PersistentBuild_PopulateGpRelationNode(
 
 		ItemPointerData persistentTid;
 		int64 persistentSerialNum;
+		Relation	rd;
 
 		if (dbInfoRel->reltablespace == GLOBALTABLESPACE_OID &&
 			info->database != TemplateDbOid)
@@ -417,6 +418,11 @@ static void PersistentBuild_PopulateGpRelationNode(
 								persistentSerialNum);
 			}
 		}
+		// reset Relation->rd_relationnodeinfo.isPresent, so that next time persistentid and serial# can be refetched
+		rd = RelationIdGetRelation(relFileNode.relNode);
+		rd->rd_relationnodeinfo.isPresent = false;
+		RelationClose(rd);
+
 		(*count)++;
 	}
 
