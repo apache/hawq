@@ -293,9 +293,9 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 		if ( attrindex == -1 )
 		{
 			snprintf(errorbuf, errorbufsize,
-					 "not defined DDL attribute name %s",
+					 "undefined DDL attribute name \'%s\'",
 					 property->Key.Str);
-			elog(WARNING, "Resource manager failed parsing attribute, %s",
+			elog(WARNING, "resource manager failed to parse attribute, %s",
 						  errorbuf);
 			return RMDDL_WRONG_ATTRNAME;
 		}
@@ -310,9 +310,9 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 			if ( parentque == NULL )
 			{
 				snprintf(errorbuf, errorbufsize,
-						 "cannot recognize parent resource queue name %s.",
+						 "cannot recognize parent resource queue name \'%s\'.",
 						 property->Val.Str);
-				elog(WARNING, "Resource manager failed parsing attribute, %s",
+				elog(WARNING, "resource manager failed to parse attribute, %s",
 							  errorbuf);
 				return RMDDL_WRONG_ATTRVALUE;
 			}
@@ -349,7 +349,7 @@ int shallowparseResourceQueueWithAttributes(List 	*rawattr,
 				snprintf(errorbuf, errorbufsize,
 						 "the value of %s cannot be empty",
 						 RSQDDLAttrNames[attrindex]);
-				elog(WARNING, "Resource manager failed parsing attribute, %s",
+				elog(WARNING, "resource manager failed to parse attribute, %s",
 							  errorbuf);
 				return RMDDL_WRONG_ATTRVALUE;
 			}
@@ -449,7 +449,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 
 		if ( SimpleStringEmpty(attrvalue) )
 		{
-			elog(DEBUG3, "No value for attribute %s.", attrname->Str);
+			elog(DEBUG3, "no value for attribute %s.", attrname->Str);
 			continue;
 		}
 
@@ -527,7 +527,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 				 */
 				if ( res == FUNC_RETURN_OK )
 				{
-					elog(DEBUG3, "Resource manager parseResourceQueueAttributes() "
+					elog(DEBUG3, "resource manager parseResourceQueueAttributes() "
 								 "parsed segment resource quota %d MB",
 								 queue->SegResourceQuotaMemoryMB);
 
@@ -556,7 +556,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 			{
 				res = RESQUEMGR_WRONG_RES_QUOTA_EXP;
 				snprintf(errorbuf, errorbufsize,
-						 "%s format %s is not valid.",
+						 "%s format \'%s\' is invalid.",
 						 loadcatalog ?
 							 RSQTBLAttrNames[RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA] :
 							 RSQDDLAttrNames[RSQ_DDL_ATTR_VSEG_RESOURCE_QUOTA],
@@ -653,7 +653,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 							 RSQDDLAttrNames[attrindex],
 						 attrvalue->Str);
 			}
-			elog(WARNING, "Resource manager failed to parse resource queue "
+			elog(WARNING, "resource manager failed to parse resource queue "
 						  "attribute, %s",
 						  errorbuf);
 			return res;
@@ -698,7 +698,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 	{
 		res = RESQUEMGR_INCONSISTENT_RESOURCE_EXP;
 		snprintf(errorbuf, errorbufsize,
-				 "%s and %s must use the same way to express resource limit",
+				 "%s and %s must use the same formats to express resource limit",
 				 loadcatalog ?
 					 RSQTBLAttrNames[RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER] :
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
@@ -762,8 +762,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 		case RSQ_TBL_ATTR_PARENT:
 			res = RESQUEMGR_WRONG_ATTRNAME;
 			snprintf(errorbuf, errorbufsize,
-					 "cannot alter resource queue parent name");
-			elog(WARNING, "Cannot update resource queue %s attribute, %s",
+					 "resource queue parent name cannot be altered");
+			elog(WARNING, "cannot update resource queue \'%s\' attribute, %s",
 						  queue->QueueInfo->Name,
 						  errorbuf);
 			return res;
@@ -774,8 +774,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 			res = SimpleStringToInt32(attrvalue, &(shadowqueinfo->ParallelCount));
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(RMLOG, "Resource manager updated %s %d in shadow "
-							"of resource queue %s.",
+				elog(RMLOG, "resource manager updated %s %d in shadow "
+							"of resource queue \'%s\'",
 							RSQTBLAttrNames[RSQ_TBL_ATTR_ACTIVE_STATMENTS],
 							shadowqueinfo->ParallelCount,
 							queue->QueueInfo->Name);
@@ -792,13 +792,12 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 
 				if ( res == FUNC_RETURN_OK )
 				{
-					elog(RMLOG, "Resource manager updated %s %lf.0%% in shadow "
-								"of resource queue %s.",
+					elog(RMLOG, "resource manager updated %s %lf.0%% in shadow "
+								"of resource queue \'%s\'",
 								RSQTBLAttrNames[RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER],
 								shadowqueinfo->ClusterMemoryPer,
 								queue->QueueInfo->Name);
 				}
-
 				shadowqueinfo->Status |= RESOURCE_QUEUE_STATUS_EXPRESS_PERCENT;
 			}
 			else
@@ -817,13 +816,12 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 
 				if ( res == FUNC_RETURN_OK )
 				{
-					elog(RMLOG, "Resource manager updated %s %lf.0%% in shadow "
-								"of resource queue %s.",
+					elog(RMLOG, "resource manager updated %s %lf.0%% in shadow "
+								"of resource queue \'%s\'",
 								RSQTBLAttrNames[RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER],
 								shadowqueinfo->ClusterVCorePer,
 								queue->QueueInfo->Name);
 				}
-
 				shadowqueinfo->Status |= RESOURCE_QUEUE_STATUS_EXPRESS_PERCENT;
 			}
 			else
@@ -850,8 +848,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 				if ( res == FUNC_RETURN_OK )
 				{
 					shadowqueinfo->SegResourceQuotaVCore = -1;
-					elog(RMLOG, "Resource manager updated %s memory quota %d MB "
-								"in shadow of resource queue %s.",
+					elog(RMLOG, "resource manager updated %s memory quota %d MB "
+								"in shadow of resource queue \'%s\'",
 								RSQTBLAttrNames[RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA],
 								shadowqueinfo->SegResourceQuotaMemoryMB,
 								queue->QueueInfo->Name);
@@ -864,8 +862,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 									   &(shadowqueinfo->ResourceOvercommit));
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(RMLOG, "Resource manager updated %s %lf in shadow of "
-							"resource queue %s.",
+				elog(RMLOG, "resource manager updated %s %lf in shadow of "
+							"resource queue \'%s\'",
 							RSQTBLAttrNames[RSQ_TBL_ATTR_RESOURCE_OVERCOMMIT_FACTOR],
 							shadowqueinfo->ResourceOvercommit,
 							queue->QueueInfo->Name);
@@ -880,8 +878,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 											 &(shadowqueinfo->AllocatePolicy));
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(RMLOG, "Resource manager updated %s %s index %d in shadow of "
-							"resource queue %s.",
+				elog(RMLOG, "resource manager updated %s \'%s\' index %d in shadow of "
+							"resource queue \'%s\'",
 							RSQTBLAttrNames[RSQ_TBL_ATTR_ALLOCATION_POLICY],
 							RSQDDLValueAllocationPolicy[shadowqueinfo->AllocatePolicy],
 							shadowqueinfo->AllocatePolicy,
@@ -894,8 +892,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 									  &(shadowqueinfo->NVSegUpperLimit));
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(RMLOG, "Resource manager updated %s %d in shadow of "
-							"resource queue %s.",
+				elog(RMLOG, "resource manager updated %s %d in shadow of "
+							"resource queue \'%s\'",
 							RSQTBLAttrNames[RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT],
 							shadowqueinfo->NVSegUpperLimit,
 							queue->QueueInfo->Name);
@@ -906,8 +904,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 									  &(shadowqueinfo->NVSegLowerLimit));
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(RMLOG, "Resource manager updated %s %d in shadow of "
-							"resource queue %s.",
+				elog(RMLOG, "resource manager updated %s %d in shadow of "
+							"resource queue \'%s\'",
 							RSQTBLAttrNames[RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT],
 							shadowqueinfo->NVSegLowerLimit,
 							queue->QueueInfo->Name);
@@ -918,8 +916,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 									   &(shadowqueinfo->NVSegUpperLimitPerSeg));
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(RMLOG, "Resource manager updated %s %lf in shadow of "
-							"resource queue %s.",
+				elog(RMLOG, "resource manager updated %s %lf in shadow of "
+							"resource queue \'%s\'",
 							RSQTBLAttrNames[RSQ_TBL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
 							shadowqueinfo->NVSegUpperLimitPerSeg,
 							queue->QueueInfo->Name);
@@ -930,8 +928,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 									   &(shadowqueinfo->NVSegLowerLimitPerSeg));
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(RMLOG, "Resource manager updated %s %lf in shadow of "
-							"resource queue %s.",
+				elog(RMLOG, "resource manager updated %s %lf in shadow of "
+							"resource queue \'%s\'",
 							RSQTBLAttrNames[RSQ_TBL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
 							shadowqueinfo->NVSegLowerLimitPerSeg,
 							queue->QueueInfo->Name);
@@ -949,8 +947,8 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 					 "failed to recognize attribute setting %s=%s",
 					 attrname->Str,
 					 attrvalue->Str);
-			elog(WARNING, "Resource manager failed to update resource queue "
-						  "attribute in shadow of resource queue %s, %s",
+			elog(WARNING, "resource manager failed to update resource queue "
+						  "attribute in shadow of resource queue \'%s\', %s",
 						  queue->QueueInfo->Name,
 						  errorbuf);
 			return res;
@@ -960,9 +958,9 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 	return res;
 }
 
-#define ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue,errorbuf)				   \
-		elog(WARNING, "Resource manager cannot complete resource queue %s, %s",\
-					  (queue)->Name,										   \
+#define ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue,errorbuf)				       \
+		elog(WARNING, "resource manager cannot complete resource queue \'%s\', %s",\
+					  (queue)->Name,										       \
 					  (errorbuf));
 /*
  * This is one API for checking if new resource queue definition is valid to be
@@ -1021,7 +1019,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 		{
 			res = RESQUEMGR_WRONG_ATTR;
 			snprintf(errorbuf, errorbufsize,
-					 "%s has at least one role assigned",
+					 "resource queue \'%s\' has at least one role assigned",
 					 parenttrack->QueueInfo->Name);
 			ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
 			return res;
@@ -1147,7 +1145,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %s",
+				 "attribute %s is less than %s",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT],
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT]);
 		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
@@ -1161,7 +1159,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %lf, wrong value %lf",
+				 "attribute %s is less than %lf, wrong value %lf",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
 				 MINIMUM_RESQUEUE_NVSEG_UPPER_PERSEG_LIMIT_N,
 				 queue->NVSegUpperLimitPerSeg);
@@ -1173,7 +1171,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %lf, wrong value %lf",
+				 "attribute %s is less than %lf, wrong value %lf",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG],
 				 MINIMUM_RESQUEUE_NVSEG_LOWER_PERSEG_LIMIT_N,
 				 queue->NVSegLowerLimitPerSeg);
@@ -1187,7 +1185,7 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 	{
 		res = RESQUEMGR_WRONG_ATTR;
 		snprintf(errorbuf, errorbufsize,
-				 "%s is less than %s",
+				 "attribute %s is less than %s",
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_UPPER_LIMIT_PERSEG],
 				 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT_PERSEG]);
 		ELOG_WARNING_ERRORMESSAGE_COMPLETEQUEUE(queue, errorbuf)
@@ -1197,8 +1195,8 @@ int checkAndCompleteNewResourceQueueAttributes(DynResourceQueue  queue,
 }
 
 #define ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue,errorbuf)			   \
-		elog(WARNING, "Resource manager cannot create resource queue track "   \
-					  "instance for queue %s, %s",  						   \
+		elog(WARNING, "resource manager cannot create resource queue track "   \
+					  "instance for resource queue \'%s\', %s",  						   \
 					  (queue)->Name,										   \
 					  (errorbuf));
 /**
@@ -1250,7 +1248,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 	if (tmpquetrack != NULL) {
 		res = RESQUEMGR_DUPLICATE_QUENAME;
 		snprintf(errorbuf, errorbufsize,
-				 "duplicate queue name %s for creating resource queue.",
+				 "duplicate queue name \'%s\' for creating resource queue.",
 			     queue->Name);
 		ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 		goto exit;
@@ -1260,7 +1258,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 	isDefaultQueue = RESQUEUE_IS_DEFAULT(queue);
 	isRootQueue	   = RESQUEUE_IS_ROOT(queue);
 
-	elog(DEBUG3, "HAWQ RM :: To create resource queue instance %s", queue->Name);
+	elog(DEBUG3, "to create resource queue instance \'%s\'", queue->Name);
 
 	/*
 	 * Check the queue parent-child relationship. No matter the queue is to be
@@ -1279,7 +1277,7 @@ int createQueueAndTrack( DynResourceQueue		queue,
 		{
 			res = RESQUEMGR_IN_USE;
 			snprintf( errorbuf, errorbufsize,
-					  "the parent queue %s has active connections",
+					  "the parent queue \'%s\' has active connections",
 					  parenttrack->QueueInfo->Name);
 			ELOG_WARNING_ERRORMESSAGE_CREATEQUEUETRACK(queue, errorbuf)
 			goto exit;
@@ -1572,7 +1570,7 @@ int32_t addResourceQueueRatio(DynResourceQueueTrack track)
 		PQUEMGR->RatioCount++;
 		PQUEMGR->RatioReferenceCounter[res] = 1;
 		PQUEMGR->RatioTrackers[res] = createDynMemoryCoreRatioTrack(ratio, res);
-		elog(RMLOG, "Added new memory/core ratio %u, assigned index %d.",
+		elog(RMLOG, "added new memory/core ratio %u, assigned index %d.",
 					ratio, res);
 
 		/* Add all resource info into the alloc/avail resource ordered indices */
@@ -1603,7 +1601,7 @@ void removeResourceQueueRatio(DynResourceQueueTrack track)
 
 	/* Ignore unkonwn ratio number. */
 	if ( ratioindex < 0 ) {
-		elog( WARNING, "HAWQ RM :: Cannot track resource queue %s with memory "
+		elog( WARNING, "cannot track resource queue \'%s\' with memory "
 					   "core ratio %d MB Per CORE.",
 					   track->QueueInfo->Name,
 					   track->MemCoreRatio);
@@ -1618,7 +1616,7 @@ void removeResourceQueueRatio(DynResourceQueueTrack track)
 	res = removeQueueTrackFromMemoryCoreTrack(PQUEMGR->RatioTrackers[ratioindex],
 											  track);
 	if ( res != FUNC_RETURN_OK ) {
-		elog( WARNING, "HAWQ RM :: Cannot find resource queue %s with memory "
+		elog( WARNING, "cannot find resource queue \'%s\' with memory "
 					   "core ratio %d MB Per CORE in memory core ratio tracker.",
 					   track->QueueInfo->Name,
 					   track->MemCoreRatio);
@@ -1664,7 +1662,7 @@ void removeResourceQueueRatio(DynResourceQueueTrack track)
 			PQUEMGR->RatioCount--;
 		}
 
-		elog(RMLOG, "HAWQ RM :: Removed ratio %d MBPCORE", ratio);
+		elog(RMLOG, "removed ratio %d MBPCORE", ratio);
 	}
 
 	track->trackedMemCoreRatio = false;
@@ -1786,7 +1784,7 @@ int registerConnectionByUserID(ConnectionTrack  conntrack,
 	else
 	{
 		snprintf(errorbuf, errorbufsize,
-				 "role %s is not defined for registering connection",
+				 "role \'%s\' is not defined for registering connection",
 				 conntrack->UserID);
 		elog(WARNING, "ConnID %d. %s", conntrack->ConnID, errorbuf);
 		res = RESQUEMGR_NO_USERID;
@@ -1804,7 +1802,7 @@ int registerConnectionByUserID(ConnectionTrack  conntrack,
 
 	transformConnectionTrackProgress(conntrack, CONN_PP_REGISTER_DONE);
 
-	elog(DEBUG3, "Resource queue %s has %d connections after registering "
+	elog(DEBUG3, "resource queue \'%s\' has %d connections after registering "
 				 "connection.",
 				 queuetrack->QueueInfo->Name,
 				 queuetrack->CurConnCounter);
@@ -1834,7 +1832,7 @@ void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout)
 		transformConnectionTrackProgress(conntrack, CONN_PP_TIMEOUT_FAIL);
 	}
 
-	elog(DEBUG3, "Resource queue %s has %d connections before returning "
+	elog(DEBUG3, "resource queue \'%s\' has %d connections before returning "
 				 "connection ConnID %d.",
 				 track->QueueInfo->Name,
 				 track->CurConnCounter,
@@ -1842,7 +1840,7 @@ void returnConnectionToQueue(ConnectionTrack conntrack, bool istimeout)
 	track->CurConnCounter--;
 	if ( track->CurConnCounter == 0 )
 	{
-		elog(RMLOG, "Resource queue %s becomes idle.", track->QueueInfo->Name);
+		elog(RMLOG, "resource queue \'%s\' becomes idle.", track->QueueInfo->Name);
 		track->isBusy = false;
 		refreshMemoryCoreRatioLimits();
 		refreshMemoryCoreRatioWaterMark();
@@ -1888,7 +1886,7 @@ int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
 	int						res			= FUNC_RETURN_OK;
 	DynResourceQueueTrack	queuetrack	= conntrack->QueueTrack;
 
-	elog(RMLOG, "ConnID %d. Expect query resource for session "INT64_FORMAT,
+	elog(RMLOG, "ConnID %d. expect query resource for session "INT64_FORMAT,
 			    conntrack->ConnID,
 			    conntrack->SessionID);
 
@@ -1910,7 +1908,7 @@ int acquireResourceFromResQueMgr(ConnectionTrack  conntrack,
 														  errorbufsize);
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) "
+				elog(LOG, "ConnID %d. expect query resource (%d MB, %lf CORE) "
 						  "x %d ( MIN %d ) resource after adjusting based on "
 						  "queue NVSEG limits.",
 						  conntrack->ConnID,
@@ -1982,7 +1980,7 @@ int acquireResourceQuotaFromResQueMgr(ConnectionTrack	conntrack,
 
 			if ( res == FUNC_RETURN_OK )
 			{
-				elog(LOG, "ConnID %d. Query resource quota expects (%d MB, %lf CORE) "
+				elog(LOG, "ConnID %d. query resource quota expects (%d MB, %lf CORE) "
 						  "x %d ( MIN %d ) resource after adjusting based on queue "
 						  "NVSEG limits.",
 						  conntrack->ConnID,
@@ -2023,7 +2021,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 		if ( queue->NVSegLowerLimit > conntrack->VSegLimit )
 		{
 			snprintf(errorbuf, errorbufsize,
-					 "queue %s's limit %s=%d is greater than maximum number of "
+					 "resource queue \'%s\' limit %s=%d is greater than maximum number of "
 					 "virtual segments in cluster %d, check queue definition and "
 					 "guc variable hawq_rm_nvseg_perquery_limit",
 					 queue->Name,
@@ -2039,7 +2037,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 			if ( queue->NVSegLowerLimit > limit )
 			{
 				snprintf(errorbuf, errorbufsize,
-						 "queue %s's limit %s=%d is greater than maximum number "
+						 "resource queue \'%s\' limit %s=%d is greater than maximum number "
 						 "of virtual segments in cluster %d, there are %d available "
 						 "segments, each segment has %d maximum virtual segments, "
 						 "check queue definition and guc variable "
@@ -2057,7 +2055,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 		if ( queue->NVSegLowerLimit > queuetrack->ClusterSegNumberMax )
 		{
 			snprintf(errorbuf, errorbufsize,
-					 "queue %s's limit %s=%d is greater than queue maximum "
+					 "resource queue \'%s\' limit %s=%d is greater than queue maximum "
 					 "number of virtual segments %d, check queue definition",
 					 queue->Name,
 					 RSQDDLAttrNames[RSQ_DDL_ATTR_NVSEG_LOWER_LIMIT],
@@ -2072,7 +2070,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 		{
 			conntrack->SegNumMin = queue->NVSegLowerLimit;
 			adjusted =true;
-			elog(RMLOG, "ConnID %d. Minimum vseg number adjusted to %d",
+			elog(RMLOG, "ConnID %d. minimum vseg number adjusted to %d",
 						conntrack->ConnID,
 						conntrack->SegNumMin);
 		}
@@ -2089,7 +2087,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 		if ( minnvseg > conntrack->VSegLimit )
 		{
 			snprintf(errorbuf, errorbufsize,
-					 "queue %s's limit %s=%lf requires minimum %d virtual "
+					 "resource queue \'%s\' limit %s=%lf requires minimum %d virtual "
 					 "segments in cluster having %d available segments, it is "
 					 "greater than maximum number of virtual segments in cluster "
 					 "%d, check queue definition and guc variable "
@@ -2109,7 +2107,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 			if ( minnvseg > limit )
 			{
 				snprintf(errorbuf, errorbufsize,
-						 "queue %s's limit %s=%lf requires minimum %d virtual "
+						 "resource queue \'%s\' limit %s=%lf requires minimum %d virtual "
 						 "segments in cluster having %d available segments, it "
 						 "is greater than maximum number of virtual segments in "
 						 "cluster %d, each segment has %d maximum virtual "
@@ -2129,7 +2127,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 		if ( minnvseg > queuetrack->ClusterSegNumberMax )
 		{
 			snprintf(errorbuf, errorbufsize,
-					 "queue %s's limit %s=%lf requires minimum %d virtual "
+					 "resource queue \'%s\' limit %s=%lf requires minimum %d virtual "
 					 "segments in cluster having %d available segments, it is "
 					 "greater than queue maximum number of virtual segments %d, "
 					 "check queue definition",
@@ -2146,7 +2144,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 		{
 			conntrack->SegNumMin = minnvseg;
 			adjusted =true;
-			elog(RMLOG, "ConnID %d. Minimum vseg number adjusted to %d",
+			elog(RMLOG, "ConnID %d. minimum vseg number adjusted to %d",
 						conntrack->ConnID,
 						conntrack->SegNumMin);
 		}
@@ -2158,7 +2156,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 		{
 			conntrack->SegNum = queue->NVSegUpperLimit;
 			adjusted =true;
-			elog(RMLOG, "ConnID %d. Maximum vseg number adjusted to %d",
+			elog(RMLOG, "ConnID %d. maximum vseg number adjusted to %d",
 						conntrack->ConnID,
 						conntrack->SegNum);
 		}
@@ -2172,7 +2170,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 		{
 			conntrack->SegNum = maxnvseg;
 			adjusted =true;
-			elog(RMLOG, "ConnID %d. Maximum vseg number adjusted to %d",
+			elog(RMLOG, "ConnID %d. maximum vseg number adjusted to %d",
 						conntrack->ConnID,
 						conntrack->SegNum);
 		}
@@ -2187,7 +2185,7 @@ int adjustResourceExpectsByQueueNVSegLimits(ConnectionTrack	 conntrack,
 	if ( conntrack->SegNumMin > conntrack->SegNum )
 	{
 		conntrack->SegNumMin = conntrack->SegNum;
-		elog(RMLOG, "ConnID %d. Minimum vseg number is forced to be equal to "
+		elog(RMLOG, "ConnID %d. minimum vseg number is forced to be equal to "
 					"maximum vseg number %d",
 					conntrack->ConnID,
 					conntrack->SegNumMin);
@@ -2275,7 +2273,7 @@ void refreshActualMinGRMContainerPerSeg(void)
 		}
 		freePAIRRefList(&(PRESPOOL->Segments), &allsegres);
 
-		elog(RMLOG, "Resource manager finds minimum global resource manager "
+		elog(RMLOG, "resource manager finds minimum global resource manager "
 					"container count can contained by all segments is %d",
 					minctncount);
 
@@ -2288,7 +2286,7 @@ void refreshActualMinGRMContainerPerSeg(void)
 								   PQUEMGR->GRMQueueCapacity /
 								   PRESPOOL->AvailNodeCount);
 
-			elog(RMLOG, "Resource manager calculates normal global resource "
+			elog(RMLOG, "resource manager calculates normal global resource "
 						"manager container count based on target queue capacity "
 						"is %d",
 						normalctncount);
@@ -2302,7 +2300,7 @@ void refreshActualMinGRMContainerPerSeg(void)
 
 	if ( newval != oldval )
 	{
-		elog(WARNING, "Resource manager adjusts minimum global resource manager "
+		elog(WARNING, "resource manager adjusts minimum global resource manager "
 					  "container count in each segment from %d to %d.",
 					  oldval,
 					  newval);
@@ -2393,7 +2391,7 @@ void refreshResourceQueuePercentageCapacity(bool queuechanged)
 	 */
 	adjustMemoryCoreValue(&mem, &core);
 
-	elog(DEBUG3, "HAWQ RM :: Use cluster (%d MB, %d CORE) resources as whole.",
+	elog(DEBUG3, "use cluster (%d MB, %d CORE) resources as whole.",
 				mem, core);
 
 	refreshResourceQueuePercentageCapacityInternal(mem, core, queuechanged);
@@ -2459,7 +2457,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 	int32_t						oldmarkmem = 0;
 	double 						oldmarkcore = 0;
 
-	elog(DEBUG5, "Resource water mark candidate (%d MB, %lf CORE) "UINT64_FORMAT,
+	elog(DEBUG5, "resource water mark candidate (%d MB, %lf CORE) "UINT64_FORMAT,
 			     memmb,
 			     core,
 			     cursec);
@@ -2470,7 +2468,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 				getDQueueContainerData(getDQueueContainerHead(marks));
 		oldmarkmem  = firstmark->ClusterMemoryMB;
 		oldmarkcore = firstmark->ClusterVCore;
-		elog(DEBUG5, "Resource water mark old (%d MB, %lf CORE)",
+		elog(DEBUG5, "resource water mark old (%d MB, %lf CORE)",
 				     oldmarkmem,
 				     oldmarkcore);
 	}
@@ -2501,7 +2499,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 		lastmark->ClusterVCore    = core;
 	}
 
-	elog(DEBUG5, "Resource water mark list size %d before timeout old marks.",
+	elog(DEBUG5, "resource water mark list size %d before timeout old marks.",
 			     marks->NodeCount);
 
 	/* Check if we should remove some marks from the head. */
@@ -2518,7 +2516,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 		}
 	}
 
-	elog(DEBUG5, "Resource water mark list size %d after timeout old marks.",
+	elog(DEBUG5, "resource water mark list size %d after timeout old marks.",
 			     marks->NodeCount);
 
 	/* Check if we can skip some marks before the last one (the one we have cut). */
@@ -2535,7 +2533,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 		}
 	}
 
-	elog(DEBUG5, "Resource water mark list size %d after remove low marks.",
+	elog(DEBUG5, "resource water mark list size %d after remove low marks.",
 			     marks->NodeCount);
 
 	/* Add the last one back to the tail. */
@@ -2547,7 +2545,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 				(DynMemoryCoreRatioWaterMark)
 				getDQueueContainerData(getDQueueContainerHead(marks));
 		if ( firstmark->ClusterMemoryMB != oldmarkmem ) {
-			elog(LOG, "Resource water mark changes from (%d MB, %lf CORE) to "
+			elog(LOG, "resource water mark changes from (%d MB, %lf CORE) to "
 					  "(%d MB, %lf CORE)",
 					  oldmarkmem,
 					  oldmarkcore,
@@ -2558,7 +2556,7 @@ void markMemoryCoreRatioWaterMark(DQueue 		marks,
 }
 
 #define ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)					   \
-		elog(WARNING, "Resource queue cannot parse role attribute, %s",  	   \
+		elog(WARNING, "resource queue cannot parse role attribute, %s",  	   \
 					  (errorbuf));
 
 /**
@@ -2599,7 +2597,7 @@ int parseUserAttributes( List 	 	*attributes,
 		{
 			if ( SimpleStringEmpty(attrvalue) )
 			{
-				elog(LOG, "No value for attribute [%s].", attrname->Str);
+				elog(LOG, "uninitialized attribute %s.", attrname->Str);
 				continue;
 			}
 		}
@@ -2637,7 +2635,7 @@ int parseUserAttributes( List 	 	*attributes,
 			if ( exist )
 			{
 				res = RESQUEMGR_DUPLICATE_USERID;
-				snprintf(errorbuf, errorbufsize, "duplicate user name %s", attrvalue->Str);
+				snprintf(errorbuf, errorbufsize, "duplicate user name \'%s\'", attrvalue->Str);
 				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
 			}
@@ -2665,7 +2663,7 @@ int parseUserAttributes( List 	 	*attributes,
 			{
 				res = RESQUEMGR_WRONG_TARGET_QUEUE;
 				snprintf(errorbuf, errorbufsize,
-						 "cannot find target resource queue %s",
+						 "cannot find target resource queue \'%s\'",
 						 attrvalue->Str);
 				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
@@ -2685,7 +2683,7 @@ int parseUserAttributes( List 	 	*attributes,
 			{
 				res = RESQUEMGR_WRONG_ATTR;
 				snprintf(errorbuf, errorbufsize,
-						 "Wrong user issuper setting %s",
+						 "invalid user issuper setting %s",
 						 attrvalue->Str);
 				ELOG_WARNING_ERRORMESSAGE_PARSEUSERATTR(errorbuf)
 				return res;
@@ -2800,20 +2798,20 @@ int dropUser(int64_t useroid, char* name)
 			MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 			PQUEMGR->Users = list_delete_cell(PQUEMGR->Users, cell, prevcell);
 			MEMORY_CONTEXT_SWITCH_BACK
-			elog(LOG, "Resource manager finds user oid "INT64_FORMAT" and delete.",
+			elog(LOG, "resource manager finds user oid "INT64_FORMAT" to delete",
 					  useroid);
 
 			SimpArray key1;
 			setSimpleArrayRef(&key1, (void *)&useroid, sizeof(int64_t));
 			int res = removeHASHTABLENode(&(PQUEMGR->UsersIDIndex), &key1);
-			elog(DEBUG3, "Resource manager removed node from UsersIDIndex returns %d",
+			elog(DEBUG3, "resource manager removed node from UsersIDIndex returns %d",
 						 res);
 			Assert(res == FUNC_RETURN_OK);
 
 			SimpString key2;
 			setSimpleStringRef(&key2, name, strlen(name));
 			res = removeHASHTABLENode(&(PQUEMGR->UsersNameIndex), &key2);
-			elog(DEBUG3, "Resource manager removed node from UsersNameIndex returns %d",
+			elog(DEBUG3, "resource manager removed node from UsersNameIndex returns %d",
 						 res);
 			Assert(res == FUNC_RETURN_OK);
 			return FUNC_RETURN_OK;
@@ -2854,7 +2852,7 @@ void dispatchResourceToQueries(void)
 		if ( (mctrack->ClusterMemoryMaxMB == 0 || IS_DOUBLE_ZERO(mctrack->ClusterVCoreMax)) ||
 			 (mctrack->TotalAllocated.MemoryMB == 0 && IS_DOUBLE_ZERO(mctrack->TotalAllocated.Core)) )
 		{
-			elog(DEBUG3, "Resource manager skipped memory core ratio index %d, "
+			elog(DEBUG3, "resource manager skipped memory core ratio index %d, "
 						 "memory max limit %d MB, %lf CORE, "
 						 "total allocated %d MB, %lf CORE",
 						 i,
@@ -2885,7 +2883,7 @@ void dispatchResourceToQueries(void)
 			/* Ignore the queues not in use. */
 			if ( !track->isBusy )
 			{
-				elog(DEBUG3, "Resource manager skips idle resource queue %s",
+				elog(DEBUG3, "resource manager skipped idle resource queue \'%s\'",
 							 track->QueueInfo->Name);
 				continue;
 			}
@@ -2908,7 +2906,7 @@ void dispatchResourceToQueries(void)
 				availmemory -= track->TotalUsed.MemoryMB;
 				availcore   -= track->TotalUsed.Core;
 
-				elog(DEBUG3, "Resource queue %s over uses resource with weight "
+				elog(DEBUG3, "resource queue \'%s\' overuses resource with weight "
 							 "%lf, expect weight %lf. Currently total used "
 							 "(%d MB, %lf CORE). Allocation to queries is paused.",
 							 track->QueueInfo->Name,
@@ -2928,7 +2926,7 @@ void dispatchResourceToQueries(void)
 
 				totalmemoryweight += track->QueueInfo->ClusterMemoryMB;
 
-				elog(DEBUG3, "Resource queue %s uses resource with weight "
+				elog(DEBUG3, "resource queue \'%s\' uses resource with weight "
 							 "%lf, expect weight %lf. Currently total used "
 							 "(%d MB, %lf CORE). To assign more resource.",
 							 track->QueueInfo->Name,
@@ -2940,7 +2938,7 @@ void dispatchResourceToQueries(void)
 		}
 
 		/* Assign resource to not over used resource queues. */
-		elog(DEBUG3, "Reassignable resource is (%d MB, %lf CORE)",
+		elog(DEBUG3, "reassignable resource is (%d MB, %lf CORE)",
 					 availmemory,
 					 availcore);
 
@@ -2975,8 +2973,8 @@ void dispatchResourceToQueries(void)
 										track->TotalAllocated.Ratio);
 				leftmemory2 -= potentialmemuse;
 				Assert(leftmemory2 >= 0);
-				elog(DEBUG3, "Resource manager fully satisfies to resource queue "
-							 "%s with (%d MB, %lf CORE) allocated.",
+				elog(DEBUG3, "resource manager fully satisfies to resource queue "
+							 "\'%s\' with (%d MB, %lf CORE) allocated.",
 							 track->QueueInfo->Name,
 							 track->TotalAllocated.MemoryMB,
 							 track->TotalAllocated.Core);
@@ -2999,15 +2997,15 @@ void dispatchResourceToQueries(void)
 
 				leftmemory2 -= allocmemory;
 				Assert(leftmemory2 >= 0);
-				elog(DEBUG3, "Resource manager partially satisfies to resource "
-							 "queue %s with (%d MB, %lf CORE) allocated.",
+				elog(DEBUG3, "resource manager partially satisfies to resource "
+							 "queue \'%s\' with (%d MB, %lf CORE) allocated.",
 							 track->QueueInfo->Name,
 							 track->TotalAllocated.MemoryMB,
 							 track->TotalAllocated.Core);
 			}
 
-			elog(DEBUG3, "Resource manager allocates resource (%d MB, %lf CORE) "
-						 "in queue %s.",
+			elog(DEBUG3, "resource manager allocates resource (%d MB, %lf CORE) "
+						 "in resource queue \'%s\'.",
 						 track->TotalAllocated.MemoryMB,
 						 track->TotalAllocated.Core,
 						 track->QueueInfo->Name);
@@ -3042,8 +3040,8 @@ void dispatchResourceToQueries(void)
 					q = tmpq;
 					if ( leftmemory2 + q->TotalAllocated.MemoryMB <= q->ClusterMemoryMaxMB)
 					{
-						elog(DEBUG3, "Resource manager allocates resource (%d MB, %lf CORE) "
-									 "in queue %s.",
+						elog(DEBUG3, "resource manager allocates resource (%d MB, %lf CORE) "
+									 "in resource queue \'%s\'.",
 									 leftmemory2,
 									 1.0 * leftmemory2 / q->MemCoreRatio,
 									 q->QueueInfo->Name);
@@ -3057,8 +3055,8 @@ void dispatchResourceToQueries(void)
 					else {
 						uint32_t memorydelta = q->ClusterMemoryMaxMB - q->TotalAllocated.MemoryMB;
 
-						elog(DEBUG3, "Resource manager allocates resource (%d MB, %lf CORE) "
-									 "in queue %s.",
+						elog(DEBUG3, "resource manager allocates resource (%d MB, %lf CORE) "
+									 "in resource queue \'%s\'.",
 									 memorydelta,
 									 1.0 * memorydelta / q->MemCoreRatio,
 									 q->QueueInfo->Name);
@@ -3131,7 +3129,7 @@ void dispatchResourceToQueries(void)
 	PQUEMGR->toRunQueryDispatch = !hasrequest || hasresourceallocated;
 	if ( !PQUEMGR->toRunQueryDispatch )
 	{
-		elog(DEBUG3, "Resource manager pauses allocating resource to query because of "
+		elog(DEBUG3, "resource manager pauses allocating resource to query because of "
 				     "lack of resource.");
 	}
 }
@@ -3382,7 +3380,7 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 			res = RESQUEMGR_TOO_MANY_FIXED_SEGNUM;
 			snprintf(errorbuf, errorbufsize,
 					 "minimum expected number of virtual segment %d is more than "
-					 "maximum possible number %d in queue %s",
+					 "maximum possible number %d in resource queue \'%s\'",
 					 conn->MinSegCountFixed,
 					 conn->SegNum,
 					 track->QueueInfo->Name);
@@ -3391,7 +3389,7 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 			return res;
 		}
 
-		elog(RMLOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
+		elog(RMLOG, "ConnID %d. expect query resource (%d MB, %lf CORE) x %d "
 				    "(MIN %d) after checking queue capacity.",
 					conn->ConnID,
 					conn->SegMemoryMB,
@@ -3421,7 +3419,7 @@ int computeQueryQuota(ConnectionTrack conn, char *errorbuf, int errorbufsize)
 			conn->SegNum	= conn->MaxSegCountFixed;
 		}
 
-		elog(RMLOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) x %d "
+		elog(RMLOG, "ConnID %d. expect query resource (%d MB, %lf CORE) x %d "
 				    "(MIN %d) after checking query expectation %d (MIN %d).",
 					conn->ConnID,
 					conn->SegMemoryMB,
@@ -3533,7 +3531,7 @@ int addQueryResourceRequestToQueue(DynResourceQueueTrack queuetrack,
 		if ( queue->DLDetector.LockedTotal.MemoryMB > 0 )
 		{
 			PQUEMGR->ForcedReturnGRMContainerCount = 0;
-			elog(LOG, "Locking resource and stop forced GRM container breathe out.");
+			elog(LOG, "locking resource and stop forced GRM container breathe out.");
 		}
 
 		/*
@@ -3564,7 +3562,7 @@ void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
 	if ( (!queuechanged) &&
 		 (prevclustermemmb == clustermemmb && prevclustercore  == clustercore) )
 	{
-		elog(DEBUG3, "Resource manager skips updating resource queue capacities "
+		elog(DEBUG3, "resource manager skipped updating resource queue capacities "
 					 "because the total resource quota does not change.");
 		return;
 	}
@@ -3711,7 +3709,7 @@ void refreshResourceQueuePercentageCapacityInternal(uint32_t clustermemmb,
 
 		Assert( track->ClusterSegNumber <= track->ClusterSegNumberMax );
 
-		elog(DEBUG3, "Resource manager refreshed resource queue capacity : %s "
+		elog(DEBUG3, "resource manager refreshed resource queue capacity : %s "
 				  	 "(%d MB, %lf CORE) x %d. MAX %d. FACTOR:%lf",
 					 track->QueueInfo->Name,
 					 track->QueueInfo->SegResourceQuotaMemoryMB,
@@ -3749,7 +3747,7 @@ void refreshMemoryCoreRatioLimits(void)
 			PQUEMGR->RatioTrackers[i]->ClusterVCoreMax    += track->ClusterVCoreMax;
 		}
 
-		elog(DEBUG3, "Limit of memory/core ratio[%d] %d MBPCORE "
+		elog(DEBUG3, "limit of memory/core ratio[%d] %d MBPCORE "
 					 "is (%d MB, %lf CORE) maximum (%d MB, %lf CORE).",
 					 i,
 					 PQUEMGR->RatioTrackers[i]->MemCoreRatio,
@@ -3790,7 +3788,7 @@ void refreshMemoryCoreRatioWaterMark(void)
 	for ( int i = 0 ; i < PQUEMGR->RatioCount ; ++i ) {
 		PQUEMGR->RatioTrackers[i]->ClusterWeightMarker =
 			PQUEMGR->RatioTrackers[i]->ClusterMemoryMaxMB / overcommit;
-		elog(DEBUG5, "HAWQ RM :: Weight balance marker of memory/core ratio "
+		elog(DEBUG5, "weight balance marker of memory/core ratio "
 					 "[%d] %d MBPCORE is %lf MB with overcommit %lf",
 					 i,
 					 PQUEMGR->RatioTrackers[i]->MemCoreRatio,
@@ -3804,7 +3802,7 @@ void dispatchResourceToQueriesInOneQueue(DynResourceQueueTrack track)
 	int			policy			= 0;
 	Assert( track != NULL );
 
-	elog(DEBUG3, "Resource manager dispatch resource in queue %s",
+	elog(DEBUG3, "resource manager dispatch resource in resource queue \'%s\'",
 				 track->QueueInfo->Name);
 
 	if ( track->QueryResRequests.NodeCount > 0 )
@@ -3813,7 +3811,7 @@ void dispatchResourceToQueriesInOneQueue(DynResourceQueueTrack track)
 		if ( topwaiter->HeadQueueTime == 0 )
 		{
 			topwaiter->HeadQueueTime = gettime_microsec();
-			elog(DEBUG3, "Set timestamp of waiting at head of queue.");
+			elog(DEBUG3, "set timestamp of waiting at head of queue.");
 		}
 	}
 
@@ -3837,9 +3835,9 @@ int addNewResourceToResourceManagerByBundle(ResourceBundle bundle)
 
 int addNewResourceToResourceManager(int32_t memorymb, double core)
 {
-	elog(RMLOG, "addNewResourceToResourceManager input (%d MB, %lf CORE)",
-			    memorymb,
-				core);
+	elog(DEBUG3, "addNewResourceToResourceManager input (%d MB, %lf CORE)",
+			     memorymb,
+				 core);
 
 	if ( memorymb == 0 && core == 0 ) {
 		return FUNC_RETURN_OK;
@@ -3853,7 +3851,7 @@ int addNewResourceToResourceManager(int32_t memorymb, double core)
 
 	if ( ratioindex >= 0 )
 	{
-		elog(RMLOG, "Allocated resource for ratio %d (%d MB, %lf CORE) plus "
+		elog(RMLOG, "allocated resource for ratio %d (%d MB, %lf CORE) plus "
 					"(%d MB, %lf CORE)",
 					ratio,
 					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
@@ -3865,7 +3863,7 @@ int addNewResourceToResourceManager(int32_t memorymb, double core)
 							  memorymb,
 							  core);
 
-		elog(RMLOG, "Current allocated resource for ratio %d (%d MB, %lf CORE)",
+		elog(RMLOG, "current allocated resource for ratio %d (%d MB, %lf CORE)",
 					ratio,
 					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
 					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core);
@@ -3887,9 +3885,9 @@ int minusResourceFromResourceManagerByBundle(ResourceBundle bundle)
 
 int minusResourceFromResourceManager(int32_t memorymb, double core)
 {
-	elog(RMLOG, "minusResourceFromResourceManager input (%d MB, %lf CORE)",
-			    memorymb,
-				core);
+	elog(DEBUG3, "minusResourceFromResourceManager input (%d MB, %lf CORE)",
+			     memorymb,
+				 core);
 
 	if ( memorymb == 0 && core ==0 )
 	{
@@ -3903,7 +3901,7 @@ int minusResourceFromResourceManager(int32_t memorymb, double core)
 
 	if ( ratioindex >= 0 )
 	{
-		elog(RMLOG, "Allocated resource for ratio %d (%d MB, %lf CORE) minus "
+		elog(RMLOG, "allocated resource for ratio %d (%d MB, %lf CORE) minus "
 					"(%d MB, %lf CORE)",
 					ratio,
 					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
@@ -3915,7 +3913,7 @@ int minusResourceFromResourceManager(int32_t memorymb, double core)
 								memorymb,
 								core);
 
-		elog(RMLOG, "Current allocated resource for ratio %d (%d MB, %lf CORE)",
+		elog(RMLOG, "current allocated resource for ratio %d (%d MB, %lf CORE)",
 					ratio,
 					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.MemoryMB,
 					PQUEMGR->RatioTrackers[ratioindex]->TotalAllocated.Core);
@@ -3933,9 +3931,9 @@ void returnAllocatedResourceToLeafQueue(DynResourceQueueTrack track,
 {
 	minusResourceBundleData(&(track->TotalUsed), memorymb, core);
 
-	elog(DEBUG3, "Return resource to queue %s (%d MB, %lf CORE).",
-			  track->QueueInfo->Name,
-			  memorymb, core);
+	elog(DEBUG3, "return resource to resource queue \'%s\' (%d MB, %lf CORE).",
+			     track->QueueInfo->Name,
+			     memorymb, core);
 }
 
 void removePendingResourceRequestInRootQueue(int32_t 	memorymb,
@@ -3968,18 +3966,18 @@ void removePendingResourceRequestInRootQueue(int32_t 	memorymb,
 			 PQUEMGR->RatioTrackers[ratioindex]->TotalPending.Core == 0 )
 		{
 			PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime = 0;
-			elog(DEBUG3, "Global resource total pending start time is updated to "UINT64_FORMAT,
+			elog(DEBUG3, "global resource total pending start time is updated to "UINT64_FORMAT,
 						 PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime);
 		}
 		else if ( memorymb > 0 && core > 0 )
 		{
 			PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime = gettime_microsec();
-			elog(DEBUG3, "Global resource total pending start time is updated to "UINT64_FORMAT,
+			elog(DEBUG3, "global resource total pending start time is updated to "UINT64_FORMAT,
 						 PQUEMGR->RatioTrackers[ratioindex]->TotalPendingStartTime);
 		}
 	}
 
-	elog(LOG, "Removed pending GRM request from root resource queue by "
+	elog(LOG, "removed pending GRM request from root resource queue by "
 			  "(%d MB, %lf CORE) to (%d MB, %lf CORE)",
 			  memorymb,
 			  core * 1.0,
@@ -4015,7 +4013,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 	int segcounter = 0;
 	int segmincounter = 0;
 
-	elog(DEBUG3, "Resource queue %s expects full parallel count %d, "
+	elog(DEBUG3, "resource queue \'%s\' expects full parallel count %d, "
 				 "current running count %d.",
 				 track->QueueInfo->Name,
 				 track->QueueInfo->ParallelCount,
@@ -4026,7 +4024,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 		/* TODO: Consider more here... */
 		if ( counter + track->NumOfRunningQueries >= track->QueueInfo->ParallelCount )
 		{
-			elog(RMLOG, "Parallel count limit is encountered, to run %d more",
+			elog(RMLOG, "parallel count limit is encountered, to run %d more",
 						counter);
 			break;
 		}
@@ -4038,7 +4036,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 		/* Check if the minimum segment requirement is met. */
 		if ( segmincounter + equalsegnummin > availsegnum )
 		{
-			elog(RMLOG, "Resource allocated is up, available vseg num %d, "
+			elog(RMLOG, "resource allocated is up, available vseg num %d, "
 						"to run %d more",
 						availsegnum,
 						counter);
@@ -4098,7 +4096,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 	for ( int processidx = 0 ; processidx < counter ; ++processidx )
 	{
 		ConnectionTrack conn = removeDQueueHeadNode(&todisp);
-		elog(DEBUG3, "Resource manager tries to dispatch resource to connection %d. "
+		elog(DEBUG3, "resource manager tries to dispatch resource to connection %d. "
 		   		  	 "Expect (%d MB, %lf CORE) x %d(max %d min %d) segment(s). "
 		   		  	 "Original vseg %d(min %d). "
 		   		  	 "VSeg limit per segment %d VSeg limit per query %d.",
@@ -4115,7 +4113,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 
 		if ( conn->StatNVSeg > 0 )
 		{
-			elog(LOG, "Resource manager tries to dispatch resource to connection %d. "
+			elog(LOG, "resource manager tries to dispatch resource to connection %d. "
 					  "Statement level resource quota is active. "
 					  "Total %d vsegs, each vseg has %d MB memory quota.",
 					  conn->ConnID,
@@ -4144,7 +4142,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 		RESOURCEPROBLEM accepted = isResourceAcceptable(conn, segnumact);
 		if ( accepted == RESPROBLEM_NO )
 		{
-			elog(DEBUG3, "Resource manager dispatched %d segment(s) to connection %d",
+			elog(DEBUG3, "resource manager dispatched %d segment(s) to connection %d",
 						 segnumact,
 						 conn->ConnID);
 			conn->SegNumActual = segnumact;
@@ -4181,10 +4179,10 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 			 * again later. We expect some other connections return the resource
 			 * back later or some more resource allocated from GRM.
 		     */
-			elog(WARNING, "HAWQ RM :: Can not find enough number of hosts "
+			elog(WARNING, "cannot find enough number of hosts "
 						  "containing sufficient resource for the connection %d.",
 						  conn->ConnID);
-			elog(WARNING, "HAWQ RM :: Found %d vsegments allocated", segnumact);
+			elog(WARNING, "found %d vsegments allocated", segnumact);
 			if ( segnumact > 0 )
 			{
 				Assert(!conn->isOld);
@@ -4202,7 +4200,7 @@ int dispatchResourceToQueries_EVEN(DynResourceQueueTrack track)
 				conn->troubledByFragmentTimestamp = gettime_microsec();
 				conn->troubledByFragment 		  = true;
 
-				elog(LOG, "Resource fragment problem is probably encountered. "
+				elog(LOG, "resource fragment problem is probably encountered. "
 						  "Session "INT64_FORMAT" expects minimum %d virtual segments.",
 						  conn->SessionID,
 						  conn->SegNumMin);
@@ -4256,7 +4254,7 @@ RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact)
 		int limit = ceil(PRESPOOL->SlavesHostCount * rm_tolerate_nseg_limit);
 		if ( PRESPOOL->SlavesHostCount - limit > list_length(conn->Resource) )
 		{
-			elog(WARNING, "Find virtual segments are dispatched to %d segments in "
+			elog(WARNING, "found virtual segments are dispatched to %d segments in "
 						  "the cluster containing %d segments defined in slaves file. "
 						  "The number of excluded segments are more than %d.",
 						  list_length(conn->Resource),
@@ -4285,7 +4283,7 @@ RESOURCEPROBLEM isResourceAcceptable(ConnectionTrack conn, int segnumact)
 		}
 		if ( rm_nvseg_variance_among_seg_limit < maxval - minval )
 		{
-			elog(WARNING, "Find virtual segments are not evenly dispatched to segments, "
+			elog(WARNING, "found virtual segments are not evenly dispatched to segments, "
 						  "maximum virtual segment size is %d, "
 						  "minimum virtual segment size is %d.",
 						  maxval,
@@ -4357,7 +4355,7 @@ void buildAcquireResourceResponseMessage(ConnectionTrack conn)
 								 (char *)(&(vsegcnt->Resource->Stat->Info)),
 								 vsegcnt->Resource->Stat->Info.Size);
 
-		elog(DEBUG3, "Resource manager added machine %s:%d containing %d segment(s) "
+		elog(DEBUG3, "resource manager added machine %s:%d containing %d segment(s) "
 					 "in response of acquiring resource.",
 					 GET_SEGRESOURCE_HOSTNAME(vsegcnt->Resource),
 					 vsegcnt->Resource->Stat->Info.port,
@@ -4376,7 +4374,7 @@ void buildAcquireResourceResponseMessage(ConnectionTrack conn)
 	conn->MessageID    = RESPONSE_QD_ACQUIRE_RESOURCE;
 	conn->ResAllocTime = gettime_microsec();
 
-	elog(LOG, "Latency of getting resource allocated is "UINT64_FORMAT "us",
+	elog(LOG, "latency of getting resource allocated is "UINT64_FORMAT "us",
 			  conn->ResAllocTime - conn->ResRequestTime);
 
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
@@ -4461,7 +4459,7 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 			/* Recycle connection track instance. */
 			Assert(track->CurConnCounter > 0);
 
-			elog(DEBUG3, "Resource queue %s has %d connections before removing "
+			elog(DEBUG3, "resource queue \'%s\' has %d connections before removing "
 						 "deadlocked connection ConnID %d.",
 						 track->QueueInfo->Name,
 						 track->CurConnCounter,
@@ -4470,7 +4468,7 @@ void detectAndDealWithDeadLock(DynResourceQueueTrack track)
 			track->CurConnCounter--;
 			if ( track->CurConnCounter == 0 )
 			{
-				elog(RMLOG, "Resource queue %s becomes idle after deadlock checking.",
+				elog(RMLOG, "resource queue \'%s\' becomes idle after deadlock checking.",
 							track->QueueInfo->Name);
 				track->isBusy = false;
 				refreshMemoryCoreRatioLimits();
@@ -4506,7 +4504,7 @@ void timeoutDeadResourceAllocation(void)
 
 		case CONN_PP_RESOURCE_QUEUE_ALLOC_DONE:
 		{
-			elog(DEBUG5, "Find allocated resource that should check timeout. "
+			elog(DEBUG5, "found allocated resource that should check timeout. "
 						 "ConnID %d",
 						 curcon->ConnID);
 
@@ -4537,7 +4535,7 @@ void timeoutDeadResourceAllocation(void)
 			if ( curmsec - curcon->LastActTime >
 				 1000000L * rm_session_lease_timeout )
 			{
-				elog(WARNING, "ConnID %d. The queued resource request timeout is "
+				elog(WARNING, "ConnID %d. the queued resource request timeout is "
 						      "detected. Last action time is "UINT64_FORMAT
 							  "msec ago",
 						      curcon->ConnID,
@@ -4566,7 +4564,7 @@ void timeoutDeadResourceAllocation(void)
 			if ( curmsec - curcon->LastActTime >
 				 1000000L * rm_session_lease_timeout )
 			{
-				elog(WARNING, "The registered connection timeout is detected. "
+				elog(WARNING, "the registered connection timeout is detected. "
 						  	  "ConnID %d. Last action time is "UINT64_FORMAT
 							  "msec ago",
 							  curcon->ConnID,
@@ -4616,7 +4614,7 @@ void timeoutQueuedRequest(void)
 		 * Case 1. RM has no available cluster built yet, the request is not
 		 * 		   added into resource queue manager queues.
 		 */
-		elog(DEBUG3, "Deferred connection track is found. "
+		elog(DEBUG3, "deferred connection track is found. "
 					 " Request Time " UINT64_FORMAT
 					 " Curr Time " UINT64_FORMAT
 					 " Delta " UINT64_FORMAT,
@@ -4688,7 +4686,7 @@ void timeoutQueuedRequest(void)
 				}
 			}
 
-			elog(DEBUG3, "Check waiting connection track: ConnID %d "
+			elog(DEBUG3, "check waiting connection track: ConnID %d "
 						 "Head time "UINT64_FORMAT " "
 						 "Global resource pending time "UINT64_FORMAT " ",
 						 curcon->ConnID,
@@ -4714,7 +4712,7 @@ void timeoutQueuedRequest(void)
 				   (curmsec - curcon->HeadQueueTime >
 				 	 	1000000L * rm_resource_allocation_timeout) ) )
 			{
-				elog(LOG, "ConnID %d. The queued resource request no resource "
+				elog(LOG, "ConnID %d. the queued resource request no resource "
 						  "timeout is detected, the waiting time in head of the"
 						  "queue is "UINT64_FORMAT " global resource pending "
 						  "start time is "UINT64_FORMAT
@@ -4735,7 +4733,7 @@ void timeoutQueuedRequest(void)
 					 1000000L * rm_resource_allocation_timeout &&
 				 ((DynResourceQueueTrack)(curcon->QueueTrack))->NumOfRunningQueries == 0 )
 			{
-				elog(LOG, "ConnID %d. The queued resource request timeout is "
+				elog(LOG, "ConnID %d. the queued resource request timeout is "
 						  "detected due to resource fragment problem.",
 						  curcon->ConnID);
 
@@ -4838,7 +4836,7 @@ void setForcedReturnGRMContainerCount(void)
 
 		if ( quetrack->DLDetector.LockedTotal.MemoryMB > 0 )
 		{
-			elog(LOG, "Queue %s has potential resource deadlock, cancel breathe.",
+			elog(LOG, "resource queue \'%s\' has potential resource deadlock, cancel breathe.",
 					  quetrack->QueueInfo->Name);
 			PQUEMGR->GRMQueueCurCapacity   = 1.0;
 			PQUEMGR->GRMQueueResourceTight = false;
@@ -4859,7 +4857,7 @@ void setForcedReturnGRMContainerCount(void)
 		 * usage lower than expected capacity.
 		 */
 		double r = (curabscapacity - PQUEMGR->GRMQueueCapacity) / curabscapacity;
-		elog(LOG, "GRM queue is over-using, cur capacity %lf*%lf, "
+		elog(LOG, "GRM queue is overusing, cur capacity %lf*%lf, "
 				  "ratio %lf, curent GRM container size %d",
 				  PQUEMGR->GRMQueueCurCapacity,
 				  PQUEMGR->GRMQueueCapacity,
@@ -4871,12 +4869,12 @@ void setForcedReturnGRMContainerCount(void)
 		{
 			double r = 1.0 * clusterctnsize * rm_return_percentage_on_overcommit / 100;
 			int toretctnsize2 = ceil(r);
-			elog(DEBUG3, "Calculated r %lf based on return percentage.", r);
+			elog(DEBUG3, "calculated r %lf based on return percentage.", r);
 			toretctnsize = toretctnsize < toretctnsize2 ? toretctnsize : toretctnsize2;
 		}
 	}
 
-	elog(LOG, "Resource manager expects to breathe out %d GRM containers. "
+	elog(LOG, "resource manager expects to breathe out %d GRM containers. "
 			  "Total %d GRM containers, ",
 			  toretctnsize,
 			  clusterctnsize);
@@ -4912,7 +4910,7 @@ void buildQueueTrackShadows(DynResourceQueueTrack	toaltertrack,
 		DynResourceQueueTrack curtrack = (DynResourceQueueTrack)linitial(q);
 		q = list_delete_first(q);
 
-		elog(DEBUG5, "Resource manager checks queue %s for building shadow "
+		elog(DEBUG5, "resource manager checks resource queue \'%s\' for building shadow "
 					 "instance.",
 					 curtrack->QueueInfo->Name);
 
@@ -4926,7 +4924,7 @@ void buildQueueTrackShadows(DynResourceQueueTrack	toaltertrack,
 			*qhavingshadow = lappend(*qhavingshadow, curtrack);
 			buildQueueTrackShadow(curtrack);
 
-			elog(RMLOG, "Resource queue %s has shadow instance built.",
+			elog(RMLOG, "resource queue \'%s\' has shadow instance built.",
 					  	curtrack->QueueInfo->Name);
 		}
 
@@ -5027,7 +5025,7 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 															 errorbufsize);
 		if ( res != FUNC_RETURN_OK )
 		{
-			elog(WARNING, "Resource manager failed to rebuild resource queue %s "
+			elog(WARNING, "resource manager failed to rebuild resource queue \'%s\' "
 						  "dynamic status in its shadow to reflect altered "
 						  "resource queues.",
 						  quetrack->QueueInfo->Name);
@@ -5035,7 +5033,7 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 		}
 		else
 		{
-			elog(RMLOG, "Resource manager passed rebuilding resource queue %s "
+			elog(RMLOG, "resource manager passed rebuilding resource queue \'%s\' "
 					    "dynamic status in its shadow.",
 					    quetrack->QueueInfo->Name);
 		}
@@ -5043,7 +5041,7 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 		res = detectAndDealWithDeadLockInShadow(quetrack, queuechanged);
 		if ( res != FUNC_RETURN_OK )
 		{
-			elog(WARNING, "Resource manager failed to rebuild resource queue %s "
+			elog(WARNING, "resource manager failed to rebuild resource queue \'%s\' "
 						  "dynamic status to reflect altered resource queues due "
 						  "to the deadlock issue introduced by altering resource "
 						  "queue.",
@@ -5052,13 +5050,13 @@ int rebuildAllResourceQueueTrackDynamicStatusInShadow(List *quehavingshadow,
 		}
 		else
 		{
-			elog(RMLOG, "Resource manager passed detecting deadlock issues in the "
-					    "shadow of resource queue %s",
+			elog(RMLOG, "resource manager passed detecting deadlock issues in the "
+					    "shadow of resource queue \'%s\'",
 					    quetrack->QueueInfo->Name);
 		}
 	}
 
-	elog(RMLOG, "Resource manager finished rebuilding resource queues' dynamic "
+	elog(RMLOG, "resource manager finished rebuilding resource queues' dynamic "
 				"status");
 	return FUNC_RETURN_OK;
 }
@@ -5070,7 +5068,7 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 {
 	int res = FUNC_RETURN_OK;
 
-	elog(RMLOG, "Rebuild resource queue %s dynamic status in its shadow.",
+	elog(RMLOG, "rebuild resource queue \'%s\' dynamic status in its shadow.",
 			    quetrack->QueueInfo->Name);
 
 	DynResourceQueueTrack shadowtrack = quetrack->ShadowQueueTrack;
@@ -5078,7 +5076,7 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 	copyResourceDeadLockDetectorWithoutLocking(&(quetrack->DLDetector),
 											   &(shadowtrack->DLDetector));
 
-	elog(DEBUG3, "Deadlock detector in shadow has %d MB in use %d MB locked.",
+	elog(DEBUG3, "deadlock detector in shadow has %d MB in use %d MB locked.",
 				 shadowtrack->DLDetector.InUseTotal.MemoryMB,
 				 quetrack->DLDetector.LockedTotal.MemoryMB);
 
@@ -5114,7 +5112,7 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 
 				if (res == FUNC_RETURN_OK )
 				{
-					elog(LOG, "ConnID %d. Expect query resource (%d MB, %lf CORE) "
+					elog(LOG, "ConnID %d. expect query resource (%d MB, %lf CORE) "
 							  "x %d ( MIN %d ) resource after adjusting based on "
 							  "queue NVSEG limits.",
 							  newconn->ConnID,
@@ -5157,9 +5155,9 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 			}
 			else
 			{
-				elog(WARNING, "Resource manager finds conflict between at least "
+				elog(WARNING, "resource manager finds conflict between at least "
 							  "one queued query resource and new definition of "
-							  "resource queue %s",
+							  "resource queue \'%s\'",
 							  quetrack->QueueInfo->Name);
 				freeUsedConnectionTrack(newconn);
 				return RESQUEMGR_ALTERQUEUE_CONFILICT;
@@ -5167,12 +5165,12 @@ int rebuildResourceQueueTrackDynamicStatusInShadow(DynResourceQueueTrack  quetra
 		}
 	DQUEUE_LOOP_END
 
-	elog(DEBUG3, "Deadlock detector in shadow has %d MB in use %d MB locked "
+	elog(DEBUG3, "deadlock detector in shadow has %d MB in use %d MB locked "
 				 "after rebuilding.",
 				 shadowtrack->DLDetector.InUseTotal.MemoryMB,
 				 shadowtrack->DLDetector.LockedTotal.MemoryMB);
 
-	elog(RMLOG, "Finished rebuilding resource queue %s dynamic status in its "
+	elog(RMLOG, "finished rebuilding resource queue \'%s\' dynamic status in its "
 				"shadow.",
 			    quetrack->QueueInfo->Name);
 
@@ -5231,8 +5229,8 @@ int detectAndDealWithDeadLockInShadow(DynResourceQueueTrack quetrack,
 			}
 			else
 			{
-				elog(WARNING, "Resource manager finds at least one deadlock issue"
-							  "due to new definition of resource queue %s",
+				elog(WARNING, "resource manager found at least one deadlock issue"
+							  "due to new definition of resource queue \'%s\'",
 							  quetrack->QueueInfo->Name);
 				return RESQUEMGR_ALTERQUEUE_CONFILICT;
 			}
@@ -5264,7 +5262,7 @@ void cancelQueryRequestToBreakDeadLockInShadow(DynResourceQueueTrack shadowtrack
 	static char errorbuf[ERRORMESSAGE_SIZE];
 	DQueueNode tailiter = getDQueueContainerTail(&(shadowtrack->QueryResRequests));
 
-	elog(DEBUG3, "ConnID %d. Try to deal with deadlock issue.",
+	elog(DEBUG3, "ConnID %d. try to deal with deadlock issue.",
 				 ((ConnectionTrack)(iter->Data))->ConnID);
 
 	/*--------------------------------------------------------------------------
@@ -5414,7 +5412,7 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
 				/* Recycle connection track instance. */
 				Assert(quetrack->CurConnCounter > 0);
 
-				elog(DEBUG3, "Resource queue %s has %d connections before handling "
+				elog(DEBUG3, "resource queue \'%s\' has %d connections before handling "
 							 "deadlocked connection ConnID %d detected from a "
 							 "shadow.",
 							 quetrack->QueueInfo->Name,
@@ -5424,7 +5422,7 @@ void applyResourceQueueTrackChangesFromShadows(List *quehavingshadow)
 				quetrack->CurConnCounter--;
 				if ( quetrack->CurConnCounter == 0 )
 				{
-					elog(RMLOG, "Resource queue %s becomes idle after applying "
+					elog(RMLOG, "resource queue \'%s\' becomes idle after applying "
 								"change from its shadow.",
 								quetrack->QueueInfo->Name);
 					quetrack->isBusy = false;
