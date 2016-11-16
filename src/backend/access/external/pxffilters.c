@@ -38,7 +38,8 @@ static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
 static bool scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter);
 static bool var_to_pxffilter(Var *var, PxfFilterDesc *filter);
 static bool supported_filter_type(Oid type);
-static bool supported_operator_type(Oid type, PxfFilterDesc *filter);
+static bool supported_operator_type_op_expr(Oid type, PxfFilterDesc *filter);
+static bool supported_operator_type_scalar_array_op_expr(Oid type, PxfFilterDesc *filter, bool useOr);
 static void scalar_const_to_str(Const *constval, StringInfo buf);
 static void list_const_to_str(Const *constval, StringInfo buf);
 static List* append_attr_from_var(Var* var, List* attrs);
@@ -50,7 +51,7 @@ static void enrich_trivial_expression(List *expressionItems);
  * down system catalog operators.
  * see pg_operator.h
  */
-dbop_pxfop_map pxf_supported_opr[] =
+dbop_pxfop_map pxf_supported_opr_op_expr[] =
 {
 	/* int2 */
 	{Int2EqualOperator  /* int2eq */, PXFOP_EQ},
@@ -134,7 +135,7 @@ dbop_pxfop_map pxf_supported_opr[] =
 	{1869 /* int82ne */, PXFOP_NE},
 
 	/* date */
-	{DateEqualOperator  /* eq */, PXFOP_EQ},
+	{DateEqualOperator  /* date_eq */, PXFOP_EQ},
 	{1095  /* date_lt */, PXFOP_LT},
 	{1097 /* date_gt */, PXFOP_GT},
 	{1096 /* date_le */, PXFOP_LE},
@@ -183,6 +184,59 @@ dbop_pxfop_map pxf_supported_opr[] =
 	//{1960 /* byteage */, PXFOP_GE},
 	//{1956 /* byteane */, PXFOP_NE}
 
+};
+
+
+dbop_pxfop_array_map pxf_supported_opr_scalar_array_op_expr[] =
+{
+	/* int2 */
+	{Int2EqualOperator  /* int2eq */, PXFOP_IN, true},
+
+	/* int4 */
+	{Int4EqualOperator  /* int4eq */, PXFOP_IN, true},
+
+	/* int8 */
+	{Int8EqualOperator /* int8eq */, PXFOP_IN, true},
+
+	/* text */
+	{TextEqualOperator  /* texteq  */, PXFOP_IN, true},
+
+	/* int2 to int4 */
+	{Int24EqualOperator /* int24eq */, PXFOP_IN, true},
+
+	/* int4 to int2 */
+	{Int42EqualOperator /* int42eq */, PXFOP_IN, true},
+
+	/* int8 to int4 */
+	{Int84EqualOperator /* int84eq */, PXFOP_IN, true},
+
+	/* int4 to int8 */
+	{Int48EqualOperator /* int48eq */, PXFOP_IN, true},
+
+	/* int2 to int8 */
+	{Int28EqualOperator /* int28eq */, PXFOP_IN, true},
+
+	/* int8 to int2 */
+	{Int82EqualOperator /* int82eq */, PXFOP_IN, true},
+
+	/* date */
+	{DateEqualOperator  /* date_eq */, PXFOP_IN, true},
+
+	/* float8 */
+	{Float8EqualOperator  /* float8eq */, PXFOP_IN, true},
+
+	/* float48 */
+	{1120 /* float48eq */, PXFOP_IN, true},
+
+	/* bpchar */
+	{BPCharEqualOperator  /* bpchareq */, PXFOP_IN, true},
+
+	/* boolean */
+	{BooleanEqualOperator  /* booleq */, PXFOP_IN, true},
+
+	/* bytea */
+	// TODO: uncomment once HAWQ-1085 is done
+	//,{ByteaEqualOperator  /* byteaeq */, PXFOP_IN, true},
 };
 
 Oid pxf_supported_types[] =
@@ -591,7 +645,7 @@ opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter)
 	/*
 	 * check if supported operator -
 	 */
-	if (!supported_operator_type(expr->opno, filter))
+	if (!supported_operator_type_op_expr(expr->opno, filter))
 		return false;
 
 	/* arguments must be VAR and CONST */
@@ -653,7 +707,7 @@ scalar_array_op_expr_to_pxffilter(ScalarArrayOpExpr *expr, PxfFilterDesc *filter
 	/*
 	 * check if supported operator -
 	 */
-	if(!supported_operator_type(expr->opno, filter))
+	if(!supported_operator_type_scalar_array_op_expr(expr->opno, filter, expr->useOr))
 		return false;
 
 	if (IsA(leftop, Var) && IsA(rightop, Const))
@@ -703,18 +757,12 @@ var_to_pxffilter(Var *var, PxfFilterDesc *filter)
 	if ((!var) || (!filter))
 		return false;
 
-	var_type = exprType(var);
+	var_type = exprType((Node *)var);
 
 	/*
 	 * check if supported type -
 	 */
 	if (!supported_filter_type(var_type))
-		return false;
-
-	/*
-	 * check if supported operator -
-	 */
-	if (!supported_operator_type(BooleanEqualOperator, filter))
 		return false;
 
 	/* arguments must be VAR and CONST */
@@ -827,24 +875,47 @@ supported_filter_type(Oid type)
 
 
 static bool
-supported_operator_type(Oid type, PxfFilterDesc *filter)
+supported_operator_type_op_expr(Oid type, PxfFilterDesc *filter)
 {
 
-	int nargs = sizeof(pxf_supported_opr) / sizeof(dbop_pxfop_map);
+	int nargs = sizeof(pxf_supported_opr_op_expr) / sizeof(dbop_pxfop_map);
 	int i;
 	/* is operator supported? if so, set the corresponding PXFOP */
 	for (i = 0; i < nargs; i++)
 	{
 		/* NOTE: switch to hash table lookup if   */
 		/* array grows. for now it's cheap enough */
-		if(type == pxf_supported_opr[i].dbop)
+		if(type == pxf_supported_opr_op_expr[i].dbop)
 		{
-			filter->op = pxf_supported_opr[i].pxfop;
+			filter->op = pxf_supported_opr_op_expr[i].pxfop;
 			return true; /* filter qualifies! */
 		}
 	}
 
 		elog(DEBUG1, "opexpr_to_pxffilter: operator is not supported, operator code: %d", type);
+
+		return false;
+}
+
+static bool
+supported_operator_type_scalar_array_op_expr(Oid type, PxfFilterDesc *filter, bool useOr)
+{
+
+	int nargs = sizeof(pxf_supported_opr_scalar_array_op_expr) / sizeof(dbop_pxfop_array_map);
+	int i;
+	/* is operator supported? if so, set the corresponding PXFOP */
+	for (i = 0; i < nargs; i++)
+	{
+		/* NOTE: switch to hash table lookup if   */
+		/* array grows. for now it's cheap enough */
+		if(useOr == pxf_supported_opr_scalar_array_op_expr[i].useOr && type == pxf_supported_opr_scalar_array_op_expr[i].dbop)
+		{
+			filter->op = pxf_supported_opr_scalar_array_op_expr[i].pxfop;
+			return true; /* filter qualifies! */
+		}
+	}
+
+		elog(DEBUG1, "supported_operator_type_scalar_array_op_expr: operator is not supported, operator code: %d", type);
 
 		return false;
 }

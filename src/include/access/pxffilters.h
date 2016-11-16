@@ -44,7 +44,8 @@ typedef enum PxfOperatorCode
 	PXFOP_GE,
 	PXFOP_EQ,
 	PXFOP_NE,
-	PXFOP_LIKE
+	PXFOP_LIKE,
+	PXFOP_IN
 
 } PxfOperatorCode;
 
@@ -91,7 +92,7 @@ typedef struct PxfFilterDesc
 } PxfFilterDesc;
 
 /*
- * HAWQ operator OID to PXF operator code mapping
+ * HAWQ operator OID to PXF operator code mapping used for OpExpr
  */
 typedef struct dbop_pxfop_map
 {
@@ -100,6 +101,16 @@ typedef struct dbop_pxfop_map
 
 } dbop_pxfop_map;
 
+/*
+ * HAWQ operator OID to PXF operator code mapping used for ScalarArrayOpExpr
+ */
+typedef struct dbop_pxfop_array_map
+{
+	Oid				dbop;
+	PxfOperatorCode	pxfop;
+	bool			useOr;
+
+} dbop_pxfop_array_map;
 
 typedef struct ExpressionItem
 {

@@ -76,7 +76,7 @@ test__supported_filter_type(void **state)
 }
 
 void
-test__supported_operator_type(void **state)
+test__supported_operator_type_op_expr(void **state)
 {
 	Oid operator_oids[13][2] = {
 			{ Int2EqualOperator, PXFOP_EQ },
@@ -103,22 +103,72 @@ test__supported_operator_type(void **state)
 	/* supported types */
 	for (; i < array_size-1; ++i)
 	{
-		result = supported_operator_type(operator_oids[i][0], filter);
+		result = supported_operator_type_op_expr(operator_oids[i][0], filter);
 		assert_true(result);
 		assert_true(operator_oids[i][1] == filter->op);
 	}
 
 	/* unsupported type */
-	result = supported_operator_type(operator_oids[i][0], filter);
+	result = supported_operator_type_op_expr(operator_oids[i][0], filter);
 	assert_false(result);
 
-	/* go over pxf_supported_opr array */
-	int nargs = sizeof(pxf_supported_opr) / sizeof(dbop_pxfop_map);
+	/* go over pxf_supported_opr_op_expr array */
+	int nargs = sizeof(pxf_supported_opr_op_expr) / sizeof(dbop_pxfop_map);
 	assert_int_equal(nargs, 91);
 	for (i = 0; i < nargs; ++i)
 	{
-		assert_true(supported_operator_type(pxf_supported_opr[i].dbop, filter));
-		assert_true(pxf_supported_opr[i].pxfop == filter->op);
+		assert_true(supported_operator_type_op_expr(pxf_supported_opr_op_expr[i].dbop, filter));
+		assert_true(pxf_supported_opr_op_expr[i].pxfop == filter->op);
+	}
+
+}
+
+void
+test__supported_operator_type_scalar_array_op_expr(void **state)
+{
+	Oid operator_oids[15][2] = {
+			{Int2EqualOperator, PXFOP_IN},
+			{Int4EqualOperator, PXFOP_IN},
+			{Int8EqualOperator, PXFOP_IN},
+			{TextEqualOperator, PXFOP_IN},
+			{Int24EqualOperator, PXFOP_IN},
+			{Int42EqualOperator, PXFOP_IN},
+			{Int84EqualOperator, PXFOP_IN},
+			{Int48EqualOperator, PXFOP_IN},
+			{Int28EqualOperator, PXFOP_IN},
+			{Int82EqualOperator, PXFOP_IN},
+			{DateEqualOperator, PXFOP_IN},
+			{Float8EqualOperator, PXFOP_IN},
+			{1120 , PXFOP_IN},
+			{BPCharEqualOperator, PXFOP_IN},
+			{BooleanEqualOperator, PXFOP_IN},
+	};
+
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
+
+	int array_size = sizeof(operator_oids) / sizeof(operator_oids[0]);
+	bool result = false;
+	int i = 0;
+
+	/* supported types */
+	for (; i < array_size-1; ++i)
+	{
+		result = supported_operator_type_scalar_array_op_expr(operator_oids[i][0], filter, true);
+		assert_true(result);
+		assert_true(operator_oids[i][1] == filter->op);
+	}
+
+	/* unsupported type */
+	result = supported_operator_type_op_expr(InvalidOid, filter);
+	assert_false(result);
+
+	/* go over pxf_supported_opr_scalar_array_op_expr array */
+	int nargs = sizeof(pxf_supported_opr_scalar_array_op_expr) / sizeof(dbop_pxfop_array_map);
+	assert_int_equal(nargs, 15);
+	for (i = 0; i < nargs; ++i)
+	{
+		assert_true(supported_operator_type_scalar_array_op_expr(pxf_supported_opr_op_expr[i].dbop, filter, pxf_supported_opr_scalar_array_op_expr[i].useOr));
+		assert_true(pxf_supported_opr_scalar_array_op_expr[i].pxfop == filter->op);
 	}
 
 }
@@ -359,7 +409,7 @@ void run__list_const_to_str__negative(Const* input, StringInfo result, int len, 
 void
 test__scalar_const_to_str__null(void **state)
 {
-	verify__scalar_const_to_str(true, NULL, 1, "\"NULL\"");
+	verify__scalar_const_to_str(true, NULL, 1, NullConstValue);
 }
 
 void
@@ -567,14 +617,14 @@ test__opexpr_to_pxffilter__intGT(void **state)
 void
 test__opexpr_to_pxffilter__allSupportedTypes(void **state)
 {
-	int nargs = sizeof(pxf_supported_opr) / sizeof(dbop_pxfop_map);
+	int nargs = sizeof(pxf_supported_opr_op_expr) / sizeof(dbop_pxfop_map);
 	PxfOperatorCode pxfop = 0;
 	Oid dbop = InvalidOid;
 
 	for (int i = 0; i < nargs; ++i)
 	{
-		dbop = pxf_supported_opr[i].dbop;
-		pxfop = pxf_supported_opr[i].pxfop;
+		dbop = pxf_supported_opr_op_expr[i].dbop;
+		pxfop = pxf_supported_opr_op_expr[i].pxfop;
 		run__opexpr_to_pxffilter__positive(dbop, pxfop);
 	}
 }
@@ -591,7 +641,7 @@ test__opexpr_to_pxffilter__attributeIsNull(void **state)
 
 	PxfFilterDesc* expected = build_filter(
 				PXF_ATTR_CODE, 1, NULL,
-				PXF_SCALAR_CONST_CODE, 0, "\"NULL\"",
+				PXF_SCALAR_CONST_CODE, 0, NullConstValue,
 				PXFOP_EQ);
 
 	/* run test */
@@ -740,7 +790,7 @@ main(int argc, char* argv[])
 
 	const UnitTest tests[] = {
 			unit_test(test__supported_filter_type),
-			unit_test(test__supported_operator_type),
+			unit_test(test__supported_operator_type_op_expr),
 			unit_test(test__scalar_const_to_str__null),
 			unit_test(test__scalar_const_to_str__int),
 			unit_test(test__scalar_const_to_str__text),
