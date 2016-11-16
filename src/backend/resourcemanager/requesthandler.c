@@ -44,7 +44,7 @@
 	if ( (*conntrack)->ConnID == INVALID_CONNID ) {                            \
 		res = retrieveConnectionTrack((*conntrack), connid);				   \
 		if ( res != FUNC_RETURN_OK ) {                                         \
-			elog(LOG, "Not valid resource context with id %d.", connid);  	   \
+			elog(LOG, "invalid resource context with id %d.", connid);  	   \
 			goto sendresponse;                                                 \
 		}                                                                      \
 		elog(DEBUG5, "HAWQ RM :: Fetched existing connection track "           \
@@ -279,7 +279,7 @@ bool handleRMRequestConnectionUnReg(void **arg)
 	 */
 	else if ( (*conntrack)->Progress == CONN_PP_REGISTER_DONE )
 	{
-		elog(WARNING, "Resource manager finds possible not handled resource "
+		elog(WARNING, "resource manager finds possible not handled resource "
 					  "request from ConnID %d.",
 					  request->ConnID);
 		removeResourceRequestInConnHavingReqeusts(request->ConnID);
@@ -357,7 +357,7 @@ bool handleRMRequestAcquireResource(void **arg)
 		 rm_nocluster_timeout * 1000000LL &&
 		 PRESPOOL->RBClusterReportCounter == 0 )
 	{
-		elog(DEBUG3, "Resource manager defers the resource request.");
+		elog(DEBUG3, "resource manager defers the resource request.");
 		return false;
 	}
 
@@ -367,7 +367,7 @@ bool handleRMRequestAcquireResource(void **arg)
 	 */
 	if ( PQUEMGR->RootTrack->QueueInfo->ClusterMemoryMB <= 0 )
 	{
-		elog(DEBUG3, "Resource manager defers the resource request because the "
+		elog(DEBUG3, "resource manager defers the resource request because the "
 					 "resource queues have no valid resource capacities yet.");
 		return false;
 	}
@@ -603,7 +603,7 @@ sendresponse:
 bool handleRMSEGRequestIMAlive(void **arg)
 {
 	ConnectionTrack conntrack = (ConnectionTrack)(*arg);
-	elog(RMLOG, "Resource manager receives segment heart-beat information.");
+	elog(RMLOG, "resource manager receives segment heart-beat information.");
 
 	SelfMaintainBufferData machinereport;
 	initializeSelfMaintainBuffer(&machinereport,PCONTEXT);
@@ -612,7 +612,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 
 	generateSegStatReport(segstat, &machinereport);
 
-	elog(RMLOG, "Resource manager received segment machine information, %s",
+	elog(RMLOG, "resource manager received segment machine information, %s",
 				SMBUFF_CONTENT(&machinereport));
 	destroySelfMaintainBuffer(&machinereport);
 
@@ -629,7 +629,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	fts_client_host = gethostbyaddr(&fts_client_addr, 4, AF_INET);
 	if (fts_client_host == NULL)
 	{
-		elog(WARNING, "Failed to reverse DNS lookup for ip %s.", fts_client_ip);
+		elog(WARNING, "failed to reverse DNS lookup for ip %s.", fts_client_ip);
 		return true;
 	}
 
@@ -665,7 +665,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	appendSMBVar(&newseginfo,addroffset);
 	appendSMBVar(&newseginfo,addrattr);
 
-	elog(RMLOG, "Resource manager received IMAlive message, this segment's IP "
+	elog(RMLOG, "resource manager received IMAlive message, this segment's IP "
 				"address count: %d",
 				fts_client_seginfo->HostAddrCount);
 
@@ -705,7 +705,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	appendSMBStr(&newseginfo,fts_client_ip);
 	appendSelfMaintainBufferTill64bitAligned(&newseginfo);
 
-	elog(RMLOG, "Resource manager received IMAlive message, "
+	elog(RMLOG, "resource manager received IMAlive message, "
 				"this segment's IP address: %s\n",
 				fts_client_ip);
 
@@ -732,7 +732,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 		newseginfoptr->FailedTmpDirOffset = getSMBContentSize(&newseginfo);
 		newseginfoptr->FailedTmpDirLen = strlen(GET_SEGINFO_FAILEDTMPDIR(fts_client_seginfo));
 		appendSMBStr(&newseginfo, GET_SEGINFO_FAILEDTMPDIR(fts_client_seginfo));
-		elog(RMLOG, "Resource manager received IMAlive message, "
+		elog(RMLOG, "resource manager received IMAlive message, "
 					"failed temporary directory:%s",
 					GET_SEGINFO_FAILEDTMPDIR(fts_client_seginfo));
 		appendSelfMaintainBufferTill64bitAligned(&newseginfo);
@@ -750,7 +750,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	newseginfoptr->GRMRackNameLen = 0;
 	newseginfoptr->GRMRackNameOffset = 0;
 
-	elog(RMLOG, "Resource manager received IMAlive message, "
+	elog(RMLOG, "resource manager received IMAlive message, "
 				"this segment's hostname: %s\n",
 				fts_client_host->h_name);
 
@@ -806,7 +806,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 							   conntrack->MessageMark2,
 							   RESPONSE_RM_IMALIVE);
 
-	elog(DEBUG3, "Resource manager accepted segment machine.");
+	elog(DEBUG3, "resource manager accepted segment machine.");
 
 	conntrack->ResponseSent = false;
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
@@ -831,7 +831,7 @@ bool handleRMRequestAcquireResourceQuota(void **arg)
 		 rm_nocluster_timeout * 1000000LL &&
 		 PRESPOOL->RBClusterReportCounter == 0 )
 	{
-		elog(DEBUG3, "Resource manager defers the resource request.");
+		elog(DEBUG3, "resource manager defers the resource request.");
 		return false;
 	}
 
@@ -841,7 +841,7 @@ bool handleRMRequestAcquireResourceQuota(void **arg)
 	 */
 	if ( PQUEMGR->RootTrack->QueueInfo->ClusterMemoryMB <= 0 )
 	{
-		elog(DEBUG3, "Resource manager defers the resource request because the "
+		elog(DEBUG3, "resource manager defers the resource request because the "
 					 "resource queues have no valid resource capacities yet.");
 		return false;
 	}
@@ -994,7 +994,7 @@ bool handleRMRequestRefreshResource(void **arg)
 						(SMBUFF_CONTENT(&(conntrack->MessageBuff)) +
 						 sizeof(RPCRequestHeadRefreshResourceHeartBeatData));
 
-	elog(DEBUG3, "Resource manager refreshes %d ConnIDs.", request->ConnIDCount);
+	elog(DEBUG3, "resource manager refreshes %d ConnIDs.", request->ConnIDCount);
 
 	for ( int i = 0 ; i < request->ConnIDCount ; ++i )
 	{
@@ -1003,11 +1003,11 @@ bool handleRMRequestRefreshResource(void **arg)
 		if ( res == FUNC_RETURN_OK )
 		{
 			oldct->LastActTime = curmsec;
-			elog(RMLOG, "Refreshed resource context connection id %d", connids[i]);
+			elog(RMLOG, "refreshed resource context connection id %d", connids[i]);
 		}
 		else
 		{
-			elog(WARNING, "Can not find resource context connection id %d for "
+			elog(WARNING, "cannot find resource context connection id %d for "
 						  "resource refreshing.",
 					      connids[i]);
 		}
@@ -1054,19 +1054,19 @@ bool handleRMRequestSegmentIsDown(void **arg)
 
 			if ( !IS_SEGSTAT_FTSAVAILABLE(segres->Stat) )
 			{
-				elog(WARNING, "Resource manager does not probe the status of "
+				elog(WARNING, "resource manager does not probe the status of "
 							  "host %s because it is down already.",
 							  hostname);
 			}
 			else if ( segres->RUAlivePending )
 			{
-				elog(LOG, "Resource manager does not probe the status of host %s "
+				elog(LOG, "resource manager does not probe the status of host %s "
 						  "because it is in RUAlive pending status already.",
 						  hostname);
 			}
 			else
 			{
-				elog(RMLOG, "Resource manager probes the status of host %s by "
+				elog(RMLOG, "resource manager probes the status of host %s by "
 							"sending RUAlive request.",
 							hostname);
 
@@ -1101,19 +1101,19 @@ bool handleRMRequestSegmentIsDown(void **arg)
 					}
 
 					/* Set the host down. */
-					elog(LOG, "Resource manager sets host %s from up to down "
+					elog(LOG, "resource manager sets host %s from up to down "
 							  "due to not reaching host.", hostname);
 				}
 				else
 				{
-					elog(RMLOG, "Resource manager triggered RUAlive request to "
+					elog(RMLOG, "resource manager triggered RUAlive request to "
 								"host %s.",
 								hostname);
 				}
 			}
 		}
 		else {
-			elog(WARNING, "Resource manager cannot find host %s to check status, "
+			elog(WARNING, "resource manager cannot find host %s to check status, "
 						  "skip it.",
 						  hostname);
 		}
@@ -1214,7 +1214,7 @@ bool handleRMRequestDumpStatus(void **arg)
     RPCRequestDumpStatus request = SMBUFF_HEAD(RPCRequestDumpStatus,
     										   &(conntrack->MessageBuff));
 
-    elog(DEBUG3, "Resource manager dump type %u data to file %s",
+    elog(DEBUG3, "resource manager dump type %u data to file %s",
     			 request->type,
 				 request->dump_file);
 
@@ -1287,7 +1287,7 @@ bool handleRMRequestQuotaControl(void **arg)
 	PRESPOOL->pausePhase[request->Phase] = request->Pause;
 	if ( oldvalue != PRESPOOL->pausePhase[request->Phase] )
 	{
-		elog(LOG, "Resource manager resource quota life cycle pause setting %d "
+		elog(LOG, "resource manager resource quota life cycle pause setting %d "
 				  "changes to %s",
 				  request->Phase,
 				  PRESPOOL->pausePhase[request->Phase]?"paused":"resumed");

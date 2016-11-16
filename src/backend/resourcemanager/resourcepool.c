@@ -1454,7 +1454,7 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	/* Update only the grm capacity. */
     if ( res != FUNC_RETURN_OK )
     {
-    	elog(LOG, "Resource manager can not find resource broker reported host %s "
+    	elog(LOG, "Resource manager cannot find resource broker reported host %s "
     			  "in the registered segment list. Skip it.",
 				  hostname);
     	return res;
@@ -1927,7 +1927,7 @@ int  addGRMContainerToToBeAccepted(GRMContainer ctn)
 	uint32_t hostnamelen = strlen(ctn->HostName);
 
 	/*
-	 * If the host does not exist, this container can not be added. Check the
+	 * If the host does not exist, this container cannot be added. Check the
 	 * host name directly, and try the host address again.
 	 */
 	if ( ctn->Resource == NULL )
@@ -1937,7 +1937,7 @@ int  addGRMContainerToToBeAccepted(GRMContainer ctn)
 		if ( res != FUNC_RETURN_OK )
 		{
 			addGRMContainerToKicked(ctn);
-			elog(LOG, "Resource manager can not find registered host %s. "
+			elog(LOG, "Resource manager cannot find registered host %s. "
 					  "To return this host's resource container at once.",
 					  ctn->HostName);
 			return res;
@@ -2655,7 +2655,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 				/* Host should not break vseg num limit. */
 				if ( !fixnodecount && curhost->VSegmentCount >= vseglimitpseg )
 				{
-					elog(RMLOG, "Segment %s can not container more vsegs for "
+					elog(RMLOG, "Segment %s cannot container more vsegs for "
 								"current statement, allocated %d vsegs.",
 								GET_SEGRESOURCE_HOSTNAME(curhost->Resource),
 								curhost->VSegmentCount);
@@ -2677,7 +2677,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 			if ( currresinfo->SliceWorkload + slicesize > rm_nslice_perseg_limit )
 			{
 				elog(LOG, "Segment %s contains %d slices working now, "
-						  "it can not afford %d more slices.",
+						  "it cannot afford %d more slices.",
 						  GET_SEGRESOURCE_HOSTNAME(currresinfo),
 						  currresinfo->SliceWorkload,
 						  slicesize);
@@ -3140,7 +3140,7 @@ int getSegIDByHostNameInternal(HASHTABLE   hashtable,
 												 &gottenaddr);
 	if ( res != FUNC_RETURN_OK )
 	{
-		elog(WARNING, "Resource manager can not resolve host name %s", hostname);
+		elog(WARNING, "Resource manager cannot resolve host name %s", hostname);
 		goto exit;
 	}
 
@@ -4305,7 +4305,7 @@ void checkSlavesFile(void)
 		if ( gphome == NULL )
 		{
 			elog(WARNING, "The environment variable GPHOME is not set. "
-						  "Resource manager can not find file slaves.");
+						  "Resource manager cannot find file slaves.");
 			return;
 		}
 
@@ -4321,7 +4321,7 @@ void checkSlavesFile(void)
 	FILE *fp = fopen(filename, "r");
 	if ( fp == NULL )
 	{
-		elog(WARNING, "Fail to open slaves file %s. errno %d", filename, errno);
+		elog(WARNING, "Failed to open slaves file %s. errno %d", filename, errno);
 		return;
 	}
 	int fd = fileno(fp);
@@ -4330,7 +4330,7 @@ void checkSlavesFile(void)
 	if ( fres != 0 )
 	{
 		fclose(fp);
-		elog(WARNING, "Fail to get slaves file stat %s. errno %d", filename, errno);
+		elog(WARNING, "Failed to get slaves file stat %s. errno %d", filename, errno);
 		return;
 	}
 	int64_t filechangetime = filestat.st_mtime;

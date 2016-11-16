@@ -565,7 +565,7 @@ CreateRole(CreateRoleStmt *stmt)
 			releaseResourceContextWithErrorReport(resourceid);
 			ereport(ERROR,
 					(errcode(ERRCODE_RESERVED_NAME),
-					 errmsg("Resource queue name \"%s\" is reserved",
+					 errmsg("resource queue name \"%s\" is reserved",
 							resqueue), errOmitLocation(true)));
 		}
 
@@ -576,7 +576,7 @@ CreateRole(CreateRoleStmt *stmt)
 			releaseResourceContextWithErrorReport(resourceid);
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("Resource queue \"%s\" does not exist",
+					 errmsg("resource queue \"%s\" does not exist",
 							resqueue), errOmitLocation(true)));
 		}
 
@@ -586,7 +586,7 @@ CreateRole(CreateRoleStmt *stmt)
 			releaseResourceContextWithErrorReport(resourceid);
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("Can't assign a branch resource queue \"%s\" to role",
+					 errmsg("cannot assign non-leaf resource queue \"%s\" to role",
 							resqueue), errOmitLocation(true)));
 		}
 
@@ -640,7 +640,7 @@ CreateRole(CreateRoleStmt *stmt)
 					(errcode(IS_TO_RM_RPC_ERROR(res) ?
 							 ERRCODE_INTERNAL_ERROR :
 							 ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("Can not apply CREATE ROLE because of %s", errorbuf)));
+					 errmsg("cannot apply CREATE ROLE because of %s", errorbuf)));
 		}
 	}
 
@@ -982,7 +982,7 @@ AlterRole(AlterRoleStmt *stmt)
     	Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
     	ereport(ERROR,
     			(errcode(ERRCODE_INTERNAL_ERROR),
-    			         errmsg("Too many existing resource context.")));
+    			         errmsg("too many existing resource context.")));
     }
 
 	/* Here, using user oid is more convenient. */
@@ -1238,7 +1238,7 @@ AlterRole(AlterRoleStmt *stmt)
 				releaseResourceContextWithErrorReport(resourceid);
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
-						 errmsg("can't assign a branch resource queue \"%s\" to role",
+						 errmsg("cannot assign non-leaf resource queue \"%s\" to role",
 								resqueue),
 										   errOmitLocation(true)));
 			}
@@ -1287,7 +1287,7 @@ AlterRole(AlterRoleStmt *stmt)
 					(errcode(IS_TO_RM_RPC_ERROR(res) ?
 							 ERRCODE_INTERNAL_ERROR :
 							 ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("Can not apply ALTER ROLE because of %s", errorbuf)));
+					 errmsg("cannot apply ALTER ROLE because of %s", errorbuf)));
 		}
 	}
 
@@ -1636,7 +1636,7 @@ DropRole(DropRoleStmt *stmt)
 			Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
 			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
-							 errmsg("Can not apply DROP ROLE. "
+							 errmsg("cannot apply DROP ROLE. "
 									"Because too many resource contexts were created.")));
 		}
 
@@ -1672,7 +1672,7 @@ DropRole(DropRoleStmt *stmt)
 					(errcode(IS_TO_RM_RPC_ERROR(res) ?
 							 ERRCODE_INTERNAL_ERROR :
 							 ERRCODE_INVALID_OBJECT_DEFINITION),
-					 errmsg("Can not apply DROP ROLE because of %s", errorbuf)));
+					 errmsg("cannot apply DROP ROLE because of %s", errorbuf)));
 		}
 
 		/*
