@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <iostream>
 #include <string>
+#include <algorithm>
 
 #include "lib/sql_util.h"
 
@@ -16,8 +17,17 @@ class TestCreateTable : public ::testing::Test {
  public:
   TestCreateTable() {}
   ~TestCreateTable() {}
+  std::string getNsOid(hawq::test::SQLUtility &util);
 };
 
+std::string TestCreateTable::getNsOid(hawq::test::SQLUtility &util) {
+  std::string schema = util.getSchemaName();
+  std::transform(schema.begin(), schema.end(), schema.begin(), ::tolower);
+  const hawq::test::PSQLQueryResult& result = util.executeQuery("SELECT oid FROM pg_namespace WHERE nspname='"+schema+"'");
+  EXPECT_EQ(result.rowCount(), 1);
+  std::string nsOid = result.getRows()[0][0];
+  return nsOid; 
+}
 
 TEST_F(TestCreateTable, TestCreateTable1) {
   hawq::test::SQLUtility util;
@@ -188,18 +198,20 @@ TEST_F(TestCreateTable, TestCreateTableInherits) {
       "CREATE TABLE t1_1_6(c2 int) INHERITS (t1) WITH (bucketnum = 7) DISTRIBUTED RANDOMLY",
       "ERROR:  distribution policy for \"t1_1_6\" must be the same as that for \"t1\"");
 
+  std::string nsOid = getNsOid(util);
+
   util.execute("CREATE TABLE t1_1_w(c2 int) INHERITS(t1) WITH (bucketnum=6)");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_1')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_1' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_1_w')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_1_w' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_1_3')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_1_3' AND relnamespace="+nsOid+")",
 		     "6||\n");
 
   util.execute("DROP TABLE t1_1_3, t1_1_w, t1_1, t1");
@@ -221,23 +233,25 @@ TEST_F(TestCreateTable, TestCreateTableDistribution1) {
   util.execute("CREATE TABLE t1_2_3(LIKE t1) WITH (bucketnum = 4) DISTRIBUTED BY (c1)");
   util.execute("CREATE TABLE t1_2_4(LIKE t1) WITH (bucketnum = 4) DISTRIBUTED RANDOMLY");
 
+  std::string nsOid = getNsOid(util);
+  
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_w')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_w' AND relnamespace="+nsOid+")",
 		     "4||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_1')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_1' AND relnamespace="+nsOid+")",
 		     "6|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_2')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_2' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_3')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_3' AND relnamespace="+nsOid+")",
 		     "4|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_4')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2_4' AND relnamespace="+nsOid+")",
 		     "4||\n");
 
   util.execute("CREATE TABLE t1_3 AS (SELECT * FROM t1)");
@@ -248,22 +262,22 @@ TEST_F(TestCreateTable, TestCreateTableDistribution1) {
   util.execute("CREATE TABLE t1_3_4 WITH (bucketnum = 7) AS (SELECT * FROM  t1) DISTRIBUTED RANDOMLY");
 
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_2' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_w')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_w' AND relnamespace="+nsOid+")",
 		     "4||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_1')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_1' AND relnamespace="+nsOid+")",
 		     "6|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_2')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_2' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_3')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_3' AND relnamespace="+nsOid+")",
 		     "6|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_4')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname='t1_3_4' AND relnamespace="+nsOid+")",
 		     "7||\n");
 
   // cleanup
@@ -303,8 +317,10 @@ TEST_F(TestCreateTable, TestCreateTableDistribution2) {
       "CREATE TABLE t2_1_6(c2 int) INHERITS (t2) WITH (bucketnum = 7) DISTRIBUTED RANDOMLY",
       "ERROR:  distribution policy for \"t2_1_6\" must be the same as that for \"t2\"");
 
+  std::string nsOid = getNsOid(util);
+  
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_1')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_1_1' AND relnamespace="+nsOid+")",
 		     "6|{1}|\n");
 
   util.execute("CREATE TABLE t2_2(LIKE t2)");
@@ -315,22 +331,22 @@ TEST_F(TestCreateTable, TestCreateTableDistribution2) {
   util.execute("CREATE TABLE t2_2_4(LIKE t2) WITH (bucketnum = 6) DISTRIBUTED RANDOMLY");
 
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2' AND relnamespace="+nsOid+")",
 		     "6|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_w')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_w' AND relnamespace="+nsOid+")",
 		     "4|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_1')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_1' AND relnamespace="+nsOid+")",
 		     "6|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_2')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_2' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_3')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_3' AND relnamespace="+nsOid+")",
 		     "5|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_4')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_2_4' AND relnamespace="+nsOid+")",
 		     "6||\n");
 
   util.execute("CREATE TABLE t2_3 AS (SELECT * FROM  t2)");
@@ -341,22 +357,22 @@ TEST_F(TestCreateTable, TestCreateTableDistribution2) {
   util.execute("CREATE TABLE t2_3_4 WITH (bucketnum = 6) AS (SELECT * FROM  t2) DISTRIBUTED RANDOMLY");
 
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_w')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_w' AND relnamespace="+nsOid+")",
 		     "4||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_1')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_1' AND relnamespace="+nsOid+")",
 		     "6|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_2')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_2' AND relnamespace="+nsOid+")",
 		     "6||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_3')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_3' AND relnamespace="+nsOid+")",
 		     "5|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_4')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't2_3_4' AND relnamespace="+nsOid+")",
 		     "6||\n");
 
   // cleanup
@@ -375,14 +391,16 @@ TEST_F(TestCreateTable, TestCreateTableDistribution3) {
   util.execute("CREATE TABLE t3_1 (c1 int) WITH (bucketnum = 5) DISTRIBUTED BY(c1)");
   util.execute("CREATE TABLE t3_2 (c1 int) WITH (bucketnum = 6) DISTRIBUTED RANDOMLY");
 
+  std::string nsOid = getNsOid(util);
+  
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3' AND relnamespace="+nsOid+")",
 		     "4||\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3_1')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3_1' AND relnamespace="+nsOid+")",
 		     "5|{1}|\n");
   util.query("SELECT bucketnum, attrnums FROM gp_distribution_policy "
-		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3_2')",
+		     "WHERE localoid = (SELECT oid FROM pg_class WHERE relname = 't3_2' AND relnamespace="+nsOid+")",
 		     "6||\n");
 
   // cleanup

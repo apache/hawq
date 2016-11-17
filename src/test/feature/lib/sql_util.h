@@ -38,6 +38,10 @@ class SQLUtility {
   // @return string of the test database name
   std::string getDbName();
 
+  // Get the test schema name
+  // @return string of the test schema name
+  std::string getSchemaName();
+  
   // Execute sql command
   // @param sql The given sql command
   // @param check true(default) if expected correctly executing, false otherwise
@@ -91,17 +95,19 @@ class SQLUtility {
   // @return the query result
   std::string getQueryResult(const std::string &query);
 
+  std::string getQueryResultSetString(const std::string &query);
+
   // execute expect error message
   // @param sql the given sql command
   // @param errmsg the expected sql error message
   // @return void
   void executeExpectErrorMsgStartWith(const std::string &sql, const std::string &errmsg);
 
+  const hawq::test::PSQLQueryResult &executeQuery(const std::string &sql);
 
  private:
   std::unique_ptr<hawq::test::PSQL> getConnection();
   const std::string generateSQLFile(const std::string &sqlFile);
-  const hawq::test::PSQLQueryResult &executeQuery(const std::string &sql);
   FilePath splitFilePath(const std::string &filePath) const;
   void exec(const std::string &sql);
 

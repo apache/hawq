@@ -3,6 +3,7 @@
 
 #include <string>
 #include <pwd.h>
+#include <fstream>
 #include "lib/hdfs_config.h"
 #include "gtest/gtest.h"
 
@@ -49,6 +50,17 @@ class TestHawqRegister : public ::testing::Test {
             return "";
         }
 
+        int getFileSize(const char *file){
+            if (file == NULL)
+                return -1;
+            std::ifstream stream;
+            stream.open(file, std::ios_base::binary);
+            stream.seekg(0, std::ios_base::end);
+            int size = stream.tellg();
+            stream.close();
+            return size;
+        }
+
         void checkPgAOSegValue(std::string relname, std::string value, std::string fmt) {
             std::string reloid = getTableOid(relname);
 
@@ -79,6 +91,13 @@ class TestHawqRegister : public ::testing::Test {
                 }
             }
         }
+
+        void runYamlCaseTableNotExists(std::string casename, std::string ymlname, int expectederror, int checknum);
+        void runYamlCaseTableExists(std::string casename, std::string ymlname, int isexpectederror, int checknum);
+        void runYamlCaseForceMode(std::string casename, std::string ymlname, int isexpectederror, int rows, int checknum, bool samepath);
+        void runYamlCaseTableNotExistsPartition(std::string casename, std::string ymlname, int expectederror, int checknum, int islistpartition);
+        void runYamlCaseTableExistsPartition(std::string casename, std::string ymlname, int isexpectederror, int checknum, int islistpartition);
+        void runYamlCaseForceModePartition(std::string casename, std::string ymlname, int isexpectederror, int rows, int checknum);
 
     private:
         std::unique_ptr<hawq::test::PSQL> conn;

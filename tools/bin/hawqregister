@@ -18,7 +18,7 @@
 # under the License.
 
 # Usage1: hawq register [-h hostname] [-p port] [-U username] [-d database] [-f filepath] [-e eof] <tablename>
-# Usage2: hawq register [-h hostname] [-p port] [-U username] [-d database] [-c config] [--force] [--repair] <tablename>
+# Usage2: hawq register [-h hostname] [-p port] [-U username] [-d database] [-c config] [--force] <tablename>
 
 import os
 import sys
@@ -54,20 +54,23 @@ def option_parser():
     parser.add_option('-e', '--eof', dest='filesize', type='int', default=None, help='eof of the file to be registered')
     parser.add_option('-c', '--config', dest='yml_config', default='', help='configuration file in YAML format')
     parser.add_option('-F', '--force', dest='force', action='store_true', default=False)
-    parser.add_option('-R', '--repair', dest='repair', action='store_true', default=False)
     return parser
 
 
 def register_yaml_dict_check(D, table_column_num, src_tablename):
     '''check exists'''
-    check_list = ['DFS_URL', 'Distribution_Policy', 'FileFormat', 'TableName', 'Bucketnum']
+    check_list = ['DFS_URL', 'Distribution_Policy', 'FileFormat', 'TableName']
     for attr in check_list:
         if D.get(attr) is None:
             logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
             sys.exit(1)
-    if D['Bucketnum'] <= 0:
-        logger.error('Bucketnum should not be zero, please check your yaml configuration file.')
-        sys.exit(1)
+    if D['Distribution_Policy'].startswith('DISTRIBUTED BY'):
+        if D.get('Bucketnum') is None:
+            logger.error('Wrong configuration yaml file format: "%s" attribute does not exist.\n See example in "hawq register --help".' % attr)
+            sys.exit(1)
+        if D['Bucketnum'] <= 0:
+            logger.error('Bucketnum should not be zero, please check your yaml configuration file.')
+            sys.exit(1)
     if D['FileFormat'] in ['Parquet', 'AO']:
         prefix = D['FileFormat']
         local_check_list = ['%s_FileLocations' % prefix, '%s_Schema' % prefix]
@@ -119,6 +122,31 @@ def register_yaml_dict_check(D, table_column_num, src_tablename):
         logger.error('Column number of table in yaml file is not equals to the column number of table %s.' % src_tablename)
         sys.exit(1)
 
+def ispartition(yml_file):
+    import yaml
+    try:
+        with open(yml_file, 'r') as f:
+            params = yaml.load(f)
+    except yaml.scanner.ScannerError as e:
+        print e
+        sys.exit(1)
+
+    if params['FileFormat'].lower() == 'parquet':
+        Format = 'Parquet'
+    else: #AO format
+        Format = 'AO'
+    Format_FileLocations = '%s_FileLocations' % Format
+    if params.get(Format_FileLocations):
+        partitionby = params.get(Format_FileLocations).get('PartitionBy')
+        if partitionby:
+            return True
+    return False
+
+def tablename_handler(tablename):
+    tmp_lst = tablename.split('.')
+    if len(tmp_lst) > 1:
+        return tmp_lst[-2], tmp_lst[-1]
+    return 'public', tablename
 
 class FailureHandler(object):
     def __init__(self, conn):
@@ -175,12 +203,18 @@ class GpRegisterAccessor(object):
         '''execute query and return dict result'''
         return self.conn.query(sql).dictresult()
 
+    def get_schema_id(self, schemaname):
+        qry = """select oid from pg_namespace where nspname='%s';""" % schemaname
+        return self.exec_query(qry)[0]['oid']
+
     def get_table_existed(self, tablename):
-        qry = """select count(*) from pg_class where relname = '%s';""" % tablename.split('.')[-1].lower()
+        schemaname, tablename = tablename_handler(tablename)
+        qry = """select count(*) from pg_class where relnamespace = '%s' and relname = '%s';""" % (self.get_schema_id(schemaname), tablename)
         return self.exec_query(qry)[0]['count'] == 1
 
     def get_table_column_num(self, tablename):
-        qry = """select count(*) from pg_attribute ,pg_class where pg_class.relname = '%s' and pg_class.oid = pg_attribute.attrelid and attnum > 0;""" % tablename.split('.')[-1].lower()
+        schemaname, tablename = tablename_handler(tablename)
+        qry = """select count(*) from pg_attribute ,pg_class where pg_class.relnamespace = '%s' and pg_class.relname = '%s' and pg_class.oid = pg_attribute.attrelid and attnum > 0;""" % (self.get_schema_id(schemaname), tablename)
         return self.exec_query(qry)[0]['count']
 
     def do_create_table(self, src_table_name, tablename, schema_info, fmt, distrbution_policy, file_locations, bucket_number, partitionby, partitions_constraint, partitions_name):
@@ -219,7 +253,8 @@ class GpRegisterAccessor(object):
         return True, query
 
     def check_hash_type(self, tablename):
-        qry = """select attrnums from gp_distribution_policy, pg_class where pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;""" % tablename
+        schemaname, tablename = tablename_handler(tablename)
+        qry = """select attrnums from gp_distribution_policy, pg_class where pg_class.relnamespace = '%s' and pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;""" % (self.get_schema_id(schemaname), tablename)
         rows = self.exec_query(qry)
         if len(rows) == 0:
             logger.error('Table %s is not an append-only table. There is no record in gp_distribution_policy table.' % tablename)
@@ -230,9 +265,9 @@ class GpRegisterAccessor(object):
 
     # pg_paqseg_#
     def get_seg_name(self, tablename, database, fmt):
-        tablename = tablename.split('.')[-1]
+        schemaname, tablename = tablename_handler(tablename)
         query = ("select pg_class2.relname from pg_class as pg_class1, pg_appendonly, pg_class as pg_class2 "
-                 "where pg_class1.relname ='%s' and pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid;") % tablename
+                 "where pg_class1.relname ='%s' and pg_class1.oid = pg_appendonly.relid and pg_appendonly.segrelid = pg_class2.oid and pg_class1.relnamespace = '%s';") % (tablename, self.get_schema_id(schemaname))
         rows = self.exec_query(query)
         if len(rows) == 0:
             logger.error('table "%s" not found in db "%s"' % (tablename, database))
@@ -245,15 +280,42 @@ class GpRegisterAccessor(object):
         return (relname, True)
 
     def get_distribution_policy_info(self, tablename):
-        query = "select oid from pg_class where relname = '%s';" % tablename.split('.')[-1].lower()
+        schemaname, tablename = tablename_handler(tablename)
+        query = "select oid from pg_class where relnamespace = '%s' and relname = '%s';" % (self.get_schema_id(schemaname), tablename)
         rows = self.exec_query(query)
         oid = rows[0]['oid']
         query = "select * from gp_distribution_policy where localoid = '%s';" % oid
         rows = self.exec_query(query)
         return rows[0]['attrnums']
 
+    def get_partition_info(self, tablename):
+        ''' Get partition information from pg_partitions, return a constraint-tablename dictionary '''
+        schemaname, tablename = tablename_handler(tablename)
+        query = "SELECT partitiontablename, partitionboundary FROM pg_partitions WHERE partitionschemaname = '%s' and tablename = '%s'" % (schemaname, tablename)
+        return self.exec_query(query)
+
+    def get_partition_parent(self, tablename):
+        schemaname, tablename = tablename_handler(tablename)
+        query = "SELECT partitiontablename, parentpartitiontablename FROM pg_partitions WHERE partitionschemaname = '%s' and tablename = '%s'" % (schemaname, tablename)
+        return self.exec_query(query)
+
+    def get_partitionby(self, tablename):
+        schemaname, tablename = tablename_handler(tablename)
+        query = "SELECT partitionschemaname, partitiontablename, partitionname, partitiontype, parentpartitiontablename, partitionboundary FROM pg_partitions WHERE schemaname = '%s' and tablename='%s';" % (schemaname, tablename)
+        parition_type = self.exec_query(query)[0]['partitiontype']
+        query = "SELECT columnname, partitionlevel FROM pg_partition_columns WHERE schemaname = '%s' and tablename='%s' ORDER BY position_in_partition_key;" % (schemaname, tablename)
+        partition_columnname = self.exec_query(query)[0]['columnname']
+        partitionby = 'PARTITION BY %s (%s)' % (parition_type, partition_columnname)
+        return partitionby
+
+    def get_partition_num(self, tablename):
+        schemaname, tablename = tablename_handler(tablename)
+        query = "SELECT partitionschemaname from pg_partitions WHERE schemaname = '%s' and tablename='%s';" % (schemaname, tablename)
+        return len(self.exec_query(query))
+
     def get_bucket_number(self, tablename):
-        query = "select oid from pg_class where relname = '%s';" % tablename.split('.')[-1].lower()
+        schemaname, tablename = tablename_handler(tablename)
+        query = "select oid from pg_class where relnamespace = '%s' and relname = '%s';" % (self.get_schema_id(schemaname), tablename)
         rows = self.exec_query(query)
         oid = rows[0]['oid']
         query = "select * from gp_distribution_policy where localoid = '%s';" % oid
@@ -261,13 +323,14 @@ class GpRegisterAccessor(object):
         return rows[0]['bucketnum']
 
     def get_metadata_from_database(self, tablename, seg_name):
+        schemaname, tablename = tablename_handler(tablename) 
         query = 'select segno from pg_aoseg.%s;' % seg_name
         firstsegno = len(self.exec_query(query)) + 1
         # get the full path of correspoding file for target table
         query = ("select location, gp_persistent_tablespace_node.tablespace_oid, database_oid, relfilenode from pg_class, gp_persistent_relation_node, "
-                 "gp_persistent_tablespace_node, gp_persistent_filespace_node where relname = '%s' and pg_class.relfilenode = "
+                 "gp_persistent_tablespace_node, gp_persistent_filespace_node where relnamespace = '%s' and relname = '%s' and pg_class.relfilenode = "
                  "gp_persistent_relation_node.relfilenode_oid and gp_persistent_relation_node.tablespace_oid = gp_persistent_tablespace_node.tablespace_oid "
-                 "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % tablename.split('.')[-1]
+                 "and gp_persistent_filespace_node.filespace_oid = gp_persistent_filespace_node.filespace_oid;") % (self.get_schema_id(schemaname), tablename)
         D = self.exec_query(query)[0]
         tabledir = '/'.join([D['location'].strip(), str(D['tablespace_oid']), str(D['database_oid']), str(D['relfilenode']), ''])
         return firstsegno, tabledir
@@ -300,25 +363,24 @@ class HawqRegister(object):
         self.accessor = GpRegisterAccessor(conn)
         self.utility_accessor = GpRegisterAccessor(utility_conn)
         self.failure_handler = failure_handler
-        self.mode = self._init_mode(options.force, options.repair)
+        self.mode = self._init_mode(options.force)
         self.srcfiles = []
         self.dstfiles = []
-        self._init()
+        self.files_same_path = []
+        self.sizes_same_path = []
+        self.segnos_same_path = []
+        self.tupcounts_same_path = []
+        self.varblockcounts_same_path = []
+        self.eofuncompresseds_same_path = []
+        self.segnos_same_path = []
 
-    def _init_mode(self, force, repair):
+    def _init_mode(self, force):
         def table_existed():
             return self.accessor.get_table_existed(self.dst_table_name)
 
         if self.yml:
             if force:
                 return 'force'
-            elif repair:
-                logger.info('--repair mode is not supported in current release of hawq register.')
-                sys.exit(0)
-                if not table_existed():
-                    logger.error('--repair mode asserts the table has been already created.')
-                    sys.exit(1)
-                return 'repair'
             else:
                 return 'usage2_table_not_exist'
         else:
@@ -368,12 +430,16 @@ class HawqRegister(object):
             self.failure_handler.rollback()
             sys.exit(1)
 
-    def _set_yml_dataa(self, file_format, files, sizes, tablename, schema, distribution_policy, file_locations,\
+    def _set_yml_data(self, file_format, files, sizes, tupcounts, eofuncompresseds, varblockcounts, tablename, schema, distribution_policy, file_locations,\
                       bucket_number, partitionby, partitions_constraint, partitions_name, partitions_compression_level,\
-                      partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding):
+                      partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, \
+                      partitions_tupcounts, partitions_eofuncompresseds, partitions_varblockcounts, encoding):
         self.file_format = file_format
         self.files = files
         self.sizes = sizes
+        self.tupcounts = tupcounts
+        self.eofuncompresseds = eofuncompresseds
+        self.varblockcounts = varblockcounts
         self.src_table_name = tablename
         self.schema = schema
         self.distribution_policy = distribution_policy
@@ -387,6 +453,9 @@ class HawqRegister(object):
         self.partitions_checksum = partitions_checksum
         self.partitions_filepaths = partitions_filepaths
         self.partitions_filesizes = partitions_filesizes
+        self.partitions_tupcounts = partitions_tupcounts
+        self.partitions_eofuncompresseds = partitions_eofuncompresseds
+        self.partitions_varblockcounts = partitions_varblockcounts
         self.encoding = encoding
 
     def _option_parser_yml(self, yml_file):
@@ -398,6 +467,7 @@ class HawqRegister(object):
             print e
             self.failure_handler.rollback()
             sys.exit(1)
+            
         table_column_num = self.accessor.get_table_column_num(self.tablename)
         register_yaml_dict_check(params, table_column_num, self.tablename)
         partitions_filepaths = []
@@ -407,33 +477,48 @@ class HawqRegister(object):
         partitions_checksum = []
         partitions_compression_level = []
         partitions_compression_type = []
-        files, sizes = [], []
+        partitions_tupcounts = []
+        partitions_eofuncompresseds = []
+        partitions_varblockcounts = []
+        files, sizes, tupcounts, eofuncompresseds, varblockcounts = [], [], [], [], []
 
-        if params['FileFormat'].lower() == 'parquet':
-            Format = 'Parquet'
-        else: #AO format
-            Format = 'AO'
-        Format_FileLocations = '%s_FileLocations' % Format
-        partitionby = params.get(Format_FileLocations).get('PartitionBy')
-        if partitionby:
-            logger.info('Partition table is not supported in current release of hawq register.')
-            sys.exit(0)
-        if params.get(Format_FileLocations).get('Partitions') and len(params[Format_FileLocations]['Partitions']):
-            partitions_checksum = [d['Checksum'] for d in params[Format_FileLocations]['Partitions']]
-            partitions_compression_level = [d['CompressionLevel'] for d in params[Format_FileLocations]['Partitions']]
-            partitions_compression_type = [d['CompressionType'] for d in params[Format_FileLocations]['Partitions']]
-            partitions_constraint = [d['Constraint'] for d in params[Format_FileLocations]['Partitions']]
-            partitions_files = [d['Files'] for d in params[Format_FileLocations]['Partitions']]
-            if len(partitions_files):
-                for pfile in partitions_files:
-                    partitions_filepaths.append([params['DFS_URL'] + item['path'] for item in pfile])
-                    partitions_filesizes.append([item['size'] for item in pfile])
-            partitions_name = [d['Name'] for d in params[Format_FileLocations]['Partitions']]
-        if len(params[Format_FileLocations]['Files']):
-            files, sizes = [params['DFS_URL'] + d['path'] for d in params[Format_FileLocations]['Files']], [d['size'] for d in params[Format_FileLocations]['Files']]
-        encoding = params['Encoding']
-        self._set_yml_dataa(Format, files, sizes, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], params['Bucketnum'], partitionby,\
-                      partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, encoding)
+        try:
+            if params['FileFormat'].lower() == 'parquet':
+                Format = 'Parquet'
+            else: #AO format
+                Format = 'AO'
+            Format_FileLocations = '%s_FileLocations' % Format
+            partitionby = params.get(Format_FileLocations).get('PartitionBy')
+            if params.get(Format_FileLocations).get('Partitions') and len(params[Format_FileLocations]['Partitions']):
+                partitions_checksum = [d['Checksum'] for d in params[Format_FileLocations]['Partitions']]
+                partitions_compression_level = [d['CompressionLevel'] for d in params[Format_FileLocations]['Partitions']]
+                partitions_compression_type = [d['CompressionType'] for d in params[Format_FileLocations]['Partitions']]
+                partitions_constraint = [d['Constraint'] for d in params[Format_FileLocations]['Partitions']]
+                partitions_files = [d['Files'] for d in params[Format_FileLocations]['Partitions']]
+                if len(partitions_files):
+                    for pfile in partitions_files:
+                        partitions_filepaths.append([params['DFS_URL'] + item['path'] for item in pfile])
+                        partitions_filesizes.append([item['size'] for item in pfile])
+                        partitions_tupcounts.append([item['tupcount'] if item.has_key('tupcount') else -1 for item in pfile])
+                        partitions_eofuncompresseds.append([item['eofuncompressed'] if item.has_key('eofuncompressed') else -1 for item in pfile])
+                        partitions_varblockcounts.append([item['varblockcount'] if item.has_key('varblockcount') else -1 for item in pfile])
+                partitions_name = [d['Name'] for d in params[Format_FileLocations]['Partitions']]
+            if len(params[Format_FileLocations]['Files']):
+                for ele in params[Format_FileLocations]['Files']:
+                    files.append(params['DFS_URL'] + ele['path'])
+                    sizes.append(ele['size'])
+                    tupcounts.append(ele['tupcount'] if ele.has_key('tupcount') else -1)
+                    eofuncompresseds.append(ele['eofuncompressed'] if ele.has_key('eofuncompressed') else -1)
+                    varblockcounts.append(ele['varblockcount'] if ele.has_key('varblockcount') else -1)
+
+            encoding = params['Encoding']
+            bucketNum = params['Bucketnum'] if params['Distribution_Policy'].startswith('DISTRIBUTED BY') else 6
+            self._set_yml_data(Format, files, sizes, tupcounts, eofuncompresseds, varblockcounts, params['TableName'], params['%s_Schema' % Format], params['Distribution_Policy'], params[Format_FileLocations], bucketNum, partitionby, partitions_constraint, partitions_name, partitions_compression_level, partitions_compression_type, partitions_checksum, partitions_filepaths, partitions_filesizes, partitions_tupcounts, partitions_eofuncompresseds, partitions_varblockcounts, encoding)
+
+        except KeyError as e:
+            logger.error('Invalid yaml file, %s is missing.' % e)
+            self.failure_handler.rollback()
+            sys.exit(1)
 
 
     # check conflicting distributed policy
@@ -465,12 +550,20 @@ class HawqRegister(object):
             self.failure_handler.rollback()
             sys.exit(1)
 
-    def _check_file_not_folder(self):
+    def _check_file_not_folder(self, pn=''):
+        if pn:
+            logger.info('Files check for table %s...' % pn)
+        else:
+            logger.info('Files check...')
         for fn in self.files:
             hdfscmd = 'hadoop fs -test -f %s' % fn
             if local_ssh(hdfscmd, logger):
                 logger.info('%s is not a file in hdfs, please check the yaml configuration file.' % fn)
                 sys.exit(1)
+        if pn:
+            logger.info('Files check done for table %s.' % pn)
+        else:
+            logger.info('Files check done.')
 
     def _is_folder(self, filepath):
         hdfscmd = 'hadoop fs -test -d %s' % filepath
@@ -489,11 +582,15 @@ class HawqRegister(object):
                 logger.error('File size(%s) in yaml configuration file should not be less than 0.' % sz)
                 self.failure_handler.rollback()
                 sys.exit(1)
-        for k, fn in enumerate(self.files):
-            hdfscmd = 'hadoop fs -du %s' % fn
-            _, out, _ = local_ssh_output(hdfscmd)
+        hdfscmd = 'hadoop fs -du %s' % ' '.join(self.files)
+        _, outs, _ = local_ssh_output(hdfscmd)
+        outs = outs.split('\n')
+        for k, out in enumerate(outs):
             if self.sizes[k] > int(out.strip().split()[0]):
-                logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], fn))
+                if self.mode == 'usage1':
+                    logger.error('Specified file size(%s) should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], self.files[k]))
+                else:
+                    logger.error('File size(%s) in yaml configuration file should not exceed actual length(%s) of file %s.' % (self.sizes[k], out.strip().split()[0], self.files[k]))
                 self.failure_handler.rollback()
                 sys.exit(1)
 
@@ -511,15 +608,14 @@ class HawqRegister(object):
                     self.failure_handler.rollback()
                     sys.exit(1)
 
-    def _init(self):
+    def prepare(self):
         if self.yml:
             self._option_parser_yml(options.yml_config)
             self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
             self._check_file_not_folder()
             self._check_database_encoding()
-            if self.mode != 'repair':
-                if not self._create_table() and self.mode != 'force':
-                    self.mode = 'usage2_table_exist'
+            if not self._create_table() and self.mode != 'force':
+                self.mode = 'usage2_table_exist'
         else:
             if self._is_folder(self.filepath) and self.filesize:
                 logger.error('-e option is only supported with single file case.')
@@ -550,26 +646,18 @@ class HawqRegister(object):
             self.failure_handler.rollback()
             sys.exit(1)
         self.firstsegno, self.tabledir = self._get_metadata()
-
-        if self.mode == 'repair':
-            if self.tabledir.strip('/') != self.filepath.strip('/'):
-                logger.error("In repair mode, file path from yaml file should be the same with table's path.")
+        
+        if self.yml and self.mode == 'force':
+            existed_files, existed_sizes = self._get_files_in_hdfs(self.tabledir)
+        else:
+            existed_files, existed_sizes = self._get_files_in_hdfs(self.filepath)
+        # check if file numbers in hdfs is consistent with the record count of pg_aoseg.
+        hdfs_file_no_lst = [f.split('/')[-1] for f in existed_files]
+        for k in range(1, self.firstsegno - 1):
+            if self.firstsegno - 1 > len(existed_files) or str(k) not in hdfs_file_no_lst:
+                logger.error("Hawq aoseg metadata doesn't consistent with file numbers in hdfs.")
                 self.failure_handler.rollback()
                 sys.exit(1)
-            seg_list, existed_sizes = self._get_metadata_from_table()
-            existed_files = [self.tabledir + seg for seg in seg_list]
-            existed_info = {}
-            for k, fn in enumerate(existed_files):
-                existed_info[fn] = existed_sizes[k]
-            for k, fn in enumerate(self.files):
-                if fn not in existed_files:
-                    logger.error('Can not register in repair mode since giving non-existing file: %s.' % fn)
-                    self.failure_handler.rollback()
-                    sys.exit(1)
-                if self.sizes[k] > existed_info[fn]:
-                    logger.error('Can not register in repair mode since giving larger file size: %s' % self.sizes[k])
-                    self.failure_handler.rollback()
-                    sys.exit(1)
 
         if self.mode == 'usage2_table_exist':
             if self.tabledir.strip('/') == self.filepath.strip('/'):
@@ -580,19 +668,19 @@ class HawqRegister(object):
         if not self.yml:
             self._check_no_regex_filepath([self.filepath])
             self.files, self.sizes = self._get_files_in_hdfs(self.filepath)
+            self.tupcounts = self.eofuncompresseds = self.varblockcounts = [-1 for i in range(len(self.files))]
 
-        self.do_not_move, self.files_update, self.sizes_update = False, [], []
-        self.newfiles, self.newsizes = [f for f in self.files], [sz for sz in self.sizes]
+        self.do_not_move, self.files_update, self.sizes_update, self.tupcounts_update, self.eofuncompresseds_update, self.varblockcounts_update = False, [], [], [], [], []
+        self.files_append, self.sizes_append, self.tupcounts_append, self.eofuncompresseds_append, self.varblockcounts_append = [f for f in self.files], [sz for sz in self.sizes], [tc for tc in self.tupcounts], [eof for eof in self.eofuncompresseds], [v for v in self.varblockcounts]
         if self.mode == 'force':
-            seg_list, _ = self._get_metadata_from_table()
-            existed_files = [self.tabledir + seg for seg in seg_list]
             if len(self.files) == len(existed_files):
                 if sorted(self.files) != sorted(existed_files):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                     self.failure_handler.rollback()
                     sys.exit(1)
                 else:
-                    self.do_not_move, self.files_update, self.sizes_update = True, self.files, self.sizes
+                    self.do_not_move, self.files_update, self.sizes_update, self.tupcounts_update, self.eofuncompresseds_update, self.varblockcounts_update = True, self.files, self.sizes, self.tupcounts, self.eofuncompresseds, self.varblockcounts
+                self.files_append, self.sizes_append, self.tupcounts_append, self.eofuncompresseds_append, self.varblockcounts_append = [], [], [], [], []
             elif len(self.files) < len(existed_files):
                 logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                 self.failure_handler.rollback()
@@ -602,37 +690,57 @@ class HawqRegister(object):
                     if f in existed_files:
                         self.files_update.append(self.files[k])
                         self.sizes_update.append(self.sizes[k])
-                        self.newfiles.remove(self.files[k])
-                        self.newsizes.remove(self.sizes[k])
+                        self.tupcounts_update.append(self.tupcounts[k])
+                        self.eofuncompresseds_update.append(self.eofuncompresseds[k])
+                        self.varblockcounts_update.append(self.varblockcounts[k])
+                        self.files_append.remove(self.files[k])
+                        self.sizes_append.remove(self.sizes[k])
+                        self.tupcounts_append.remove(self.tupcounts[k])
+                        self.eofuncompresseds_append.remove(self.eofuncompresseds[k])
+                        self.varblockcounts_append.remove(self.varblockcounts[k])
                 if sorted(self.files_update) != sorted(existed_files):
                     logger.error('In force mode, you should include existing table files in yaml configuration file. Otherwise you should drop the previous table before register --force.')
                     self.failure_handler.rollback()
                     sys.exit(1)
-        elif self.mode == 'repair':
-            self.do_not_move = True
-            self.files_update, self.sizes_update = [fn for fn in self.files], [sz for sz in self.sizes]
-            self.files_delete = []
-            for fn in existed_files:
-                if fn not in self.files:
-                    self.files_delete.append(fn)
-            self.files, self.sizes = [], []
 
         self._check_files_and_table_in_same_hdfs_cluster(self.filepath, self.tabledir)
 
-        print 'New file(s) to be registered: ', self.newfiles
+        logger.info('New file(s) to be registered: %s' % self.files_append)
         if self.files_update:
-            print 'Catalog info need to be updated for these files: ', self.files_update
+            logger.info('Catalog info need to be updated for these files: %s' % self.files_update)
 
         if self.filesize is not None:
             if len(self.files) != 1:
                 logger.error('-e option is only supported with single file case.')
                 self.failure_handler.rollback()
                 sys.exit(1)
+            self.sizes_append = [self.filesize]
             self.sizes = [self.filesize]
         self._check_sizes_valid()
 
         if self.file_format == 'Parquet':
             self._check_parquet_format(self.files)
+
+    def test_set_move_files_in_hdfs(self):
+        ''' Output of print shoud be:
+        self.files_update = ['1', '2', '3']
+        self.files_same_path = ['5', '6', 'a']
+        self.srcfiles=['5', '6', 'a', '1', '2', '3']
+        self.dstfiles=['5', '6', '4', '7' , '8', '9']
+        '''
+        self.firstsegno = 4
+        self.files_update = ['1', '2', '3', '5', '6', 'a']
+        self.sizes_update = [1, 2, 3, 4, 5, 6]
+        self.files_append = ['1', '2', '3']
+        self.tupcounts_update = [1, 2, 3, 4, 5, 6]
+        self.eofuncompresseds_update = [1, 2, 3, 4, 5, 6]
+        self.varblockcounts_update = [1, 2, 3, 4, 5, 6]
+        self.tabledir = ''
+        self._set_move_files_in_hdfs()
+        print self.files_update
+        print self.files_same_path
+        print self.srcfiles
+        print self.dstfiles
 
     def _check_files_and_table_in_same_hdfs_cluster(self, filepath, tabledir):
         '''Check whether all the files refered by 'filepath' and the location corresponding to the table are in the same hdfs cluster'''
@@ -698,7 +806,51 @@ class HawqRegister(object):
 
     def _set_move_files_in_hdfs(self):
         segno = self.firstsegno
-        for f in self.newfiles:
+        # set self.files_same_path, self.sizes_same_path and self.segnos_same_path, which are for files existed in HDFS but not in catalog metadata
+        update_segno_lst = [f.split('/')[-1] for f in self.files_update]
+        catalog_lst = [str(i) for i in range(1, segno)]
+        new_catalog_lst = [str(i) for i in range(segno, len(self.files_update) + 1)]
+        exist_catalog_lst = []
+        tmp_files_update = [f for f in self.files_update]
+        tmp_sizes_update = [f for f in self.sizes_update]
+
+        tmp_tupcounts_update = [f for f in self.tupcounts_update]
+        tmp_eofuncompresseds_update = [f for f in self.eofuncompresseds_update]
+        tmp_varblockcounts_update = [f for f in self.varblockcounts_update]
+         
+        for k, seg in enumerate(update_segno_lst):
+            if seg not in catalog_lst:
+
+                self.files_same_path.append(tmp_files_update[k])
+                self.sizes_same_path.append(tmp_sizes_update[k])
+                self.tupcounts_same_path.append(tmp_tupcounts_update[k])
+                self.eofuncompresseds_same_path.append(tmp_eofuncompresseds_update[k])
+                self.varblockcounts_same_path.append(tmp_varblockcounts_update[k])
+           
+                self.files_update.remove(tmp_files_update[k])
+                self.sizes_update.remove(tmp_sizes_update[k])
+                self.tupcounts_update.remove(tmp_tupcounts_update[k])
+                self.eofuncompresseds_update.remove(tmp_eofuncompresseds_update[k])
+                self.varblockcounts_update.remove(tmp_varblockcounts_update[k])
+
+            if seg in new_catalog_lst:
+                exist_catalog_lst.append(seg)
+        for seg in update_segno_lst:
+            if seg not in catalog_lst:
+                if seg in exist_catalog_lst:
+                    self.segnos_same_path.append(int(seg))
+                else:
+                    while (str(segno) in exist_catalog_lst):
+                        segno += 1
+                    self.segnos_same_path.append(segno)
+                    segno += 1
+
+        for k, f in enumerate(self.files_same_path):
+            self.srcfiles.append(f)
+            self.dstfiles.append(self.tabledir + str(self.segnos_same_path[k]))
+
+        segno = self.firstsegno + len(self.files_same_path)
+        for f in self.files_append:
             self.srcfiles.append(f)
             self.dstfiles.append(self.tabledir + str(segno))
             segno += 1
@@ -717,79 +869,76 @@ class HawqRegister(object):
                     sys.exit(1)
                 self.failure_handler.commit(('HDFSCMD', hdfscmd))
 
-    def _delete_files_in_hdfs(self):
-        for fn in self.files_delete:
-            hdfscmd = 'hadoop fs -rm %s' % fn
-            sys.stdout.write('hdfscmd: "%s"\n' % hdfscmd)
-            result = local_ssh(hdfscmd, logger)
-            if result != 0:
-                logger.error('Fail to delete %s ' % fn)
-                self.failure_handler.rollback()
-                sys.exit(1)
-
     def _set_modify_metadata(self, mode):
-        if mode == 'insert':
-            eofs = self.sizes
-            query = ""
-            if self.file_format == 'Parquet':
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, self.firstsegno, eofs[0], -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1)
-            else:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, self.firstsegno, eofs[0], -1, -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1, -1)
-            query += ';'
-            self.queries += query
-        elif mode == 'force':
-            eofs = self.sizes
-            segno_lst = [f.split('/')[-1] for f in self.files]
-            query = "delete from pg_aoseg.%s;" % (self.seg_name)
-            firstsegno = 1
-            if self.file_format == 'Parquet':
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, firstsegno, eofs[0], -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (firstsegno + k + 1, eof, -1, -1)
-            else:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, firstsegno, eofs[0], -1, -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d, %d)' % (firstsegno + k + 1, eof, -1, -1, -1)
-            query += ';'
-            self.queries += query
-        elif mode == 'update':
-            eofs = self.sizes_update
-            query = ""
-            segno_lst = [f.split('/')[-1] for f in self.files_update]
-            if self.file_format == 'Parquet':
-                for i, eof in enumerate(eofs):
-                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, segno_lst[i])
-            else:
-                for i, eof in enumerate(eofs):
-                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', varblockcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, -1, segno_lst[i])
-            self.queries += query
-        else: # update_and_insert
-            eofs = self.sizes
-            query = ""
-            if self.file_format == 'Parquet':
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, self.firstsegno, eofs[0], -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1)
-            else:
-                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, self.firstsegno, eofs[0], -1, -1, -1)
-                for k, eof in enumerate(eofs[1:]):
-                    query += ',(%d, %d, %d, %d, %d)' % (self.firstsegno + k + 1, eof, -1, -1, -1)
-            query += ';'
-
-            segno_lst = [f.split('/')[-1] for f in self.files_update]
-            if self.file_format == 'Parquet':
-                for i, eof in enumerate(self.sizes_update):
-                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, segno_lst[i])
-            else:
-                for i, eof in enumerate(self.sizes_update):
-                    query += "update pg_aoseg.%s set eof = '%s', tupcount = '%s', varblockcount = '%s', eofuncompressed = '%s' where segno = '%s';" % (self.seg_name, eof, -1, -1, -1, segno_lst[i])
-            self.queries += query
+        segno = self.firstsegno
+        append_eofs = self.sizes_append
+        update_eofs = self.sizes_update
+        same_path_eofs = self.sizes_same_path
+        append_tupcounts = self.tupcounts_append
+        update_tupcounts = self.tupcounts_update
+        same_path_tupcounts = self.tupcounts_same_path
+        append_eofuncompresseds = self.eofuncompresseds_append
+        update_eofuncompresseds = self.eofuncompresseds_update
+        same_path_eofuncompresseds = self.eofuncompresseds_same_path
+        append_varblockcounts = self.varblockcounts_append
+        update_varblockcounts = self.varblockcounts_update
+        same_path_varblockcounts = self.varblockcounts_same_path
+        update_segno_lst = [f.split('/')[-1] for f in self.files_update]
+        same_path_segno_lst = [seg for seg in self.segnos_same_path]
+        query = ""
+        
+        if mode == 'force':
+            query += "delete from pg_aoseg.%s;" % (self.seg_name)
+        
+        if self.file_format == 'Parquet': 
+            if len(update_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d)' % (self.seg_name, update_segno_lst[0], update_eofs[0], update_tupcounts[0], update_eofuncompresseds[0])
+                k = 0
+                for update_eof, update_tupcount, update_eofuncompressed in zip(update_eofs[1:], update_tupcounts[1:], update_eofuncompresseds[1:]):
+                    query += ',(%s, %d, %d, %d)' % (update_segno_lst[k + 1], update_eof, update_tupcount, update_eofuncompressed)
+                    k += 1
+                query += ';'
+            if len(same_path_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], same_path_tupcounts[0], same_path_eofuncompresseds[0])
+                k = 0
+                for same_path_eof, same_path_tupcount, same_path_eofuncompressed in zip(same_path_eofs[1:], same_path_tupcounts[1:], same_path_eofuncompresseds[1:]):
+                    query += ',(%d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, same_path_tupcount, same_path_eofuncompressed)
+                    k += 1
+                query += ';'
+            segno += len(same_path_eofs)
+            if len(append_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], append_tupcounts[0], append_eofuncompresseds[0])
+                k = 0
+                for append_eof, append_tupcount, append_eofuncompressed in zip(append_eofs[1:], append_tupcounts[1:], append_eofuncompresseds[1:]):
+                    query += ',(%d, %d, %d, %d)' % (segno + k + 1, append_eof, append_tupcount, append_eofuncompressed)
+                    k += 1
+                query += ';'
+        else:
+            if len(update_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%s, %d, %d, %d, %d)' % (self.seg_name, update_segno_lst[0], update_eofs[0], update_tupcounts[0], update_varblockcounts[0], update_eofuncompresseds[0])
+                k = 0
+                for update_eof, update_tupcount, update_varblockcount, update_eofuncompresseds in zip(update_eofs[1:], update_tupcounts[1:], update_varblockcounts[1:], update_eofuncompresseds[1:]):
+                    query += ',(%s, %d, %d, %d, %d)' % (update_segno_lst[k + 1], update_eof, update_tupcount, update_varblockcount, update_eofuncompresseds)
+                    k += 1
+                query += ';'
+            if len(same_path_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], same_path_tupcounts[0], same_path_varblockcounts[0], same_path_eofuncompresseds[0])
+                k = 0
+                for same_path_eof, same_path_tupcount, same_path_varblockcount, same_path_eofuncompressed in zip(same_path_eofs[1:], same_path_tupcounts[1:], same_path_varblockcounts[1:], same_path_eofuncompresseds[1:]):
+                    query += ',(%d, %d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, same_path_tupcount, same_path_varblockcount, same_path_eofuncompressed)
+                    k += 1
+                query += ';'
+            segno += len(same_path_eofs)
+            if len(append_eofs) > 0:
+                query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], append_tupcounts[0], append_varblockcounts[0], append_eofuncompresseds[0])
+                k = 0
+                for append_eof, append_tupcount, append_varblockcount, append_eofuncompressed in zip(append_eofs[1:], append_tupcounts[1:], append_varblockcounts[1:], append_eofuncompresseds[1:]):
+                    query += ',(%d, %d, %d, %d, %d)' % (segno + k + 1, append_eof, append_tupcount, append_varblockcount, append_eofuncompressed)
+                    k += 1
+                query += ';'
+        self.queries += query
     
-    def _modify_metadata(self, mode):
+    def _modify_metadata(self):
         try:
             self.utility_accessor.update_catalog(self.queries)
         except pg.DatabaseError as e:
@@ -797,45 +946,113 @@ class HawqRegister(object):
             self.failure_handler.rollback()
             sys.exit(1)
 
-    def _delete_metadata(self):
-        query = "set allow_system_table_mods='dml';"
-        query += "begin transaction;"
-        segno_lst = [fn.strip().split('/')[-1] for fn in self.files_delete]
-        for seg in segno_lst:
-            query += "delete from pg_aoseg.%s where segno = '%s';" % (self.seg_name, seg)
-        query += "end transaction;"
-        return self.utility_accessor.update_catalog(query)
-
     def _prepare_register(self):
         if not self.do_not_move:
             self._set_move_files_in_hdfs()
-        if (not self.do_not_move) and self.mode == 'force':
+        if self.mode == 'force':
             self._set_modify_metadata('force')
         else:
-            if self.mode == 'force':
-                self._set_modify_metadata('force')
-            elif self.mode == 'repair':
-                self._set_modify_metadata('update')
-            else:
-                self._set_modify_metadata('insert')
+            self._set_modify_metadata('insert')
 
     def register(self):
         if not self.do_not_move:
             self._move_files_in_hdfs()
-        if (not self.do_not_move) and self.mode == 'force':
-            self._modify_metadata('force')
-        else:
-            if self.mode == 'force':
-                self._modify_metadata('force')
-            elif self.mode == 'repair':
-                self._modify_metadata('update')
-                if self.files_delete:
-                    self._delete_files_in_hdfs()
-                    self._delete_metadata()
-            else:
-                self._modify_metadata('insert')
+        self._modify_metadata()
         logger.info('Hawq Register Succeed.')
 
+
+class HawqRegisterPartition(HawqRegister):
+    def __init__(self, options, table, utility_conn, conn, failure_handler):
+        HawqRegister.__init__(self, options, table, utility_conn, conn, failure_handler)
+
+    def _get_partition_info(self):
+        dic = {}
+        for ele in self.accessor.get_partition_info(self.dst_table_name):
+            dic[ele['partitionboundary']] = ele['partitiontablename']
+        return dic
+
+    def _get_partition_parent(self):
+        return self.accessor.get_partition_parent(self.dst_table_name)
+
+    def _check_partitionby(self):
+        def get_partitionby():
+            return self.accessor.get_partitionby(self.dst_table_name)
+
+        if self.partitionby != get_partitionby():
+            logger.error('PartitionBy of %s is not consistent with previous partitionby.' % self.tablename)
+            self.failure_handler.rollback()
+            sys.exit(1)
+
+    def _check_partition_num(self):
+        def get_partition_num():
+            return self.accessor.get_partition_num(self.dst_table_name)
+
+        if get_partition_num() < len(self.partitions_name):
+            logger.error('Partition Number of %s is not consistent with previous partition number.' % self.tablename)
+            self.failure_handler.rollback()
+            sys.exit(1)
+
+    def _check_duplicate_constraint(self):
+        partitions_constraint = sorted(self.partitions_constraint)
+        for k, _ in enumerate(partitions_constraint):
+            if k < len(partitions_constraint) - 1 and partitions_constraint[k] == partitions_constraint[k+1]:
+                logger.error('Partition Constraint "%s" in table %s is duplicated' % (partitions_constraint[k], self.tablename))
+                self.failure_handler.rollback()
+                sys.exit(1)
+
+    def prepare(self):
+        if self.yml:
+            self._option_parser_yml(options.yml_config)
+        else:
+            if self._is_folder(self.filepath) and self.filesize:
+                logger.error('-e option is only supported with single file case.')
+                sys.exit(1)
+            self.file_format = 'Parquet'
+            self._check_hash_type() # Usage1 only support randomly distributed table
+
+        # check if it is a multi-level partition table
+        partitions_parents = self._get_partition_parent()
+        if any(p['parentpartitiontablename'] for p in partitions_parents):
+            logger.error('Multi-level partition table is not supported!')
+            sys.exit(1)
+
+        for k, pn in enumerate(self.partitions_name):
+            self.tablename = pn
+            self.files = self.partitions_filepaths[k]
+            self.sizes = self.partitions_filesizes[k]
+            if self.yml:
+                self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
+                self._check_file_not_folder(pn)
+        if self.yml:
+            self._check_database_encoding()
+            if not self._create_table() and self.mode != 'force':
+                self.mode = 'usage2_table_exist'
+                self._check_partitionby()
+                self._check_partition_num()
+        partitions = self._get_partition_info()
+
+        self.queries = "set allow_system_table_mods='dml';"
+        self.queries += "begin transaction;"
+        self._check_duplicate_constraint()
+        schemaname, _ = tablename_handler(self.dst_table_name)
+        for k, pn in enumerate(self.partitions_name):
+            self.constraint = self.partitions_constraint[k]
+            if not partitions.has_key(self.constraint):
+                logger.error('Partition Constraint "%s" is not in table %s' % (self.constraint, self.tablename))
+                self.failure_handler.rollback()
+                sys.exit(1)
+            self.tablename = schemaname + '.' + partitions[self.constraint]
+            self.files = self.partitions_filepaths[k]
+            self.sizes = self.partitions_filesizes[k]
+            self.tupcounts = self.partitions_tupcounts[k]
+            self.eofuncompresseds = self.partitions_eofuncompresseds[k]
+            self.varblockcounts = self.partitions_varblockcounts[k]
+            self._do_check()
+            self._prepare_register()
+        self.queries += "end transaction;"
+
+    def register(self):
+        HawqRegister.register(self)
 
 def main(options, args):
     def connectdb(options):
@@ -861,18 +1078,49 @@ def main(options, args):
 
     failure_handler = FailureHandler(conn)
     # register
-    ins = HawqRegister(options, args[0], utility_conn, conn, failure_handler)
+    if options.yml_config and ispartition(options.yml_config):
+        ins = HawqRegisterPartition(options, args[0], utility_conn, conn, failure_handler)
+    else:
+        ins = HawqRegister(options, args[0], utility_conn, conn, failure_handler)
+    ins.prepare()
     ins.register()
     conn.close()
+
+def test(options, args):
+    def connectdb(options):
+        '''
+        Trying to connect database, return a connection object.
+        If failed to connect, raise a pg.InternalError
+        '''
+        url = dbconn.DbURL(hostname=options.host, port=options.port,
+                           dbname=options.database, username=options.user)
+        logger.info('try to connect database %s:%s %s' % (url.pghost, url.pgport, url.pgdb))
+        utility_conn = pg.connect(dbname=url.pgdb, host=url.pghost, port=url.pgport,
+                                  user=url.pguser, passwd=url.pgpass, opt='-c gp_session_role=utility')
+        conn = pg.connect(dbname=url.pgdb, host=url.pghost, port=url.pgport,
+                          user=url.pguser, passwd=url.pgpass)
+        return utility_conn, conn
+
+    # connect db
+    try:
+        utility_conn, conn = connectdb(options)
+    except pg.InternalError:
+        logger.error('Fail to connect to database, this script can only be run when database is up.')
+        return 1
+
+    failure_handler = FailureHandler(conn)
+    # register
+    ins = HawqRegister(options, args[0], utility_conn, conn, failure_handler)
+    ins.test_set_move_files_in_hdfs()
 
 
 if __name__ == '__main__':
     parser = option_parser()
     options, args = parser.parse_args()
-    if len(args) != 1 or (options.force and options.repair):
+    if len(args) != 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    if (options.yml_config or options.force or options.repair) and options.filepath:
+    if (options.yml_config or options.force) and options.filepath:
         parser.print_help(sys.stderr)
         sys.exit(1)
     if local_ssh('hdfs'):

@@ -816,5 +816,61 @@ drop role unpriv;
 drop table can_set_tag_target;
 drop table can_set_tag_audit;
 
+reset optimizer_segments;
+
+-- Check if ORCA can handle GPDB's error properly
+drop table if exists orca_exc_handle;
+create table orca_exc_handle(
+	a int primary key,
+	b char
+);
+
+insert into orca_exc_handle select i, i from generate_Series(1,4) as i; 
+
+-- enable the fault injector
+--start_ignore
+\! gpfaultinjector -f opt_relcache_translator_catalog_access -y error --seg_dbid 1
+--end_ignore
+
+select a from orca_exc_handle;
+-- reset the fault injector
+--start_ignore
+\! gpfaultinjector -f opt_relcache_translator_catalog_access -y reset --seg_dbid 1
+--end_ignore
+
+drop table orca_exc_handle;
+-- End of Check if ORCA can handle GPDB's error properly
+
+-- Test B-Tree index scan with in list
+CREATE TABLE btree_test as SELECT * FROM generate_series(1,100) as a distributed randomly;
+CREATE INDEX btree_test_index ON btree_test(a);
+EXPLAIN SELECT * FROM btree_test WHERE a in (1, 47);
+EXPLAIN SELECT * FROM btree_test WHERE a in ('2', 47);
+EXPLAIN SELECT * FROM btree_test WHERE a in ('1', '2');
+EXPLAIN SELECT * FROM btree_test WHERE a in ('1', '2', 47);
+
+-- Test Bitmap index scan with in list
+CREATE TABLE bitmap_test as SELECT * FROM generate_series(1,100) as a distributed randomly;
+CREATE INDEX bitmap_index ON bitmap_test USING BITMAP(a);
+EXPLAIN SELECT * FROM bitmap_test WHERE a in (select 1);
+EXPLAIN SELECT * FROM bitmap_test WHERE a in (1, 47);
+EXPLAIN SELECT * FROM bitmap_test WHERE a in ('2', 47);
+EXPLAIN SELECT * FROM bitmap_test WHERE a in ('1', '2');
+EXPLAIN SELECT * FROM bitmap_test WHERE a in ('1', '2', 47);
+
+-- Test Logging for unsupported features in ORCA
+-- start_ignore
+drop table if exists foo;
+-- end_ignore
+
+create table foo(a int, b int);
+set client_min_messages='log';
+select count(*) from foo group by cube(a,b);
+reset client_min_messages;
+
+-- start_ignore
+drop table foo;
+-- end_ignore
+
 -- clean up
 drop schema orca cascade;

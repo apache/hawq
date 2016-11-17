@@ -497,8 +497,9 @@ class HAWQArray:
             version_str = row[0]
         version = GpVersion(version_str)
 
-        # Only for HAWQ 2.0
-        if version.getVersionRelease() in ("2.0"):
+        # Now only support HAWQ 2.x
+        hawq_major_version = version.getVersionRelease().split('.')[0]
+        if hawq_major_version == '2':
 
             hawq_site = HawqXMLParser(GPHOME)
             master_data_directory  = hawq_site.get_value_from_name('hawq_master_directory')

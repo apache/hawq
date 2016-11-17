@@ -147,17 +147,17 @@ class GpMetadataAccessor:
 
     def get_aoseg_files(self, oid):
         '''
-        Return rows in pg_aoseg_`oid` table, excluding
-        rows whose content id is -1.
+        Return rows in pg_aoseg_`oid` table
 
         Example:
         >>> accessor.get_aoseg_files(35709)
-        >>> [{'fileno':'1', 'filesize':'320'},
-        ...  {'fileno':'2', 'filesize':'880'},
-        ...  {'fileno':'3', 'filesize':'160'}]
+        >>> [{'fileno':'1', 'filesize':'320', 'tupcount':'10', 'varblockcount':'2', eofuncompressed:'320'},
+        ...  {'fileno':'2', 'filesize':'880', 'tupcount':'27', 'varblockcount':'3', eofuncompressed:'880'},
+        ...  {'fileno':'3', 'filesize':'160', 'tupcount':'5', 'varblockcount':'2', eofuncompressed:'160'}]
         '''
         qry = """
-        SELECT segno as fileno, eof as filesize
+        SELECT segno as fileno, eof as filesize, tupcount as tupcount,
+        varblockcount as varblockcount, eofuncompressed as eofuncompressed
         FROM pg_aoseg.pg_aoseg_%d
         ORDER by fileno;
         """ % oid
@@ -170,12 +170,12 @@ class GpMetadataAccessor:
 
         Example:
         >>> accessor.get_paqseg_files(35709)
-        >>> [{'fileno':'1', 'filesize':'320'},
-        ...  {'fileno':'2', 'filesize':'880'},
-        ...  {'fileno':'3', 'filesize':'160'}]
+        >>> [{'fileno':'1', 'filesize':'320', 'tupcount':'10', 'eofuncompressed':'320'},
+        ...  {'fileno':'2', 'filesize':'880', 'tupcount':'27', 'eofuncompressed':'880'},
+        ...  {'fileno':'3', 'filesize':'160', 'tupcount':'5', 'eofuncompressed':'160'}]
         '''
         qry = """
-        SELECT segno as fileno, eof as filesize
+        SELECT segno as fileno, eof as filesize, tupcount, eofuncompressed
         FROM pg_aoseg.pg_paqseg_%d
         ORDER by fileno;
         """ % oid
@@ -357,7 +357,7 @@ def extract_metadata(conn, tbname):
                     relfilenode,
                     f['fileno']
             )
-            files.append({'path': path, 'size': int(f['filesize'])})
+            files.append({'path': path, 'size': int(f['filesize']), 'tupcount': int(f['tupcount']), 'varblockcount': int(f['varblockcount']), 'eofuncompressed': int(f['eofuncompressed'])})
         return files
 
     def get_parquet_table_files(oid, relfilenode):
@@ -375,7 +375,7 @@ def extract_metadata(conn, tbname):
                     relfilenode,
                     f['fileno']
             )
-            files.append({'path': path, 'size': int(f['filesize'])})
+            files.append({'path': path, 'size': int(f['filesize']), 'tupcount': int(f['tupcount']), 'eofuncompressed': int(f['eofuncompressed'])})
         return files
 
     def extract_AO_metadata():
@@ -421,7 +421,8 @@ def extract_metadata(conn, tbname):
         logger.info('-- extract Distribution_Policy')
         metadata['Distribution_Policy'] = accessor.get_distribution_policy_info(rel_pgclass['oid'], relid)
         logger.info('-- extract bucket number')
-        metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
+        if accessor.get_distribution_policy_info(rel_pgclass['oid'], relid).startswith('DISTRIBUTED BY'):
+            metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
 
     def extract_Parquet_metadata():
         relid = rel_pgclass['oid']
@@ -471,7 +472,8 @@ def extract_metadata(conn, tbname):
         logger.info('-- extract Distribution_Policy')
         metadata['Distribution_Policy'] = accessor.get_distribution_policy_info(rel_pgclass['oid'], relid)
         logger.info('-- extract bucket number')
-        metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
+        if accessor.get_distribution_policy_info(rel_pgclass['oid'], relid).startswith('DISTRIBUTED BY'):
+            metadata['Bucketnum'] = accessor.get_bucket_number(rel_pgclass['oid'])
 
 
     # extract AO/Parquet specific metadata

@@ -45,6 +45,8 @@ typedef enum PxfOperatorCode
 	PXFOP_EQ,
 	PXFOP_NE,
 	PXFOP_LIKE,
+	PXFOP_IS_NULL,
+	PXFOP_IS_NOTNULL,
 	PXFOP_IN
 
 } PxfOperatorCode;

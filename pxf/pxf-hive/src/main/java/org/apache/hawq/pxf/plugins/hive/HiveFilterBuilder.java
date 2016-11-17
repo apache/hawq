@@ -61,8 +61,11 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
      *             filter or list of basic filters
      */
     public Object getFilterObject(String filterString) throws Exception {
+        if (filterString == null)
+            return null;
+
         FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString);
+        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
 
         if (!(result instanceof LogicalFilter) && !(result instanceof BasicFilter)
                 && !(result instanceof List)) {
@@ -91,6 +94,16 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
         return handleSimpleOperations(opId,
                 (FilterParser.ColumnIndex) leftOperand,
                 (FilterParser.Constant) rightOperand);
+    }
+
+    @Override
+    public Object build(FilterParser.Operation operation, Object operand) throws Exception {
+        if (operation == FilterParser.Operation.HDOP_IS_NULL || operation == FilterParser.Operation.HDOP_IS_NOT_NULL) {
+            // use null for the constant value of null comparison
+            return handleSimpleOperations(operation, (FilterParser.ColumnIndex) operand, null);
+        } else {
+            throw new Exception("Unsupported unary operation " + operation);
+        }
     }
 
     /*

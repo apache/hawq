@@ -568,10 +568,32 @@ OpExpr* build_op_expr(void* left, void* right, int op)
 	return expr;
 }
 
-ExpressionItem* build_expression_item(int lattnum, Oid lattrtype, char* rconststr, Oid rattrtype, int op) {
+NullTest* build_null_expr(Expr* arg, NullTestType nullType)
+{
+	NullTest *expr = (NullTest*) palloc0(sizeof(NullTest));
+	expr->nulltesttype = nullType;
+	expr->arg = arg;
 
+	expr->xpr.type = T_NullTest;
+	return expr;
+}
+
+ExpressionItem* build_null_expression_item(int attnum, Oid attrtype, NullTestType nullType)
+{
 	ExpressionItem *expressionItem = (ExpressionItem*) palloc0(sizeof(ExpressionItem));
+	Var *vararg = build_var(attrtype, attnum);
+	OpExpr *operationExpression = build_null_expr(vararg, nullType);
 
+	expressionItem->node = operationExpression;
+	expressionItem->processed = false;
+	expressionItem->parent = NULL;
+
+	return expressionItem;
+}
+
+ExpressionItem* build_expression_item(int lattnum, Oid lattrtype, char* rconststr, Oid rattrtype, int op)
+{
+	ExpressionItem *expressionItem = (ExpressionItem*) palloc0(sizeof(ExpressionItem));
 	Var *leftop = build_var(lattrtype, lattnum);
 	Const *rightop = build_const(rattrtype, strdup(rconststr));
 	OpExpr *operationExpression = build_op_expr(leftop, rightop, op);
@@ -632,7 +654,7 @@ test__opexpr_to_pxffilter__allSupportedTypes(void **state)
 /* NOTE: this test is not  a use case - when the query includes
  * 'is null' or 'is not null' the qualifier code is T_NullTest and not T_OpExpr */
 void
-test__opexpr_to_pxffilter__attributeIsNull(void **state)
+test__opexpr_to_pxffilter__attributeEqualsNull(void **state)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 1);
@@ -652,6 +674,17 @@ test__opexpr_to_pxffilter__attributeIsNull(void **state)
 	pxf_free_filter(expected);
 
 	list_free_deep(expr->args); /* free all args */
+	pfree(expr);
+}
+
+void
+test__opexpr_to_pxffilter__attributeIsNull(void **state)
+{
+	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
+	Var *arg_var = build_var(INT2OID, 1);
+	NullTest *expr = build_null_expr(arg_var, IS_NULL);
+
+	free(expr->arg);
 	pfree(expr);
 }
 
@@ -734,8 +767,8 @@ test__opexpr_to_pxffilter__unsupportedOpNot(void **state)
 	pfree(expr);
 }
 
-void test__pxf_serialize_filter_list__oneFilter(void **state) {
-
+void test__pxf_serialize_filter_list__oneFilter(void **state)
+{
 	List* expressionItems = NIL;
 
 	ExpressionItem* filterExpressionItem = build_expression_item(1, TEXTOID, "1984", TEXTOID, TextEqualOperator);
@@ -744,6 +777,24 @@ void test__pxf_serialize_filter_list__oneFilter(void **state) {
 
 	char* result = pxf_serialize_filter_list(expressionItems);
 	assert_string_equal(result, "a0c25s4d1984o5");
+
+	pxf_free_expression_items_list(expressionItems, true);
+	expressionItems = NIL;
+	pfree(result);
+
+}
+
+void test__pxf_serialize_fillter_list__nullFilter(void **state)
+{
+
+	List* expressionItems = NIL;
+
+	ExpressionItem* filterExpressionItem = build_null_expression_item(1, TEXTOID, IS_NULL);
+
+	expressionItems = lappend(expressionItems, filterExpressionItem);
+
+	char* result = pxf_serialize_filter_list(expressionItems);
+	assert_string_equal(result, "a0o8");
 
 	pxf_free_expression_items_list(expressionItems, true);
 	expressionItems = NIL;
@@ -762,7 +813,8 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	ExpressionItem* expressionItem3 = build_expression_item(3, TEXTOID, "Winston", TEXTOID, TextEqualOperator);
 	ExpressionItem* expressionItem4 = build_expression_item(4, TEXTOID, "Eric-%", TEXTOID, 1209);
 	ExpressionItem* expressionItem5 = build_expression_item(5, TEXTOID, "\"Ugly\" string with quotes", TEXTOID, TextEqualOperator);
-
+	ExpressionItem* expressionItem6 = build_expression_item(6, TEXTOID, "", TEXTOID, TextEqualOperator);
+	ExpressionItem* expressionItem7 = build_null_expression_item(7, TEXTOID, IS_NOT_NULL);
 
 	expressionItems = lappend(expressionItems, expressionItem1);
 	expressionItems = lappend(expressionItems, expressionItem2);
@@ -770,8 +822,11 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	expressionItems = lappend(expressionItems, expressionItem4);
 	expressionItems = lappend(expressionItems, expressionItem5);
 
+	expressionItems = lappend(expressionItems, expressionItem6);
+	expressionItems = lappend(expressionItems, expressionItem7);
+
 	result = pxf_serialize_filter_list(expressionItems);
-	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7a4c25s25d\"Ugly\" string with quoteso5");
+	assert_string_equal(result, "a0c25s4d1984o5a1c25s13dGeorge Orwello5a2c25s7dWinstono5a3c25s6dEric-%o7a4c25s25d\"Ugly\" string with quoteso5a5c25s0do5a6o9");
 	pfree(result);
 
 	int trivialExpressionItems = expressionItems->length;
@@ -803,12 +858,14 @@ main(int argc, char* argv[])
 			unit_test(test__opexpr_to_pxffilter__unary_expr),
 			unit_test(test__opexpr_to_pxffilter__intGT),
 			unit_test(test__opexpr_to_pxffilter__allSupportedTypes),
-			unit_test(test__opexpr_to_pxffilter__attributeIsNull),
+			unit_test(test__opexpr_to_pxffilter__attributeEqualsNull),
 			unit_test(test__opexpr_to_pxffilter__differentTypes),
 			unit_test(test__opexpr_to_pxffilter__unsupportedTypeCircle),
 			unit_test(test__opexpr_to_pxffilter__twoVars),
 			unit_test(test__opexpr_to_pxffilter__unsupportedOpNot),
+			unit_test(test__opexpr_to_pxffilter__attributeIsNull),
 			unit_test(test__pxf_serialize_filter_list__oneFilter),
+			unit_test(test__pxf_serialize_fillter_list__nullFilter),
 			unit_test(test__pxf_serialize_filter_list__manyFilters)
 	};
 	return run_tests(tests);

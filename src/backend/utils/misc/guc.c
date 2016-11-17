@@ -745,6 +745,7 @@ int		optimizer_segments;
 int		optimizer_parts_to_force_sort_on_insert;
 int		optimizer_join_arity_for_associativity_commutativity;
 int		optimizer_array_expansion_threshold;
+int		optimizer_join_order_threshold;
 bool		optimizer_analyze_root_partition;
 bool		optimizer_analyze_midlevel_partition;
 bool		optimizer_enable_constant_expression_evaluation;
@@ -758,12 +759,14 @@ bool		optimizer_static_partition_selection;
 bool		optimizer_enable_partial_index;
 bool		optimizer_dml_triggers;
 bool		optimizer_dml_constraints;
-bool 		optimizer_enable_master_only_queries;
-bool sort_segments_enable;
-bool 		optimizer_multilevel_partitioning;
-bool        optimizer_enable_derive_stats_all_groups;
+bool		optimizer_enable_master_only_queries;
+bool		sort_segments_enable;
+bool		optimizer_multilevel_partitioning;
+bool		optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
+bool		optimizer_parallel_union;
+bool		optimizer_array_constraints;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -4387,6 +4390,27 @@ static struct config_bool ConfigureNamesBool[] =
 		true, NULL, NULL
 	},
 
+	{
+		{"optimizer_parallel_union", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable parallel execution for UNION/UNION ALL queries."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_parallel_union,
+		false, NULL, NULL
+	},
+
+	{
+		{"optimizer_array_constraints", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Allows the optimizer's constraint framework to derive array constraints."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_array_constraints,
+		false, NULL, NULL
+	},
+
+
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, false, NULL, NULL
@@ -6136,6 +6160,7 @@ static struct config_int ConfigureNamesInt[] =
 		&server_ticket_renew_interval,
 		43200000, 0, INT_MAX, NULL, NULL
 	},
+
 	{
 		{"optimizer_array_expansion_threshold", PGC_USERSET, QUERY_TUNING_METHOD,
 			gettext_noop("Item limit for expansion of arrays in WHERE clause to disjunctive form."),
@@ -6145,6 +6170,16 @@ static struct config_int ConfigureNamesInt[] =
 		&optimizer_array_expansion_threshold,
 		25, 0, INT_MAX, NULL, NULL
 	},
+
+	{
+		{"optimizer_join_order_threshold", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Maximum number of join children to use dynamic programming based join ordering algorithm."),
+			NULL
+		},
+		&optimizer_join_order_threshold,
+		10, 0, INT_MAX, NULL, NULL
+	},
+
 	{
 		{"memory_profiler_dataset_size", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Set the size in GB"),

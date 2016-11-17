@@ -46,7 +46,7 @@ static List* append_attr_from_var(Var* var, List* attrs);
 static void enrich_trivial_expression(List *expressionItems);
 
 /*
- * All supported HAWQ operators, and their respective HFDS operator code.
+ * All supported HAWQ operators, and their respective HDFS operator code.
  * Note that it is OK to use hardcoded OIDs, since these are all pinned
  * down system catalog operators.
  * see pg_operator.h
@@ -324,6 +324,7 @@ pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 			case T_Var: // IN(single_value)
 			case T_OpExpr:
 			case T_ScalarArrayOpExpr:
+			case T_NullTest:
 			{
 				result = lappend(result, expressionItem);
 				break;
@@ -413,7 +414,7 @@ pxf_free_filter(PxfFilterDesc* filter)
  * as flattened tree. Operands and operators are represented with their
  * respective codes. Each filter is serialized as follows:
  *
- * <attcode><attnum><constcode><constval><opercode><opernum>
+ * <attcode><attnum><constcode><constval><constsizecode><constsize><constdata><constvalue><opercode><opernum>
  *
  * Example filter list:
  *
@@ -421,7 +422,27 @@ pxf_free_filter(PxfFilterDesc* filter)
  *
  * Yields the following serialized string:
  *
- * a0c1o2a0c5o1o7a2c"third"o5o7
+ * a0c23s1d1o2a1c23s1d5o1a2c25s5dthirdo5l0l0
+ *
+ * Where:
+ *
+ * a0     - first column of table
+ * c23    - scalar constant with type oid 23(INT4)
+ * s1     - size of constant in bytes
+ * d1     - serialized constant value
+ * o2     - greater than operation
+ * a1     - second column of table
+ * c23    - scalar constant with type oid 23(INT4)
+ * s1     - size of constant in bytes
+ * d5     - serialized constant value
+ * o1     - less than operation
+ * a2     - third column of table
+ * c25    - scalar constant with type oid 25(TEXT)
+ * s5     - size of constant in bytes
+ * dthird - serialized constant value
+ * o5     - equals operation
+ * l0     - AND operator
+ * l0     - AND operator
  *
  */
 static char *
@@ -581,6 +602,29 @@ pxf_serialize_filter_list(List *expressionItems)
 				BoolExprType boolType = expr->boolop;
 				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_BoolExpr), bool node type %d", tag, boolType);
 				appendStringInfo(resbuf, "%c%d", PXF_LOGICAL_OPERATOR_CODE, boolType);
+				break;
+			}
+			case T_NullTest:
+			{
+				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_NullTest)", tag);
+				NullTest *expr = (NullTest *) node;
+
+				/* filter expression for T_NullTest will not have any constant value */
+				if (expr->nulltesttype == IS_NULL)
+				{
+					appendStringInfo(resbuf, "%c%d%c%d", PXF_ATTR_CODE, ((Var *) expr->arg)->varattno - 1, PXF_OPERATOR_CODE, PXFOP_IS_NULL);
+				}
+				else if (expr->nulltesttype == IS_NOT_NULL)
+				{
+					appendStringInfo(resbuf, "%c%d%c%d", PXF_ATTR_CODE, ((Var *) expr->arg)->varattno - 1, PXF_OPERATOR_CODE, PXFOP_IS_NOTNULL);
+				}
+				else
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_INTERNAL_ERROR),
+							 errmsg("internal error in pxffilters.c:pxf_serialize_"
+									 "filter_list. Found a NullTest filter with incorrect NullTestType")));
+				}
 				break;
 			}
 			default:

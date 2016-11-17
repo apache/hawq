@@ -29,20 +29,6 @@
 //
 //---------------------------------------------------------------------------
 
-#define ALLOW_DatumGetPointer
-#define ALLOW_ntohl
-#define ALLOW_memset
-#define ALLOW_printf
-#define ALLOW_offsetof
-#define ALLOW_PointerGetDatum
-#define ALLOW_Int32GetDatum
-#define ALLOW_Int16GetDatum
-#define ALLOW_DatumGetInt32
-#define ALLOW_MemoryContextAllocImpl
-#define ALLOW_pfree
-#define ALLOW_MemoryContextFreeImpl
-#define ALLOW_CharGetDatum
-
 #include "postgres.h"
 #include "naucrates/md/CMDIdCast.h"
 #include "naucrates/md/CMDIdScCmp.h"
@@ -74,20 +60,6 @@
 #include "cdb/cdbdatalocality.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_statistic.h"
-
-#undef ALLOW_DatumGetPointer
-#undef ALLOW_ntohl
-#undef ALLOW_memset
-#undef ALLOW_printf
-#undef ALLOW_offsetof
-#undef ALLOW_PointerGetDatum
-#undef ALLOW_Int32GetDatum
-#undef ALLOW_Int16GetDatum
-#undef ALLOW_DatumGetInt32
-#undef ALLOW_CharGetDatum
-#undef ALLOW_pfree
-#undef ALLOW_MemoryContextAllocImpl
-#undef ALLOW_MemoryContextFreeImpl
 
 #define GPDB_COUNT_AGG_OID 2147
 
