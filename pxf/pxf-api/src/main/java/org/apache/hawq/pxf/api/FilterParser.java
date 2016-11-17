@@ -219,10 +219,10 @@ public class FilterParser {
                     operandsStack.push(new ColumnIndex(safeToInt(parseNumber())));
                     break;
                 case SCALAR_CONST_OP:
-                    operandsStack.push(new Constant(parseParameter()));
+                    operandsStack.push(new Constant(parseScalarParameter()));
                     break;
                 case LIST_CONST_OP:
-                    operandsStack.push(new Constant(parseParameters()));
+                    operandsStack.push(new Constant(parseListParameter()));
                     break;
                 case COMP_OP:
                     opNumber = safeToInt(parseNumber());
@@ -399,7 +399,7 @@ public class FilterParser {
     /**
      * Parses either a number or a string.
      */
-    private Object parseParameter() throws Exception {
+    private Object parseScalarParameter() throws Exception {
         if (index == filterByteArr.length) {
             throw new FilterStringSyntaxException("argument should follow at " + index);
         }
@@ -426,7 +426,7 @@ public class FilterParser {
         return data;
     }
 
-    private Object parseParameters() throws Exception {
+    private Object parseListParameter() throws Exception {
         if (index == filterByteArr.length) {
             throw new FilterStringSyntaxException("argument should follow at " + index);
         }
