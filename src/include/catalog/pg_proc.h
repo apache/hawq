@@ -9924,6 +9924,10 @@ DESCR("Remove an entry specified by TID from a persistent table for the current 
 DATA(insert OID = 7182 ( gp_persistent_set_relation_bufpool_kind_all  PGNSP PGUID 12 f f f f v 0 23 f "" _null_ _null_ _null_ gp_persistent_set_relation_bufpool_kind_all - _null_ n ));
 DESCR("Populate the gp_persistent_relation_node table's relation_bufpool_kind column for the whole database instance for upgrade from 4.0 to 4.1");
 
+/* gp_relfile_insert_for_register(Oid, Oid, Oid, Oid, Oid, cstring, char, char, Oid) => int4 */
+DATA(insert OID = 7185 ( gp_relfile_insert_for_register  PGNSP PGUID 12 f f f f v 9 23 f "26 26 26 26 26 2275 18 18 26" _null_ _null_ _null_ gp_relfile_insert_for_register - _null_ n ));
+DESCR("insert record into gp_persistent_relfile_node and gp_relfile_node");
+
 
 /* GIN array support */
 /* ginarrayextract(anyarray, internal) => internal */ 

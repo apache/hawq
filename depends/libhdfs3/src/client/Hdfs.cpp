@@ -646,9 +646,9 @@ hdfsFile hdfsOpenFile(hdfsFS fs, const char * path, int flags, int bufferSize,
         if ((flags & O_CREAT) || (flags & O_APPEND) || (flags & O_WRONLY)) {
             int internalFlags = 0;
 
-            if ((flags & O_CREAT) && (flags & O_EXCL)) {
+            if (flags & O_CREAT)  {
                 internalFlags |= Hdfs::Create;
-            } else if ((flags & O_CREAT) || ((flags & O_APPEND) && (flags & O_WRONLY))) {
+            } else if ((flags & O_APPEND) && (flags & O_WRONLY)) {
                 internalFlags |= Hdfs::Create;
                 internalFlags |= Hdfs::Append;
             } else if (flags & O_WRONLY) {
