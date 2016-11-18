@@ -831,6 +831,123 @@ gp_persistent_build_all(PG_FUNCTION_ARGS)
 	PG_RETURN_INT32(1);
 }
 
+/*
+ * gp_relfile_insert_for_register
+ * 
+ * This function is an internal function, for hawq register to insert metadata
+ * into gp_relfile_node and gp_persistent_relfile_node.
+ */
+Datum
+gp_relfile_insert_for_register(PG_FUNCTION_ARGS)
+{
+	Oid		tablespace = PG_GETARG_OID(0);
+	Oid		database = PG_GETARG_OID(1);
+	Oid		relation = PG_GETARG_OID(2);
+	Oid		relfilenode = PG_GETARG_OID(3);
+	Oid		segfile = PG_GETARG_OID(4);
+	char           *relname = PG_GETARG_CSTRING(5);
+	char		relkind = PG_GETARG_CHAR(6);
+	char		relstorage = PG_GETARG_CHAR(7);
+	Oid		relam = PG_GETARG_OID(8);
+
+	Relation	gp_relfile_node;
+
+	RelFileNode	relFileNode;
+
+	PersistentFileSysRelStorageMgr relStorageMgr;
+
+	ItemPointerData	persistentTid;
+	int64		persistentSerialNum;
+
+	/* Fetch a copy of the tuple to scribble on */
+	HeapTuple	tuple = SearchSysCacheCopy(DATABASEOID,
+					     ObjectIdGetDatum(database),
+					     0, 0, 0);
+	if (!HeapTupleIsValid(tuple))
+		elog(ERROR, "could not find tuple for database %u", database);
+	Form_pg_database form_pg_database = (Form_pg_database) GETSTRUCT(tuple);
+
+	Oid		defaultTablespace = form_pg_database->dattablespace;
+	gp_relfile_node =
+		DirectOpen_GpRelfileNodeOpen(
+					     defaultTablespace,
+					     database);
+
+	relFileNode.spcNode = tablespace;
+	relFileNode.dbNode = database;
+	relFileNode.relNode = relfilenode;
+
+	relStorageMgr = (
+			 (relstorage == RELSTORAGE_AOROWS ||
+			  relstorage == RELSTORAGE_PARQUET) ?
+			 PersistentFileSysRelStorageMgr_AppendOnly :
+			 PersistentFileSysRelStorageMgr_BufferPool);
+
+	gp_before_persistence_work = true;
+
+	if (relStorageMgr == PersistentFileSysRelStorageMgr_BufferPool) {
+		PersistentFileSysRelStorageMgr localRelStorageMgr;
+		PersistentFileSysRelBufpoolKind relBufpoolKind;
+
+		GpPersistentRelfileNode_GetRelfileInfo(
+						       relkind,
+						       relstorage,
+						       relam,
+						       &localRelStorageMgr,
+						       &relBufpoolKind);
+		Assert(localRelStorageMgr == PersistentFileSysRelStorageMgr_BufferPool);
+
+		/*
+		 * Heap tables only ever add a single segment_file_num=0
+		 * entry to gp_persistent_relation regardless of how many
+		 * segment files there really are.
+		 */
+		PersistentRelfile_AddCreated(
+					     &relFileNode,
+					      /* segmentFileNum */ 0,
+					     relStorageMgr,
+					     relBufpoolKind,
+					     relname,
+					     &persistentTid,
+					     &persistentSerialNum,
+					      /* flushToXLog */ false);
+
+		InsertGpRelfileNodeTuple(
+					 gp_relfile_node,
+					 relation, //pg_class OID
+					 relname,
+				 relFileNode.relNode, //pg_class relfilenode
+					  /* segmentFileNum */ 0,
+					  /* updateIndex */ true,
+					 &persistentTid,
+					 persistentSerialNum);
+	} else {
+		PersistentRelfile_AddCreated(
+					     &relFileNode,
+					     segfile,
+					     relStorageMgr,
+				       PersistentFileSysRelBufpoolKind_None,
+					     relname,
+					     &persistentTid,
+					     &persistentSerialNum,
+					      /* flushToXLog */ false);
+
+		InsertGpRelfileNodeTuple(
+					 gp_relfile_node,
+					 relation, //pg_class OID
+					 relname,
+				 relFileNode.relNode, //pg_class relfilenode
+					 segfile,
+					  /* updateIndex */ true,
+					 &persistentTid,
+					 persistentSerialNum);
+	}
+
+	gp_before_persistence_work = false;
+
+	PG_RETURN_INT32(1);
+}
+
 static void
 PersistentBuild_FindGpRelationNodeIndex(
 	Oid				database,

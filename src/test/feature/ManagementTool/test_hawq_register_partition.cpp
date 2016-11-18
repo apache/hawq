@@ -51,6 +51,8 @@ void TestHawqRegister::runYamlCaseTableExistsPartition(std::string casename, std
         util.query("select * from nt;", 100);
     } else {
         util.query("select * from nt;", checknum);
+        util.execute("insert into nt select generate_series(1, 100), 1, 1, 'M', 1;");
+        util.query("select * from nt;", checknum + 100);
     }
     
     EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
@@ -91,6 +93,8 @@ void TestHawqRegister::runYamlCaseTableNotExistsPartition(std::string casename, 
         util.query("select * from pg_class where relname = 'nt';", 0);
     } else {
         util.query("select * from nt;", checknum);
+        util.execute("insert into nt select generate_series(1, 100), 1, 1, 'M', 1;");
+        util.query("select * from nt;", checknum + 100);
     }
     
     EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
@@ -163,6 +167,9 @@ void TestHawqRegister::runYamlCaseForceModePartition(std::string casename, std::
     EXPECT_EQ(result1_1_1 + result1_1_2, result2_1);
     EXPECT_EQ(result1_2_1 + result1_2_2, result2_2);
     EXPECT_EQ(result1_3_1 + result1_3_2, result2_3);
+
+    util.execute("insert into nt select generate_series(1, 100), 1, 1, 'M', 1;");
+    util.query("select * from nt;", checknum + 100);
 
     EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
     util.execute("drop table t;");
