@@ -436,7 +436,7 @@ public class FilterParser {
         }
 
         DataType dataType = DataType.get(parseConstDataType());
-        List<Object> data = new ArrayList<Object>();;
+        List<Object> data = new ArrayList<Object>();
         if (dataType == DataType.UNSUPPORTED_TYPE) {
             throw new FilterStringSyntaxException("invalid DataType OID at " + (index - 1));
         }
