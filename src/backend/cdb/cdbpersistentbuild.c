@@ -420,8 +420,10 @@ static void PersistentBuild_PopulateGpRelationNode(
 		}
 		// reset Relation->rd_relationnodeinfo.isPresent, so that next time persistentid and serial# can be refetched
 		rd = RelationIdGetRelation(relFileNode.relNode);
-		rd->rd_relationnodeinfo.isPresent = false;
-		RelationClose(rd);
+		if(RelationIsValid(rd)){
+			rd->rd_relationnodeinfo.isPresent = false;
+			RelationClose(rd);
+		}
 
 		(*count)++;
 	}
