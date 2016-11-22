@@ -441,7 +441,10 @@ def createHostList():
     if HADOOP_HOME:
         try:
             namenode_host = getHDFSNamenodeHost()
-            gpcheck_info.hosts[namenode_host] = GpCheckHost(namenode_host, is_namenode=True)
+            if namenode_host in hostlist:
+                gpcheck_info.hosts[namenode_host] = GpCheckHost(namenode_host, is_namenode=True)
+            else:
+                logger.warning("utility will skip HDFS namenode check since it's not in current host list.")
 
         except Exception, e:
             checkFailed(None, "utility will SKIP HDFS namenode check: %s" % str(e))
@@ -1296,58 +1299,62 @@ if __name__ == '__main__':
 
     if gpcheck_info.is_root:
         logger.info("gpcheck will perform block device's readahead checks when run as root")
-
     try:
-        checkPlatform()
-        parseargs()
-        readConfigFile()
-
-    except GpCheckError, e:
-        logger.error(str(e))
-        sys.exit(1)
-
-    try:
-        tmpdir = tempfile.mkdtemp(prefix='gpcheck')
-    except Exception, e:
-        logger.error("Error creating tmp dir on master: %s" % e)
-        sys.exit(1)
-
-    try:
-        # Phase 1: collect input
-        if options.zipin:
-            readZip() # load information into gpcheck_info from zip
-        else:
-            # read host info into gpcheck_info.hosts from --file or --host
-            createHostList()
-            # collect each server's system environment configuration
-            runCollections()
-            # read collected data into gpcheck_info
-            readDataFiles()
-            # read HAWQ configuration
-            readHAWQConfiguration()
-
-        # Phase 2: generate output
-        if options.stdout:
-            doPrint()
-        elif options.zipout:
-            doZip("./gpcheck_%s" % time.time())
-        else:
-            runTests()
-            if found_errors:
-                sys.exit(1)
-
-    except GpCheckError, e:
-        logger.error(str(e))
-        sys.exit(1)
-
-    finally:
-        logger.info("Clean up...")
         try:
-            if tmpdir:
-                shutil.rmtree(tmpdir)
+            checkPlatform()
+            parseargs()
+            readConfigFile()
+
+        except GpCheckError, e:
+            logger.error(str(e))
+            sys.exit(1)
+            if pool:
+                pool.join()
+                pool.haltWork()
+                pool.joinWorkers()
+
+        try:
+            tmpdir = tempfile.mkdtemp(prefix='gpcheck')
         except Exception, e:
-            logger.error("error removing tempdir during job cleanup: %s" % e)
-        
+            logger.error("Error creating tmp dir on master: %s" % e)
+            sys.exit(1)
+
+        try:
+            # Phase 1: collect input
+            if options.zipin:
+                readZip() # load information into gpcheck_info from zip
+            else:
+                # read host info into gpcheck_info.hosts from --file or --host
+                createHostList()
+                # collect each server's system environment configuration
+                runCollections()
+                # read collected data into gpcheck_info
+                readDataFiles()
+                # read HAWQ configuration
+                readHAWQConfiguration()
+
+            # Phase 2: generate output
+            if options.stdout:
+                doPrint()
+            elif options.zipout:
+                doZip("./gpcheck_%s" % time.time())
+            else:
+                runTests()
+                if found_errors:
+                    sys.exit(1)
+
+        except GpCheckError, e:
+            logger.error(str(e))
+            sys.exit(1)
+
+        finally:
+            logger.info("Clean up...")
+            try:
+                if tmpdir:
+                    shutil.rmtree(tmpdir)
+            except Exception, e:
+                logger.error("error removing tempdir during job cleanup: %s" % e)
+    finally:
         if pool:
             pool.join()
             pool.haltWork()

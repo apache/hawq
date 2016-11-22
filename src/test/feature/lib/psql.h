@@ -67,6 +67,7 @@ class PSQL {
   static bool checkDiff(const std::string& expect_file,
                         const std::string& result_file,
                         bool save_diff = true,
+                        const std::string& global_init_file = "",
                         const std::string& init_file = "");
 
   void resetOutput();
