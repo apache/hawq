@@ -4925,7 +4925,7 @@ select * from t;
 -- END MPP-19105
 reset optimizer_nestloop_factor;
 
--- Test split default partition while per tuple memory context is reset
+-- Test split default partition while per tuple memory context is reset 
 -- Origin GPDB PR: https://github.com/greenplum-db/gpdb/pull/866
 drop table if exists test_split_part cascade;
 
