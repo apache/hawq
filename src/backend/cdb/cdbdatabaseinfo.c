@@ -797,7 +797,7 @@ static void DatabaseInfo_AddFile(
 		DatabaseInfo_AddMiscEntry(info, tablespace, false, name);
 		return;
 	}
-	else if (itemCount == 1 && !isHdfs)
+	else if (itemCount == 1)
 		segmentFileNum = 0;
 	else
 		Assert(itemCount == 2);
