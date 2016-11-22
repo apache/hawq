@@ -56,7 +56,6 @@ public enum DataType {
     BOOLARRAY(1000),
     TEXTARRAY(1009),
 
-    INVALID_OID(0),
     UNSUPPORTED_TYPE(-1);
 
     private static final Map<Integer, DataType> lookup = new HashMap<>();

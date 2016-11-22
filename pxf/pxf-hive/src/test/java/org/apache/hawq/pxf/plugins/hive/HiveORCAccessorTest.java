@@ -103,4 +103,22 @@ public class HiveORCAccessorTest {
         assertEquals(sarg.toKryo(), jobConf.get(SARG_PUSHDOWN));
     }
 
+    @Test
+    public void parseFilterWithIn() throws Exception {
+
+        when(inputData.hasFilter()).thenReturn(true);
+        when(inputData.getFilterString()).thenReturn("a1m1007s1d1s1d2s1d3o10a2m1007s1d1s1d2o10l0");
+        when(columnDesc.columnName()).thenReturn("FOO");
+        when(inputData.getColumn(1)).thenReturn(columnDesc);
+
+        when(columnDesc.columnName()).thenReturn("FOO");
+        when(inputData.getColumn(2)).thenReturn(columnDesc);
+
+        accessor.openForRead();
+
+        SearchArgument sarg = SearchArgumentFactory.newBuilder().startAnd().in("FOO", 1, 2, 3).in("FOO", 1, 2).end().build();
+
+        assertEquals(sarg.toKryo(), jobConf.get(SARG_PUSHDOWN));
+    }
+
 }

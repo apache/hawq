@@ -40,14 +40,25 @@ public class HiveORCSearchArgumentTest {
         HiveFilterBuilder eval = new HiveFilterBuilder(null);
         Object filter = eval.getFilterObject(filterStr);
 
-        Object current = filter;
         SearchArgument.Builder filterBuilder = SearchArgumentFactory.newBuilder();
         buildExpression(filterBuilder, Arrays.asList(filter));
         SearchArgument sarg = filterBuilder.build();
         Assert.assertEquals("and(or(lt(col1, 5), not(lteq(col1, 1))), or(lt(col1, 5), lteq(col1, 3)))", sarg.toFilterPredicate().toString());
     }
 
-    private void buildExpression(SearchArgument.Builder builder, List<Object> filterList) {
+    @Test
+    public void buildIn() throws Exception {
+        String filterStr = "a0m1009s4drow1s4drow2o10a1m1009s3ds_6s3ds_7o10l0";
+        HiveFilterBuilder eval = new HiveFilterBuilder(null);
+        Object filter = eval.getFilterObject(filterStr);
+
+        SearchArgument.Builder filterBuilder = SearchArgumentFactory.newBuilder();
+        buildExpression(filterBuilder, Arrays.asList(filter));
+        SearchArgument sarg = filterBuilder.build();
+        Assert.assertEquals("and(or(eq(col1, Binary{\"row1\"}), eq(col1, Binary{\"row2\"})), or(eq(col1, Binary{\"s_6\"}), eq(col1, Binary{\"s_7\"})))", sarg.toFilterPredicate().toString());
+    }
+
+    private boolean buildExpression(SearchArgument.Builder builder, List<Object> filterList) {
         for (Object f : filterList) {
             if (f instanceof LogicalFilter) {
                 switch(((LogicalFilter) f).getOperator()) {
@@ -61,15 +72,21 @@ public class HiveORCSearchArgumentTest {
                         builder.startNot();
                         break;
                 }
-                buildExpression(builder, ((LogicalFilter) f).getFilterList());
-                builder.end();
+                if (buildExpression(builder, ((LogicalFilter) f).getFilterList())) {
+                    builder.end();
+                } else {
+                    return false;
+                }
             } else {
-                buildArgument(builder, f);
+                if (!buildArgument(builder, f)) {
+                    return false;
+                }
             }
         }
+        return true;
     }
 
-    private void buildArgument(SearchArgument.Builder builder, Object filterObj) {
+    private boolean buildArgument(SearchArgument.Builder builder, Object filterObj) {
         /* The below functions will not be compatible and requires update  with Hive 2.0 APIs */
         BasicFilter filter = (BasicFilter) filterObj;
         int filterColumnIndex = filter.getColumn().index();
@@ -97,7 +114,18 @@ public class HiveORCSearchArgumentTest {
             case HDOP_NE:
                 builder.startNot().equals(filterColumnName, filterValue).end();
                 break;
+            case HDOP_IN:
+                if (filterValue instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> l = (List<Object>)filterValue;
+                    builder.in(filterColumnName, l.toArray());
+                } else {
+                    throw new IllegalArgumentException("filterValue should be instace of List for HDOP_IN operation");
+                }
+                break;
+            default:
+                return false;
         }
-        return;
+        return true;
     }
 }

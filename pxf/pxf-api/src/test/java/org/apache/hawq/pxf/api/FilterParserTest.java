@@ -143,6 +143,24 @@ public class FilterParserTest {
         index = 6;
         exception = "failed to parse number data type starting at " + index;
         runParseNegative("const operand with an invalid value", filter, exception);
+
+        filter = "m1122";
+        index = 4;
+        exception = "invalid DataType OID at " + index;
+        runParseNegative("const operand with an invalid datatype", filter, exception);
+
+        filter = "m20";
+        exception = "expected non-scalar datatype, but got datatype with oid = 20";
+        runParseNegative("const operand with an scalar datatype instead of list", filter, exception);
+
+        filter = "m1007s1d1s1d2s2d3";
+        exception = "filter string is shorter than expected";
+        runParseNegative("const operand with list datatype, and \"d\" tag has less data than indicated in \"s\" tag", filter, exception);
+
+        filter = "m1007s1d1s1d2s2d123";
+        index = 18;
+        exception = "unknown opcode 3(51) at " + index;
+        runParseNegative("const operand with list datatype, and \"d\" tag has more data than indicated in \"s\" tag", filter, exception);
     }
 
     @Test
@@ -271,6 +289,10 @@ public class FilterParserTest {
         filter = "a1o9";
         op = Operation.HDOP_IS_NOT_NULL;
         runParseOneUnaryOperation("this filter was build from HDOP_IS_NULL", filter, op);
+
+        filter = "a1m1005s1d1s1d2s1d3o10";
+        op = Operation.HDOP_IN;
+        runParseOneOperation("this filter was built from HDOP_IN", filter, op);
 
     }
 

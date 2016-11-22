@@ -362,6 +362,10 @@ public class FilterParser {
     }
 
     private Object convertDataType(byte[] byteData, int start, int end, DataType dataType) throws Exception {
+
+        if (byteData.length < end)
+            throw new FilterStringSyntaxException("filter string is shorter than expected");
+
         String data = new String(byteData, start, end-start, DEFAULT_CHARSET);
         try {
             switch (dataType) {
@@ -437,7 +441,7 @@ public class FilterParser {
             throw new FilterStringSyntaxException("invalid DataType OID at " + (index - 1));
         }
 
-        if (dataType.getTypeElem().getOID() == DataType.INVALID_OID.getOID()) {
+        if (dataType.getTypeElem() == null) {
             throw new FilterStringSyntaxException("expected non-scalar datatype, but got datatype with oid = " + dataType.getOID());
         }
 
