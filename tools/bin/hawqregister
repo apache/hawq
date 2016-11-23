@@ -348,6 +348,18 @@ class GpRegisterAccessor(object):
         query = "select pg_encoding_to_char(%s);" % encoding_indx
         return self.exec_query(query)[0]['pg_encoding_to_char']
 
+    def get_metadata_for_relfile_insert(self, database, tablename):
+        _, tablename = tablename_handler(tablename)
+        query = "select reltablespace from pg_class where relname = '%s';" % tablename
+        tablespace_oid = int(self.exec_query(query)[0]['reltablespace'])
+        if tablespace_oid == 0:
+            query = "select oid from pg_tablespace where spcname='dfs_default';"
+            tablespace_oid = int(self.exec_query(query)[0]['oid'])
+        query = "select oid from pg_database where datname='%s';" % database
+        database_oid = int(self.exec_query(query)[0]['oid'])
+        query = "select oid, relfilenode, relname, relkind, relstorage, relam from pg_class where relname='%s';" % tablename
+        return [tablespace_oid, database_oid, int(self.exec_query(query)[0]['oid']), int(self.exec_query(query)[0]['relfilenode']), str(self.exec_query(query)[0]['relname']), str(self.exec_query(query)[0]['relkind']), str(self.exec_query(query)[0]['relstorage']), int(self.exec_query(query)[0]['relam'])]
+
     def update_catalog(self, query):
         self.conn.query(query)
 
@@ -429,6 +441,9 @@ class HawqRegister(object):
             logger.error('Distribution policy of %s from yaml file is not consistent with the policy of existing table.' % self.dst_table_name)
             self.failure_handler.rollback()
             sys.exit(1)
+
+    def _get_metadata_for_relfile_insert(self):
+        return self.accessor.get_metadata_for_relfile_insert(self.database, self.tablename)
 
     def _set_yml_data(self, file_format, files, sizes, tupcounts, eofuncompresseds, varblockcounts, tablename, schema, distribution_policy, file_locations,\
                       bucket_number, partitionby, partitions_constraint, partitions_name, partitions_compression_level,\
@@ -885,7 +900,9 @@ class HawqRegister(object):
         same_path_varblockcounts = self.varblockcounts_same_path
         update_segno_lst = [f.split('/')[-1] for f in self.files_update]
         same_path_segno_lst = [seg for seg in self.segnos_same_path]
+        relfile_data = self._get_metadata_for_relfile_insert()
         query = ""
+        insert_relfile_segs = []
         
         if mode == 'force':
             query += "delete from pg_aoseg.%s;" % (self.seg_name)
@@ -900,17 +917,21 @@ class HawqRegister(object):
                 query += ';'
             if len(same_path_eofs) > 0:
                 query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], same_path_tupcounts[0], same_path_eofuncompresseds[0])
+                insert_relfile_segs.append(int(same_path_segno_lst[0]));
                 k = 0
                 for same_path_eof, same_path_tupcount, same_path_eofuncompressed in zip(same_path_eofs[1:], same_path_tupcounts[1:], same_path_eofuncompresseds[1:]):
                     query += ',(%d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, same_path_tupcount, same_path_eofuncompressed)
+                    insert_relfile_segs.append(int(same_path_segno_lst[k + 1]));
                     k += 1
                 query += ';'
             segno += len(same_path_eofs)
             if len(append_eofs) > 0:
                 query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], append_tupcounts[0], append_eofuncompresseds[0])
+                insert_relfile_segs.append(segno);
                 k = 0
                 for append_eof, append_tupcount, append_eofuncompressed in zip(append_eofs[1:], append_tupcounts[1:], append_eofuncompresseds[1:]):
                     query += ',(%d, %d, %d, %d)' % (segno + k + 1, append_eof, append_tupcount, append_eofuncompressed)
+                    insert_relfile_segs.append(segno + k + 1);
                     k += 1
                 query += ';'
         else:
@@ -923,20 +944,27 @@ class HawqRegister(object):
                 query += ';'
             if len(same_path_eofs) > 0:
                 query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, same_path_segno_lst[0], same_path_eofs[0], same_path_tupcounts[0], same_path_varblockcounts[0], same_path_eofuncompresseds[0])
+                insert_relfile_segs.append(int(same_path_segno_lst[0]));
                 k = 0
                 for same_path_eof, same_path_tupcount, same_path_varblockcount, same_path_eofuncompressed in zip(same_path_eofs[1:], same_path_tupcounts[1:], same_path_varblockcounts[1:], same_path_eofuncompresseds[1:]):
                     query += ',(%d, %d, %d, %d, %d)' % (same_path_segno_lst[k + 1], same_path_eof, same_path_tupcount, same_path_varblockcount, same_path_eofuncompressed)
+                    insert_relfile_segs.append(int(same_path_segno_lst[k + 1]));
                     k += 1
                 query += ';'
             segno += len(same_path_eofs)
             if len(append_eofs) > 0:
                 query += 'insert into pg_aoseg.%s values(%d, %d, %d, %d, %d)' % (self.seg_name, segno, append_eofs[0], append_tupcounts[0], append_varblockcounts[0], append_eofuncompresseds[0])
+                insert_relfile_segs.append(segno);
                 k = 0
                 for append_eof, append_tupcount, append_varblockcount, append_eofuncompressed in zip(append_eofs[1:], append_tupcounts[1:], append_varblockcounts[1:], append_eofuncompresseds[1:]):
                     query += ',(%d, %d, %d, %d, %d)' % (segno + k + 1, append_eof, append_tupcount, append_varblockcount, append_eofuncompressed)
+                    insert_relfile_segs.append(segno + k + 1);
                     k += 1
                 query += ';'
         self.queries += query
+        for seg in insert_relfile_segs:
+            self.queries += "select gp_relfile_insert_for_register(%d, %d, %d, %d, %d, '%s', '%s', '%s', %d);" % (relfile_data[0], relfile_data[1], relfile_data[2], relfile_data[3], seg, relfile_data[4], relfile_data[5], relfile_data[6], relfile_data[7])
+
     
     def _modify_metadata(self):
         try:
@@ -1016,6 +1044,15 @@ class HawqRegisterPartition(HawqRegister):
             logger.error('Multi-level partition table is not supported!')
             sys.exit(1)
 
+        parent_tablename = self.tablename
+        parent_files = self.files
+        parent_sizes = self.sizes
+        parent_tupcounts = self.tupcounts
+        parent_eofuncompresseds = self.eofuncompresseds
+        parent_varblockcounts = self.varblockcounts
+        if self.yml:
+            self.filepath = self.files[0][:self.files[0].rfind('/')] if self.files else ''
+            self._check_file_not_folder()
         for k, pn in enumerate(self.partitions_name):
             self.tablename = pn
             self.files = self.partitions_filepaths[k]
@@ -1034,6 +1071,14 @@ class HawqRegisterPartition(HawqRegister):
         self.queries = "set allow_system_table_mods='dml';"
         self.queries += "begin transaction;"
         self._check_duplicate_constraint()
+        self.tablename = parent_tablename
+        self.files = parent_files
+        self.sizes = parent_sizes
+        self.tupcounts = parent_tupcounts
+        self.eofuncompresseds = parent_eofuncompresseds
+        self.varblockcounts = parent_varblockcounts
+        self._do_check()
+        self._prepare_register()
         schemaname, _ = tablename_handler(self.dst_table_name)
         for k, pn in enumerate(self.partitions_name):
             self.constraint = self.partitions_constraint[k]

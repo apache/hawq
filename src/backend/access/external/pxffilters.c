@@ -251,7 +251,6 @@ Oid pxf_supported_types[] =
 	VARCHAROID,
 	BPCHAROID,
 	CHAROID,
-	BYTEAOID,
 	BOOLOID,
 	DATEOID,
 	TIMESTAMPOID,
@@ -608,15 +607,23 @@ pxf_serialize_filter_list(List *expressionItems)
 			{
 				elog(DEBUG1, "pxf_serialize_filter_list: node tag %d (T_NullTest)", tag);
 				NullTest *expr = (NullTest *) node;
+				Var *var = (Var *) expr->arg;
+
+				//TODO: add check for supported operation
+				if (!supported_filter_type(var->vartype))
+				{
+					elog(DEBUG1, "Query will not be optimized to use filter push-down.");
+					return NULL;
+				}
 
 				/* filter expression for T_NullTest will not have any constant value */
 				if (expr->nulltesttype == IS_NULL)
 				{
-					appendStringInfo(resbuf, "%c%d%c%d", PXF_ATTR_CODE, ((Var *) expr->arg)->varattno - 1, PXF_OPERATOR_CODE, PXFOP_IS_NULL);
+					appendStringInfo(resbuf, "%c%d%c%d", PXF_ATTR_CODE, var->varattno - 1, PXF_OPERATOR_CODE, PXFOP_IS_NULL);
 				}
 				else if (expr->nulltesttype == IS_NOT_NULL)
 				{
-					appendStringInfo(resbuf, "%c%d%c%d", PXF_ATTR_CODE, ((Var *) expr->arg)->varattno - 1, PXF_OPERATOR_CODE, PXFOP_IS_NOTNULL);
+					appendStringInfo(resbuf, "%c%d%c%d", PXF_ATTR_CODE, var->varattno - 1, PXF_OPERATOR_CODE, PXFOP_IS_NOTNULL);
 				}
 				else
 				{

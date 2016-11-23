@@ -1106,6 +1106,7 @@ Datum gp_persistent_build_all(PG_FUNCTION_ARGS);
 Datum gp_persistent_reset_all(PG_FUNCTION_ARGS);
 Datum gp_persistent_repair_delete(PG_FUNCTION_ARGS);
 Datum gp_persistent_set_relation_bufpool_kind_all(PG_FUNCTION_ARGS);
+Datum gp_relfile_insert_for_register(PG_FUNCTION_ARGS);
 
 
 /* utils/error/elog.c */

@@ -3545,7 +3545,7 @@ void timeoutIdleGRMResourceToRB(void)
 			timeoutIdleGRMResourceToRBByRatio(i,
 										   	  retcontnum,
 											  &realretcontnum,
-											  mark->ClusterVCore > 0 ? 2 : 0 );
+											  mark->ClusterVCore > 0 ? PQUEMGR->ActualMinGRMContainerPerSeg : 0 );
 			if ( realretcontnum > 0 )
 			{
 				/* Notify resource queue manager to minus allocated resource.*/
