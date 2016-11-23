@@ -422,8 +422,8 @@ static void PersistentBuild_PopulateGpRelationNode(
 		rd = RelationIdGetRelation(relFileNode.relNode);
 		if(RelationIsValid(rd)){
 			rd->rd_relationnodeinfo.isPresent = false;
-			RelationClose(rd);
 		}
+		RelationClose(rd);
 
 		(*count)++;
 	}
