@@ -1038,6 +1038,12 @@ scalar_const_to_str(Const *constval, StringInfo buf)
 /*
  * list_const_to_str
  *
+ * Extracts the value stored in a list constant to a string.
+ * Currently supported data types: int2[], int4[], int8[], text[], boolean[]
+ * Example:
+ * Input: ['abc', 'xyz']
+ * Output: s3dabcs3dxyz
+ *
  */
 static void
 list_const_to_str(Const *constval, StringInfo buf)
