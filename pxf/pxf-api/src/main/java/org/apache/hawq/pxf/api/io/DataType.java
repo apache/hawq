@@ -49,17 +49,32 @@ public enum DataType {
     TIME(1083),
     TIMESTAMP(1114),
     NUMERIC(1700),
+
+    INT2ARRAY(1005),
+    INT4ARRAY(1007),
+    INT8ARRAY(1016),
+    BOOLARRAY(1000),
+    TEXTARRAY(1009),
+
     UNSUPPORTED_TYPE(-1);
 
     private static final Map<Integer, DataType> lookup = new HashMap<>();
 
     static {
+
+        INT2ARRAY.typeElem = SMALLINT;
+        INT4ARRAY.typeElem = INTEGER;
+        INT8ARRAY.typeElem = BIGINT;
+        BOOLARRAY.typeElem = BOOLEAN;
+        TEXTARRAY.typeElem = TEXT;
+
         for (DataType dt : EnumSet.allOf(DataType.class)) {
             lookup.put(dt.getOID(), dt);
         }
     }
 
     private final int OID;
+    private DataType typeElem;
 
     DataType(int OID) {
         this.OID = OID;
@@ -80,5 +95,9 @@ public enum DataType {
 
     public int getOID() {
         return OID;
+    }
+
+    public DataType getTypeElem() {
+        return typeElem;
     }
 }

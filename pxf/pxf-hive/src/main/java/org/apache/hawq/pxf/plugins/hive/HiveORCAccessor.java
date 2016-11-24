@@ -195,6 +195,15 @@ public class HiveORCAccessor extends HiveAccessor {
             case HDOP_IS_NOT_NULL:
                 builder.startNot().isNull(filterColumnName).end();
                 break;
+            case HDOP_IN:
+                if (filterValue instanceof List) {
+                    @SuppressWarnings("unchecked")
+                    List<Object> l = (List<Object>)filterValue;
+                    builder.in(filterColumnName, l.toArray());
+                } else {
+                    throw new IllegalArgumentException("filterValue should be instace of List for HDOP_IN operation");
+                }
+                break;
             default: {
                 LOG.debug("Filter push-down is not supported for " + filter.getOperation() + "operation.");
                 return false;

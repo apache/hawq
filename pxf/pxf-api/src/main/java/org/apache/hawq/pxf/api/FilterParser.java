@@ -25,6 +25,8 @@ import org.apache.hawq.pxf.api.io.DataType;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 /**
@@ -65,11 +67,13 @@ public class FilterParser {
     private Stack<Object> operandsStack;
     private FilterBuilder filterBuilder;
     public static final char COL_OP = 'a';
-    public static final char CONST_OP = 'c';
+    public static final char SCALAR_CONST_OP = 'c';
+    public static final char LIST_CONST_OP = 'm';
     public static final char CONST_LEN = 's';
     public static final char CONST_DATA = 'd';
     public static final char COMP_OP = 'o';
     public static final char LOG_OP = 'l';
+
     public static final String DEFAULT_CHARSET = "UTF-8";
 
     /** Supported operations by the parser. */
@@ -83,7 +87,8 @@ public class FilterParser {
         HDOP_NE,
         HDOP_LIKE,
         HDOP_IS_NULL,
-        HDOP_IS_NOT_NULL
+        HDOP_IS_NOT_NULL,
+        HDOP_IN
     }
 
     /**
@@ -213,8 +218,11 @@ public class FilterParser {
                 case COL_OP:
                     operandsStack.push(new ColumnIndex(safeToInt(parseNumber())));
                     break;
-                case CONST_OP:
-                    operandsStack.push(new Constant(parseParameter()));
+                case SCALAR_CONST_OP:
+                    operandsStack.push(new Constant(parseScalarParameter()));
+                    break;
+                case LIST_CONST_OP:
+                    operandsStack.push(new Constant(parseListParameter()));
                     break;
                 case COMP_OP:
                     opNumber = safeToInt(parseNumber());
@@ -354,6 +362,10 @@ public class FilterParser {
     }
 
     private Object convertDataType(byte[] byteData, int start, int end, DataType dataType) throws Exception {
+
+        if (byteData.length < end)
+            throw new FilterStringSyntaxException("filter string is shorter than expected");
+
         String data = new String(byteData, start, end-start, DEFAULT_CHARSET);
         try {
             switch (dataType) {
@@ -391,7 +403,7 @@ public class FilterParser {
     /**
      * Parses either a number or a string.
      */
-    private Object parseParameter() throws Exception {
+    private Object parseScalarParameter() throws Exception {
         if (index == filterByteArr.length) {
             throw new FilterStringSyntaxException("argument should follow at " + index);
         }
@@ -415,6 +427,40 @@ public class FilterParser {
 
         Object data = convertDataType(filterByteArr, index, index+dataLength, dataType);
         index += dataLength;
+        return data;
+    }
+
+    private Object parseListParameter() throws Exception {
+        if (index == filterByteArr.length) {
+            throw new FilterStringSyntaxException("argument should follow at " + index);
+        }
+
+        DataType dataType = DataType.get(parseConstDataType());
+        List<Object> data = new ArrayList<Object>();
+        if (dataType == DataType.UNSUPPORTED_TYPE) {
+            throw new FilterStringSyntaxException("invalid DataType OID at " + (index - 1));
+        }
+
+        if (dataType.getTypeElem() == null) {
+            throw new FilterStringSyntaxException("expected non-scalar datatype, but got datatype with oid = " + dataType.getOID());
+        }
+
+        while (((char) filterByteArr[index]) == CONST_LEN) {
+            int dataLength = parseDataLength();
+
+            if (index + dataLength > filterByteArr.length) {
+                throw new FilterStringSyntaxException("data size larger than filter string starting at " + index);
+            }
+
+            if (((char) filterByteArr[index]) != CONST_DATA) {
+                throw new FilterStringSyntaxException("data delimiter 'd' expected at " + index);
+            }
+
+            index++;
+            data.add(convertDataType(filterByteArr, index, index+dataLength, dataType.getTypeElem()));
+            index += dataLength;
+        }
+
         return data;
     }
 
