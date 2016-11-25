@@ -87,9 +87,12 @@ def register_func(options, args):
                 existed_db_conn.close()
         utility_conn.close()
     except pg.DatabaseError as e:
-        print e
+        logger.error('%s', e)
+        logger.info('Hawq Upgrade Failed.')
+        return 1
     except pg.InternalError:
         logger.error('Fail to connect to database, this script can only be run when database is up.')
+        logger.info('Hawq Upgrade Failed.')
         return 1
     logger.info('Hawq Upgrade Succeed.')
 
