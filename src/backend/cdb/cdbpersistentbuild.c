@@ -840,15 +840,17 @@ gp_persistent_build_all(PG_FUNCTION_ARGS)
 Datum
 gp_relfile_insert_for_register(PG_FUNCTION_ARGS)
 {
-	Oid		tablespace = PG_GETARG_OID(0);
-	Oid		database = PG_GETARG_OID(1);
-	Oid		relation = PG_GETARG_OID(2);
-	Oid		relfilenode = PG_GETARG_OID(3);
-	Oid		segfile = PG_GETARG_OID(4);
-	char           *relname = PG_GETARG_CSTRING(5);
-	char		relkind = PG_GETARG_CHAR(6);
-	char		relstorage = PG_GETARG_CHAR(7);
-	Oid		relam = PG_GETARG_OID(8);
+	Oid tablespace = PG_GETARG_OID(0);
+	Oid database = PG_GETARG_OID(1);
+	Oid relation = PG_GETARG_OID(2);
+	Oid relfilenode = PG_GETARG_OID(3);
+	Oid segfile = PG_GETARG_OID(4);
+	char* relname = PG_GETARG_CSTRING(5);
+	BpChar* vRelkind = PG_GETARG_BPCHAR_P(6);
+	char relkind = vRelkind->vl_dat[0];
+	BpChar* vRelStorage = PG_GETARG_BPCHAR_P(7);
+	char	 relstorage = vRelStorage->vl_dat[0];
+	Oid relam = PG_GETARG_OID(8);
 
 	Relation	gp_relfile_node;
 
