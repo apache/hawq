@@ -3650,11 +3650,11 @@ void timeoutIdleGRMResourceToRBByRatio(int 		 ratioindex,
 		GRMContainer retcont = getGRMContainerSetContainerFirst(containerset);
 
 		if ( containerset->Available.MemoryMB >= retcont->MemoryMB &&
-			 containerset->Available.Core     >= retcont->Core )
+			 IS_DOUBLE_EQGREATER(containerset->Available.Core,
+					             retcont->Core ) )
 		{
-
 			Assert(resource->Available.MemoryMB >= retcont->MemoryMB);
-			Assert(resource->Available.Core     >= retcont->Core);
+			Assert(IS_DOUBLE_EQGREATER(resource->Available.Core, retcont->Core));
 
 			retcont = popGRMContainerSetContainerList(containerset);
 
@@ -3669,12 +3669,12 @@ void timeoutIdleGRMResourceToRBByRatio(int 		 ratioindex,
 			Assert( resource->Allocated.MemoryMB >= 0 );
 			Assert( resource->Allocated.Core >= 0  );
 			Assert( resource->Available.MemoryMB >= 0 );
-			Assert( resource->Available.Core >= 0  );
+			Assert( IS_DOUBLE_EQGREATER(resource->Available.Core, 0) );
 
 			Assert( containerset->Allocated.MemoryMB >= 0 );
 			Assert( containerset->Allocated.Core >= 0   );
 			Assert( containerset->Available.MemoryMB >= 0 );
-			Assert( containerset->Available.Core >= 0   );
+			Assert( IS_DOUBLE_EQGREATER(containerset->Available.Core, 0) );
 
 			reorderSegResourceAllocIndex(resource, ratio);
 			reorderSegResourceAvailIndex(resource, ratio);

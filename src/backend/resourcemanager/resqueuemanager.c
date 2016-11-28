@@ -3267,6 +3267,10 @@ void minusResourceBundleData(ResourceBundle detail, int32_t mem, double core)
 {
 	detail->MemoryMB -= mem;
 	detail->Core -= core;
+	if (IS_DOUBLE_EQ(detail->Core, 0)) {
+		// this setting is to avoid accumulating double precision problem
+		detail->Core = 0.0;
+	}
 }
 
 void resetResourceBundleDataByBundle(ResourceBundle detail, ResourceBundle source)
