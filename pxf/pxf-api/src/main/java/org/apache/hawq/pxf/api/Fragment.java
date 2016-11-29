@@ -51,6 +51,11 @@ public class Fragment {
     private byte[] userData;
 
     /**
+     * Profile name, recommended for reading given Fragment.
+     */
+    private String profile;
+
+    /**
      * Constructs a Fragment.
      *
      * @param sourceName the resource uri (File path+name, table name, etc.)
@@ -81,6 +86,15 @@ public class Fragment {
         this.replicas = hosts;
         this.metadata = metadata;
         this.userData = userData;
+    }
+
+    public Fragment(String sourceName,
+            String[] hosts, 
+            byte[] metadata,
+            byte[] userData,
+            String profile) {
+        this(sourceName, hosts, metadata, userData);
+        this.profile = profile;
     }
 
     public String getSourceName() {
@@ -117,5 +131,13 @@ public class Fragment {
 
     public void setUserData(byte[] userData) {
         this.userData = userData;
+    }
+
+    public String getProfile() {
+        return profile;
+    }
+
+    public void setProfile(String profile) {
+        this.profile = profile;
     }
 }
