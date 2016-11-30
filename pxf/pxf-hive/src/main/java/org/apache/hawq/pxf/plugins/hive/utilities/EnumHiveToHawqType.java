@@ -45,7 +45,7 @@ public enum EnumHiveToHawqType {
     BinaryType("binary", EnumHawqType.ByteaType),
     TimestampType("timestamp", EnumHawqType.TimestampType),
     DateType("date", EnumHawqType.DateType),
-    DecimalType("decimal", EnumHawqType.NumericType, "[(,)]"),
+    DecimalType("decimal", EnumHawqType.NumericType, "[(,)]", "(38,18)"),
     VarcharType("varchar", EnumHawqType.VarcharType, "[(,)]"),
     CharType("char", EnumHawqType.BpcharType, "[(,)]"),
     ArrayType("array", EnumHawqType.TextType, "[<,>]"),
@@ -57,6 +57,7 @@ public enum EnumHiveToHawqType {
     private EnumHawqType hawqType;
     private String splitExpression;
     private byte size;
+    private String defaultModifier;
 
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType) {
         this.typeName = typeName;
@@ -71,6 +72,11 @@ public enum EnumHiveToHawqType {
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType, String splitExpression) {
         this(typeName, hawqType);
         this.splitExpression = splitExpression;
+    }
+
+    EnumHiveToHawqType(String typeName, EnumHawqType hawqType, String splitExpression, String defaultModifier) {
+        this(typeName, hawqType, splitExpression);
+        this.defaultModifier = defaultModifier;
     }
 
     /**
@@ -95,6 +101,22 @@ public enum EnumHiveToHawqType {
      */
     public String getSplitExpression() {
         return this.splitExpression;
+    }
+
+    /**
+     * This field is needed to find compatible Hive type when more than one Hive type mapped to HAWQ type
+     * @return size of this type in bytes or 0
+     */
+    public byte getSize() {
+        return size;
+    }
+
+    /**
+     * This field is needed to certain fields that need to use default modifiers
+     * @return modifier string
+     */
+    public String getDefaultModifier() {
+        return defaultModifier;
     }
 
     /**
@@ -176,6 +198,8 @@ public enum EnumHiveToHawqType {
             }
             fullType.append(end);
             return fullType.toString();
+        } else if(hiveToHawqType.getDefaultModifier() != null) {
+            return hiveToHawqType.getTypeName() + hiveToHawqType.getDefaultModifier();
         } else {
             return hiveToHawqType.getTypeName();
         }
@@ -206,14 +230,6 @@ public enum EnumHiveToHawqType {
         }
         throw new UnsupportedTypeException("Unable to map Hive's type: "
                 + hiveType + " to HAWQ's type");
-    }
-
-    /**
-     * This field is needed to find compatible Hive type when more than one Hive type mapped to HAWQ type
-     * @return size of this type in bytes or 0
-     */
-    public byte getSize() {
-        return size;
     }
 
 }
