@@ -675,7 +675,6 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 	char	*dup_frag = pstrdup(fragment);
 	char	*value_start;
 	char	*value_end;
-	bool	has_user_data = false;
 
 	StringInfoData formatter;
 	FragmentData* fragment_data;
@@ -711,21 +710,26 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 	value_start = value_end + 1;
 	/* expect fragment metadata */
 	Assert(value_start);
-
-	/* check for user data */
 	value_end = strchr(value_start, segwork_separator);
-	if (value_end != NULL)
-	{
-		has_user_data = true;
-		*value_end = '\0';
-	}
+	Assert(value_end != NULL);
+	*value_end = '\0';
 	fragment_data->fragment_md = pstrdup(value_start);
+	value_start = value_end + 1;
 
-	/* read user data */
-	if (has_user_data)
-	{
-		fragment_data->user_data = pstrdup(value_end + 1);
-	}
+	/* expect user data */
+	Assert(value_start);
+	value_end = strchr(value_start, segwork_separator);
+	Assert(value_end != NULL);
+	*value_end = '\0';
+	fragment_data->user_data = pstrdup(value_start);
+	value_start = value_end + 1;
+
+	/* expect for profile */
+	Assert(value_start);
+	value_end = strchr(value_start, segwork_separator);
+	Assert(value_end != NULL);
+	*value_end = '\0';
+	fragment_data->profile = pstrdup(value_start);
 
 	return lappend(fragments, fragment_data);
 }

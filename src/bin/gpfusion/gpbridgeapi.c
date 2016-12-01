@@ -226,6 +226,11 @@ void set_current_fragment_headers(gphadoop_context* context)
 		churl_headers_remove(context->churl_headers, "X-GP-FRAGMENT-USER-DATA", true);
 	}
 
+	if (frag_data->profile)
+	{
+		churl_headers_override(context->churl_headers, "X-GP-Profile", frag_data->profile);
+	}
+
 }
 
 void gpbridge_import_start(PG_FUNCTION_ARGS)

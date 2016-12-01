@@ -46,6 +46,7 @@ typedef struct FragmentData
 	char	 *source_name;
 	char	 *fragment_md;
 	char	 *user_data;
+	char	 *profile;
 } FragmentData;
 
 typedef struct OptionData
