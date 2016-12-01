@@ -58,7 +58,6 @@ import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
-import org.apache.hawq.pxf.service.ProfileFactory;
 
 /**
  * Fragmenter class for HIVE tables. <br>
@@ -310,7 +309,6 @@ public class HiveDataFragmenter extends Fragmenter {
             throws Exception {
         InputFormat<?, ?> fformat = makeInputFormat(
                 tablePartition.storageDesc.getInputFormat(), jobConf);
-        String profile = ProfileFactory.get(fformat);
         FileInputFormat.setInputPaths(jobConf, new Path(
                 tablePartition.storageDesc.getLocation()));
 
@@ -329,7 +327,7 @@ public class HiveDataFragmenter extends Fragmenter {
 
             byte[] locationInfo = HdfsUtilities.prepareFragmentMetadata(fsp);
             Fragment fragment = new Fragment(filepath, hosts, locationInfo,
-                    makeUserData(tablePartition), profile);
+                    makeUserData(tablePartition));
             fragments.add(fragment);
         }
     }
