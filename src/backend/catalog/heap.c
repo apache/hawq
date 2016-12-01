@@ -1612,7 +1612,7 @@ heap_create_with_catalog(const char *relname,
 		IsNormalProcessingMode() &&
         (Gp_role == GP_ROLE_DISPATCH))
 	{
-		if ((relstorage == RELSTORAGE_PARQUET))
+		if (relstorage == RELSTORAGE_PARQUET)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg(
