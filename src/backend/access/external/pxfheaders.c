@@ -314,7 +314,7 @@ static char* prepend_x_gp(const char* key)
 {	
 	StringInfoData formatter;
 	initStringInfo(&formatter);
-	appendStringInfo(&formatter, "X-GP-%s", toupper(key));
+	appendStringInfo(&formatter, "X-GP-%s", key);
 	
 	return formatter.data;
 }
