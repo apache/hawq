@@ -1624,6 +1624,9 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     	activeContainerIds[i]  = allocatedResourcesArray[i].containerId;
     }
 
+    /* Return the containers fail to activate. */
+    int64_t *activeFailIds = NULL;
+    int  activeFailSize = 0;
     yarnres = activeResources(LIBYARNClient,
     						  YARNJobID,
 							  activeContainerIds,
@@ -1637,9 +1640,6 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     elog(LOG, "YARN mode resource broker submitted to activate %d containers.",
     		  allocatedResourcesArraySize);
 
-    /* Return the containers fail to activate. */
-    int64_t *activeFailIds = NULL;
-    int  activeFailSize = 0;
     yarnres = getActiveFailContainerIds(LIBYARNClient,
     									&activeFailIds,
 										&activeFailSize);

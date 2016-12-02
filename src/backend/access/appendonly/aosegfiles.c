@@ -1091,7 +1091,7 @@ static Datum
 gp_update_ao_master_stats_internal(Oid relid, Snapshot appendOnlyMetaDataSnapshot)
 {
 	Relation		parentrel;
-	Datum			returnDatum;
+	Datum			returnDatum = 0;
 
 	/* open the parent (main) relation */
 	parentrel = heap_open(relid, RowExclusiveLock);

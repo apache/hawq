@@ -416,7 +416,7 @@ ExecInitTableFunction(TableFunctionScan *node, EState *estate, int eflags)
 		ExecInitExpr((Expr *) rte->funcexpr, (PlanState *) scanstate);
 	Assert(scanstate->fcache && IsA(scanstate->fcache, FuncExprState));
 
-	scanstate->rsinfo.type		   = T_ReturnSetInfo;
+	scanstate->rsinfo.type		   = (fmNodeTag) T_ReturnSetInfo;
 	scanstate->rsinfo.econtext	   = econtext;
 	scanstate->rsinfo.expectedDesc = resultdesc;
 	scanstate->rsinfo.allowedModes = (int) (SFRM_ValuePerCall);
