@@ -800,7 +800,7 @@ DefineRelation_int(CreateStmt *stmt,
  * Add Default page size and rowgroup size to relation options
  */
 static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
-	Datum result;
+	Datum result = 0;
 	ListCell   *cell = NULL;
 	bool pageSizeSet = false;
 	bool rowgroupSizeSet = false;
@@ -4726,7 +4726,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 				pc->arg1 = (Node *)NIL;
 				foreach(l, todo)
 				{
-					List *l1;
+					List *l1 = NIL;
 					ListCell *lc;
 					Node *t = lfirst(l);
 
@@ -10752,10 +10752,10 @@ ATExecSetTableSpace_AppendOnly(
 
 	HeapTuple tuple;
 
-	int32 segmentFileNum;
+	int32 segmentFileNum = 0;
 
 	ItemPointerData oldPersistentTid;
-	int64 oldPersistentSerialNum;
+	int64 oldPersistentSerialNum = 0;
 
 	ItemPointerData newPersistentTid;
 	int64 newPersistentSerialNum;
