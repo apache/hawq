@@ -228,7 +228,7 @@ void set_current_fragment_headers(gphadoop_context* context)
 
 	if (frag_data->profile)
 	{
-		churl_headers_override(context->churl_headers, "X-GP-Profile", frag_data->profile);
+		churl_headers_override(context->churl_headers, "X-GP-PROFILE", frag_data->profile);
 	}
 
 }
