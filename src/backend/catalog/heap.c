@@ -907,7 +907,7 @@ void MetaTrackAddObject(Oid		classid,
 	MetaTrackAddUpdInternal(pcqCtx,
 							classid, objoid, relowner,
 							actionname, subtype,
-							rel, InvalidOid);
+							rel, (HeapTuple) InvalidOid);
 
 	caql_endscan(pcqCtx);
 	heap_close(rel, RowExclusiveLock);

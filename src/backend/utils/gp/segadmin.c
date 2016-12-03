@@ -109,7 +109,7 @@ mirroring_sanity_check(int flags, const char *func)
 		/* TODO: Add new check */
 	}
 
-	if ((flags && STANDBY_ONLY) == STANDBY_ONLY)
+	if ((flags & STANDBY_ONLY) == STANDBY_ONLY)
 	{
 		/* TODO: Add new check */
 	}
