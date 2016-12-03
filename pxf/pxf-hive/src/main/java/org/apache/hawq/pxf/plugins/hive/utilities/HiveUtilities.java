@@ -433,6 +433,10 @@ public class HiveUtilities {
 
         String userData = null;
 
+        if (fragmenterClassName == null) {
+            throw new IllegalArgumentException("No fragmenter provided.");
+        }
+
         if (fragmenterClassName.equals("org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter")) {
             String inputFormatName = partData.storageDesc.getInputFormat();
             String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
