@@ -1032,7 +1032,7 @@ int  loadDynamicResourceManagerConfigure(void)
 
 	setSimpleStringRefNoLen(&segmem, rm_seg_memory_use);
 	int res = SimpleStringToStorageSizeMB(&segmem,
-										  &(DRMGlobalInstance->SegmentMemoryMB));
+										  (uint32_t *) &(DRMGlobalInstance->SegmentMemoryMB));
 	if ( res != FUNC_RETURN_OK)
 	{
 		elog(WARNING, "Can not understand the value '%s' of property %s.",

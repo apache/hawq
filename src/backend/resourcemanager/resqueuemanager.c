@@ -486,7 +486,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 			{
 				memlimit_value = true;
 				res = SimpleStringToStorageSizeMB(attrvalue,
-												  &(queue->ClusterMemoryMB));
+												  (uint32_t *) &(queue->ClusterMemoryMB));
 			}
 			break;
 
@@ -517,7 +517,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 								   attrvalue->Len-sizeof(RESOURCE_QUEUE_SEG_RES_QUOTA_MEM)+1);
 
 				res = SimpleStringToStorageSizeMB(&valuestr,
-												  &(queue->SegResourceQuotaMemoryMB));
+												  (uint32_t *) &(queue->SegResourceQuotaMemoryMB));
 
 				/*
 				 *--------------------------------------------------------------
@@ -846,7 +846,7 @@ int updateResourceQueueAttributesInShadow(List 			 		*attributes,
 
 				res = SimpleStringToStorageSizeMB(
 						&valuestr,
-						&(shadowqueinfo->SegResourceQuotaMemoryMB));
+						(uint32_t *) &(shadowqueinfo->SegResourceQuotaMemoryMB));
 				if ( res == FUNC_RETURN_OK )
 				{
 					shadowqueinfo->SegResourceQuotaVCore = -1;

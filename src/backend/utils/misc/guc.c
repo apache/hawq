@@ -13683,7 +13683,7 @@ assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source)
 {
 	if (doit)
 	{
-		int32_t newvalmb = 0;
+		uint32_t newvalmb = 0;
 		int parseres = FUNC_RETURN_OK;
 		SimpString valuestr;
 		setSimpleStringRef(&valuestr, newval, strlen(newval));
