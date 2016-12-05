@@ -266,57 +266,58 @@ public class HiveResolver extends Plugin implements ReadResolver {
             return 0;
         }
         String[] partitionLevels = partitionKeys.split(HiveDataFragmenter.HIVE_PARTITIONS_DELIM);
-        for (String partLevel : partitionLevels) {
-            String[] levelKey = partLevel.split(HiveDataFragmenter.HIVE_1_PART_DELIM);
-            String type = levelKey[1];
-            String val = levelKey[2];
-            parts.append(delimiter);
-
-            if (isDefaultPartition(type, val)) {
-                parts.append(nullChar);
-            } else {
-                // ignore the type's parameters
-                String typeName = type.replaceAll("\\(.*\\)", "");
-                switch (typeName) {
-                    case serdeConstants.STRING_TYPE_NAME:
-                    case serdeConstants.VARCHAR_TYPE_NAME:
-                    case serdeConstants.CHAR_TYPE_NAME:
-                        parts.append(val);
-                        break;
-                    case serdeConstants.BOOLEAN_TYPE_NAME:
-                        parts.append(Boolean.parseBoolean(val));
-                        break;
-                    case serdeConstants.TINYINT_TYPE_NAME:
-                    case serdeConstants.SMALLINT_TYPE_NAME:
-                        parts.append(Short.parseShort(val));
-                        break;
-                    case serdeConstants.INT_TYPE_NAME:
-                        parts.append(Integer.parseInt(val));
-                        break;
-                    case serdeConstants.BIGINT_TYPE_NAME:
-                        parts.append(Long.parseLong(val));
-                        break;
-                    case serdeConstants.FLOAT_TYPE_NAME:
-                        parts.append(Float.parseFloat(val));
-                        break;
-                    case serdeConstants.DOUBLE_TYPE_NAME:
-                        parts.append(Double.parseDouble(val));
-                        break;
-                    case serdeConstants.TIMESTAMP_TYPE_NAME:
-                        parts.append(Timestamp.valueOf(val));
-                        break;
-                    case serdeConstants.DATE_TYPE_NAME:
-                        parts.append(Date.valueOf(val));
-                        break;
-                    case serdeConstants.DECIMAL_TYPE_NAME:
-                        parts.append(HiveDecimal.create(val).bigDecimalValue());
-                        break;
-                    case serdeConstants.BINARY_TYPE_NAME:
-                        Utilities.byteArrayToOctalString(val.getBytes(), parts);
-                        break;
-                    default:
-                        throw new UnsupportedTypeException(
-                                "Unsupported partition type: " + type);
+        if (parts != null) {
+            for (String partLevel : partitionLevels) {
+                String[] levelKey = partLevel.split(HiveDataFragmenter.HIVE_1_PART_DELIM);
+                String type = levelKey[1];
+                String val = levelKey[2];
+                parts.append(delimiter);
+                if (isDefaultPartition(type, val)) {
+                    parts.append(nullChar);
+                } else {
+                    // ignore the type's parameters
+                    String typeName = type.replaceAll("\\(.*\\)", "");
+                    switch (typeName) {
+                        case serdeConstants.STRING_TYPE_NAME:
+                        case serdeConstants.VARCHAR_TYPE_NAME:
+                        case serdeConstants.CHAR_TYPE_NAME:
+                            parts.append(val);
+                            break;
+                        case serdeConstants.BOOLEAN_TYPE_NAME:
+                            parts.append(Boolean.parseBoolean(val));
+                            break;
+                        case serdeConstants.TINYINT_TYPE_NAME:
+                        case serdeConstants.SMALLINT_TYPE_NAME:
+                            parts.append(Short.parseShort(val));
+                            break;
+                        case serdeConstants.INT_TYPE_NAME:
+                            parts.append(Integer.parseInt(val));
+                            break;
+                        case serdeConstants.BIGINT_TYPE_NAME:
+                            parts.append(Long.parseLong(val));
+                            break;
+                        case serdeConstants.FLOAT_TYPE_NAME:
+                            parts.append(Float.parseFloat(val));
+                            break;
+                        case serdeConstants.DOUBLE_TYPE_NAME:
+                            parts.append(Double.parseDouble(val));
+                            break;
+                        case serdeConstants.TIMESTAMP_TYPE_NAME:
+                            parts.append(Timestamp.valueOf(val));
+                            break;
+                        case serdeConstants.DATE_TYPE_NAME:
+                            parts.append(Date.valueOf(val));
+                            break;
+                        case serdeConstants.DECIMAL_TYPE_NAME:
+                            parts.append(HiveDecimal.create(val).bigDecimalValue());
+                            break;
+                        case serdeConstants.BINARY_TYPE_NAME:
+                            Utilities.byteArrayToOctalString(val.getBytes(), parts);
+                            break;
+                        default:
+                            throw new UnsupportedTypeException(
+                                    "Unsupported partition type: " + type);
+                    }
                 }
             }
         }

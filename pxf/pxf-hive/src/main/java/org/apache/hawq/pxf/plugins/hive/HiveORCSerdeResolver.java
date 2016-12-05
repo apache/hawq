@@ -44,7 +44,6 @@ import java.util.*;
 public class HiveORCSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveORCSerdeResolver.class);
     private OrcSerde deserializer;
-    private StringBuilder parts;
     private int numberOfPartitions;
     private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
 
@@ -63,7 +62,6 @@ public class HiveORCSerdeResolver extends HiveResolver {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
         }
         partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
-        parseDelimiterChar(input);
         collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM
                 : input.getUserProperty("COLLECTION_DELIM");
         mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM
@@ -72,8 +70,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
     @Override
     void initPartitionFields() {
-        parts = new StringBuilder();
-        numberOfPartitions = initPartitionFields(parts);
+        numberOfPartitions = initPartitionFields(null);
     }
 
     /**
@@ -131,5 +128,4 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
         deserializer.initialize(new JobConf(new Configuration(), HiveORCSerdeResolver.class), serdeProperties);
     }
-
 }
