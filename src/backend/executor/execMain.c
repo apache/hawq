@@ -258,25 +258,6 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
 			if (!OidIsValid(scan->fmterrtbl))
 				return false;
 
-			/*
-			 * check if two external table use the same error table in a statement
-			 */
-			if (info->errTblOid)
-			{
-				ListCell	   *c;
-				Oid				errtbloid;
-				foreach(c, info->errTblOid)
-				{
-					errtbloid = lfirst_oid(c);
-					if (errtbloid == scan->fmterrtbl)
-					{
-						Relation rel = heap_open(scan->fmterrtbl, AccessShareLock);
-						elog(ERROR, "Two or more external tables use the same error table \"%s\" in a statement",
-								RelationGetRelationName(rel));
-					}
-				}
-			}
-
             /*
              * Prepare error table for insert.
              */
@@ -285,12 +266,12 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
             scan->errAosegnos = errSegnos;
             info->errTblOid = lcons_oid(scan->fmterrtbl, info->errTblOid);
 
-            Relation errRel = heap_open(scan->fmterrtbl, RowExclusiveLock);
+            Relation errRel = heap_open(scan->fmterrtbl, NoLock);
             CreateAppendOnlyParquetSegFileForRelationOnMaster(errRel, errSegnos);
             prepareDispatchedCatalogSingleRelation(info, scan->fmterrtbl, TRUE, errSegnos);
             scan->err_aosegfileinfos = fetchSegFileInfos(scan->fmterrtbl, errSegnos);
 
-            heap_close(errRel, RowExclusiveLock);
+            heap_close(errRel, NoLock);
 
             return false;
 		default:
