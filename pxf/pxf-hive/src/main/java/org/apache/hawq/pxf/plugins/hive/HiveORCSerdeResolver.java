@@ -89,6 +89,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
         StructObjectInspector soi = (StructObjectInspector) deserializer.getObjectInspector();
         List<OneField> record = traverseStruct(tuple, soi, false);
 
+        record.addAll(partitionFields);
         return record;
 
     }
