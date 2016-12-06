@@ -444,7 +444,7 @@ public class HiveUtilities {
             assertFileType(inputFormatName, partData);
             userData = assertSerde(serdeName, partData) + HiveDataFragmenter.HIVE_UD_DELIM
                     + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter;
-        } else if (fragmenterClassName.equals("org.apache.hawq.pxf.plugins.hive.HiveDataFragmenter")) {
+        } else {
             String inputFormatName = partData.storageDesc.getInputFormat();
             String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
             String propertiesString = serializeProperties(partData.properties);
