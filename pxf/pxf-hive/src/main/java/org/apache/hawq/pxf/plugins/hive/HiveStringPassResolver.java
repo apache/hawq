@@ -44,7 +44,6 @@ public class HiveStringPassResolver extends HiveResolver {
     void parseUserData(InputData input) throws Exception {
         String userData = new String(input.getFragmentUserData());
         String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);
-        parseDelimiterChar(input);
         parts = new StringBuilder();
         partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
     }

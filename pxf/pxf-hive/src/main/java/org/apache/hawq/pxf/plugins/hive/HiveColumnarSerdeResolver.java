@@ -83,7 +83,6 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
         }
         parts = new StringBuilder();
         partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
-        parseDelimiterChar(input);
     }
 
     @Override

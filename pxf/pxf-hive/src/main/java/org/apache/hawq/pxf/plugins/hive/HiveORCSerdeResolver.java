@@ -44,6 +44,7 @@ import java.util.*;
 public class HiveORCSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveORCSerdeResolver.class);
     private OrcSerde deserializer;
+    private StringBuilder parts;
     private int numberOfPartitions;
     private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
 
@@ -70,7 +71,8 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
     @Override
     void initPartitionFields() {
-        numberOfPartitions = initPartitionFields(null);
+        parts = new StringBuilder();
+        numberOfPartitions = initPartitionFields(parts);
     }
 
     /**
