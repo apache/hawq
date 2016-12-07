@@ -44,8 +44,6 @@ import java.util.*;
 public class HiveORCSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveORCSerdeResolver.class);
     private OrcSerde deserializer;
-    private StringBuilder parts;
-    private int numberOfPartitions;
     private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
 
     public HiveORCSerdeResolver(InputData input) throws Exception {
@@ -69,12 +67,6 @@ public class HiveORCSerdeResolver extends HiveResolver {
                 : input.getUserProperty("MAPKEY_DELIM");
     }
 
-    @Override
-    void initPartitionFields() {
-        parts = new StringBuilder();
-        numberOfPartitions = initPartitionFields(parts);
-    }
-
     /**
      * getFields returns a singleton list of OneField item.
      * OneField item contains two fields: an integer representing the VARCHAR type and a Java
@@ -87,6 +79,9 @@ public class HiveORCSerdeResolver extends HiveResolver {
         // Each Hive record is a Struct
         StructObjectInspector soi = (StructObjectInspector) deserializer.getObjectInspector();
         List<OneField> record = traverseStruct(tuple, soi, false);
+
+        //Add partition fields if any
+        record.addAll(getPartitionFields());
 
         return record;
 
@@ -101,7 +96,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
     @Override
     void initSerde(InputData input) throws Exception {
         Properties serdeProperties = new Properties();
-        int numberOfDataColumns = input.getColumns() - numberOfPartitions;
+        int numberOfDataColumns = input.getColumns() - getNumberOfPartitions();
 
         LOG.debug("Serde number of columns is " + numberOfDataColumns);
 

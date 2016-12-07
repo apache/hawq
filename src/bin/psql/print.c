@@ -2045,7 +2045,7 @@ ClosePager(FILE *pagerpipe)
  * table.
  */
 void
-printTableInit(printTableContent *const content, const printTableOpt *opt,
+printTableInit(printTableContent *const content, printTableOpt *opt,
 			   const char *title, const int ncolumns, const int nrows)
 {
 	content->opt = opt;
@@ -2380,7 +2380,7 @@ printQuery(const PGresult *result, const printQueryOpt *opt, FILE *fout, FILE *f
 	if (cancel_pressed)
 		return;
 
-	printTableInit(&cont, &opt->topt, opt->title,
+	printTableInit(&cont, (printTableOpt *) &opt->topt, opt->title,
 				   PQnfields(result), PQntuples(result));
 
 	for (i = 0; i < cont.ncolumns; i++)

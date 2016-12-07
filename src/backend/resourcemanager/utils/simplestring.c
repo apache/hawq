@@ -51,7 +51,7 @@ void initSimpleStringWithContent( SimpStringPtr str,
 }
 
 void setSimpleStringWithContent( SimpStringPtr str,
-					  	  	     char		  *content,
+					  	  	     const char		  *content,
 					  	  	     int		   length)
 {
 	Assert( str != NULL );
@@ -82,10 +82,10 @@ void freeSimpleStringContent(SimpStringPtr  str)
 	str->Len = -1;
 }
 
-void setSimpleStringRef(SimpStringPtr str, char *content, int length)
+void setSimpleStringRef(SimpStringPtr str, const char *content, int length)
 {
 	Assert( str != NULL );
-	str->Str = content;
+	str->Str = (char *)content;
 	str->Len = length;
 	str->Context = NULL;
 }
@@ -269,9 +269,9 @@ int  SimpleStringToUInt32(SimpStringPtr str, uint32_t *value)
 }
 */
 
-int  SimpleStringToInt64(SimpStringPtr str, int64_t *value)
+int  SimpleStringToInt64(SimpStringPtr str, int64 *value)
 {
-	int64_t val;
+	int64 val;
 	int scanres = sscanf(str->Str, INT64_FORMAT, &val);
 	if ( scanres == 1 ) {
 		*value = val;
@@ -372,7 +372,7 @@ int SimpleStringSetOid(SimpStringPtr str, Oid value)
 {
 	static char valuestr[64];
 	Assert(str != NULL);
-	int64_t val = value;
+	int64 val = value;
 	sprintf(valuestr, INT64_FORMAT, val);
 	setSimpleStringNoLen(str, valuestr);
 	return FUNC_RETURN_OK;
