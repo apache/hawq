@@ -79,7 +79,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
     private String serdeName;
     private String propsString;
     String partitionKeys;
-    char delimiter = 1;
+    char delimiter;
     String nullChar = "\\N";
     private Configuration conf;
     private String hiveDefaultPartName;
@@ -607,5 +607,55 @@ public class HiveResolver extends Plugin implements ReadResolver {
     private void addOneFieldToRecord(List<OneField> record,
                                      DataType gpdbWritableType, Object val) {
         record.add(new OneField(gpdbWritableType.getOID(), val));
+    }
+    /*
+     * Gets the delimiter character from the URL, verify and store it. Must be a
+     * single ascii character (same restriction as Hawq's). If a hex
+     * representation was passed, convert it to its char.
+     */
+    void parseDelimiterChar(InputData input) {
+
+        String userDelim = input.getUserProperty("DELIMITER");
+
+        if (userDelim == null) {
+            throw new IllegalArgumentException("DELIMITER is a required option");
+        }
+
+        final int VALID_LENGTH = 1;
+        final int VALID_LENGTH_HEX = 4;
+
+        if (userDelim.startsWith("\\x")) { // hexadecimal sequence
+
+            if (userDelim.length() != VALID_LENGTH_HEX) {
+                throw new IllegalArgumentException(
+                        "Invalid hexdecimal value for delimiter (got"
+                                + userDelim + ")");
+            }
+
+            delimiter = (char) Integer.parseInt(
+                    userDelim.substring(2, VALID_LENGTH_HEX), 16);
+
+            if (!CharUtils.isAscii(delimiter)) {
+                throw new IllegalArgumentException(
+                        "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII "
+                                + delimiter + ")");
+            }
+
+            return;
+        }
+
+        if (userDelim.length() != VALID_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got "
+                            + userDelim + ")");
+        }
+
+        if (!CharUtils.isAscii(userDelim.charAt(0))) {
+            throw new IllegalArgumentException(
+                    "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII "
+                            + userDelim + ")");
+        }
+
+        delimiter = userDelim.charAt(0);
     }
 }
