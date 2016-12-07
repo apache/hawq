@@ -61,7 +61,6 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
     private boolean firstColumn;
     private StringBuilder builder;
     private StringBuilder parts;
-    private int numberOfPartitions;
     private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
 
     public HiveColumnarSerdeResolver(InputData input) throws Exception {
@@ -88,7 +87,7 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
 
     @Override
     void initPartitionFields() {
-        numberOfPartitions = initPartitionFields(parts);
+        initPartitionFields(parts);
     }
 
     /**
@@ -118,7 +117,7 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
 	@Override
     void initSerde(InputData input) throws Exception {
         Properties serdeProperties = new Properties();
-        int numberOfDataColumns = input.getColumns() - numberOfPartitions;
+        int numberOfDataColumns = input.getColumns() - getNumberOfPartitions();
 
         LOG.debug("Serde number of columns is " + numberOfDataColumns);
 
