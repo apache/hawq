@@ -79,7 +79,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
     private String serdeName;
     private String propsString;
     String partitionKeys;
-    char delimiter;
+    protected char delimiter;
     String nullChar = "\\N";
     private Configuration conf;
     private String hiveDefaultPartName;
