@@ -712,7 +712,7 @@ void PersistentTablespace_MarkCreatePending(
 	mmxlog_log_create_tablespace(
 						filespaceOid,
 						tablespaceOid,
-						persistentTid, persistentSerialNum);
+						persistentTid, *persistentSerialNum);
 #endif
 
 	#ifdef FAULT_INJECTOR

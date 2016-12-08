@@ -675,8 +675,8 @@ resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
       pfree(allocResult);
     }else{
     		find_udf(my_parse, &udf_context);
-    		if(udf_context.udf_exist){
-    			if ((resourceLife == QRL_ONCE)) {
+    		if (udf_context.udf_exist) {
+    		  if (resourceLife == QRL_ONCE) {
     				int64 mincost = min_cost_for_each_query;
     				mincost <<= 20;
     				int avgSliceNum = 3;

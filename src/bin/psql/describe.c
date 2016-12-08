@@ -43,7 +43,7 @@ static void printACLColumn(PQExpBuffer buf, const char *colname);
 static bool isGPDB(void);
 static bool isGPDB4200OrLater(void);
 static bool describePxfTable(const char *profile, const char *pattern, bool verbose);
-static void parsePxfPattern(const char *user_pattern, char **pattern);
+static void parsePxfPattern(char *user_pattern, char **pattern);
 
 /* GPDB 3.2 used PG version 8.2.10, and we've moved the minor number up since then for each release,  4.1 = 8.2.15 */
 /* Allow for a couple of future releases.  If the version isn't in this range, we are talking to PostgreSQL, not GPDB */
@@ -4243,7 +4243,7 @@ printACLColumn(PQExpBuffer buf, const char *colname)
  * Splits user_pattern by "." and writes second part to pattern.
  */
 static void
-parsePxfPattern(const char *user_pattern, char **pattern)
+parsePxfPattern(char *user_pattern, char **pattern)
 {
 	strtok(user_pattern, ".");
 	*pattern = strtok(NULL, "/0");
@@ -4346,7 +4346,7 @@ describePxfTable(const char *profile, const char *pattern, bool verbose)
 			/* Initialize */
 			initPQExpBuffer(&title);
 			printfPQExpBuffer(&title, _("PXF %s Table \"%s.%s\""), profile, path, itemname);
-			printTableInit(&cont, &myopt, title.data, cols, total_fields);
+			printTableInit(&cont, (printTableOpt *) &myopt, title.data, cols, total_fields);
 			printTableInitialized = true;
 
 			for (int j = 0; j < cols; j++)

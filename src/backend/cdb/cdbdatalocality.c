@@ -4241,7 +4241,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 				if ((context.resultRelationHashSegNum < context.externTableForceSegNum
 						&& context.externTableForceSegNum != 0)
 						|| (context.resultRelationHashSegNum < context.externTableLocationSegNum)) {
-					cleanup_allocation_algorithm(&context);
 					elog(ERROR, "Could not allocate enough memory! "
 							"bucket number of result hash table and external table should match each other");
 				}
@@ -4251,7 +4250,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			else if(context.externTableForceSegNum > 0){
 				/* bucket number of external table must be the same with the number of virtual segments*/
 				if(context.externTableForceSegNum < context.externTableLocationSegNum){
-					cleanup_allocation_algorithm(&context);
 					elog(ERROR, "external table bucket number should match each other");
 				}
 				maxTargetSegmentNumber = context.externTableForceSegNum;
@@ -4411,7 +4409,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 		/* for normal query if containerCount equals to 0, then stop the query.*/
 		if (resourceLife != QRL_NONE && VirtualSegmentNumber == 0) {
-			cleanup_allocation_algorithm(&context);
 			elog(ERROR, "Could not allocate enough resource!");
 		}
 

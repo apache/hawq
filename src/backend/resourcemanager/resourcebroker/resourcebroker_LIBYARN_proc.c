@@ -139,7 +139,7 @@ int ResBrokerMain(void)
 	/* Load parameters */
 	int res = loadParameters();
 	if ( res != FUNC_RETURN_OK ) {
-		elog(WARNING, "Resource broker loads invalid yarn parameters");
+		elog(WARNING, "resource broker loads invalid yarn parameters");
 	}
 
 	/* Set signal behavior */
@@ -191,7 +191,7 @@ int ResBrokerMainInternal(void)
 		 * run anymore. The process goes to the exit phase directly.
 		 */
 		if ( getppid() != ResBrokerParentPID ) {
-			elog(WARNING, "Parent process of YARN mode resource broker quit. "
+			elog(WARNING, "parent process of YARN mode resource broker quit. "
 					  	  "Resource broker process will actively close.");
 			ResBrokerKeepRun = false;
 			continue;
@@ -200,7 +200,7 @@ int ResBrokerMainInternal(void)
 		/* refresh kerberos ticket */
 		if (enable_secure_filesystem && !login())
 		{
-			elog(WARNING, "Resource broker failed to refresh kerberos ticket.");
+			elog(WARNING, "resource broker failed to refresh kerberos ticket.");
 		}
 
 		/*
@@ -349,7 +349,8 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
 
 	if (cache) {
 		if (0 != setenv("KRB5CCNAME", cache, 1)) {
-			elog(WARNING, "Cannot set env parameter \"KRB5CCNAME\" when extract principal from cache:%s", cache);
+			elog(WARNING, "could not set env parameter \"KRB5CCNAME\" when extract "
+					      "principal from cache:%s", cache);
 			return NULL;
 		}
 	}
@@ -378,7 +379,7 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
 		if (cxt) {
 			errorMsg = krb5_get_error_message(cxt, ec);
 		} else {
-			errorMsg = "Cannot initialize kerberos context";
+			errorMsg = "could not initialize kerberos context";
 		}
 	}
 
@@ -399,7 +400,7 @@ char * ExtractPrincipalFromTicketCache(const char* cache)
 	}
 
 	if (errorMsg != NULL) {
-		elog(WARNING, "Fail to extract principal from cache, because : %s", errorMsg);
+		elog(WARNING, "failed to extract principal from cache, because : %s", errorMsg);
 		return NULL;
 	}
 
@@ -424,7 +425,7 @@ int  loadParameters(void)
 	if ( rm_grm_yarn_rm_addr == NULL ||
 		 (pcolon = strchr(rm_grm_yarn_rm_addr, ':')) ==NULL ) {
 		res = RESBROK_WRONG_GLOB_MGR_ADDRESS;
-		elog(LOG, "The format of property %s must be <address>:<port>.",
+		elog(LOG, "the format of property %s must be <address>:<port>.",
 				  HAWQDRM_CONFFILE_YARN_SERVERADDR);
 		goto exit;
 	}
@@ -439,7 +440,7 @@ int  loadParameters(void)
 	res = SimpleStringToInt32(&YARNPort, &testport);
 	if ( res != FUNC_RETURN_OK ) {
 		res = RESBROK_WRONG_GLOB_MGR_ADDRESS;
-		elog(LOG, "The port number in property %s can not be parsed.",
+		elog(LOG, "the port number in property %s cannot be parsed.",
 				  HAWQDRM_CONFFILE_YARN_SERVERADDR);
 		goto exit;
 	}
@@ -448,7 +449,7 @@ int  loadParameters(void)
 	if ( rm_grm_yarn_sched_addr == NULL ||
 		 (pcolon = strchr(rm_grm_yarn_sched_addr, ':')) ==NULL ) {
 		res = RESBROK_WRONG_GLOB_MGR_ADDRESS;
-		elog(LOG, "The format of property %s must be <address>:<port>.",
+		elog(LOG, "the format of property %s must be <address>:<port>.",
 				  HAWQDRM_CONFFILE_YARN_SCHEDULERADDR);
 		goto exit;
 	}
@@ -462,7 +463,7 @@ int  loadParameters(void)
 	res = SimpleStringToInt32(&YARNSchedulerPort, &testschedport);
 	if ( res != FUNC_RETURN_OK ) {
 		res = RESBROK_WRONG_GLOB_MGR_ADDRESS;
-		elog(LOG, "The port number in property %s can not be parsed.",
+		elog(LOG, "the port number in property %s cannot be parsed.",
 				  HAWQDRM_CONFFILE_YARN_SCHEDULERADDR);
 		goto exit;
 	}
@@ -470,7 +471,7 @@ int  loadParameters(void)
 	/* Get YARN queue name. */
 	if ( rm_grm_yarn_queue == NULL || rm_grm_yarn_queue[0] == '\0' ) {
 		res = RESBROK_WRONG_GLOB_MGR_QUEUE;
-		elog(LOG, "Can not find property %s.", HAWQDRM_CONFFILE_YARN_QUEUE);
+		elog(LOG, "cannot find property %s.", HAWQDRM_CONFFILE_YARN_QUEUE);
 		goto exit;
 	}
 
@@ -479,7 +480,7 @@ int  loadParameters(void)
 	/* Get YARN HAWQ application name string. */
 	if ( rm_grm_yarn_app_name == NULL || rm_grm_yarn_app_name[0] == '\0' ) {
 		res = RESBROK_WRONG_GLOB_MGR_APPNAME;
-		elog(LOG, "Can not find property %s.", HAWQDRM_CONFFILE_YARN_APP_NAME);
+		elog(LOG, "cannot find property %s.", HAWQDRM_CONFFILE_YARN_APP_NAME);
 		goto exit;
 	}
 
@@ -490,7 +491,7 @@ int  loadParameters(void)
 	{
 		if (!login())
 		{
-			elog(WARNING, "Resource broker failed to refresh kerberos ticket.");
+			elog(WARNING, "resource broker failed to refresh kerberos ticket.");
 		}
 		YARNUser = ExtractPrincipalFromTicketCache(krb5_ccname);
 		YARNUserShouldFree = true;
@@ -582,7 +583,7 @@ int handleRM2RB_GetClusterReport(void)
 		return sendRBGetClusterReportErrorData(RESBROK_ERROR_GRM);
 	}
 
-	elog(LOG, "Get YARN resource queue %s report: "
+	elog(LOG, "get YARN resource queue %s report: "
 			  "Capacity %lf, Current Capacity %lf, Maximum Capacity %lf.",
 			  resqueuename.Buffer,
 			  cap,
@@ -793,7 +794,7 @@ int handleRM2RB_AllocateResource(void)
 		return RESBROK_PIPE_ERROR;
 	}
 
-    elog(DEBUG3, "Resource manager acquires (%d MB, %d CORE) x %d containers "
+    elog(DEBUG3, "resource manager acquires (%d MB, %d CORE) x %d containers "
     			 "from YARN.",
                  request.MemoryMB,
 				 request.Core,
@@ -1624,6 +1625,9 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     	activeContainerIds[i]  = allocatedResourcesArray[i].containerId;
     }
 
+    /* Return the containers fail to activate. */
+    int64_t *activeFailIds = NULL;
+    int  activeFailSize = 0;
     yarnres = activeResources(LIBYARNClient,
     						  YARNJobID,
 							  activeContainerIds,
@@ -1637,9 +1641,6 @@ int RB2YARN_acquireResource(uint32_t memorymb,
     elog(LOG, "YARN mode resource broker submitted to activate %d containers.",
     		  allocatedResourcesArraySize);
 
-    /* Return the containers fail to activate. */
-    int64_t *activeFailIds = NULL;
-    int  activeFailSize = 0;
     yarnres = getActiveFailContainerIds(LIBYARNClient,
     									&activeFailIds,
 										&activeFailSize);
