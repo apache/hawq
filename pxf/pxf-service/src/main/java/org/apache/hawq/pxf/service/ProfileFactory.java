@@ -20,19 +20,23 @@ package org.apache.hawq.pxf.service;
  */
 
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
+//import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
-import org.apache.hadoop.mapred.TextInputFormat;
+//import org.apache.hadoop.mapred.TextInputFormat;
 
 public class ProfileFactory {
 
-    //private static final String HIVE_TEXT_PROFILE = "HiveText";
+    private static final String HIVE_TEXT_PROFILE = "HiveText";
+    private static final String HIVE_RC_PROFILE = "HiveRC";
     private static final String HIVE_ORC_PROFILE = "HiveORC";
 
     public static String get(InputFormat inputFormat) throws Exception {
         String profileName = null;
-        /*if (inputFormat instanceof TextInputFormat) {
-            profileName = HIVE_TEXT_PROFILE;
-        } else */if (inputFormat instanceof OrcInputFormat) {
+        //if (inputFormat instanceof TextInputFormat) {
+        //    profileName = HIVE_TEXT_PROFILE;
+        //} else if (inputFormat instanceof RCFileInputFormat) {
+        //    profileName = HIVE_RC_PROFILE;
+        /*} else */if (inputFormat instanceof OrcInputFormat) {
             profileName = HIVE_ORC_PROFILE;
         }
 
