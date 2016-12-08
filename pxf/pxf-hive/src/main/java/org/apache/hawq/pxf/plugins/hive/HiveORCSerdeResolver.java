@@ -61,7 +61,6 @@ public class HiveORCSerdeResolver extends HiveResolver {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
         }
         partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
-        parseDelimiterChar(input);
         collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM
                 : input.getUserProperty("COLLECTION_DELIM");
         mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM
@@ -126,5 +125,4 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
         deserializer.initialize(new JobConf(new Configuration(), HiveORCSerdeResolver.class), serdeProperties);
     }
-
 }

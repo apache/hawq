@@ -79,7 +79,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
     private String serdeName;
     private String propsString;
     String partitionKeys;
-    char delimiter;
+    protected char delimiter;
     String nullChar = "\\N";
     private Configuration conf;
     private String hiveDefaultPartName;
@@ -263,8 +263,8 @@ public class HiveResolver extends Plugin implements ReadResolver {
                             "Unsupported partition type: " + type);
             }
             addOneFieldToRecord(partitionFields, convertedType, convertedValue);
-            numberOfPartitions = partitionFields.size();
         }
+        numberOfPartitions = partitionFields.size();
     }
 
     /*
@@ -281,7 +281,6 @@ public class HiveResolver extends Plugin implements ReadResolver {
             String type = levelKey[1];
             String val = levelKey[2];
             parts.append(delimiter);
-
             if (isDefaultPartition(type, val)) {
                 parts.append(nullChar);
             } else {
@@ -619,7 +618,6 @@ public class HiveResolver extends Plugin implements ReadResolver {
                                      DataType gpdbWritableType, Object val) {
         record.add(new OneField(gpdbWritableType.getOID(), val));
     }
-
     /*
      * Gets the delimiter character from the URL, verify and store it. Must be a
      * single ascii character (same restriction as Hawq's). If a hex
