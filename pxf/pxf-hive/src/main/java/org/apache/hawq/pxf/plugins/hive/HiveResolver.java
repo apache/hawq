@@ -628,8 +628,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
         String userDelim = input.getUserProperty("DELIMITER");
 
         if (userDelim == null) {
-            //throw new IllegalArgumentException("DELIMITER is a required option");
-            userDelim = "t";
+            throw new IllegalArgumentException("DELIMITER is a required option");
         }
 
         final int VALID_LENGTH = 1;
