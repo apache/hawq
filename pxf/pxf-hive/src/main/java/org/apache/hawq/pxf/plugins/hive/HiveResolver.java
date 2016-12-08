@@ -75,7 +75,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
     protected String collectionDelim;
     protected String mapkeyDelim;
     private SerDe deserializer;
-    protected List<OneField> partitionFields;
+    private List<OneField> partitionFields;
     private String serdeName;
     private String propsString;
     String partitionKeys;
