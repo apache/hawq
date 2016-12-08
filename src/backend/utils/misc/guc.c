@@ -4115,7 +4115,7 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"enable_prefer_list_to_rm;", PGC_USERSET, DEVELOPER_OPTIONS,
+		{"enable_prefer_list_to_rm", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Sets whether enable data locality prefer list passed to rm"),
 			NULL,
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
@@ -13683,7 +13683,7 @@ assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source)
 {
 	if (doit)
 	{
-		int32_t newvalmb = 0;
+		uint32_t newvalmb = 0;
 		int parseres = FUNC_RETURN_OK;
 		SimpString valuestr;
 		setSimpleStringRef(&valuestr, newval, strlen(newval));

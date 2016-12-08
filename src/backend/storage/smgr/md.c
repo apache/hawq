@@ -1286,7 +1286,7 @@ mdtruncate(SMgrRelation reln, BlockNumber nblocks, bool isTemp)
 			 */
 			BlockNumber lastsegblocks = nblocks - priorblocks;
 
-			if (!MirroredBufferPool_Truncate(&v->mdmir_open, lastsegblocks * BLCKSZ) < 0)
+			if (!MirroredBufferPool_Truncate(&v->mdmir_open, lastsegblocks * BLCKSZ))
 				return InvalidBlockNumber;
 			if (!isTemp)
 			{
@@ -1307,7 +1307,7 @@ mdtruncate(SMgrRelation reln, BlockNumber nblocks, bool isTemp)
 		priorblocks += RELSEG_SIZE;
 	}
 #else
-	if (!MirroredBufferPool_Truncate(&v->mdmir_open, nblocks * BLCKSZ) < 0)
+	if (!MirroredBufferPool_Truncate(&v->mdmir_open, nblocks * BLCKSZ))
 		return InvalidBlockNumber;
 	if (!isTemp)
 	{

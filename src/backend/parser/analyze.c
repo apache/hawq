@@ -9322,7 +9322,7 @@ map_sgr_mutator(Node *node, void *context)
 	{
 		GroupingClause *gc = (GroupingClause*)node;
 		GroupingClause *new_gc = makeNode(GroupingClause);
-		memcpy(new_gc, gc, sizeof(gc));
+		memcpy(new_gc, gc, sizeof(GroupingClause));
 		new_gc->groupsets = (List*)map_sgr_mutator((Node*)gc->groupsets, ctx);
 		return (Node*)new_gc;
 	}

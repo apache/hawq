@@ -1062,7 +1062,7 @@ char *
 custom_fmtopts_string(const char *src)
 {
 		int			len = src ? strlen(src) : 0;
-		char	   *result = malloc(len * 2 + 1);
+		char	   *result = calloc(len * 2 + 1, sizeof(char));
 		char	   *srcdup = src ? strdup(src) : NULL;
 		char	   *srcdup_start = srcdup;
 		char       *find_res = NULL;
@@ -1070,8 +1070,6 @@ custom_fmtopts_string(const char *src)
 
 		if(!src || !srcdup || !result)
 			return NULL;
-
-		memset(result,0,sizeof(result));
 
 		while (srcdup)
 		{

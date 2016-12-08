@@ -92,7 +92,7 @@ void createResourceQueue(CreateQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("resource queue %s already exists",
+				 errmsg("resource queue \'%s\' already exists",
 						stmt->queue)));
 	}
 
@@ -176,7 +176,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot drop system resource queue %s",
+				 errmsg("cannot drop system resource queue \'%s\'",
 						stmt->queue)));
 	}
 
@@ -195,7 +195,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 	if (!HeapTupleIsValid(tuple))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("resource queue %s does not exist",
+				 errmsg("resource queue \'%s\' does not exist",
 						stmt->queue)));
 
 	/* Remember the Oid */
@@ -211,7 +211,7 @@ void dropResourceQueue(DropQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DEPENDENT_OBJECTS_STILL_EXIST),
-				 errmsg("resource queue %s is used by at least one role",
+				 errmsg("resource queue \'%s\' is used by at least one role",
 						stmt->queue)));
 	}
 
@@ -303,7 +303,7 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot alter system resource queue %s",
+				 errmsg("cannot alter system resource queue \'%s\'",
 						stmt->queue)));
 	}
 
@@ -333,7 +333,7 @@ void alterResourceQueue(AlterQueueStmt *stmt)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
-				 errmsg("resource queue %s does not exist",
+				 errmsg("resource queue \'%s\' does not exist",
 						stmt->queue)));
 	}
 

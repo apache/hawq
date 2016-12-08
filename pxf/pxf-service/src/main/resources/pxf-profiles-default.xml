@@ -83,7 +83,6 @@ under the License.
         <description>This profile is suitable only for Hive tables stored in ORC files
             and serialized with either the ColumnarSerDe or the LazyBinaryColumnarSerDe.
             It is much faster than the general purpose Hive profile.
-            DELIMITER parameter is mandatory.
         </description>
         <plugins>
             <fragmenter>org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter</fragmenter>

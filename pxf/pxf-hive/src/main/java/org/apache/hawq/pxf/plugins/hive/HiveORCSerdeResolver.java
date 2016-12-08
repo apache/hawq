@@ -44,8 +44,6 @@ import java.util.*;
 public class HiveORCSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveORCSerdeResolver.class);
     private OrcSerde deserializer;
-    private StringBuilder parts;
-    private int numberOfPartitions;
     private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
 
     public HiveORCSerdeResolver(InputData input) throws Exception {
@@ -63,17 +61,10 @@ public class HiveORCSerdeResolver extends HiveResolver {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
         }
         partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
-        parseDelimiterChar(input);
         collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM
                 : input.getUserProperty("COLLECTION_DELIM");
         mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM
                 : input.getUserProperty("MAPKEY_DELIM");
-    }
-
-    @Override
-    void initPartitionFields() {
-        parts = new StringBuilder();
-        numberOfPartitions = initPartitionFields(parts);
     }
 
     /**
@@ -89,6 +80,9 @@ public class HiveORCSerdeResolver extends HiveResolver {
         StructObjectInspector soi = (StructObjectInspector) deserializer.getObjectInspector();
         List<OneField> record = traverseStruct(tuple, soi, false);
 
+        //Add partition fields if any
+        record.addAll(getPartitionFields());
+
         return record;
 
     }
@@ -102,7 +96,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
     @Override
     void initSerde(InputData input) throws Exception {
         Properties serdeProperties = new Properties();
-        int numberOfDataColumns = input.getColumns() - numberOfPartitions;
+        int numberOfDataColumns = input.getColumns() - getNumberOfPartitions();
 
         LOG.debug("Serde number of columns is " + numberOfDataColumns);
 
@@ -131,5 +125,4 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
         deserializer.initialize(new JobConf(new Configuration(), HiveORCSerdeResolver.class), serdeProperties);
     }
-
 }

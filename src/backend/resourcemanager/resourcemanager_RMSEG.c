@@ -101,7 +101,7 @@ int  initializeSocketServer_RMSEG(void)
 	 * tasks. */
 	if ( netres != STATUS_OK ) {
 		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
-		elog( LOG,  "Can not create socket server. HostName=%s, Port=%d",
+		elog( LOG,  "cannot create socket server. HostName=%s, Port=%d",
 				    allip,
 					rm_segment_port);
 		return res;

@@ -1121,6 +1121,12 @@ def main(options, args):
         logger.error('Fail to connect to database, this script can only be run when database is up.')
         return 1
 
+    # check if Function gp_relfile_insert_for_register exists
+    sql = 'select count(*) from pg_proc  where proname=\'gp_relfile_insert_for_register\''
+    if int(conn.query(sql).dictresult()[0]['count']) == 0 :
+        logger.error('Function \'gp_relfile_insert_for_register\' is not found, please run \'hawq upgrade\' then try again.')
+        return 1
+
     failure_handler = FailureHandler(conn)
     # register
     if options.yml_config and ispartition(options.yml_config):
