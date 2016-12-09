@@ -215,6 +215,8 @@ typedef enum FaultInjectorIdentifier_e {
 
 	RunawayCleanup,
 
+	InterconnectStopAckIsLost,
+
 	/* INSERT has to be done before that line */
 	FaultInjectorIdMax,
 	

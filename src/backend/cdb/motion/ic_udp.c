@@ -48,6 +48,7 @@
 #include "utils/atomic.h"
 #include "utils/builtins.h"
 #include "utils/debugbreak.h"
+#include "utils/faultinjector.h"
 #include "utils/pg_crc.h"
 #include "port/pg_crc32c.h"
 
@@ -1815,6 +1816,9 @@ destroyConnHashTable(ConnHashTable *ht)
 		pfree(ht->table);
 	else
 		free(ht->table);
+
+	ht->table = NULL;
+	ht->size = 0;
 }
 
 /*
@@ -4587,7 +4591,7 @@ handleAcks(ChunkTransportState *transportStates, ChunkTransportStateEntry *pEntr
 					break;
 				}
 
-				if (pkt->seq <= ackConn->receivedAckSeq)
+				if (pkt->seq < ackConn->receivedAckSeq)
 				{
 					if (DEBUG1 >= log_min_messages)
 						write_log("ack with bad seq?! expected (%d, %d] got %d flags 0x%x, capacity %d consumedSeq %d", ackConn->receivedAckSeq, ackConn->sentSeq, pkt->seq, pkt->flags, ackConn->capacity, ackConn->consumedSeq);
@@ -4604,6 +4608,13 @@ handleAcks(ChunkTransportState *transportStates, ChunkTransportStateEntry *pEntr
 					ackConn->conn_info.flags |= UDPIC_FLAGS_STOP;
 					ret = true;
 					/* continue to deal with acks */
+				}
+
+				if (pkt->seq == ackConn->receivedAckSeq)
+				{
+					if (DEBUG1 >= log_min_messages)
+						write_log("ack with bad seq?! expected (%d, %d] got %d flags 0x%x, capacity %d consumedSeq %d", ackConn->receivedAckSeq, ackConn->sentSeq, pkt->seq, pkt->flags, ackConn->capacity, ackConn->consumedSeq);
+					break;
 				}
 
 				/* deal with a regular ack. */
@@ -5394,7 +5405,7 @@ checkExpirationCapacityFC(ChunkTransportState *transportStates, ChunkTransportSt
 	uint64 now = getCurrentTime();
 	uint64 elapsed = now - ic_control_info.lastPacketSendTime;
 
-	if (elapsed >= (timeout * 1000))
+	if (elapsed >= ((uint64)timeout * 1000))
 	{
 		ICBufferLink *bufLink = icBufferListFirst(&conn->unackQueue);
 		ICBuffer *buf = GET_ICBUFFER_FROM_PRIMARY(bufLink);
@@ -5777,6 +5788,18 @@ doSendStopMessageUDP(ChunkTransportState *transportStates, int16 motNodeID)
 				 * We will skip sending ACKs to those connections.
 				 */
 
+#ifdef FAULT_INJECTOR
+				if (FaultInjector_InjectFaultIfSet(
+												   InterconnectStopAckIsLost,
+												   DDLNotSpecified,
+												   "" /* databaseName */,
+												   "" /* tableName */) == FaultInjectorTypeSkip)
+				{
+					pthread_mutex_unlock(&ic_control_info.lock);
+					continue;
+				}
+#endif
+
 				if (conn->peer.ss_family == AF_INET || conn->peer.ss_family == AF_INET6)
 				{
 					uint32 seq = conn->conn_info.seq > 0 ? conn->conn_info.seq - 1 : 0;
@@ -5977,7 +6000,9 @@ handleDataPacket(MotionConn *conn, icpkthdr *pkt, struct sockaddr_storage *peer,
 	#ifdef AMS_VERBOSE_LOGGING
 		logPkt("STATUS QUERY MESSAGE", pkt);
 	#endif
-		setAckSendParam(param, conn, UDPIC_FLAGS_CAPACITY | UDPIC_FLAGS_ACK | conn->conn_info.flags, conn->conn_info.seq - 1, conn->conn_info.extraSeq);
+		uint32 seq = conn->conn_info.seq > 0 ? conn->conn_info.seq - 1 : 0;
+		uint32 extraSeq = conn->stopRequested ? seq : conn->conn_info.extraSeq;
+		setAckSendParam(param, conn, UDPIC_FLAGS_CAPACITY | UDPIC_FLAGS_ACK | conn->conn_info.flags, seq, extraSeq);
 
 		return false;
 	}
@@ -6224,7 +6249,9 @@ rxThreadFunc(void *arg)
 		if (compare_and_swap_32(&ic_control_info.shutdown, 1, 0))
 		{
 			if (DEBUG1 >= log_min_messages)
+			{
 				write_log("udp-ic: rx-thread shutting down");
+			}
 			break;
 		}
 
@@ -6249,6 +6276,15 @@ rxThreadFunc(void *arg)
 			nfd.events = POLLIN;
 
 			n = poll(&nfd, 1, RX_THREAD_POLL_TIMEOUT);
+
+			if (compare_and_swap_32(&ic_control_info.shutdown, 1, 0))
+			{
+				if (DEBUG1 >= log_min_messages)
+				{
+					write_log("udp-ic: rx-thread shutting down");
+				}
+				break;
+			}
 
 			if (n < 0)
 			{
@@ -6284,6 +6320,15 @@ rxThreadFunc(void *arg)
 			peerlen = sizeof(peer);
 			read_count = recvfrom(UDP_listenerFd, (char *)pkt, Gp_max_packet_size, 0,
 								  (struct sockaddr *)&peer, &peerlen);
+
+			if (compare_and_swap_32(&ic_control_info.shutdown, 1, 0))
+			{
+				if (DEBUG1 >= log_min_messages)
+				{
+					write_log("udp-ic: rx-thread shutting down");
+				}
+				break;
+			}
 
 			if (DEBUG5 >= log_min_messages)
 				write_log("received inbound len %d", read_count);
@@ -6876,4 +6921,28 @@ dumpConnections(ChunkTransportStateEntry *pEntry, const char *fname)
 		fprintf(ofile, "\n");
 	}
     fclose(ofile);
+}
+
+void
+WaitInterconnectQuitUDP(void)
+{
+	if (Gp_role == GP_ROLE_UTILITY)
+	{
+		return;	
+	}
+
+	/*
+	 * Just in case ic thread is waiting on the locks.
+	*/
+	pthread_mutex_unlock(&ic_control_info.errorLock);
+	pthread_mutex_unlock(&ic_control_info.lock);
+
+	compare_and_swap_32(&ic_control_info.shutdown, 0, 1);
+
+	if (ic_control_info.threadCreated)
+	{
+		SendDummyPacket();
+		pthread_join(ic_control_info.threadHandle, NULL);
+	}
+	ic_control_info.threadCreated = false;
 }
