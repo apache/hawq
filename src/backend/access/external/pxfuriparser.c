@@ -611,6 +611,8 @@ GPHDUri_debug_print_segwork(GPHDUri *uri)
 				 	 	 data->fragment_md ? data->fragment_md : "NULL");
 		if (data->user_data)
 			appendStringInfo(&fragment_data, ", user data : %s", data->user_data);
+		if (data->profile)
+			appendStringInfo(&fragment_data, ", profile : %s", data->profile);
 		elog(NOTICE, "%s", fragment_data.data);
 		++count;
 		resetStringInfo(&fragment_data);
@@ -684,30 +686,35 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 
 	value_start = dup_frag;
 	/* expect ip */
+
 	value_end = strchr(value_start, segwork_separator);
 	Assert(value_end != NULL);
 	*value_end = '\0';
 	appendStringInfo(&formatter, "%s:", value_start);
 	value_start = value_end + 1;
 	/* expect port */
+
 	value_end = strchr(value_start, segwork_separator);
 	Assert(value_end != NULL);
 	*value_end = '\0';
 	appendStringInfo(&formatter, "%s", value_start);
 	fragment_data->authority = formatter.data;
 	value_start = value_end + 1;
+
 	/* expect source name */
 	value_end = strchr(value_start, segwork_separator);
 	Assert(value_end != NULL);
 	*value_end = '\0';
 	fragment_data->source_name = pstrdup(value_start);
 	value_start = value_end + 1;
+
 	/* expect index */
 	value_end = strchr(value_start, segwork_separator);
 	Assert(value_end != NULL);
 	*value_end = '\0';
 	fragment_data->index = pstrdup(value_start);
 	value_start = value_end + 1;
+
 	/* expect fragment metadata */
 	Assert(value_start);
 	value_end = strchr(value_start, segwork_separator);
@@ -724,14 +731,30 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 	fragment_data->user_data = pstrdup(value_start);
 	value_start = value_end + 1;
 
-	/* expect for profile */
+	/* expect for profile, it's optional */
 	Assert(value_start);
 	value_end = strchr(value_start, segwork_separator);
 	Assert(value_end != NULL);
 	*value_end = '\0';
-	fragment_data->profile = pstrdup(value_start);
+	if (strlen(value_start) > 0)
+		fragment_data->profile = pstrdup(value_start);
 
 	return lappend(fragments, fragment_data);
+}
+
+/*
+ * Free fragment data
+ */
+static void
+GPHDUri_free_fragment(FragmentData *data)
+{
+		pfree(data->authority);
+		pfree(data->fragment_md);
+		pfree(data->index);
+		pfree(data->profile);
+		pfree(data->source_name);
+		pfree(data->user_data);
+		pfree(data);
 }
 
 /*
@@ -745,10 +768,7 @@ GPHDUri_free_fragments(GPHDUri *uri)
 	foreach(fragment, uri->fragments)
 	{
 		FragmentData *data = (FragmentData*)lfirst(fragment);
-		pfree(data->authority);
-		pfree(data->index);
-		pfree(data->source_name);
-		pfree(data);
+		GPHDUri_free_fragment(data);
 	}
 	list_free(uri->fragments);
 	uri->fragments = NIL;

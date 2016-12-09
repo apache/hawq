@@ -431,9 +431,33 @@ test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts(void **stat
 	assert_true(false);
 }
 
+void
+test__GPHDUri_parse_fragment__ValidFragment(void **state) {
+	char* fragment = "HOST@REST_PORT@TABLE_NAME@INDEX@FRAGMENT_METADATA@USER_DATA@PROFILE@";
+
+	List *fragments = NIL;
+
+	fragments = GPHDUri_parse_fragment(fragment, fragments);
+
+	ListCell *fragment_cell = list_head(fragments);
+	FragmentData *fragment_data = (FragmentData*) lfirst(fragment_cell);
+
+	assert_string_equal(fragment_data->authority, "HOST:REST_PORT");
+	assert_string_equal(fragment_data->fragment_md, "FRAGMENT_METADATA");
+	assert_string_equal(fragment_data->index, "INDEX");
+	assert_string_equal(fragment_data->profile, "PROFILE");
+	assert_string_equal(fragment_data->source_name, "TABLE_NAME");
+	assert_string_equal(fragment_data->user_data, "USER_DATA");
+
+	GPHDUri_free_fragment(fragment_data);
+	list_free(fragments);
+
+}
+
 int 
 main(int argc, char* argv[]) 
 {
+
 	cmockery_parse_arguments(argc, argv);
 
 	const UnitTest tests[] = {
@@ -446,6 +470,7 @@ main(int argc, char* argv[])
 			unit_test(test__parseGPHDUri__NegativeTestDuplicateEquals),
 			unit_test(test__parseGPHDUri__NegativeTestMissingKey),
 			unit_test(test__parseGPHDUri__NegativeTestMissingValue),
+			unit_test(test__GPHDUri_parse_fragment__ValidFragment),
 			unit_test(test__GPHDUri_verify_no_duplicate_options__ValidURI),
 			unit_test(test__GPHDUri_verify_no_duplicate_options__NegativeTestDuplicateOpts),
 			unit_test(test__GPHDUri_verify_core_options_exist__ValidURI),
