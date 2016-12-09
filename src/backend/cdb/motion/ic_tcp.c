@@ -312,8 +312,12 @@ setupTCPListeningSocket(int backlog, int *listenerSocketFd, uint16 *listenerPort
 			break;              /* Success */
 
 		close(fd);
+		fd = -1;
 	}
 
+	fun = "bind";
+	if (fd == -1)
+		goto error;
 
     /* Make socket non-blocking. */
     fun = "fcntl(O_NONBLOCK)";

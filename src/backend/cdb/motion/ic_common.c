@@ -36,13 +36,10 @@
 
 #include "postgres.h"
 
-#include <pthread.h>
-
 #include "nodes/execnodes.h"            /* Slice, SliceTable */
 #include "nodes/pg_list.h"
 #include "nodes/print.h"
 #include "utils/memutils.h"
-#include "utils/hsearch.h"
 #include "miscadmin.h"
 #include "libpq/libpq-be.h"
 #include "libpq/ip.h"

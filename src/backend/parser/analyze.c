@@ -85,9 +85,7 @@
 #include "parser/parse_cte.h"
 #include "parser/parsetree.h"
 #include "rewrite/rewriteManip.h"
-#include "utils/acl.h"
 #include "utils/builtins.h"
-#include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
 
@@ -96,8 +94,6 @@
 #include "cdb/cdbcat.h"
 #include "cdb/cdbhash.h"
 #include "cdb/cdbsreh.h"
-
-#include "executor/spi.h"
 
 /* temporary rule to control whether we generate RULEs or not -- for testing */
 bool        enable_partition_rules = false;
