@@ -23,12 +23,13 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+#include "cdb/cdbdisp.h"
 #include "miscadmin.h"
 #ifdef PROFILE_PID_DIR
 #include "postmaster/autovacuum.h"
 #endif
 #include "storage/ipc.h"
-
+#include "libpq/pqsignal.h"
 
 /*
  * This flag is set during proc_exit() to change ereport()'s behavior,
@@ -42,8 +43,7 @@ bool		proc_exit_inprogress = false;
  * (or in the parent postmaster).
  */
 static bool atexit_callback_setup = false;
-
-
+extern void WaitInterconnectQuit(void);
 
 /* ----------------------------------------------------------------
  *						exit() handling stuff
@@ -143,6 +143,16 @@ void
 proc_exit_prepare(int code)
 {
 	/*
+	 * If we came here from any critical section, we don't have safe way to
+	 * clean up shared memory or transaction state.  Though it's not a pleasant
+	 * solution, this is better than messing up database.  This is the least
+	 * desirable bail-out, and whenever you should see this situation, you
+	 * should consider to resolve the actual programming error.
+	 */
+	if (CritSectionCount > 0)
+		elog(PANIC, "process is dying from critical section");
+
+	/*
 	 * Once we set this flag, we are committed to exit.  Any ereport() will
 	 * NOT send control back to the main loop, but right back here.
 	 */
@@ -161,6 +171,30 @@ proc_exit_prepare(int code)
 	InterruptWhenCallingPLUDF = false;
 	InterruptHoldoffCount = 1;
 	CritSectionCount = 0;
+
+	/*
+	 * Also clear the error context stack, to prevent error callbacks
+	 * from being invoked by any elog/ereport calls made during proc_exit.
+	 * Whatever context they might want to offer is probably not relevant,
+	 * and in any case they are likely to fail outright after we've done
+	 * things like aborting any open transaction.  (In normal exit scenarios
+	 * the context stack should be empty anyway, but it might not be in the
+	 * case of elog(FATAL) for example.)
+	 */
+	error_context_stack = NULL;
+
+	/*
+	* Make sure interconnect thread quit before shmem_exit() in FATAL case.
+	* Otherwise, shmem_exit() may free MemoryContex of MotionConns in connHtab unexpectedly;
+	*
+	* For example: PORTAL_MULTI_QUERY strategy doesn't bind estate with portal,
+	* so when fatal occurs, MotionConns of estate don't get removed through
+	* TeardownInterconnect(), but MemoryContex of these MotionConns are freed.
+	*
+	* It's ok to shutdown Interconnect background thread here, process is dying, no
+	* necessary to receive more motion data.
+	*/
+	WaitInterconnectQuit();
 
 	/* do our shared memory exits first */
 	shmem_exit(code);
