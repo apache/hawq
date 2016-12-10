@@ -829,6 +829,8 @@ free_allocated_frags(List *segment_fragments)
 			pfree(frag->fragment_md);
 		if (frag->user_data)
 			pfree(frag->user_data);
+		if (frag->profile)
+			pfree(frag->profile);
 		pfree(frag);
 	}
 	list_free(segment_fragments);

@@ -431,6 +431,9 @@ test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts(void **stat
 	assert_true(false);
 }
 
+/*
+ * Test GPHDUri_parse_fragment when fragment string is valid and all parameters are passed
+ */
 void
 test__GPHDUri_parse_fragment__ValidFragment(void **state) {
 	char* fragment = "HOST@REST_PORT@TABLE_NAME@INDEX@FRAGMENT_METADATA@USER_DATA@PROFILE@";
@@ -446,6 +449,32 @@ test__GPHDUri_parse_fragment__ValidFragment(void **state) {
 	assert_string_equal(fragment_data->fragment_md, "FRAGMENT_METADATA");
 	assert_string_equal(fragment_data->index, "INDEX");
 	assert_string_equal(fragment_data->profile, "PROFILE");
+	assert_string_equal(fragment_data->source_name, "TABLE_NAME");
+	assert_string_equal(fragment_data->user_data, "USER_DATA");
+
+	GPHDUri_free_fragment(fragment_data);
+	list_free(fragments);
+
+}
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string doesn't have profile
+ */
+void
+test__GPHDUri_parse_fragment__NoProfile(void **state) {
+	char* fragment = "HOST@REST_PORT@TABLE_NAME@INDEX@FRAGMENT_METADATA@USER_DATA@@";
+
+	List *fragments = NIL;
+
+	fragments = GPHDUri_parse_fragment(fragment, fragments);
+
+	ListCell *fragment_cell = list_head(fragments);
+	FragmentData *fragment_data = (FragmentData*) lfirst(fragment_cell);
+
+	assert_string_equal(fragment_data->authority, "HOST:REST_PORT");
+	assert_string_equal(fragment_data->fragment_md, "FRAGMENT_METADATA");
+	assert_string_equal(fragment_data->index, "INDEX");
+	assert_true(!fragment_data->profile);
 	assert_string_equal(fragment_data->source_name, "TABLE_NAME");
 	assert_string_equal(fragment_data->user_data, "USER_DATA");
 
@@ -471,6 +500,7 @@ main(int argc, char* argv[])
 			unit_test(test__parseGPHDUri__NegativeTestMissingKey),
 			unit_test(test__parseGPHDUri__NegativeTestMissingValue),
 			unit_test(test__GPHDUri_parse_fragment__ValidFragment),
+			unit_test(test__GPHDUri_parse_fragment__NoProfile),
 			unit_test(test__GPHDUri_verify_no_duplicate_options__ValidURI),
 			unit_test(test__GPHDUri_verify_no_duplicate_options__NegativeTestDuplicateOpts),
 			unit_test(test__GPHDUri_verify_core_options_exist__ValidURI),
