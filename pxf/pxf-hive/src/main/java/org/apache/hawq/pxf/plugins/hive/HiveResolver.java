@@ -263,8 +263,8 @@ public class HiveResolver extends Plugin implements ReadResolver {
                             "Unsupported partition type: " + type);
             }
             addOneFieldToRecord(partitionFields, convertedType, convertedValue);
-            numberOfPartitions = partitionFields.size();
         }
+        numberOfPartitions = partitionFields.size();
     }
 
     /*
