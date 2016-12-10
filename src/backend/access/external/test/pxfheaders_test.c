@@ -232,6 +232,112 @@ void restore_gucs()
 	pxf_remote_service_secret = old_pxf_remote_service_secret;
 }
 
+void
+test__normalize_key_name_Positive(void **state)
+{
+	char *input_key = strdup("mIxEdCaSeVaLuE");
+	char *input_key_upper = strdup("MIXEDCASEVALUE");
+
+	expect_string(str_toupper, buff, input_key);
+	expect_value(str_toupper, nbytes, strlen(input_key));
+	will_return(str_toupper, input_key_upper);
+
+	char *normalized_key = normalize_key_name(input_key);
+	assert_string_equal(normalized_key, "X-GP-MIXEDCASEVALUE");
+
+	pfree(input_key);
+	pfree(normalized_key);
+}
+
+void
+test__normalize_key_name_PositiveUpperCase(void **state)
+{
+	char *input_key = strdup("ALREADY_UPPER_CASE");
+	char *input_key_upper = strdup("ALREADY_UPPER_CASE");
+
+	expect_string(str_toupper, buff, input_key);
+	expect_value(str_toupper, nbytes, strlen(input_key));
+	will_return(str_toupper, input_key_upper);
+
+	char *normalized_key = normalize_key_name(input_key);
+	assert_string_equal(normalized_key, "X-GP-ALREADY_UPPER_CASE");
+
+	pfree(input_key);
+	pfree(normalized_key);
+}
+
+void
+test__normalize_key_name_Negative__key_is_null(void **state)
+{
+	char *input_key = NULL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfheaders.c:normalize_key_name. Parameter key is null or empty.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		char *normalized_key = normalize_key_name(input_key);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		pfree(err_msg->data);
+		pfree(err_msg);
+
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+void
+test__normalize_key_name_Negative__key_is_empty(void **state)
+{
+	char *input_key = "";
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfheaders.c:normalize_key_name. Parameter key is null or empty.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		char *normalized_key = normalize_key_name(input_key);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		pfree(err_msg->data);
+		pfree(err_msg);
+
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
 int 
 main(int argc, char* argv[]) 
 {
@@ -244,7 +350,11 @@ main(int argc, char* argv[])
 		unit_test_setup_teardown(test__build_http_header__remote_login_is_not_null, 
 								 common_setup, common_teardown),
 		unit_test_setup_teardown(test__build_http_header__remote_credentials_are_not_null, 
-								 common_setup, common_teardown)
+								 common_setup, common_teardown),
+		unit_test(test__normalize_key_name_Positive),
+		unit_test(test__normalize_key_name_PositiveUpperCase),
+		unit_test(test__normalize_key_name_Negative__key_is_null),
+		unit_test(test__normalize_key_name_Negative__key_is_empty)
 	};
 
 	return run_tests(tests);

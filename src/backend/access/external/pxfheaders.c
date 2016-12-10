@@ -310,9 +310,20 @@ static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphd
 	}
 }
 
-/* Full name of the HEADER KEY expected by the PXF service */
+/*
+ * Full name of the HEADER KEY expected by the PXF service
+ * Converts input string to upper case and prepends "X-GP-" string
+ *
+ */
 static char* normalize_key_name(const char* key)
 {	
+	if (!key || strlen(key) == 0)
+	{
+		ereport(ERROR,
+			(errcode(ERRCODE_INTERNAL_ERROR),
+			 errmsg("internal error in pxfheaders.c:normalize_key_name. Parameter key is null or empty.")));
+	}
+
 	StringInfoData formatter;
 	initStringInfo(&formatter);
 	char* upperCasedKey = str_toupper(pstrdup(key), strlen(key));
