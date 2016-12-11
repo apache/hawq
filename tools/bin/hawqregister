@@ -252,6 +252,14 @@ class GpRegisterAccessor(object):
         self.conn.query(query)
         return True, query
 
+    def is_hash_distributed(self, tablename):
+        schemaname, tablename = tablename_handler(tablename)
+        qry = """select attrnums from gp_distribution_policy, pg_class where pg_class.relnamespace = '%s' and pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;""" % (self.get_schema_id(schemaname), tablename)
+        rows = self.exec_query(qry)
+        if rows[0]['attrnums']:
+            return True
+        return False
+
     def check_hash_type(self, tablename):
         schemaname, tablename = tablename_handler(tablename)
         qry = """select attrnums from gp_distribution_policy, pg_class where pg_class.relnamespace = '%s' and pg_class.relname = '%s' and pg_class.oid = gp_distribution_policy.localoid;""" % (self.get_schema_id(schemaname), tablename)
@@ -401,6 +409,9 @@ class HawqRegister(object):
                 sys.exit(1)
             else:
                 return 'usage1'
+
+    def _is_hash_distributed(self):
+        return self.accessor.is_hash_distributed(self.dst_table_name)
 
     def _check_hash_type(self):
         self.accessor.check_hash_type(self.dst_table_name)
@@ -645,7 +656,8 @@ class HawqRegister(object):
 
     def _do_check(self):
         if self.yml:
-            self._check_bucket_number()
+            if self._is_hash_distributed():
+                self._check_bucket_number()
             self._check_distribution_policy()
             self._check_policy_consistency()
             self._check_no_regex_filepath(self.files)
