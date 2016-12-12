@@ -732,6 +732,7 @@ int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_limit;
+bool enable_ranger = false;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
@@ -4326,6 +4327,16 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+    {"enable_ranger", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
+     gettext_noop("Enable Apache Ranger for HAWQ privilege management."),
+     NULL,
+     GUC_SUPERUSER_ONLY
+    },
+    &enable_ranger,
+    false, NULL, NULL
+  },
+
+	{
 		{"filesystem_support_truncate", PGC_USERSET, APPENDONLY_TABLES,
 		 gettext_noop("the file system support truncate feature."),
 		 NULL,
@@ -6250,6 +6261,15 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+    {"hawq_rps_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("rps server address port number"),
+      NULL
+    },
+    &rps_addr_port,
+    1, 1, 65535, NULL, NULL
+  },
+
+	{
 		{"hawq_segment_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("segment address port number"),
 			NULL
@@ -8152,6 +8172,15 @@ static struct config_string ConfigureNamesString[] =
 		&master_addr_host,
 		"localhost", NULL, NULL
 	},
+
+	{
+    {"hawq_rps_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("rps server address hostname"),
+      NULL
+    },
+    &rps_addr_host,
+    "localhost", NULL, NULL
+  },
 
 	{
 		{"standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,

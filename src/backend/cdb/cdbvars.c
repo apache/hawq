@@ -292,6 +292,8 @@ bool enable_prefer_list_to_rm;
  * reserved to facilitate showing settings in hawq-site.xml. */
 char  *master_addr_host;
 int    master_addr_port;
+char  *rps_addr_host;
+int    rps_addr_port;
 char  *standby_addr_host;
 int    seg_addr_port;
 char  *dfs_url;

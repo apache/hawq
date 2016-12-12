@@ -275,6 +275,7 @@ extern bool gp_plpgsql_clear_cache_always;
 extern bool gp_disable_catalog_access_on_segment;
 
 extern bool gp_called_by_pgdump;
+extern bool enable_ranger;
 
 /* Debug DTM Action */
 typedef enum
