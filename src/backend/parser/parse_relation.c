@@ -35,35 +35,34 @@
 
 #include <ctype.h>
 
-#include "access/genam.h"
-#include "access/heapam.h"
 #include "catalog/catquery.h"
+#include "access/genam.h"
 #include "catalog/heap.h"
+#include "access/heapam.h"
+#include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_exttable.h"
 #include "catalog/pg_proc_callback.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_database.h"
 #include "catalog/pg_type.h"
-#include "catalog/indexing.h"
 #include "funcapi.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/relation.h"                 /* CdbRelColumnInfo */
 #include "optimizer/pathnode.h"             /* cdb_rte_find_pseudo_column() */
 #include "parser/parsetree.h"
+#include "parser/parse_coerce.h"
 #include "parser/parse_expr.h"
 #include "parser/parse_relation.h"
 #include "parser/parse_type.h"
-#include "parser/parse_coerce.h"
 #include "utils/acl.h"
+#include "utils/array.h"
 #include "utils/builtins.h"
+#include "utils/fmgroids.h"
+#include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
-#include "utils/array.h"
-#include "utils/fmgroids.h"
-
-
 /* GUC parameter */
 bool		add_missing_from;
 
@@ -2713,12 +2712,87 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 void
 ExecCheckRTPerms(List *rangeTable)
 {
+  if (enable_ranger)
+  {
+    if(rangeTable!=NULL)
+      ExecCheckRTPermsWithRanger(rangeTable);
+    return;
+  }
 	ListCell   *l;
-
 	foreach(l, rangeTable)
 	{
 		ExecCheckRTEPerms((RangeTblEntry *) lfirst(l));
 	}
+}
+
+/*
+ * ExecCheckRTPerms
+ *   Batch implementation: Check access permissions for all relations listed in a range table with enable_ranger is true.
+ */
+void
+ExecCheckRTPermsWithRanger(List *rangeTable)
+{
+  List *ranger_check_args = NIL;
+  ListCell *l;
+  foreach(l, rangeTable)
+  {
+
+    AclMode requiredPerms;
+    Oid relOid;
+    Oid userid;
+    RangeTblEntry *rte = (RangeTblEntry *) lfirst(l);
+
+    if (rte->rtekind != RTE_RELATION)
+      return;
+    requiredPerms = rte->requiredPerms;
+    if (requiredPerms == 0)
+      return;
+    
+    relOid = rte->relid;
+    userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
+
+    RangerPrivilegeArgs *ranger_check_arg = (RangerPrivilegeArgs *) palloc(sizeof(RangerPrivilegeArgs));
+    ranger_check_arg->objkind = ACL_KIND_CLASS;
+    ranger_check_arg->object_oid = relOid;
+    ranger_check_arg->roleid = userid;
+    ranger_check_arg->mask = requiredPerms;
+    ranger_check_arg->how = ACLMASK_ALL;
+    ranger_check_args = lappend(ranger_check_args, ranger_check_arg);
+
+  } // foreach
+
+  // ranger ACL check with package Oids
+  List *aclresults = NIL;
+  aclresults = pg_rangercheck_batch(ranger_check_args);
+  if (aclresults == NIL)
+  {
+    elog(ERROR, "ERROR\n");
+    return;
+  }
+
+  // check result
+  ListCell *result;
+  foreach(result, aclresults)
+  {
+    RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
+    if(result_ptr->result != RANGERCHECK_OK)
+    {
+      Oid relOid = result_ptr->relOid;
+      const char *rel_name = get_rel_name_partition(relOid);
+      aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+    }
+  }
+  
+  if (ranger_check_args)
+  {
+    list_free_deep(ranger_check_args);
+    ranger_check_args = NIL;
+  }
+  if (aclresults)
+  {
+    list_free_deep(aclresults);
+    aclresults = NIL;
+  }
 }
 
 /*
@@ -2762,15 +2836,33 @@ ExecCheckRTEPerms(RangeTblEntry *rte)
 	/*
 	 * We must have *all* the requiredPerms bits, so use aclmask not aclcheck.
 	 */
-	if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
-		!= requiredPerms)
+	if (enable_ranger && !fallBackToNativeCheck(ACL_KIND_CLASS, relOid, userid))
 	{
-		/*
-		 * If the table is a partition, return an error message that includes
-		 * the name of the parent table.
-		 */
-		const char *rel_name = get_rel_name_partition(relOid);
-		aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+	  elog(LOG, "ExecCheckRTEPerms: here");
+	  /* ranger check required permission should all be approved.*/
+    if (pg_rangercheck(ACL_KIND_CLASS, relOid, userid, requiredPerms, ACLMASK_ALL)
+        != RANGERCHECK_OK)
+    {
+      /*
+       * If the table is a partition, return an error message that includes
+       * the name of the parent table.
+       */
+      const char *rel_name = get_rel_name_partition(relOid);
+      aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+    }
+	}
+	else
+	{
+	  if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
+	        != requiredPerms)
+    {
+      /*
+       * If the table is a partition, return an error message that includes
+       * the name of the parent table.
+       */
+      const char *rel_name = get_rel_name_partition(relOid);
+      aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+    }
 	}
 }
 
