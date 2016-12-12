@@ -358,15 +358,15 @@ class GpRegisterAccessor(object):
         return self.exec_query(query)[0]['pg_encoding_to_char']
 
     def get_metadata_for_relfile_insert(self, database, tablename):
-        _, tablename = tablename_handler(tablename)
-        query = "select reltablespace from pg_class where relname = '%s';" % tablename
+        schemaname, tablename = tablename_handler(tablename)
+        query = "select reltablespace from pg_class where relnamespace = '%s' and relname = '%s';" % (self.get_schema_id(schemaname), tablename)
         tablespace_oid = int(self.exec_query(query)[0]['reltablespace'])
         if tablespace_oid == 0:
             query = "select oid from pg_tablespace where spcname='dfs_default';"
             tablespace_oid = int(self.exec_query(query)[0]['oid'])
         query = "select oid from pg_database where datname='%s';" % database
         database_oid = int(self.exec_query(query)[0]['oid'])
-        query = "select oid, relfilenode, relname, relkind, relstorage, relam from pg_class where relname='%s';" % tablename
+        query = "select oid, relfilenode, relname, relkind, relstorage, relam from pg_class where relnamespace = '%s' and relname='%s';" % (self.get_schema_id(schemaname), tablename)
         return [tablespace_oid, database_oid, int(self.exec_query(query)[0]['oid']), int(self.exec_query(query)[0]['relfilenode']), str(self.exec_query(query)[0]['relname']), str(self.exec_query(query)[0]['relkind']), str(self.exec_query(query)[0]['relstorage']), int(self.exec_query(query)[0]['relam'])]
 
     def update_catalog(self, query):
@@ -492,6 +492,7 @@ class HawqRegister(object):
                 params = yaml.load(f)
         except yaml.scanner.ScannerError as e:
             print e
+            logger.error('In _option_parser_yml(): %s' % e)
             self.failure_handler.rollback()
             sys.exit(1)
             
@@ -671,6 +672,7 @@ class HawqRegister(object):
 
         (self.seg_name, tmp_ret) = self._get_seg_name()
         if not tmp_ret:
+            logger.error('Failed to get segment name')
             self.failure_handler.rollback()
             sys.exit(1)
         self.firstsegno, self.tabledir = self._get_metadata()
@@ -984,6 +986,7 @@ class HawqRegister(object):
             self.utility_accessor.update_catalog(self.queries)
         except pg.DatabaseError as e:
             print e
+            logger.error('In _modify_metadata(): %s' % e);
             self.failure_handler.rollback()
             sys.exit(1)
 

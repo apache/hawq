@@ -31,7 +31,7 @@ TEST_F(TestHawqRegister, TestRollbackErrorSchema) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", "testhawqregister_testrollbackerrorschema");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);
@@ -63,7 +63,7 @@ TEST_F(TestHawqRegister, TestRollbackErrorHDFSFileSize) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", "testhawqregister_testrollbackerrorhdfsfilesize");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);
@@ -95,7 +95,7 @@ TEST_F(TestHawqRegister, TestRollBackHDFSFilePathContainErrorSymbol) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", "testhawqregister_testrollbackhdfsfilepathcontainerrorsymbol");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);

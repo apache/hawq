@@ -44,7 +44,7 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
                 hawq::test::FileReplace frep;
                 std::unordered_map<std::string, std::string> strs_src_dst;
                 strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-                strs_src_dst["@TABLE_OID@"]= getTableOid(t);
+                strs_src_dst["@TABLE_OID@"]= getTableOid(t, "testhawqregister_testusage2case2expected");
                 string hdfs_prefix;
                 hawq::test::HdfsConfig hc;
                 hc.getNamenodeHost(hdfs_prefix);
@@ -59,17 +59,17 @@ TEST_F(TestHawqRegister, TestUsage2Case2Expected) {
                 util.execute(hawq::test::stringFormat("insert into %s select generate_series(1, 50);", t.c_str()));
                 util.query(hawq::test::stringFormat("select * from %s;", t.c_str()), 50);
                 strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-                strs_src_dst["@TABLE_OID_OLD@"]= getTableOid(nt);
-                strs_src_dst["@TABLE_OID_NEW@"]= getTableOid(t);
+                strs_src_dst["@TABLE_OID_OLD@"]= getTableOid(nt, "testhawqregister_testusage2case2expected");
+                strs_src_dst["@TABLE_OID_NEW@"]= getTableOid(t, "testhawqregister_testusage2case2expected");
                 strs_src_dst["@PORT@"]= hdfs_prefix;
                 frep.replace(t_yml_tpl_new, t_yml_new, strs_src_dst);
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq register %s -d %s -c %s testhawqregister_testusage2case2expected.%s", opt.c_str(), HAWQ_DB, t_yml_new.c_str(), nt.c_str())));
                 util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 150);
 
                 if (fmt == "row")
-                   checkPgAOSegValue(nt, "-1", "aoseg");
+                   checkPgAOSegValue(nt, "testhawqregister_testusage2case2expected", "-1", "aoseg");
                 else 
-                   checkPgAOSegValue(nt, "-1", "paqseg");
+                   checkPgAOSegValue(nt, "testhawqregister_testusage2case2expected", "-1", "paqseg");
                 
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
                 EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml_new.c_str())));
@@ -100,8 +100,8 @@ void TestHawqRegister::runYamlCaseForceMode(std::string casename, std::string ym
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
-    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);
@@ -143,8 +143,8 @@ TEST_F(TestHawqRegister, TestUsage2Case2Hash2Random) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
-    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt", "testhawqregister_testusage2case2hash2random");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t", "testhawqregister_testusage2case2hash2random");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);
@@ -178,8 +178,8 @@ TEST_F(TestHawqRegister, TestUsage2Case2Random2Hash) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
-    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt", "testhawqregister_testusage2case2random2hash");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t", "testhawqregister_testusage2case2random2hash");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);
@@ -208,7 +208,7 @@ TEST_F(TestHawqRegister, TestUsage2Case2TableNotExist) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t", "testhawqregister_testusage2case2tablenotexist");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);
@@ -237,7 +237,7 @@ TEST_F(TestHawqRegister, TestUsage2Case2TableExistNoData) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t", "testhawqregister_testusage2case2tableexistnodata");
     util.execute("create table nt(i int) with (appendonly=true, orientation=parquet) distributed by (i);");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
@@ -328,8 +328,8 @@ TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorBlockSize) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
-    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt", "testhawqregister_testusage2case2errorblocksize");
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t", "testhawqregister_testusage2case2errorblocksize");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);

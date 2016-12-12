@@ -21,7 +21,7 @@ TEST_F(TestHawqRegister, TestUsage2Case1EmptyTable) {
     EXPECT_EQ(0, Command::getCommandStatus("hawq extract -d " + (string) HAWQ_DB + " -o t9.yml testhawqregister_testusage2case1emptytable.t9"));
     EXPECT_EQ(0, Command::getCommandStatus("hawq register -d " + (string) HAWQ_DB + " -c t9.yml testhawqregister_testusage2case1emptytable.nt9"));
     util.query("select * from nt9;", 0);
-    std::string reloid = getTableOid("nt9");
+    std::string reloid = getTableOid("nt9", "testhawqregister_testusage2case1emptytable");
     /* An empty table has no row in pg_aoseg.pg_aoseg_xxx table */
     util.query(hawq::test::stringFormat("select * from pg_aoseg.pg_aoseg_%s;", reloid.c_str()), 0);
     EXPECT_EQ(0, Command::getCommandStatus("rm -rf t9.yml"));
@@ -76,7 +76,7 @@ TEST_F(TestHawqRegister, TestUsage2Case1Expected) {
             util.query(hawq::test::stringFormat("select * from %s;", t.c_str()), 100);
 
             // get pg_aoseg.pg_xxxseg_xxx table
-            std::string reloid1 = getTableOid(t.c_str());
+            std::string reloid1 = getTableOid(t.c_str(), "testhawqregister_testusage2case1expected");
             string result1 = util.getQueryResultSetString(hawq::test::stringFormat("select * from pg_aoseg.pg_%s_%s order by segno;", fmt_prefix.c_str(), reloid1.c_str()));
 
             EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_%s.yml testhawqregister_testusage2case1expected.%s", HAWQ_DB, std::to_string(suffix).c_str(), t.c_str())));
@@ -84,7 +84,7 @@ TEST_F(TestHawqRegister, TestUsage2Case1Expected) {
             util.query(hawq::test::stringFormat("select * from %s;", nt.c_str()), 100);
 
             // check pg_aoseg.pg_xxxseg_xxx table
-            std::string reloid2 = getTableOid(nt.c_str());
+            std::string reloid2 = getTableOid(nt.c_str(), "testhawqregister_testusage2case1expected");
             string result2 = util.getQueryResultSetString(hawq::test::stringFormat("select * from pg_aoseg.pg_%s_%s order by segno;", fmt_prefix.c_str(), reloid2.c_str()));
             EXPECT_EQ(result1, result2);
 
@@ -121,12 +121,14 @@ void TestHawqRegister::runYamlCaseTableExists(std::string casename, std::string 
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     hawq::test::HdfsConfig hc;
     string hdfs_prefix;
     hc.getNamenodeHost(hdfs_prefix);
     strs_src_dst["@PORT@"]= hdfs_prefix;
     frep.replace(t_yml_tpl, t_yml, strs_src_dst);
+    //printf("%s\n", hawq::test::stringFormat("hawq register -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str()).c_str());
+    //sleep(60);
     EXPECT_EQ(isexpectederror, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str())));
     if (isexpectederror > 0) {
         util.query("select * from t;", 100);
@@ -154,7 +156,7 @@ void TestHawqRegister::runYamlCaseTableNotExists(std::string casename, std::stri
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     hawq::test::HdfsConfig hc;
     string hdfs_prefix;
     hc.getNamenodeHost(hdfs_prefix);
@@ -163,7 +165,14 @@ void TestHawqRegister::runYamlCaseTableNotExists(std::string casename, std::stri
     EXPECT_EQ(isexpectederror, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str())));
     if (isexpectederror > 0) {
         util.query("select * from t;", 100);
-        util.query("select * from pg_class where relname = 'nt';", 0);
+        std::string relnamespace = "2200";
+        const hawq::test::PSQLQueryResult &result_tmp = conn->getQueryResult(
+            hawq::test::stringFormat("SELECT oid from pg_namespace where nspname= \'testhawqregister_%s\';", casename.c_str()));
+        std::vector<std::vector<std::string>> table = result_tmp.getRows();
+        if (table.size() > 0) {
+            relnamespace = table[0][0];
+        }
+        util.query(hawq::test::stringFormat("select * from pg_class where relnamespace = %s and relname = 'nt';", relnamespace.c_str()), 0);
     } else {
         util.query("select * from nt;", checknum);
     }
@@ -279,7 +288,7 @@ TEST_F(TestHawqRegister, DISABLED_TestUsage2Case1ErrorBlockSize) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", "testhawqregister_testusage2case1errorblocksize");
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);
@@ -340,7 +349,7 @@ TEST_F(TestHawqRegister, TestUsage2Case1FileUnderTableDirectory) {
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", "testhawqregister_testusage2case1fileUndertabledirectory");
     hawq::test::HdfsConfig hc;
     string hdfs_prefix;
     hc.getNamenodeHost(hdfs_prefix);
