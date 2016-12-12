@@ -6411,7 +6411,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 	  savedResource = GetActiveQueryResource();
 	  SetActiveQueryResource(resource);
 
-	  segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, false);
+	  segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, true, false);
 
     /*
      * We create seg files for the new relation here.
@@ -16682,7 +16682,7 @@ ATPExecPartSplit(Relation rel,
     resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num, NULL, 0);
     savedResource = GetActiveQueryResource();
     SetActiveQueryResource(resource);
-    segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, false);
+    segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, true, false);
     scantable_splits = NIL;
 
 		/* create the segfiles for the new relations here */

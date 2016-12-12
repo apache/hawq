@@ -71,8 +71,13 @@ truncate EXT_NATION_ERROR1;
 select * from EXT_NATION1 as x, EXT_NATION3 as y where x.n_nationkey = y.n_nationkey;
 select count(*) from EXT_NATION_ERROR1; -- should be 50
 
-select * from EXT_NATION1 as x, EXT_NATION1 as y where x.n_nationkey = y.n_nationkey; --should fail on self join
-select * from EXT_NATION1 as x, EXT_NATION_WITH_EXIST_ERROR_TABLE as y where x.n_nationkey = y.n_nationkey; --should fail with the same error table
+truncate EXT_NATION_ERROR1;
+select * from EXT_NATION1 as x, EXT_NATION1 as y where x.n_nationkey = y.n_nationkey; --should not fail on self join
+select count(*) from EXT_NATION_ERROR1; -- should be 100
+
+truncate EXT_NATION_ERROR1;
+select * from EXT_NATION1 as x, EXT_NATION_WITH_EXIST_ERROR_TABLE as y where x.n_nationkey = y.n_nationkey; --should not fail with the same error table
+select count(*) from EXT_NATION_ERROR1; -- should be 100
 
 -- should fail on writable external table
 CREATE WRITABLE EXTERNAL TABLE EXT_NATION_WRITABLE ( N_NATIONKEY  INTEGER ,

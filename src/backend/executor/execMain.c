@@ -245,6 +245,7 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
 	ExternalScan   *scan = (ExternalScan *)node;
 	QueryContextInfo *info = cxt->info;
 	List *errSegnos;
+	bool reuse_segfilenum_in_same_xid = true;
 
 	if (NULL == node)
 		return false;
@@ -270,9 +271,8 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
 					errtbloid = lfirst_oid(c);
 					if (errtbloid == scan->fmterrtbl)
 					{
-						Relation rel = heap_open(scan->fmterrtbl, AccessShareLock);
-						elog(ERROR, "Two or more external tables use the same error table \"%s\" in a statement",
-								RelationGetRelationName(rel));
+						reuse_segfilenum_in_same_xid = false;
+						break;
 					}
 				}
 			}
@@ -281,7 +281,7 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
              * Prepare error table for insert.
              */
             Assert(!rel_is_partitioned(scan->fmterrtbl));
-            errSegnos = SetSegnoForWrite(NIL, scan->fmterrtbl, GetQEGangNum(), false, true);
+            errSegnos = SetSegnoForWrite(NIL, scan->fmterrtbl, GetQEGangNum(), false, reuse_segfilenum_in_same_xid, true);
             scan->errAosegnos = errSegnos;
             info->errTblOid = lcons_oid(scan->fmterrtbl, info->errTblOid);
 
@@ -877,7 +877,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                     
                     if (plannedstmt->intoClause != NULL)
                     {
-                        List *segment_segnos = SetSegnoForWrite(NIL, 0, GetQEGangNum(), true, false);
+                        List *segment_segnos = SetSegnoForWrite(NIL, 0, GetQEGangNum(), true, true, false);
                         prepareDispatchedCatalogSingleRelation(plannedstmt->contextdisp,
                                                                plannedstmt->intoClause->oidInfo.relOid, TRUE, segment_segnos);
                     }
@@ -4456,7 +4456,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 	/*
 	 * create a list of segment file numbers for insert.
 	 */
-	segnos = SetSegnoForWrite(NIL, intoRelationId, GetQEGangNum(), true, false);
+	segnos = SetSegnoForWrite(NIL, intoRelationId, GetQEGangNum(), true, true, false);
 	CreateAppendOnlyParquetSegFileForRelationOnMaster(intoRelationDesc, segnos);
 	queryDesc->plannedstmt->into_aosegnos = segnos;
 
