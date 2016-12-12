@@ -39,10 +39,17 @@ class TestHawqRegister : public ::testing::Test {
             return "";
         }
 
-        std::string getTableOid(std::string relname) {
+        std::string getTableOid(std::string relname, std::string nspname) {
+            std::string relnamespace = "2200";
+            const hawq::test::PSQLQueryResult &result_tmp = conn->getQueryResult(
+                hawq::test::stringFormat("SELECT oid from pg_namespace where nspname= \'%s\';", nspname.c_str()));
+            std::vector<std::vector<std::string>> table = result_tmp.getRows();
+            if (table.size() > 0) {
+                relnamespace = table[0][0];
+            }
             const hawq::test::PSQLQueryResult &result = conn->getQueryResult(
-                hawq::test::stringFormat("SELECT oid from pg_class where relname = \'%s\';", relname.c_str()));
-            std::vector<std::vector<std::string>> table = result.getRows();
+                hawq::test::stringFormat("SELECT oid from pg_class where relname = \'%s\' and relnamespace=%s;", relname.c_str(), relnamespace.c_str()));
+            table = result.getRows();
             if (table.size() > 0) {
                 return table[0][0];
             }
@@ -61,8 +68,8 @@ class TestHawqRegister : public ::testing::Test {
             return size;
         }
 
-        void checkPgAOSegValue(std::string relname, std::string value, std::string fmt) {
-            std::string reloid = getTableOid(relname);
+        void checkPgAOSegValue(std::string relname, std::string nspname, std::string value, std::string fmt) {
+            std::string reloid = getTableOid(relname, nspname);
 
             const hawq::test::PSQLQueryResult &result1 = conn->getQueryResult(
                 hawq::test::stringFormat("SELECT tupcount from pg_aoseg.pg_%s_%s;", fmt.c_str(), reloid.c_str()));

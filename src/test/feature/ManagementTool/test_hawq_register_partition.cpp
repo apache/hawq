@@ -36,10 +36,10 @@ void TestHawqRegister::runYamlCaseTableExistsPartition(std::string casename, std
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
-    strs_src_dst["@TABLE_OID1@"]= getTableOid("t_1_prt_girls");
-    strs_src_dst["@TABLE_OID2@"]= getTableOid("t_1_prt_boys");
-    strs_src_dst["@TABLE_OID3@"]= getTableOid("t_1_prt_other");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID1@"]= getTableOid("t_1_prt_girls", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID2@"]= getTableOid("t_1_prt_boys", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID3@"]= getTableOid("t_1_prt_other", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     hawq::test::HdfsConfig hc;
     string hdfs_prefix;
     hc.getNamenodeHost(hdfs_prefix);
@@ -78,10 +78,10 @@ void TestHawqRegister::runYamlCaseTableNotExistsPartition(std::string casename, 
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID@"]= getTableOid("t");
-    strs_src_dst["@TABLE_OID1@"]= getTableOid("t_1_prt_girls");
-    strs_src_dst["@TABLE_OID2@"]= getTableOid("t_1_prt_boys");
-    strs_src_dst["@TABLE_OID3@"]= getTableOid("t_1_prt_other");
+    strs_src_dst["@TABLE_OID@"]= getTableOid("t", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID1@"]= getTableOid("t_1_prt_girls", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID2@"]= getTableOid("t_1_prt_boys", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID3@"]= getTableOid("t_1_prt_other", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     hawq::test::HdfsConfig hc;
     string hdfs_prefix;
     hc.getNamenodeHost(hdfs_prefix);
@@ -90,7 +90,14 @@ void TestHawqRegister::runYamlCaseTableNotExistsPartition(std::string casename, 
     EXPECT_EQ(isexpectederror, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c %s testhawqregister_%s.nt", HAWQ_DB, t_yml.c_str(), casename.c_str())));
     if (isexpectederror > 0) {
         util.query("select * from t;", 100);
-        util.query("select * from pg_class where relname = 'nt';", 0);
+        std::string relnamespace = "2200";
+        const hawq::test::PSQLQueryResult &result_tmp = conn->getQueryResult(
+            hawq::test::stringFormat("SELECT oid from pg_namespace where nspname= \'testhawqregister_%s\';", casename.c_str()));
+        std::vector<std::vector<std::string>> table = result_tmp.getRows();
+        if (table.size() > 0) {
+            relnamespace = table[0][0];
+        }
+        util.query(hawq::test::stringFormat("select * from pg_class where relnamespace = %s and relname = 'nt';", relnamespace.c_str()), 0);
     } else {
         util.query("select * from nt;", checknum);
         util.execute("insert into nt select generate_series(1, 100), 1, 1, 'M', 1;");
@@ -113,9 +120,9 @@ void TestHawqRegister::runYamlCaseForceModePartition(std::string casename, std::
     util.execute("CREATE TABLE nt (id int, rank int, year int, gender char(1), count int ) DISTRIBUTED BY (id) PARTITION BY LIST (gender) ( PARTITION girls VALUES ('F'), PARTITION boys VALUES ('M'), DEFAULT PARTITION other );");
     util.execute("insert into nt select generate_series(1, 100), 1, 1, 'F', 1;");
     // get pg_aoseg.pg_xxxseg_xxx table
-    std::string reloid1_1_1 = getTableOid("nt_1_prt_girls");
-    std::string reloid1_2_1 = getTableOid("nt_1_prt_boys");
-    std::string reloid1_3_1 = getTableOid("nt_1_prt_other");
+    std::string reloid1_1_1 = getTableOid("nt_1_prt_girls", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    std::string reloid1_2_1 = getTableOid("nt_1_prt_boys", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    std::string reloid1_3_1 = getTableOid("nt_1_prt_other", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     string result1_1_1 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid1_1_1.c_str()));
     string result1_2_1 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid1_2_1.c_str()));
     string result1_3_1 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid1_3_1.c_str()));
@@ -126,9 +133,9 @@ void TestHawqRegister::runYamlCaseForceModePartition(std::string casename, std::
     util.execute("CREATE TABLE t (id int, rank int, year int, gender char(1), count int ) DISTRIBUTED BY (id) PARTITION BY LIST (gender) ( PARTITION girls VALUES ('F'), PARTITION boys VALUES ('M'), DEFAULT PARTITION other );");
     util.execute(hawq::test::stringFormat("insert into t select generate_series(1, %s), 1, 1, 'F', 1;", std::to_string(rows).c_str()));
     // get pg_aoseg.pg_xxxseg_xxx table
-    std::string reloid1_1_2 = getTableOid("t_1_prt_girls");
-    std::string reloid1_2_2 = getTableOid("t_1_prt_boys");
-    std::string reloid1_3_2 = getTableOid("t_1_prt_other");
+    std::string reloid1_1_2 = getTableOid("t_1_prt_girls", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    std::string reloid1_2_2 = getTableOid("t_1_prt_boys", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    std::string reloid1_3_2 = getTableOid("t_1_prt_other", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     string result1_1_2 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid1_1_2.c_str()));
     string result1_2_2 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid1_2_2.c_str()));
     string result1_3_2 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid1_3_2.c_str()));
@@ -136,14 +143,14 @@ void TestHawqRegister::runYamlCaseForceModePartition(std::string casename, std::
     hawq::test::FileReplace frep;
     std::unordered_map<std::string, std::string> strs_src_dst;
     strs_src_dst["@DATABASE_OID@"]= getDatabaseOid();
-    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt");
-    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t");
-    strs_src_dst["@TABLE_OID_OLD1@"]= getTableOid("nt_1_prt_girls");
-    strs_src_dst["@TABLE_OID_OLD2@"]= getTableOid("nt_1_prt_boys");
-    strs_src_dst["@TABLE_OID_OLD3@"]= getTableOid("nt_1_prt_other");
-    strs_src_dst["@TABLE_OID_NEW1@"]= getTableOid("t_1_prt_girls");
-    strs_src_dst["@TABLE_OID_NEW2@"]= getTableOid("t_1_prt_boys");
-    strs_src_dst["@TABLE_OID_NEW3@"]= getTableOid("t_1_prt_other");
+    strs_src_dst["@TABLE_OID_OLD@"]= getTableOid("nt", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID_NEW@"]= getTableOid("t", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID_OLD1@"]= getTableOid("nt_1_prt_girls", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID_OLD2@"]= getTableOid("nt_1_prt_boys", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID_OLD3@"]= getTableOid("nt_1_prt_other", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID_NEW1@"]= getTableOid("t_1_prt_girls", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID_NEW2@"]= getTableOid("t_1_prt_boys", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    strs_src_dst["@TABLE_OID_NEW3@"]= getTableOid("t_1_prt_other", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     string hdfs_prefix;
     hawq::test::HdfsConfig hc;
     hc.getNamenodeHost(hdfs_prefix);
@@ -154,9 +161,9 @@ void TestHawqRegister::runYamlCaseForceModePartition(std::string casename, std::
     util.query("select * from nt;", checknum);
 
     // check pg_aoseg.pg_xxxseg_xxx table
-    std::string reloid2_1 = getTableOid("nt_1_prt_girls");
-    std::string reloid2_2 = getTableOid("nt_1_prt_boys");
-    std::string reloid2_3 = getTableOid("nt_1_prt_other");
+    std::string reloid2_1 = getTableOid("nt_1_prt_girls", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    std::string reloid2_2 = getTableOid("nt_1_prt_boys", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
+    std::string reloid2_3 = getTableOid("nt_1_prt_other", hawq::test::stringFormat("testhawqregister_%s", casename.c_str()));
     string result2_1 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid2_1.c_str()));
     string result2_2 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid2_2.c_str()));
     string result2_3 = util.getQueryResultSetString(hawq::test::stringFormat("select eof, tupcount, varblockcount, eofuncompressed from pg_aoseg.pg_aoseg_%s order by segno;", reloid2_3.c_str()));
