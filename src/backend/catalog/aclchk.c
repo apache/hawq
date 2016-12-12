@@ -2684,7 +2684,61 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
  */
 List *pg_rangercheck_batch(List *arg_list)
 {
-  return NIL;
+  List *aclresults = NIL;
+  List *requestargs = NIL;
+  ListCell *arg;
+  foreach(arg, arg_list) {
+    RangerPrivilegeArgs *arg_ptr = (RangerPrivilegeArgs *) lfirst(arg);
+    AclObjectKind objkind = arg_ptr->objkind;
+    Oid object_oid = arg_ptr->object_oid;
+    char *objectname = getNameFromOid(objkind, object_oid);
+    char *rolename = getRoleName(arg_ptr->roleid);
+    List* actions = getActionName(arg_ptr->mask);
+    bool isAll = (arg_ptr->how == ACLMASK_ALL) ? true: false;
+    RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
+    aclresult->result = -1;
+    aclresult->relOid = object_oid;
+    aclresults = lappend(aclresults, aclresult);
+
+    RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
+    requestarg->user = rolename;
+    requestarg->kind = objkind;
+    requestarg->object = objectname;
+    requestarg->actions = actions;
+    requestarg->how = isAll;
+    requestargs = lappend(requestargs, requestarg);
+
+  } // foreach
+
+  RangerACLResult ret = check_privilege_from_ranger_batch(requestargs);
+
+  ListCell *result;
+  int k = 0;
+  foreach(result, aclresults) {
+    RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
+    result_ptr->result = ret;
+    ++k;
+  }
+
+  if(requestargs) {
+    ListCell   *cell = list_head(requestargs);
+    while (cell != NULL)
+    {
+      ListCell   *tmp = cell;
+      cell = lnext(cell);
+      RangerRequestJsonArgs* requestarg =
+          (RangerRequestJsonArgs*)lfirst(tmp);
+      pfree(requestarg->user);
+      pfree(requestarg->object);
+      pfree(requestarg->actions);
+    }
+
+    list_free_deep(requestargs);
+    requestargs = NULL;
+  }
+
+  elog(LOG, "oids%d\n", arg_list->length);
+  return aclresults;
 }
 
 AclResult
