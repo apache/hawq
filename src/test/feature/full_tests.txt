@@ -2,5 +2,5 @@
 #SERIAL=* are the serial tests to run, optional but should not be empty
 #you can have several PARALLEL or SRRIAL
 
-PARALLEL=TestErrorTable.*:TestPreparedStatement.*:TestUDF.*:TestAOSnappy.*:TestAlterOwner.*:TestAlterTable.*:TestCreateTable.*:TestGuc.*:TestType.*:TestDatabase.*:TestParquet.*:TestPartition.*:TestSubplan.*:TestAggregate.*:TestCreateTypeComposite.*:TestGpDistRandom.*:TestInformationSchema.*:TestQueryInsert.*:TestQueryNestedCaseNull.*:TestQueryPolymorphism.*:TestQueryPortal.*:TestQueryPrepare.*:TestQuerySequence.*:TestCommonLib.*:TestToast.*:TestTransaction.*:TestCommand.*:TestCopy.*:TestParser.*
-SERIAL=TestHawqRegister.*:TestExternalOid.TestExternalOidAll:TestExternalTable.TestExternalTableAll:TestTemp.BasicTest:TestRowTypes.*
+PARALLEL=TestErrorTable.*:TestPreparedStatement.*:TestUDF.*:TestAOSnappy.*:TestAlterOwner.*:TestAlterTable.*:TestCreateTable.*:TestGuc.*:TestType.*:TestDatabase.*:TestParquet.*:TestPartition.*:TestSubplan.*:TestAggregate.*:TestCreateTypeComposite.*:TestGpDistRandom.*:TestInformationSchema.*:TestQueryInsert.*:TestQueryNestedCaseNull.*:TestQueryPolymorphism.*:TestQueryPortal.*:TestQueryPrepare.*:TestQuerySequence.*:TestCommonLib.*:TestToast.*:TestTransaction.*:TestCommand.*:TestCopy.*:TestParser.*:TestHawqRegister.*
+SERIAL=TestExternalOid.TestExternalOidAll:TestExternalTable.TestExternalTableAll:TestTemp.BasicTest:TestRowTypes.*
