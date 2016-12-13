@@ -673,44 +673,61 @@ GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 static List*
 GPHDUri_parse_fragment(char* fragment, List* fragments)
 {
+	if (!fragment)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment.fragment string is null.")));
+	}
 
 	char	*dup_frag = pstrdup(fragment);
 	char	*value_start;
 	char	*value_end;
 
-	StringInfoData formatter;
+	StringInfoData authority_formatter;
 	FragmentData* fragment_data;
 
 	fragment_data = palloc0(sizeof(FragmentData));
-	initStringInfo(&formatter);
+	initStringInfo(&authority_formatter);
 
 	value_start = dup_frag;
+
 	/* expect ip */
-
 	value_end = strchr(value_start, segwork_separator);
-	Assert(value_end != NULL);
+	if (value_end == NULL)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+	}
 	*value_end = '\0';
-	appendStringInfo(&formatter, "%s:", value_start);
+	appendStringInfo(&authority_formatter, "%s:", value_start);
 	value_start = value_end + 1;
-	/* expect port */
 
+	/* expect port */
 	value_end = strchr(value_start, segwork_separator);
-	Assert(value_end != NULL);
+	if (value_end == NULL)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+	}
 	*value_end = '\0';
-	appendStringInfo(&formatter, "%s", value_start);
-	fragment_data->authority = formatter.data;
+	appendStringInfo(&authority_formatter, "%s", value_start);
+	fragment_data->authority = pstrdup(authority_formatter.data);
+	pfree(authority_formatter.data);
 	value_start = value_end + 1;
 
 	/* expect source name */
 	value_end = strchr(value_start, segwork_separator);
-	Assert(value_end != NULL);
+	if (value_end == NULL)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+	}
 	*value_end = '\0';
 	fragment_data->source_name = pstrdup(value_start);
 	value_start = value_end + 1;
 
 	/* expect index */
 	value_end = strchr(value_start, segwork_separator);
-	Assert(value_end != NULL);
+	if (value_end == NULL)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+	}
 	*value_end = '\0';
 	fragment_data->index = pstrdup(value_start);
 	value_start = value_end + 1;
@@ -718,7 +735,10 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 	/* expect fragment metadata */
 	Assert(value_start);
 	value_end = strchr(value_start, segwork_separator);
-	Assert(value_end != NULL);
+	if (value_end == NULL)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+	}
 	*value_end = '\0';
 	fragment_data->fragment_md = pstrdup(value_start);
 	value_start = value_end + 1;
@@ -726,15 +746,21 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 	/* expect user data */
 	Assert(value_start);
 	value_end = strchr(value_start, segwork_separator);
-	Assert(value_end != NULL);
+	if (value_end == NULL)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+	}
 	*value_end = '\0';
 	fragment_data->user_data = pstrdup(value_start);
 	value_start = value_end + 1;
 
-	/* expect for profile, it's optional */
+	/* expect for profile */
 	Assert(value_start);
 	value_end = strchr(value_start, segwork_separator);
-	Assert(value_end != NULL);
+	if (value_end == NULL)
+	{
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+	}
 	*value_end = '\0';
 	if (strlen(value_start) > 0)
 		fragment_data->profile = pstrdup(value_start);
