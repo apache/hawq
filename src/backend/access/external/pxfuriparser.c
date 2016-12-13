@@ -774,13 +774,19 @@ GPHDUri_parse_fragment(char* fragment, List* fragments)
 static void
 GPHDUri_free_fragment(FragmentData *data)
 {
+	if (data->authority)
 		pfree(data->authority);
+	if (data->fragment_md)
 		pfree(data->fragment_md);
+	if (data->index)
 		pfree(data->index);
+	if (data->profile)
 		pfree(data->profile);
+	if (data->source_name)
 		pfree(data->source_name);
+	if (data->user_data)
 		pfree(data->user_data);
-		pfree(data);
+	pfree(data);
 }
 
 /*
