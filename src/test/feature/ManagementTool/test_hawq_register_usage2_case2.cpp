@@ -366,10 +366,19 @@ TEST_F(TestHawqRegister, DISABLED_TestUsage2Case2ErrorRowgroupSize) {
 TEST_F(TestHawqRegister, TestUsage2Case2IncludeDirectory) {
     SQLUtility util;
     string test_root(util.getTestRootPath());
-    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hadoop fs -put -f %s/ManagementTool/usage2case2 %s/", test_root.c_str(), getHdfsLocation().c_str())));
-    string t_yml(hawq::test::stringFormat("%s/ManagementTool/usage2case2/includedirectory.yml", test_root.c_str()));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hadoop fs -put -f %s/ManagementTool/usage2_include2 %s/", test_root.c_str(), getHdfsLocation().c_str())));
+    string t_yml(hawq::test::stringFormat("%s/ManagementTool/usage2_include2/includedirectory.yml", test_root.c_str()));
+    string t_yml_tpl(hawq::test::stringFormat("%s/ManagementTool/usage2_include2/includedirectory_tpl.yml", test_root.c_str()));
+    hawq::test::FileReplace frep;
+    std::unordered_map<std::string, std::string> strs_src_dst;
+    hawq::test::HdfsConfig hc;
+    string hdfs_prefix;
+    hc.getNamenodeHost(hdfs_prefix);
+    strs_src_dst["@PORT@"]= hdfs_prefix;
+    frep.replace(t_yml_tpl, t_yml, strs_src_dst);
     EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register --force -d %s -c %s testhawqregister_testusage2case2includedirectory.nt", HAWQ_DB, t_yml.c_str())));
-    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -rm -r %s/usage2case2", getHdfsLocation().c_str())));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("rm -rf %s", t_yml.c_str())));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hdfs dfs -rm -r %s/usage2_include2", getHdfsLocation().c_str())));
 }
 
 TEST_F(TestHawqRegister, TestUsage2Case2ErrorFormat) {
