@@ -148,6 +148,14 @@ def tablename_handler(tablename):
         return tmp_lst[-2], tmp_lst[-1]
     return 'public', tablename
 
+def check_file_exist(yml_file):
+    if yml_file:
+        if not os.path.exists(yml_file):
+            logger.error('Cannot find yaml file : %s' % yml_file)
+            sys.exit(1)
+        return True
+    return False
+
 class FailureHandler(object):
     def __init__(self, conn):
         self.operations = []
@@ -1145,7 +1153,7 @@ def main(options, args):
 
     failure_handler = FailureHandler(conn)
     # register
-    if options.yml_config and ispartition(options.yml_config):
+    if check_file_exist(options.yml_config) and ispartition(options.yml_config):
         ins = HawqRegisterPartition(options, args[0], utility_conn, conn, failure_handler)
     else:
         ins = HawqRegister(options, args[0], utility_conn, conn, failure_handler)
