@@ -214,6 +214,14 @@ typedef struct
 	List	   *cooked_privs; /* precooked AclItems from partitioning code */
 } InternalGrant;
 
+typedef struct RangerRequestJsonArgs {
+    char* user;
+    AclObjectKind kind;
+    char* object;
+    List* actions;
+    char* how;
+} RangerRequestJsonArgs;
+
 /*
  * routines used internally
  */
