@@ -779,6 +779,8 @@ bool gp_plpgsql_clear_cache_always = false;
 /* indicate whether called by gpdump, if yes, processutility will open some limitations */
 bool gp_called_by_pgdump = false;
 
+char   *rps_addr_host;
+int     rps_addr_port;
 
 /*
  * Displayable names for context types (enum GucContext)

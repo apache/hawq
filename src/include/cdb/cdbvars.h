@@ -1143,8 +1143,6 @@ extern bool debug_datalocality_time;
 /* New HAWQ 2.0 basic GUCs */
 extern char   *master_addr_host;
 extern int     master_addr_port;
-extern char   *rps_addr_host;
-extern int     rps_addr_port;
 extern char   *standby_addr_host;
 extern int     seg_addr_port;
 extern char   *dfs_url;

@@ -24,13 +24,13 @@
  *
  *-------------------------------------------------------------------------
  */
-#include <json-c/json.h>
-#include "utils/rangerrest.h"
-#include "utils/elog.h"
-#include "utils/palloc.h"
 #include "postgres.h"
+
+#include <json-c/json.h>
+
 #include "utils/acl.h"
-#include "nodes/pg_list.h"
+#include "utils/guc.h"
+#include "utils/rangerrest.h"
 
 /*
  * Internal buffer for libcurl context
@@ -433,7 +433,14 @@ void call_ranger_rest(CURL_HANDLE curl_handle, char* request)
 
     /* specify URL to get */
     //curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, "http://localhost:8089/checkprivilege");
-    curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, "http://10.32.127.114:8080/rps");
+    StringInfoData tname;
+    initStringInfo(&tname);
+    appendStringInfo(&tname, "http://");
+    appendStringInfo(&tname, rps_addr_host);
+    appendStringInfo(&tname, ":");
+    appendStringInfo(&tname, "%d", rps_addr_port);
+    appendStringInfo(&tname, "/rps");
+    curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
 
     /* specify format */
     // struct curl_slist *plist = curl_slist_append(NULL, "Content-Type:application/json;charset=UTF-8");
