@@ -6264,7 +6264,7 @@ static struct config_int ConfigureNamesInt[] =
 
 	{
     {"hawq_rps_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
-      gettext_noop("rps server address port number"),
+      gettext_noop("ranger plugin server address port number"),
       NULL
     },
     &rps_addr_port,
@@ -8177,7 +8177,7 @@ static struct config_string ConfigureNamesString[] =
 
 	{
     {"hawq_rps_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
-      gettext_noop("rps server address hostname"),
+      gettext_noop("ranger plugin server address hostname"),
       NULL
     },
     &rps_addr_host,

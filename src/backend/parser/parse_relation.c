@@ -2766,7 +2766,7 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
   aclresults = pg_rangercheck_batch(ranger_check_args);
   if (aclresults == NIL)
   {
-    elog(ERROR, "ERROR\n");
+    elog(ERROR, "ACL check failed\n");
     return;
   }
 
