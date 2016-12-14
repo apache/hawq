@@ -4,7 +4,7 @@ AO_FileLocations:
   CompressionLevel: 0
   CompressionType: null
   Files:
-  - path: /usage2case1
+  - path: /usage2_include1
     size: 1016
 AO_Schema:
 - name: i
