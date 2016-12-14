@@ -304,7 +304,7 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
 {
   PlannedStmt *result = plannedstmt;
   ResourceNegotiatorResult *ppResult = (ResourceNegotiatorResult *) palloc(sizeof(ResourceNegotiatorResult));
-  SplitAllocResult initResult = {NULL, NULL, NIL, 0, NIL, NULL};
+  SplitAllocResult initResult = {NULL, NIL, 0, NIL, NULL};
   ppResult->saResult = initResult;
   ppResult->stmt = plannedstmt;
   instr_time  starttime, endtime;
@@ -410,7 +410,6 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
 
   /* add resource and split information to it*/
   result->resource = ppResult->saResult.resource;
-  result->resource_parameters = ppResult->saResult.resource_parameters;
   result->scantable_splits = ppResult->saResult.alloc_results;
   result->planner_segments = ppResult->saResult.planner_segments;
   result->datalocalityInfo = ppResult->saResult.datalocalityInfo;
@@ -446,7 +445,7 @@ planner(Query *parse, int cursorOptions,
 	PlannedStmt *result = NULL;
 	instr_time	starttime, endtime;
 	ResourceNegotiatorResult *ppResult = (ResourceNegotiatorResult *) palloc(sizeof(ResourceNegotiatorResult));
-	SplitAllocResult initResult = {NULL, NULL, NIL, 0, NIL, NULL};
+	SplitAllocResult initResult = {NULL, NIL, 0, NIL, NULL};
 	ppResult->saResult = initResult;
 	ppResult->stmt = NULL;
 	static int plannerLevel = 0;
@@ -622,7 +621,6 @@ planner(Query *parse, int cursorOptions,
 		SetActiveQueryResource(savedQueryResource);
 
 		result->resource = ppResult->saResult.resource;
-		result->resource_parameters = ppResult->saResult.resource_parameters;
 		result->scantable_splits = ppResult->saResult.alloc_results;
 		result->planner_segments = ppResult->saResult.planner_segments;
 		result->datalocalityInfo = ppResult->saResult.datalocalityInfo;

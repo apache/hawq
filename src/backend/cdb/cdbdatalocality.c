@@ -49,6 +49,7 @@
 #include "nodes/nodes.h"
 #include "nodes/parsenodes.h"
 #include "optimizer/walkers.h"
+#include "optimizer/planmain.h"
 #include "parser/parsetree.h"
 #include "storage/fd.h"
 #include "postmaster/identity.h"
@@ -462,32 +463,6 @@ static Relation_File** change_file_order_based_on_continuity(
 
 static int64 set_maximum_segment_volume_parameter(Relation_Data *rel_data,
 		int host_num, double* maxSizePerSegment);
-
-/*
- * saveQueryResourceParameters: save QueryResourceParameters
- * in prepare statement along with query plan so that the query
- * resource can be re-allocated during multiple executions of
- * the plan
- */
-void saveQueryResourceParameters(
-		QueryResourceParameters	*resource_parameters,
-		QueryResourceLife       life,
-		int32                   slice_size,
-		int64_t                 iobytes,
-		int                     max_target_segment_num,
-		int                     min_target_segment_num,
-		HostnameVolumeInfo      *vol_info,
-		int                     vol_info_size)
-
-{
-	resource_parameters->life = life;
-	resource_parameters->slice_size = slice_size;
-	resource_parameters->iobytes = iobytes;
-	resource_parameters->max_target_segment_num = max_target_segment_num;
-	resource_parameters->min_target_segment_num = min_target_segment_num;
-	resource_parameters->vol_info = vol_info;
-	resource_parameters->vol_info_size = vol_info_size;
-}
 
 /*
  * Setup /cleanup the memory context for this run
@@ -3433,45 +3408,45 @@ static void print_datalocality_overall_log_information(SplitAllocResult *result,
 			if(log_context->minSegmentNumofHost > 0 ){
 				fprintf(fpratio, "segmentnumber_perhost_max/min=%.2f\n", (double)(log_context->maxSegmentNumofHost / log_context->minSegmentNumofHost));
 			}else{
-				fprintf(fpratio, "segmentnumber_perhost_max/min=%lld\n", INT64_MAX);
+				fprintf(fpratio, "segmentnumber_perhost_max/min=" INT64_FORMAT "\n", INT64_MAX);
 			}
 			if(log_context->avgSegmentNumofHost > 0 ){
 				fprintf(fpratio, "segmentnumber_perhost_max/avg=%.2f\n", (double)(log_context->maxSegmentNumofHost / log_context->avgSegmentNumofHost));
 			}else{
-				fprintf(fpratio, "segmentnumber_perhost_max/avg=%lld\n", INT64_MAX);
+				fprintf(fpratio, "segmentnumber_perhost_max/avg=" INT64_FORMAT "\n", INT64_MAX);
 			}
 
 			if (log_context->minSizeSegmentOverall > 0){
 				fprintf(fpratio, "segments_size_max/min=%.5f\n", (double)log_context->maxSizeSegmentOverall / (double)log_context->minSizeSegmentOverall);
 			}else{
-				fprintf(fpratio, "segments_size_max/min=%lld\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_max/min=" INT64_FORMAT "\n", INT64_MAX);
 			}
 			if (log_context->avgSizeOverall > 0){
 				fprintf(fpratio, "segments_size_max/avg=%.5f\n", log_context->maxSizeSegmentOverall / log_context->avgSizeOverall);
 			}else{
-				fprintf(fpratio, "segments_size_max/avg=%lld\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_max/avg=" INT64_FORMAT "\n", INT64_MAX);
 			}
 
 			if (log_context->minSizeSegmentOverallPenalty > 0){
 				fprintf(fpratio, "segments_size_penalty_max/min=%.5f\n",(double)log_context->maxSizeSegmentOverallPenalty / (double)log_context->minSizeSegmentOverallPenalty);
 			}else{
-				fprintf(fpratio, "segments_size_penalty_max/min=%lld\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_penalty_max/min=" INT64_FORMAT "\n", INT64_MAX);
 			}
 			if (log_context->avgSizeOverallPenalty > 0){
 				fprintf(fpratio, "segments_size_penalty_max/avg=%.5f\n",log_context->maxSizeSegmentOverallPenalty / log_context->avgSizeOverallPenalty);
 			}else{
-				fprintf(fpratio, "segments_size_penalty_max/avg=%lld\n", INT64_MAX);
+				fprintf(fpratio, "segments_size_penalty_max/avg=" INT64_FORMAT "\n", INT64_MAX);
 			}
 
 			if (log_context->minContinuityOverall > 0){
 				fprintf(fpratio, "continuity_max/min=%.5f\n",log_context->maxContinuityOverall / log_context->minContinuityOverall);
 			}else{
-				fprintf(fpratio, "continuity_max/min=%lld\n", INT64_MAX);
+				fprintf(fpratio, "continuity_max/min=" INT64_FORMAT "\n", INT64_MAX);
 			}
 			if (log_context->avgContinuityOverall > 0){
 				fprintf(fpratio, "continuity_max/avg=%.5f\n",log_context->maxContinuityOverall / log_context->avgContinuityOverall);
 			}else{
-				fprintf(fpratio, "continuity_max/avg=%lld\n", INT64_MAX);
+				fprintf(fpratio, "continuity_max/avg=" INT64_FORMAT "\n", INT64_MAX);
 			}
 			fflush(fpratio);
 			fclose(fpratio);
@@ -4050,7 +4025,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum, int fixedVsegNum) {
 	SplitAllocResult *result = NULL;
 	QueryResource *resource = NULL;
-	QueryResourceParameters *resource_parameters = NULL;
 
 	List *virtual_segments = NIL;
 	List *alloc_result = NIL;
@@ -4060,7 +4034,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 	result = (SplitAllocResult *) palloc(sizeof(SplitAllocResult));
 	result->resource = NULL;
-	result->resource_parameters = NULL;
 	result->alloc_results = NIL;
 	result->relsType = NIL;
 	result->planner_segments = 0;
@@ -4078,7 +4051,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 	if (Gp_role != GP_ROLE_DISPATCH) {
 		result->resource = NULL;
-		result->resource_parameters = NULL;
 		result->alloc_results = NIL;
 		result->relsType = NIL;
 		result->planner_segments = 0;
@@ -4090,8 +4062,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		init_datalocality_memory_context();
 
 		init_datalocality_context(&context);
-
-		resource_parameters = makeNode(QueryResourceParameters);
 
 		collect_range_tables(query, fullRangeTable, &(context.rtc_context));
 
@@ -4146,17 +4116,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 			{
 				resource = AllocateResource(resourceLife, sliceNum, 0, 0, 0, NULL, 0);
 			}
-
-			saveQueryResourceParameters(
-							resource_parameters,  /* resource_parameters */
-							resourceLife,         /* life */
-							sliceNum,             /* slice_size */
-							0,                    /* iobytes */
-							0,                    /* max_target_segment_num */
-							0,                    /* min_target_segment_num */
-							NULL,                 /* vol_info */
-							0                     /* vol_info_size */
-							);
 
 			if (resource != NULL) {
 				if ((context.keep_hash)
@@ -4348,18 +4307,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 					                            context.host_context.hostnameVolInfos,
 					                            context.host_context.size);
 				}
-
-				saveQueryResourceParameters(
-								resource_parameters,                   /* resource_parameters */
-								QRL_ONCE,                              /* life */
-								sliceNum,                              /* slice_size */
-								queryCost,                             /* iobytes */
-								maxTargetSegmentNumber,                /* max_target_segment_num */
-								minTargetSegmentNumber,                /* min_target_segment_num */
-								context.host_context.hostnameVolInfos, /* vol_info */
-								context.host_context.size              /* vol_info_size */
-								);
-
 			}
 			/* for explain statement, we doesn't allocate resource physically*/
 			else {
@@ -4380,7 +4327,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 			if (resource == NULL) {
 				result->resource = NULL;
-				result->resource_parameters = resource_parameters;
 				result->alloc_results = NIL;
 				result->relsType = NIL;
 				result->planner_segments = planner_segments;
@@ -4418,7 +4364,6 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 		alloc_result = run_allocation_algorithm(result, virtual_segments, &resource, &context);
 
 		result->resource = resource;
-		result->resource_parameters = resource_parameters;
 		result->alloc_results = alloc_result;
 		result->planner_segments = list_length(resource->segments);
 	}
