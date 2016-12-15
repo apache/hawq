@@ -33,7 +33,7 @@
 static void add_alignment_size_httpheader(CHURL_HEADERS headers);
 static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel);
 static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphduri);
-static char* normalize_key_name(const char* key);
+char* normalize_key_name(const char* key);
 static void add_delegation_token_headers(CHURL_HEADERS headers, PxfInputData *inputData);
 static void add_remote_credentials(CHURL_HEADERS headers);
 static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo, List *qualsAttributes);
@@ -315,7 +315,7 @@ static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphd
  * Converts input string to upper case and prepends "X-GP-" string
  *
  */
-static char* normalize_key_name(const char* key)
+char* normalize_key_name(const char* key)
 {	
 	if (!key || strlen(key) == 0)
 	{

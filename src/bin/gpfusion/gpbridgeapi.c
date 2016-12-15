@@ -226,7 +226,22 @@ void set_current_fragment_headers(gphadoop_context* context)
 		churl_headers_remove(context->churl_headers, "X-GP-FRAGMENT-USER-DATA", true);
 	}
 
-	if (frag_data->profile)
+	bool has_fragmenter = false;
+	ListCell *option = NULL;
+	foreach(option, context->gphd_uri->options)
+	{
+		OptionData *data = (OptionData*)lfirst(option);
+		char *x_gp_key = normalize_key_name(data->key);
+		if (strcmp(x_gp_key, "X-GP-FRAGMENTER") == 0)
+		{
+			has_fragmenter = true;
+			pfree(x_gp_key);
+			break;
+		}
+		pfree(x_gp_key);
+	}
+
+	if (frag_data->profile && !has_fragmenter)
 	{
 		churl_headers_override(context->churl_headers, "X-GP-PROFILE", frag_data->profile);
 	}
