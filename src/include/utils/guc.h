@@ -275,6 +275,7 @@ extern bool gp_plpgsql_clear_cache_always;
 extern bool gp_disable_catalog_access_on_segment;
 
 extern bool gp_called_by_pgdump;
+extern bool enable_ranger;
 
 /* Debug DTM Action */
 typedef enum
@@ -449,6 +450,11 @@ extern bool optimizer_array_constraints;
  */
 extern bool	optimizer_partition_selection_log;
 
+/**
+ * rps host and port
+ */
+extern char   *rps_addr_host;
+extern int     rps_addr_port;
 /*
  * During insertion in a table with parquet partitions,
  * require tuples to be sorted by partition key.
