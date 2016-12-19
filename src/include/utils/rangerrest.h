@@ -36,4 +36,9 @@ typedef enum
     RANGERCHECK_UNKNOWN
 } RangerACLResult;
 
+#include "utils/acl.h"
+
+int check_privilege_from_ranger_batch(List *arg_list);
+int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object, List* actions, char* how);
+
 #endif
