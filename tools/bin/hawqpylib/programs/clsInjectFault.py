@@ -420,6 +420,7 @@ class HAWQInjectFaultProgram:
 				  "fail_qe_when_do_query (inject fault when QE actually working, set error)" \
 				  "fail_qe_when_begin_parquet_scan (inject fault when begin scan parquet table, set error)"\
 				  "fail_qe_when_parquet_get_next (inject fault when get next, set error)"\
+			      "interconnect_stop_ack_is_lost (inject fault in interconnect to skip sending the stop ack), " \
 				  "all (affects all faults injected, used for 'status' and 'reset'), ")
         addTo.add_option("-c", "--ddl_statement", dest="ddlStatement", type="string",
                          metavar="ddlStatement",
