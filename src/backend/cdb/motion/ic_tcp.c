@@ -1473,6 +1473,10 @@ SetupTCPInterconnect(EState *estate)
 
 		expectedTotalIncoming += activeNumProcs;
 	}
+	
+	if (expectedTotalIncoming > listenerBacklog)
+		ereport(WARNING, (errmsg("SetupTCPInterconnect: too many expected incoming connections(%d), Interconnect setup might possibly fail", expectedTotalIncoming),
+						  errhint("Try enlarging the gp_interconnect_tcp_listener_backlog GUC value and OS net.core.somaxconn parameter")));
 
     if (gp_log_interconnect >= GPVARS_VERBOSITY_DEBUG)
         ereport(DEBUG1, (errmsg("SetupInterconnect will activate "

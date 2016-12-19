@@ -1815,6 +1815,9 @@ destroyConnHashTable(ConnHashTable *ht)
 		pfree(ht->table);
 	else
 		free(ht->table);
+
+	ht->table = NULL;
+	ht->size = 0;
 }
 
 /*

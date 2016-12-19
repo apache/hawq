@@ -319,8 +319,10 @@ InitMotionLayerIPC(void)
 	/*activated = false;*/
 	savedSeqServerFd = -1;
 
-	InitMotionTCP(&TCP_listenerFd, &tcp_listener);
-	InitMotionUDP(&UDP_listenerFd, &udp_listener);
+	if (Gp_interconnect_type == INTERCONNECT_TYPE_TCP)
+		InitMotionTCP(&TCP_listenerFd, &tcp_listener);
+	else if (Gp_interconnect_type == INTERCONNECT_TYPE_UDP)
+		InitMotionUDP(&UDP_listenerFd, &udp_listener);
 
 	Gp_listener_port = (udp_listener<<16) | tcp_listener;
 
