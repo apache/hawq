@@ -82,7 +82,7 @@ typedef struct RangerRequestJsonArgs {
   AclObjectKind kind;
   char* object;
   List* actions;
-  bool how;
+  bool isAll;
 } RangerRequestJsonArgs;
 
 RangerACLResult parse_ranger_response(char *);

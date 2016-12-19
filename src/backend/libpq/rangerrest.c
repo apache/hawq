@@ -102,7 +102,7 @@ json_object *create_ranger_request_json_batch(List *args)
     }
     AclObjectKind kind = arg_ptr->kind;
     char* object = arg_ptr->object;
-    Assert(user != NULL && object != NULL && privilege != NULL && arg_ptr->how);
+    Assert(user != NULL && object != NULL && privilege != NULL && arg_ptr->isAll);
     elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
          user, AclObjectKindStr[kind], object);
     
@@ -245,10 +245,10 @@ json_object *create_ranger_request_json_batch(List *args)
  *   }
  */
 json_object* create_ranger_request_json(char* user, AclObjectKind kind, char* object,
-        List* actions, bool how)
+        List* actions, bool isAll)
 {
     Assert(user != NULL && object != NULL && privilege != NULL
-                    && how);
+                    && isAll);
     ListCell *cell;
 
     elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
@@ -363,7 +363,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
         void *userp)
 {
     size_t realsize = size * nitems;
-    CURL_HANDLE curl = (struct curl_context_t *) userp;
+    CURL_HANDLE curl = (curl_context_t *) userp;
 
     curl->response.buffer = palloc0(realsize + 1);
     memset(curl->response.buffer, 0, realsize + 1);
@@ -490,10 +490,10 @@ int check_privilege_from_ranger_batch(List *arg_list)
  * Check the privilege from Ranger for one role
  */
 int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object,
-        List* actions, bool how)
+        List* actions, bool isAll)
 {
     json_object* jrequest = create_ranger_request_json(user, kind, object,
-                                                       actions, how);
+                                                       actions, isAll);
 
     Assert(jrequest != NULL);
     const char* request = json_object_to_json_string(jrequest);
