@@ -24,34 +24,32 @@
  *
  *-------------------------------------------------------------------------
  */
-#include "postgres.h"
 
-#include <json-c/json.h>
-
-#include "utils/acl.h"
-#include "utils/guc.h"
 #include "utils/rangerrest.h"
 
 /*
- * Internal buffer for libcurl context
+ * A mapping from AclObjectKind to string
  */
-typedef struct curl_context_t
+char* AclObjectKindStr[] =
 {
-    CURL* curl_handle;
-
-    char curl_error_buffer[CURL_ERROR_SIZE];
-
-    int curl_still_running;
-
-    struct
-    {
-        char* buffer;
-        int size;
-    } response;
-
-    char* last_http_reponse;
-} curl_context_t;
-typedef curl_context_t* CURL_HANDLE;
+    "table",             /* pg_class */
+    "sequence",          /* pg_sequence */
+    "database",          /* pg_database */
+    "function",          /* pg_proc */
+    "operator",          /* pg_operator */
+    "type",              /* pg_type */
+    "language",          /* pg_language */
+    "namespace",         /* pg_namespace */
+    "oplass",            /* pg_opclass */
+    "conversion",        /* pg_conversion */
+    "tablespace",        /* pg_tablespace */
+    "filespace",         /* pg_filespace */
+    "filesystem",        /* pg_filesystem */
+    "fdw",               /* pg_foreign_data_wrapper */
+    "foreign_server",    /* pg_foreign_server */
+    "protocol",          /* pg_extprotocol */
+    "none"               /* MUST BE LAST */
+};
 
 RangerACLResult parse_ranger_response(char* buffer)
 {
@@ -84,30 +82,6 @@ RangerACLResult parse_ranger_response(char* buffer)
 }
 
 /*
- * A mapping from AclObjectKind to string
- */
-char* AclObjectKindStr[] =
-{
-    "table",             /* pg_class */
-    "sequence",          /* pg_sequence */
-    "database",          /* pg_database */
-    "function",          /* pg_proc */
-    "operator",          /* pg_operator */
-    "type",              /* pg_type */
-    "language",          /* pg_language */
-    "namespace",         /* pg_namespace */
-    "oplass",            /* pg_opclass */
-    "conversion",        /* pg_conversion */
-    "tablespace",        /* pg_tablespace */
-    "filespace",         /* pg_filespace */
-    "filesystem",        /* pg_filesystem */
-    "fdw",               /* pg_foreign_data_wrapper */
-    "foreign_server",    /* pg_foreign_server */
-    "protocol",          /* pg_extprotocol */
-    "none"               /* MUST BE LAST */
-};
-
-/*
  * args: List of RangerRequestJsonArgs
  */
 json_object *create_ranger_request_json_batch(List *args)
@@ -128,8 +102,7 @@ json_object *create_ranger_request_json_batch(List *args)
     }
     AclObjectKind kind = arg_ptr->kind;
     char* object = arg_ptr->object;
-    char* how = arg_ptr->how;
-    Assert(user != NULL && object != NULL && privilege != NULL && how != NULL);
+    Assert(user != NULL && object != NULL && privilege != NULL && arg_ptr->isAll);
     elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
          user, AclObjectKindStr[kind], object);
     
@@ -182,7 +155,6 @@ json_object *create_ranger_request_json_batch(List *args)
             if (third != NULL)
             {
                 json_object *jthird = json_object_new_string(third);
-                elog(LOG, "JTHIRD %s\n", jthird);
                 json_object_object_add(jresource,
                          (kind == ACL_KIND_CLASS) ? "table" :
                          (kind == ACL_KIND_SEQUENCE) ? "sequence" : "function", jthird);
@@ -273,10 +245,10 @@ json_object *create_ranger_request_json_batch(List *args)
  *   }
  */
 json_object* create_ranger_request_json(char* user, AclObjectKind kind, char* object,
-        List* actions, char* how)
+        List* actions, bool isAll)
 {
     Assert(user != NULL && object != NULL && privilege != NULL
-                    && how != NULL);
+                    && isAll);
     ListCell *cell;
 
     elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
@@ -391,7 +363,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
         void *userp)
 {
     size_t realsize = size * nitems;
-    CURL_HANDLE curl = (struct curl_context *) userp;
+    CURL_HANDLE curl = (curl_context_t *) userp;
 
     curl->response.buffer = palloc0(realsize + 1);
     memset(curl->response.buffer, 0, realsize + 1);
@@ -409,7 +381,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
     return realsize;
 }
 
-void call_ranger_rest(CURL_HANDLE curl_handle, char* request)
+void call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 {
     CURLcode res;
     Assert(request != NULL);
@@ -468,7 +440,7 @@ void call_ranger_rest(CURL_HANDLE curl_handle, char* request)
     }
     else
     {
-        elog(LOG, "%lu bytes retrieved from Ranger Restful API.",
+        elog(LOG, "%d bytes retrieved from Ranger Restful API.",
                 curl_handle->response.size);
     }
 
@@ -490,7 +462,7 @@ int check_privilege_from_ranger_batch(List *arg_list)
 {
   json_object* jrequest = create_ranger_request_json_batch(arg_list);
   Assert(jrequest != NULL);
-  char *request = json_object_to_json_string(jrequest);
+  const char *request = json_object_to_json_string(jrequest);
   elog(LOG, "Send JSON request to Ranger: %s", request);
   Assert(request != NULL);
   struct curl_context_t curl_context;
@@ -518,13 +490,13 @@ int check_privilege_from_ranger_batch(List *arg_list)
  * Check the privilege from Ranger for one role
  */
 int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object,
-        List* actions, char* how)
+        List* actions, bool isAll)
 {
     json_object* jrequest = create_ranger_request_json(user, kind, object,
-                                                       actions, how);
+                                                       actions, isAll);
 
     Assert(jrequest != NULL);
-    char* request = json_object_to_json_string(jrequest);
+    const char* request = json_object_to_json_string(jrequest);
     elog(LOG, "send JSON request to Ranger: %s", request);
     Assert(request != NULL);
 
