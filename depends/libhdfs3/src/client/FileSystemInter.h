@@ -27,9 +27,11 @@
 
 #include "BlockLocation.h"
 #include "DirectoryIterator.h"
+#include "EncryptionZoneIterator.h"
 #include "FileStatus.h"
 #include "FileSystemKey.h"
 #include "FileSystemStats.h"
+#include "EncryptionZoneInfo.h"
 #include "PeerCache.h"
 #include "Permission.h"
 #include "server/LocatedBlocks.h"
@@ -481,6 +483,44 @@ public:
      * @return return the peer cache.
      */
     virtual PeerCache& getPeerCache() = 0;
+
+    /**
+     * Create encryption zone for the directory with specific key name
+     * @param path the directory path which is to be created.
+     * @param keyname The key name of the encryption zone 
+     * @return return true if success.
+     */
+    virtual bool createEncryptionZone(const char * path, const char * keyName) = 0;
+
+    /**
+     * To get encryption zone information.
+     * @param path the path which information is to be returned.
+     * @return the encryption zone information.
+     */
+    virtual EncryptionZoneInfo getEZForPath(const char * path) = 0;
+
+    /**
+     * Get a partial listing of the indicated encryption zones
+     *
+     * @param id the index of encryption zones.
+     * @param ezl append the returned encryption zones.
+     * @return return true if there are more items.
+     */   
+    virtual bool listEncryptionZones(const int64_t id, std::vector<EncryptionZoneInfo> & ezl) = 0;
+
+    /**
+     * list the contents of an encryption zone.
+     * @return Return a iterator to visit all elements in this encryption zone.
+     */
+    virtual EncryptionZoneIterator listEncryptionZone() = 0;
+
+
+    /**
+     * list all the contents of encryption zones.
+     * @param id the index of encryption zones.
+     * @return Return a vector of encryption zones information..
+     */
+    virtual std::vector<EncryptionZoneInfo> listAllEncryptionZoneItems() = 0; 
 };
 
 }

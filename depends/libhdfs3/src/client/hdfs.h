@@ -482,6 +482,30 @@ int hdfsCreateDirectory(hdfsFS fs, const char * path);
 int hdfsSetReplication(hdfsFS fs, const char * path, int16_t replication);
 
 /**
+ * hdfsEncryptionZoneInfo- Information about an encryption zone.
+ */
+typedef struct {
+    int mSuite; /* the suite of encryption zone */
+    int mCryptoProtocolVersion; /* the version of crypto protocol */
+    int64_t mId; /* the id of encryption zone */
+    char * mPath; /* the path of encryption zone */
+    char * mKeyName; /* the key name of encryption zone */
+} hdfsEncryptionZoneInfo;
+
+
+/**
+ * hdfsEncryptionFileInfo - Information about an encryption file/directory.
+ */
+typedef struct {
+    int mSuite; /* the suite of encryption file/directory */
+    int mCryptoProtocolVersion; /* the version of crypto protocol */
+    char * mKey; /* the key of encryption file/directory */
+    char * mKeyName; /* the key name of encryption file/directory */
+    char * mIv; /* the iv of encryption file/directory */
+    char * mEzKeyVersionName; /* the version encryption file/directory */
+} hdfsEncryptionFileInfo;
+
+/**
  * hdfsFileInfo - Information about a file/directory.
  */
 typedef struct {
@@ -495,6 +519,7 @@ typedef struct {
     char * mGroup; /* the group associated with the file */
     short mPermissions; /* the permissions associated with the file */
     tTime mLastAccess; /* the last access time for the file in seconds */
+    hdfsEncryptionFileInfo * mHdfsEncryptionFileInfo; /* the encryption info of the file/directory */
 } hdfsFileInfo;
 
 /**
@@ -526,6 +551,15 @@ hdfsFileInfo * hdfsGetPathInfo(hdfsFS fs, const char * path);
  * @param numEntries The size of the array.
  */
 void hdfsFreeFileInfo(hdfsFileInfo * infos, int numEntries);
+
+/**
+ * hdfsFreeEncryptionZoneInfo - Free up the hdfsEncryptionZoneInfo array (including fields)
+ * @param infos The array of dynamically-allocated hdfsEncryptionZoneInfo
+ * objects.
+ * @param numEntries The size of the array.
+ */
+void hdfsFreeEncryptionZoneInfo(hdfsEncryptionZoneInfo * infos, int numEntries);
+
 
 /**
  * hdfsGetHosts - Get hostnames where a particular block (determined by
@@ -722,6 +756,35 @@ BlockLocation * hdfsGetFileBlockLocations(hdfsFS fs, const char * path,
  * @param numOfBlock The number of elements in the locaitons
  */
 void hdfsFreeFileBlockLocations(BlockLocation * locations, int numOfBlock);
+
+/**
+ * Create encryption zone for the directory with specific key name
+ * @param fs The configured filesystem handle.
+ * @param path The path of the directory.
+ * @param keyname The key name of the encryption zone 
+ * @return Returns 0 on success, -1 on error.
+ */
+int hdfsCreateEncryptionZone(hdfsFS fs, const char * path, const char * keyName);
+
+/**
+ * hdfsEncryptionZoneInfo - Get information about a path as a (dynamically
+ * allocated) single hdfsEncryptionZoneInfo struct. hdfsEncryptionZoneInfo should be
+ * called when the pointer is no longer needed.
+ * @param fs The configured filesystem handle.
+ * @param path The path of the encryption zone.
+ * @return Returns a dynamically-allocated hdfsEncryptionZoneInfo object;
+ * NULL on error.
+ */
+hdfsEncryptionZoneInfo * hdfsGetEZForPath(hdfsFS fs, const char * path);
+
+/**
+ * hdfsEncryptionZoneInfo -  Get list of all the encryption zones.
+ * hdfsFreeEncryptionZoneInfo should be called to deallocate memory.
+ * @param fs The configured filesystem handle.
+ * @return Returns a dynamically-allocated array of hdfsEncryptionZoneInfo objects;
+ * NULL on error.
+ */
+hdfsEncryptionZoneInfo * hdfsListEncryptionZones(hdfsFS fs, int * numEntries);
 
 #ifdef __cplusplus
 }

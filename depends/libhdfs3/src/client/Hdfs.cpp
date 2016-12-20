@@ -989,8 +989,31 @@ int hdfsSetReplication(hdfsFS fs, const char * path, int16_t replication) {
     return -1;
 }
 
+static void ConstructHdfsEncryptionZoneInfo(hdfsEncryptionZoneInfo * infoEn,
+                                  std::vector<Hdfs::EncryptionZoneInfo> & enStatus) {
+    size_t size = enStatus.size();
+
+    for (size_t i = 0; i < size; ++i) {
+        infoEn[i].mSuite = enStatus[i].getSuite();
+        infoEn[i].mCryptoProtocolVersion = enStatus[i].getCryptoProtocolVersion();
+        infoEn[i].mId = enStatus[i].getId();
+        infoEn[i].mPath = Strdup(enStatus[i].getPath());
+        infoEn[i].mKeyName = Strdup(enStatus[i].getKeyName());
+    }
+}
+
+static void ConstructHdfsEncryptionFileInfo(hdfsEncryptionFileInfo * infoEn,
+                                  Hdfs::FileEncryptionInfo* enStatus) {
+    infoEn->mSuite = enStatus->getSuite();
+    infoEn->mCryptoProtocolVersion = enStatus->getCryptoProtocolVersion();
+    infoEn->mKey = const_cast<char*>(enStatus->getKey().c_str());
+    infoEn->mKeyName = const_cast<char*>(enStatus->getKeyName().c_str());
+    infoEn->mIv = const_cast<char*>(enStatus->getIv().c_str());
+    infoEn->mEzKeyVersionName = const_cast<char*>(enStatus->getEzKeyVersionName().c_str());
+}
+
 static void ConstructHdfsFileInfo(hdfsFileInfo * infos,
-                                  const std::vector<Hdfs::FileStatus> & status) {
+                                  std::vector<Hdfs::FileStatus> & status) {
     size_t size = status.size();
 
     for (size_t i = 0; i < size; ++i) {
@@ -1006,6 +1029,13 @@ static void ConstructHdfsFileInfo(hdfsFileInfo * infos,
         infos[i].mPermissions = status[i].getPermission().toShort();
         infos[i].mReplication = status[i].getReplication();
         infos[i].mSize = status[i].getLength();
+        infos[i].mHdfsEncryptionFileInfo = NULL;
+        if (status[i].isFileEncrypted()) {
+             infos[i].mHdfsEncryptionFileInfo = new hdfsEncryptionFileInfo[1];
+             memset(infos[i].mHdfsEncryptionFileInfo, 0, sizeof(hdfsEncryptionFileInfo));
+             ConstructHdfsEncryptionFileInfo(infos[i].mHdfsEncryptionFileInfo, status[i].getFileEncryption());
+             
+        }
     }
 }
 
@@ -1021,7 +1051,7 @@ hdfsFileInfo * hdfsListDirectory(hdfsFS fs, const char * path,
         size = status.size();
         retval = new hdfsFileInfo[size];
         memset(retval, 0, sizeof(hdfsFileInfo) * size);
-        ConstructHdfsFileInfo(&retval[0], status);
+        ConstructHdfsFileInfo(retval, status);
         *numEntries = size;
         return retval;
     } catch (const std::bad_alloc & e) {
@@ -1061,11 +1091,22 @@ hdfsFileInfo * hdfsGetPathInfo(hdfsFS fs, const char * path) {
     return NULL;
 }
 
+void hdfsFreeEncryptionZoneInfo(hdfsEncryptionZoneInfo * infos, int numEntries) {
+    for (int i = 0; infos != NULL && i < numEntries; ++i) {
+        delete [] infos[i].mPath;
+        delete [] infos[i].mKeyName;
+    }
+    delete[] infos;
+}
+
 void hdfsFreeFileInfo(hdfsFileInfo * infos, int numEntries) {
     for (int i = 0; infos != NULL && i < numEntries; ++i) {
         delete [] infos[i].mGroup;
         delete [] infos[i].mName;
         delete [] infos[i].mOwner;
+        if (infos[i].mHdfsEncryptionFileInfo != NULL) {
+            delete [] infos[i].mHdfsEncryptionFileInfo;
+        }
     }
 
     delete[] infos;
@@ -1450,6 +1491,75 @@ void hdfsFreeFileBlockLocations(BlockLocation * locations, int numOfBlock) {
     delete [] locations;
 }
 
+int hdfsCreateEncryptionZone(hdfsFS fs, const char * path, const char * keyName) {
+    PARAMETER_ASSERT(fs && path && strlen(path) > 0 && keyName && strlen(keyName) > 0, -1, EINVAL);
+
+    try {
+        return fs->getFilesystem().createEncryptionZone(path, keyName) ? 0 : -1;
+    } catch (const std::bad_alloc & e) {
+        SetErrorMessage("Out of memory");
+        errno = ENOMEM;
+    } catch (...) {
+        SetLastException(Hdfs::current_exception());
+        handleException(Hdfs::current_exception());
+    }
+
+    return -1;
+}
+
+hdfsEncryptionZoneInfo * hdfsGetEZForPath(hdfsFS fs, const char * path) {
+    PARAMETER_ASSERT(fs && path && strlen(path) > 0, NULL, EINVAL);
+    hdfsEncryptionZoneInfo * retval = NULL;
+
+    try {
+        retval = new hdfsEncryptionZoneInfo[1];
+        memset(retval, 0, sizeof(hdfsEncryptionZoneInfo));
+        std::vector<Hdfs::EncryptionZoneInfo> enStatus(1);
+        enStatus[0] = fs->getFilesystem().getEZForPath(path);
+        ConstructHdfsEncryptionZoneInfo(retval, enStatus);
+        return retval;
+    } catch (const std::bad_alloc & e) {
+        SetErrorMessage("Out of memory");
+        hdfsFreeEncryptionZoneInfo(retval, 1);
+        /* If out of memory error occurred, free hdfsEncryptionZoneInfo array's memory. */
+        errno = ENOMEM;
+    } catch (...) {
+        SetLastException(Hdfs::current_exception());
+        hdfsFreeEncryptionZoneInfo(retval, 1);
+        /* If any exceptions throw out, free hdfsEncryptionZoneInfo array's memory. */
+        handleException(Hdfs::current_exception());
+    }
+
+    return NULL;
+}
+
+
+hdfsEncryptionZoneInfo * hdfsListEncryptionZones(hdfsFS fs, int * numEntries) {
+    PARAMETER_ASSERT(fs, NULL, EINVAL);
+    hdfsEncryptionZoneInfo * retval = NULL;
+    int size = 0;
+
+    try {
+        std::vector<Hdfs::EncryptionZoneInfo> enStatus =
+            fs->getFilesystem().listAllEncryptionZoneItems();
+        size = enStatus.size();
+        retval = new hdfsEncryptionZoneInfo[size];
+        memset(retval, 0, sizeof(hdfsEncryptionZoneInfo) * size);
+        ConstructHdfsEncryptionZoneInfo(&retval[0], enStatus);
+        *numEntries = size;
+        return retval;
+    } catch (const std::bad_alloc & e) {
+        SetErrorMessage("Out of memory");
+        /* If out of memory error occurred, free hdfsEncryptionZoneInfo array's memory. */ 
+        hdfsFreeEncryptionZoneInfo(retval, size);
+    } catch (...) {
+        SetLastException(Hdfs::current_exception());
+        /* If any exceptions throw out, free hdfsEncryptionZoneInfo array's memory. */
+        hdfsFreeEncryptionZoneInfo(retval, size);
+        handleException(Hdfs::current_exception());
+    }
+    return NULL;
+}
 #ifdef __cplusplus
 }
 #endif
