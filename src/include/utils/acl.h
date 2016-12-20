@@ -26,7 +26,7 @@
 
 #include "nodes/parsenodes.h"
 #include "utils/array.h"
-#include "utils/rangerrest.h"
+//#include "utils/rangerrest.h"
 
 
 /*
@@ -342,28 +342,5 @@ extern bool pg_database_ownercheck(Oid db_oid, Oid roleid);
 extern bool pg_conversion_ownercheck(Oid conv_oid, Oid roleid);
 extern bool pg_foreign_server_ownercheck(Oid srv_oid, Oid roleid);
 extern bool pg_extprotocol_ownercheck(Oid ptc_oid, Oid roleid);
-
-typedef struct RangerPrivilegeArgs
-{
-  AclObjectKind objkind;
-  Oid        object_oid;
-  Oid            roleid;
-  AclMode          mask;
-  AclMaskHow        how;
-} RangerPrivilegeArgs;
-
-typedef struct RangerPrivilegeResults
-{
-  RangerACLResult result;
-  Oid relOid;
-} RangerPrivilegeResults;
-
-typedef struct RangerRequestJsonArgs {
-  char* user;
-  AclObjectKind kind;
-  char* object;
-  List* actions;
-  char* how;
-} RangerRequestJsonArgs;
 
 #endif   /* ACL_H */

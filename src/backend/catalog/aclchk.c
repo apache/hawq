@@ -56,6 +56,7 @@
 #include "utils/lsyscache.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
+#include "utils/rangerrest.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/dispatcher.h"
@@ -2726,7 +2727,7 @@ List *pg_rangercheck_batch(List *arg_list)
     requestarg->kind = objkind;
     requestarg->object = objectname;
     requestarg->actions = actions;
-    requestarg->how = isAll;
+    requestarg->isAll = isAll;
     requestargs = lappend(requestargs, requestarg);
 
   } // foreach

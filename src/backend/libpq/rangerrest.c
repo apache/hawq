@@ -25,13 +25,7 @@
  *-------------------------------------------------------------------------
  */
 
-
-#include <json-c/json.h>
-#include "postgres.h"
-#include "utils/guc.h"
 #include "utils/rangerrest.h"
-
-
 /*
  * A mapping from AclObjectKind to string
  */
@@ -56,28 +50,7 @@ char* AclObjectKindStr[] =
 	"none"               /* MUST BE LAST */
 };
 
-/*
- * Internal buffer for libcurl context
- */
-typedef struct curl_context_t
-{
-	CURL* curl_handle;
-
-	char curl_error_buffer[CURL_ERROR_SIZE];
-
-	int curl_still_running;
-
-	struct
-	{
-		char* buffer;
-		int size;
-	} response;
-
-	char* last_http_reponse;
-} curl_context_t;
-typedef curl_context_t* CURL_HANDLE;
-
-static RangerACLResult parse_ranger_response(char* buffer)
+RangerACLResult parse_ranger_response(char* buffer)
 {
 	Assert(buffer != NULL);
 	if (strlen(buffer) == 0)
@@ -100,13 +73,13 @@ static RangerACLResult parse_ranger_response(char* buffer)
 	}
 
 	int arraylen = json_object_array_length(accessObj);
-	elog(LOG, "Array Length: %dn",arraylen);
+	elog(LOG, "Array Length: %d",arraylen);
 
 	// here should return which table's acl check failed in future.
 	for (int i=0; i< arraylen; i++){
 		struct json_object *jvalue = NULL;
 		struct json_object *jallow = NULL;
-		
+
 		jvalue = json_object_array_get_idx(accessObj, i);
 		if (!json_object_object_get_ex(jvalue, "allowed", &jallow))
 		{
@@ -124,7 +97,7 @@ static RangerACLResult parse_ranger_response(char* buffer)
 /*
  * args: List of RangerRequestJsonArgs
  */
-static json_object *create_ranger_request_json_batch(List *args)
+json_object *create_ranger_request_json_batch(List *args)
 {
 	json_object *juser = NULL;
 	json_object *jaccess = json_object_new_array();
@@ -142,8 +115,7 @@ static json_object *create_ranger_request_json_batch(List *args)
 		}
 		AclObjectKind kind = arg_ptr->kind;
 		char* object = arg_ptr->object;
-		//char* how = arg_ptr->how;
-		Assert(user != NULL && object != NULL && privilege != NULL && how != NULL);
+		Assert(user != NULL && object != NULL && privilege != NULL && arg_ptr->isAll);
 		elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
 			user, AclObjectKindStr[kind], object);
 
@@ -196,7 +168,6 @@ static json_object *create_ranger_request_json_batch(List *args)
 				if (third != NULL)
 				{
 					json_object *jthird = json_object_new_string(third);
-					//elog(LOG, "JTHIRD %s\n", jthird);
 					json_object_object_add(jresource,
 						(kind == ACL_KIND_CLASS) ? "table" :
 						(kind == ACL_KIND_SEQUENCE) ? "sequence" : "function", jthird);
@@ -286,11 +257,11 @@ static json_object *create_ranger_request_json_batch(List *args)
  *       ]
  *   }
  */
-static json_object* create_ranger_request_json(char* user, AclObjectKind kind, char* object,
-	List* actions, char* how)
+json_object* create_ranger_request_json(char* user, AclObjectKind kind, char* object,
+	List* actions, bool isAll)
 {
 	Assert(user != NULL && object != NULL && privilege != NULL
-		&& how != NULL);
+		&& isAll);
 	ListCell *cell;
 
 	elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
@@ -407,15 +378,15 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	size_t realsize = size * nitems;
 	CURL_HANDLE curl = (CURL_HANDLE) userp;
 	Assert(curl != NULL);
-	
+
 	if (curl->response.buffer == NULL) 
 	{
 		curl->response.buffer = palloc0(realsize + 1);
-		//memset(curl->response.buffer, 0, realsize + 1);
 	}
 	else 
 	{
-		//Note: if curl->response.buffer==NULL, repalloc will core dump
+		//Note:
+		//our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL
 		curl->response.buffer = repalloc(curl->response.buffer, curl->response.size + realsize + 1);
 	}
 
@@ -434,10 +405,35 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	return realsize;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * @returns: 0 curl success; -1 curl failed
  */
-static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
+int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 {
 	int ret = -1;
 	CURLcode res;
@@ -452,8 +448,8 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 		goto _exit;
 	}
 
-	// hard core timeout
-	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_TIMEOUT, 15L);
+	// hard-coded timeout
+	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_TIMEOUT, 30L);
 
 	/* specify URL to get */
 	//curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, "http://localhost:8089/checkprivilege");
@@ -550,10 +546,11 @@ int check_privilege_from_ranger_batch(List *arg_list)
 /*
  * Check the privilege from Ranger for one role
  */
-int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object, List* actions, char* how)
+int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object,
+	List* actions, bool isAll)
 {
 	json_object* jrequest = create_ranger_request_json(user, kind, object,
-		actions, how);
+		actions, isAll);
 
 	Assert(jrequest != NULL);
 	const char* request = json_object_to_json_string(jrequest);
@@ -574,6 +571,7 @@ int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object, Li
 
 	/* parse the JSON-format result */
 	RangerACLResult ret = parse_ranger_response(curl_context.response.buffer);
+
 	/* free response buffer */
 	if (curl_context.response.buffer != NULL)
 	{

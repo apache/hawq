@@ -27,18 +27,69 @@
 #ifndef RANGERREST_H
 #define RANGERREST_H
 
+#include <json-c/json.h>
 #include <curl/curl.h>
+#include "postgres.h"
+#include "utils/acl.h"
+#include "utils/guc.h"
 
 typedef enum
 {
-    RANGERCHECK_OK = 0,
-    RANGERCHECK_NO_PRIV,
-    RANGERCHECK_UNKNOWN
+  RANGERCHECK_OK = 0,
+  RANGERCHECK_NO_PRIV,
+  RANGERCHECK_UNKNOWN
 } RangerACLResult;
 
-#include "utils/acl.h"
+/*
+ * Internal buffer for libcurl context
+ */
+typedef struct curl_context_t
+{
+  CURL* curl_handle;
 
-int check_privilege_from_ranger_batch(List *arg_list);
-int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object, List* actions, char* how);
+  char curl_error_buffer[CURL_ERROR_SIZE];
+
+  int curl_still_running;
+
+  struct
+  {
+    char* buffer;
+    int size;
+  } response;
+
+  char* last_http_reponse;
+} curl_context_t;
+
+typedef curl_context_t* CURL_HANDLE;
+
+typedef struct RangerPrivilegeArgs
+{
+  AclObjectKind objkind;
+  Oid        object_oid;
+  Oid            roleid;
+  AclMode          mask;
+  AclMaskHow        how;
+} RangerPrivilegeArgs;
+
+typedef struct RangerPrivilegeResults
+{
+  RangerACLResult result;
+  Oid relOid;
+} RangerPrivilegeResults;
+
+typedef struct RangerRequestJsonArgs {
+  char* user;
+  AclObjectKind kind;
+  char* object;
+  List* actions;
+  bool isAll;
+} RangerRequestJsonArgs;
+
+RangerACLResult parse_ranger_response(char *);
+json_object *create_ranger_request_json_batch(List *);
+json_object *create_ranger_request_json(char *, AclObjectKind kind, char *, List *, bool);
+int call_ranger_rest(CURL_HANDLE curl_handle, const char *request);
+extern int check_privilege_from_ranger_batch(List *);
+extern int check_privilege_from_ranger(char *, AclObjectKind kind, char *, List *, bool);
 
 #endif

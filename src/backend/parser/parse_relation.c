@@ -63,6 +63,8 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
+#include "utils/rangerrest.h"
+
 /* GUC parameter */
 bool		add_missing_from;
 
