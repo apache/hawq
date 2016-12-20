@@ -24,7 +24,6 @@
  *
  *-------------------------------------------------------------------------
  */
-
 #include "utils/rangerrest.h"
 /*
  * A mapping from AclObjectKind to string
@@ -62,14 +61,14 @@ RangerACLResult parse_ranger_response(char* buffer)
 	if (response == NULL) 
 	{
 		elog(WARNING, "json_tokener_parse failed");
-		return RANGERCHECK_UNKNOWN;
+		return RANGERCHECK_NO_PRIV;
 	}
 
 	struct json_object *accessObj = NULL;
 	if (!json_object_object_get_ex(response, "access", &accessObj))
 	{
 		elog(WARNING, "get json access field failed");
-		return RANGERCHECK_UNKNOWN;
+		return RANGERCHECK_NO_PRIV;
 	}
 
 	int arraylen = json_object_array_length(accessObj);
@@ -405,31 +404,6 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	return realsize;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /**
  * @returns: 0 curl success; -1 curl failed
  */
@@ -526,7 +500,7 @@ int check_privilege_from_ranger_batch(List *arg_list)
 	/* call GET method to send request*/
 	if (call_ranger_rest(&curl_context, request) < 0)
 	{
-		return RANGERCHECK_UNKNOWN;
+		return RANGERCHECK_NO_PRIV;
 	}
 
 	/* free the JSON object */
@@ -563,7 +537,7 @@ int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object,
 	/* call GET method to send request*/
 	if (call_ranger_rest(&curl_context, request) < 0)
 	{
-		return RANGERCHECK_UNKNOWN;
+		return RANGERCHECK_NO_PRIV;
 	}
 
 	/* free the JSON object */
