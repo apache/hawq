@@ -33,7 +33,7 @@ namespace Internal {
 enum AuthMethod {
     SIMPLE = 80, KERBEROS = 81, //"GSSAPI"
     TOKEN = 82, //"DIGEST-MD5"
-    UNKNOWN = 255
+    UNSURENESS = 255
 };
 
 enum AuthProtocol {
