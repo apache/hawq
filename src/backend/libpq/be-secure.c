@@ -318,8 +318,7 @@ rloop:
  * This function holds an interrupt before reporting this error to avoid
  * a self deadlock situation, see MPP-13718 for more info.
  */
-
-/* no used now, avoid compile warnning
+/* here is a warning on gcc 4.8.5 */
 static void
 report_commerror(const char *err_msg)
 {
@@ -331,7 +330,6 @@ report_commerror(const char *err_msg)
 
 	RESUME_INTERRUPTS();
 }
-*/
 
 /*
  *	Write data to a secure connection.
