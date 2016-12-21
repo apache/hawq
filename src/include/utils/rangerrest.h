@@ -27,9 +27,9 @@
 #ifndef RANGERREST_H
 #define RANGERREST_H
 
-#include "postgres.h"
-#include <curl/curl.h>
 #include <json-c/json.h>
+#include <curl/curl.h>
+#include "postgres.h"
 #include "utils/acl.h"
 #include "utils/guc.h"
 
@@ -88,7 +88,7 @@ typedef struct RangerRequestJsonArgs {
 RangerACLResult parse_ranger_response(char *);
 json_object *create_ranger_request_json_batch(List *);
 json_object *create_ranger_request_json(char *, AclObjectKind kind, char *, List *, bool);
-void call_ranger_rest(CURL_HANDLE curl_handle, const char *request);
+int call_ranger_rest(CURL_HANDLE curl_handle, const char *request);
 extern int check_privilege_from_ranger_batch(List *);
 extern int check_privilege_from_ranger(char *, AclObjectKind kind, char *, List *, bool);
 
