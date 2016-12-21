@@ -226,25 +226,16 @@ void set_current_fragment_headers(gphadoop_context* context)
 		churl_headers_remove(context->churl_headers, "X-GP-FRAGMENT-USER-DATA", true);
 	}
 
-	bool has_fragmenter = false;
-	ListCell *option = NULL;
-	foreach(option, context->gphd_uri->options)
-	{
-		OptionData *data = (OptionData*)lfirst(option);
-		char *x_gp_key = normalize_key_name(data->key);
-		if (strcmp(x_gp_key, "X-GP-FRAGMENTER") == 0)
-		{
-			has_fragmenter = true;
-			pfree(x_gp_key);
-			break;
-		}
-		pfree(x_gp_key);
-	}
-
-	if (frag_data->profile && !has_fragmenter)
+	/* if current fragment has optimal profile set it*/
+	if (frag_data->profile)
 	{
 		churl_headers_override(context->churl_headers, "X-GP-PROFILE", frag_data->profile);
+	} else if (context->gphd_uri->profile)
+	{
+		/* if current fragment doesn't have any optimal profile, set to use profile from url */
+		churl_headers_override(context->churl_headers, "X-GP-PROFILE", context->gphd_uri->profile);
 	}
+	/* if there is no profile passed in url, we expect to have accessor+fragmenter+resolver so no action needed by this point */
 
 }
 

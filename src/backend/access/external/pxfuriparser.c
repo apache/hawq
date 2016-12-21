@@ -33,7 +33,7 @@ static void  GPHDUri_parse_protocol(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_authority(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_data(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_options(GPHDUri *uri, char **cursor);
-static List* GPHDUri_parse_option(char* pair, List* options, const char* uri);
+static List* GPHDUri_parse_option(char* pair, GPHDUri *uri);
 static void  GPHDUri_free_options(GPHDUri *uri);
 static void  GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str);
 static List* GPHDUri_parse_fragment(char* fragment, List* fragments);
@@ -41,6 +41,7 @@ static void  GPHDUri_free_fragments(GPHDUri *uri);
 static void  GPHDUri_debug_print_options(GPHDUri *uri);
 static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
 static void  GPHDUri_fetch_authority_from_ha_nn(GPHDUri *uri, char *nameservice);
+char* normalize_key_name(const char* key);
 
 /* parseGPHDUri
  *
@@ -119,6 +120,8 @@ freeGPHDUri(GPHDUri *uri)
 	pfree(uri->host);
 	pfree(uri->port);
 	pfree(uri->data);
+	if (uri->profile)
+		pfree(uri->profile);
 
 	GPHDUri_free_options(uri);
 	if (uri->ha_nodes)
@@ -133,6 +136,8 @@ freeGPHDUriForMetadata(GPHDUri *uri)
 
 	pfree(uri->host);
 	pfree(uri->port);
+	if (uri->profile)
+		pfree(uri->profile);
 
 	pfree(uri);
 }
@@ -472,7 +477,7 @@ GPHDUri_parse_options(GPHDUri *uri, char **cursor)
 			pair;
 			pair = strtok_r(NULL, sep, &strtok_context))
 	{
-		uri->options = GPHDUri_parse_option(pair, uri->options, uri->uri);
+		uri->options = GPHDUri_parse_option(pair, uri);
 	}
 
 	pfree(dup);
@@ -484,7 +489,7 @@ GPHDUri_parse_options(GPHDUri *uri, char **cursor)
  * to OptionData object (key and value).
  */
 static List*
-GPHDUri_parse_option(char* pair, List* options, const char* uri)
+GPHDUri_parse_option(char* pair, GPHDUri *uri)
 {
 
 	char	*sep;
@@ -498,33 +503,40 @@ GPHDUri_parse_option(char* pair, List* options, const char* uri)
 	if (sep == NULL) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid URI %s: option '%s' missing '='", uri, pair)));
+				 errmsg("Invalid URI %s: option '%s' missing '='", uri->uri, pair)));
 	}
 
 	if (strchr(sep + 1, '=') != NULL) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid URI %s: option '%s' contains duplicate '='", uri, pair)));
+				 errmsg("Invalid URI %s: option '%s' contains duplicate '='", uri->uri, pair)));
 	}
 
 	key_len = sep - pair;
 	if (key_len == 0) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid URI %s: option '%s' missing key before '='", uri, pair)));
+				 errmsg("Invalid URI %s: option '%s' missing key before '='", uri->uri, pair)));
 	}
 	
 	value_len = pair_len - key_len + 1;
 	if (value_len == EMPTY_VALUE_LEN) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid URI %s: option '%s' missing value after '='", uri, pair)));
+				 errmsg("Invalid URI %s: option '%s' missing value after '='", uri->uri, pair)));
 	}
     
 	option_data->key = pnstrdup(pair,key_len);
 	option_data->value = pnstrdup(sep + 1, value_len);
 
-	return lappend(options, option_data);
+	char *x_gp_key = normalize_key_name(option_data->key);
+	if (strcmp(x_gp_key, "X-GP-PROFILE") == 0)
+	{
+		uri->profile = pstrdup(option_data->value);
+	}
+	pfree(x_gp_key);
+
+	return lappend(uri->options, option_data);
 }
 
 /*
@@ -561,6 +573,11 @@ GPHDUri_debug_print(GPHDUri *uri)
 		 uri->host,
 		 uri->port,
 		 uri->data);
+
+	if (uri->profile)
+	{
+		elog(NOTICE, "Profile: %s", uri->profile);
+	}
 
 	GPHDUri_debug_print_options(uri);
 	GPHDUri_debug_print_segwork(uri);
@@ -878,4 +895,27 @@ bool RelationIsExternalPxfReadOnly(Relation rel, StringInfo location)
 	pfree(tbl);
 
 	return false;
+}
+
+/*
+ * Full name of the HEADER KEY expected by the PXF service
+ * Converts input string to upper case and prepends "X-GP-" string
+ *
+ */
+char* normalize_key_name(const char* key)
+{
+	if (!key || strlen(key) == 0)
+	{
+		ereport(ERROR,
+			(errcode(ERRCODE_INTERNAL_ERROR),
+			 errmsg("internal error in pxfheaders.c:normalize_key_name. Parameter key is null or empty.")));
+	}
+
+	StringInfoData formatter;
+	initStringInfo(&formatter);
+	char* upperCasedKey = str_toupper(pstrdup(key), strlen(key));
+	appendStringInfo(&formatter, "X-GP-%s", upperCasedKey);
+	pfree(upperCasedKey);
+
+	return formatter.data;
 }

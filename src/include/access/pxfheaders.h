@@ -49,6 +49,5 @@ typedef struct sPxfInputData
 } PxfInputData;
 
 void build_http_header(PxfInputData *input);
-char* normalize_key_name(const char* key);
 
 #endif

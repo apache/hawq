@@ -33,7 +33,6 @@
 static void add_alignment_size_httpheader(CHURL_HEADERS headers);
 static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel);
 static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphduri);
-char* normalize_key_name(const char* key);
 static void add_delegation_token_headers(CHURL_HEADERS headers, PxfInputData *inputData);
 static void add_remote_credentials(CHURL_HEADERS headers);
 static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo, List *qualsAttributes);
@@ -308,29 +307,6 @@ static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphd
 		churl_headers_append(headers, x_gp_key, data->value);
 		pfree(x_gp_key);
 	}
-}
-
-/*
- * Full name of the HEADER KEY expected by the PXF service
- * Converts input string to upper case and prepends "X-GP-" string
- *
- */
-char* normalize_key_name(const char* key)
-{	
-	if (!key || strlen(key) == 0)
-	{
-		ereport(ERROR,
-			(errcode(ERRCODE_INTERNAL_ERROR),
-			 errmsg("internal error in pxfheaders.c:normalize_key_name. Parameter key is null or empty.")));
-	}
-
-	StringInfoData formatter;
-	initStringInfo(&formatter);
-	char* upperCasedKey = str_toupper(pstrdup(key), strlen(key));
-	appendStringInfo(&formatter, "X-GP-%s", upperCasedKey);
-	pfree(upperCasedKey);
-
-	return formatter.data;
 }
 
 /*
