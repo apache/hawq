@@ -3038,11 +3038,9 @@ renamerel(Oid myrelid, const char *newrelname, RenameStmt *stmt)
 	char			oldrelname[NAMEDATALEN];
 	bool			relhastriggers;
 	Form_pg_class	form;
-	bool			isSystemRelation;
+	bool __MAYBE_UNUSED	isSystemRelation;
 	cqContext		cqc;
 	cqContext	   *pcqCtx;
-
-	POSSIBLE_UNUSED_VAR(isSystemRelation);
 
 	/* if this is a child table of a partitioning configuration, complain */
 	if (stmt && rel_is_child_partition(myrelid) && !stmt->bAllowPartn)
@@ -14516,14 +14514,12 @@ ATPExecPartExchange(AlteredTableInfo *tab, Relation rel, AlterPartitionCmd *pc)
 		AttrMap			*newmap;
 		AttrMap			*oldmap;
 		List			*newcons;
-		bool			 ok;
+		bool __MAYBE_UNUSED	 ok;
 		bool			 validate	= intVal(pc2->arg1) ? true : false;
 		Oid				 oldnspid	= InvalidOid;
 		Oid				 newnspid	= InvalidOid;
 		char			*newNspName = NULL;
 		char			*oldNspName = NULL;
-
-		POSSIBLE_UNUSED_VAR(ok);
 
 		newrel = heap_open(newrelid, AccessExclusiveLock);
 		oldrel = heap_open(oldrelid, AccessExclusiveLock);
