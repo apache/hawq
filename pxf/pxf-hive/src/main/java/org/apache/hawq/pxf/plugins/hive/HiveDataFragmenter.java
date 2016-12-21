@@ -281,7 +281,11 @@ public class HiveDataFragmenter extends Fragmenter {
             throws Exception {
         InputFormat<?, ?> fformat = makeInputFormat(
                 tablePartition.storageDesc.getInputFormat(), jobConf);
-        String profile = ProfileFactory.get(fformat);
+        String profile = null;
+        if (inputData.getAccessor() == null) {
+            // evaluate optimal profile based on file format if fragmenter+accessor+resolver wasn't explicitly specified in url
+            profile = ProfileFactory.get(fformat);
+        }
         String fragmenterForProfile = null;
         if (profile != null) {
             fragmenterForProfile = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-FRAGMENTER");
