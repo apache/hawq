@@ -20,9 +20,7 @@ package org.apache.hawq.pxf.service;
  */
 
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
-//import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
-//import org.apache.hadoop.mapred.TextInputFormat;
 
 public class ProfileFactory {
 
@@ -32,6 +30,7 @@ public class ProfileFactory {
 
     public static String get(InputFormat inputFormat) throws Exception {
         String profileName = null;
+        // TODO: Uncomment in process of HAWQ-1228 implementation
         //if (inputFormat instanceof TextInputFormat) {
         //    profileName = HIVE_TEXT_PROFILE;
         //} else if (inputFormat instanceof RCFileInputFormat) {
