@@ -43,6 +43,7 @@ public class InputData {
     protected boolean filterStringValid;
     protected String filterString;
     protected String dataSource;
+    protected String profile;
     protected String accessor;
     protected String resolver;
     protected String fragmenter;
@@ -94,6 +95,7 @@ public class InputData {
         this.filterStringValid = copy.filterStringValid;
         this.filterString = copy.filterString;
         this.dataSource = copy.dataSource;
+        this.profile = copy.profile;
         this.accessor = copy.accessor;
         this.resolver = copy.resolver;
         this.fragmenter = copy.fragmenter;
@@ -243,6 +245,15 @@ public class InputData {
      */
     public void setDataSource(String dataSource) {
         this.dataSource = dataSource;
+    }
+
+    /**
+     * Returns the profile name.
+     *
+     * @return name of profile
+     */
+    public String getProfile() {
+        return profile;
     }
 
     /**
