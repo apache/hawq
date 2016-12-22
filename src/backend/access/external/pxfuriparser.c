@@ -33,7 +33,7 @@ static void  GPHDUri_parse_protocol(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_authority(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_data(GPHDUri *uri, char **cursor);
 static void  GPHDUri_parse_options(GPHDUri *uri, char **cursor);
-static List* GPHDUri_parse_option(char* pair, GPHDUri *uri);
+static List* GPHDUri_parse_option(char* pair, List* options, const char* uri);
 static void  GPHDUri_free_options(GPHDUri *uri);
 static void  GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str);
 static List* GPHDUri_parse_fragment(char* fragment, List* fragments);
@@ -41,7 +41,6 @@ static void  GPHDUri_free_fragments(GPHDUri *uri);
 static void  GPHDUri_debug_print_options(GPHDUri *uri);
 static void  GPHDUri_debug_print_segwork(GPHDUri *uri);
 static void  GPHDUri_fetch_authority_from_ha_nn(GPHDUri *uri, char *nameservice);
-char* normalize_key_name(const char* key);
 
 /* parseGPHDUri
  *
@@ -120,8 +119,6 @@ freeGPHDUri(GPHDUri *uri)
 	pfree(uri->host);
 	pfree(uri->port);
 	pfree(uri->data);
-	if (uri->profile)
-		pfree(uri->profile);
 
 	GPHDUri_free_options(uri);
 	if (uri->ha_nodes)
@@ -136,8 +133,6 @@ freeGPHDUriForMetadata(GPHDUri *uri)
 
 	pfree(uri->host);
 	pfree(uri->port);
-	if (uri->profile)
-		pfree(uri->profile);
 
 	pfree(uri);
 }
@@ -477,7 +472,7 @@ GPHDUri_parse_options(GPHDUri *uri, char **cursor)
 			pair;
 			pair = strtok_r(NULL, sep, &strtok_context))
 	{
-		uri->options = GPHDUri_parse_option(pair, uri);
+		uri->options = GPHDUri_parse_option(pair, uri->options, uri->uri);
 	}
 
 	pfree(dup);
@@ -489,7 +484,7 @@ GPHDUri_parse_options(GPHDUri *uri, char **cursor)
  * to OptionData object (key and value).
  */
 static List*
-GPHDUri_parse_option(char* pair, GPHDUri *uri)
+GPHDUri_parse_option(char* pair, List* options, const char* uri)
 {
 
 	char	*sep;
@@ -503,40 +498,33 @@ GPHDUri_parse_option(char* pair, GPHDUri *uri)
 	if (sep == NULL) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid URI %s: option '%s' missing '='", uri->uri, pair)));
+				 errmsg("Invalid URI %s: option '%s' missing '='", uri, pair)));
 	}
 
 	if (strchr(sep + 1, '=') != NULL) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid URI %s: option '%s' contains duplicate '='", uri->uri, pair)));
+				 errmsg("Invalid URI %s: option '%s' contains duplicate '='", uri, pair)));
 	}
 
 	key_len = sep - pair;
 	if (key_len == 0) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid URI %s: option '%s' missing key before '='", uri->uri, pair)));
+				 errmsg("Invalid URI %s: option '%s' missing key before '='", uri, pair)));
 	}
 	
 	value_len = pair_len - key_len + 1;
 	if (value_len == EMPTY_VALUE_LEN) {
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("Invalid URI %s: option '%s' missing value after '='", uri->uri, pair)));
+				 errmsg("Invalid URI %s: option '%s' missing value after '='", uri, pair)));
 	}
     
 	option_data->key = pnstrdup(pair,key_len);
 	option_data->value = pnstrdup(sep + 1, value_len);
 
-	char *x_gp_key = normalize_key_name(option_data->key);
-	if (strcmp(x_gp_key, "X-GP-PROFILE") == 0)
-	{
-		uri->profile = pstrdup(option_data->value);
-	}
-	pfree(x_gp_key);
-
-	return lappend(uri->options, option_data);
+	return lappend(options, option_data);
 }
 
 /*
@@ -573,11 +561,6 @@ GPHDUri_debug_print(GPHDUri *uri)
 		 uri->host,
 		 uri->port,
 		 uri->data);
-
-	if (uri->profile)
-	{
-		elog(NOTICE, "Profile: %s", uri->profile);
-	}
 
 	GPHDUri_debug_print_options(uri);
 	GPHDUri_debug_print_segwork(uri);
@@ -628,8 +611,6 @@ GPHDUri_debug_print_segwork(GPHDUri *uri)
 				 	 	 data->fragment_md ? data->fragment_md : "NULL");
 		if (data->user_data)
 			appendStringInfo(&fragment_data, ", user data : %s", data->user_data);
-		if (data->profile)
-			appendStringInfo(&fragment_data, ", profile : %s", data->profile);
 		elog(NOTICE, "%s", fragment_data.data);
 		++count;
 		resetStringInfo(&fragment_data);
@@ -690,120 +671,63 @@ GPHDUri_parse_segwork(GPHDUri *uri, const char *uri_str)
 static List*
 GPHDUri_parse_fragment(char* fragment, List* fragments)
 {
-	if (!fragment)
-	{
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment.fragment string is null.")));
-	}
 
 	char	*dup_frag = pstrdup(fragment);
 	char	*value_start;
 	char	*value_end;
+	bool	has_user_data = false;
 
-	StringInfoData authority_formatter;
+	StringInfoData formatter;
 	FragmentData* fragment_data;
 
 	fragment_data = palloc0(sizeof(FragmentData));
-	initStringInfo(&authority_formatter);
+	initStringInfo(&formatter);
 
 	value_start = dup_frag;
-
 	/* expect ip */
 	value_end = strchr(value_start, segwork_separator);
-	if (value_end == NULL)
-	{
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
-	}
+	Assert(value_end != NULL);
 	*value_end = '\0';
-	appendStringInfo(&authority_formatter, "%s:", value_start);
+	appendStringInfo(&formatter, "%s:", value_start);
 	value_start = value_end + 1;
-
 	/* expect port */
 	value_end = strchr(value_start, segwork_separator);
-	if (value_end == NULL)
-	{
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
-	}
+	Assert(value_end != NULL);
 	*value_end = '\0';
-	appendStringInfo(&authority_formatter, "%s", value_start);
-	fragment_data->authority = pstrdup(authority_formatter.data);
-	pfree(authority_formatter.data);
+	appendStringInfo(&formatter, "%s", value_start);
+	fragment_data->authority = formatter.data;
 	value_start = value_end + 1;
-
 	/* expect source name */
 	value_end = strchr(value_start, segwork_separator);
-	if (value_end == NULL)
-	{
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
-	}
+	Assert(value_end != NULL);
 	*value_end = '\0';
 	fragment_data->source_name = pstrdup(value_start);
 	value_start = value_end + 1;
-
 	/* expect index */
 	value_end = strchr(value_start, segwork_separator);
-	if (value_end == NULL)
-	{
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
-	}
+	Assert(value_end != NULL);
 	*value_end = '\0';
 	fragment_data->index = pstrdup(value_start);
 	value_start = value_end + 1;
-
 	/* expect fragment metadata */
 	Assert(value_start);
+
+	/* check for user data */
 	value_end = strchr(value_start, segwork_separator);
-	if (value_end == NULL)
+	if (value_end != NULL)
 	{
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+		has_user_data = true;
+		*value_end = '\0';
 	}
-	*value_end = '\0';
 	fragment_data->fragment_md = pstrdup(value_start);
-	value_start = value_end + 1;
 
-	/* expect user data */
-	Assert(value_start);
-	value_end = strchr(value_start, segwork_separator);
-	if (value_end == NULL)
+	/* read user data */
+	if (has_user_data)
 	{
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
+		fragment_data->user_data = pstrdup(value_end + 1);
 	}
-	*value_end = '\0';
-	fragment_data->user_data = pstrdup(value_start);
-	value_start = value_end + 1;
-
-	/* expect for profile */
-	Assert(value_start);
-	value_end = strchr(value_start, segwork_separator);
-	if (value_end == NULL)
-	{
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.")));
-	}
-	*value_end = '\0';
-	if (strlen(value_start) > 0)
-		fragment_data->profile = pstrdup(value_start);
 
 	return lappend(fragments, fragment_data);
-}
-
-/*
- * Free fragment data
- */
-static void
-GPHDUri_free_fragment(FragmentData *data)
-{
-	if (data->authority)
-		pfree(data->authority);
-	if (data->fragment_md)
-		pfree(data->fragment_md);
-	if (data->index)
-		pfree(data->index);
-	if (data->profile)
-		pfree(data->profile);
-	if (data->source_name)
-		pfree(data->source_name);
-	if (data->user_data)
-		pfree(data->user_data);
-	pfree(data);
 }
 
 /*
@@ -817,7 +741,10 @@ GPHDUri_free_fragments(GPHDUri *uri)
 	foreach(fragment, uri->fragments)
 	{
 		FragmentData *data = (FragmentData*)lfirst(fragment);
-		GPHDUri_free_fragment(data);
+		pfree(data->authority);
+		pfree(data->index);
+		pfree(data->source_name);
+		pfree(data);
 	}
 	list_free(uri->fragments);
 	uri->fragments = NIL;
@@ -895,27 +822,4 @@ bool RelationIsExternalPxfReadOnly(Relation rel, StringInfo location)
 	pfree(tbl);
 
 	return false;
-}
-
-/*
- * Full name of the HEADER KEY expected by the PXF service
- * Converts input string to upper case and prepends "X-GP-" string
- *
- */
-char* normalize_key_name(const char* key)
-{
-	if (!key || strlen(key) == 0)
-	{
-		ereport(ERROR,
-			(errcode(ERRCODE_INTERNAL_ERROR),
-			 errmsg("internal error in pxfheaders.c:normalize_key_name. Parameter key is null or empty.")));
-	}
-
-	StringInfoData formatter;
-	initStringInfo(&formatter);
-	char* upperCasedKey = str_toupper(pstrdup(key), strlen(key));
-	appendStringInfo(&formatter, "X-GP-%s", upperCasedKey);
-	pfree(upperCasedKey);
-
-	return formatter.data;
 }

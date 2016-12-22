@@ -56,7 +56,6 @@ typedef struct sDataFragment
 	List *replicas;
 	char *fragment_md; /* fragment meta data (start, end, length, etc.) */
 	char *user_data;
-	char *profile;
 } DataFragment;
 
 /*
