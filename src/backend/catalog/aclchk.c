@@ -2732,7 +2732,7 @@ List *pg_rangercheck_batch(List *arg_list)
 
   } // foreach
 
-  RangerACLResult ret = check_privilege_from_ranger_batch(requestargs);
+  RangerACLResult ret = check_privilege_from_ranger(requestargs);
 
   ListCell *result;
   int k = 0;
@@ -2770,27 +2770,38 @@ AclResult
 pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
          AclMode mask, AclMaskHow how)
 {
-  char* objectname = getNameFromOid(objkind, object_oid);
-  char* rolename = getRoleName(roleid);
-  List* actions = getActionName(mask);
-  bool isAll = (how == ACLMASK_ALL) ? true: false;
+	char* objectname = getNameFromOid(objkind, object_oid);
+	char* rolename = getRoleName(roleid);
+	List* actions = getActionName(mask);
+	bool isAll = (how == ACLMASK_ALL) ? true: false;
 
-  elog(LOG, "rangeraclcheck kind:%d,objectname:%s,role:%s,mask:%u\n",objkind,objectname,rolename,mask);
-  int ret = check_privilege_from_ranger(rolename, objkind, objectname, actions, isAll);
+	elog(LOG, "rangeraclcheck kind:%d,objectname:%s,role:%s,mask:%u\n",objkind,objectname,rolename,mask);
+	List *requestargs = NIL;
+	RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
+	requestarg->user = rolename;
+	requestarg->kind = objkind;
+	requestarg->object = objectname;
+	requestarg->actions = actions;
+	requestarg->isAll = isAll;
+	requestargs = lappend(requestargs, requestarg);
+	int ret = check_privilege_from_ranger(requestargs);
 
-  if(objectname){
-    pfree(objectname);
-    objectname = NULL;
-  }
-  if(rolename){
-    pfree(rolename);
-    rolename = NULL;
-  }
-  if(actions){
-    list_free_deep(actions);
-    actions = NIL;
-  }
-  return ret;
+	if (requestargs)
+	{
+		ListCell *cell = list_head(requestargs);
+		while (cell != NULL)
+		{
+			ListCell *tmp = cell;
+			cell = lnext(cell);
+			RangerRequestJsonArgs* requestarg = (RangerRequestJsonArgs*) lfirst(tmp);
+			pfree(requestarg->user);
+			pfree(requestarg->object);
+			pfree(requestarg->actions);
+		}
+		list_free_deep(requestargs);
+		requestargs = NULL;
+	}
+	return ret;
 }
 
 /*

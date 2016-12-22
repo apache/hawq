@@ -49,6 +49,23 @@ char* AclObjectKindStr[] =
 	"none"               /* MUST BE LAST */
 };
 
+static int request_id = 1;
+
+void getClientIP(char *remote_host)
+{
+	Port *port = MyProcPort;
+	char remote_port[32];
+	remote_port[0] = '\0';
+
+	int ret = pg_getnameinfo_all(&port->raddr.addr, port->raddr.salen,
+					remote_host, sizeof(remote_host),
+					remote_port,	 sizeof(remote_port),
+					NI_NUMERICHOST | NI_NUMERICSERV);
+	if (ret){
+		elog(LOG,"cannot get clientIP. pg_getnameinfo_all() failed: %s", gai_strerror(ret));
+	}
+	elog(DEBUG3, "get clientIP when building json request : %s", remote_host);
+}
 RangerACLResult parse_ranger_response(char* buffer)
 {
 	Assert(buffer != NULL);
@@ -92,15 +109,43 @@ RangerACLResult parse_ranger_response(char* buffer)
 	return RANGERCHECK_OK;
 
 }
-
-/*
- * args: List of RangerRequestJsonArgs
+/**
+ * Create a JSON object for Ranger request given some parameters.
+ *
+ *   {
+ *     "requestId": 1,
+ *     "user": "joe",
+ *     "groups": ["admin","us"],
+ *     "clientIp": "123.0.0.21",
+ *     "context": "SELECT * FROM sales",
+ *     "access":
+ *       [
+ *         {
+ *           "resource":
+ *           {
+ *             "database": "finance"
+ *           },
+ *           "privileges": ["connect"]
+ *         },
+ *         {
+ *           "resource":
+ *           {
+ *             "database": "finance",
+ *             "schema": "us",
+ *             "table": "sales"
+ *           },
+ *           "privileges": ["select", "insert"]
+ *         }
+ *       ]
+ *   }
+ *
+ *   args: List of RangerRequestJsonArgs
  */
-json_object *create_ranger_request_json_batch(List *args)
+json_object *create_ranger_request_json(List *args)
 {
+	json_object *jrequest = json_object_new_object();
 	json_object *juser = NULL;
 	json_object *jaccess = json_object_new_array();
-	json_object *jrequest = json_object_new_object();
 	char *user = NULL;
 	ListCell *arg;
 
@@ -116,28 +161,27 @@ json_object *create_ranger_request_json_batch(List *args)
 		char* object = arg_ptr->object;
 		Assert(user != NULL && object != NULL && privilege != NULL && arg_ptr->isAll);
 		elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
-			user, AclObjectKindStr[kind], object);
+				user, AclObjectKindStr[kind], object);
 
-		json_object *jresource = json_object_new_object();
 		json_object *jelement = json_object_new_object();
+		json_object *jresource = json_object_new_object();
 		json_object *jactions = json_object_new_array();
-
 		switch(kind)
 		{
-		case ACL_KIND_CLASS:
-		case ACL_KIND_SEQUENCE:
-		case ACL_KIND_PROC:
-		case ACL_KIND_NAMESPACE:
-		case ACL_KIND_LANGUAGE:
+			case ACL_KIND_CLASS:
+			case ACL_KIND_SEQUENCE:
+			case ACL_KIND_PROC:
+			case ACL_KIND_NAMESPACE:
+			case ACL_KIND_LANGUAGE:
 			{
-				char *ptr = NULL; char *name = NULL;
+				char *ptr = NULL;
+				char *name = NULL;
 				char *first = NULL; // could be a database or protocol or tablespace
 				char *second = NULL; // could be a schema or language
 				char *third = NULL; // could be a table or sequence or function
 				int idx = 0;
-				for (name = strtok_r(object, ".", &ptr);
-					name;
-					name = strtok_r(NULL, ".", &ptr), idx++)
+				for (name = strtok_r(object, ".", &ptr); name;
+						name = strtok_r(NULL, ".", &ptr), idx++)
 				{
 					if (idx == 0)
 					{
@@ -180,24 +224,23 @@ json_object *create_ranger_request_json_batch(List *args)
 					pfree(third);
 				break;
 			}
-		case ACL_KIND_OPER:
-		case ACL_KIND_CONVERSION:
-		case ACL_KIND_DATABASE:
-		case ACL_KIND_TABLESPACE:
-		case ACL_KIND_TYPE:
-		case ACL_KIND_FILESYSTEM:
-		case ACL_KIND_FDW:
-		case ACL_KIND_FOREIGN_SERVER:
-		case ACL_KIND_EXTPROTOCOL:
+			case ACL_KIND_OPER:
+			case ACL_KIND_CONVERSION:
+			case ACL_KIND_DATABASE:
+			case ACL_KIND_TABLESPACE:
+			case ACL_KIND_TYPE:
+			case ACL_KIND_FILESYSTEM:
+			case ACL_KIND_FDW:
+			case ACL_KIND_FOREIGN_SERVER:
+			case ACL_KIND_EXTPROTOCOL:
 			{
 				json_object *jobject = json_object_new_string(object);
 				json_object_object_add(jresource, AclObjectKindStr[kind], jobject);
 				break;
 			}
-		default:
-			elog(ERROR, "unrecognized objkind: %d", (int) kind);
+			default:
+				elog(ERROR, "unrecognized objkind: %d", (int) kind);
 		} // switch
-
 		json_object_object_add(jelement, "resource", jresource);
 
 		ListCell *cell;
@@ -210,161 +253,20 @@ json_object *create_ranger_request_json_batch(List *args)
 		json_object_array_add(jaccess, jelement);
 
 	} // foreach
-
-	json_object_object_add(jrequest, "user", juser);
-	json_object_object_add(jrequest, "access", jaccess);
-
-	json_object *jreqid = json_object_new_string("1");
+	char str[32];
+	sprintf(str,"%d",request_id);
+	json_object *jreqid = json_object_new_string(str);
 	json_object_object_add(jrequest, "requestId", jreqid);
-	json_object *jclientip = json_object_new_string("123.0.0.21");
-	json_object_object_add(jrequest, "clientIp", jclientip);
-	json_object *jcontext = json_object_new_string("SELECT * FROM DDDDDDD");
-	json_object_object_add(jrequest, "context", jcontext);
-
-	return jrequest;
-}
-
-/**
- * Create a JSON object for Ranger request given some parameters.
- *
- *   {
- *     "requestId": 1,
- *     "user": "joe",
- *     "groups": ["admin","us"],
- *     "clientIp": "123.0.0.21",
- *     "context": "SELECT * FROM sales",
- *     "access":
- *       [
- *         {
- *           "resource":
- *           {
- *             "database": "finance"
- *           },
- *           "privileges": ["connect"]
- *         },
- *         {
- *           "resource":
- *           {
- *             "database": "finance",
- *             "schema": "us",
- *             "table": "sales"
- *           },
- *           "privileges": ["select, insert"]
- *         }
- *       ]
- *   }
- */
-json_object* create_ranger_request_json(char* user, AclObjectKind kind, char* object,
-	List* actions, bool isAll)
-{
-	Assert(user != NULL && object != NULL && privilege != NULL
-		&& isAll);
-	ListCell *cell;
-
-	elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
-		user, AclObjectKindStr[kind], object);
-	json_object *jrequest = json_object_new_object();
-	json_object *juser = json_object_new_string(user);
-
-	json_object *jaccess = json_object_new_array();
-	json_object *jelement = json_object_new_object();
-
-	json_object *jresource = json_object_new_object();
-	switch(kind)
-	{
-	case ACL_KIND_CLASS:
-	case ACL_KIND_SEQUENCE:
-	case ACL_KIND_PROC:
-	case ACL_KIND_NAMESPACE:
-	case ACL_KIND_LANGUAGE:
-		{
-			char *ptr = NULL; char *name = NULL;
-			char *first = NULL; // could be a database or protocol or tablespace
-			char *second = NULL; // could be a schema or language
-			char *third = NULL; // could be a table or sequence or function
-			int idx = 0;
-			for (name = strtok_r(object, ".", &ptr);
-				name;
-				name = strtok_r(NULL, ".", &ptr), idx++)
-			{
-				if (idx == 0)
-				{
-					first = pstrdup(name);
-				}
-				else if (idx == 1)
-				{
-					second = pstrdup(name);
-				}
-				else
-				{
-					third = pstrdup(name);
-				}
-			}
-
-			if (first != NULL)
-			{
-				json_object *jfirst = json_object_new_string(first);
-				json_object_object_add(jresource, "database", jfirst);
-			}
-			if (second != NULL)
-			{
-				json_object *jsecond = json_object_new_string(second);
-				json_object_object_add(jresource,
-					(kind == ACL_KIND_LANGUAGE) ? "language" : "schema", jsecond);
-			}
-			if (third != NULL)
-			{
-				json_object *jthird = json_object_new_string(third);
-				json_object_object_add(jresource,
-					(kind == ACL_KIND_CLASS) ? "table" :
-					(kind == ACL_KIND_SEQUENCE) ? "sequence" : "function", jthird);
-			}
-
-			if (first != NULL)
-				pfree(first);
-			if (second != NULL)
-				pfree(second);
-			if (third != NULL)
-				pfree(third);
-			break;
-		}
-	case ACL_KIND_OPER:
-	case ACL_KIND_CONVERSION:
-	case ACL_KIND_DATABASE:
-	case ACL_KIND_TABLESPACE:
-	case ACL_KIND_TYPE:
-	case ACL_KIND_FILESYSTEM:
-	case ACL_KIND_FDW:
-	case ACL_KIND_FOREIGN_SERVER:
-	case ACL_KIND_EXTPROTOCOL:
-		{
-			json_object *jobject = json_object_new_string(object);
-			json_object_object_add(jresource, AclObjectKindStr[kind], jobject);
-			break;
-		}
-	default:
-		elog(ERROR, "unrecognized objkind: %d", (int) kind);
-	}
-
-	json_object *jactions = json_object_new_array();
-	foreach(cell, actions)
-	{
-		json_object* jaction = json_object_new_string((char *)cell->data.ptr_value);
-		json_object_array_add(jactions, jaction);
-	}
-	json_object_object_add(jelement, "resource", jresource);
-	json_object_object_add(jelement, "privileges", jactions);
-	json_object_array_add(jaccess, jelement);
-
 	json_object_object_add(jrequest, "user", juser);
-	json_object_object_add(jrequest, "access", jaccess);
-	json_object *jreqid = json_object_new_string("1");
-	json_object_object_add(jrequest, "requestId", jreqid);
-	json_object *jclientip = json_object_new_string("123.0.0.21");
-	json_object_object_add(jrequest, "clientIp", jclientip);
-	json_object *jcontext = json_object_new_string("SELECT * FROM DDDDDDD");
-	json_object_object_add(jrequest, "context", jcontext);
 
+	char remote_host[1025];
+	getClientIP(remote_host);
+	json_object *jclientip = json_object_new_string(remote_host);
+	json_object_object_add(jrequest, "clientIp", jclientip);
+
+	json_object *jcontext = json_object_new_string(debug_query_string);
+	json_object_object_add(jrequest, "context", jcontext);
+	json_object_object_add(jrequest, "access", jaccess);
 
 	return jrequest;
 }
@@ -435,11 +337,9 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
 
 	struct curl_slist *headers = NULL;
-	//curl_slist_append(headers, "Accept: application/json");
 	headers = curl_slist_append(headers, "Content-Type:application/json");
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_HTTPHEADER, headers);
 
-	//curl_easy_setopt(curl_handle->curl_handle, CURLOPT_POST, 1L);
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_POSTFIELDS,request);
 	//"{\"requestId\": 1,\"user\": \"hubert\",\"clientIp\":\"123.0.0.21\",\"context\": \"SELECT * FROM sales\",\"access\":[{\"resource\":{\"database\":\"a-database\",\"schema\":\"a-schema\",\"table\":\"sales\"},\"privileges\": [\"select\"]}]}");
 	/* send all data to this function  */
@@ -447,7 +347,11 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_WRITEDATA, (void *)curl_handle);
 
 	res = curl_easy_perform(curl_handle->curl_handle);
-
+	if(request_id == INT_MAX)
+	{
+		request_id = 0;
+	}
+	request_id++;
 	/* check for errors */
 	if(res != CURLE_OK)
 	{
@@ -476,9 +380,9 @@ _exit:
 /*
  * arg_list: List of RangerRequestJsonArgs
  */
-int check_privilege_from_ranger_batch(List *arg_list)
+int check_privilege_from_ranger(List *arg_list)
 {
-	json_object* jrequest = create_ranger_request_json_batch(arg_list);
+	json_object* jrequest = create_ranger_request_json(arg_list);
 	Assert(jrequest != NULL);
 	const char *request = json_object_to_json_string(jrequest);
 	elog(LOG, "Send JSON request to Ranger: %s", request);
@@ -505,42 +409,3 @@ int check_privilege_from_ranger_batch(List *arg_list)
 
 	return ret;
 }
-
-/*
- * Check the privilege from Ranger for one role
- */
-int check_privilege_from_ranger(char* user, AclObjectKind kind, char* object,
-	List* actions, bool isAll)
-{
-	json_object* jrequest = create_ranger_request_json(user, kind, object,
-		actions, isAll);
-
-	Assert(jrequest != NULL);
-	const char* request = json_object_to_json_string(jrequest);
-	elog(LOG, "send JSON request to Ranger: %s", request);
-	Assert(request != NULL);
-
-	struct curl_context_t curl_context;
-	memset(&curl_context, 0, sizeof(struct curl_context_t));
-
-	/* call GET method to send request*/
-	if (call_ranger_rest(&curl_context, request) < 0)
-	{
-		return RANGERCHECK_NO_PRIV;
-	}
-
-	/* free the JSON object */
-	json_object_put(jrequest);
-
-	/* parse the JSON-format result */
-	RangerACLResult ret = parse_ranger_response(curl_context.response.buffer);
-
-	/* free response buffer */
-	if (curl_context.response.buffer != NULL)
-	{
-		pfree(curl_context.response.buffer);
-	}
-
-	return ret;
-}
-
