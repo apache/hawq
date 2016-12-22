@@ -20,9 +20,12 @@ package org.apache.hawq.pxf.plugins.hive.utilities;
  */
 
 
+import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.ListIterator;
+import java.util.Properties;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
@@ -33,10 +36,16 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.io.DataType;
+import org.apache.hawq.pxf.plugins.hive.HiveDataFragmenter;
+import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter;
+import org.apache.hawq.pxf.plugins.hive.HiveTablePartition;
+import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_INPUT_FORMATS;
+import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_SERDES;
 
 /**
  * Class containing helper functions connecting
@@ -51,6 +60,14 @@ public class HiveUtilities {
      * Default Hive DB (schema) name.
      */
     private static final String HIVE_DEFAULT_DBNAME = "default";
+
+    static final String STR_RC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
+    static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
+    static final String STR_ORC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
+    static final String STR_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe";
+    static final String STR_LAZY_BINARY_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe";
+    static final String STR_LAZY_SIMPLE_SERDE = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe";
+    static final String STR_ORC_SERDE = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
 
     /**
      * Initializes the HiveMetaStoreClient
@@ -325,5 +342,117 @@ public class HiveUtilities {
                 }
                 break;
         }
+    }
+
+    /* Turns a Properties class into a string */
+    private static String serializeProperties(Properties props) throws Exception {
+        ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+        props.store(outStream, ""/* comments */);
+        return outStream.toString();
+    }
+
+    /*
+     * Validates that partition format corresponds to PXF supported formats and
+     * transforms the class name to an enumeration for writing it to the
+     * accessors on other PXF instances.
+     */
+    private static String assertFileType(String className, HiveTablePartition partData)
+            throws Exception {
+        switch (className) {
+            case STR_RC_FILE_INPUT_FORMAT:
+                return PXF_HIVE_INPUT_FORMATS.RC_FILE_INPUT_FORMAT.name();
+            case STR_TEXT_FILE_INPUT_FORMAT:
+                return PXF_HIVE_INPUT_FORMATS.TEXT_FILE_INPUT_FORMAT.name();
+            case STR_ORC_FILE_INPUT_FORMAT:
+                return PXF_HIVE_INPUT_FORMATS.ORC_FILE_INPUT_FORMAT.name();
+            default:
+                throw new IllegalArgumentException(
+                        "HiveInputFormatFragmenter does not yet support "
+                                + className
+                                + " for "
+                                + partData
+                                + ". Supported InputFormat are "
+                                + Arrays.toString(PXF_HIVE_INPUT_FORMATS.values()));
+        }
+    }
+
+    /*
+     * Validates that partition serde corresponds to PXF supported serdes and
+     * transforms the class name to an enumeration for writing it to the
+     * resolvers on other PXF instances.
+     */
+    private static String assertSerde(String className, HiveTablePartition partData)
+            throws Exception {
+        switch (className) {
+            case STR_COLUMNAR_SERDE:
+                return PXF_HIVE_SERDES.COLUMNAR_SERDE.name();
+            case STR_LAZY_BINARY_COLUMNAR_SERDE:
+                return PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name();
+            case STR_LAZY_SIMPLE_SERDE:
+                return PXF_HIVE_SERDES.LAZY_SIMPLE_SERDE.name();
+            case STR_ORC_SERDE:
+                return PXF_HIVE_SERDES.ORC_SERDE.name();
+            default:
+                throw new UnsupportedTypeException(
+                        "HiveInputFormatFragmenter does not yet support  "
+                                + className + " for " + partData
+                                + ". Supported serializers are: "
+                                + Arrays.toString(PXF_HIVE_SERDES.values()));
+        }
+    }
+
+
+    /* Turns the partition keys into a string */
+    public static String serializePartitionKeys(HiveTablePartition partData) throws Exception {
+        if (partData.partition == null) /*
+                                         * this is a simple hive table - there
+                                         * are no partitions
+                                         */{
+            return HiveDataFragmenter.HIVE_NO_PART_TBL;
+        }
+
+        StringBuilder partitionKeys = new StringBuilder();
+        String prefix = "";
+        ListIterator<String> valsIter = partData.partition.getValues().listIterator();
+        ListIterator<FieldSchema> keysIter = partData.partitionKeys.listIterator();
+        while (valsIter.hasNext() && keysIter.hasNext()) {
+            FieldSchema key = keysIter.next();
+            String name = key.getName();
+            String type = key.getType();
+            String val = valsIter.next();
+            String oneLevel = prefix + name + HiveDataFragmenter.HIVE_1_PART_DELIM + type
+                    + HiveDataFragmenter.HIVE_1_PART_DELIM + val;
+            partitionKeys.append(oneLevel);
+            prefix = HiveDataFragmenter.HIVE_PARTITIONS_DELIM;
+        }
+
+        return partitionKeys.toString();
+    }
+
+    public static byte[] makeUserData(String fragmenterClassName, HiveTablePartition partData, boolean filterInFragmenter) throws Exception {
+
+        String userData = null;
+
+        if (fragmenterClassName == null) {
+            throw new IllegalArgumentException("No fragmenter provided.");
+        }
+
+        if (fragmenterClassName.equals("org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter")) {
+            String inputFormatName = partData.storageDesc.getInputFormat();
+            String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
+            String partitionKeys = serializePartitionKeys(partData);
+            assertFileType(inputFormatName, partData);
+            userData = assertSerde(serdeName, partData) + HiveDataFragmenter.HIVE_UD_DELIM
+                    + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter;
+        } else {
+            String inputFormatName = partData.storageDesc.getInputFormat();
+            String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
+            String propertiesString = serializeProperties(partData.properties);
+            String partitionKeys = serializePartitionKeys(partData);
+            userData = inputFormatName + HiveDataFragmenter.HIVE_UD_DELIM + serdeName
+                    + HiveDataFragmenter.HIVE_UD_DELIM + propertiesString + HiveDataFragmenter.HIVE_UD_DELIM
+                    + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter;
+        }
+        return userData.getBytes();
     }
 }
