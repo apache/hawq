@@ -46,6 +46,7 @@ typedef struct FragmentData
 	char	 *source_name;
 	char	 *fragment_md;
 	char	 *user_data;
+	char	 *profile;
 } FragmentData;
 
 typedef struct OptionData
@@ -66,6 +67,7 @@ typedef struct GPHDUri
 	char			*host;		/* host name str			*/
 	char			*port;		/* port number as string	*/
 	char			*data;      /* data location (path)     */
+	char			*profile;   /* profile option			*/
 	List			*fragments; /* list of FragmentData		*/
 
 	/* options */
@@ -88,5 +90,6 @@ int		 GPHDUri_get_value_for_opt(GPHDUri *uri, char *key, char **val, bool emit_e
 bool 	 RelationIsExternalPxfReadOnly(Relation rel, StringInfo location);
 void 	 GPHDUri_verify_no_duplicate_options(GPHDUri *uri);
 void 	 GPHDUri_verify_core_options_exist(GPHDUri *uri, List *coreOptions);
+char* normalize_key_name(const char* key);
 
 #endif	// _PXF_URIPARSER_H_
