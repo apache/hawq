@@ -50,6 +50,7 @@ public class ProtocolData extends InputData {
     protected OutputFormat outputFormat;
     protected int port;
     protected String host;
+    protected String profile;
     protected String token;
     // statistics parameters
     protected int statsMaxFragments;
