@@ -21,7 +21,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.hawq</groupId>
   <artifactId>hawq-ambari-plugin</artifactId>
-  <version>2.0.1.0</version>
+  <version>2.1.0.0</version>
   <name>hawq-ambari-plugin</name>
   <url>http://maven.apache.org</url>
 
