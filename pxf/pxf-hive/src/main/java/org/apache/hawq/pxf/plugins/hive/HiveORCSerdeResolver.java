@@ -45,6 +45,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveORCSerdeResolver.class);
     private OrcSerde deserializer;
     private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
+    private String typesString;
 
     public HiveORCSerdeResolver(InputData input) throws Exception {
         super(input);
@@ -61,6 +62,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
         }
         partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
+        typesString = toks[HiveInputFormatFragmenter.TOK_COL_TYPES];
         collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM
                 : input.getUserProperty("COLLECTION_DELIM");
         mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM
@@ -102,11 +104,19 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
         StringBuilder columnNames = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
         StringBuilder columnTypes = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
+        String[] cols = typesString.split(":");
+        String[] hiveColTypes = new String[numberOfDataColumns];
+        parseColTypes(cols, hiveColTypes);
+
         String delim = ",";
         for (int i = 0; i < numberOfDataColumns; i++) {
             ColumnDescriptor column = input.getColumn(i);
             String columnName = column.columnName();
             String columnType = HiveUtilities.toCompatibleHiveType(DataType.get(column.columnTypeCode()), column.columnTypeModifiers());
+            //Complex Types will have a mismatch between Hive and Hawq type
+            if (!columnType.equals(hiveColTypes[i])) {
+                columnType = hiveColTypes[i];
+            }
             if(i > 0) {
                 columnNames.append(delim);
                 columnTypes.append(delim);
@@ -124,5 +134,27 @@ public class HiveORCSerdeResolver extends HiveResolver {
         }
 
         deserializer.initialize(new JobConf(new Configuration(), HiveORCSerdeResolver.class), serdeProperties);
+    }
+
+    private void parseColTypes(String[] cols, String[] output) {
+        int i = 0;
+        StringBuilder structTypeBuilder = new StringBuilder();
+        boolean inStruct = false;
+        for (String str : cols) {
+            if (str.contains("struct")) {
+                structTypeBuilder = new StringBuilder();
+                inStruct = true;
+                structTypeBuilder.append(str);
+            } else if (inStruct) {
+                structTypeBuilder.append(':');
+                structTypeBuilder.append(str);
+                if (str.contains(">")) {
+                    inStruct = false;
+                    output[i++] = structTypeBuilder.toString();
+                }
+            } else {
+                output[i++] = str;
+            }
+        }
     }
 }

@@ -26,7 +26,6 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.hawq.pxf.plugins.hive.utilities.EnumHiveToHawqType;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -35,6 +34,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Specialized Hive fragmenter for RC and Text files tables. Unlike the
@@ -55,10 +55,11 @@ import java.util.List;
  */
 public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     private static final Log LOG = LogFactory.getLog(HiveInputFormatFragmenter.class);
-    private static final int EXPECTED_NUM_OF_TOKS = 3;
+    private static final int EXPECTED_NUM_OF_TOKS = 4;
     public static final int TOK_SERDE = 0;
     public static final int TOK_KEYS = 1;
     public static final int TOK_FILTER_DONE = 2;
+    public static final int TOK_COL_TYPES = 3;
 
     /** Defines the Hive input formats currently supported in pxf */
     public enum PXF_HIVE_INPUT_FORMATS {
