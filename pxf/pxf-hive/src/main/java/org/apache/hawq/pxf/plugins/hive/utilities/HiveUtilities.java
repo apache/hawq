@@ -429,6 +429,7 @@ public class HiveUtilities {
         return partitionKeys.toString();
     }
 
+    @SuppressWarnings("unchecked")
     public static byte[] makeUserData(String fragmenterClassName, HiveTablePartition partData, boolean filterInFragmenter) throws Exception {
 
         String userData = null;
@@ -437,14 +438,16 @@ public class HiveUtilities {
             throw new IllegalArgumentException("No fragmenter provided.");
         }
 
-        if (fragmenterClassName.equals("org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter")) {
+        Class fragmenterClass = Class.forName(fragmenterClassName);
+
+        if (HiveInputFormatFragmenter.class.isAssignableFrom(fragmenterClass)) {
             String inputFormatName = partData.storageDesc.getInputFormat();
             String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
             String partitionKeys = serializePartitionKeys(partData);
             assertFileType(inputFormatName, partData);
             userData = assertSerde(serdeName, partData) + HiveDataFragmenter.HIVE_UD_DELIM
                     + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter;
-        } else {
+        } else if (HiveDataFragmenter.class.isAssignableFrom(fragmenterClass)){
             String inputFormatName = partData.storageDesc.getInputFormat();
             String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
             String propertiesString = serializeProperties(partData.properties);
@@ -452,6 +455,8 @@ public class HiveUtilities {
             userData = inputFormatName + HiveDataFragmenter.HIVE_UD_DELIM + serdeName
                     + HiveDataFragmenter.HIVE_UD_DELIM + propertiesString + HiveDataFragmenter.HIVE_UD_DELIM
                     + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter;
+        } else {
+            throw new IllegalArgumentException("HiveUtilities#makeUserData is not implemented for " + fragmenterClassName);
         }
         return userData.getBytes();
     }
