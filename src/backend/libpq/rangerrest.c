@@ -200,14 +200,12 @@ json_object *create_ranger_request_json_batch(List *args)
 
 		json_object_object_add(jelement, "resource", jresource);
 
-		//ListCell *cell;
-		//foreach(cell, arg_ptr->actions)
-		//{
-		char tmp[7] = "select";
-		json_object* jaction = json_object_new_string((char *)tmp);
-		//json_object* jaction = json_object_new_string((char *)cell->data.ptr_value);
-		json_object_array_add(jactions, jaction);
-		//}
+		ListCell *cell;
+		foreach(cell, arg_ptr->actions)
+		{
+		    json_object* jaction = json_object_new_string((char *)cell->data.ptr_value);
+		    json_object_array_add(jactions, jaction);
+		}
 		json_object_object_add(jelement, "privileges", jactions);
 		json_object_array_add(jaccess, jelement);
 
