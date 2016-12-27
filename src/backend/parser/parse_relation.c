@@ -2745,10 +2745,10 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
     RangeTblEntry *rte = (RangeTblEntry *) lfirst(l);
 
     if (rte->rtekind != RTE_RELATION)
-      return;
+      continue;
     requiredPerms = rte->requiredPerms;
     if (requiredPerms == 0)
-      return;
+      continue;
     
     relOid = rte->relid;
     userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
@@ -2762,6 +2762,9 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
     ranger_check_args = lappend(ranger_check_args, ranger_check_arg);
 
   } // foreach
+
+  if (ranger_check_args == NIL)
+    return;
 
   // ranger ACL check with package Oids
   List *aclresults = NIL;
