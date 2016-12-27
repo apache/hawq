@@ -27,12 +27,12 @@
 #include "catalog/pg_exttable.h"
 #include "access/pxfheaders.h"
 #include "access/pxffilters.h"
+#include "utils/formatting.h"
 #include "utils/guc.h"
 
 static void add_alignment_size_httpheader(CHURL_HEADERS headers);
 static void add_tuple_desc_httpheader(CHURL_HEADERS headers, Relation rel);
 static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphduri);
-static char* prepend_x_gp(const char* key);
 static void add_delegation_token_headers(CHURL_HEADERS headers, PxfInputData *inputData);
 static void add_remote_credentials(CHURL_HEADERS headers);
 static void add_projection_desc_httpheader(CHURL_HEADERS headers, ProjectionInfo *projInfo, List *qualsAttributes);
@@ -303,20 +303,10 @@ static void add_location_options_httpheader(CHURL_HEADERS headers, GPHDUri *gphd
 	foreach(option, gphduri->options)
 	{
 		OptionData *data = (OptionData*)lfirst(option);
-		char *x_gp_key = prepend_x_gp(data->key);
+		char *x_gp_key = normalize_key_name(data->key);
 		churl_headers_append(headers, x_gp_key, data->value);
 		pfree(x_gp_key);
 	}
-}
-
-/* Full name of the HEADER KEY expected by the PXF service */
-static char* prepend_x_gp(const char* key)
-{	
-	StringInfoData formatter;
-	initStringInfo(&formatter);
-	appendStringInfo(&formatter, "X-GP-%s", key);
-	
-	return formatter.data;
 }
 
 /*
