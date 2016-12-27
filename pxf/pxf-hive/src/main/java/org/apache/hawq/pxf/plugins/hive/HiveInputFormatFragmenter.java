@@ -55,14 +55,6 @@ import java.util.List;
  */
 public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     private static final Log LOG = LogFactory.getLog(HiveInputFormatFragmenter.class);
-
-    static final String STR_RC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
-    static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
-    static final String STR_ORC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
-    static final String STR_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe";
-    static final String STR_LAZY_BINARY_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe";
-    static final String STR_LAZY_SIMPLE_SERDE = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe";
-    static final String STR_ORC_SERDE = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
     private static final int EXPECTED_NUM_OF_TOKS = 3;
     public static final int TOK_SERDE = 0;
     public static final int TOK_KEYS = 1;
@@ -162,69 +154,6 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
             HiveUtilities.validateTypeCompatible(colType, colDesc.columnTypeModifiers(), hivePart.getType(), colDesc.columnName());
         }
 
-    }
-
-    /*
-     * Validates that partition format corresponds to PXF supported formats and
-     * transforms the class name to an enumeration for writing it to the
-     * accessors on other PXF instances.
-     */
-    private String assertFileType(String className, HiveTablePartition partData)
-            throws Exception {
-        switch (className) {
-            case STR_RC_FILE_INPUT_FORMAT:
-                return PXF_HIVE_INPUT_FORMATS.RC_FILE_INPUT_FORMAT.name();
-            case STR_TEXT_FILE_INPUT_FORMAT:
-                return PXF_HIVE_INPUT_FORMATS.TEXT_FILE_INPUT_FORMAT.name();
-            case STR_ORC_FILE_INPUT_FORMAT:
-                return PXF_HIVE_INPUT_FORMATS.ORC_FILE_INPUT_FORMAT.name();
-            default:
-                throw new IllegalArgumentException(
-                        "HiveInputFormatFragmenter does not yet support "
-                                + className
-                                + " for "
-                                + partData
-                                + ". Supported InputFormat are "
-                                + Arrays.toString(PXF_HIVE_INPUT_FORMATS.values()));
-        }
-    }
-
-    /*
-     * Validates that partition serde corresponds to PXF supported serdes and
-     * transforms the class name to an enumeration for writing it to the
-     * resolvers on other PXF instances.
-     */
-    private String assertSerde(String className, HiveTablePartition partData)
-            throws Exception {
-        switch (className) {
-            case STR_COLUMNAR_SERDE:
-                return PXF_HIVE_SERDES.COLUMNAR_SERDE.name();
-            case STR_LAZY_BINARY_COLUMNAR_SERDE:
-                return PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name();
-            case STR_LAZY_SIMPLE_SERDE:
-                return PXF_HIVE_SERDES.LAZY_SIMPLE_SERDE.name();
-            case STR_ORC_SERDE:
-                return PXF_HIVE_SERDES.ORC_SERDE.name();
-            default:
-                throw new UnsupportedTypeException(
-                        "HiveInputFormatFragmenter does not yet support  "
-                                + className + " for " + partData
-                                + ". Supported serializers are: "
-                                + Arrays.toString(PXF_HIVE_SERDES.values()));
-        }
-    }
-
-    @Override
-    byte[] makeUserData(HiveTablePartition partData) throws Exception {
-        String inputFormatName = partData.storageDesc.getInputFormat();
-        String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
-        String partitionKeys = serializePartitionKeys(partData);
-
-        assertFileType(inputFormatName, partData);
-        String userData = assertSerde(serdeName, partData) + HIVE_UD_DELIM
-                + partitionKeys + HIVE_UD_DELIM + filterInFragmenter;
-
-        return userData.getBytes();
     }
 
     /**
