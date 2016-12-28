@@ -780,6 +780,7 @@ bool gp_plpgsql_clear_cache_always = false;
 bool gp_called_by_pgdump = false;
 
 char   *rps_addr_host;
+char   *rps_addr_suffix;
 int     rps_addr_port;
 
 /*
@@ -6268,7 +6269,7 @@ static struct config_int ConfigureNamesInt[] =
       NULL
     },
     &rps_addr_port,
-    1, 1, 65535, NULL, NULL
+    8080, 1, 65535, NULL, NULL
   },
 
 	{
@@ -8182,6 +8183,15 @@ static struct config_string ConfigureNamesString[] =
     },
     &rps_addr_host,
     "localhost", NULL, NULL
+  },
+
+  {
+    {"hawq_rps_address_suffix", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("ranger plugin server suffix of restful service address"),
+      NULL
+    },
+    &rps_addr_suffix,
+    "hawq", NULL, NULL
   },
 
 	{

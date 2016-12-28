@@ -426,24 +426,15 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_TIMEOUT, 30L);
 
 	/* specify URL to get */
-	//curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, "http://localhost:8089/checkprivilege");
 	StringInfoData tname;
 	initStringInfo(&tname);
 	appendStringInfo(&tname, "http://");
 	appendStringInfo(&tname, "%s", rps_addr_host);
 	appendStringInfo(&tname, ":");
 	appendStringInfo(&tname, "%d", rps_addr_port);
-	appendStringInfo(&tname, "/rps");
+	appendStringInfo(&tname, "/");
+	appendStringInfo(&tname, "%s", rps_addr_suffix);
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
-
-	/* specify format */
-	// struct curl_slist *plist = curl_slist_append(NULL, "Content-Type:application/json;charset=UTF-8");
-	// curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, plist);
-
-
-	//curl_easy_setopt(curl_handle->curl_handle, CURLOPT_POSTFIELDSIZE_LARGE, 1000);
-	//curl_easy_setopt(curl_handle->curl_handle, CURLOPT_HTTPGET, 0);
-	//curl_easy_setopt(curl_handle->curl_handle, CURLOPT_CUSTOMREQUEST, "POST");
 
 	struct curl_slist *headers = NULL;
 	//curl_slist_append(headers, "Accept: application/json");
