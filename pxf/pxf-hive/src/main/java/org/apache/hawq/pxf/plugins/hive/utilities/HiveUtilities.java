@@ -39,19 +39,54 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
+import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
+import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.plugins.hive.HiveDataFragmenter;
 import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter;
 import org.apache.hawq.pxf.plugins.hive.HiveTablePartition;
 import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_INPUT_FORMATS;
-import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_SERDES;
+import org.apache.hawq.pxf.plugins.hive.HiveUserData;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
 
 /**
  * Class containing helper functions connecting
  * and interacting with Hive.
  */
 public class HiveUtilities {
+
+    /** Defines the Hive serializers (serde classes) currently supported in pxf */
+    public enum PXF_HIVE_SERDES {
+        COLUMNAR_SERDE("org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe"),
+        LAZY_BINARY_COLUMNAR_SERDE("org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe"),
+        LAZY_SIMPLE_SERDE("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"),
+        ORC_SERDE("org.apache.hadoop.hive.ql.io.orc.OrcSerde");
+        
+        private String serdeClassName;
+        
+        PXF_HIVE_SERDES(String serdeClassName) {
+            this.serdeClassName = serdeClassName;
+        }
+
+        public static PXF_HIVE_SERDES getPxfHiveSerde(String serdeClassName, PXF_HIVE_SERDES... allowedSerdes) {
+            for (PXF_HIVE_SERDES s : values()) {
+                if (s.getSerdeClassName().equals(serdeClassName)) {
+
+                    if (allowedSerdes.length > 0
+                            && !Arrays.asList(allowedSerdes).contains(s)) {
+                        throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeClassName);
+                    }
+                    return s;
+                }
+            }
+            throw new UnsupportedTypeException("Unable to find serde for class name: "+ serdeClassName);
+        }
+
+        public String getSerdeClassName() {
+            return serdeClassName;
+        }
+    }
 
     private static final Log LOG = LogFactory.getLog(HiveUtilities.class);
     private static final String WILDCARD = "*";
@@ -64,10 +99,7 @@ public class HiveUtilities {
     static final String STR_RC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
     static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
     static final String STR_ORC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
-    static final String STR_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe";
-    static final String STR_LAZY_BINARY_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe";
-    static final String STR_LAZY_SIMPLE_SERDE = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe";
-    static final String STR_ORC_SERDE = "org.apache.hadoop.hive.ql.io.orc.OrcSerde";
+    private static final int EXPECTED_NUM_OF_TOKS = 5;
 
     /**
      * Initializes the HiveMetaStoreClient
@@ -376,31 +408,6 @@ public class HiveUtilities {
         }
     }
 
-    /*
-     * Validates that partition serde corresponds to PXF supported serdes and
-     * transforms the class name to an enumeration for writing it to the
-     * resolvers on other PXF instances.
-     */
-    private static String assertSerde(String className, HiveTablePartition partData)
-            throws Exception {
-        switch (className) {
-            case STR_COLUMNAR_SERDE:
-                return PXF_HIVE_SERDES.COLUMNAR_SERDE.name();
-            case STR_LAZY_BINARY_COLUMNAR_SERDE:
-                return PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name();
-            case STR_LAZY_SIMPLE_SERDE:
-                return PXF_HIVE_SERDES.LAZY_SIMPLE_SERDE.name();
-            case STR_ORC_SERDE:
-                return PXF_HIVE_SERDES.ORC_SERDE.name();
-            default:
-                throw new UnsupportedTypeException(
-                        "HiveInputFormatFragmenter does not yet support  "
-                                + className + " for " + partData
-                                + ". Supported serializers are: "
-                                + Arrays.toString(PXF_HIVE_SERDES.values()));
-        }
-    }
-
 
     /* Turns the partition keys into a string */
     public static String serializePartitionKeys(HiveTablePartition partData) throws Exception {
@@ -432,7 +439,7 @@ public class HiveUtilities {
     @SuppressWarnings("unchecked")
     public static byte[] makeUserData(String fragmenterClassName, HiveTablePartition partData, boolean filterInFragmenter) throws Exception {
 
-        String userData = null;
+        HiveUserData hiveUserData = null;
 
         if (fragmenterClassName == null) {
             throw new IllegalArgumentException("No fragmenter provided.");
@@ -440,24 +447,36 @@ public class HiveUtilities {
 
         Class fragmenterClass = Class.forName(fragmenterClassName);
 
+        String inputFormatName = partData.storageDesc.getInputFormat();
+        String serdeClassName = partData.storageDesc.getSerdeInfo().getSerializationLib();
+        String propertiesString = serializeProperties(partData.properties);
+        String partitionKeys = serializePartitionKeys(partData);
+
         if (HiveInputFormatFragmenter.class.isAssignableFrom(fragmenterClass)) {
-            String inputFormatName = partData.storageDesc.getInputFormat();
-            String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
-            String partitionKeys = serializePartitionKeys(partData);
             assertFileType(inputFormatName, partData);
-            userData = assertSerde(serdeName, partData) + HiveDataFragmenter.HIVE_UD_DELIM
-                    + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter;
-        } else if (HiveDataFragmenter.class.isAssignableFrom(fragmenterClass)){
-            String inputFormatName = partData.storageDesc.getInputFormat();
-            String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
-            String propertiesString = serializeProperties(partData.properties);
-            String partitionKeys = serializePartitionKeys(partData);
-            userData = inputFormatName + HiveDataFragmenter.HIVE_UD_DELIM + serdeName
-                    + HiveDataFragmenter.HIVE_UD_DELIM + propertiesString + HiveDataFragmenter.HIVE_UD_DELIM
-                    + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter;
-        } else {
-            throw new IllegalArgumentException("HiveUtilities#makeUserData is not implemented for " + fragmenterClassName);
         }
-        return userData.getBytes();
+
+        hiveUserData = new HiveUserData(inputFormatName, serdeClassName, propertiesString, partitionKeys, filterInFragmenter);
+
+        return hiveUserData.toString().getBytes();
+    }
+
+    public static HiveUserData parseHiveUserData(InputData input, PXF_HIVE_SERDES... supportedSerdes) throws UserDataException{
+        String userData = new String(input.getFragmentUserData());
+        String[] toks = userData.split(HiveUserData.HIVE_UD_DELIM);
+
+        if (toks.length != (EXPECTED_NUM_OF_TOKS)) {
+            throw new UserDataException("HiveInputFormatFragmenter expected "
+                    + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
+        }
+
+        HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]));
+
+            if (supportedSerdes.length > 0) {
+                /* Make sure this serde is supported */
+                PXF_HIVE_SERDES pxfHiveSerde = PXF_HIVE_SERDES.getPxfHiveSerde(hiveUserData.getSerdeClassName(), supportedSerdes);
+            }
+
+        return hiveUserData;
     }
 }

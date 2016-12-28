@@ -19,26 +19,30 @@ package org.apache.hawq.pxf.service;
  * under the License.
  */
 
+import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
+import org.apache.hadoop.mapred.TextInputFormat;
 
 public class ProfileFactory {
 
     private static final String HIVE_TEXT_PROFILE = "HiveText";
     private static final String HIVE_RC_PROFILE = "HiveRC";
     private static final String HIVE_ORC_PROFILE = "HiveORC";
+    private static final String HIVE_PROFILE = "Hive";
 
-    public static String get(InputFormat inputFormat) throws Exception {
+    public static String get(InputFormat inputFormat) {
         String profileName = null;
-        // TODO: Uncomment in process of HAWQ-1228 implementation
-        //if (inputFormat instanceof TextInputFormat) {
-        //    profileName = HIVE_TEXT_PROFILE;
-        //} else if (inputFormat instanceof RCFileInputFormat) {
-        //    profileName = HIVE_RC_PROFILE;
-        /*} else */if (inputFormat instanceof OrcInputFormat) {
+        if (inputFormat instanceof TextInputFormat) {
+            profileName = HIVE_TEXT_PROFILE;
+        } else if (inputFormat instanceof RCFileInputFormat) {
+            profileName = HIVE_RC_PROFILE;
+        } else if (inputFormat instanceof OrcInputFormat) {
             profileName = HIVE_ORC_PROFILE;
+        } else {
+            //Default case
+            profileName = HIVE_PROFILE;
         }
-
         return profileName;
     }
 

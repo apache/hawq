@@ -67,6 +67,9 @@ typedef struct PxfItem
 	
 	/* fields */
 	List *fields;
+
+	/* output formats*/
+	List *outputFormats;
 } PxfItem;
 
 

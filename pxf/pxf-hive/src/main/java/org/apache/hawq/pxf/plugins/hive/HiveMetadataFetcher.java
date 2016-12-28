@@ -21,19 +21,27 @@ package org.apache.hawq.pxf.plugins.hive;
 
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
-
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.MetadataFetcher;
+import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.ProfilesConf;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
+import org.apache.hawq.pxf.service.ProfileFactory;
 
 /**
  * Class for connecting to Hive's MetaStore and getting schema of Hive tables.
@@ -42,12 +50,14 @@ public class HiveMetadataFetcher extends MetadataFetcher {
 
     private static final Log LOG = LogFactory.getLog(HiveMetadataFetcher.class);
     private HiveMetaStoreClient client;
+    private JobConf jobConf;
 
     public HiveMetadataFetcher(InputData md) {
         super(md);
 
         // init hive metastore client connection.
         client = HiveUtilities.initHiveClient();
+        jobConf = new JobConf(new Configuration());
     }
 
     /**
@@ -84,6 +94,21 @@ public class HiveMetadataFetcher extends MetadataFetcher {
                 Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
                 getSchema(tbl, metadata);
                 metadataList.add(metadata);
+                List<Partition> tablePartitions = client.listPartitionsByFilter(tblDesc.getPath(), tblDesc.getName(), "", (short) -1);
+                Set<OutputFormat> formats = new HashSet<OutputFormat>();
+                //If table has partitions - find out all formats
+                for (Partition tablePartition : tablePartitions) {
+                    String inputFormat = tablePartition.getSd().getInputFormat();
+                    OutputFormat outputFormat = getOutputFormat(inputFormat);
+                    formats.add(outputFormat);
+                }
+                //If table has no partitions - get single format of table
+                if (tablePartitions.size() == 0 ) {
+                    String inputFormat = tbl.getSd().getInputFormat();
+                    OutputFormat outputFormat = getOutputFormat(inputFormat);
+                    formats.add(outputFormat);
+                }
+                metadata.setFormats(formats);
             } catch (UnsupportedTypeException | UnsupportedOperationException e) {
                 if(ignoreErrors) {
                     LOG.warn("Metadata fetch for " + tblDesc.toString() + " failed. " + e.getMessage());
@@ -135,4 +160,18 @@ public class HiveMetadataFetcher extends MetadataFetcher {
             throw new UnsupportedTypeException(errorMsg);
         }
     }
+
+    private OutputFormat getOutputFormat(String inputFormat) {
+        OutputFormat outputFormat = OutputFormat.UNKNOWN;
+        try {
+            InputFormat<?, ?> fformat = HiveDataFragmenter.makeInputFormat(inputFormat, jobConf);
+            String profile = ProfileFactory.get(fformat);
+            String outputFormatString = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OUTPUTFORMAT");
+            outputFormat = OutputFormat.valueOf(outputFormatString);
+        } catch (Exception e) {
+            LOG.warn("Unable to get output format for input format: " + inputFormat);
+        }
+        return outputFormat;
+    }
+
 }

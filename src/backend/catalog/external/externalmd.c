@@ -57,6 +57,8 @@ static void LoadDistributionPolicy(Oid relid, PxfItem *pxfItem);
 static void LoadExtTable(Oid relid, PxfItem *pxfItem);
 static void LoadColumns(Oid relid, List *columns);
 static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nTypeMod);
+static Datum GetFormatTypeForProfile(const List *outputFormats);
+static Datum GetFormatOptionsForProfile(const List *outputFormats);
 
 const int maxNumTypeModifiers = 2;
 /*
@@ -128,7 +130,22 @@ static PxfItem *ParsePxfItem(struct json_object *pxfMD, char* profile)
 	pxfItem->profile = profile;
 	pxfItem->path = pstrdup(json_object_get_string(itemPath));
 	pxfItem->name = pstrdup(json_object_get_string(itemName));
-	
+
+	/* parse output formats */
+	struct json_object *jsonOutputFormats = json_object_object_get(pxfMD, "outputFormats");
+
+	if (NULL != jsonOutputFormats)
+	{
+		const int numOutputFormats = json_object_array_length(jsonOutputFormats);
+		for (int i = 0; i < numOutputFormats; i++)
+		{
+			PxfField *pxfField = palloc0(sizeof(PxfField));
+			struct json_object *jsonOutputFormat = json_object_array_get_idx(jsonOutputFormats, i);
+			char *outupFormat = pstrdup(json_object_get_string(jsonOutputFormat));
+			pxfItem->outputFormats = lappend(pxfItem->outputFormats, outupFormat);
+		}
+	}
+
 	elog(DEBUG1, "Parsed item %s, namespace %s", itemName, itemPath);
 		
 	/* parse columns */
@@ -464,17 +481,10 @@ static void LoadExtTable(Oid relid, PxfItem *pxfItem)
 	Assert(NULL != astate);
 	Datum location = makeArrayResult(astate, CurrentMemoryContext);
 
-	/* format options - should be "formatter 'pxfwritable_import'" */
-	StringInfoData formatStr;
-	initStringInfo(&formatStr);
-	appendStringInfo(&formatStr, "formatter 'pxfwritable_import'");
-	Datum format_opts = DirectFunctionCall1(textin, CStringGetDatum(formatStr.data));
-	pfree(formatStr.data);
-
 	values[Anum_pg_exttable_reloid - 1] = ObjectIdGetDatum(relid);
 	values[Anum_pg_exttable_location - 1] = location;
-	values[Anum_pg_exttable_fmttype - 1] = CharGetDatum('b' /* binary */);
-	values[Anum_pg_exttable_fmtopts - 1] = format_opts;
+	values[Anum_pg_exttable_fmttype - 1] = GetFormatTypeForProfile(pxfItem->outputFormats);
+	values[Anum_pg_exttable_fmtopts - 1] = GetFormatOptionsForProfile(pxfItem->outputFormats);
 	nulls[Anum_pg_exttable_command - 1] = true;
 	nulls[Anum_pg_exttable_rejectlimit - 1] = true;
 	nulls[Anum_pg_exttable_rejectlimittype - 1] = true;
@@ -629,5 +639,32 @@ static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nT
 	}
 	
 	return VARHDRSZ + result;
+}
+
+static Datum GetFormatTypeForProfile(const List *outputFormats)
+{
+
+	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),"TEXT") == 0)
+	{
+		return CharGetDatum(TextFormatType);
+	} else
+	{
+		return CharGetDatum(CustomFormatType);
+	}
+}
+
+static Datum GetFormatOptionsForProfile(const List *outputFormats)
+{
+	StringInfoData formatStr;
+	initStringInfo(&formatStr);
+	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),"TEXT") == 0)
+	{
+		appendStringInfo(&formatStr, "delimiter '\x01' null '\N' escape '\'");
+	} else {
+		appendStringInfo(&formatStr, "formatter 'pxfwritable_import'");
+	}
+	Datum format_opts = DirectFunctionCall1(textin, CStringGetDatum(formatStr.data));
+	pfree(formatStr.data);
+	return format_opts;
 }
 

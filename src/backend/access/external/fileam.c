@@ -461,8 +461,12 @@ external_stopscan(FileScanDesc scan)
 ExternalSelectDesc
 external_getnext_init(PlanState *state) {
 	ExternalSelectDesc desc = (ExternalSelectDesc) palloc0(sizeof(ExternalSelectDescData));
+
 	if (state != NULL)
+	{
 		desc->projInfo = state->ps_ProjInfo;
+		desc->fmttype = &((ExternalScan *) state->plan)->fmtType;
+	}
 	return desc;
 }
 

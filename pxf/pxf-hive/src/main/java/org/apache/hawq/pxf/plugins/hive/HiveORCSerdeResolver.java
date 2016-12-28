@@ -34,6 +34,7 @@ import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
 
 import java.util.*;
 
@@ -44,7 +45,7 @@ import java.util.*;
 public class HiveORCSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveORCSerdeResolver.class);
     private OrcSerde deserializer;
-    private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
+    private HiveUtilities.PXF_HIVE_SERDES serdeType;
 
     public HiveORCSerdeResolver(InputData input) throws Exception {
         super(input);
@@ -53,14 +54,9 @@ public class HiveORCSerdeResolver extends HiveResolver {
     /* read the data supplied by the fragmenter: inputformat name, serde name, partition keys */
     @Override
     void parseUserData(InputData input) throws Exception {
-        String[] toks = HiveInputFormatFragmenter.parseToks(input);
-        String serdeEnumStr = toks[HiveInputFormatFragmenter.TOK_SERDE];
-        if (serdeEnumStr.equals(HiveInputFormatFragmenter.PXF_HIVE_SERDES.ORC_SERDE.name())) {
-            serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.ORC_SERDE;
-        } else {
-            throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
-        }
-        partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
+        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input, HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE);
+        serdeType = PXF_HIVE_SERDES.getPxfHiveSerde(hiveUserData.getSerdeClassName());
+        partitionKeys = hiveUserData.getPartitionKeys();
         collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM
                 : input.getUserProperty("COLLECTION_DELIM");
         mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM
@@ -72,6 +68,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
      * OneField item contains two fields: an integer representing the VARCHAR type and a Java
      * Object representing the field value.
      */
+    //TODO: It's the same as in parent class
     @Override
     public List<OneField> getFields(OneRow onerow) throws Exception {
 
@@ -117,7 +114,7 @@ public class HiveORCSerdeResolver extends HiveResolver {
         serdeProperties.put(serdeConstants.LIST_COLUMNS, columnNames.toString());
         serdeProperties.put(serdeConstants.LIST_COLUMN_TYPES, columnTypes.toString());
 
-        if (serdeType == HiveInputFormatFragmenter.PXF_HIVE_SERDES.ORC_SERDE) {
+        if (serdeType == HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE) {
             deserializer = new OrcSerde();
         } else {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeType.name()); /* we should not get here */

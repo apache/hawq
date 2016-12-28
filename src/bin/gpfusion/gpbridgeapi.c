@@ -49,7 +49,7 @@ gphadoop_context*	create_context(PG_FUNCTION_ARGS);
 void	add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS);
 void	append_churl_header_if_exists(gphadoop_context* context,
 									  const char* key, const char* value);
-void    set_current_fragment_headers(gphadoop_context* context);
+void    set_current_fragment_headers(gphadoop_context* context, char *fmttype);
 void	gpbridge_import_start(PG_FUNCTION_ARGS);
 void	gpbridge_export_start(PG_FUNCTION_ARGS);
 PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel);
@@ -62,6 +62,7 @@ void 	build_uri_for_write(gphadoop_context* context, PxfServer* rest_server);
 size_t	fill_buffer(gphadoop_context* context, char* start, size_t size);
 void	add_delegation_token(PxfInputData *inputData);
 void	free_token_resources(PxfInputData *inputData);
+static void assign_optimal_supported_profile(char *profile, char *fmttype, char **supportedProfile, char **supportedFormat);
 
 /* Custom protocol entry point for read
  */
@@ -207,7 +208,7 @@ void append_churl_header_if_exists(gphadoop_context* context, const char* key, c
  * 2. X-GP-FRAGMENT-USER-DATA header is changed to the current fragment's user data.
  * If the fragment doesn't have user data, the header will be removed.
  */
-void set_current_fragment_headers(gphadoop_context* context)
+void set_current_fragment_headers(gphadoop_context* context, char *fmttype)
 {
 	FragmentData* frag_data = (FragmentData*)lfirst(context->current_fragment);
 	elog(DEBUG2, "pxf: set_current_fragment_source_name: source_name %s, index %s, has user data: %s ",
@@ -229,11 +230,21 @@ void set_current_fragment_headers(gphadoop_context* context)
 	/* if current fragment has optimal profile set it*/
 	if (frag_data->profile)
 	{
-		churl_headers_override(context->churl_headers, "X-GP-PROFILE", frag_data->profile);
+		char *supportedProfile = NULL;
+		char *supportedFormat = NULL;
+		assign_optimal_supported_profile(frag_data->profile, fmttype, &supportedProfile, &supportedFormat);
+
+		churl_headers_override(context->churl_headers, "X-GP-PROFILE", supportedProfile);
+		churl_headers_override(context->churl_headers, "X-GP-FORMAT", supportedFormat);
 	} else if (context->gphd_uri->profile)
 	{
 		/* if current fragment doesn't have any optimal profile, set to use profile from url */
-		churl_headers_override(context->churl_headers, "X-GP-PROFILE", context->gphd_uri->profile);
+		char *supportedProfile = NULL;
+		char *supportedFormat = NULL;
+		assign_optimal_supported_profile(context->gphd_uri->profile, fmttype, &supportedProfile, &supportedFormat);
+
+		churl_headers_override(context->churl_headers, "X-GP-PROFILE", supportedProfile);
+		churl_headers_override(context->churl_headers, "X-GP-FORMAT", supportedFormat);
 	}
 	/* if there is no profile passed in url, we expect to have accessor+fragmenter+resolver so no action needed by this point */
 
@@ -249,7 +260,8 @@ void gpbridge_import_start(PG_FUNCTION_ARGS)
 	context->churl_headers = churl_headers_init();
 	add_querydata_to_http_header(context, fcinfo);
 
-	set_current_fragment_headers(context);
+	char *fmttype = EXTPROTOCOL_GET_FMTTYPE(fcinfo);
+	set_current_fragment_headers(context, fmttype);
 
 	context->churl_handle = churl_init_download(context->uri.data,
 												context->churl_headers);
@@ -399,6 +411,7 @@ PxfServer* get_pxf_server(GPHDUri* gphd_uri, const Relation rel)
 size_t gpbridge_read(PG_FUNCTION_ARGS)
 {
 	char* databuf;
+	char* fmttype;
 	size_t datalen;
 	size_t n = 0;
 	gphadoop_context* context;
@@ -406,6 +419,7 @@ size_t gpbridge_read(PG_FUNCTION_ARGS)
 	context = EXTPROTOCOL_GET_USER_CTX(fcinfo);
 	databuf = EXTPROTOCOL_GET_DATABUF(fcinfo);
 	datalen = EXTPROTOCOL_GET_DATALEN(fcinfo);
+	fmttype = EXTPROTOCOL_GET_FMTTYPE(fcinfo);
 
 	while ((n = fill_buffer(context, databuf, datalen)) == 0)
 	{
@@ -419,7 +433,7 @@ size_t gpbridge_read(PG_FUNCTION_ARGS)
 		if (context->current_fragment == NULL)
 			return 0;
 
-		set_current_fragment_headers(context);
+		set_current_fragment_headers(context, fmttype);
 		churl_download_restart(context->churl_handle, context->uri.data, context->churl_headers);
 
 		/* read some bytes to make sure the connection is established */
@@ -546,4 +560,21 @@ void free_token_resources(PxfInputData *inputData)
 		return;
 
 	pfree(inputData->token);
+}
+
+static void	assign_optimal_supported_profile(char *profile, char *fmttype, char **supportedProfile, char **supportedFormat)
+{
+	if (fmttype_is_text(*fmttype) && ((strcmp(profile, "HiveText") == 0) || (strcmp(profile, "HiveRc") == 0)))
+	{
+		*supportedFormat = "TEXT";
+		*supportedProfile = profile;
+	} else if (fmttype_is_custom(*fmttype))
+	{
+		*supportedFormat = "GPDBWritable";
+		*supportedProfile = profile;
+	} else
+	{
+		*supportedFormat = "GPDBWritable";
+		*supportedProfile = "Hive";
+	}
 }

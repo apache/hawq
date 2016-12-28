@@ -27,6 +27,7 @@ import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.lang.CharUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -74,10 +75,13 @@ public class HiveResolver extends Plugin implements ReadResolver {
     protected static final String COLLECTION_DELIM = ",";
     protected String collectionDelim;
     protected String mapkeyDelim;
-    private SerDe deserializer;
+    //private SerDe deserializer;
+    protected SerDe deserializer;
     private List<OneField> partitionFields;
-    private String serdeName;
-    private String propsString;
+    //private String serdeClassName;
+    protected String serdeClassName;
+    //private String propsString;
+    protected String propsString;
     String partitionKeys;
     protected char delimiter;
     String nullChar = "\\N";
@@ -135,17 +139,11 @@ public class HiveResolver extends Plugin implements ReadResolver {
     void parseUserData(InputData input) throws Exception {
         final int EXPECTED_NUM_OF_TOKS = 5;
 
-        String userData = new String(input.getFragmentUserData());
-        String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);
+        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input);
 
-        if (toks.length != EXPECTED_NUM_OF_TOKS) {
-            throw new UserDataException("HiveResolver expected "
-                    + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
-        }
-
-        serdeName = toks[1];
-        propsString = toks[2];
-        partitionKeys = toks[3];
+        serdeClassName = hiveUserData.getSerdeClassName();
+        propsString = hiveUserData.getPropertiesString();
+        partitionKeys = hiveUserData.getPartitionKeys();
 
         collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM
                 : input.getUserProperty("COLLECTION_DELIM");
@@ -160,14 +158,14 @@ public class HiveResolver extends Plugin implements ReadResolver {
     void initSerde(InputData inputData) throws Exception {
         Properties serdeProperties;
 
-        Class<?> c = Class.forName(serdeName, true, JavaUtils.getClassLoader());
+        Class<?> c = Class.forName(serdeClassName, true, JavaUtils.getClassLoader());
         deserializer = (SerDe) c.newInstance();
         serdeProperties = new Properties();
-        ByteArrayInputStream inStream = new ByteArrayInputStream(
-                propsString.getBytes());
-        serdeProperties.load(inStream);
-        deserializer.initialize(new JobConf(conf, HiveResolver.class),
-                serdeProperties);
+        if (propsString != null ) {
+            ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
+            serdeProperties.load(inStream);
+        }
+        deserializer.initialize(new JobConf(conf, HiveResolver.class), serdeProperties);
     }
 
     /*
@@ -271,7 +269,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
      * The partition fields are initialized one time based on userData provided
      * by the fragmenter.
      */
-    void initPartitionFields(StringBuilder parts) {
+    void initTextPartitionFields(StringBuilder parts) {
         if (partitionKeys.equals(HiveDataFragmenter.HIVE_NO_PART_TBL)) {
             return;
         }
