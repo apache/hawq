@@ -33,7 +33,7 @@ under the License.
 	</property>
 
 	<property>
-		<name>standby_address_host</name>
+		<name>hawq_standby_address_host</name>
 		<value>%standby.host%</value>
 		<description>The host name of hawq standby master.</description>
 	</property>
@@ -45,19 +45,19 @@ under the License.
 	</property>
 
 	<property>
-		<name>dfs_url</name>
+		<name>hawq_dfs_url</name>
 		<value>%namenode.host%:%namenode.port%/%hawq.file.space%</value>
 		<description>URL for accessing HDFS.</description>
 	</property>
 
 	<property>
-		<name>master_directory</name>
+		<name>hawq_master_directory</name>
 		<value>%master.directory%</value>
 		<description>The directory of hawq master.</description>
 	</property>
 
 	<property>
-		<name>segment_directory</name>
+		<name>hawq_segment_directory</name>
 		<value>%segment.directory%</value>
 		<description>The directory of hawq segment.</description>
 	</property> 
