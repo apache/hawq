@@ -68,8 +68,7 @@ void getClientIP(char *remote_host)
 }
 RangerACLResult parse_ranger_response(char* buffer)
 {
-	Assert(buffer != NULL);
-	if (strlen(buffer) == 0)
+	if (buffer == NULL || strlen(buffer) == 0)
 		return RANGERCHECK_UNKNOWN;
 
 	elog(LOG, "read from Ranger Restful API: %s", buffer);
