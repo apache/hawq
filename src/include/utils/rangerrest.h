@@ -33,9 +33,10 @@
 #include "utils/acl.h"
 #include "utils/guc.h"
 #include "miscadmin.h"
-#include "libpq/ip.h"
 #include "libpq/libpq-be.h"
 #include "tcop/tcopprot.h"
+
+#define HOST_BUFFER_SIZE 1025
 
 typedef enum
 {
@@ -93,6 +94,5 @@ RangerACLResult parse_ranger_response(char *);
 json_object *create_ranger_request_json(List *);
 int call_ranger_rest(CURL_HANDLE curl_handle, const char *request);
 extern int check_privilege_from_ranger(List *);
-void getClientIP(char *remote_host);
 
 #endif
