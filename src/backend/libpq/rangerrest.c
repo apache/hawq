@@ -53,6 +53,11 @@ static int request_id = 1;
 
 static void getClientIP(char *remote_host)
 {
+	if( MyProcPort->remote_host == NULL || strlen(MyProcPort->remote_host) == 0 )
+	{
+		snprintf(remote_host, HOST_BUFFER_SIZE, "%s", "UNKNOWN");
+		return;
+	}
 	if (strcmp(MyProcPort->remote_host, "[local]") == 0)
 	{
 		snprintf(remote_host, HOST_BUFFER_SIZE, "%s", "127.0.0.1");

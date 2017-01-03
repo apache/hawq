@@ -2752,7 +2752,7 @@ List *pg_rangercheck_batch(List *arg_list)
           (RangerRequestJsonArgs*)lfirst(tmp);
       pfree(requestarg->user);
       pfree(requestarg->object);
-      pfree(requestarg->actions);
+      list_free_deep(requestarg->actions);
     }
 
     list_free_deep(requestargs);
@@ -2796,7 +2796,7 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 			RangerRequestJsonArgs* requestarg = (RangerRequestJsonArgs*) lfirst(tmp);
 			pfree(requestarg->user);
 			pfree(requestarg->object);
-			pfree(requestarg->actions);
+			list_free_deep(requestarg->actions);
 		}
 		list_free_deep(requestargs);
 		requestargs = NULL;
