@@ -8195,7 +8195,7 @@ static struct config_string ConfigureNamesString[] =
   },
 
 	{
-		{"standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("standby server address hostname"),
 			NULL
 		},
@@ -8204,7 +8204,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"dfs_url", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_dfs_url", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("hdfs url"),
 			NULL
 		},
@@ -8213,7 +8213,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("master server data directory"),
 			NULL
 		},
@@ -8222,7 +8222,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"segment_directory", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_segment_directory", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("segment data directory"),
 			NULL
 		},
