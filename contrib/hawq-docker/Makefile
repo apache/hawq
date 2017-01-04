@@ -43,7 +43,7 @@ all:
 build:
 	@make -f $(THIS_MAKEFILE_PATH) build-hawq-dev-$(OS_VERSION)
 	@make -f $(THIS_MAKEFILE_PATH) build-hawq-test-$(OS_VERSION)
-	@echo "Done!"
+	@echo "Build Images Done!"
 
 build-hawq-dev-$(OS_VERSION): $(TOP_DIR)/$(OS_VERSION)-docker/hawq-dev/Dockerfile
 	@echo build hawq-dev:$(OS_VERSION) image
@@ -89,7 +89,7 @@ run-hdfs:
 		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i run-datanode-container; \
 		i=$$((i+1)); \
 	done
-	@echo "Done!"
+	@echo "HAWQ Environment Setup Done!"
 	@echo 'run "docker exec -it ${CLUSTER_ID}-namenode bash" to attach to ${CLUSTER_ID}-namenode node'
 
 run-namenode-container:
@@ -122,7 +122,7 @@ start-hdfs:
 		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i start-datanode-container; \
 		i=$$((i+1)); \
 	done
-	@echo "Done!"
+	@echo "Start All Containers Done!"
 
 start-namenode-container:
 	@echo "start ${CLUSTER_ID}-namenode container"
@@ -150,7 +150,7 @@ stop-hdfs:
 		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i stop-datanode-container; \
 		i=$$((i+1)); \
 	done
-	@echo "Done!"
+	@echo "Stop All Containers Done!"
 
 stop-namenode-container:
 	@echo "stop ${CLUSTER_ID}-namenode container"
@@ -175,7 +175,7 @@ remove-hdfs:
 		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i remove-datanode-container; \
 		i=$$((i+1)); \
 	done
-	@echo "Done!"
+	@echo "Remove HDFS Done!"
 
 remove-namenode-container:
 	@echo "make ${CLUSTER_ID}-namenode container"
@@ -209,7 +209,7 @@ pull:
 clean:
 	@make -f $(THIS_MAKEFILE_PATH) stop 2>&1 >/dev/null || true
 	@make -f $(THIS_MAKEFILE_PATH) remove-hdfs 2>&1 >/dev/null || true
-	@echo "Done!"
+	@echo "Clean Done!"
 
 distclean:
 	@make -f $(THIS_MAKEFILE_PATH) stop 2>&1 >/dev/null || true
@@ -219,4 +219,4 @@ distclean:
 	        echo remove network $(NETWORK); \
 	        docker network rm $(NETWORK) 2>&1 >/dev/null || true; \
 	fi
-	@echo "Done!"
+	@echo "Distclean Done!"
