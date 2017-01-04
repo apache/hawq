@@ -104,7 +104,10 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
         StringBuilder columnNames = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
         StringBuilder columnTypes = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
-        String[] hiveColTypes = typesString.split(":");
+        String[] tmp = typesString.split(":");
+        String[] hiveColTypes = new String[numberOfDataColumns];
+        parseColTypes(tmp, hiveColTypes);
+
         String delim = ",";
         for (int i = 0; i < numberOfDataColumns; i++) {
             ColumnDescriptor column = input.getColumn(i);
@@ -131,5 +134,27 @@ public class HiveORCSerdeResolver extends HiveResolver {
         }
 
         deserializer.initialize(new JobConf(new Configuration(), HiveORCSerdeResolver.class), serdeProperties);
+    }
+
+    private void parseColTypes(String[] cols, String[] output) {
+        int i = 0;
+        StringBuilder structTypeBuilder = new StringBuilder();
+        boolean inStruct = false;
+        for (String str : cols) {
+            if (str.contains("struct")) {
+                structTypeBuilder = new StringBuilder();
+                inStruct = true;
+                structTypeBuilder.append(str);
+            } else if (inStruct) {
+                structTypeBuilder.append(':');
+                structTypeBuilder.append(str);
+                if (str.contains(">")) {
+                    inStruct = false;
+                    output[i++] = structTypeBuilder.toString();
+                }
+            } else {
+                output[i++] = str;
+            }
+        }
     }
 }

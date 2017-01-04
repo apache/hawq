@@ -444,9 +444,10 @@ public class HiveUtilities {
             String inputFormatName = partData.storageDesc.getInputFormat();
             String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
             String partitionKeys = serializePartitionKeys(partData);
+            String colTypes = partData.properties.getProperty("columns.types");
             assertFileType(inputFormatName, partData);
             userData = assertSerde(serdeName, partData) + HiveDataFragmenter.HIVE_UD_DELIM
-                    + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter;
+                    + partitionKeys + HiveDataFragmenter.HIVE_UD_DELIM + filterInFragmenter + HiveDataFragmenter.HIVE_UD_DELIM + colTypes;
         } else if (HiveDataFragmenter.class.isAssignableFrom(fragmenterClass)){
             String inputFormatName = partData.storageDesc.getInputFormat();
             String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
