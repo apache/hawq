@@ -94,12 +94,6 @@ RUN mkdir -p /tmp/build/ && \
  ./configure --prefix=/usr && make && make install && ldconfig && \
  rm -rf /tmp/build
 
-# install libhdfs3
-RUN mkdir -p /tmp/build && \
- cd /tmp/build && git clone https://github.com/PivotalRD/libhdfs3.git . && mkdir build && cd build && \
- ../bootstrap --prefix=/usr && make && make install && ldconfig && \
- rm -rf /tmp/build
-
 # install python module 
 RUN pip --retries=50 --timeout=300 install pycrypto
 
