@@ -71,15 +71,15 @@ create-data-container:
 
 run:
 	@if [ -z "`docker network ls 2>/dev/null`" ]; then \
-                make -f $(THIS_MAKEFILE_PATH) NETWORK=default create-data-container && \
-                make -f $(THIS_MAKEFILE_PATH) NETWORK=default run-hdfs; \
+ 		make -f $(THIS_MAKEFILE_PATH) NETWORK=default create-data-container && \
+		make -f $(THIS_MAKEFILE_PATH) NETWORK=default run-hdfs; \
 	else \
-	        if [ -z "`docker network ls 2>/dev/null | grep $(NETWORK)`" ]; then \
-	                echo create network $(NETWORK) && \
-	                docker network create --driver bridge $(NETWORK); \
-	        fi && \
-	        make -f $(THIS_MAKEFILE_PATH) create-data-container && \
-                make -f $(THIS_MAKEFILE_PATH) run-hdfs; \
+		if [ -z "`docker network ls 2>/dev/null | grep $(NETWORK)`" ]; then \
+			echo create network $(NETWORK) && \
+			docker network create --driver bridge $(NETWORK); \
+		fi && \
+		make -f $(THIS_MAKEFILE_PATH) create-data-container && \
+		make -f $(THIS_MAKEFILE_PATH) run-hdfs; \
 	fi
 
 run-hdfs:
@@ -106,7 +106,7 @@ run-datanode-container:
 	@if [ -z "`docker ps -a --filter="name=${CLUSTER_ID}-datanode$(CUR_DATANODE)" | grep -v CONTAINER`" ]; then \
 		docker run --privileged -itd --net=$(NETWORK) --hostname=${CLUSTER_ID}-datanode$(CUR_DATANODE) \
 			--name=${CLUSTER_ID}-datanode$(CUR_DATANODE) -e NAMENODE=${CLUSTER_ID}-namenode \
-		  --volumes-from ${CLUSTER_ID}-data hawq/hawq-test:$(OS_VERSION); \
+			--volumes-from ${CLUSTER_ID}-data hawq/hawq-test:$(OS_VERSION); \
 	else \
 		echo "${CLUSTER_ID}-datanode$(CUR_DATANODE) container already exist!"; \
 	fi
@@ -216,7 +216,7 @@ distclean:
 	@make -f $(THIS_MAKEFILE_PATH) remove-hdfs 2>&1 >/dev/null || true
 	@make -f $(THIS_MAKEFILE_PATH) remove-data 2>&1 >/dev/null || true
 	@if [ ! -z "`docker network ls 2>/dev/null | grep $(NETWORK)`" ]; then \
-	        echo remove network $(NETWORK); \
-	        docker network rm $(NETWORK) 2>&1 >/dev/null || true; \
+		echo remove network $(NETWORK); \
+		docker network rm $(NETWORK) 2>&1 >/dev/null || true; \
 	fi
 	@echo "Distclean Done!"

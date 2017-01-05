@@ -12,17 +12,18 @@ Take CentOS 7 as an example below.
 https://docs.docker.com/
 
 # Setup build and test environment
-* clone this repository
+* clone hawq repository
 ```
-git clone https://github.com/guofengrichard/hawq-docker.git .
+git clone https://github.com/apache/incubator-hawq.git .
+cd incubator-hawq/contrib/hawq-docker
 ```
 * Get the docker images
 ```
-  cd hawq-docker
   make pull (recommended)
 OR
   make build
 ``` 
+(Command `make pull` is to pull docker images from Docker Hub, while command `make build` is to build docker images locally. In general, `make pull` is faster than `make build`.)
 * setup a 5 nodes virtual cluster for Apache HAWQ build and test.
 ```
 make run
