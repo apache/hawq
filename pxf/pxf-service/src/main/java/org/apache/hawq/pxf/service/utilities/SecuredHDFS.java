@@ -53,6 +53,10 @@ public class SecuredHDFS {
     public static void verifyToken(ProtocolData protData, ServletContext context) {
         try {
             if (UserGroupInformation.isSecurityEnabled()) {
+                UserGroupInformation loginUser = UserGroupInformation.getLoginUser();
+                if (!loginUser.hasKerberosCredentials()) {
+                    SecureLogin.login();
+                }
                 Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>();
                 String tokenString = protData.getToken();
                 token.decodeFromUrlString(tokenString);
