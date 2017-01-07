@@ -93,6 +93,6 @@ public class HiveStringPassResolver extends HiveResolver {
     }
 
     void parseDelimiterChar(InputData input) {
-        this.delimiter = 1;
+        delimiter = 44; //,
     }
 }

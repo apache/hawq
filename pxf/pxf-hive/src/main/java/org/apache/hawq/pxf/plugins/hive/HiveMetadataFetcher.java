@@ -162,7 +162,7 @@ public class HiveMetadataFetcher extends MetadataFetcher {
     }
 
     private OutputFormat getOutputFormat(String inputFormat) {
-        OutputFormat outputFormat = OutputFormat.UNKNOWN;
+        OutputFormat outputFormat = null;
         try {
             InputFormat<?, ?> fformat = HiveDataFragmenter.makeInputFormat(inputFormat, jobConf);
             String profile = ProfileFactory.get(fformat);

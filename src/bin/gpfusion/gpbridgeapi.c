@@ -564,7 +564,7 @@ void free_token_resources(PxfInputData *inputData)
 
 static void	assign_optimal_supported_profile(char *profile, char *fmttype, char **supportedProfile, char **supportedFormat)
 {
-	if (fmttype_is_text(*fmttype) && ((strcmp(profile, "HiveText") == 0) || (strcmp(profile, "HiveRc") == 0)))
+	if (fmttype_is_text(*fmttype) && ((strcmp(profile, HiveTextProfileName) == 0) || (strcmp(profile, HiveRCProfileName) == 0)))
 	{
 		*supportedFormat = "TEXT";
 		*supportedProfile = profile;
@@ -575,6 +575,6 @@ static void	assign_optimal_supported_profile(char *profile, char *fmttype, char 
 	} else
 	{
 		*supportedFormat = "GPDBWritable";
-		*supportedProfile = "Hive";
+		*supportedProfile = HiveProfileName;
 	}
 }

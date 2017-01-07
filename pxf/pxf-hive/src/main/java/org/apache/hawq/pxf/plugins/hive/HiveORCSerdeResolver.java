@@ -44,7 +44,6 @@ import java.util.*;
  */
 public class HiveORCSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveORCSerdeResolver.class);
-    private OrcSerde deserializer;
     private HiveUtilities.PXF_HIVE_SERDES serdeType;
 
     public HiveORCSerdeResolver(InputData input) throws Exception {
@@ -61,27 +60,6 @@ public class HiveORCSerdeResolver extends HiveResolver {
                 : input.getUserProperty("COLLECTION_DELIM");
         mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM
                 : input.getUserProperty("MAPKEY_DELIM");
-    }
-
-    /**
-     * getFields returns a singleton list of OneField item.
-     * OneField item contains two fields: an integer representing the VARCHAR type and a Java
-     * Object representing the field value.
-     */
-    //TODO: It's the same as in parent class
-    @Override
-    public List<OneField> getFields(OneRow onerow) throws Exception {
-
-        Object tuple = deserializer.deserialize((Writable) onerow.getData());
-        // Each Hive record is a Struct
-        StructObjectInspector soi = (StructObjectInspector) deserializer.getObjectInspector();
-        List<OneField> record = traverseStruct(tuple, soi, false);
-
-        //Add partition fields if any
-        record.addAll(getPartitionFields());
-
-        return record;
-
     }
 
     /*

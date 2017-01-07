@@ -48,5 +48,7 @@ PxfFragmentStatsElem *get_pxf_fragments_statistics(char *uri, Relation rel);
 List *get_pxf_item_metadata(char *profile, char *pattern, Oid dboid);
 
 #define HiveProfileName "Hive"
+#define HiveTextProfileName "HiveText"
+#define HiveRCProfileName "HiveRC"
 
 #endif   /* HDWORKMGR_H */

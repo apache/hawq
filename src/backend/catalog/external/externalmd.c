@@ -659,7 +659,7 @@ static Datum GetFormatOptionsForProfile(const List *outputFormats)
 	initStringInfo(&formatStr);
 	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),"TEXT") == 0)
 	{
-		appendStringInfo(&formatStr, "delimiter '\x01' null '\N' escape '\'");
+		appendStringInfo(&formatStr, "delimiter '\x2C' null '\\N' escape '\\'");
 	} else {
 		appendStringInfo(&formatStr, "formatter 'pxfwritable_import'");
 	}
