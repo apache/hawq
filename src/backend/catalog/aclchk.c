@@ -224,8 +224,9 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 	 * If we found no grant options, consider whether to issue a hard error.
 	 * Per spec, having any privilege at all on the object will get you by
 	 * here.
+	 * QE bypass all permission checking.
 	 */
-	if (avail_goptions == ACL_NO_RIGHTS)
+	if (avail_goptions == ACL_NO_RIGHTS && Gp_role != GP_ROLE_EXECUTE)
 	{
 	  if (enable_ranger && !fallBackToNativeCheck(objkind, objectId, grantorId)) {
 	    if (pg_rangercheck(objkind, objectId, grantorId,
@@ -2948,9 +2949,9 @@ pg_class_aclmask(Oid table_oid, Oid roleid,
 		}
 	}
 	/*
-	 * Otherwise, superusers or on QE bypass all permission-checking.
+	 * Otherwise, superusers bypass all permission-checking.
 	 */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	if (superuser_arg(roleid))
 	{
 #ifdef ACLDEBUG
 		elog(DEBUG2, "OID %u is superuser, home free", roleid);
@@ -3006,8 +3007,8 @@ pg_database_aclmask(Oid db_oid, Oid roleid,
 	Oid			ownerId;
 	cqContext  *pcqCtx;
 
-	/* Superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3069,8 +3070,8 @@ pg_proc_aclmask(Oid proc_oid, Oid roleid,
 	Oid			ownerId;
 	cqContext  *pcqCtx;
 
-	/* Superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3131,8 +3132,8 @@ pg_language_aclmask(Oid lang_oid, Oid roleid,
 	Oid			ownerId;
 	cqContext  *pcqCtx;
 
-	/* Superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3194,8 +3195,8 @@ pg_namespace_aclmask(Oid nsp_oid, Oid roleid,
 	Oid			ownerId;
 	cqContext  *pcqCtx;
 
-	/* Superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3293,8 +3294,8 @@ pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
 	if (spc_oid == GLOBALTABLESPACE_OID && !(IsBootstrapProcessingMode()||gp_upgrade_mode))
 		return 0;
 
-	/* Otherwise, superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3366,8 +3367,8 @@ pg_foreign_data_wrapper_aclmask(Oid fdw_oid, Oid roleid,
 
 	Form_pg_foreign_data_wrapper fdwForm;
 
-	/* Bypass permission checks for superusers or on QE */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3435,8 +3436,8 @@ pg_foreign_server_aclmask(Oid srv_oid, Oid roleid,
 
 	Form_pg_foreign_server srvForm;
 
-	/* Bypass permission checks for superusers or on QE */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3505,10 +3506,10 @@ pg_extprotocol_aclmask(Oid ptcOid, Oid roleid,
 	cqContext	cqc;
 	cqContext  *pcqCtx;
 
-	/* Bypass permission checks for superusers or on QE */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
-	
+
 	rel = heap_open(ExtprotocolRelationId, AccessShareLock);
 
 	pcqCtx = caql_beginscan(
@@ -3585,8 +3586,8 @@ pg_filesystem_aclmask(Oid fsysOid, Oid roleid,
 	ScanKeyData entry[1];
 
 
-	/* Bypass permission checks for superusers or on QE */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Bypass permission checks for superusers */
+	if (superuser_arg(roleid))
 		return mask;
 	
 	/*
@@ -3788,6 +3789,10 @@ pg_filesystem_nativecheck(Oid fsysid, Oid roleid, AclMode mode)
 AclResult
 pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_CLASS, table_oid, roleid, mode, ACLMASK_ANY);
@@ -3804,6 +3809,10 @@ pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 AclResult
 pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid))
    {
      return pg_rangercheck(ACL_KIND_DATABASE, db_oid, roleid, mode, ACLMASK_ANY);
@@ -3820,6 +3829,10 @@ pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
 AclResult
 pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_PROC, proc_oid, roleid, mode, ACLMASK_ANY);
@@ -3836,6 +3849,10 @@ pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode, ACLMASK_ANY);
@@ -3852,6 +3869,10 @@ pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
 AclResult
 pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode, ACLMASK_ANY);
@@ -3868,6 +3889,10 @@ pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
 AclResult
 pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode, ACLMASK_ANY);
@@ -3885,6 +3910,10 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FDW, fdw_oid, roleid, mode, ACLMASK_ANY);
@@ -3902,6 +3931,10 @@ pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode, ACLMASK_ANY);
@@ -3919,6 +3952,10 @@ pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
 AclResult
 pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid))
   {
     return pg_rangercheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode, ACLMASK_ANY);
@@ -3935,6 +3972,10 @@ pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
 AclResult
 pg_filesystem_aclcheck(Oid fsysid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode, ACLMASK_ANY);
