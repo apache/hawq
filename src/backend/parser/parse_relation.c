@@ -2841,33 +2841,14 @@ ExecCheckRTEPerms(RangeTblEntry *rte)
 	/*
 	 * We must have *all* the requiredPerms bits, so use aclmask not aclcheck.
 	 */
-	if (enable_ranger && !fallBackToNativeCheck(ACL_KIND_CLASS, relOid, userid))
-	{
-	  elog(LOG, "ExecCheckRTEPerms: here");
-	  /* ranger check required permission should all be approved.*/
-    if (pg_rangercheck(ACL_KIND_CLASS, relOid, userid, requiredPerms, ACLMASK_ALL)
-        != RANGERCHECK_OK)
-    {
-      /*
-       * If the table is a partition, return an error message that includes
-       * the name of the parent table.
-       */
-      const char *rel_name = get_rel_name_partition(relOid);
-      aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
-    }
-	}
-	else
-	{
-	  if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
-	        != requiredPerms)
-    {
-      /*
-       * If the table is a partition, return an error message that includes
-       * the name of the parent table.
-       */
-      const char *rel_name = get_rel_name_partition(relOid);
-      aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
-    }
+	if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
+			!= requiredPerms) {
+		/*
+		 * If the table is a partition, return an error message that includes
+		 * the name of the parent table.
+		 */
+		const char *rel_name = get_rel_name_partition(relOid);
+		aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
 	}
 }
 
