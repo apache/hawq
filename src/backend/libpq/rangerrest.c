@@ -71,7 +71,9 @@ static void getClientIP(char *remote_host)
 RangerACLResult parse_ranger_response(char* buffer)
 {
 	if (buffer == NULL || strlen(buffer) == 0)
+	{
 		return RANGERCHECK_UNKNOWN;
+	}
 
 	elog(LOG, "read from Ranger Restful API: %s", buffer);
 
@@ -281,29 +283,27 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	CURL_HANDLE curl = (CURL_HANDLE) userp;
 	Assert(curl != NULL);
 
-	if (curl->response.buffer == NULL) 
+	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.size, curl->response.buffer_size);
+	if(curl->response.size + realsize >= curl->response.buffer_size)
 	{
-		curl->response.buffer = palloc0(realsize + 1);
+		/*
+		 * our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL
+		 * double the buffer size if the buffer is not enough.
+		 */
+		curl->response.buffer = repalloc(curl->response.buffer, curl->response.buffer_size * 2);
+		curl->response.buffer_size = curl->response.buffer_size * 2;
 	}
-	else 
-	{
-		/*Note:*/
-		/*our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL*/
-		curl->response.buffer = repalloc(curl->response.buffer, curl->response.size + realsize + 1);
-	}
-
+	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.size, curl->response.buffer_size);
 	if (curl->response.buffer == NULL)
 	{
 		/* out of memory! */
 		elog(WARNING, "not enough memory for Ranger response");
 		return 0;
 	}
-
 	memcpy(curl->response.buffer + curl->response.size, contents, realsize);
+	elog(LOG, "read from Ranger Restful API: %s", curl->response.buffer);
 	curl->response.size += realsize;
 	curl->response.buffer[curl->response.size] = '\0';
-	elog(LOG, "read from Ranger Restful API: %s", curl->response.buffer);
-
 	return realsize;
 }
 
@@ -316,15 +316,14 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	CURLcode res;
 	Assert(request != NULL);
 
-	curl_global_init(CURL_GLOBAL_ALL);
-
-	/* init the curl session */
-	curl_handle->curl_handle = curl_easy_init();
-	if (curl_handle->curl_handle == NULL)
-	{
-		goto _exit;
-	}
-
+	/*
+	 * Re-initializes all options previously set on a specified CURL handle
+	 * to the default values. This puts back the handle to the same state as
+	 * it was in when it was just created with curl_easy_init.It does not
+	 * change the following information kept in the handle: live connections,
+	 * the Session ID cache, the DNS cache, the cookies and shares.
+	 */
+	curl_easy_reset(curl_handle->curl_handle);
 	/* timeout: hard-coded temporarily and maybe should be a guc in future */
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_TIMEOUT, 30L);
 
@@ -368,15 +367,6 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 			curl_handle->response.size);
 	}
 
-_exit:
-	/* cleanup curl stuff */
-	if (curl_handle->curl_handle)
-	{
-		curl_easy_cleanup(curl_handle->curl_handle);
-	}
-
-	/* we're done with libcurl, so clean it up */
-	curl_global_cleanup();
 	return ret;
 }
 
@@ -390,8 +380,6 @@ int check_privilege_from_ranger(List *arg_list)
 	const char *request = json_object_to_json_string(jrequest);
 	elog(LOG, "Send JSON request to Ranger: %s", request);
 	Assert(request != NULL);
-	struct curl_context_t curl_context;
-	memset(&curl_context, 0, sizeof(struct curl_context_t));
 
 	/* call GET method to send request*/
 	if (call_ranger_rest(&curl_context, request) < 0)
@@ -404,10 +392,10 @@ int check_privilege_from_ranger(List *arg_list)
 
 	/* parse the JSON-format result */
 	RangerACLResult ret = parse_ranger_response(curl_context.response.buffer);
-	/* free response buffer */
 	if (curl_context.response.buffer != NULL)
 	{
-		pfree(curl_context.response.buffer);
+		/* reset response size to reuse the buffer. */
+		curl_context.response.size = 0;
 	}
 
 	return ret;

@@ -114,6 +114,8 @@
 
 #include "cdb/cdbinmemheapam.h"
 
+#include "utils/rangerrest.h"
+
 #include "resourcemanager/dynrm.h"
 #include "resourcemanager/envswitch.h"
 #include "resourcemanager/communication/rmcomm_QD2RM.h"
@@ -133,6 +135,7 @@ extern char *optarg;
 extern char *savedSeqServerHost;
 extern int savedSeqServerPort;
 
+struct curl_context_t curl_context;
 /* ----------------
  *		global variables
  * ----------------
@@ -266,6 +269,7 @@ static void log_disconnections(int code, Datum arg);
 static bool renice_current_process(int nice_level);
 static int getSlaveHostNumber(FILE *fp);
 static bool CheckSlaveFile();
+static void curl_finalize(int code, Datum arg);
 
 /*saved interrupt global variable for client_read_xxx functions*/
 static bool SavedImmediateInterruptOK = false;
@@ -4626,6 +4630,24 @@ PostgresMain(int argc, char *argv[], const char *username)
 	if (!ignore_till_sync)
 		send_ready_for_query = true;	/* initially, or after error */
 
+	/* for enable ranger*/
+	if (enable_ranger && !curl_context.hasInited)
+	{
+		memset(&curl_context, 0, sizeof(curl_context_t));
+		curl_global_init(CURL_GLOBAL_ALL);
+		/* init the curl session */
+		curl_context.curl_handle = curl_easy_init();
+		if (curl_context.curl_handle == NULL) {
+			/* cleanup curl stuff */
+			/* no need to cleanup curl_handle since it's null. just cleanup curl global.*/
+			curl_global_cleanup();
+		}
+		curl_context.hasInited = true;
+		curl_context.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
+		curl_context.response.buffer_size = CURL_RES_BUFFER_SIZE;
+		elog(LOG, "when enable ranger, init global struct for privileges check.");
+		on_proc_exit(curl_finalize, 0);
+	}
 	/*
 	 * Non-error queries loop here.
 	 */
@@ -5314,6 +5336,24 @@ PostgresMain(int argc, char *argv[], const char *username)
 	return 1;					/* keep compiler quiet */
 }
 
+static void
+curl_finalize(int code, Datum arg __attribute__((unused)))
+{
+	if (curl_context.hasInited)
+	{
+		if (curl_context.response.buffer != NULL) {
+			pfree(curl_context.response.buffer);
+		}
+		/* cleanup curl stuff */
+		if (curl_context.curl_handle) {
+			curl_easy_cleanup(curl_context.curl_handle);
+		}
+		/* we're done with libcurl, so clean it up */
+		curl_global_cleanup();
+		curl_context.hasInited = false;
+		elog(LOG, "finalize the global struct for curl handle context.");
+	}
+}
 
 /*
  * Obtain platform stack depth limit (in bytes)
