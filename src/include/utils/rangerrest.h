@@ -37,6 +37,7 @@
 #include "tcop/tcopprot.h"
 
 #define HOST_BUFFER_SIZE 1025
+#define CURL_RES_BUFFER_SIZE 1024
 
 typedef enum
 {
@@ -59,10 +60,13 @@ typedef struct curl_context_t
   struct
   {
     char* buffer;
-    int size;
+    int response_size;
+    int buffer_size;
   } response;
 
   char* last_http_reponse;
+
+  bool hasInited;
 } curl_context_t;
 
 typedef curl_context_t* CURL_HANDLE;
@@ -94,5 +98,6 @@ RangerACLResult parse_ranger_response(char *);
 json_object *create_ranger_request_json(List *);
 int call_ranger_rest(CURL_HANDLE curl_handle, const char *request);
 extern int check_privilege_from_ranger(List *);
+extern struct curl_context_t curl_context_ranger;
 
 #endif
