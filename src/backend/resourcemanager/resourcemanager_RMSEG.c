@@ -275,3 +275,14 @@ void checkAndBuildFailedTmpDirList(void)
 			  "directory, which costs " UINT64_FORMAT " us",
 			  endtime - starttime);
 }
+
+void switchIMAliveSendingTarget(void)
+{
+	/* We switch to standby server only when it is correctly set. */
+	if (strcmp(standby_addr_host, "none") != 0)
+	{
+		DRMGlobalInstance->SendToStandby = !DRMGlobalInstance->SendToStandby;
+		elog(LOG, "segment will send heart-beat to %s from now on",
+				  DRMGlobalInstance->SendToStandby ? "standby" : "master");
+	}
+}
