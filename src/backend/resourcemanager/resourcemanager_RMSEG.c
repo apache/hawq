@@ -279,7 +279,7 @@ void checkAndBuildFailedTmpDirList(void)
 void switchIMAliveSendingTarget(void)
 {
 	/* We switch to standby server only when it is correctly set. */
-	if (strcmp(standby_addr_host, "none") != 0)
+	if (pg_strcasecmp(standby_addr_host, "none") != 0)
 	{
 		DRMGlobalInstance->SendToStandby = !DRMGlobalInstance->SendToStandby;
 		elog(LOG, "segment will send heart-beat to %s from now on",
