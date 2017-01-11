@@ -284,7 +284,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	Assert(curl != NULL);
 
 	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.size, curl->response.buffer_size);
-	if(curl->response.size + realsize >= curl->response.buffer_size)
+	while(curl->response.size + realsize >= curl->response.buffer_size)
 	{
 		/*
 		 * our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL
