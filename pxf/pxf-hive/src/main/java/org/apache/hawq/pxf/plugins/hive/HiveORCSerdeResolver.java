@@ -104,9 +104,9 @@ public class HiveORCSerdeResolver extends HiveResolver {
 
         StringBuilder columnNames = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
         StringBuilder columnTypes = new StringBuilder(numberOfDataColumns * 2); // column + delimiter
-        String[] tmp = typesString.split(":");
+        String[] cols = typesString.split(":");
         String[] hiveColTypes = new String[numberOfDataColumns];
-        parseColTypes(tmp, hiveColTypes);
+        parseColTypes(cols, hiveColTypes);
 
         String delim = ",";
         for (int i = 0; i < numberOfDataColumns; i++) {
