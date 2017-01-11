@@ -75,7 +75,7 @@ RangerACLResult parse_ranger_response(char* buffer)
 		return RANGERCHECK_UNKNOWN;
 	}
 
-	elog(LOG, "read from Ranger Restful API: %s", buffer);
+	elog(DEBUG3, "parse ranger restful response content : %s", buffer);
 
 	struct json_object *response = json_tokener_parse(buffer);
 	if (response == NULL) 
@@ -92,7 +92,7 @@ RangerACLResult parse_ranger_response(char* buffer)
 	}
 
 	int arraylen = json_object_array_length(accessObj);
-	elog(LOG, "Array Length: %d",arraylen);
+	elog(DEBUG3, "parse ranger response result array length: %d",arraylen);
 
 	// here should return which table's acl check failed in future.
 	for (int i=0; i< arraylen; i++){
@@ -163,7 +163,7 @@ json_object *create_ranger_request_json(List *args)
 		AclObjectKind kind = arg_ptr->kind;
 		char* object = arg_ptr->object;
 		Assert(user != NULL && object != NULL && privilege != NULL && arg_ptr->isAll);
-		elog(LOG, "build json for ranger request, user:%s, kind:%s, object:%s",
+		elog(DEBUG3, "build json for ranger restful request, user:%s, kind:%s, object:%s",
 				user, AclObjectKindStr[kind], object);
 
 		json_object *jelement = json_object_new_object();
@@ -283,7 +283,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	CURL_HANDLE curl = (CURL_HANDLE) userp;
 	Assert(curl != NULL);
 
-	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
+	elog(DEBUG3, "ranger restful response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
 	int original_size = curl->response.buffer_size;
 	while(curl->response.response_size + realsize >= curl->response.buffer_size)
 	{
@@ -295,7 +295,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 		/* our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL */
 		curl->response.buffer = repalloc(curl->response.buffer, curl->response.buffer_size);
 	}
-	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
+	elog(DEBUG3, "ranger restful response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
 	if (curl->response.buffer == NULL)
 	{
 		/* out of memory! */
@@ -303,7 +303,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 		return 0;
 	}
 	memcpy(curl->response.buffer + curl->response.response_size, contents, realsize);
-	elog(LOG, "read from Ranger Restful API: %s", curl->response.buffer);
+	elog(DEBUG3, "read from ranger restful response: %s", curl->response.buffer);
 	curl->response.response_size += realsize;
 	curl->response.buffer[curl->response.response_size] = '\0';
 	return realsize;
@@ -365,7 +365,7 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	else
 	{
 		ret = 0;
-		elog(LOG, "%d bytes retrieved from Ranger Restful API.",
+		elog(DEBUG3, "retrieved %d bytes from ranger restful response.",
 			curl_handle->response.response_size);
 	}
 
@@ -380,11 +380,11 @@ int check_privilege_from_ranger(List *arg_list)
 	json_object* jrequest = create_ranger_request_json(arg_list);
 	Assert(jrequest != NULL);
 	const char *request = json_object_to_json_string(jrequest);
-	elog(LOG, "Send JSON request to Ranger: %s", request);
+	elog(DEBUG3, "send json request to ranger : %s", request);
 	Assert(request != NULL);
 
 	/* call GET method to send request*/
-	if (call_ranger_rest(&curl_context, request) < 0)
+	if (call_ranger_rest(&curl_context_ranger, request) < 0)
 	{
 		return RANGERCHECK_NO_PRIV;
 	}
@@ -393,11 +393,11 @@ int check_privilege_from_ranger(List *arg_list)
 	json_object_put(jrequest);
 
 	/* parse the JSON-format result */
-	RangerACLResult ret = parse_ranger_response(curl_context.response.buffer);
-	if (curl_context.response.buffer != NULL)
+	RangerACLResult ret = parse_ranger_response(curl_context_ranger.response.buffer);
+	if (curl_context_ranger.response.buffer != NULL)
 	{
 		/* reset response size to reuse the buffer. */
-		curl_context.response.response_size = 0;
+		curl_context_ranger.response.response_size = 0;
 	}
 
 	return ret;
