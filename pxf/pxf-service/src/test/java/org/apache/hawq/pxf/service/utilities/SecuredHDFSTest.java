@@ -33,6 +33,7 @@ import java.io.IOException;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -47,7 +48,6 @@ public class SecuredHDFSTest {
         when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
         UserGroupInformation ugi = mock(UserGroupInformation.class);
         when(UserGroupInformation.getLoginUser()).thenReturn(ugi);
-        when(ugi.hasKerberosCredentials()).thenReturn(true);
         when(mockProtocolData.getToken()).thenReturn("This is odd");
 
         try {
@@ -63,15 +63,13 @@ public class SecuredHDFSTest {
         when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
         UserGroupInformation ugi = mock(UserGroupInformation.class);
         when(UserGroupInformation.getLoginUser()).thenReturn(ugi);
-        when(ugi.hasKerberosCredentials()).thenReturn(false);
         when(mockProtocolData.getToken()).thenReturn("This is odd");
 
         try {
             SecuredHDFS.verifyToken(mockProtocolData, mockContext);
             fail("invalid X-GP-TOKEN should throw");
         } catch (SecurityException e) {
-            PowerMockito.verifyStatic();
-            SecureLogin.login();
+            verify(ugi).reloginFromKeytab();
             assertEquals("Failed to verify delegation token java.io.EOFException", e.getMessage());
         }
     }
@@ -85,6 +83,5 @@ public class SecuredHDFSTest {
         mockContext = mock(ServletContext.class);
 
         PowerMockito.mockStatic(UserGroupInformation.class);
-        PowerMockito.mockStatic(SecureLogin.class);
     }
 }
