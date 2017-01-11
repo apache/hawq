@@ -4391,7 +4391,24 @@ PostgresMain(int argc, char *argv[], const char *username)
 		BuildFlatFiles(true);
 	}
 
-
+	/* for enable ranger*/
+	if (enable_ranger && !curl_context_ranger.hasInited)
+	{
+		memset(&curl_context_ranger, 0, sizeof(curl_context_t));
+		curl_global_init(CURL_GLOBAL_ALL);
+		/* init the curl session */
+		curl_context_ranger.curl_handle = curl_easy_init();
+		if (curl_context_ranger.curl_handle == NULL) {
+			/* cleanup curl stuff */
+			/* no need to cleanup curl_handle since it's null. just cleanup curl global.*/
+			curl_global_cleanup();
+		}
+		curl_context_ranger.hasInited = true;
+		curl_context_ranger.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
+		curl_context_ranger.response.buffer_size = CURL_RES_BUFFER_SIZE;
+		elog(DEBUG3, "when enable ranger, init global struct for privileges check.");
+		on_proc_exit(curl_finalize, 0);
+	}
 	/*
 	 * Create a per-backend PGPROC struct in shared memory, except in the
 	 * EXEC_BACKEND case where this was done in SubPostmasterMain. We must do
@@ -4630,25 +4647,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 	if (!ignore_till_sync)
 		send_ready_for_query = true;	/* initially, or after error */
 
-	/* for enable ranger*/
-	if (AmIMaster() && enable_ranger && !curl_context_ranger.hasInited)
-	{
-		memset(&curl_context_ranger, 0, sizeof(curl_context_t));
-		curl_global_init(CURL_GLOBAL_ALL);
-		/* init the curl session */
-		curl_context_ranger.curl_handle = curl_easy_init();
-		if (curl_context_ranger.curl_handle == NULL) {
-			/* cleanup curl stuff */
-			/* no need to cleanup curl_handle since it's null. just cleanup curl global.*/
-			curl_global_cleanup();
-			elog(ERROR, "initialize global curl context failed.");
-		}
-		curl_context_ranger.hasInited = true;
-		curl_context_ranger.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
-		curl_context_ranger.response.buffer_size = CURL_RES_BUFFER_SIZE;
-		elog(DEBUG3, "initialize global curl context for privileges check.");
-		on_proc_exit(curl_finalize, 0);
-	}
 	/*
 	 * Non-error queries loop here.
 	 */

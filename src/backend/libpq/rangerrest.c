@@ -384,6 +384,7 @@ int check_privilege_from_ranger(List *arg_list)
 	Assert(request != NULL);
 
 	/* call GET method to send request*/
+	Assert(curl_context_ranger.hasInited);
 	if (call_ranger_rest(&curl_context_ranger, request) < 0)
 	{
 		return RANGERCHECK_NO_PRIV;
