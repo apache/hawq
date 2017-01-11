@@ -283,27 +283,29 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	CURL_HANDLE curl = (CURL_HANDLE) userp;
 	Assert(curl != NULL);
 
-	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.size, curl->response.buffer_size);
-	while(curl->response.size + realsize >= curl->response.buffer_size)
+	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
+	int original_size = curl->response.buffer_size;
+	while(curl->response.response_size + realsize >= curl->response.buffer_size)
 	{
-		/*
-		 * our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL
-		 * double the buffer size if the buffer is not enough.
-		 */
-		curl->response.buffer = repalloc(curl->response.buffer, curl->response.buffer_size * 2);
+		/*double the buffer size if the buffer is not enough.*/
 		curl->response.buffer_size = curl->response.buffer_size * 2;
 	}
-	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.size, curl->response.buffer_size);
+	if(original_size < curl->response.buffer_size)
+	{
+		/* our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL */
+		curl->response.buffer = repalloc(curl->response.buffer, curl->response.buffer_size);
+	}
+	elog(DEBUG3, "response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
 	if (curl->response.buffer == NULL)
 	{
 		/* out of memory! */
 		elog(WARNING, "not enough memory for Ranger response");
 		return 0;
 	}
-	memcpy(curl->response.buffer + curl->response.size, contents, realsize);
+	memcpy(curl->response.buffer + curl->response.response_size, contents, realsize);
 	elog(LOG, "read from Ranger Restful API: %s", curl->response.buffer);
-	curl->response.size += realsize;
-	curl->response.buffer[curl->response.size] = '\0';
+	curl->response.response_size += realsize;
+	curl->response.buffer[curl->response.response_size] = '\0';
 	return realsize;
 }
 
@@ -364,7 +366,7 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	{
 		ret = 0;
 		elog(LOG, "%d bytes retrieved from Ranger Restful API.",
-			curl_handle->response.size);
+			curl_handle->response.response_size);
 	}
 
 	return ret;
@@ -395,7 +397,7 @@ int check_privilege_from_ranger(List *arg_list)
 	if (curl_context.response.buffer != NULL)
 	{
 		/* reset response size to reuse the buffer. */
-		curl_context.response.size = 0;
+		curl_context.response.response_size = 0;
 	}
 
 	return ret;

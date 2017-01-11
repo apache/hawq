@@ -60,7 +60,7 @@ typedef struct curl_context_t
   struct
   {
     char* buffer;
-    int size;
+    int response_size;
     int buffer_size;
   } response;
 
