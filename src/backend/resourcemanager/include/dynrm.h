@@ -322,4 +322,6 @@ int  initializeSocketServer_RMSEG(void);
 int  MainHandlerLoop_RMSEG(void);
 
 void checkAndBuildFailedTmpDirList(void);
+
+void switchIMAliveTarget(void);
 #endif //DYNAMIC_RESOURCE_MANAGEMENT_H

@@ -8200,7 +8200,7 @@ static struct config_string ConfigureNamesString[] =
 			NULL
 		},
 		&standby_addr_host,
-		"localhost", NULL, NULL
+		"none", NULL, NULL
 	},
 
 	{
