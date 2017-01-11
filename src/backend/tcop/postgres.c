@@ -4641,11 +4641,12 @@ PostgresMain(int argc, char *argv[], const char *username)
 			/* cleanup curl stuff */
 			/* no need to cleanup curl_handle since it's null. just cleanup curl global.*/
 			curl_global_cleanup();
+			elog(ERROR, "init curl handle failed.");
 		}
 		curl_context.hasInited = true;
 		curl_context.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
 		curl_context.response.buffer_size = CURL_RES_BUFFER_SIZE;
-		elog(LOG, "when enable ranger, init global struct for privileges check.");
+		elog(DEBUG3, "init global curl context for privileges check.");
 		on_proc_exit(curl_finalize, 0);
 	}
 	/*
@@ -5337,7 +5338,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 }
 
 static void
-curl_finalize(int code, Datum arg __attribute__((unused)))
+curl_finalize(int code, Datum arg __MAYBE_UNUSED)
 {
 	if (curl_context.hasInited)
 	{
@@ -5351,7 +5352,7 @@ curl_finalize(int code, Datum arg __attribute__((unused)))
 		/* we're done with libcurl, so clean it up */
 		curl_global_cleanup();
 		curl_context.hasInited = false;
-		elog(LOG, "finalize the global struct for curl handle context.");
+		elog(DEBUG3, "finalize the global struct for curl handle context.");
 	}
 }
 
