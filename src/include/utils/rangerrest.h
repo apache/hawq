@@ -84,6 +84,13 @@ typedef struct RangerPrivilegeResults
 {
   RangerACLResult result;
   Oid relOid;
+
+  /* 
+   * string_hash of access[i] field of ranger request 
+   * use the sigh to identify each resource result
+   */ 
+  uint32 resource_sign;
+  uint32 privilege_sign;
 } RangerPrivilegeResults;
 
 typedef struct RangerRequestJsonArgs {
@@ -94,10 +101,8 @@ typedef struct RangerRequestJsonArgs {
   bool isAll;
 } RangerRequestJsonArgs;
 
-RangerACLResult parse_ranger_response(char *);
-json_object *create_ranger_request_json(List *);
-int call_ranger_rest(CURL_HANDLE curl_handle, const char *request);
-extern int check_privilege_from_ranger(List *);
 extern struct curl_context_t curl_context_ranger;
+
+int check_privilege_from_ranger(List *request_list, List *result_list);
 
 #endif

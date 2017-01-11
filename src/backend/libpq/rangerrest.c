@@ -25,6 +25,7 @@
  *-------------------------------------------------------------------------
  */
 #include "utils/rangerrest.h"
+#include "utils/hsearch.h"
 /*
  * A mapping from AclObjectKind to string
  */
@@ -68,12 +69,16 @@ static void getClientIP(char *remote_host)
 	}
 }
 
-RangerACLResult parse_ranger_response(char* buffer)
+/*
+ * parse ranger response
+ * @param	buffer	ranger response 	
+ * @param	result_list		List of RangerPrivilegeResults
+ * @return	0 parse success; -1 other error
+ */
+static int parse_ranger_response(char* buffer, List *result_list)
 {
 	if (buffer == NULL || strlen(buffer) == 0)
-	{
-		return RANGERCHECK_UNKNOWN;
-	}
+		return -1;
 
 	elog(DEBUG3, "parse ranger restful response content : %s", buffer);
 
@@ -81,40 +86,81 @@ RangerACLResult parse_ranger_response(char* buffer)
 	if (response == NULL) 
 	{
 		elog(WARNING, "json_tokener_parse failed");
-		return RANGERCHECK_NO_PRIV;
+		return -1;
 	}
 
 	struct json_object *accessObj = NULL;
 	if (!json_object_object_get_ex(response, "access", &accessObj))
 	{
 		elog(WARNING, "get json access field failed");
-		return RANGERCHECK_NO_PRIV;
+		return -1;
 	}
 
 	int arraylen = json_object_array_length(accessObj);
 	elog(DEBUG3, "parse ranger response result array length: %d",arraylen);
-
-	// here should return which table's acl check failed in future.
 	for (int i=0; i< arraylen; i++){
 		struct json_object *jvalue = NULL;
 		struct json_object *jallow = NULL;
+		struct json_object *jresource = NULL;
+		struct json_object *jprivilege = NULL;
 
 		jvalue = json_object_array_get_idx(accessObj, i);
+		if (jvalue == NULL) 
+			return -1;
 		if (!json_object_object_get_ex(jvalue, "allowed", &jallow))
-		{
-			return RANGERCHECK_NO_PRIV;
-		}
-		json_bool result = json_object_get_boolean(jallow);
-		if(result != 1){
-			return RANGERCHECK_NO_PRIV;
+			return -1;
+		if (!json_object_object_get_ex(jvalue, "resource", &jresource))
+			return -1;
+		if (!json_object_object_get_ex(jvalue, "privileges", &jprivilege))
+			return -1;
+		
+		json_bool ok = json_object_get_boolean(jallow);
+
+		const char *resource_str = json_object_get_string(jresource);
+		const char *privilege_str = json_object_get_string(jprivilege);
+		uint32 resource_sign = string_hash(resource_str, strlen(resource_str));
+		uint32 privilege_sign = string_hash(privilege_str, strlen(privilege_str));
+		elog(DEBUG3, "ranger reponse access sign, resource_str:%s, privilege_str:%s", 
+			resource_str, privilege_str);
+
+		ListCell *result;
+		/* get each resource result by use sign */
+		foreach(result, result_list) {
+			/* loop find is enough for performence*/
+			RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
+			if (result_ptr->resource_sign != resource_sign || result_ptr->privilege_sign != privilege_sign)
+				continue;
+
+			if (ok == 1)
+				result_ptr->result = RANGERCHECK_OK;
+			else 
+				result_ptr->result = RANGERCHECK_NO_PRIV;
 		}
 	}
-	return RANGERCHECK_OK;
-
+	return 0;
 }
+
+/**
+ * convert a string to lower
+ */ 
+static void str_tolower(char *dest, const char *src)
+{
+	Assert(src != NULL);
+	Assert(dest != NULL);
+	int len = strlen(src);
+	for (int i = 0; i < len; i++)
+	{
+		unsigned char ch = (unsigned char) src[i];
+
+		if (ch >= 'A' && ch <= 'Z')
+			ch += 'a' - 'A';
+		*(dest+i) = ch;
+	}	
+}
+
 /**
  * Create a JSON object for Ranger request given some parameters.
- *
+ * example:
  *   {
  *     "requestId": 1,
  *     "user": "joe",
@@ -141,10 +187,12 @@ RangerACLResult parse_ranger_response(char* buffer)
  *         }
  *       ]
  *   }
- *
- *   args: List of RangerRequestJsonArgs
+ * 
+ * @param	request_list	List of RangerRequestJsonArgs
+ * @param	result_list		List of RangerPrivilegeResults
+ * @return	the parsed json object
  */
-json_object *create_ranger_request_json(List *args)
+static json_object *create_ranger_request_json(List *request_list, List *result_list)
 {
 	json_object *jrequest = json_object_new_object();
 	json_object *juser = NULL;
@@ -152,7 +200,8 @@ json_object *create_ranger_request_json(List *args)
 	char *user = NULL;
 	ListCell *arg;
 
-	foreach(arg, args)
+	int j = 0;
+	foreach(arg, request_list)
 	{
 		RangerRequestJsonArgs *arg_ptr = (RangerRequestJsonArgs *) lfirst(arg);
 		if (user == NULL)
@@ -162,7 +211,7 @@ json_object *create_ranger_request_json(List *args)
 		}
 		AclObjectKind kind = arg_ptr->kind;
 		char* object = arg_ptr->object;
-		Assert(user != NULL && object != NULL && privilege != NULL && arg_ptr->isAll);
+		Assert(user != NULL && object != NULL);
 		elog(DEBUG3, "build json for ranger restful request, user:%s, kind:%s, object:%s",
 				user, AclObjectKindStr[kind], object);
 
@@ -249,12 +298,27 @@ json_object *create_ranger_request_json(List *args)
 		ListCell *cell;
 		foreach(cell, arg_ptr->actions)
 		{
-		    json_object* jaction = json_object_new_string((char *)cell->data.ptr_value);
+			/* need more normalization in future */
+			char lower_action[32];
+			str_tolower(lower_action, (char *)cell->data.ptr_value);
+			lower_action[sizeof(lower_action)-1] = '\0';
+
+		    json_object* jaction = json_object_new_string(lower_action);
 		    json_object_array_add(jactions, jaction);
 		}
 		json_object_object_add(jelement, "privileges", jactions);
 		json_object_array_add(jaccess, jelement);
-
+		
+		/* set access sign */  
+		RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *)list_nth(result_list, j);			
+		const char *resource_str = json_object_to_json_string(jresource);
+		const char *privilege_str = json_object_to_json_string(jactions);
+		result_ptr->resource_sign = string_hash(resource_str, strlen(resource_str));
+		result_ptr->privilege_sign = string_hash(privilege_str, strlen(privilege_str));
+		elog(DEBUG3, "request access sign, resource_str:%s, privilege_str:%s", 
+			resource_str, privilege_str);
+		
+		j++;
 	} // foreach
 	char str[32];
 	sprintf(str,"%d",request_id);
@@ -310,9 +374,9 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 }
 
 /**
- * @returns: 0 curl success; -1 curl failed
+ * @return	0 curl success; -1 curl failed
  */
-int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
+static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 {
 	int ret = -1;
 	CURLcode res;
@@ -339,6 +403,7 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	appendStringInfo(&tname, "/");
 	appendStringInfo(&tname, "%s", rps_addr_suffix);
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
+	pfree(tname.data);	
 
 	struct curl_slist *headers = NULL;
 	headers = curl_slist_append(headers, "Content-Type:application/json");
@@ -373,12 +438,16 @@ int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 }
 
 /*
- * arg_list: List of RangerRequestJsonArgs
+ * check privilege(s) from ranger
+ * @param	request_list	List of RangerRequestJsonArgs
+ * @param	result_list		List of RangerPrivilegeResults
+ * @return	0 get response from ranger and parse success; -1 other error
  */
-int check_privilege_from_ranger(List *arg_list)
+int check_privilege_from_ranger(List *request_list, List *result_list)
 {
-	json_object* jrequest = create_ranger_request_json(arg_list);
+	json_object* jrequest = create_ranger_request_json(request_list, result_list);
 	Assert(jrequest != NULL);
+
 	const char *request = json_object_to_json_string(jrequest);
 	elog(DEBUG3, "send json request to ranger : %s", request);
 	Assert(request != NULL);
@@ -387,7 +456,7 @@ int check_privilege_from_ranger(List *arg_list)
 	Assert(curl_context_ranger.hasInited);
 	if (call_ranger_rest(&curl_context_ranger, request) < 0)
 	{
-		return RANGERCHECK_NO_PRIV;
+		return -1;
 	}
 
 	/* free the JSON object */
