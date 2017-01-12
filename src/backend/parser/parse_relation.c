@@ -2761,12 +2761,12 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 		ranger_check_arg->how = ACLMASK_ALL;
 		ranger_check_args = lappend(ranger_check_args, ranger_check_arg);
 
-	} // foreach
+	}
 
 	if (ranger_check_args == NIL)
 		return;
 
-	// ranger ACL check with package Oids
+	/* ranger ACL check with package Oids */
 	List *aclresults = NIL;
 	aclresults = pg_rangercheck_batch(ranger_check_args);
 	if (aclresults == NIL)
@@ -2775,7 +2775,7 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 		return;
 	}
 
-	// check result
+	/* check result */
 	StringInfoData acl_fail_msg;
 	bool acl_allok = true;
 
@@ -2788,7 +2788,7 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 			if (acl_allok)
 			{
 				initStringInfo(&acl_fail_msg);
-				appendStringInfo(&acl_fail_msg, "permission denied for those relation(s): ");
+				appendStringInfo(&acl_fail_msg, "permission denied for relation(s): ");
 			}
 			else
 			{
@@ -2796,7 +2796,7 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 			}
 			acl_allok = false;
 
-			//collect all acl fail relations 
+			/* collect all acl fail relations */
 			Oid relOid = result_ptr->relOid;
 			const char *rel_name = get_rel_name_partition(relOid);
 			appendStringInfo(&acl_fail_msg, "%s", rel_name);
@@ -2820,12 +2820,6 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 		errmsg("%s", acl_fail_msg.data),
 		pfree(acl_fail_msg.data);
 		errfinish(errOmitLocation(true));
-		/*
-		   ereport(ERROR,
-		   (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-		   errmsg("%s", acl_fail_msg.data),
-		   errOmitLocation(true)));
-		   */
 	}
 }
 

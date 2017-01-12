@@ -87,7 +87,7 @@ typedef struct RangerPrivilegeResults
 
   /* 
    * string_hash of access[i] field of ranger request 
-   * use the sigh to identify each resource result
+   * use the sign to identify each resource result
    */ 
   uint32 resource_sign;
   uint32 privilege_sign;

@@ -156,6 +156,7 @@ static void str_tolower(char *dest, const char *src)
 			ch += 'a' - 'A';
 		*(dest+i) = ch;
 	}	
+	dest[len] = '\0';
 }
 
 /**
@@ -449,8 +450,8 @@ int check_privilege_from_ranger(List *request_list, List *result_list)
 	Assert(jrequest != NULL);
 
 	const char *request = json_object_to_json_string(jrequest);
-	elog(DEBUG3, "send json request to ranger : %s", request);
 	Assert(request != NULL);
+	elog(DEBUG3, "send json request to ranger : %s", request);
 
 	/* call GET method to send request*/
 	Assert(curl_context_ranger.hasInited);
@@ -463,7 +464,12 @@ int check_privilege_from_ranger(List *request_list, List *result_list)
 	json_object_put(jrequest);
 
 	/* parse the JSON-format result */
-	RangerACLResult ret = parse_ranger_response(curl_context_ranger.response.buffer);
+	int ret = parse_ranger_response(curl_context_ranger.response.buffer, result_list);
+	if (ret < 0)
+	{
+		elog(WARNING, "parse ranger response failed, response[%s]", 
+			curl_context_ranger.response.buffer == NULL? "":curl_context_ranger.response.buffer);
+	}
 	if (curl_context_ranger.response.buffer != NULL)
 	{
 		/* reset response size to reuse the buffer. */

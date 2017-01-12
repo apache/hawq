@@ -2710,6 +2710,7 @@ List *pg_rangercheck_batch(List *arg_list)
   List *aclresults = NIL;
   List *requestargs = NIL;
   ListCell *arg;
+  elog(LOG, "rangeracl batch check, acl list length:%d\n", arg_list->length);
   foreach(arg, arg_list) {
     RangerPrivilegeArgs *arg_ptr = (RangerPrivilegeArgs *) lfirst(arg);
 
@@ -2723,9 +2724,9 @@ List *pg_rangercheck_batch(List *arg_list)
     RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
     aclresult->result = RANGERCHECK_NO_PRIV;
     aclresult->relOid = object_oid;
-	// this two sign fields will be set in create_ranger_request_json()
-	aclresult->resource_sign = 0;
-	aclresult->privilege_sign = 0;
+    // this two sign fields will be set in create_ranger_request_json()
+    aclresult->resource_sign = 0;
+    aclresult->privilege_sign = 0;
     aclresults = lappend(aclresults, aclresult);
 
     RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
@@ -2766,7 +2767,6 @@ List *pg_rangercheck_batch(List *arg_list)
     requestargs = NULL;
   }
 
-  elog(LOG, "oids%d\n", arg_list->length);
   return aclresults;
 }
 
