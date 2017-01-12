@@ -1,8 +1,18 @@
-![HAWQ](http://hawq.incubator.apache.org/images/logo-hawq.png) [![https://travis-ci.org/apache/incubator-hawq.png](https://travis-ci.org/apache/incubator-hawq.png)](https://travis-ci.org/apache/incubator-hawq) [![Coverity Scan Build](https://scan.coverity.com/projects/apache-incubator-hawq/badge.svg)](https://scan.coverity.com/projects/apache-incubator-hawq)
+![HAWQ](http://hawq.incubator.apache.org/images/logo-hawq.png)
+
+---
+
+|CI Process|Status|
+|---|---|
+|Travis CI Build|[![https://travis-ci.org/apache/incubator-hawq.png](https://travis-ci.org/apache/incubator-hawq.png)](https://travis-ci.org/apache/incubator-hawq)|
+|Apache Release Audit Tool ([RAT](https://creadur.apache.org/rat/))|[![Rat Status](https://builds.apache.org/buildStatus/icon?job=HAWQ-rat)](https://builds.apache.org/view/HAWQ/job/HAWQ-rat/)|
+|Coverity Static Analysis   |[![Coverity Scan Build](https://scan.coverity.com/projects/apache-incubator-hawq/badge.svg)](https://scan.coverity.com/projects/apache-incubator-hawq)|
+
+---
 
 [Website](http://hawq.incubator.apache.org/) |
-[Wiki](https://cwiki.apache.org/confluence/display/HAWQ/Apache+HAWQ+Home) |
-[Documentation](http://hdb.docs.pivotal.io/) |
+[Wiki](https://cwiki.apache.org/confluence/display/HAWQ) |
+[Documentation](http://hawq.incubator.apache.org/docs/userguide/2.1.0.0-incubating/overview/HAWQOverview.html) |
 [Developer Mailing List](mailto:dev@hawq.incubator.apache.org) |
 [User Mailing List](mailto:user@hawq.incubator.apache.org) |
 [Q&A Collections](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=65144284) |
