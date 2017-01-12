@@ -355,61 +355,61 @@ static const struct cname
 static int
 pg_wc_isdigit(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && isdigit((unsigned char) c));
+	return (c <= UCHAR_MAX && isdigit((unsigned char) c));
 }
 
 static int
 pg_wc_isalpha(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && isalpha((unsigned char) c));
+	return (c <= UCHAR_MAX && isalpha((unsigned char) c));
 }
 
 static int
 pg_wc_isalnum(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && isalnum((unsigned char) c));
+	return (c <= UCHAR_MAX && isalnum((unsigned char) c));
 }
 
 static int
 pg_wc_isupper(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && isupper((unsigned char) c));
+	return (c <= UCHAR_MAX && isupper((unsigned char) c));
 }
 
 static int
 pg_wc_islower(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && islower((unsigned char) c));
+	return (c <= UCHAR_MAX && islower((unsigned char) c));
 }
 
 static int
 pg_wc_isgraph(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && isgraph((unsigned char) c));
+	return (c <= UCHAR_MAX && isgraph((unsigned char) c));
 }
 
 static int
 pg_wc_isprint(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && isprint((unsigned char) c));
+	return (c <= UCHAR_MAX && isprint((unsigned char) c));
 }
 
 static int
 pg_wc_ispunct(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && ispunct((unsigned char) c));
+	return (c <= UCHAR_MAX && ispunct((unsigned char) c));
 }
 
 static int
 pg_wc_isspace(pg_wchar c)
 {
-	return (c >= 0 && c <= UCHAR_MAX && isspace((unsigned char) c));
+	return (c <= UCHAR_MAX && isspace((unsigned char) c));
 }
 
 static pg_wchar
 pg_wc_toupper(pg_wchar c)
 {
-	if (c >= 0 && c <= UCHAR_MAX)
+	if (c <= UCHAR_MAX)
 		return toupper((unsigned char) c);
 	return c;
 }
@@ -417,7 +417,7 @@ pg_wc_toupper(pg_wchar c)
 static pg_wchar
 pg_wc_tolower(pg_wchar c)
 {
-	if (c >= 0 && c <= UCHAR_MAX)
+	if (c <= UCHAR_MAX)
 		return tolower((unsigned char) c);
 	return c;
 }

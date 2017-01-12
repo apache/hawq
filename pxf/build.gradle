@@ -193,7 +193,12 @@ project('pxf-service') {
         providedCompile "org.apache.hadoop:hadoop-hdfs:$hadoopVersion"
         providedCompile "org.apache.hadoop:hadoop-auth:$hadoopVersion"
         providedCompile "org.apache.hadoop:hadoop-annotations:$hadoopVersion"
+        providedCompile "org.apache.hadoop:hadoop-mapreduce-client-core:$hadoopVersion"
         providedCompile "org.apache.tomcat:tomcat-catalina:$tomcatVersion"
+        providedCompile("org.apache.hive:hive-exec:$hiveVersion") {
+            exclude module: 'calcite-core'
+            exclude module: 'calcite-avatica'
+        }
     }
 
     ospackage {
@@ -342,6 +347,7 @@ project('pxf-hdfs') {
 project('pxf-hive') {
     dependencies {
         compile(project(':pxf-hdfs'))
+        compile(project(':pxf-service'))
         compile("org.apache.hive:hive-exec:$hiveVersion") {
             exclude module: 'calcite-core'
             exclude module: 'calcite-avatica'

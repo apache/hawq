@@ -1461,7 +1461,7 @@ set_inner_join_references(PlannerGlobal *glob, Plan *inner_plan,
 		 * if they are duplicated in qpqual, so must test these independently.
 		 */
 		Index innerrel;
-		List **bitmapqualorig_p;
+		List **bitmapqualorig_p = NIL;
 		if (IsA(inner_plan, BitmapHeapScan))
 		{
 			BitmapHeapScan *innerscan = (BitmapHeapScan *) inner_plan;

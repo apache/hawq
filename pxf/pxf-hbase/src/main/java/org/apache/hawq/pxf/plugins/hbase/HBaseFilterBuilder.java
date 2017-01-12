@@ -23,6 +23,8 @@ package org.apache.hawq.pxf.plugins.hbase;
 import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseColumnDescriptor;
+import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseDoubleComparator;
+import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseFloatComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseIntegerComparator;
 import org.apache.hawq.pxf.plugins.hbase.utilities.HBaseTupleDescription;
 import org.apache.hadoop.hbase.HConstants;
@@ -89,12 +91,15 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
      * @throws Exception if parsing failed
      */
     public Filter getFilterObject(String filterString) throws Exception {
+        if (filterString == null)
+            return null;
+
         // First check for NOT, HBase does not support this
         if (filterNotOpPresent(filterString))
             return null;
 
         FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString);
+        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
 
         if (!(result instanceof Filter)) {
             throw new Exception("String " + filterString + " couldn't be resolved to any supported filter");
@@ -152,6 +157,11 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     @Override
+    public Object build(FilterParser.Operation operation, Object operand) throws Exception {
+        return handleSimpleOperations(operation, (FilterParser.ColumnIndex) operand);
+    }
+
+    @Override
     public Object build(FilterParser.LogicalOperation opId, Object leftOperand, Object rightOperand) {
         return handleCompoundOperations(opId, (Filter) leftOperand, (Filter) rightOperand);
     }
@@ -178,6 +188,29 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
         logicalOperatorsMap = new EnumMap<>(FilterParser.LogicalOperation.class);
         logicalOperatorsMap.put(FilterParser.LogicalOperation.HDOP_AND, FilterList.Operator.MUST_PASS_ALL);
         logicalOperatorsMap.put(FilterParser.LogicalOperation.HDOP_OR, FilterList.Operator.MUST_PASS_ONE);
+    }
+
+    private Object handleSimpleOperations(FilterParser.Operation opId,
+                                          FilterParser.ColumnIndex column) throws Exception {
+        HBaseColumnDescriptor hbaseColumn = tupleDescription.getColumn(column.index());
+        CompareFilter.CompareOp compareOperation;
+        ByteArrayComparable comparator;
+        switch (opId) {
+            case HDOP_IS_NULL:
+                compareOperation = CompareFilter.CompareOp.EQUAL;
+                comparator = new NullComparator();
+                break;
+            case HDOP_IS_NOT_NULL:
+                compareOperation = CompareFilter.CompareOp.NOT_EQUAL;
+                comparator = new NullComparator();
+                break;
+            default:
+                throw new Exception("unsupported unary operation for filtering " + opId);
+        }
+        return new SingleColumnValueFilter(hbaseColumn.columnFamilyBytes(),
+                hbaseColumn.qualifierBytes(),
+                compareOperation,
+                comparator);
     }
 
     /**
@@ -229,8 +262,28 @@ public class HBaseFilterBuilder implements FilterParser.FilterBuilder {
                 break;
             case SMALLINT:
             case INTEGER:
+                result = new HBaseIntegerComparator(((Integer) data).longValue());
+                break;
             case BIGINT:
-                result = new HBaseIntegerComparator((Long) data);
+                if (data instanceof Long) {
+                    result = new HBaseIntegerComparator((Long) data);
+                } else if (data instanceof Integer) {
+                    result = new HBaseIntegerComparator(((Integer) data).longValue());
+                } else {
+                    result = null;
+                }
+                break;
+            case FLOAT8:
+                result = new HBaseDoubleComparator((double) data);
+                break;
+            case REAL:
+                if (data instanceof Double) {
+                    result = new HBaseDoubleComparator((double) data);
+                } else if (data instanceof Float) {
+                    result = new HBaseFloatComparator((float) data);
+                } else {
+                    result = null;
+                }
                 break;
             default:
                 throw new Exception("unsupported column type for filtering " + type);

@@ -384,7 +384,7 @@ FileSystemGetNameByOid(Oid	fsysOid)
 
 char *fsys_func_type_to_name(FileSystemFuncType ftype)
 {
-	if(ftype < 0 || ftype >= FSYS_FUNC_TOTALNUM)
+	if (ftype < FSYS_FUNC_CONNECT || ftype >= FSYS_FUNC_TOTALNUM)
 	{
 		elog(ERROR, "internal error in pg_filesystem:func_type_to_name");
 		return NULL;
@@ -394,7 +394,7 @@ char *fsys_func_type_to_name(FileSystemFuncType ftype)
 
 int fsys_func_type_to_attnum(FileSystemFuncType ftype)
 {
-	if(ftype < 0 || ftype >= FSYS_FUNC_TOTALNUM)
+	if (ftype < FSYS_FUNC_CONNECT || ftype >= FSYS_FUNC_TOTALNUM)
 	{
 		elog(ERROR, "internal error in pg_filesystem:func_type_to_attnum");
 		return -1;

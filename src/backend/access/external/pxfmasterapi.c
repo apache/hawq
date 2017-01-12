@@ -358,6 +358,11 @@ parse_get_fragments_response(List *fragments, StringInfo rest_buf)
 		if (js_user_data)
 			fragment->user_data = pstrdup(json_object_get_string(js_user_data));
 
+		/* 5. profile - recommended profile to work with fragment */
+		struct json_object *js_profile = json_object_object_get(js_fragment, "profile");
+		if (js_profile)
+			fragment->profile = pstrdup(json_object_get_string(js_profile));
+
 		/*
 		 * HD-2547:
 		 * Ignore fragment if it doesn't contain any host locations,
@@ -400,6 +405,10 @@ void free_fragment(DataFragment *fragment)
 
 	if (fragment->user_data)
 		pfree(fragment->user_data);
+
+	if (fragment->profile)
+		pfree(fragment->profile);
+
 	pfree(fragment);
 }
 

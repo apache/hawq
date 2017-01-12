@@ -313,6 +313,7 @@ class RemoteCommand(Operation):
             cmd = Command(name = 'Remote Command', cmdStr = self.cmd_str, ctxt = REMOTE, remoteHost = host)
             pool.addCommand(cmd)
         pool.join()
+        pool.haltWork()
 
         #This will raise ExecutionError exception if even a single command fails
         pool.check_results()
@@ -1262,6 +1263,7 @@ class GpScp(Operation):
                                 dstFile = self.target_path,
                                 dstHost = host))
         pool.join()
+        pool.haltWork()
 
 
 class HostOperation(Operation):

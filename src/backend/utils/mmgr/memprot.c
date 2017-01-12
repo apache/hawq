@@ -299,7 +299,7 @@ static void gp_failed_to_alloc(MemoryAllocationStatus ec, int en, int sz)
 		/*
 		 * Generate a core dump by writing to NULL pointer
 		 */
-		*(int *) NULL = ec;
+		*(volatile int *) NULL = ec;
 	}
 
 	if (ec == MemoryFailure_VmemExhausted)

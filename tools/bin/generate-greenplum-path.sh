@@ -56,37 +56,18 @@ if [ -h \${GPHOME}/../hawq ]; then
 fi
 EOF
 
-# OSX does NOT have DYLD_LIBRARY_PATH, add it
-if [ "${PLAT}" = "Darwin" ] ; then
 cat <<EOF
 PATH=\$GPHOME/bin:\$PATH
+EOF
+
+if [ "${PLAT}" = "Darwin" ] ; then
+	cat <<EOF
 DYLD_LIBRARY_PATH=\$GPHOME/lib:\$DYLD_LIBRARY_PATH
 EOF
-fi
-
-# OSX does NOT need ext/python/bin/ path
-if [ "${PLAT}" = "Darwin" ] ; then
-cat <<EOF
-PATH=\$GPHOME/bin:\$PATH
-EOF
 else
-cat <<EOF
-PATH=\$GPHOME/bin:\$GPHOME/ext/python/bin:\$PATH
-EOF
-fi
-
-# OSX does NOT have LD_LIBRARY_PATH, add it
-if [ "${PLAT}" != "Darwin" ] ; then
-    #Solaris needs /usr/sfw/lib in order for groupsession to work and /usr/local/lib for readline for Python 
-    if [ "${PLAT}" = "SunOS" ] ; then
     cat <<EOF
-LD_LIBRARY_PATH=\$GPHOME/lib:\$GPHOME/ext/python/lib:/usr/sfw/lib:/usr/local/python/lib:\$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=\$GPHOME/lib:\$LD_LIBRARY_PATH
 EOF
-    else
-    cat <<EOF
-LD_LIBRARY_PATH=\$GPHOME/lib:\$GPHOME/ext/python/lib:\$LD_LIBRARY_PATH
-EOF
-    fi
 fi
 
 #setup PYTHONPATH

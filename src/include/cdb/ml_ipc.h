@@ -84,6 +84,16 @@ extern void InitMotionLayerIPC(void);
  */
 extern void CleanUpMotionLayerIPC(void);
 
+/*
+ * Wait interconnect thread to quit, called when proc exit.
+ */
+extern void WaitInterconnectQuit(void);
+
+/*
+* Send a dummy packet to interconnect thread to exit poll() immediately
+*/
+extern void SendDummyPacket(void);
+
 /* Returns the fd of the socket that connects to the seqserver.  This value
  * is -1 if it has not been setup.
  */
@@ -335,6 +345,7 @@ extern void markUDPConnInactive(MotionConn *conn);
 
 extern void CleanupMotionTCP(void);
 extern void CleanupMotionUDP(void);
+extern void WaitInterconnectQuitUDP(void);
 
 extern void adjustMasterRouting(Slice *recvSlice);
 

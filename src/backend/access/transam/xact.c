@@ -4822,7 +4822,11 @@ AbortSubTransaction(void)
 	AtSubAbort_Memory();
 	AtSubAbort_ResourceOwner();
 	AtAbort_AppendOnly(true);
-	AtSubAbort_ActiveQueryResource();
+	/* In sub transaction, ActiveQueryResource should not be set NULL
+	 * sub transaction inherits resource from parent.
+	 * parent transaction may still use ActiveQueryResource to reference the original resource.
+	 */
+	// AtSubAbort_ActiveQueryResource();
 
 	/*
 	 * Release any LW locks we might be holding as quickly as possible.

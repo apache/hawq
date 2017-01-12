@@ -220,7 +220,7 @@ void initializeQD2RMComm(void)
     res = createDRMInstance();
     if ( res != FUNC_RETURN_OK )
     {
-    	elog(ERROR, "Fail to initialize data structure for communicating with "
+    	elog(ERROR, "failed to initialize data structure for communicating with "
                 	"resource manager.");
     }
 
@@ -239,7 +239,7 @@ void initializeQD2RMComm(void)
     res = initializeDRMInstanceForQD();
     if ( res != FUNC_RETURN_OK )
     {
-		elog(ERROR, "Failed to initialize data structure for communicating with "
+		elog(ERROR, "failed to initialize data structure for communicating with "
 					"resource manager.");
     }
 
@@ -259,7 +259,7 @@ void initializeQD2RMComm(void)
     /* Init mutex for accessing resource sets. */
     if ( pthread_mutex_init(&ResourceSetsMutex, NULL) != 0 )
     {
-    	elog(ERROR, "Fail to build mutex for communication with resource manager.");
+    	elog(ERROR, "failed to build mutex for communication with resource manager.");
     }
 
     /* Start resource heart-beat thread. */
@@ -457,7 +457,7 @@ int cleanupQD2RMComm(void)
 	int res = FUNC_RETURN_OK;
 	char errorbuf[ERRORMESSAGE_SIZE];
 
-	elog(LOG, "Clean up communication to resource manager now.");
+	elog(LOG, "clean up communication to resource manager now.");
 
 	initializeQD2RMComm();
 
@@ -468,7 +468,7 @@ int cleanupQD2RMComm(void)
         {
             if ( QD2RM_ResourceSets[i]->QD_ResourceList != NULL )
             {
-            	elog(WARNING, "Un-returned resource is probed, will be returned. "
+            	elog(WARNING, "un-returned resource is probed, will be returned. "
                               "(%d MB, %lf CORE) x %d. Conn ID=%d",
 							  QD2RM_ResourceSets[i]->QD_SegMemoryMB,
 							  QD2RM_ResourceSets[i]->QD_SegCore,
@@ -497,7 +497,7 @@ int cleanupQD2RMComm(void)
         ResourceHeartBeatRunning = false;
         res = pthread_join(ResourceHeartBeatThreadHandle, NULL);
         if ( res != FUNC_RETURN_OK ) {
-            elog(WARNING, "Fail to cancel resource heartbeat thread.");
+            elog(WARNING, "failed to cancel resource heartbeat thread.");
         }
     }
 
@@ -1012,12 +1012,12 @@ int manipulateResourceQueue(int 	 index,
 		RPCResponseHeadManipulateResQueueERROR error =
 			SMBUFF_HEAD(RPCResponseHeadManipulateResQueueERROR, recvbuffer);
 
-		elog(LOG, "Fail to manipulate resource queue because %s",
+		elog(LOG, "failed to manipulate resource queue because %s",
 				  error->ErrorText);
 		snprintf(errorbuf, errorbufsize, "%s", error->ErrorText);
 	}
 
-	elog(DEBUG3, "Manipulated resource queue and got result %d", response->Result);
+	elog(DEBUG3, "manipulated resource queue and got result %d", response->Result);
 
 	return response->Result;
 }
@@ -1062,12 +1062,12 @@ int manipulateRoleForResourceQueue (int 	  index,
 	}
 	else
 	{
-		elog(WARNING, "Resource manager finds in valid role name %s.", rolename);
+		elog(WARNING, "resource manager finds invalid role name %s.", rolename);
 		snprintf(errorbuf, errorbufsize, "invalid role name %s.", rolename);
 		return RESQUEMGR_NO_USERID;
 	}
 
-	elog(DEBUG3, "Resource manager (manipulateRoleForResourceQueue) "
+	elog(DEBUG3, "resource manager (manipulateRoleForResourceQueue) "
 				 "role oid:%d, queueID:%d, isSuper:%d, roleName:%s, action:%d",
 				 request.RoleOID, request.QueueOID, request.isSuperUser,
 				 request.Name, request.Action);
@@ -1099,7 +1099,7 @@ int manipulateRoleForResourceQueue (int 	  index,
 		RPCResponseHeadManipulateRoleERROR error =
 			SMBUFF_HEAD(RPCResponseHeadManipulateRoleERROR, recvbuffer);
 
-		elog(WARNING, "Resource manager failed to manipulate role %s. %s",
+		elog(WARNING, "resource manager failed to manipulate role %s. %s",
 					  rolename,
 					  error->ErrorText);
 		snprintf(errorbuf, errorbufsize, "%s", error->ErrorText);
@@ -1206,11 +1206,11 @@ void sendFailedNodeToResourceManager(int hostNum, char **pghost)
 	for ( int i = 0 ; i < hostNum ; ++i )
 	{
 		appendSMBStr(&sendbuffer, pghost[i]);
-		elog(LOG, "Dispatcher thinks %s is down.", pghost[i]);
+		elog(LOG, "dispatcher thinks %s is down.", pghost[i]);
 	}
 	appendSelfMaintainBufferTill64bitAligned(&sendbuffer);
 
-	elog(LOG, "Dispatcher sends %d failed host(s) to resource manager.",
+	elog(LOG, "dispatcher sends %d failed host(s) to resource manager.",
 			  hostNum);
 
 	errorbuf2[0] = '\0';
@@ -1224,72 +1224,17 @@ void sendFailedNodeToResourceManager(int hostNum, char **pghost)
 
     if ( res != FUNC_RETURN_OK )
     {
-    	elog(WARNING, "Fail to get response from resource manager RPC. %s",
+    	elog(WARNING, "failed to get response from resource manager RPC. %s",
     				  errorbuf2);
     	goto exit;
     }
 
-    elog(LOG, "Succeed in sending failed host to resource manager.");
+    elog(LOG, "succeed in sending failed host to resource manager.");
 
 exit:
 	destroySelfMaintainBuffer(&sendbuffer);
 	destroySelfMaintainBuffer(&recvbuffer);
 }
-
-/*
-int getLocalTmpDirFromMasterRM(char *errorbuf, int errorbufsize)
-{
-	static char 	 errorbuf2[ERRORMESSAGE_SIZE];
-    initializeQD2RMComm();
-
-	int 				   res 		   = FUNC_RETURN_OK;
-	SelfMaintainBufferData sendbuffer;
-	SelfMaintainBufferData recvbuffer;
-	initializeSelfMaintainBuffer(&sendbuffer, QD2RM_CommContext);
-	initializeSelfMaintainBuffer(&recvbuffer, QD2RM_CommContext);
-
-    RPCRequestTmpDirForQDData request;
-    request.Reserved = 0;
-	appendSMBVar(&sendbuffer, request);
-
-	errorbuf2[0] = '\0';
-	res = callSyncRPCToRM(SMBUFF_CONTENT(&sendbuffer),
-						  getSMBContentSize(&sendbuffer),
-						  REQUEST_QD_TMPDIR,
-						  RESPONSE_QD_TMPDIR,
-						  &recvbuffer,
-						  errorbuf2,
-						  sizeof(errorbuf2));
-    if ( res != FUNC_RETURN_OK ) 
-    {
-        snprintf(errorbuf, errorbufsize,
-        		 "failed to get temporary directory from resource manager, %s",
-        		 errorbuf2);
-        goto exit;
-    }
-
-    RPCResponseTmpDirForQD response = SMBUFF_HEAD(RPCResponseTmpDirForQD,
-    											  &recvbuffer);
-    if ( response->Result != FUNC_RETURN_OK ) 
-    {
-    	char *errorstr = SMBUFF_CONTENT(&recvbuffer) +
-    					 sizeof(RPCResponseTmpDirForQDData);
-    	snprintf(errorbuf, errorbufsize,
-    			 "failed to get temporary directory from resource manager, %s",
-				 errorstr);
-    	res = response->Result;
-    	goto exit;
-    }
-
-    LocalTempPath = pstrdup(response->tmpdir);
-    elog(LOG, "Got temporary directory %s", LocalTempPath);
-
-exit:
-	destroySelfMaintainBuffer(&sendbuffer);
-	destroySelfMaintainBuffer(&recvbuffer);
-	return res;
-}
-*/
 
 int acquireResourceQuotaFromRM(int64_t		user_oid,
 							   uint32_t		max_seg_count_fix,
@@ -1877,7 +1822,7 @@ extern Datum pg_explain_resource_distribution(PG_FUNCTION_ARGS)
 		ret = createNewResourceContext(&resourceId);
 		if ( ret != FUNC_RETURN_OK )
 		{
-			elog(ERROR, "Fail to create resource context. %d", ret);
+			elog(ERROR, "failed to create resource context. %d", ret);
 		}
 		/* STEP 2. Register. */
 		errorbuf[0] = '\0';
@@ -2160,7 +2105,7 @@ extern Datum pg_play_resource_action(PG_FUNCTION_ARGS)
 		int res = loadTestActionScript(actfile.Str, &actions);
 		if ( res != FUNC_RETURN_OK )
 		{
-			elog(ERROR, "Fail to load resource play actions from %s.", actfile.Str);
+			elog(ERROR, "failed to load resource play actions from %s.", actfile.Str);
 		}
 
 		/* Perform action script. */
@@ -2175,7 +2120,7 @@ extern Datum pg_play_resource_action(PG_FUNCTION_ARGS)
 			actsize += list_length(actconn->Actions);
 		}
 
-		elog(LOG, "Total action item size is %d", actsize);
+		elog(LOG, "total action item size is %d", actsize);
 
 		/* STEP 7. Construct a tuple descriptor for the result rows. */
 		TupleDesc tupledesc = CreateTemplateTupleDesc(PG_PLAY_RESOURCE_ACTION_COLUMNS, false);
@@ -2321,7 +2266,7 @@ int setResourceManagerQuotaControl(bool 	pause,
 
 	appendSMBVar(&sendbuffer, request);
 
-	elog(LOG, "Request GRM container life cycle phase %d %s",
+	elog(LOG, "request GRM container life cycle phase %d %s",
 			  phase,
 			  pause?"paused":"resumed");
 
@@ -2345,7 +2290,7 @@ int setResourceManagerQuotaControl(bool 	pause,
 	RPCResponseQuotaControl response = SMBUFF_HEAD(RPCResponseQuotaControl,
 												   &recvbuffer);
 	Assert( response->Result == FUNC_RETURN_OK );
-	elog(LOG, "Succeeded in setting container life cycle phase %d %s",
+	elog(LOG, "succeeded in setting container life cycle phase %d %s",
 			  phase,
 			  pause?"paused":"resumed");
 exit:
@@ -2369,7 +2314,7 @@ int loadTestActionScript(const char *filename, List **actions)
 		return FUNC_RETURN_FAIL;
 	}
 
-	elog(LOG, "Start loading action file %s", filename);
+	elog(LOG, "start loading action file %s", filename);
 
 	MEMORY_CONTEXT_SWITCH_TO(QD2RM_CommContext)
 
@@ -2386,7 +2331,7 @@ int loadTestActionScript(const char *filename, List **actions)
 			linesize--;
 		}
 
-		elog(LOG, "Loaded action line : %s", line);
+		elog(LOG, "loaded action line : %s", line);
 
 		TestActionItem newitem = (TestActionItem)
 								 rm_palloc0(QD2RM_CommContext,
@@ -2408,7 +2353,7 @@ int loadTestActionScript(const char *filename, List **actions)
 			{
 				/* it is a connection name. */
 				strncpy(connname, word, sizeof(connname)-1);
-				elog(LOG, "Get action play argument connection name %s", connname);
+				elog(LOG, "get action play argument connection name %s", connname);
 			}
 			else  if ( argidx == 1 )
 			{
@@ -2416,11 +2361,11 @@ int loadTestActionScript(const char *filename, List **actions)
 				if ( strlen(word) < sizeof(newitem->ActionName) )
 				{
 					strcpy(newitem->ActionName, word);
-					elog(LOG, "Get action play argument action name %s", newitem->ActionName);
+					elog(LOG, "get action play argument action name %s", newitem->ActionName);
 				}
 				else
 				{
-					elog(ERROR, "Too long action name %s that is not legal.",
+					elog(ERROR, "too long action name %s that is not legal.",
 								newitem->ActionName);
 				}
 			}
@@ -2430,7 +2375,7 @@ int loadTestActionScript(const char *filename, List **actions)
 				char *newarg = rm_palloc0(QD2RM_CommContext, strlen(word) + 1);
 				strcpy(newarg, word);
 				newitem->Arguments = lappend(newitem->Arguments, newarg);
-				elog(LOG, "Appended action play argument %s", newarg);
+				elog(LOG, "appended action play argument %s", newarg);
 			}
 		}
 
@@ -2461,7 +2406,7 @@ int loadTestActionScript(const char *filename, List **actions)
 			newactconn->Actions 	 = lappend(newactconn->Actions, newitem);
 			strcpy(newactconn->ConnectionName, connname);
 			*actions = lappend(*actions, newactconn);
-			elog(LOG, "Build action play connection %s", connname);
+			elog(LOG, "build action play connection %s", connname);
 		}
 	}
 
@@ -2489,7 +2434,7 @@ int loadTestActionScript(const char *filename, List **actions)
 			}
 
 			appendSMBStr(&smb, "$");
-			elog(LOG, "Loaded action play :: %s", SMBUFF_CONTENT(&smb));
+			elog(LOG, "loaded action play :: %s", SMBUFF_CONTENT(&smb));
 			destroySelfMaintainBuffer(&smb);
 		}
 	}
@@ -2548,7 +2493,7 @@ int runTestActionScript(List *actions, const char *filename)
 				ret = createNewResourceContext(&(actconn->ResourceID));
 				if ( ret != FUNC_RETURN_OK )
 				{
-					elog(ERROR, "Fail to create resource context. %d", ret);
+					elog(ERROR, "failed to create resource context. %d", ret);
 				}
 				/* STEP 2. Register. */
 				char *role = (char *)lfirst(list_head(actitem->Arguments));
@@ -2630,7 +2575,7 @@ int runTestActionScript(List *actions, const char *filename)
 										  token1->Str,
 										  token2->Str);
 							}
-							elog(LOG, "Parse locality data %d hosts", infosize);
+							elog(LOG, "parse locality data %d hosts", infosize);
 						}
 						freeSimpleStringTokens(&locality, &tokens, toksize);
 						freeSimpleStringContent(&locality);

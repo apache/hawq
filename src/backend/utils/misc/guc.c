@@ -732,6 +732,7 @@ int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_limit;
+bool enable_ranger = false;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
@@ -745,6 +746,7 @@ int		optimizer_segments;
 int		optimizer_parts_to_force_sort_on_insert;
 int		optimizer_join_arity_for_associativity_commutativity;
 int		optimizer_array_expansion_threshold;
+int		optimizer_join_order_threshold;
 bool		optimizer_analyze_root_partition;
 bool		optimizer_analyze_midlevel_partition;
 bool		optimizer_enable_constant_expression_evaluation;
@@ -758,12 +760,14 @@ bool		optimizer_static_partition_selection;
 bool		optimizer_enable_partial_index;
 bool		optimizer_dml_triggers;
 bool		optimizer_dml_constraints;
-bool 		optimizer_enable_master_only_queries;
-bool sort_segments_enable;
-bool 		optimizer_multilevel_partitioning;
-bool        optimizer_enable_derive_stats_all_groups;
+bool		optimizer_enable_master_only_queries;
+bool		sort_segments_enable;
+bool		optimizer_multilevel_partitioning;
+bool		optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
+bool		optimizer_parallel_union;
+bool		optimizer_array_constraints;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -775,6 +779,9 @@ bool gp_plpgsql_clear_cache_always = false;
 /* indicate whether called by gpdump, if yes, processutility will open some limitations */
 bool gp_called_by_pgdump = false;
 
+char   *rps_addr_host;
+char   *rps_addr_suffix;
+int     rps_addr_port;
 
 /*
  * Displayable names for context types (enum GucContext)
@@ -4112,7 +4119,7 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"enable_prefer_list_to_rm;", PGC_USERSET, DEVELOPER_OPTIONS,
+		{"enable_prefer_list_to_rm", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Sets whether enable data locality prefer list passed to rm"),
 			NULL,
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
@@ -4323,6 +4330,16 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+    {"enable_ranger", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
+     gettext_noop("Enable Apache Ranger for HAWQ privilege management."),
+     NULL,
+     GUC_SUPERUSER_ONLY
+    },
+    &enable_ranger,
+    false, NULL, NULL
+  },
+
+	{
 		{"filesystem_support_truncate", PGC_USERSET, APPENDONLY_TABLES,
 		 gettext_noop("the file system support truncate feature."),
 		 NULL,
@@ -4386,6 +4403,27 @@ static struct config_bool ConfigureNamesBool[] =
 		&optimizer_prefer_scalar_dqa_multistage_agg,
 		true, NULL, NULL
 	},
+
+	{
+		{"optimizer_parallel_union", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable parallel execution for UNION/UNION ALL queries."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_parallel_union,
+		false, NULL, NULL
+	},
+
+	{
+		{"optimizer_array_constraints", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Allows the optimizer's constraint framework to derive array constraints."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_array_constraints,
+		false, NULL, NULL
+	},
+
 
 	/* End-of-list marker */
 	{
@@ -6136,6 +6174,7 @@ static struct config_int ConfigureNamesInt[] =
 		&server_ticket_renew_interval,
 		43200000, 0, INT_MAX, NULL, NULL
 	},
+
 	{
 		{"optimizer_array_expansion_threshold", PGC_USERSET, QUERY_TUNING_METHOD,
 			gettext_noop("Item limit for expansion of arrays in WHERE clause to disjunctive form."),
@@ -6145,6 +6184,16 @@ static struct config_int ConfigureNamesInt[] =
 		&optimizer_array_expansion_threshold,
 		25, 0, INT_MAX, NULL, NULL
 	},
+
+	{
+		{"optimizer_join_order_threshold", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Maximum number of join children to use dynamic programming based join ordering algorithm."),
+			NULL
+		},
+		&optimizer_join_order_threshold,
+		10, 0, INT_MAX, NULL, NULL
+	},
+
 	{
 		{"memory_profiler_dataset_size", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Set the size in GB"),
@@ -6213,6 +6262,15 @@ static struct config_int ConfigureNamesInt[] =
 		&master_addr_port,
 		1, 1, 65535, NULL, NULL
 	},
+
+	{
+    {"hawq_rps_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("ranger plugin server address port number"),
+      NULL
+    },
+    &rps_addr_port,
+    8080, 1, 65535, NULL, NULL
+  },
 
 	{
 		{"hawq_segment_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
@@ -8119,16 +8177,34 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
+    {"hawq_rps_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("ranger plugin server address hostname"),
+      NULL
+    },
+    &rps_addr_host,
+    "localhost", NULL, NULL
+  },
+
+  {
+    {"hawq_rps_address_suffix", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("ranger plugin server suffix of restful service address"),
+      NULL
+    },
+    &rps_addr_suffix,
+    "hawq", NULL, NULL
+  },
+
+	{
+		{"hawq_standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("standby server address hostname"),
 			NULL
 		},
 		&standby_addr_host,
-		"localhost", NULL, NULL
+		"none", NULL, NULL
 	},
 
 	{
-		{"dfs_url", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_dfs_url", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("hdfs url"),
 			NULL
 		},
@@ -8137,7 +8213,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("master server data directory"),
 			NULL
 		},
@@ -8146,7 +8222,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"segment_directory", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_segment_directory", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("segment data directory"),
 			NULL
 		},
@@ -13648,7 +13724,7 @@ assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source)
 {
 	if (doit)
 	{
-		int32_t newvalmb = 0;
+		uint32_t newvalmb = 0;
 		int parseres = FUNC_RETURN_OK;
 		SimpString valuestr;
 		setSimpleStringRef(&valuestr, newval, strlen(newval));

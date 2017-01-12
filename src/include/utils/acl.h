@@ -26,6 +26,7 @@
 
 #include "nodes/parsenodes.h"
 #include "utils/array.h"
+//#include "utils/rangerrest.h"
 
 
 /*
@@ -287,6 +288,42 @@ extern AclResult pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMo
 extern AclResult pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode);
 extern AclResult pg_extprotocol_aclcheck(Oid ptc_oid, Oid roleid, AclMode mode);
 extern AclResult pg_filesystem_aclcheck(Oid fsys_oid, Oid roleid, AclMode mode);
+
+extern AclResult pg_class_nativecheck(Oid table_oid, Oid roleid, AclMode mode);
+extern AclResult pg_database_nativecheck(Oid db_oid, Oid roleid, AclMode mode);
+extern AclResult pg_proc_nativecheck(Oid proc_oid, Oid roleid, AclMode mode);
+extern AclResult pg_language_nativecheck(Oid lang_oid, Oid roleid, AclMode mode);
+extern AclResult pg_namespace_nativecheck(Oid nsp_oid, Oid roleid, AclMode mode);
+extern AclResult pg_tablespace_nativecheck(Oid spc_oid, Oid roleid, AclMode mode);
+extern AclResult pg_foreign_data_wrapper_nativecheck(Oid fdw_oid, Oid roleid, AclMode mode);
+extern AclResult pg_foreign_server_nativecheck(Oid srv_oid, Oid roleid, AclMode mode);
+extern AclResult pg_extprotocol_nativecheck(Oid ptc_oid, Oid roleid, AclMode mode);
+extern AclResult pg_filesystem_nativecheck(Oid fsys_oid, Oid roleid, AclMode mode);
+
+extern List *pg_rangercheck_batch(List *);
+extern AclResult
+pg_rangercheck(AclObjectKind objkind, Oid table_oid, Oid roleid,
+         AclMode mask, AclMaskHow how);
+extern bool fallBackToNativeCheck(AclObjectKind objkind, Oid table_oid, Oid roleid);
+extern bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid);
+extern char *getNameFromOid(AclObjectKind objkind, Oid object_oid);
+extern char *getClassNameFromOid(Oid object_oid);
+extern char *getSequenceNameFromOid(Oid object_oid);
+extern char *getDatabaseNameFromOid(Oid object_oid);
+extern char *getProcNameFromOid(Oid object_oid);
+extern char *getOperNameFromOid(Oid object_oid);
+extern char *getTypeNameFromOid(Oid object_oid);
+extern char *getLanguageNameFromOid(Oid object_oid);
+extern char *getNamespaceNameFromOid(Oid object_oid);
+extern char *getConversionNameFromOid(Oid object_oid);
+extern char *getTablespaceNameFromOid(Oid object_oid);
+extern char *getFilespaceNameFromOid(Oid object_oid);
+extern char *getFilesystemNameFromOid(Oid object_oid);
+extern char *getFDWNameFromOid(Oid object_oid);
+extern char *getForeignServerNameFromOid(Oid object_oid);
+extern char *getExtprotocolNameFromOid(Oid object_oid);
+extern List *getActionName(AclMode mask);
+extern char *getRoleName(Oid role_id);
 
 extern void aclcheck_error(AclResult aclerr, AclObjectKind objectkind,
 			   const char *objectname);

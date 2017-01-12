@@ -79,10 +79,11 @@ public class HiveResolver extends Plugin implements ReadResolver {
     private String serdeName;
     private String propsString;
     String partitionKeys;
-    char delimiter;
+    protected char delimiter;
     String nullChar = "\\N";
     private Configuration conf;
     private String hiveDefaultPartName;
+    private int numberOfPartitions;
 
     /**
      * Constructs the HiveResolver by parsing the userdata in the input and
@@ -120,6 +121,14 @@ public class HiveResolver extends Plugin implements ReadResolver {
         record.addAll(partitionFields);
 
         return record;
+    }
+
+    public List<OneField> getPartitionFields() {
+        return partitionFields;
+    }
+
+    public int getNumberOfPartitions() {
+        return numberOfPartitions;
     }
 
     /* Parses user data string (arrived from fragmenter). */
@@ -255,15 +264,16 @@ public class HiveResolver extends Plugin implements ReadResolver {
             }
             addOneFieldToRecord(partitionFields, convertedType, convertedValue);
         }
+        numberOfPartitions = partitionFields.size();
     }
 
     /*
      * The partition fields are initialized one time based on userData provided
      * by the fragmenter.
      */
-    int initPartitionFields(StringBuilder parts) {
+    void initPartitionFields(StringBuilder parts) {
         if (partitionKeys.equals(HiveDataFragmenter.HIVE_NO_PART_TBL)) {
-            return 0;
+            return;
         }
         String[] partitionLevels = partitionKeys.split(HiveDataFragmenter.HIVE_PARTITIONS_DELIM);
         for (String partLevel : partitionLevels) {
@@ -271,7 +281,6 @@ public class HiveResolver extends Plugin implements ReadResolver {
             String type = levelKey[1];
             String val = levelKey[2];
             parts.append(delimiter);
-
             if (isDefaultPartition(type, val)) {
                 parts.append(nullChar);
             } else {
@@ -320,7 +329,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
                 }
             }
         }
-        return partitionLevels.length;
+        this.numberOfPartitions = partitionLevels.length;
     }
 
     /**
@@ -609,7 +618,6 @@ public class HiveResolver extends Plugin implements ReadResolver {
                                      DataType gpdbWritableType, Object val) {
         record.add(new OneField(gpdbWritableType.getOID(), val));
     }
-
     /*
      * Gets the delimiter character from the URL, verify and store it. Must be a
      * single ascii character (same restriction as Hawq's). If a hex

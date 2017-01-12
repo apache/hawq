@@ -1211,9 +1211,11 @@ RelationBuildDesc(Oid targetRelId, bool insertIt)
 	/*
 	 * if no such tuple exists, return NULL
 	 */
-	if (!HeapTupleIsValid(pg_class_tuple))
+	if (!HeapTupleIsValid(pg_class_tuple)){
+		if(RelationIsValid(pg_class_relation))
+			heap_close(pg_class_relation, AccessShareLock);
 		return NULL;
-
+	}
 	/*
 	 * get information from the pg_class_tuple
 	 */

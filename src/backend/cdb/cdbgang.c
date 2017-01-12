@@ -444,7 +444,7 @@ disconnectAndDestroyGang(Gang *gp)
 		elog(DEBUG2, "Warning: disconnectAndDestroyGang called on an %s gang",
 			 gp->active ? "active" : "allocated");
 
-	if (gp->gang_id < 1 || gp->gang_id > 100000000 || gp->type > 10 || gp->size > 100000)
+	if (gp->gang_id < 1 || gp->gang_id > 100000000 || gp->type < GANGTYPE_UNALLOCATED || gp->type > GANGTYPE_PRIMARY_WRITER || gp->size > 100000)
 	{
 		elog(LOG, "disconnectAndDestroyGang on bad gang");
 		return;

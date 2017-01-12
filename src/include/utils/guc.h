@@ -275,6 +275,7 @@ extern bool gp_plpgsql_clear_cache_always;
 extern bool gp_disable_catalog_access_on_segment;
 
 extern bool gp_called_by_pgdump;
+extern bool enable_ranger;
 
 /* Debug DTM Action */
 typedef enum
@@ -420,6 +421,7 @@ extern int optimizer_segments;
 extern int optimizer_parts_to_force_sort_on_insert;
 extern int optimizer_join_arity_for_associativity_commutativity;
 extern int optimizer_array_expansion_threshold;
+extern int optimizer_join_order_threshold;
 extern bool optimizer_analyze_root_partition;
 extern bool optimizer_analyze_midlevel_partition;
 extern bool optimizer_enable_constant_expression_evaluation;
@@ -440,12 +442,20 @@ extern bool optimizer_multilevel_partitioning;
 extern bool optimizer_enable_derive_stats_all_groups;
 extern bool optimizer_explain_show_status;
 extern bool optimizer_prefer_scalar_dqa_multistage_agg;
+extern bool optimizer_parallel_union;
+extern bool optimizer_array_constraints;
 
 /**
  * Enable logging of DPE match in optimizer.
  */
 extern bool	optimizer_partition_selection_log;
 
+/**
+ * rps host and port
+ */
+extern char   *rps_addr_host;
+extern char   *rps_addr_suffix;
+extern int     rps_addr_port;
 /*
  * During insertion in a table with parquet partitions,
  * require tuples to be sorted by partition key.

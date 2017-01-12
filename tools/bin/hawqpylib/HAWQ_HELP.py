@@ -159,10 +159,10 @@ usage: hawq config [--options]
 
 The "options" are:
    -c --change         Changes a configuration parameter setting.
+   -v --value          Sets the configuration parameter value.
    -s --show           Shows the value for a specified configuration parameter.
    -l --list           Lists all configuration parameters.
    -q --quiet          Run in quiet mode.
-   -v --verbose        Displays detailed status.
    -r --remove         HAWQ GUC name to be removed.
    --skipvalidation    Skip the system validation checks.
    --ignore-bad-hosts  Skips copying configuration files on host on which SSH fails

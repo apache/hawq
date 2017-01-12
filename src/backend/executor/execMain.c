@@ -245,6 +245,7 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
 	ExternalScan   *scan = (ExternalScan *)node;
 	QueryContextInfo *info = cxt->info;
 	List *errSegnos;
+	bool reuse_segfilenum_in_same_xid = true;
 
 	if (NULL == node)
 		return false;
@@ -270,9 +271,8 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
 					errtbloid = lfirst_oid(c);
 					if (errtbloid == scan->fmterrtbl)
 					{
-						Relation rel = heap_open(scan->fmterrtbl, AccessShareLock);
-						elog(ERROR, "Two or more external tables use the same error table \"%s\" in a statement",
-								RelationGetRelationName(rel));
+						reuse_segfilenum_in_same_xid = false;
+						break;
 					}
 				}
 			}
@@ -281,7 +281,7 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
              * Prepare error table for insert.
              */
             Assert(!rel_is_partitioned(scan->fmterrtbl));
-            errSegnos = SetSegnoForWrite(NIL, scan->fmterrtbl, GetQEGangNum(), false, true);
+            errSegnos = SetSegnoForWrite(NIL, scan->fmterrtbl, GetQEGangNum(), false, reuse_segfilenum_in_same_xid, true);
             scan->errAosegnos = errSegnos;
             info->errTblOid = lcons_oid(scan->fmterrtbl, info->errTblOid);
 
@@ -877,7 +877,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                     
                     if (plannedstmt->intoClause != NULL)
                     {
-                        List *segment_segnos = SetSegnoForWrite(NIL, 0, GetQEGangNum(), true, false);
+                        List *segment_segnos = SetSegnoForWrite(NIL, 0, GetQEGangNum(), true, true, false);
                         prepareDispatchedCatalogSingleRelation(plannedstmt->contextdisp,
                                                                plannedstmt->intoClause->oidInfo.relOid, TRUE, segment_segnos);
                     }
@@ -1912,44 +1912,9 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 	 * rangetable here --- subplan RTEs will be checked during
 	 * ExecInitSubPlan().
 	 */
-	if (operation != CMD_SELECT ||
-			(Gp_role != GP_ROLE_EXECUTE &&
-			 !(shouldDispatch && cdbpathlocus_querysegmentcatalogs)))
+	if (Gp_role != GP_ROLE_EXECUTE)
 	{
 		ExecCheckRTPerms(plannedstmt->rtable);
-	}
-	else
-	{
-		/*
-		 * We don't check the rights here, so we can query pg_statistic even if we are a non-privileged user.
-		 * This shouldn't cause a problem, because "cdbpathlocus_querysegmentcatalogs" can only be true if we
-		 * are doing special catalog queries for ANALYZE.  Otherwise, the QD will execute the normal access right
-		 * check.  This does open a security hole, as it's possible for a hacker to connect to a segdb with GP_ROLE_EXECUTE,
-		 * (at least, in theory, although it isn't easy) and then do a query.  But all they can see is
-		 * pg_statistic and pg_class, and pg_class is normally readable by everyone.
-		 */
-
-		ListCell *lc = NULL;
-
-		foreach(lc, plannedstmt->rtable)
-		{
-			RangeTblEntry *rte = lfirst(lc);
-
-			if (rte->rtekind != RTE_RELATION)
-				continue;
-
-			if (rte->requiredPerms == 0)
-				continue;
-
-			/*
-			 * Ignore access rights check on pg_statistic and pg_class, so
-			 * the QD can retreive the statistics from the QEs.
-			 */
-			if (rte->relid != StatisticRelationId && rte->relid != RelationRelationId)
-			{
-				ExecCheckRTEPerms(rte);
-			}
-		}
 	}
 
 	/*
@@ -4456,7 +4421,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 	/*
 	 * create a list of segment file numbers for insert.
 	 */
-	segnos = SetSegnoForWrite(NIL, intoRelationId, GetQEGangNum(), true, false);
+	segnos = SetSegnoForWrite(NIL, intoRelationId, GetQEGangNum(), true, true, false);
 	CreateAppendOnlyParquetSegFileForRelationOnMaster(intoRelationDesc, segnos);
 	queryDesc->plannedstmt->into_aosegnos = segnos;
 

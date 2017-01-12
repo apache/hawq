@@ -184,6 +184,9 @@ def main():
             sys.exit(1)
         cmd = "%s; hawqregister %s" % (source_hawq_env, sub_args)
         result = local_run(cmd)
+    elif hawq_command == "upgrade":
+        cmd = "%s; hawqupgrade %s" % (source_hawq_env, sub_args)
+        result = local_run(cmd)
     elif hawq_command == "version" or hawq_command == "--version":
         print_version()
     else:

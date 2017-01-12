@@ -67,6 +67,10 @@ std::string SQLUtility::getDbName() {
     return databaseName;
 }
 
+std::string SQLUtility::getSchemaName() {
+    return schemaName;
+}
+
 void SQLUtility::exec(const string &sql) {
   EXPECT_EQ(0, (conn->runSQLCommand(sql)).getLastStatus())
       << conn->getLastResult();
@@ -152,7 +156,10 @@ void SQLUtility::execSQLFile(const string &sqlFile,
     initFileAbsPath = "";
   }
 
-  bool is_sql_ans_diff = conn->checkDiff(ansFileAbsPath, outFileAbsPath, true, initFileAbsPath);
+  string globalInitFileAbsPath;
+  globalInitFileAbsPath = testRootPath + "/lib/global_init_file";
+
+  bool is_sql_ans_diff = conn->checkDiff(ansFileAbsPath, outFileAbsPath, true, globalInitFileAbsPath, initFileAbsPath);
   EXPECT_FALSE(is_sql_ans_diff);
   if (is_sql_ans_diff == false) {
     // no diff, continue to delete the generated sql file
@@ -266,6 +273,17 @@ std::string SQLUtility::getQueryResult(const std::string &query) {
   }
 
   return value;
+}
+
+std::string SQLUtility::getQueryResultSetString(const std::string &query) {
+  const hawq::test::PSQLQueryResult &result = executeQuery(query);
+  std::vector<std::vector<string> > resultString = result.getRows();
+  string resultStr;
+  for (auto row : result.getRows()) {
+    for (auto column : row) resultStr += column + "|";
+    resultStr += "\n";
+  }
+  return resultStr;
 }
 
 FilePath SQLUtility::splitFilePath(const string &filePath) const {

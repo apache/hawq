@@ -3,6 +3,7 @@
 
 #include <string>
 #include <pwd.h>
+#include <fstream>
 #include "lib/hdfs_config.h"
 #include "gtest/gtest.h"
 
@@ -38,10 +39,17 @@ class TestHawqRegister : public ::testing::Test {
             return "";
         }
 
-        std::string getTableOid(std::string relname) {
+        std::string getTableOid(std::string relname, std::string nspname) {
+            std::string relnamespace = "2200";
+            const hawq::test::PSQLQueryResult &result_tmp = conn->getQueryResult(
+                hawq::test::stringFormat("SELECT oid from pg_namespace where nspname= \'%s\';", nspname.c_str()));
+            std::vector<std::vector<std::string>> table = result_tmp.getRows();
+            if (table.size() > 0) {
+                relnamespace = table[0][0];
+            }
             const hawq::test::PSQLQueryResult &result = conn->getQueryResult(
-                hawq::test::stringFormat("SELECT oid from pg_class where relname = \'%s\';", relname.c_str()));
-            std::vector<std::vector<std::string>> table = result.getRows();
+                hawq::test::stringFormat("SELECT oid from pg_class where relname = \'%s\' and relnamespace=%s;", relname.c_str(), relnamespace.c_str()));
+            table = result.getRows();
             if (table.size() > 0) {
                 return table[0][0];
             }
@@ -49,8 +57,19 @@ class TestHawqRegister : public ::testing::Test {
             return "";
         }
 
-        void checkPgAOSegValue(std::string relname, std::string value, std::string fmt) {
-            std::string reloid = getTableOid(relname);
+        int getFileSize(const char *file){
+            if (file == NULL)
+                return -1;
+            std::ifstream stream;
+            stream.open(file, std::ios_base::binary);
+            stream.seekg(0, std::ios_base::end);
+            int size = stream.tellg();
+            stream.close();
+            return size;
+        }
+
+        void checkPgAOSegValue(std::string relname, std::string nspname, std::string value, std::string fmt) {
+            std::string reloid = getTableOid(relname, nspname);
 
             const hawq::test::PSQLQueryResult &result1 = conn->getQueryResult(
                 hawq::test::stringFormat("SELECT tupcount from pg_aoseg.pg_%s_%s;", fmt.c_str(), reloid.c_str()));
@@ -79,6 +98,13 @@ class TestHawqRegister : public ::testing::Test {
                 }
             }
         }
+
+        void runYamlCaseTableNotExists(std::string casename, std::string ymlname, int expectederror, int checknum);
+        void runYamlCaseTableExists(std::string casename, std::string ymlname, int isexpectederror, int checknum);
+        void runYamlCaseForceMode(std::string casename, std::string ymlname, int isexpectederror, int rows, int checknum, bool samepath);
+        void runYamlCaseTableNotExistsPartition(std::string casename, std::string ymlname, int expectederror, int checknum, int islistpartition);
+        void runYamlCaseTableExistsPartition(std::string casename, std::string ymlname, int isexpectederror, int checknum, int islistpartition);
+        void runYamlCaseForceModePartition(std::string casename, std::string ymlname, int isexpectederror, int rows, int checknum);
 
     private:
         std::unique_ptr<hawq::test::PSQL> conn;

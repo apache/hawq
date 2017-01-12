@@ -44,7 +44,10 @@ typedef enum PxfOperatorCode
 	PXFOP_GE,
 	PXFOP_EQ,
 	PXFOP_NE,
-	PXFOP_LIKE
+	PXFOP_LIKE,
+	PXFOP_IS_NULL,
+	PXFOP_IS_NOTNULL,
+	PXFOP_IN
 
 } PxfOperatorCode;
 
@@ -53,10 +56,17 @@ typedef enum PxfOperatorCode
  * by a code that will describe the operator type in the final serialized
  * string that gets pushed down.
  */
-#define PXF_ATTR_CODE		'a'
-#define PXF_CONST_CODE		'c'
-#define PXF_OPERATOR_CODE	'o'
+#define PXF_ATTR_CODE				'a'
+#define PXF_SCALAR_CONST_CODE		'c'
+#define PXF_LIST_CONST_CODE			'm'
+#define PXF_SIZE_BYTES				's'
+#define PXF_CONST_DATA				'd'
+#define PXF_OPERATOR_CODE			'o'
 #define PXF_LOGICAL_OPERATOR_CODE	'l'
+
+#define NullConstValue   "NULL"
+#define TrueConstValue   "true"
+#define FalseConstValue   "false"
 
 /*
  * An Operand has any of the above codes, and the information specific to
@@ -65,9 +75,10 @@ typedef enum PxfOperatorCode
  */
 typedef struct PxfOperand
 {
-	char		opcode;		/* PXF_ATTR_CODE or PXF_CONST_CODE*/
+	char		opcode;		/* PXF_ATTR_CODE, PXF_SCALAR_CONST_CODE, PXF_LIST_CONST_CODE*/
 	AttrNumber 	attnum;		/* used when opcode is PXF_ATTR_CODE */
-	StringInfo 	conststr;	/* used when opcode is PXF_CONST_CODE */
+	StringInfo 	conststr;	/* used when opcode is PXF_SCALAR_CONST_CODE or PXF_LIST_CONST_CODE*/
+	Oid 		consttype; 	/* used when opcode is PXF_SCALAR_CONST_CODE or PXF_LIST_CONST_CODE*/
 
 } PxfOperand;
 
@@ -83,7 +94,7 @@ typedef struct PxfFilterDesc
 } PxfFilterDesc;
 
 /*
- * HAWQ operator OID to PXF operator code mapping
+ * HAWQ operator OID to PXF operator code mapping used for OpExpr
  */
 typedef struct dbop_pxfop_map
 {
@@ -92,6 +103,16 @@ typedef struct dbop_pxfop_map
 
 } dbop_pxfop_map;
 
+/*
+ * HAWQ operator OID to PXF operator code mapping used for ScalarArrayOpExpr
+ */
+typedef struct dbop_pxfop_array_map
+{
+	Oid				dbop;
+	PxfOperatorCode	pxfop;
+	bool			useOr;
+
+} dbop_pxfop_array_map;
 
 typedef struct ExpressionItem
 {
@@ -105,9 +126,14 @@ static inline bool pxfoperand_is_attr(PxfOperand x)
 	return (x.opcode == PXF_ATTR_CODE);
 }
 
-static inline bool pxfoperand_is_const(PxfOperand x)
+static inline bool pxfoperand_is_scalar_const(PxfOperand x)
 {
-	return (x.opcode == PXF_CONST_CODE);
+	return (x.opcode == PXF_SCALAR_CONST_CODE);
+}
+
+static inline bool pxfoperand_is_list_const(PxfOperand x)
+{
+	return (x.opcode == PXF_LIST_CONST_CODE);
 }
 
 char *serializePxfFilterQuals(List *quals);

@@ -31,8 +31,9 @@
         <plugin>
           <groupId>org.apache.rat</groupId>
           <artifactId>apache-rat-plugin</artifactId>
-          <version>0.11</version>
+          <version>0.12</version>
           <configuration>
+            <consoleOutput>true</consoleOutput>
             <excludes>
 
               <!-- stream benchmark under BSD-like license with a few
@@ -224,7 +225,7 @@
         <plugin>
           <groupId>org.apache.rat</groupId>
           <artifactId>apache-rat-plugin</artifactId>
-          <version>0.11</version>
+          <version>0.12</version>
           <executions>
             <execution>
               <phase>verify</phase>
