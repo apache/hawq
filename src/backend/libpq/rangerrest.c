@@ -120,7 +120,7 @@ static int parse_ranger_response(char* buffer, List *result_list)
 		const char *privilege_str = json_object_get_string(jprivilege);
 		uint32 resource_sign = string_hash(resource_str, strlen(resource_str));
 		uint32 privilege_sign = string_hash(privilege_str, strlen(privilege_str));
-		elog(DEBUG3, "ranger reponse access sign, resource_str:%s, privilege_str:%s", 
+		elog(DEBUG3, "ranger response access sign, resource_str:%s, privilege_str:%s", 
 			resource_str, privilege_str);
 
 		ListCell *result;
@@ -128,7 +128,9 @@ static int parse_ranger_response(char* buffer, List *result_list)
 		foreach(result, result_list) {
 			/* loop find is enough for performence*/
 			RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
-			if (result_ptr->resource_sign != resource_sign || result_ptr->privilege_sign != privilege_sign)
+			/* if only one access in response, no need to check sign*/
+			if (arraylen > 1 &&  
+				(result_ptr->resource_sign != resource_sign || result_ptr->privilege_sign != privilege_sign) )
 				continue;
 
 			if (ok == 1)
