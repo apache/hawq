@@ -2710,7 +2710,7 @@ List *pg_rangercheck_batch(List *arg_list)
   List *aclresults = NIL;
   List *requestargs = NIL;
   ListCell *arg;
-  elog(LOG, "rangeracl batch check, acl list length:%d\n", arg_list->length);
+  elog(DEBUG3, "ranger acl batch check, acl list length: %d\n", arg_list->length);
   foreach(arg, arg_list) {
     RangerPrivilegeArgs *arg_ptr = (RangerPrivilegeArgs *) lfirst(arg);
 
@@ -2724,7 +2724,7 @@ List *pg_rangercheck_batch(List *arg_list)
     RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
     aclresult->result = RANGERCHECK_NO_PRIV;
     aclresult->relOid = object_oid;
-    // this two sign fields will be set in create_ranger_request_json()
+    /* this two sign fields will be set in function create_ranger_request_json */
     aclresult->resource_sign = 0;
     aclresult->privilege_sign = 0;
     aclresults = lappend(aclresults, aclresult);
@@ -2742,7 +2742,6 @@ List *pg_rangercheck_batch(List *arg_list)
   int ret = check_privilege_from_ranger(requestargs, aclresults);
   if (ret < 0)
   {
-	  elog(WARNING, "ranger service unavailable or unexpected error\n");
 	  ListCell *result;
 	  foreach(result, aclresults) {
 		  RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
@@ -2779,13 +2778,13 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 	List* actions = getActionName(mask);
 	bool isAll = (how == ACLMASK_ALL) ? true: false;
 
-	elog(LOG, "rangeraclcheck kind:%d,objectname:%s,role:%s,mask:%u\n",objkind,objectname,rolename,mask);
+	elog(DEBUG3, "ranger acl check kind: %d, object name: %s, role: %s, mask: %u\n", objkind, objectname, rolename, mask);
 
 	List *resultargs = NIL;
     RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
     aclresult->result = RANGERCHECK_NO_PRIV;
     aclresult->relOid = object_oid;
-	// this two sign fields will be set in create_ranger_request_json()
+	/* this two sign fields will be set in function create_ranger_request_json */
 	aclresult->resource_sign = 0;
 	aclresult->privilege_sign = 0;
     resultargs = lappend(resultargs, aclresult);
@@ -2805,7 +2804,7 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 	{
 		ListCell *arg;
 		foreach(arg, resultargs) {
-			// only one element
+			/* only one element */
 			RangerPrivilegeResults *arg_ptr = (RangerPrivilegeResults *) lfirst(arg);
 			if (arg_ptr->result == RANGERCHECK_OK)
 				result = ACLCHECK_OK;
@@ -2864,7 +2863,7 @@ pg_aclmask(AclObjectKind objkind, Oid table_oid, Oid roleid,
 		case ACL_KIND_EXTPROTOCOL:
 			return pg_extprotocol_aclmask(table_oid, roleid, mask, how);
 		default:
-			elog(ERROR, "unrecognized objkind: %d",
+			elog(ERROR, "unrecognized object kind : %d",
 				 (int) objkind);
 			/* not reached, but keep compiler quiet */
 			return ACL_NO_RIGHTS;

@@ -4392,7 +4392,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	}
 
 	/* for enable ranger*/
-	if (enable_ranger && !curl_context_ranger.hasInited)
+	if (AmIMaster() && enable_ranger && !curl_context_ranger.hasInited)
 	{
 		memset(&curl_context_ranger, 0, sizeof(curl_context_t));
 		curl_global_init(CURL_GLOBAL_ALL);
@@ -4402,11 +4402,12 @@ PostgresMain(int argc, char *argv[], const char *username)
 			/* cleanup curl stuff */
 			/* no need to cleanup curl_handle since it's null. just cleanup curl global.*/
 			curl_global_cleanup();
+			elog(ERROR, "initialize global curl context failed.");
 		}
 		curl_context_ranger.hasInited = true;
 		curl_context_ranger.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
 		curl_context_ranger.response.buffer_size = CURL_RES_BUFFER_SIZE;
-		elog(DEBUG3, "when enable ranger, init global struct for privileges check.");
+		elog(DEBUG3, "initialize global curl context for privileges check.");
 		on_proc_exit(curl_finalize, 0);
 	}
 	/*
