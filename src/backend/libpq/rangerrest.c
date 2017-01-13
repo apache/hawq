@@ -85,14 +85,14 @@ static int parse_ranger_response(char* buffer, List *result_list)
 	struct json_object *response = json_tokener_parse(buffer);
 	if (response == NULL) 
 	{
-		elog(WARNING, "json_tokener_parse failed");
+		elog(WARNING, "failed to parse json tokener.");
 		return -1;
 	}
 
 	struct json_object *accessObj = NULL;
 	if (!json_object_object_get_ex(response, "access", &accessObj))
 	{
-		elog(WARNING, "get json access field failed");
+		elog(WARNING, "failed to get json \"access\" field.");
 		return -1;
 	}
 
@@ -120,7 +120,7 @@ static int parse_ranger_response(char* buffer, List *result_list)
 		const char *privilege_str = json_object_get_string(jprivilege);
 		uint32 resource_sign = string_hash(resource_str, strlen(resource_str));
 		uint32 privilege_sign = string_hash(privilege_str, strlen(privilege_str));
-		elog(DEBUG3, "ranger response access sign, resource_str:%s, privilege_str:%s", 
+		elog(DEBUG3, "ranger response access sign, resource_str: %s, privilege_str: %s",
 			resource_str, privilege_str);
 
 		ListCell *result;
@@ -294,7 +294,7 @@ static json_object *create_ranger_request_json(List *request_list, List *result_
 				break;
 			}
 			default:
-				elog(ERROR, "unrecognized objkind: %d", (int) kind);
+				elog(ERROR, "unsupported object kind : %s", AclObjectKindStr[kind]);
 		} // switch
 		json_object_object_add(jelement, "resource", jresource);
 
@@ -320,7 +320,6 @@ static json_object *create_ranger_request_json(List *request_list, List *result_
 		result_ptr->privilege_sign = string_hash(privilege_str, strlen(privilege_str));
 		elog(DEBUG3, "request access sign, resource_str:%s, privilege_str:%s", 
 			resource_str, privilege_str);
-		
 		j++;
 	} // foreach
 	char str[32];
@@ -354,19 +353,19 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	int original_size = curl->response.buffer_size;
 	while(curl->response.response_size + realsize >= curl->response.buffer_size)
 	{
-		/*double the buffer size if the buffer is not enough.*/
+		/* double the buffer size if the buffer is not enough.*/
 		curl->response.buffer_size = curl->response.buffer_size * 2;
 	}
 	if(original_size < curl->response.buffer_size)
 	{
-		/* our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL */
+		/* repalloc is not same as realloc, repalloc's first parameter cannot be NULL */
 		curl->response.buffer = repalloc(curl->response.buffer, curl->response.buffer_size);
 	}
 	elog(DEBUG3, "ranger restful response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
 	if (curl->response.buffer == NULL)
 	{
-		/* out of memory! */
-		elog(WARNING, "not enough memory for Ranger response");
+		/* allocate memory failed. probably out of memory */
+		elog(WARNING, "cannot allocate memory for ranger response");
 		return 0;
 	}
 	memcpy(curl->response.buffer + curl->response.response_size, contents, realsize);
@@ -413,7 +412,6 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_HTTPHEADER, headers);
 
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_POSTFIELDS,request);
-	//"{\"requestId\": 1,\"user\": \"hubert\",\"clientIp\":\"123.0.0.21\",\"context\": \"SELECT * FROM sales\",\"access\":[{\"resource\":{\"database\":\"a-database\",\"schema\":\"a-schema\",\"table\":\"sales\"},\"privileges\": [\"select\"]}]}");
 	/* send all data to this function  */
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_WRITEFUNCTION, write_callback);
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_WRITEDATA, (void *)curl_handle);
@@ -427,13 +425,13 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	/* check for errors */
 	if(res != CURLE_OK)
 	{
-		elog(WARNING, "curl_easy_perform() failed: %s\n",
-			curl_easy_strerror(res));
+		elog(WARNING, "ranger plugin service from http://%s:%d/%s is unavailable : %s.\n",
+				rps_addr_host, rps_addr_port, rps_addr_suffix, curl_easy_strerror(res));
 	}
 	else
 	{
 		ret = 0;
-		elog(DEBUG3, "retrieved %d bytes from ranger restful response.",
+		elog(DEBUG3, "retrieved %d bytes data from ranger restful response.",
 			curl_handle->response.response_size);
 	}
 
@@ -469,8 +467,8 @@ int check_privilege_from_ranger(List *request_list, List *result_list)
 	int ret = parse_ranger_response(curl_context_ranger.response.buffer, result_list);
 	if (ret < 0)
 	{
-		elog(WARNING, "parse ranger response failed, response[%s]", 
-			curl_context_ranger.response.buffer == NULL? "":curl_context_ranger.response.buffer);
+		elog(WARNING, "parse ranger response failed, ranger response content is %s",
+			curl_context_ranger.response.buffer == NULL? "empty.":curl_context_ranger.response.buffer);
 	}
 	if (curl_context_ranger.response.buffer != NULL)
 	{
