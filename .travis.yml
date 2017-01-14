@@ -21,6 +21,7 @@ install:
     libevent
     bison
     cpanm
+    maven
   - brew reinstall python
   - brew outdated libyaml || brew upgrade libyaml
   - brew outdated json-c || brew upgrade json-c
@@ -31,6 +32,7 @@ install:
   - sudo cpanm install JSON
 
 before_script:
+  - mvn apache-rat:check
   - cd $TRAVIS_BUILD_DIR
   - ./configure
 
