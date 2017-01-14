@@ -228,7 +228,7 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 	 */
 	if (avail_goptions == ACL_NO_RIGHTS && Gp_role != GP_ROLE_EXECUTE)
 	{
-	  if (enable_ranger && !fallBackToNativeCheck(objkind, objectId, grantorId)) {
+	  if (aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(objkind, objectId, grantorId)) {
 	    if (pg_rangercheck(objkind, objectId, grantorId,
 	        whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
 	        ACLMASK_ANY) != ACLCHECK_OK)
@@ -3851,7 +3851,7 @@ pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_CLASS, table_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3871,7 +3871,7 @@ pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid))
    {
      return pg_rangercheck(ACL_KIND_DATABASE, db_oid, roleid, mode, ACLMASK_ANY);
    }
@@ -3891,7 +3891,7 @@ pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_PROC, proc_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3911,7 +3911,7 @@ pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3931,7 +3931,7 @@ pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3951,7 +3951,7 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3972,7 +3972,7 @@ pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FDW, fdw_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3993,7 +3993,7 @@ pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -4014,7 +4014,7 @@ pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid))
   {
     return pg_rangercheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode, ACLMASK_ANY);
   }
@@ -4034,7 +4034,7 @@ pg_filesystem_aclcheck(Oid fsysid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode, ACLMASK_ANY);
   }

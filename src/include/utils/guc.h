@@ -275,7 +275,6 @@ extern bool gp_plpgsql_clear_cache_always;
 extern bool gp_disable_catalog_access_on_segment;
 
 extern bool gp_called_by_pgdump;
-extern bool enable_ranger;
 
 /* Debug DTM Action */
 typedef enum
@@ -452,6 +451,9 @@ extern int information_schema_namespcace_oid;
  * Enable logging of DPE match in optimizer.
  */
 extern bool	optimizer_partition_selection_log;
+
+/* acl type for privileges check */
+extern char   *acl_type;
 
 /**
  * rps host and port

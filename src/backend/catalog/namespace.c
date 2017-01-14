@@ -1946,7 +1946,7 @@ recomputeNamespacePath(void)
 	 */
 	if (namespaceSearchPathValid && namespaceUser == roleid)
 	{
-		if (!enable_ranger)
+		if (aclType != HAWQ_ACL_RANGER)
 		{
 			return;
 		}
@@ -1959,7 +1959,7 @@ recomputeNamespacePath(void)
 			if (current_query_sign == last_query_sign)
 				return;
 			last_query_sign = current_query_sign;
-			elog(DEBUG3, "recompute search_path[%s] when enable_ranger", namespace_search_path);
+			elog(DEBUG3, "recompute search_path[%s] when acl_type is ranger", namespace_search_path);
 		}
 	}
 

@@ -2714,7 +2714,7 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 void
 ExecCheckRTPerms(List *rangeTable)
 {
-	if (enable_ranger && !fallBackToNativeChecks(ACL_KIND_CLASS,rangeTable,GetUserId()))
+	if (aclType == HAWQ_ACL_RANGER && !fallBackToNativeChecks(ACL_KIND_CLASS,rangeTable,GetUserId()))
 	{
 		if(rangeTable!=NULL)
 			ExecCheckRTPermsWithRanger(rangeTable);
@@ -2729,7 +2729,8 @@ ExecCheckRTPerms(List *rangeTable)
 
 /*
  * ExecCheckRTPerms
- *   Batch implementation: Check access permissions for all relations listed in a range table with enable_ranger is true.
+ *   Batch implementation: Check access permissions for all relations
+ *   listed in a range table with acl_type is ranger.
  */
 void
 ExecCheckRTPermsWithRanger(List *rangeTable)
