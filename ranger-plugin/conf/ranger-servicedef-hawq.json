@@ -1,0 +1,287 @@
+{
+  "name": "hawq",
+  "implClass": "org.apache.hawq.ranger.service.RangerServiceHawq",
+  "label": "HAWQ",
+  "description": "HAWQ",
+  "guid": "1ebb27ee-549a-401d-85ab-818342ca54af",
+  "resources":
+  [
+    {
+      "itemId": 1,
+      "name": "database",
+      "type": "string",
+      "level": 10,
+      "parent": "",
+      "mandatory": true,
+      "lookupSupported": true,
+      "recursiveSupported": false,
+      "excludesSupported": true,
+      "Matcher": "org.apache.ranger.plugin.resourcematcher.RangerDefaultResourceMatcher",
+      "matcherOptions": {"wildCard":true, "ignoreCase":true},
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "Database",
+      "description": "HAWQ Database"
+    },
+    {
+      "itemId": 2,
+      "name": "schema",
+      "type": "string",
+      "level": 20,
+      "parent": "database",
+      "mandatory": true,
+      "lookupSupported": true,
+      "recursiveSupported": false,
+      "excludesSupported": true,
+      "Matcher": "org.apache.ranger.plugin.resourcematcher.RangerDefaultResourceMatcher",
+      "matcherOptions": {"wildCard":true, "ignoreCase":true},
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "Schema",
+      "description": "HAWQ Schema"
+    },
+    {
+      "itemId": 3,
+      "name": "table",
+      "type": "string",
+      "level": 30,
+      "parent": "schema",
+      "mandatory": true,
+      "lookupSupported": true,
+      "recursiveSupported": false,
+      "excludesSupported": true,
+      "Matcher": "org.apache.ranger.plugin.resourcematcher.RangerDefaultResourceMatcher",
+      "matcherOptions": {"wildCard":true, "ignoreCase":true},
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "Table",
+      "description": "HAWQ Table"
+    },
+    {
+      "itemId": 4,
+      "name": "sequence",
+      "type": "string",
+      "level": 30,
+      "parent": "schema",
+      "mandatory": true,
+      "lookupSupported": true,
+      "recursiveSupported": false,
+      "excludesSupported": true,
+      "Matcher": "org.apache.ranger.plugin.resourcematcher.RangerDefaultResourceMatcher",
+      "matcherOptions": {"wildCard":true, "ignoreCase":true},
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "Sequence",
+      "description": "HAWQ Sequence"
+    },
+    {
+      "itemId": 5,
+      "name": "function",
+      "type": "string",
+      "level": 30,
+      "parent": "schema",
+      "mandatory": true,
+      "lookupSupported": true,
+      "recursiveSupported": false,
+      "excludesSupported": true,
+      "Matcher": "org.apache.ranger.plugin.resourcematcher.RangerDefaultResourceMatcher",
+      "matcherOptions": {"wildCard":true, "ignoreCase":true},
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "Function",
+      "description": "HAWQ Function"
+    },
+    {
+      "itemId": 6,
+      "name": "language",
+      "type": "string",
+      "level": 20,
+      "parent": "database",
+      "mandatory": true,
+      "lookupSupported": true,
+      "recursiveSupported": false,
+      "excludesSupported": true,
+      "Matcher": "org.apache.ranger.plugin.resourcematcher.RangerDefaultResourceMatcher",
+      "matcherOptions": {"wildCard":true, "ignoreCase":true},
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "Language",
+      "description": "HAWQ Language"
+    },
+    {
+      "itemId": 7,
+      "name": "tablespace",
+      "type": "string",
+      "level": 10,
+      "parent": "",
+      "mandatory": true,
+      "lookupSupported": true,
+      "recursiveSupported": false,
+      "excludesSupported": true,
+      "Matcher": "org.apache.ranger.plugin.resourcematcher.RangerDefaultResourceMatcher",
+      "matcherOptions": {"wildCard":true, "ignoreCase":true},
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "Tablespace",
+      "description": "HAWQ Tablespace"
+    },
+    {
+      "itemId": 8,
+      "name": "protocol",
+      "type": "string",
+      "level": 10,
+      "parent": "",
+      "mandatory": true,
+      "lookupSupported": true,
+      "recursiveSupported": false,
+      "excludesSupported": true,
+      "Matcher": "org.apache.ranger.plugin.resourcematcher.RangerDefaultResourceMatcher",
+      "matcherOptions": {"wildCard":true, "ignoreCase":true},
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "Protocol",
+      "description": "HAWQ Protocol"
+    }
+  ],
+  "accessTypes":
+  [
+    {
+      "itemId": 1,
+      "name": "select",
+      "label": "select"
+    },
+    {
+      "itemId": 2,
+      "name": "insert",
+      "label": "insert"
+    },
+    {
+      "itemId": 3,
+      "name": "update",
+      "label": "update"
+    },
+    {
+      "itemId": 4,
+      "name": "delete",
+      "label": "delete"
+    },
+    {
+      "itemId": 5,
+      "name": "references",
+      "label": "references"
+    },
+    {
+      "itemId": 6,
+      "name": "usage",
+      "label": "usage"
+    },
+    {
+      "itemId": 7,
+      "name": "create",
+      "label": "create"
+    },
+    {
+      "itemId": 8,
+      "name": "connect",
+      "label": "connect"
+    },
+    {
+      "itemId": 9,
+      "name": "execute",
+      "label": "execute"
+    },
+    {
+      "itemId": 10,
+      "name": "temp",
+      "label": "temp"
+    },
+    {
+      "itemId": 11,
+      "name": "create-schema",
+      "label": "create-schema"
+    },
+    {
+      "itemId": 12,
+      "name": "usage-schema",
+      "label": "usage-schema"
+    },
+    {
+      "itemId": 13,
+      "name": "all",
+      "label": "All",
+      "impliedGrants": [
+        "select",
+        "insert",
+        "update",
+        "delete",
+        "references",
+        "usage",
+        "create",
+        "connect",
+        "execute",
+        "temp",
+        "create-schema",
+        "usage-schema"
+      ]
+    }
+  ],
+
+  "configs":
+  [
+    {
+      "itemId": 1,
+      "name": "username",
+      "type": "string",
+      "mandatory": true,
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "HAWQ User Name",
+      "defaultValue": "gpadmin"
+    },
+    {
+      "itemId": 2,
+      "name": "password",
+      "type": "password",
+      "mandatory": true,
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "HAWQ User Password"
+    },
+    {
+      "itemId": 3,
+      "name": "hostname",
+      "type": "string",
+      "mandatory": true,
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "HAWQ Master Hostname"
+    },
+    {
+      "itemId": 4,
+      "name": "port",
+      "type": "int",
+      "mandatory": true,
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "HAWQ Master Port",
+      "defaultValue": 5432
+    }
+  ],
+  "enums": [],
+  "contextEnrichers": [],
+  "policyConditions": [],
+  "dataMaskDef": {},
+  "rowFilterDef": {}
+}
