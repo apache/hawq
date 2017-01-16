@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
 
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({UserGroupInformation.class, SecureLogin.class})
+@PrepareForTest({UserGroupInformation.class})
 public class SecuredHDFSTest {
     ProtocolData mockProtocolData;
     ServletContext mockContext;

@@ -111,9 +111,6 @@ public class SecuredHDFS {
             LOG.debug("user " + userGroupInformation.getUserName() + " ("
                     + userGroupInformation.getShortUserName()
                     + ") authenticated");
-
-            // re-login if necessary
-            userGroupInformation.checkTGTAndReloginFromKeytab();
         } catch (IOException e) {
             throw new SecurityException("Failed to verify delegation token "
                     + e, e);
