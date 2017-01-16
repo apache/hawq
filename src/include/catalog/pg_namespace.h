@@ -123,7 +123,7 @@ DESCR("Standard public schema");
 DATA(insert OID = 6104 ( "pg_aoseg" PGUID _null_ 0));
 DESCR("Reserved schema for Append Only segment list and eof tables");
 #define PG_AOSEGMENT_NAMESPACE 6104
-
+#define PG_INFORMATION_SCHEMA_NAMESPACE 10671
 
 #define IsBuiltInNameSpace(namespaceId) \
 	(namespaceId == PG_CATALOG_NAMESPACE || \

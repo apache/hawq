@@ -2670,28 +2670,50 @@ List *getActionName(AclMode mask)
 bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
 {
   //for heap table, we fall back to native check.
-  if(objkind == ACL_KIND_CLASS)
+  if (objkind == ACL_KIND_CLASS)
   {
     char relstorage = get_rel_relstorage(obj_oid);
-    if(relstorage == 'h')
+    if (relstorage == 'h')
     {
       return true;
     }
   }
+  else if (objkind == ACL_KIND_NAMESPACE)
+  {
+	//native check build-in schemas.
+    if (obj_oid == PG_CATALOG_NAMESPACE || obj_oid == PG_INFORMATION_SCHEMA_NAMESPACE
+    		|| obj_oid == PG_AOSEGMENT_NAMESPACE || obj_oid == PG_TOAST_NAMESPACE
+			|| obj_oid == PG_BITMAPINDEX_NAMESPACE)
+    {
+      return true;
+    }
+  }
+  else if (objkind == ACL_KIND_PROC)
+  {
+	//native check functions under build-in schemas.
+    Oid namespaceid = get_func_namespace(obj_oid);
+    if (namespaceid == PG_CATALOG_NAMESPACE || namespaceid == PG_INFORMATION_SCHEMA_NAMESPACE
+			|| namespaceid == PG_AOSEGMENT_NAMESPACE || namespaceid == PG_TOAST_NAMESPACE
+			|| namespaceid == PG_BITMAPINDEX_NAMESPACE)
+    {
+      return true;
+    }
+  }
+
   return false;
 }
 
 bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid)
 {
-  //for heap table, we fall back to native check.
-  if(objkind == ACL_KIND_CLASS)
+  //we only have range table here
+  if (objkind == ACL_KIND_CLASS)
   {
     ListCell   *l;
     foreach(l, table_list)
     {
       RangeTblEntry *rte=(RangeTblEntry *) lfirst(l);
-      char relstorage = get_rel_relstorage(rte->relid);
-      if(relstorage == 'h')
+      bool ret = fallBackToNativeCheck(ACL_KIND_CLASS, rte->relid, roleid);
+      if(ret)
       {
         return true;
       }
