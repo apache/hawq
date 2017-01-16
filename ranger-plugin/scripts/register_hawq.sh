@@ -1,0 +1,217 @@
+#!/usr/bin/env bash
+
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+function usage() {
+  echo "USAGE: register_hawq.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password -h hawq_host:hawq_port -w hawq_user -q hawq_password"
+  exit 1
+}
+
+function fail() {
+  echo "ERROR: $1"
+  exit 1
+}
+
+function mask() {
+  printf -v stars '%*s' ${#1} ''
+  echo "[${stars// /*}]"
+}
+
+function read_value() {
+  local input
+  read -p "Enter value for $1 : " input
+  echo $input
+}
+
+function read_password() {
+  local input
+  read -s -p "Enter value for $1 : " input
+  echo $input
+}
+
+function get_ranger_url() {
+  while [[ -z "$RANGER_URL" ]]
+  do
+    RANGER_URL=$(read_value "Ranger Admin host and port (e.g. abc.com:6080)")
+  done
+  local prefix="http://"
+  RANGER_URL=${RANGER_URL#$prefix}
+}
+
+function get_ranger_user() {
+  while [[ -z "$RANGER_USER" ]]
+  do
+    RANGER_USER=$(read_value "Ranger Admin user name")
+  done
+}
+
+function get_ranger_password() {
+  while [[ -z "$RANGER_PASSWORD" ]]
+  do
+    RANGER_PASSWORD=$(read_password "Ranger Admin password")
+    echo
+  done
+}
+
+function get_hawq_url() {
+  #todo read hawq-site.xml ?
+  local default=`hostname -f`
+  default="${default}:5432"
+  while [[ -z "$HAWQ_URL" ]]
+  do
+    HAWQ_URL=$(read_value "HAWQ Master host and port [${default}]")
+  done
+  local prefix="http://"
+  HAWQ_URL=${HAWQ_URL#$prefix}
+  local parts=(${HAWQ_URL//:/ })
+  if [ ${#parts[@]} != 2 ]; then
+    fail "Incorrect value for HAWQ Master host and port."
+  fi
+  HAWQ_HOST=${parts[0]}
+  HAWQ_PORT=${parts[1]}
+}
+
+function get_hawq_user() {
+  local default="gpadmin"
+  while [[ -z "$HAWQ_USER" ]]
+  do
+    HAWQ_USER=$(read_value "HAWQ user name [${default}]")
+  done
+}
+
+function get_hawq_password() {
+  while [[ -z "$HAWQ_PASSWORD" ]]
+  do
+    HAWQ_PASSWORD=$(read_password "HAWQ password")
+    echo
+  done
+}
+
+function parse_params() {
+  while [[ $# -gt 0 ]] 
+  do
+    key="$1"
+    case $key in
+      -r)
+        RANGER_URL="$2"
+        shift
+        ;;
+      -u)
+        RANGER_USER="$2"
+        shift
+        ;;
+      -p)
+        RANGER_PASSWORD="$2"
+        shift
+        ;;
+      -h)
+        HAWQ_URL="$2"
+        shift
+        ;;
+      -w)
+        HAWQ_USER="$2"
+        shift
+        ;;
+      -q)
+        HAWQ_PASSWORD="$2"
+        shift
+        ;;
+      *)
+        usage
+        ;;
+    esac
+    shift
+  done
+}
+
+function validate_params() {
+  get_ranger_url
+  get_ranger_user
+  get_ranger_password
+  get_hawq_url
+  get_hawq_user
+  get_hawq_password
+  echo "RANGER URL  = ${RANGER_URL}" 
+  echo "RANGER User = ${RANGER_USER}" 
+  echo "RANGER Password = $(mask ${RANGER_PASSWORD})" 
+  echo "HAWQ HOST = ${HAWQ_HOST}"
+  echo "HAWQ PORT = ${HAWQ_PORT}"  
+  echo "HAWQ User = ${HAWQ_USER}" 
+  echo "HAWQ Password = $(mask ${HAWQ_PASSWORD})" 
+}
+
+function check_hawq_service_definition() {
+  echo $(curl -sS -u ${RANGER_USER}:${RANGER_PASSWORD} http://${RANGER_URL}/service/public/v2/api/servicedef/name/hawq | grep hawq | wc -l)
+}
+
+function create_hawq_service_definition() {
+  if [ $(check_hawq_service_definition) == 0 ]; then
+    local json_file="$(dirname ${SCRIPT_DIR})/etc/ranger-servicedef-hawq.json"
+    if [ ! -f ${json_file} ]; then
+      fail "File ${json_file} not found."
+    fi
+    echo "HAWQ service definition was not found in Ranger Admin, creating it by uploading ${json_file}"
+    local output=$(curl -sS -u ${RANGER_USER}:${RANGER_PASSWORD} -H "Content-Type: application/json" -X POST http://${RANGER_URL}/service/plugins/definitions -d @${json_file})
+    local created=$(echo ${output} | grep created | wc -l)
+    if [ ${created} == 0 ] || [ $(check_hawq_service_definition) == 0 ]; then
+      fail "Creation of HAWQ service definition from ${json_file} in Ranger Admin at ${RANGER_URL} failed. ${output}"
+    fi
+  else
+    echo "HAWQ service definition already exists in Ranger Admin, nothing to do." 
+  fi
+}
+
+function check_hawq_service_instance() {
+  echo $(curl -sS -u ${RANGER_USER}:${RANGER_PASSWORD} http://${RANGER_URL}/service/public/v2/api/service/name/hawq | grep hawq | wc -l)
+}
+
+function create_hawq_service_instance() {
+  if [ $(check_hawq_service_instance) == 0 ]; then
+    local payload="{\"name\":\"hawq\",
+                    \"type\":\"hawq\",
+                    \"description\":\"HAWQ Master\",
+                    \"isEnabled\":true,
+                    \"configs\":{\"username\":\"${HAWQ_USER}\",
+                               \"password\":\"${HAWQ_PASSWORD}\",
+                               \"hostname\":\"${HAWQ_HOST}\",
+                               \"port\":\"${HAWQ_PORT}\"}}"
+
+    echo "HAWQ service instance was not found in Ranger Admin, creating it."
+    local output=$(curl -sS -u ${RANGER_USER}:${RANGER_PASSWORD} -H "Content-Type: application/json" -X POST http://${RANGER_URL}/service/public/v2/api/service -d "${payload}")
+    local created=$(echo ${output} | grep created | wc -l)
+    if [ ${created} == 0 ] || [ $(check_hawq_service_instance) == 0 ]; then
+      fail "Creation of HAWQ service instance in Ranger Admin at ${RANGER_URL} failed. ${output}"
+    fi
+  else
+    echo "HAWQ service instance already exists in Ranger Admin, nothing to do."
+  fi
+}
+
+main() {
+  if [[ $# -lt 1 ]]; then
+    usage
+  fi
+  SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  parse_params "$@"
+  validate_params
+  create_hawq_service_definition
+  create_hawq_service_instance
+}
+main "$@"
