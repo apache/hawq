@@ -769,6 +769,8 @@ bool		optimizer_prefer_scalar_dqa_multistage_agg;
 bool		optimizer_parallel_union;
 bool		optimizer_array_constraints;
 
+int information_schema_namespcace_oid;
+
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
 
@@ -6192,6 +6194,15 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&optimizer_join_order_threshold,
 		10, 0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"information_schema_namespcace_oid", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("the oid of information_schema namespace"),
+			NULL
+		},
+		&information_schema_namespcace_oid,
+		0, 0, INT_MAX, NULL, NULL
 	},
 
 	{

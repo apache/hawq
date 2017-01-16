@@ -148,6 +148,7 @@ extern void free_attstatsslot(Oid atttype,
 				  Datum *values, int nvalues,
 				  float4 *numbers, int nnumbers);
 extern char *get_namespace_name(Oid nspid);
+extern Oid get_namespace_oid(const char* npname);
 extern Oid	get_roleid(const char *rolname);
 extern char *get_rolname(Oid roleid);
 extern char get_relation_storage_type(Oid relid);
