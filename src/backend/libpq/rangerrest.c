@@ -353,18 +353,18 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	int original_size = curl->response.buffer_size;
 	while(curl->response.response_size + realsize >= curl->response.buffer_size)
 	{
-		/*double the buffer size if the buffer is not enough.*/
+		/* double the buffer size if the buffer is not enough.*/
 		curl->response.buffer_size = curl->response.buffer_size * 2;
 	}
 	if(original_size < curl->response.buffer_size)
 	{
-		/* our repalloc is not same as realloc, repalloc's first param(buffer) can not be NULL */
+		/* repalloc is not same as realloc, repalloc's first parameter cannot be NULL */
 		curl->response.buffer = repalloc(curl->response.buffer, curl->response.buffer_size);
 	}
 	elog(DEBUG3, "ranger restful response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
 	if (curl->response.buffer == NULL)
 	{
-		/* out of memory! */
+		/* allocate memory failed. probably out of memory */
 		elog(WARNING, "cannot allocate memory for ranger response");
 		return 0;
 	}
