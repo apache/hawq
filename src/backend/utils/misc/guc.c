@@ -8202,7 +8202,7 @@ static struct config_string ConfigureNamesString[] =
       NULL
     },
     &rps_addr_suffix,
-    "hawq", NULL, NULL
+    "rps", NULL, NULL
   },
 
 	{
