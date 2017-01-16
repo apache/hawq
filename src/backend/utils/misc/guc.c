@@ -6280,7 +6280,7 @@ static struct config_int ConfigureNamesInt[] =
       NULL
     },
     &rps_addr_port,
-    8080, 1, 65535, NULL, NULL
+    8432, 1, 65535, NULL, NULL
   },
 
 	{
