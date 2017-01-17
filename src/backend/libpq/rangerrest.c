@@ -294,7 +294,7 @@ static json_object *create_ranger_request_json(List *request_list, List *result_
 				break;
 			}
 			default:
-				elog(ERROR, "unrecognized object kind : %d", (int) kind);
+				elog(ERROR, "unsupported object kind : %s", AclObjectKindStr[kind]);
 		} // switch
 		json_object_object_add(jelement, "resource", jresource);
 
