@@ -425,7 +425,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	/* check for errors */
 	if(res != CURLE_OK)
 	{
-		elog(WARNING, "ranger plugin service from http://%s:%d/%s is unavailable : %s.\n",
+		elog(ERROR, "ranger plugin service from http://%s:%d/%s is unavailable : %s.\n",
 				rps_addr_host, rps_addr_port, rps_addr_suffix, curl_easy_strerror(res));
 	}
 	else
@@ -467,7 +467,7 @@ int check_privilege_from_ranger(List *request_list, List *result_list)
 	int ret = parse_ranger_response(curl_context_ranger.response.buffer, result_list);
 	if (ret < 0)
 	{
-		elog(WARNING, "parse ranger response failed, ranger response content is %s",
+		elog(ERROR, "parse ranger response failed, ranger response content is %s",
 			curl_context_ranger.response.buffer == NULL? "empty.":curl_context_ranger.response.buffer);
 	}
 	if (curl_context_ranger.response.buffer != NULL)
