@@ -1933,7 +1933,12 @@ recomputeNamespacePath(void)
 	 * Do nothing if path is already valid.
 	 */
 	if (namespaceSearchPathValid && namespaceUser == roleid)
-		return;
+	{
+		if (!enable_ranger)
+			return;
+		else
+			elog(DEBUG3, "recompute search_path[%s] when enable_ranger", namespace_search_path);
+	}
 
 	/* Need a modifiable copy of namespace_search_path string */
 	rawname = pstrdup(namespace_search_path);
