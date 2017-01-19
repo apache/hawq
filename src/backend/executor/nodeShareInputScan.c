@@ -640,8 +640,13 @@ read_retry:
 	else if(sz == 0 || errno == EINTR)
 		goto read_retry;
 	else
+	{
+		if(fd >= 0)
+		{
+			gp_retry_close(fd);
+		}
 		elog(ERROR, "could not read from fifo: %m");
-
+	}
 	Assert(!"Never be here");
 	return 0;
 }
@@ -658,7 +663,13 @@ write_retry:
 	else if(sz == 0 || errno == EINTR)
 		goto write_retry;
 	else
+	{
+		if(fd >= 0)
+		{
+			gp_retry_close(fd);
+		}
 		elog(ERROR, "could not write to fifo: %m");
+	}
 
 	Assert(!"Never be here");
 	return 0;
@@ -872,6 +883,7 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 	mpp_fd_set rset;
 	struct timeval tval;
 	char b;
+	int timeout_times = 0;
 
 	while(ack_needed > 0)
 	{
@@ -906,6 +918,10 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 		}
 		else if(numReady==0)
 		{
+			/*If timeout times reach the max_retry_times, we need to return to avoid endless loop*/
+			if(timeout_times++ > MAX_RETRY_TIMES){
+				return;
+			}
 			elog(DEBUG1, "SISC WRITER (shareid=%d, slice=%d): Notify ready time out once ... ",
 					share_id, currentSliceId);
 		}
@@ -914,6 +930,10 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 			int save_errno = errno;
 			elog(LOG, "SISC WRITER (shareid=%d, slice=%d): notify still wait for an answer, errno %d",
 					share_id, currentSliceId, save_errno);
+			/*if error(except EINTR) happens in select, we just return to avoid endless loop*/
+			if(errno != EINTR){
+				return;
+			}
 		}
 	}
 }

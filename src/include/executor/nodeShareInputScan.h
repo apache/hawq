@@ -30,6 +30,8 @@
 #define NODESHAREINPUTSCAN_H
 
 #include "nodes/execnodes.h"
+
+#define MAX_RETRY_TIMES 5
 extern int ExecCountSlotsShareInputScan(ShareInputScan* node);
 extern ShareInputScanState *ExecInitShareInputScan(ShareInputScan *node, EState *estate, int eflags);
 extern TupleTableSlot *ExecShareInputScan(ShareInputScanState *node);
