@@ -30,7 +30,6 @@
 #define NODESHAREINPUTSCAN_H
 
 #include "nodes/execnodes.h"
-
 extern int ExecCountSlotsShareInputScan(ShareInputScan* node);
 extern ShareInputScanState *ExecInitShareInputScan(ShareInputScan *node, EState *estate, int eflags);
 extern TupleTableSlot *ExecShareInputScan(ShareInputScanState *node);
