@@ -883,7 +883,6 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 	mpp_fd_set rset;
 	struct timeval tval;
 	char b;
-	int timeout_times = 0;
 
 	while(ack_needed > 0)
 	{
@@ -918,10 +917,6 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 		}
 		else if(numReady==0)
 		{
-			/*If timeout times reach the max_retry_times, we need to return to avoid endless loop*/
-			if(timeout_times++ > MAX_RETRY_TIMES){
-				return;
-			}
 			elog(DEBUG1, "SISC WRITER (shareid=%d, slice=%d): Notify ready time out once ... ",
 					share_id, currentSliceId);
 		}
