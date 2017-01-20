@@ -44,16 +44,17 @@ public class DatabaseTest extends ServiceTestBase {
 
     @Test
     public void testSpecificResource_UserPolicy() throws IOException {
+        createResourceUserPolicy(TEST_DB);
+        runTestScenario();
+    }
 
-        // create user policy
-        Policy policy = policyBuilder
-                .resource(database, TEST_DB)
-                .resource(schema, STAR)
-                .resource(table, STAR)
-                .userAccess(TEST_USER, PRIVILEGES)
-                .build();
-        createPolicy(policy);
+    @Test
+    public void testStarResource_UserPolicy() throws IOException {
+        createResourceUserPolicy(STAR);
+        runTestScenario();
+    }
 
+    private void runTestScenario() throws IOException {
         // user IN the policy --> has all possible privileges to the specific resource
         assertTrue(hasAccess(TEST_USER, specificResource, PRIVILEGES));
         for (String privilege : PRIVILEGES) {
@@ -70,6 +71,16 @@ public class DatabaseTest extends ServiceTestBase {
         // delete the policy
         deletePolicy();
         assertFalse(hasAccess(TEST_USER, specificResource, PRIVILEGES));
+    }
+
+    private void createResourceUserPolicy(String name) throws IOException {
+        Policy policy = policyBuilder
+                .resource(database, name)
+                .resource(schema, STAR)
+                .resource(table, STAR)
+                .userAccess(TEST_USER, PRIVILEGES)
+                .build();
+        createPolicy(policy);
 
     }
 
