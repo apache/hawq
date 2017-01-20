@@ -38,9 +38,6 @@ public class DatabaseTest extends ServiceTestBase {
 
     @Before
     public void beforeTest() throws IOException {
-        Policy policy = policyBuilder.resource(database, TEST_DB).userAccess(TEST_USER, PRIVILEGES).build();
-        createPolicy(policy);
-
         specificResource.put(database, TEST_DB);
         unknownResource.put(database, UNKNOWN);
     }
