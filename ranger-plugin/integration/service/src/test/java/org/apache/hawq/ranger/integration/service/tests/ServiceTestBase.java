@@ -22,6 +22,8 @@ package org.apache.hawq.ranger.integration.service.tests;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
+import org.apache.hawq.ranger.integration.service.tests.policy.Policy.PolicyBuilder;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 import org.junit.After;
@@ -39,12 +41,13 @@ public abstract class ServiceTestBase {
     @Rule
     public final TestName testName = new TestName();
 
-    protected final String policyName = getClass().getSimpleName();
-
-    protected Map<String, String> resources = new HashMap<>();
-
     protected static final String TEST_USER = "maria_dev";
-    protected static final String UNKNOWN_USER = "dracula";
+    protected static final String UNKNOWN = "unknown";
+
+
+    protected final String policyName = getClass().getSimpleName();
+    protected Map<String, String> resources = new HashMap<>();
+    protected PolicyBuilder policyBuilder;
 
 
 
@@ -57,7 +60,6 @@ public abstract class ServiceTestBase {
     private static final String RANGER_URL = String.format("http://%s:%s/service/public/v2/api", RANGER_HOST, RANGER_PORT);
     private static final String RANGER_POLICY_URL = RANGER_URL + "/policy";
 
-
     private static int    POLICY_REFRESH_INTERVAL = 6000;
 
     private static final TypeReference<HashMap<String,Object>> typeMSO = new TypeReference<HashMap<String,Object>>() {};
@@ -65,11 +67,14 @@ public abstract class ServiceTestBase {
     private RESTClient rest = new RESTClient();
     private ObjectMapper mapper = new ObjectMapper();
 
+
     @Before
     public void setUp() throws IOException {
         LOG.info("======================================================================================");
         LOG.info("Running test " + testName.getMethodName());
         LOG.info("======================================================================================");
+
+        policyBuilder = (new PolicyBuilder()).name(policyName);
     }
 
     @After
@@ -83,6 +88,12 @@ public abstract class ServiceTestBase {
         waitForPolicyRefresh();
     }
 
+    protected void createPolicy(Policy policy) throws IOException {
+        LOG.info(String.format("Creating policy %s", policy.name));
+        rest.executeRequest(RESTClient.Method.POST, RANGER_POLICY_URL, mapper.writeValueAsString(policy));
+        waitForPolicyRefresh();
+    }
+
     protected void deletePolicy() throws IOException {
         LOG.info("Deleting policy " + policyName);
         try {
@@ -91,6 +102,10 @@ public abstract class ServiceTestBase {
             // ignore error when deleting a policy that does not exit
         }
         waitForPolicyRefresh();
+    }
+
+    protected boolean hasAccess(String user, Map<String, String> resources, String[] privileges) throws IOException {
+        return hasAccess(user, resources, Arrays.asList(privileges));
     }
 
     protected boolean hasAccess(String user, Map<String, String> resources, List<String> privileges) throws IOException {

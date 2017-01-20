@@ -19,44 +19,46 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
+import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
+import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.database;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class DatabaseTest extends ServiceTestBase {
 
-    private static final List<String> PRIVILEGES = Arrays.asList("connect", "temp");
+    private static final String[] PRIVILEGES = {"connect", "temp"};
+    private static final String TEST_DB = "test-user-db";
 
     @Before
     public void beforeTest() throws IOException {
-        createPolicy("test-database.json");
-        resources.put("database", "sirotan");
+        Policy policy = policyBuilder.resource(database, TEST_DB).userAccess(TEST_USER, PRIVILEGES).build();
+        createPolicy(policy);
+        resources.put("database", TEST_DB);
     }
 
     @Test
-    public void testDatabases_UserMaria_SirotanDb_Allowed() throws IOException {
+    public void testDatabase_Explicit_User_Allowed() throws IOException {
         assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testDatabases_UserMaria_DoesNotExistDb_Denied() throws IOException {
-        resources.put("database", "doesnotexist");
+    public void testDatabase_Unknown_User_Denied() throws IOException {
+        resources.put("database", UNKNOWN);
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testDatabases_UserBob_SirotanDb_Denied() throws IOException {
-        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
+    public void testDatabase_UserBob_SirotanDb_Denied() throws IOException {
+        assertFalse(hasAccess(UNKNOWN, resources, PRIVILEGES));
     }
 
     @Test
-    public void testDatabases_UserMaria_SirotanDb_Denied() throws IOException {
+    public void testDatabase_UserMaria_SirotanDb_Denied() throws IOException {
         deletePolicy();
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
