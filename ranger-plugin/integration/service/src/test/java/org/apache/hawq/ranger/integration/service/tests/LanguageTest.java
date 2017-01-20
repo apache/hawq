@@ -53,7 +53,7 @@ public class LanguageTest extends ServiceTestBase {
 
     @Test
     public void testLanguages_UserBob_SirotanDb_SqlLanguage_Denied() throws IOException {
-        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(UNKNOWN, resources, PRIVILEGES));
     }
 
     @Test

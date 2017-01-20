@@ -52,7 +52,7 @@ public class TablespaceTest extends ServiceTestBase {
 
     @Test
     public void testTablespaces_UserBob_PgGlobalTablespace_Denied() throws IOException {
-        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(UNKNOWN, resources, PRIVILEGES));
     }
 
     @Test

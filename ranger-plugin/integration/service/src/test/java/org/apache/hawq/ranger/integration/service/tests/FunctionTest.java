@@ -60,7 +60,7 @@ public class FunctionTest extends ServiceTestBase {
 
     @Test
     public void testFunctions_UserBob_SirotanDb_AtanFunction_Denied() throws IOException {
-        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(UNKNOWN, resources, PRIVILEGES));
     }
 
     @Test
