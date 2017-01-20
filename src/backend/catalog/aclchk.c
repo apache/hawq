@@ -2669,29 +2669,58 @@ List *getActionName(AclMode mask)
 
 bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
 {
-  //for heap table, we fall back to native check.
-  if(objkind == ACL_KIND_CLASS)
+  /* get the latest information_schema_namespcace_oid. Since caql access heap table
+   * directly without aclcheck, this function will not be called recursively
+   */
+  if (information_schema_namespcace_oid == 0)
+  {
+	  information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
+  }
+  /*for heap table, we fall back to native check.*/
+  if (objkind == ACL_KIND_CLASS)
   {
     char relstorage = get_rel_relstorage(obj_oid);
-    if(relstorage == 'h')
+    if (relstorage == 'h')
     {
       return true;
     }
   }
+  else if (objkind == ACL_KIND_NAMESPACE)
+  {
+	/*native check build-in schemas.*/
+    if (obj_oid == PG_CATALOG_NAMESPACE || obj_oid == information_schema_namespcace_oid
+    		|| obj_oid == PG_AOSEGMENT_NAMESPACE || obj_oid == PG_TOAST_NAMESPACE
+			|| obj_oid == PG_BITMAPINDEX_NAMESPACE)
+    {
+      return true;
+    }
+  }
+  else if (objkind == ACL_KIND_PROC)
+  {
+	/*native check functions under build-in schemas.*/
+    Oid namespaceid = get_func_namespace(obj_oid);
+    if (namespaceid == PG_CATALOG_NAMESPACE || namespaceid == information_schema_namespcace_oid
+			|| namespaceid == PG_AOSEGMENT_NAMESPACE || namespaceid == PG_TOAST_NAMESPACE
+			|| namespaceid == PG_BITMAPINDEX_NAMESPACE)
+    {
+      return true;
+    }
+  }
+
   return false;
 }
 
 bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid)
 {
-  //for heap table, we fall back to native check.
-  if(objkind == ACL_KIND_CLASS)
+  /*we only have range table here*/
+  if (objkind == ACL_KIND_CLASS)
   {
     ListCell   *l;
     foreach(l, table_list)
     {
       RangeTblEntry *rte=(RangeTblEntry *) lfirst(l);
-      char relstorage = get_rel_relstorage(rte->relid);
-      if(relstorage == 'h')
+      bool ret = fallBackToNativeCheck(ACL_KIND_CLASS, rte->relid, roleid);
+      if(ret)
       {
         return true;
       }
@@ -2710,17 +2739,23 @@ List *pg_rangercheck_batch(List *arg_list)
   List *aclresults = NIL;
   List *requestargs = NIL;
   ListCell *arg;
+  elog(DEBUG3, "ranger acl batch check, acl list length: %d\n", arg_list->length);
   foreach(arg, arg_list) {
     RangerPrivilegeArgs *arg_ptr = (RangerPrivilegeArgs *) lfirst(arg);
+
     AclObjectKind objkind = arg_ptr->objkind;
     Oid object_oid = arg_ptr->object_oid;
     char *objectname = getNameFromOid(objkind, object_oid);
     char *rolename = getRoleName(arg_ptr->roleid);
     List* actions = getActionName(arg_ptr->mask);
     bool isAll = (arg_ptr->how == ACLMASK_ALL) ? true: false;
+
     RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
-    aclresult->result = -1;
+    aclresult->result = RANGERCHECK_NO_PRIV;
     aclresult->relOid = object_oid;
+    /* this two sign fields will be set in function create_ranger_request_json */
+    aclresult->resource_sign = 0;
+    aclresult->privilege_sign = 0;
     aclresults = lappend(aclresults, aclresult);
 
     RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
@@ -2733,14 +2768,14 @@ List *pg_rangercheck_batch(List *arg_list)
 
   } // foreach
 
-  RangerACLResult ret = check_privilege_from_ranger(requestargs);
-
-  ListCell *result;
-  int k = 0;
-  foreach(result, aclresults) {
-    RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
-    result_ptr->result = ret;
-    ++k;
+  int ret = check_privilege_from_ranger(requestargs, aclresults);
+  if (ret < 0)
+  {
+	  ListCell *result;
+	  foreach(result, aclresults) {
+		  RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
+		  result_ptr->result = RANGERCHECK_NO_PRIV;
+	  }
   }
 
   if(requestargs) {
@@ -2760,10 +2795,6 @@ List *pg_rangercheck_batch(List *arg_list)
     requestargs = NULL;
   }
 
-  if(ret != RANGERCHECK_OK){
-    elog(ERROR, "ACL check failed\n");
-  }
-  elog(LOG, "oids%d\n", arg_list->length);
   return aclresults;
 }
 
@@ -2776,7 +2807,17 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 	List* actions = getActionName(mask);
 	bool isAll = (how == ACLMASK_ALL) ? true: false;
 
-	elog(LOG, "rangeraclcheck kind:%d,objectname:%s,role:%s,mask:%u\n",objkind,objectname,rolename,mask);
+	elog(DEBUG3, "ranger acl check kind: %d, object name: %s, role: %s, mask: %u\n", objkind, objectname, rolename, mask);
+
+	List *resultargs = NIL;
+    RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
+    aclresult->result = RANGERCHECK_NO_PRIV;
+    aclresult->relOid = object_oid;
+	/* this two sign fields will be set in function create_ranger_request_json */
+	aclresult->resource_sign = 0;
+	aclresult->privilege_sign = 0;
+    resultargs = lappend(resultargs, aclresult);
+
 	List *requestargs = NIL;
 	RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
 	requestarg->user = rolename;
@@ -2785,8 +2826,25 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 	requestarg->actions = actions;
 	requestarg->isAll = isAll;
 	requestargs = lappend(requestargs, requestarg);
-	int ret = check_privilege_from_ranger(requestargs);
 
+	AclResult result = ACLCHECK_NO_PRIV;	
+	int ret = check_privilege_from_ranger(requestargs, resultargs);
+	if (ret == 0) 
+	{
+		ListCell *arg;
+		foreach(arg, resultargs) {
+			/* only one element */
+			RangerPrivilegeResults *arg_ptr = (RangerPrivilegeResults *) lfirst(arg);
+			if (arg_ptr->result == RANGERCHECK_OK)
+				result = ACLCHECK_OK;
+			break;
+		}
+	}
+
+	if (resultargs)
+	{
+		list_free_deep(resultargs);
+	}
 	if (requestargs)
 	{
 		ListCell *cell = list_head(requestargs);
@@ -2802,7 +2860,7 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 		list_free_deep(requestargs);
 		requestargs = NULL;
 	}
-	return ret;
+	return result;
 }
 
 /*
@@ -2834,7 +2892,7 @@ pg_aclmask(AclObjectKind objkind, Oid table_oid, Oid roleid,
 		case ACL_KIND_EXTPROTOCOL:
 			return pg_extprotocol_aclmask(table_oid, roleid, mask, how);
 		default:
-			elog(ERROR, "unrecognized objkind: %d",
+			elog(ERROR, "unrecognized object kind : %d",
 				 (int) objkind);
 			/* not reached, but keep compiler quiet */
 			return ACL_NO_RIGHTS;

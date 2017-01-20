@@ -2714,12 +2714,12 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 void
 ExecCheckRTPerms(List *rangeTable)
 {
-  if (enable_ranger && !fallBackToNativeChecks(ACL_KIND_CLASS,rangeTable,GetUserId()))
-  {
-    if(rangeTable!=NULL)
-      ExecCheckRTPermsWithRanger(rangeTable);
-    return;
-  }
+	if (enable_ranger && !fallBackToNativeChecks(ACL_KIND_CLASS,rangeTable,GetUserId()))
+	{
+		if(rangeTable!=NULL)
+			ExecCheckRTPermsWithRanger(rangeTable);
+		return;
+	}
 	ListCell   *l;
 	foreach(l, rangeTable)
 	{
@@ -2734,70 +2734,93 @@ ExecCheckRTPerms(List *rangeTable)
 void
 ExecCheckRTPermsWithRanger(List *rangeTable)
 {
-  List *ranger_check_args = NIL;
-  ListCell *l;
-  foreach(l, rangeTable)
-  {
+	List *ranger_check_args = NIL;
+	ListCell *l;
+	foreach(l, rangeTable)
+	{
 
-    AclMode requiredPerms;
-    Oid relOid;
-    Oid userid;
-    RangeTblEntry *rte = (RangeTblEntry *) lfirst(l);
+		AclMode requiredPerms;
+		Oid relOid;
+		Oid userid;
+		RangeTblEntry *rte = (RangeTblEntry *) lfirst(l);
 
-    if (rte->rtekind != RTE_RELATION)
-      continue;
-    requiredPerms = rte->requiredPerms;
-    if (requiredPerms == 0)
-      continue;
-    
-    relOid = rte->relid;
-    userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
+		if (rte->rtekind != RTE_RELATION)
+			continue;
+		requiredPerms = rte->requiredPerms;
+		if (requiredPerms == 0)
+			continue;
 
-    RangerPrivilegeArgs *ranger_check_arg = (RangerPrivilegeArgs *) palloc(sizeof(RangerPrivilegeArgs));
-    ranger_check_arg->objkind = ACL_KIND_CLASS;
-    ranger_check_arg->object_oid = relOid;
-    ranger_check_arg->roleid = userid;
-    ranger_check_arg->mask = requiredPerms;
-    ranger_check_arg->how = ACLMASK_ALL;
-    ranger_check_args = lappend(ranger_check_args, ranger_check_arg);
+		relOid = rte->relid;
+		userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
 
-  } // foreach
+		RangerPrivilegeArgs *ranger_check_arg = (RangerPrivilegeArgs *) palloc(sizeof(RangerPrivilegeArgs));
+		ranger_check_arg->objkind = ACL_KIND_CLASS;
+		ranger_check_arg->object_oid = relOid;
+		ranger_check_arg->roleid = userid;
+		ranger_check_arg->mask = requiredPerms;
+		ranger_check_arg->how = ACLMASK_ALL;
+		ranger_check_args = lappend(ranger_check_args, ranger_check_arg);
 
-  if (ranger_check_args == NIL)
-    return;
+	}
 
-  // ranger ACL check with package Oids
-  List *aclresults = NIL;
-  aclresults = pg_rangercheck_batch(ranger_check_args);
-  if (aclresults == NIL)
-  {
-    elog(ERROR, "ACL check failed\n");
-    return;
-  }
+	if (ranger_check_args == NIL)
+		return;
 
-  // check result
-  ListCell *result;
-  foreach(result, aclresults)
-  {
-    RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
-    if(result_ptr->result != RANGERCHECK_OK)
-    {
-      Oid relOid = result_ptr->relOid;
-      const char *rel_name = get_rel_name_partition(relOid);
-      aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
-    }
-  }
-  
-  if (ranger_check_args)
-  {
-    list_free_deep(ranger_check_args);
-    ranger_check_args = NIL;
-  }
-  if (aclresults)
-  {
-    list_free_deep(aclresults);
-    aclresults = NIL;
-  }
+	/* ranger ACL check with package Oids */
+	List *aclresults = NIL;
+	aclresults = pg_rangercheck_batch(ranger_check_args);
+	if (aclresults == NIL)
+	{
+		elog(ERROR, "ACL check failed\n");
+		return;
+	}
+
+	/* check result */
+	StringInfoData acl_fail_msg;
+	bool acl_allok = true;
+
+	ListCell *result;
+	foreach(result, aclresults)
+	{
+		RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
+		if(result_ptr->result != RANGERCHECK_OK)
+		{
+			if (acl_allok)
+			{
+				initStringInfo(&acl_fail_msg);
+				appendStringInfo(&acl_fail_msg, "permission denied for relation(s): ");
+			}
+			else
+			{
+				appendStringInfo(&acl_fail_msg, ", ");
+			}
+			acl_allok = false;
+
+			/* collect all acl fail relations */
+			Oid relOid = result_ptr->relOid;
+			const char *rel_name = get_rel_name_partition(relOid);
+			appendStringInfo(&acl_fail_msg, "%s", rel_name);
+		}
+	}
+
+	if (ranger_check_args)
+	{
+		list_free_deep(ranger_check_args);
+		ranger_check_args = NIL;
+	}
+	if (aclresults)
+	{
+		list_free_deep(aclresults);
+		aclresults = NIL;
+	}
+
+	if (!acl_allok)
+	{
+		errstart(ERROR, __FILE__, __LINE__, PG_FUNCNAME_MACRO, TEXTDOMAIN);
+		errmsg("%s", acl_fail_msg.data),
+		pfree(acl_fail_msg.data);
+		errfinish(errOmitLocation(true));
+	}
 }
 
 /*

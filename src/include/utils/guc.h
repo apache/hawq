@@ -445,6 +445,9 @@ extern bool optimizer_prefer_scalar_dqa_multistage_agg;
 extern bool optimizer_parallel_union;
 extern bool optimizer_array_constraints;
 
+
+extern int information_schema_namespcace_oid;
+
 /**
  * Enable logging of DPE match in optimizer.
  */
