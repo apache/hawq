@@ -59,7 +59,6 @@ import static org.apache.hawq.pxf.api.io.DataType.VARCHAR;
  */
 public class HiveColumnarSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveColumnarSerdeResolver.class);
-    //private ColumnarSerDeBase deserializer;
     private boolean firstColumn;
     private StringBuilder builder;
     private StringBuilder parts;

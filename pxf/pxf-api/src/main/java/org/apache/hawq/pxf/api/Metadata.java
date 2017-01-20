@@ -22,6 +22,7 @@ package org.apache.hawq.pxf.api;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
@@ -124,16 +125,23 @@ public class Metadata {
      * Item's fields
      */
     private List<Metadata.Field> fields;
-
-
     private Set<OutputFormat> outputFormats;
+    private Map<String, String> outputParameters;
 
     public Set<OutputFormat> getOutputFormats() {
         return outputFormats;
     }
 
-    public void setFormats(Set<OutputFormat> outputFormats) {
+    public void setOutputFormats(Set<OutputFormat> outputFormats) {
         this.outputFormats = outputFormats;
+    }
+
+    public Map<String, String> getOutputParameters() {
+        return outputParameters;
+    }
+
+    public void setOutputParameters(Map<String, String> outputParameters) {
+        this.outputParameters = outputParameters;
     }
 
     /**

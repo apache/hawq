@@ -23,6 +23,7 @@ package org.apache.hawq.pxf.plugins.hive;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
 import org.apache.hawq.pxf.api.OutputFormat;
+import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
@@ -50,6 +51,8 @@ public class HiveStringPassResolver extends HiveResolver {
         parts = new StringBuilder();
         partitionKeys = hiveUserData.getPartitionKeys();
         serdeClassName = hiveUserData.getSerdeClassName();
+        collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM : input.getUserProperty("COLLECTION_DELIM");
+        mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM : input.getUserProperty("MAPKEY_DELIM");
 
         /* Needed only for BINARY format*/
         if (((ProtocolData) inputData).outputFormat() == OutputFormat.BINARY) {
@@ -84,15 +87,22 @@ public class HiveStringPassResolver extends HiveResolver {
     public List<OneField> getFields(OneRow onerow) throws Exception {
         if (((ProtocolData) inputData).outputFormat() == OutputFormat.TEXT) {
             String line = (onerow.getData()).toString();
-
+            String replacedLine = replaceComplexSpecCharacters(line);
             /* We follow Hive convention. Partition fields are always added at the end of the record */
-            return Collections.singletonList(new OneField(VARCHAR.getOID(), line + parts));
+            return Collections.singletonList(new OneField(VARCHAR.getOID(), replacedLine + parts));
         } else {
             return super.getFields(onerow);
         }
     }
 
-    void parseDelimiterChar(InputData input) {
-        delimiter = 44; //,
+    private String replaceComplexSpecCharacters(String line) throws UserDataException {
+        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(inputData);
+        char collectionDelimChar = (char)Integer.valueOf(hiveUserData.getCollectionDelim()).intValue();
+        char mapKeyDelimChar = (char)Integer.valueOf(hiveUserData.getMapKeyDelim()).intValue();
+        String replacedLine = line;
+        replacedLine = line.replace(Character.toString(collectionDelimChar), collectionDelim);
+        replacedLine = replacedLine.replace(Character.toString(mapKeyDelimChar), mapkeyDelim);
+        return replacedLine;
     }
+
 }

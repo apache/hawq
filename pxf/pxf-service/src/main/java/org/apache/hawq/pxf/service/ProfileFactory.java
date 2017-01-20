@@ -23,6 +23,7 @@ import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.TextInputFormat;
+import org.apache.hawq.pxf.api.Metadata;
 
 public class ProfileFactory {
 

@@ -134,8 +134,6 @@ public class HiveResolver extends Plugin implements ReadResolver {
 
     /* Parses user data string (arrived from fragmenter). */
     void parseUserData(InputData input) throws Exception {
-        final int EXPECTED_NUM_OF_TOKS = 5;
-
         HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input);
 
         serdeClassName = hiveUserData.getSerdeClassName();
@@ -620,10 +618,10 @@ public class HiveResolver extends Plugin implements ReadResolver {
      */
     void parseDelimiterChar(InputData input) {
 
-        String userDelim = input.getUserProperty("DELIMITER");
+        String userDelim = input.getUserProperty(InputData.DELIMITER_KEY);
 
         if (userDelim == null) {
-            throw new IllegalArgumentException("DELIMITER is a required option");
+            throw new IllegalArgumentException(InputData.DELIMITER_KEY + " is a required option");
         }
 
         final int VALID_LENGTH = 1;

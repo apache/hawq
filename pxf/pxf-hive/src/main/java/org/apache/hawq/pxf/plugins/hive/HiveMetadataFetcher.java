@@ -21,8 +21,11 @@ package org.apache.hawq.pxf.plugins.hive;
 
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
@@ -32,6 +35,7 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hawq.pxf.api.Metadata;
@@ -47,6 +51,11 @@ import org.apache.hawq.pxf.service.ProfileFactory;
  * Class for connecting to Hive's MetaStore and getting schema of Hive tables.
  */
 public class HiveMetadataFetcher extends MetadataFetcher {
+
+    private static final String DELIM_COLLECTION = "DELIM.COLLECTION";
+    private static final String DELIM_MAPKEY = "DELIM.MAPKEY";
+    private static final String DELIM_LINE = "DELIM.LINE";
+    private static final String DELIM_FIELD = InputData.DELIMITER_KEY;
 
     private static final Log LOG = LogFactory.getLog(HiveMetadataFetcher.class);
     private HiveMetaStoreClient client;
@@ -108,7 +117,16 @@ public class HiveMetadataFetcher extends MetadataFetcher {
                     OutputFormat outputFormat = getOutputFormat(inputFormat);
                     formats.add(outputFormat);
                 }
-                metadata.setFormats(formats);
+                metadata.setOutputFormats(formats);
+                if (tbl != null && tbl.getSd() != null && tbl.getSd().getSerdeInfo() != null) {
+                    Map<String, String> outputParameters = new HashMap<String, String>();
+                    Map<String, String> serdeParameters = tbl.getSd().getSerdeInfo().getParameters();
+                    //outputParameters.put(DELIM_COLLECTION, String.valueOf((int) serdeParameters.get(serdeConstants.COLLECTION_DELIM).charAt(0)));
+                    //outputParameters.put(DELIM_MAPKEY, String.valueOf((int) serdeParameters.get(serdeConstants.MAPKEY_DELIM).charAt(0)));
+                    //outputParameters.put(DELIM_LINE, String.valueOf((int) serdeParameters.get(serdeConstants.LINE_DELIM).charAt(0)));
+                    outputParameters.put(DELIM_FIELD, String.valueOf((int) serdeParameters.get(serdeConstants.FIELD_DELIM).charAt(0)));
+                    metadata.setOutputParameters(outputParameters);
+                }
             } catch (UnsupportedTypeException | UnsupportedOperationException e) {
                 if(ignoreErrors) {
                     LOG.warn("Metadata fetch for " + tblDesc.toString() + " failed. " + e.getMessage());

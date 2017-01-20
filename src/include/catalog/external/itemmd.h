@@ -70,6 +70,8 @@ typedef struct PxfItem
 
 	/* output formats*/
 	List *outputFormats;
+
+	int delimiter;
 } PxfItem;
 
 

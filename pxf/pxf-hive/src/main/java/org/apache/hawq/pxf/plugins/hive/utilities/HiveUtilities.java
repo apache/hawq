@@ -36,6 +36,7 @@ import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
@@ -99,7 +100,7 @@ public class HiveUtilities {
     static final String STR_RC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
     static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
     static final String STR_ORC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
-    private static final int EXPECTED_NUM_OF_TOKS = 5;
+    private static final int EXPECTED_NUM_OF_TOKS = 7;
 
     /**
      * Initializes the HiveMetaStoreClient
@@ -451,12 +452,14 @@ public class HiveUtilities {
         String serdeClassName = partData.storageDesc.getSerdeInfo().getSerializationLib();
         String propertiesString = serializeProperties(partData.properties);
         String partitionKeys = serializePartitionKeys(partData);
+        String collectionDelim = String.valueOf((int) partData.storageDesc.getSerdeInfo().getParameters().get(serdeConstants.COLLECTION_DELIM).charAt(0));
+        String mapKeyDelim = String.valueOf((int) partData.storageDesc.getSerdeInfo().getParameters().get(serdeConstants.MAPKEY_DELIM).charAt(0));
 
         if (HiveInputFormatFragmenter.class.isAssignableFrom(fragmenterClass)) {
             assertFileType(inputFormatName, partData);
         }
 
-        hiveUserData = new HiveUserData(inputFormatName, serdeClassName, propertiesString, partitionKeys, filterInFragmenter);
+        hiveUserData = new HiveUserData(inputFormatName, serdeClassName, propertiesString, partitionKeys, filterInFragmenter, collectionDelim, mapKeyDelim);
 
         return hiveUserData.toString().getBytes();
     }
@@ -470,7 +473,7 @@ public class HiveUtilities {
                     + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
         }
 
-        HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]));
+        HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]), toks[5], toks[6]);
 
             if (supportedSerdes.length > 0) {
                 /* Make sure this serde is supported */

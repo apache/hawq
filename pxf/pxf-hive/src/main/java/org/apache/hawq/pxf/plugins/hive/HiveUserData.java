@@ -25,12 +25,17 @@ public class HiveUserData {
 
     public HiveUserData(String inputFormatName, String serdeClassName,
             String propertiesString, String partitionKeys,
-            boolean filterInFragmenter) {
+            boolean filterInFragmenter,
+            String collectionDelim,
+            String mapKeyDelim) {
+
         this.inputFormatName = inputFormatName;
         this.serdeClassName = serdeClassName;
         this.propertiesString = propertiesString;
         this.partitionKeys = partitionKeys;
         this.filterInFragmenter = filterInFragmenter;
+        this.collectionDelim = collectionDelim;
+        this.mapKeyDelim = mapKeyDelim;
     }
 
     public String getInputFormatName() {
@@ -53,19 +58,38 @@ public class HiveUserData {
         return filterInFragmenter;
     }
 
+    public String getCollectionDelim() {
+        return collectionDelim;
+    }
+
+    public void setCollectionDelim(String collectionDelim) {
+        this.collectionDelim = collectionDelim;
+    }
+
+    public String getMapKeyDelim() {
+        return mapKeyDelim;
+    }
+
+    public void setMapKeyDelim(String mapKeyDelim) {
+        this.mapKeyDelim = mapKeyDelim;
+    }
+
     private String inputFormatName;
     private String serdeClassName;
     private String propertiesString;
     private String partitionKeys;
     private boolean filterInFragmenter;
+    private String collectionDelim;
+    private String mapKeyDelim;
 
     @Override
     public String toString() {
-        return inputFormatName + HiveUserData.HIVE_UD_DELIM 
+        return inputFormatName + HiveUserData.HIVE_UD_DELIM
                 + serdeClassName + HiveUserData.HIVE_UD_DELIM
                 + propertiesString + HiveUserData.HIVE_UD_DELIM
-                + partitionKeys + HiveUserData.HIVE_UD_DELIM 
-                + filterInFragmenter;
+                + partitionKeys + HiveUserData.HIVE_UD_DELIM
+                + filterInFragmenter + HiveUserData.HIVE_UD_DELIM
+                + collectionDelim + HiveUserData.HIVE_UD_DELIM
+                + mapKeyDelim;
     }
-
 }
