@@ -22,6 +22,7 @@ package org.apache.hawq.ranger.integration.service.tests;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.*;
@@ -80,20 +81,24 @@ public class RESTClient {
         request.setHeader("Content-Type", ContentType.APPLICATION_JSON.toString());
 
         CloseableHttpResponse response = httpClient.execute(request);
-        int responseCode = response.getStatusLine().getStatusCode();
-        LOG.debug("<-- response code = " + responseCode);
         String payload = null;
         try {
-            payload = EntityUtils.toString(response.getEntity());
+            int responseCode = response.getStatusLine().getStatusCode();
+            LOG.debug("<-- response code = " + responseCode);
+
+            HttpEntity entity = response.getEntity();
+            if (entity != null) {
+                payload = EntityUtils.toString(response.getEntity());
+            }
+            LOG.debug("<-- response payload = " + payload);
+
+            if (responseCode == HttpStatus.SC_NOT_FOUND) {
+                throw new ResourceNotFoundException();
+            } else if (responseCode >= 300) {
+                throw new ClientProtocolException("Unexpected HTTP response code = " + responseCode);
+            }
         } finally {
             response.close();
-        }
-        LOG.debug("<-- response payload = " + payload);
-
-        if (responseCode == HttpStatus.SC_NOT_FOUND) {
-            throw new ResourceNotFoundException();
-        } else if (responseCode >= 300) {
-            throw new ClientProtocolException("Unexpected HTTP response code = " + responseCode);
         }
 
         return payload;
