@@ -43,11 +43,17 @@ public abstract class ServiceTestBase {
 
     protected static final String TEST_USER = "maria_dev";
     protected static final String UNKNOWN = "unknown";
+    protected static final String STAR = "*";
+
 
 
     protected final String policyName = getClass().getSimpleName();
     protected Map<String, String> resources = new HashMap<>();
     protected PolicyBuilder policyBuilder;
+
+    protected Map<Policy.ResourceType, String> specificResource = new HashMap<>();
+    protected Map<Policy.ResourceType, String> unknownResource = new HashMap<>();
+
 
 
 
@@ -75,6 +81,8 @@ public abstract class ServiceTestBase {
         LOG.info("======================================================================================");
 
         policyBuilder = (new PolicyBuilder()).name(policyName);
+        specificResource = new HashMap<>();
+        unknownResource = new HashMap<>();
     }
 
     @After
@@ -104,8 +112,13 @@ public abstract class ServiceTestBase {
         waitForPolicyRefresh();
     }
 
-    protected boolean hasAccess(String user, Map<String, String> resources, String[] privileges) throws IOException {
-        return hasAccess(user, resources, Arrays.asList(privileges));
+    protected boolean hasAccess(String user, Map<Policy.ResourceType, String> resources, String... privileges) throws IOException {
+        LOG.info("Checking access for user " + user);
+        String response = rest.executeRequest(RESTClient.Method.POST, RPS_URL, getRPSRequestPayloadNew(user, resources, privileges));
+        Map<String, Object> responseMap = mapper.readValue(response, typeMSO);
+        boolean allowed = (Boolean)((Map)((List) responseMap.get("access")).get(0)).get("allowed");
+        LOG.info(String.format("Access for user %s is allowed = %s", user, allowed));
+        return allowed;
     }
 
     protected boolean hasAccess(String user, Map<String, String> resources, List<String> privileges) throws IOException {
@@ -135,6 +148,23 @@ public abstract class ServiceTestBase {
     }
 
     private String getRPSRequestPayload (String user, Map<String, String> resources, List<String> privileges) throws IOException {
+        Map<String, Object> request = new HashMap<>();
+        request.put("requestId", 9);
+        request.put("user", user);
+        request.put("clientIp", "123.0.0.21");
+        request.put("context", "CREATE SOME DATABASE OBJECT;");
+
+        Map<String, Object> access = new HashMap<>();
+        access.put("resource", resources);
+        access.put("privileges", privileges);
+
+        Set<Map<String, Object>> accesses = new HashSet<>();
+        accesses.add(access);
+        request.put("access", accesses);
+        return new ObjectMapper().writeValueAsString(request);
+    }
+
+    private String getRPSRequestPayloadNew (String user, Map<Policy.ResourceType, String> resources, String[] privileges) throws IOException {
         Map<String, Object> request = new HashMap<>();
         request.put("requestId", 9);
         request.put("user", user);

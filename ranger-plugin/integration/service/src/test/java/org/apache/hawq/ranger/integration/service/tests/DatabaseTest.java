@@ -26,6 +26,8 @@ import org.junit.Test;
 import java.io.IOException;
 
 import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.database;
+import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.schema;
+import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.table;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -38,9 +40,43 @@ public class DatabaseTest extends ServiceTestBase {
     public void beforeTest() throws IOException {
         Policy policy = policyBuilder.resource(database, TEST_DB).userAccess(TEST_USER, PRIVILEGES).build();
         createPolicy(policy);
-        resources.put("database", TEST_DB);
+
+        specificResource.put(database, TEST_DB);
+        unknownResource.put(database, UNKNOWN);
     }
 
+    @Test
+    public void testSpecificResource_UserPolicy() throws IOException {
+
+        // create user policy
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(schema, STAR)
+                .resource(table, STAR)
+                .userAccess(TEST_USER, PRIVILEGES)
+                .build();
+        createPolicy(policy);
+
+        // user IN the policy --> has all possible privileges to the specific resource
+        assertTrue(hasAccess(TEST_USER, specificResource, PRIVILEGES));
+        for (String privilege : PRIVILEGES) {
+            // user IN the policy --> has individual privileges to the specific resource
+            assertTrue(hasAccess(TEST_USER, specificResource, privilege));
+        }
+
+        // user NOT in the policy --> has NO access to the specific resource
+        assertFalse(hasAccess(UNKNOWN, specificResource, PRIVILEGES));
+
+        // user IN the policy --> has NO access to the unknown resource
+        assertFalse(hasAccess(TEST_USER, unknownResource, PRIVILEGES));
+
+        // delete the policy
+        deletePolicy();
+        assertFalse(hasAccess(TEST_USER, specificResource, PRIVILEGES));
+
+    }
+
+    /*
     @Test
     public void testDatabase_Explicit_User_Allowed() throws IOException {
         assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
@@ -62,5 +98,6 @@ public class DatabaseTest extends ServiceTestBase {
         deletePolicy();
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
+    */
 
 }
