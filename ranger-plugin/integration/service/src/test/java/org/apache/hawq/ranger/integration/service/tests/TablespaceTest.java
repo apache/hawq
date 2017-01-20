@@ -28,7 +28,7 @@ import java.util.List;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class TablespaceTest extends ServiceBaseTest {
+public class TablespaceTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("create");
 
@@ -41,27 +41,27 @@ public class TablespaceTest extends ServiceBaseTest {
     @Test
     public void testTablespaces_UserMaria_PgGlobalTablespace_Allowed()
             throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testTablespaces_UserMaria_DoesNotExistTablespace_Denied()
             throws IOException {
         resources.put("tablespace", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testTablespaces_UserBob_PgGlobalTablespace_Denied()
             throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
+        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testTablespaces_UserMaria_PgGlobalTablespace_Denied()
             throws IOException {
         deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
 }

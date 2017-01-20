@@ -19,6 +19,7 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -28,40 +29,36 @@ import java.util.List;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class DatabaseTest extends ServiceBaseTest {
+public class DatabaseTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("connect", "temp");
 
-    public void beforeTest()
-            throws IOException {
+    @Before
+    public void beforeTest() throws IOException {
         createPolicy("test-database.json");
         resources.put("database", "sirotan");
     }
 
     @Test
-    public void testDatabases_UserMaria_SirotanDb_Allowed()
-            throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    public void testDatabases_UserMaria_SirotanDb_Allowed() throws IOException {
+        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testDatabases_UserMaria_DoesNotExistDb_Denied()
-            throws IOException {
+    public void testDatabases_UserMaria_DoesNotExistDb_Denied() throws IOException {
         resources.put("database", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testDatabases_UserBob_SirotanDb_Denied()
-            throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
+    public void testDatabases_UserBob_SirotanDb_Denied() throws IOException {
+        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testDatabases_UserMaria_SirotanDb_Denied()
-            throws IOException {
+    public void testDatabases_UserMaria_SirotanDb_Denied() throws IOException {
         deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
 }

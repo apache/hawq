@@ -28,7 +28,7 @@ import java.util.List;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class ProtocolTest extends ServiceBaseTest {
+public class ProtocolTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("select", "insert");
 
@@ -41,27 +41,27 @@ public class ProtocolTest extends ServiceBaseTest {
     @Test
     public void testProtocols_UserMaria_PxfProtocol_Allowed()
             throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testProtocols_UserMaria_DoesNotExistProtocol_Denied()
             throws IOException {
         resources.put("protocol", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testProtocols_UserBob_PxfProtocol_Denied()
             throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
+        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testProtocols_UserMaria_PxfProtocol_Denied()
             throws IOException {
         deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
 }

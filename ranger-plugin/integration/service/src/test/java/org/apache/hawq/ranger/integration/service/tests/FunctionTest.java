@@ -28,7 +28,7 @@ import java.util.List;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class FunctionTest extends ServiceBaseTest {
+public class FunctionTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("execute");
 
@@ -43,41 +43,41 @@ public class FunctionTest extends ServiceBaseTest {
     @Test
     public void testFunctions_UserMaria_SirotanDb_AtanFunction_Allowed()
             throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testFunctions_UserMaria_OtherDb_AtanFunction_Denied()
             throws IOException {
         resources.put("database", "other");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testFunctions_UserMaria_SirotanDb_DoesNotExistFunction_Denied()
             throws IOException {
         resources.put("function", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testFunctions_UserBob_SirotanDb_AtanFunction_Denied()
             throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
+        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testFunctions_UserMaria_SirotanDb_AtanFunction_Denied()
             throws IOException {
         deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testFunctions_UserMaria_DoesNotExistDb_AtanFunction_Denied()
             throws IOException {
         resources.put("database", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
@@ -85,7 +85,7 @@ public class FunctionTest extends ServiceBaseTest {
             throws IOException {
         deletePolicy();
         createPolicy("test-function-2.json");
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
 }

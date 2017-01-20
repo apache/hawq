@@ -28,7 +28,7 @@ import java.util.List;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class LanguageTest extends ServiceBaseTest {
+public class LanguageTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("usage");
 
@@ -42,34 +42,34 @@ public class LanguageTest extends ServiceBaseTest {
     @Test
     public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Allowed()
             throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testLanguages_UserMaria_SirotanDb_DoesNotExistLanguage_Denied()
             throws IOException {
         resources.put("language", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testLanguages_UserBob_SirotanDb_SqlLanguage_Denied()
             throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
+        assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Denied()
             throws IOException {
         deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
     public void testLanguages_UserMaria_DoesNotExistDb_SqlLanguage_Denied()
             throws IOException {
         resources.put("database", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
@@ -77,7 +77,7 @@ public class LanguageTest extends ServiceBaseTest {
             throws IOException {
         deletePolicy();
         createPolicy("test-language-2.json");
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
 }
