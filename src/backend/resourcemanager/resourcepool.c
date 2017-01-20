@@ -4697,9 +4697,9 @@ void adjustSegmentStatGRMCapacity(SegStat segstat)
 		if ( oldmemorymb != segstat->GRMTotalMemoryMB ||
 			 oldcore	 != segstat->GRMTotalCore )
 		{
-			elog(LOG, "Resource manager adjusts segment (GRM name) %s original "
-					  "global resource manager resource capacity from "
-					  "(%d MB, %d CORE) to (%d MB, %d CORE)",
+			elog(LOG, "resource manager adjusts segment %s resource capacity "
+					  "from (%d MB, %d CORE) to (%d MB, %d CORE) from the "
+					  "cluster report of global resource manager",
 					  GET_SEGINFO_GRMHOSTNAME(&(segstat->Info)),
 					  oldmemorymb,
 					  oldcore,
