@@ -85,7 +85,11 @@ public abstract class ServiceTestBase {
 
     protected void deletePolicy() throws IOException {
         LOG.info("Deleting policy " + policyName);
-        rest.executeRequest(RESTClient.Method.DELETE, getRangerPolicyUrl(policyName));
+        try {
+            rest.executeRequest(RESTClient.Method.DELETE, getRangerPolicyUrl(policyName));
+        } catch (RESTClient.ResourceNotFoundException e) {
+            // ignore error when deleting a policy that does not exit
+        }
         waitForPolicyRefresh();
     }
 
