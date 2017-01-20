@@ -59,7 +59,7 @@ public class SqlBuilderTest {
     public void testIdFilter() throws Exception {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
-        when(inputData.getFilterString()).thenReturn("a0c1o5");//id=1
+        when(inputData.getFilterString()).thenReturn("a0c20s1d1o5");//id=1
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
         assertEquals("1=1 AND id=1", builder.buildWhereSQL(DB_PRODUCT));
@@ -70,7 +70,7 @@ public class SqlBuilderTest {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
         // cdate>'2008-02-01' and cdate<'2008-12-01' and amt > 1200
-        when(inputData.getFilterString()).thenReturn("a1c\"2008-02-01\"o2a1c\"2008-12-01\"o1l0a2c1200o2l0");
+        when(inputData.getFilterString()).thenReturn("a1c25s10d2008-02-01o2a1c25s10d2008-12-01o1l0a2c20s4d1200o2l0");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
         assertEquals("1=1 AND cdate>DATE('2008-02-01') AND cdate<DATE('2008-12-01') AND amt>1200"
@@ -82,7 +82,7 @@ public class SqlBuilderTest {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
         // grade like 'bad'
-        when(inputData.getFilterString()).thenReturn("a3c\"bad\"o7");
+        when(inputData.getFilterString()).thenReturn("a3c25s3dbado7");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
         assertEquals(null, builder.buildWhereSQL(DB_PRODUCT));
@@ -93,7 +93,7 @@ public class SqlBuilderTest {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
         // cdate>'2008-02-01' or amt < 1200
-        when(inputData.getFilterString()).thenReturn("a1c\"2008-02-01\"o2a2c1200o2l1");
+        when(inputData.getFilterString()).thenReturn("a1c25s10d2008-02-01o2a2c20s4d1200o2l1");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
         assertEquals(null, builder.buildWhereSQL(DB_PRODUCT));
@@ -121,7 +121,7 @@ public class SqlBuilderTest {
     public void testFilterAndPartition() throws Exception {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
-        when(inputData.getFilterString()).thenReturn("a0c5o2"); //id>5
+        when(inputData.getFilterString()).thenReturn("a0c20s1d5o2"); //id>5
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("grade:enum");
         when(inputData.getUserProperty("RANGE")).thenReturn("excellent:good:general:bad");
 
@@ -160,7 +160,7 @@ public class SqlBuilderTest {
         when(inputData.getDataSource()).thenReturn("sales");
 
 
-        ArrayList<ColumnDescriptor> columns = new ArrayList<ColumnDescriptor>();
+        ArrayList<ColumnDescriptor> columns = new ArrayList<>();
         columns.add(new ColumnDescriptor("id", DataType.INTEGER.getOID(), 0, "int4", null));
         columns.add(new ColumnDescriptor("cdate", DataType.DATE.getOID(), 1, "date", null));
         columns.add(new ColumnDescriptor("amt", DataType.FLOAT8.getOID(), 2, "float8", null));

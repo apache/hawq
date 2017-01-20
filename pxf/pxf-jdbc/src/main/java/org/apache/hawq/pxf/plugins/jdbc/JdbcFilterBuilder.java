@@ -30,9 +30,9 @@ import java.util.List;
 /**
  * Uses the filter parser code to build a filter object, either simple - a
  * single {@link BasicFilter} object or a
- * compound - a {@link java.util.List} of
+ * compound - a {@link List} of
  * {@link BasicFilter} objects.
- * The subclass {@link org.apache.hawq.pxf.plugins.jdbc.WhereSQLBuilder} will use the filter for
+ * The subclass {@link WhereSQLBuilder} will use the filter for
  * generate WHERE statement.
  */
 public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
@@ -42,14 +42,14 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
      *
      * @param filterString the string representation of the filter
      * @return a single {@link BasicFilter}
-     *         object or a {@link java.util.List} of
+     *         object or a {@link List} of
      *         {@link BasicFilter} objects.
      * @throws Exception if parsing the filter failed or filter is not a basic
      *             filter or list of basic filters
      */
     public Object getFilterObject(String filterString) throws Exception {
         FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString);
+        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
 
         if (!(result instanceof LogicalFilter) && !(result instanceof BasicFilter)
                 && !(result instanceof List)) {
@@ -79,6 +79,16 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
         return handleSimpleOperations(opId,
                 (FilterParser.ColumnIndex) leftOperand,
                 (FilterParser.Constant) rightOperand);
+    }
+
+    @Override
+    public Object build(FilterParser.Operation operation, Object operand) throws Exception {
+        if (operation == FilterParser.Operation.HDOP_IS_NULL || operation == FilterParser.Operation.HDOP_IS_NOT_NULL) {
+            // use null for the constant value of null comparison
+            return handleSimpleOperations(operation, (FilterParser.ColumnIndex) operand, null);
+        } else {
+            throw new Exception("Unsupported unary operation " + operation);
+        }
     }
 
     /*
@@ -116,7 +126,7 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
 
     private List<BasicFilter> handleCompoundOperations(BasicFilter left,
                                                        BasicFilter right) {
-        List<BasicFilter> result = new LinkedList<BasicFilter>();
+        List<BasicFilter> result = new LinkedList<>();
 
         result.add(left);
         result.add(right);

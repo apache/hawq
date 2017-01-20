@@ -21,18 +21,20 @@ package org.apache.hawq.pxf.plugins.jdbc;
 
 
 import org.apache.hawq.pxf.api.BasicFilter;
+import org.apache.hawq.pxf.api.FilterParser;
 import org.apache.hawq.pxf.api.FilterParser.LogicalOperation;
 import org.apache.hawq.pxf.api.LogicalFilter;
 import org.junit.Test;
 
 import static org.apache.hawq.pxf.api.FilterParser.Operation.*;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class JdbcFilterBuilderTest {
     @Test
     public void parseFilterWithThreeOperations() throws Exception {
         //orgin sql => col_1>'2008-02-01' and col_1<'2008-12-01' or col_2 > 1200
-        String filterstr = "a1c\"2008-02-01\"o2a1c\"2008-12-01\"o1l0a2c1200o2l1";
+        String filterstr = "a1c25s10d2008-02-01o2a1c25s10d2008-12-01o1l0a2c20s4d1200o2l1";
         JdbcFilterBuilder builder = new JdbcFilterBuilder();
 
         LogicalFilter filterList = (LogicalFilter) builder.getFilterObject(filterstr);
@@ -64,7 +66,7 @@ public class JdbcFilterBuilderTest {
     @Test
     public void parseFilterWithLogicalOperation() throws Exception {
         WhereSQLBuilder builder = new WhereSQLBuilder(null);
-        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c\"first\"o5a2c2o2l0");
+        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c25s5dfirsto5a2c20s1d2o2l0");
         assertEquals(LogicalOperation.HDOP_AND, filter.getOperator());
         assertEquals(2, filter.getFilterList().size());
     }
@@ -72,10 +74,28 @@ public class JdbcFilterBuilderTest {
     @Test
     public void parseNestedExpressionWithLogicalOperation() throws Exception {
         WhereSQLBuilder builder = new WhereSQLBuilder(null);
-        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c\"first\"o5a2c2o2l0a1c1o1l1");
+        LogicalFilter filter = (LogicalFilter) builder.getFilterObject("a1c25s5dfirsto5a2c20s1d2o2l0a1c20s1d1o1l1");
         assertEquals(LogicalOperation.HDOP_OR, filter.getOperator());
         assertEquals(LogicalOperation.HDOP_AND, ((LogicalFilter) filter.getFilterList().get(0)).getOperator());
         assertEquals(HDOP_LT, ((BasicFilter) filter.getFilterList().get(1)).getOperation());
+    }
+
+    @Test
+    public void parseISNULLExpression() throws Exception {
+        WhereSQLBuilder builder = new WhereSQLBuilder(null);
+        BasicFilter filter = (BasicFilter) builder.getFilterObject("a1o8");
+        assertEquals(FilterParser.Operation.HDOP_IS_NULL, filter.getOperation());
+        assertEquals(1, filter.getColumn().index());
+        assertNull(filter.getConstant());
+    }
+
+    @Test
+    public void parseISNOTNULLExpression() throws Exception {
+        WhereSQLBuilder builder = new WhereSQLBuilder(null);
+        BasicFilter filter = (BasicFilter) builder.getFilterObject("a1o9");
+        assertEquals(FilterParser.Operation.HDOP_IS_NOT_NULL, filter.getOperation());
+        assertEquals(1, filter.getColumn().index());
+        assertNull(filter.getConstant());
     }
 
 }
