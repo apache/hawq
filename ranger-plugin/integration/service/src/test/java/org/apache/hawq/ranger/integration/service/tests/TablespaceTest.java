@@ -19,6 +19,7 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -32,36 +33,31 @@ public class TablespaceTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("create");
 
-    public void beforeTest()
-            throws IOException {
+    @Before
+    public void beforeTest() throws IOException {
         createPolicy("test-tablespace.json");
         resources.put("tablespace", "pg_global");
     }
 
     @Test
-    public void testTablespaces_UserMaria_PgGlobalTablespace_Allowed()
-            throws IOException {
+    public void testTablespaces_UserMaria_PgGlobalTablespace_Allowed() throws IOException {
         assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testTablespaces_UserMaria_DoesNotExistTablespace_Denied()
-            throws IOException {
+    public void testTablespaces_UserMaria_DoesNotExistTablespace_Denied() throws IOException {
         resources.put("tablespace", "doesnotexist");
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testTablespaces_UserBob_PgGlobalTablespace_Denied()
-            throws IOException {
+    public void testTablespaces_UserBob_PgGlobalTablespace_Denied() throws IOException {
         assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testTablespaces_UserMaria_PgGlobalTablespace_Denied()
-            throws IOException {
+    public void testTablespaces_UserMaria_PgGlobalTablespace_Denied() throws IOException {
         deletePolicy();
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
-
 }

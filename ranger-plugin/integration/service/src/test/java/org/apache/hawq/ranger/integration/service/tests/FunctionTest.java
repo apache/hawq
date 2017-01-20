@@ -19,6 +19,7 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -32,8 +33,8 @@ public class FunctionTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("execute");
 
-    public void beforeTest()
-            throws IOException {
+    @Before
+    public void beforeTest() throws IOException {
         createPolicy("test-function.json");
         resources.put("database", "sirotan");
         resources.put("schema", "siroschema");
@@ -41,51 +42,43 @@ public class FunctionTest extends ServiceTestBase {
     }
 
     @Test
-    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Allowed()
-            throws IOException {
+    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Allowed() throws IOException {
         assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testFunctions_UserMaria_OtherDb_AtanFunction_Denied()
-            throws IOException {
+    public void testFunctions_UserMaria_OtherDb_AtanFunction_Denied() throws IOException {
         resources.put("database", "other");
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testFunctions_UserMaria_SirotanDb_DoesNotExistFunction_Denied()
-            throws IOException {
+    public void testFunctions_UserMaria_SirotanDb_DoesNotExistFunction_Denied() throws IOException {
         resources.put("function", "doesnotexist");
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testFunctions_UserBob_SirotanDb_AtanFunction_Denied()
-            throws IOException {
+    public void testFunctions_UserBob_SirotanDb_AtanFunction_Denied() throws IOException {
         assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Denied()
-            throws IOException {
+    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Denied() throws IOException {
         deletePolicy();
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testFunctions_UserMaria_DoesNotExistDb_AtanFunction_Denied()
-            throws IOException {
+    public void testFunctions_UserMaria_DoesNotExistDb_AtanFunction_Denied() throws IOException {
         resources.put("database", "doesnotexist");
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Policy2_Allowed()
-            throws IOException {
+    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Policy2_Allowed() throws IOException {
         deletePolicy();
         createPolicy("test-function-2.json");
         assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
-
 }

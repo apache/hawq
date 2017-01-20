@@ -30,9 +30,7 @@ import org.junit.Rule;
 import org.junit.rules.TestName;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public abstract class ServiceTestBase {
 
@@ -118,15 +116,19 @@ public abstract class ServiceTestBase {
     }
 
     private String getRPSRequestPayload (String user, Map<String, String> resources, List<String> privileges) throws IOException {
-        Map<String, Object> access = new HashMap<>();
-        access.put("resource", resources);
-        access.put("privileges", privileges);
         Map<String, Object> request = new HashMap<>();
         request.put("requestId", 9);
         request.put("user", user);
         request.put("clientIp", "123.0.0.21");
         request.put("context", "CREATE SOME DATABASE OBJECT;");
-        request.put("access", access);
+
+        Map<String, Object> access = new HashMap<>();
+        access.put("resource", resources);
+        access.put("privileges", privileges);
+
+        Set<Map<String, Object>> accesses = new HashSet<>();
+        accesses.add(access);
+        request.put("access", accesses);
         return new ObjectMapper().writeValueAsString(request);
     }
 

@@ -19,6 +19,7 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -32,52 +33,45 @@ public class LanguageTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("usage");
 
-    public void beforeTest()
-            throws IOException {
+    @Before
+    public void beforeTest() throws IOException {
         createPolicy("test-language.json");
         resources.put("database", "sirotan");
         resources.put("language", "sql");
     }
 
     @Test
-    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Allowed()
-            throws IOException {
+    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Allowed() throws IOException {
         assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testLanguages_UserMaria_SirotanDb_DoesNotExistLanguage_Denied()
-            throws IOException {
+    public void testLanguages_UserMaria_SirotanDb_DoesNotExistLanguage_Denied() throws IOException {
         resources.put("language", "doesnotexist");
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testLanguages_UserBob_SirotanDb_SqlLanguage_Denied()
-            throws IOException {
+    public void testLanguages_UserBob_SirotanDb_SqlLanguage_Denied() throws IOException {
         assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Denied()
-            throws IOException {
+    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Denied() throws IOException {
         deletePolicy();
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testLanguages_UserMaria_DoesNotExistDb_SqlLanguage_Denied()
-            throws IOException {
+    public void testLanguages_UserMaria_DoesNotExistDb_SqlLanguage_Denied() throws IOException {
         resources.put("database", "doesnotexist");
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Policy2_Allowed()
-            throws IOException {
+    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Policy2_Allowed() throws IOException {
         deletePolicy();
         createPolicy("test-language-2.json");
         assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
-
 }

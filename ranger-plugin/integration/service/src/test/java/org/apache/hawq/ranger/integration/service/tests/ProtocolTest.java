@@ -19,6 +19,7 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -32,36 +33,31 @@ public class ProtocolTest extends ServiceTestBase {
 
     private static final List<String> PRIVILEGES = Arrays.asList("select", "insert");
 
-    public void beforeTest()
-            throws IOException {
+    @Before
+    public void beforeTest() throws IOException {
         createPolicy("test-protocol.json");
         resources.put("protocol", "pxf");
     }
 
     @Test
-    public void testProtocols_UserMaria_PxfProtocol_Allowed()
-            throws IOException {
+    public void testProtocols_UserMaria_PxfProtocol_Allowed() throws IOException {
         assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testProtocols_UserMaria_DoesNotExistProtocol_Denied()
-            throws IOException {
+    public void testProtocols_UserMaria_DoesNotExistProtocol_Denied() throws IOException {
         resources.put("protocol", "doesnotexist");
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testProtocols_UserBob_PxfProtocol_Denied()
-            throws IOException {
+    public void testProtocols_UserBob_PxfProtocol_Denied() throws IOException {
         assertFalse(hasAccess(UNKNOWN_USER, resources, PRIVILEGES));
     }
 
     @Test
-    public void testProtocols_UserMaria_PxfProtocol_Denied()
-            throws IOException {
+    public void testProtocols_UserMaria_PxfProtocol_Denied() throws IOException {
         deletePolicy();
         assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
     }
-
 }
