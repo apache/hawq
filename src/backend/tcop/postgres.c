@@ -115,6 +115,7 @@
 #include "cdb/cdbinmemheapam.h"
 
 #include "utils/rangerrest.h"
+#include "catalog/namespace.h"
 
 #include "resourcemanager/dynrm.h"
 #include "resourcemanager/envswitch.h"
@@ -591,6 +592,9 @@ ReadCommand(StringInfo inBuf)
 		result = SocketBackend(inBuf);
 	else
 		result = InteractiveBackend(inBuf);
+
+	/* reset last_query_sign to 0 when running a new sql */
+	reset_query_sign();
 	return result;
 }
 
