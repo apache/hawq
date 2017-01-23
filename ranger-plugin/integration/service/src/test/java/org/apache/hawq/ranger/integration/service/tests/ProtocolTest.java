@@ -30,10 +30,11 @@ import java.util.List;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class ProtocolTest extends ServiceTestBase {
+public class ProtocolTest /*extends ServiceTestBase*/ {
 
     private static final List<String> PRIVILEGES = Arrays.asList("select", "insert");
 
+    /*
     @Override
     protected Policy getResourceUserPolicy() {
         return null;
@@ -44,7 +45,7 @@ public class ProtocolTest extends ServiceTestBase {
         return null;
     }
 
-    /*
+
     @Before
     public void beforeTest() throws IOException {
         createPolicy("test-protocol.json");

@@ -30,10 +30,11 @@ import java.util.List;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class FunctionTest extends ServiceTestBase {
+public class FunctionTest /*extends ServiceTestBase*/ {
 
     private static final List<String> PRIVILEGES = Arrays.asList("execute");
 
+    /*
     @Override
     protected Policy getResourceUserPolicy() {
         return null;
@@ -44,7 +45,7 @@ public class FunctionTest extends ServiceTestBase {
         return null;
     }
 
-    /*
+
     @Before
     public void beforeTest() throws IOException {
         createPolicy("test-function.json");

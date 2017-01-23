@@ -224,5 +224,5 @@ public abstract class ServiceTestBase {
         deletePolicy(policy);
         assertFalse(hasAccess(TEST_USER, specificResource, privileges));
     }
-    
+
 }

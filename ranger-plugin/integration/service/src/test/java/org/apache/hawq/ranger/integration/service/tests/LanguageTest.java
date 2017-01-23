@@ -30,10 +30,11 @@ import java.util.List;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class LanguageTest extends ServiceTestBase {
+public class LanguageTest /*extends ServiceTestBase*/ {
 
     private static final List<String> PRIVILEGES = Arrays.asList("usage");
 
+    /*
     @Override
     protected Policy getResourceUserPolicy() {
         return null;
@@ -44,7 +45,7 @@ public class LanguageTest extends ServiceTestBase {
         return null;
     }
 
-    /*
+
     @Before
     public void beforeTest() throws IOException {
         createPolicy("test-language.json");
