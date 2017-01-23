@@ -21,91 +21,41 @@ package org.apache.hawq.ranger.integration.service.tests;
 
 import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
 import org.junit.Before;
-import org.junit.Test;
 
 import java.io.IOException;
 
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.database;
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.schema;
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.table;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.*;
 
 public class DatabaseTest extends ServiceTestBase {
 
-    private static final String[] PRIVILEGES = {"connect", "temp"};
-    private static final String TEST_DB = "test-user-db";
+    private static final String TEST_DB = "test-db";
 
     @Before
     public void beforeTest() throws IOException {
         specificResource.put(database, TEST_DB);
         unknownResource.put(database, UNKNOWN);
+        privileges = new String[] {"connect", "temp"};
     }
 
-    @Test
-    public void testSpecificResource_UserPolicy() throws IOException {
-        createResourceUserPolicy(TEST_DB);
-        runTestScenario();
-    }
-
-    @Test
-    public void testStarResource_UserPolicy() throws IOException {
-        createResourceUserPolicy(STAR);
-        runTestScenario();
-    }
-
-    private void runTestScenario() throws IOException {
-        // user IN the policy --> has all possible privileges to the specific resource
-        assertTrue(hasAccess(TEST_USER, specificResource, PRIVILEGES));
-        for (String privilege : PRIVILEGES) {
-            // user IN the policy --> has individual privileges to the specific resource
-            assertTrue(hasAccess(TEST_USER, specificResource, privilege));
-        }
-
-        // user NOT in the policy --> has NO access to the specific resource
-        assertFalse(hasAccess(UNKNOWN, specificResource, PRIVILEGES));
-
-        // user IN the policy --> has NO access to the unknown resource
-        assertFalse(hasAccess(TEST_USER, unknownResource, PRIVILEGES));
-
-        // delete the policy
-        deletePolicy();
-        assertFalse(hasAccess(TEST_USER, specificResource, PRIVILEGES));
-    }
-
-    private void createResourceUserPolicy(String name) throws IOException {
+    @Override
+    protected Policy getResourceUserPolicy() {
         Policy policy = policyBuilder
-                .resource(database, name)
+                .resource(database, TEST_DB)
                 .resource(schema, STAR)
                 .resource(table, STAR)
-                .userAccess(TEST_USER, PRIVILEGES)
+                .userAccess(TEST_USER, privileges)
                 .build();
-        createPolicy(policy);
-
+        return policy;
     }
 
-    /*
-    @Test
-    public void testDatabase_Explicit_User_Allowed() throws IOException {
-        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceGroupPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(schema, STAR)
+                .resource(table, STAR)
+                .groupAccess(PUBLIC_GROUP, privileges)
+                .build();
+        return policy;
     }
-
-    @Test
-    public void testDatabase_Unknown_User_Denied() throws IOException {
-        resources.put("database", UNKNOWN);
-        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testDatabase_UserBob_SirotanDb_Denied() throws IOException {
-        assertFalse(hasAccess(UNKNOWN, resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testDatabase_UserMaria_SirotanDb_Denied() throws IOException {
-        deletePolicy();
-        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
-    }
-    */
-
 }

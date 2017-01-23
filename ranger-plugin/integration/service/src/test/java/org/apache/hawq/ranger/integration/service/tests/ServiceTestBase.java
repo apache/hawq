@@ -29,10 +29,14 @@ import org.codehaus.jackson.type.TypeReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.TestName;
 
 import java.io.IOException;
 import java.util.*;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 public abstract class ServiceTestBase {
 
@@ -41,18 +45,17 @@ public abstract class ServiceTestBase {
     @Rule
     public final TestName testName = new TestName();
 
+    protected static final String PUBLIC_GROUP = "public";
+    protected static final String GPADMIN_USER = "gpadmin";
     protected static final String TEST_USER = "maria_dev";
     protected static final String UNKNOWN = "unknown";
     protected static final String STAR = "*";
 
-
-
-    protected final String policyName = getClass().getSimpleName();
     protected Map<String, String> resources = new HashMap<>();
-    protected PolicyBuilder policyBuilder;
-
+    protected String[] privileges = {};
     protected Map<Policy.ResourceType, String> specificResource = new HashMap<>();
     protected Map<Policy.ResourceType, String> unknownResource = new HashMap<>();
+    protected PolicyBuilder policyBuilder;
 
 
 
@@ -80,20 +83,9 @@ public abstract class ServiceTestBase {
         LOG.info("Running test " + testName.getMethodName());
         LOG.info("======================================================================================");
 
-        policyBuilder = (new PolicyBuilder()).name(policyName);
+        policyBuilder = (new PolicyBuilder()).name(getClass().getSimpleName());
         specificResource = new HashMap<>();
         unknownResource = new HashMap<>();
-    }
-
-    @After
-    public void tearDown() throws IOException {
-        deletePolicy();
-    }
-
-    protected void createPolicy(String jsonFile) throws IOException {
-        LOG.info(String.format("Creating policy %s from file %s", policyName, jsonFile));
-        rest.executeRequest(RESTClient.Method.POST, RANGER_POLICY_URL, readFile(jsonFile));
-        waitForPolicyRefresh();
     }
 
     protected void createPolicy(Policy policy) throws IOException {
@@ -102,10 +94,10 @@ public abstract class ServiceTestBase {
         waitForPolicyRefresh();
     }
 
-    protected void deletePolicy() throws IOException {
-        LOG.info("Deleting policy " + policyName);
+    protected void deletePolicy(Policy policy) throws IOException {
+        LOG.info("Deleting policy " + policy.name);
         try {
-            rest.executeRequest(RESTClient.Method.DELETE, getRangerPolicyUrl(policyName));
+            rest.executeRequest(RESTClient.Method.DELETE, getRangerPolicyUrl(policy.name));
         } catch (RESTClient.ResourceNotFoundException e) {
             // ignore error when deleting a policy that does not exit
         }
@@ -181,4 +173,56 @@ public abstract class ServiceTestBase {
         return new ObjectMapper().writeValueAsString(request);
     }
 
+
+    protected void checkSpecificResource(String user) throws IOException {
+        // user IN the policy --> has all possible privileges to the specific resource
+        assertTrue(hasAccess(user, specificResource, privileges));
+        for (String privilege : privileges) {
+            // user IN the policy --> has individual privileges to the specific resource
+            assertTrue(hasAccess(user, specificResource, privilege));
+        }
+    }
+
+    abstract protected Policy getResourceUserPolicy();
+    abstract protected Policy getResourceGroupPolicy();
+
+    @Test
+    public void testSpecificResourceUserPolicy() throws IOException {
+        Policy policy = getResourceUserPolicy();
+        createPolicy(policy);
+        checkSpecificResource(TEST_USER);
+        // user NOT in the policy --> has NO access to the specific resource
+        assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
+        // user IN the policy --> has NO access to the unknown resource
+        assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
+        // test that user doesn't have access if policy is deleted
+        deletePolicy(policy);
+        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+    }
+
+    @Test
+    public void testStarResourceGpadminPolicy() throws IOException {
+        checkSpecificResource(GPADMIN_USER);
+        // user NOT in the policy --> has NO access to the specific resource
+        assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
+        // test that other existing user can't rely on gpadmin policy
+        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+        // user IN the policy --> has access to the unknown resource
+        assertTrue(hasAccess(GPADMIN_USER, unknownResource, privileges));
+    }
+
+    @Test
+    public void testSpecificResourcePublicGroupPolicy() throws IOException {
+        Policy policy = getResourceGroupPolicy();
+        createPolicy(policy);
+        checkSpecificResource(TEST_USER);
+        // user NOT in the policy --> has access to the specific resource
+        assertTrue(hasAccess(UNKNOWN, specificResource, privileges));
+        // user IN the policy --> has NO access to the unknown resource
+        assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
+        // test that user doesn't have access if policy is deleted
+        deletePolicy(policy);
+        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+    }
+    
 }
