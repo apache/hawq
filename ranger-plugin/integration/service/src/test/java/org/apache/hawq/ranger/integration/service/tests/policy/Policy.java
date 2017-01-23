@@ -72,6 +72,10 @@ public class Policy {
     public Set<Object> dataMaskPolicyItems = new HashSet<>();
     public Set<Object> rowFilterPolicyItems = new HashSet<>();
 
+    // do not serialize into JSON
+    public transient boolean isParentStar = false;
+    public transient boolean isChildStar = false;
+
     public static class PolicyBuilder {
         private Policy policy = new Policy();
 

@@ -22,8 +22,6 @@ package org.apache.hawq.ranger.integration.service.tests;
 import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
 import org.junit.Before;
 
-import java.io.IOException;
-
 import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.protocol;
 
 public class ProtocolTest extends ServiceTestBase {
@@ -31,7 +29,7 @@ public class ProtocolTest extends ServiceTestBase {
     private static final String TEST_PROTOCOL = "test-protocol";
 
     @Before
-    public void beforeTest() throws IOException {
+    public void beforeTest() {
         specificResource.put(protocol, TEST_PROTOCOL);
         unknownResource.put(protocol, UNKNOWN);
         privileges = new String[] {"select", "insert"};

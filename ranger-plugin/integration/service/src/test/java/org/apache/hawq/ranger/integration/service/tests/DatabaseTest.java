@@ -22,8 +22,6 @@ package org.apache.hawq.ranger.integration.service.tests;
 import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
 import org.junit.Before;
 
-import java.io.IOException;
-
 import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.*;
 
 public class DatabaseTest extends ServiceTestBase {
@@ -31,7 +29,7 @@ public class DatabaseTest extends ServiceTestBase {
     private static final String TEST_DB = "test-db";
 
     @Before
-    public void beforeTest() throws IOException {
+    public void beforeTest() {
         specificResource.put(database, TEST_DB);
         unknownResource.put(database, UNKNOWN);
         privileges = new String[] {"connect", "temp"};

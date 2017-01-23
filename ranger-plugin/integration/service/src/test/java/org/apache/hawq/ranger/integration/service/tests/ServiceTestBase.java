@@ -35,6 +35,7 @@ import org.junit.rules.TestName;
 import java.io.IOException;
 import java.util.*;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -54,6 +55,8 @@ public abstract class ServiceTestBase {
     protected Map<String, String> resources = new HashMap<>();
     protected String[] privileges = {};
     protected Map<Policy.ResourceType, String> specificResource = new HashMap<>();
+    protected Map<Policy.ResourceType, String> parentUnknownResource = new HashMap<>();
+    protected Map<Policy.ResourceType, String> childUnknownResource = new HashMap<>();
     protected Map<Policy.ResourceType, String> unknownResource = new HashMap<>();
     protected PolicyBuilder policyBuilder;
 
@@ -183,21 +186,35 @@ public abstract class ServiceTestBase {
         }
     }
 
-    abstract protected Policy getResourceUserPolicy();
-    abstract protected Policy getResourceGroupPolicy();
-
-    @Test
-    public void testSpecificResourceUserPolicy() throws IOException {
-        Policy policy = getResourceUserPolicy();
+    protected void checkResourceUserPolicy(Policy policy) throws IOException {
         createPolicy(policy);
         checkSpecificResource(TEST_USER);
         // user NOT in the policy --> has NO access to the specific resource
         assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
+
+        // if resource has parents, assert edge cases
+        if (!parentUnknownResource.isEmpty()) {
+            // user IN the policy --> has access to the resource only for parentStar policies
+            assertEquals(policy.isParentStar, hasAccess(TEST_USER, parentUnknownResource, privileges));
+        }
+        if (!childUnknownResource.isEmpty()) {
+            // user IN the policy --> has access to the resource only for childStar policies
+            assertEquals(policy.isChildStar, hasAccess(TEST_USER, childUnknownResource, privileges));
+        }
+
         // user IN the policy --> has NO access to the unknown resource
         assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
         // test that user doesn't have access if policy is deleted
         deletePolicy(policy);
         assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+    }
+
+    abstract protected Policy getResourceUserPolicy();
+    abstract protected Policy getResourceGroupPolicy();
+
+    @Test
+    public void testSpecificResourceUserPolicy() throws IOException {
+        checkResourceUserPolicy(getResourceUserPolicy());
     }
 
     @Test

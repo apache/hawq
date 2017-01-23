@@ -22,8 +22,6 @@ package org.apache.hawq.ranger.integration.service.tests;
 import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
 import org.junit.Before;
 
-import java.io.IOException;
-
 import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.tablespace;
 
 public class TablespaceTest extends ServiceTestBase {
@@ -31,7 +29,7 @@ public class TablespaceTest extends ServiceTestBase {
     private static final String TEST_TABLESPACE = "test-tablespace";
 
     @Before
-    public void beforeTest() throws IOException {
+    public void beforeTest() {
         specificResource.put(tablespace, TEST_TABLESPACE);
         unknownResource.put(tablespace, UNKNOWN);
         privileges = new String[] {"create"};
