@@ -99,12 +99,12 @@ public class SchemaTest extends ServiceTestBase {
     }
 
     @Test
-    public void testParentStartResourceUserPolicy() throws IOException {
+    public void testParentStarResourceUserPolicy() throws IOException {
         checkResourceUserPolicy(getResourceParentStarUserPolicy());
     }
 
     @Test
-    public void testChildStartResourceUserPolicy() throws IOException {
+    public void testChildStarResourceUserPolicy() throws IOException {
         checkResourceUserPolicy(getResourceChildStarUserPolicy());
     }
 }

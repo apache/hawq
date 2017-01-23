@@ -92,8 +92,9 @@ public abstract class ServiceTestBase {
     }
 
     protected void createPolicy(Policy policy) throws IOException {
-        LOG.info(String.format("Creating policy %s", policy.name));
-        rest.executeRequest(RESTClient.Method.POST, RANGER_POLICY_URL, mapper.writeValueAsString(policy));
+        String policyJson = mapper.writeValueAsString(policy)
+        LOG.info(String.format("Creating policy %s : %s", policy.name, policyJson));
+        rest.executeRequest(RESTClient.Method.POST, RANGER_POLICY_URL, policyJson);
         waitForPolicyRefresh();
     }
 
@@ -108,15 +109,6 @@ public abstract class ServiceTestBase {
     }
 
     protected boolean hasAccess(String user, Map<Policy.ResourceType, String> resources, String... privileges) throws IOException {
-        LOG.info("Checking access for user " + user);
-        String response = rest.executeRequest(RESTClient.Method.POST, RPS_URL, getRPSRequestPayloadNew(user, resources, privileges));
-        Map<String, Object> responseMap = mapper.readValue(response, typeMSO);
-        boolean allowed = (Boolean)((Map)((List) responseMap.get("access")).get(0)).get("allowed");
-        LOG.info(String.format("Access for user %s is allowed = %s", user, allowed));
-        return allowed;
-    }
-
-    protected boolean hasAccess(String user, Map<String, String> resources, List<String> privileges) throws IOException {
         LOG.info("Checking access for user " + user);
         String response = rest.executeRequest(RESTClient.Method.POST, RPS_URL, getRPSRequestPayload(user, resources, privileges));
         Map<String, Object> responseMap = mapper.readValue(response, typeMSO);
@@ -134,32 +126,11 @@ public abstract class ServiceTestBase {
         }
     }
 
-    private String readFile(String fileName) throws IOException {
-        return IOUtils.toString(ServiceTestBase.class.getClassLoader().getResourceAsStream(fileName));
-    }
-
     private String getRangerPolicyUrl(String policyName) {
         return RANGER_POLICY_URL + "?servicename=hawq&policyname=" + policyName;
     }
 
-    private String getRPSRequestPayload (String user, Map<String, String> resources, List<String> privileges) throws IOException {
-        Map<String, Object> request = new HashMap<>();
-        request.put("requestId", 9);
-        request.put("user", user);
-        request.put("clientIp", "123.0.0.21");
-        request.put("context", "CREATE SOME DATABASE OBJECT;");
-
-        Map<String, Object> access = new HashMap<>();
-        access.put("resource", resources);
-        access.put("privileges", privileges);
-
-        Set<Map<String, Object>> accesses = new HashSet<>();
-        accesses.add(access);
-        request.put("access", accesses);
-        return new ObjectMapper().writeValueAsString(request);
-    }
-
-    private String getRPSRequestPayloadNew (String user, Map<Policy.ResourceType, String> resources, String[] privileges) throws IOException {
+    private String getRPSRequestPayload(String user, Map<Policy.ResourceType, String> resources, String[] privileges) throws IOException {
         Map<String, Object> request = new HashMap<>();
         request.put("requestId", 9);
         request.put("user", user);
@@ -179,34 +150,42 @@ public abstract class ServiceTestBase {
 
     protected void checkSpecificResource(String user) throws IOException {
         // user IN the policy --> has all possible privileges to the specific resource
+        LOG.debug(String.format("Asserting user %s HAS access %s privileges %s", user, specificResource, privileges));
         assertTrue(hasAccess(user, specificResource, privileges));
         for (String privilege : privileges) {
             // user IN the policy --> has individual privileges to the specific resource
+            LOG.debug(String.format("Asserting user %s HAS access %s privilege %s", user, specificResource, privilege));
             assertTrue(hasAccess(user, specificResource, privilege));
         }
     }
 
     protected void checkResourceUserPolicy(Policy policy) throws IOException {
         createPolicy(policy);
-        checkSpecificResource(TEST_USER);
-        // user NOT in the policy --> has NO access to the specific resource
-        assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
+        try {
+            checkSpecificResource(TEST_USER);
+            // user NOT in the policy --> has NO access to the specific resource
+            LOG.debug(String.format("Asserting user %s NO  access %s privileges %s", UNKNOWN, specificResource, privileges));
+            assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
 
-        // if resource has parents, assert edge cases
-        if (!parentUnknownResource.isEmpty()) {
-            // user IN the policy --> has access to the resource only for parentStar policies
-            assertEquals(policy.isParentStar, hasAccess(TEST_USER, parentUnknownResource, privileges));
-        }
-        if (!childUnknownResource.isEmpty()) {
-            // user IN the policy --> has access to the resource only for childStar policies
-            assertEquals(policy.isChildStar, hasAccess(TEST_USER, childUnknownResource, privileges));
-        }
+            // if resource has parents, assert edge cases
+            if (!parentUnknownResource.isEmpty()) {
+                // user IN the policy --> has access to the resource only for parentStar policies
+                assertEquals(policy.isParentStar, hasAccess(TEST_USER, parentUnknownResource, privileges));
+            }
+            if (!childUnknownResource.isEmpty()) {
+                // user IN the policy --> has access to the resource only for childStar policies
+                assertEquals(policy.isChildStar, hasAccess(TEST_USER, childUnknownResource, privileges));
+            }
 
-        // user IN the policy --> has NO access to the unknown resource
-        assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
-        // test that user doesn't have access if policy is deleted
-        deletePolicy(policy);
-        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+            // user IN the policy --> has NO access to the unknown resource
+            assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
+            // test that user doesn't have access if policy is deleted
+            deletePolicy(policy);
+            assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+        } finally {
+            // if a given test fails with assertion, still delete the policy not to impact other tests
+            deletePolicy(policy);
+        }
     }
 
     abstract protected Policy getResourceUserPolicy();
