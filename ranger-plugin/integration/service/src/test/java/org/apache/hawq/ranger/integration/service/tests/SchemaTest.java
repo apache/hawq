@@ -26,36 +26,39 @@ import org.junit.Test;
 import java.io.IOException;
 
 import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.database;
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.language;
+import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.schema;
 
-public class LanguageTest extends ServiceTestBase {
+public class SchemaTest extends ServiceTestBase {
 
     private static final String TEST_DB = "test-db";
-    private static final String TEST_LANGUAGE = "test-language";
+    private static final String TEST_SCHEMA = "test-schema";
+
+    // for schema only, privileges in policy must have -schema suffix added
+    private static final String[] SPECIAL_PRIVILEGES = new String[] {"usage-schema", "create-schema"};
 
     @Before
     public void beforeTest() {
         specificResource.put(database, TEST_DB);
-        specificResource.put(language, TEST_LANGUAGE);
+        specificResource.put(schema, TEST_SCHEMA);
 
         parentUnknownResource.put(database, UNKNOWN);
-        parentUnknownResource.put(language, TEST_LANGUAGE);
+        parentUnknownResource.put(schema, TEST_SCHEMA);
 
         childUnknownResource.put(database, TEST_DB);
-        childUnknownResource.put(language, UNKNOWN);
+        childUnknownResource.put(schema, UNKNOWN);
 
         unknownResource.put(database, UNKNOWN);
-        unknownResource.put(language, UNKNOWN);
+        unknownResource.put(schema, UNKNOWN);
 
-        privileges = new String[] {"usage"};
+        privileges = new String[] {"usage", "create"};
     }
 
     @Override
     protected Policy getResourceUserPolicy() {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
-                .resource(language, TEST_LANGUAGE)
-                .userAccess(TEST_USER, privileges)
+                .resource(schema, TEST_SCHEMA)
+                .userAccess(TEST_USER, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
     }
@@ -63,8 +66,8 @@ public class LanguageTest extends ServiceTestBase {
     protected Policy getResourceParentStarUserPolicy() {
         Policy policy = policyBuilder
                 .resource(database, STAR)
-                .resource(language, TEST_LANGUAGE)
-                .userAccess(TEST_USER, privileges)
+                .resource(schema, TEST_SCHEMA)
+                .userAccess(TEST_USER, SPECIAL_PRIVILEGES)
                 .build();
         policy.isParentStar = true;
         return policy;
@@ -73,8 +76,8 @@ public class LanguageTest extends ServiceTestBase {
     protected Policy getResourceChildStarUserPolicy() {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
-                .resource(language, STAR)
-                .userAccess(TEST_USER, privileges)
+                .resource(schema, STAR)
+                .userAccess(TEST_USER, SPECIAL_PRIVILEGES)
                 .build();
         policy.isChildStar = true;
         return policy;
@@ -84,8 +87,8 @@ public class LanguageTest extends ServiceTestBase {
     protected Policy getResourceGroupPolicy() {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
-                .resource(language, TEST_LANGUAGE)
-                .groupAccess(PUBLIC_GROUP, privileges)
+                .resource(schema, TEST_SCHEMA)
+                .groupAccess(PUBLIC_GROUP, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
     }
