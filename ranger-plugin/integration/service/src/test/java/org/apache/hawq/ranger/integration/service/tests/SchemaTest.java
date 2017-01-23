@@ -27,6 +27,7 @@ import java.io.IOException;
 
 import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.database;
 import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.schema;
+import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.table;
 
 public class SchemaTest extends ServiceTestBase {
 
@@ -58,6 +59,7 @@ public class SchemaTest extends ServiceTestBase {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
                 .resource(schema, TEST_SCHEMA)
+                .resource(table, STAR)
                 .userAccess(TEST_USER, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
@@ -67,6 +69,7 @@ public class SchemaTest extends ServiceTestBase {
         Policy policy = policyBuilder
                 .resource(database, STAR)
                 .resource(schema, TEST_SCHEMA)
+                .resource(table, STAR)
                 .userAccess(TEST_USER, SPECIAL_PRIVILEGES)
                 .build();
         policy.isParentStar = true;
@@ -77,6 +80,7 @@ public class SchemaTest extends ServiceTestBase {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
                 .resource(schema, STAR)
+                .resource(table, STAR)
                 .userAccess(TEST_USER, SPECIAL_PRIVILEGES)
                 .build();
         policy.isChildStar = true;
@@ -88,6 +92,7 @@ public class SchemaTest extends ServiceTestBase {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
                 .resource(schema, TEST_SCHEMA)
+                .resource(table, STAR)
                 .groupAccess(PUBLIC_GROUP, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
