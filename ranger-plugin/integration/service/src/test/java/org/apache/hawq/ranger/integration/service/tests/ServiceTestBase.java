@@ -92,7 +92,7 @@ public abstract class ServiceTestBase {
     }
 
     protected void createPolicy(Policy policy) throws IOException {
-        String policyJson = mapper.writeValueAsString(policy)
+        String policyJson = mapper.writeValueAsString(policy);
         LOG.info(String.format("Creating policy %s : %s", policy.name, policyJson));
         rest.executeRequest(RESTClient.Method.POST, RANGER_POLICY_URL, policyJson);
         waitForPolicyRefresh();
