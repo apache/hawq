@@ -84,6 +84,7 @@ public class LanguageTest extends ServiceTestBase {
     @Override
     protected Policy getResourceGroupPolicy() {
         Policy policy = policyBuilder
+                .resource(database, TEST_DB)
                 .resource(language, TEST_LANGUAGE)
                 .groupAccess(PUBLIC_GROUP, privileges)
                 .build();
