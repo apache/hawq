@@ -21,57 +21,37 @@ package org.apache.hawq.ranger.integration.service.tests;
 
 import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
 import org.junit.Before;
-import org.junit.Test;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.protocol;
 
-public class ProtocolTest /*extends ServiceTestBase*/ {
+public class ProtocolTest extends ServiceTestBase {
 
-    private static final List<String> PRIVILEGES = Arrays.asList("select", "insert");
+    private static final String TEST_PROTOCOL = "test-protocol";
 
-    /*
+    @Before
+    public void beforeTest() throws IOException {
+        specificResource.put(protocol, TEST_PROTOCOL);
+        unknownResource.put(protocol, UNKNOWN);
+        privileges = new String[] {"select", "insert"};
+    }
+
     @Override
     protected Policy getResourceUserPolicy() {
-        return null;
+        Policy policy = policyBuilder
+                .resource(protocol, TEST_PROTOCOL)
+                .userAccess(TEST_USER, privileges)
+                .build();
+        return policy;
     }
 
     @Override
     protected Policy getResourceGroupPolicy() {
-        return null;
+        Policy policy = policyBuilder
+                .resource(protocol, TEST_PROTOCOL)
+                .groupAccess(PUBLIC_GROUP, privileges)
+                .build();
+        return policy;
     }
-
-
-    @Before
-    public void beforeTest() throws IOException {
-        createPolicy("test-protocol.json");
-        resources.put("protocol", "pxf");
-    }
-
-    @Test
-    public void testProtocols_UserMaria_PxfProtocol_Allowed() throws IOException {
-        assertTrue(hasAccess(TEST_USER, resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testProtocols_UserMaria_DoesNotExistProtocol_Denied() throws IOException {
-        resources.put("protocol", "doesnotexist");
-        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testProtocols_UserBob_PxfProtocol_Denied() throws IOException {
-        assertFalse(hasAccess(UNKNOWN, resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testProtocols_UserMaria_PxfProtocol_Denied() throws IOException {
-        deletePolicy();
-        assertFalse(hasAccess(TEST_USER, resources, PRIVILEGES));
-    }
-    */
 }
