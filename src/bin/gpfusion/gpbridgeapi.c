@@ -69,7 +69,6 @@ static void assign_optimal_supported_profile(char *profile, char *fmttype, char 
 Datum gpbridge_import(PG_FUNCTION_ARGS)
 {
 	gpbridge_check_inside_extproto(fcinfo, "gpbridge_import");
-//	ExternalSelectDesc desc = EXTPROTOCOL_GET_SELECTDESC(fcinfo);
 
 	if (gpbridge_last_call(fcinfo))
 		PG_RETURN_INT32(gpbridge_cleanup(fcinfo));
@@ -564,17 +563,15 @@ void free_token_resources(PxfInputData *inputData)
 
 static void	assign_optimal_supported_profile(char *profile, char *fmttype, char **supportedProfile, char **supportedFormat)
 {
+	*supportedFormat = get_format_name(fmttype);
 	if (fmttype_is_text(*fmttype) && ((strcmp(profile, HiveTextProfileName) == 0) || (strcmp(profile, HiveRCProfileName) == 0)))
 	{
-		*supportedFormat = TextFormatName;
 		*supportedProfile = profile;
 	} else if (fmttype_is_text(*fmttype) || fmttype_is_csv(*fmttype))
 	{
-		*supportedFormat = TextFormatName;
 		*supportedProfile = profile;
 	} else if (fmttype_is_custom(*fmttype))
 	{
-		*supportedFormat = GpdbWritableFormatName;
 		*supportedProfile = profile;
 	}
 }

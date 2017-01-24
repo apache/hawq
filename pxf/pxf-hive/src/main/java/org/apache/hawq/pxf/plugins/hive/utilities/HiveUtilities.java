@@ -102,7 +102,7 @@ public class HiveUtilities {
     static final String STR_RC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
     static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
     static final String STR_ORC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
-    private static final int EXPECTED_NUM_OF_TOKS = 8;
+    private static final int EXPECTED_NUM_OF_TOKS = 6;
     private static final String DEFAULT_DELIMITER = "44";
 
     /**
@@ -455,15 +455,13 @@ public class HiveUtilities {
         String serdeClassName = partData.storageDesc.getSerdeInfo().getSerializationLib();
         String propertiesString = serializeProperties(partData.properties);
         String partitionKeys = serializePartitionKeys(partData);
-        String collectionDelim = getCollectionDelim(partData.storageDesc);
-        String mapKeyDelim = getMapKeyDelim(partData.storageDesc);
         String delimiter = getDelimiter(partData.storageDesc);
 
         if (HiveInputFormatFragmenter.class.isAssignableFrom(fragmenterClass)) {
             assertFileType(inputFormatName, partData);
         }
 
-        hiveUserData = new HiveUserData(inputFormatName, serdeClassName, propertiesString, partitionKeys, filterInFragmenter, collectionDelim, mapKeyDelim, delimiter);
+        hiveUserData = new HiveUserData(inputFormatName, serdeClassName, propertiesString, partitionKeys, filterInFragmenter, delimiter);
 
         return hiveUserData.toString().getBytes();
     }
@@ -477,7 +475,7 @@ public class HiveUtilities {
                     + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
         }
 
-        HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]), toks[5], toks[6], toks[7]);
+        HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]), toks[5]);
 
             if (supportedSerdes.length > 0) {
                 /* Make sure this serde is supported */
@@ -493,16 +491,6 @@ public class HiveUtilities {
             parameterValue = String.valueOf((int) sd.getSerdeInfo().getParameters().get(parameterKey).charAt(0));
         }
         return parameterValue;
-    }
-
-    public static String getCollectionDelim(StorageDescriptor sd) {
-        String collectionDelim = getSerdeParameter(sd, serdeConstants.COLLECTION_DELIM);
-        return collectionDelim;
-    }
-
-    public static String getMapKeyDelim(StorageDescriptor sd) {
-        String mapKeyDelim = getSerdeParameter(sd, serdeConstants.MAPKEY_DELIM);
-        return mapKeyDelim;
     }
 
     public static String getDelimiter(StorageDescriptor sd) {

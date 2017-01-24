@@ -56,7 +56,7 @@ void build_http_header(PxfInputData *input)
 		/* format */
 		ExtTableEntry *exttbl = GetExtTableEntry(rel->rd_id);
         /* pxf treats CSV as TEXT */
-		char* format = (fmttype_is_text(exttbl->fmtcode) || fmttype_is_csv(exttbl->fmtcode)) ? TextFormatName:GpdbWritableFormatName;
+		char* format = get_format_name(exttbl->fmtcode);
 		churl_headers_append(headers, "X-GP-FORMAT", format);
 		
 		/* Record fields - name and type of each field */
@@ -337,4 +337,9 @@ static void add_remote_credentials(CHURL_HEADERS headers)
 
 	if (pxf_remote_service_secret != NULL)
 	churl_headers_append(headers, "X-GP-REMOTE-PASS", pxf_remote_service_secret);
+}
+
+void char* get_format_name(char fmtcode)
+{
+	return (fmttype_is_text(fmtcode) || fmttype_is_csv(fmtcode)) ? TextFormatName:GpdbWritableFormatName;
 }

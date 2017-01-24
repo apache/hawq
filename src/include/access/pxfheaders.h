@@ -49,6 +49,7 @@ typedef struct sPxfInputData
 } PxfInputData;
 
 void build_http_header(PxfInputData *input);
+void char* get_format_name(char fmtcode);
 
 #define GpdbWritableFormatName "GPDBWritable"
 #define TextFormatName "TEXT"

@@ -31,8 +31,6 @@ import org.apache.hawq.pxf.api.LogicalFilter;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
-//import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
-//import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
 import org.apache.commons.lang.StringUtils;
 
 import java.sql.Date;

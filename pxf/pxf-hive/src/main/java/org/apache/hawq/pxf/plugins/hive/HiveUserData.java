@@ -26,8 +26,6 @@ public class HiveUserData {
     public HiveUserData(String inputFormatName, String serdeClassName,
             String propertiesString, String partitionKeys,
             boolean filterInFragmenter,
-            String collectionDelim,
-            String mapKeyDelim,
             String delimiter) {
 
         this.inputFormatName = inputFormatName;
@@ -35,8 +33,6 @@ public class HiveUserData {
         this.propertiesString = propertiesString;
         this.partitionKeys = partitionKeys;
         this.filterInFragmenter = filterInFragmenter;
-        this.collectionDelim = (collectionDelim == null ? "0" : collectionDelim);
-        this.mapKeyDelim = (mapKeyDelim == null ? "0" : mapKeyDelim);
         this.delimiter = (delimiter == null ? "0" : delimiter);
     }
 
@@ -60,22 +56,6 @@ public class HiveUserData {
         return filterInFragmenter;
     }
 
-    public String getCollectionDelim() {
-        return collectionDelim;
-    }
-
-    public void setCollectionDelim(String collectionDelim) {
-        this.collectionDelim = collectionDelim;
-    }
-
-    public String getMapKeyDelim() {
-        return mapKeyDelim;
-    }
-
-    public void setMapKeyDelim(String mapKeyDelim) {
-        this.mapKeyDelim = mapKeyDelim;
-    }
-
     public String getDelimiter() {
         return delimiter;
     }
@@ -89,8 +69,6 @@ public class HiveUserData {
     private String propertiesString;
     private String partitionKeys;
     private boolean filterInFragmenter;
-    private String collectionDelim;
-    private String mapKeyDelim;
     private String delimiter;
 
     @Override
@@ -100,8 +78,6 @@ public class HiveUserData {
                 + propertiesString + HiveUserData.HIVE_UD_DELIM
                 + partitionKeys + HiveUserData.HIVE_UD_DELIM
                 + filterInFragmenter + HiveUserData.HIVE_UD_DELIM
-                + collectionDelim + HiveUserData.HIVE_UD_DELIM
-                + mapKeyDelim + HiveUserData.HIVE_UD_DELIM
                 + delimiter;
     }
 }
