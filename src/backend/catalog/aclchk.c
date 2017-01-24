@@ -2646,7 +2646,7 @@ char *getNameFromOid(AclObjectKind objkind, Oid object_oid)
 
 char actionName[12][12] = {"INSERT","SELECT","UPDATE", "DELETE",
     "TRUNCATE", "REFERENCES", "TRIGGER", "EXECUTE", "USAGE",
-    "CREATE", "CREATE_TEMP", "CONNECT"};
+    "CREATE", "TEMP", "CONNECT"};
 
 List *getActionName(AclMode mask)
 {
