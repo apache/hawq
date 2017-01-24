@@ -34,8 +34,8 @@ public class SchemaTest extends ServiceTestBase {
     private static final String TEST_DB = "test-db";
     private static final String TEST_SCHEMA = "test-schema";
 
-    // for schema only, privileges in policy must have -schema suffix added
-    private static final String[] SPECIAL_PRIVILEGES = new String[] {"usage-schema", "create-schema"};
+    // for schema only, privileges in policy must have -schema suffix added, create-schema is covered as part of DatabaseTest
+    private static final String[] SPECIAL_PRIVILEGES = new String[] {"usage-schema"};
 
     @Before
     public void beforeTest() {
@@ -51,7 +51,7 @@ public class SchemaTest extends ServiceTestBase {
         unknownResource.put(database, UNKNOWN);
         unknownResource.put(schema, UNKNOWN);
 
-        privileges = new String[] {"usage", "create"};
+        privileges = new String[] {"usage"};
     }
 
     @Override

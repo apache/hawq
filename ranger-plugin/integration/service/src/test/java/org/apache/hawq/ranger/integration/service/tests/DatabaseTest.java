@@ -27,12 +27,14 @@ import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.Res
 public class DatabaseTest extends ServiceTestBase {
 
     private static final String TEST_DB = "test-db";
+    // create-schema will be requested by HAWQ with only database in context, so it looks like a privilege for database resource
+    private static final String[] SPECIAL_PRIVILEGES = new String[] {"connect", "temp", "create-schema"};
 
     @Before
     public void beforeTest() {
         specificResource.put(database, TEST_DB);
         unknownResource.put(database, UNKNOWN);
-        privileges = new String[] {"connect", "temp"};
+        privileges = new String[] {"connect", "temp", "create"};
     }
 
     @Override
@@ -41,7 +43,7 @@ public class DatabaseTest extends ServiceTestBase {
                 .resource(database, TEST_DB)
                 .resource(schema, STAR)
                 .resource(table, STAR)
-                .userAccess(TEST_USER, privileges)
+                .userAccess(TEST_USER, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
     }
@@ -52,7 +54,7 @@ public class DatabaseTest extends ServiceTestBase {
                 .resource(database, TEST_DB)
                 .resource(schema, STAR)
                 .resource(table, STAR)
-                .groupAccess(PUBLIC_GROUP, privileges)
+                .groupAccess(PUBLIC_GROUP, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
     }
