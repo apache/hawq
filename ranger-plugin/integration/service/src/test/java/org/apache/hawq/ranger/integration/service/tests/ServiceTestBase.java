@@ -19,14 +19,12 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
 import org.apache.hawq.ranger.integration.service.tests.policy.Policy.PolicyBuilder;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -35,9 +33,7 @@ import org.junit.rules.TestName;
 import java.io.IOException;
 import java.util.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public abstract class ServiceTestBase {
 
@@ -52,16 +48,12 @@ public abstract class ServiceTestBase {
     protected static final String UNKNOWN = "unknown";
     protected static final String STAR = "*";
 
-    protected Map<String, String> resources = new HashMap<>();
-    protected String[] privileges = {};
     protected Map<Policy.ResourceType, String> specificResource = new HashMap<>();
     protected Map<Policy.ResourceType, String> parentUnknownResource = new HashMap<>();
     protected Map<Policy.ResourceType, String> childUnknownResource = new HashMap<>();
     protected Map<Policy.ResourceType, String> unknownResource = new HashMap<>();
+    protected String[] privileges = {};
     protected PolicyBuilder policyBuilder;
-
-
-
 
     private static final String RPS_HOST = "localhost";
     private static final String RPS_PORT = "8432";
@@ -72,13 +64,11 @@ public abstract class ServiceTestBase {
     private static final String RANGER_URL = String.format("http://%s:%s/service/public/v2/api", RANGER_HOST, RANGER_PORT);
     private static final String RANGER_POLICY_URL = RANGER_URL + "/policy";
 
-    private static int    POLICY_REFRESH_INTERVAL = 6000;
-
+    private static final int POLICY_REFRESH_INTERVAL = 6000;
     private static final TypeReference<HashMap<String,Object>> typeMSO = new TypeReference<HashMap<String,Object>>() {};
 
     private RESTClient rest = new RESTClient();
     private ObjectMapper mapper = new ObjectMapper();
-
 
     @Before
     public void setUp() throws IOException {
@@ -86,77 +76,43 @@ public abstract class ServiceTestBase {
         LOG.info("Running test " + testName.getMethodName());
         LOG.info("======================================================================================");
 
-        policyBuilder = (new PolicyBuilder()).name(getClass().getSimpleName());
         specificResource = new HashMap<>();
+        parentUnknownResource = new HashMap<>();
+        childUnknownResource = new HashMap<>();
         unknownResource = new HashMap<>();
+        privileges = new String[]{};
+
+        policyBuilder = (new PolicyBuilder()).name(getClass().getSimpleName());
     }
 
-    protected void createPolicy(Policy policy) throws IOException {
-        String policyJson = mapper.writeValueAsString(policy);
-        LOG.info(String.format("Creating policy %s : %s", policy.name, policyJson));
-        rest.executeRequest(RESTClient.Method.POST, RANGER_POLICY_URL, policyJson);
-        waitForPolicyRefresh();
+    @Test
+    public void testSpecificResourceUserPolicy() throws IOException {
+        checkResourceUserPolicy(getResourceUserPolicy());
     }
 
-    protected void deletePolicy(Policy policy) throws IOException {
-        LOG.info("Deleting policy " + policy.name);
-        try {
-            rest.executeRequest(RESTClient.Method.DELETE, getRangerPolicyUrl(policy.name));
-        } catch (RESTClient.ResourceNotFoundException e) {
-            // ignore error when deleting a policy that does not exit
-        }
-        waitForPolicyRefresh();
+    @Test
+    public void testStarResourceGpadminPolicy() throws IOException {
+        checkSpecificResource(GPADMIN_USER);
+        // user NOT in the policy --> has NO access to the specific resource
+        assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
+        // test that other existing user can't rely on gpadmin policy
+        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+        // user IN the policy --> has access to the unknown resource
+        assertTrue(hasAccess(GPADMIN_USER, unknownResource, privileges));
     }
 
-    protected boolean hasAccess(String user, Map<Policy.ResourceType, String> resources, String... privileges) throws IOException {
-        LOG.info("Checking access for user " + user);
-        String response = rest.executeRequest(RESTClient.Method.POST, RPS_URL, getRPSRequestPayload(user, resources, privileges));
-        Map<String, Object> responseMap = mapper.readValue(response, typeMSO);
-        boolean allowed = (Boolean)((Map)((List) responseMap.get("access")).get(0)).get("allowed");
-        LOG.info(String.format("Access for user %s is allowed = %s", user, allowed));
-        return allowed;
-    }
-
-    private void waitForPolicyRefresh() {
-        try {
-            Thread.sleep(POLICY_REFRESH_INTERVAL);
-        }
-        catch (InterruptedException e) {
-            LOG.error(e);
-        }
-    }
-
-    private String getRangerPolicyUrl(String policyName) {
-        return RANGER_POLICY_URL + "?servicename=hawq&policyname=" + policyName;
-    }
-
-    private String getRPSRequestPayload(String user, Map<Policy.ResourceType, String> resources, String[] privileges) throws IOException {
-        Map<String, Object> request = new HashMap<>();
-        request.put("requestId", 9);
-        request.put("user", user);
-        request.put("clientIp", "123.0.0.21");
-        request.put("context", "CREATE SOME DATABASE OBJECT;");
-
-        Map<String, Object> access = new HashMap<>();
-        access.put("resource", resources);
-        access.put("privileges", privileges);
-
-        Set<Map<String, Object>> accesses = new HashSet<>();
-        accesses.add(access);
-        request.put("access", accesses);
-        return new ObjectMapper().writeValueAsString(request);
-    }
-
-
-    protected void checkSpecificResource(String user) throws IOException {
-        // user IN the policy --> has all possible privileges to the specific resource
-        LOG.debug(String.format("Asserting user %s HAS access %s privileges %s", user, specificResource, privileges));
-        assertTrue(hasAccess(user, specificResource, privileges));
-        for (String privilege : privileges) {
-            // user IN the policy --> has individual privileges to the specific resource
-            LOG.debug(String.format("Asserting user %s HAS access %s privilege %s", user, specificResource, privilege));
-            assertTrue(hasAccess(user, specificResource, privilege));
-        }
+    @Test
+    public void testSpecificResourcePublicGroupPolicy() throws IOException {
+        Policy policy = getResourceGroupPolicy();
+        createPolicy(policy);
+        checkSpecificResource(TEST_USER);
+        // user NOT in the policy --> has access to the specific resource
+        assertTrue(hasAccess(UNKNOWN, specificResource, privileges));
+        // user IN the policy --> has NO access to the unknown resource
+        assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
+        // test that user doesn't have access if policy is deleted
+        deletePolicy(policy);
+        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
     }
 
     protected void checkResourceUserPolicy(Policy policy) throws IOException {
@@ -192,37 +148,73 @@ public abstract class ServiceTestBase {
         }
     }
 
+    private void checkSpecificResource(String user) throws IOException {
+        // user IN the policy --> has all possible privileges to the specific resource
+        LOG.debug(String.format("Asserting user %s HAS access %s privileges %s", user, specificResource, privileges));
+        assertTrue(hasAccess(user, specificResource, privileges));
+        for (String privilege : privileges) {
+            // user IN the policy --> has individual privileges to the specific resource
+            LOG.debug(String.format("Asserting user %s HAS access %s privilege %s", user, specificResource, privilege));
+            assertTrue(hasAccess(user, specificResource, privilege));
+        }
+    }
+
     abstract protected Policy getResourceUserPolicy();
     abstract protected Policy getResourceGroupPolicy();
 
-    @Test
-    public void testSpecificResourceUserPolicy() throws IOException {
-        checkResourceUserPolicy(getResourceUserPolicy());
+    private void createPolicy(Policy policy) throws IOException {
+        String policyJson = mapper.writeValueAsString(policy);
+        LOG.info(String.format("Creating policy %s : %s", policy.name, policyJson));
+        rest.executeRequest(RESTClient.Method.POST, RANGER_POLICY_URL, policyJson);
+        waitForPolicyRefresh();
     }
 
-    @Test
-    public void testStarResourceGpadminPolicy() throws IOException {
-        checkSpecificResource(GPADMIN_USER);
-        // user NOT in the policy --> has NO access to the specific resource
-        assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
-        // test that other existing user can't rely on gpadmin policy
-        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
-        // user IN the policy --> has access to the unknown resource
-        assertTrue(hasAccess(GPADMIN_USER, unknownResource, privileges));
+    private void deletePolicy(Policy policy) throws IOException {
+        LOG.info("Deleting policy " + policy.name);
+        try {
+            rest.executeRequest(RESTClient.Method.DELETE, getRangerPolicyUrl(policy.name));
+        } catch (RESTClient.ResourceNotFoundException e) {
+            // ignore error when deleting a policy that does not exit
+        }
+        waitForPolicyRefresh();
     }
 
-    @Test
-    public void testSpecificResourcePublicGroupPolicy() throws IOException {
-        Policy policy = getResourceGroupPolicy();
-        createPolicy(policy);
-        checkSpecificResource(TEST_USER);
-        // user NOT in the policy --> has access to the specific resource
-        assertTrue(hasAccess(UNKNOWN, specificResource, privileges));
-        // user IN the policy --> has NO access to the unknown resource
-        assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
-        // test that user doesn't have access if policy is deleted
-        deletePolicy(policy);
-        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+    private boolean hasAccess(String user, Map<Policy.ResourceType, String> resources, String... privileges) throws IOException {
+        LOG.info("Checking access for user " + user);
+        String response = rest.executeRequest(RESTClient.Method.POST, RPS_URL, getRPSRequestPayload(user, resources, privileges));
+        Map<String, Object> responseMap = mapper.readValue(response, typeMSO);
+        boolean allowed = (Boolean)((Map)((List) responseMap.get("access")).get(0)).get("allowed");
+        LOG.info(String.format("Access for user %s is allowed = %s", user, allowed));
+        return allowed;
+    }
+    
+    private void waitForPolicyRefresh() {
+        try {
+            Thread.sleep(POLICY_REFRESH_INTERVAL);
+        }
+        catch (InterruptedException e) {
+            LOG.error(e);
+        }
     }
 
+    private String getRangerPolicyUrl(String policyName) {
+        return RANGER_POLICY_URL + "?servicename=hawq&policyname=" + policyName;
+    }
+
+    private String getRPSRequestPayload(String user, Map<Policy.ResourceType, String> resources, String[] privileges) throws IOException {
+        Map<String, Object> request = new HashMap<>();
+        request.put("requestId", 9);
+        request.put("user", user);
+        request.put("clientIp", "123.0.0.21");
+        request.put("context", "CREATE SOME DATABASE OBJECT;");
+
+        Map<String, Object> access = new HashMap<>();
+        access.put("resource", resources);
+        access.put("privileges", privileges);
+
+        Set<Map<String, Object>> accesses = new HashSet<>();
+        accesses.add(access);
+        request.put("access", accesses);
+        return new ObjectMapper().writeValueAsString(request);
+    }
 }
