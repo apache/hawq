@@ -161,6 +161,7 @@ public abstract class ServiceTestBase {
 
     protected void checkResourceUserPolicy(Policy policy) throws IOException {
         createPolicy(policy);
+        boolean policyDeleted = false;
         try {
             checkSpecificResource(TEST_USER);
             // user NOT in the policy --> has NO access to the specific resource
@@ -181,10 +182,13 @@ public abstract class ServiceTestBase {
             assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
             // test that user doesn't have access if policy is deleted
             deletePolicy(policy);
+            policyDeleted = true;
             assertFalse(hasAccess(TEST_USER, specificResource, privileges));
         } finally {
             // if a given test fails with assertion, still delete the policy not to impact other tests
-            deletePolicy(policy);
+            if (!policyDeleted) {
+                deletePolicy(policy);
+            }
         }
     }
 
