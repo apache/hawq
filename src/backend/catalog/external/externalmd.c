@@ -59,6 +59,7 @@ static void LoadColumns(Oid relid, List *columns);
 static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nTypeMod);
 static Datum GetFormatTypeForProfile(const List *outputFormats);
 static Datum GetFormatOptionsForProfile(const List *outputFormats, int delimiter);
+static Datum GetLocationForFormat(char *profile, List *outputFormats, char *pxf_service_address, char *path, char *name, int delimiter);
 
 const int maxNumTypeModifiers = 2;
 /*
@@ -469,27 +470,8 @@ static void LoadExtTable(Oid relid, PxfItem *pxfItem)
 		values[i] = (Datum) 0;
 	}
 
-	/* location - should be an array of text with one element:
-	 * pxf://<ip:port/namaservice>/<hive db>.<hive table>?Profile=Hive */
-	StringInfoData locationStr;
-	initStringInfo(&locationStr);
-	appendStringInfo(&locationStr, "pxf://%s/%s.%s?Profile=%s&delimiter=%cx%02x",
-			pxf_service_address, pxfItem->path, pxfItem->name, pxfItem->profile, '\\', pxfItem->delimiter);
-	Size len = VARHDRSZ + locationStr.len;
-	/* +1 leaves room for sprintf's trailing null */
-	text *t = (text *) palloc(len + 1);
-	SET_VARSIZE(t, len);
-	sprintf((char *) VARDATA(t), "%s", locationStr.data);
-	ArrayBuildState *astate = NULL;
-	astate = accumArrayResult(astate, PointerGetDatum(t),
-							  false, TEXTOID,
-							  CurrentMemoryContext);
-	pfree(locationStr.data);
-	Assert(NULL != astate);
-	Datum location = makeArrayResult(astate, CurrentMemoryContext);
-
 	values[Anum_pg_exttable_reloid - 1] = ObjectIdGetDatum(relid);
-	values[Anum_pg_exttable_location - 1] = location;
+	values[Anum_pg_exttable_location - 1] = GetLocationForFormat(pxfItem->profile, pxfItem->outputFormats, pxf_service_address, pxfItem->path, pxfItem->name, pxfItem->delimiter);
 	values[Anum_pg_exttable_fmttype - 1] = GetFormatTypeForProfile(pxfItem->outputFormats);
 	values[Anum_pg_exttable_fmtopts - 1] = GetFormatOptionsForProfile(pxfItem->outputFormats, pxfItem->delimiter);
 	nulls[Anum_pg_exttable_command - 1] = true;
@@ -664,11 +646,13 @@ static Datum GetFormatOptionsForProfile(const List *outputFormats, int delimiter
 {
 	StringInfoData formatStr;
 	initStringInfo(&formatStr);
+
 	/* "delimiter 'delimiter' null '\\N' escape '\\'"*/
 	char formatArr[35] = { 0x64, 0x65, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x65,
 			0x72, 0x20, 0x27, delimiter, 0x27, 0x20, 0x6e, 0x75, 0x6c, 0x6c,
 			0x20, 0x27, 0x5c, 0x4e, 0x27, 0x20, 0x65, 0x73, 0x63, 0x61, 0x70,
 			0x65, 0x20, 0x27, 0x5c, 0x27, 0x00 };
+
 	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),"TEXT") == 0)
 	{
 		appendStringInfo(&formatStr, "%s", formatArr);
@@ -680,3 +664,44 @@ static Datum GetFormatOptionsForProfile(const List *outputFormats, int delimiter
 	return format_opts;
 }
 
+/* location - should be an array of text with one element:
+ * pxf://<ip:port/namaservice>/<hive db>.<hive table>?Profile=Hive */
+static Datum GetLocationForFormat(char *profile, List *outputFormats, char *pxf_service_address, char *path, char *name, int delimiter)
+{
+	StringInfoData locationStr;
+	initStringInfo(&locationStr);
+	appendStringInfo(&locationStr, "pxf://%s/%s.%s?Profile=%s", pxf_service_address, path, name, profile);
+	bool hasTextOutputFormat = false;
+	ListCell *lc = NULL;
+	foreach (lc, outputFormats)
+	{
+		char *outputFormat = (char *) lfirst(lc);
+		if (strcmp(outputFormat, "TEXT") == 0)
+		{
+			hasTextOutputFormat = true;
+			break;
+		}
+	}
+	if (delimiter)
+	{
+		appendStringInfo(&locationStr, "&delimiter=%cx%02x", '\\', delimiter);
+	} else if (hasTextOutputFormat)
+	{
+		ereport(ERROR,
+			(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+			 errmsg("delimiter attribute is mandatory for output format \"TEXT\"")));
+	}
+	Size len = VARHDRSZ + locationStr.len;
+	/* +1 leaves room for sprintf's trailing null */
+	text *t = (text *) palloc(len + 1);
+	SET_VARSIZE(t, len);
+	sprintf((char *) VARDATA(t), "%s", locationStr.data);
+	ArrayBuildState *astate = NULL;
+	astate = accumArrayResult(astate, PointerGetDatum(t),
+							  false, TEXTOID,
+							  CurrentMemoryContext);
+	pfree(locationStr.data);
+	Assert(NULL != astate);
+	Datum location = makeArrayResult(astate, CurrentMemoryContext);
+	return location;
+}

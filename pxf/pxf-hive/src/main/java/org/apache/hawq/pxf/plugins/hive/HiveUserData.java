@@ -27,15 +27,17 @@ public class HiveUserData {
             String propertiesString, String partitionKeys,
             boolean filterInFragmenter,
             String collectionDelim,
-            String mapKeyDelim) {
+            String mapKeyDelim,
+            String delimiter) {
 
         this.inputFormatName = inputFormatName;
         this.serdeClassName = serdeClassName;
         this.propertiesString = propertiesString;
         this.partitionKeys = partitionKeys;
         this.filterInFragmenter = filterInFragmenter;
-        this.collectionDelim = collectionDelim;
-        this.mapKeyDelim = mapKeyDelim;
+        this.collectionDelim = (collectionDelim == null ? "0" : collectionDelim);
+        this.mapKeyDelim = (mapKeyDelim == null ? "0" : mapKeyDelim);
+        this.delimiter = (delimiter == null ? "0" : delimiter);
     }
 
     public String getInputFormatName() {
@@ -74,6 +76,14 @@ public class HiveUserData {
         this.mapKeyDelim = mapKeyDelim;
     }
 
+    public String getDelimiter() {
+        return delimiter;
+    }
+
+    public void setDelimiter(String delimiter) {
+        this.delimiter = delimiter;
+    }
+
     private String inputFormatName;
     private String serdeClassName;
     private String propertiesString;
@@ -81,6 +91,7 @@ public class HiveUserData {
     private boolean filterInFragmenter;
     private String collectionDelim;
     private String mapKeyDelim;
+    private String delimiter;
 
     @Override
     public String toString() {
@@ -90,6 +101,7 @@ public class HiveUserData {
                 + partitionKeys + HiveUserData.HIVE_UD_DELIM
                 + filterInFragmenter + HiveUserData.HIVE_UD_DELIM
                 + collectionDelim + HiveUserData.HIVE_UD_DELIM
-                + mapKeyDelim;
+                + mapKeyDelim + HiveUserData.HIVE_UD_DELIM
+                + delimiter;
     }
 }

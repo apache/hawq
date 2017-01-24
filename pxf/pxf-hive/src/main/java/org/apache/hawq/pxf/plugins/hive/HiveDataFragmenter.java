@@ -162,6 +162,10 @@ public class HiveDataFragmenter extends Fragmenter {
 
         Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
 
+        Metadata metadata = new Metadata(tblDesc);
+        HiveUtilities.getSchema(tbl, metadata);
+        boolean hasComplexTypes = HiveUtilities.hasComplexTypes(metadata);
+
         verifySchema(tbl);
 
         List<Partition> partitions = null;
@@ -227,7 +231,7 @@ public class HiveDataFragmenter extends Fragmenter {
 
         if (partitions.isEmpty()) {
             props = getSchema(tbl);
-            fetchMetaDataForSimpleTable(descTable, props);
+            fetchMetaDataForSimpleTable(descTable, props, hasComplexTypes);
         } else {
             List<FieldSchema> partitionKeys = tbl.getPartitionKeys();
 
@@ -238,7 +242,7 @@ public class HiveDataFragmenter extends Fragmenter {
                         tblDesc.getPath(), tblDesc.getName(),
                         partitionKeys);
                 fetchMetaDataForPartitionedTable(descPartition, props,
-                        partition, partitionKeys, tblDesc.getName());
+                        partition, partitionKeys, tblDesc.getName(), hasComplexTypes);
             }
         }
     }
@@ -254,29 +258,30 @@ public class HiveDataFragmenter extends Fragmenter {
     }
 
     private void fetchMetaDataForSimpleTable(StorageDescriptor stdsc,
-                                             Properties props) throws Exception {
-        fetchMetaDataForSimpleTable(stdsc, props, null);
+                                             Properties props, boolean hasComplexTypes) throws Exception {
+        fetchMetaDataForSimpleTable(stdsc, props, null, hasComplexTypes);
     }
 
     private void fetchMetaDataForSimpleTable(StorageDescriptor stdsc,
-                                             Properties props, String tableName)
+                                             Properties props, String tableName, boolean hasComplexTypes)
             throws Exception {
         fetchMetaData(new HiveTablePartition(stdsc, props, null, null,
-                tableName));
+                tableName), hasComplexTypes);
     }
 
     private void fetchMetaDataForPartitionedTable(StorageDescriptor stdsc,
                                                   Properties props,
                                                   Partition partition,
                                                   List<FieldSchema> partitionKeys,
-                                                  String tableName)
+                                                  String tableName,
+                                                  boolean hasComplexTypes)
             throws Exception {
         fetchMetaData(new HiveTablePartition(stdsc, props, partition,
-                partitionKeys, tableName));
+                partitionKeys, tableName), hasComplexTypes);
     }
 
     /* Fills a table partition */
-    private void fetchMetaData(HiveTablePartition tablePartition)
+    private void fetchMetaData(HiveTablePartition tablePartition, boolean hasComplexTypes)
             throws Exception {
         InputFormat<?, ?> fformat = makeInputFormat(
                 tablePartition.storageDesc.getInputFormat(), jobConf);
@@ -284,7 +289,7 @@ public class HiveDataFragmenter extends Fragmenter {
         if (inputData.getProfile() != null) {
             // evaluate optimal profile based on file format if profile was explicitly specified in url
             // if user passed accessor+fragmenter+resolver - use them
-            profile = ProfileFactory.get(fformat);
+            profile = ProfileFactory.get(fformat, hasComplexTypes);
         }
         String fragmenterForProfile = null;
         if (profile != null) {

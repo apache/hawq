@@ -64,7 +64,7 @@ public class HiveORCAccessorTest {
         PowerMockito.whenNew(JobConf.class).withAnyArguments().thenReturn(jobConf);
 
         PowerMockito.mockStatic(HiveUtilities.class);
-        PowerMockito.when(HiveUtilities.parseHiveUserData(any(InputData.class), any(PXF_HIVE_SERDES[].class))).thenReturn(new HiveUserData("", "", null, HiveDataFragmenter.HIVE_NO_PART_TBL, true, "2", "3"));
+        PowerMockito.when(HiveUtilities.parseHiveUserData(any(InputData.class), any(PXF_HIVE_SERDES[].class))).thenReturn(new HiveUserData("", "", null, HiveDataFragmenter.HIVE_NO_PART_TBL, true, "2", "3", "1"));
 
         PowerMockito.mockStatic(HdfsUtilities.class);
 

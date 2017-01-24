@@ -42,35 +42,46 @@ public enum EnumHiveToHawqType {
     FloatType("float", EnumHawqType.Float4Type),
     DoubleType("double", EnumHawqType.Float8Type),
     StringType("string", EnumHawqType.TextType),
-    BinaryType("binary", EnumHawqType.ByteaType),
+    BinaryType("binary", EnumHawqType.ByteaType, true),
     TimestampType("timestamp", EnumHawqType.TimestampType),
     DateType("date", EnumHawqType.DateType),
     DecimalType("decimal", EnumHawqType.NumericType, "[(,)]"),
     VarcharType("varchar", EnumHawqType.VarcharType, "[(,)]"),
     CharType("char", EnumHawqType.BpcharType, "[(,)]"),
-    ArrayType("array", EnumHawqType.TextType, "[<,>]"),
-    MapType("map", EnumHawqType.TextType, "[<,>]"),
-    StructType("struct", EnumHawqType.TextType, "[<,>]"),
-    UnionType("uniontype", EnumHawqType.TextType, "[<,>]");
+    ArrayType("array", EnumHawqType.TextType, "[<,>]", true),
+    MapType("map", EnumHawqType.TextType, "[<,>]", true),
+    StructType("struct", EnumHawqType.TextType, "[<,>]", true),
+    UnionType("uniontype", EnumHawqType.TextType, "[<,>]", true);
 
     private String typeName;
     private EnumHawqType hawqType;
     private String splitExpression;
     private byte size;
+    private boolean isComplexType;
 
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType) {
         this.typeName = typeName;
         this.hawqType = hawqType;
     }
-    
+
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType, byte size) {
         this(typeName, hawqType);
         this.size = size;
     }
 
+    EnumHiveToHawqType(String typeName, EnumHawqType hawqType, boolean isComplexType) {
+        this(typeName, hawqType);
+        this.isComplexType = isComplexType;
+    }
+
     EnumHiveToHawqType(String typeName, EnumHawqType hawqType, String splitExpression) {
         this(typeName, hawqType);
         this.splitExpression = splitExpression;
+    }
+
+    EnumHiveToHawqType(String typeName, EnumHawqType hawqType, String splitExpression, boolean isComplexType) {
+        this(typeName, hawqType, splitExpression);
+        this.isComplexType = isComplexType;
     }
 
     /**
@@ -214,6 +225,14 @@ public enum EnumHiveToHawqType {
      */
     public byte getSize() {
         return size;
+    }
+
+    public boolean isComplexType() {
+        return isComplexType;
+    }
+
+    public void setComplexType(boolean isComplexType) {
+        this.isComplexType = isComplexType;
     }
 
 }

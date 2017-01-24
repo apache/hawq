@@ -621,44 +621,46 @@ public class HiveResolver extends Plugin implements ReadResolver {
         String userDelim = input.getUserProperty(InputData.DELIMITER_KEY);
 
         if (userDelim == null) {
-            throw new IllegalArgumentException(InputData.DELIMITER_KEY + " is a required option");
-        }
-
-        final int VALID_LENGTH = 1;
-        final int VALID_LENGTH_HEX = 4;
-
-        if (userDelim.startsWith("\\x")) { // hexadecimal sequence
-
-            if (userDelim.length() != VALID_LENGTH_HEX) {
+            /* No DELIMITER in URL, try to get it from fragment's user data*/
+            HiveUserData hiveUserData = null;
+            try {
+                hiveUserData = HiveUtilities.parseHiveUserData(input);
+            } catch (UserDataException ude) {
+                throw new IllegalArgumentException(InputData.DELIMITER_KEY + " is a required option");
+            }
+            if (hiveUserData.getDelimiter() == null) {
+                throw new IllegalArgumentException(InputData.DELIMITER_KEY + " is a required option");
+            }
+            delimiter = (char) Integer.valueOf(hiveUserData.getDelimiter()).intValue();
+        } else {
+            final int VALID_LENGTH = 1;
+            final int VALID_LENGTH_HEX = 4;
+            if (userDelim.startsWith("\\x")) { // hexadecimal sequence
+                if (userDelim.length() != VALID_LENGTH_HEX) {
+                    throw new IllegalArgumentException(
+                            "Invalid hexdecimal value for delimiter (got"
+                                    + userDelim + ")");
+                }
+                delimiter = (char) Integer.parseInt(
+                        userDelim.substring(2, VALID_LENGTH_HEX), 16);
+                if (!CharUtils.isAscii(delimiter)) {
+                    throw new IllegalArgumentException(
+                            "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII "
+                                    + delimiter + ")");
+                }
+                return;
+            }
+            if (userDelim.length() != VALID_LENGTH) {
                 throw new IllegalArgumentException(
-                        "Invalid hexdecimal value for delimiter (got"
+                        "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got "
                                 + userDelim + ")");
             }
-
-            delimiter = (char) Integer.parseInt(
-                    userDelim.substring(2, VALID_LENGTH_HEX), 16);
-
-            if (!CharUtils.isAscii(delimiter)) {
+            if (!CharUtils.isAscii(userDelim.charAt(0))) {
                 throw new IllegalArgumentException(
                         "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII "
-                                + delimiter + ")");
+                                + userDelim + ")");
             }
-
-            return;
+            delimiter = userDelim.charAt(0);
         }
-
-        if (userDelim.length() != VALID_LENGTH) {
-            throw new IllegalArgumentException(
-                    "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got "
-                            + userDelim + ")");
-        }
-
-        if (!CharUtils.isAscii(userDelim.charAt(0))) {
-            throw new IllegalArgumentException(
-                    "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII "
-                            + userDelim + ")");
-        }
-
-        delimiter = userDelim.charAt(0);
     }
 }

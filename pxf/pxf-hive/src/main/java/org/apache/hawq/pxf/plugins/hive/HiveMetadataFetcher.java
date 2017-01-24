@@ -101,32 +101,28 @@ public class HiveMetadataFetcher extends MetadataFetcher {
             try {
                 Metadata metadata = new Metadata(tblDesc);
                 Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
-                getSchema(tbl, metadata);
+                HiveUtilities.getSchema(tbl, metadata);
+                boolean hasComplexTypes = HiveUtilities.hasComplexTypes(metadata);
                 metadataList.add(metadata);
                 List<Partition> tablePartitions = client.listPartitionsByFilter(tblDesc.getPath(), tblDesc.getName(), "", (short) -1);
                 Set<OutputFormat> formats = new HashSet<OutputFormat>();
                 //If table has partitions - find out all formats
                 for (Partition tablePartition : tablePartitions) {
                     String inputFormat = tablePartition.getSd().getInputFormat();
-                    OutputFormat outputFormat = getOutputFormat(inputFormat);
+                    OutputFormat outputFormat = getOutputFormat(inputFormat, hasComplexTypes);
                     formats.add(outputFormat);
                 }
                 //If table has no partitions - get single format of table
                 if (tablePartitions.size() == 0 ) {
                     String inputFormat = tbl.getSd().getInputFormat();
-                    OutputFormat outputFormat = getOutputFormat(inputFormat);
+                    OutputFormat outputFormat = getOutputFormat(inputFormat, hasComplexTypes);
                     formats.add(outputFormat);
                 }
                 metadata.setOutputFormats(formats);
-                if (tbl != null && tbl.getSd() != null && tbl.getSd().getSerdeInfo() != null) {
-                    Map<String, String> outputParameters = new HashMap<String, String>();
-                    Map<String, String> serdeParameters = tbl.getSd().getSerdeInfo().getParameters();
-                    //outputParameters.put(DELIM_COLLECTION, String.valueOf((int) serdeParameters.get(serdeConstants.COLLECTION_DELIM).charAt(0)));
-                    //outputParameters.put(DELIM_MAPKEY, String.valueOf((int) serdeParameters.get(serdeConstants.MAPKEY_DELIM).charAt(0)));
-                    //outputParameters.put(DELIM_LINE, String.valueOf((int) serdeParameters.get(serdeConstants.LINE_DELIM).charAt(0)));
-                    outputParameters.put(DELIM_FIELD, String.valueOf((int) serdeParameters.get(serdeConstants.FIELD_DELIM).charAt(0)));
-                    metadata.setOutputParameters(outputParameters);
-                }
+                Map<String, String> outputParameters = new HashMap<String, String>();
+                if (HiveUtilities.getDelimiter(tbl.getSd()) != null)
+                    outputParameters.put(DELIM_FIELD, HiveUtilities.getDelimiter(tbl.getSd()));
+                metadata.setOutputParameters(outputParameters);
             } catch (UnsupportedTypeException | UnsupportedOperationException e) {
                 if(ignoreErrors) {
                     LOG.warn("Metadata fetch for " + tblDesc.toString() + " failed. " + e.getMessage());
@@ -140,50 +136,11 @@ public class HiveMetadataFetcher extends MetadataFetcher {
         return metadataList;
     }
 
-
-    /**
-     * Populates the given metadata object with the given table's fields and partitions,
-     * The partition fields are added at the end of the table schema.
-     * Throws an exception if the table contains unsupported field types.
-     * Supported HCatalog types: TINYINT,
-     * SMALLINT, INT, BIGINT, BOOLEAN, FLOAT, DOUBLE, STRING, BINARY, TIMESTAMP,
-     * DATE, DECIMAL, VARCHAR, CHAR.
-     *
-     * @param tbl Hive table
-     * @param metadata schema of given table
-     */
-    private void getSchema(Table tbl, Metadata metadata) {
-
-        int hiveColumnsSize = tbl.getSd().getColsSize();
-        int hivePartitionsSize = tbl.getPartitionKeysSize();
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Hive table: " + hiveColumnsSize + " fields, " + hivePartitionsSize + " partitions.");
-        }
-
-        // check hive fields
-        try {
-            List<FieldSchema> hiveColumns = tbl.getSd().getCols();
-            for (FieldSchema hiveCol : hiveColumns) {
-                metadata.addField(HiveUtilities.mapHiveType(hiveCol));
-            }
-            // check partition fields
-            List<FieldSchema> hivePartitions = tbl.getPartitionKeys();
-            for (FieldSchema hivePart : hivePartitions) {
-                metadata.addField(HiveUtilities.mapHiveType(hivePart));
-            }
-        } catch (UnsupportedTypeException e) {
-            String errorMsg = "Failed to retrieve metadata for table " + metadata.getItem() + ". " +
-                    e.getMessage();
-            throw new UnsupportedTypeException(errorMsg);
-        }
-    }
-
-    private OutputFormat getOutputFormat(String inputFormat) {
+    private OutputFormat getOutputFormat(String inputFormat, boolean hasComplexTypes) {
         OutputFormat outputFormat = null;
         try {
             InputFormat<?, ?> fformat = HiveDataFragmenter.makeInputFormat(inputFormat, jobConf);
-            String profile = ProfileFactory.get(fformat);
+            String profile = ProfileFactory.get(fformat, hasComplexTypes);
             String outputFormatString = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OUTPUTFORMAT");
             outputFormat = OutputFormat.valueOf(outputFormatString);
         } catch (Exception e) {

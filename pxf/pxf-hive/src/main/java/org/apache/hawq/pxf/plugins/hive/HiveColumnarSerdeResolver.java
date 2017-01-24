@@ -237,9 +237,4 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
         }
         firstColumn = false;
     }
-
-    @Override
-    void parseDelimiterChar(InputData input) {
-        delimiter = 44; //,
-    }
 }

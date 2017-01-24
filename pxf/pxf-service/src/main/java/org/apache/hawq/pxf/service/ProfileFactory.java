@@ -32,9 +32,14 @@ public class ProfileFactory {
     private static final String HIVE_ORC_PROFILE = "HiveORC";
     private static final String HIVE_PROFILE = "Hive";
 
-    public static String get(InputFormat inputFormat) {
+/*    public static String get(InputFormat inputFormat) {
+        String profileName = get(inputFormat, false);
+        return profileName;
+    }
+*/
+    public static String get(InputFormat inputFormat, boolean hasComplexTypes) {
         String profileName = null;
-        if (inputFormat instanceof TextInputFormat) {
+        if (inputFormat instanceof TextInputFormat && !hasComplexTypes) {
             profileName = HIVE_TEXT_PROFILE;
         } else if (inputFormat instanceof RCFileInputFormat) {
             profileName = HIVE_RC_PROFILE;

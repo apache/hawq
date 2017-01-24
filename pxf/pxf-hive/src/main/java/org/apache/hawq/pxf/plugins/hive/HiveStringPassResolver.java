@@ -87,22 +87,11 @@ public class HiveStringPassResolver extends HiveResolver {
     public List<OneField> getFields(OneRow onerow) throws Exception {
         if (((ProtocolData) inputData).outputFormat() == OutputFormat.TEXT) {
             String line = (onerow.getData()).toString();
-            String replacedLine = replaceComplexSpecCharacters(line);
             /* We follow Hive convention. Partition fields are always added at the end of the record */
-            return Collections.singletonList(new OneField(VARCHAR.getOID(), replacedLine + parts));
+            return Collections.singletonList(new OneField(VARCHAR.getOID(), line + parts));
         } else {
             return super.getFields(onerow);
         }
-    }
-
-    private String replaceComplexSpecCharacters(String line) throws UserDataException {
-        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(inputData);
-        char collectionDelimChar = (char)Integer.valueOf(hiveUserData.getCollectionDelim()).intValue();
-        char mapKeyDelimChar = (char)Integer.valueOf(hiveUserData.getMapKeyDelim()).intValue();
-        String replacedLine = line;
-        replacedLine = line.replace(Character.toString(collectionDelimChar), collectionDelim);
-        replacedLine = replacedLine.replace(Character.toString(mapKeyDelimChar), mapkeyDelim);
-        return replacedLine;
     }
 
 }

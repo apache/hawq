@@ -35,10 +35,12 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.Metadata;
+import org.apache.hawq.pxf.api.Metadata.Field;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
@@ -100,7 +102,8 @@ public class HiveUtilities {
     static final String STR_RC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
     static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
     static final String STR_ORC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
-    private static final int EXPECTED_NUM_OF_TOKS = 7;
+    private static final int EXPECTED_NUM_OF_TOKS = 8;
+    private static final String DEFAULT_DELIMITER = "44";
 
     /**
      * Initializes the HiveMetaStoreClient
@@ -195,7 +198,7 @@ public class HiveUtilities {
         } else
             hiveTypeName = hiveType;
 
-        return new Metadata.Field(fieldName, hawqType, hiveTypeName, modifiers);
+        return new Metadata.Field(fieldName, hawqType, hiveToHawqType.isComplexType(), hiveTypeName, modifiers);
     }
 
     /**
@@ -452,28 +455,29 @@ public class HiveUtilities {
         String serdeClassName = partData.storageDesc.getSerdeInfo().getSerializationLib();
         String propertiesString = serializeProperties(partData.properties);
         String partitionKeys = serializePartitionKeys(partData);
-        String collectionDelim = String.valueOf((int) partData.storageDesc.getSerdeInfo().getParameters().get(serdeConstants.COLLECTION_DELIM).charAt(0));
-        String mapKeyDelim = String.valueOf((int) partData.storageDesc.getSerdeInfo().getParameters().get(serdeConstants.MAPKEY_DELIM).charAt(0));
+        String collectionDelim = getCollectionDelim(partData.storageDesc);
+        String mapKeyDelim = getMapKeyDelim(partData.storageDesc);
+        String delimiter = getDelimiter(partData.storageDesc);
 
         if (HiveInputFormatFragmenter.class.isAssignableFrom(fragmenterClass)) {
             assertFileType(inputFormatName, partData);
         }
 
-        hiveUserData = new HiveUserData(inputFormatName, serdeClassName, propertiesString, partitionKeys, filterInFragmenter, collectionDelim, mapKeyDelim);
+        hiveUserData = new HiveUserData(inputFormatName, serdeClassName, propertiesString, partitionKeys, filterInFragmenter, collectionDelim, mapKeyDelim, delimiter);
 
         return hiveUserData.toString().getBytes();
     }
 
     public static HiveUserData parseHiveUserData(InputData input, PXF_HIVE_SERDES... supportedSerdes) throws UserDataException{
         String userData = new String(input.getFragmentUserData());
-        String[] toks = userData.split(HiveUserData.HIVE_UD_DELIM);
+        String[] toks = userData.split(HiveUserData.HIVE_UD_DELIM, EXPECTED_NUM_OF_TOKS);
 
         if (toks.length != (EXPECTED_NUM_OF_TOKS)) {
             throw new UserDataException("HiveInputFormatFragmenter expected "
                     + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
         }
 
-        HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]), toks[5], toks[6]);
+        HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]), toks[5], toks[6], toks[7]);
 
             if (supportedSerdes.length > 0) {
                 /* Make sure this serde is supported */
@@ -481,5 +485,81 @@ public class HiveUtilities {
             }
 
         return hiveUserData;
+    }
+
+    private static String getSerdeParameter(StorageDescriptor sd, String parameterKey) {
+        String parameterValue = null;
+        if (sd != null && sd.getSerdeInfo() != null && sd.getSerdeInfo().getParameters() != null && sd.getSerdeInfo().getParameters().get(parameterKey) != null) {
+            parameterValue = String.valueOf((int) sd.getSerdeInfo().getParameters().get(parameterKey).charAt(0));
+        }
+        return parameterValue;
+    }
+
+    public static String getCollectionDelim(StorageDescriptor sd) {
+        String collectionDelim = getSerdeParameter(sd, serdeConstants.COLLECTION_DELIM);
+        return collectionDelim;
+    }
+
+    public static String getMapKeyDelim(StorageDescriptor sd) {
+        String mapKeyDelim = getSerdeParameter(sd, serdeConstants.MAPKEY_DELIM);
+        return mapKeyDelim;
+    }
+
+    public static String getDelimiter(StorageDescriptor sd) {
+        String delimiter = getSerdeParameter(sd, serdeConstants.FIELD_DELIM);
+        if (delimiter == null)
+            delimiter = DEFAULT_DELIMITER;
+        return delimiter;
+    }
+
+    public static boolean hasComplexTypes(Metadata metadata) {
+        boolean hasComplexTypes = false;
+        List<Field> fields = metadata.getFields();
+        for (Field field: fields) {
+            if (field.isComplexType()) {
+                hasComplexTypes = true;
+                break;
+            }
+        }
+
+        return hasComplexTypes;
+    }
+
+    /**
+     * Populates the given metadata object with the given table's fields and partitions,
+     * The partition fields are added at the end of the table schema.
+     * Throws an exception if the table contains unsupported field types.
+     * Supported HCatalog types: TINYINT,
+     * SMALLINT, INT, BIGINT, BOOLEAN, FLOAT, DOUBLE, STRING, BINARY, TIMESTAMP,
+     * DATE, DECIMAL, VARCHAR, CHAR.
+     *
+     * @param tbl Hive table
+     * @param metadata schema of given table
+     */
+    public static void getSchema(Table tbl, Metadata metadata) {
+
+        int hiveColumnsSize = tbl.getSd().getColsSize();
+        int hivePartitionsSize = tbl.getPartitionKeysSize();
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Hive table: " + hiveColumnsSize + " fields, " + hivePartitionsSize + " partitions.");
+        }
+
+        // check hive fields
+        try {
+            List<FieldSchema> hiveColumns = tbl.getSd().getCols();
+            for (FieldSchema hiveCol : hiveColumns) {
+                metadata.addField(HiveUtilities.mapHiveType(hiveCol));
+            }
+            // check partition fields
+            List<FieldSchema> hivePartitions = tbl.getPartitionKeys();
+            for (FieldSchema hivePart : hivePartitions) {
+                metadata.addField(HiveUtilities.mapHiveType(hivePart));
+            }
+        } catch (UnsupportedTypeException e) {
+            String errorMsg = "Failed to retrieve metadata for table " + metadata.getItem() + ". " +
+                    e.getMessage();
+            throw new UnsupportedTypeException(errorMsg);
+        }
     }
 }

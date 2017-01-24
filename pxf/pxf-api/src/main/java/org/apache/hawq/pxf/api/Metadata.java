@@ -78,6 +78,7 @@ public class Metadata {
     public static class Field {
         private String name;
         private EnumHawqType type; // field type which PXF exposes
+        private boolean isComplexType; // whether source field's type is complex
         private String sourceType; // field type PXF reads from
         private String[] modifiers; // type modifiers, optional field
 
@@ -93,10 +94,15 @@ public class Metadata {
             this.sourceType = sourceType;
         }
 
-        public Field(String name, EnumHawqType type, String sourceType,
-                String[] modifiers) {
+        public Field(String name, EnumHawqType type, String sourceType, String[] modifiers) {
             this(name, type, sourceType);
             this.modifiers = modifiers;
+        }
+
+        public Field(String name, EnumHawqType type, boolean isComplexType, String sourceType, String[] modifiers) {
+            this(name, type, sourceType);
+            this.modifiers = modifiers;
+            this.isComplexType = isComplexType;
         }
 
         public String getName() {
@@ -113,6 +119,14 @@ public class Metadata {
 
         public String[] getModifiers() {
             return modifiers;
+        }
+
+        public boolean isComplexType() {
+            return isComplexType;
+        }
+
+        public void setComplexType(boolean isComplexType) {
+            this.isComplexType = isComplexType;
         }
     }
 
