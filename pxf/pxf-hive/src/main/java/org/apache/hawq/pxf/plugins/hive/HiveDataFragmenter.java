@@ -59,7 +59,7 @@ import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.ProfilesConf;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
-import org.apache.hawq.pxf.service.ProfileFactory;
+import org.apache.hawq.pxf.plugins.hive.utilities.ProfileFactory;
 
 /**
  * Fragmenter class for HIVE tables. <br>

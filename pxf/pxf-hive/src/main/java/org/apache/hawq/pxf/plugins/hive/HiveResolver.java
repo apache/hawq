@@ -626,7 +626,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
             try {
                 hiveUserData = HiveUtilities.parseHiveUserData(input);
             } catch (UserDataException ude) {
-                throw new IllegalArgumentException(InputData.DELIMITER_KEY + " is a required option");
+                throw new IllegalArgumentException("Couldn't parse user data to get " + InputData.DELIMITER_KEY);
             }
             if (hiveUserData.getDelimiter() == null) {
                 throw new IllegalArgumentException(InputData.DELIMITER_KEY + " is a required option");

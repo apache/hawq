@@ -1,4 +1,4 @@
-package org.apache.hawq.pxf.service;
+package org.apache.hawq.pxf.plugins.hive.utilities;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -32,11 +32,6 @@ public class ProfileFactory {
     private static final String HIVE_ORC_PROFILE = "HiveORC";
     private static final String HIVE_PROFILE = "Hive";
 
-/*    public static String get(InputFormat inputFormat) {
-        String profileName = get(inputFormat, false);
-        return profileName;
-    }
-*/
     public static String get(InputFormat inputFormat, boolean hasComplexTypes) {
         String profileName = null;
         if (inputFormat instanceof TextInputFormat && !hasComplexTypes) {

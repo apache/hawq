@@ -45,7 +45,7 @@ import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.ProfilesConf;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
-import org.apache.hawq.pxf.service.ProfileFactory;
+import org.apache.hawq.pxf.plugins.hive.utilities.ProfileFactory;
 
 /**
  * Class for connecting to Hive's MetaStore and getting schema of Hive tables.
