@@ -566,15 +566,15 @@ static void	assign_optimal_supported_profile(char *profile, char *fmttype, char 
 {
 	if (fmttype_is_text(*fmttype) && ((strcmp(profile, HiveTextProfileName) == 0) || (strcmp(profile, HiveRCProfileName) == 0)))
 	{
-		*supportedFormat = "TEXT";
+		*supportedFormat = TextFormatName;
+		*supportedProfile = profile;
+	} else if (fmttype_is_text(*fmttype) || fmttype_is_csv(*fmttype))
+	{
+		*supportedFormat = TextFormatName;
 		*supportedProfile = profile;
 	} else if (fmttype_is_custom(*fmttype))
 	{
-		*supportedFormat = "GPDBWritable";
+		*supportedFormat = GpdbWritableFormatName;
 		*supportedProfile = profile;
-	} else
-	{
-		*supportedFormat = "GPDBWritable";
-		*supportedProfile = HiveProfileName;
 	}
 }

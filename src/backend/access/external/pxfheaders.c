@@ -56,7 +56,7 @@ void build_http_header(PxfInputData *input)
 		/* format */
 		ExtTableEntry *exttbl = GetExtTableEntry(rel->rd_id);
         /* pxf treats CSV as TEXT */
-		char* format = (fmttype_is_text(exttbl->fmtcode) || fmttype_is_csv(exttbl->fmtcode)) ? "TEXT":"GPDBWritable";
+		char* format = (fmttype_is_text(exttbl->fmtcode) || fmttype_is_csv(exttbl->fmtcode)) ? TextFormatName:GpdbWritableFormatName;
 		churl_headers_append(headers, "X-GP-FORMAT", format);
 		
 		/* Record fields - name and type of each field */

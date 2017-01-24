@@ -50,4 +50,8 @@ typedef struct sPxfInputData
 
 void build_http_header(PxfInputData *input);
 
+#define GpdbWritableFormatName "GPDBWritable"
+#define TextFormatName "TEXT"
+
+
 #endif
