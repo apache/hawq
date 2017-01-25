@@ -212,25 +212,6 @@
       "itemId": 12,
       "name": "usage-schema",
       "label": "usage-schema"
-    },
-    {
-      "itemId": 13,
-      "name": "all",
-      "label": "All",
-      "impliedGrants": [
-        "select",
-        "insert",
-        "update",
-        "delete",
-        "references",
-        "usage",
-        "create",
-        "connect",
-        "execute",
-        "temp",
-        "create-schema",
-        "usage-schema"
-      ]
     }
   ],
 
