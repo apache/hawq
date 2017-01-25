@@ -30,6 +30,8 @@ public class LanguageTest extends ComplexResourceTestBase {
 
     @Before
     public void beforeTest() {
+        LOG.info("---------> beforeTest()");
+
         specificResource.put(database, TEST_DB);
         specificResource.put(language, TEST_LANGUAGE);
 

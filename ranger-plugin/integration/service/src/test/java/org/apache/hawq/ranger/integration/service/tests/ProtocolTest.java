@@ -29,6 +29,8 @@ public class ProtocolTest extends SimpleResourceTestBase {
 
     @Before
     public void beforeTest() {
+        LOG.info("---------> beforeTest()");
+
         specificResource.put(protocol, TEST_PROTOCOL);
         unknownResource.put(protocol, UNKNOWN);
         privileges = new String[] {"select", "insert"};

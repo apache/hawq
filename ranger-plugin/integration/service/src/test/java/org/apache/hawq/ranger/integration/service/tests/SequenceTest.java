@@ -29,6 +29,8 @@ public class SequenceTest extends ComplexResourceTestBase {
 
     @Before
     public void beforeTest() {
+        LOG.info("---------> beforeTest()");
+
         specificResource.put(database, TEST_DB);
         specificResource.put(schema, TEST_SCHEMA);
         specificResource.put(sequence, TEST_SEQUENCE);

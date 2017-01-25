@@ -29,6 +29,8 @@ public class TableTest extends ComplexResourceTestBase {
 
     @Before
     public void beforeTest() {
+        LOG.info("---------> beforeTest()");
+
         specificResource.put(database, TEST_DB);
         specificResource.put(schema, TEST_SCHEMA);
         specificResource.put(table, TEST_TABLE);

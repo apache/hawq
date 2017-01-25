@@ -39,6 +39,8 @@ public abstract class SimpleResourceTestBase extends ServiceTestBase {
 
     @Before
     public void beforeSimple() throws IOException {
+        LOG.info("---> beforeSimple()");
+
         specificResource = new HashMap<>();
         parentUnknownResource = new HashMap<>();
         childUnknownResource = new HashMap<>();

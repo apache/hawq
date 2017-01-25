@@ -41,6 +41,7 @@ public class SpecialPrivilegesTest extends ServiceTestBase {
 
     @Before
     public void beforeTest() {
+        LOG.info("---------> beforeTest()");
 
         // resource used for lookup from RPS
         schemaResource = new HashMap<>();
