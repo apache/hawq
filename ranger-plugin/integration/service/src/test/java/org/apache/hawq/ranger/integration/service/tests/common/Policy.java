@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.hawq.ranger.integration.service.tests.policy;
+package org.apache.hawq.ranger.integration.service.tests.common;
 
 import java.util.*;
 

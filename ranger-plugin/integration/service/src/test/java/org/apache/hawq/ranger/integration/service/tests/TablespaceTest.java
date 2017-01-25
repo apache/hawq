@@ -19,14 +19,13 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.SimpleResourceTestBase;
 import org.junit.Before;
 
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.tablespace;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.tablespace;
 
-public class TablespaceTest extends ServiceTestBase {
-
-    private static final String TEST_TABLESPACE = "test-tablespace";
+public class TablespaceTest extends SimpleResourceTestBase {
 
     @Before
     public void beforeTest() {

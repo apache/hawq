@@ -19,19 +19,17 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.SimpleResourceTestBase;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
 
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.database;
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.language;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.database;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.language;
 
-public class LanguageTest extends ServiceTestBase {
-
-    private static final String TEST_DB = "test-db";
-    private static final String TEST_LANGUAGE = "test-language";
+public class LanguageTest extends SimpleResourceTestBase {
 
     @Before
     public void beforeTest() {

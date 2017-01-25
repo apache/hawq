@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.hawq.ranger.integration.service.tests;
+package org.apache.hawq.ranger.integration.service.tests.common;
 
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.logging.Log;

@@ -19,14 +19,14 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.SimpleResourceTestBase;
 import org.junit.Before;
 
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.*;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.*;
 
-public class DatabaseTest extends ServiceTestBase {
+public class DatabaseTest extends SimpleResourceTestBase {
 
-    private static final String TEST_DB = "test-db";
     // create-schema will be requested by HAWQ with only database in context, so it looks like a privilege for database resource
     private static final String[] SPECIAL_PRIVILEGES = new String[] {"connect", "temp", "create-schema"};
 

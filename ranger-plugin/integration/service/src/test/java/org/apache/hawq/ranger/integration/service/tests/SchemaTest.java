@@ -19,20 +19,16 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.apache.hawq.ranger.integration.service.tests.policy.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.SimpleResourceTestBase;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
 
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.database;
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.schema;
-import static org.apache.hawq.ranger.integration.service.tests.policy.Policy.ResourceType.table;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.*;
 
-public class SchemaTest extends ServiceTestBase {
-
-    private static final String TEST_DB = "test-db";
-    private static final String TEST_SCHEMA = "test-schema";
+public class SchemaTest extends SimpleResourceTestBase {
 
     // for schema only, privileges in policy must have -schema suffix added, create-schema is covered as part of DatabaseTest
     private static final String[] SPECIAL_PRIVILEGES = new String[] {"usage-schema"};
