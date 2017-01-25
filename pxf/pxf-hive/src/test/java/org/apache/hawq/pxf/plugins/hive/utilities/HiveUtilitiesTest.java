@@ -25,6 +25,7 @@ import static org.junit.Assert.*;
 import java.util.Arrays;
 
 import com.google.common.base.Joiner;
+
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
@@ -410,5 +411,21 @@ public class HiveUtilitiesTest {
 
         serde = HiveUtilities.createDeserializer(HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE, HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE);
         assertTrue(serde instanceof org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe);
+
+        serde = HiveUtilities.createDeserializer(HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE, HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE);
+        assertTrue(serde instanceof org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe);
+
+        try {
+            serde = HiveUtilities.createDeserializer(HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE, HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE);
+            fail("shouldn't be able to create deserializer with not allowed serde");
+        } catch (UnsupportedTypeException e) {
+            assertTrue(e.getMessage().equals("Unsupported Hive Serde: " + HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE.name()));
+        }
+    }
+
+    @Test
+    public void getDelimiterCode() {
+        Integer delimiterCode = HiveUtilities.getDelimiterCode(null);
+        assertTrue(delimiterCode == 44);
     }
 }

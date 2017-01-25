@@ -339,7 +339,21 @@ static void add_remote_credentials(CHURL_HEADERS headers)
 	churl_headers_append(headers, "X-GP-REMOTE-PASS", pxf_remote_service_secret);
 }
 
-void char* get_format_name(char fmtcode)
+char* get_format_name(char fmtcode)
 {
-	return (fmttype_is_text(fmtcode) || fmttype_is_csv(fmtcode)) ? TextFormatName:GpdbWritableFormatName;
+	char *formatName = NULL;
+
+	if (fmttype_is_text(fmtcode) || fmttype_is_csv(fmtcode))
+	{
+		formatName = TextFormatName;
+	} else if (fmttype_is_custom(fmtcode))
+	{
+		formatName = GpdbWritableFormatName;
+	} else {
+		ereport(ERROR,
+			(errcode(ERRCODE_INTERNAL_ERROR),
+			 errmsg("Unable to get format name for format code: %c", fmtcode)));
+	}
+
+	return formatName;
 }

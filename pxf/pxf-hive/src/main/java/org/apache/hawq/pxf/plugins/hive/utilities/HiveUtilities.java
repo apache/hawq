@@ -107,7 +107,7 @@ public class HiveUtilities {
     static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
     static final String STR_ORC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
     private static final int EXPECTED_NUM_OF_TOKS = 6;
-    private static final String DEFAULT_DELIMITER = "44";
+    private static final int DEFAULT_DELIMITER_CODE = 44;
 
     /**
      * Initializes the HiveMetaStoreClient
@@ -459,7 +459,7 @@ public class HiveUtilities {
         String serdeClassName = partData.storageDesc.getSerdeInfo().getSerializationLib();
         String propertiesString = serializeProperties(partData.properties);
         String partitionKeys = serializePartitionKeys(partData);
-        String delimiter = getDelimiter(partData.storageDesc);
+        String delimiter = getDelimiterCode(partData.storageDesc).toString();
 
         if (HiveInputFormatFragmenter.class.isAssignableFrom(fragmenterClass)) {
             assertFileType(inputFormatName, partData);
@@ -492,16 +492,31 @@ public class HiveUtilities {
     private static String getSerdeParameter(StorageDescriptor sd, String parameterKey) {
         String parameterValue = null;
         if (sd != null && sd.getSerdeInfo() != null && sd.getSerdeInfo().getParameters() != null && sd.getSerdeInfo().getParameters().get(parameterKey) != null) {
-            parameterValue = String.valueOf((int) sd.getSerdeInfo().getParameters().get(parameterKey).charAt(0));
+            parameterValue = sd.getSerdeInfo().getParameters().get(parameterKey);
         }
+
+        System.out.println("Returning parameter value:");
+        System.out.println(parameterValue);
+
         return parameterValue;
     }
 
-    public static String getDelimiter(StorageDescriptor sd) {
+    public static Integer getDelimiterCode(StorageDescriptor sd) {
+        Integer delimiterCode = null;
+
         String delimiter = getSerdeParameter(sd, serdeConstants.FIELD_DELIM);
-        if (delimiter == null)
-            delimiter = DEFAULT_DELIMITER;
-        return delimiter;
+        if (delimiter != null) {
+            delimiterCode = (int) delimiter.charAt(0);
+            return delimiterCode;
+        }
+
+        delimiter = getSerdeParameter(sd, serdeConstants.SERIALIZATION_FORMAT);
+        if (delimiter != null) {
+            delimiterCode = Integer.parseInt(delimiter);
+            return delimiterCode;
+        }
+
+        return DEFAULT_DELIMITER_CODE;
     }
 
     public static boolean hasComplexTypes(Metadata metadata) {

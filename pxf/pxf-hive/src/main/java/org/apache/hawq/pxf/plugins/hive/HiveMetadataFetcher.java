@@ -120,8 +120,8 @@ public class HiveMetadataFetcher extends MetadataFetcher {
                 }
                 metadata.setOutputFormats(formats);
                 Map<String, String> outputParameters = new HashMap<String, String>();
-                if (HiveUtilities.getDelimiter(tbl.getSd()) != null)
-                    outputParameters.put(DELIM_FIELD, HiveUtilities.getDelimiter(tbl.getSd()));
+                Integer delimiterCode = HiveUtilities.getDelimiterCode(tbl.getSd());
+                outputParameters.put(DELIM_FIELD, delimiterCode.toString());
                 metadata.setOutputParameters(outputParameters);
             } catch (UnsupportedTypeException | UnsupportedOperationException e) {
                 if(ignoreErrors) {
