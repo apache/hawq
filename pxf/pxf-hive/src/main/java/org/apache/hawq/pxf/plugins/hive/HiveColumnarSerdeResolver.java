@@ -141,15 +141,7 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
         serdeProperties.put(serdeConstants.LIST_COLUMNS, columnNames.toString());
         serdeProperties.put(serdeConstants.LIST_COLUMN_TYPES, columnTypes.toString());
 
-        //TODO: Move this logic to utilities
-        if (serdeType == HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE) {
-            deserializer = new ColumnarSerDe();
-        } else if (serdeType == HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE) {
-            deserializer = new LazyBinaryColumnarSerDe();
-        } else {
-            throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeType.name()); /* we should not get here */
-        }
-
+        deserializer = HiveUtilities.createDeserializer(serdeType, HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE, HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE);
         deserializer.initialize(new JobConf(new Configuration(), HiveColumnarSerdeResolver.class), serdeProperties);
     }
 

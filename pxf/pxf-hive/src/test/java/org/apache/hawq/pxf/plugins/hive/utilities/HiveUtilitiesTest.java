@@ -27,6 +27,9 @@ import java.util.Arrays;
 import com.google.common.base.Joiner;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
+import org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe;
+import org.apache.hadoop.hive.serde2.*;
 import org.junit.Test;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
@@ -398,5 +401,14 @@ public class HiveUtilitiesTest {
         } catch (IllegalArgumentException e) {
             assertEquals(errorMsg, e.getMessage());
         }
+    }
+
+    @Test
+    public void createDeserializer() throws Exception {
+        SerDe serde = HiveUtilities.createDeserializer(HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE, HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE);
+        assertTrue(serde instanceof OrcSerde);
+
+        serde = HiveUtilities.createDeserializer(HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE, HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE);
+        assertTrue(serde instanceof org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe);
     }
 }

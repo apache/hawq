@@ -38,6 +38,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.*;
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.Metadata.Field;
@@ -46,9 +47,12 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.io.DataType;
+import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hawq.pxf.plugins.hive.HiveDataFragmenter;
 import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter;
 import org.apache.hawq.pxf.plugins.hive.HiveTablePartition;
+import org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe;
+import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
 import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_INPUT_FORMATS;
 import org.apache.hawq.pxf.plugins.hive.HiveUserData;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
@@ -549,5 +553,23 @@ public class HiveUtilities {
                     e.getMessage();
             throw new UnsupportedTypeException(errorMsg);
         }
+    }
+
+    @SuppressWarnings("deprecation")
+    public static SerDe createDeserializer(PXF_HIVE_SERDES serdeType, PXF_HIVE_SERDES... allowedSerdes) throws Exception{
+        SerDe deserializer = null;
+        if (!Arrays.asList(allowedSerdes).contains(serdeType)) {
+            throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeType.name());
+        }
+        if (serdeType == HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE) {
+            deserializer = new ColumnarSerDe();
+        } else if (serdeType == HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE) {
+            deserializer = new LazyBinaryColumnarSerDe();
+        } else if (serdeType == HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE) {
+            deserializer = new OrcSerde();
+        } else {
+            throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeType.name()); /* we should not get here */
+        }
+        return deserializer;
     }
 }
