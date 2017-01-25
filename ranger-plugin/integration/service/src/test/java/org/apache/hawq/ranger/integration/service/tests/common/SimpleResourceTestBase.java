@@ -38,7 +38,7 @@ public abstract class SimpleResourceTestBase extends ServiceTestBase {
     protected Policy.PolicyBuilder policyBuilder;
 
     @Before
-    public void setUp() throws IOException {
+    public void beforeSimple() throws IOException {
         specificResource = new HashMap<>();
         parentUnknownResource = new HashMap<>();
         childUnknownResource = new HashMap<>();

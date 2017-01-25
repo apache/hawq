@@ -19,16 +19,13 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
+import org.apache.hawq.ranger.integration.service.tests.common.ComplexResourceTestBase;
 import org.apache.hawq.ranger.integration.service.tests.common.Policy;
-import org.apache.hawq.ranger.integration.service.tests.common.SimpleResourceTestBase;
 import org.junit.Before;
-import org.junit.Test;
-
-import java.io.IOException;
 
 import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.*;
 
-public class SchemaTest extends SimpleResourceTestBase {
+public class SchemaTest extends ComplexResourceTestBase {
 
     // for schema only, privileges in policy must have -schema suffix added, create-schema is covered as part of DatabaseTest
     private static final String[] SPECIAL_PRIVILEGES = new String[] {"usage-schema"};
@@ -61,6 +58,7 @@ public class SchemaTest extends SimpleResourceTestBase {
         return policy;
     }
 
+    @Override
     protected Policy getResourceParentStarUserPolicy() {
         Policy policy = policyBuilder
                 .resource(database, STAR)
@@ -72,6 +70,7 @@ public class SchemaTest extends SimpleResourceTestBase {
         return policy;
     }
 
+    @Override
     protected Policy getResourceChildStarUserPolicy() {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
@@ -92,15 +91,5 @@ public class SchemaTest extends SimpleResourceTestBase {
                 .groupAccess(PUBLIC_GROUP, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
-    }
-
-    @Test
-    public void testParentStarResourceUserPolicy() throws IOException {
-        checkResourceUserPolicy(getResourceParentStarUserPolicy());
-    }
-
-    @Test
-    public void testChildStarResourceUserPolicy() throws IOException {
-        checkResourceUserPolicy(getResourceChildStarUserPolicy());
     }
 }

@@ -19,16 +19,13 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
+import org.apache.hawq.ranger.integration.service.tests.common.ComplexResourceTestBase;
 import org.apache.hawq.ranger.integration.service.tests.common.Policy;
-import org.apache.hawq.ranger.integration.service.tests.common.SimpleResourceTestBase;
 import org.junit.Before;
-import org.junit.Test;
-
-import java.io.IOException;
 
 import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.*;
 
-public class SequenceTest extends SimpleResourceTestBase {
+public class SequenceTest extends ComplexResourceTestBase {
 
     @Before
     public void beforeTest() {
@@ -62,6 +59,8 @@ public class SequenceTest extends SimpleResourceTestBase {
         return policy;
     }
 
+    @Override
+
     protected Policy getResourceParentStarUserPolicy() {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
@@ -73,6 +72,7 @@ public class SequenceTest extends SimpleResourceTestBase {
         return policy;
     }
 
+    @Override
     protected Policy getResourceChildStarUserPolicy() {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
@@ -93,15 +93,5 @@ public class SequenceTest extends SimpleResourceTestBase {
                 .groupAccess(PUBLIC_GROUP, privileges)
                 .build();
         return policy;
-    }
-
-    @Test
-    public void testParentStarResourceUserPolicy() throws IOException {
-        checkResourceUserPolicy(getResourceParentStarUserPolicy());
-    }
-
-    @Test
-    public void testChildStarResourceUserPolicy() throws IOException {
-        checkResourceUserPolicy(getResourceChildStarUserPolicy());
     }
 }
