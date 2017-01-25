@@ -84,7 +84,7 @@ public abstract class ServiceTestBase {
 
     protected void checkUserHasResourceAccess(String user, Map<Policy.ResourceType, String> resource, String[] privileges) throws IOException {
         // user IN the policy --> has all possible privileges to the specific resource
-        LOG.debug(String.format("Asserting user %s HAS access %s privileges %s", user, resource, privileges));
+        LOG.debug(String.format("Asserting user %s HAS access %s privileges %s", user, resource, Arrays.toString(privileges)));
         assertTrue(hasAccess(user, resource, privileges));
         for (String privilege : privileges) {
             // user IN the policy --> has individual privileges to the specific resource
@@ -95,7 +95,7 @@ public abstract class ServiceTestBase {
 
     protected void checkUserDeniedResourceAccess(String user, Map<Policy.ResourceType, String> resource, String[] privileges) throws IOException {
         // user IN the policy --> has all possible privileges to the specific resource
-        LOG.debug(String.format("Asserting user %s HAS NO access %s privileges %s", user, resource, privileges));
+        LOG.debug(String.format("Asserting user %s HAS NO access %s privileges %s", user, resource, Arrays.toString(privileges)));
         assertFalse(hasAccess(user, resource, privileges));
         for (String privilege : privileges) {
             // user IN the policy --> has individual privileges to the specific resource

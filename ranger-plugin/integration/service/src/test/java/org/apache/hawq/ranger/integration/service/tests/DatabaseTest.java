@@ -32,8 +32,6 @@ public class DatabaseTest extends SimpleResourceTestBase {
 
     @Before
     public void beforeTest() {
-        LOG.info("---------> beforeTest()");
-
         specificResource.put(database, TEST_DB);
         unknownResource.put(database, UNKNOWN);
         privileges = new String[] {"connect", "temp", "create"};

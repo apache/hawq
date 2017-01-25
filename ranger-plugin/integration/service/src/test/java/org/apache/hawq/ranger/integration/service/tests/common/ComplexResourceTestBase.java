@@ -19,17 +19,11 @@
 
 package org.apache.hawq.ranger.integration.service.tests.common;
 
-import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
 
 public abstract class ComplexResourceTestBase extends SimpleResourceTestBase {
-
-    @Before
-    public void beforeComplex() throws IOException {
-        LOG.info("------> beforeComplex()");
-    }
 
     @Test
     public void testParentStarResourceUserPolicy() throws IOException {

@@ -41,8 +41,6 @@ public class SpecialPrivilegesTest extends ServiceTestBase {
 
     @Before
     public void beforeTest() {
-        LOG.info("---------> beforeTest()");
-
         // resource used for lookup from RPS
         schemaResource = new HashMap<>();
         schemaResource.put(database, TEST_DB);
@@ -89,7 +87,7 @@ public class SpecialPrivilegesTest extends ServiceTestBase {
             // user should have NO access to usage on schema
             checkUserDeniedResourceAccess(TEST_USER, schemaResource, privilegeUsage);
             // user should have access to usage on sequence
-            checkUserDeniedResourceAccess(TEST_USER, sequenceResource, privilegeUsage);
+            checkUserHasResourceAccess(TEST_USER, sequenceResource, privilegeUsage);
         } finally {
             deletePolicy(policy);
         }

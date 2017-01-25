@@ -29,8 +29,6 @@ public class TablespaceTest extends SimpleResourceTestBase {
 
     @Before
     public void beforeTest() {
-        LOG.info("---------> beforeTest()");
-
         specificResource.put(tablespace, TEST_TABLESPACE);
         unknownResource.put(tablespace, UNKNOWN);
         privileges = new String[] {"create"};

@@ -23,6 +23,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,8 +39,6 @@ public abstract class SimpleResourceTestBase extends ServiceTestBase {
 
     @Before
     public void beforeSimple() throws IOException {
-        LOG.info("---> beforeSimple()");
-
         specificResource = new HashMap<>();
         parentUnknownResource = new HashMap<>();
         childUnknownResource = new HashMap<>();
@@ -83,7 +82,7 @@ public abstract class SimpleResourceTestBase extends ServiceTestBase {
         try {
             checkUserHasResourceAccess(TEST_USER, specificResource, privileges);
             // user NOT in the policy --> has NO access to the specific resource
-            LOG.debug(String.format("Asserting user %s NO  access %s privileges %s", UNKNOWN, specificResource, privileges));
+            LOG.debug(String.format("Asserting user %s NO  access %s privileges %s", UNKNOWN, specificResource, Arrays.toString(privileges)));
             assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
 
             // if resource has parents, assert edge cases
