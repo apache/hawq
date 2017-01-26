@@ -633,7 +633,8 @@ static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nT
 static Datum GetFormatTypeForProfile(const List *outputFormats)
 {
 
-	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),TextFormatName) == 0)
+	/* if table is homogeneous and output format is text - use text*/
+	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)), TextFormatName) == 0)
 	{
 		return CharGetDatum(TextFormatType);
 	} else
@@ -665,7 +666,7 @@ static Datum GetFormatOptionsForProfile(const List *outputFormats, int delimiter
 }
 
 /* location - should be an array of text with one element:
- * pxf://<ip:port/namaservice>/<hive db>.<hive table>?Profile=Hive */
+ * pxf://<ip:port/namaservice>/<db>.<path>?Profile=profileName&delimiter=delimiterCode */
 static Datum GetLocationForFormat(char *profile, List *outputFormats, char *pxf_service_address, char *path, char *name, int delimiter)
 {
 	StringInfoData locationStr;

@@ -465,7 +465,6 @@ external_getnext_init(PlanState *state) {
 	if (state != NULL)
 	{
 		desc->projInfo = state->ps_ProjInfo;
-		desc->fmttype = &((ExternalScan *) state->plan)->fmtType;
 	}
 	return desc;
 }

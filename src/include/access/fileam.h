@@ -70,7 +70,6 @@ typedef ExternalInsertDescData *ExternalInsertDesc;
 typedef struct ExternalSelectDescData
 {
 	ProjectionInfo *projInfo;
-	char	*fmttype;
 } ExternalSelectDescData;
 
 typedef enum DataLineStatus

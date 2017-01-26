@@ -62,9 +62,7 @@ public class HiveStringPassResolver extends HiveResolver {
 
     @Override
     void initSerde(InputData input) throws Exception {
-        if (((ProtocolData) inputData).outputFormat() == OutputFormat.TEXT) {
-            /* nothing to do here */
-        } else {
+        if (((ProtocolData) inputData).outputFormat() == OutputFormat.GPDBWritable) {
             super.initSerde(input);
         }
     }
