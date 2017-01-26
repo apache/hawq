@@ -28,3 +28,9 @@ export CATALINA_OUT=${PXF_LOGDIR}/catalina.out
 
 # Path to Run directory
 export PXF_RUNDIR=/var/run/pxf
+
+# Configured user
+export PXF_USER=pxf
+
+# Port
+export PXF_PORT=51200
