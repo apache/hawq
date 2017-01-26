@@ -633,7 +633,7 @@ static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nT
 static Datum GetFormatTypeForProfile(const List *outputFormats)
 {
 
-	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),"TEXT") == 0)
+	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),TextFormatName) == 0)
 	{
 		return CharGetDatum(TextFormatType);
 	} else
@@ -653,7 +653,7 @@ static Datum GetFormatOptionsForProfile(const List *outputFormats, int delimiter
 			0x20, 0x27, 0x5c, 0x4e, 0x27, 0x20, 0x65, 0x73, 0x63, 0x61, 0x70,
 			0x65, 0x20, 0x27, 0x5c, 0x27, 0x00 };
 
-	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),"TEXT") == 0)
+	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),TextFormatName) == 0)
 	{
 		appendStringInfo(&formatStr, "%s", formatArr);
 	} else {
@@ -676,7 +676,7 @@ static Datum GetLocationForFormat(char *profile, List *outputFormats, char *pxf_
 	foreach (lc, outputFormats)
 	{
 		char *outputFormat = (char *) lfirst(lc);
-		if (strcmp(outputFormat, "TEXT") == 0)
+		if (strcmp(outputFormat, TextFormatName) == 0)
 		{
 			hasTextOutputFormat = true;
 			break;

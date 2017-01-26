@@ -168,6 +168,10 @@ RemoveExtTableEntry(Oid relid);
 #define TextFormatType 't'
 #define CsvFormatType 'c'
 
+/* PXF formats*/
+#define GpdbWritableFormatName "GPDBWritable"
+#define TextFormatName "TEXT"
+
 #define fmttype_is_custom(c) (c == CustomFormatType)
 #define fmttype_is_text(c)   (c == TextFormatType)
 #define fmttype_is_csv(c)    (c == CsvFormatType)
