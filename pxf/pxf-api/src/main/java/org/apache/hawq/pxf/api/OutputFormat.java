@@ -21,6 +21,28 @@ package org.apache.hawq.pxf.api;
 
 
 /**
- * PXF supported output formats: {@link #TEXT} and {@link #BINARY}
+ * PXF supported output formats: {@link org.apache.hawq.pxf.service.io.Text} and {@link org.apache.hawq.pxf.service.io.GPDBWritable}
  */
-public enum OutputFormat {TEXT, BINARY}
+public enum OutputFormat {
+    TEXT("org.apache.hawq.pxf.service.io.Text"),
+    GPDBWritable("org.apache.hawq.pxf.service.io.GPDBWritable");
+
+    private String className;
+
+    OutputFormat(String className) {
+        this.className = className;
+    }
+
+    public String getClassName() {
+        return className;
+    }
+
+    public static OutputFormat getOutputFormat(String className) {
+        for (OutputFormat of : values()) {
+            if (of.getClassName().equals(className)) {
+                return of;
+            }
+        }
+        throw new UnsupportedTypeException("Unable to find output format by given class name: " + className);
+    }
+}

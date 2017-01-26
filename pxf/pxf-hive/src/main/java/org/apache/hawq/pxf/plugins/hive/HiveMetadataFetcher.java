@@ -136,16 +136,12 @@ public class HiveMetadataFetcher extends MetadataFetcher {
         return metadataList;
     }
 
-    private OutputFormat getOutputFormat(String inputFormat, boolean hasComplexTypes) {
+    private OutputFormat getOutputFormat(String inputFormat, boolean hasComplexTypes) throws Exception {
         OutputFormat outputFormat = null;
-        try {
-            InputFormat<?, ?> fformat = HiveDataFragmenter.makeInputFormat(inputFormat, jobConf);
-            String profile = ProfileFactory.get(fformat, hasComplexTypes);
-            String outputFormatString = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OUTPUTFORMAT");
-            outputFormat = OutputFormat.valueOf(outputFormatString);
-        } catch (Exception e) {
-            LOG.warn("Unable to get output format for input format: " + inputFormat);
-        }
+        InputFormat<?, ?> fformat = HiveDataFragmenter.makeInputFormat(inputFormat, jobConf);
+        String profile = ProfileFactory.get(fformat, hasComplexTypes);
+        String outputFormatClassName = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OUTPUTFORMAT");
+        outputFormat = OutputFormat.getOutputFormat(outputFormatClassName);
         return outputFormat;
     }
 

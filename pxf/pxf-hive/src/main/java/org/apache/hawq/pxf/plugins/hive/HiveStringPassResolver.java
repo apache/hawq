@@ -55,7 +55,7 @@ public class HiveStringPassResolver extends HiveResolver {
         mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM : input.getUserProperty("MAPKEY_DELIM");
 
         /* Needed only for BINARY format*/
-        if (((ProtocolData) inputData).outputFormat() == OutputFormat.BINARY) {
+        if (((ProtocolData) inputData).outputFormat() == OutputFormat.GPDBWritable) {
             propsString = hiveUserData.getPropertiesString();
         }
     }
