@@ -52,9 +52,6 @@ import org.apache.hawq.pxf.plugins.hive.utilities.ProfileFactory;
  */
 public class HiveMetadataFetcher extends MetadataFetcher {
 
-    private static final String DELIM_COLLECTION = "DELIM.COLLECTION";
-    private static final String DELIM_MAPKEY = "DELIM.MAPKEY";
-    private static final String DELIM_LINE = "DELIM.LINE";
     private static final String DELIM_FIELD = InputData.DELIMITER_KEY;
 
     private static final Log LOG = LogFactory.getLog(HiveMetadataFetcher.class);

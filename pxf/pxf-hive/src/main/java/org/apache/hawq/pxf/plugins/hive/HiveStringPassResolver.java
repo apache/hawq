@@ -51,10 +51,8 @@ public class HiveStringPassResolver extends HiveResolver {
         parts = new StringBuilder();
         partitionKeys = hiveUserData.getPartitionKeys();
         serdeClassName = hiveUserData.getSerdeClassName();
-        collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM : input.getUserProperty("COLLECTION_DELIM");
-        mapkeyDelim = input.getUserProperty("MAPKEY_DELIM") == null ? MAPKEY_DELIM : input.getUserProperty("MAPKEY_DELIM");
 
-        /* Needed only for BINARY format*/
+        /* Needed only for GPDBWritable format*/
         if (((ProtocolData) inputData).outputFormat() == OutputFormat.GPDBWritable) {
             propsString = hiveUserData.getPropertiesString();
         }

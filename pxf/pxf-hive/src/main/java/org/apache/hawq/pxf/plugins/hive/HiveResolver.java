@@ -159,6 +159,8 @@ public class HiveResolver extends Plugin implements ReadResolver {
         if (propsString != null ) {
             ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
             serdeProperties.load(inStream);
+        } else {
+            throw new IllegalArgumentException("propsString is mandatory to initialize serde.");
         }
         deserializer.initialize(new JobConf(conf, HiveResolver.class), serdeProperties);
     }
