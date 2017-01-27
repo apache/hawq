@@ -105,6 +105,15 @@ public class HiveUserData {
     private boolean filterInFragmenter;
     private String delimiter;
 
+    /**
+     * The method returns expected number of tokens in raw user data
+     *
+     * @return number of tokens in raw user data
+     */
+    public static int getNumOfTokens() {
+        return HiveUserData.class.getDeclaredFields().length;
+    }
+
     @Override
     public String toString() {
         return inputFormatName + HiveUserData.HIVE_UD_DELIM

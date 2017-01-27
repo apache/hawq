@@ -425,6 +425,8 @@ public class HiveUtilitiesTest {
 
     @Test
     public void getDelimiterCode() {
+
+        //Default delimiter code should be 44(comma)
         Integer delimiterCode = HiveUtilities.getDelimiterCode(null);
         assertTrue(delimiterCode == 44);
     }

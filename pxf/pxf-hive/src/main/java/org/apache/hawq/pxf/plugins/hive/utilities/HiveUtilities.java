@@ -46,6 +46,7 @@ import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe;
 import org.apache.hawq.pxf.plugins.hive.HiveDataFragmenter;
@@ -69,13 +70,21 @@ public class HiveUtilities {
         LAZY_BINARY_COLUMNAR_SERDE("org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe"),
         LAZY_SIMPLE_SERDE("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"),
         ORC_SERDE("org.apache.hadoop.hive.ql.io.orc.OrcSerde");
-        
+
         private String serdeClassName;
-        
+
         PXF_HIVE_SERDES(String serdeClassName) {
             this.serdeClassName = serdeClassName;
         }
 
+        /**
+         * Method which looks up serde by serde class name.
+         *
+         * @param serdeClassName input serde name
+         * @param allowedSerdes all serdes which allowed in current context
+         * @return serde by given serde class name and list of allowed serdes
+         * @throws UnsupportedTypeException if unable to find serde by class name, or found serde which is not allowed in current context
+         */
         public static PXF_HIVE_SERDES getPxfHiveSerde(String serdeClassName, PXF_HIVE_SERDES... allowedSerdes) {
             for (PXF_HIVE_SERDES s : values()) {
                 if (s.getSerdeClassName().equals(serdeClassName)) {
@@ -106,7 +115,6 @@ public class HiveUtilities {
     static final String STR_RC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
     static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
     static final String STR_ORC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.orc.OrcInputFormat";
-    private static final int EXPECTED_NUM_OF_TOKS = 6;
     private static final int DEFAULT_DELIMITER_CODE = 44;
 
     /**
@@ -444,6 +452,15 @@ public class HiveUtilities {
         return partitionKeys.toString();
     }
 
+    /**
+     * The method which serializes fragment-related attributes, needed for reading and resolution to string
+     *
+     * @param fragmenterClassName
+     * @param partData
+     * @param filterInFragmenter
+     * @return serialized representation of fragment-related attributes
+     * @throws Exception
+     */
     @SuppressWarnings("unchecked")
     public static byte[] makeUserData(String fragmenterClassName, HiveTablePartition partData, boolean filterInFragmenter) throws Exception {
 
@@ -470,13 +487,21 @@ public class HiveUtilities {
         return hiveUserData.toString().getBytes();
     }
 
+    /**
+     * The method parses raw user data into HiveUserData class
+     *
+     * @param input input data
+     * @param supportedSerdes list of allowed serdes in current context
+     * @return instance of HiveUserData class
+     * @throws UserDataException
+     */
     public static HiveUserData parseHiveUserData(InputData input, PXF_HIVE_SERDES... supportedSerdes) throws UserDataException{
         String userData = new String(input.getFragmentUserData());
-        String[] toks = userData.split(HiveUserData.HIVE_UD_DELIM, EXPECTED_NUM_OF_TOKS);
+        String[] toks = userData.split(HiveUserData.HIVE_UD_DELIM, HiveUserData.getNumOfTokens());
 
-        if (toks.length != (EXPECTED_NUM_OF_TOKS)) {
+        if (toks.length != (HiveUserData.getNumOfTokens())) {
             throw new UserDataException("HiveInputFormatFragmenter expected "
-                    + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
+                    + HiveUserData.getNumOfTokens() + " tokens, but got " + toks.length);
         }
 
         HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]), toks[5]);
@@ -501,6 +526,13 @@ public class HiveUtilities {
         return parameterValue;
     }
 
+    /**
+     * The method which extracts field delimiter from storage descriptor.
+     * When unable to extract delimiter from storage descriptor, default value is used
+     *
+     * @param sd StorageDescriptor of table/partition
+     * @return ASCII code of delimiter
+     */
     public static Integer getDelimiterCode(StorageDescriptor sd) {
         Integer delimiterCode = null;
 
@@ -519,6 +551,13 @@ public class HiveUtilities {
         return DEFAULT_DELIMITER_CODE;
     }
 
+    /**
+     * The method determines whether metadata definition has any complex type
+     * @see EnumHiveToHawqType for complex type attribute definition
+     *
+     * @param metadata metadata of relation
+     * @return true if metadata has at least one field of complex type
+     */
     public static boolean hasComplexTypes(Metadata metadata) {
         boolean hasComplexTypes = false;
         List<Field> fields = metadata.getFields();
@@ -570,21 +609,23 @@ public class HiveUtilities {
         }
     }
 
+    /**
+     * Creates an instance of a given serde type
+     *
+     * @param serdeType
+     * @param allowedSerdes
+     * @return instance of a given serde
+     * @throws UnsupportedTypeException if given serde is not allowed in current context
+     */
     @SuppressWarnings("deprecation")
     public static SerDe createDeserializer(PXF_HIVE_SERDES serdeType, PXF_HIVE_SERDES... allowedSerdes) throws Exception{
         SerDe deserializer = null;
         if (!Arrays.asList(allowedSerdes).contains(serdeType)) {
             throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeType.name());
         }
-        if (serdeType == HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE) {
-            deserializer = new ColumnarSerDe();
-        } else if (serdeType == HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE) {
-            deserializer = new LazyBinaryColumnarSerDe();
-        } else if (serdeType == HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE) {
-            deserializer = new OrcSerde();
-        } else {
-            throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeType.name()); /* we should not get here */
-        }
+
+        deserializer = (SerDe) Utilities.createAnyInstance(serdeType.getSerdeClassName());
+
         return deserializer;
     }
 }

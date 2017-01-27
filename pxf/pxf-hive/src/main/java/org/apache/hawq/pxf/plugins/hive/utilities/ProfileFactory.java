@@ -25,6 +25,10 @@ import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hawq.pxf.api.Metadata;
 
+/**
+ * Factory class which returns optimal profile for given input format
+ *
+ */
 public class ProfileFactory {
 
     private static final String HIVE_TEXT_PROFILE = "HiveText";
@@ -32,6 +36,13 @@ public class ProfileFactory {
     private static final String HIVE_ORC_PROFILE = "HiveORC";
     private static final String HIVE_PROFILE = "Hive";
 
+    /**
+     * The method which returns optimal profile
+     *
+     * @param inputFormat input format of table/partition
+     * @param hasComplexTypes whether record has complex types, see @EnumHiveToHawqType
+     * @return name of optimal profile
+     */
     public static String get(InputFormat inputFormat, boolean hasComplexTypes) {
         String profileName = null;
         if (inputFormat instanceof TextInputFormat && !hasComplexTypes) {
