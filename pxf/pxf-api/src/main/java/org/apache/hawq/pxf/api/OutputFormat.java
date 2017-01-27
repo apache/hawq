@@ -33,6 +33,11 @@ public enum OutputFormat {
         this.className = className;
     }
 
+    /**
+     * Returns a formats's implementation class name
+     *
+     * @param fields the item's output parameters
+     */
     public String getClassName() {
         return className;
     }

@@ -70,9 +70,10 @@ public class Metadata {
     }
 
     /**
-     * Class representing item field - name, type, source type, modifiers.
+     * Class representing item field - name, type, source type, is complex type?, modifiers.
      * Type - exposed type of field
      * Source type - type of field in underlying source
+     * Is complex type - whether source type is complex type
      * Modifiers - additional attributes which describe type or field
      */
     public static class Field {
@@ -142,6 +143,11 @@ public class Metadata {
     private Set<OutputFormat> outputFormats;
     private Map<String, String> outputParameters;
 
+    /**
+     * Returns an item's output formats, @see OutputFormat.
+     *
+     * @return item's output formats
+     */
     public Set<OutputFormat> getOutputFormats() {
         return outputFormats;
     }
@@ -150,6 +156,11 @@ public class Metadata {
         this.outputFormats = outputFormats;
     }
 
+    /**
+     * Returns an item's output parameters, for example - delimiters etc.
+     *
+     * @return item's output parameters
+     */
     public Map<String, String> getOutputParameters() {
         return outputParameters;
     }

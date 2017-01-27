@@ -666,7 +666,7 @@ static Datum GetFormatOptionsForProfile(const List *outputFormats, int delimiter
 }
 
 /* location - should be an array of text with one element:
- * pxf://<ip:port/namaservice>/<db>.<path>?Profile=profileName&delimiter=delimiterCode */
+ * pxf://<ip:port/namaservice>/<path>.<name>?Profile=profileName&delimiter=delimiterCode */
 static Datum GetLocationForFormat(char *profile, List *outputFormats, char *pxf_service_address, char *path, char *name, int delimiter)
 {
 	StringInfoData locationStr;
