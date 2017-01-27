@@ -506,10 +506,10 @@ public class HiveUtilities {
 
         HiveUserData hiveUserData = new HiveUserData(toks[0], toks[1], toks[2], toks[3], Boolean.valueOf(toks[4]), toks[5]);
 
-            if (supportedSerdes.length > 0) {
-                /* Make sure this serde is supported */
-                PXF_HIVE_SERDES pxfHiveSerde = PXF_HIVE_SERDES.getPxfHiveSerde(hiveUserData.getSerdeClassName(), supportedSerdes);
-            }
+        if (supportedSerdes.length > 0) {
+            /* Make sure this serde is supported */
+            PXF_HIVE_SERDES pxfHiveSerde = PXF_HIVE_SERDES.getPxfHiveSerde(hiveUserData.getSerdeClassName(), supportedSerdes);
+        }
 
         return hiveUserData;
     }
@@ -519,9 +519,6 @@ public class HiveUtilities {
         if (sd != null && sd.getSerdeInfo() != null && sd.getSerdeInfo().getParameters() != null && sd.getSerdeInfo().getParameters().get(parameterKey) != null) {
             parameterValue = sd.getSerdeInfo().getParameters().get(parameterKey);
         }
-
-        System.out.println("Returning parameter value:");
-        System.out.println(parameterValue);
 
         return parameterValue;
     }

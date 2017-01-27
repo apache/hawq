@@ -23,11 +23,15 @@ package org.apache.hawq.pxf.plugins.hive.utilities;
 import static org.junit.Assert.*;
 
 import java.util.Arrays;
+import java.util.Collections;
 
 import com.google.common.base.Joiner;
 
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.SerDeInfo;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
 import org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe;
 import org.apache.hadoop.hive.serde2.*;
@@ -428,6 +432,24 @@ public class HiveUtilitiesTest {
 
         //Default delimiter code should be 44(comma)
         Integer delimiterCode = HiveUtilities.getDelimiterCode(null);
-        assertTrue(delimiterCode == 44);
+        char defaultDelim = ',';
+        assertTrue(delimiterCode == (int) defaultDelim);
+
+        //Some serdes use FIELD_DELIM key
+        char expectedDelim = '%';
+        StorageDescriptor sd = new StorageDescriptor();
+        SerDeInfo si = new SerDeInfo();
+        si.setParameters(Collections.singletonMap(serdeConstants.FIELD_DELIM, String.valueOf(expectedDelim)));
+        sd.setSerdeInfo(si);
+        delimiterCode = HiveUtilities.getDelimiterCode(sd);
+        assertTrue(delimiterCode == (int) expectedDelim);
+
+        //Some serdes use SERIALIZATION_FORMAT key
+        sd = new StorageDescriptor();
+        si = new SerDeInfo();
+        si.setParameters(Collections.singletonMap(serdeConstants.SERIALIZATION_FORMAT, String.valueOf((int)expectedDelim)));
+        sd.setSerdeInfo(si);
+        delimiterCode = HiveUtilities.getDelimiterCode(sd);
+        assertTrue(delimiterCode == (int) expectedDelim);
     }
 }
