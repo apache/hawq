@@ -36,12 +36,18 @@ public enum OutputFormat {
     /**
      * Returns a formats's implementation class name
      *
-     * @param fields the item's output parameters
+     * @return a formats's implementation class name
      */
     public String getClassName() {
         return className;
     }
 
+    /**
+     * Looks up output format for given class name if it exists.
+     *
+     * @throws UnsupportedTypeException if output format with given class wasn't found
+     * @return an output format with given class name
+     */
     public static OutputFormat getOutputFormat(String className) {
         for (OutputFormat of : values()) {
             if (of.getClassName().equals(className)) {

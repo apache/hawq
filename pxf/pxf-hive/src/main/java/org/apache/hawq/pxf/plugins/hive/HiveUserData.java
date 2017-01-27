@@ -19,6 +19,10 @@
 
 package org.apache.hawq.pxf.plugins.hive;
 
+/**
+ * Class which is a carrier for user data in Hive fragment.
+ *
+ */
 public class HiveUserData {
 
     public static final String HIVE_UD_DELIM = "!HUDD!";
@@ -36,26 +40,56 @@ public class HiveUserData {
         this.delimiter = (delimiter == null ? "0" : delimiter);
     }
 
+    /**
+     * Returns input format of a fragment
+     *
+     * @return input format of a fragment
+     */
     public String getInputFormatName() {
         return inputFormatName;
     }
 
+    /**
+     * Returns SerDe class name
+     *
+     * @return SerDe class name
+     */
     public String getSerdeClassName() {
         return serdeClassName;
     }
 
+    /**
+     * Returns properties string needed for SerDe initialization
+     *
+     * @return properties string needed for SerDe initialization
+     */
     public String getPropertiesString() {
         return propertiesString;
     }
 
+    /**
+     * Returns partition keys
+     *
+     * @return partition keys
+     */
     public String getPartitionKeys() {
         return partitionKeys;
     }
 
+    /**
+     * Returns whether filtering was done in fragmenter
+     *
+     * @return true if filtering was done in fragmenter
+     */
     public boolean isFilterInFragmenter() {
         return filterInFragmenter;
     }
 
+    /**
+     * Returns field delimiter
+     *
+     * @return field delimiter
+     */
     public String getDelimiter() {
         return delimiter;
     }
