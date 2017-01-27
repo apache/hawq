@@ -80,7 +80,6 @@ function createInstance()
 
 	chown -R $instance_owner $instance_root
 	chmod 700 $instance_root/$instance_name
-
 	return 0
 }
 
@@ -270,8 +269,8 @@ function doStart()
 		return 1
 	fi
 	patchWebapp || return 1
-    commandWebapp start || return 1
-    checkWebapp 300 || return 1
+	commandWebapp start || return 1
+	checkWebapp 300 || return 1
 }
 
 #
@@ -281,11 +280,11 @@ function doStart()
 #
 function doStop()
 {
-	instanceExists
-	if [ $? -ne 0 ]; then
-		echo ERROR: cant find PXF instance, maybe call init?
-		return 1
-	fi
+    instanceExists
+    if [ $? -ne 0 ]; then
+        echo "ERROR: can't find PXF instance, maybe call init?"
+        return 1
+    fi
     commandWebapp stop || return 1
 }
 

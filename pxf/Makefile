@@ -26,7 +26,7 @@ else
     else ifneq "$(GPHOME)" ""
         BUILD_PARAMS= -DdeployPath="$(GPHOME)/pxf"
     else
-        @echo "Cannot invoke install without either PXF_HOME or GPHOME configured"
+		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
     endif
 endif
 
@@ -40,8 +40,8 @@ endif
 
 help:
 	@echo 
-	@echo	"help it is then"
-	@echo	"Possible targets"
+	@echo"help it is then"
+	@echo   "Possible targets"
 	@echo	"  - all (clean, build, unittest, jar, tar, rpm)"
 	@echo	"  -  -  HD=<phd|hdp> - set classpath to match hadoop distribution. default phd"
 	@echo	"  -  -  LICENSE=<license info> - add license info to created RPMs"
@@ -78,6 +78,3 @@ tomcat:
 
 install:
 	./gradlew install $(BUILD_PARAMS)
-
-
-
