@@ -19,26 +19,36 @@
 default: all
 
 ifneq "$(HD)" ""
-BUILD_PARAMS= -Dhd=$(HD)
+    BUILD_PARAMS= -Dhd=$(HD)
+else
+    ifneq "$(PXF_HOME)" ""
+        BUILD_PARAMS= -DdeployPath=$(PXF_HOME)
+    else ifneq "$(GPHOME)" ""
+        BUILD_PARAMS= -DdeployPath="$(GPHOME)/pxf"
+    else
+		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
+    endif
 endif
 
 ifneq "$(LICENSE)" ""
-BUILD_PARAMS+= -Plicense="$(LICENSE)"
+    BUILD_PARAMS+= -Plicense="$(LICENSE)"
 endif
+
 ifneq "$(VENDOR)" ""
-BUILD_PARAMS+= -Pvendor="$(VENDOR)"
+    BUILD_PARAMS+= -Pvendor="$(VENDOR)"
 endif
 
 help:
 	@echo 
-	@echo	"help it is then"
-	@echo	"Possible targets"
+	@echo"help it is then"
+	@echo   "Possible targets"
 	@echo	"  - all (clean, build, unittest, jar, tar, rpm)"
 	@echo	"  -  -  HD=<phd|hdp> - set classpath to match hadoop distribution. default phd"
 	@echo	"  -  -  LICENSE=<license info> - add license info to created RPMs"
 	@echo	"  -  -  VENDOR=<vendor name> - add vendor name to created RPMs"
 	@echo	"  - tomcat - builds tomcat rpm from downloaded tarball"
 	@echo	"  -  -  LICENSE and VENDOR parameters can be used as well"
+	@echo	"  - deploy - setup PXF along with tomcat in the configured deployPath"
 	@echo	"  - doc - creates aggregate javadoc under docs"
 
 all: 
@@ -65,3 +75,6 @@ doc:
 .PHONY: tomcat
 tomcat:
 	./gradlew tomcatRpm $(BUILD_PARAMS)
+
+install:
+	./gradlew install $(BUILD_PARAMS)

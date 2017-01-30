@@ -20,18 +20,12 @@
 # pxf-service	start/stop/initialize/status the PXF instance
 #
 
-pxf_root=/usr/lib/pxf
-env_script=/etc/pxf/conf/pxf-env.sh
-tomcat_root=/opt/apache-tomcat
-tomcat_templates=/opt/pxf/tomcat-templates
-instance_root=/var/pxf
 
-pxf_user=pxf
-instance_name=pxf-service
-instance_port=51200
-instance_owner=pxf:pxf
-
-curl=`which curl`
+if [ -z $PXF_HOME ]; then
+    env_script=/etc/pxf/conf/pxf-env.sh
+else
+    env_script=$PXF_HOME/conf/pxf-env.sh
+fi
 
 # load pxf-env.sh script
 if [ ! -f $env_script ]; then
@@ -39,6 +33,29 @@ if [ ! -f $env_script ]; then
 else
 	source $env_script
 fi
+
+pxf_user=$PXF_USER
+instance_port=$PXF_PORT
+instance_name=pxf-service
+
+if [ -z $PXF_HOME ]; then
+    # RPM based setup
+    pxf_root=/usr/lib/pxf
+    tomcat_root=/opt/apache-tomcat
+    tomcat_templates=/opt/pxf/tomcat-templates
+    instance_root=/var/pxf
+    instance_owner=$pxf_user:$pxf_user
+else
+    # OSS/Source code based setup
+    pxf_root=$PXF_HOME/lib
+    tomcat_root=$PXF_HOME/apache-tomcat
+    tomcat_templates=$PXF_HOME/tomcat-templates
+    instance_root=$PXF_HOME
+    instance_owner=$pxf_user
+fi
+
+curl=`which curl`
+
 
 # validate JAVA_HOME
 if [ ! -x $JAVA_HOME/bin/java ]; then
@@ -61,9 +78,8 @@ function createInstance()
 		return 1
 	fi
 
-	chown $instance_owner -R $instance_root
+	chown -R $instance_owner $instance_root
 	chmod 700 $instance_root/$instance_name
-
 	return 0
 }
 
@@ -97,7 +113,7 @@ function configureInstance()
 	# set pid
 	catalinaEnv=$instance_root/$instance_name/bin/setenv.sh
 	cat $catalinaEnv | \
-	sed "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" \
+	sed -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" \
 	> ${catalinaEnv}.tmp
 	rm $catalinaEnv
 	mv ${catalinaEnv}.tmp $catalinaEnv
@@ -176,7 +192,7 @@ function checkWebapp()
 # non zero otherwise
 function instanceExists()
 {
-	if [ ! -d $instance_root ]; then
+	if [ ! -d "$instance_root/$instance_name" ]; then
 		return 1
 	fi
 
@@ -193,39 +209,83 @@ function doInit()
 		return 0
 	fi
 
-	createInstance || return 1
+    createInstance || return 1
 	configureInstance || return 1
 	deployWebapp || return 1
 }
 
+#
+# patchWebapp patches the webapp config files
+# patch applied only if PXF_HOME is defined
+#
+function patchWebapp()
+{
+    if [ -z $PXF_HOME ]; then
+        # webapp doesn't require patch
+        return 0
+    fi
+    pushd $instance_root/$instance_name/webapps || return 1
+    rm -rf pxf
+    mkdir pxf
+    cd pxf
+    unzip -q ../pxf.war
+    popd
+
+    context_file=$instance_root/$instance_name/webapps/pxf/META-INF/context.xml
+    cat $context_file | \
+    sed  -e "s:classpathFiles=\"[a-zA-Z0-9\/\;.-]*\":classpathFiles=\"$PXF_HOME\/conf\/pxf-private.classpath\":" \
+    -e "s:secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\":secondaryClasspathFiles=\"$PXF_HOME\/conf\/pxf-public.classpath\":" > context.xml.tmp
+    mv context.xml.tmp $context_file
+
+    web_file=$instance_root/$instance_name/webapps/pxf/WEB-INF/web.xml
+    cat $web_file | \
+    sed "s:<param-value>.*pxf-log4j.properties<\/param-value>:<param-value>$PXF_HOME\/conf\/pxf-log4j.properties<\/param-value>:" > web.xml.tmp
+    mv web.xml.tmp $web_file
+}
+
+function commandWebapp()
+{
+    command=$1
+    pushd $instance_root
+    su $pxf_user -c "$instance_root/$instance_name/bin/catalina.sh $command"
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+    popd
+}
+
 # 
-# doStartStop handles start/stop commands
-# commands are executed as the user $pxf_user
+# doStart handles start command
+# command is executed as the user $pxf_user
 #
 # after start, uses checkWebapp to verify the PXF webapp was loaded
 # successfully
 #
-function doStartStop()
+function doStart()
 {
-	command=$1
-
 	instanceExists
 	if [ $? -ne 0 ]; then
 		echo ERROR: cant find PXF instance, maybe call init?
 		return 1
 	fi
+	patchWebapp || return 1
+	commandWebapp start || return 1
+	checkWebapp 300 || return 1
+}
 
-	pushd $instance_root
-	su $pxf_user -c "$instance_root/$instance_name/bin/catalina.sh $command"
-	if [ $? -ne 0 ]; then
-		return 1
-	fi 
-	popd
-	
-	if [ "$command" = "start" ]; then
-		# try to connect for 5 minutes
-		checkWebapp 300 || return 1
-	fi
+#
+# doStart handles stop command
+# command is executed as the user $pxf_user
+#
+#
+function doStop()
+{
+    instanceExists
+    if [ $? -ne 0 ]; then
+        echo "ERROR: can't find PXF instance, maybe call init?"
+        return 1
+    fi
+    commandWebapp stop || return 1
 }
 
 function doStatus()
@@ -240,15 +300,15 @@ case "$command" in
 		doInit
 		;;
 	"start" )
-		doStartStop $command
+		doStart
 		;;
 	"stop" )
-		doStartStop $command
+		doStop
 		;;
 	"restart" )
-		doStartStop stop
+		doStop
 		sleep 1s
-		doStartStop start
+		doStart
 		;;
 	"status" )
 		doStatus
