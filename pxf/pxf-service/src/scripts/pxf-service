@@ -306,9 +306,9 @@ case "$command" in
 		doStop
 		;;
 	"restart" )
-		doStart
-		sleep 1s
 		doStop
+		sleep 1s
+		doStart
 		;;
 	"status" )
 		doStatus
