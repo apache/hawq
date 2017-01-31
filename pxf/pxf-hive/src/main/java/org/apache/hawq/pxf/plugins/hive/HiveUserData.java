@@ -26,6 +26,7 @@ package org.apache.hawq.pxf.plugins.hive;
 public class HiveUserData {
 
     public static final String HIVE_UD_DELIM = "!HUDD!";
+    private static final int EXPECTED_NUM_OF_TOKS = 7;
 
     public HiveUserData(String inputFormatName, String serdeClassName,
             String propertiesString, String partitionKeys,
@@ -114,7 +115,7 @@ public class HiveUserData {
      * @return number of tokens in raw user data
      */
     public static int getNumOfTokens() {
-        return HiveUserData.class.getDeclaredFields().length;
+        return EXPECTED_NUM_OF_TOKS;
     }
 
     @Override
