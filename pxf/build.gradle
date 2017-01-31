@@ -232,6 +232,7 @@ project('pxf-service') {
         from("src/main/resources") {
             into("/etc/pxf-${project.version}/conf")
             include("**/pxf-private*.classpath")
+            exclude("**/pxf-private.classpath")
         }
 
         from("src/main/resources/pxf-private${hddist}.classpath") {
