@@ -29,7 +29,7 @@ CREATE OR REPLACE FUNCTION search_policy(tblname text)
   AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_gp_distribution_policy';
 
 CREATE OR REPLACE FUNCTION search_exttable(tblname text) 
-  RETURNS table(oid "oid", relname text, location text)
+  RETURNS table(oid "oid", relname text, location text, fmttype text, fmtopts text)
   LANGUAGE C volatile NO SQL
   AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_exttable';
 
@@ -59,9 +59,15 @@ SELECT nspname, nspdboid, count(distinct oid) from search_namespace('default') g
 SELECT relname, relkind from search_table('mytable');
 SELECT relname from search_type('mytable');
 SELECT relname, policy_atts from search_policy('mytable');
-SELECT relname, location from search_exttable('mytable');
+SELECT relname, location, fmttype, fmtopts from search_exttable('mytable');
 SELECT relname, relkind from search_table('mytable') where oid >= min_external_oid();
 SELECT * from search_attribute('mytable');
+END TRANSACTION;
+
+-- positive test case with a single table, using text format and custom delimiter
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/single_table_text.json');
+SELECT relname, location, fmttype, fmtopts from search_exttable('mytable');
 END TRANSACTION;
 
 -- positive test case with multiple tables
@@ -73,7 +79,7 @@ SELECT nspname, nspdboid, count(distinct oid) from search_namespace('db2') where
 SELECT relname, relkind from search_table('ht1') where oid >= min_external_oid();
 SELECT relname, count(oid) from search_type('ht1') group by relname, namespace;
 SELECT relname, policy_atts from search_policy('ht1');
-SELECT relname, location from search_exttable('ht1');
+SELECT relname, location, fmttype, fmtopts from search_exttable('ht1');
 END TRANSACTION;
 
 -- negative test: duplicated tables
