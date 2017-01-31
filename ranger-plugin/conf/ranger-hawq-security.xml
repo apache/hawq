@@ -61,19 +61,12 @@
 
     <property>
         <name>ranger.plugin.hawq.policy.cache.dir</name>
-        <value>/usr/local/hawq/ranger/policycache</value>
+        <value>/usr/local/hawq/ranger/plugin-service/work/policycache</value>
         <description>
             Directory where Ranger policies are cached after successful retrieval from the source
         </description>
     </property>
 
-    <!--
-    <property>
-        <name>xasecure.hive.update.xapolicies.on.grant.revoke</name>
-        <value>true</value>
-        <description>Should Hive plugin update Ranger policies for updates to permissions done using GRANT/REVOKE?</description>
-    </property>
-    -->
     <property>
         <name>ranger.plugin.hawq.policy.rest.client.connection.timeoutMs</name>
         <value>120000</value>

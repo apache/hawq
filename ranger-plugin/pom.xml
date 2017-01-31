@@ -84,7 +84,31 @@
                             <filemode>755</filemode>
                             <sources>
                                 <source>
-                                    <location>scripts</location>
+                                    <location>scripts/register_hawq.sh</location>
+                                </source>
+                                <source>
+                                    <location>scripts/rps.sh</location>
+                                </source>
+                                <source>
+                                    <location>scripts/rps-env.sh</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/etc</directory>
+                            <sources>
+                                <source>
+                                    <location>conf/ranger-servicedef-hawq.json</location>
+                                </source>
+                                <!-- filtered resources include version number and come from target/conf directory -->
+                                <source>
+                                    <location>service/target/conf/ranger-hawq-security.xml</location>
+                                </source>
+                                <source>
+                                    <location>service/target/conf/rps.properties</location>
+                                </source>
+                                <source>
+                                    <location>service/target/conf/log4j.properties</location>
                                 </source>
                             </sources>
                         </mapping>
@@ -100,18 +124,23 @@
                             </sources>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/etc</directory>
-                            <sources>
-                                <source>
-                                    <location>conf/ranger-servicedef-hawq.json</location>
-                                </source>
-                            </sources>
-                        </mapping>
-                        <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service</directory>
                         </mapping>
                         <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/bin</directory>
+                            <sources>
+                                <source>
+                                    <location>scripts/setenv.sh</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/conf</directory>
+                            <sources>
+                                <source>
+                                    <location>conf/server.xml</location>
+                                </source>
+                            </sources>
                         </mapping>
                         <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/logs</directory>
@@ -123,6 +152,9 @@
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/work</directory>
                         </mapping>
                         <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/work/policycache</directory>
+                        </mapping>
+                        <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/webapps</directory>
                             <sources>
                                 <source>
@@ -131,14 +163,7 @@
                                 </source>
                             </sources>
                         </mapping>
-                        <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/conf</directory>
-                            <sources>
-                                <source>
-                                    <location>conf/tomcat-server.xml</location>
-                                </source>
-                            </sources>
-                        </mapping>
+
                     </mappings>
                 </configuration>
             </plugin>

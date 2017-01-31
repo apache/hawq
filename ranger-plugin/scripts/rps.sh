@@ -28,7 +28,7 @@ actionCmd=$1
 shift
 
 CWDIR=$( cd $( dirname ${BASH_SOURCE[0]} ) && pwd )
-source $CWDIR/rps_env.sh
+source $CWDIR/rps-env.sh
 
 setup_rps() {
   echo "Initializing Hawq Ranger Plugin Service..."
