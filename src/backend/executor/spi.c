@@ -1145,13 +1145,13 @@ SPI_cursor_open(const char *name, SPIPlanPtr plan,
 	/* Switch to portal's memory and copy the parsetrees and plans to there */
 	oldcontext = MemoryContextSwitchTo(PortalGetHeapMemory(portal));
 	qtlist = copyObject(qtlist);
-	ptlist = copyObject(ptlist);
 
 	Query *queryTree = (Query *) linitial(qtlist);
-	queryTree = copyObject(queryTree);
+	PlannedStmt* stmt = (PlannedStmt *)linitial(ptlist);
 
-	PlannedStmt* stmt = (PlannedStmt*)linitial(ptlist);
-	stmt = refineCachedPlan(stmt, queryTree, 0 ,NULL);
+	PlannedStmt* new_stmt = refineCachedPlan(stmt, queryTree, 0, NULL);
+	if (new_stmt == stmt)
+		new_stmt = copyObject(new_stmt);
 
 	/* If the plan has parameters, set them up */
 	if (spiplan->nargs > 0)
@@ -1199,7 +1199,7 @@ SPI_cursor_open(const char *name, SPIPlanPtr plan,
 					  query_string,
 					  T_SelectStmt,
 					  CreateCommandTag(PortalListGetPrimaryStmt(qtlist)),
-					  ptlist,
+					  list_make1(new_stmt),
 					  PortalGetHeapMemory(portal));
 
 	create_filesystem_credentials(portal);
@@ -1213,13 +1213,10 @@ SPI_cursor_open(const char *name, SPIPlanPtr plan,
 	{
 		int option = CURSOR_OPT_NO_SCROLL;
 		
-		if ( list_length(ptlist) == 1 )
-		{
-			PlannedStmt *stmt = (PlannedStmt *)linitial(ptlist);
-			if ( stmt && stmt->planTree && 
-				ExecSupportsBackwardScan(stmt->planTree) )
-				option = CURSOR_OPT_SCROLL;
-		}
+		if ( new_stmt && new_stmt->planTree &&
+			ExecSupportsBackwardScan(new_stmt->planTree) )
+			option = CURSOR_OPT_SCROLL;
+
 		portal->cursorOptions |= option;
 	}
 

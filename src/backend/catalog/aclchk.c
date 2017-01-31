@@ -224,8 +224,9 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 	 * If we found no grant options, consider whether to issue a hard error.
 	 * Per spec, having any privilege at all on the object will get you by
 	 * here.
+	 * QE bypass all permission checking.
 	 */
-	if (avail_goptions == ACL_NO_RIGHTS)
+	if (avail_goptions == ACL_NO_RIGHTS && Gp_role != GP_ROLE_EXECUTE)
 	{
 	  if (enable_ranger && !fallBackToNativeCheck(objkind, objectId, grantorId)) {
 	    if (pg_rangercheck(objkind, objectId, grantorId,
@@ -2645,7 +2646,7 @@ char *getNameFromOid(AclObjectKind objkind, Oid object_oid)
 
 char actionName[12][12] = {"INSERT","SELECT","UPDATE", "DELETE",
     "TRUNCATE", "REFERENCES", "TRIGGER", "EXECUTE", "USAGE",
-    "CREATE", "CREATE_TEMP", "CONNECT"};
+    "CREATE", "TEMP", "CONNECT"};
 
 List *getActionName(AclMode mask)
 {
@@ -2668,29 +2669,58 @@ List *getActionName(AclMode mask)
 
 bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
 {
-  //for heap table, we fall back to native check.
-  if(objkind == ACL_KIND_CLASS)
+  /* get the latest information_schema_namespcace_oid. Since caql access heap table
+   * directly without aclcheck, this function will not be called recursively
+   */
+  if (information_schema_namespcace_oid == 0)
+  {
+	  information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
+  }
+  /*for heap table, we fall back to native check.*/
+  if (objkind == ACL_KIND_CLASS)
   {
     char relstorage = get_rel_relstorage(obj_oid);
-    if(relstorage == 'h')
+    if (relstorage == 'h')
     {
       return true;
     }
   }
+  else if (objkind == ACL_KIND_NAMESPACE)
+  {
+	/*native check build-in schemas.*/
+    if (obj_oid == PG_CATALOG_NAMESPACE || obj_oid == information_schema_namespcace_oid
+    		|| obj_oid == PG_AOSEGMENT_NAMESPACE || obj_oid == PG_TOAST_NAMESPACE
+			|| obj_oid == PG_BITMAPINDEX_NAMESPACE)
+    {
+      return true;
+    }
+  }
+  else if (objkind == ACL_KIND_PROC)
+  {
+	/*native check functions under build-in schemas.*/
+    Oid namespaceid = get_func_namespace(obj_oid);
+    if (namespaceid == PG_CATALOG_NAMESPACE || namespaceid == information_schema_namespcace_oid
+			|| namespaceid == PG_AOSEGMENT_NAMESPACE || namespaceid == PG_TOAST_NAMESPACE
+			|| namespaceid == PG_BITMAPINDEX_NAMESPACE)
+    {
+      return true;
+    }
+  }
+
   return false;
 }
 
 bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid)
 {
-  //for heap table, we fall back to native check.
-  if(objkind == ACL_KIND_CLASS)
+  /*we only have range table here*/
+  if (objkind == ACL_KIND_CLASS)
   {
     ListCell   *l;
     foreach(l, table_list)
     {
       RangeTblEntry *rte=(RangeTblEntry *) lfirst(l);
-      char relstorage = get_rel_relstorage(rte->relid);
-      if(relstorage == 'h')
+      bool ret = fallBackToNativeCheck(ACL_KIND_CLASS, rte->relid, roleid);
+      if(ret)
       {
         return true;
       }
@@ -2709,17 +2739,23 @@ List *pg_rangercheck_batch(List *arg_list)
   List *aclresults = NIL;
   List *requestargs = NIL;
   ListCell *arg;
+  elog(DEBUG3, "ranger acl batch check, acl list length: %d\n", arg_list->length);
   foreach(arg, arg_list) {
     RangerPrivilegeArgs *arg_ptr = (RangerPrivilegeArgs *) lfirst(arg);
+
     AclObjectKind objkind = arg_ptr->objkind;
     Oid object_oid = arg_ptr->object_oid;
     char *objectname = getNameFromOid(objkind, object_oid);
     char *rolename = getRoleName(arg_ptr->roleid);
     List* actions = getActionName(arg_ptr->mask);
     bool isAll = (arg_ptr->how == ACLMASK_ALL) ? true: false;
+
     RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
-    aclresult->result = -1;
+    aclresult->result = RANGERCHECK_NO_PRIV;
     aclresult->relOid = object_oid;
+    /* this two sign fields will be set in function create_ranger_request_json */
+    aclresult->resource_sign = 0;
+    aclresult->privilege_sign = 0;
     aclresults = lappend(aclresults, aclresult);
 
     RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
@@ -2732,14 +2768,14 @@ List *pg_rangercheck_batch(List *arg_list)
 
   } // foreach
 
-  RangerACLResult ret = check_privilege_from_ranger_batch(requestargs);
-
-  ListCell *result;
-  int k = 0;
-  foreach(result, aclresults) {
-    RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
-    result_ptr->result = ret;
-    ++k;
+  int ret = check_privilege_from_ranger(requestargs, aclresults);
+  if (ret < 0)
+  {
+	  ListCell *result;
+	  foreach(result, aclresults) {
+		  RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
+		  result_ptr->result = RANGERCHECK_NO_PRIV;
+	  }
   }
 
   if(requestargs) {
@@ -2752,17 +2788,13 @@ List *pg_rangercheck_batch(List *arg_list)
           (RangerRequestJsonArgs*)lfirst(tmp);
       pfree(requestarg->user);
       pfree(requestarg->object);
-      pfree(requestarg->actions);
+      list_free_deep(requestarg->actions);
     }
 
     list_free_deep(requestargs);
     requestargs = NULL;
   }
 
-  if(ret != RANGERCHECK_OK){
-    elog(ERROR, "ACL check failed\n");
-  }
-  elog(LOG, "oids%d\n", arg_list->length);
   return aclresults;
 }
 
@@ -2770,27 +2802,65 @@ AclResult
 pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
          AclMode mask, AclMaskHow how)
 {
-  char* objectname = getNameFromOid(objkind, object_oid);
-  char* rolename = getRoleName(roleid);
-  List* actions = getActionName(mask);
-  bool isAll = (how == ACLMASK_ALL) ? true: false;
+	char* objectname = getNameFromOid(objkind, object_oid);
+	char* rolename = getRoleName(roleid);
+	List* actions = getActionName(mask);
+	bool isAll = (how == ACLMASK_ALL) ? true: false;
 
-  elog(LOG, "rangeraclcheck kind:%d,objectname:%s,role:%s,mask:%u\n",objkind,objectname,rolename,mask);
-  int ret = check_privilege_from_ranger(rolename, objkind, objectname, actions, isAll);
+	elog(DEBUG3, "ranger acl check kind: %d, object name: %s, role: %s, mask: %u\n", objkind, objectname, rolename, mask);
 
-  if(objectname){
-    pfree(objectname);
-    objectname = NULL;
-  }
-  if(rolename){
-    pfree(rolename);
-    rolename = NULL;
-  }
-  if(actions){
-    list_free_deep(actions);
-    actions = NIL;
-  }
-  return ret;
+	List *resultargs = NIL;
+    RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
+    aclresult->result = RANGERCHECK_NO_PRIV;
+    aclresult->relOid = object_oid;
+	/* this two sign fields will be set in function create_ranger_request_json */
+	aclresult->resource_sign = 0;
+	aclresult->privilege_sign = 0;
+    resultargs = lappend(resultargs, aclresult);
+
+	List *requestargs = NIL;
+	RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
+	requestarg->user = rolename;
+	requestarg->kind = objkind;
+	requestarg->object = objectname;
+	requestarg->actions = actions;
+	requestarg->isAll = isAll;
+	requestargs = lappend(requestargs, requestarg);
+
+	AclResult result = ACLCHECK_NO_PRIV;	
+	int ret = check_privilege_from_ranger(requestargs, resultargs);
+	if (ret == 0) 
+	{
+		ListCell *arg;
+		foreach(arg, resultargs) {
+			/* only one element */
+			RangerPrivilegeResults *arg_ptr = (RangerPrivilegeResults *) lfirst(arg);
+			if (arg_ptr->result == RANGERCHECK_OK)
+				result = ACLCHECK_OK;
+			break;
+		}
+	}
+
+	if (resultargs)
+	{
+		list_free_deep(resultargs);
+	}
+	if (requestargs)
+	{
+		ListCell *cell = list_head(requestargs);
+		while (cell != NULL)
+		{
+			ListCell *tmp = cell;
+			cell = lnext(cell);
+			RangerRequestJsonArgs* requestarg = (RangerRequestJsonArgs*) lfirst(tmp);
+			pfree(requestarg->user);
+			pfree(requestarg->object);
+			list_free_deep(requestarg->actions);
+		}
+		list_free_deep(requestargs);
+		requestargs = NULL;
+	}
+	return result;
 }
 
 /*
@@ -2822,7 +2892,7 @@ pg_aclmask(AclObjectKind objkind, Oid table_oid, Oid roleid,
 		case ACL_KIND_EXTPROTOCOL:
 			return pg_extprotocol_aclmask(table_oid, roleid, mask, how);
 		default:
-			elog(ERROR, "unrecognized objkind: %d",
+			elog(ERROR, "unrecognized object kind : %d",
 				 (int) objkind);
 			/* not reached, but keep compiler quiet */
 			return ACL_NO_RIGHTS;
@@ -2937,9 +3007,9 @@ pg_class_aclmask(Oid table_oid, Oid roleid,
 		}
 	}
 	/*
-	 * Otherwise, superusers or on QE bypass all permission-checking.
+	 * Otherwise, superusers bypass all permission-checking.
 	 */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	if (superuser_arg(roleid))
 	{
 #ifdef ACLDEBUG
 		elog(DEBUG2, "OID %u is superuser, home free", roleid);
@@ -2995,8 +3065,8 @@ pg_database_aclmask(Oid db_oid, Oid roleid,
 	Oid			ownerId;
 	cqContext  *pcqCtx;
 
-	/* Superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3058,8 +3128,8 @@ pg_proc_aclmask(Oid proc_oid, Oid roleid,
 	Oid			ownerId;
 	cqContext  *pcqCtx;
 
-	/* Superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3120,8 +3190,8 @@ pg_language_aclmask(Oid lang_oid, Oid roleid,
 	Oid			ownerId;
 	cqContext  *pcqCtx;
 
-	/* Superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3183,8 +3253,8 @@ pg_namespace_aclmask(Oid nsp_oid, Oid roleid,
 	Oid			ownerId;
 	cqContext  *pcqCtx;
 
-	/* Superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3282,8 +3352,8 @@ pg_tablespace_aclmask(Oid spc_oid, Oid roleid,
 	if (spc_oid == GLOBALTABLESPACE_OID && !(IsBootstrapProcessingMode()||gp_upgrade_mode))
 		return 0;
 
-	/* Otherwise, superusers or on QE bypass all permission checking. */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3355,8 +3425,8 @@ pg_foreign_data_wrapper_aclmask(Oid fdw_oid, Oid roleid,
 
 	Form_pg_foreign_data_wrapper fdwForm;
 
-	/* Bypass permission checks for superusers or on QE */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3424,8 +3494,8 @@ pg_foreign_server_aclmask(Oid srv_oid, Oid roleid,
 
 	Form_pg_foreign_server srvForm;
 
-	/* Bypass permission checks for superusers or on QE */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
 
 	/*
@@ -3494,10 +3564,10 @@ pg_extprotocol_aclmask(Oid ptcOid, Oid roleid,
 	cqContext	cqc;
 	cqContext  *pcqCtx;
 
-	/* Bypass permission checks for superusers or on QE */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Superusers bypass all permission checking. */
+	if (superuser_arg(roleid))
 		return mask;
-	
+
 	rel = heap_open(ExtprotocolRelationId, AccessShareLock);
 
 	pcqCtx = caql_beginscan(
@@ -3574,8 +3644,8 @@ pg_filesystem_aclmask(Oid fsysOid, Oid roleid,
 	ScanKeyData entry[1];
 
 
-	/* Bypass permission checks for superusers or on QE */
-	if (GP_ROLE_EXECUTE == Gp_role || superuser_arg(roleid))
+	/* Bypass permission checks for superusers */
+	if (superuser_arg(roleid))
 		return mask;
 	
 	/*
@@ -3777,6 +3847,10 @@ pg_filesystem_nativecheck(Oid fsysid, Oid roleid, AclMode mode)
 AclResult
 pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_CLASS, table_oid, roleid, mode, ACLMASK_ANY);
@@ -3793,6 +3867,10 @@ pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 AclResult
 pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid))
    {
      return pg_rangercheck(ACL_KIND_DATABASE, db_oid, roleid, mode, ACLMASK_ANY);
@@ -3809,6 +3887,10 @@ pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
 AclResult
 pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_PROC, proc_oid, roleid, mode, ACLMASK_ANY);
@@ -3825,6 +3907,10 @@ pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode, ACLMASK_ANY);
@@ -3841,6 +3927,10 @@ pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
 AclResult
 pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode, ACLMASK_ANY);
@@ -3857,6 +3947,10 @@ pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
 AclResult
 pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode, ACLMASK_ANY);
@@ -3874,6 +3968,10 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FDW, fdw_oid, roleid, mode, ACLMASK_ANY);
@@ -3891,6 +3989,10 @@ pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode, ACLMASK_ANY);
@@ -3908,6 +4010,10 @@ pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
 AclResult
 pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid))
   {
     return pg_rangercheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode, ACLMASK_ANY);
@@ -3924,6 +4030,10 @@ pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
 AclResult
 pg_filesystem_aclcheck(Oid fsysid, Oid roleid, AclMode mode)
 {
+  /* Bypass all permission checking on QE. */
+  if (Gp_role == GP_ROLE_EXECUTE)
+    return ACLCHECK_OK;
+
   if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode, ACLMASK_ANY);

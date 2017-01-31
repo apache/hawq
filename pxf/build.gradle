@@ -473,8 +473,7 @@ task rpm(type: Copy, dependsOn: [subprojects.build, distSubprojects.buildRpm]) {
 
 // tomcat 
 def tomcatName = "apache-tomcat-${tomcatVersion}"
-def tomcatTargetDir = "tomcat/build/"
-
+def tomcatTargetDir = "tomcat/build"
 
 task tomcatGet << {
 
@@ -506,12 +505,12 @@ task tomcatGet << {
 apply plugin: 'os-package'
 
 task tomcatRpm(type: Rpm) {
-    buildDir = 'tomcat/build/'
+    buildDir = "${tomcatTargetDir}"
 
     // clean should not delete the downloaded tarball
     // and RPM, so this is a bogus directory to delete instead.
     clean {
-        delete = 'tomcat/build/something'
+        delete = "${tomcatTargetDir}/something"
     }
 
     ospackage {
@@ -543,6 +542,26 @@ task tomcatRpm(type: Rpm) {
 }
 
 tomcatRpm.dependsOn tomcatGet
+
+def pxfTargetDir = System.properties['deployPath'] ?: "build/"
+
+task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
+    into "${pxfTargetDir}"
+    subprojects { subProject ->
+        from("${project.name}/build/libs") { into 'lib' }
+    }
+    from("pxf-service/src/scripts/pxf-service") {
+        into 'bin'
+        fileMode 0755
+        rename('pxf-service', 'pxf')
+    }
+
+    from("${tomcatTargetDir}/${tomcatName}") { into 'apache-tomcat' }
+    from("pxf-service/src/main/resources") { into 'conf' }
+    from("pxf-service/src/configs/pxf-site.xml") { into 'conf' }
+    from("pxf-service/src/scripts/pxf-env.sh") { into 'conf' }
+    from("pxf-service/src/configs/tomcat") { into 'tomcat-templates' }
+}
 
 
 buildDir = '.'

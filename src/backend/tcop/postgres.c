@@ -114,6 +114,9 @@
 
 #include "cdb/cdbinmemheapam.h"
 
+#include "utils/rangerrest.h"
+#include "catalog/namespace.h"
+
 #include "resourcemanager/dynrm.h"
 #include "resourcemanager/envswitch.h"
 #include "resourcemanager/communication/rmcomm_QD2RM.h"
@@ -133,6 +136,7 @@ extern char *optarg;
 extern char *savedSeqServerHost;
 extern int savedSeqServerPort;
 
+struct curl_context_t curl_context_ranger;
 /* ----------------
  *		global variables
  * ----------------
@@ -266,6 +270,7 @@ static void log_disconnections(int code, Datum arg);
 static bool renice_current_process(int nice_level);
 static int getSlaveHostNumber(FILE *fp);
 static bool CheckSlaveFile();
+static void curl_finalize(int code, Datum arg);
 
 /*saved interrupt global variable for client_read_xxx functions*/
 static bool SavedImmediateInterruptOK = false;
@@ -587,6 +592,9 @@ ReadCommand(StringInfo inBuf)
 		result = SocketBackend(inBuf);
 	else
 		result = InteractiveBackend(inBuf);
+
+	/* reset last_query_sign to 0 when running a new sql */
+	reset_query_sign();
 	return result;
 }
 
@@ -4387,7 +4395,25 @@ PostgresMain(int argc, char *argv[], const char *username)
 		BuildFlatFiles(true);
 	}
 
-
+	/* for enable ranger*/
+	if (AmIMaster() && enable_ranger && !curl_context_ranger.hasInited)
+	{
+		memset(&curl_context_ranger, 0, sizeof(curl_context_t));
+		curl_global_init(CURL_GLOBAL_ALL);
+		/* init the curl session */
+		curl_context_ranger.curl_handle = curl_easy_init();
+		if (curl_context_ranger.curl_handle == NULL) {
+			/* cleanup curl stuff */
+			/* no need to cleanup curl_handle since it's null. just cleanup curl global.*/
+			curl_global_cleanup();
+			elog(ERROR, "initialize global curl context failed.");
+		}
+		curl_context_ranger.hasInited = true;
+		curl_context_ranger.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
+		curl_context_ranger.response.buffer_size = CURL_RES_BUFFER_SIZE;
+		elog(DEBUG3, "initialize global curl context for privileges check.");
+		on_proc_exit(curl_finalize, 0);
+	}
 	/*
 	 * Create a per-backend PGPROC struct in shared memory, except in the
 	 * EXEC_BACKEND case where this was done in SubPostmasterMain. We must do
@@ -5314,6 +5340,24 @@ PostgresMain(int argc, char *argv[], const char *username)
 	return 1;					/* keep compiler quiet */
 }
 
+static void
+curl_finalize(int code, Datum arg __MAYBE_UNUSED)
+{
+	if (AmIMaster() && curl_context_ranger.hasInited)
+	{
+		if (curl_context_ranger.response.buffer != NULL) {
+			pfree(curl_context_ranger.response.buffer);
+		}
+		/* cleanup curl stuff */
+		if (curl_context_ranger.curl_handle) {
+			curl_easy_cleanup(curl_context_ranger.curl_handle);
+		}
+		/* we're done with libcurl, so clean it up */
+		curl_global_cleanup();
+		curl_context_ranger.hasInited = false;
+		elog(DEBUG3, "finalize the global struct for curl handle context.");
+	}
+}
 
 /*
  * Obtain platform stack depth limit (in bytes)

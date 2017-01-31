@@ -32,6 +32,12 @@
 #include "postgres.h"
 #include "utils/acl.h"
 #include "utils/guc.h"
+#include "miscadmin.h"
+#include "libpq/libpq-be.h"
+#include "tcop/tcopprot.h"
+
+#define HOST_BUFFER_SIZE 1025
+#define CURL_RES_BUFFER_SIZE 1024
 
 typedef enum
 {
@@ -54,10 +60,13 @@ typedef struct curl_context_t
   struct
   {
     char* buffer;
-    int size;
+    int response_size;
+    int buffer_size;
   } response;
 
   char* last_http_reponse;
+
+  bool hasInited;
 } curl_context_t;
 
 typedef curl_context_t* CURL_HANDLE;
@@ -75,6 +84,13 @@ typedef struct RangerPrivilegeResults
 {
   RangerACLResult result;
   Oid relOid;
+
+  /* 
+   * string_hash of access[i] field of ranger request 
+   * use the sign to identify each resource result
+   */ 
+  uint32 resource_sign;
+  uint32 privilege_sign;
 } RangerPrivilegeResults;
 
 typedef struct RangerRequestJsonArgs {
@@ -85,11 +101,8 @@ typedef struct RangerRequestJsonArgs {
   bool isAll;
 } RangerRequestJsonArgs;
 
-RangerACLResult parse_ranger_response(char *);
-json_object *create_ranger_request_json_batch(List *);
-json_object *create_ranger_request_json(char *, AclObjectKind kind, char *, List *, bool);
-int call_ranger_rest(CURL_HANDLE curl_handle, const char *request);
-extern int check_privilege_from_ranger_batch(List *);
-extern int check_privilege_from_ranger(char *, AclObjectKind kind, char *, List *, bool);
+extern struct curl_context_t curl_context_ranger;
+
+int check_privilege_from_ranger(List *request_list, List *result_list);
 
 #endif

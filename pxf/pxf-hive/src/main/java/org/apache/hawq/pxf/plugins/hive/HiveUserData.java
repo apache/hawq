@@ -30,7 +30,8 @@ public class HiveUserData {
     public HiveUserData(String inputFormatName, String serdeClassName,
             String propertiesString, String partitionKeys,
             boolean filterInFragmenter,
-            String delimiter) {
+            String delimiter,
+            String colTypes) {
 
         this.inputFormatName = inputFormatName;
         this.serdeClassName = serdeClassName;
@@ -38,6 +39,7 @@ public class HiveUserData {
         this.partitionKeys = partitionKeys;
         this.filterInFragmenter = filterInFragmenter;
         this.delimiter = (delimiter == null ? "0" : delimiter);
+        this.colTypes = colTypes;
     }
 
     /**
@@ -104,6 +106,7 @@ public class HiveUserData {
     private String partitionKeys;
     private boolean filterInFragmenter;
     private String delimiter;
+    private String colTypes;
 
     /**
      * The method returns expected number of tokens in raw user data
@@ -121,6 +124,11 @@ public class HiveUserData {
                 + propertiesString + HiveUserData.HIVE_UD_DELIM
                 + partitionKeys + HiveUserData.HIVE_UD_DELIM
                 + filterInFragmenter + HiveUserData.HIVE_UD_DELIM
-                + delimiter;
+                + delimiter + HiveUserData.HIVE_UD_DELIM
+                + colTypes;
+    }
+
+    public String getColTypes() {
+        return colTypes;
     }
 }

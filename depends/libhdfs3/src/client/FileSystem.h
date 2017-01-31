@@ -24,8 +24,10 @@
 
 #include "BlockLocation.h"
 #include "DirectoryIterator.h"
+#include "EncryptionZoneIterator.h"
 #include "FileStatus.h"
 #include "FileSystemStats.h"
+#include "EncryptionZoneInfo.h"
 #include "Permission.h"
 #include "XmlConfig.h"
 
@@ -275,6 +277,36 @@ public:
      * @throws IOException
      */
     void cancelDelegationToken(const std::string & token);
+
+    /**
+     * Create encryption zone for the directory with specific key name
+     * @param path the directory path which is to be created.
+     * @param keyname The key name of the encryption zone 
+     * @return return true if success.
+     */
+    bool createEncryptionZone(const char * path, const char * keyName);
+    
+    /**
+     * To get encryption zone information.
+     * @param path the path which information is to be returned.
+     * @return the encryption zone information.
+     */
+    EncryptionZoneInfo getEZForPath(const char * path);
+
+    /**
+     * list the contents of an encryption zone;
+     * @return Return a iterator to visit all elements in this encryption zone.
+     */
+    EncryptionZoneIterator listEncryptionZone();
+
+
+   /**
+    * list all the contents of encryption zones.
+    * @param id the index of encryption zones.
+    * @return Return a vector of encryption zones information..
+    */
+    std::vector<EncryptionZoneInfo> listAllEncryptionZoneItems();
+
 
 private:
     Config conf;

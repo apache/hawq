@@ -769,6 +769,8 @@ bool		optimizer_prefer_scalar_dqa_multistage_agg;
 bool		optimizer_parallel_union;
 bool		optimizer_array_constraints;
 
+int information_schema_namespcace_oid;
+
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
 
@@ -780,6 +782,7 @@ bool gp_plpgsql_clear_cache_always = false;
 bool gp_called_by_pgdump = false;
 
 char   *rps_addr_host;
+char   *rps_addr_suffix;
 int     rps_addr_port;
 
 /*
@@ -6194,6 +6197,15 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"information_schema_namespcace_oid", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("the oid of information_schema namespace"),
+			NULL
+		},
+		&information_schema_namespcace_oid,
+		0, 0, INT_MAX, NULL, NULL
+	},
+
+	{
 		{"memory_profiler_dataset_size", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Set the size in GB"),
 			NULL,
@@ -6268,7 +6280,7 @@ static struct config_int ConfigureNamesInt[] =
       NULL
     },
     &rps_addr_port,
-    1, 1, 65535, NULL, NULL
+    8432, 1, 65535, NULL, NULL
   },
 
 	{
@@ -8184,17 +8196,26 @@ static struct config_string ConfigureNamesString[] =
     "localhost", NULL, NULL
   },
 
+  {
+    {"hawq_rps_address_suffix", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("ranger plugin server suffix of restful service address"),
+      NULL
+    },
+    &rps_addr_suffix,
+    "rps", NULL, NULL
+  },
+
 	{
-		{"standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("standby server address hostname"),
 			NULL
 		},
 		&standby_addr_host,
-		"localhost", NULL, NULL
+		"none", NULL, NULL
 	},
 
 	{
-		{"dfs_url", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_dfs_url", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("hdfs url"),
 			NULL
 		},
@@ -8203,7 +8224,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("master server data directory"),
 			NULL
 		},
@@ -8212,7 +8233,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"segment_directory", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_segment_directory", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("segment data directory"),
 			NULL
 		},

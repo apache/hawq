@@ -23,6 +23,7 @@
 #define _HDFS_LIBHDFS3_SERVER_RPCHELPER_H_
 
 #include "client/FileStatus.h"
+#include "client/EncryptionZoneInfo.h"
 #include "client/Permission.h"
 #include "ClientDatanodeProtocol.pb.h"
 #include "ClientNamenodeProtocol.pb.h"
@@ -182,6 +183,36 @@ static inline void Convert(const std::string & src, FileStatus & fs,
     fs.setSymlink(proto.symlink().c_str());
     fs.setPermission(Permission(proto.permission().perm()));
     fs.setIsdir(proto.filetype() == HdfsFileStatusProto::IS_DIR);
+
+    if (proto.has_fileencryptioninfo()){
+        const FileEncryptionInfoProto &encrypt = proto.fileencryptioninfo();
+        FileEncryptionInfo* convert = fs.getFileEncryption();
+        convert->setSuite(encrypt.suite());
+        convert->setCryptoProtocolVersion(encrypt.cryptoprotocolversion());
+        convert->setKey(encrypt.key());
+        convert->setKeyName(encrypt.keyname());
+        convert->setIv(encrypt.iv());
+        convert->setEzKeyVersionName(encrypt.ezkeyversionname()); 
+    }
+}
+
+static inline void Convert(EncryptionZoneInfo & enZone,
+                           const EncryptionZoneProto & proto) {
+    enZone.setSuite(proto.suite());
+    enZone.setCryptoProtocolVersion(proto.cryptoprotocolversion());
+    enZone.setId(proto.id());
+    enZone.setPath(proto.path().c_str());
+    enZone.setKeyName(proto.keyname().c_str());
+}
+
+static inline void Convert(std::vector<EncryptionZoneInfo> & ezl,
+                           const ListEncryptionZonesResponseProto & proto) {
+    RepeatedPtrField<EncryptionZoneProto> ptrproto = proto.zones();
+    for (int i=0; i < ptrproto.size(); i++) {
+        EncryptionZoneInfo enZoneInfo;
+        Convert(enZoneInfo, ptrproto.Get(i));
+        ezl.push_back(enZoneInfo);
+    }
 }
 
 static inline void Convert(const std::string & src,
