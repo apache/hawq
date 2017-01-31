@@ -55,25 +55,12 @@ import java.util.Properties;
  */
 public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     private static final Log LOG = LogFactory.getLog(HiveInputFormatFragmenter.class);
-    private static final int EXPECTED_NUM_OF_TOKS = 4;
-    public static final int TOK_SERDE = 0;
-    public static final int TOK_KEYS = 1;
-    public static final int TOK_FILTER_DONE = 2;
-    public static final int TOK_COL_TYPES = 3;
 
     /** Defines the Hive input formats currently supported in pxf */
     public enum PXF_HIVE_INPUT_FORMATS {
         RC_FILE_INPUT_FORMAT,
         TEXT_FILE_INPUT_FORMAT,
         ORC_FILE_INPUT_FORMAT
-    }
-
-    /** Defines the Hive serializers (serde classes) currently supported in pxf */
-    public enum PXF_HIVE_SERDES {
-        COLUMNAR_SERDE,
-        LAZY_BINARY_COLUMNAR_SERDE,
-        LAZY_SIMPLE_SERDE,
-        ORC_SERDE
     }
 
     /**
@@ -83,34 +70,6 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
      */
     public HiveInputFormatFragmenter(InputData inputData) {
         super(inputData, HiveInputFormatFragmenter.class);
-    }
-
-    /**
-     * Extracts the user data:
-     * serde, partition keys and whether filter was included in fragmenter
-     *
-     * @param input input data from client
-     * @param supportedSerdes supported serde names
-     * @return parsed tokens
-     * @throws UserDataException if user data contains unsupported serde
-     *                           or wrong number of tokens
-     */
-    static public String[] parseToks(InputData input, String... supportedSerdes)
-            throws UserDataException {
-        String userData = new String(input.getFragmentUserData());
-        String[] toks = userData.split(HIVE_UD_DELIM);
-        if (supportedSerdes.length > 0
-                && !Arrays.asList(supportedSerdes).contains(toks[TOK_SERDE])) {
-            throw new UserDataException(toks[TOK_SERDE]
-                    + " serializer isn't supported by " + input.getAccessor());
-        }
-
-        if (toks.length != (EXPECTED_NUM_OF_TOKS)) {
-            throw new UserDataException("HiveInputFormatFragmenter expected "
-                    + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
-        }
-
-        return toks;
     }
 
     /*

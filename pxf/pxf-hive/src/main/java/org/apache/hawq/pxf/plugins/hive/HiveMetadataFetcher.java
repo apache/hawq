@@ -21,33 +21,49 @@ package org.apache.hawq.pxf.plugins.hive;
 
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
-
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hawq.pxf.api.Metadata;
 import org.apache.hawq.pxf.api.MetadataFetcher;
+import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.ProfilesConf;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.ProfileFactory;
 
 /**
  * Class for connecting to Hive's MetaStore and getting schema of Hive tables.
  */
 public class HiveMetadataFetcher extends MetadataFetcher {
 
+    private static final String DELIM_FIELD = InputData.DELIMITER_KEY;
+
     private static final Log LOG = LogFactory.getLog(HiveMetadataFetcher.class);
     private HiveMetaStoreClient client;
+    private JobConf jobConf;
 
     public HiveMetadataFetcher(InputData md) {
         super(md);
 
         // init hive metastore client connection.
         client = HiveUtilities.initHiveClient();
+        jobConf = new JobConf(new Configuration());
     }
 
     /**
@@ -82,8 +98,28 @@ public class HiveMetadataFetcher extends MetadataFetcher {
             try {
                 Metadata metadata = new Metadata(tblDesc);
                 Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
-                getSchema(tbl, metadata);
+                HiveUtilities.getSchema(tbl, metadata);
+                boolean hasComplexTypes = HiveUtilities.hasComplexTypes(metadata);
                 metadataList.add(metadata);
+                List<Partition> tablePartitions = client.listPartitionsByFilter(tblDesc.getPath(), tblDesc.getName(), "", (short) -1);
+                Set<OutputFormat> formats = new HashSet<OutputFormat>();
+                //If table has partitions - find out all formats
+                for (Partition tablePartition : tablePartitions) {
+                    String inputFormat = tablePartition.getSd().getInputFormat();
+                    OutputFormat outputFormat = getOutputFormat(inputFormat, hasComplexTypes);
+                    formats.add(outputFormat);
+                }
+                //If table has no partitions - get single format of table
+                if (tablePartitions.size() == 0 ) {
+                    String inputFormat = tbl.getSd().getInputFormat();
+                    OutputFormat outputFormat = getOutputFormat(inputFormat, hasComplexTypes);
+                    formats.add(outputFormat);
+                }
+                metadata.setOutputFormats(formats);
+                Map<String, String> outputParameters = new HashMap<String, String>();
+                Integer delimiterCode = HiveUtilities.getDelimiterCode(tbl.getSd());
+                outputParameters.put(DELIM_FIELD, delimiterCode.toString());
+                metadata.setOutputParameters(outputParameters);
             } catch (UnsupportedTypeException | UnsupportedOperationException e) {
                 if(ignoreErrors) {
                     LOG.warn("Metadata fetch for " + tblDesc.toString() + " failed. " + e.getMessage());
@@ -97,42 +133,13 @@ public class HiveMetadataFetcher extends MetadataFetcher {
         return metadataList;
     }
 
-
-    /**
-     * Populates the given metadata object with the given table's fields and partitions,
-     * The partition fields are added at the end of the table schema.
-     * Throws an exception if the table contains unsupported field types.
-     * Supported HCatalog types: TINYINT,
-     * SMALLINT, INT, BIGINT, BOOLEAN, FLOAT, DOUBLE, STRING, BINARY, TIMESTAMP,
-     * DATE, DECIMAL, VARCHAR, CHAR.
-     *
-     * @param tbl Hive table
-     * @param metadata schema of given table
-     */
-    private void getSchema(Table tbl, Metadata metadata) {
-
-        int hiveColumnsSize = tbl.getSd().getColsSize();
-        int hivePartitionsSize = tbl.getPartitionKeysSize();
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Hive table: " + hiveColumnsSize + " fields, " + hivePartitionsSize + " partitions.");
-        }
-
-        // check hive fields
-        try {
-            List<FieldSchema> hiveColumns = tbl.getSd().getCols();
-            for (FieldSchema hiveCol : hiveColumns) {
-                metadata.addField(HiveUtilities.mapHiveType(hiveCol));
-            }
-            // check partition fields
-            List<FieldSchema> hivePartitions = tbl.getPartitionKeys();
-            for (FieldSchema hivePart : hivePartitions) {
-                metadata.addField(HiveUtilities.mapHiveType(hivePart));
-            }
-        } catch (UnsupportedTypeException e) {
-            String errorMsg = "Failed to retrieve metadata for table " + metadata.getItem() + ". " +
-                    e.getMessage();
-            throw new UnsupportedTypeException(errorMsg);
-        }
+    private OutputFormat getOutputFormat(String inputFormat, boolean hasComplexTypes) throws Exception {
+        OutputFormat outputFormat = null;
+        InputFormat<?, ?> fformat = HiveDataFragmenter.makeInputFormat(inputFormat, jobConf);
+        String profile = ProfileFactory.get(fformat, hasComplexTypes);
+        String outputFormatClassName = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OUTPUTFORMAT");
+        outputFormat = OutputFormat.getOutputFormat(outputFormatClassName);
+        return outputFormat;
     }
+
 }

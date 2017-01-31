@@ -22,6 +22,8 @@ package org.apache.hawq.pxf.api;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
 import org.apache.commons.lang.StringUtils;
@@ -68,14 +70,16 @@ public class Metadata {
     }
 
     /**
-     * Class representing item field - name, type, source type, modifiers.
+     * Class representing item field - name, type, source type, is complex type?, modifiers.
      * Type - exposed type of field
      * Source type - type of field in underlying source
+     * Is complex type - whether source type is complex type
      * Modifiers - additional attributes which describe type or field
      */
     public static class Field {
         private String name;
         private EnumHawqType type; // field type which PXF exposes
+        private boolean isComplexType; // whether source field's type is complex
         private String sourceType; // field type PXF reads from
         private String[] modifiers; // type modifiers, optional field
 
@@ -91,10 +95,15 @@ public class Metadata {
             this.sourceType = sourceType;
         }
 
-        public Field(String name, EnumHawqType type, String sourceType,
-                String[] modifiers) {
+        public Field(String name, EnumHawqType type, String sourceType, String[] modifiers) {
             this(name, type, sourceType);
             this.modifiers = modifiers;
+        }
+
+        public Field(String name, EnumHawqType type, boolean isComplexType, String sourceType, String[] modifiers) {
+            this(name, type, sourceType);
+            this.modifiers = modifiers;
+            this.isComplexType = isComplexType;
         }
 
         public String getName() {
@@ -112,6 +121,14 @@ public class Metadata {
         public String[] getModifiers() {
             return modifiers;
         }
+
+        public boolean isComplexType() {
+            return isComplexType;
+        }
+
+        public void setComplexType(boolean isComplexType) {
+            this.isComplexType = isComplexType;
+        }
     }
 
     /**
@@ -123,6 +140,34 @@ public class Metadata {
      * Item's fields
      */
     private List<Metadata.Field> fields;
+    private Set<OutputFormat> outputFormats;
+    private Map<String, String> outputParameters;
+
+    /**
+     * Returns an item's output formats, @see OutputFormat.
+     *
+     * @return item's output formats
+     */
+    public Set<OutputFormat> getOutputFormats() {
+        return outputFormats;
+    }
+
+    public void setOutputFormats(Set<OutputFormat> outputFormats) {
+        this.outputFormats = outputFormats;
+    }
+
+    /**
+     * Returns an item's output parameters, for example - delimiters etc.
+     *
+     * @return item's output parameters
+     */
+    public Map<String, String> getOutputParameters() {
+        return outputParameters;
+    }
+
+    public void setOutputParameters(Map<String, String> outputParameters) {
+        this.outputParameters = outputParameters;
+    }
 
     /**
      * Constructs an item's Metadata.

@@ -57,7 +57,7 @@ public class MetadataResponseFormatterTest {
         response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
-                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\"}]}]}");
+                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\",\"complexType\":false},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\",\"complexType\":false}]}]}");
 
         assertEquals(expected.toString(), convertResponseToString(response));
     }
@@ -75,7 +75,7 @@ public class MetadataResponseFormatterTest {
         response = MetadataResponseFormatter.formatResponse(metadataList, "path.file");
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
-                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\"}]}]}");
+                .append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\",\"complexType\":false},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\",\"complexType\":false}]}]}");
 
         assertEquals(expected.toString(), convertResponseToString(response));
     }
@@ -97,9 +97,9 @@ public class MetadataResponseFormatterTest {
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
                 .append("\"fields\":[")
-                .append("{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},")
-                .append("{\"name\":\"field2\",\"type\":\"numeric\",\"sourceType\":\"decimal\",\"modifiers\":[\"1349\",\"1789\"]},")
-                .append("{\"name\":\"field3\",\"type\":\"bpchar\",\"sourceType\":\"char\",\"modifiers\":[\"50\"]}")
+                .append("{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\",\"complexType\":false},")
+                .append("{\"name\":\"field2\",\"type\":\"numeric\",\"sourceType\":\"decimal\",\"modifiers\":[\"1349\",\"1789\"],\"complexType\":false},")
+                .append("{\"name\":\"field3\",\"type\":\"bpchar\",\"sourceType\":\"char\",\"modifiers\":[\"50\"],\"complexType\":false}")
                 .append("]}]}");
 
         assertEquals(expected.toString(), convertResponseToString(response));
@@ -118,7 +118,7 @@ public class MetadataResponseFormatterTest {
         StringBuilder expected = new StringBuilder("{\"PXFMetadata\":[{");
         expected.append("\"item\":{\"path\":\"default\",\"name\":\"table1\"},")
                 .append("\"fields\":[")
-                .append("{\"name\":\"field1\",\"type\":\"float8\",\"sourceType\":\"double\"}")
+                .append("{\"name\":\"field1\",\"type\":\"float8\",\"sourceType\":\"double\",\"complexType\":false}")
                 .append("]}]}");
 
         assertEquals(expected.toString(), convertResponseToString(response));
@@ -199,7 +199,7 @@ public class MetadataResponseFormatterTest {
                 expected.append(",");
             }
             expected.append("{\"item\":{\"path\":\"default\",\"name\":\"table").append(i).append("\"},");
-            expected.append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\"}]}");
+            expected.append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\",\"complexType\":false},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\",\"complexType\":false}]}");
         }
         expected.append("]}");
 
@@ -226,7 +226,7 @@ public class MetadataResponseFormatterTest {
                 expected.append(",");
             }
             expected.append("{\"item\":{\"path\":\"default").append(i).append("\",\"name\":\"table").append(i).append("\"},");
-            expected.append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\"},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\"}]}");
+            expected.append("\"fields\":[{\"name\":\"field1\",\"type\":\"int8\",\"sourceType\":\"bigint\",\"complexType\":false},{\"name\":\"field2\",\"type\":\"text\",\"sourceType\":\"string\",\"complexType\":false}]}");
         }
         expected.append("]}");
 

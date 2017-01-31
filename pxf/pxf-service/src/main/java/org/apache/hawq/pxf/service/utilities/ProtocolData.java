@@ -71,7 +71,7 @@ public class ProtocolData extends InputData {
             filterString = getProperty("FILTER");
         }
 
-        parseFormat(getProperty("FORMAT"));
+        outputFormat = OutputFormat.valueOf(getProperty("FORMAT"));
 
         host = getProperty("URL-HOST");
         port = getIntProperty("URL-PORT");
@@ -357,26 +357,6 @@ public class ProtocolData extends InputData {
         }
         throw new IllegalArgumentException("Illegal boolean value '"
                 + threadSafeStr + "'." + " Usage: [TRUE|FALSE]");
-    }
-
-    /**
-     * Sets the format type based on the input string. Allowed values are:
-     * "TEXT", "GPDBWritable".
-     *
-     * @param formatString format string
-     */
-    protected void parseFormat(String formatString) {
-        switch (formatString) {
-            case "TEXT":
-                outputFormat = OutputFormat.TEXT;
-                break;
-            case "GPDBWritable":
-                outputFormat = OutputFormat.BINARY;
-                break;
-            default:
-                throw new IllegalArgumentException(
-                        "Wrong value for greenplum.format " + formatString);
-        }
     }
 
     /*

@@ -28,6 +28,7 @@ import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.HdfsSplittableDataAccessor;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapred.InputFormat;
@@ -41,10 +42,6 @@ import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-
-import static org.apache.hawq.pxf.api.io.DataType.*;
-import static org.apache.hawq.pxf.api.io.DataType.BPCHAR;
-import static org.apache.hawq.pxf.api.io.DataType.BYTEA;
 
 /**
  * Accessor for Hive tables. The accessor will open and read a split belonging
@@ -138,12 +135,11 @@ public class HiveAccessor extends HdfsSplittableDataAccessor {
      */
     private InputFormat<?, ?> createInputFormat(InputData input)
             throws Exception {
-        String userData = new String(input.getFragmentUserData());
-        String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);
-        initPartitionFields(toks[3]);
-        filterInFragmenter = new Boolean(toks[4]);
+        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input);
+        initPartitionFields(hiveUserData.getPartitionKeys());
+        filterInFragmenter = hiveUserData.isFilterInFragmenter();
         return HiveDataFragmenter.makeInputFormat(
-                toks[0]/* inputFormat name */, jobConf);
+                hiveUserData.getInputFormatName()/* inputFormat name */, jobConf);
     }
 
     /*

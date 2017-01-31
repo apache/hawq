@@ -132,6 +132,7 @@ public class HiveMetadataFetcherTest {
         fields.add(new FieldSchema("field2", "int", null));
         StorageDescriptor sd = new StorageDescriptor();
         sd.setCols(fields);
+        sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
         Table hiveTable = new Table();
         hiveTable.setTableType("MANAGED_TABLE");
         hiveTable.setSd(sd);
@@ -176,6 +177,7 @@ public class HiveMetadataFetcherTest {
         fields.add(new FieldSchema("field2", "int", null));
         StorageDescriptor sd = new StorageDescriptor();
         sd.setCols(fields);
+        sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
 
         // Mock hive tables returned from hive client
         for(int index=1;index<=2;index++) {
@@ -235,6 +237,7 @@ public class HiveMetadataFetcherTest {
         fields.add(new FieldSchema("field2", "int", null));
         StorageDescriptor sd = new StorageDescriptor();
         sd.setCols(fields);
+        sd.setInputFormat("org.apache.hadoop.mapred.TextInputFormat");
         Table hiveTable2 = new Table();
         hiveTable2.setTableType("MANAGED_TABLE");
         hiveTable2.setSd(sd);

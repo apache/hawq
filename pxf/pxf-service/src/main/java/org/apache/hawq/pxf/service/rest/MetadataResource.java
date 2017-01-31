@@ -50,7 +50,7 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
  * Class enhances the API of the WEBHDFS REST server. Returns the metadata of a
  * given hcatalog table. <br>
  * Example for querying API FRAGMENTER from a web client:<br>
- * <code>curl -i "http://localhost:51200/pxf/{version}/Metadata/getTableMetadata?table=t1"</code>
+ * <code>curl -i "http://localhost:51200/pxf/{version}/Metadata/getMetadata?profile=PROFILE_NAME&pattern=OBJECT_PATTERN"</code>
  * <br>
  * /pxf/ is made part of the path when there is a webapp by that name in tomcat.
  */
@@ -69,7 +69,12 @@ public class MetadataResource extends RestResource {
      * Response Examples:<br>
      * For a table <code>default.t1</code> with 2 fields (a int, b float) will
      * be returned as:
-     * <code>{"PXFMetadata":[{"item":{"path":"default","name":"t1"},"fields":[{"name":"a","type":"int"},{"name":"b","type":"float"}]}]}</code>
+     * <code>{"PXFMetadata":[{"item":{"path":"default","name":"t1"},
+     * "fields":[{"name":"a","type":"int4","sourceType":"int","complexType":false},
+     * {"name":"b","type":"float8","sourceType":"double","complexType":false}],
+     * "outputFormats":["TEXT"],
+     * "outputParameters":{"DELIMITER":"1"}}]}
+     * </code>
      *
      * @param servletContext servlet context
      * @param headers http headers

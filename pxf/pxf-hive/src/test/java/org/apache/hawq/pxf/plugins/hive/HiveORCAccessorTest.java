@@ -26,6 +26,8 @@ import org.apache.hadoop.mapred.*;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -43,7 +45,7 @@ import static org.mockito.Mockito.when;
 
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({HiveORCAccessor.class, HiveInputFormatFragmenter.class, HdfsUtilities.class, HiveDataFragmenter.class})
+@PrepareForTest({HiveORCAccessor.class, HiveUtilities.class, HdfsUtilities.class, HiveDataFragmenter.class})
 @SuppressStaticInitializationFor({"org.apache.hadoop.mapred.JobConf",
         "org.apache.hadoop.hive.metastore.api.MetaException",
         "org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities"}) // Prevents static inits
@@ -61,8 +63,9 @@ public class HiveORCAccessorTest {
         jobConf = new JobConf();
         PowerMockito.whenNew(JobConf.class).withAnyArguments().thenReturn(jobConf);
 
-        PowerMockito.mockStatic(HiveInputFormatFragmenter.class);
-        PowerMockito.when(HiveInputFormatFragmenter.parseToks(any(InputData.class), any(String[].class))).thenReturn(new String[]{"", HiveDataFragmenter.HIVE_NO_PART_TBL, "true"});
+        PowerMockito.mockStatic(HiveUtilities.class);
+        PowerMockito.when(HiveUtilities.parseHiveUserData(any(InputData.class), any(PXF_HIVE_SERDES[].class))).thenReturn(new HiveUserData("", "", null, HiveDataFragmenter.HIVE_NO_PART_TBL, true, "1", ""));
+
         PowerMockito.mockStatic(HdfsUtilities.class);
 
         PowerMockito.mockStatic(HiveDataFragmenter.class);

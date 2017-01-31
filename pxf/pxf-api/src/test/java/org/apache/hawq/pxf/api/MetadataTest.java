@@ -32,7 +32,7 @@ public class MetadataTest {
     @Test
     public void createFieldEmptyNameType() {
         try {
-            Metadata.Field field = new Metadata.Field(null, null, null, null);
+            Metadata.Field field = new Metadata.Field(null, null, false, null, null);
             fail("Empty name, type and source type shouldn't be allowed.");
         } catch (IllegalArgumentException e) {
             assertEquals("Field name, type and source type cannot be empty", e.getMessage());
