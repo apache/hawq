@@ -20,41 +20,71 @@
 #
 
 if [ $# -le 0 ]; then
-  echo "Usage: rps (start|stop|init) [<catalina-args...>]"
+  echo "Usage: rps.sh (start|stop)"
   exit 1
 fi
 
-actionCmd=$1
+action=$1
 shift
 
-CWDIR=$( cd $( dirname ${BASH_SOURCE[0]} ) && pwd )
-source $CWDIR/rps_env.sh
+CWDIR=$( cd $( dirname ${BASH_SOURCE[0]} ) && pwd -P)
+BASEDIR=$( dirname ${CWDIR} )
+# read properties from the file
+source ${BASEDIR}/etc/rps.properties
 
-setup_rps() {
-  echo "Initializing Hawq Ranger Plugin Service..."
-  cp $CATALINA_HOME/conf.template/* $CATALINA_BASE/conf
-  cp $CATALINA_BASE/conf/tomcat-server.xml $CATALINA_BASE/conf/server.xml
-  pushd $CATALINA_BASE/webapps >/dev/null
-  unzip -d rps rps.war >/dev/null
-  find . -name ranger-hawq-security.xml | xargs sed -i \
-    "s/localhost:6080/$RANGER_ADMIN_HOST:$RANGER_ADMIN_PORT/g"
-  popd >/dev/null
-  echo "Hawq Ranger Plugin Service installed on http://$RPS_HOST:$RPS_PORT/rps"
-  echo "Please use 'rps.sh start' to start the service"
+export CATALINA_HOME=/usr/lib/bigtop-tomcat
+export CATALINA_BASE=${BASEDIR}/plugin-service
+export CATALINA_PID=${CATALINA_BASE}/work/rps.pid
+
+# options used to start the RPS process
+export CATALINA_OPTS="-server -Xms512m -Xmx512m -XX:MaxPermSize=128m
+                     -Dproc_rps -Dversion=${RPS_VERSION}
+                     -Dranger.hawq.instance=${RANGER_HAWQ_INSTANCE}
+                     -Drps.http.port=${RPS_HTTP_PORT} -Drps.https.port=${RPS_HTTPS_PORT}
+                     -Dpolicy.manager.url=${POLICY_MGR_URL}"
+
+# options used to stop the RPS process
+export JAVA_OPTS="-Drps.shutdown.port=${RPS_SHUTDOWN_PORT}"
+
+RPS_URL="http://localhost:${RPS_HTTP_PORT}/rps"
+RPS_LOG="${CATALINA_BASE}/logs/catalina.out"
+
+function fail() {
+    echo "FATAL: Failed to ${1} HAWQ Ranger Plugin Service. Check ${RPS_LOG} for details."
+    exit 2
 }
 
-case $actionCmd in
-  (init)
-    setup_rps
-    ;;
+function tomcat_command() {
+    ${CWDIR}/catalina.sh ${1} ${2}
+    if [ $? -ne 0 ]; then
+      fail ${1}
+    fi
+}
+
+function wait_until_server_started() {
+    echo -n "Waiting for Hawq Ranger Plugin Service to start ."
+    local retries="20"
+    local n=0
+    until $(curl -s --output /dev/null --fail ${RPS_URL}/version); do
+      n=$[${n}+1]
+      if [ ${n} -ge ${retries} ]; then
+        echo
+        fail "start"
+      fi
+      printf '.'
+      sleep 3
+    done
+    echo -e "\nHawq Ranger Plugin Service is available at ${RPS_URL}"
+}
+
+case ${action} in
   (start)
-    $CATALINA_HOME/bin/catalina.sh start "$@"
-    echo "Waiting for RPS service to start..."
-    sleep 15
+    tomcat_command "start"
+    wait_until_server_started
     ;;
   (stop)
-    $CATALINA_HOME/bin/catalina.sh stop "$@"
-    echo "Waiting for RPS service to stop..."
-    sleep 10
+    # allow the server 10 seconds after shutdown command before force killing it
+    tomcat_command "stop" "10 -force"
+    echo "Hawq Ranger Plugin Service is stopped."
     ;;
 esac

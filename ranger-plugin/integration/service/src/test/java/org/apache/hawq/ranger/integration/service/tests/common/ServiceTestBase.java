@@ -67,7 +67,8 @@ public abstract class ServiceTestBase {
     private static final String RANGER_URL = String.format("http://%s:%s/service/public/v2/api", RANGER_HOST, RANGER_PORT);
     private static final String RANGER_POLICY_URL = RANGER_URL + "/policy";
 
-    private static final int POLICY_REFRESH_INTERVAL = 6000;
+    private static final String POLICY_WAIT_INTERVAL_PROP_NAME = "policy.wait.interval.ms";
+    private static final int POLICY_WAIT_INTERVAL = Integer.parseInt(System.getProperty(POLICY_WAIT_INTERVAL_PROP_NAME, "6000"));
     private static final TypeReference<HashMap<String,Object>> typeMSO = new TypeReference<HashMap<String,Object>>() {};
 
     private RESTClient rest = new RESTClient();
@@ -132,7 +133,7 @@ public abstract class ServiceTestBase {
 
     private void waitForPolicyRefresh() {
         try {
-            Thread.sleep(POLICY_REFRESH_INTERVAL);
+            Thread.sleep(POLICY_WAIT_INTERVAL);
         }
         catch (InterruptedException e) {
             LOG.error(e);

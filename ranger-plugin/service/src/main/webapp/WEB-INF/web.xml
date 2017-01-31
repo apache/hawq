@@ -31,10 +31,9 @@ under the License.
         init-param		com.sun.jersey.config.property.packages
                             Tells Jersey where are the REST components of this webapp
                         jersey.config.server.provider.scanning.recursive
-                            Tells Jersey to recusively scan package for REST resources
+                            Tells Jersey to scan package for REST resources recursively
         load-on-startup	Initialize the webapp on app server startup
-        servlet-mapping	Maps the path of the servlet (ranger-plugin/*)
-        listener		A class called after the webapp was initialized and before it's about to go down
+        servlet-mapping	Maps the path of the servlet under the context (/*)
     -->
 
     <servlet>
@@ -54,19 +53,4 @@ under the License.
         <servlet-name>HAWQ_Ranger_Plugin_Service</servlet-name>
         <url-pattern>/*</url-pattern>
     </servlet-mapping>
-
-    <!--
-    <listener>
-        <listener-class>org.apache.hawq.pxf.service.rest.ServletLifecycleListener</listener-class>
-    </listener>
-    -->
-    <!-- log4j configuration
-         Log4jConfigListener looks for a file under log4jConfigLocation.
-         When not using absolute path, the path starts from the webapp root directory.
-         If this file cannot be read, log4j will revert to using the default
-         pxf-log4j.properties inside the webapp. -->
-    <context-param>
-        <param-name>log4jConfigLocation</param-name>
-        <param-value>/etc/pxf/conf/pxf-log4j.properties</param-value>
-    </context-param>
 </web-app>

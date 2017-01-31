@@ -19,12 +19,5 @@
 # under the License.
 #
 
-export CATALINA_HOME=/usr/lib/bigtop-tomcat
-export CATALINA_BASE=/usr/local/hawq/ranger/plugin-service
-
-export RANGER_ADMIN_HOST=${RANGER_ADMIN_HOST:-localhost}
-export RANGER_ADMIN_PORT=${RANGER_ADMIN_PORT:-6080}
-
-export RPS_HOST=${RPS_HOST:-localhost}
-export RPS_PORT=${RPS_PORT:-8432}
-export CATALINA_OPTS="-Dhttp.host=$RPS_HOST -Dhttp.port=$RPS_PORT"
+# allow the webapp to see config files in this directory from its classpath
+export CLASSPATH=$(dirname ${CATALINA_BASE})/etc
