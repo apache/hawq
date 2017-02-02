@@ -51,7 +51,7 @@ function fail() {
 }
 
 function tomcat_command() {
-    ${CATALINA_HOME}/bin/catalina.sh ${1}
+    ${CWDIR}/catalina.sh ${1} ${2}
     if [ $? -ne 0 ]; then
       fail ${1}
     fi
@@ -59,40 +59,18 @@ function tomcat_command() {
 
 function wait_until_server_started() {
     echo "Waiting for Hawq Ranger Plugin Service to start ."
-    local pid="20"
+    local retries="20"
     local n=0
     until $(curl -s --output /dev/null --fail ${RPS_URL}/version); do
       n=$[${n}+1]
       if [ ${n} -ge ${retries} ]; then
+        echo
         fail "start"
       fi
       printf '.'
       sleep 3
     done
-    echo "Hawq Ranger Plugin Service is available at ${RPS_URL}"
-}
-
-function wait_until_server_stopped() {
-    if [ ${RPS_PID} -ne 0 ]; then
-      local retries="20"
-      local n=0
-      while $(ps -p ${1} > /dev/null); do
-        n=$[${n}+1]
-        if [ ${n} -ge ${retries} ]; then
-          fail "stop"
-        fi
-        printf '.'
-        sleep 3
-      done
-    fi
-}
-
-function get_pid() {
-    local pid=0
-    if [ -f "${CATALINA_PID}" ]; then
-        pid=$(cat "$CATALINA_PID")
-    fi
-    echo ${pid}
+    echo -e "\nHawq Ranger Plugin Service is available at ${RPS_URL}"
 }
 
 case ${action} in
@@ -101,8 +79,8 @@ case ${action} in
     wait_until_server_started
     ;;
   (stop)
-    RPS_PID=$(get_pid)
-    tomcat_command "stop"
-    wait_until_server_stopped
+    # allow the server 10 seconds after shutdown command before force killing it
+    tomcat_command "stop" "10 -force"
+    echo "Hawq Ranger Plugin Service is stopped."
     ;;
 esac

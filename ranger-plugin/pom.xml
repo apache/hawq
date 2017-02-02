@@ -89,6 +89,9 @@
                                 <source>
                                     <location>scripts/rps.sh</location>
                                 </source>
+                                <source>
+                                    <location>scripts/catalina.sh</location>
+                                </source>
                             </sources>
                         </mapping>
                         <mapping>
