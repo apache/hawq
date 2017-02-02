@@ -37,7 +37,7 @@
 
     <property>
         <name>ranger.plugin.hawq.policy.rest.url</name>
-        <value>http://localhost:6080</value>
+        <value>${ranger.admin.url}</value>
         <description>
             URL to Ranger Admin
         </description>

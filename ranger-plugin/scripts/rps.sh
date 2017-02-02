@@ -37,7 +37,11 @@ export CATALINA_BASE=${BASEDIR}/plugin-service
 export CATALINA_PID=${CATALINA_BASE}/work/rps.pid
 
 # options used to start the RPS process
-export CATALINA_OPTS="-server -Xms512m -Xmx512m -XX:MaxPermSize=128m -Dproc_rps -Dversion=${RPS_VERSION} -Dranger.hawq.instance=${RANGER_HAWQ_INSTANCE} -Drps.http.port=${RPS_HTTP_PORT} -Drps.https.port=${RPS_HTTPS_PORT}"
+export CATALINA_OPTS="-server -Xms512m -Xmx512m -XX:MaxPermSize=128m" \
+                     "-Dproc_rps -Dversion=${RPS_VERSION}" \
+                     "-Dranger.hawq.instance=${RANGER_HAWQ_INSTANCE}" \
+                     "-Drps.http.port=${RPS_HTTP_PORT} -Drps.https.port=${RPS_HTTPS_PORT}" \
+                     "-Dranger.admin.url=${POLICY_MGR_URL}"
 
 # options used to stop the RPS process
 export JAVA_OPTS="-Drps.shutdown.port=${RPS_SHUTDOWN_PORT}"
@@ -58,7 +62,7 @@ function tomcat_command() {
 }
 
 function wait_until_server_started() {
-    echo "Waiting for Hawq Ranger Plugin Service to start ."
+    echo -n "Waiting for Hawq Ranger Plugin Service to start ."
     local retries="20"
     local n=0
     until $(curl -s --output /dev/null --fail ${RPS_URL}/version); do
