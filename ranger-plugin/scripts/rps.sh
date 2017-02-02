@@ -37,11 +37,11 @@ export CATALINA_BASE=${BASEDIR}/plugin-service
 export CATALINA_PID=${CATALINA_BASE}/work/rps.pid
 
 # options used to start the RPS process
-export CATALINA_OPTS="-server -Xms512m -Xmx512m -XX:MaxPermSize=128m" \
-                     "-Dproc_rps -Dversion=${RPS_VERSION}" \
-                     "-Dranger.hawq.instance=${RANGER_HAWQ_INSTANCE}" \
-                     "-Drps.http.port=${RPS_HTTP_PORT} -Drps.https.port=${RPS_HTTPS_PORT}" \
-                     "-Dranger.admin.url=${POLICY_MGR_URL}"
+export CATALINA_OPTS="-server -Xms512m -Xmx512m -XX:MaxPermSize=128m
+                     -Dproc_rps -Dversion=${RPS_VERSION}
+                     -Dranger.hawq.instance=${RANGER_HAWQ_INSTANCE}
+                     -Drps.http.port=${RPS_HTTP_PORT} -Drps.https.port=${RPS_HTTPS_PORT}
+                     -Dpolicy.manager.url=${POLICY_MGR_URL}"
 
 # options used to stop the RPS process
 export JAVA_OPTS="-Drps.shutdown.port=${RPS_SHUTDOWN_PORT}"

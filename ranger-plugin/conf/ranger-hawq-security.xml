@@ -37,7 +37,7 @@
 
     <property>
         <name>ranger.plugin.hawq.policy.rest.url</name>
-        <value>${ranger.admin.url}</value>
+        <value>${policy.manager.url}</value>
         <description>
             URL to Ranger Admin
         </description>
