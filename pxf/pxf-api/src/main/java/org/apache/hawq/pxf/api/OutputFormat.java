@@ -21,7 +21,7 @@ package org.apache.hawq.pxf.api;
 
 
 /**
- * PXF supported output formats: {@link org.apache.hawq.pxf.service.io.Text} and {@link org.apache.hawq.pxf.service.io.GPDBWritable}
+ * PXF supported output formats, enum which contains serializations classes
  */
 public enum OutputFormat {
     TEXT("org.apache.hawq.pxf.service.io.Text"),
