@@ -44,7 +44,8 @@ public enum OutputFormat {
 
     /**
      * Looks up output format for given class name if it exists.
-     *
+     * 
+     * @param className class name implementing certain output format
      * @throws UnsupportedTypeException if output format with given class wasn't found
      * @return an output format with given class name
      */
