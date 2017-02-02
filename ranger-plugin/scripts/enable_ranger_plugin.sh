@@ -20,7 +20,7 @@
 #
 
 function usage() {
-  echo "USAGE: register_hawq.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password -h hawq_host:hawq_port -w hawq_user -q hawq_password"
+  echo "USAGE: enable_ranger_plugin.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password -h hawq_host:hawq_port -w hawq_user -q hawq_password"
   exit 1
 }
 
