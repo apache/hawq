@@ -34,8 +34,8 @@ else
 	source $env_script
 fi
 
-pxf_user=$PXF_USER
-instance_port=$PXF_PORT
+pxf_user=${PXF_USER:-pxf}
+instance_port=${PXF_PORT:-51200}
 instance_name=pxf-service
 
 if [ -z $PXF_HOME ]; then
