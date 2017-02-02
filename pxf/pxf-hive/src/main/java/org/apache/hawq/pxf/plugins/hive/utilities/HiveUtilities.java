@@ -455,11 +455,11 @@ public class HiveUtilities {
     /**
      * The method which serializes fragment-related attributes, needed for reading and resolution to string
      *
-     * @param fragmenterClassName
-     * @param partData
-     * @param filterInFragmenter
+     * @param fragmenterClassName fragmenter class name
+     * @param partData partition data
+     * @param filterInFragmenter whether filtering was done in fragmenter
      * @return serialized representation of fragment-related attributes
-     * @throws Exception
+     * @throws Exception when error occurred during serialization
      */
     @SuppressWarnings("unchecked")
     public static byte[] makeUserData(String fragmenterClassName, HiveTablePartition partData, boolean filterInFragmenter) throws Exception {
@@ -494,7 +494,7 @@ public class HiveUtilities {
      * @param input input data
      * @param supportedSerdes list of allowed serdes in current context
      * @return instance of HiveUserData class
-     * @throws UserDataException
+     * @throws UserDataException when incorrect number of tokens in Hive user data received
      */
     public static HiveUserData parseHiveUserData(InputData input, PXF_HIVE_SERDES... supportedSerdes) throws UserDataException{
         String userData = new String(input.getFragmentUserData());
@@ -610,10 +610,11 @@ public class HiveUtilities {
     /**
      * Creates an instance of a given serde type
      *
-     * @param serdeType
-     * @param allowedSerdes
+     * @param serdeType SerDe type
+     * @param allowedSerdes allowed serdes in current context
      * @return instance of a given serde
      * @throws UnsupportedTypeException if given serde is not allowed in current context
+     * @throws Exception if other error occurred during creation of SerDe instance
      */
     @SuppressWarnings("deprecation")
     public static SerDe createDeserializer(PXF_HIVE_SERDES serdeType, PXF_HIVE_SERDES... allowedSerdes) throws Exception{
