@@ -21,7 +21,8 @@ package org.apache.hawq.ranger.authorization;
 
 import org.junit.Test;
 
-import static org.apache.hawq.ranger.authorization.Utils.APP_ID_PROPERTY;
+import static org.apache.hawq.ranger.authorization.Utils.APP_ID_PROPERTY_ENV;
+import static org.apache.hawq.ranger.authorization.Utils.VERSION_PROPERTY_ENV;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -30,19 +31,26 @@ import static org.junit.Assert.assertEquals;
 public class UtilsTest {
 
     @Test
-    public void testCustomAppId_SystemEnv() throws Exception {
-        System.setProperty(APP_ID_PROPERTY, "app-id");
+    public void testAppId_SystemEnv() throws Exception {
+        System.setProperty(APP_ID_PROPERTY_ENV, "app-id");
         assertEquals("app-id", Utils.getAppId());
-        System.clearProperty(APP_ID_PROPERTY);
+        System.clearProperty(APP_ID_PROPERTY_ENV);
     }
 
     @Test
-    public void testCustomAppId_PropertyFile() throws Exception {
+    public void testAppId_PropertyFile() throws Exception {
         assertEquals("instance-test", Utils.getAppId());
     }
 
     @Test
-    public void testGetVersion() throws Exception {
+    public void testGetVersion_SystemEnv() throws Exception {
+        System.setProperty(VERSION_PROPERTY_ENV, "1.2.3");
+        assertEquals("1.2.3", Utils.getVersion());
+        System.clearProperty(VERSION_PROPERTY_ENV);
+    }
+
+    @Test
+    public void testGetVersion_PropertyFile() throws Exception {
         assertEquals("version-test", Utils.getVersion());
     }
 }

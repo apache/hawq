@@ -21,4 +21,3 @@
 
 # allow the webapp to see config files in this directory from its classpath
 export CLASSPATH=$(dirname ${CATALINA_BASE})/etc
-export CATALINA_OPTS="-server -Xms512m -Xmx512m -XX:MaxPermSize=128m"

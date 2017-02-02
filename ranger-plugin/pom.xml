@@ -84,13 +84,10 @@
                             <filemode>755</filemode>
                             <sources>
                                 <source>
-                                    <location>scripts/register_hawq.sh</location>
+                                    <location>scripts/enable_ranger_plugin.sh</location>
                                 </source>
                                 <source>
                                     <location>scripts/rps.sh</location>
-                                </source>
-                                <source>
-                                    <location>scripts/rps-env.sh</location>
                                 </source>
                             </sources>
                         </mapping>
