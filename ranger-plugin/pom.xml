@@ -149,7 +149,10 @@
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/lib</directory>
                             <sources>
                                 <source>
-                                    <location>service/target/ranger-plugin-service-${project.version}/WEB-INF/lib/hadoop-common-*.jar</location>
+                                    <location>service/target/ranger-plugin-service-${project.version}/WEB-INF/lib</location>
+                                    <includes>
+                                        <include>hadoop-common-*.jar</include>
+                                    </includes>
                                 </source>
                             </sources>
                         </mapping>
