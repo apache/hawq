@@ -45,7 +45,7 @@
 
     <property>
         <name>ranger.plugin.hawq.policy.rest.ssl.config.file</name>
-        <value>/usr/local/hawq/ranger/etc/ranger-policymgr-ssl.xml</value>
+        <value>ranger-policymgr-ssl.xml</value>
         <description>
             Path to the file containing SSL details to contact Ranger Admin
         </description>
@@ -61,7 +61,7 @@
 
     <property>
         <name>ranger.plugin.hawq.policy.cache.dir</name>
-        <value>/usr/local/hawq/ranger/plugin-service/work/policycache</value>
+        <value>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/work/policycache</value>
         <description>
             Directory where Ranger policies are cached after successful retrieval from the source
         </description>

@@ -19,7 +19,6 @@
 
     <!--APR library loader. Documentation at /docs/apr.html -->
     <Listener className="org.apache.catalina.core.AprLifecycleListener" SSLEngine="on" />
-    <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
 
     <Service name="Catalina">
         <Connector port="${rps.http.port}" redirectPort="${rps.https.port}" protocol="HTTP/1.1"

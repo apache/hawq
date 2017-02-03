@@ -105,6 +105,9 @@
                                     <location>service/target/conf/ranger-hawq-security.xml</location>
                                 </source>
                                 <source>
+                                    <location>service/target/conf/ranger-hawq-audit.xml</location>
+                                </source>
+                                <source>
                                     <location>service/target/conf/rps.properties</location>
                                 </source>
                                 <source>
