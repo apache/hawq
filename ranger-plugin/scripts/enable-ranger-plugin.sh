@@ -207,7 +207,7 @@ function create_hawq_service_instance() {
 function update_ranger_url() {
   local policy_mgr_url="http://${RANGER_URL}"
   local prop_file=$(dirname ${SCRIPT_DIR})/etc/rps.properties
-  sed -i -e "/^POLICY_MGR_URL=/s|=.*|=${policy_mgr_url}|g" ${prop_file}
+  sed -i -e "s|^POLICY_MGR_URL=.*|POLICY_MGR_URL=${policy_mgr_url}|g" ${prop_file}
   echo "Updated POLICY_MGR_URL to ${policy_mgr_url} in ${prop_file}"
 }
 
