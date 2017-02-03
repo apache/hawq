@@ -84,7 +84,7 @@
                             <filemode>755</filemode>
                             <sources>
                                 <source>
-                                    <location>scripts/enable_ranger_plugin.sh</location>
+                                    <location>scripts/enable-ranger-plugin.sh</location>
                                 </source>
                                 <source>
                                     <location>scripts/rps.sh</location>
