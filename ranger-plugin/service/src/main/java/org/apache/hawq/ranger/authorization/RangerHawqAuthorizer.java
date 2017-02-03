@@ -68,7 +68,7 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
      */
     private RangerHawqAuthorizer() {
 
-        LOG.info("Initializing RangerHawqAuthorizer");
+        LOG.info("********** Initializing RangerHawqAuthorizer **********");
 
         String appId = Utils.getAppId();
 
@@ -76,7 +76,7 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
         rangerPlugin = new RangerBasePlugin(HAWQ, appId);
         rangerPlugin.setResultProcessor(new RangerDefaultAuditHandler());
         rangerPlugin.init();
-        LOG.info(String.format("Initialized RangerBasePlugin for service %s:%s", HAWQ, appId));
+        LOG.info(String.format("********** Initialized RangerBasePlugin for service %s:%s **********", HAWQ, appId));
     }
 
     @Override

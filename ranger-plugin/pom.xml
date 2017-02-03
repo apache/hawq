@@ -146,6 +146,14 @@
                             </sources>
                         </mapping>
                         <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/lib</directory>
+                            <sources>
+                                <source>
+                                    <location>service/target/ranger-plugin-service-{project.version}/WEB-INF/lib/hadoop-common-*.jar</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/logs</directory>
                         </mapping>
                         <mapping>
