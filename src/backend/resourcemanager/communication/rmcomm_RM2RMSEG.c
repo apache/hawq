@@ -191,10 +191,10 @@ void receivedRUAliveResponse(AsyncCommMessageHandlerContext  context,
 			if (Gp_role != GP_ROLE_UTILITY)
 			{
 				SimpStringPtr description = build_segment_status_description(segres->Stat);
-				update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+				update_segment_status(segres->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 									  SEGMENT_STATUS_DOWN,
 									  (description->Len > 0)?description->Str:"");
-				add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+				add_segment_history_row(segres->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 										GET_SEGRESOURCE_HOSTNAME(segres),
 										description->Str);
 
@@ -257,10 +257,10 @@ void sentRUAliveError(AsyncCommMessageHandlerContext context)
 		if (Gp_role != GP_ROLE_UTILITY)
 		{
 			SimpStringPtr description = build_segment_status_description(segres->Stat);
-			update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+			update_segment_status(segres->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 								  SEGMENT_STATUS_DOWN,
 								  (description->Len > 0)?description->Str:"");
-			add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+			add_segment_history_row(segres->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 									GET_SEGRESOURCE_HOSTNAME(segres),
 									description->Str);
 
