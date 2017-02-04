@@ -42,6 +42,7 @@
 #include "communication/rmcomm_RMSEG2RM.h"
 #include "communication/rmcomm_RM2RMSEG.h"
 #include "storage/proc.h"
+#include "storage/pmsignal.h" /* PostmasterIsAlive */
 #include "catalog/pg_database.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/catalog.h"
@@ -831,11 +832,6 @@ int initializeDRMInstance(MCTYPE context)
 	
     initializeDQueue(&(DRMGlobalInstance->LocalHostTempDirectories),   context);
     DRMGlobalInstance->LocalHostFailedTmpDirList = NULL;
-
-    HASHCTL ctl;
-    ctl.keysize                                 = sizeof(TmpDirKey);
-    ctl.entrysize                               = sizeof(TmpDirEntry);
-    ctl.hcxt                                    = context;
 
 	/* Tell the working threads keep running. */
 	DRMGlobalInstance->ResManagerMainKeepRun 	= true;
@@ -2765,7 +2761,7 @@ int  loadHostInformationIntoResourcePool(void)
         SegStat segstat = (SegStat)rm_palloc0(PCONTEXT,
                                               offsetof(SegStatData, Info) +
                                               seginfobuff.Cursor + 1);
-        segstat->ID                = SEGSTAT_ID_INVALID;
+        segstat->Info.ID           = SEGSTAT_ID_INVALID;
         segstat->FTSAvailable      = RESOURCE_SEG_STATUS_AVAILABLE;
         segstat->FTSTotalMemoryMB  = DRMGlobalInstance->SegmentMemoryMB;
         segstat->FTSTotalCore      = DRMGlobalInstance->SegmentCore;

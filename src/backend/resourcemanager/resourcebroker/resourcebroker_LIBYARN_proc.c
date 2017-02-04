@@ -833,7 +833,7 @@ int handleRM2RB_AllocateResource(void)
 		}
 	}
 
-	elog(DEBUG3, "LIBYARN mode resource broker process read %d bytes in.",
+	elog(DEBUG3, "LIBYARN mode resource broker process read "UINT64_FORMAT" bytes in.",
 				 request.MsgLength + sizeof(RPCRequestRBAllocateResourceContainersData));
 
 	if ( YARNJobID == NULL )
@@ -1487,7 +1487,7 @@ int RB2YARN_getClusterReport(DQueue hosts)
     											  offsetof(SegStatData, Info) +
 												  segsize);
 
-    		segstat->ID     					 = SEGSTAT_ID_INVALID;
+    		segstat->Info.ID     				 = SEGSTAT_ID_INVALID;
     		segstat->FTSAvailable 				 = RESOURCE_SEG_STATUS_UNSET;
     		segstat->GRMTotalMemoryMB  	   		 = pnodereport->memoryCapability;
     		segstat->GRMTotalCore	  	   		 = pnodereport->vcoresCapability;
