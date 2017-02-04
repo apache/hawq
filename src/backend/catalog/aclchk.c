@@ -298,6 +298,14 @@ ExecuteGrantStmt(GrantStmt *stmt)
 	bool		added_objs = false;
 
 	/*
+	 * Don't allow GRANT/REVOKE if in ranger mode.
+	 */
+	if (aclType == HAWQ_ACL_RANGER)
+	{
+		elog(ERROR, "GRANT/REVOKE is not allowed in ranger mode");
+	}
+
+	/*
 	 * Turn the regular GrantStmt into the InternalGrant form.
 	 */
 	istmt.is_grant = stmt->is_grant;

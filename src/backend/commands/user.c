@@ -1902,6 +1902,14 @@ GrantRole(GrantRoleStmt *stmt)
 	List		*grantee_ids;
 	ListCell	*item;
 
+	/*
+	 * Don't allow GRANT/REVOKE if in ranger mode.
+	 */
+	if (aclType == HAWQ_ACL_RANGER)
+	{
+		elog(ERROR, "GRANT/REVOKE is not allowed in ranger mode");
+	}
+
 	if (stmt->grantor)
 		grantor = get_roleid_checked(stmt->grantor);
 	else
