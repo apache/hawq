@@ -20,6 +20,7 @@
 #include "envswitch.h"
 #include "dynrm.h"
 #include "utils/hashtable.h"
+#include "cdb/cdbfts.h"
 
 #include "resourcemanager/resourcemanager.h"
 #include "resourceenforcer/resourceenforcer.h"
@@ -66,6 +67,11 @@
 
 extern bool FindMyDatabase(const char *name, Oid *db_id, Oid *db_tablespace);
 static char *probeDatabase = "template1";
+
+/* Bitmap to monitor segment health info (up/down). */
+bits8 *shm_segment_status;
+void MarkSegmentUp(int x);
+void MarkSegmentDown(int x);
 
 int  loadAllQueueAndUser(void);
 int  loadHostInformationIntoResourcePool(void);
@@ -3013,4 +3019,75 @@ bool cleanedAllGRMContainers(void)
 	/* Condition 2. No on-the-fly GRM containers for increasing and decreasing.*/
 	return PRESPOOL->AddPendingContainerCount == 0 &&
 		   PRESPOOL->RetPendingContainerCount == 0;
+}
+
+int SegmentStatus_ShmSize(void)
+{
+	return (FTS_MAX_DBS >> 3) + 1;
+}
+
+void SegmentStatusShmemReset(void)
+{
+	/* For each bit, 0 means an invalid node (down or non-existent). */
+	MemSet(shm_segment_status, 0, SegmentStatus_ShmSize());
+}
+
+void SegmentStatusShmemInit(void)
+{
+	bool found;
+
+	shm_segment_status = (bits8 *)ShmemInitStruct(
+		"Segment status (up/down. Monitored by RM)", SegmentStatus_ShmSize(), &found);
+
+	if (!shm_segment_status)
+		elog(FATAL, "could not initialize segment status bitmap (shared memory).");
+
+	if (found)
+		return;
+
+	SegmentStatusShmemReset();
+}
+
+void MarkSegmentDown(int x)
+{
+	int octnum, bitnum;
+
+    if (x < 0 || x >= FTS_MAX_DBS)
+        elog(ERROR, "Segment ID is out of range (%d)", x);
+
+	octnum = x >> 3;
+	bitnum = x & 0x7;
+
+	/* Clear the bit. */
+	shm_segment_status[octnum] &= ~(1 << bitnum);
+}
+
+void MarkSegmentUp(int x)
+{
+	int octnum, bitnum;
+
+    if (x < 0 || x >= FTS_MAX_DBS)
+        elog(ERROR, "Segment ID is out of range (%d)", x);
+
+	octnum = x >> 3;
+	bitnum = x & 0x7;
+
+	/* Set the bit. */
+	shm_segment_status[octnum] |= (1 << bitnum);
+}
+
+bool IsSegmentDown(int x)
+{
+	int octnum, bitnum;
+
+    if (x < 0 || x >= FTS_MAX_DBS)
+        elog(ERROR, "Segment ID is out of range (%d)", x);
+
+	octnum = x >> 3;
+	bitnum = x & 0x7;
+
+	if ((shm_segment_status[octnum] & (1 << bitnum)) == 0)
+		return true;
+
+	return false;
 }

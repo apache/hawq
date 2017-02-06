@@ -42,6 +42,8 @@
 #include "utils/guc_tables.h"	/* TODO: manipulate gucs */
 #include "portability/instr_time.h"	/* Monitor the dispatcher performance */
 
+#include "resourcemanager/dynrm.h"
+
 typedef enum ExecutorMgrConstant {
 	EXECUTORMGR_CANCEL_ERROR_BUFFER_SIZE = 256,
 } ExecutorMgrConstant;
@@ -320,6 +322,12 @@ executormgr_get_executor_result(QueryExecutor *executor)
 }
 
 int
+executormgr_get_ID(QueryExecutor *executor)
+{
+	return executor->desc->segment->ID;
+}
+
+int
 executormgr_get_fd(QueryExecutor *executor)
 {
 	return PQsocket(executor->desc->conn);
@@ -399,7 +407,7 @@ executormgr_is_dispatchable(QueryExecutor *executor)
 
 	if (!executormgr_validate_conn(conn) || PQstatus(conn) == CONNECTION_BAD)
 	{
-		write_log("function executormgr_is_dispatchable meets error, connection is bad.");
+		write_log("function %s meets error, connection is bad.", __func__);
 		executormgr_catch_error(executor);
 		return false;
 	}
@@ -469,6 +477,26 @@ error:
 	write_log("function executormgr_dispatch_and_run meets error.");
 	executormgr_catch_error(executor);
 	return false;
+}
+
+bool
+executormgr_check_segment_status(QueryExecutor *executor)
+{
+	/*
+	 * Cancel the query if a segment is down. QEs could hang in interconnect
+	 * until timeout when one segment is down. This will cause QD keep polling
+	 * until QE timeout.
+	 */
+	int ID = executormgr_get_ID(executor);
+
+	if (IsSegmentDown(ID))
+	{
+		cdbdisp_seterrcode(ERRCODE_GP_INTERCONNECTION_ERROR, -1,
+						   executormgr_get_executor_result(executor));
+		return false;
+	}
+
+	return true;
 }
 
 /*
@@ -547,7 +575,7 @@ executormgr_consume(QueryExecutor *executor)
 
 connection_error:
 	/* Let caller deal with connection error. */
-	write_log("function executormgr_consume meets error, connection is bad.");
+	write_log("function %s meets error, connection is bad.", __func__);
 	executormgr_catch_error(executor);
 	return false;
 }
