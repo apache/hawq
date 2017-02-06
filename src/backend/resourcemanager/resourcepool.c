@@ -78,6 +78,8 @@ int __DRM_NODERESPOOL_comp_ratioFree(void *arg, void *val1, void *val2);
 int __DRM_NODERESPOOL_comp_ratioAlloc(void *arg, void *val1, void *val2);
 int __DRM_NODERESPOOL_comp_combine(void *arg, void *val1, void *val2);
 
+extern void MarkSegmentUp(int x);
+
 /*
  * The balanced BST index comparing function. The segment containing most
  * available resource is ordered at the left most, the segment not in
@@ -411,6 +413,8 @@ void cleanup_segment_config()
 	PQExpBuffer sql = NULL;
 	PGresult* result = NULL;
 
+	SegmentStatusShmemReset();
+
 	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
 	conn = PQconnectdb(conninfo);
@@ -647,6 +651,19 @@ void update_segment_status(int32_t id, char status, char* description)
 	else if (status == SEGMENT_STATUS_DOWN)
 		Assert(strlen(description) != 0);
 
+	/* For segment nodes only. */
+	if (id >= REGISTRATION_ORDER_OFFSET)
+	{
+		if (status == SEGMENT_STATUS_UP)
+			MarkSegmentUp(id - REGISTRATION_ORDER_OFFSET);
+		else if (status == SEGMENT_STATUS_DOWN)
+			MarkSegmentDown(id - REGISTRATION_ORDER_OFFSET);
+		else
+			elog(ERROR, "Unrecognized segment status character: '%c' "
+						"(Should be one of '%c' and '%c')", status,
+						SEGMENT_STATUS_UP, SEGMENT_STATUS_DOWN);
+	}
+
 	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
 	conn = PQconnectdb(conninfo);
@@ -813,6 +830,19 @@ void add_segment_config_row(int32_t id,
 	char conninfo[512];
 	PQExpBuffer sql = NULL;
 	PGresult* result = NULL;
+
+	/* For segment nodes only. */
+	if (id >= REGISTRATION_ORDER_OFFSET)
+	{
+		if (status == SEGMENT_STATUS_UP)
+			MarkSegmentUp(id - REGISTRATION_ORDER_OFFSET);
+		else if (status == SEGMENT_STATUS_DOWN)
+			MarkSegmentDown(id - REGISTRATION_ORDER_OFFSET);
+		else
+			elog(ERROR, "Unrecognized segment status character: '%c' "
+						"(Should be one of '%c' and '%c')", status,
+						SEGMENT_STATUS_UP, SEGMENT_STATUS_DOWN);
+	}
 
 	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);

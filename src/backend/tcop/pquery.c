@@ -832,7 +832,8 @@ AllocateResource(QueryResourceLife   life,
 			seg->hdfsHostname 	= qdseginfo->QD_HdfsHostName == NULL ?
 								  NULL :
 								  pstrdup(qdseginfo->QD_HdfsHostName);
-			seg->segindex 	  	= i;
+			seg->segindex   	= i;
+			seg->ID 			= qdseginfo->QD_SegInfo->ID;
 			seg->master   		= qdseginfo->QD_SegInfo->master;
 			seg->port     		= qdseginfo->QD_SegInfo->port;
 			seg->standby  		= qdseginfo->QD_SegInfo->standby;
@@ -849,8 +850,8 @@ AllocateResource(QueryResourceLife   life,
 
 			elog(DEBUG3, "Get allocated segment located at : %s:%d,"
 					  "Address:%s,"
-					  "Master:%d,Standby:%d,Alive:%d,ID:%d, "
-					  "HDFS Host:%s",
+					  "Master:%d,Standby:%d,Alive:%d,internl index:%d, "
+					  "Global ID:%d, HDFS Host:%s",
 					  seg->hostname,
 					  seg->port,
 					  seg->hostip,
@@ -858,6 +859,7 @@ AllocateResource(QueryResourceLife   life,
 					  seg->standby,
 					  seg->alive,
 					  seg->segindex,
+					  seg->ID,
 					  (seg->hdfsHostname == NULL ? "NULL" : seg->hdfsHostname));
 		}
 	}
@@ -959,7 +961,6 @@ static void
 RemoveFromGlobalQueryResources(int resourceId, QueryResourceLife life)
 {
   ListCell *lc;
-  QueryResourceItem *newItem;
   MemoryContext old;
 
   if (life == QRL_NONE)
@@ -991,8 +992,6 @@ static void
 SetResourcesAllocatedSucceed(int resourceId, QueryResourceLife life)
 {
 	ListCell *lc;
-	QueryResourceItem *newItem;
-	MemoryContext old;
 
 	if (life == QRL_NONE)
 	{
@@ -1019,7 +1018,7 @@ FreeResource(QueryResource *resource)
 	ListCell	*lc;
 	int			ret;
 	char		errorbuf[1024];
-	bool found = false;
+	bool __MAYBE_UNUSED found = false;
 
 	if (!resource)
 	{
