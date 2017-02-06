@@ -285,6 +285,31 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 }
 
 /*
+ * Check if this object's ACL is checked natively.
+ */
+bool checkACLNative(GrantObjectType type, Oid oid)
+{
+	AclObjectKind kind = MAX_ACL_KIND;
+	if (type == ACL_OBJECT_RELATION)
+	{
+		kind = ACL_KIND_CLASS;
+	}
+	else if (type == ACL_OBJECT_NAMESPACE)
+	{
+		kind = ACL_KIND_NAMESPACE;
+	}
+	else if (type == ACL_OBJECT_FUNCTION)
+	{
+		kind = ACL_KIND_PROC;
+	}
+	else
+	{
+		return false;
+	}
+	return fallBackToNativeCheck(kind, oid, GetUserId());
+}
+
+/*
  * Called to execute the utility commands GRANT and REVOKE
  */
 void
@@ -298,19 +323,27 @@ ExecuteGrantStmt(GrantStmt *stmt)
 	bool		added_objs = false;
 
 	/*
-	 * Don't allow GRANT/REVOKE if in ranger mode.
-	 */
-	if (aclType == HAWQ_ACL_RANGER)
-	{
-		elog(ERROR, "GRANT/REVOKE is not allowed in ranger mode");
-	}
-
-	/*
 	 * Turn the regular GrantStmt into the InternalGrant form.
 	 */
 	istmt.is_grant = stmt->is_grant;
 	istmt.objtype = stmt->objtype;
 	istmt.objects = objectNamesToOids(stmt->objtype, stmt->objects);
+
+	/*
+	 * Don't allow GRANT/REVOKE for objects managed by Ranger
+	 * if in ranger mode.
+	 */
+	if (aclType == HAWQ_ACL_RANGER)
+	{
+		foreach(cell, istmt.objects)
+		{
+			Oid oid = lfirst_oid(cell);
+			if (!checkACLNative(stmt->objtype, oid))
+			{
+				elog(ERROR, "GRANT/REVOKE is not allowed for this object in ranger mode");
+			}
+		}
+	}
 
 	/* If this is a GRANT/REVOKE on a table, expand partition references */
 	if (istmt.objtype == ACL_OBJECT_RELATION)
