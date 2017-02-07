@@ -18,13 +18,29 @@ TEST_F(TestUDF, TestUDFBasics)
 	hawq::test::SQLUtility util;
 	if (util.getGUCValue("optimizer") == "on")
 	{
-		util.execSQLFile("UDF/sql/function_basics.sql",
-		                 "UDF/ans/function_basics.ans.orca");
+		if (util.getGUCValue("hawq_acl_type") == "standalone")
+		{
+			util.execSQLFile("UDF/sql/function_basics.sql",
+							 "UDF/ans/function_basics.ans.orca");
+		}
+		else
+		{
+			util.execSQLFile("UDF/sql/function_basics.sql",
+							 "UDF/ans/function_basics.ranger.ans.orca");
+		}
 	}
 	else
 	{
-		util.execSQLFile("UDF/sql/function_basics.sql",
-		                 "UDF/ans/function_basics.ans.planner");
+		if (util.getGUCValue("hawq_acl_type") == "standalone")
+		{
+			util.execSQLFile("UDF/sql/function_basics.sql",
+							 "UDF/ans/function_basics.ans.planner");
+		}
+		else
+		{
+			util.execSQLFile("UDF/sql/function_basics.sql",
+							 "UDF/ans/function_basics.ranger.ans.planner");
+		}
 	}
 }
 
