@@ -15,7 +15,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<Server port="${rps.shutdown.port}" shutdown="SHUTDOWN">
+<Server port="${rps.shutdown.port}" shutdown="7d558327-ef81-48fa-bed2-fc1aaa5bb634">
 
     <!--APR library loader. Documentation at /docs/apr.html -->
     <Listener className="org.apache.catalina.core.AprLifecycleListener" SSLEngine="on" />

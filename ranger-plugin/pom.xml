@@ -68,8 +68,6 @@
                 <configuration>
                     <copyright>ASL 2.0</copyright>
                     <group>org.apache.hawq.ranger</group>
-                    <defaultUsername>gpadmin</defaultUsername>
-                    <defaultGroupname>gpadmin</defaultGroupname>
                     <description>
                         HAWQ Ranger plugin.
                     </description>
@@ -81,7 +79,7 @@
                     <mappings>
                         <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/bin</directory>
-                            <filemode>755</filemode>
+                            <filemode>744</filemode>
                             <sources>
                                 <source>
                                     <location>scripts/enable-ranger-plugin.sh</location>
@@ -143,6 +141,9 @@
                                 <source>
                                     <location>conf/server.xml</location>
                                 </source>
+                                <source>
+                                    <location>conf/catalina.properties</location>
+                                </source>
                             </sources>
                         </mapping>
                         <mapping>
@@ -150,9 +151,6 @@
                             <sources>
                                 <source>
                                     <location>service/target/ranger-plugin-service-${project.version}/WEB-INF/lib</location>
-                                    <includes>
-                                        <include>hadoop-common-*.jar</include>
-                                    </includes>
                                 </source>
                             </sources>
                         </mapping>

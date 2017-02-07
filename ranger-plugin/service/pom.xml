@@ -61,6 +61,15 @@
                 </executions>
             </plugin>
             <plugin>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.0.0</version>
+                <configuration>
+                    <!-- Due to Hadoop library using system-level JVM hook, all dependent classes must be loaded by
+                         Tomcat's server classloader, so they are shipped in RPM and not with the webapp -->
+                    <packagingExcludes>WEB-INF/lib/*.jar</packagingExcludes>
+                </configuration>
+            </plugin>
+            <plugin>
                 <!-- use mvn tomcat6:run-war to run the appserver with the app deployed -->
                 <groupId>org.apache.tomcat.maven</groupId>
                 <artifactId>tomcat6-maven-plugin</artifactId>
