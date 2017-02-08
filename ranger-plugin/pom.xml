@@ -137,6 +137,8 @@
                         </mapping>
                         <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/conf</directory>
+                            <!-- do not allow others even read the files as server.xml contains shutdown secret -->
+                            <filemode>640</filemode>
                             <sources>
                                 <source>
                                     <location>conf/server.xml</location>
