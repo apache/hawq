@@ -68,6 +68,8 @@
                 <configuration>
                     <copyright>ASL 2.0</copyright>
                     <group>org.apache.hawq.ranger</group>
+                    <defaultUsername>gpadmin</defaultUsername>
+                    <defaultGroupname>gpadmin</defaultGroupname>
                     <description>
                         HAWQ Ranger plugin.
                     </description>
