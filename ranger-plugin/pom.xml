@@ -79,7 +79,6 @@
                     <mappings>
                         <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/bin</directory>
-                            <filemode>744</filemode>
                             <sources>
                                 <source>
                                     <location>scripts/enable-ranger-plugin.sh</location>
@@ -137,8 +136,6 @@
                         </mapping>
                         <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/conf</directory>
-                            <!-- do not allow others even read the files as server.xml contains shutdown secret -->
-                            <filemode>640</filemode>
                             <sources>
                                 <source>
                                     <location>conf/server.xml</location>
