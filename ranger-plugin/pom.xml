@@ -79,6 +79,7 @@
                     <mappings>
                         <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/bin</directory>
+                            <filemode>750</filemode>
                             <sources>
                                 <source>
                                     <location>scripts/enable-ranger-plugin.sh</location>
