@@ -2715,9 +2715,9 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
    */
   if (information_schema_namespcace_oid == 0)
   {
-	  information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
+      information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
   }
-  /*for heap table, we fall back to native check.*/
+  /* for heap table, we fall back to native check. */
   if (objkind == ACL_KIND_CLASS)
   {
     char relstorage = get_rel_relstorage(obj_oid);
@@ -2728,21 +2728,26 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
   }
   else if (objkind == ACL_KIND_NAMESPACE)
   {
-	/*native check build-in schemas.*/
+    /* native check build-in schemas. */
     if (obj_oid == PG_CATALOG_NAMESPACE || obj_oid == information_schema_namespcace_oid
-    		|| obj_oid == PG_AOSEGMENT_NAMESPACE || obj_oid == PG_TOAST_NAMESPACE
-			|| obj_oid == PG_BITMAPINDEX_NAMESPACE)
+            || obj_oid == PG_AOSEGMENT_NAMESPACE || obj_oid == PG_TOAST_NAMESPACE
+            || obj_oid == PG_BITMAPINDEX_NAMESPACE)
     {
+      return true;
+    }
+    else if (obj_oid == PG_PUBLIC_NAMESPACE && superuser())
+    {
+      /* superuser's access to PUBLIC */
       return true;
     }
   }
   else if (objkind == ACL_KIND_PROC)
   {
-	/*native check functions under build-in schemas.*/
+    /* native check functions under build-in schemas. */
     Oid namespaceid = get_func_namespace(obj_oid);
     if (namespaceid == PG_CATALOG_NAMESPACE || namespaceid == information_schema_namespcace_oid
-			|| namespaceid == PG_AOSEGMENT_NAMESPACE || namespaceid == PG_TOAST_NAMESPACE
-			|| namespaceid == PG_BITMAPINDEX_NAMESPACE)
+            || namespaceid == PG_AOSEGMENT_NAMESPACE || namespaceid == PG_TOAST_NAMESPACE
+            || namespaceid == PG_BITMAPINDEX_NAMESPACE)
     {
       return true;
     }
@@ -2848,16 +2853,17 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 	List* actions = getActionName(mask);
 	bool isAll = (how == ACLMASK_ALL) ? true: false;
 
-	elog(DEBUG3, "ranger acl check kind: %d, object name: %s, role: %s, mask: %u\n", objkind, objectname, rolename, mask);
+	elog(DEBUG3, "ranger acl check kind: %d, object name: %s, object oid:%d, role: %s, mask: %u\n",
+			objkind, objectname, object_oid, rolename, mask);
 
 	List *resultargs = NIL;
-    RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
-    aclresult->result = RANGERCHECK_NO_PRIV;
-    aclresult->relOid = object_oid;
+	RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
+	aclresult->result = RANGERCHECK_NO_PRIV;
+	aclresult->relOid = object_oid;
 	/* this two sign fields will be set in function create_ranger_request_json */
 	aclresult->resource_sign = 0;
 	aclresult->privilege_sign = 0;
-    resultargs = lappend(resultargs, aclresult);
+	resultargs = lappend(resultargs, aclresult);
 
 	List *requestargs = NIL;
 	RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
