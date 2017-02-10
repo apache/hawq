@@ -39,7 +39,7 @@ ifneq "$(VENDOR)" ""
 endif
 
 ifneq "$(PXF_VERSION)" ""
-    BUILD_PARAMSi+= -Pversion="$(PXF_VERSION)"
+    BUILD_PARAMS+= -Pversion="$(PXF_VERSION)"
 endif
 
 help:
