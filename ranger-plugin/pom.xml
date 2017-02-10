@@ -68,6 +68,7 @@
                 <configuration>
                     <copyright>ASL 2.0</copyright>
                     <group>org.apache.hawq.ranger</group>
+                    <name>hawq-ranger-plugin_${hawq.name.version}</name>
                     <defaultUsername>gpadmin</defaultUsername>
                     <defaultGroupname>gpadmin</defaultGroupname>
                     <description>
@@ -177,7 +178,6 @@
                                 </source>
                             </sources>
                         </mapping>
-
                     </mappings>
                 </configuration>
             </plugin>
