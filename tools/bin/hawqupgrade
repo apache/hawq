@@ -49,25 +49,13 @@ def option_parser():
     parser.add_option('-U', '--user', help='username of the target DB')
     return parser
 
-def register_func(options, args):
+def upgrade_func(options, args, drop_func_query, create_func_query):
     # connect db
     try:
         url = dbconn.DbURL(hostname=options.host, port=options.port,
                            dbname="template1", username=options.user)
         utility_conn = pg.connect(dbname=url.pgdb, host=url.pghost, port=url.pgport,
                                   user=url.pguser, passwd=url.pgpass, opt='-c gp_session_role=utility')
-
-
-        # register function for template1
-        create_func_query = """
-            CREATE FUNCTION gp_relfile_insert_for_register(Oid, Oid, Oid, Oid, Oid, cstring, char, char, Oid)
-            RETURNS int4 LANGUAGE internal VOLATILE AS 'gp_relfile_insert_for_register'
-            WITH (DESCRIPTION="insert record into gp_relfile_insert_for_register and gp_relfile_node");
-            """
-        drop_func_query = """
-            DROP FUNCTION IF EXISTS gp_relfile_insert_for_register
-            (Oid, Oid, Oid, Oid, Oid, cstring, char, char, Oid);
-            """
 
         utility_conn.query(drop_func_query)
         utility_conn.query(create_func_query)
@@ -102,4 +90,28 @@ if __name__ == '__main__':
     if len(args) != 0:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    register_func(options, args)
+
+    # register function for template1
+    create_register_func_query = """
+        CREATE FUNCTION gp_relfile_insert_for_register(Oid, Oid, Oid, Oid, Oid, cstring, char, char, Oid)
+        RETURNS int4 LANGUAGE internal VOLATILE AS 'gp_relfile_insert_for_register'
+        WITH (DESCRIPTION="insert record into gp_relfile_insert_for_register and gp_relfile_node");
+        """
+    drop_register_func_query = """
+        DROP FUNCTION IF EXISTS gp_relfile_insert_for_register
+        (Oid, Oid, Oid, Oid, Oid, cstring, char, char, Oid);
+        """
+    upgrade_func(options, args, drop_register_func_query, create_register_func_query)
+
+    create_pxf_get_item_fields_func_query = """
+        CREATE FUNCTION pxf_get_item_fields(IN profile text, IN pattern text, OUT path text, OUT itemname text, OUT fieldname text, OUT fieldtype text, OUT sourcefieldtype text)
+        RETURNS SETOF pg_catalog.record LANGUAGE internal VOLATILE STRICT AS 'pxf_get_object_fields'
+        WITH (OID=9996, DESCRIPTION="Returns the metadata fields of external object from PXF");
+        """
+    drop_pxf_get_item_fields_func_query = """
+        DROP FUNCTION IF EXISTS pxf_get_item_fields
+        (IN profile text, IN pattern text, OUT path text, OUT itemname text, OUT fieldname text, OUT fieldtype text, OUT sourcefieldtype text);
+        DROP FUNCTION IF EXISTS pxf_get_item_fields
+        (IN profile text, IN pattern text, OUT path text, OUT itemname text, OUT fieldname text, OUT fieldtype text);
+        """
+    upgrade_func(options, args, drop_pxf_get_item_fields_func_query, create_pxf_get_item_fields_func_query)
