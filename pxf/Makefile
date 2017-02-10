@@ -38,6 +38,10 @@ ifneq "$(VENDOR)" ""
     BUILD_PARAMS+= -Pvendor="$(VENDOR)"
 endif
 
+ifneq "$(PXF_VERSION)" ""
+    BUILD_PARAMS+= -Pversion="$(PXF_VERSION)"
+endif
+
 help:
 	@echo 
 	@echo"help it is then"
