@@ -68,17 +68,21 @@
                 <configuration>
                     <copyright>ASL 2.0</copyright>
                     <group>org.apache.hawq.ranger</group>
+                    <name>hawq-ranger-plugin_${hawq.name.version}</name>
                     <defaultUsername>gpadmin</defaultUsername>
                     <defaultGroupname>gpadmin</defaultGroupname>
                     <description>
                         HAWQ Ranger plugin.
                     </description>
-                    <release>${release.version}</release>
+                    <release>${release.version}%{?dist}</release>
                     <requires>
                         <require>bigtop-tomcat</require>
                         <require>hawq_${hawq.name.version} &gt;= ${project.version}</require>
                     </requires>
                     <mappings>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger</directory>
+                        </mapping>
                         <mapping>
                             <directory>/usr/local/hawq_${hawq.name.version}/ranger/bin</directory>
                             <filemode>750</filemode>
@@ -177,7 +181,6 @@
                                 </source>
                             </sources>
                         </mapping>
-
                     </mappings>
                 </configuration>
             </plugin>
