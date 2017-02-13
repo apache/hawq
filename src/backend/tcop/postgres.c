@@ -3608,8 +3608,6 @@ ProcessInterrupts(void)
 
 	if (QueryCancelPending)
 	{
-		elog(LOG,"Process interrupt for 'query cancel pending'.");
-
 		QueryCancelPending = false;
 			ImmediateInterruptOK = false;	/* not idle anymore */
 			DisableNotifyInterrupt();
