@@ -129,7 +129,39 @@
               <exclude>src/pl/**/*</exclude>
               <exclude>src/port/*</exclude>
               <exclude>src/template/*</exclude>
-              <exclude>src/test/**/*</exclude>
+              <exclude>src/test/**/*.in</exclude>
+              <exclude>src/test/**/*.mdp</exclude>
+              <exclude>src/test/feature/UDF/ans/function_basics.ans.orca</exclude>
+              <exclude>src/test/feature/UDF/ans/function_basics.ranger.ans.orca</exclude>
+              <exclude>src/test/feature/UDF/ans/function_basics.ans.planner</exclude>
+              <exclude>src/test/feature/UDF/ans/function_basics.ranger.ans.planner</exclude>
+              <exclude>src/test/**/*.paq</exclude>
+              <exclude>src/test/**/*paq</exclude>
+              <exclude>src/test/**/usage2case2/*</exclude>
+              <exclude>src/test/**/*.tbl</exclude>
+              <exclude>src/test/**/*.xml</exclude>
+              <exclude>src/test/**/*.yml</exclude>
+              <exclude>src/test/**/arch_config</exclude>
+              <exclude>src/test/regress/bkuprestore_schedule</exclude>
+              <exclude>src/test/regress/current_good_schedule.EXCLUDE</exclude>
+              <exclude>src/test/regress/goh_schedule</exclude>
+              <exclude>src/test/regress/makeschedule</exclude>
+              <exclude>src/test/performance/sqls/crtsimple</exclude>
+              <exclude>src/test/performance/sqls/crtsimpleidx</exclude>
+              <exclude>src/test/performance/sqls/drpsimple</exclude>
+              <exclude>src/test/performance/sqls/orbsimple</exclude>
+              <exclude>src/test/performance/sqls/slcsimple</exclude>
+              <exclude>src/test/**/Makefile</exclude>
+              <exclude>src/test/performance/results/PgSQL.970926</exclude>
+              <exclude>src/test/performance/sqls/connection</exclude>
+              <exclude>src/test/feature/doxygen_template</exclude>
+              <exclude>src/test/regress/expected_statuses</exclude>
+              <exclude>src/test/feature/lib/global_init_file</exclude>
+              <exclude>src/test/**/init_file</exclude>
+              <exclude>src/test/bench/query*</exclude>
+              <exclude>src/test/regress/resultmap</exclude>
+              <exclude>src/test/locale/**/runall</exclude>
+              <exclude>src/test/performance/sqls/vacuum</exclude>
               <exclude>src/timezone/**/*</exclude>
               <exclude>doc/src/sgml/fixrtf</exclude>
               <exclude>doc/**/*.sgml</exclude>
