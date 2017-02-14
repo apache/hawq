@@ -4,6 +4,7 @@
   "label": "HAWQ",
   "description": "HAWQ",
   "guid": "1ebb27ee-549a-401d-85ab-818342ca54af",
+  "options": {"enableDenyAndExceptionsInPolicies": "true”},
   "resources":
   [
     {
