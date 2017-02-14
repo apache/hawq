@@ -2707,6 +2707,8 @@ List *getActionName(AclMode mask)
   return actions;
 }
 
+#define FALLBACK_IS_TRUE(x)        x == PG_CATALOG_NAMESPACE || x == information_schema_namespcace_oid \
+                                || x == PG_AOSEGMENT_NAMESPACE || x == PG_TOAST_NAMESPACE || x == PG_BITMAPINDEX_NAMESPACE
 
 bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
 {
@@ -2720,20 +2722,18 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
   /* for heap table, we fall back to native check. */
   if (objkind == ACL_KIND_CLASS)
   {
-    char relstorage = get_rel_relstorage(obj_oid);
-    if (relstorage == 'h')
-    {
-      return true;
-    }
+      Oid namespaceid = get_rel_namespace(obj_oid);
+      if(FALLBACK_IS_TRUE(namespaceid))
+      {
+          return true;
+      }
   }
   else if (objkind == ACL_KIND_NAMESPACE)
   {
     /* native check build-in schemas. */
-    if (obj_oid == PG_CATALOG_NAMESPACE || obj_oid == information_schema_namespcace_oid
-            || obj_oid == PG_AOSEGMENT_NAMESPACE || obj_oid == PG_TOAST_NAMESPACE
-            || obj_oid == PG_BITMAPINDEX_NAMESPACE)
+    if(FALLBACK_IS_TRUE(obj_oid))
     {
-      return true;
+        return true;
     }
     else if (obj_oid == PG_PUBLIC_NAMESPACE && superuser())
     {
@@ -2745,9 +2745,7 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
   {
     /* native check functions under build-in schemas. */
     Oid namespaceid = get_func_namespace(obj_oid);
-    if (namespaceid == PG_CATALOG_NAMESPACE || namespaceid == information_schema_namespcace_oid
-            || namespaceid == PG_AOSEGMENT_NAMESPACE || namespaceid == PG_TOAST_NAMESPACE
-            || namespaceid == PG_BITMAPINDEX_NAMESPACE)
+    if (FALLBACK_IS_TRUE(namespaceid))
     {
       return true;
     }
