@@ -75,6 +75,7 @@ extern int	executormgr_get_fd(struct QueryExecutor *executor);
 extern bool	executormgr_cancel(struct QueryExecutor * executor);
 extern bool	executormgr_dispatch_and_run(struct DispatchData *data, struct QueryExecutor *executor);
 extern bool	executormgr_check_segment_status(struct QueryExecutor *executor);
+extern void	executormgr_seterrcode_if_needed(struct QueryExecutor *executor);
 extern bool	executormgr_consume(struct QueryExecutor *executor);
 extern bool	executormgr_discard(struct QueryExecutor *executor);
 extern void	executormgr_merge_error(struct QueryExecutor *exeutor);
