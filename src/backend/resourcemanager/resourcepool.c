@@ -4143,8 +4143,8 @@ void validateResourcePoolStatus(bool refquemgr)
 					  "pool (%d MB, %lf CORE), maximum capacity (%d MB, %d CORE)",
 					  totalallocmem,
 					  totalalloccore,
-					  core,
-					  mem);
+					  mem,
+					  core);
 	}
 
 	/*
