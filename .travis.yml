@@ -7,27 +7,30 @@ compiler:
   - clang
 
 before_install:
+  - brew --version
   - "brew update 2>&1 > /tmp/brew-update.txt || (cat /tmp/brew-update.txt && false)"
+  - brew list --versions
 
 install:
-  - brew install
+  - brew reinstall
+    Gsasl
+    bison
+    ccache
+    cpanm
+    libevent
+    maven
+    openssl
     protobuf
     protobuf-c
-    Gsasl
-    openssl
-    thrift
-    ccache
+    python
     snappy
-    libevent
-    bison
-    cpanm
-    maven
-  - brew reinstall python
+    thrift
   - brew outdated libyaml || brew upgrade libyaml
-  - brew outdated json-c || brew upgrade json-c
-  - brew outdated boost || brew upgrade boost
-  - brew outdated maven || brew upgrade maven
+  - brew outdated json-c  || brew upgrade json-c
+  - brew outdated boost   || brew upgrade boost
+  - brew outdated maven   || brew upgrade maven
   - brew install iproute2mac
+  - brew list --versions
   - sudo pip install pycrypto
   - sudo cpanm install JSON
 
