@@ -472,9 +472,7 @@ executormgr_dispatch_and_run(struct DispatchData *data, QueryExecutor *executor)
 	return true;
 
 error:
-	if (query)
-		free(query);
-	write_log("function executormgr_dispatch_and_run meets error.");
+	free(query);
 	executormgr_catch_error(executor);
 	return false;
 }
@@ -497,6 +495,22 @@ executormgr_check_segment_status(QueryExecutor *executor)
 	}
 
 	return true;
+}
+
+void
+executormgr_seterrcode_if_needed(QueryExecutor *executor)
+{
+	struct CdbDispatchResult *dispatchResult;
+ 
+	if (executor == NULL)
+		return;
+
+	dispatchResult = executormgr_get_executor_result(executor);
+    if (dispatchResult->errcode == ERRCODE_SUCCESSFUL_COMPLETION ||
+		dispatchResult->errcode == ERRCODE_INTERNAL_ERROR)
+	{
+		cdbdisp_seterrcode(ERRCODE_INTERNAL_ERROR, -1, dispatchResult);
+	}
 }
 
 /*
@@ -605,16 +619,16 @@ executormgr_discard(QueryExecutor *executor)
 static void
 executormgr_catch_error(QueryExecutor *executor)
 {
-	PGconn			*conn = executor->desc->conn;
-	char			*msg;
-	int       errCode = 0;
+	PGconn	*conn = executor->desc->conn;
+	char	*msg;
+	int		errCode = 0;
 	if (executor->refResult->errcode != 0)
-	  errCode = executor->refResult->errcode;
+		errCode = executor->refResult->errcode;
 
 	msg = PQerrorMessage(conn);
 
 	if (msg && (strcmp("", msg) != 0) && (executor->refResult->errcode == 0)) {
-	  errCode = ERRCODE_GP_INTERCONNECTION_ERROR;
+		errCode = ERRCODE_GP_INTERCONNECTION_ERROR;
 	}
 
 	PQExpBufferData selfDesc;
@@ -624,23 +638,21 @@ executormgr_catch_error(QueryExecutor *executor)
 	                  executor->desc->segment->hostname,
 	                  executor->desc->segment->port);
 
-  if (!executor->refResult->error_message) {
-    cdbdisp_appendMessage(
-        executor->refResult,
-        LOG,
-        errCode,
-        "%s %s: %s",
-        (executor->state == QES_DISPATCHABLE ?
-            "Error dispatching to" :
-            (executor->state == QES_RUNNING ?
-                "Query Executor Error in" : "Error in ")),
-        (executor->desc->whoami && strcmp(executor->desc->whoami, "") != 0) ?
-            executor->desc->whoami : selfDesc.data,
-        msg ? msg : "unknown error");
-  }
+	if (!executor->refResult->error_message) {
+		cdbdisp_appendMessage(
+				executor->refResult, LOG, errCode,
+				"%s %s: %s",
+				(executor->state == QES_DISPATCHABLE ?
+					"Error dispatching to" :
+					(executor->state == QES_RUNNING ?
+						"Query Executor Error in" : "Error in ")),
+				(executor->desc->whoami && strcmp(executor->desc->whoami, "") != 0) ?
+					executor->desc->whoami : selfDesc.data,
+				msg ? msg : "unknown error");
+				  }
 
-  termPQExpBuffer(&selfDesc);
-  PQfinish(conn);
+	termPQExpBuffer(&selfDesc);
+	PQfinish(conn);
 
 	executor->desc->conn = NULL;
 
