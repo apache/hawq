@@ -89,11 +89,11 @@ def register_func(options, args):
     except pg.DatabaseError as e:
         logger.error('%s', e)
         logger.info('Hawq Upgrade Failed.')
-        return 1
+        sys.exit(1)
     except pg.InternalError:
         logger.error('Fail to connect to database, this script can only be run when database is up.')
         logger.info('Hawq Upgrade Failed.')
-        return 1
+        sys.exit(1)
 
 def pxf_get_item_fields_func(options, args):
     # connect db
@@ -130,11 +130,11 @@ def pxf_get_item_fields_func(options, args):
     except pg.DatabaseError as e:
         logger.error('%s', e)
         logger.info('Hawq Upgrade Failed.')
-        return 1
+        sys.exit(1)
     except pg.InternalError:
         logger.error('Fail to connect to database, this script can only be run when database is up.')
         logger.info('Hawq Upgrade Failed.')
-        return 1
+        sys.exit(1)
 
 if __name__ == '__main__':
     parser = option_parser()
