@@ -2551,6 +2551,28 @@ char *getNamespaceNameFromOid(Oid object_oid)
 
   return tname.data;
 }
+char *getNamespaceNameByOid(Oid object_oid)
+{
+
+  StringInfoData tname;
+  initStringInfo(&tname);
+
+  Assert(OidIsValid(object_oid));
+  char* schema_name = caql_getcstring(
+                   NULL,
+                   cql("SELECT nspname FROM pg_namespace "
+                     " WHERE oid = :1",
+                     ObjectIdGetDatum(object_oid)));
+  if (schema_name == NULL)
+  {
+    return NULL;
+  }
+
+  appendStringInfo(&tname, "%s", schema_name);
+  pfree(schema_name);
+
+  return tname.data;
+}
 char *getConversionNameFromOid(Oid object_oid)
 {
   Assert(OidIsValid(object_oid));
@@ -2707,8 +2729,27 @@ List *getActionName(AclMode mask)
   return actions;
 }
 
-#define FALLBACK_IS_TRUE(x)        x == PG_CATALOG_NAMESPACE || x == information_schema_namespcace_oid \
-                                || x == PG_AOSEGMENT_NAMESPACE || x == PG_TOAST_NAMESPACE || x == PG_BITMAPINDEX_NAMESPACE
+bool checkNamespaceFallback(Oid x)
+{
+  if (x == PG_CATALOG_NAMESPACE || x == information_schema_namespcace_oid
+     || x == PG_AOSEGMENT_NAMESPACE || x == PG_TOAST_NAMESPACE || x == PG_BITMAPINDEX_NAMESPACE)
+  {
+    return true;
+  }
+  else
+  {
+    char* name = getNamespaceNameByOid(x);
+    if (name != NULL && pg_strncasecmp(name, "pg_temp", strlen("pg_temp")) == 0)
+    {
+      /* fall back pg_temp_XX check to native*/
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
 
 bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
 {
@@ -2717,23 +2758,23 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
    */
   if (information_schema_namespcace_oid == 0)
   {
-      information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
+    information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
   }
   /* for heap table, we fall back to native check. */
   if (objkind == ACL_KIND_CLASS)
   {
-      Oid namespaceid = get_rel_namespace(obj_oid);
-      if(FALLBACK_IS_TRUE(namespaceid))
-      {
-          return true;
-      }
+    Oid namespaceid = get_rel_namespace(obj_oid);
+    if(checkNamespaceFallback(namespaceid))
+    {
+      return true;
+    }
   }
   else if (objkind == ACL_KIND_NAMESPACE)
   {
     /* native check build-in schemas. */
-    if(FALLBACK_IS_TRUE(obj_oid))
+    if(checkNamespaceFallback(obj_oid))
     {
-        return true;
+      return true;
     }
     else if (obj_oid == PG_PUBLIC_NAMESPACE && superuser())
     {
@@ -2745,7 +2786,7 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
   {
     /* native check functions under build-in schemas. */
     Oid namespaceid = get_func_namespace(obj_oid);
-    if (FALLBACK_IS_TRUE(namespaceid))
+    if (checkNamespaceFallback(namespaceid))
     {
       return true;
     }
