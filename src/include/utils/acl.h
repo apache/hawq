@@ -327,6 +327,7 @@ extern char *getOperNameFromOid(Oid object_oid);
 extern char *getTypeNameFromOid(Oid object_oid);
 extern char *getLanguageNameFromOid(Oid object_oid);
 extern char *getNamespaceNameFromOid(Oid object_oid);
+extern char *getNamespaceNameByOid(Oid object_oid);
 extern char *getConversionNameFromOid(Oid object_oid);
 extern char *getTablespaceNameFromOid(Oid object_oid);
 extern char *getFilespaceNameFromOid(Oid object_oid);
