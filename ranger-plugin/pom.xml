@@ -74,7 +74,6 @@
                     <description>
                         HAWQ Ranger plugin.
                     </description>
-                    <needarch>x86_64</needarch>
                     <release>${release.version}%{?dist}</release>
                     <requires>
                         <require>bigtop-tomcat</require>
