@@ -27,24 +27,26 @@ before_install:
 
 install:
   - brew reinstall
-    Gsasl
-    bison
-    ccache
-    cpanm
-    libevent
-    maven
-    openssl
-    protobuf
-    protobuf-c
-    python
-    snappy
-    thrift
+      Gsasl
+      bison
+      ccache
+      cpanm
+      libevent
+      maven
+      openssl
+      python
+      snappy
+  - brew reinstall
+      protobuf
+      protobuf-c
+      thrift
   - brew outdated libyaml || brew upgrade libyaml
   - brew outdated json-c  || brew upgrade json-c
   - brew outdated boost   || brew upgrade boost
   - brew outdated maven   || brew upgrade maven
   - brew install iproute2mac
   - brew list --versions
+  - sudo easy_install pip
   - sudo pip install pycrypto
   - sudo cpanm install JSON
 
