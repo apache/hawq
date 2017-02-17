@@ -1,7 +1,7 @@
 ![HAWQ](http://hawq.incubator.apache.org/images/logo-hawq.png) [![https://travis-ci.org/apache/incubator-hawq.png](https://travis-ci.org/apache/incubator-hawq.png)](https://travis-ci.org/apache/incubator-hawq) [![Coverity Scan Build](https://scan.coverity.com/projects/apache-incubator-hawq/badge.svg)](https://scan.coverity.com/projects/apache-incubator-hawq)
 
 [Website](http://hawq.incubator.apache.org/) |
-[Wiki](https://cwiki.apache.org/confluence/display/HAWQ/Apache+HAWQ+Home) |
+[Wiki](https://cwiki.apache.org/confluence/display/HAWQ/Apadche+HAWQ+Home) |
 [Documentation](http://hdb.docs.pivotal.io/) |
 [Developer Mailing List](mailto:dev@hawq.incubator.apache.org) |
 [User Mailing List](mailto:user@hawq.incubator.apache.org) |
