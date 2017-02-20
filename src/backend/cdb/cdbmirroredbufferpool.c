@@ -117,27 +117,18 @@ static void MirroredBufferPool_DoOpen(
 	open->create = create;
 	if (true)
 	{
-		char *dbPath;
 		char *path;
 
-		dbPath = (char*)palloc(MAXPGPATH + 1);
 		path = (char*)palloc(MAXPGPATH + 1);
 
 		/*
 		 * Do the primary work first so we don't leave files on the mirror or have an
 		 * open to clean up.
 		 */
-
-		FormDatabasePath(
-					dbPath,
-					filespaceLocation,
-					relFileNode->spcNode,
-					relFileNode->dbNode);
-		
-		if (segmentFileNum == 0)
-			sprintf(path, "%s/%u", dbPath, relFileNode->relNode);
-		else
-			sprintf(path, "%s/%u/%u", dbPath, relFileNode->relNode, segmentFileNum);
+		FormRelfilePath(path,
+						filespaceLocation,
+						relFileNode,
+						segmentFileNum);
 
 		errno = 0;
 		
@@ -148,7 +139,6 @@ static void MirroredBufferPool_DoOpen(
 			*primaryError = errno;
 		}
 
-		pfree(dbPath);
 		pfree(path);
 	}
 	
@@ -454,22 +444,14 @@ static void MirroredBufferPool_DoDrop(
 	
 	if (true)
 	{
-		char *dbPath; 
 		char *path;
 
-		dbPath = (char*)palloc(MAXPGPATH + 1);
 		path = (char*)palloc(MAXPGPATH + 1);
 
-		FormDatabasePath(
-						 dbPath,
-						 filespaceLocation,
-						 relFileNode->spcNode,
-						 relFileNode->dbNode);
-		
-		if (segmentFileNum == 0)
-			sprintf(path, "%s/%u", dbPath, relFileNode->relNode);
-		else
-			sprintf(path, "%s/%u/%u", dbPath, relFileNode->relNode, segmentFileNum);
+		FormRelfilePath(path,
+						filespaceLocation,
+						relFileNode,
+						segmentFileNum);
 
 		errno = 0;
 		
@@ -478,7 +460,6 @@ static void MirroredBufferPool_DoDrop(
 			*primaryError = errno;
 		}
 
-		pfree(dbPath);
 		pfree(path);
 	}
 	
