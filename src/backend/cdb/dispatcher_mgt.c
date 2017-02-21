@@ -326,7 +326,7 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 			{
 				write_log("%s(): detected one segment (Global ID: %d) is down, "
 						  "so abort the query that is running or will run on it",
-						  __func__, executormgr_get_ID(executor));
+						  __func__, executormgr_get_segment_ID(executor));
 				err_handle_executor = executor;
 				goto error_cleanup;
 			}
