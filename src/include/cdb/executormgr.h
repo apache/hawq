@@ -70,7 +70,7 @@ extern void executormgr_get_executor_connection_info(struct QueryExecutor *execu
 extern bool	executormgr_is_stop(struct QueryExecutor *executor);
 extern bool	executormgr_has_error(struct QueryExecutor *executor);
 extern int	executormgr_get_executor_slice_id(struct QueryExecutor *executor);
-extern int	executormgr_get_ID(struct QueryExecutor *executor);
+extern int	executormgr_get_segment_ID(struct QueryExecutor *executor);
 extern int	executormgr_get_fd(struct QueryExecutor *executor);
 extern bool	executormgr_cancel(struct QueryExecutor * executor);
 extern bool	executormgr_dispatch_and_run(struct DispatchData *data, struct QueryExecutor *executor);

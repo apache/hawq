@@ -322,9 +322,15 @@ executormgr_get_executor_result(QueryExecutor *executor)
 }
 
 int
-executormgr_get_ID(QueryExecutor *executor)
+executormgr_get_segment_ID(QueryExecutor *executor)
 {
-	return executor->desc->segment->ID;
+	Segment *seg = executor->desc->segment;
+
+	/* For segment only */
+	if (seg->master || seg->standby)
+		return -1;
+
+	return seg->ID;
 }
 
 int
@@ -485,9 +491,9 @@ executormgr_check_segment_status(QueryExecutor *executor)
 	 * until timeout when one segment is down. This will cause QD keep polling
 	 * until QE timeout.
 	 */
-	int ID = executormgr_get_ID(executor);
+	int ID = executormgr_get_segment_ID(executor);
 
-	if (IsSegmentDown(ID))
+	if (ID >= 0 && IsSegmentDown(ID))
 	{
 		cdbdisp_seterrcode(ERRCODE_GP_INTERCONNECTION_ERROR, -1,
 						   executormgr_get_executor_result(executor));
