@@ -95,6 +95,6 @@ installupgradefiles: $(UPGRADEFILES) $(DATAFILES)
 		$(INSTALL_DATA) $$i '$(DESTDIR)$(datadir)/upgrade/'`basename $$i`; \
 	done
 
-gpmodcat_unistall:
+gpmodcat_uninstall:
 	rm -f '$(DESTDIR)$(bindir)'/lib, gpmodcatversion$(X)
 
