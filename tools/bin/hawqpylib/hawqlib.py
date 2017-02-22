@@ -22,6 +22,7 @@ import threading
 import Queue
 from xml.dom import minidom
 from xml.etree.ElementTree import ElementTree
+from pygresql.pg import DatabaseError
 import shutil
 from gppylib.db import dbconn
 from gppylib.commands.base import WorkerPool, REMOTE
