@@ -56,7 +56,7 @@ The "options" are:
    -l --logdir        Sets log dir of management tools.
    -q --quiet         Run in quiet mode.
    -v --verbose       Displays detailed status, progress and error messages output by the utility.
-   -t --timeout       Sets timeout value in seconds, default is 60 seconds.
+   -t --timeout       Sets timeout value in seconds, default is 600 seconds.
    -m --masteronly    Start hawq in masteronly mode.
    -R --restrict      Start hawq in restrict mode.
    -U --special-mode   Start hawq in [upgrade/maintenance] mode.
@@ -79,7 +79,7 @@ The "options" are:
    -l --logdir     Sets log dir of management tools.
    -q --quiet      Run in quiet mode.
    -v --verbose    Displays detailed status, progress and error messages output by the utility.
-   -t --timeout    Sets timeout value in seconds, default is 60 seconds.
+   -t --timeout    Sets timeout value in seconds, default is 600 seconds.
    -M --mode       Stop with mode [smart|fast|immediate]
    -u --reload     Reload GUC values without restarting hawq cluster.
 
@@ -131,7 +131,7 @@ The "options" are:
    -l --logdir        Sets log dir of management tools.
    -q --quiet         Run in quiet mode.
    -v --verbose       Displays detailed status, progress and error messages output by the utility.
-   -t --timeout       Sets timeout value in seconds, default is 60 seconds.
+   -t --timeout       Sets timeout value in seconds, default is 600 seconds.
    -M --mode          Stop with mode [smart|fast|immediate]
    -u --reload        Reload GUC values without restart hawq cluster.
    -m --masteronly    Start HAWQ in master-only mode.
@@ -148,7 +148,6 @@ The "options" are:
    -q --quiet      Run in quiet mode.
    -v --verbose    Displays detailed status, progress and error messages output by the utility.
    -l --logdir     Sets log dir of management tools.
-   -t --timeout    Sets timeout value in seconds, default is 60 seconds.
    -M --mode       Stop with mode [smart|fast|immediate]
 
 See 'hawq --help' for more information on other commands.
