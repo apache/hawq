@@ -58,23 +58,23 @@ An example is shown below:
 OPTIONS
 *****************************************************
 
---config config_file
+--config <config_file>
 
  The name of a configuration file to use instead of the default 
  file $GPHOME/etc/hawq_check.cnf.
 
--f hostfile_hawq_check
+-f <hostfile_hawq_check>
 
  The name of a file that contains a list of hosts that hawq check 
  uses to validate platform-specific settings. This file should 
  contain a single host name for all hosts in your HAWQ system 
  (master, standby master, and segments).
 
--h/--host hostname
+-h/--host <hostname>
  Specifies a single host on which platform-specific settings will
  be validated.
 
---hadoop/--hadoop-home hadoop_home
+--hadoop/--hadoop-home <hadoop_home>
 
  Use this option to specify the full path to your hadoop installation
  location so that hawq check can validate HDFS settings. This option
@@ -121,7 +121,7 @@ OPTIONS
  performed.
 
 
---zipin hawq_check_zipfile
+--zipin <hawq_check_zipfile>
 
  Use this option to decompress and check a .zip file created with 
  the --zipout option. hawq check performs validation tasks against 
@@ -142,7 +142,7 @@ OPTIONS
 EXAMPLES
 *****************************************************
 
-Verify and validate the HAWQ platform settings by  specifying
+Verify and validate the HAWQ platform settings by specifying
 a host file and identifying the full hadoop install path:
 
  # hawq check -f hostfile_hawq_check --hadoop /usr/local/hadoop-<version>/
