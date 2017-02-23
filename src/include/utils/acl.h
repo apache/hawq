@@ -316,7 +316,7 @@ extern List *pg_rangercheck_batch(List *);
 extern AclResult
 pg_rangercheck(AclObjectKind objkind, Oid table_oid, Oid roleid,
          AclMode mask, AclMaskHow how);
-extern bool fallBackToNativeCheck(AclObjectKind objkind, Oid table_oid, Oid roleid);
+extern bool fallBackToNativeCheck(AclObjectKind objkind, Oid table_oid, Oid roleid, AclMode mode);
 extern bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid);
 extern char *getNameFromOid(AclObjectKind objkind, Oid object_oid);
 extern char *getClassNameFromOid(Oid object_oid);
