@@ -33,7 +33,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * Class JdbcReadResolver Read the Jdbc ResultSet, and generates the data type - List <OneField>.
+ * Class JdbcReadResolver Read the Jdbc ResultSet, and generates the data type - List {@link OneField}.
  */
 public class JdbcReadResolver extends Plugin implements ReadResolver {
     private static final Log LOG = LogFactory.getLog(JdbcReadResolver.class);

@@ -34,7 +34,7 @@ import java.util.ArrayList;
  * Accessor for Jdbc tables. The accessor will open and read a partition belonging
  * to a Jdbc table. JdbcReadAccessor generates and executes SQL from filter and
  * fragmented information, uses {@link JdbcReadResolver } to read the ResultSet, and generates
- * the data type - List <OneField> that HAWQ needs.
+ * the data type - List {@link OneRow} that HAWQ needs.
  */
 public class JdbcReadAccessor extends JdbcPlugin implements ReadAccessor {
     private static final Log LOG = LogFactory.getLog(JdbcReadAccessor.class);

@@ -49,9 +49,10 @@ public class JdbcPlugin extends Plugin {
     protected String dbProduct = null;
 
     /**
-     * parse
+     * parse input data
      *
      * @param input the input data
+     * @throws UserDataException if the request parameter is malformed
      */
     public JdbcPlugin(InputData input) throws UserDataException {
         super(input);

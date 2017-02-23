@@ -28,6 +28,8 @@ import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.utilities.InputData;
 
 import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -37,27 +39,27 @@ import java.util.*;
  * Extends the {@link Fragmenter} abstract class, with the purpose of transforming
  * an input data path  (an JDBC Database table name  and user request parameters)  into a list of regions
  * that belong to this table.
- * <p>
- * <h4>The parameter Patterns </h4>
- * There are three  parameters,  the format is as follows:<p>
+ * <br>
+ * The parameter Patterns<br>
+ * There are three  parameters,  the format is as follows:<br>
  * <pre>
- * <code>PARTITION_BY=column_name:column_type&RANGE=start_value[:end_value]&INTERVAL=interval_num[:interval_unit]</code>
+ * <code>PARTITION_BY=column_name:column_type&amp;RANGE=start_value[:end_value]&amp;INTERVAL=interval_num[:interval_unit]</code>
  * </pre>
  * The <code>PARTITION_BY</code> parameter can be split by colon(':'),the <code>column_type</code> current supported : <code>date,int,enum</code> .
- * The Date format is 'yyyy-MM-dd'. <p>
+ * The Date format is 'yyyy-MM-dd'. <br>
  * The <code>RANGE</code> parameter can be split by colon(':') ,used to identify the starting range of each fragment.
- * The range is left-closed, ie:<code> '>= start_value AND < end_value' </code>.If the <code>column_type</code> is <code>int</code>,
- * the <code>end_value</code> can be empty. If the <code>column_type</code>is <code>enum</code>,the parameter <code>RANGE</code> can be empty. <p>
+ * The range is left-closed, ie:<code> '&gt;= start_value AND &lt; end_value' </code>.If the <code>column_type</code> is <code>int</code>,
+ * the <code>end_value</code> can be empty. If the <code>column_type</code>is <code>enum</code>,the parameter <code>RANGE</code> can be empty. <br>
  * The <code>INTERVAL</code> parameter can be split by colon(':'), indicate the interval value of one fragment.
  * When <code>column_type</code> is <code>date</code>,this parameter must be split by colon, and <code>interval_unit</code> can be <code>year,month,day</code>.
  * When <code>column_type</code> is <code>int</code>, the <code>interval_unit</code> can be empty.
  * When <code>column_type</code> is <code>enum</code>,the <code>INTERVAL</code> parameter can be empty.
- * </p>
+ * <br>
  * <p>
- * The syntax examples is :<p>
- * <code>PARTITION_BY=createdate:date&RANGE=2008-01-01:2010-01-01&INTERVAL=1:month'</code> <p>
- * <code>PARTITION_BY=year:int&RANGE=2008:2010&INTERVAL=1</code> <p>
- * <code>PARTITION_BY=grade:enum&RANGE=excellent:good:general:bad</code>
+ * The syntax examples is :<br>
+ * <code>PARTITION_BY=createdate:date&amp;RANGE=2008-01-01:2010-01-01&amp;INTERVAL=1:month'</code> <br>
+ * <code>PARTITION_BY=year:int&amp;RANGE=2008:2010&amp;INTERVAL=1</code> <br>
+ * <code>PARTITION_BY=grade:enum&amp;RANGE=excellent:good:general:bad</code>
  * </p>
  *
  */
@@ -69,6 +71,11 @@ public class JdbcPartitionFragmenter extends Fragmenter {
     String partitionColumn = null;
     IntervalType intervalType = null;
     int intervalNum = 1;
+
+    //when partitionType is DATE,it is valid
+    Calendar rangeStart = null;
+    Calendar rangeEnd = null;
+
 
     enum PartitionType {
         DATE,
@@ -94,7 +101,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
      * Constructor for JdbcPartitionFragmenter.
      *
      * @param inConf input data such as which Jdbc table to scan
-     * @throws UserDataException
+     * @throws UserDataException  if the request parameter is malformed
      */
     public JdbcPartitionFragmenter(InputData inConf) throws UserDataException {
         super(inConf);
@@ -128,13 +135,25 @@ public class JdbcPartitionFragmenter extends Fragmenter {
         } catch (UserDataException e2) {
             throw e2;
         }
+        try {
+            if (partitionType == PartitionType.DATE) {
+                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+                rangeStart = Calendar.getInstance();
+                rangeStart.setTime(df.parse(range[0]));
+                rangeEnd = Calendar.getInstance();
+                rangeEnd.setTime(df.parse(range[1]));
+            }
+        } catch (ParseException e) {
+            throw new UserDataException("The parameter 'RANGE' include invalid date format.");
+        }
     }
 
     /**
      * Returns statistics for Jdbc table. Currently it's not implemented.
+     * @throws UnsupportedOperationException ANALYZE for Jdbc plugin is not supported
      */
     @Override
-    public FragmentsStats getFragmentsStats() throws Exception {
+    public FragmentsStats getFragmentsStats() throws UnsupportedOperationException {
         throw new UnsupportedOperationException("ANALYZE for Jdbc plugin is not supported");
     }
 
@@ -143,6 +162,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
      * Jdbc table data.
      *
      * @return a list of fragments
+     * @throws Exception if assign host error
      */
     @Override
     public List<Fragment> getFragments() throws Exception {
@@ -155,14 +175,9 @@ public class JdbcPartitionFragmenter extends Fragmenter {
         }
         switch (partitionType) {
             case DATE: {
-                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
                 int currInterval = intervalNum;
 
-                //start of range = start of first fragment
-                Calendar fragStart = Calendar.getInstance();
-                fragStart.setTime(df.parse(range[0]));
-                Calendar rangeEnd = Calendar.getInstance();
-                rangeEnd.setTime(df.parse(range[1]));
+                Calendar fragStart = rangeStart;
                 while (fragStart.before(rangeEnd)) {
                     Calendar fragEnd = (Calendar) fragStart.clone();
                     switch (intervalType) {
@@ -235,9 +250,9 @@ public class JdbcPartitionFragmenter extends Fragmenter {
      * Since the other PXF host addresses can not be probed, only the host name of the current PXF engine is returned.
      * @param fragments a list of fragments
      * @return a list of fragments that assigned hosts.
-     * @throws Exception
+     * @throws UnknownHostException if InetAddress.getLocalHost error.
      */
-    public static List<Fragment> prepareHosts(List<Fragment> fragments) throws Exception {
+    public static List<Fragment> prepareHosts(List<Fragment> fragments) throws UnknownHostException {
         for (Fragment fragment : fragments) {
             String pxfHost = InetAddress.getLocalHost().getHostAddress();
             String[] hosts = new String[]{pxfHost};

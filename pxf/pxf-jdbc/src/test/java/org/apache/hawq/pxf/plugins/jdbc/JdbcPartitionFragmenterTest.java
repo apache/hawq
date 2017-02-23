@@ -176,7 +176,7 @@ public class JdbcPartitionFragmenterTest {
             JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
             fragment.getFragments();
             fail("Expected an ParseException");
-        } catch (ParseException ex) {
+        } catch (UserDataException ex) {
         }
     }
 
