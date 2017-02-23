@@ -1,4 +1,5 @@
 <?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
 <!--
   Licensed to the Apache Software Foundation (ASF) under one or more
   contributor license agreements.  See the NOTICE file distributed with
@@ -15,9 +16,12 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
 <configuration xmlns:xi="http://www.w3.org/2001/XInclude">
+
+    <!-- ********************************* -->
     <!-- HDFS audit provider configuration -->
+    <!-- ********************************* -->
     <property>
         <name>xasecure.audit.destination.hdfs</name>
         <value>false</value>
@@ -30,11 +34,45 @@
 
     <property>
         <name>xasecure.audit.destination.hdfs.batch.filespool.dir</name>
-        <value>/tmp/audit/hdfs/spool</value>
+        <value>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/logs/spool/audit/hdfs</value>
     </property>
 
 
+    <!-- ********************************* -->
+    <!-- SOLR audit provider configuration -->
+    <!-- ********************************* -->
+    <property>
+        <name>xasecure.audit.destination.solr</name>
+        <value>false</value>
+    </property>
+
+    <!-- if not using zookeepers but direct url instead, then leave this property empty or set it to NONE -->
+    <property>
+        <name>xasecure.audit.destination.solr.zookeepers</name>
+        <value>zkhost1:2181,zkhost2:2181</value>
+    </property>
+
+    <!-- if not using zookeepers but direct url instead, then leave this property empty or set it to NONE -->
+    <property>
+        <name>xasecure.audit.destination.solr.collection</name>
+        <value>ranger_audits</value>
+    </property>
+
+    <!-- if not using direct url and using zookeeper instead, then leave this property empty or set it to NONE. -->
+    <property>
+        <name>xasecure.audit.destination.solr.urls</name>
+        <value>http://solrHost1:6083/solr/ranger_audits,http://solrHost2:6083/solr/ranger_audits</value>
+    </property>
+
+    <property>
+        <name>xasecure.audit.destination.solr.batch.filespool.dir</name>
+        <value>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/logs/spool/audit/solr</value>
+    </property>
+
+
+    <!-- ********************************** -->
     <!-- Log4j audit provider configuration -->
+    <!-- ********************************** -->
     <property>
         <name>xasecure.audit.destination.log4j</name>
         <value>true</value>
