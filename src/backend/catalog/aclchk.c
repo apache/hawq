@@ -228,7 +228,7 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 	 */
 	if (avail_goptions == ACL_NO_RIGHTS && Gp_role != GP_ROLE_EXECUTE)
 	{
-	  if (enable_ranger && !fallBackToNativeCheck(objkind, objectId, grantorId)) {
+	  if (aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(objkind, objectId, grantorId)) {
 	    if (pg_rangercheck(objkind, objectId, grantorId,
 	        whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
 	        ACLMASK_ANY) != ACLCHECK_OK)
@@ -285,6 +285,31 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 }
 
 /*
+ * Check if this object's ACL is checked natively.
+ */
+bool checkACLNative(GrantObjectType type, Oid oid)
+{
+	AclObjectKind kind = MAX_ACL_KIND;
+	if (type == ACL_OBJECT_RELATION)
+	{
+		kind = ACL_KIND_CLASS;
+	}
+	else if (type == ACL_OBJECT_NAMESPACE)
+	{
+		kind = ACL_KIND_NAMESPACE;
+	}
+	else if (type == ACL_OBJECT_FUNCTION)
+	{
+		kind = ACL_KIND_PROC;
+	}
+	else
+	{
+		return false;
+	}
+	return fallBackToNativeCheck(kind, oid, GetUserId());
+}
+
+/*
  * Called to execute the utility commands GRANT and REVOKE
  */
 void
@@ -303,6 +328,22 @@ ExecuteGrantStmt(GrantStmt *stmt)
 	istmt.is_grant = stmt->is_grant;
 	istmt.objtype = stmt->objtype;
 	istmt.objects = objectNamesToOids(stmt->objtype, stmt->objects);
+
+	/*
+	 * Don't allow GRANT/REVOKE for objects managed by Ranger
+	 * if in ranger mode.
+	 */
+	if (aclType == HAWQ_ACL_RANGER)
+	{
+		foreach(cell, istmt.objects)
+		{
+			Oid oid = lfirst_oid(cell);
+			if (!checkACLNative(stmt->objtype, oid))
+			{
+				elog(ERROR, "GRANT/REVOKE is not allowed for this object in ranger mode");
+			}
+		}
+	}
 
 	/* If this is a GRANT/REVOKE on a table, expand partition references */
 	if (istmt.objtype == ACL_OBJECT_RELATION)
@@ -2510,6 +2551,28 @@ char *getNamespaceNameFromOid(Oid object_oid)
 
   return tname.data;
 }
+char *getNamespaceNameByOid(Oid object_oid)
+{
+
+  StringInfoData tname;
+  initStringInfo(&tname);
+
+  Assert(OidIsValid(object_oid));
+  char* schema_name = caql_getcstring(
+                   NULL,
+                   cql("SELECT nspname FROM pg_namespace "
+                     " WHERE oid = :1",
+                     ObjectIdGetDatum(object_oid)));
+  if (schema_name == NULL)
+  {
+    return NULL;
+  }
+
+  appendStringInfo(&tname, "%s", schema_name);
+  pfree(schema_name);
+
+  return tname.data;
+}
 char *getConversionNameFromOid(Oid object_oid)
 {
   Assert(OidIsValid(object_oid));
@@ -2646,7 +2709,7 @@ char *getNameFromOid(AclObjectKind objkind, Oid object_oid)
 
 char actionName[12][12] = {"INSERT","SELECT","UPDATE", "DELETE",
     "TRUNCATE", "REFERENCES", "TRIGGER", "EXECUTE", "USAGE",
-    "CREATE", "CREATE_TEMP", "CONNECT"};
+    "CREATE", "TEMP", "CONNECT"};
 
 List *getActionName(AclMode mask)
 {
@@ -2666,6 +2729,27 @@ List *getActionName(AclMode mask)
   return actions;
 }
 
+bool checkNamespaceFallback(Oid x)
+{
+  if (x == PG_CATALOG_NAMESPACE || x == information_schema_namespcace_oid
+     || x == PG_AOSEGMENT_NAMESPACE || x == PG_TOAST_NAMESPACE || x == PG_BITMAPINDEX_NAMESPACE)
+  {
+    return true;
+  }
+  else
+  {
+    char* name = getNamespaceNameByOid(x);
+    if (name != NULL && pg_strncasecmp(name, "pg_temp", strlen("pg_temp")) == 0)
+    {
+      /* fall back pg_temp_XX check to native*/
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+}
 
 bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
 {
@@ -2674,34 +2758,35 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
    */
   if (information_schema_namespcace_oid == 0)
   {
-	  information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
+    information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
   }
-  /*for heap table, we fall back to native check.*/
+  /* for heap table, we fall back to native check. */
   if (objkind == ACL_KIND_CLASS)
   {
-    char relstorage = get_rel_relstorage(obj_oid);
-    if (relstorage == 'h')
+    Oid namespaceid = get_rel_namespace(obj_oid);
+    if(checkNamespaceFallback(namespaceid))
     {
       return true;
     }
   }
   else if (objkind == ACL_KIND_NAMESPACE)
   {
-	/*native check build-in schemas.*/
-    if (obj_oid == PG_CATALOG_NAMESPACE || obj_oid == information_schema_namespcace_oid
-    		|| obj_oid == PG_AOSEGMENT_NAMESPACE || obj_oid == PG_TOAST_NAMESPACE
-			|| obj_oid == PG_BITMAPINDEX_NAMESPACE)
+    /* native check build-in schemas. */
+    if(checkNamespaceFallback(obj_oid))
     {
+      return true;
+    }
+    else if (obj_oid == PG_PUBLIC_NAMESPACE && superuser())
+    {
+      /* superuser's access to PUBLIC */
       return true;
     }
   }
   else if (objkind == ACL_KIND_PROC)
   {
-	/*native check functions under build-in schemas.*/
+    /* native check functions under build-in schemas. */
     Oid namespaceid = get_func_namespace(obj_oid);
-    if (namespaceid == PG_CATALOG_NAMESPACE || namespaceid == information_schema_namespcace_oid
-			|| namespaceid == PG_AOSEGMENT_NAMESPACE || namespaceid == PG_TOAST_NAMESPACE
-			|| namespaceid == PG_BITMAPINDEX_NAMESPACE)
+    if (checkNamespaceFallback(namespaceid))
     {
       return true;
     }
@@ -2807,16 +2892,17 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 	List* actions = getActionName(mask);
 	bool isAll = (how == ACLMASK_ALL) ? true: false;
 
-	elog(DEBUG3, "ranger acl check kind: %d, object name: %s, role: %s, mask: %u\n", objkind, objectname, rolename, mask);
+	elog(DEBUG3, "ranger acl check kind: %d, object name: %s, object oid:%d, role: %s, mask: %u\n",
+			objkind, objectname, object_oid, rolename, mask);
 
 	List *resultargs = NIL;
-    RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
-    aclresult->result = RANGERCHECK_NO_PRIV;
-    aclresult->relOid = object_oid;
+	RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
+	aclresult->result = RANGERCHECK_NO_PRIV;
+	aclresult->relOid = object_oid;
 	/* this two sign fields will be set in function create_ranger_request_json */
 	aclresult->resource_sign = 0;
 	aclresult->privilege_sign = 0;
-    resultargs = lappend(resultargs, aclresult);
+	resultargs = lappend(resultargs, aclresult);
 
 	List *requestargs = NIL;
 	RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
@@ -3851,7 +3937,7 @@ pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_CLASS, table_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3871,7 +3957,7 @@ pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid))
    {
      return pg_rangercheck(ACL_KIND_DATABASE, db_oid, roleid, mode, ACLMASK_ANY);
    }
@@ -3891,7 +3977,7 @@ pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_PROC, proc_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3911,7 +3997,7 @@ pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3931,7 +4017,7 @@ pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3951,7 +4037,7 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3972,7 +4058,7 @@ pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FDW, fdw_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3993,7 +4079,7 @@ pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -4014,7 +4100,7 @@ pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid))
   {
     return pg_rangercheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode, ACLMASK_ANY);
   }
@@ -4034,7 +4120,7 @@ pg_filesystem_aclcheck(Oid fsysid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(enable_ranger && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid))
   {
     return pg_rangercheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode, ACLMASK_ANY);
   }

@@ -6,9 +6,11 @@ Verifies and validates HAWQ platform settings.
 SYNOPSIS
 *****************************************************
 
-hawq check -f <hostfile_hawq_check>
+hawq check -f <hostfile_hawq_check> | 
+                     (-h <hostname> | --host <hostname>)
         [--hadoop | --hadoop-home <hadoop_home>]
         [--stdout | --zipout] [--config <config_file>]
+        [--kerberos] [--hdfs-ha] [--yarn] [--yarn-ha]
 
 hawq check --zipin <hawq_check_zipfile>
 
@@ -25,24 +27,26 @@ The hawq check utility determines the platform on which
 you are running HAWQ and validates various platform-specific 
 configuration settings as well as HAWQ and HDFS specific 
 configuration settings. In order to perform HAWQ configuration 
-checks, make sure HAWQ has been already started and gpconfig 
-works. For HDFS checks, you should either set the HADOOP_HOME 
-environment variable or give the hadoop installation location 
-using --hadoop option.
+checks, make sure HAWQ has been already started and hawq config 
+works. For HDFS checks, you should either set the $HADOOP_HOME 
+environment variable or provide the full path to the hadoop
+installation location using the --hadoop option.
 
-hawq check can use a host file or a file previously created with
-the --zipout option to validate platform settings. If
-GPCHECK_ERROR displays, one or more validation checks failed.
+The hawq check utility can use a host file or a file previously
+created with the --zipout option to validate platform settings.
+If GPCHECK_ERROR displays, one or more validation checks failed.
 You can also use hawq check to gather and view platform settings 
 on hosts without running validation checks.
 
 When running checks, hawq check compares your actual configuration
-setting with expected value listed in a config file (which is
-$GPHOME/etc/hawq check.cnf by default). You are supposed to modify
-values for "mount.points" and "diskusage.monitor.mounts" to
-the actual mount points you want to check separated by comma,
-otherwise it only checks the root directory which may not be 
-helpful, here is an example:
+setting with an expected value listed in a configuration file 
+($GPHOME/etc/hawq_check.cnf by default). You must modify your
+configuration values for "mount.points" and "diskusage.monitor.mounts"
+to the actual mount points you want to check, as a comma-separated
+list. Otherwise the utility only checks the root directory, which
+may not be helpful.
+
+An example is shown below:
 
     [linux.mount]
     mount.points = /,/data1,/data2
@@ -54,71 +58,74 @@ helpful, here is an example:
 OPTIONS
 *****************************************************
 
---config config_file
+--config <config_file>
 
  The name of a configuration file to use instead of the default 
- file $GPHOME/etc/hawq_check.cnf (or ~/gpconfigs/hawq_check_dca_config 
- on the EMC Greenplum Data Computing Appliance). This file specifies 
- the OS-specific checks and HDFS-specific checks to run.
+ file $GPHOME/etc/hawq_check.cnf.
 
-
--f hostfile_hawq_check
+-f <hostfile_hawq_check>
 
  The name of a file that contains a list of hosts that hawq check 
  uses to validate platform-specific settings. This file should 
  contain a single host name for all hosts in your HAWQ system 
  (master, standby master, and segments).
 
---hadoop/--hadoop-home hadoop_home
+-h/--host <hostname>
+ Specifies a single host on which platform-specific settings will
+ be validated.
 
- Use this option to specify your hadoop installation location so that
- hawq check can validate HDFS settings. This option is not needed when
- HADOOP_HOME environment variable is set.
+--hadoop/--hadoop-home <hadoop_home>
+
+ Use this option to specify the full path to your hadoop installation
+ location so that hawq check can validate HDFS settings. This option
+ is not needed when the $HADOOP_HOME environment variable is set.
 
 
 --kerberos
 
- Use this option to specify HDFS/YARN enables Kerberos mode, so
- that hawq check can validate HDFS/YARN settings with Kerberos
- enabled.
+ Use this option to check HDFS and YARN when running in Kerberos
+ mode.  This allows hawq check to validate HAWQ/HDFS/YARN settings
+ with Kerberos enabled.
 
 
 --hdfs-ha
 
- Use this option to specify HDFS HA mode enabled, so that hawq check
- can validate HDFS settings with HA enabled.
+ Use this option to specify that HDFS in High Availability mode is
+ enabled, allowing hawq check to validate HA HDFS settings.
 
 
 --yarn
 
- Use this option to specify HAWQ enables YARN mode, so that hawq check
- can validate HAWQ/YARN settings.
+ If HAWQ is using YARN, this option enables yarn mode, allowing 
+ hawq check to validate the basic YARN settings.
 
 
 --yarn-ha
 
- Use this option to specify HAWQ enables YARN HA mode, so that
- hawq check can validate HAWQ/YARN settings with YARN-HA enabled.
+ Use this option to indicate HAWQ is using YARN with High Availability
+ mode enabled. This allows hawq check to validate HAWQ/YARN settings
+ with YARN HA enabled.
 
 
 --stdout
 
- Display collected host information from hawq check. No checks or 
- validations are performed.
+ Display collected host information from hawq check to standard
+ output.  No checks or validations are performed.
 
 
 --zipout
 
  Save all collected data to a .zip file in the current working 
  directory. hawq check automatically creates the .zip file and names 
- it hawq_check_timestamp.tar.gz. No checks or validations are performed.
+ it hawq_check_<timestamp>.tar.gz. No checks or validations are
+ performed.
 
 
---zipin file
+--zipin <hawq_check_zipfile>
 
  Use this option to decompress and check a .zip file created with 
  the --zipout option. hawq check performs validation tasks against 
- the file you specify in this option.
+ the specified file.
 
 
 -? (help)
@@ -135,27 +142,27 @@ OPTIONS
 EXAMPLES
 *****************************************************
 
-Verify and validate the HAWQ platform settings by 
-entering a host file and specifying the hadoop location:
+Verify and validate the HAWQ platform settings by specifying
+a host file and identifying the full hadoop install path:
 
- # hawq check -f hostfile_hawq_check --hadoop ~/hadoop-2.0.0/
+ # hawq check -f hostfile_hawq_check --hadoop /usr/local/hadoop-<version>/
 
 
 Verify and validate the HAWQ platform settings with HDFS HA
-enabled, YARN HA enabled and Kerberos enabled:
+enabled, YARN HA enabled, and Kerberos enabled:
 
- # hawq check -f hostfile_hawq_check --hadoop ~/hadoop-2.0.0/
+ # hawq check -f hostfile_hawq_check --hadoop /usr/local/hadoop-<version>/
               --hdfs-ha --yarn-ha --kerberos
 
 
 Verify and validate the HAWQ platform settings with HDFS HA
-enabled, and Kerberos enabled:
+enabled and Kerberos enabled:
 
- # hawq check -f hostfile_hawq_check --hadoop ~/hadoop-2.0.0/
+ # hawq check -f hostfile_hawq_check --hadoop /usr/local/hadoop-<version>/
               --hdfs-ha --kerberos
 
 
-Save HAWQ platform settings to a zip file, when HADOOP_HOME
+Save HAWQ platform settings to a zip file; the $HADOOP_HOME
 environment variable is set:
 
  # hawq check -f hostfile_hawq_check --zipout
@@ -164,12 +171,12 @@ environment variable is set:
 Verify and validate the HAWQ platform settings 
 using a zip file created with the --zipout option:
 
- # hawq check --zipin hawq_check_timestamp.tar.gz
+ # hawq check --zipin hawq_check_<timestamp>.tar.gz
 
 
 View collected HAWQ platform settings:
 
- # hawq check -f hostfile_hawq_check --hadoop ~/hadoop-2.0.0/ --stdout
+ # hawq check -f hostfile_hawq_check --hadoop /usr/local/hadoop-<version>/ --stdout
 
 
 *****************************************************

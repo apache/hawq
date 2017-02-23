@@ -42,6 +42,8 @@
 #include "utils/guc_tables.h"	/* TODO: manipulate gucs */
 #include "portability/instr_time.h"	/* Monitor the dispatcher performance */
 
+#include "resourcemanager/dynrm.h"
+
 typedef enum ExecutorMgrConstant {
 	EXECUTORMGR_CANCEL_ERROR_BUFFER_SIZE = 256,
 } ExecutorMgrConstant;
@@ -320,6 +322,18 @@ executormgr_get_executor_result(QueryExecutor *executor)
 }
 
 int
+executormgr_get_segment_ID(QueryExecutor *executor)
+{
+	Segment *seg = executor->desc->segment;
+
+	/* For segment only */
+	if (seg->master || seg->standby)
+		return -1;
+
+	return seg->ID;
+}
+
+int
 executormgr_get_fd(QueryExecutor *executor)
 {
 	return PQsocket(executor->desc->conn);
@@ -399,7 +413,7 @@ executormgr_is_dispatchable(QueryExecutor *executor)
 
 	if (!executormgr_validate_conn(conn) || PQstatus(conn) == CONNECTION_BAD)
 	{
-		write_log("function executormgr_is_dispatchable meets error, connection is bad.");
+		write_log("function %s meets error, connection is bad.", __func__);
 		executormgr_catch_error(executor);
 		return false;
 	}
@@ -464,11 +478,45 @@ executormgr_dispatch_and_run(struct DispatchData *data, QueryExecutor *executor)
 	return true;
 
 error:
-	if (query)
-		free(query);
-	write_log("function executormgr_dispatch_and_run meets error.");
+	free(query);
 	executormgr_catch_error(executor);
 	return false;
+}
+
+bool
+executormgr_check_segment_status(QueryExecutor *executor)
+{
+	/*
+	 * Cancel the query if a segment is down. QEs could hang in interconnect
+	 * until timeout when one segment is down. This will cause QD keep polling
+	 * until QE timeout.
+	 */
+	int ID = executormgr_get_segment_ID(executor);
+
+	if (ID >= 0 && IsSegmentDown(ID))
+	{
+		cdbdisp_seterrcode(ERRCODE_GP_INTERCONNECTION_ERROR, -1,
+						   executormgr_get_executor_result(executor));
+		return false;
+	}
+
+	return true;
+}
+
+void
+executormgr_seterrcode_if_needed(QueryExecutor *executor)
+{
+	struct CdbDispatchResult *dispatchResult;
+ 
+	if (executor == NULL)
+		return;
+
+	dispatchResult = executormgr_get_executor_result(executor);
+    if (dispatchResult->errcode == ERRCODE_SUCCESSFUL_COMPLETION ||
+		dispatchResult->errcode == ERRCODE_INTERNAL_ERROR)
+	{
+		cdbdisp_seterrcode(ERRCODE_INTERNAL_ERROR, -1, dispatchResult);
+	}
 }
 
 /*
@@ -547,7 +595,7 @@ executormgr_consume(QueryExecutor *executor)
 
 connection_error:
 	/* Let caller deal with connection error. */
-	write_log("function executormgr_consume meets error, connection is bad.");
+	write_log("function %s meets error, connection is bad.", __func__);
 	executormgr_catch_error(executor);
 	return false;
 }
@@ -577,16 +625,16 @@ executormgr_discard(QueryExecutor *executor)
 static void
 executormgr_catch_error(QueryExecutor *executor)
 {
-	PGconn			*conn = executor->desc->conn;
-	char			*msg;
-	int       errCode = 0;
+	PGconn	*conn = executor->desc->conn;
+	char	*msg;
+	int		errCode = 0;
 	if (executor->refResult->errcode != 0)
-	  errCode = executor->refResult->errcode;
+		errCode = executor->refResult->errcode;
 
 	msg = PQerrorMessage(conn);
 
 	if (msg && (strcmp("", msg) != 0) && (executor->refResult->errcode == 0)) {
-	  errCode = ERRCODE_GP_INTERCONNECTION_ERROR;
+		errCode = ERRCODE_GP_INTERCONNECTION_ERROR;
 	}
 
 	PQExpBufferData selfDesc;
@@ -596,23 +644,21 @@ executormgr_catch_error(QueryExecutor *executor)
 	                  executor->desc->segment->hostname,
 	                  executor->desc->segment->port);
 
-  if (!executor->refResult->error_message) {
-    cdbdisp_appendMessage(
-        executor->refResult,
-        LOG,
-        errCode,
-        "%s %s: %s",
-        (executor->state == QES_DISPATCHABLE ?
-            "Error dispatching to" :
-            (executor->state == QES_RUNNING ?
-                "Query Executor Error in" : "Error in ")),
-        (executor->desc->whoami && strcmp(executor->desc->whoami, "") != 0) ?
-            executor->desc->whoami : selfDesc.data,
-        msg ? msg : "unknown error");
-  }
+	if (!executor->refResult->error_message) {
+		cdbdisp_appendMessage(
+				executor->refResult, LOG, errCode,
+				"%s %s: %s",
+				(executor->state == QES_DISPATCHABLE ?
+					"Error dispatching to" :
+					(executor->state == QES_RUNNING ?
+						"Query Executor Error in" : "Error in ")),
+				(executor->desc->whoami && strcmp(executor->desc->whoami, "") != 0) ?
+					executor->desc->whoami : selfDesc.data,
+				msg ? msg : "unknown error");
+				  }
 
-  termPQExpBuffer(&selfDesc);
-  PQfinish(conn);
+	termPQExpBuffer(&selfDesc);
+	PQfinish(conn);
 
 	executor->desc->conn = NULL;
 

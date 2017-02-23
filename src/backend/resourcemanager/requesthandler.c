@@ -768,14 +768,13 @@ bool handleRMSEGRequestIMAlive(void **arg)
 
 	destroySelfMaintainBuffer(&newseginfo);
 
-	newsegstat->ID 				 = SEGSTAT_ID_INVALID;
+	newsegstat->Info.ID 		 = SEGSTAT_ID_INVALID;
 
 	RPCRequestHeadIMAlive header = SMBUFF_HEAD(RPCRequestHeadIMAlive,
 												&(conntrack->MessageBuff));
 	newsegstat->FailedTmpDirNum  = header->TmpDirBrokenCount;
 	newsegstat->RMStartTimestamp = header->RMStartTimestamp;
 	newsegstat->StatusDesc = 0;
-	newsegstat->Reserved   = 0;
 
 	bool capstatchanged = false;
 	if ( addHAWQSegWithSegStat(newsegstat, &capstatchanged) != FUNC_RETURN_OK )
@@ -961,9 +960,6 @@ errorexit:
 		SelfMaintainBufferData responsedata;
 		initializeSelfMaintainBuffer(&responsedata, PCONTEXT);
 
-		RPCResponseHeadAcquireResourceQuotaFromRMByOIDERRORData response;
-		response.Result   = res;
-		response.Reserved = 0;
 		buildResponseIntoConnTrack(conntrack,
 								   SMBUFF_CONTENT(&responsedata),
 								   getSMBContentSize(&responsedata),
@@ -1089,10 +1085,10 @@ bool handleRMRequestSegmentIsDown(void **arg)
 					if (Gp_role != GP_ROLE_UTILITY)
 					{
 						SimpStringPtr description = build_segment_status_description(segres->Stat);
-						update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+						update_segment_status(segres->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 											  SEGMENT_STATUS_DOWN,
 											  (description->Len > 0)?description->Str:"");
-						add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+						add_segment_history_row(segres->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 												hostname,
 												description->Str);
 
@@ -1207,7 +1203,6 @@ bool handleRMRequestDumpResQueueStatus(void **arg)
 
 bool handleRMRequestDumpStatus(void **arg)
 {
-	static char errorbuf[ERRORMESSAGE_SIZE];
     ConnectionTrack conntrack   = (ConnectionTrack)(*arg);
     RPCResponseDumpStatusData response;
 

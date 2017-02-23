@@ -32,13 +32,43 @@
         <relativePath>..</relativePath>
     </parent>
     <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-            </resource>
-        </resources>
         <plugins>
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.0.2</version>
+                <executions>
+                    <execution>
+                        <id>copy-resources</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <escapeString>\</escapeString>
+                            <outputDirectory>${basedir}/target/conf</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${basedir}/../conf</directory>
+                                    <excludes>
+                                        <exclude>ranger-servicedef-hawq.json</exclude>
+                                        <exclude>server.xml</exclude>
+                                    </excludes>
+                                    <filtering>true</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.0.0</version>
+                <configuration>
+                    <!-- Due to Hadoop library using system-level JVM hook, all dependent classes must be loaded by
+                         Tomcat's server classloader, so they are shipped in RPM and not with the webapp -->
+                    <packagingExcludes>WEB-INF/lib/*.jar</packagingExcludes>
+                </configuration>
+            </plugin>
             <plugin>
                 <!-- use mvn tomcat6:run-war to run the appserver with the app deployed -->
                 <groupId>org.apache.tomcat.maven</groupId>

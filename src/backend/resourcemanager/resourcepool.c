@@ -19,6 +19,7 @@
 
 #include "envswitch.h"
 #include "dynrm.h"
+#include "miscadmin.h"
 #include "include/communication/rmcomm_RM2GRM.h"
 #include "include/communication/rmcomm_RM2RMSEG.h"
 #include "utils/simplestring.h"
@@ -76,6 +77,8 @@ void refreshSlavesFileHostSize(FILE *fp);
 int __DRM_NODERESPOOL_comp_ratioFree(void *arg, void *val1, void *val2);
 int __DRM_NODERESPOOL_comp_ratioAlloc(void *arg, void *val1, void *val2);
 int __DRM_NODERESPOOL_comp_combine(void *arg, void *val1, void *val2);
+
+extern void MarkSegmentUp(int x);
 
 /*
  * The balanced BST index comparing function. The segment containing most
@@ -410,6 +413,8 @@ void cleanup_segment_config()
 	PQExpBuffer sql = NULL;
 	PGresult* result = NULL;
 
+	SegmentStatusShmemReset();
+
 	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
 	conn = PQconnectdb(conninfo);
@@ -646,6 +651,19 @@ void update_segment_status(int32_t id, char status, char* description)
 	else if (status == SEGMENT_STATUS_DOWN)
 		Assert(strlen(description) != 0);
 
+	/* For segment nodes only. */
+	if (id >= REGISTRATION_ORDER_OFFSET)
+	{
+		if (status == SEGMENT_STATUS_UP)
+			MarkSegmentUp(id - REGISTRATION_ORDER_OFFSET);
+		else if (status == SEGMENT_STATUS_DOWN)
+			MarkSegmentDown(id - REGISTRATION_ORDER_OFFSET);
+		else
+			elog(ERROR, "Unrecognized segment status character: '%c' "
+						"(Should be one of '%c' and '%c')", status,
+						SEGMENT_STATUS_UP, SEGMENT_STATUS_DOWN);
+	}
+
 	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
 	conn = PQconnectdb(conninfo);
@@ -813,6 +831,19 @@ void add_segment_config_row(int32_t id,
 	PQExpBuffer sql = NULL;
 	PGresult* result = NULL;
 
+	/* For segment nodes only. */
+	if (id >= REGISTRATION_ORDER_OFFSET)
+	{
+		if (status == SEGMENT_STATUS_UP)
+			MarkSegmentUp(id - REGISTRATION_ORDER_OFFSET);
+		else if (status == SEGMENT_STATUS_DOWN)
+			MarkSegmentDown(id - REGISTRATION_ORDER_OFFSET);
+		else
+			elog(ERROR, "Unrecognized segment status character: '%c' "
+						"(Should be one of '%c' and '%c')", status,
+						SEGMENT_STATUS_UP, SEGMENT_STATUS_DOWN);
+	}
+
 	sprintf(conninfo, "options='-c gp_session_role=UTILITY -c allow_system_table_mods=dml' "
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, CONNECT_TIMEOUT);
 	conn = PQconnectdb(conninfo);
@@ -939,9 +970,9 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 		segresource = createSegResource(segstat);
 
 		/* Update machine internal ID. */
-		segresource->Stat->ID = PRESPOOL->SegmentIDCounter;
+		segresource->Stat->Info.ID = PRESPOOL->SegmentIDCounter;
 		PRESPOOL->SegmentIDCounter++;
-		segid = segresource->Stat->ID;
+		segid = segresource->Stat->Info.ID;
 
 		/* Add HAWQ node into resource pool indexed by machine id. */
 		setHASHTABLENode(&(PRESPOOL->Segments),
@@ -1306,7 +1337,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 			if (Gp_role != GP_ROLE_UTILITY)
 			{
 				SimpStringPtr description = build_segment_status_description(segresource->Stat);
-				update_segment_status(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET,
+				update_segment_status(segresource->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 										IS_SEGSTAT_FTSAVAILABLE(segresource->Stat) ?
 																SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
 										(description->Len > 0)?description->Str:"");
@@ -1318,7 +1349,7 @@ int addHAWQSegWithSegStat(SegStat segstat, bool *capstatchanged)
 								SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
 							(description->Len > 0)?description->Str:"");
 
-				add_segment_history_row(segresource->Stat->ID + REGISTRATION_ORDER_OFFSET,
+				add_segment_history_row(segresource->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 										GET_SEGRESOURCE_HOSTNAME(segresource),
 										IS_SEGSTAT_FTSAVAILABLE(segresource->Stat) ?
 											SEG_STATUS_DESCRIPTION_UP:description->Str);
@@ -1609,11 +1640,11 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 	if (statusDescChange && Gp_role != GP_ROLE_UTILITY)
 	{
 		SimpStringPtr description = build_segment_status_description(segres->Stat);
-		update_segment_status(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+		update_segment_status(segres->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 								IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
 									SEGMENT_STATUS_UP:SEGMENT_STATUS_DOWN,
 								 (description->Len > 0)?description->Str:"");
-		add_segment_history_row(segres->Stat->ID + REGISTRATION_ORDER_OFFSET,
+		add_segment_history_row(segres->Stat->Info.ID + REGISTRATION_ORDER_OFFSET,
 								GET_SEGRESOURCE_HOSTNAME(segres),
 								IS_SEGSTAT_FTSAVAILABLE(segres->Stat) ?
 									SEG_STATUS_DESCRIPTION_UP:description->Str);
@@ -1627,15 +1658,6 @@ int updateHAWQSegWithGRMSegStat( SegStat segstat)
 
 		freeSimpleStringContent(description);
 		rm_pfree(PCONTEXT, description);
-	}
-
-	int32_t curratio = 0;
-	if (DRMGlobalInstance->ImpType == YARN_LIBYARN &&
-		segres->Stat->GRMTotalMemoryMB > 0 &&
-		segres->Stat->GRMTotalCore > 0)
-	{
-		curratio = trunc(segres->Stat->GRMTotalMemoryMB /
-						 segres->Stat->GRMTotalCore);
 	}
 
 	return FUNC_RETURN_OK;
@@ -1878,7 +1900,7 @@ void generateSegInfoAddrStr(SegInfo seginfo, int addrindex, SelfMaintainBuffer b
 	Assert(addrindex >= 0  && addrindex < seginfo->HostAddrCount);
 
 	/* Get address attribute and offset value. */
-	uint16_t attr = GET_SEGINFO_ADDR_ATTR_AT(seginfo, addrindex);
+	uint16_t __MAYBE_UNUSED attr = GET_SEGINFO_ADDR_ATTR_AT(seginfo, addrindex);
 
 	Assert(IS_SEGINFO_ADDR_STR(attr));
 	AddressString straddr = NULL;
@@ -1905,7 +1927,7 @@ void  generateSegStatReport(SegStat segstat, SelfMaintainBuffer buff)
 			"NODE:ID=%d,HAWQ %s, "
 			"HAWQ CAP (%d MB, %lf CORE), "
 			"GRM CAP(%d MB, %lf CORE),",
-			segstat->ID,
+			segstat->Info.ID,
 			segstat->FTSAvailable ? "AVAIL" : "UNAVAIL",
 			segstat->FTSTotalMemoryMB,
 			segstat->FTSTotalCore * 1.0,
@@ -2039,7 +2061,6 @@ void addGRMContainerToResPool(GRMContainer container)
 	SegResource			segresource	= NULL;
 	uint32_t			ratio		= 0;
 	GRMContainerSet 	ctns		= NULL;
-	bool				newratio	= false;
 
 	Assert(container->Resource != NULL);
 	segresource = container->Resource;
@@ -2048,8 +2069,6 @@ void addGRMContainerToResPool(GRMContainer container)
 	ratio = container->MemoryMB / container->Core;
 	createAndGetGRMContainerSet(segresource, ratio, &ctns);
 	Assert(ctns != NULL);
-
-	newratio = ctns->Allocated.MemoryMB == 0;
 
 	appendGRMContainerSetContainer(ctns, container);
 
@@ -2071,7 +2090,7 @@ void addGRMContainerToResPool(GRMContainer container)
 				container->MemoryMB,
 				container->Core,
 				container->HostName,
-				segresource->Stat->ID,
+				segresource->Stat->Info.ID,
 				segresource->Stat->Info.HostNameLen,
 				GET_SEGRESOURCE_HOSTNAME(segresource),
 				segresource->IncPending.MemoryMB);
@@ -2495,7 +2514,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 			VSegmentCounterInternal vsegcnt = createVSegmentCounter(i, segresource);
 
 			setHASHTABLENode(&vsegcnttbl,
-							 TYPCONVERT(void *, segresource->Stat->ID),
+							 TYPCONVERT(void *, segresource->Stat->Info.ID),
 							 TYPCONVERT(void *, vsegcnt),
 							 false);
 
@@ -2537,7 +2556,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 			 */
 			PAIR pair2 = getHASHTABLENode(&vsegcnttbl,
 										  TYPCONVERT(void *,
-													 segres->Stat->ID));
+													 segres->Stat->Info.ID));
 			nvseg = pair2 == NULL ? nvseg : nvseg + 1;
 
 			minnvseg = minnvseg < nvseg ? minnvseg : nvseg;
@@ -2567,7 +2586,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 				VSegmentCounterInternal vsegcounter = (VSegmentCounterInternal)
 													  ((PAIR)(lfirst(cell)))->Value;
 				GRMContainerSet ctns = NULL;
-				int res2 = getGRMContainerSet(vsegcounter->Resource, ratio, &ctns);
+				int __MAYBE_UNUSED res2 = getGRMContainerSet(vsegcounter->Resource, ratio, &ctns);
 				Assert(res2 == FUNC_RETURN_OK);
 
 				res2 = recycleResourceToSegment(vsegcounter->Resource,
@@ -2644,7 +2663,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 			VSegmentCounterInternal curhost = NULL;
 			PAIR pair = getHASHTABLENode(&vsegcnttbl,
 										 TYPCONVERT(void *,
-													currresinfo->Stat->ID));
+													currresinfo->Stat->Info.ID));
 			if ( pair != NULL )
 			{
 				Assert(!currresinfo->RUAlivePending);
@@ -2738,7 +2757,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 					res=getSegIDByHDFSHostName(preferredhostname[k],
 											   strlen(preferredhostname[k]),
 											   &syncid);
-					if(syncid == currresinfo->Stat->ID)
+					if(syncid == currresinfo->Stat->Info.ID)
 					{
 						hdfsnameindex = k;
 						break;
@@ -2757,7 +2776,7 @@ int allocateResourceFromResourcePoolIOBytes2(int32_t 	 nodecount,
 				}
 
 				setHASHTABLENode(&vsegcnttbl,
-								 TYPCONVERT(void *, currresinfo->Stat->ID),
+								 TYPCONVERT(void *, currresinfo->Stat->Info.ID),
 								 TYPCONVERT(void *, vsegcnt),
 								 false);
 			}
@@ -2826,7 +2845,7 @@ int returnResourceToResourcePool(int 		memory,
 								 List 	  **hosts,
 								 bool 		isold)
 {
-	int				 res	= FUNC_RETURN_OK;
+	int __MAYBE_UNUSED res	= FUNC_RETURN_OK;
 	uint32_t 		 ratio	= 0;
 	SegResource		 segres = NULL;
 	GRMContainerSet	 ctns	= NULL;
@@ -2896,7 +2915,7 @@ VSegmentCounterInternal createVSegmentCounter(uint32_t 		hdfsnameindex,
 	result->HDFSNameIndex = hdfsnameindex;
 	result->Resource	  = segres;
 	result->VSegmentCount = 1;
-	result->SegId		  = segres->Stat->ID;
+	result->SegId		  = segres->Stat->Info.ID;
 	return result;
 }
 
@@ -2979,7 +2998,7 @@ int recycleResourceToSegment(SegResource	 segres,
 
 void addSegResourceAvailIndex(SegResource segres)
 {
-	int 	 res 	= FUNC_RETURN_OK;
+	int __MAYBE_UNUSED res 	= FUNC_RETURN_OK;
 	BBST	 tree	= NULL;
 	uint32_t ratio  = 0;
 	for ( int i = 0 ; i < PQUEMGR->RatioCount ; ++i )
@@ -3002,7 +3021,7 @@ void addSegResourceAvailIndex(SegResource segres)
 
 void addSegResourceAllocIndex(SegResource segres)
 {
-	int 	 res 	= FUNC_RETURN_OK;
+	int __MAYBE_UNUSED res 	= FUNC_RETURN_OK;
 	BBST	 tree	= NULL;
 	uint32_t ratio  = 0;
 	for ( int i = 0 ; i < PQUEMGR->RatioCount ; ++i )
@@ -3026,7 +3045,7 @@ void addSegResourceAllocIndex(SegResource segres)
 void addSegResourceCombinedWorkloadIndex(SegResource segres)
 {
 	/* Add the node */
-	int res = insertBBSTNode(&(PRESPOOL->OrderedCombinedWorkload),
+	int __MAYBE_UNUSED res = insertBBSTNode(&(PRESPOOL->OrderedCombinedWorkload),
 						 	 createBBSTNode(&(PRESPOOL->OrderedCombinedWorkload),
 						 			 	 	segres));
 	Assert(res == FUNC_RETURN_OK);
@@ -3225,7 +3244,7 @@ void returnAllGRMResourceFromSegment(SegResource segres)
 	elog(DEBUG3, "HAWQ RM: returnAllResourceForSegment: %u containers have been "
 				 "removed for machine internal id:%u",
 				 count,
-				 segres->Stat->ID);
+				 segres->Stat->Info.ID);
 
 	validateResourcePoolStatus(false);
 }
@@ -4124,8 +4143,8 @@ void validateResourcePoolStatus(bool refquemgr)
 					  "pool (%d MB, %lf CORE), maximum capacity (%d MB, %d CORE)",
 					  totalallocmem,
 					  totalalloccore,
-					  core,
-					  mem);
+					  mem,
+					  core);
 	}
 
 	/*
@@ -4697,10 +4716,10 @@ void adjustSegmentStatGRMCapacity(SegStat segstat)
 		if ( oldmemorymb != segstat->GRMTotalMemoryMB ||
 			 oldcore	 != segstat->GRMTotalCore )
 		{
-			elog(LOG, "Resource manager adjusts segment %s original global resource "
-					  "manager resource capacity from (%d MB, %d CORE) to "
-					  "(%d MB, %d CORE)",
-					  GET_SEGINFO_HOSTNAME(&(segstat->Info)),
+			elog(LOG, "resource manager adjusts segment %s resource capacity "
+					  "from (%d MB, %d CORE) to (%d MB, %d CORE) from the "
+					  "cluster report of global resource manager",
+					  GET_SEGINFO_GRMHOSTNAME(&(segstat->Info)),
 					  oldmemorymb,
 					  oldcore,
 					  segstat->GRMTotalMemoryMB,
@@ -4825,7 +4844,7 @@ void dumpResourcePoolHosts(const char *filename)
     	{
             SegResource segresource = (SegResource)(((PAIR)lfirst(cell))->Value);
             fprintf(fp, "HOST_ID(id=%u:hostname:%s)\n",
-            		segresource->Stat->ID,
+            		segresource->Stat->Info.ID,
                     GET_SEGRESOURCE_HOSTNAME(segresource));
             fprintf(fp, "HOST_INFO(FTSTotalMemoryMB=%u:FTSTotalCore=%u:"
             					  "GRMTotalMemoryMB=%u:GRMTotalCore=%u)\n",

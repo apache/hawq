@@ -309,8 +309,6 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	int 					successCount = 0, failCount = 0;
 	StringInfoData 			failNames;
 
-	initStringInfo(&failNames);
-
 	/**
 	 * Ensure that an ANALYZE is requested.
 	 */
@@ -362,6 +360,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 
 	MemoryContextSwitchTo(analyzeStatementContext);
 
+	initStringInfo(&failNames);
 
 	/*
 	 * This is a per relation context.
@@ -678,8 +677,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 							              RelationGetRelationName(candidateRelation),
 							              edata->message);
 							failCount += 1;
+
+							/* failNames uses memory from statement level context */
+							MemoryContextSwitchTo(analyzeStatementContext);
 							appendStringInfo(&failNames, "%s", failCount == 1 ? "(" : ", ");
 							appendStringInfo(&failNames, "%s", RelationGetRelationName(candidateRelation));
+							MemoryContextSwitchTo(oldcontext);
 
 							/* rollback this table's sub-transaction */
 							RollbackAndReleaseCurrentSubTransaction();

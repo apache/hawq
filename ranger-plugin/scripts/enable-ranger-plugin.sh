@@ -20,7 +20,7 @@
 #
 
 function usage() {
-  echo "USAGE: register_hawq.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password -h hawq_host:hawq_port -w hawq_user -q hawq_password"
+  echo "USAGE: enable-ranger-plugin.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password -h hawq_host:hawq_port -w hawq_user -q hawq_password"
   exit 1
 }
 
@@ -204,14 +204,22 @@ function create_hawq_service_instance() {
   fi
 }
 
+function update_ranger_url() {
+  local policy_mgr_url="http://${RANGER_URL}"
+  local prop_file=$(dirname ${SCRIPT_DIR})/etc/rps.properties
+  sed -i -e "s|^POLICY_MGR_URL=.*|POLICY_MGR_URL=${policy_mgr_url}|g" ${prop_file}
+  echo "Updated POLICY_MGR_URL to ${policy_mgr_url} in ${prop_file}"
+}
+
 main() {
   if [[ $# -lt 1 ]]; then
     usage
   fi
-  SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+  SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd -P)"
   parse_params "$@"
   validate_params
   create_hawq_service_definition
   create_hawq_service_instance
+  update_ranger_url
 }
 main "$@"

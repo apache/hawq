@@ -90,9 +90,13 @@ extern void AtEOXact_Namespace(bool isCommit);
 extern void AtEOSubXact_Namespace(bool isCommit, SubTransactionId mySubid,
 					  SubTransactionId parentSubid);
 
+extern List *fetch_search_path(bool includeImplicit);
+
+extern void reset_query_sign();
+
 /* stuff for search_path GUC variable */
 extern char *namespace_search_path;
 
-extern List *fetch_search_path(bool includeImplicit);
+
 
 #endif   /* NAMESPACE_H */

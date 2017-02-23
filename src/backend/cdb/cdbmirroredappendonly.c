@@ -95,26 +95,18 @@ static void MirroredAppendOnly_DoOpen(
 										TRUE,
 										&filespaceLocation);
 
-	char *dbPath;
 	char *path;
 
-	dbPath = (char*)palloc(MAXPGPATH + 1);
 	path = (char*)palloc(MAXPGPATH + 1);
 
 	/*
 	 * Do the primary work first so we don't leave files on the mirror or have an
 	 * open to clean up.
 	 */
-	FormDatabasePath(
-				dbPath,
-				filespaceLocation,
-				relFileNode->spcNode,
-				relFileNode->dbNode);
-	
-	if (segmentFileNum == 0)
-		sprintf(path, "%s/%u", dbPath, relFileNode->relNode);
-	else
-		sprintf(path, "%s/%u/%u", dbPath, relFileNode->relNode, segmentFileNum);
+	FormRelfilePath(path,
+					 filespaceLocation,
+					 relFileNode,
+					 segmentFileNum);
 
 	errno = 0;
 
@@ -133,7 +125,6 @@ static void MirroredAppendOnly_DoOpen(
 		*primaryError = errno;
 	}
 
-	pfree(dbPath);
 	pfree(path);
 
 	if (*primaryError != 0)
@@ -164,27 +155,14 @@ void AppendOnly_Overwrite(RelFileNode *relFileNode, int32 segmentFileNum, int *p
 										TRUE,
 										&primaryFilespaceLocation);
 
-	char *dbPath;
 	char *path;
 
-	dbPath = (char*)palloc(MAXPGPATH + 1);
 	path = (char*)palloc(MAXPGPATH + 1);
 
-	/*
-	 * Do the primary work first so we don't leave files on the mirror or have an
-	 * open to clean up.
-	 */
-	FormDatabasePath(
-				dbPath,
-				primaryFilespaceLocation,
-				relFileNode->spcNode,
-				relFileNode->dbNode);
-
-	if (segmentFileNum == 0)
-		sprintf(path, "%s/%u", dbPath, relFileNode->relNode);
-	else
-		sprintf(path, "%s/%u/%u", dbPath, relFileNode->relNode, segmentFileNum);
-
+	FormRelfilePath(path,
+					 primaryFilespaceLocation,
+					 relFileNode,
+					 segmentFileNum);
 	errno = 0;
 
 	fileFlags = O_WRONLY | O_SYNC;
@@ -194,7 +172,6 @@ void AppendOnly_Overwrite(RelFileNode *relFileNode, int32 segmentFileNum, int *p
 	if (file < 0)
 		*primaryError = errno;
 
-	pfree(dbPath);
 	pfree(path);
 
 	if (primaryFilespaceLocation != NULL)
@@ -389,22 +366,15 @@ static void MirroredAppendOnly_DoDrop(
 
     HdfsFileInfo *file_info;
 
-	char *dbPath;
+
 	char *path;
 
-	dbPath = (char*)palloc(MAXPGPATH + 1);
 	path = (char*)palloc(MAXPGPATH + 1);
 
-	FormDatabasePath(
-					 dbPath,
+	FormRelfilePath(path,
 					 filespaceLocation,
-					 relFileNode->spcNode,
-					 relFileNode->dbNode);
-
-	if (segmentFileNum == 0)
-		sprintf(path, "%s/%u", dbPath, relFileNode->relNode);
-	else
-		sprintf(path, "%s/%u/%u", dbPath, relFileNode->relNode, segmentFileNum);
+					 relFileNode,
+					 segmentFileNum);
 
 	errno = 0;
 	
@@ -423,7 +393,6 @@ static void MirroredAppendOnly_DoDrop(
         DestroyHdfsFileInfo(file_info);
     }
 
-	pfree(dbPath);
 	pfree(path);
 
 	if (filespaceLocation != NULL)

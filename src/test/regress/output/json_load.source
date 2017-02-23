@@ -22,7 +22,7 @@ CREATE OR REPLACE FUNCTION search_policy(tblname text)
   LANGUAGE C volatile NO SQL
   AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_gp_distribution_policy';
 CREATE OR REPLACE FUNCTION search_exttable(tblname text) 
-  RETURNS table(oid "oid", relname text, location text)
+  RETURNS table(oid "oid", relname text, location text, fmttype text, fmtopts text)
   LANGUAGE C volatile NO SQL
   AS '@abs_builddir@/regress@DLSUFFIX@', 'caql_scan_in_memory_pg_exttable';
 CREATE OR REPLACE FUNCTION search_attribute(tblname text) 
@@ -99,10 +99,10 @@ SELECT relname, policy_atts from search_policy('mytable');
  mytable | null
 (1 row)
 
-SELECT relname, location from search_exttable('mytable');
- relname |                      location                      
----------+----------------------------------------------------
- mytable | pxf://localhost:51200/default.mytable?Profile=Hive
+SELECT relname, location, fmttype, fmtopts from search_exttable('mytable');
+ relname |                             location                              | fmttype |            fmtopts             
+---------+-------------------------------------------------------------------+---------+--------------------------------
+ mytable | pxf://localhost:51200/default.mytable?Profile=Hive&delimiter=\x01 | b       | formatter 'pxfwritable_import'
 (1 row)
 
 SELECT relname, relkind from search_table('mytable') where oid >= min_external_oid();
@@ -130,6 +130,21 @@ SELECT * from search_attribute('mytable');
  c1      |    1042 |        7
  bin     |      17 |       -1
 (15 rows)
+
+END TRANSACTION;
+-- positive test case with a single table, using text format and custom delimiter
+BEGIN TRANSACTION;
+SELECT load_json_data('@abs_builddir@/data/hcatalog/single_table_text.json');
+  load_json_data  
+------------------
+ default.mytable 
+(1 row)
+
+SELECT relname, location, fmttype, fmtopts from search_exttable('mytable');
+ relname |                             location                              | fmttype |            fmtopts                 
+---------+-------------------------------------------------------------------+---------+------------------------------------
+ mytable | pxf://localhost:51200/default.mytable?Profile=Hive&delimiter=\x2a | t       | delimiter '*' null '\N' escape '\'
+(1 row)
 
 END TRANSACTION;
 -- positive test case with multiple tables
@@ -173,11 +188,11 @@ SELECT relname, policy_atts from search_policy('ht1');
  ht1     | null
 (2 rows)
 
-SELECT relname, location from search_exttable('ht1');
- relname |                  location                  
----------+--------------------------------------------
- ht1     | pxf://localhost:51200/db1.ht1?Profile=Hive
- ht1     | pxf://localhost:51200/db2.ht1?Profile=Hive
+SELECT relname, location, fmttype, fmtopts from search_exttable('ht1');
+ relname |                  location                  | fmttype |            fmtopts             
+---------+--------------------------------------------+---------+--------------------------------
+ ht1     | pxf://localhost:51200/db1.ht1?Profile=Hive | b       | formatter 'pxfwritable_import'
+ ht1     | pxf://localhost:51200/db2.ht1?Profile=Hive | b       | formatter 'pxfwritable_import'
 (2 rows)
 
 END TRANSACTION;

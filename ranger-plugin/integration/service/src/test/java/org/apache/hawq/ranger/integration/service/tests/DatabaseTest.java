@@ -19,49 +19,43 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.junit.Test;
+import org.apache.hawq.ranger.integration.service.tests.common.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.SimpleResourceTestBase;
+import org.junit.Before;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.*;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+public class DatabaseTest extends SimpleResourceTestBase {
 
-public class DatabaseTest extends ServiceBaseTest {
+    // create-schema will be requested by HAWQ with only database in context, so it looks like a privilege for database resource
+    private static final String[] SPECIAL_PRIVILEGES = new String[] {"connect", "temp", "create-schema"};
 
-    private static final List<String> PRIVILEGES = Arrays.asList("connect", "temp");
-
-    public void beforeTest()
-            throws IOException {
-        createPolicy("test-database.json");
-        resources.put("database", "sirotan");
+    @Before
+    public void beforeTest() {
+        specificResource.put(database, TEST_DB);
+        unknownResource.put(database, UNKNOWN);
+        privileges = new String[] {"connect", "temp", "create"};
     }
 
-    @Test
-    public void testDatabases_UserMaria_SirotanDb_Allowed()
-            throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceUserPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(schema, STAR)
+                .resource(table, STAR)
+                .userAccess(TEST_USER, SPECIAL_PRIVILEGES)
+                .build();
+        return policy;
     }
 
-    @Test
-    public void testDatabases_UserMaria_DoesNotExistDb_Denied()
-            throws IOException {
-        resources.put("database", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceGroupPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(schema, STAR)
+                .resource(table, STAR)
+                .groupAccess(PUBLIC_GROUP, SPECIAL_PRIVILEGES)
+                .build();
+        return policy;
     }
-
-    @Test
-    public void testDatabases_UserBob_SirotanDb_Denied()
-            throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testDatabases_UserMaria_SirotanDb_Denied()
-            throws IOException {
-        deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
-    }
-
 }

@@ -89,12 +89,52 @@ def register_func(options, args):
     except pg.DatabaseError as e:
         logger.error('%s', e)
         logger.info('Hawq Upgrade Failed.')
-        return 1
+        sys.exit(1)
     except pg.InternalError:
         logger.error('Fail to connect to database, this script can only be run when database is up.')
         logger.info('Hawq Upgrade Failed.')
-        return 1
-    logger.info('Hawq Upgrade Succeed.')
+        sys.exit(1)
+
+def pxf_get_item_fields_func(options, args):
+    # connect db
+    try:
+        url = dbconn.DbURL(hostname=options.host, port=options.port,
+                           dbname="template1", username=options.user)
+        utility_conn = pg.connect(dbname=url.pgdb, host=url.pghost, port=url.pgport,
+                                  user=url.pguser, passwd=url.pgpass, opt='-c gp_session_role=utility')
+
+
+        # update function for template1
+        update_func_query = """
+            SET allow_system_table_mods = 'dml';
+            UPDATE pg_proc
+            SET proallargtypes = '{25,25,25,25,25,25,25}',  proargmodes = '{i,i,o,o,o,o,o}',  proargnames = '{profile,pattern,path,itemname,fieldname,fieldtype,sourcefieldtype}'
+            WHERE proname = 'pxf_get_item_fields';
+            """
+
+        utility_conn.query(update_func_query)
+        logger.info('Function pxf_get_item_fields successfully updated into database template1.')
+         # pxf_get_item_fields function for other databases
+        query = """select datname from pg_database;"""
+        dbs = utility_conn.query(query).dictresult()
+        for cur_db in dbs:
+            if cur_db['datname'] not in ['template1', 'template0', 'hcatalog']:
+                url = dbconn.DbURL(hostname=options.host, port=options.port,
+                               dbname=cur_db['datname'], username=options.user)
+                existed_db_conn = pg.connect(dbname=cur_db['datname'], host=url.pghost,
+                                         port=url.pgport, user=url.pguser, passwd=url.pgpass)
+                existed_db_conn.query(update_func_query);
+                logger.info('Function pxf_get_item_fields successfully updated in database %s.',cur_db['datname'])
+                existed_db_conn.close()
+        utility_conn.close()
+    except pg.DatabaseError as e:
+        logger.error('%s', e)
+        logger.info('Hawq Upgrade Failed.')
+        sys.exit(1)
+    except pg.InternalError:
+        logger.error('Fail to connect to database, this script can only be run when database is up.')
+        logger.info('Hawq Upgrade Failed.')
+        sys.exit(1)
 
 if __name__ == '__main__':
     parser = option_parser()
@@ -103,3 +143,5 @@ if __name__ == '__main__':
         parser.print_help(sys.stderr)
         sys.exit(1)
     register_func(options, args)
+    pxf_get_item_fields_func(options, args)
+    logger.info('Hawq Upgrade Succeed.')

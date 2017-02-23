@@ -26,7 +26,6 @@
 
 #include "nodes/parsenodes.h"
 #include "utils/array.h"
-//#include "utils/rangerrest.h"
 
 
 /*
@@ -155,6 +154,19 @@ typedef ArrayType Acl;
 #define ACL_ALL_RIGHTS_LANGUAGE		(ACL_USAGE)
 #define ACL_ALL_RIGHTS_NAMESPACE	(ACL_USAGE|ACL_CREATE)
 #define ACL_ALL_RIGHTS_TABLESPACE	(ACL_CREATE)
+
+/* how hawq do acl check */
+#define HAWQ_ACL_TYPE_STANDALONE      "standalone"
+#define HAWQ_ACL_TYPE_RANGER          "ranger"
+
+/* acl type */
+typedef enum
+{
+	HAWQ_ACL_NATIVE,
+	HAWQ_ACL_RANGER
+} AclType;
+
+extern AclType aclType;
 
 /* operation codes for pg_*_aclmask */
 typedef enum
@@ -315,6 +327,7 @@ extern char *getOperNameFromOid(Oid object_oid);
 extern char *getTypeNameFromOid(Oid object_oid);
 extern char *getLanguageNameFromOid(Oid object_oid);
 extern char *getNamespaceNameFromOid(Oid object_oid);
+extern char *getNamespaceNameByOid(Oid object_oid);
 extern char *getConversionNameFromOid(Oid object_oid);
 extern char *getTablespaceNameFromOid(Oid object_oid);
 extern char *getFilespaceNameFromOid(Oid object_oid);

@@ -1,0 +1,144 @@
+-- start_ignore
+SET SEARCH_PATH=TestRegex_TestRegexBasic;
+SET
+-- end_ignore
+--
+-- Regular expression tests
+--
+-- Don't want to have to double backslashes in regexes
+set standard_conforming_strings = on;
+SET
+-- Test simple quantified backrefs
+select 'bbbbb' ~ '^([bc])\1*$' as t;
+ t 
+---
+ t
+(1 row)
+
+select 'ccc' ~ '^([bc])\1*$' as t;
+ t 
+---
+ t
+(1 row)
+
+select 'xxx' ~ '^([bc])\1*$' as f;
+ f 
+---
+ f
+(1 row)
+
+select 'b' ~ '^([bc])\1*$' as t;
+ t 
+---
+ t
+(1 row)
+
+-- Test lookahead constraints
+select regexp_matches('ab', 'a(?=b)b*');
+ regexp_matches 
+----------------
+ {ab}
+(1 row)
+
+select regexp_matches('a', 'a(?=b)b*');
+ regexp_matches 
+----------------
+(0 rows)
+
+select regexp_matches('abc', 'a(?=b)b*(?=c)c*');
+ regexp_matches 
+----------------
+ {abc}
+(1 row)
+
+select regexp_matches('ab', 'a(?=b)b*(?=c)c*');
+ regexp_matches 
+----------------
+(0 rows)
+
+select regexp_matches('ab', 'a(?!b)b*');
+ regexp_matches 
+----------------
+(0 rows)
+
+select regexp_matches('a', 'a(?!b)b*');
+ regexp_matches 
+----------------
+ {a}
+(1 row)
+
+select regexp_matches('b', '(?=b)b');
+ regexp_matches 
+----------------
+ {b}
+(1 row)
+
+select regexp_matches('a', '(?=b)b');
+ regexp_matches 
+----------------
+(0 rows)
+
+-- Test optimization of single-chr-or-bracket-expression lookaround constraints
+select 'xz' ~ 'x(?=[xy])';
+ ?column? 
+----------
+ f
+(1 row)
+
+select 'xy' ~ 'x(?=[xy])';
+ ?column? 
+----------
+ t
+(1 row)
+
+select 'xz' ~ 'x(?![xy])';
+ ?column? 
+----------
+ t
+(1 row)
+
+select 'xy' ~ 'x(?![xy])';
+ ?column? 
+----------
+ f
+(1 row)
+
+select 'x'  ~ 'x(?![xy])';
+ ?column? 
+----------
+ t
+(1 row)
+
+select 'zyy' ~ '(?<![xy])yy+';
+psql:/tmp/TestRegex_TestRegexBasic.sql:33: ERROR:  invalid regular expression: quantifier operand invalid
+-- Test for infinite loop in cfindloop with zero-length possible match
+-- but no actual match (can only happen in the presence of backrefs)
+select 'a' ~ '$()|^\1';
+ ?column? 
+----------
+ f
+(1 row)
+
+select 'a' ~ '.. ()|\1';
+ ?column? 
+----------
+ f
+(1 row)
+
+select 'a' ~ '()*\1';
+ ?column? 
+----------
+ t
+(1 row)
+
+select 'a' ~ '()+\1';
+ ?column? 
+----------
+ t
+(1 row)
+
+-- Error conditions
+select 'xyz' ~ 'x(\w)(?=\1)';  -- no backrefs in LACONs
+psql:/tmp/TestRegex_TestRegexBasic.sql:43: ERROR:  invalid regular expression: invalid backreference number
+select 'a' ~ '\x7fffffff';  -- invalid chr code
+psql:/tmp/TestRegex_TestRegexBasic.sql:44: ERROR:  invalid regular expression: invalid escape \ sequence

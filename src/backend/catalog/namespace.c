@@ -48,8 +48,10 @@
 #include "utils/memutils.h"
 #include "utils/syscache.h"
 #include "utils/guc.h"
+#include "utils/hsearch.h"
 #include "cdb/cdbvars.h"
 #include "tcop/utility.h"
+
 
 /*
  * The namespace search path is a possibly-empty list of namespace OIDs.
@@ -113,6 +115,8 @@
  * namespaceUser is the userid the path has been computed for.
  */
 
+extern const char *debug_query_string;
+
 static List *namespaceSearchPath = NIL;
 
 static Oid	namespaceUser = InvalidOid;
@@ -128,6 +132,9 @@ static bool tempCreationPending = false;
 
 /* The above five values are valid only if namespaceSearchPathValid */
 static bool namespaceSearchPathValid = true;
+
+/* store the query sign on the last call of recomputeNamespacePath(), and used the sign to judge cache invalidation */
+static uint32 last_query_sign = 0;
 
 /*
  * myTempNamespace is InvalidOid until and unless a TEMP namespace is set up
@@ -178,6 +185,11 @@ Datum		pg_my_temp_schema(PG_FUNCTION_ARGS);
 Datum		pg_is_other_temp_schema(PG_FUNCTION_ARGS);
 Datum       pg_objname_to_oid(PG_FUNCTION_ARGS);
 
+void
+reset_query_sign()
+{
+	last_query_sign = 0;
+}
 
 /*
  * GetCatalogId
@@ -1934,10 +1946,21 @@ recomputeNamespacePath(void)
 	 */
 	if (namespaceSearchPathValid && namespaceUser == roleid)
 	{
-		if (!enable_ranger)
+		if (aclType != HAWQ_ACL_RANGER)
+		{
 			return;
+		}
 		else
-			elog(DEBUG3, "recompute search_path[%s] when enable_ranger", namespace_search_path);
+		{
+			uint32 current_query_sign = 0;
+			if (debug_query_string != NULL)
+				current_query_sign = string_hash(debug_query_string, strlen(debug_query_string));
+
+			if (current_query_sign == last_query_sign)
+				return;
+			last_query_sign = current_query_sign;
+			elog(DEBUG3, "recompute search_path[%s] when acl_type is ranger", namespace_search_path);
+		}
 	}
 
 	/* Need a modifiable copy of namespace_search_path string */

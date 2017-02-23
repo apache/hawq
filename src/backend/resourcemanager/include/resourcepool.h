@@ -69,10 +69,11 @@ struct SegInfoData {
 	uint32_t		HostAddrCount;
 	uint32_t		FailedTmpDirOffset;
 	uint32_t		FailedTmpDirLen;
+	int32_t			ID;									   /* Global unique ID. */
 	uint8_t			master;
 	uint8_t			standby;
 	uint8_t			alive;
-	uint8_t 		Reserved1;							   /* 64-bit aligned. */
+	uint8_t 		Reserved[5];						   /* 64-bit aligned. */
 };
 
 typedef struct SegInfoData *SegInfo;
@@ -142,7 +143,6 @@ void  generateSegInfoReport(SegInfo seginfo, SelfMaintainBuffer buff);
  */
 
 struct SegStatData {
-	int32_t			ID;					/* Internal ID.						  */
 	uint16_t		FailedTmpDirNum;	/* Failed temporary directory number */
 	uint8_t			FTSAvailable;		/* If it is available now.			  */
 	uint8_t			GRMHandled;			/* If its GRM status is handled */
@@ -150,9 +150,8 @@ struct SegStatData {
 	uint32_t		FTSTotalCore;			/* FTS reports core capacity.	  */
 	uint32_t		GRMTotalMemoryMB;		/* GRM reports memory capacity.	  */
 	uint32_t		GRMTotalCore;			/* GRM reports core capacity. 	  */
-	uint64_t		RMStartTimestamp;		/* RM process reset timestamp */
 	uint32_t		StatusDesc;				/* Description of status */
-	uint32_t		Reserved;
+	uint64_t		RMStartTimestamp;		/* RM process reset timestamp */
 	SegInfoData		Info;					/* 64-bit aligned.				  */
 };
 

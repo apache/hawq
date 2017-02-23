@@ -129,7 +129,88 @@
               <exclude>src/pl/**/*</exclude>
               <exclude>src/port/*</exclude>
               <exclude>src/template/*</exclude>
-              <exclude>src/test/**/*</exclude>
+
+              <!-- src/test/bench -->
+
+              <exclude>src/test/bench/query*</exclude>
+
+              <!-- PostgreSQL src/test/regress -->
+              
+              <exclude>src/test/regress/**/*.in</exclude>
+              <exclude>src/test/regress/**/*.mdp</exclude>
+              <exclude>src/test/regress/**/*.xml</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_3chars_line_delimiter.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_big.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_no_line_delimiter.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_out.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_blankfields.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_blankfields_and_nulls.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_correct.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_error_fieldtoolong.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_error_fieldtype.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_error_rejectlimitcrossed.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_error_rejectlimitnotcrossed.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_error_toofewfields.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_error_toomanyfields.tbl</exclude>
+              <exclude>src/test/regress/data/fixedwidth/fixedwidth_small_nulldefined.tbl</exclude>
+              <exclude>src/test/regress/data/nation.tbl</exclude>
+              <exclude>src/test/regress/data/nation_error50.tbl</exclude>
+              <exclude>src/test/regress/data/region.tbl</exclude>
+              <exclude>src/test/regress/expected_statuses</exclude>
+                            
+              <!-- src/test/feature -->
+
+              <exclude>src/test/feature/ExternalSource/data/nation.tbl</exclude>
+              <exclude>src/test/feature/ExternalSource/data/nation_error50.tbl</exclude>
+              <exclude>src/test/feature/ExternalSource/data/region.tbl</exclude>
+              <exclude>src/test/feature/ManagementTool/test_hawq_register_hawq.paq</exclude>
+              <exclude>src/test/feature/ManagementTool/test_hawq_register_hive.paq</exclude>
+              <exclude>src/test/feature/ManagementTool/data/parquet200/dat.paq</exclude>
+              <exclude>src/test/feature/ManagementTool/data/parquet200sum/a.paq</exclude>
+              <exclude>src/test/feature/ManagementTool/data/parquet200sum/b.paq</exclude>
+              <exclude>src/test/feature/ManagementTool/test_hawq_register_data_types.paq</exclude>
+              <exclude>src/test/feature/ManagementTool/test_hawq_register_not_paq</exclude>
+              <exclude>src/test/feature/ManagementTool/test_hawq_register_null.paq</exclude>
+              <exclude>src/test/feature/ManagementTool/usage2case2/10</exclude>
+              <exclude>src/test/feature/ManagementTool/usage2case2/11</exclude>
+              <exclude>src/test/feature/ManagementTool/usage2case2/12</exclude>
+              <exclude>src/test/feature/ManagementTool/usage2case2/13</exclude>
+              <exclude>src/test/feature/ManagementTool/usage2case2/8</exclude>
+              <exclude>src/test/feature/ManagementTool/usage2case2/9</exclude>
+              
+              <exclude>src/test/feature/UDF/ans/function_basics.ans.orca</exclude>
+              <exclude>src/test/feature/UDF/ans/function_basics.ans.planner</exclude>
+              <exclude>src/test/feature/UDF/ans/function_basics.ranger.ans.orca</exclude>
+              <exclude>src/test/feature/UDF/ans/function_basics.ranger.ans.planner</exclude>
+
+              <exclude>src/test/locale/**/Makefile</exclude>
+              <exclude>src/test/locale/**/runall</exclude>
+              <exclude>src/test/locale/de_DE.ISO8859-1/test-de-select.sql.in</exclude>
+              <exclude>src/test/locale/de_DE.ISO8859-1/test-de-sort.in</exclude>
+              <exclude>src/test/locale/de_DE.ISO8859-1/test-de-upper.sql.in</exclude>
+              <exclude>src/test/locale/de_DE.ISO8859-1/test-de.sql.in</exclude>
+              <exclude>src/test/locale/gr_GR.ISO8859-7/test-gr-select.sql.in</exclude>
+              <exclude>src/test/locale/gr_GR.ISO8859-7/test-gr-sort.in</exclude>
+              <exclude>src/test/locale/gr_GR.ISO8859-7/test-gr.sql.in</exclude>
+              <exclude>src/test/locale/koi8-r/test-koi8-select.sql.in</exclude>
+              <exclude>src/test/locale/koi8-r/test-koi8-sort.in</exclude>
+              <exclude>src/test/locale/koi8-r/test-koi8.sql.in</exclude>
+              <exclude>src/test/locale/koi8-to-win1251/test-koi8-select.sql.in</exclude>
+              <exclude>src/test/locale/koi8-to-win1251/test-koi8-sort.in</exclude>
+              <exclude>src/test/locale/koi8-to-win1251/test-koi8.sql.in</exclude>
+
+              <!-- src/test/performance test files -->
+
+              <exclude>src/test/performance/results/PgSQL.970926</exclude>
+              <exclude>src/test/performance/sqls/connection</exclude>
+              <exclude>src/test/performance/sqls/crtsimple</exclude>
+              <exclude>src/test/performance/sqls/crtsimpleidx</exclude>
+              <exclude>src/test/performance/sqls/drpsimple</exclude>
+              <exclude>src/test/performance/sqls/orbsimple</exclude>
+              <exclude>src/test/performance/sqls/slcsimple</exclude>
+              <exclude>src/test/performance/sqls/vacuum</exclude>
+              <exclude>src/test/regress/resultmap</exclude>
+
               <exclude>src/timezone/**/*</exclude>
               <exclude>doc/src/sgml/fixrtf</exclude>
               <exclude>doc/**/*.sgml</exclude>
@@ -161,6 +242,10 @@
               <exclude>tools/demo/gpfdist_transform/*.yaml</exclude>
               <exclude>tools/bin/gppylib/operations/madlib_depcheck/changelist.yaml</exclude>
 
+              <!-- PXF test file -->
+
+              <exclude>pxf/pxf-json/src/test/resources/tweets.tar.gz</exclude>
+              
               <!-- Finally we exclude a few file types (based on
                    extension) for which comments are tough to
                    maintain. Note that this is a combination of files
@@ -196,8 +281,6 @@
               <exclude>**/*.commit</exclude>
               <exclude>**/__init__.py</exclude>
               <exclude>**/*README*</exclude>
-              <exclude>**/.travis.yml</exclude>
-              <exclude>pxf/**/*.classpath</exclude>	 
             </excludes>
             <licenses>
               <license implementation="org.apache.rat.analysis.license.SimplePatternBasedLicense">

@@ -324,4 +324,12 @@ int  MainHandlerLoop_RMSEG(void);
 void checkAndBuildFailedTmpDirList(void);
 
 void switchIMAliveTarget(void);
+
+int SegmentStatus_ShmSize(void);
+void SegmentStatusShmemReset(void);
+void SegmentStatusShmemInit(void);
+void MarkSegmentDown(int x);
+void MarkSegmentUp(int x);
+bool IsSegmentDown(int x);
+
 #endif //DYNAMIC_RESOURCE_MANAGEMENT_H

@@ -1,4 +1,22 @@
 /*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
  * json_utils.c
  *
  *  Created on: Mar 5, 2015
@@ -26,6 +44,7 @@
  * number of output columns for the UDFs for scanning in memory catalog tables
  */
 #define NUM_COLS 3
+#define NUM_COLS_EXTTABLE 5
 
 static 
 char *read_file(const char *filename);
@@ -430,12 +449,16 @@ caql_scan_in_memory_pg_exttable(PG_FUNCTION_ARGS)
 		/* switch context when allocating stuff to be used in later calls */
 		oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
 
-		tupdesc = CreateTemplateTupleDesc(NUM_COLS, false);
+		tupdesc = CreateTemplateTupleDesc(NUM_COLS_EXTTABLE, false);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 1, "exttableoid",
 						   OIDOID, -1, 0);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 2, "exttablename",
 						   TEXTOID, -1, 0);
 		TupleDescInitEntry(tupdesc, (AttrNumber) 3, "exttablelocation",
+						   TEXTOID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 4, "exttableformat",
+						   TEXTOID, -1, 0);
+		TupleDescInitEntry(tupdesc, (AttrNumber) 5, "exttableformatoptions",
 						   TEXTOID, -1, 0);
 		funcctx->tuple_desc = BlessTupleDesc(tupdesc);
 
@@ -458,8 +481,8 @@ caql_scan_in_memory_pg_exttable(PG_FUNCTION_ARGS)
 
 	if (NULL != (pgclasstup = caql_getnext(pcqCtx)))
 	{
-		Datum values[NUM_COLS];
-		bool nulls[NUM_COLS];
+		Datum values[NUM_COLS_EXTTABLE];
+		bool nulls[NUM_COLS_EXTTABLE];
 
 		/* create tuples for pg_exttable table */
 		cqContext* pcqCtx1 = caql_beginscan(
@@ -482,6 +505,8 @@ caql_scan_in_memory_pg_exttable(PG_FUNCTION_ARGS)
 		nulls[1]  = false;
 
 		Datum locations = tuple_getattr(readtup, tupleDesc, Anum_pg_exttable_location);
+		Datum fmttype = tuple_getattr(readtup, tupleDesc, Anum_pg_exttable_fmttype);
+		Datum fmtopts = tuple_getattr(readtup, tupleDesc, Anum_pg_exttable_fmtopts);
 		Datum* elems = NULL;
 		int nelems;
 		deconstruct_array(DatumGetArrayTypeP(locations),
@@ -490,9 +515,18 @@ caql_scan_in_memory_pg_exttable(PG_FUNCTION_ARGS)
 		Assert(nelems > 0);
 		char *loc_str = DatumGetCString(DirectFunctionCall1(textout, elems[0]));
 		text *t2 = cstring_to_text(loc_str);
-
 		values[2] = PointerGetDatum(t2);
 		nulls[2]  = false;
+
+		char fmttype_chr = DatumGetChar(fmttype);
+		text *t3 = cstring_to_text_with_len(&fmttype_chr, 1);
+		values[3] = PointerGetDatum(t3);
+		nulls[3]  = false;
+
+		char *fmtopts_str = DatumGetCString(fmtopts);
+		text *t4 = cstring_to_text(fmtopts_str);
+		values[4] = PointerGetDatum(t4);
+		nulls[4]  = false;
 
 		/* build tuple */
 		restuple = heap_form_tuple(funcctx->tuple_desc, values, nulls);

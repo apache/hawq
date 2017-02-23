@@ -125,6 +125,22 @@ test__build_http_header__remote_credentials_are_not_null(void **state)
 	build_http_header(input_data);
 }
 
+void
+test__get_format_name(void **state)
+{
+	char fmtcode = 't';
+	char *formatName = get_format_name(fmtcode);
+	assert_string_equal(TextFormatName, formatName);
+
+	fmtcode = 'c';
+	formatName = get_format_name(fmtcode);
+	assert_string_equal(TextFormatName, formatName);
+
+	fmtcode = 'b';
+	formatName = get_format_name(fmtcode);
+	assert_string_equal(GpdbWritableFormatName, formatName);
+}
+
 /*
  * Add an expect clause on a churl_headers_append with given
  * key and value
@@ -244,6 +260,8 @@ main(int argc, char* argv[])
 		unit_test_setup_teardown(test__build_http_header__remote_login_is_not_null, 
 								 common_setup, common_teardown),
 		unit_test_setup_teardown(test__build_http_header__remote_credentials_are_not_null, 
+								 common_setup, common_teardown),
+		unit_test_setup_teardown(test__get_format_name,
 								 common_setup, common_teardown)
 	};
 

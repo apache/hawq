@@ -27,14 +27,16 @@ import java.io.InputStream;
 import java.util.Properties;
 
 /**
- * Utility class for reading values from the property file.
+ * Utility class for reading values from the environment with falling back to reading them from the property file.
  */
 public abstract class Utils {
 
     public static final String HAWQ = "hawq";
     public static final String UNKNOWN = "unknown";
-    public static final String APP_ID_PROPERTY = "ranger.hawq.instance";
-    public static final String VERSION_PROPERTY = "version";
+    public static final String APP_ID_PROPERTY_ENV = "ranger.hawq.instance";
+    public static final String APP_ID_PROPERTY_FILE = "RANGER_HAWQ_INSTANCE";
+    public static final String VERSION_PROPERTY_ENV = "version";
+    public static final String VERSION_PROPERTY_FILE = "RPS_VERSION";
     public static final String RANGER_SERVICE_PROPERTY_FILE = "rps.properties";
 
     private static final Log LOG = LogFactory.getLog(Utils.class);
@@ -42,25 +44,26 @@ public abstract class Utils {
 
     /**
      * Retrieves the app id from the environment variable with the key ranger.hawq.instance
-     * or from the rps.properties file with the key ranger.hawq.instance
+     * or from the rps.properties file with the key RANGER_HAWQ_INSTANCE
      *
      * If none exist, hawq is used as the default
      *
      * @return String id of the app
      */
     public static String getAppId() {
-        return System.getProperty(APP_ID_PROPERTY, properties.getProperty(APP_ID_PROPERTY, HAWQ));
+        return System.getProperty(APP_ID_PROPERTY_ENV, properties.getProperty(APP_ID_PROPERTY_FILE, HAWQ));
     }
 
     /**
-     * Retrieves the version read from the property file.
+     * Retrieves the version from the environment variable with the key version
+     * or from the rps.properties file with the key RPS_VERSION
      *
      * If none exist, unknown is used as the default
      *
      * @return version of the service
      */
     public static String getVersion() {
-        return properties.getProperty(VERSION_PROPERTY, UNKNOWN);
+        return System.getProperty(VERSION_PROPERTY_ENV, properties.getProperty(VERSION_PROPERTY_FILE, UNKNOWN));
     }
 
     /**

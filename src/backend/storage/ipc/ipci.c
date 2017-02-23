@@ -66,6 +66,8 @@
 #include "cdb/cdbtmpdir.h"
 #include "utils/session_state.h"
 
+#include "resourcemanager/dynrm.h"
+
 shmem_startup_hook_type shmem_startup_hook = NULL;
 
 static Size total_addin_request = 0;
@@ -168,6 +170,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		size = add_size(size, PersistentRelfile_ShmemSize());
 		size = add_size(size, Pass2Recovery_ShmemSize());
 		size = add_size(size, FSCredShmemSize());
+		size = add_size(size, SegmentStatus_ShmSize());
 
         if (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY)
         {
@@ -363,6 +366,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 
 	FSCredShmemInit();
 
+	SegmentStatusShmemInit();
 #ifdef EXEC_BACKEND
 
 	/*
@@ -371,7 +375,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	if (!IsUnderPostmaster)
 		ShmemBackendArrayAllocation();
 #endif
-	
+
 	SPI_InitMemoryReservation();
 	
 	/*

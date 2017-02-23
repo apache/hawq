@@ -31,6 +31,7 @@ import java.util.*;
  */
 public class InputData {
 
+    public static final String DELIMITER_KEY = "DELIMITER";
     public static final int INVALID_SPLIT_IDX = -1;
     private static final Log LOG = LogFactory.getLog(InputData.class);
 

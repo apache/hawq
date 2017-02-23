@@ -101,12 +101,7 @@ FormatAOSegmentFileName(
 	
 	*fileSegNo = pseudoSegNo;
 
-	if (pseudoSegNo > 0)
-	{
-		sprintf(filepathname, "%s/%u", basepath, pseudoSegNo);
-	}
-	else
-		sprintf(filepathname, "%s", basepath);
+	sprintf(filepathname, "%s/%u", basepath, pseudoSegNo);
 }
 
 /*

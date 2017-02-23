@@ -31,7 +31,7 @@ import org.apache.commons.logging.LogFactory;
 
 /**
  * PXF protocol version. Any call to PXF resources should include the current
- * version e.g. {@code ...pxf/v14/Bridge}
+ * version e.g. {@code ...pxf/v15/Bridge}
  */
 class Version {
     /**
