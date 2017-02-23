@@ -42,7 +42,7 @@ void GPfdist::init_gpfdist() {
 
 	util->execute(
 			"CREATE EXTERNAL WEB TABLE gpfdist_stop (x text) "
-					"execute E'(/bin/pkill gpfdist || killall gpfdist) > /dev/null 2>&1; echo stopping...' "
+					"execute E'(pkill gpfdist || killall gpfdist) > /dev/null 2>&1; echo stopping...' "
 					"on SEGMENT 0 "
 					"FORMAT 'text' (delimiter '|');");
 	util->execute("select * from gpfdist_stop;");
