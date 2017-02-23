@@ -49,5 +49,6 @@ typedef struct sPxfInputData
 } PxfInputData;
 
 void build_http_header(PxfInputData *input);
+char* get_format_name(char fmtcode);
 
 #endif

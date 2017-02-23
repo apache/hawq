@@ -42,7 +42,6 @@
 #endif
 #include "cdb/cdbconn.h"		/* SOCK_ERRNO */
 
-
 typedef enum DispMgtConstant {
 	DISPMGT_POLL_TIME = 2 * 1000,
 } DispMgtConstant;
@@ -282,20 +281,26 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 	QueryExecutorInGroupIterator	iterator;
 	struct DispatchData 			*data = group->team->refDispatchData;
 	struct QueryExecutor			*executor;
+	struct QueryExecutor			*err_handle_executor = NULL;
 
 	/* Assume the connections are already set up. */
 	dispmgt_init_query_executor_in_group_iterator(group, &iterator, false);
 	while ((executor = dispmgt_get_query_executor_in_group_iterator(group, &iterator)) != NULL)
 	{
+		if (err_handle_executor == NULL)
+			err_handle_executor = executor;
+
 		if (workermgr_should_query_stop(state)) {
-			write_log("+++++++++dispmgr_thread_func_run meets should query "
-					  "stop before dispatching, entering error_cleanup");
+			write_log("%s(): query is canceled before dispatching. "
+					  "Will exit and clean up.", __func__);
+			err_handle_executor = executor;
 			goto error_cleanup;
 		}
 
 		if (!executormgr_dispatch_and_run(data, executor)) {
-			write_log("+++++++++dispmgr_thread_func_run meets dispatch_and_run "
-					  "problem when dispatching, entering error_cleanup");
+			write_log("%s(): query cannot dispatch and run. "
+					  "Will exit and clean up.", __func__);
+			err_handle_executor = executor;
 			goto error_cleanup;
 		}
 	}
@@ -309,14 +314,23 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 
 		/* Check global state to abort query, this let poll process easier. */
 		if (workermgr_should_query_stop(state)){
-			write_log("dispmgr_thread_func_run meets should query stop when "
-					  "polling executors, entering error_cleanup");
+			write_log("%s(): query is canceled before polling executors."
+					  "Will exit and clean up.", __func__);
 			goto error_cleanup;
 		}
 		/* Skip the stopped executor make the logic easy to understand. */
 		dispmgt_init_query_executor_in_group_iterator(group, &iterator, true);
 		while ((executor = dispmgt_get_query_executor_in_group_iterator(group, &iterator)) != NULL)
 		{
+			if (!executormgr_check_segment_status(executor))
+			{
+				write_log("%s(): detected one segment (Global ID: %d) is down, "
+						  "so abort the query that is running or will run on it",
+						  __func__, executormgr_get_segment_ID(executor));
+				err_handle_executor = executor;
+				goto error_cleanup;
+			}
+
 			/*
 			 * The fds array may shorter than executor array.
 			 * DO NOT mark executor stop!
@@ -349,6 +363,8 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 			 * System call poll error is only caused by program bug or system
 			 * resources unavailable. In this case, fail the query is okay.
 			 */
+			write_log("%s(): poll() failed with errno: %d. "
+					  "Will exit and clean up.", __func__, SOCK_ERRNO);
 			goto error_cleanup;
 		}
 
@@ -367,7 +383,7 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 		dispmgt_init_query_executor_in_group_iterator(group, &iterator, true);
 		while ((executor = dispmgt_get_query_executor_in_group_iterator(group, &iterator)) != NULL)
 		{
-			int 	sockfd;
+			int __MAYBE_UNUSED sockfd;
 
 			sockfd = executormgr_get_fd(executor);
 			/* TODO: is that safe to call Assert() in a thread ? */
@@ -376,7 +392,9 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 				continue;
 
 			if (!executormgr_consume(executor)) {
-				write_log("dispmgr_thread_func_run meets consume error for executor, entering error_cleanup");
+				write_log("%s(): fail to consume data. "
+						  "Will exit and clean up.", __func__);
+				err_handle_executor = executor;
 				goto error_cleanup;
 			}
 		}
@@ -388,7 +406,7 @@ error_cleanup:
 	 * 1. query cancel, result error, and poll error: mark the executor stop.
 	 * 2. connection error: mark the gang error. Set by workermgr_mark_executor_error().
 	 */
-  workermgr_set_state_cancel(state);
+	workermgr_set_state_cancel(state);
 	dispmgt_init_query_executor_in_group_iterator(group, &iterator, false);
 	while ((executor = dispmgt_get_query_executor_in_group_iterator(group, &iterator)) != NULL)
 	{
@@ -405,6 +423,16 @@ error_cleanup:
 		if (!executormgr_has_error(executor))
 			continue;
 	}
+
+	/*
+	 * Previously query failed, probably in this executor. We need to
+	 * set error code here if it has not been set although the executor
+	 * is probably fine. This let the main process for the query proceed
+	 * to cancel the query in its thread also, without waiting for a long
+	 * time. We expect the error code have been set previously before jumping
+	 * to error_cleanup. The code below could be the last defence.
+	 */
+	executormgr_seterrcode_if_needed(err_handle_executor);
 
 thread_return:
 	return;
@@ -514,8 +542,6 @@ dispmgt_concurrent_connect(List	*executors, int executors_num_per_thread)
 	}
 	PG_CATCH();
 	{
-		ListCell	*lc;
-
 		workermgr_cancel_job(state);
 		/* We have to clean up the executors. */
 		dispmgt_free_concurrent_connect_state(tasks);

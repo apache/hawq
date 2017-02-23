@@ -174,8 +174,8 @@ int refreshLocalHostInstance(void)
 		RMSEG_INBUILDHOST->GRMTotalCore     = 0.0;
 		RMSEG_INBUILDHOST->FTSTotalMemoryMB = DRMGlobalInstance->SegmentMemoryMB;
 		RMSEG_INBUILDHOST->FTSTotalCore     = DRMGlobalInstance->SegmentCore;
-		RMSEG_INBUILDHOST->FTSAvailable    = RESOURCE_SEG_STATUS_AVAILABLE;
-		RMSEG_INBUILDHOST->ID				= SEGSTAT_ID_INVALID;
+		RMSEG_INBUILDHOST->FTSAvailable     = RESOURCE_SEG_STATUS_AVAILABLE;
+		RMSEG_INBUILDHOST->Info.ID          = SEGSTAT_ID_INVALID;
 		RMSEG_INBUILDHOST->FailedTmpDirNum  = failedTmpDirNum;
 
 		RMSEG_INBUILDHOST->Info.master	= 0;			 /* I'm a segment. 	  */
@@ -417,9 +417,9 @@ bool handleRMIncreaseMemoryQuota(void **arg)
 		umq_end_time = gettime_microsec();
 	}
 	elog(DEBUG1, "Resource enforcer increases memory quota "
-	             "in "UINT64_FORMAT" us to: ",
-	             "total memory quota = "INT64_FORMAT" MB, ",
-	             "delta memory quota = "INT64_FORMAT" MB",
+	             "in "UINT64_FORMAT" us to: "
+	             "total memory quota = "UINT64_FORMAT" MB, "
+	             "delta memory quota = "UINT64_FORMAT" MB",
 	             umq_end_time - umq_beg_time,
 	             memquotatotal, memquotadelta);
 
@@ -450,9 +450,9 @@ bool handleRMIncreaseMemoryQuota(void **arg)
 								   conntrack->MessageMark2,
 								   RESPONSE_RM_INCREASE_MEMORY_QUOTA);
 
-		elog(WARNING, "Resource enforcer fails to increase memory quota to: ",
-		              "total memory quota = "INT64_FORMAT" MB, "
-		              "delta memory quota = "INT64_FORMAT" MB",
+		elog(WARNING, "Resource enforcer fails to increase memory quota to: "
+		              "total memory quota = "UINT64_FORMAT" MB, "
+		              "delta memory quota = "UINT64_FORMAT" MB",
 					  memquotatotal, memquotadelta);
 	}
 
@@ -505,9 +505,9 @@ bool handleRMDecreaseMemoryQuota(void **arg)
 		umq_end_time = gettime_microsec();
 	}
 	elog(DEBUG1, "Resource enforcer decreases memory quota "
-	             "in "UINT64_FORMAT" us to: ",
-	             "total memory quota = "INT64_FORMAT" MB, ",
-	             "delta memory quota = "INT64_FORMAT" MB",
+	             "in "UINT64_FORMAT" us to: "
+	             "total memory quota = "UINT64_FORMAT" MB, "
+	             "delta memory quota = "UINT64_FORMAT" MB",
 	             umq_end_time - umq_beg_time,
 	             memquotatotal, memquotadelta);
 
@@ -538,9 +538,9 @@ bool handleRMDecreaseMemoryQuota(void **arg)
 								   conntrack->MessageMark2,
 								   RESPONSE_RM_DECREASE_MEMORY_QUOTA);
 
-		elog(WARNING, "Resource enforcer fails to decrease memory quota to: ",
-		              "total memory quota = "INT64_FORMAT" MB, "
-		              "delta memory quota = "INT64_FORMAT" MB",
+		elog(WARNING, "Resource enforcer fails to decrease memory quota to: "
+		              "total memory quota = "UINT64_FORMAT" MB, "
+		              "delta memory quota = "UINT64_FORMAT" MB",
 		              memquotatotal, memquotadelta);
 	}
 

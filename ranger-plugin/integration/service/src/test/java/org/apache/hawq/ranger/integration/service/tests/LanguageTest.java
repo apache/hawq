@@ -19,65 +19,71 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.junit.Test;
+import org.apache.hawq.ranger.integration.service.tests.common.ComplexResourceTestBase;
+import org.apache.hawq.ranger.integration.service.tests.common.Policy;
+import org.junit.Before;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.database;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.language;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+public class LanguageTest extends ComplexResourceTestBase {
 
-public class LanguageTest extends ServiceBaseTest {
+    @Before
+    public void beforeTest() {
+        specificResource.put(database, TEST_DB);
+        specificResource.put(language, TEST_LANGUAGE);
 
-    private static final List<String> PRIVILEGES = Arrays.asList("usage");
+        parentUnknownResource.put(database, UNKNOWN);
+        parentUnknownResource.put(language, TEST_LANGUAGE);
 
-    public void beforeTest()
-            throws IOException {
-        createPolicy("test-language.json");
-        resources.put("database", "sirotan");
-        resources.put("language", "sql");
+        childUnknownResource.put(database, TEST_DB);
+        childUnknownResource.put(language, UNKNOWN);
+
+        unknownResource.put(database, UNKNOWN);
+        unknownResource.put(language, UNKNOWN);
+
+        privileges = new String[] {"usage"};
     }
 
-    @Test
-    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Allowed()
-            throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceUserPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(language, TEST_LANGUAGE)
+                .userAccess(TEST_USER, privileges)
+                .build();
+        return policy;
     }
 
-    @Test
-    public void testLanguages_UserMaria_SirotanDb_DoesNotExistLanguage_Denied()
-            throws IOException {
-        resources.put("language", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceParentStarUserPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, STAR)
+                .resource(language, TEST_LANGUAGE)
+                .userAccess(TEST_USER, privileges)
+                .build();
+        policy.isParentStar = true;
+        return policy;
     }
 
-    @Test
-    public void testLanguages_UserBob_SirotanDb_SqlLanguage_Denied()
-            throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceChildStarUserPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(language, STAR)
+                .userAccess(TEST_USER, privileges)
+                .build();
+        policy.isChildStar = true;
+        return policy;
     }
 
-    @Test
-    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Denied()
-            throws IOException {
-        deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceGroupPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(language, TEST_LANGUAGE)
+                .groupAccess(PUBLIC_GROUP, privileges)
+                .build();
+        return policy;
     }
-
-    @Test
-    public void testLanguages_UserMaria_DoesNotExistDb_SqlLanguage_Denied()
-            throws IOException {
-        resources.put("database", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testLanguages_UserMaria_SirotanDb_SqlLanguage_Policy2_Allowed()
-            throws IOException {
-        deletePolicy();
-        createPolicy("test-language-2.json");
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
-    }
-
 }

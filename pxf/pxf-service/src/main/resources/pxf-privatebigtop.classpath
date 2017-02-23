@@ -1,0 +1,62 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+##################################################################
+# This file contains the internal classpaths required to run PXF.
+# WARNING: DO NOT EDIT!
+# Any change in this file can result in PXF failing to run.
+# Adding resources should be done using pxf-public.classpath file. 
+##################################################################
+/etc/pxf/conf
+/etc/hadoop/conf
+/etc/hbase/conf
+/etc/hive/conf
+/usr/lib/hadoop/client/zookeeper.jar
+/usr/lib/hadoop-hdfs/hadoop-hdfs.jar
+/usr/lib/hadoop-mapreduce/hadoop-mapreduce-client-core.jar
+/usr/lib/hadoop/client/hadoop-auth.jar
+/usr/lib/hadoop/client/hadoop-common.jar
+/usr/lib/hadoop/lib/asm-*[0-9].jar
+/usr/lib/hadoop/lib/jersey-core-*[0-9].jar
+/usr/lib/hadoop/lib/jersey-server-*[0-9].jar
+/usr/lib/hadoop/client/avro-*[0-9].jar
+/usr/lib/hadoop/client/commons-cli-*[0-9].jar
+/usr/lib/hadoop/client/commons-codec-*[0-9].jar
+/usr/lib/hadoop/client/commons-collections-*[0-9].jar
+/usr/lib/hadoop/client/commons-configuration-*[0-9].jar
+/usr/lib/hadoop/client/commons-io-*[0-9].jar
+/usr/lib/hadoop/client/commons-lang-*[0-9].jar
+/usr/lib/hadoop/client/commons-logging-*[0-9].jar
+/usr/lib/hadoop/client/guava-*[0-9].jar
+/usr/lib/hadoop/client/htrace-core-*[0-9]*.jar
+/usr/lib/hadoop/client/hadoop-lzo-*[0-9].jar
+/usr/lib/hadoop/client/jackson-core-asl-*[0-9].jar
+/usr/lib/hadoop/client/jackson-mapper-asl-*[0-9].jar
+/usr/lib/hadoop/client/jetty-*.jar
+/usr/lib/hadoop/client/log4j-*[0-9].jar
+/usr/lib/hadoop/client/protobuf-java-*[0-9].jar
+/usr/lib/hadoop/client/slf4j-api-*[0-9].jar
+/usr/lib/hadoop/client/snappy-java-*[0-9].jar
+/usr/lib/hive/lib/antlr-runtime-*[0-9].jar
+/usr/lib/hive/lib/datanucleus-api-jdo-*[0-9].jar
+/usr/lib/hive/lib/datanucleus-core-*[0-9].jar
+/usr/lib/hive/lib/hive-exec.jar
+/usr/lib/hive/lib/hive-metastore.jar
+/usr/lib/hive/lib/jdo-api-*[0-9].jar
+/usr/lib/hive/lib/libfb303-*[0-9].jar
+/usr/lib/pxf/pxf-hbase-*[0-9].jar
+/usr/lib/pxf/pxf-hdfs-*[0-9].jar
+/usr/lib/pxf/pxf-hive-*[0-9].jar
+/usr/lib/pxf/pxf-json-*[0-9].jar

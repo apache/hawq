@@ -115,6 +115,7 @@
 #include "cdb/cdbinmemheapam.h"
 
 #include "utils/rangerrest.h"
+#include "catalog/namespace.h"
 
 #include "resourcemanager/dynrm.h"
 #include "resourcemanager/envswitch.h"
@@ -591,6 +592,9 @@ ReadCommand(StringInfo inBuf)
 		result = SocketBackend(inBuf);
 	else
 		result = InteractiveBackend(inBuf);
+
+	/* reset last_query_sign to 0 when running a new sql */
+	reset_query_sign();
 	return result;
 }
 
@@ -3604,8 +3608,6 @@ ProcessInterrupts(void)
 
 	if (QueryCancelPending)
 	{
-		elog(LOG,"Process interrupt for 'query cancel pending'.");
-
 		QueryCancelPending = false;
 			ImmediateInterruptOK = false;	/* not idle anymore */
 			DisableNotifyInterrupt();
@@ -4391,8 +4393,21 @@ PostgresMain(int argc, char *argv[], const char *username)
 		BuildFlatFiles(true);
 	}
 
-	/* for enable ranger*/
-	if (AmIMaster() && enable_ranger && !curl_context_ranger.hasInited)
+	if (strcasecmp(acl_type, HAWQ_ACL_TYPE_STANDALONE) == 0)
+	{
+		aclType = HAWQ_ACL_NATIVE;
+	}
+	else if (strcasecmp(acl_type, HAWQ_ACL_TYPE_RANGER) == 0)
+	{
+		aclType = HAWQ_ACL_RANGER;
+	}
+	else
+	{
+		elog(ERROR, "invalid acl check type : %s.", acl_type);
+	}
+	elog(LOG, "acl check type is %s, the acl type value is %d.", acl_type, aclType);
+	/* for acl_type is ranger*/
+	if (AmIMaster() && aclType == HAWQ_ACL_RANGER && !curl_context_ranger.hasInited)
 	{
 		memset(&curl_context_ranger, 0, sizeof(curl_context_t));
 		curl_global_init(CURL_GLOBAL_ALL);

@@ -19,73 +19,78 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.junit.Test;
+import org.apache.hawq.ranger.integration.service.tests.common.ComplexResourceTestBase;
+import org.apache.hawq.ranger.integration.service.tests.common.Policy;
+import org.junit.Before;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.*;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+public class FunctionTest extends ComplexResourceTestBase {
 
-public class FunctionTest extends ServiceBaseTest {
+    @Before
+    public void beforeTest() {
+        specificResource.put(database, TEST_DB);
+        specificResource.put(schema, TEST_SCHEMA);
+        specificResource.put(function, TEST_FUNCTION);
 
-    private static final List<String> PRIVILEGES = Arrays.asList("execute");
+        parentUnknownResource.put(database, TEST_DB);
+        parentUnknownResource.put(schema, UNKNOWN);
+        parentUnknownResource.put(function, TEST_FUNCTION);
 
-    public void beforeTest()
-            throws IOException {
-        createPolicy("test-function.json");
-        resources.put("database", "sirotan");
-        resources.put("schema", "siroschema");
-        resources.put("function", "atan");
+        childUnknownResource.put(database, TEST_DB);
+        childUnknownResource.put(schema, TEST_SCHEMA);
+        childUnknownResource.put(function, UNKNOWN);
+
+        unknownResource.put(database, UNKNOWN);
+        unknownResource.put(schema, UNKNOWN);
+        unknownResource.put(function, UNKNOWN);
+
+        privileges = new String[] {"execute"};
     }
 
-    @Test
-    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Allowed()
-            throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceUserPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(schema, TEST_SCHEMA)
+                .resource(function, TEST_FUNCTION)
+                .userAccess(TEST_USER, privileges)
+                .build();
+        return policy;
     }
 
-    @Test
-    public void testFunctions_UserMaria_OtherDb_AtanFunction_Denied()
-            throws IOException {
-        resources.put("database", "other");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceParentStarUserPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(schema, STAR)
+                .resource(function, TEST_FUNCTION)
+                .userAccess(TEST_USER, privileges)
+                .build();
+        policy.isParentStar = true;
+        return policy;
     }
 
-    @Test
-    public void testFunctions_UserMaria_SirotanDb_DoesNotExistFunction_Denied()
-            throws IOException {
-        resources.put("function", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceChildStarUserPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(schema, TEST_SCHEMA)
+                .resource(function, STAR)
+                .userAccess(TEST_USER, privileges)
+                .build();
+        policy.isChildStar = true;
+        return policy;
     }
 
-    @Test
-    public void testFunctions_UserBob_SirotanDb_AtanFunction_Denied()
-            throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceGroupPolicy() {
+        Policy policy = policyBuilder
+                .resource(database, TEST_DB)
+                .resource(schema, TEST_SCHEMA)
+                .resource(function, TEST_FUNCTION)
+                .groupAccess(PUBLIC_GROUP, privileges)
+                .build();
+        return policy;
     }
-
-    @Test
-    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Denied()
-            throws IOException {
-        deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testFunctions_UserMaria_DoesNotExistDb_AtanFunction_Denied()
-            throws IOException {
-        resources.put("database", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testFunctions_UserMaria_SirotanDb_AtanFunction_Policy2_Allowed()
-            throws IOException {
-        deletePolicy();
-        createPolicy("test-function-2.json");
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
-    }
-
 }

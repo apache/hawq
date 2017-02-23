@@ -68,7 +68,6 @@ void	free_token_resources(PxfInputData *inputData);
 Datum gpbridge_import(PG_FUNCTION_ARGS)
 {
 	gpbridge_check_inside_extproto(fcinfo, "gpbridge_import");
-//	ExternalSelectDesc desc = EXTPROTOCOL_GET_SELECTDESC(fcinfo);
 
 	if (gpbridge_last_call(fcinfo))
 		PG_RETURN_INT32(gpbridge_cleanup(fcinfo));
@@ -226,14 +225,17 @@ void set_current_fragment_headers(gphadoop_context* context)
 		churl_headers_remove(context->churl_headers, "X-GP-FRAGMENT-USER-DATA", true);
 	}
 
-	/* if current fragment has optimal profile set it*/
 	if (frag_data->profile)
 	{
+		/* if current fragment has optimal profile set it*/
 		churl_headers_override(context->churl_headers, "X-GP-PROFILE", frag_data->profile);
+		elog(DEBUG2, "pxf: set_current_fragment_headers: using profile: %s", frag_data->profile);
+
 	} else if (context->gphd_uri->profile)
 	{
 		/* if current fragment doesn't have any optimal profile, set to use profile from url */
 		churl_headers_override(context->churl_headers, "X-GP-PROFILE", context->gphd_uri->profile);
+		elog(DEBUG2, "pxf: set_current_fragment_headers: using profile: %s", context->gphd_uri->profile);
 	}
 	/* if there is no profile passed in url, we expect to have accessor+fragmenter+resolver so no action needed by this point */
 

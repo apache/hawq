@@ -19,49 +19,36 @@
 
 package org.apache.hawq.ranger.integration.service.tests;
 
-import org.junit.Test;
+import org.apache.hawq.ranger.integration.service.tests.common.Policy;
+import org.apache.hawq.ranger.integration.service.tests.common.SimpleResourceTestBase;
+import org.junit.Before;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
+import static org.apache.hawq.ranger.integration.service.tests.common.Policy.ResourceType.tablespace;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+public class TablespaceTest extends SimpleResourceTestBase {
 
-public class TablespaceTest extends ServiceBaseTest {
-
-    private static final List<String> PRIVILEGES = Arrays.asList("create");
-
-    public void beforeTest()
-            throws IOException {
-        createPolicy("test-tablespace.json");
-        resources.put("tablespace", "pg_global");
+    @Before
+    public void beforeTest() {
+        specificResource.put(tablespace, TEST_TABLESPACE);
+        unknownResource.put(tablespace, UNKNOWN);
+        privileges = new String[] {"create"};
     }
 
-    @Test
-    public void testTablespaces_UserMaria_PgGlobalTablespace_Allowed()
-            throws IOException {
-        assertTrue(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceUserPolicy() {
+        Policy policy = policyBuilder
+                .resource(tablespace, TEST_TABLESPACE)
+                .userAccess(TEST_USER, privileges)
+                .build();
+        return policy;
     }
 
-    @Test
-    public void testTablespaces_UserMaria_DoesNotExistTablespace_Denied()
-            throws IOException {
-        resources.put("tablespace", "doesnotexist");
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
+    @Override
+    protected Policy getResourceGroupPolicy() {
+        Policy policy = policyBuilder
+                .resource(tablespace, TEST_TABLESPACE)
+                .groupAccess(PUBLIC_GROUP, privileges)
+                .build();
+        return policy;
     }
-
-    @Test
-    public void testTablespaces_UserBob_PgGlobalTablespace_Denied()
-            throws IOException {
-        assertFalse(hasAccess("bob", resources, PRIVILEGES));
-    }
-
-    @Test
-    public void testTablespaces_UserMaria_PgGlobalTablespace_Denied()
-            throws IOException {
-        deletePolicy();
-        assertFalse(hasAccess(RANGER_TEST_USER, resources, PRIVILEGES));
-    }
-
 }

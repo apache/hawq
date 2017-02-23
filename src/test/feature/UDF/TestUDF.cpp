@@ -1,3 +1,39 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "gtest/gtest.h"
 
 #include "lib/command.h"
@@ -18,13 +54,29 @@ TEST_F(TestUDF, TestUDFBasics)
 	hawq::test::SQLUtility util;
 	if (util.getGUCValue("optimizer") == "on")
 	{
-		util.execSQLFile("UDF/sql/function_basics.sql",
-		                 "UDF/ans/function_basics.ans.orca");
+		if (util.getGUCValue("hawq_acl_type") == "standalone")
+		{
+			util.execSQLFile("UDF/sql/function_basics.sql",
+							 "UDF/ans/function_basics.ans.orca");
+		}
+		else
+		{
+			util.execSQLFile("UDF/sql/function_basics.sql",
+							 "UDF/ans/function_basics.ranger.ans.orca");
+		}
 	}
 	else
 	{
-		util.execSQLFile("UDF/sql/function_basics.sql",
-		                 "UDF/ans/function_basics.ans.planner");
+		if (util.getGUCValue("hawq_acl_type") == "standalone")
+		{
+			util.execSQLFile("UDF/sql/function_basics.sql",
+							 "UDF/ans/function_basics.ans.planner");
+		}
+		else
+		{
+			util.execSQLFile("UDF/sql/function_basics.sql",
+							 "UDF/ans/function_basics.ranger.ans.planner");
+		}
 	}
 }
 
@@ -184,6 +236,10 @@ TEST_F(TestUDF, TestUDFPljava)
 	// run test if pljava language is enabled
 	if (util.getQueryResult("SELECT lanname FROM pg_language WHERE lanname = 'java'") == "java")
 	{
+		// prepare jar files
+		hawq::test::Command cmd("cd " + d_feature_test_root + "/UDF/sql/; javac PLJavaAdd.java; jar cf PLJavaAdd.jar PLJavaAdd.class");
+		cmd.run();
+
 		// copy jar files over hawq cluster
 		std::string query = "SELECT string_agg('-h ' || hostname, ' ' ORDER BY hostname) FROM gp_segment_configuration;";
 		std::string hosts = util.getQueryResult(query);
@@ -214,6 +270,10 @@ TEST_F(TestUDF, TestUDFPljavau)
 	// run test if pljavau language is enabled
 	if (util.getQueryResult("SELECT lanname FROM pg_language WHERE lanname = 'javau'") == "javau")
 	{
+		// prepare jar files
+		hawq::test::Command cmd("cd " + d_feature_test_root + "/UDF/sql/; javac PLJavauAdd.java; jar cf PLJavauAdd.jar PLJavauAdd.class");
+		cmd.run();
+
 		// copy jar files over hawq cluster
 		std::string query = "SELECT string_agg('-h ' || hostname, ' ' ORDER BY hostname) FROM gp_segment_configuration;";
 		std::string hosts = util.getQueryResult(query);

@@ -27,6 +27,7 @@ import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.lang.CharUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -74,10 +75,10 @@ public class HiveResolver extends Plugin implements ReadResolver {
     protected static final String COLLECTION_DELIM = ",";
     protected String collectionDelim;
     protected String mapkeyDelim;
-    private SerDe deserializer;
+    protected SerDe deserializer;
     private List<OneField> partitionFields;
-    private String serdeName;
-    private String propsString;
+    protected String serdeClassName;
+    protected String propsString;
     String partitionKeys;
     protected char delimiter;
     String nullChar = "\\N";
@@ -133,19 +134,11 @@ public class HiveResolver extends Plugin implements ReadResolver {
 
     /* Parses user data string (arrived from fragmenter). */
     void parseUserData(InputData input) throws Exception {
-        final int EXPECTED_NUM_OF_TOKS = 5;
+        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input);
 
-        String userData = new String(input.getFragmentUserData());
-        String[] toks = userData.split(HiveDataFragmenter.HIVE_UD_DELIM);
-
-        if (toks.length != EXPECTED_NUM_OF_TOKS) {
-            throw new UserDataException("HiveResolver expected "
-                    + EXPECTED_NUM_OF_TOKS + " tokens, but got " + toks.length);
-        }
-
-        serdeName = toks[1];
-        propsString = toks[2];
-        partitionKeys = toks[3];
+        serdeClassName = hiveUserData.getSerdeClassName();
+        propsString = hiveUserData.getPropertiesString();
+        partitionKeys = hiveUserData.getPartitionKeys();
 
         collectionDelim = input.getUserProperty("COLLECTION_DELIM") == null ? COLLECTION_DELIM
                 : input.getUserProperty("COLLECTION_DELIM");
@@ -160,14 +153,16 @@ public class HiveResolver extends Plugin implements ReadResolver {
     void initSerde(InputData inputData) throws Exception {
         Properties serdeProperties;
 
-        Class<?> c = Class.forName(serdeName, true, JavaUtils.getClassLoader());
+        Class<?> c = Class.forName(serdeClassName, true, JavaUtils.getClassLoader());
         deserializer = (SerDe) c.newInstance();
         serdeProperties = new Properties();
-        ByteArrayInputStream inStream = new ByteArrayInputStream(
-                propsString.getBytes());
-        serdeProperties.load(inStream);
-        deserializer.initialize(new JobConf(conf, HiveResolver.class),
-                serdeProperties);
+        if (propsString != null ) {
+            ByteArrayInputStream inStream = new ByteArrayInputStream(propsString.getBytes());
+            serdeProperties.load(inStream);
+        } else {
+            throw new IllegalArgumentException("propsString is mandatory to initialize serde.");
+        }
+        deserializer.initialize(new JobConf(conf, HiveResolver.class), serdeProperties);
     }
 
     /*
@@ -271,7 +266,7 @@ public class HiveResolver extends Plugin implements ReadResolver {
      * The partition fields are initialized one time based on userData provided
      * by the fragmenter.
      */
-    void initPartitionFields(StringBuilder parts) {
+    void initTextPartitionFields(StringBuilder parts) {
         if (partitionKeys.equals(HiveDataFragmenter.HIVE_NO_PART_TBL)) {
             return;
         }
@@ -625,47 +620,49 @@ public class HiveResolver extends Plugin implements ReadResolver {
      */
     void parseDelimiterChar(InputData input) {
 
-        String userDelim = input.getUserProperty("DELIMITER");
+        String userDelim = input.getUserProperty(InputData.DELIMITER_KEY);
 
         if (userDelim == null) {
-            throw new IllegalArgumentException("DELIMITER is a required option");
-        }
-
-        final int VALID_LENGTH = 1;
-        final int VALID_LENGTH_HEX = 4;
-
-        if (userDelim.startsWith("\\x")) { // hexadecimal sequence
-
-            if (userDelim.length() != VALID_LENGTH_HEX) {
+            /* No DELIMITER in URL, try to get it from fragment's user data*/
+            HiveUserData hiveUserData = null;
+            try {
+                hiveUserData = HiveUtilities.parseHiveUserData(input);
+            } catch (UserDataException ude) {
+                throw new IllegalArgumentException("Couldn't parse user data to get " + InputData.DELIMITER_KEY);
+            }
+            if (hiveUserData.getDelimiter() == null) {
+                throw new IllegalArgumentException(InputData.DELIMITER_KEY + " is a required option");
+            }
+            delimiter = (char) Integer.valueOf(hiveUserData.getDelimiter()).intValue();
+        } else {
+            final int VALID_LENGTH = 1;
+            final int VALID_LENGTH_HEX = 4;
+            if (userDelim.startsWith("\\x")) { // hexadecimal sequence
+                if (userDelim.length() != VALID_LENGTH_HEX) {
+                    throw new IllegalArgumentException(
+                            "Invalid hexdecimal value for delimiter (got"
+                                    + userDelim + ")");
+                }
+                delimiter = (char) Integer.parseInt(
+                        userDelim.substring(2, VALID_LENGTH_HEX), 16);
+                if (!CharUtils.isAscii(delimiter)) {
+                    throw new IllegalArgumentException(
+                            "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII "
+                                    + delimiter + ")");
+                }
+                return;
+            }
+            if (userDelim.length() != VALID_LENGTH) {
                 throw new IllegalArgumentException(
-                        "Invalid hexdecimal value for delimiter (got"
+                        "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got "
                                 + userDelim + ")");
             }
-
-            delimiter = (char) Integer.parseInt(
-                    userDelim.substring(2, VALID_LENGTH_HEX), 16);
-
-            if (!CharUtils.isAscii(delimiter)) {
+            if (!CharUtils.isAscii(userDelim.charAt(0))) {
                 throw new IllegalArgumentException(
                         "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII "
-                                + delimiter + ")");
+                                + userDelim + ")");
             }
-
-            return;
+            delimiter = userDelim.charAt(0);
         }
-
-        if (userDelim.length() != VALID_LENGTH) {
-            throw new IllegalArgumentException(
-                    "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got "
-                            + userDelim + ")");
-        }
-
-        if (!CharUtils.isAscii(userDelim.charAt(0))) {
-            throw new IllegalArgumentException(
-                    "Invalid delimiter value. Must be a single ASCII character, or a hexadecimal sequence (got non ASCII "
-                            + userDelim + ")");
-        }
-
-        delimiter = userDelim.charAt(0);
     }
 }

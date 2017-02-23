@@ -127,6 +127,9 @@ typedef struct Segment {
 	bool	alive;
 
 	int		segindex;
+
+	/* Global unique ID. */
+	int		ID;
 } Segment;
 
 extern Segment *GetMasterSegment(void);

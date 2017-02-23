@@ -17,26 +17,24 @@
  * under the License.
  */
 
-package org.apache.hawq.ranger.integration.service.tests;
+package org.apache.hawq.ranger.integration.service.tests.common;
 
-import org.codehaus.jackson.annotate.JsonProperty;
+import org.junit.Test;
 
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
 
-public class RPSResponse {
+public abstract class ComplexResourceTestBase extends SimpleResourceTestBase {
 
-    @JsonProperty
-    public int requestId;
-
-    @JsonProperty
-    public List<Map<String, Object>> access;
-
-    public List<Map<String, Object>> getAccess() {
-        return access;
+    @Test
+    public void testParentStarResourceUserPolicy() throws IOException {
+        checkResourceUserPolicy(getResourceParentStarUserPolicy());
     }
 
-    public boolean hasAccess() {
-        return (boolean) access.get(0).get("allowed");
+    @Test
+    public void testChildStarResourceUserPolicy() throws IOException {
+        checkResourceUserPolicy(getResourceChildStarUserPolicy());
     }
+
+    abstract protected Policy getResourceParentStarUserPolicy();
+    abstract protected Policy getResourceChildStarUserPolicy();
 }

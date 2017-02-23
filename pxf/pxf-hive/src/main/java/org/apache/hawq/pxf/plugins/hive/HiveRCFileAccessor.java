@@ -21,7 +21,7 @@ package org.apache.hawq.pxf.plugins.hive;
 
 
 import org.apache.hawq.pxf.api.utilities.InputData;
-
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileRecordReader;
 import org.apache.hadoop.mapred.FileSplit;
@@ -30,7 +30,7 @@ import org.apache.hadoop.mapred.JobConf;
 
 import java.io.IOException;
 
-import static org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_SERDES;
+import static org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
 
 /**
  * Specialization of HiveAccessor for a Hive table that stores only RC files.
@@ -47,9 +47,9 @@ public class HiveRCFileAccessor extends HiveAccessor {
      */
     public HiveRCFileAccessor(InputData input) throws Exception {
         super(input, new RCFileInputFormat());
-        String[] toks = HiveInputFormatFragmenter.parseToks(input, PXF_HIVE_SERDES.COLUMNAR_SERDE.name(), PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name());
-        initPartitionFields(toks[HiveInputFormatFragmenter.TOK_KEYS]);
-        filterInFragmenter = new Boolean(toks[HiveInputFormatFragmenter.TOK_FILTER_DONE]);
+        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input, PXF_HIVE_SERDES.COLUMNAR_SERDE, PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE);
+        initPartitionFields(hiveUserData.getPartitionKeys());
+        filterInFragmenter = hiveUserData.isFilterInFragmenter();
     }
 
     @Override

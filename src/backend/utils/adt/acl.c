@@ -32,6 +32,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
+#include "utils/guc.h"
 
 typedef struct
 {
@@ -108,7 +109,7 @@ static AclResult pg_role_aclcheck(Oid role_oid, Oid roleid, AclMode mode);
 
 static void RoleMembershipCacheCallback(Datum arg, Oid relid);
 
-
+AclType aclType;
 /*
  * getid
  *		Consumes the first alphanumeric string (identifier) found in string

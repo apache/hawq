@@ -57,6 +57,9 @@ static void LoadDistributionPolicy(Oid relid, PxfItem *pxfItem);
 static void LoadExtTable(Oid relid, PxfItem *pxfItem);
 static void LoadColumns(Oid relid, List *columns);
 static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nTypeMod);
+static Datum GetFormatTypeForProfile(const List *outputFormats);
+static Datum GetFormatOptionsForProfile(const List *outputFormats, int delimiter);
+static Datum GetLocationForFormat(char *profile, List *outputFormats, char *pxf_service_address, char *path, char *name, int delimiter);
 
 const int maxNumTypeModifiers = 2;
 /*
@@ -124,11 +127,33 @@ static PxfItem *ParsePxfItem(struct json_object *pxfMD, char* profile)
 		ereport(ERROR,
 			(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
 			 errmsg("Could not parse PXF item, expected not null value for attribute \"name\"")));
-
 	pxfItem->profile = profile;
 	pxfItem->path = pstrdup(json_object_get_string(itemPath));
 	pxfItem->name = pstrdup(json_object_get_string(itemName));
-	
+
+	/* parse output formats */
+	struct json_object *jsonOutputFormats = json_object_object_get(pxfMD, "outputFormats");
+
+	if (NULL != jsonOutputFormats)
+	{
+		const int numOutputFormats = json_object_array_length(jsonOutputFormats);
+		for (int i = 0; i < numOutputFormats; i++)
+		{
+			PxfField *pxfField = palloc0(sizeof(PxfField));
+			struct json_object *jsonOutputFormat = json_object_array_get_idx(jsonOutputFormats, i);
+			char *outupFormat = pstrdup(json_object_get_string(jsonOutputFormat));
+			pxfItem->outputFormats = lappend(pxfItem->outputFormats, outupFormat);
+		}
+	}
+
+	/* parse delimiter */
+	struct json_object *jsonOutputParameters = json_object_object_get(pxfMD, "outputParameters");
+	if (NULL != jsonOutputParameters)
+	{
+		struct json_object *outputParameterDelimiter = json_object_object_get(jsonOutputParameters, "DELIMITER");
+		pxfItem->delimiter = atoi(pstrdup(json_object_get_string(outputParameterDelimiter)));
+	}
+
 	elog(DEBUG1, "Parsed item %s, namespace %s", itemName, itemPath);
 		
 	/* parse columns */
@@ -445,36 +470,10 @@ static void LoadExtTable(Oid relid, PxfItem *pxfItem)
 		values[i] = (Datum) 0;
 	}
 
-	/* location - should be an array of text with one element:
-	 * pxf://<ip:port/namaservice>/<hive db>.<hive table>?Profile=Hive */
-	StringInfoData locationStr;
-	initStringInfo(&locationStr);
-	appendStringInfo(&locationStr, "pxf://%s/%s.%s?Profile=%s",
-			pxf_service_address, pxfItem->path, pxfItem->name, pxfItem->profile);
-	Size len = VARHDRSZ + locationStr.len;
-	/* +1 leaves room for sprintf's trailing null */
-	text *t = (text *) palloc(len + 1);
-	SET_VARSIZE(t, len);
-	sprintf((char *) VARDATA(t), "%s", locationStr.data);
-	ArrayBuildState *astate = NULL;
-	astate = accumArrayResult(astate, PointerGetDatum(t),
-							  false, TEXTOID,
-							  CurrentMemoryContext);
-	pfree(locationStr.data);
-	Assert(NULL != astate);
-	Datum location = makeArrayResult(astate, CurrentMemoryContext);
-
-	/* format options - should be "formatter 'pxfwritable_import'" */
-	StringInfoData formatStr;
-	initStringInfo(&formatStr);
-	appendStringInfo(&formatStr, "formatter 'pxfwritable_import'");
-	Datum format_opts = DirectFunctionCall1(textin, CStringGetDatum(formatStr.data));
-	pfree(formatStr.data);
-
 	values[Anum_pg_exttable_reloid - 1] = ObjectIdGetDatum(relid);
-	values[Anum_pg_exttable_location - 1] = location;
-	values[Anum_pg_exttable_fmttype - 1] = CharGetDatum('b' /* binary */);
-	values[Anum_pg_exttable_fmtopts - 1] = format_opts;
+	values[Anum_pg_exttable_location - 1] = GetLocationForFormat(pxfItem->profile, pxfItem->outputFormats, pxf_service_address, pxfItem->path, pxfItem->name, pxfItem->delimiter);
+	values[Anum_pg_exttable_fmttype - 1] = GetFormatTypeForProfile(pxfItem->outputFormats);
+	values[Anum_pg_exttable_fmtopts - 1] = GetFormatOptionsForProfile(pxfItem->outputFormats, pxfItem->delimiter);
 	nulls[Anum_pg_exttable_command - 1] = true;
 	nulls[Anum_pg_exttable_rejectlimit - 1] = true;
 	nulls[Anum_pg_exttable_rejectlimittype - 1] = true;
@@ -631,3 +630,79 @@ static int ComputeTypeMod(Oid typeOid, const char *colname, int *typemod, int nT
 	return VARHDRSZ + result;
 }
 
+static Datum GetFormatTypeForProfile(const List *outputFormats)
+{
+
+	/* if table is homogeneous and output format is text - use text*/
+	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)), TextFormatName) == 0)
+	{
+		return CharGetDatum(TextFormatType);
+	} else
+	{
+		return CharGetDatum(CustomFormatType);
+	}
+}
+
+static Datum GetFormatOptionsForProfile(const List *outputFormats, int delimiter)
+{
+	StringInfoData formatStr;
+	initStringInfo(&formatStr);
+
+	/* "delimiter 'delimiter' null '\\N' escape '\\'"*/
+	char formatArr[35] = { 0x64, 0x65, 0x6c, 0x69, 0x6d, 0x69, 0x74, 0x65,
+			0x72, 0x20, 0x27, delimiter, 0x27, 0x20, 0x6e, 0x75, 0x6c, 0x6c,
+			0x20, 0x27, 0x5c, 0x4e, 0x27, 0x20, 0x65, 0x73, 0x63, 0x61, 0x70,
+			0x65, 0x20, 0x27, 0x5c, 0x27, 0x00 };
+
+	if (list_length(outputFormats) == 1 && strcmp(lfirst(list_head(outputFormats)),TextFormatName) == 0)
+	{
+		appendStringInfo(&formatStr, "%s", formatArr);
+	} else {
+		appendStringInfo(&formatStr, "formatter 'pxfwritable_import'");
+	}
+	Datum format_opts = DirectFunctionCall1(textin, CStringGetDatum(formatStr.data));
+	pfree(formatStr.data);
+	return format_opts;
+}
+
+/* location - should be an array of text with one element:
+ * pxf://<ip:port/namaservice>/<path>.<name>?Profile=profileName&delimiter=delimiterCode */
+static Datum GetLocationForFormat(char *profile, List *outputFormats, char *pxf_service_address, char *path, char *name, int delimiter)
+{
+	StringInfoData locationStr;
+	initStringInfo(&locationStr);
+	appendStringInfo(&locationStr, "pxf://%s/%s.%s?Profile=%s", pxf_service_address, path, name, profile);
+	bool hasTextOutputFormat = false;
+	ListCell *lc = NULL;
+	foreach (lc, outputFormats)
+	{
+		char *outputFormat = (char *) lfirst(lc);
+		if (strcmp(outputFormat, TextFormatName) == 0)
+		{
+			hasTextOutputFormat = true;
+			break;
+		}
+	}
+	if (delimiter)
+	{
+		appendStringInfo(&locationStr, "&delimiter=%cx%02x", '\\', delimiter);
+	} else if (hasTextOutputFormat)
+	{
+		ereport(ERROR,
+			(errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED),
+			 errmsg("delimiter attribute is mandatory for output format \"TEXT\"")));
+	}
+	Size len = VARHDRSZ + locationStr.len;
+	/* +1 leaves room for sprintf's trailing null */
+	text *t = (text *) palloc(len + 1);
+	SET_VARSIZE(t, len);
+	sprintf((char *) VARDATA(t), "%s", locationStr.data);
+	ArrayBuildState *astate = NULL;
+	astate = accumArrayResult(astate, PointerGetDatum(t),
+							  false, TEXTOID,
+							  CurrentMemoryContext);
+	pfree(locationStr.data);
+	Assert(NULL != astate);
+	Datum location = makeArrayResult(astate, CurrentMemoryContext);
+	return location;
+}

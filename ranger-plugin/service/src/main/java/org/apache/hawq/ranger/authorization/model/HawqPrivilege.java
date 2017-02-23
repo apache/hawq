@@ -37,8 +37,7 @@ public enum HawqPrivilege {
     execute,
     temp,
     create_schema,
-    usage_schema,
-    all;
+    usage_schema;
 
     /**
      * Returns HawqPrivilege type by case-insensitive lookup of the value.

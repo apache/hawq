@@ -21,12 +21,12 @@ package org.apache.hawq.pxf.plugins.hive;
 
 
 import org.apache.hawq.pxf.api.utilities.InputData;
-
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.hadoop.mapred.*;
 
 import java.io.IOException;
 
-import static org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_SERDES;
+import static org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
 
 /**
  * Specialization of HiveAccessor for a Hive table stored as Text files.
@@ -43,9 +43,9 @@ public class HiveLineBreakAccessor extends HiveAccessor {
     public HiveLineBreakAccessor(InputData input) throws Exception {
         super(input, new TextInputFormat());
         ((TextInputFormat) inputFormat).configure(jobConf);
-        String[] toks = HiveInputFormatFragmenter.parseToks(input, PXF_HIVE_SERDES.LAZY_SIMPLE_SERDE.name());
-        initPartitionFields(toks[HiveInputFormatFragmenter.TOK_KEYS]);
-        filterInFragmenter = new Boolean(toks[HiveInputFormatFragmenter.TOK_FILTER_DONE]);
+        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input, PXF_HIVE_SERDES.LAZY_SIMPLE_SERDE);
+        initPartitionFields(hiveUserData.getPartitionKeys());
+        filterInFragmenter = hiveUserData.isFilterInFragmenter();
     }
 
     @Override

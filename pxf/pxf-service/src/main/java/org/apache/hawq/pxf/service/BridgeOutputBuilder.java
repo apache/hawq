@@ -92,7 +92,7 @@ public class BridgeOutputBuilder {
     void makeErrorRecord() {
         int[] errSchema = { TEXT.getOID() };
 
-        if (inputData.outputFormat() != OutputFormat.BINARY) {
+        if (inputData.outputFormat() != OutputFormat.GPDBWritable) {
             return;
         }
 
@@ -109,7 +109,7 @@ public class BridgeOutputBuilder {
      * @throws Exception if the output format is not binary
      */
     public Writable getErrorOutput(Exception ex) throws Exception {
-        if (inputData.outputFormat() == OutputFormat.BINARY) {
+        if (inputData.outputFormat() == OutputFormat.GPDBWritable) {
             errorRecord.setString(0, ex.getMessage());
             return errorRecord;
         } else {
@@ -126,7 +126,7 @@ public class BridgeOutputBuilder {
      */
     public LinkedList<Writable> makeOutput(List<OneField> recFields)
             throws BadRecordException {
-        if (output == null && inputData.outputFormat() == OutputFormat.BINARY) {
+        if (output == null && inputData.outputFormat() == OutputFormat.GPDBWritable) {
             makeGPDBWritableOutput();
         }
 
@@ -174,7 +174,7 @@ public class BridgeOutputBuilder {
      * @throws BadRecordException if building the output record failed
      */
     void fillOutputRecord(List<OneField> recFields) throws BadRecordException {
-        if (inputData.outputFormat() == OutputFormat.BINARY) {
+        if (inputData.outputFormat() == OutputFormat.GPDBWritable) {
             fillGPDBWritable(recFields);
         } else {
             fillText(recFields);

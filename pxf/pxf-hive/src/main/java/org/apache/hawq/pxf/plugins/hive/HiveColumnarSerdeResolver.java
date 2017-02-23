@@ -22,12 +22,15 @@ package org.apache.hawq.pxf.plugins.hive;
 import org.apache.hawq.pxf.api.BadRecordException;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
+import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
+import org.apache.hawq.pxf.service.utilities.ProtocolData;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -40,7 +43,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.*;
-
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.JobConf;
 
@@ -57,11 +59,10 @@ import static org.apache.hawq.pxf.api.io.DataType.VARCHAR;
  */
 public class HiveColumnarSerdeResolver extends HiveResolver {
     private static final Log LOG = LogFactory.getLog(HiveColumnarSerdeResolver.class);
-    private ColumnarSerDeBase deserializer;
     private boolean firstColumn;
     private StringBuilder builder;
     private StringBuilder parts;
-    private HiveInputFormatFragmenter.PXF_HIVE_SERDES serdeType;
+    private HiveUtilities.PXF_HIVE_SERDES serdeType;
 
     public HiveColumnarSerdeResolver(InputData input) throws Exception {
         super(input);
@@ -70,24 +71,22 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
     /* read the data supplied by the fragmenter: inputformat name, serde name, partition keys */
     @Override
     void parseUserData(InputData input) throws Exception {
-        String[] toks = HiveInputFormatFragmenter.parseToks(input);
-        String serdeEnumStr = toks[HiveInputFormatFragmenter.TOK_SERDE];
-        if (serdeEnumStr.equals(HiveInputFormatFragmenter.PXF_HIVE_SERDES.COLUMNAR_SERDE.name())) {
-            serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.COLUMNAR_SERDE;
-        } else if (serdeEnumStr.equals(HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name())) {
-            serdeType = HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE;
-        }
-        else {
-            throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeEnumStr);
-        }
+        HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input, HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE, HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE);
+        String serdeClassName = hiveUserData.getSerdeClassName();
+
+        serdeType = PXF_HIVE_SERDES.getPxfHiveSerde(serdeClassName);
         parts = new StringBuilder();
-        partitionKeys = toks[HiveInputFormatFragmenter.TOK_KEYS];
+        partitionKeys = hiveUserData.getPartitionKeys();
         parseDelimiterChar(input);
     }
 
     @Override
     void initPartitionFields() {
-        initPartitionFields(parts);
+        if (((ProtocolData) inputData).outputFormat() == OutputFormat.TEXT) {
+            initTextPartitionFields(parts);
+        } else {
+            super.initPartitionFields();
+        }
     }
 
     /**
@@ -97,15 +96,19 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
      */
     @Override
     public List<OneField> getFields(OneRow onerow) throws Exception {
-        firstColumn = true;
-        builder = new StringBuilder();
-        Object tuple = deserializer.deserialize((Writable) onerow.getData());
-        ObjectInspector oi = deserializer.getObjectInspector();
-
-        traverseTuple(tuple, oi);
-        /* We follow Hive convention. Partition fields are always added at the end of the record */
-        builder.append(parts);
-        return Collections.singletonList(new OneField(VARCHAR.getOID(), builder.toString()));
+        if (((ProtocolData) inputData).outputFormat() == OutputFormat.TEXT) {
+            firstColumn = true;
+            builder = new StringBuilder();
+            Object tuple = deserializer.deserialize((Writable) onerow.getData());
+            ObjectInspector oi = deserializer.getObjectInspector();
+    
+            traverseTuple(tuple, oi);
+            /* We follow Hive convention. Partition fields are always added at the end of the record */
+            builder.append(parts);
+            return Collections.singletonList(new OneField(VARCHAR.getOID(), builder.toString()));
+        } else {
+            return super.getFields(onerow);
+        }
     }
 
     /*
@@ -138,14 +141,7 @@ public class HiveColumnarSerdeResolver extends HiveResolver {
         serdeProperties.put(serdeConstants.LIST_COLUMNS, columnNames.toString());
         serdeProperties.put(serdeConstants.LIST_COLUMN_TYPES, columnTypes.toString());
 
-        if (serdeType == HiveInputFormatFragmenter.PXF_HIVE_SERDES.COLUMNAR_SERDE) {
-            deserializer = new ColumnarSerDe();
-        } else if (serdeType == HiveInputFormatFragmenter.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE) {
-            deserializer = new LazyBinaryColumnarSerDe();
-        } else {
-            throw new UnsupportedTypeException("Unsupported Hive Serde: " + serdeType.name()); /* we should not get here */
-        }
-
+        deserializer = HiveUtilities.createDeserializer(serdeType, HiveUtilities.PXF_HIVE_SERDES.COLUMNAR_SERDE, HiveUtilities.PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE);
         deserializer.initialize(new JobConf(new Configuration(), HiveColumnarSerdeResolver.class), serdeProperties);
     }
 

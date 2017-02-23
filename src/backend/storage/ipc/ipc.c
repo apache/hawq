@@ -149,7 +149,7 @@ proc_exit_prepare(int code)
 	 * desirable bail-out, and whenever you should see this situation, you
 	 * should consider to resolve the actual programming error.
 	 */
-	if (CritSectionCount > 0)
+	if (CritSectionCount > 0 && !SuppressPanic)
 		elog(PANIC, "process is dying from critical section");
 
 	/*

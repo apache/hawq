@@ -732,7 +732,6 @@ int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_limit;
-bool enable_ranger = false;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
@@ -780,6 +779,8 @@ bool gp_plpgsql_clear_cache_always = false;
 
 /* indicate whether called by gpdump, if yes, processutility will open some limitations */
 bool gp_called_by_pgdump = false;
+
+char   *acl_type;
 
 char   *rps_addr_host;
 char   *rps_addr_suffix;
@@ -4330,16 +4331,6 @@ static struct config_bool ConfigureNamesBool[] =
 		&enable_secure_filesystem,
 		false, NULL, NULL
 	},
-
-	{
-    {"enable_ranger", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
-     gettext_noop("Enable Apache Ranger for HAWQ privilege management."),
-     NULL,
-     GUC_SUPERUSER_ONLY
-    },
-    &enable_ranger,
-    false, NULL, NULL
-  },
 
 	{
 		{"filesystem_support_truncate", PGC_USERSET, APPENDONLY_TABLES,
@@ -8188,22 +8179,31 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-    {"hawq_rps_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
-      gettext_noop("ranger plugin server address hostname"),
-      NULL
-    },
-    &rps_addr_host,
-    "localhost", NULL, NULL
-  },
+		{"hawq_rps_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
+			gettext_noop("ranger plugin server address hostname"),
+			NULL
+		},
+		&rps_addr_host,
+		"localhost", NULL, NULL
+	},
 
-  {
-    {"hawq_rps_address_suffix", PGC_POSTMASTER, PRESET_OPTIONS,
-      gettext_noop("ranger plugin server suffix of restful service address"),
-      NULL
-    },
-    &rps_addr_suffix,
-    "rps", NULL, NULL
-  },
+	{
+		{"hawq_rps_address_suffix", PGC_POSTMASTER, PRESET_OPTIONS,
+			gettext_noop("ranger plugin server suffix of restful service address"),
+			NULL
+		},
+		&rps_addr_suffix,
+		"rps", NULL, NULL
+	},
+
+	{
+		{"hawq_acl_type", PGC_POSTMASTER, PRESET_OPTIONS,
+			gettext_noop("hawq acl mode, currently 'standalone' and 'ranger' is available"),
+			NULL
+		},
+		&acl_type,
+		"standalone", NULL, NULL
+	},
 
 	{
 		{"hawq_standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,

@@ -528,6 +528,51 @@ FormRelationPath(char *relationPath, char *filespaceLocation, RelFileNode rnode)
 					targetMaxLen);
 }
 
+/**
+ * Form path for relfile, it support not only catalog relfile but also relfile on hdfs
+ */
+void
+FormRelfilePath(char *relfilePath, char *filespaceLocation, RelFileNode *rnode, int32 segmentFileNum)
+{
+	char		dbPath[MAXPGPATH + 1];
+	int			targetMaxLen = MAXPGPATH + 1;
+	int 		snprintfResult;
+
+	FormDatabasePath(dbPath,
+					 filespaceLocation,
+					 rnode->spcNode,
+					 rnode->dbNode);
+
+	if (IsLocalPath(dbPath))
+	{
+		/* catalog relfile rule same as postgres: all relfile at same level */
+		if (segmentFileNum == 0)
+			snprintfResult =
+						snprintf(relfilePath, targetMaxLen, "%s/%u", dbPath, rnode->relNode);
+		else
+			snprintfResult =
+						snprintf(relfilePath, targetMaxLen, "%s/%u.%u", dbPath, rnode->relNode, segmentFileNum);
+
+	}else
+	{
+		/* hdfs relfile rule change from file to directory at relation level, and  segnum */
+		snprintfResult =
+					snprintf(relfilePath, targetMaxLen, "%s/%u/%u", dbPath, rnode->relNode, segmentFileNum);
+	}
+
+	if (snprintfResult < 0)
+		elog(ERROR, "FormRelfilePath formatting error");
+
+	/*
+	 * Magically truncating the result to fit in the target string is unacceptable here
+	 * because it can result in the wrong file-system object being referenced.
+	 */
+	if (snprintfResult >= targetMaxLen)
+		elog(ERROR, "FormRelfilePath formatting result length %d exceeded the maximum length %d",
+					snprintfResult,
+					targetMaxLen);
+}
+
 /*
  * IsSystemRelation
  *		True iff the relation is a system catalog relation.
