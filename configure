@@ -667,6 +667,9 @@ CURL_CFLAGS
 CURL_CONFIG
 R_HOME
 ZIC
+SETCLASSPATH
+CATALINA
+CATALINA_HOME
 JAVAC_FLAGS
 JAVADOC
 JAR
@@ -734,6 +737,7 @@ with_python
 with_perl
 with_tcl
 enable_thread_safety
+enable_rps
 enable_orca
 enable_email
 enable_gphdfs
@@ -846,6 +850,7 @@ enable_snmp
 enable_gphdfs
 enable_email
 enable_orca
+enable_rps
 enable_thread_safety
 enable_thread_safety_force
 with_tcl
@@ -1523,6 +1528,7 @@ disable 64-bit integer date/time support
   --enable-gphdfs        enables GPHDFS support
   --enable-email        enable email alerts
   --enable-orca        enable Pivotal Query Optimizer
+  --enable-rps         enable hawq ranger plugin
   --disable-thread-safety  Do not make client libraries thread-safe
   --enable-thread-safety-force  force thread-safety despite thread test failure
   --disable-xmltest       Do not try to compile and run a test LIBXML program
@@ -5501,6 +5507,37 @@ fi
 
 
 #
+# Enable hawq ranger plugin
+#
+
+pgac_args="$pgac_args enable_rps"
+
+# Check whether --enable-rps was given.
+if test "${enable_rps+set}" = set; then :
+  enableval=$enable_rps;
+  case $enableval in
+    yes)
+
+$as_echo "#define USE_RANGER 1" >>confdefs.h
+
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --enable-rps option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  enable_rps=no
+
+fi
+
+
+
+
+#
 # Enable thread-safe client libraries
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking allow thread-safe client libraries" >&5
@@ -8166,6 +8203,143 @@ $as_echo "no" >&6; }
     { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
   fi
+
+fi
+
+if test "$enable_rps" = yes; then
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking CATALINA_HOME" >&5
+$as_echo_n "checking CATALINA_HOME... " >&6; }
+
+        if test -x "${CATALINA_HOME}/bin/catalina.sh"; then
+    TOMCAT="${CATALINA_HOME}"
+  elif test -x "/usr/local/Cellar/tomcat@6/6.0.45/libexec/bin/catalina.sh"; then
+    TOMCAT="/usr/local/Cellar/tomcat@6/6.0.45/libexec/"
+  elif test -x "/usr/lib/bigtop-tomcat/bin/catalina.sh"; then
+    TOMCAT="/usr/lib/bigtop-tomcat/"
+  else
+    { $as_echo "$as_me:${as_lineno-$LINENO}: result: not found" >&5
+$as_echo "not found" >&6; }
+    as_fn_error $? "CATALINA_HOME not found" "$LINENO" 5
+  fi
+  CATALINA_HOME="$TOMCAT"
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: ${CATALINA_HOME}" >&5
+$as_echo "${CATALINA_HOME}" >&6; }
+
+
+
+  CATALINA=none
+  SETCLASSPATH=none
+
+
+  for ac_prog in catalina.sh
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_CATALINA+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $CATALINA in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_CATALINA="$CATALINA" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in ${CATALINA_HOME}/bin
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_CATALINA="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+CATALINA=$ac_cv_path_CATALINA
+if test -n "$CATALINA"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $CATALINA" >&5
+$as_echo "$CATALINA" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$CATALINA" && break
+done
+
+  for ac_prog in setclasspath.sh
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_path_SETCLASSPATH+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  case $SETCLASSPATH in
+  [\\/]* | ?:[\\/]*)
+  ac_cv_path_SETCLASSPATH="$SETCLASSPATH" # Let the user override the test with a path.
+  ;;
+  *)
+  as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in ${CATALINA_HOME}/bin
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_path_SETCLASSPATH="$as_dir/$ac_word$ac_exec_ext"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+  ;;
+esac
+fi
+SETCLASSPATH=$ac_cv_path_SETCLASSPATH
+if test -n "$SETCLASSPATH"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SETCLASSPATH" >&5
+$as_echo "$SETCLASSPATH" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$SETCLASSPATH" && break
+done
+
+
+
+
+
+  # Check the current tomcat version
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for tomcat version" >&5
+$as_echo_n "checking for tomcat version... " >&6; }
+  version=`${CATALINA} version 2>&1 | grep "Server version" | cut -d '/' -f2`
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: \"$version\"" >&5
+$as_echo "\"$version\"" >&6; }
+
+  if echo "$version" | sed 's/[^0-9]/ /g' | $AWK '{ if ($1 != 6) exit 0; else exit 1;}'
+  then
+    as_fn_error $? "The installed version of tomcat is not compatiable to use with ranger-plugin.
+                  Apache Tomcat/6.0.x is required, but this is $version" "$LINENO" 5
+  fi
+
 
 fi
 
@@ -16544,7 +16718,7 @@ $as_echo "done" >&6; }
 fi
 
 
-ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global"
+ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global ranger-plugin/Makefile.global"
 
 
 ac_config_links="$ac_config_links src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION} src/backend/port/pg_shmem.c:${SHMEM_IMPLEMENTATION} src/include/dynloader.h:src/backend/port/dynloader/${template}.h src/include/pg_config_os.h:src/include/port/${template}.h src/Makefile.port:src/makefiles/Makefile.${template}"
@@ -17277,6 +17451,7 @@ do
     "depends/libyarn/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libyarn/Makefile.global" ;;
     "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;
     "src/pl/pljava/src/java/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/pl/pljava/src/java/Makefile.global" ;;
+    "ranger-plugin/Makefile.global") CONFIG_FILES="$CONFIG_FILES ranger-plugin/Makefile.global" ;;
     "src/backend/port/dynloader.c") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c" ;;
     "src/backend/port/pg_sema.c") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION}" ;;
     "src/backend/port/pg_shmem.c") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/pg_shmem.c:${SHMEM_IMPLEMENTATION}" ;;

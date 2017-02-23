@@ -17,6 +17,7 @@ all:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
 	$(MAKE) -C tools $@
+	$(MAKE) -C ranger-plugin $@
 	@echo "All of HAWQ successfully made. Ready to install."
 
 install:
@@ -28,6 +29,7 @@ install:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
 	$(MAKE) -C tools $@
+	$(MAKE) -C ranger-plugin $@
 	@echo "HAWQ installation complete."
 
 installdirs uninstall:
@@ -35,6 +37,7 @@ installdirs uninstall:
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
+	$(MAKE) -C ranger-plugin $@
 
 distprep:
 #	$(MAKE) -C doc $@
@@ -60,6 +63,7 @@ clean:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
 	$(MAKE) -C tools $@
+	$(MAKE) -C ranger-plugin $@
 	-$(MAKE) -C src feature-test-clean
 # Garbage from autoconf:
 	@rm -rf autom4te.cache/
@@ -76,6 +80,7 @@ distclean maintainer-clean:
 	-$(MAKE) -C tools $@
 	-$(MAKE) -C src feature-test-clean
 	-$(MAKE) -C src $@
+	-$(MAKE) -C ranger-plugin $@
 	-rm -f config.cache config.log config.status GNUmakefile
 # Garbage from autoconf:
 	@rm -rf autom4te.cache/
