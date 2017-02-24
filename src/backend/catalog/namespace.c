@@ -1939,7 +1939,7 @@ static void checkNamespaceInternal(List **oidlist, Oid namespaceId, Oid roleid)
 		*oidlist = lappend_oid(*oidlist, namespaceId);
 	}
 	else {
-		if (OidIsValid(namespaceId)) {
+		if (OidIsValid(namespaceId) && aclType == HAWQ_ACL_RANGER) {
 			elog(WARNING, "usage privilege of namespace %s is required.",
 					getNamespaceNameByOid(namespaceId));
 		}
