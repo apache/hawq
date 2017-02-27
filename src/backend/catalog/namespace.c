@@ -2119,6 +2119,11 @@ recomputeNamespacePath(void)
 	namespaceSearchPathValid = true;
 	namespaceUser = roleid;
 
+	if (debug_query_string != NULL)
+	{
+		last_query_sign = string_hash(debug_query_string, strlen(debug_query_string));
+	}
+
 	/* Clean up. */
 	pfree(rawname);
 	list_free(namelist);
