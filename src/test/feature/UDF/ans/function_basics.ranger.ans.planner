@@ -249,7 +249,7 @@ CREATE ROLE u1;
 psql:/tmp/TestUDF_TestUDFBasics.sql:149: NOTICE:  resource queue required -- using default resource queue "pg_default"
 CREATE ROLE
 GRANT SELECT ON TABLE foo TO u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:150: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:150: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
 CREATE FUNCTION
 SELECT proacl FROM pg_proc where proname = 'g';
@@ -259,7 +259,7 @@ SELECT proacl FROM pg_proc where proname = 'g';
 (1 row)
 
 REVOKE ALL ON FUNCTION g(int) FROM PUBLIC;
-psql:/tmp/TestUDF_TestUDFBasics.sql:153: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:153: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -281,18 +281,24 @@ SELECT count(g(x)) FROM foo;
 SET ROLE u1;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:158: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:158: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:159: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:159: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE superuser;
 SET
 GRANT EXECUTE ON FUNCTION g(int) TO u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:161: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:161: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -302,18 +308,24 @@ SELECT proacl FROM pg_proc where proname = 'g';
 SET ROLE u1;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:164: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:164: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:165: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:165: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE superuser;
 SET
 REVOKE EXECUTE ON FUNCTION g(int) FROM u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:167: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:167: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -323,11 +335,17 @@ SELECT proacl FROM pg_proc where proname = 'g';
 SET ROLE u1;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:170: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:170: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:171: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:171: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
@@ -336,7 +354,7 @@ RESET
 DROP FUNCTION g(int);
 DROP FUNCTION
 REVOKE SELECT ON TABLE foo FROM u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:174: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:174: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 DROP ROLE u1;
 DROP ROLE
 DROP ROLE superuser;
@@ -350,7 +368,7 @@ CREATE ROLE u1;
 psql:/tmp/TestUDF_TestUDFBasics.sql:183: NOTICE:  resource queue required -- using default resource queue "pg_default"
 CREATE ROLE
 GRANT SELECT ON TABLE foo TO u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:184: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:184: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
 CREATE FUNCTION
 SELECT proacl FROM pg_proc where proname = 'g';
@@ -360,7 +378,7 @@ SELECT proacl FROM pg_proc where proname = 'g';
 (1 row)
 
 REVOKE ALL ON FUNCTION g(int) FROM PUBLIC;
-psql:/tmp/TestUDF_TestUDFBasics.sql:187: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:187: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -382,18 +400,24 @@ SELECT count(g(x)) FROM foo;
 SET ROLE u1;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:192: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:192: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:193: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:193: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE superuser;
 SET
 GRANT EXECUTE ON FUNCTION g(int) TO PUBLIC;
-psql:/tmp/TestUDF_TestUDFBasics.sql:195: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:195: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -403,18 +427,24 @@ SELECT proacl FROM pg_proc where proname = 'g';
 SET ROLE u1;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:198: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:198: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:199: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:199: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE superuser;
 SET
 REVOKE EXECUTE ON FUNCTION g(int) FROM PUBLIC;
-psql:/tmp/TestUDF_TestUDFBasics.sql:201: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:201: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -424,11 +454,17 @@ SELECT proacl FROM pg_proc where proname = 'g';
 SET ROLE u1;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:204: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:204: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:205: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:205: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
@@ -437,7 +473,7 @@ RESET
 DROP FUNCTION g(int);
 DROP FUNCTION
 REVOKE SELECT ON TABLE foo FROM u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:208: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:208: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 DROP ROLE u1;
 DROP ROLE
 DROP ROLE superuser;
@@ -454,7 +490,7 @@ CREATE ROLE u2 IN GROUP u1;
 psql:/tmp/TestUDF_TestUDFBasics.sql:218: NOTICE:  resource queue required -- using default resource queue "pg_default"
 CREATE ROLE
 GRANT SELECT ON TABLE foo TO u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:219: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:219: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
 CREATE FUNCTION
 SELECT proacl FROM pg_proc where proname = 'g';
@@ -464,7 +500,7 @@ SELECT proacl FROM pg_proc where proname = 'g';
 (1 row)
 
 REVOKE ALL ON FUNCTION g(int) FROM PUBLIC;
-psql:/tmp/TestUDF_TestUDFBasics.sql:222: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:222: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -486,18 +522,24 @@ SELECT count(g(x)) FROM foo;
 SET ROLE u2;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:227: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:227: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:228: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:228: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE superuser;
 SET
 GRANT EXECUTE ON FUNCTION g(int) TO u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:230: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:230: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -507,18 +549,24 @@ SELECT proacl FROM pg_proc where proname = 'g';
 SET ROLE u2;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:233: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:233: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:234: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:234: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE superuser;
 SET
 REVOKE EXECUTE ON FUNCTION g(int) FROM u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:236: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:236: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -528,11 +576,17 @@ SELECT proacl FROM pg_proc where proname = 'g';
 SET ROLE u2;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:239: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:239: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:240: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:240: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
@@ -541,7 +595,7 @@ RESET
 DROP FUNCTION g(int);
 DROP FUNCTION
 REVOKE SELECT ON TABLE foo FROM u1;
-psql:/tmp/TestUDF_TestUDFBasics.sql:243: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:243: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 DROP ROLE u1;
 DROP ROLE
 DROP ROLE u2;
@@ -560,7 +614,7 @@ CREATE ROLE u2;
 psql:/tmp/TestUDF_TestUDFBasics.sql:254: NOTICE:  resource queue required -- using default resource queue "pg_default"
 CREATE ROLE
 GRANT SELECT ON TABLE foo TO PUBLIC;
-psql:/tmp/TestUDF_TestUDFBasics.sql:255: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:255: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 CREATE FUNCTION g(int) RETURNS INTEGER AS 'SELECT $1' LANGUAGE SQL IMMUTABLE STRICT;
 CREATE FUNCTION
 SELECT proacl FROM pg_proc where proname = 'g';
@@ -570,7 +624,7 @@ SELECT proacl FROM pg_proc where proname = 'g';
 (1 row)
 
 REVOKE ALL ON FUNCTION g(int) FROM PUBLIC;
-psql:/tmp/TestUDF_TestUDFBasics.sql:258: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:258: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -592,23 +646,33 @@ SELECT count(g(x)) FROM foo;
 SET ROLE u2;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:263: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:263: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:264: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:264: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE superuser;
 SET
 GRANT ALL ON FUNCTION g(int) TO u1 WITH GRANT OPTION;
-psql:/tmp/TestUDF_TestUDFBasics.sql:266: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:266: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SET ROLE u1;
 SET
 GRANT ALL ON FUNCTION g(int) TO u2;
+psql:/tmp/TestUDF_TestUDFBasics.sql:268: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
 psql:/tmp/TestUDF_TestUDFBasics.sql:268: ERROR:  function g(integer) does not exist
 SELECT proacl FROM pg_proc where proname = 'g';
+psql:/tmp/TestUDF_TestUDFBasics.sql:269: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT proacl FROM pg_proc where proname = 'g';
+                           ^
  proacl 
 --------
  
@@ -617,29 +681,41 @@ SELECT proacl FROM pg_proc where proname = 'g';
 SET ROLE u1;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:271: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:271: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:272: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:272: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE u2;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:274: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:274: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:275: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:275: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE superuser;
 SET
 REVOKE ALL ON FUNCTION g(int) FROM u1 CASCADE;
-psql:/tmp/TestUDF_TestUDFBasics.sql:277: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:277: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 SELECT proacl FROM pg_proc where proname = 'g';
  proacl 
 --------
@@ -649,22 +725,34 @@ SELECT proacl FROM pg_proc where proname = 'g';
 SET ROLE u1;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:280: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:280: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:281: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:281: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
 SET ROLE u2;
 SET
 SELECT g(1);
+psql:/tmp/TestUDF_TestUDFBasics.sql:283: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT g(1);
+               ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:283: ERROR:  function g(integer) does not exist
 LINE 1: SELECT g(1);
                ^
 HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
 SELECT count(g(x)) FROM foo;
+psql:/tmp/TestUDF_TestUDFBasics.sql:284: WARNING:  usage privilege of namespace testudf_testudfbasics is required.
+LINE 1: SELECT count(g(x)) FROM foo;
+                                ^
 psql:/tmp/TestUDF_TestUDFBasics.sql:284: ERROR:  relation "foo" does not exist
 LINE 1: SELECT count(g(x)) FROM foo;
                                 ^
@@ -673,7 +761,7 @@ RESET
 DROP FUNCTION g(int);
 DROP FUNCTION
 REVOKE SELECT ON TABLE foo FROM PUBLIC;
-psql:/tmp/TestUDF_TestUDFBasics.sql:287: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:343)
+psql:/tmp/TestUDF_TestUDFBasics.sql:287: ERROR:  GRANT/REVOKE is not allowed for this object in ranger mode (aclchk.c:344)
 DROP ROLE u1;
 DROP ROLE
 DROP ROLE u2;
@@ -1045,7 +1133,7 @@ SELECT outer(0);
 (1 row)
 
 SELECT outer(0) FROM foo;
-psql:/tmp/TestUDF_TestUDFBasics.sql:423: ERROR:  function inner(integer) does not exist
+psql:/tmp/TestUDF_TestUDFBasics.sql:423: ERROR:  function inner(integer) does not exist  (seg2 localhost:40000 pid=63812)
 DETAIL:  PL/pgSQL function "outer" line 2 at return
 DROP FUNCTION outer(int);
 DROP FUNCTION
