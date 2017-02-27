@@ -447,7 +447,7 @@ project('pxf-jdbc') {
     ospackage {
         packageName = versionedPackageName("${project.name}")
         summary = 'HAWQ Extension Framework (PXF), JDBC plugin'
-        description = 'Querying external data stored in RelationDatabase using JDBC.'
+        description = 'Querying external data stored in Relation Database using JDBC.'
         packager = ' '
         packageGroup = 'Development/Libraries'
         release = buildNumber() + '.' + project.osFamily
