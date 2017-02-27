@@ -39,8 +39,6 @@
  *-------------------------------------------------------------------------
  */
 
-asdfasdfd
-
 #include "postgres.h"
 
 #include "access/attnum.h"
