@@ -1982,6 +1982,13 @@ recomputeNamespacePath(void)
 			elog(DEBUG3, "recompute search_path[%s] when acl_type is ranger", namespace_search_path);
 		}
 	}
+	else 
+	{
+		if (debug_query_string != NULL)
+		{
+			last_query_sign = string_hash(debug_query_string, strlen(debug_query_string));
+		}
+	}
 
 	/* Need a modifiable copy of namespace_search_path string */
 	rawname = pstrdup(namespace_search_path);
@@ -2118,11 +2125,6 @@ recomputeNamespacePath(void)
 	/* Mark the path valid. */
 	namespaceSearchPathValid = true;
 	namespaceUser = roleid;
-
-	if (debug_query_string != NULL)
-	{
-		last_query_sign = string_hash(debug_query_string, strlen(debug_query_string));
-	}
 
 	/* Clean up. */
 	pfree(rawname);
