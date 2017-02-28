@@ -2714,7 +2714,7 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 void
 ExecCheckRTPerms(List *rangeTable)
 {
-	if (aclType == HAWQ_ACL_RANGER && !fallBackToNativeChecks(ACL_KIND_CLASS,rangeTable,GetUserId()))
+	if (aclType == HAWQ_ACL_RANGER)
 	{
 		if(rangeTable!=NULL)
 			ExecCheckRTPermsWithRanger(rangeTable);
@@ -2750,6 +2750,11 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 		requiredPerms = rte->requiredPerms;
 		if (requiredPerms == 0)
 			continue;
+		bool ret = fallBackToNativeCheck(ACL_KIND_CLASS, rte->relid, GetUserId(), ACL_NO_RIGHTS);
+		if (ret) {
+			ExecCheckRTEPerms((RangeTblEntry *) lfirst(l));
+			continue;
+		}
 
 		relOid = rte->relid;
 		userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();

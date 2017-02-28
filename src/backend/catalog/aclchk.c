@@ -2749,26 +2749,6 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid, AclMo
   return false;
 }
 
-bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid)
-{
-  /*we only have range table here*/
-  if (objkind == ACL_KIND_CLASS)
-  {
-    ListCell   *l;
-    foreach(l, table_list)
-    {
-      RangeTblEntry *rte=(RangeTblEntry *) lfirst(l);
-      bool ret = fallBackToNativeCheck(ACL_KIND_CLASS, rte->relid, roleid, ACL_NO_RIGHTS);
-      if(ret)
-      {
-        return true;
-      }
-    }
-
-  }
-  return false;
-}
-
 /*
  * 	check whether rte is a sequence.
  */
