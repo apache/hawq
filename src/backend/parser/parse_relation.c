@@ -2800,7 +2800,8 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 			/* collect all acl fail relations */
 			Oid relOid = result_ptr->relOid;
 			const char *rel_name = get_rel_name_partition(relOid);
-			appendStringInfo(&acl_fail_msg, "%s", rel_name);
+			const char *namespace_name = get_namespace_name(get_rel_namespace(relOid));
+			appendStringInfo(&acl_fail_msg, "%s.%s", namespace_name, rel_name);
 		}
 	}
 

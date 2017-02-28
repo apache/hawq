@@ -1984,7 +1984,7 @@ recomputeNamespacePath(void)
 	}
 	else 
 	{
-		if (debug_query_string != NULL)
+		if (aclType == HAWQ_ACL_RANGER && debug_query_string != NULL)
 		{
 			last_query_sign = string_hash(debug_query_string, strlen(debug_query_string));
 		}
