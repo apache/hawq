@@ -320,7 +320,6 @@ extern bool fallBackToNativeCheck(AclObjectKind objkind, Oid table_oid, Oid role
 extern bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid);
 extern char *getNameFromOid(AclObjectKind objkind, Oid object_oid);
 extern char *getClassNameFromOid(Oid object_oid);
-extern char *getSequenceNameFromOid(Oid object_oid);
 extern char *getDatabaseNameFromOid(Oid object_oid);
 extern char *getProcNameFromOid(Oid object_oid);
 extern char *getOperNameFromOid(Oid object_oid);

@@ -82,6 +82,8 @@ static AclMode restrict_and_check_grant(bool is_grant, AclMode avail_goptions,
 static AclMode pg_aclmask(AclObjectKind objkind, Oid table_oid, Oid roleid,
 		   AclMode mask, AclMaskHow how);
 
+static bool is_sequence(Oid object_oid);
+
 
 #ifdef ACLDEBUG
 static void
@@ -2359,54 +2361,6 @@ char *getClassNameFromOid(Oid object_oid)
   return tname.data;
 }
 
-char *getSequenceNameFromOid(Oid object_oid)
-{
-  StringInfoData tname;
-  initStringInfo(&tname);
-
-  Assert(OidIsValid(object_oid));
-  char* seq_name = caql_getcstring(
-                  NULL,
-                  cql("SELECT relname FROM pg_class "
-                    " WHERE oid = :1",
-                    ObjectIdGetDatum(object_oid)));
-  if (seq_name == NULL)
-   elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
-
-  int fetchCount=0;
-  Oid schema_name_oid = caql_getoid_plus(
-                    NULL,
-                    &fetchCount,
-                    NULL,
-                    cql("SELECT relnamespace FROM pg_class "
-                      " WHERE oid = :1",
-                      ObjectIdGetDatum(object_oid)));
-  if (schema_name_oid == InvalidOid)
-     elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
-
-  char* schema_name= caql_getcstring(
-     NULL,
-     cql("select nspname from pg_namespace "
-       " WHERE oid = :1",
-       ObjectIdGetDatum(schema_name_oid)));
-  if (schema_name == NULL)
-     elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
-
-  char* database_name = get_database_name(MyDatabaseId);
-  if (database_name == NULL)
-      elog(ERROR, "oid [%u] not found current database", object_oid);
-
-  appendStringInfo(&tname, "%s", database_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", schema_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", seq_name);
-  pfree(seq_name);
-  pfree(schema_name);
-  pfree(database_name);
-
-  return tname.data;
-}
 char *getDatabaseNameFromOid(Oid object_oid)
 {
   Assert(OidIsValid(object_oid));
@@ -2671,9 +2625,8 @@ char *getNameFromOid(AclObjectKind objkind, Oid object_oid)
   switch (objkind)
   {
     case ACL_KIND_CLASS:
-      return getClassNameFromOid(object_oid);
     case ACL_KIND_SEQUENCE:
-      return getSequenceNameFromOid(object_oid);
+      return getClassNameFromOid(object_oid);
     case ACL_KIND_DATABASE:
       return getDatabaseNameFromOid(object_oid);
     case ACL_KIND_PROC:
@@ -2814,6 +2767,18 @@ bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid)
 
   }
   return false;
+}
+
+/*
+ * 	check whether rte is a sequence.
+ */
+bool is_sequence(Oid object_oid) {
+	char relkind = get_rel_relkind(object_oid);
+	if(relkind == 's' || relkind == 'S')
+	{
+		return true;
+	}
+	return false;
 }
 
 /*
@@ -3940,7 +3905,11 @@ pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 
   if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid, mode))
   {
-    return pg_rangercheck(ACL_KIND_CLASS, table_oid, roleid, mode, ACLMASK_ANY);
+	AclObjectKind objkind = ACL_KIND_CLASS;
+	if (is_sequence(table_oid)) {
+		objkind = ACL_KIND_SEQUENCE;
+	}
+    return pg_rangercheck(objkind, table_oid, roleid, mode, ACLMASK_ANY);
   }
   else
   {
