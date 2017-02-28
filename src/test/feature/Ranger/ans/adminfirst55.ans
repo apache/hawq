@@ -1,0 +1,9 @@
+-- start_ignore
+-- end_ignore
+select getfoo();
+(1,1)
+(1,1)
+(1,1)
+(1,1)
+(1,1)
+(1,1)

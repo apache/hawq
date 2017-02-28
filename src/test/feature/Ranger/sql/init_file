@@ -1,0 +1,7 @@
+-- start_matchignore
+m/You are now connected to database*/
+s/public\|a\|table\|.*\|append only/public\|a\|table\|gpadmin\|append only/
+s/public\|aa\|table\|.*\|append only/public\|aa\|table\|gpadmin\|append only/
+s/public\|aaa\|table\|.*\|append only/public\|aaa\|table\|gpadmin\|append only/
+s/public\|av\|view\|.*\|none/public\|av\|view\|gpadmin\|none/
+-- end_matchignore

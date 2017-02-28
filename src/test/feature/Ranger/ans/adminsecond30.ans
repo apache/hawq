@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+drop EXTERNAL TABLE ext_t;
+DROP EXTERNAL TABLE

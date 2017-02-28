@@ -1,0 +1,11 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest43;
+SET
+select * from av;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+LINE 1: select * from av;
+                      ^
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  relation "av" does not exist
+LINE 1: select * from av;
+                      ^

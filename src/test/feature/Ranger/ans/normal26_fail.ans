@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest26;
+SET
+CREATE EXTERNAL TABLE ext_t ( N_NATIONKEY INTEGER ,N_NAME CHAR(25), N_REGIONKEY  INTEGER ,N_COMMENT    VARCHAR(152))location ('gpfdist://localhost:7070/nation_error50.tbl')FORMAT 'text' (delimiter '|')SEGMENT REJECT LIMIT 51;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  no schema has been selected to create in

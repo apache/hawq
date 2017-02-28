@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper6;
+SET
+drop language plpythonu;
+DROP LANGUAGE

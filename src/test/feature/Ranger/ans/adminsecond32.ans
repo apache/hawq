@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+create schema sa;
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: ERROR:  schema "sa" already exists

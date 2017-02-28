@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest25;
+SET
+COPY a TO STDOUT WITH DELIMITER '|';
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  relation "a" does not exist

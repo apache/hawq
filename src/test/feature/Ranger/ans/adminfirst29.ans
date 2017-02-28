@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+insert into ext_t2(i) values(234);
+INSERT 0 1

@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+insert into a values(1);
+INSERT 0 1

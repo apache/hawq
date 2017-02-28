@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+CREATE SEQUENCE myseq START 1;
+CREATE SEQUENCE

@@ -102,5 +102,13 @@ TEST_F(TestErrorTable, TestErrorTableAll) {
       "LOG ERRORS INTO EXT_NATION_ERROR_WRITABLE SEGMENT REJECT LIMIT 5;",
       false);
 
+  util.execute("drop external table EXT_NATION_WITH_EXIST_ERROR_TABLE;");
+  util.execute("drop external table EXT_NATION1;");
+  util.execute("drop table EXT_NATION_ERROR1 CASCADE;");
+  util.execute("drop external table EXT_NATION2;");
+  util.execute("drop table EXT_NATION_ERROR2 CASCADE;");
+  util.execute("drop external table EXT_NATION3;");
+  util.execute("drop table EXT_NATION_ERROR3 CASCADE;");
+
   gpdfist.finalize_gpfdist();
 }

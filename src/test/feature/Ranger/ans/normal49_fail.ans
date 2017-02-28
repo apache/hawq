@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest49;
+SET
+CREATE AGGREGATE scube(numeric) ( SFUNC = scube_accum, STYPE = numeric, INITCOND = 0 );
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  no schema has been selected to create in

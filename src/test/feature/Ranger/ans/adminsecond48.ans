@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+CREATE FUNCTION scube_accum(numeric, numeric) RETURNS numeric AS 'select $1 + $2 * $2 * $2' LANGUAGE SQL IMMUTABLE RETURNS NULL ON NULL INPUT;
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: ERROR:  function "scube_accum" already exists with same argument types

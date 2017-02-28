@@ -1,0 +1,8 @@
+-- start_ignore
+-- end_ignore
+\d
+public|a|table|huanzhang|append only
+public|aa|table|huanzhang|append only
+public|aaa|table|huanzhang|append only
+public|av|view|huanzhang|none
+public|myseq|sequence|huanzhang|heap

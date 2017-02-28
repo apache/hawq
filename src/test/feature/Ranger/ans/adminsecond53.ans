@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+CREATE TYPE mytype AS (f1 int, f2 int);
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: ERROR:  relation "mytype" already exists

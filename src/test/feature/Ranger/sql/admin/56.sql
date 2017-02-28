@@ -1,0 +1,2 @@
+drop type mytype cascade;
+

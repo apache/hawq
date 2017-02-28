@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest45;
+SET
+SELECT * INTO aaa FROM a WHERE i > 0 order by i;
+SELECT 5

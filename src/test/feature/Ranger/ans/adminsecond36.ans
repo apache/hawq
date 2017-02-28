@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+create table sa.t(a int, b int);
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: ERROR:  relation "t" already exists

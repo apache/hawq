@@ -1,0 +1,8 @@
+-- start_ignore
+-- end_ignore
+select * from a order by i;
+1
+1
+1
+1
+1
