@@ -146,6 +146,11 @@ ParquetExecutorReadColumn(ParquetColumnReader *columnReader, File file)
 
 		/*just process data page now*/
 		if(pageHeader->page_type != DATA_PAGE){
+			if(pageHeader->page_type == DICTIONARY_PAGE) {
+				ereport(ERROR, (errcode(ERRCODE_GP_INTERNAL_ERROR),
+								errmsg("HAWQ does not support dictionary page type resolver for Parquet format in column \'%s\' ",
+										columnChunkMetadata->colName)));
+			}
 			buffer += pageHeader->compressed_page_size;
 			continue;
 		}
