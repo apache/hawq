@@ -168,7 +168,6 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
         rangerRequest.setAccessTime(new Date());
         rangerRequest.setAction(accessType);
         rangerRequest.setClientIPAddress(clientIp);
-        rangerRequest.setRemoteIPAddress(clientIp);
         rangerRequest.setRequestData(context);
         RangerAccessResult result = rangerPlugin.isAccessAllowed(rangerRequest);
         boolean accessAllowed = result != null && result.getIsAllowed();
