@@ -49,7 +49,7 @@
     <!-- if not using zookeepers but direct url instead, then leave this property empty or set it to NONE -->
     <property>
         <name>xasecure.audit.destination.solr.zookeepers</name>
-        <value>zkhost1:2181,zkhost2:2181</value>
+        <value>zkhost1:2181,zkhost2:2181/infra-solr</value>
     </property>
 
     <!-- if not using zookeepers but direct url instead, then leave this property empty or set it to NONE -->
@@ -59,9 +59,10 @@
     </property>
 
     <!-- if not using direct url and using zookeeper instead, then leave this property empty or set it to NONE. -->
+    <!-- example value: http://solrHost1:6083/solr/ranger_audits,http://solrHost2:6083/solr/ranger_audits -->
     <property>
         <name>xasecure.audit.destination.solr.urls</name>
-        <value>http://solrHost1:6083/solr/ranger_audits,http://solrHost2:6083/solr/ranger_audits</value>
+        <value></value>
     </property>
 
     <property>
