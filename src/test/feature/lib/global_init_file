@@ -14,6 +14,6 @@
 # limitations under the License.
 #mask code line numbers
 -- start_matchsubs
-m/\(.*c[p]+:\d+\)/
-s/\(.*c[p]+:\d+\)/(file_and_line)/
+m/\(.*c[p]*:\d+\)/
+s/\(.*c[p]*:\d+\)/(file_and_line)/
 -- end_matchsubs
