@@ -37,10 +37,7 @@ import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResult;
 import org.apache.ranger.plugin.service.RangerBasePlugin;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.apache.hawq.ranger.authorization.Utils.HAWQ;
 
@@ -93,7 +90,7 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
 
         // iterate over resource requests, augment processed ones with the decision and add to the response
         for (ResourceAccess resourceAccess : request.getAccess()) {
-            boolean accessAllowed = authorizeResource(resourceAccess, request.getUser());
+            boolean accessAllowed = authorizeResource(resourceAccess, request.getUser(), request.getClientIp(), request.getContext());
             resourceAccess.setAllowed(accessAllowed);
             access.add(resourceAccess);
         }
@@ -108,7 +105,7 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
      * @param user user requesting authorization
      * @return true if access is authorized, false otherwise
      */
-    private boolean authorizeResource(ResourceAccess resourceAccess, String user) {
+    private boolean authorizeResource(ResourceAccess resourceAccess, String user, String clientIp, String context) {
 
         if (LOG.isDebugEnabled()) {
             LOG.debug(String.format("Request: access for user=%s to resource=%s with privileges=%s",
@@ -126,7 +123,7 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
         for (HawqPrivilege privilege : resourceAccess.getPrivileges()) {
             // TODO not clear how we will get user groups -- Kerberos case ?
             Set<String> userGroups = Collections.emptySet();
-            boolean privilegeAuthorized = authorizeResourcePrivilege(rangerResource, privilege.name(), user, userGroups);
+            boolean privilegeAuthorized = authorizeResourcePrivilege(rangerResource, privilege.name(), user, userGroups, clientIp, context);
             // ALL model of evaluation -- all privileges must be authorized for access to be allowed
             if (!privilegeAuthorized) {
                 accessAllowed = false;
@@ -151,7 +148,7 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
      * @param userGroups groups a user belongs to
      * @return true if access is authorized, false otherwise
      */
-    private boolean authorizeResourcePrivilege(RangerAccessResource rangerResource, String accessType, String user, Set<String> userGroups) {
+    private boolean authorizeResourcePrivilege(RangerAccessResource rangerResource, String accessType, String user, Set<String> userGroups, String clientIp, String context) {
 
         Map<String, String> resourceMap = rangerResource.getAsMap();
         String database = resourceMap.get(HawqResource.database.name());
@@ -167,7 +164,12 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
             LOG.debug("accessType mapped to: usage-schema");
         }
 
-        RangerAccessRequest rangerRequest = new RangerAccessRequestImpl(rangerResource, accessType, user, userGroups);
+        RangerAccessRequestImpl rangerRequest = new RangerAccessRequestImpl(rangerResource, accessType, user, userGroups);
+        rangerRequest.setAccessTime(new Date());
+        rangerRequest.setAction(accessType);
+        rangerRequest.setClientIPAddress(clientIp);
+        rangerRequest.setRemoteIPAddress(clientIp);
+        rangerRequest.setRequestData(context);
         RangerAccessResult result = rangerPlugin.isAccessAllowed(rangerRequest);
         boolean accessAllowed = result != null && result.getIsAllowed();
 
