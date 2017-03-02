@@ -32,10 +32,10 @@ def option_parser():
     parser = OptionParser()
     parser.remove_option('-h')
     parser.add_option('-?', '--help', action='help')
-    parser.add_option('-h', '--host', dest="host", help='host of the target DB', \
+    parser.add_option('-h', '--host', dest="host", help='host of the ranger server', \
                       default='localhost')
     parser.add_option('-p', '--port', dest="port", \
-                      help='port of the target DB', type='int', default=6080)
+                      help='port of the ranger server', type='int', default=6080)
     parser.add_option('-U', '--rangeruser', dest="rangerusername", default='admin', \
                       help='ranger username')
     parser.add_option('-w', '--rangerpassword', dest="rangerpassword", \
