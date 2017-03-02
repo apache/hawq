@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper18;
+SET
+DROP RESOURCE QUEUE myqueue;
+DROP QUEUE

@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+CREATE TABLE foo(i int) TABLESPACE mytblspace;
+CREATE TABLE

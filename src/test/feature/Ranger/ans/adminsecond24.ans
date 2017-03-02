@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+COPY a FROM '/tmp/a.txt';
+COPY 2

@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+insert into foo(i) values(1234);
+INSERT 0 1

@@ -1,0 +1,5 @@
+-- start_ignore
+-- end_ignore
+drop schema sa CASCADE;
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: NOTICE:  drop cascades to append only table sa.t
+DROP SCHEMA

@@ -1,0 +1,8 @@
+-- start_ignore
+-- end_ignore
+\d
+public|a|table|usertest1|append only
+public|aa|table|usertest35|append only
+public|aaa|table|usertest45|append only
+public|av|view|usertest34|none
+public|myseq|sequence|usertest37|heap

@@ -1,0 +1,2 @@
+drop language plpythonu;
+

@@ -1,0 +1,2 @@
+select * from f4();
+

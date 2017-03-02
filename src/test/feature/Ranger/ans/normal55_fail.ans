@@ -1,0 +1,12 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest55;
+SET
+select getfoo();
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+LINE 1: select getfoo();
+               ^
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  function getfoo() does not exist
+LINE 1: select getfoo();
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.

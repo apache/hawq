@@ -106,9 +106,9 @@ PSQL& PSQL::runSQLCommand(const string& sql_cmd) {
   return *this;
 }
 
-PSQL& PSQL::runSQLFile(const string& sql_file) {
+PSQL& PSQL::runSQLFile(const string& sql_file, bool printTupleOnly) {
   this->_last_status =
-      hawq::test::Command::getCommandStatus(this->_getPSQLFileCommand(sql_file));
+      hawq::test::Command::getCommandStatus(this->_getPSQLFileCommand(sql_file, printTupleOnly));
   return *this;
 }
 
@@ -210,9 +210,14 @@ const string PSQL::_getPSQLQueryCommand(const string& query) const {
   return command.append(" -c \"").append(query).append("\"");
 }
 
-const string PSQL::_getPSQLFileCommand(const string& file) const {
+const string PSQL::_getPSQLFileCommand(const string& file, bool printTupleOnly) const {
   string command = this->_getPSQLBaseCommand();
-  return command.append(" -a -f ").append(file);
+  if (printTupleOnly) {
+	  return command.append(" -a -A -t -f").append(file);
+  }
+  else {
+	  return command.append(" -a -f ").append(file);
+  }
 }
 
 bool PSQL::checkDiff(const string& expect_file,

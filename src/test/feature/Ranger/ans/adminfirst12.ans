@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+drop OPERATOR CLASS sva_special_ops USING btree;
+DROP OPERATOR CLASS

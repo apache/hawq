@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper12;
+SET
+drop OPERATOR CLASS sva_special_ops USING btree;
+DROP OPERATOR CLASS

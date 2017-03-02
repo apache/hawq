@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+SELECT setval('myseq', 1);
+1

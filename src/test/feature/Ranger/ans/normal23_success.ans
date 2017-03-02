@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest23;
+SET
+drop tablespace mytblspace;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  must be owner of tablespace mytblspace

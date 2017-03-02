@@ -1,0 +1,5 @@
+-- start_ignore
+-- end_ignore
+COPY a TO STDOUT WITH DELIMITER '|';
+1
+1
