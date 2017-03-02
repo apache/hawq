@@ -23,7 +23,7 @@
 
 int main() {
     FILE *fin, *fout, *foutsuper;
-    fin = fopen("sqlsplitinput", "r");
+    fin = fopen("sqlsplitinput.sql", "r");
     char line[1000];
     int i = 0;
     int isnormalquery = 0;
