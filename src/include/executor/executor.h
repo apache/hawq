@@ -72,6 +72,8 @@ struct ChunkTransportState;             /* #include "cdb/cdbinterconnect.h" */
 #define EXEC_FLAG_BACKWARD		0x0004	/* need backward scan */
 #define EXEC_FLAG_MARK			0x0008	/* need mark/restore */
 
+#define EXEC_FLAG_EXTERNAL_AGG_COUNT  0x0010	/* can support external agg */
+
 
 /*
  * ExecEvalExpr was formerly a function containing a switch statement;
