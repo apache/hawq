@@ -3,6 +3,6 @@
 set session role=usertest35;
 SET
 create table aa as select * from a order by i;
-psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  skipping "aa" --- error returned: permission denied for relation(s): aa
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  skipping "aa" --- error returned: permission denied for relation(s): public.aa
 psql:/tmp/TestHawqRanger_BasicTest.sql:4: INFO:  ANALYZE completed. Success: 0, Failure: 1 (aa)
 SELECT 2

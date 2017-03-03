@@ -42,7 +42,7 @@ TEST_F(TestHawqRanger, BasicTest) {
 
 		string rootPath(util.getTestRootPath());
 		string initfile = hawq::test::stringFormat("Ranger/sql/init_file");
-		auto cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/normal/*.sql 2>/dev/null | wc -l", rootPath.c_str());
+		auto cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/normal/*.sql 2>/dev/null | grep \"^-\" | wc -l", rootPath.c_str());
 		int sql_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 		int writableTableCase = 28;
 		string rangerHost = RANGER_HOST;
@@ -88,10 +88,10 @@ TEST_F(TestHawqRanger, BasicTest) {
 			string super_ansfile_fail = hawq::test::stringFormat("Ranger/ans/super%d_fail.ans", i);
 			string admin_ansfile = hawq::test::stringFormat("Ranger/ans/adminfirst%d.ans", i);
 
-			cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null| wc -l", rootPath.c_str(), i);
+			cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null| grep \"^-\" | wc -l", rootPath.c_str(), i);
 			int policy_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 
-			cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/super/%d.sql 2>/dev/null| wc -l", rootPath.c_str(), i);
+			cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/super/%d.sql 2>/dev/null| grep \"^-\" | wc -l", rootPath.c_str(), i);
 			int supersqlexist = std::atoi(Command::getCommandOutput(cmd).c_str());
 
 			if (policy_num > 0){
@@ -122,9 +122,9 @@ TEST_F(TestHawqRanger, BasicTest) {
 			string super_ansfile_success = hawq::test::stringFormat("Ranger/ans/super%d_success.ans", i);
 
 
-			cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null| wc -l", rootPath.c_str(), i);
+			cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null| grep \"^-\" | wc -l", rootPath.c_str(), i);
 			int policy_num = std::atoi(Command::getCommandOutput(cmd).c_str());
-			cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/super/%d.sql 2>/dev/null | wc -l", rootPath.c_str(), i);
+			cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/super/%d.sql 2>/dev/null | grep \"^-\" | wc -l", rootPath.c_str(), i);
 			int supersqlexist = std::atoi(Command::getCommandOutput(cmd).c_str());
 			util.execSQLFile(normal_sqlfile, normal_ansfile_success, initfile, true, true);
 			if (supersqlexist) {
@@ -146,7 +146,7 @@ TEST_F(TestHawqRanger, BasicTest) {
 			util.execute(hawq::test::stringFormat("drop role %s;",normalusername.c_str()), false);
 			util.execute(hawq::test::stringFormat("drop role %s;",superusername.c_str()), false);
 			// delete policy
-			std::string cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null | wc -l", rootPath.c_str(), i);
+			std::string cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null | grep \"^-\" | wc -l", rootPath.c_str(), i);
 			int policy_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 			for (int j = 1; j <= policy_num; j++) {
 				cmd = hawq::test::stringFormat("python %s/Ranger/rangerpolicy.py -h %s -d policy%d-%d", rootPath.c_str(), rangerHost.c_str(), i, j);

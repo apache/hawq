@@ -79,7 +79,7 @@ insert into a values(1);
 1
 insert into a VALUES (nextval('myseq'));
 1
-select * from a order by i;
+select * from pg_database, a order by oid, i limit 1;
 1
 select generate_series(1,3);
 1

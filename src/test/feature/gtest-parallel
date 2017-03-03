@@ -469,12 +469,6 @@ def start_daemon(func):
   return t
 
 
-#run test in parallel way
-workers = [start_daemon(worker) for i in range(options.workers)]
-
-[t.join() for t in workers]
-
-
 #run test in serail way
 job_id = parallel_id
 while True:
@@ -487,6 +481,13 @@ while True:
   if job is None:
     break
   times.record_test_time(test_binary, test, run_job(job))
+
+
+#run test in parallel way
+workers = [start_daemon(worker) for i in range(options.workers)]
+
+[t.join() for t in workers]
+
 
 logger.end()
 times.write_to_file(save_file)

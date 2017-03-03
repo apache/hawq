@@ -14,8 +14,12 @@
 # limitations under the License.
 -- start_matchignore
 m/You are now connected to database*/
+m/Settings:  default_hash_table_bucket_number=.*/
+m/[O|o]ptimizer status:.*/
 s/public\|a\|table\|.*\|append only/public\|a\|table\|gpadmin\|append only/
 s/public\|aa\|table\|.*\|append only/public\|aa\|table\|gpadmin\|append only/
 s/public\|aaa\|table\|.*\|append only/public\|aaa\|table\|gpadmin\|append only/
 s/public\|av\|view\|.*\|none/public\|av\|view\|gpadmin\|none/
+s/public\|myseq\|sequence\|.*\|heap/public\|myseq\|sequence\|gpadmin\|heap/
+s/cost=.* rows/cost=fixedcost rows/
 -- end_matchignore
