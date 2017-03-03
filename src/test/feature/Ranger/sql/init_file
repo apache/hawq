@@ -15,6 +15,7 @@
 -- start_matchignore
 m/You are now connected to database*/
 m/Settings:  default_hash_table_bucket_number=.*/
+m/Settings:  optimizer=.*/
 m/[O|o]ptimizer status:.*/
 s/public\|a\|table\|.*\|append only/public\|a\|table\|gpadmin\|append only/
 s/public\|aa\|table\|.*\|append only/public\|aa\|table\|gpadmin\|append only/
