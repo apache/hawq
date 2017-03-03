@@ -21,7 +21,7 @@
 <configuration xmlns:xi="http://www.w3.org/2001/XInclude">
     <property>
         <name>ranger.plugin.hawq.service.name</name>
-        <value>hawq</value>
+        <value>${ranger.hawq.instance}</value>
         <description>
             Name of the Ranger service containing policies for this HAWQ instance
         </description>

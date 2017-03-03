@@ -17,23 +17,20 @@
 
 package org.apache.hawq.ranger.authorization;
 
+import org.apache.ranger.plugin.service.RangerBasePlugin;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.powermock.api.mockito.PowerMockito;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
 
+import static org.apache.hawq.ranger.authorization.Utils.INSTANCE_PROPERTY_KEY_ENV;
 import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.when;
-
-@RunWith(PowerMockRunner.class)
-@PrepareForTest(Utils.class)
-public class RangerHawqAuthorizerAppIdTest {
+public class RangerHawqAuthorizerServiceNameTest {
 
     @Test
-    public void testAppIdIsSet() {
-        PowerMockito.mockStatic(Utils.class);
-        when(Utils.getAppId()).thenReturn("foo");
-        assertEquals("foo", RangerHawqAuthorizer.getInstance().getRangerPlugin().getAppId());
+    public void testServiceNameIsSet() {
+        System.setProperty(INSTANCE_PROPERTY_KEY_ENV, "instance");
+        assertEquals("instance", Utils.getInstanceName());
+        RangerBasePlugin plugin = RangerHawqAuthorizer.getInstance().getRangerPlugin();
+        assertEquals("instance", plugin.getServiceName());
+        assertEquals("hawq", plugin.getServiceType());
+        assertEquals("rps", plugin.getAppId());
     }
 }

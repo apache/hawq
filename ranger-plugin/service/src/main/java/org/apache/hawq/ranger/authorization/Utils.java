@@ -32,26 +32,27 @@ import java.util.Properties;
 public abstract class Utils {
 
     public static final String HAWQ = "hawq";
+    public static final String APPID = "rps";
     public static final String UNKNOWN = "unknown";
-    public static final String APP_ID_PROPERTY_ENV = "ranger.hawq.instance";
-    public static final String APP_ID_PROPERTY_FILE = "RANGER_HAWQ_INSTANCE";
-    public static final String VERSION_PROPERTY_ENV = "version";
-    public static final String VERSION_PROPERTY_FILE = "RPS_VERSION";
+    public static final String INSTANCE_PROPERTY_KEY_ENV = "ranger.hawq.instance";
+    public static final String INSTANCE_PROPERTY_KEY_FILE = "RANGER_HAWQ_INSTANCE";
+    public static final String VERSION_PROPERTY_KEY_ENV = "version";
+    public static final String VERSION_PROPERTY_KEY_FILE = "RPS_VERSION";
     public static final String RANGER_SERVICE_PROPERTY_FILE = "rps.properties";
 
     private static final Log LOG = LogFactory.getLog(Utils.class);
     private static final Properties properties = readPropertiesFromFile();
 
     /**
-     * Retrieves the app id from the environment variable with the key ranger.hawq.instance
+     * Retrieves the instance name from the environment variable with the key ranger.hawq.instance
      * or from the rps.properties file with the key RANGER_HAWQ_INSTANCE
      *
      * If none exist, hawq is used as the default
      *
-     * @return String id of the app
+     * @return instance name
      */
-    public static String getAppId() {
-        return System.getProperty(APP_ID_PROPERTY_ENV, properties.getProperty(APP_ID_PROPERTY_FILE, HAWQ));
+    public static String getInstanceName() {
+        return System.getProperty(INSTANCE_PROPERTY_KEY_ENV, properties.getProperty(INSTANCE_PROPERTY_KEY_FILE, HAWQ));
     }
 
     /**
@@ -63,7 +64,7 @@ public abstract class Utils {
      * @return version of the service
      */
     public static String getVersion() {
-        return System.getProperty(VERSION_PROPERTY_ENV, properties.getProperty(VERSION_PROPERTY_FILE, UNKNOWN));
+        return System.getProperty(VERSION_PROPERTY_KEY_ENV, properties.getProperty(VERSION_PROPERTY_KEY_FILE, UNKNOWN));
     }
 
     /**
