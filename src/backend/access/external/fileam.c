@@ -459,12 +459,20 @@ external_stopscan(FileScanDesc scan)
  *	----------------
  */
 ExternalSelectDesc
-external_getnext_init(PlanState *state) {
+external_getnext_init(PlanState *state, ExternalScanState *es_state) {
 	ExternalSelectDesc desc = (ExternalSelectDesc) palloc0(sizeof(ExternalSelectDescData));
+	Plan *rootPlan;
 
 	if (state != NULL)
 	{
 		desc->projInfo = state->ps_ProjInfo;
+		/*
+		 * If we have an agg type then our parent is an Agg node
+		 */
+		rootPlan = state->state->es_plannedstmt->planTree;
+		if (rootPlan->type == T_Agg && es_state->parent_agg_type) {
+			desc->agg_type = es_state->parent_agg_type;
+		}
 	}
 	return desc;
 }

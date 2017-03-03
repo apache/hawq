@@ -46,6 +46,8 @@ typedef struct sPxfInputData
 	PxfHdfsToken	token;
 	ProjectionInfo  *proj_info;
 	List			*quals;
+	int				agg_type;
+	int				agg_groups;
 } PxfInputData;
 
 void build_http_header(PxfInputData *input);

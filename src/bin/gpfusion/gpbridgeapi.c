@@ -182,8 +182,13 @@ void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
 	inputData.quals = EXTPROTOCOL_GET_SCANQUALS(fcinfo);
 	inputData.filterstr = serializePxfFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
-	if (EXTPROTOCOL_GET_SELECTDESC(fcinfo))
+	if (EXTPROTOCOL_GET_SELECTDESC(fcinfo)) {
 		inputData.proj_info = EXTPROTOCOL_GET_PROJINFO(fcinfo);
+		int agg_type = EXTPROTOCOL_GET_AGG_TYPE(fcinfo);
+		if (agg_type) {
+			inputData.agg_type = agg_type;
+		}
+	}
 	add_delegation_token(&inputData);
 	
 	build_http_header(&inputData);

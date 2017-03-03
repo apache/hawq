@@ -1950,6 +1950,21 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	 * initialize child nodes
 	 */
 	outerPlan = outerPlan(node);
+	if (outerPlan->type == T_ExternalScan) {
+		/*
+		 * Hack to indicate to PXF when there is an external scan
+		 */
+		if (aggstate->aggs && list_length(aggstate->aggs) == 1) {
+			foreach(l, aggstate->aggs) {
+				AggrefExprState *aggrefstate = (AggrefExprState *) lfirst(l);
+				Aggref	   *aggref = (Aggref *) aggrefstate->xprstate.expr;
+				//Only dealing with one agg
+				if (aggref->aggfnoid == 2147 || aggref->aggfnoid == 2803) {
+					eflags |= EXEC_FLAG_EXTERNAL_AGG_COUNT;
+				}
+			}
+		}
+	}
 	outerPlanState(aggstate) = ExecInitNode(outerPlan, estate, eflags);
 
 	/*

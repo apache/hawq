@@ -70,6 +70,8 @@ typedef ExternalInsertDescData *ExternalInsertDesc;
 typedef struct ExternalSelectDescData
 {
 	ProjectionInfo *projInfo;
+	// Information needed for aggregate pushdown
+	int  agg_type;
 } ExternalSelectDescData;
 
 typedef enum DataLineStatus
@@ -89,7 +91,7 @@ extern FileScanDesc external_beginscan(Relation relation, Index scanrelid,
 extern void external_rescan(FileScanDesc scan);
 extern void external_endscan(FileScanDesc scan);
 extern void external_stopscan(FileScanDesc scan);
-extern ExternalSelectDesc external_getnext_init(PlanState *state);
+extern ExternalSelectDesc external_getnext_init(PlanState *state, ExternalScanState *es_state);
 extern HeapTuple external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc desc);
 extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno);
 extern Oid external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup);
