@@ -381,13 +381,14 @@ for test_binary in binaries:
       
   if options.gtest_filter :
     tests = do_gtest_filter(list_command, command, options.gtest_filter)
+    parallel_id = 0
     if options.workers > 1:
       for test in tests:
         test_map[test[2]] = 'PARALLEL'
+      parallel_id = parallel_id + len(tests)
     else:
       for test in tests:
         test_map[test[2]] = 'SERIAL'
-    parallel_id = len(tests)
 
 if options.failed:
   # The first element of each entry is the runtime of the most recent
@@ -468,9 +469,9 @@ def start_daemon(func):
   t.start()
   return t
 
-
 #run test in serail way
 job_id = parallel_id
+
 while True:
   job = None
   if job_id < len(tests):
@@ -482,12 +483,11 @@ while True:
     break
   times.record_test_time(test_binary, test, run_job(job))
 
-
+job_id = 0
 #run test in parallel way
 workers = [start_daemon(worker) for i in range(options.workers)]
 
 [t.join() for t in workers]
-
 
 logger.end()
 times.write_to_file(save_file)
