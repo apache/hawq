@@ -30,7 +30,6 @@ import org.apache.hawq.ranger.authorization.model.HawqPrivilege;
 import org.apache.hawq.ranger.authorization.model.HawqResource;
 import org.apache.hawq.ranger.authorization.model.ResourceAccess;
 import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
-import org.apache.ranger.plugin.policyengine.RangerAccessRequest;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResource;
 import org.apache.ranger.plugin.policyengine.RangerAccessResourceImpl;
@@ -39,6 +38,7 @@ import org.apache.ranger.plugin.service.RangerBasePlugin;
 
 import java.util.*;
 
+import static org.apache.hawq.ranger.authorization.Utils.APPID;
 import static org.apache.hawq.ranger.authorization.Utils.HAWQ;
 
 /**
@@ -67,13 +67,13 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
 
         LOG.info("********** Initializing RangerHawqAuthorizer **********");
 
-        String appId = Utils.getAppId();
+        String instance = Utils.getInstanceName();
 
-        LOG.info(String.format("Initializing RangerBasePlugin for service %s:%s", HAWQ, appId));
-        rangerPlugin = new RangerBasePlugin(HAWQ, appId);
+        LOG.info(String.format("Initializing RangerBasePlugin for service %s:%s:%s", HAWQ, instance, APPID));
+        rangerPlugin = new RangerBasePlugin(HAWQ, APPID);
         rangerPlugin.setResultProcessor(new RangerDefaultAuditHandler());
         rangerPlugin.init();
-        LOG.info(String.format("********** Initialized RangerBasePlugin for service %s:%s **********", HAWQ, appId));
+        LOG.info(String.format("********** Initialized RangerBasePlugin for service %s:%s:%s **********", HAWQ, instance, APPID));
     }
 
     @Override

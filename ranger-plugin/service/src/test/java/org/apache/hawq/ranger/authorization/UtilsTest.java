@@ -21,7 +21,7 @@ package org.apache.hawq.ranger.authorization;
 
 import org.junit.Test;
 
-import static org.apache.hawq.ranger.authorization.Utils.APP_ID_PROPERTY_ENV;
+import static org.apache.hawq.ranger.authorization.Utils.INSTANCE_PROPERTY_ENV;
 import static org.apache.hawq.ranger.authorization.Utils.VERSION_PROPERTY_ENV;
 import static org.junit.Assert.assertEquals;
 
@@ -32,14 +32,14 @@ public class UtilsTest {
 
     @Test
     public void testAppId_SystemEnv() throws Exception {
-        System.setProperty(APP_ID_PROPERTY_ENV, "app-id");
-        assertEquals("app-id", Utils.getAppId());
-        System.clearProperty(APP_ID_PROPERTY_ENV);
+        System.setProperty(INSTANCE_PROPERTY_ENV, "instance");
+        assertEquals("instance", Utils.getInstanceName());
+        System.clearProperty(INSTANCE_PROPERTY_ENV);
     }
 
     @Test
     public void testAppId_PropertyFile() throws Exception {
-        assertEquals("instance-test", Utils.getAppId());
+        assertEquals("instance-test", Utils.getInstanceName());
     }
 
     @Test
