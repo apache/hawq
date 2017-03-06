@@ -41,7 +41,6 @@ export CATALINA_OPTS="-server -Xms512m -Xmx512m -XX:MaxPermSize=128m
                      -Dproc_rps -Dversion=${RPS_VERSION}
                      -Dranger.hawq.instance=${RANGER_HAWQ_INSTANCE}
                      -Drps.http.port=${RPS_HTTP_PORT} -Drps.https.port=${RPS_HTTPS_PORT}
-                     -Dranger.hawq.instance=${RANGER_HAWQ_INSTANCE}
                      -Dpolicy.manager.url=${POLICY_MGR_URL}"
 
 # options used to stop the RPS process

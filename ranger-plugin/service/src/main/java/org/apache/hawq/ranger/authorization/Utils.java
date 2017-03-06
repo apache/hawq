@@ -49,7 +49,7 @@ public abstract class Utils {
      *
      * If none exist, hawq is used as the default
      *
-     * @return String id of the app
+     * @return instance name
      */
     public static String getInstanceName() {
         return System.getProperty(INSTANCE_PROPERTY_ENV, properties.getProperty(INSTANCE_PROPERTY_FILE, HAWQ));
