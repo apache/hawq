@@ -149,4 +149,37 @@ under the License.
 		</description>
 	</property>
 	<!-- HAWQ resource enforcement parameters end here. -->
+
+    <!-- HAWQ ACL parameters -->
+    <property>
+        <name>hawq_acl_type</name>
+        <value>standalone</value>
+        <description>HAWQ ACL mode. 
+                     'standalone' means HAWQ does native ACL check;
+                     'ranger' means HAWQ does priviliges check through Ranger.
+        </description>
+    </property>
+
+    <property>
+        <name>hawq_rps_address_host</name>
+        <value>localhost</value>
+        <description>The hostname of Ranger Plugin Service.</description>
+    </property>
+
+    <property>
+        <name>hawq_rps_address_port</name>
+        <value>8432</value>
+        <description>The port number of Ranger Plugin Serice.</description>
+    </property>
+
+    <property>
+        <name>hawq_rps_address_suffix</name>
+        <value>rps</value>
+        <description>The suffix of Ranger Plugin Service. It co-works 
+                     with above two parameters, and HAWQ RPS address is 
+                     $hawq_rps_address_host:$hawq_rps_address_port/$hawq_rps_address_suffix
+                     For example, localhost:8432/rps.
+        </description>
+    </property>
+    <!-- HAWQ ACL parameters ends here-->
 </configuration>
