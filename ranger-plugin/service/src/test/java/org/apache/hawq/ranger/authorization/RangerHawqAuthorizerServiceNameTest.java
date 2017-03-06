@@ -20,13 +20,13 @@ package org.apache.hawq.ranger.authorization;
 import org.apache.ranger.plugin.service.RangerBasePlugin;
 import org.junit.Test;
 
-import static org.apache.hawq.ranger.authorization.Utils.INSTANCE_PROPERTY_ENV;
+import static org.apache.hawq.ranger.authorization.Utils.INSTANCE_PROPERTY_KEY_ENV;
 import static org.junit.Assert.assertEquals;
 public class RangerHawqAuthorizerServiceNameTest {
 
     @Test
     public void testServiceNameIsSet() {
-        System.setProperty(INSTANCE_PROPERTY_ENV, "instance");
+        System.setProperty(INSTANCE_PROPERTY_KEY_ENV, "instance");
         assertEquals("instance", Utils.getInstanceName());
         RangerBasePlugin plugin = RangerHawqAuthorizer.getInstance().getRangerPlugin();
         assertEquals("instance", plugin.getServiceName());

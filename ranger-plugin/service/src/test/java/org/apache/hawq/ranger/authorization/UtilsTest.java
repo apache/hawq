@@ -21,8 +21,8 @@ package org.apache.hawq.ranger.authorization;
 
 import org.junit.Test;
 
-import static org.apache.hawq.ranger.authorization.Utils.INSTANCE_PROPERTY_ENV;
-import static org.apache.hawq.ranger.authorization.Utils.VERSION_PROPERTY_ENV;
+import static org.apache.hawq.ranger.authorization.Utils.INSTANCE_PROPERTY_KEY_ENV;
+import static org.apache.hawq.ranger.authorization.Utils.VERSION_PROPERTY_KEY_ENV;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -32,9 +32,9 @@ public class UtilsTest {
 
     @Test
     public void testAppId_SystemEnv() throws Exception {
-        System.setProperty(INSTANCE_PROPERTY_ENV, "instance");
+        System.setProperty(INSTANCE_PROPERTY_KEY_ENV, "instance");
         assertEquals("instance", Utils.getInstanceName());
-        System.clearProperty(INSTANCE_PROPERTY_ENV);
+        System.clearProperty(INSTANCE_PROPERTY_KEY_ENV);
     }
 
     @Test
@@ -44,9 +44,9 @@ public class UtilsTest {
 
     @Test
     public void testGetVersion_SystemEnv() throws Exception {
-        System.setProperty(VERSION_PROPERTY_ENV, "1.2.3");
+        System.setProperty(VERSION_PROPERTY_KEY_ENV, "1.2.3");
         assertEquals("1.2.3", Utils.getVersion());
-        System.clearProperty(VERSION_PROPERTY_ENV);
+        System.clearProperty(VERSION_PROPERTY_KEY_ENV);
     }
 
     @Test
