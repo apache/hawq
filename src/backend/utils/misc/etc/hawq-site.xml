@@ -163,24 +163,22 @@ under the License.
     <property>
         <name>hawq_rps_address_host</name>
         <value>localhost</value>
-        <description>Ranger plugin server address hostname.
-                     For example, HAWQ Ranger plugin server address is localhost:8432/rps.
-        </description>
+        <description>Ranger plugin server address hostname.</description>
     </property>
 
     <property>
         <name>hawq_rps_address_port</name>
         <value>8432</value>
-        <description>Ranger plugin server address port number.
-                     For example, HAWQ Ranger plugin server address is localhost:8432/rps.
-        </description>
+        <description>Ranger plugin server address port number.</description>
     </property>
 
     <property>
         <name>hawq_rps_address_suffix</name>
         <value>rps</value>
-        <description>Ranger plugin server suffix of restful service address.
-                     For example, HAWQ Ranger plugin server address is localhost:8432/rps.
+        <description>Ranger plugin server suffix of restful service address. It 
+                     co-works with above two parameters, and HAWQ RPS address is 
+                     $hawq_rps_address_host:$hawq_rps_address_port/$hawq_rps_address_suffix
+                     For example, localhost:8432/rps.
         </description>
     </property>
     <!-- HAWQ ACL parameters ends here-->
