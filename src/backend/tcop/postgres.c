@@ -4181,6 +4181,9 @@ PostgresMain(int argc, char *argv[], const char *username)
 				errs++;
 				break;
 		}
+
+		if (errs)
+			break;
 	}
 
 	/*
@@ -4324,12 +4327,22 @@ PostgresMain(int argc, char *argv[], const char *username)
 	if (IsUnderPostmaster)
 	{
 		/* noninteractive case: nothing should be left after switches */
-		if (errs || argc != optind || dbname == NULL)
+		if (errs || argc != optind)
 		{
+			if (errs)
+				optind--;		/* complain about the previous argument */
+
 			ereport(FATAL,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid command-line arguments for server process"),
+				 errmsg("invalid command-line argument for server process: %s", argv[optind]),
 			   errhint("Try \"%s --help\" for more information.", argv[0])));
+		}
+
+		if (dbname == NULL)
+		{
+			ereport(FATAL,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("%s: no database specified", argv[0])));
 		}
 
 		BaseInit();
@@ -4339,10 +4352,13 @@ PostgresMain(int argc, char *argv[], const char *username)
 		/* interactive case: database name can be last arg on command line */
 		if (errs || argc - optind > 1)
 		{
+			if (errs)
+				optind--;		/* complain about the previous argument */
+
 			ereport(FATAL,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("%s: invalid command-line arguments",
-							argv[0]),
+					 errmsg("%s: invalid command-line argument: %s",
+							argv[0], argv[optind]),
 			   errhint("Try \"%s --help\" for more information.", argv[0])));
 		}
 		else if (argc - optind == 1)
