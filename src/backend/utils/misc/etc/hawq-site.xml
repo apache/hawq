@@ -149,4 +149,30 @@ under the License.
 		</description>
 	</property>
 	<!-- HAWQ resource enforcement parameters end here. -->
+
+    <!-- HAWQ ACL parameters -->
+        <property>
+                <name>hawq_acl_type</name>
+                <value>standalone</value>
+                <description>Hawq acl mode, currently 'standalone' and 'ranger' is available.</description>
+        </property>
+
+        <property>
+                <name>hawq_rps_address_host</name>
+                <value>localhost</value>
+                <description>Ranger plugin server address hostname.</description>
+        </property>
+
+        <property>
+                <name>hawq_rps_address_suffix</name>
+                <value>rps</value>
+                <description>Ranger plugin server suffix of restful service address.</description>
+        </property>
+
+        <property>
+                <name>hawq_rps_address_port</name>
+                <value>8432</value>
+                <description>Ranger plugin server address port number.</description>
+        </property>
+    <!-- HAWQ ACL parameters ends here-->
 </configuration>
