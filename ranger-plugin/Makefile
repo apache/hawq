@@ -30,7 +30,7 @@ ifeq ($(enable_rps), yes)
 all:
 ifdef MAVEN
 	$(MAVEN) $(MVN_OPTS) clean
-	$(MAVEN) $(MVN_OPTS) packag
+	$(MAVEN) $(MVN_OPTS) package
 	$(MAVEN) $(MVN_OPTS) install
 else
 	@$(missing) mvn $< $(MVN_OPTS) clean

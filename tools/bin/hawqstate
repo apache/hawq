@@ -18,6 +18,8 @@
 
 import os
 import sys
+import re
+import commands
 from optparse import Option, OptionParser
 from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, check_file_exist_list
 from gppylib.db import dbconn
@@ -53,6 +55,38 @@ def check_status(status_value):
         status_tag = 'Unknown'
     return status_tag
 
+def get_guc_value(guc):
+    try:
+        master_host_name = hawq_site.hawq_dict['hawq_master_address_host']
+        master_port_num = hawq_site.hawq_dict['hawq_master_address_port']
+        dburl = dbconn.DbURL(hostname=master_host_name, port=master_port_num, dbname='template1')
+        conn = dbconn.connect(dburl, True)
+        query = "select name, setting from pg_catalog.pg_settings where name='%s';" % guc
+        rows = dbconn.execSQL(conn, query)
+        conn.close()
+    except DatabaseError, ex:
+        print "Failed to connect to database, this script can only be run when the database is up."
+        sys.exit(1)
+    for row in rows:
+        if row[0] == guc:
+            return row[1]
+
+def check_rps_status():
+    hawq_rps_address_host = get_guc_value("hawq_rps_address_host")
+    hawq_rps_address_port = get_guc_value("hawq_rps_address_port")
+    hawq_rps_address_suffix = get_guc_value("hawq_rps_address_suffix")
+    params = ["curl --connect-timeout 2 http://", hawq_rps_address_host.strip(), ":", hawq_rps_address_port.strip(), "/", hawq_rps_address_suffix.strip(), "/version"]
+    check_cmd = ''.join(params)
+    status, output = commands.getstatusoutput(check_cmd)
+    pattern1 = re.compile("\"version\":\"\d\.\d\.\d\.\d\"")
+    pattern2 = re.compile("Connection refused")
+    if pattern1.search(output):
+        status = 'Active'
+    elif pattern2.search(output):
+        status = 'Down'
+    else:
+        status = 'Unknown'
+    return status
 
 def show_brief_status(hawq_site, segment_list, standby_host):
     try:
@@ -92,7 +126,7 @@ def show_brief_status(hawq_site, segment_list, standby_host):
     seg_pid_file_path = hawq_site.hawq_dict['hawq_segment_directory'] + "/postmaster.pid"
     total_seg_pid_file_found = len(check_file_exist_list(seg_pid_file_path, segment_list, '' ))
     total_seg_pid_file_miss = total_seg_num - total_seg_pid_file_found
-    logger.info("-HAWQ instance status summary")
+    logger.info("- HAWQ instance status summary")
     logger.info("-----------------------------------------------------")
     logger.info("-   Master instance                                = %s" % master_status)
     if 'hawq_standby_address_host' in hawq_site.hawq_dict:
@@ -101,6 +135,12 @@ def show_brief_status(hawq_site, segment_list, standby_host):
     else:
         logger.info("-   No Standby master defined                           ")
     logger.info("-   Total segment instance count from config file  = %s"% total_seg_num)
+    if 'hawq_acl_type' in hawq_site.hawq_dict:
+        hawq_acl_type = hawq_site.hawq_dict['hawq_acl_type']
+        logger.info("-   Current HAWQ acl type                          = %s" % hawq_acl_type)
+        if hawq_acl_type == "ranger":
+            hawq_rps_status = check_rps_status()
+            logger.info("-   HAWQ Ranger plugin service state               = %s" % hawq_rps_status)
     logger.info("----------------------------------------------------- ")
     logger.info("-   Segment Status                                    ")
     logger.info("----------------------------------------------------- ")
