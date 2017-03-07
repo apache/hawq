@@ -163,20 +163,20 @@ under the License.
     <property>
         <name>hawq_rps_address_host</name>
         <value>localhost</value>
-        <description>Ranger plugin server address hostname.</description>
+        <description>The hostname of Ranger Plugin Service.</description>
     </property>
 
     <property>
         <name>hawq_rps_address_port</name>
         <value>8432</value>
-        <description>Ranger plugin server address port number.</description>
+        <description>The port number of Ranger Plugin Serice.</description>
     </property>
 
     <property>
         <name>hawq_rps_address_suffix</name>
         <value>rps</value>
-        <description>Ranger plugin server suffix of restful service address. It 
-                     co-works with above two parameters, and HAWQ RPS address is 
+        <description>The suffix of Ranger Plugin Service. It co-works 
+                     with above two parameters, and HAWQ RPS address is 
                      $hawq_rps_address_host:$hawq_rps_address_port/$hawq_rps_address_suffix
                      For example, localhost:8432/rps.
         </description>
