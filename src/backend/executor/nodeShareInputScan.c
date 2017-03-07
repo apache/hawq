@@ -40,7 +40,6 @@
 
 #include "postgres.h"
 
-#include "access/xact.h"
 #include "cdb/cdbvars.h"
 #include "executor/executor.h"
 #include "executor/nodeShareInputScan.h"
@@ -641,10 +640,6 @@ read_retry:
 		goto read_retry;
 	else
 	{
-		if(fd >= 0)
-		{
-			gp_retry_close(fd);
-		}
 		elog(ERROR, "could not read from fifo: %m");
 	}
 	Assert(!"Never be here");
@@ -664,10 +659,6 @@ write_retry:
 		goto write_retry;
 	else
 	{
-		if(fd >= 0)
-		{
-			gp_retry_close(fd);
-		}
 		elog(ERROR, "could not write to fifo: %m");
 	}
 
@@ -750,6 +741,21 @@ shareinput_reader_waitready(int share_id, PlanGenerator planGen)
 	while(1)
 	{
 		CHECK_FOR_INTERRUPTS();
+
+		/*
+		 * Readers won't wait for data writing done notification from writer if transaction is
+		 * aborting. Writer may fail to send data writing done notification to readers in two
+		 * cases:
+		 *
+		 *    1. The transaction is aborted due to interrupts or exceptions, i.e., user cancels
+		 *       query, division by zero on some segment
+		 *
+		 *    2. Logic errors in reader which incur its unexpected exit, i.e., segmentation fault
+		 */
+		if (IsAbortInProgress())
+		{
+			break;
+		}
 
 		MPP_FD_ZERO(&rset);
 		MPP_FD_SET(pctxt->readyfd, &rset);
@@ -887,6 +893,21 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 	while(ack_needed > 0)
 	{
 		CHECK_FOR_INTERRUPTS();
+
+		/*
+		 * Writer won't wait for ack notification from readers if transaction is
+		 * aborting. Readers may fail to send ack notification to writer in two
+		 * cases:
+		 *
+		 *    1. The transaction is aborted due to interrupts or exceptions, i.e., user cancels
+		 *       query, division by zero on some segment
+		 *
+		 *    2. Logic errors in reader which incur its unexpected exit, i.e., segmentation fault
+		 */
+		if (IsAbortInProgress())
+		{
+			break;
+		}
 
 		MPP_FD_ZERO(&rset);
 		MPP_FD_SET(pctxt->donefd, &rset);
