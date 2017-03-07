@@ -2238,55 +2238,20 @@ build_startup_packet(const PGconn *conn, char *packet,
 
 	/* GPSQL: */
 	if (conn->dboid && conn->dboid[0])
-	{
-		if (packet)
-			strcpy(packet + packet_len, "dboid");
-		packet_len += strlen("dboid") + 1;
-		if (packet)
-			strcpy(packet + packet_len, conn->dboid);
-		packet_len += strlen(conn->dboid) + 1;
-	}
+		ADD_STARTUP_OPTION("dboid", conn->dboid);
 
 	if (conn->dbdtsoid && conn->dbdtsoid[0])
-	{
-		if (packet)
-			strcpy(packet + packet_len, "dbdtsoid");
-		packet_len += strlen("dbdtsoid") + 1;
-		if (packet)
-			strcpy(packet + packet_len, conn->dbdtsoid);
-		packet_len += strlen(conn->dbdtsoid) + 1;
-	}
+		ADD_STARTUP_OPTION("dbdtsoid", conn->dbdtsoid);
 
 	if (conn->bootstrap_user && conn->bootstrap_user[0])
-	{
-		if (packet)
-			strcpy(packet + packet_len, "bootstrap_user");
-		packet_len += strlen("bootstrap_user") + 1;
-		if (packet)
-			strcpy(packet + packet_len, conn->bootstrap_user);
-		packet_len += strlen(conn->bootstrap_user) + 1;
-	}
+		ADD_STARTUP_OPTION("bootstrap_user", conn->bootstrap_user);
 
 	if (conn->encoding && conn->encoding[0])
-	{
-		if (packet)
-			strcpy(packet + packet_len, "encoding");
-		packet_len += strlen("encoding") + 1;
-		if (packet)
-			strcpy(packet + packet_len, conn->encoding);
-		packet_len += strlen(conn->encoding) + 1;
-	}
+		ADD_STARTUP_OPTION("encoding", conn->encoding);
 
 	/* CDB: Add qExec startup data */
 	if (conn->gpqeid && conn->gpqeid[0])
-	{
-		if (packet)
-			strcpy(packet + packet_len, "gpqeid");
-		packet_len += strlen("gpqeid") + 1;
-		if (packet)
-			strcpy(packet + packet_len, conn->gpqeid);
-		packet_len += strlen(conn->gpqeid) + 1;
-	}
+		ADD_STARTUP_OPTION("gpqeid", conn->gpqeid);
 
 	/* Add any environment-driven GUC settings needed */
 	for (next_eo = options; next_eo->envName; next_eo++)
@@ -2296,20 +2261,8 @@ build_startup_packet(const PGconn *conn, char *packet,
 		if ((val = getenv(next_eo->envName)) != NULL)
 		{
 			if (pg_strcasecmp(val, "default") != 0)
-			{
-				if (packet)
-					strcpy(packet + packet_len, next_eo->pgName);
-				packet_len += strlen(next_eo->pgName) + 1;
-				if (packet)
-					strcpy(packet + packet_len, val);
-				packet_len += strlen(val) + 1;
-			}
-		}		if (packet)
-			strcpy(packet + packet_len, "options");
-		packet_len += strlen("options") + 1;
-		if (packet)
-			strcpy(packet + packet_len, conn->pgoptions);
-		packet_len += strlen(conn->pgoptions) + 1;
+				ADD_STARTUP_OPTION(next_eo->pgName, val);
+		}
 	}
 
 	/* Add trailing terminator */
