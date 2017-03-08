@@ -1,5 +1,7 @@
 # PLEASE IGNORE - Test PR branch to validate Apache Jenkins build PR project.
 
+---
+
 ![HAWQ](http://hawq.incubator.apache.org/images/logo-hawq.png)
 
 ---
