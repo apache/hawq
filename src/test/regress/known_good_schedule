@@ -1,7 +1,5 @@
 # $PostgreSQL: pgsql/src/test/regress/serial_schedule,v 1.33 2006/08/30 23:34:22 tgl Exp $
 # This should probably be in an order similar to parallel_schedule.
-test: errortbl
-test: goh_create_type_composite
 ignore: goh_create_table
 ignore: goh_vacuum
 ignore: goh_subselect
@@ -10,11 +8,8 @@ ignore: goh_gphdfs
 ignore: goh_dpe
 ignore: goh_gpic
 ignore: goh_eagerfree
-test: goh_toast
 ignore: goh_alter_distribution_policy
 ignore: goh_column_compression
-test: goh_database
-test: goh_gp_dist_random
 ignore: gpsql_fault_tolerance
 ignore: goh_set_schema
 ignore: bit
@@ -63,7 +58,6 @@ ignore: select_distinct_on
 ignore: select_implicit
 ignore: select_having
 ignore: subselect
-test: information_schema
 ignore: union
 ignore: case
 ignore: join
@@ -73,7 +67,6 @@ ignore: leastsquares
 ignore: naivebayes
 ignore: direct_dispatch
 ignore: partition_pruning_with_fn
-test: transactions
 ignore: distributed_transactions
 ignore: random
 ignore: arrays
@@ -97,7 +90,6 @@ ignore: combocid
 ignore: limit
 ignore: plpgsql
 ignore: copy2
-test: temp
 ignore: domain
 ignore: rangefuncs
 ignore: table_functions
@@ -107,7 +99,6 @@ ignore: without_oid
 ignore: conversion
 ignore: truncate
 ignore: alter_table
-test: rowtypes
 ignore: returning
 ignore: stats
 ignore: tablespace

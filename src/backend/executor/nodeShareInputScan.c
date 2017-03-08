@@ -40,7 +40,6 @@
 
 #include "postgres.h"
 
-#include "access/xact.h"
 #include "cdb/cdbvars.h"
 #include "executor/executor.h"
 #include "executor/nodeShareInputScan.h"
@@ -641,10 +640,6 @@ read_retry:
 		goto read_retry;
 	else
 	{
-		if(fd >= 0)
-		{
-			gp_retry_close(fd);
-		}
 		elog(ERROR, "could not read from fifo: %m");
 	}
 	Assert(!"Never be here");
@@ -664,10 +659,6 @@ write_retry:
 		goto write_retry;
 	else
 	{
-		if(fd >= 0)
-		{
-			gp_retry_close(fd);
-		}
 		elog(ERROR, "could not write to fifo: %m");
 	}
 
@@ -794,7 +785,14 @@ shareinput_reader_waitready(int share_id, PlanGenerator planGen)
 		{
 			int save_errno = errno;
 			elog(LOG, "SISC READER (shareid=%d, slice=%d): Wait ready try again, errno %d ... ",
-					share_id, currentSliceId, save_errno);
+								share_id, currentSliceId, save_errno);
+			if(save_errno == EBADF)
+			{
+				/* The file description is invalid, maybe this FD has been already closed by writer in some cases
+				 * we need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
+				 */
+				break;
+			}
 		}
 	}
 	return (void *) pctxt;
@@ -925,9 +923,12 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 			int save_errno = errno;
 			elog(LOG, "SISC WRITER (shareid=%d, slice=%d): notify still wait for an answer, errno %d",
 					share_id, currentSliceId, save_errno);
-			/*if error(except EINTR) happens in select, we just return to avoid endless loop*/
-			if(errno != EINTR){
-				return;
+			if(save_errno == EBADF)
+			{
+				/* The file description is invalid, maybe this FD has been already closed by writer in some cases
+				 * we need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
+				 */
+				break;
 			}
 		}
 	}
@@ -979,21 +980,6 @@ shareinput_writer_waitdone(void *ctxt, int share_id, int nsharer_xslice)
 	while(ack_needed > 0)
 	{
 		CHECK_FOR_INTERRUPTS();
-
-		/*
-		 * Writer won't wait for data reading done notification from readers if transaction is
-		 * aborting. Readers may fail to send data reading done notification to writer in two
-		 * cases:
-		 *
-		 *    1. The transaction is aborted due to interrupts or exceptions, i.e., user cancels
-		 *       query, division by zero on some segment
-		 *
-		 *    2. Logic errors in reader which incur its unexpected exit, i.e., segmentation fault
-		 */
-		if (IsAbortInProgress())
-		{
-			break;
-		}
 	
 		MPP_FD_ZERO(&rset);
 		MPP_FD_SET(pctxt->donefd, &rset);
@@ -1024,6 +1010,13 @@ shareinput_writer_waitdone(void *ctxt, int share_id, int nsharer_xslice)
 			int save_errno = errno;
 			elog(LOG, "SISC WRITER (shareid=%d, slice=%d): wait done time out once, errno %d",
 					share_id, currentSliceId, save_errno);
+			if(save_errno == EBADF)
+			{
+				/* The file description is invalid, maybe this FD has been already closed by writer in some cases
+				 * we need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
+				 */
+				break;
+			}
 		}
 	}
 

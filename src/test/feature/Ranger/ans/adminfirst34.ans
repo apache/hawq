@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+create view av as select * from a order by i;
+CREATE VIEW

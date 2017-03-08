@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest67;
+SET
+drop view av;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  view "av" does not exist

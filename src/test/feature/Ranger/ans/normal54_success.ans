@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest54;
+SET
+CREATE FUNCTION getfoo() RETURNS SETOF mytype AS $$ SELECT i, i FROM a order by i $$ LANGUAGE SQL;
+CREATE FUNCTION

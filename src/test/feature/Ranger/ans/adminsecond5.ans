@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+drop function f4();
+DROP FUNCTION

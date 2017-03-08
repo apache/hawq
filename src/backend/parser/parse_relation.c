@@ -2714,7 +2714,7 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 void
 ExecCheckRTPerms(List *rangeTable)
 {
-	if (aclType == HAWQ_ACL_RANGER && !fallBackToNativeChecks(ACL_KIND_CLASS,rangeTable,GetUserId()))
+	if (aclType == HAWQ_ACL_RANGER)
 	{
 		if(rangeTable!=NULL)
 			ExecCheckRTPermsWithRanger(rangeTable);
@@ -2750,6 +2750,11 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 		requiredPerms = rte->requiredPerms;
 		if (requiredPerms == 0)
 			continue;
+		bool ret = fallBackToNativeCheck(ACL_KIND_CLASS, rte->relid, GetUserId(), ACL_NO_RIGHTS);
+		if (ret) {
+			ExecCheckRTEPerms((RangeTblEntry *) lfirst(l));
+			continue;
+		}
 
 		relOid = rte->relid;
 		userid = rte->checkAsUser ? rte->checkAsUser : GetUserId();
@@ -2800,7 +2805,8 @@ ExecCheckRTPermsWithRanger(List *rangeTable)
 			/* collect all acl fail relations */
 			Oid relOid = result_ptr->relOid;
 			const char *rel_name = get_rel_name_partition(relOid);
-			appendStringInfo(&acl_fail_msg, "%s", rel_name);
+			const char *namespace_name = get_namespace_name(get_rel_namespace(relOid));
+			appendStringInfo(&acl_fail_msg, "%s.%s", namespace_name, rel_name);
 		}
 	}
 

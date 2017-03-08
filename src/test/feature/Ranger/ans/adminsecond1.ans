@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+create table a(i int);
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: ERROR:  relation "a" already exists

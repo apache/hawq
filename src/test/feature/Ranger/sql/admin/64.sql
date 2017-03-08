@@ -1,0 +1,2 @@
+truncate aa;
+

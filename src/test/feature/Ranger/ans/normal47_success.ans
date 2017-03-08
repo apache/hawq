@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest47;
+SET
+explain select * from a;
+Gather Motion 1:1  (slice1; segments: 1)  (cost=0.00..1.02 rows=2 width=4)
+  ->  Append-only Scan on a  (cost=0.00..1.02 rows=2 width=4)

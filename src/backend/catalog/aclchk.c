@@ -82,6 +82,8 @@ static AclMode restrict_and_check_grant(bool is_grant, AclMode avail_goptions,
 static AclMode pg_aclmask(AclObjectKind objkind, Oid table_oid, Oid roleid,
 		   AclMode mask, AclMaskHow how);
 
+static bool is_sequence(Oid object_oid);
+
 
 #ifdef ACLDEBUG
 static void
@@ -228,18 +230,19 @@ restrict_and_check_grant(bool is_grant, AclMode avail_goptions, bool all_privs,
 	 */
 	if (avail_goptions == ACL_NO_RIGHTS && Gp_role != GP_ROLE_EXECUTE)
 	{
-	  if (aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(objkind, objectId, grantorId)) {
-	    if (pg_rangercheck(objkind, objectId, grantorId,
-	        whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
-	        ACLMASK_ANY) != ACLCHECK_OK)
-	      aclcheck_error(ACLCHECK_NO_PRIV, objkind, objname);
-	  }
-	  else {
-	    if (pg_aclmask(objkind, objectId, grantorId,
-	        whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
-	        ACLMASK_ANY) == ACL_NO_RIGHTS)
-	      aclcheck_error(ACLCHECK_NO_PRIV, objkind, objname);
-	  }
+		if (aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(objkind, objectId,
+				grantorId, whole_mask | ACL_GRANT_OPTION_FOR(whole_mask))) {
+			if (pg_rangercheck(objkind, objectId, grantorId,
+					whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
+					ACLMASK_ANY) != ACLCHECK_OK)
+				aclcheck_error(ACLCHECK_NO_PRIV, objkind, objname);
+		}
+		else {
+			if (pg_aclmask(objkind, objectId, grantorId,
+					whole_mask | ACL_GRANT_OPTION_FOR(whole_mask),
+					ACLMASK_ANY) == ACL_NO_RIGHTS)
+				aclcheck_error(ACLCHECK_NO_PRIV, objkind, objname);
+		}
 	}
 
 	/*
@@ -306,7 +309,7 @@ bool checkACLNative(GrantObjectType type, Oid oid)
 	{
 		return false;
 	}
-	return fallBackToNativeCheck(kind, oid, GetUserId());
+	return fallBackToNativeCheck(kind, oid, GetUserId(), ACL_NO_RIGHTS);
 }
 
 /*
@@ -2358,54 +2361,6 @@ char *getClassNameFromOid(Oid object_oid)
   return tname.data;
 }
 
-char *getSequenceNameFromOid(Oid object_oid)
-{
-  StringInfoData tname;
-  initStringInfo(&tname);
-
-  Assert(OidIsValid(object_oid));
-  char* seq_name = caql_getcstring(
-                  NULL,
-                  cql("SELECT relname FROM pg_class "
-                    " WHERE oid = :1",
-                    ObjectIdGetDatum(object_oid)));
-  if (seq_name == NULL)
-   elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
-
-  int fetchCount=0;
-  Oid schema_name_oid = caql_getoid_plus(
-                    NULL,
-                    &fetchCount,
-                    NULL,
-                    cql("SELECT relnamespace FROM pg_class "
-                      " WHERE oid = :1",
-                      ObjectIdGetDatum(object_oid)));
-  if (schema_name_oid == InvalidOid)
-     elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
-
-  char* schema_name= caql_getcstring(
-     NULL,
-     cql("select nspname from pg_namespace "
-       " WHERE oid = :1",
-       ObjectIdGetDatum(schema_name_oid)));
-  if (schema_name == NULL)
-     elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
-
-  char* database_name = get_database_name(MyDatabaseId);
-  if (database_name == NULL)
-      elog(ERROR, "oid [%u] not found current database", object_oid);
-
-  appendStringInfo(&tname, "%s", database_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", schema_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", seq_name);
-  pfree(seq_name);
-  pfree(schema_name);
-  pfree(database_name);
-
-  return tname.data;
-}
 char *getDatabaseNameFromOid(Oid object_oid)
 {
   Assert(OidIsValid(object_oid));
@@ -2670,9 +2625,8 @@ char *getNameFromOid(AclObjectKind objkind, Oid object_oid)
   switch (objkind)
   {
     case ACL_KIND_CLASS:
-      return getClassNameFromOid(object_oid);
     case ACL_KIND_SEQUENCE:
-      return getSequenceNameFromOid(object_oid);
+      return getClassNameFromOid(object_oid);
     case ACL_KIND_DATABASE:
       return getDatabaseNameFromOid(object_oid);
     case ACL_KIND_PROC:
@@ -2751,7 +2705,7 @@ bool checkNamespaceFallback(Oid x)
   }
 }
 
-bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
+bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid, AclMode mode)
 {
   /* get the latest information_schema_namespcace_oid. Since caql access heap table
    * directly without aclcheck, this function will not be called recursively
@@ -2776,7 +2730,7 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
     {
       return true;
     }
-    else if (obj_oid == PG_PUBLIC_NAMESPACE && superuser())
+    else if (obj_oid == PG_PUBLIC_NAMESPACE && superuser() && mode == ACL_USAGE)
     {
       /* superuser's access to PUBLIC */
       return true;
@@ -2795,24 +2749,16 @@ bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid)
   return false;
 }
 
-bool fallBackToNativeChecks(AclObjectKind objkind, List* table_list, Oid roleid)
-{
-  /*we only have range table here*/
-  if (objkind == ACL_KIND_CLASS)
-  {
-    ListCell   *l;
-    foreach(l, table_list)
-    {
-      RangeTblEntry *rte=(RangeTblEntry *) lfirst(l);
-      bool ret = fallBackToNativeCheck(ACL_KIND_CLASS, rte->relid, roleid);
-      if(ret)
-      {
-        return true;
-      }
-    }
-
-  }
-  return false;
+/*
+ * 	check whether rte is a sequence.
+ */
+bool is_sequence(Oid object_oid) {
+	char relkind = get_rel_relkind(object_oid);
+	if(relkind == 's' || relkind == 'S')
+	{
+		return true;
+	}
+	return false;
 }
 
 /*
@@ -3937,9 +3883,13 @@ pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid, mode))
   {
-    return pg_rangercheck(ACL_KIND_CLASS, table_oid, roleid, mode, ACLMASK_ANY);
+	AclObjectKind objkind = ACL_KIND_CLASS;
+	if (is_sequence(table_oid)) {
+		objkind = ACL_KIND_SEQUENCE;
+	}
+    return pg_rangercheck(objkind, table_oid, roleid, mode, ACLMASK_ANY);
   }
   else
   {
@@ -3957,7 +3907,7 @@ pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid, mode))
    {
      return pg_rangercheck(ACL_KIND_DATABASE, db_oid, roleid, mode, ACLMASK_ANY);
    }
@@ -3977,7 +3927,7 @@ pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid, mode))
   {
     return pg_rangercheck(ACL_KIND_PROC, proc_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -3997,7 +3947,7 @@ pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode))
   {
     return pg_rangercheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -4017,7 +3967,7 @@ pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode))
   {
     return pg_rangercheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -4037,7 +3987,7 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode))
   {
     return pg_rangercheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -4058,7 +4008,7 @@ pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid, mode))
   {
     return pg_rangercheck(ACL_KIND_FDW, fdw_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -4079,7 +4029,7 @@ pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode))
   {
     return pg_rangercheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode, ACLMASK_ANY);
   }
@@ -4100,7 +4050,7 @@ pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode))
   {
     return pg_rangercheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode, ACLMASK_ANY);
   }
@@ -4120,7 +4070,7 @@ pg_filesystem_aclcheck(Oid fsysid, Oid roleid, AclMode mode)
   if (Gp_role == GP_ROLE_EXECUTE)
     return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid))
+  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode))
   {
     return pg_rangercheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode, ACLMASK_ANY);
   }

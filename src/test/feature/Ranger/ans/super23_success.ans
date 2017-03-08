@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper23;
+SET
+drop tablespace mytblspace;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  tablespace "mytblspace" is not empty: existing table.

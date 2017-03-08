@@ -1,0 +1,2 @@
+explain select * from a;
+

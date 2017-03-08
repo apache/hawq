@@ -154,7 +154,7 @@ test__GPHD_HA_load_nodes__PxfServicePortIsAssigned(void **state)
 {
 	unsigned int numn = 2;
 	Namenode nns[] = { {"mdw:2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};
-	char strPort[30] = {0};
+	char strPort[INT32_CHAR_SIZE] = {0};
 	pg_ltoa(pxf_service_port, strPort);
 	
 	will_return(hdfsGetHANamenodes, nns);
@@ -188,7 +188,7 @@ test__GPHD_HA_load_nodes__HostMissing(void **state)
 {
 	unsigned int numn = 2;
 	Namenode nns[] = { {":2080", "mdw:50070"}, {"smdw:2080", "smdw:50070"}};
-	char strPort[30] = {0};
+	char strPort[INT32_CHAR_SIZE] = {0};
 	pg_ltoa(pxf_service_port, strPort);
 	
 	will_return(hdfsGetHANamenodes, nns);

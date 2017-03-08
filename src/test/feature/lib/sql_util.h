@@ -31,6 +31,7 @@
 #define HAWQ_USER (getenv("PGUSER") ? getenv("PGUSER") : "")
 #define HAWQ_PASSWORD (getenv("PGPASSWORD") ? getenv("PGPASSWORD") : "")
 #define HAWQ_DEFAULT_SCHEMA ("public")
+#define RANGER_HOST (getenv("RANGERHOST") ? getenv("RANGERHOST") : "localhost")
 
 namespace hawq {
 namespace test {
@@ -88,7 +89,9 @@ class SQLUtility {
   // @param ansFile The given ansFile which is relative path to test root dir
   // @param initFile The given initFile (used by gpdiff.pl) which is relative path to test root dir
   // @return void
-  void execSQLFile(const std::string &sqlFile, const std::string &ansFile, const std::string &initFile = "");
+  void execSQLFile(const std::string &sqlFile, const std::string &ansFile,
+		  const std::string &initFile = "", bool usingDefaultSchema = false,
+		  bool printTupleOnly = false);
 
   // Execute sql file and check its return status
   // @param sqlFile The given sqlFile which is relative path to test root dir
@@ -125,7 +128,7 @@ class SQLUtility {
 
  private:
   std::unique_ptr<hawq::test::PSQL> getConnection();
-  const std::string generateSQLFile(const std::string &sqlFile);
+  const std::string generateSQLFile(const std::string &sqlFile, bool usingDefaultSchema);
   FilePath splitFilePath(const std::string &filePath) const;
   void exec(const std::string &sql);
 

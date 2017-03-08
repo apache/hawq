@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+CREATE AGGREGATE scube(numeric) ( SFUNC = scube_accum, STYPE = numeric, INITCOND = 0 );
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: ERROR:  function "scube" already exists with same argument types

@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest16;
+SET
+drop FUNCTION normalize_si(text);
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  function normalize_si(text) does not exist

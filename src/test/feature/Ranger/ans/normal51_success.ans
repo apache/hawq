@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest51;
+SET
+DROP AGGREGATE scube2(numeric);
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  aggregate scube2(numeric) does not exist

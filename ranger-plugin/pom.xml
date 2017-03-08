@@ -248,6 +248,12 @@
               <artifactId>guava</artifactId>
               <version>11.0.2</version>
             </dependency>
+            <!-- SolrJ client for auditing to Solr requires httpcore 4.2+ -->
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpcore</artifactId>
+                <version>4.4.4</version>
+            </dependency>
             <dependency>
                 <groupId>javax.servlet</groupId>
                 <artifactId>servlet-api</artifactId>

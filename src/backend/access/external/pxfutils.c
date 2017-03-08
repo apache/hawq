@@ -43,7 +43,7 @@ bool are_ips_equal(char *ip1, char *ip2)
 /* override port str with given new port int */
 void port_to_str(char **port, int new_port)
 {
-	char tmp[10];
+	char tmp[INT32_CHAR_SIZE];
 
 	if (!port)
 		elog(ERROR, "unexpected internal error in pxfutils.c");

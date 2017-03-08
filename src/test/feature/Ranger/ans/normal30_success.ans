@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest30;
+SET
+drop EXTERNAL TABLE ext_t;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  must be owner of relation ext_t

@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+CREATE SEQUENCE myseq START 1;
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: ERROR:  relation "myseq" already exists

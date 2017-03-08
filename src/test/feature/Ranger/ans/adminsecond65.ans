@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+alter table a rename column i to j;
+ALTER TABLE

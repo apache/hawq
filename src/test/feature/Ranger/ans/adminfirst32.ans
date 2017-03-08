@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+create schema sa;
+CREATE SCHEMA

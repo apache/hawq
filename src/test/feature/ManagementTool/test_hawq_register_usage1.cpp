@@ -445,15 +445,15 @@ TEST_F(TestHawqRegister, TestUsage1EofFailure) {
 
 TEST_F(TestHawqRegister, TestUsage1FolderFailure) {
     SQLUtility util;
-    string folderName = "usage1tmp";
-    string folderNameNotExist = "usage1tmpNotExist";
+    string folderName = "usage1_folder_tmp";
+    string folderNameNotExist = "usage1_folder_tmpNotExist";
     string rootPath(util.getTestRootPath());
     string relativePath("/ManagementTool/test_hawq_register_hawq.paq");
     string filePath = rootPath + relativePath;
     string relativePath2("/ManagementTool/files_incomplete.yml");
     string filePath2 = rootPath + relativePath2;
 
-    auto cmd = hawq::test::stringFormat("hdfs dfs -mkdir %s/usage1tmp", getHdfsLocation().c_str(), "");
+    auto cmd = hawq::test::stringFormat("hdfs dfs -mkdir %s/%s", getHdfsLocation().c_str(), folderName.c_str());
     EXPECT_EQ(0, Command::getCommandStatus(cmd));
 
     util.execute("create table hawqregister(i int) with (appendonly=true, orientation=parquet);");

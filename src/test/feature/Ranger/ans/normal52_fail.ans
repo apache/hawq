@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest52;
+SET
+DROP FUNCTION scube_accum(numeric, numeric);
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  function scube_accum(numeric, numeric) does not exist

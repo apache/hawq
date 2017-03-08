@@ -869,7 +869,7 @@ static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
 			text *t;
 			const char *name = "pagesize";
 			Size len;
-			char value[20];
+			char value[INT32_CHAR_SIZE];
 			pg_ltoa(DEFAULT_PARQUET_PAGE_SIZE_PARTITION, value);
 
 			len = VARHDRSZ + strlen(name) + 1 + strlen(value);
@@ -885,7 +885,7 @@ static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
 		if(rowgroupSizeSet == false){
 			text *t;
 			const char *name = "rowgroupsize";
-			char value[20];
+			char value[INT32_CHAR_SIZE];
 			Size len;
 
 			pg_ltoa(DEFAULT_PARQUET_ROWGROUP_SIZE_PARTITION, value);
