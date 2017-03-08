@@ -690,6 +690,8 @@ class HawqStart:
     def _start_all_nodes(self):
         logger.info("Start all the nodes in hawq cluster")
 
+        if self.hawq_acl_type == 'ranger':
+            self.start_rps()
         if self.standby_host_name.lower() not in ('', 'none'):
             logger.info("Starting standby master '%s'" % self.standby_host_name)
             check_return_code(self.start_standby(), logger, "Standby master start failed, exit",
@@ -699,8 +701,6 @@ class HawqStart:
         check_return_code(self.start_master(), logger, "Master start failed, exit", \
                           "Master started successfully")
 
-        if self.hawq_acl_type == 'ranger':
-            self.start_rps()
         segments_return_flag = self._start_all_segments()
         if segments_return_flag == 0:
             logger.info("HAWQ cluster started successfully")
@@ -749,10 +749,10 @@ class HawqStart:
 
     def run(self):
         if self.node_type == "master":
-            check_return_code(self.start_master(), logger, \
-                              "Master start failed, exit", "Master started successfully")
             if self.hawq_acl_type == 'ranger':
                 self.start_rps()
+            check_return_code(self.start_master(), logger, \
+                              "Master start failed, exit", "Master started successfully")
         elif self.node_type == "standby":
             if self.standby_host_name == '':
                 sys.exit(1)
