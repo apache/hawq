@@ -446,8 +446,8 @@ extern bool optimizer_array_constraints;
 
 
 /* fallback in ranger ACL check */
-extern int information_schema_namespcace_oid;
-extern int hawq_toolkit_schema_namespcace_oid;
+extern int information_schema_namespace_oid;
+extern int hawq_toolkit_schema_namespace_oid;
 
 /**
  * Enable logging of DPE match in optimizer.
