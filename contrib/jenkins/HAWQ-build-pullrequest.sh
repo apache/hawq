@@ -26,6 +26,43 @@ work_dir=$(pwd)
 
 echo "working dir is ${work_dir}"
 
+## ----------------------------------------------------------------------
+## Diagnostic scriptlet to fix cloning permission denied issue for HAWQ
+## PR Project (HAWQ-build-pullrequest).
+## 
+## 0) Open two browser "configure" tab's for project:
+##
+##    https://builds.apache.org/job/HAWQ-build-pullrequest/configure
+##
+##    One will be used to make the updates to the project's
+##    configuration that will be reverted by the second unmodified tab
+##    when the slave has been fixed.
+##
+## 1) Change "Source Code Management" to None
+## 2) Uncomment to following section
+## 3) Ensure  the "Restrict where this project can be run" --> "Label
+##    Expression" specifies the slave with the build issue.
+## 4) Manually trigger project "HAWQ-build-pullrequest"
+## 5) Restore project in 2nd "configure" browser tab.
+##
+## ----------------------------------------------------------------------
+
+## ls -al
+##
+## # Remove previous source artifacts from slave. The operation is
+## # performed in the container to have sufficient privileges.
+##
+## docker run -v $(pwd):/data/hawq-src \
+##            -u root rlei/mydocker:centos7-build \
+##            /bin/sh -c "rm -rf /data/hawq-src/*"
+## 
+## ls -al
+## exit 1
+
+## ----------------------------------------------------------------------
+## End Diagnositc scriptlet
+## ----------------------------------------------------------------------
+
 git diff
 git log -n 5
 git status
