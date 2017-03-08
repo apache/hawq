@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper5;
+SET
+drop function f4();
+DROP FUNCTION

@@ -403,6 +403,12 @@ project('pxf-json') {
 
       link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
     }
+
+    task create_tweets_tgz(type: Exec){
+      commandLine 'tar', '-zcf', 'src/test/resources/tweets.tar.gz', '-C', 'src/test/resources', 'tweets-pp.json'
+    }
+    
+    tasks['test'].dependsOn('create_tweets_tgz')
 }
 
 project('pxf-hbase') {

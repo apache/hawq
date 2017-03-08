@@ -1,0 +1,26 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+-- start_matchignore
+m/You are now connected to database*/
+m/Settings:  default_hash_table_bucket_number=.*/
+m/Settings:  optimizer=.*/
+m/[O|o]ptimizer status:.*/
+s/public\|a\|table\|.*\|append only/public\|a\|table\|gpadmin\|append only/
+s/public\|aa\|table\|.*\|append only/public\|aa\|table\|gpadmin\|append only/
+s/public\|aaa\|table\|.*\|append only/public\|aaa\|table\|gpadmin\|append only/
+s/public\|av\|view\|.*\|none/public\|av\|view\|gpadmin\|none/
+s/public\|myseq\|sequence\|.*\|heap/public\|myseq\|sequence\|gpadmin\|heap/
+s/cost=.* rows/cost=fixedcost rows/
+-- end_matchignore

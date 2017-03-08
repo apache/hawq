@@ -242,10 +242,6 @@
               <exclude>tools/demo/gpfdist_transform/*.yaml</exclude>
               <exclude>tools/bin/gppylib/operations/madlib_depcheck/changelist.yaml</exclude>
 
-              <!-- PXF test file -->
-
-              <exclude>pxf/pxf-json/src/test/resources/tweets.tar.gz</exclude>
-              
               <!-- Finally we exclude a few file types (based on
                    extension) for which comments are tough to
                    maintain. Note that this is a combination of files

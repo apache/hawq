@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest60;
+SET
+analyze a;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  Skipping "a" --- only table or database owner can analyze it
+ANALYZE

@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest50;
+SET
+ALTER AGGREGATE scube(numeric) RENAME TO scube2;   
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  must be owner of function scube

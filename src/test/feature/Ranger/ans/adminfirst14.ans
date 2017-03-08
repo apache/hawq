@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+drop FUNCTION si_same(text, text);
+DROP FUNCTION

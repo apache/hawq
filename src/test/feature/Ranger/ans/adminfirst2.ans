@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+create language plpythonu;
+CREATE LANGUAGE

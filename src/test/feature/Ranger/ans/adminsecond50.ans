@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+ALTER AGGREGATE scube(numeric) RENAME TO scube2;   
+ALTER AGGREGATE

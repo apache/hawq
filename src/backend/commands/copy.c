@@ -2520,7 +2520,7 @@ CopyOneRowTo(CopyState cstate, Oid tupleOid, Datum *values, bool *isnulls)
 			if (out_functions[attnum -1].fn_oid == 39 ||  /* int2out or int4out */
 				out_functions[attnum -1].fn_oid == 43 )
 			{
-				char tmp[33];
+				char tmp[INT32_CHAR_SIZE];
 				/*
 				 * The standard postgres way is to call the output function, but that involves one or more pallocs,
 				 * and a call to sprintf, followed by a conversion to client charset.

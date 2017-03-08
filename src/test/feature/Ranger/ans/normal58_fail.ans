@@ -1,0 +1,12 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest58;
+SET
+BEGIN; INSERT INTO a VALUES (1); SAVEPOINT my_savepoint; INSERT INTO a VALUES (1); RELEASE SAVEPOINT my_savepoint; COMMIT;
+BEGIN
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  relation "a" does not exist
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK

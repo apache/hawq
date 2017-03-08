@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest44;
+SET
+SELECT setval('myseq', 1);
+1

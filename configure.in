@@ -644,6 +644,14 @@ PGAC_ARG_BOOL(enable, orca, no, [  --enable-orca        enable Pivotal Query Opt
 AC_SUBST(enable_orca)
 
 #
+# Enable hawq ranger plugin
+#
+PGAC_ARG_BOOL(enable, rps, no, [  --enable-rps         enable hawq ranger plugin],
+              [AC_DEFINE([USE_RANGER], 1,
+                         [Define to 1 to build with hawq ranger plugin. (--enable-rps)])])
+AC_SUBST(enable_rps)
+
+#
 # Enable thread-safe client libraries
 #
 AC_MSG_CHECKING([allow thread-safe client libraries])
@@ -986,6 +994,11 @@ fi
 if test "$with_java" = yes; then
   PGAC_PATH_JAVA
   PGAC_CHECK_JAVA_EMBED_SETUP
+fi
+
+if test "$enable_rps" = yes; then
+  PGAC_PATH_TOMCAT
+  PGAC_CHECK_TOMCAT_EMBED_SETUP
 fi
 
 ZIC=
@@ -1885,6 +1898,10 @@ AC_DEFINE_UNQUOTED(INT64_FORMAT, $INT64_FORMAT,
 AC_DEFINE_UNQUOTED(UINT64_FORMAT, $UINT64_FORMAT,
                    [Define to the appropriate snprintf format for unsigned 64-bit ints, if any.])
 
+# Define the length of char bytes needed to represent int32
+AC_DEFINE(INT32_CHAR_SIZE, 12,
+	  [Define number of bytes required to represent an Int32 in Char format])
+
 # Now we have checked all the reasons to replace snprintf
 if test $pgac_need_repl_snprintf = yes; then
   AC_DEFINE(USE_REPL_SNPRINTF, 1, [Use replacement snprintf() functions.])
@@ -2140,7 +2157,7 @@ else
 fi
 AC_SUBST(vpath_build)
 
-AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global])
+AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global ranger-plugin/Makefile.global])
 
 AC_CONFIG_LINKS([
   src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c

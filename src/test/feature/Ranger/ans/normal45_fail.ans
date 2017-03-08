@@ -1,0 +1,11 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest45;
+SET
+SELECT * INTO aaa FROM a WHERE i > 0 order by i;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+LINE 1: SELECT * INTO aaa FROM a WHERE i > 0 order by i;
+                               ^
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  relation "a" does not exist
+LINE 1: SELECT * INTO aaa FROM a WHERE i > 0 order by i;
+                               ^

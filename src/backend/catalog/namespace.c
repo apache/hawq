@@ -167,6 +167,7 @@ char	   *namespace_search_path = NULL;
 
 /* Local functions */
 static void recomputeNamespacePath(void);
+static void checkNamespaceInternal(List **oidlist, Oid namespaceId, Oid roleid);
 static void InitTempTableNamespace(void);
 static void RemoveTempRelations(Oid tempNamespaceId);
 static void RemoveTempRelationsCallback(int code, Datum arg);
@@ -1925,6 +1926,25 @@ FindDefaultConversionProc(int4 for_encoding, int4 to_encoding)
 	return InvalidOid;
 }
 
+
+
+/*
+ *
+ */
+static void checkNamespaceInternal(List **oidlist, Oid namespaceId, Oid roleid)
+{
+	if (pg_namespace_aclcheck(namespaceId, roleid,
+			ACL_USAGE) == ACLCHECK_OK)
+	{
+		*oidlist = lappend_oid(*oidlist, namespaceId);
+	}
+	else {
+		if (OidIsValid(namespaceId) && aclType == HAWQ_ACL_RANGER) {
+			elog(WARNING, "usage privilege of namespace %s is required.",
+					getNamespaceNameByOid(namespaceId));
+		}
+	}
+}
 /*
  * recomputeNamespacePath - recompute path derived variables if needed.
  */
@@ -1960,6 +1980,13 @@ recomputeNamespacePath(void)
 				return;
 			last_query_sign = current_query_sign;
 			elog(DEBUG3, "recompute search_path[%s] when acl_type is ranger", namespace_search_path);
+		}
+	}
+	else 
+	{
+		if (aclType == HAWQ_ACL_RANGER && debug_query_string != NULL)
+		{
+			last_query_sign = string_hash(debug_query_string, strlen(debug_query_string));
 		}
 	}
 
@@ -2006,10 +2033,10 @@ recomputeNamespacePath(void)
 				namespaceId = LookupInternalNamespaceId(rname);
 
 				if (OidIsValid(namespaceId) &&
-					!list_member_oid(oidlist, namespaceId) &&
-					pg_namespace_aclcheck(namespaceId, roleid,
-										  ACL_USAGE) == ACLCHECK_OK)
-					oidlist = lappend_oid(oidlist, namespaceId);
+						!list_member_oid(oidlist, namespaceId))
+				{
+					checkNamespaceInternal(&oidlist, namespaceId, roleid);
+				}
 			}
 		}
 		else if (strcmp(curname, "pg_temp") == 0)
@@ -2034,10 +2061,10 @@ recomputeNamespacePath(void)
 			namespaceId = LookupInternalNamespaceId(curname);
 
 			if (OidIsValid(namespaceId) &&
-				!list_member_oid(oidlist, namespaceId) &&
-				pg_namespace_aclcheck(namespaceId, roleid,
-									  ACL_USAGE) == ACLCHECK_OK)
-				oidlist = lappend_oid(oidlist, namespaceId);
+				!list_member_oid(oidlist, namespaceId))
+			{
+				checkNamespaceInternal(&oidlist, namespaceId, roleid);
+			}
 		}
 	}
 

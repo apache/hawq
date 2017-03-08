@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper2;
+SET
+create language plpythonu;
+CREATE LANGUAGE

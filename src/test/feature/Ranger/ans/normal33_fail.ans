@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest33;
+SET
+create temp table ta(i int);
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  permission denied to create temporary tables in database "hawq_feature_test_db"

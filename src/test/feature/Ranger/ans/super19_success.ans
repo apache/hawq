@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper19;
+SET
+CREATE TABLESPACE mytblspace FILESPACE dfs_system;    
+CREATE TABLESPACE

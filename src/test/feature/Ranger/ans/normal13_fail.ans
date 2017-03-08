@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest13;
+SET
+drop OPERATOR <# (text,text) CASCADE;
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  operator does not exist: text <# text

@@ -69,7 +69,7 @@ class PSQL {
   virtual ~PSQL(){};
 
   PSQL& runSQLCommand(const std::string& sql_cmd);
-  PSQL& runSQLFile(const std::string& sql_file);
+  PSQL& runSQLFile(const std::string& sql_file, bool printTupleOnly = false);
   const PSQLQueryResult& getQueryResult(const std::string& sql);
 
   PSQL& setHost(const std::string& host);
@@ -96,7 +96,7 @@ class PSQL {
 
   const std::string _getPSQLBaseCommand() const;
   const std::string _getPSQLQueryCommand(const std::string& query) const;
-  const std::string _getPSQLFileCommand(const std::string& file) const;
+  const std::string _getPSQLFileCommand(const std::string& file, bool printTupleOnly = false) const;
 
   std::string _dbname;
   std::string _host;

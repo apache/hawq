@@ -1,0 +1,3 @@
+set session role=usertest26;
+CREATE EXTERNAL TABLE ext_t ( N_NATIONKEY INTEGER ,N_NAME CHAR(25), N_REGIONKEY  INTEGER ,N_COMMENT    VARCHAR(152))location ('gpfdist://localhost:7070/nation_error50.tbl')FORMAT 'text' (delimiter '|')SEGMENT REJECT LIMIT 51;
+

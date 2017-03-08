@@ -704,6 +704,9 @@
 /* HAWQ version as a number */
 #undef HQ_VERSION_NUM
 
+/* Define number of bytes required to represent an Int32 in Char format */
+#undef INT32_CHAR_SIZE
+
 /* Define to the appropriate snprintf format for 64-bit ints, if any. */
 #undef INT64_FORMAT
 
@@ -821,6 +824,9 @@
 
 /* Define to 1 to build with PAM support. (--with-pam) */
 #undef USE_PAM
+
+/* Define to 1 to build with hawq ranger plugin. (--enable-rps) */
+#undef USE_RANGER
 
 /* Use replacement snprintf() functions. */
 #undef USE_REPL_SNPRINTF

@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest41;
+SET
+select * from pg_database, a order by oid, i limit 1;
+template1|10|6|t|t|-1|0|881|1663|16385|||1

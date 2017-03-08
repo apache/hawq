@@ -1,0 +1,5 @@
+-- start_ignore
+-- end_ignore
+drop type mytype cascade;
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: NOTICE:  drop cascades to function getfoo()
+DROP TYPE

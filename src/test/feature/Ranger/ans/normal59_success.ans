@@ -1,0 +1,13 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest59;
+SET
+\d
+public|a|table|usertest1|append only
+public|aa|table|usertest35|append only
+public|aaa|table|usertest45|append only
+public|av|view|usertest34|none
+public|ext_t|table|usertest26|external
+public|ext_t2|table|usertest28|external
+public|foo|table|usertest20|append only
+public|myseq|sequence|usertest37|heap

@@ -1,0 +1,8 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest42;
+SET
+select generate_series(1,3);
+1
+2
+3

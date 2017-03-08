@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+CREATE TABLESPACE mytblspace FILESPACE dfs_system;    
+psql:/tmp/TestHawqRanger_BasicTest.sql:3: ERROR:  tablespace "mytblspace" already exists

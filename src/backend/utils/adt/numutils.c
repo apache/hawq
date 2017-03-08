@@ -112,81 +112,71 @@ pg_atoi(char *s, int size, int c)
 }
 
 /*
- *		pg_itoa			- converts a short int to its string representation
+ *		pg_itoa: converts a signed 16-bit integer to its string representation
  *
- *		Note:
- *				previously based on ~ingres/source/gutil/atoi.c
- *				now uses vendor's sprintf conversion
+ *		Caller must ensure that 'a' points to enough memory to hold the result
+ *		(at least 7 bytes, counting a leading sign and trailing NUL).
+ *
+ *		It doesn't seem worth implementing this separately.
  */
 void
 pg_itoa(int16 i, char *a)
 {
-	/* 
-	 * The standard postgres way is to sprintf, but that uses a lot of cpu.
-	 * Do a fast conversion to string instead.
-	 */
-	char tmp[33];
-	char *tp = tmp;
-	char *sp;
-	int ii = 0;
-	unsigned long v;
-	long value = i;
-	bool sign = (value < 0);;
-	if (sign)
-		v = -value;
-	else
-		v = (unsigned long)value;
-	while (v || tp == tmp)
-	{
-		ii = v % 10;
-		v = v / 10;
-		*tp++ = ii+'0';
-	}
-	sp = a;
-	if (sign)
-		*sp++ = '-';
-	while (tp > tmp)
-		*sp++ = *--tp;
-	*sp = 0;
-	
+		pg_ltoa((int32)i, a);
 }
 
 /*
- *		pg_ltoa			- converts a long int to its string representation
+ *		pg_ltoa: converts a signed 32-bit integer to its string representation
  *
- *		Note:
- *				previously based on ~ingres/source/gutil/atoi.c
- *				now uses vendor's sprintf conversion
+ *		Caller must ensure that 'a' points to enough memory to hold the result
+ *		(at least 12 bytes, counting a leading sign and trailing NUL).
+ *
+ *		This is ported from Postgres commit #4fc115b. The previous implementation
+ *		in HAWQ allocated a 33 byte char[] when converting but an int32's string
+ *		representation requires only a maximum 12.
  */
 void
 pg_ltoa(int32 l, char *a)
 {
-	/* 
-	 * The standard postgres way is to sprintf, but that uses a lot of cpu.
-	 * Do a fast conversion to string instead.
+	char *start = a;
+	bool neg = false;
+
+	/*
+	 * Avoid problems with the most negative integer not being representable
+	 * as a positive integer.
 	 */
-	char tmp[33];
-	char *tp = tmp;
-	char *sp;
-	int ii = 0;
-	unsigned long v;
-	long value = l;
-	bool sign = (value < 0);;
-	if (sign)
-		v = -value;
-	else
-		v = (unsigned long)value;
-	while (v || tp == tmp)
+	if (l == INT32_MIN)
 	{
-		ii = v % 10;
-		v = v / 10;
-		*tp++ = ii+'0';
+		memcpy(a, "-2147483648", 12);
+		return;
 	}
-	sp = a;
-	if (sign)
-		*sp++ = '-';
-	while (tp > tmp)
-		*sp++ = *--tp;
-	*sp = 0;
-	
+	else if (l < 0)
+	{
+		l = -l;
+		neg = true;
+	}
+
+	/* Compute the result backwards. */
+	do
+	{
+		int32 remainder;
+		int32 oldval = l;
+		l /= 10;
+		remainder = oldval - l * 10;
+		*a++  = '0' + remainder;
+	} while (l != 0);
+	if (neg)
+		*a++ = '-';
+
+	/* Add trailing NUL byte. */
+	*a-- = '\0';
+
+	/* reverse string */
+	while (start < a)
+	{
+		char swap = *start;
+		*start++ = *a;
+		*a-- = swap;
+	}
+
 }

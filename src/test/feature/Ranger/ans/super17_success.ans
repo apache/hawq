@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper17;
+SET
+CREATE RESOURCE QUEUE myqueue WITH (PARENT='pg_root', ACTIVE_STATEMENTS=20, MEMORY_LIMIT_CLUSTER=50%, CORE_LIMIT_CLUSTER=50%);   
+CREATE QUEUE

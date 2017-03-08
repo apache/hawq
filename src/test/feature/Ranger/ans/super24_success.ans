@@ -1,0 +1,6 @@
+-- start_ignore
+-- end_ignore
+set session role=usersuper24;
+SET
+COPY a FROM '/tmp/a.txt';
+COPY 2

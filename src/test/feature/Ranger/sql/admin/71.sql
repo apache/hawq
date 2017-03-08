@@ -1,0 +1,2 @@
+drop schema sa CASCADE;
+

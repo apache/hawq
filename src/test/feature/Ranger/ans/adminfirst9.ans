@@ -1,0 +1,4 @@
+-- start_ignore
+-- end_ignore
+CREATE OPERATOR <# ( PROCEDURE=si_lt,LEFTARG=text, RIGHTARG=text);
+CREATE OPERATOR

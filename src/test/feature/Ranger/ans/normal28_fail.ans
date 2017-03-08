@@ -1,0 +1,7 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest28;
+SET
+CREATE WRITABLE EXTERNAL TABLE ext_t2 (i int) LOCATION ('gpfdist://localhost:7070/ranger2.out') FORMAT 'TEXT' ( DELIMITER '|' NULL ' ');
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: WARNING:  usage privilege of namespace public is required.
+psql:/tmp/TestHawqRanger_BasicTest.sql:4: ERROR:  no schema has been selected to create in
