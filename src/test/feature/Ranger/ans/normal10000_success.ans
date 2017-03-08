@@ -1,0 +1,10 @@
+-- start_ignore
+-- end_ignore
+set session role=usertest10000;
+SET
+select count(*) from information_schema.view_table_usage;
+0
+select count(*) from hawq_toolkit.hawq_table_indexes;
+0
+select count(*) from pg_catalog.pg_compression;
+4

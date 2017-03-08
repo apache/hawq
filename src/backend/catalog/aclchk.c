@@ -2685,8 +2685,12 @@ List *getActionName(AclMode mask)
 
 bool checkNamespaceFallback(Oid x)
 {
-  if (x == PG_CATALOG_NAMESPACE || x == information_schema_namespcace_oid
-     || x == PG_AOSEGMENT_NAMESPACE || x == PG_TOAST_NAMESPACE || x == PG_BITMAPINDEX_NAMESPACE)
+  if (x == PG_CATALOG_NAMESPACE
+     || x == PG_AOSEGMENT_NAMESPACE
+     || x == PG_TOAST_NAMESPACE
+     || x == PG_BITMAPINDEX_NAMESPACE
+     || x == information_schema_namespace_oid
+     || x == hawq_toolkit_schema_namespace_oid )
   {
     return true;
   }
@@ -2707,13 +2711,18 @@ bool checkNamespaceFallback(Oid x)
 
 bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid, AclMode mode)
 {
-  /* get the latest information_schema_namespcace_oid. Since caql access heap table
-   * directly without aclcheck, this function will not be called recursively
+  /* get the latest information_schema_namespace_oid and hawq_toolkit_schema_namespace_oid.
+   * Since caql access heap table directly without aclcheck, this function will not be called recursively
    */
-  if (information_schema_namespcace_oid == 0)
+  if (information_schema_namespace_oid == 0)
   {
-    information_schema_namespcace_oid = (int)get_namespace_oid("information_schema");
+    information_schema_namespace_oid = (int)get_namespace_oid("information_schema");
   }
+  if (hawq_toolkit_schema_namespace_oid == 0)
+  {
+    hawq_toolkit_schema_namespace_oid = (int)get_namespace_oid("hawq_toolkit");
+  }
+
   /* for heap table, we fall back to native check. */
   if (objkind == ACL_KIND_CLASS)
   {

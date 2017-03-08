@@ -445,7 +445,9 @@ extern bool optimizer_parallel_union;
 extern bool optimizer_array_constraints;
 
 
-extern int information_schema_namespcace_oid;
+/* fallback in ranger ACL check */
+extern int information_schema_namespace_oid;
+extern int hawq_toolkit_schema_namespace_oid;
 
 /**
  * Enable logging of DPE match in optimizer.

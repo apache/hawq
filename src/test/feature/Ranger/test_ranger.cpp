@@ -41,7 +41,7 @@ TEST_F(TestHawqRanger, BasicTest) {
 		gpdfist.init_gpfdist();
 
 		string rootPath(util.getTestRootPath());
-		string initfile = hawq::test::stringFormat("Ranger/sql/init_file");
+		string initfile = "Ranger/sql/init_file";
 		auto cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/normal/*.sql 2>/dev/null | grep \"^-\" | wc -l", rootPath.c_str());
 		int sql_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 		int writableTableCase = 28;
@@ -121,9 +121,6 @@ TEST_F(TestHawqRanger, BasicTest) {
 			string normal_ansfile_success = hawq::test::stringFormat("Ranger/ans/normal%d_success.ans", i);
 			string super_ansfile_success = hawq::test::stringFormat("Ranger/ans/super%d_success.ans", i);
 
-
-			cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null| grep \"^-\" | wc -l", rootPath.c_str(), i);
-			int policy_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 			cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/super/%d.sql 2>/dev/null | grep \"^-\" | wc -l", rootPath.c_str(), i);
 			int supersqlexist = std::atoi(Command::getCommandOutput(cmd).c_str());
 			util.execSQLFile(normal_sqlfile, normal_ansfile_success, initfile, true, true);
@@ -155,5 +152,61 @@ TEST_F(TestHawqRanger, BasicTest) {
 		}
 
 		gpdfist.finalize_gpfdist();
+    }
+}
+
+static void clear_env(SQLUtility &util, int sql_id, string rootPath, string rangerHost)
+{
+	int i = sql_id;
+	// delete user_num
+	std::string normalusername = hawq::test::stringFormat("usertest%d", i);
+	std::string superusername = hawq::test::stringFormat("usersuper%d", i);
+	util.execute(hawq::test::stringFormat("drop role %s;",normalusername.c_str()), false);
+	util.execute(hawq::test::stringFormat("drop role %s;",superusername.c_str()), false);
+
+	// delete policy
+	std::string cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null| grep \"^-\" | wc -l ", rootPath.c_str(), i);
+	int policy_num = std::atoi(Command::getCommandOutput(cmd).c_str());
+	for (int j = 1; j <= policy_num; j++) {
+		cmd = hawq::test::stringFormat("python %s/Ranger/rangerpolicy.py -h %s -d policy%d-%d", rootPath.c_str(), rangerHost.c_str(), i, j);
+		Command::getCommandStatus(cmd);
+	}
+}
+
+TEST_F(TestHawqRanger, FallbackTest) {
+    SQLUtility util;
+
+    if (util.getGUCValue("hawq_acl_type") == "ranger")
+    {
+		string rootPath(util.getTestRootPath());
+		string rangerHost = RANGER_HOST;
+		string initfile = "Ranger/sql/init_file";
+		string cmd;
+		int FallbackCase = 10000;
+		int i = FallbackCase;
+
+		// clear environment
+		clear_env(util, i, rootPath, rangerHost);
+
+		// create user_num
+		std::string normalusername = hawq::test::stringFormat("usertest%d", i);;
+		std::string superusername = hawq::test::stringFormat("usersuper%d", i);;
+		util.execute(hawq::test::stringFormat("create role %s with login createdb;", normalusername.c_str()),true);
+		util.execute(hawq::test::stringFormat("create role %s with login createdb superuser;", superusername.c_str()),true);
+		// add user
+		cmd = hawq::test::stringFormat("python %s/Ranger/rangeruser.py -h %s -u %s,%s", rootPath.c_str(),
+			rangerHost.c_str(), normalusername.c_str(), superusername.c_str());
+		Command::getCommandStatus(cmd);
+		// add policy
+		cmd = hawq::test::stringFormat("python %s/Ranger/rangerpolicy.py -h %s -a %s/Ranger/policy/%d/%d.json", rootPath.c_str(), rangerHost.c_str(), rootPath.c_str(), i, 1);
+		Command::getCommandStatus(cmd);
+		sleep(60);
+
+		// run sql test
+		string normal_sqlfile = hawq::test::stringFormat("Ranger/sql/manual/%d.sql", i);
+		string normal_ansfile_success = hawq::test::stringFormat("Ranger/ans/normal%d_success.ans", i);
+		util.execSQLFile(normal_sqlfile, normal_ansfile_success, initfile, true, true);
+
+		clear_env(util, i, rootPath, rangerHost);
     }
 }

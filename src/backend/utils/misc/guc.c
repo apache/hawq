@@ -768,7 +768,9 @@ bool		optimizer_prefer_scalar_dqa_multistage_agg;
 bool		optimizer_parallel_union;
 bool		optimizer_array_constraints;
 
-int information_schema_namespcace_oid;
+/* fallback in ranger ACL check */
+int information_schema_namespace_oid;
+int hawq_toolkit_schema_namespace_oid;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -6188,11 +6190,11 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"information_schema_namespcace_oid", PGC_USERSET, DEVELOPER_OPTIONS,
+		{"information_schema_namespace_oid", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("the oid of information_schema namespace"),
 			NULL
 		},
-		&information_schema_namespcace_oid,
+		&information_schema_namespace_oid,
 		0, 0, INT_MAX, NULL, NULL
 	},
 
