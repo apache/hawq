@@ -768,7 +768,9 @@ bool		optimizer_prefer_scalar_dqa_multistage_agg;
 bool		optimizer_parallel_union;
 bool		optimizer_array_constraints;
 
+/* fallback in ranger ACL check */
 int information_schema_namespcace_oid;
+int hawq_toolkit_schema_namespcace_oid;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
