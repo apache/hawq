@@ -33,6 +33,7 @@
     </modules>
 
     <properties>
+        <hadoop.version>2.7.1</hadoop.version>
         <jackson.version>1.9</jackson.version>
         <release.version>1</release.version>
         <postgresql.version>9.1-901-1.jdbc4</postgresql.version>
@@ -253,6 +254,12 @@
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpcore</artifactId>
                 <version>4.4.4</version>
+            </dependency>
+            <!-- HDFS library is needed for auditing to HDFS -->
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-hdfs</artifactId>
+                <version>${hadoop.version}</version>
             </dependency>
             <dependency>
                 <groupId>javax.servlet</groupId>
