@@ -91,6 +91,11 @@
             <groupId>org.apache.ranger</groupId>
             <artifactId>ranger-plugins-common</artifactId>
         </dependency>
+        <!-- explicitly package hadoop-hdfs.jar required for auditing to HDFS -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>log4j</groupId>
