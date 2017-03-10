@@ -634,16 +634,16 @@ static int retry_read(int fd, char *buf, int rsize)
 
 read_retry:
 	sz = read(fd, buf, rsize);
-	if (sz > 0)
+	if (sz >= 0)  
 		return sz;
-	else if(sz == 0 || errno == EINTR)
+	else if(errno == EINTR)
 		goto read_retry;
 	else
 	{
 		elog(ERROR, "could not read from fifo: %m");
 	}
 	Assert(!"Never be here");
-	return 0;
+	return -1;
 }
 
 static int retry_write(int fd, char *buf, int wsize)
@@ -663,7 +663,7 @@ write_retry:
 	}
 
 	Assert(!"Never be here");
-	return 0;
+	return -1;
 }
 
 /* 
@@ -741,6 +741,12 @@ shareinput_reader_waitready(int share_id, PlanGenerator planGen)
 	while(1)
 	{
 		CHECK_FOR_INTERRUPTS();
+	
+		// Comments reference to shareinput_writer_waitdone function.	
+		if (IsAbortInProgress())
+		{
+			break;
+		}
 
 		MPP_FD_ZERO(&rset);
 		MPP_FD_SET(pctxt->readyfd, &rset);
@@ -752,10 +758,12 @@ shareinput_reader_waitready(int share_id, PlanGenerator planGen)
 
 		if(n==1)
 		{
-#if USE_ASSERT_CHECKING
-			int rwsize =
-#endif
-			retry_read(pctxt->readyfd, &a, 1);
+			int rwsize;
+
+			rwsize = retry_read(pctxt->readyfd, &a, 1);
+			if (rwsize == 0)
+				break;
+
 			Assert(rwsize == 1 && a == 'a');
 
 			elog(DEBUG1, "SISC READER (shareid=%d, slice=%d): Wait ready got writer's handshake",
@@ -785,11 +793,12 @@ shareinput_reader_waitready(int share_id, PlanGenerator planGen)
 		{
 			int save_errno = errno;
 			elog(LOG, "SISC READER (shareid=%d, slice=%d): Wait ready try again, errno %d ... ",
-								share_id, currentSliceId, save_errno);
-			if(save_errno == EBADF)
+								share_id, currentSliceId, save_errno);	
+			if(save_errno == EBADF || save_errno == EINVAL)
 			{
-				/* The file description is invalid, maybe this FD has been already closed by writer in some cases
-				 * we need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
+				/* The file description is invalid or the value contained within timeout is invalid. 
+				 * Maybe this FD has been already closed by others in some cases.
+				 * We need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
 				 */
 				break;
 			}
@@ -885,6 +894,13 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 	while(ack_needed > 0)
 	{
 		CHECK_FOR_INTERRUPTS();
+	
+		// Comments reference to shareinput_writer_waitdone function.	
+		if (IsAbortInProgress())
+		{
+			break;
+		}
+
 
 		MPP_FD_ZERO(&rset);
 		MPP_FD_SET(pctxt->donefd, &rset);
@@ -895,10 +911,12 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 
 		if(numReady==1)
 		{
-#if USE_ASSERT_CHECKING
-			int rwsize =
-#endif
-			retry_read(pctxt->donefd, &b, 1);
+			int rwsize;
+
+			rwsize = retry_read(pctxt->donefd, &b, 1);
+			if (rwsize == 0)
+				break;
+
 			Assert(rwsize == 1);
 
 			if(b == 'z')
@@ -923,10 +941,11 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 			int save_errno = errno;
 			elog(LOG, "SISC WRITER (shareid=%d, slice=%d): notify still wait for an answer, errno %d",
 					share_id, currentSliceId, save_errno);
-			if(save_errno == EBADF)
+			if(save_errno == EBADF || save_errno == EINVAL)
 			{
-				/* The file description is invalid, maybe this FD has been already closed by writer in some cases
-				 * we need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
+				/* The file description is invalid or the value contained within timeout is invalid. 
+				 * Maybe this FD has been already closed by others in some cases.
+				 * We need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
 				 */
 				break;
 			}
@@ -980,7 +999,23 @@ shareinput_writer_waitdone(void *ctxt, int share_id, int nsharer_xslice)
 	while(ack_needed > 0)
 	{
 		CHECK_FOR_INTERRUPTS();
-	
+		
+		/*
+		 * Writer won't wait for data reading done notification from readers if transaction is
+		 * aborting. Readers may fail to send data reading done notification to writer in two
+		 * cases:
+		 *
+		 *    1. The transaction is aborted due to interrupts or exceptions, i.e., user cancels
+		 *       query, division by zero on some segment
+		 *
+		 *    2. Logic errors in reader which incur its unexpected exit, i.e., segmentation fault
+		 */
+		if (IsAbortInProgress())
+		{
+			break;
+		}
+
+
 		MPP_FD_ZERO(&rset);
 		MPP_FD_SET(pctxt->donefd, &rset);
 
@@ -990,10 +1025,12 @@ shareinput_writer_waitdone(void *ctxt, int share_id, int nsharer_xslice)
 	
 		if(numReady==1)
 		{
-#if USE_ASSERT_CHECKING
-			int rwsize =
-#endif
-			retry_read(pctxt->donefd, &z, 1);
+			int rwsize;
+
+			rwsize = retry_read(pctxt->donefd, &z, 1);
+			if (rwsize == 0)
+				break;
+
 			Assert(rwsize == 1 && z == 'z');
 
 			elog(DEBUG1, "SISC WRITER (shareid=%d, slice=%d): wait done get 1 notification",
@@ -1009,11 +1046,12 @@ shareinput_writer_waitdone(void *ctxt, int share_id, int nsharer_xslice)
 		{
 			int save_errno = errno;
 			elog(LOG, "SISC WRITER (shareid=%d, slice=%d): wait done time out once, errno %d",
-					share_id, currentSliceId, save_errno);
-			if(save_errno == EBADF)
+					share_id, currentSliceId, save_errno);	
+			if(save_errno == EBADF || save_errno == EINVAL)
 			{
-				/* The file description is invalid, maybe this FD has been already closed by writer in some cases
-				 * we need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
+				/* The file description is invalid or the value contained within timeout is invalid. 
+				 * Maybe this FD has been already closed by others in some cases.
+				 * We need to break here to avoid endless loop and continue to run CHECK_FOR_INTERRUPTS.
 				 */
 				break;
 			}
