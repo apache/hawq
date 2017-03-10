@@ -147,7 +147,7 @@ typedef struct extvar_t
 	char GP_XID[TMGIDSIZE];		/* global transaction id */
 	char GP_CID[10];		/* command id */
 	char GP_SN[10];		/* scan number */
-	char GP_SEGMENT_ID[7];  /*segments content id*/
+	char GP_SEGMENT_ID[6];  /*segments content id*/
 	char GP_SEG_PORT[10];
 	char GP_SESSION_ID[10];  /* session id */
  	char GP_SEGMENT_COUNT[6]; /* total number of (primary) segs in the system */
