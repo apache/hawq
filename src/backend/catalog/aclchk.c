@@ -2771,6 +2771,18 @@ bool is_sequence(Oid object_oid) {
 }
 
 /*
+ * 	check whether rte is a sequence.
+ */
+bool is_sequence(Oid object_oid) {
+	char relkind = get_rel_relkind(object_oid);
+	if(relkind == 's' || relkind == 'S')
+	{
+		return true;
+	}
+	return false;
+}
+
+/*
  * return: List of RangerPrivilegeResults 
  * arg_list: List of RangerPrivilegeArgs
  */
