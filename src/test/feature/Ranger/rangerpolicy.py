@@ -69,6 +69,13 @@ def create_policy(policy_json_file_name, rangerhelper):
             response_dict = json.load(response)
             for new_policy_item in json_decode['policyItems']:
                 response_dict["policyItems"].append(new_policy_item)
+            for new_policy_item in json_decode['denyPolicyItems']:
+                response_dict["denyPolicyItems"].append(new_policy_item)
+            for new_policy_item in json_decode['allowExceptions']:
+                response_dict["allowExceptions"].append(new_policy_item)
+            for new_policy_item in json_decode['denyExceptions']:
+                response_dict["denyExceptions"].append(new_policy_item)
+                
             rangerhelper.update_policy(service_name, dup_policy_name, \
                                     json.dumps(response_dict));
         return policyname

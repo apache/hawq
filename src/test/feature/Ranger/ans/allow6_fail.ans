@@ -1,0 +1,13 @@
+-- start_ignore
+SET SEARCH_PATH=TestHawqRanger_ResourceIncludeATest;
+SET
+-- end_ignore
+set session role= 'userallow6';
+SET
+select * from a;
+psql:/tmp/TestHawqRanger_ResourceIncludeATest.sql:5: WARNING:  usage privilege of namespace testhawqranger_resourceincludeatest is required.
+LINE 1: select * from a;
+                      ^
+psql:/tmp/TestHawqRanger_ResourceIncludeATest.sql:5: ERROR:  relation "a" does not exist
+LINE 1: select * from a;
+                      ^
