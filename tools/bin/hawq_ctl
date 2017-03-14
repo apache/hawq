@@ -835,6 +835,8 @@ class HawqStop:
                 acl_type = rows.next()[1]
             conn.close()
         except DatabaseError, ex:
+            # get hawq_acl_type from hawq_site.xml if connect db failed.
+            # avoid cannot stop segments where master is down.
             if 'hawq_acl_type' in self.hawq_dict:
                 acl_type = self.hawq_dict['hawq_acl_type']
 
