@@ -832,8 +832,8 @@ class HawqStop:
             rows = dbconn.execSQL(conn, query)
             conn.close()
         except DatabaseError, ex:
-            logger.error("Failed to connect to database, this script can only be run when the database is up")
-            sys.exit(1)
+            logger.warning("Failed to connect to database, cannot get hawq_acl_type")
+            return "unknown"
 
         for row in rows:
             if row[1].lower() == 'ranger':
@@ -963,6 +963,9 @@ class HawqStop:
                 logger.info("Standby master %s successfully" % self.stop_action_past)
         if self.hawq_acl_type == 'ranger':
             self.stop_rps()
+        if self.hawq_acl_type == 'unknown':
+            logger.warning("try to stop RPS when hawq_acl_type is unknown")
+            self.stop_rps()
 
         # Execute segment stop command on each node.
         segments_return_flag = self._stopAllSegments()
@@ -1053,6 +1056,9 @@ class HawqStop:
             check_return_code(self._stop_master(), logger, \
                               "Master %s failed, exit" % self.stop_action, "Master %s successfully" % self.stop_action_past)
             if self.hawq_acl_type == 'ranger':
+                self.stop_rps()
+            if self.hawq_acl_type == 'unknown':
+                logger.warning("try to stop RPS when hawq_acl_type is unknown")
                 self.stop_rps()
         elif self.node_type == "standby":
             if self.standby_host_name.lower() not in ('', 'none'):
