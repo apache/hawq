@@ -825,19 +825,21 @@ class HawqStop:
             self.standby_host_name = ''
 
     def check_hawq_acl_type(self):
+        acl_type = ''
         try:
             dburl = dbconn.DbURL(port=self.master_port, username=self.user, dbname='template1')
             conn = dbconn.connect(dburl, True)
             query = "select name, setting from pg_catalog.pg_settings where name='hawq_acl_type';"
             rows = dbconn.execSQL(conn, query)
+            if rows and rows.rowcount > 0:
+                acl_type = rows.next()[1]
             conn.close()
         except DatabaseError, ex:
-            logger.error("Failed to connect to database, this script can only be run when the database is up")
-            sys.exit(1)
+            if 'hawq_acl_type' in self.hawq_dict:
+                acl_type = self.hawq_dict['hawq_acl_type']
 
-        for row in rows:
-            if row[1].lower() == 'ranger':
-                return "ranger"
+        if acl_type.lower() == 'ranger':
+            return "ranger"
         return "standalone"
 
     def _stop_master_checks(self):
