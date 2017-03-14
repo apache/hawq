@@ -111,7 +111,8 @@ if __name__ == '__main__':
             add_full_privilege_for_user(user, policy_names, helper)
             print 'user {} complete'.format(user)
     else:
-        for user in unames:
-            add_user(user, helper)
-            print 'user {} is added'.format(user)
+        if unames != None:
+            for user in unames:
+                add_user(user, helper)
+                print 'user {} is added'.format(user)
         

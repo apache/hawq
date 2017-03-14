@@ -1,0 +1,11 @@
+-- start_ignore
+SET SEARCH_PATH=TestHawqRanger_AllowExcludeTest;
+SET
+-- end_ignore
+set session role= 'userallowexclude3';
+SET
+select * from a;
+ i 
+---
+(0 rows)
+

@@ -1,0 +1,13 @@
+-- start_ignore
+SET SEARCH_PATH=TestHawqRanger_ResourceExcludeTest;
+SET
+-- end_ignore
+set session role= 'userresourceexclude4';
+SET
+select * from a;
+psql:/tmp/TestHawqRanger_ResourceExcludeTest.sql:5: ERROR:  permission denied for relation(s): testhawqranger_resourceexcludetest.a
+select * from b;
+ i 
+---
+(0 rows)
+

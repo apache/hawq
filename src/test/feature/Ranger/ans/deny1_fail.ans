@@ -1,0 +1,8 @@
+-- start_ignore
+SET SEARCH_PATH=TestHawqRanger_DenyTest;
+SET
+-- end_ignore
+set session role= 'userdeny1';
+SET
+select * from a;
+psql:/tmp/TestHawqRanger_DenyTest.sql:5: ERROR:  permission denied for relation(s): testhawqranger_denytest.a
