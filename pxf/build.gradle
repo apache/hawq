@@ -437,6 +437,38 @@ project('pxf-hbase') {
     }
 }
 
+
+project('pxf-jdbc') {
+    dependencies {
+        compile(project(':pxf-api'))
+        compile(project(':pxf-service'))
+        compile "org.apache.hadoop:hadoop-common:$hadoopVersion"
+        compile "org.apache.hadoop:hadoop-hdfs:$hadoopVersion"
+        testCompile "mysql:mysql-connector-java:5.1.6"
+    }
+    tasks.withType(JavaCompile) {
+        options.encoding = "UTF-8"
+    }
+
+    ospackage {
+        packageName = versionedPackageName("${project.name}")
+        summary = 'HAWQ Extension Framework (PXF), JDBC plugin'
+        description = 'Querying external data stored in Relation Database using JDBC.'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
+
+        requires(versionedPackageName('pxf-service'), project.version, GREATER | EQUAL)
+
+        from(jar.outputs.files) {
+            into "/usr/lib/pxf-${project.version}"
+        }
+
+        link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+    }
+}
+
 def buildNumber() {
     System.getenv('BUILD_NUMBER') ?: System.getProperty('user.name')
 }
