@@ -825,23 +825,19 @@ class HawqStop:
             self.standby_host_name = ''
 
     def check_hawq_acl_type(self):
-        acl_type = ''
         try:
             dburl = dbconn.DbURL(port=self.master_port, username=self.user, dbname='template1')
             conn = dbconn.connect(dburl, True)
             query = "select name, setting from pg_catalog.pg_settings where name='hawq_acl_type';"
             rows = dbconn.execSQL(conn, query)
-            if rows and rows.rowcount > 0:
-                acl_type = rows.next()[1]
             conn.close()
         except DatabaseError, ex:
-            # get hawq_acl_type from hawq_site.xml if connect db failed.
-            # avoid cannot stop segments where master is down.
-            if 'hawq_acl_type' in self.hawq_dict:
-                acl_type = self.hawq_dict['hawq_acl_type']
+            logger.warning("Failed to connect to database, cannot get hawq_acl_type")
+            return "unknown"
 
-        if acl_type.lower() == 'ranger':
-            return "ranger"
+        for row in rows:
+            if row[1].lower() == 'ranger':
+                return "ranger"
         return "standalone"
 
     def _stop_master_checks(self):
@@ -967,6 +963,9 @@ class HawqStop:
                 logger.info("Standby master %s successfully" % self.stop_action_past)
         if self.hawq_acl_type == 'ranger':
             self.stop_rps()
+        if self.hawq_acl_type == 'unknown':
+            logger.warning("try to stop RPS when hawq_acl_type is unknown")
+            self.stop_rps()
 
         # Execute segment stop command on each node.
         segments_return_flag = self._stopAllSegments()
@@ -1057,6 +1056,9 @@ class HawqStop:
             check_return_code(self._stop_master(), logger, \
                               "Master %s failed, exit" % self.stop_action, "Master %s successfully" % self.stop_action_past)
             if self.hawq_acl_type == 'ranger':
+                self.stop_rps()
+            if self.hawq_acl_type == 'unknown':
+                logger.warning("try to stop RPS when hawq_acl_type is unknown")
                 self.stop_rps()
         elif self.node_type == "standby":
             if self.standby_host_name.lower() not in ('', 'none'):
