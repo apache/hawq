@@ -15,6 +15,10 @@ UDF/ans/function_c.ans
 UDF/ans/function_creation.ans
 UDF/sql/function_c.sql
 UDF/sql/function_creation.sql
+UDF/sql/PLJavaAdd.class
+UDF/sql/PLJavaAdd.jar
+UDF/sql/PLJavauAdd.class
+UDF/sql/PLJavauAdd.jar
 testlib/ans/template.ans
 testlib/sql/template.sql
 utility/ans/copytest.csv
