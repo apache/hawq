@@ -29,6 +29,9 @@ public:
 	~TestHawqRanger() {
 	}
 
+	std::string rangerHost;
+	std::string initfile;
+
 	void clearEnv(hawq::test::SQLUtility* util, std::string case_name, int user_index);
 	void runSQLFile(hawq::test::SQLUtility* util, std::string case_name,
 			std::string ans_suffix, int sql_index = -1);
@@ -36,13 +39,6 @@ public:
 	void addPolicy(hawq::test::SQLUtility* util, std::string case_name, int policy_index);
 	void addUser(hawq::test::SQLUtility* util, std::string case_name, int user_index = -1, bool full_policy = false,
 			int writable_index = -1);
-
-	std::string& getRangerHost();
-
-private:
-	std::string rangerHost = "";
-	std::string initfile = "";
-
 };
 
 #endif

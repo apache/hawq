@@ -136,9 +136,8 @@ void SQLUtility::query(const string &sql, const string &expectStr) {
 void SQLUtility::execSQLFile(const string &sqlFile,
                              const string &ansFile,
                              const string &initFile,
-							 bool usingDefaultSchema,
-							 bool printTupleOnly) {
-	printf("dd2d%s\n",schemaName.c_str());
+                             bool usingDefaultSchema,
+                             bool printTupleOnly) {
   FilePath fp;
 
   // do precheck for sqlFile & ansFile
@@ -225,10 +224,8 @@ const string SQLUtility::generateSQLFile(const string &sqlFile, bool usingDefaul
     EXPECT_TRUE(false) << "Error opening file " << newSqlFile;
   }
   out << "-- start_ignore" << std::endl;
-  printf("dd2d%s\n",schemaName.c_str());
   if (!usingDefaultSchema) {
-	  printf("ddd%s\n",schemaName.c_str());
-	  out << "SET SEARCH_PATH=" + schemaName + ";" << std::endl;
+      out << "SET SEARCH_PATH=" + schemaName + ";" << std::endl;
   }
   if (sql_util_mode ==  MODE_DATABASE) {
     out << "\\c " << databaseName << std::endl;

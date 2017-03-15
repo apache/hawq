@@ -34,17 +34,7 @@ using hawq::test::Command;
 TestHawqRanger::TestHawqRanger()
 {
 	initfile = hawq::test::stringFormat("Ranger/sql/init_file");
-	rangerHost = getRangerHost();
-}
-
-std::string& TestHawqRanger::getRangerHost()
-{
-	string cmd = hawq::test::stringFormat("hawq config -s hawq_rps_address_host");
-	string rangerHostStr = Command::getCommandOutput(cmd);
-	rangerHostStr = rangerHostStr.substr(rangerHostStr.find("Value") + 5);
-	rangerHostStr = rangerHostStr.substr(rangerHostStr.find(":") + 1);
-	rangerHostStr = rangerHostStr.substr(rangerHostStr.find_first_not_of(' '));
-	return hawq::test::trimNewLine(rangerHostStr);
+	rangerHost = RANGER_HOST;
 }
 
 TEST_F(TestHawqRanger, BasicTest) {
@@ -56,11 +46,9 @@ TEST_F(TestHawqRanger, BasicTest) {
 		gpdfist.init_gpfdist();
 
 		string rootPath(util.getTestRootPath());
-		string initfile = "Ranger/sql/init_file";
 		auto cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/normal/*.sql 2>/dev/null | grep \"^-\" | wc -l", rootPath.c_str());
 		int sql_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 		int writableTableCase = 28;
-		string rangerHost = getRangerHost();
 		cmd = hawq::test::stringFormat("cp %s/Ranger/data/copydata.txt /tmp/a.txt", rootPath.c_str());
 		Command::getCommandStatus(cmd);
 
