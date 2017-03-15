@@ -30,7 +30,7 @@ from optparse import OptionParser
 
 PLUGIN_VERSION = '${release}'
 DEFAULT_STACK = '${default.stack}'
-SUPPORTED_OS_LIST = ['redhat6']
+SUPPORTED_OS_LIST = ['redhat6', 'redhat7']
 HAWQ_LIB_STAGING_DIR = '${hawq.lib.staging.dir}'
 REPO_VERSION = '${repository.version}'
 HAWQ_REPO = '${hawq.repo.prefix}'
