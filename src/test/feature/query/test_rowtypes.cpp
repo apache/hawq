@@ -33,8 +33,8 @@ TEST_F(TestRowTypes, BasicTest)
 {
 	hawq::test::SQLUtility util;
 
-    util.execute("drop table if exists tenk1");
-    util.execute("create table tenk1 ("
+    util.execute("drop table if exists TestRowTypes.BasicTest.tenk1");
+    util.execute("create table TestRowTypes.BasicTest.tenk1 ("
                 "    unique1     int4,"
                 "    unique2     int4,"
                 "    two         int4,"
@@ -53,7 +53,7 @@ TEST_F(TestRowTypes, BasicTest)
                 "    string4     name) with oids");
 	
     std::string pwd = util.getTestRootPath();
-    std::string cmd = "COPY tenk1 FROM '" + pwd + "/query/data/tenk.data'";
+    std::string cmd = "COPY TestRowTypes.BasicTest.tenk1 FROM '" + pwd + "/query/data/tenk.data'";
     std::cout << cmd << std::endl;
     util.execute(cmd);
     
