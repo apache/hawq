@@ -46,7 +46,15 @@ Requires(pre): shadow-utils
 AutoReqProv:    no
 
 %description
-%{summary}
+Apache HAWQ (incubating) combines exceptional MPP-based analytics
+performance, robust ANSI SQL compliance, Hadoop ecosystem
+integration and manageability, and flexible data-store format
+support, all natively in Hadoop, no connectors required.
+
+Built from a decade’s worth of massively parallel
+processing (MPP) expertise developed through the creation of open
+source Greenplum® Database and PostgreSQL, HAWQ enables you to
+swiftly and interactively query Hadoop data, natively via HDFS.
 
 %prep
 %setup -n %{name}
