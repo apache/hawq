@@ -45,6 +45,12 @@ distprep:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
 
+rpm:
+	$(MAKE) -C contrib/hawq-package $@
+	$(MAKE) -C pxf $@
+	$(MAKE) -C ranger-plugin $@
+	$(MAKE) -C contrib/hawq-package rpm-tarball
+
 feature-test:
 	$(MAKE) -C src feature-test
 
@@ -63,6 +69,8 @@ clean:
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
 	$(MAKE) -C tools $@
+	$(MAKE) -C contrib/hawq-package $@
+	$(MAKE) -C pxf $@
 	$(MAKE) -C ranger-plugin $@
 	-$(MAKE) -C src feature-test-clean
 # Garbage from autoconf:
