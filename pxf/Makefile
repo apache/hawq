@@ -68,7 +68,7 @@ jar:
 tar:
 	./gradlew tar $(BUILD_PARAMS)
 
-rpm:
+rpm: tomcat
 	./gradlew rpm $(BUILD_PARAMS)
 	
 clean:

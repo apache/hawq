@@ -25,6 +25,10 @@ MVN_OPTS="-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenT
 #
 .PHONY: all install distclean clean uninstall
 
+rpm:
+	@echo "Build rpm package for HAWQ ranger-plugin."
+	./scripts/build_ranger_rpm.sh
+
 ifeq ($(enable_rps), yes)
 
 all:
@@ -59,5 +63,10 @@ distclean: clean
 else
 
 all install distclean clean uninstall:
+
+clean:
+	rm -rf target/rpm/*
+
+distclean: clean
 
 endif

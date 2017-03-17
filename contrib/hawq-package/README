@@ -1,0 +1,38 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+Build HAWQ rpm package tarball steps:
+
+1. Prepare a HAWQ source code tarball for rpm building.
+   a) Make sure the source code tarball name format is: 
+      apache-hawq-src-%{hawq_version}-incubating.tar.gz
+   b) Make sure the extracted directory name format is:
+      apache-hawq-src-%{hawq_version}-incubating
+   c) Put the HAWQ source tarball to %{top_dir}/contrib/hawq-package folder.
+      Or use "HAWQ_SOURCE_TARBALL_PATH" to specify the find path of HAWQ source tarball.
+
+2. Install build dependencies of HAWQ, following instruction at:
+   https://cwiki.apache.org/confluence/display/HAWQ/Build+and+Install 
+
+3. Run 'make distclean' and './configure'.
+
+4. Run 'make rpm' in the top directory of the source code.
+   You can set environment variable "HAWQ_RELEASE_VERSION" to specify HAWQ version.
+
+5. You can find HAWQ/PXF/Ranger-plugin rpms tarball as:
+   %{top_dir}/contrib/hawq-package/apache-hawq-rpm-%{hawq_version}-incubating.tar.gz 
