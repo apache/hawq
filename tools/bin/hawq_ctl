@@ -964,8 +964,8 @@ class HawqStop:
         if self.hawq_acl_type == 'ranger':
             self.stop_rps()
         if self.hawq_acl_type == 'unknown':
-            logger.warning("try to stop RPS when hawq_acl_type is unknown")
-            self.stop_rps()
+            logger.warning("Try to stop RPS when hawq_acl_type is unknown")
+            self.stop_rps(check_ret = False)
 
         # Execute segment stop command on each node.
         segments_return_flag = self._stopAllSegments()
@@ -1046,9 +1046,11 @@ class HawqStop:
         result = remote_ssh(cmd_str, self.master_host_name, self.user)
         return result
 
-    def stop_rps(self):
+    def stop_rps(self, check_ret = True):
         logger.info("Stop Ranger plugin service")
-        check_return_code(self._stop_rps(), logger, \
+        result = self._stop_rps()
+        if check_ret:
+            check_return_code(result, logger, \
                           "Ranger plugin service stop failed, exit", "Ranger plugin service stopped successfully")
 
     def run(self):
@@ -1058,8 +1060,8 @@ class HawqStop:
             if self.hawq_acl_type == 'ranger':
                 self.stop_rps()
             if self.hawq_acl_type == 'unknown':
-                logger.warning("try to stop RPS when hawq_acl_type is unknown")
-                self.stop_rps()
+                logger.warning("Try to stop RPS when hawq_acl_type is unknown")
+                self.stop_rps(check_ret = False)
         elif self.node_type == "standby":
             if self.standby_host_name.lower() not in ('', 'none'):
                 check_return_code(self._stop_standby(), logger, \
