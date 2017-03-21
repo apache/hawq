@@ -662,7 +662,7 @@ gpfs_hdfs_truncate(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_tell outside filesystem manager");
+		elog(WARNING, "cannot execute gpfs_hdfs_truncate outside filesystem manager");
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -717,7 +717,7 @@ gpfs_hdfs_getpathinfo(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_tell outside filesystem manager");
+		elog(WARNING, "cannot execute gpfs_hdfs_getpathinfo outside filesystem manager");
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -757,7 +757,7 @@ gpfs_hdfs_freefileinfo(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_tell outside filesystem manager");
+		elog(WARNING, "cannot execute gpfs_hdfs_freefileinfo outside filesystem manager");
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
