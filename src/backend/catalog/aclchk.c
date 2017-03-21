@@ -2335,19 +2335,25 @@ char *getClassNameFromOid(Oid object_oid)
                        " WHERE oid = :1",
                        ObjectIdGetDatum(object_oid)));
   if (schema_name_oid == InvalidOid)
-      elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
+    elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
 
   char* schema_name= caql_getcstring(
       NULL,
       cql("select nspname from pg_namespace "
-        " WHERE oid = :1",
-        ObjectIdGetDatum(schema_name_oid)));
+          " WHERE oid = :1",
+          ObjectIdGetDatum(schema_name_oid)));
   if (schema_name == NULL)
       elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
 
-  char* database_name = get_database_name(MyDatabaseId);
+  Oid dboid = InvalidOid;
+  dboid = caql_getoid(NULL,
+                  cql("SELECT nspdboid FROM pg_namespace WHERE nspname = :1", schema_name));
+
+  if (dboid == InvalidOid)
+    dboid = MyDatabaseId;
+  char* database_name = get_database_name(dboid);
   if (database_name == NULL)
-       elog(ERROR, "oid [%u] not found current database", object_oid);
+    elog(ERROR, "cannot find database by oid [%u]", dboid);
 
   appendStringInfo(&tname, "%s", database_name);
   appendStringInfoChar(&tname, '.');
@@ -2407,9 +2413,15 @@ char *getProcNameFromOid(Oid object_oid)
   if (schema_name == NULL)
      elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
 
-  char* database_name = get_database_name(MyDatabaseId);
+  Oid dboid = InvalidOid;
+  dboid = caql_getoid(NULL,
+                  cql("SELECT nspdboid FROM pg_namespace WHERE nspname = :1", schema_name));
+
+  if (dboid == InvalidOid)
+    dboid = MyDatabaseId;
+  char* database_name = get_database_name(dboid);
   if (database_name == NULL)
-      elog(ERROR, "oid [%u] not found current database", object_oid);
+    elog(ERROR, "cannot find database by oid [%u]", dboid);
 
   appendStringInfo(&tname, "%s", database_name);
   appendStringInfoChar(&tname, '.');
@@ -2462,11 +2474,9 @@ char *getLanguageNameFromOid(Oid object_oid)
   if (lang_name == NULL)
     elog(ERROR, "oid [%u] not found in table pg_language", object_oid);
 
-
-
   char* database_name = get_database_name(MyDatabaseId);
   if (database_name == NULL)
-      elog(ERROR, "oid [%u] not found current database", object_oid);
+    elog(ERROR, "cannot find database by oid [%u]", MyDatabaseId);
 
   appendStringInfo(&tname, "%s", database_name);
   appendStringInfoChar(&tname, '.');
@@ -2492,10 +2502,15 @@ char *getNamespaceNameFromOid(Oid object_oid)
   if (schema_name == NULL)
     elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
 
+  Oid dboid = InvalidOid;
+  dboid = caql_getoid(NULL,
+                  cql("SELECT nspdboid FROM pg_namespace WHERE nspname = :1", schema_name));
 
-  char* database_name = get_database_name(MyDatabaseId);
+  if(dboid == InvalidOid)
+    dboid = MyDatabaseId;
+  char* database_name = get_database_name(dboid);
   if (database_name == NULL)
-      elog(ERROR, "oid [%u] not found current database", object_oid);
+    elog(ERROR, "cannot find database by oid [%u]", dboid);
 
   appendStringInfo(&tname, "%s", database_name);
   appendStringInfoChar(&tname, '.');
