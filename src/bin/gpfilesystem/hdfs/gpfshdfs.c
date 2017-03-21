@@ -171,7 +171,7 @@ gpfs_hdfs_disconnect(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_openfile outside filesystem manager");
+		elog(WARNING, "cannot execute gpfs_hdfs_disconnect outside filesystem manager");
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -180,7 +180,7 @@ gpfs_hdfs_disconnect(PG_FUNCTION_ARGS)
 	hdfs = FSYS_UDF_GET_HDFS(fcinfo);
 
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfs invalid in gpfs_hdfs_openfile");
+		elog(WARNING, "get hdfs invalid in gpfs_hdfs_disconnect");
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
