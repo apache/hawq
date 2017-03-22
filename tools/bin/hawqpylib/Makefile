@@ -28,18 +28,18 @@ include $(top_builddir)/src/Makefile.global
 SKIP_INSTALL=.gitignore|.p4ignore|.rcfile|Makefile|test/
 
 install:
-	${INSTALL_SCRIPT} -d ${libdir}/python/hawqpylib
+	${INSTALL_SCRIPT} -d ${DESTDIR}${libdir}/python/hawqpylib
 	@for file in `find * -type f | grep -v -E "${SKIP_INSTALL}"`; \
 		do \
-			echo "install $${file} into ${libdir}/python/hawqpylib/$${file}" ; \
-			${INSTALL_SCRIPT} $${file} ${libdir}/python/hawqpylib/$${file}; \
+			echo "install $${file} into ${DESTDIR}${libdir}/python/hawqpylib/$${file}" ; \
+			${INSTALL_SCRIPT} $${file} ${DESTDIR}${libdir}/python/hawqpylib/$${file}; \
 		done
 	@for dirs in `find * -type d | grep -v test` ;\
 		do \
-			${INSTALL_SCRIPT} -d ${libdir}/python/hawqpylib/$${dirs}; \
+			${INSTALL_SCRIPT} -d ${DESTDIR}${libdir}/python/hawqpylib/$${dirs}; \
 			for file in `find $${dirs} -type f | grep -v -E "${SKIP_INSTALL}"`; do \
-				echo "install $${file} into ${libdir}/python/hawqpylib/$${file}" ; \
-				${INSTALL_SCRIPT} $${file} ${libdir}/python/hawqpylib/$${file}; \
+				echo "install $${file} into ${DESTDIR}${libdir}/python/hawqpylib/$${file}" ; \
+				${INSTALL_SCRIPT} $${file} ${DESTDIR}${libdir}/python/hawqpylib/$${file}; \
 			done \
 		done
 	

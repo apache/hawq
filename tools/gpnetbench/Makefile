@@ -39,8 +39,8 @@ gpnetbenchClient: $(CLIENT_OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o gpnetbenchClient $(CLIENT_OBJS)
 
 install: all
-	$(INSTALL_PROGRAM) gpnetbenchServer $(bindir)/lib
-	$(INSTALL_PROGRAM) gpnetbenchClient $(bindir)/lib
+	$(INSTALL_PROGRAM) gpnetbenchServer ${DESTDIR}$(bindir)/lib
+	$(INSTALL_PROGRAM) gpnetbenchClient ${DESTDIR}$(bindir)/lib
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<

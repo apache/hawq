@@ -305,13 +305,13 @@ endif
 	$(INSTALL_DATA) $(srcdir)/libpq/pg_ident.conf.sample '$(DESTDIR)$(datadir)/pg_ident.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/utils/misc/postgresql.conf.sample '$(DESTDIR)$(datadir)/postgresql.conf.sample'
 	$(INSTALL_DATA) $(srcdir)/access/transam/recovery.conf.sample '$(DESTDIR)$(datadir)/recovery.conf.sample'
-	${INSTALL_SCRIPT} -d ${sysconfdir}
-	${INSTALL_DATA} $(srcdir)/utils/misc/etc/hawq-site.xml ${sysconfdir}
-	${INSTALL_DATA} $(srcdir)/utils/misc/etc/hdfs-client.xml ${sysconfdir}
-	${INSTALL_DATA} $(srcdir)/utils/misc/etc/yarn-client.xml ${sysconfdir}
-	${INSTALL_DATA} $(srcdir)/utils/misc/etc/slaves ${sysconfdir}
-	${INSTALL_DATA} $(srcdir)/utils/misc/etc/template-hawq-site.xml ${sysconfdir}
-	${INSTALL_DATA} $(srcdir)/utils/misc/etc/gpcheck.cnf ${sysconfdir}
+	${INSTALL_SCRIPT} -d $(DESTDIR)${sysconfdir}
+	${INSTALL_DATA} $(srcdir)/utils/misc/etc/hawq-site.xml $(DESTDIR)${sysconfdir}
+	${INSTALL_DATA} $(srcdir)/utils/misc/etc/hdfs-client.xml $(DESTDIR)${sysconfdir}
+	${INSTALL_DATA} $(srcdir)/utils/misc/etc/yarn-client.xml $(DESTDIR)${sysconfdir}
+	${INSTALL_DATA} $(srcdir)/utils/misc/etc/slaves $(DESTDIR)${sysconfdir}
+	${INSTALL_DATA} $(srcdir)/utils/misc/etc/template-hawq-site.xml $(DESTDIR)${sysconfdir}
+	${INSTALL_DATA} $(srcdir)/utils/misc/etc/gpcheck.cnf $(DESTDIR)${sysconfdir}
 ifeq ($(enable_orca), yes)
 	$(MAKE) -C $(ORCA_BLD_PATH)/gporca/build $@
 	$(MAKE) -C $(ORCA_BLD_PATH)/gpos/build $@
