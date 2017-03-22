@@ -2297,480 +2297,429 @@ has_rolcatupdate(Oid roleid)
 
 char *getRoleName(Oid role_id)
 {
-  Assert(OidIsValid(role_id));
-  int fetchCount;
-  char* role_name = caql_getcstring_plus(
-            NULL,
-            &fetchCount,
-            NULL,
-            cql("SELECT rolname FROM pg_authid "
-              " WHERE oid = :1 ",
-              ObjectIdGetDatum(role_id)));
+	Assert(OidIsValid(role_id));
+	int fetchCount;
+	char* role_name = caql_getcstring_plus(
+						NULL,
+						&fetchCount,
+						NULL,
+						cql("SELECT rolname FROM pg_authid  WHERE oid = :1 ",
+							ObjectIdGetDatum(role_id)));
 
- if (role_name == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_authid", role_id);
-  return role_name;
+	if (role_name == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_authid", role_id);
+	return role_name;
 }
 
 char *getClassNameFromOid(Oid object_oid)
 {
-  StringInfoData tname;
-  initStringInfo(&tname);
+	StringInfoData tname;
+	initStringInfo(&tname);
+	HeapTuple tup;
+	cqContext *pCtx;
+	Assert(OidIsValid(object_oid));
 
-  Assert(OidIsValid(object_oid));
-  char* rel_name = caql_getcstring(
-                   NULL,
-                   cql("SELECT relname FROM pg_class "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (rel_name == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
+	pCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_class "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(object_oid)));
 
-  int fetchCount=0;
-  Oid schema_name_oid = caql_getoid_plus(
-                     NULL,
-                     &fetchCount,
-                     NULL,
-                     cql("SELECT relnamespace FROM pg_class "
-                       " WHERE oid = :1",
-                       ObjectIdGetDatum(object_oid)));
-  if (schema_name_oid == InvalidOid)
-    elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
+	tup = caql_getnext(pCtx);
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
 
-  char* schema_name= caql_getcstring(
-      NULL,
-      cql("select nspname from pg_namespace "
-          " WHERE oid = :1",
-          ObjectIdGetDatum(schema_name_oid)));
-  if (schema_name == NULL)
-      elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
+	char* schema_name = getNamespaceNameFromOid(((Form_pg_class)GETSTRUCT(tup))->relnamespace);
+	appendStringInfo(&tname, "%s", schema_name);
+	appendStringInfoChar(&tname, '.');
+	appendStringInfo(&tname, "%s", ((Form_pg_class)GETSTRUCT(tup))->relname);
 
-  Oid dboid = InvalidOid;
-  dboid = caql_getoid(NULL,
-                  cql("SELECT nspdboid FROM pg_namespace WHERE nspname = :1", schema_name));
-
-  if (dboid == InvalidOid)
-    dboid = MyDatabaseId;
-  char* database_name = get_database_name(dboid);
-  if (database_name == NULL)
-    elog(ERROR, "cannot find database by oid [%u]", dboid);
-
-  appendStringInfo(&tname, "%s", database_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", schema_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", rel_name);
-  pfree(rel_name);
-  pfree(schema_name);
-  pfree(database_name);
-
-  return tname.data;
+	pfree(schema_name);
+	caql_endscan(pCtx);
+	return tname.data;
 }
 
 char *getDatabaseNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* dbname = caql_getcstring(
-                   NULL,
-                   cql("SELECT datname FROM pg_database "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (dbname == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_database", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* dbname = caql_getcstring(
+					NULL,
+					cql("SELECT datname FROM pg_database "
+						" WHERE oid = :1",
+						ObjectIdGetDatum(object_oid)));
 
-  return dbname;
+	if (dbname == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_database", object_oid);
+
+	return dbname;
 }
+
 char *getProcNameFromOid(Oid object_oid)
 {
-  StringInfoData tname;
-  initStringInfo(&tname);
+	StringInfoData tname;
+	initStringInfo(&tname);
+	HeapTuple tup;
+	cqContext *pCtx;
 
-  Assert(OidIsValid(object_oid));
-  char* proc_name = caql_getcstring(
-                   NULL,
-                   cql("SELECT proname FROM pg_proc "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (proc_name == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_proc", object_oid);
+	Assert(OidIsValid(object_oid));
 
-  int fetchCount=0;
-  Oid schema_name_oid = caql_getoid_plus(
-                    NULL,
-                    &fetchCount,
-                    NULL,
-                    cql("SELECT pronamespace FROM pg_proc "
-                      " WHERE oid = :1",
-                      ObjectIdGetDatum(object_oid)));
-  if (schema_name_oid == InvalidOid)
-     elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
+	pCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(object_oid)));
 
-  char* schema_name= caql_getcstring(
-     NULL,
-     cql("select nspname from pg_namespace "
-       " WHERE oid = :1",
-       ObjectIdGetDatum(schema_name_oid)));
-  if (schema_name == NULL)
-     elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
+	tup = caql_getnext(pCtx);
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
 
-  Oid dboid = InvalidOid;
-  dboid = caql_getoid(NULL,
-                  cql("SELECT nspdboid FROM pg_namespace WHERE nspname = :1", schema_name));
+	char* schema_name = getNamespaceNameFromOid(((Form_pg_proc)GETSTRUCT(tup))->pronamespace);
+	appendStringInfo(&tname, "%s", schema_name);
+	appendStringInfoChar(&tname, '.');
+	appendStringInfo(&tname, "%s", ((Form_pg_proc)GETSTRUCT(tup))->proname);
 
-  if (dboid == InvalidOid)
-    dboid = MyDatabaseId;
-  char* database_name = get_database_name(dboid);
-  if (database_name == NULL)
-    elog(ERROR, "cannot find database by oid [%u]", dboid);
-
-  appendStringInfo(&tname, "%s", database_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", schema_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", proc_name);
-  pfree(proc_name);
-  pfree(schema_name);
-  pfree(database_name);
-
-  return tname.data;
+	pfree(schema_name);
+	caql_endscan(pCtx);
+	return tname.data;
 }
+
 char *getOperNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT oprname FROM pg_operator "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_operator", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+						NULL,
+						cql("SELECT oprname FROM pg_operator "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_operator", object_oid);
 
-  return typename;
+	return typename;
 }
+
 char *getTypeNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT typname FROM pg_type "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_type", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+						NULL,
+						cql("SELECT typname FROM pg_type "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_type", object_oid);
 
-  return typename;
+	return typename;
 }
+
 char *getLanguageNameFromOid(Oid object_oid)
 {
-  StringInfoData tname;
-  initStringInfo(&tname);
+	StringInfoData tname;
+	initStringInfo(&tname);
 
-  Assert(OidIsValid(object_oid));
-  char* lang_name = caql_getcstring(
-                   NULL,
-                   cql("SELECT lanname FROM pg_language "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (lang_name == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_language", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* lang_name = caql_getcstring(
+						NULL,
+						cql("SELECT lanname FROM pg_language "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
 
-  char* database_name = get_database_name(MyDatabaseId);
-  if (database_name == NULL)
-    elog(ERROR, "cannot find database by oid [%u]", MyDatabaseId);
+	if (lang_name == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_language", object_oid);
 
-  appendStringInfo(&tname, "%s", database_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", lang_name);
+	char* database_name = get_database_name(MyDatabaseId);
+	if (database_name == NULL)
+		elog(ERROR, "cannot find database by oid [%u]", MyDatabaseId);
 
-  pfree(lang_name);
-  pfree(database_name);
+	appendStringInfo(&tname, "%s", database_name);
+	appendStringInfoChar(&tname, '.');
+	appendStringInfo(&tname, "%s", lang_name);
 
-  return tname.data;
+	pfree(lang_name);
+	pfree(database_name);
+
+	return tname.data;
 }
+
+/**
+ * Given a namespace oid, return its database name and namespace name: XX.XX
+ */
 char *getNamespaceNameFromOid(Oid object_oid)
 {
+	StringInfoData tname;
+	initStringInfo(&tname);
+	HeapTuple tup;
+	cqContext *pCtx;
 
-  StringInfoData tname;
-  initStringInfo(&tname);
+	pCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_namespace "
+				" WHERE oid = :1 ",
+				ObjectIdGetDatum(object_oid)));
 
-  Assert(OidIsValid(object_oid));
-  char* schema_name = caql_getcstring(
-                   NULL,
-                   cql("SELECT nspname FROM pg_namespace "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (schema_name == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
+	tup = caql_getnext(pCtx);
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
 
-  Oid dboid = InvalidOid;
-  dboid = caql_getoid(NULL,
-                  cql("SELECT nspdboid FROM pg_namespace WHERE nspname = :1", schema_name));
+	Oid dboid = ((Form_pg_namespace)GETSTRUCT(tup))->nspdboid;
+	if (dboid == InvalidOid)
+		dboid = MyDatabaseId;
+	char* database_name = get_database_name(dboid);
+	if (database_name == NULL)
+		elog(ERROR, "cannot find database by oid [%u]", dboid);
 
-  if(dboid == InvalidOid)
-    dboid = MyDatabaseId;
-  char* database_name = get_database_name(dboid);
-  if (database_name == NULL)
-    elog(ERROR, "cannot find database by oid [%u]", dboid);
+	appendStringInfo(&tname, "%s", database_name);
+	appendStringInfoChar(&tname, '.');
+	appendStringInfo(&tname, "%s", ((Form_pg_namespace)GETSTRUCT(tup))->nspname);
 
-  appendStringInfo(&tname, "%s", database_name);
-  appendStringInfoChar(&tname, '.');
-  appendStringInfo(&tname, "%s", schema_name);
-
-  pfree(schema_name);
-  pfree(database_name);
-
-  return tname.data;
+	pfree(database_name);
+	caql_endscan(pCtx);
+	return tname.data;
 }
+
 char *getNamespaceNameByOid(Oid object_oid)
 {
-
-  StringInfoData tname;
-  initStringInfo(&tname);
-
-  Assert(OidIsValid(object_oid));
-  char* schema_name = caql_getcstring(
-                   NULL,
-                   cql("SELECT nspname FROM pg_namespace "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (schema_name == NULL)
-  {
-    return NULL;
-  }
-
-  appendStringInfo(&tname, "%s", schema_name);
-  pfree(schema_name);
-
-  return tname.data;
+	Assert(OidIsValid(object_oid));
+	return caql_getcstring(
+				NULL,
+				cql("SELECT nspname FROM pg_namespace "
+					" WHERE oid = :1",
+				ObjectIdGetDatum(object_oid)));
 }
+
 char *getConversionNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT conname FROM pg_conversion "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_conversion", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+						NULL,
+						cql("SELECT conname FROM pg_conversion "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_conversion", object_oid);
 
-  return typename;
+	return typename;
 }
+
 char *getTablespaceNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT spcname FROM pg_tablespace "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_tablespace", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+						NULL,
+						cql("SELECT spcname FROM pg_tablespace "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_tablespace", object_oid);
 
-  return typename;
+	return typename;
 }
+
 char *getFilespaceNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT fsname FROM pg_filespace "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_filespace", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+						NULL,
+						cql("SELECT fsname FROM pg_filespace "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_filespace", object_oid);
 
-  return typename;
+	return typename;
 }
+
 char *getFilesystemNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT fsysname FROM pg_filesystem "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_filesystem", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+						NULL,
+						cql("SELECT fsysname FROM pg_filesystem "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_filesystem", object_oid);
 
-  return typename;
+	return typename;
 }
+
 char *getFDWNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT fdwname FROM pg_foreign_data_wrapper "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_foreign_data_wrapper", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+					 NULL,
+						cql("SELECT fdwname FROM pg_foreign_data_wrapper "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_foreign_data_wrapper", object_oid);
 
-  return typename;
+	return typename;
 }
+
 char *getForeignServerNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT srvname FROM pg_foreign_server "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_foreign_server", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+						NULL,
+						cql("SELECT srvname FROM pg_foreign_server "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_foreign_server", object_oid);
 
-  return typename;
+	return typename;
 }
+
 char *getExtprotocolNameFromOid(Oid object_oid)
 {
-  Assert(OidIsValid(object_oid));
-  char* typename = caql_getcstring(
-                   NULL,
-                   cql("SELECT ptcname FROM pg_extprotocol "
-                     " WHERE oid = :1",
-                     ObjectIdGetDatum(object_oid)));
-  if (typename == NULL)
-    elog(ERROR, "oid [%u] not found in table pg_extprotocol", object_oid);
+	Assert(OidIsValid(object_oid));
+	char* typename = caql_getcstring(
+						NULL,
+						cql("SELECT ptcname FROM pg_extprotocol "
+							" WHERE oid = :1",
+							ObjectIdGetDatum(object_oid)));
+	if (typename == NULL)
+		elog(ERROR, "oid [%u] not found in table pg_extprotocol", object_oid);
 
-  return typename;
+	return typename;
 }
 
 char *getNameFromOid(AclObjectKind objkind, Oid object_oid)
 {
-  switch (objkind)
-  {
-    case ACL_KIND_CLASS:
-    case ACL_KIND_SEQUENCE:
-      return getClassNameFromOid(object_oid);
-    case ACL_KIND_DATABASE:
-      return getDatabaseNameFromOid(object_oid);
-    case ACL_KIND_PROC:
-      return getProcNameFromOid(object_oid);
-    case ACL_KIND_OPER:
-      return getOperNameFromOid(object_oid);
-    case ACL_KIND_TYPE:
-      return getTypeNameFromOid(object_oid);
-    case ACL_KIND_CONVERSION:
-      return getConversionNameFromOid(object_oid);
-    case ACL_KIND_LANGUAGE:
-      return getLanguageNameFromOid(object_oid);
-    case ACL_KIND_NAMESPACE:
-      return getNamespaceNameFromOid(object_oid);
-    case ACL_KIND_TABLESPACE:
-      return getTablespaceNameFromOid(object_oid);
-    case ACL_KIND_FILESPACE:
-      return getFilespaceNameFromOid(object_oid);
-    case ACL_KIND_FILESYSTEM:
-      return getFilesystemNameFromOid(object_oid);
-    case ACL_KIND_FDW:
-      return getFDWNameFromOid(object_oid);
-    case ACL_KIND_FOREIGN_SERVER:
-      return getForeignServerNameFromOid(object_oid);
-    case ACL_KIND_EXTPROTOCOL:
-      return getExtprotocolNameFromOid(object_oid);
-    default:
-      elog(ERROR, "unrecognized objkind: %d",
-         (int) objkind);
-      /* not reached, but keep compiler quiet */
-      return NULL;
-  }
+	switch (objkind)
+	{
+		case ACL_KIND_CLASS:
+		case ACL_KIND_SEQUENCE:
+			return getClassNameFromOid(object_oid);
+		case ACL_KIND_DATABASE:
+			return getDatabaseNameFromOid(object_oid);
+		case ACL_KIND_PROC:
+			return getProcNameFromOid(object_oid);
+		case ACL_KIND_OPER:
+			return getOperNameFromOid(object_oid);
+		case ACL_KIND_TYPE:
+			return getTypeNameFromOid(object_oid);
+		case ACL_KIND_CONVERSION:
+			return getConversionNameFromOid(object_oid);
+		case ACL_KIND_LANGUAGE:
+			return getLanguageNameFromOid(object_oid);
+		case ACL_KIND_NAMESPACE:
+			return getNamespaceNameFromOid(object_oid);
+		case ACL_KIND_TABLESPACE:
+			return getTablespaceNameFromOid(object_oid);
+		case ACL_KIND_FILESPACE:
+			return getFilespaceNameFromOid(object_oid);
+		case ACL_KIND_FILESYSTEM:
+			return getFilesystemNameFromOid(object_oid);
+		case ACL_KIND_FDW:
+			return getFDWNameFromOid(object_oid);
+		case ACL_KIND_FOREIGN_SERVER:
+			return getForeignServerNameFromOid(object_oid);
+		case ACL_KIND_EXTPROTOCOL:
+			return getExtprotocolNameFromOid(object_oid);
+		default:
+			elog(ERROR, "unrecognized objkind: %d",
+			(int) objkind);
+			/* not reached, but keep compiler quiet */
+			return NULL;
+	}
 }
 
 char actionName[12][12] = {"INSERT","SELECT","UPDATE", "DELETE",
-    "TRUNCATE", "REFERENCES", "TRIGGER", "EXECUTE", "USAGE",
-    "CREATE", "TEMP", "CONNECT"};
+	"TRUNCATE", "REFERENCES", "TRIGGER", "EXECUTE", "USAGE",
+	"CREATE", "TEMP", "CONNECT"};
 
 List *getActionName(AclMode mask)
 {
-  List* actions = NIL;
-  int i = 0;
-  while(mask > 0)
-  {
-    if((mask & 1) > 0)
-    {
-      char* action = palloc(sizeof(char) * ACTION_LENGTH);
-      strncpy(action, actionName[i], ACTION_LENGTH);
-      actions = lappend(actions, action);
-    }
-    mask = mask >> 1;
-    i++;
-  }
-  return actions;
+	List* actions = NIL;
+	int i = 0;
+	while(mask > 0)
+	{
+		if((mask & 1) > 0)
+		{
+			char* action = palloc(sizeof(char) * ACTION_LENGTH);
+			strncpy(action, actionName[i], ACTION_LENGTH);
+			actions = lappend(actions, action);
+		}
+		mask = mask >> 1;
+		i++;
+	}
+	return actions;
 }
 
 bool checkNamespaceFallback(Oid x)
 {
-  if (x == PG_CATALOG_NAMESPACE
-     || x == PG_AOSEGMENT_NAMESPACE
-     || x == PG_TOAST_NAMESPACE
-     || x == PG_BITMAPINDEX_NAMESPACE
-     || x == information_schema_namespace_oid
-     || x == hawq_toolkit_schema_namespace_oid )
-  {
-    return true;
-  }
-  else
-  {
-    char* name = getNamespaceNameByOid(x);
-    if (name != NULL && pg_strncasecmp(name, "pg_temp", strlen("pg_temp")) == 0)
-    {
-      /* fall back pg_temp_XX check to native*/
-      return true;
-    }
-    else
-    {
-      return false;
-    }
-  }
+	if (x == PG_CATALOG_NAMESPACE
+		 || x == PG_AOSEGMENT_NAMESPACE
+		 || x == PG_TOAST_NAMESPACE
+		 || x == PG_BITMAPINDEX_NAMESPACE
+		 || x == information_schema_namespace_oid
+		 || x == hawq_toolkit_schema_namespace_oid )
+	{
+		return true;
+	}
+	else
+	{
+		char* name = getNamespaceNameByOid(x);
+		if (name != NULL && pg_strncasecmp(name, "pg_temp", strlen("pg_temp")) == 0)
+		{
+			/* fall back pg_temp_XX check to native*/
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
 }
 
 bool fallBackToNativeCheck(AclObjectKind objkind, Oid obj_oid, Oid roleid, AclMode mode)
 {
-  /* get the latest information_schema_namespace_oid and hawq_toolkit_schema_namespace_oid.
-   * Since caql access heap table directly without aclcheck, this function will not be called recursively
-   */
-  if (information_schema_namespace_oid == 0)
-  {
-    information_schema_namespace_oid = (int)get_namespace_oid("information_schema");
-  }
-  if (hawq_toolkit_schema_namespace_oid == 0)
-  {
-    hawq_toolkit_schema_namespace_oid = (int)get_namespace_oid("hawq_toolkit");
-  }
+	/* get the latest information_schema_namespace_oid and hawq_toolkit_schema_namespace_oid.
+	 * Since caql access heap table directly without aclcheck, this function will not be called recursively
+	 */
+	if (information_schema_namespace_oid == 0)
+	{
+		information_schema_namespace_oid = (int) get_namespace_oid("information_schema");
+	}
+	if (hawq_toolkit_schema_namespace_oid == 0)
+	{
+		hawq_toolkit_schema_namespace_oid = (int) get_namespace_oid("hawq_toolkit");
+	}
 
-  /* for heap table, we fall back to native check. */
-  if (objkind == ACL_KIND_CLASS)
-  {
-    Oid namespaceid = get_rel_namespace(obj_oid);
-    if(checkNamespaceFallback(namespaceid))
-    {
-      return true;
-    }
-  }
-  else if (objkind == ACL_KIND_NAMESPACE)
-  {
-    /* native check build-in schemas. */
-    if(checkNamespaceFallback(obj_oid))
-    {
-      return true;
-    }
-    else if (obj_oid == PG_PUBLIC_NAMESPACE && superuser() && mode == ACL_USAGE)
-    {
-      /* superuser's access to PUBLIC */
-      return true;
-    }
-  }
-  else if (objkind == ACL_KIND_PROC)
-  {
-    /* native check functions under build-in schemas. */
-    Oid namespaceid = get_func_namespace(obj_oid);
-    if (checkNamespaceFallback(namespaceid))
-    {
-      return true;
-    }
-  }
+	/* for heap table, we fall back to native check. */
+	if (objkind == ACL_KIND_CLASS)
+	{
+		Oid namespaceid = get_rel_namespace(obj_oid);
+		if(checkNamespaceFallback(namespaceid))
+		{
+			return true;
+		}
+	}
+	else if (objkind == ACL_KIND_NAMESPACE)
+	{
+		/* native check build-in schemas. */
+		if(checkNamespaceFallback(obj_oid))
+		{
+			return true;
+		}
+		else if (obj_oid == PG_PUBLIC_NAMESPACE && superuser() && mode == ACL_USAGE)
+		{
+			/* superuser's access to PUBLIC */
+			return true;
+		}
+	}
+	else if (objkind == ACL_KIND_PROC)
+	{
+		/* native check functions under build-in schemas. */
+		Oid namespaceid = get_func_namespace(obj_oid);
+		if (checkNamespaceFallback(namespaceid))
+		{
+			return true;
+		}
+	}
 
-  return false;
+	return false;
 }
 
 /*
@@ -2791,66 +2740,68 @@ bool is_sequence(Oid object_oid) {
  */
 List *pg_rangercheck_batch(List *arg_list)
 {
-  List *aclresults = NIL;
-  List *requestargs = NIL;
-  ListCell *arg;
-  elog(DEBUG3, "ranger acl batch check, acl list length: %d\n", arg_list->length);
-  foreach(arg, arg_list) {
-    RangerPrivilegeArgs *arg_ptr = (RangerPrivilegeArgs *) lfirst(arg);
+	List *aclresults = NIL;
+	List *requestargs = NIL;
+	ListCell *arg;
+	elog(DEBUG3, "ranger acl batch check, acl list length: %d\n", arg_list->length);
+	foreach(arg, arg_list)
+	{
+		RangerPrivilegeArgs *arg_ptr = (RangerPrivilegeArgs *) lfirst(arg);
 
-    AclObjectKind objkind = arg_ptr->objkind;
-    Oid object_oid = arg_ptr->object_oid;
-    char *objectname = getNameFromOid(objkind, object_oid);
-    char *rolename = getRoleName(arg_ptr->roleid);
-    List* actions = getActionName(arg_ptr->mask);
-    bool isAll = (arg_ptr->how == ACLMASK_ALL) ? true: false;
+		AclObjectKind objkind = arg_ptr->objkind;
+		Oid object_oid = arg_ptr->object_oid;
+		char *objectname = getNameFromOid(objkind, object_oid);
+		char *rolename = getRoleName(arg_ptr->roleid);
+		List* actions = getActionName(arg_ptr->mask);
+		bool isAll = (arg_ptr->how == ACLMASK_ALL) ? true: false;
 
-    RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
-    aclresult->result = RANGERCHECK_NO_PRIV;
-    aclresult->relOid = object_oid;
-    /* this two sign fields will be set in function create_ranger_request_json */
-    aclresult->resource_sign = 0;
-    aclresult->privilege_sign = 0;
-    aclresults = lappend(aclresults, aclresult);
+		RangerPrivilegeResults *aclresult = (RangerPrivilegeResults *) palloc(sizeof(RangerPrivilegeResults));
+		aclresult->result = RANGERCHECK_NO_PRIV;
+		aclresult->relOid = object_oid;
+		/* this two sign fields will be set in function create_ranger_request_json */
+		aclresult->resource_sign = 0;
+		aclresult->privilege_sign = 0;
+		aclresults = lappend(aclresults, aclresult);
 
-    RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
-    requestarg->user = rolename;
-    requestarg->kind = objkind;
-    requestarg->object = objectname;
-    requestarg->actions = actions;
-    requestarg->isAll = isAll;
-    requestargs = lappend(requestargs, requestarg);
+		RangerRequestJsonArgs *requestarg = (RangerRequestJsonArgs *) palloc(sizeof(RangerRequestJsonArgs));
+		requestarg->user = rolename;
+		requestarg->kind = objkind;
+		requestarg->object = objectname;
+		requestarg->actions = actions;
+		requestarg->isAll = isAll;
+		requestargs = lappend(requestargs, requestarg);
+	} // foreach
 
-  } // foreach
+	int ret = check_privilege_from_ranger(requestargs, aclresults);
+	if (ret < 0)
+	{
+		ListCell *result;
+		foreach(result, aclresults)
+		{
+			RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
+			result_ptr->result = RANGERCHECK_NO_PRIV;
+		}
+	}
 
-  int ret = check_privilege_from_ranger(requestargs, aclresults);
-  if (ret < 0)
-  {
-	  ListCell *result;
-	  foreach(result, aclresults) {
-		  RangerPrivilegeResults *result_ptr = (RangerPrivilegeResults *) lfirst(result);
-		  result_ptr->result = RANGERCHECK_NO_PRIV;
-	  }
-  }
+	if(requestargs)
+	{
+		ListCell   *cell = list_head(requestargs);
+		while (cell != NULL)
+		{
+			ListCell   *tmp = cell;
+			cell = lnext(cell);
+			RangerRequestJsonArgs* requestarg =
+			(RangerRequestJsonArgs*)lfirst(tmp);
+			pfree(requestarg->user);
+			pfree(requestarg->object);
+			list_free_deep(requestarg->actions);
+		}
 
-  if(requestargs) {
-    ListCell   *cell = list_head(requestargs);
-    while (cell != NULL)
-    {
-      ListCell   *tmp = cell;
-      cell = lnext(cell);
-      RangerRequestJsonArgs* requestarg =
-          (RangerRequestJsonArgs*)lfirst(tmp);
-      pfree(requestarg->user);
-      pfree(requestarg->object);
-      list_free_deep(requestarg->actions);
-    }
+		list_free_deep(requestargs);
+		requestargs = NULL;
+	}
 
-    list_free_deep(requestargs);
-    requestargs = NULL;
-  }
-
-  return aclresults;
+	return aclresults;
 }
 
 AclResult
@@ -2948,8 +2899,7 @@ pg_aclmask(AclObjectKind objkind, Oid table_oid, Oid roleid,
 		case ACL_KIND_EXTPROTOCOL:
 			return pg_extprotocol_aclmask(table_oid, roleid, mask, how);
 		default:
-			elog(ERROR, "unrecognized object kind : %d",
-				 (int) objkind);
+			elog(ERROR, "unrecognized object kind : %d",(int) objkind);
 			/* not reached, but keep compiler quiet */
 			return ACL_NO_RIGHTS;
 	}
@@ -3775,10 +3725,10 @@ pg_filesystem_aclmask(Oid fsysOid, Oid roleid,
 AclResult
 pg_class_nativecheck(Oid table_oid, Oid roleid, AclMode mode)
 {
-  if (pg_class_aclmask(table_oid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_class_aclmask(table_oid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3787,10 +3737,10 @@ pg_class_nativecheck(Oid table_oid, Oid roleid, AclMode mode)
 AclResult
 pg_database_nativecheck(Oid db_oid, Oid roleid, AclMode mode)
 {
-  if (pg_database_aclmask(db_oid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_database_aclmask(db_oid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3799,10 +3749,10 @@ pg_database_nativecheck(Oid db_oid, Oid roleid, AclMode mode)
 AclResult
 pg_proc_nativecheck(Oid proc_oid, Oid roleid, AclMode mode)
 {
-  if (pg_proc_aclmask(proc_oid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_proc_aclmask(proc_oid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3811,10 +3761,10 @@ pg_proc_nativecheck(Oid proc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_language_nativecheck(Oid lang_oid, Oid roleid, AclMode mode)
 {
-  if (pg_language_aclmask(lang_oid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_language_aclmask(lang_oid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3823,10 +3773,10 @@ pg_language_nativecheck(Oid lang_oid, Oid roleid, AclMode mode)
 AclResult
 pg_namespace_nativecheck(Oid nsp_oid, Oid roleid, AclMode mode)
 {
-  if (pg_namespace_aclmask(nsp_oid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_namespace_aclmask(nsp_oid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3835,10 +3785,10 @@ pg_namespace_nativecheck(Oid nsp_oid, Oid roleid, AclMode mode)
 AclResult
 pg_tablespace_nativecheck(Oid spc_oid, Oid roleid, AclMode mode)
 {
-  if (pg_tablespace_aclmask(spc_oid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_tablespace_aclmask(spc_oid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3848,10 +3798,10 @@ pg_tablespace_nativecheck(Oid spc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_data_wrapper_nativecheck(Oid fdw_oid, Oid roleid, AclMode mode)
 {
-  if (pg_foreign_data_wrapper_aclmask(fdw_oid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_foreign_data_wrapper_aclmask(fdw_oid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3861,10 +3811,10 @@ pg_foreign_data_wrapper_nativecheck(Oid fdw_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_server_nativecheck(Oid srv_oid, Oid roleid, AclMode mode)
 {
-  if (pg_foreign_server_aclmask(srv_oid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_foreign_server_aclmask(srv_oid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3874,10 +3824,10 @@ pg_foreign_server_nativecheck(Oid srv_oid, Oid roleid, AclMode mode)
 AclResult
 pg_extprotocol_nativecheck(Oid ptcid, Oid roleid, AclMode mode)
 {
-  if (pg_extprotocol_aclmask(ptcid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_extprotocol_aclmask(ptcid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 /*
@@ -3886,10 +3836,10 @@ pg_extprotocol_nativecheck(Oid ptcid, Oid roleid, AclMode mode)
 AclResult
 pg_filesystem_nativecheck(Oid fsysid, Oid roleid, AclMode mode)
 {
-  if (pg_filesystem_aclmask(fsysid, roleid, mode, ACLMASK_ANY) != 0)
-    return ACLCHECK_OK;
-  else
-    return ACLCHECK_NO_PRIV;
+	if (pg_filesystem_aclmask(fsysid, roleid, mode, ACLMASK_ANY) != 0)
+		return ACLCHECK_OK;
+	else
+		return ACLCHECK_NO_PRIV;
 }
 
 
@@ -3903,22 +3853,24 @@ pg_filesystem_nativecheck(Oid fsysid, Oid roleid, AclMode mode)
 AclResult
 pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid, mode))
-  {
-	AclObjectKind objkind = ACL_KIND_CLASS;
-	if (is_sequence(table_oid)) {
-		objkind = ACL_KIND_SEQUENCE;
+	if (aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_CLASS, table_oid, roleid, mode))
+	{
+		AclObjectKind objkind = ACL_KIND_CLASS;
+		if (is_sequence(table_oid))
+		{
+			objkind = ACL_KIND_SEQUENCE;
+		}
+		return pg_rangercheck(objkind, table_oid, roleid, mode, ACLMASK_ANY);
 	}
-    return pg_rangercheck(objkind, table_oid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_class_nativecheck(table_oid, roleid, mode);
-  }
+	else
+	{
+		return pg_class_nativecheck(table_oid, roleid, mode);
+	}
 }
 
 /*
@@ -3927,18 +3879,19 @@ pg_class_aclcheck(Oid table_oid, Oid roleid, AclMode mode)
 AclResult
 pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid, mode))
-   {
-     return pg_rangercheck(ACL_KIND_DATABASE, db_oid, roleid, mode, ACLMASK_ANY);
-   }
-   else
-   {
-     return pg_database_nativecheck(db_oid, roleid, mode);
-   }
+	if (aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_DATABASE, db_oid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_DATABASE, db_oid, roleid, mode, ACLMASK_ANY);
+	}
+	else
+	{
+		return pg_database_nativecheck(db_oid, roleid, mode);
+	}
 }
 
 /*
@@ -3947,18 +3900,19 @@ pg_database_aclcheck(Oid db_oid, Oid roleid, AclMode mode)
 AclResult
 pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid, mode))
-  {
-    return pg_rangercheck(ACL_KIND_PROC, proc_oid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_proc_nativecheck(proc_oid, roleid, mode);
-  }
+	if (aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_PROC, proc_oid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_PROC, proc_oid, roleid, mode, ACLMASK_ANY);
+	}
+	else
+	{
+		return pg_proc_nativecheck(proc_oid, roleid, mode);
+	}
 }
 
 /*
@@ -3967,18 +3921,19 @@ pg_proc_aclcheck(Oid proc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode))
-  {
-    return pg_rangercheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_language_nativecheck(lang_oid, roleid, mode);
-  }
+	if (aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_LANGUAGE, lang_oid, roleid, mode, ACLMASK_ANY);
+	}
+	else
+	{
+		return pg_language_nativecheck(lang_oid, roleid, mode);
+	}
 }
 
 /*
@@ -3987,18 +3942,19 @@ pg_language_aclcheck(Oid lang_oid, Oid roleid, AclMode mode)
 AclResult
 pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode))
-  {
-    return pg_rangercheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_namespace_nativecheck(nsp_oid, roleid, mode);
-  }
+	if(aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_NAMESPACE, nsp_oid, roleid, mode, ACLMASK_ANY);
+	}
+	else
+	{
+		return pg_namespace_nativecheck(nsp_oid, roleid, mode);
+	}
 }
 
 /*
@@ -4007,18 +3963,19 @@ pg_namespace_aclcheck(Oid nsp_oid, Oid roleid, AclMode mode)
 AclResult
 pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode))
-  {
-    return pg_rangercheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_tablespace_nativecheck(spc_oid, roleid, mode);
-  }
+	if(aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_TABLESPACE, spc_oid, roleid, mode, ACLMASK_ANY);
+	}
+ 	else
+	{
+		return pg_tablespace_nativecheck(spc_oid, roleid, mode);
+	}
 }
 
 /*
@@ -4028,18 +3985,19 @@ pg_tablespace_aclcheck(Oid spc_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid, mode))
-  {
-    return pg_rangercheck(ACL_KIND_FDW, fdw_oid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_foreign_data_wrapper_nativecheck(fdw_oid, roleid, mode);
-  }
+	if(aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_FDW, fdw_oid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_FDW, fdw_oid, roleid, mode, ACLMASK_ANY);
+	}
+	else
+	{
+		return pg_foreign_data_wrapper_nativecheck(fdw_oid, roleid, mode);
+	}
 }
 
 /*
@@ -4049,18 +4007,19 @@ pg_foreign_data_wrapper_aclcheck(Oid fdw_oid, Oid roleid, AclMode mode)
 AclResult
 pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode))
-  {
-    return pg_rangercheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_foreign_server_nativecheck(srv_oid, roleid, mode);
-  }
+	if(aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_FOREIGN_SERVER, srv_oid, roleid, mode, ACLMASK_ANY);
+	}
+	else
+	{
+		return pg_foreign_server_nativecheck(srv_oid, roleid, mode);
+	}
 }
 
 /*
@@ -4070,18 +4029,19 @@ pg_foreign_server_aclcheck(Oid srv_oid, Oid roleid, AclMode mode)
 AclResult
 pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode))
-  {
-    return pg_rangercheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_extprotocol_nativecheck(ptcid, roleid, mode);
-  }
+	if (aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_EXTPROTOCOL, ptcid, roleid, mode, ACLMASK_ANY);
+	}
+	else
+	{
+		return pg_extprotocol_nativecheck(ptcid, roleid, mode);
+	}
 }
 
 /*
@@ -4090,18 +4050,19 @@ pg_extprotocol_aclcheck(Oid ptcid, Oid roleid, AclMode mode)
 AclResult
 pg_filesystem_aclcheck(Oid fsysid, Oid roleid, AclMode mode)
 {
-  /* Bypass all permission checking on QE. */
-  if (Gp_role == GP_ROLE_EXECUTE)
-    return ACLCHECK_OK;
+	/* Bypass all permission checking on QE. */
+	if (Gp_role == GP_ROLE_EXECUTE)
+		return ACLCHECK_OK;
 
-  if(aclType == HAWQ_ACL_RANGER && !fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode))
-  {
-    return pg_rangercheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode, ACLMASK_ANY);
-  }
-  else
-  {
-    return pg_filesystem_nativecheck(fsysid, roleid, mode);
-  }
+	if (aclType == HAWQ_ACL_RANGER &&
+			!fallBackToNativeCheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode))
+	{
+		return pg_rangercheck(ACL_KIND_FILESYSTEM, fsysid, roleid, mode, ACLMASK_ANY);
+	}
+	else
+	{
+		return pg_filesystem_nativecheck(fsysid, roleid, mode);
+	}
 }
 
 /*
