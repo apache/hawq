@@ -71,6 +71,7 @@ SQLUtility::SQLUtility(SQLUtilityMode mode)
 
 SQLUtility::~SQLUtility() {
   if (!test_info->result()->Failed()) {
+    usleep(200000);
     if (schemaName != HAWQ_DEFAULT_SCHEMA) {
       exec("DROP SCHEMA " + schemaName + " CASCADE");
     }
