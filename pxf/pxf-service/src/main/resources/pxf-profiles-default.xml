@@ -46,7 +46,7 @@ under the License.
         <description>
             This profile is suitable for using when connecting to Hive.
             Supports GPDBWritable output format, as specified in FORMAT header parameter.
-            Based on storage format, it uses one of optimized profiles(HiveRC, HiveText, HiveORC) whenever it's possible.
+            It auto-detects actual file storage format and uses an optimized profile (HiveRC, HiveText, HiveORC) if applicable.
         </description>
         <plugins>
             <fragmenter>org.apache.hawq.pxf.plugins.hive.HiveDataFragmenter</fragmenter>
