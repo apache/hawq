@@ -2276,10 +2276,10 @@ has_rolcatupdate(Oid roleid)
 	/* XXX XXX: SELECT rolcatupdate */
 
 	pcqCtx = caql_beginscan(
-			NULL,
-			cql("SELECT * FROM pg_authid "
-				" WHERE oid = :1 ",
-				ObjectIdGetDatum(roleid)));
+				NULL,
+				cql("SELECT * FROM pg_authid "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(roleid)));
 	
 	tuple = caql_getnext(pcqCtx);
 
@@ -2320,10 +2320,10 @@ char *getClassNameFromOid(Oid object_oid)
 	Assert(OidIsValid(object_oid));
 
 	pCtx = caql_beginscan(
-			NULL,
-			cql("SELECT * FROM pg_class "
-				" WHERE oid = :1 ",
-				ObjectIdGetDatum(object_oid)));
+				NULL,
+				cql("SELECT * FROM pg_class "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(object_oid)));
 
 	tup = caql_getnext(pCtx);
 	if (!HeapTupleIsValid(tup))
@@ -2364,10 +2364,10 @@ char *getProcNameFromOid(Oid object_oid)
 	Assert(OidIsValid(object_oid));
 
 	pCtx = caql_beginscan(
-			NULL,
-			cql("SELECT * FROM pg_proc "
-				" WHERE oid = :1 ",
-				ObjectIdGetDatum(object_oid)));
+				NULL,
+				cql("SELECT * FROM pg_proc "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(object_oid)));
 
 	tup = caql_getnext(pCtx);
 	if (!HeapTupleIsValid(tup))
@@ -2546,7 +2546,7 @@ char *getFDWNameFromOid(Oid object_oid)
 {
 	Assert(OidIsValid(object_oid));
 	char* typename = caql_getcstring(
-					 NULL,
+						NULL,
 						cql("SELECT fdwname FROM pg_foreign_data_wrapper "
 							" WHERE oid = :1",
 							ObjectIdGetDatum(object_oid)));
