@@ -71,6 +71,20 @@ SQLUtility::SQLUtility(SQLUtilityMode mode)
 
 SQLUtility::~SQLUtility() {
   if (!test_info->result()->Failed()) {
+
+	//--------------------------------------------------------------------------
+	// This is a temporary work around to sleep a short time window in order to
+	// wait for the quit of query dispatcher processes. Because each query
+	// dispatcher has one resource heart-beat thread to be joined before the
+	// exit, in worst case, that thread will sleep 100ms and consequently check
+	// the switch variable to complete the exiting logic. This may causes the
+	// error reporting that the database is still accessed by other users, when
+	// user drops database once finished using database.
+	//
+	// When we have that exit logic improved, we can remove this logic.
+	//--------------------------------------------------------------------------
+
+    usleep(200000);
     if (schemaName != HAWQ_DEFAULT_SCHEMA) {
       exec("DROP SCHEMA " + schemaName + " CASCADE");
     }
