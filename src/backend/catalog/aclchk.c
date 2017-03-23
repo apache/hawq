@@ -2449,6 +2449,7 @@ char *getNamespaceNameFromOid(Oid object_oid)
 	initStringInfo(&tname);
 	HeapTuple tup;
 	cqContext *pCtx;
+	bool isnull;
 
 	pCtx = caql_beginscan(
 			NULL,
@@ -2460,7 +2461,9 @@ char *getNamespaceNameFromOid(Oid object_oid)
 	if (!HeapTupleIsValid(tup))
 		elog(ERROR, "oid [%u] not found in table pg_namespace", object_oid);
 
-	Oid dboid = ((Form_pg_namespace)GETSTRUCT(tup))->nspdboid;
+	Oid dboid = DatumGetObjectId(caql_getattr(pCtx, Anum_pg_namespace_nspdboid, &isnull));
+	if (isnull)
+		elog(ERROR, "null nspdboid in pg_namespace by oid [%u]", object_oid);
 	if (dboid == InvalidOid)
 		dboid = MyDatabaseId;
 	char* database_name = get_database_name(dboid);
