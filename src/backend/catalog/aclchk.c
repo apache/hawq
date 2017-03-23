@@ -2332,7 +2332,7 @@ char *getClassNameFromOid(Oid object_oid)
 	char* schema_name = getNamespaceNameFromOid(((Form_pg_class)GETSTRUCT(tup))->relnamespace);
 	appendStringInfo(&tname, "%s", schema_name);
 	appendStringInfoChar(&tname, '.');
-	appendStringInfo(&tname, "%s", ((Form_pg_class)GETSTRUCT(tup))->relname);
+	appendStringInfo(&tname, "%s", NameStr(((Form_pg_class)GETSTRUCT(tup))->relname));
 
 	pfree(schema_name);
 	caql_endscan(pCtx);
@@ -2376,7 +2376,7 @@ char *getProcNameFromOid(Oid object_oid)
 	char* schema_name = getNamespaceNameFromOid(((Form_pg_proc)GETSTRUCT(tup))->pronamespace);
 	appendStringInfo(&tname, "%s", schema_name);
 	appendStringInfoChar(&tname, '.');
-	appendStringInfo(&tname, "%s", ((Form_pg_proc)GETSTRUCT(tup))->proname);
+	appendStringInfo(&tname, "%s", NameStr(((Form_pg_proc)GETSTRUCT(tup))->proname));
 
 	pfree(schema_name);
 	caql_endscan(pCtx);
@@ -2472,7 +2472,7 @@ char *getNamespaceNameFromOid(Oid object_oid)
 
 	appendStringInfo(&tname, "%s", database_name);
 	appendStringInfoChar(&tname, '.');
-	appendStringInfo(&tname, "%s", ((Form_pg_namespace)GETSTRUCT(tup))->nspname);
+	appendStringInfo(&tname, "%s", NameStr(((Form_pg_namespace)GETSTRUCT(tup))->nspname));
 
 	pfree(database_name);
 	caql_endscan(pCtx);
