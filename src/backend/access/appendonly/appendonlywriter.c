@@ -403,7 +403,7 @@ AORelCreateHashEntry(Oid relid)
 	aoHashEntry->head_rel_segfile.xid = InvalidTransactionId;
 	aoHashEntry->head_rel_segfile.latestWriteXid = InvalidTransactionId;
 	aoHashEntry->head_rel_segfile.isfull = true;
-  aoHashEntry->head_rel_segfile.needCheck = true;
+	aoHashEntry->head_rel_segfile.needCheck = true;
 	aoHashEntry->head_rel_segfile.tupcount = 0;
 	aoHashEntry->head_rel_segfile.tupsadded = 0;
 	aoHashEntry->max_seg_no = 0;
@@ -923,9 +923,9 @@ usedByConcurrentTransaction(AOSegfileStatus *segfilestat)
  */
 int
 addCandidateSegno(AOSegfileStatus **maxSegno4Seg, int segment_num, AOSegfileStatus *candidate_status, bool isKeepHash)
-{  
+{
+	int remaining_num = segment_num;
 	if(isKeepHash){
-		int remaining_num  = segment_num;
 		int idx = (candidate_status->segno+segment_num-1) % segment_num;	// from 1 to segment_num-1, then 0(segment_num)
 		if (NULL==maxSegno4Seg[idx] || maxSegno4Seg[idx]->segno > candidate_status->segno)  //using the min seg no firstly.
         	maxSegno4Seg[idx] = candidate_status;
@@ -933,20 +933,24 @@ addCandidateSegno(AOSegfileStatus **maxSegno4Seg, int segment_num, AOSegfileStat
 		for(int i=0; i<segment_num; i++)
     	{
     		if(NULL!=maxSegno4Seg[i] && maxSegno4Seg[i]->segno > 0){
-            remaining_num--;
+				remaining_num--;
           	}
     	}
-    	return remaining_num;
 	}else{
+		bool assigned = false; // candidate_status assigned?
+		remaining_num  = 0;
 		for(int i=0; i<segment_num; i++){
-			if (NULL==maxSegno4Seg[i]){
-				maxSegno4Seg[i]= candidate_status;
-				return segment_num-i-1;	
+			if (NULL==maxSegno4Seg[i] || maxSegno4Seg[i]->segno <= 0){
+				if(!assigned){
+					maxSegno4Seg[i]= candidate_status;
+					assigned = true;
+				}else{
+					remaining_num++;
+				}
 			}
 		}
 	}
-   Assert(false);
-   return 0;
+	return remaining_num;
 }
 
 /*
@@ -1136,26 +1140,22 @@ List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num,
             /* If the found segfile status are still no enough,
              * we need to get new ones from the status pool.
              */
-            if (remaining_num > 0)
-            {
-                //generate new segment_num to make sure that in keepHash mode, all segment node has at least one segfile is writable
-                int newAllocatedNum = remaining_num;
-                for(int i= 1; i<= newAllocatedNum; i++)
-                {
-                    int new_status = AORelGetSegfileStatus(aoentry);
-                    if (new_status == NEXT_END_OF_LIST)
-                    {
-                        LWLockRelease(AOSegFileLock);
-                        ereport(ERROR, (errmsg("cannot open more than %d append-only table segment files cocurrently",
-                                        MaxAORelSegFileStatus)));
-                    }
-                    AOSegfileStatusPool[new_status].segno = ++aoentry->max_seg_no;
-                    AOSegfileStatusPool[new_status].next = aoentry->head_rel_segfile.next;
-                    aoentry->head_rel_segfile.next = new_status;
-                    remaining_num = addCandidateSegno(maxSegno4Segment, segment_num,  &AOSegfileStatusPool[new_status], keepHash);
-                }
-                Assert(remaining_num==0);//make sure all segno got a candidate
-            }
+			while(remaining_num>0)
+			{
+				//generate new segment_num to make sure that in keepHash mode, all segment node has at least one segfile is writable
+				int new_status = AORelGetSegfileStatus(aoentry);
+				if (new_status == NEXT_END_OF_LIST)
+				{
+					LWLockRelease(AOSegFileLock);
+					ereport(ERROR, (errmsg("cannot open more than %d append-only table segment files concurrently",
+									MaxAORelSegFileStatus)));
+				}
+				AOSegfileStatusPool[new_status].segno = ++aoentry->max_seg_no;
+				AOSegfileStatusPool[new_status].next = aoentry->head_rel_segfile.next;
+				aoentry->head_rel_segfile.next = new_status;
+				remaining_num = addCandidateSegno(maxSegno4Segment, segment_num,  &AOSegfileStatusPool[new_status], keepHash);
+			}
+			Assert(remaining_num==0);//make sure all segno got a candidate
 
 
             for (int i = 0; i < segment_num; i++)
