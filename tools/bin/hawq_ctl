@@ -962,10 +962,10 @@ class HawqStop:
             else:
                 logger.info("Standby master %s successfully" % self.stop_action_past)
         if self.hawq_acl_type == 'ranger':
-            self.stop_rps()
+            self._stop_rps()
         if self.hawq_acl_type == 'unknown':
             logger.warning("Try to stop RPS when hawq_acl_type is unknown")
-            self.stop_rps(check_ret = False)
+            self._stop_rps(check_ret = False)
 
         # Execute segment stop command on each node.
         segments_return_flag = self._stopAllSegments()
@@ -1041,14 +1041,14 @@ class HawqStop:
             logger.info("Segments %s successfully" % self.stop_action_past)
         return total_return_flag
 
-    def _stop_rps(self):
+
+    def _stop_rps(self, check_ret = True):
+        if self.hawq_reload:
+            # not stop RPS when running 'hawq stop --reload'.
+            return
+        logger.info("Stop Ranger plugin service")
         cmd_str = "%s/ranger/bin/rps.sh stop" % (self.GPHOME)
         result = remote_ssh(cmd_str, self.master_host_name, self.user)
-        return result
-
-    def stop_rps(self, check_ret = True):
-        logger.info("Stop Ranger plugin service")
-        result = self._stop_rps()
         if check_ret:
             check_return_code(result, logger, \
                           "Ranger plugin service stop failed, exit", "Ranger plugin service stopped successfully")
@@ -1058,10 +1058,10 @@ class HawqStop:
             check_return_code(self._stop_master(), logger, \
                               "Master %s failed, exit" % self.stop_action, "Master %s successfully" % self.stop_action_past)
             if self.hawq_acl_type == 'ranger':
-                self.stop_rps()
+                self._stop_rps()
             if self.hawq_acl_type == 'unknown':
                 logger.warning("Try to stop RPS when hawq_acl_type is unknown")
-                self.stop_rps(check_ret = False)
+                self._stop_rps(check_ret = False)
         elif self.node_type == "standby":
             if self.standby_host_name.lower() not in ('', 'none'):
                 check_return_code(self._stop_standby(), logger, \
