@@ -32,6 +32,7 @@ BASEDIR=$( dirname ${CWDIR} )
 # read properties from the file
 source ${BASEDIR}/etc/rps.properties
 
+export JAVA_HOME
 export CATALINA_HOME
 export CATALINA_BASE=${BASEDIR}/plugin-service
 export CATALINA_PID=${CATALINA_BASE}/work/rps.pid

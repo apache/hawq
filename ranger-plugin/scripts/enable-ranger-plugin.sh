@@ -150,7 +150,7 @@ function validate_params() {
   get_hawq_password
   echo "RANGER URL  = ${RANGER_URL}" 
   echo "RANGER User = ${RANGER_USER}" 
-  echo "RANGER Password = $(mask ${RANGER_PASSWORD})" 
+  echo "RANGER Password = $(mask ${RANGER_PASSWORD})"
   echo "HAWQ HOST = ${HAWQ_HOST}"
   echo "HAWQ PORT = ${HAWQ_PORT}"  
   echo "HAWQ User = ${HAWQ_USER}" 
@@ -211,6 +211,24 @@ function update_ranger_url() {
   echo "Updated POLICY_MGR_URL to ${policy_mgr_url} in ${prop_file}"
 }
 
+function update_java_home() {
+  local java_base="/usr/jdk64"
+  if [[ -d ${java_base} ]]; then
+    local DIR_NAME=$(ls ${java_base} | sort -r | head -1)
+
+    if [[ ${DIR_NAME} ]]; then
+      JAVA_HOME_DIR="${java_base}/${DIR_NAME}"
+      local prop_file=$(dirname ${SCRIPT_DIR})/etc/rps.properties
+      sed -i -e "s|/usr/java/default|${JAVA_HOME_DIR}|g" ${prop_file}
+      echo "Updated default value of JAVA_HOME to ${JAVA_HOME_DIR} in ${prop_file}"
+    fi
+  fi
+
+  if [[ ! ${JAVA_HOME_DIR} && ! ${JAVA_HOME} ]]; then
+    echo "Unable to locate JAVA_HOME on this machine. Please modify the default value of JAVA_HOME in ${prop_file}."
+  fi
+}
+
 main() {
   if [[ $# -lt 1 ]]; then
     usage
@@ -221,5 +239,6 @@ main() {
   create_hawq_service_definition
   create_hawq_service_instance
   update_ranger_url
+  update_java_home
 }
 main "$@"
