@@ -28,7 +28,9 @@ elif [ -f /etc/SuSE-release ] ; then
     OS_TYPE="suse${DISTRO_MAJOR_VERSION}"
 fi
 
-HAWQ_RELEASE_VERSION=$(cat ../../getversion| grep ^GP_VERSION | cut -d '=' -f2 | sed 's|"||g' | cut -d '-' -f1)
+if [ -z "${HAWQ_RELEASE_VERSION}" ]; then
+    HAWQ_RELEASE_VERSION=$(cat ../../getversion| grep ^GP_VERSION | cut -d '=' -f2 | sed 's|"||g' | cut -d '-' -f1)
+fi
 
 echo "HAWQ_RELEASE_VERSION is $HAWQ_RELEASE_VERSION"
 
@@ -61,10 +63,8 @@ fi
 pushd rpmbuild > /dev/null
 RPM_TOP_DIR=$(pwd)
 
-echo 'rpmbuild --define "_topdir ${RPM_TOP_DIR}" \
-               --define "_hawq_version ${HAWQ_RELEASE_VERSION}" \
-               --define "_rpm_os_version ${OS_TYPE}" \
-               -bb SPECS/hawq.spec'
+set -x
+
 rpmbuild --define "_topdir ${RPM_TOP_DIR}" \
          --define "_hawq_version ${HAWQ_RELEASE_VERSION}" \
          --define "_rpm_os_version ${OS_TYPE}" \
@@ -74,4 +74,5 @@ if [ $? != 0 ]; then
     exit 0
 fi
 
+set +x
 popd > /dev/null
