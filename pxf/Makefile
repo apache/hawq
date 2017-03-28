@@ -73,6 +73,9 @@ rpm: tomcat
 	
 clean:
 	./gradlew clean
+	@rm -rf ./distributions/apache-tomcat*.rpm
+
+distclean maintainer-clean: clean
 
 doc:
 	./gradlew aggregateJavadoc 
