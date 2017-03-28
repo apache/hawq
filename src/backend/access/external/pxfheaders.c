@@ -112,8 +112,6 @@ void build_http_header(PxfInputData *input)
 
 	/* Aggregate information */
 	if (input->agg_type) {
-		char agg_groups_str[sizeof(int32)];
-
 		switch(input->agg_type) {
 		case EXEC_FLAG_EXTERNAL_AGG_COUNT:
 			churl_headers_append(headers, "X-GP-AGG-TYPE", "count");
