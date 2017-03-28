@@ -215,6 +215,7 @@ void set_current_fragment_headers(gphadoop_context* context)
 	churl_headers_override(context->churl_headers, "X-GP-DATA-DIR", frag_data->source_name);
 	churl_headers_override(context->churl_headers, "X-GP-DATA-FRAGMENT", frag_data->index);
 	churl_headers_override(context->churl_headers, "X-GP-FRAGMENT-METADATA", frag_data->fragment_md);
+	churl_headers_override(context->churl_headers, "X-GP-FRAGMENT-INDEX", frag_data->index);
 
 	if (frag_data->user_data)
 	{

@@ -30,6 +30,8 @@ import java.util.Properties;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -45,6 +47,7 @@ import org.apache.hawq.pxf.api.Metadata.Field;
 import org.apache.hawq.pxf.api.UnsupportedTypeException;
 import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.EnumHawqType;
+import org.apache.hawq.pxf.api.utilities.FragmentMetadata;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.api.io.DataType;
@@ -57,6 +60,12 @@ import org.apache.hadoop.hive.ql.io.orc.OrcSerde;
 import org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter.PXF_HIVE_INPUT_FORMATS;
 import org.apache.hawq.pxf.plugins.hive.HiveUserData;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_SERDES;
+import org.apache.hadoop.hive.ql.io.orc.Reader;
+import org.apache.hadoop.hive.ql.io.orc.ReaderImpl;
+import org.apache.hadoop.hive.ql.io.orc.OrcFile;
+import org.apache.hadoop.hive.ql.io.orc.ColumnStatistics;
+import org.apache.hadoop.hive.ql.io.orc.StripeInformation;
+import org.apache.hadoop.hive.ql.io.orc.StripeStatistics;
 
 /**
  * Class containing helper functions connecting
@@ -626,5 +635,19 @@ public class HiveUtilities {
         deserializer = (SerDe) Utilities.createAnyInstance(serdeType.getSerdeClassName());
 
         return deserializer;
+    }
+
+    public static Reader getOrcReader(InputData inputData) {
+        try {
+
+            Path path = new Path(inputData.getDataSource());
+            Reader reader = OrcFile.createReader(path.getFileSystem(new Configuration()), path);
+
+            return reader;
+
+        } catch (Exception e) {
+            throw new RuntimeException(
+                    "Exception while getting orc reader", e);
+        }
     }
 }
