@@ -308,6 +308,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	ListCell				*le1 = NULL;
 	int 					successCount = 0, failCount = 0;
 	StringInfoData 			failNames;
+	ResourceOwner owner, oldOwner;
 
 	/**
 	 * Ensure that an ANALYZE is requested.
@@ -475,6 +476,13 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		CommitTransactionCommand();
 		MemoryContextSwitchTo(analyzeStatementContext);
 	}
+
+	/**
+	 * Create a resource owner to keep track of our resources even not in trasaction block 
+	 */
+	owner = ResourceOwnerCreate(CurrentResourceOwner, "analyzeStmt");
+	oldOwner = CurrentResourceOwner;
+	CurrentResourceOwner = owner;
 
 	/**
 	 *  we use preferred_seg_num as default and
@@ -807,6 +815,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	}
 	elog(failCount > 0 ? INFO : elevel, "ANALYZE completed. Success: %d, Failure: %d %s", successCount, failCount, failNames.data);
 	pfree(failNames.data);
+
+	ResourceOwnerRelease(owner,
+						 RESOURCE_RELEASE_BEFORE_LOCKS,
+						 false, true);							
+	ResourceOwnerDelete(owner);
+	CurrentResourceOwner = oldOwner;
 
 	Assert(analyzeStatementContext == CurrentMemoryContext);
 	MemoryContextSwitchTo(callerContext);
