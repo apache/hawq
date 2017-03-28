@@ -34,16 +34,16 @@ except ImportError, e:
     sys.stderr.write('Cannot import module, please check that you have source greenplum_path.sh\n')
     sys.exit(2)
 
+# setup logging
+logger = get_default_logger()
+EXECNAME = os.path.split(__file__)[-1]
+setup_tool_logging(EXECNAME, getLocalHostname(), getUserName())
+
 # print executing command
 cmd = "Executing Command: ";
 for arg in sys.argv:
     cmd += arg + " "
 logger.info(cmd);
-
-# setup logging
-logger = get_default_logger()
-EXECNAME = os.path.split(__file__)[-1]
-setup_tool_logging(EXECNAME, getLocalHostname(), getUserName())
 
 def option_parser():
     '''option parser'''
