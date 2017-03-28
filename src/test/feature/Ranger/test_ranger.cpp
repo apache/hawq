@@ -322,6 +322,8 @@ TEST_F(TestHawqRanger, HcatalogTest) {
 		 * create a table in hive and populate some rows
 		 */
 		clearEnv(&util, "pxf", 1);
+		clearEnv(&util, "pxf", 2);
+		clearEnv(&util, "pxf", 3);
 		string rootPath(util.getTestRootPath());
 		string sqlPath = rootPath + "/Ranger/data/testhive.sql";
 		auto cmd =  hawq::test::stringFormat("hive -f %s", sqlPath.c_str());
@@ -334,7 +336,7 @@ TEST_F(TestHawqRanger, HcatalogTest) {
 		runSQLFile(&util, "pxf", "fail", 1);
 
 		/*
-		 * add an allow policy for this user and query again, succeed.
+		 * add allow policies for this user and query again, succeed.
 		 */
 		addPolicy(&util, "pxf", 1); // usage of default
 		addPolicy(&util, "pxf", 2); // select of table
