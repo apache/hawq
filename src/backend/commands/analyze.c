@@ -308,6 +308,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	ListCell				*le1 = NULL;
 	int 					successCount = 0, failCount = 0;
 	StringInfoData 			failNames;
+	ResourceOwner owner, oldOwner;
 
 	/**
 	 * Ensure that an ANALYZE is requested.
@@ -475,6 +476,13 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		CommitTransactionCommand();
 		MemoryContextSwitchTo(analyzeStatementContext);
 	}
+
+	/**
+	 * Create a resource owner to keep track of our resources even not in trasaction block
+	 */
+	owner = ResourceOwnerCreate(CurrentResourceOwner, "analyzeStmt");
+	oldOwner = CurrentResourceOwner;
+	CurrentResourceOwner = owner;
 
 	/**
 	 *  we use preferred_seg_num as default and
@@ -773,6 +781,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		resource = NULL;
 		UnsetActiveQueryResource();
 		SetActiveQueryResource(savedResource);
+		
+		ResourceOwnerRelease(owner,
+				RESOURCE_RELEASE_BEFORE_LOCKS,
+				false, true);
+		CurrentResourceOwner = oldOwner;
+		ResourceOwnerDelete(owner);
 
 		/* Carry on with error handling. */
 		PG_RE_THROW();
@@ -786,6 +800,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	resource = NULL;
 	UnsetActiveQueryResource();
 	SetActiveQueryResource(savedResource);
+
+	ResourceOwnerRelease(owner,
+            RESOURCE_RELEASE_BEFORE_LOCKS,
+            false, true);
+	CurrentResourceOwner = oldOwner;
+	ResourceOwnerDelete(owner);
 
 	if (bUseOwnXacts)
 	{
