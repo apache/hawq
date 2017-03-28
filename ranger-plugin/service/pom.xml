@@ -61,6 +61,15 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.19.1</version>
+                <configuration>
+                    <!-- run test classes in separate JVMs, as RangerHawqAuthorizerServiceNameTest requires it -->
+                    <reuseForks>false</reuseForks>
+                </configuration>
+            </plugin>
+            <plugin>
                 <artifactId>maven-war-plugin</artifactId>
                 <version>3.0.0</version>
                 <configuration>
