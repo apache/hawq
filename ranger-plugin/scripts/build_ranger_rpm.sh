@@ -30,21 +30,21 @@ fi
 mvn ${MVN_OPTS} versions:set -DnewVersion=${HAWQ_RELEASE_VERSION}
 if [ $? != 0 ]; then
     echo "Set HAWQ ranger-plugin failed."
-    exit 1
+    exit $?
 fi
 
 # generate jar and war files.
 mvn ${MVN_OPTS} clean package
 if [ $? != 0 ]; then
     echo "Generate HAWQ ranger-plugin jar and war files failed."
-    exit 1
+    exit $?
 fi
 
 # build rpm
 mvn ${MVN_OPTS} -N -Drelease.version=${BUILD_NUMBER} install
 if [ $? != 0 ]; then
     echo "Build HAWQ ranger-plugin rpm package failed."
-    exit 1
+    exit $?
 fi
 
 exit 0
