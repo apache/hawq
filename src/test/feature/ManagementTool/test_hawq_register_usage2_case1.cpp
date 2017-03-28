@@ -214,51 +214,51 @@ TEST_F(TestHawqRegister, TestUsage2Case1HDFSFilePathContainErrorSymbol) {
 
 TEST_F(TestHawqRegister, TestUsage2Case1ErrorHashTableRegistry) {
     SQLUtility util;
-    util.execute("drop table if exists t_1_1;");
-    util.execute("drop table if exists t_1_2;");
-    util.execute("drop table if exists t_1_3;");
-    util.execute("drop table if exists t_2;");
-    util.execute("drop table if exists nt_1;");
-    util.execute("drop table if exists nt_2;");
+    util.execute("drop table if exists t_hash_1_1;");
+    util.execute("drop table if exists t_hash_1_2;");
+    util.execute("drop table if exists t_hash_1_3;");
+    util.execute("drop table if exists t_hash_2;");
+    util.execute("drop table if exists nt_hash_1;");
+    util.execute("drop table if exists nt_hash_2;");
 
-    util.execute("create table t_1_1(i int, j int, k int) with (appendonly=true, orientation=row, bucketnum=12) distributed by (i, j);");
-    util.execute("insert into t_1_1 select generate_series(1, 100);");
-    util.query("select * from t_1_1;", 100);
-    util.execute("create table t_1_2(i int, j int, k int) with (appendonly=true, orientation=row) distributed by (i);");
-    util.execute("insert into t_1_2 select generate_series(1, 100);");
-    util.query("select * from t_1_2;", 100);
-    util.execute("create table t_1_3(i int, j int, k int) with (appendonly=true, orientation=row) distributed randomly;");
-    util.execute("insert into t_1_3 select generate_series(1, 100);");
-    util.query("select * from t_1_3;", 100);
-    util.execute("create table t_2(i int, j int, k int) with (appendonly=true, orientation=row) distributed by (i);");
-    util.execute("insert into t_2 select generate_series(1, 100);");
-    util.query("select * from t_2;", 100);
-    util.execute("create table nt_1(i int, j int, k int) with (appendonly=true, orientation=row) distributed by (i, j);");
-    util.execute("insert into nt_1 select generate_series(1, 100);");
-    util.query("select * from nt_1;", 100);
-    util.execute("create table nt_2(i int, j int, k int) with (appendonly=true, orientation=row) distributed by (j);");
-    util.execute("insert into nt_2 select generate_series(1, 100);");
-    util.query("select * from nt_2;", 100);
+    util.execute("create table t_hash_1_1(i int, j int, k int) with (appendonly=true, orientation=row, bucketnum=12) distributed by (i, j);");
+    util.execute("insert into t_hash_1_1 select generate_series(1, 100);");
+    util.query("select * from t_hash_1_1;", 100);
+    util.execute("create table t_hash_1_2(i int, j int, k int) with (appendonly=true, orientation=row) distributed by (i);");
+    util.execute("insert into t_hash_1_2 select generate_series(1, 100);");
+    util.query("select * from t_hash_1_2;", 100);
+    util.execute("create table t_hash_1_3(i int, j int, k int) with (appendonly=true, orientation=row) distributed randomly;");
+    util.execute("insert into t_hash_1_3 select generate_series(1, 100);");
+    util.query("select * from t_hash_1_3;", 100);
+    util.execute("create table t_hash_2(i int, j int, k int) with (appendonly=true, orientation=row) distributed by (i);");
+    util.execute("insert into t_hash_2 select generate_series(1, 100);");
+    util.query("select * from t_hash_2;", 100);
+    util.execute("create table nt_hash_1(i int, j int, k int) with (appendonly=true, orientation=row) distributed by (i, j);");
+    util.execute("insert into nt_hash_1 select generate_series(1, 100);");
+    util.query("select * from nt_hash_1;", 100);
+    util.execute("create table nt_hash_2(i int, j int, k int) with (appendonly=true, orientation=row) distributed by (j);");
+    util.execute("insert into nt_hash_2 select generate_series(1, 100);");
+    util.query("select * from nt_hash_2;", 100);
 
-    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_1_1.yml testhawqregister_testusage2case1errorhashtableregistry.t_1_1", HAWQ_DB)));
-    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_1_1.yml testhawqregister_testusage2case1errorhashtableregistry.nt_1", HAWQ_DB)));
-    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_1_2.yml testhawqregister_testusage2case1errorhashtableregistry.t_1_2", HAWQ_DB)));
-    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_1_2.yml testhawqregister_testusage2case1errorhashtableregistry.nt_1", HAWQ_DB)));
-    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_1_3.yml testhawqregister_testusage2case1errorhashtableregistry.t_1_3", HAWQ_DB)));
-    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_1_3.yml testhawqregister_testusage2case1errorhashtableregistry.nt_1", HAWQ_DB)));
-    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_2.yml testhawqregister_testusage2case1errorhashtableregistry.t_2", HAWQ_DB)));
-    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_2.yml testhawqregister_testusage2case1errorhashtableregistry.nt_2", HAWQ_DB)));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_hash_1_1.yml testhawqregister_testusage2case1errorhashtableregistry.t_hash_1_1", HAWQ_DB)));
+    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_hash_1_1.yml testhawqregister_testusage2case1errorhashtableregistry.nt_hash_1", HAWQ_DB)));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_hash_1_2.yml testhawqregister_testusage2case1errorhashtableregistry.t_hash_1_2", HAWQ_DB)));
+    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_hash_1_2.yml testhawqregister_testusage2case1errorhashtableregistry.nt_hash_1", HAWQ_DB)));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_hash_1_3.yml testhawqregister_testusage2case1errorhashtableregistry.t_hash_1_3", HAWQ_DB)));
+    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_hash_1_3.yml testhawqregister_testusage2case1errorhashtableregistry.nt_hash_1", HAWQ_DB)));
+    EXPECT_EQ(0, Command::getCommandStatus(hawq::test::stringFormat("hawq extract -d %s -o t_hash_2.yml testhawqregister_testusage2case1errorhashtableregistry.t_hash_2", HAWQ_DB)));
+    EXPECT_EQ(1, Command::getCommandStatus(hawq::test::stringFormat("hawq register -d %s -c t_hash_2.yml testhawqregister_testusage2case1errorhashtableregistry.nt_hash_2", HAWQ_DB)));
 
-    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t_1_1.yml"));
-    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t_1_2.yml"));
-    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t_1_3.yml"));
-    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t_2.yml"));
-    util.execute("drop table t_1_1;");
-    util.execute("drop table t_1_2;");
-    util.execute("drop table t_1_3;");
-    util.execute("drop table t_2;");
-    util.execute("drop table nt_1;");
-    util.execute("drop table nt_2;");
+    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t_hash_1_1.yml"));
+    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t_hash_1_2.yml"));
+    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t_hash_1_3.yml"));
+    EXPECT_EQ(0, Command::getCommandStatus("rm -rf t_hash_2.yml"));
+    util.execute("drop table t_hash_1_1;");
+    util.execute("drop table t_hash_1_2;");
+    util.execute("drop table t_hash_1_3;");
+    util.execute("drop table t_hash_2;");
+    util.execute("drop table nt_hash_1;");
+    util.execute("drop table nt_hash_2;");
 }
 
 TEST_F(TestHawqRegister, TestUsage2Case1ZeroEof) {
