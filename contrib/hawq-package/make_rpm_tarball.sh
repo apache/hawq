@@ -58,7 +58,7 @@ if [ $? != 0 ]; then
 fi
 
 # Copy HAWQ Ranger rpm package
-cp ${SRC_TOP_DIR}/ranger-plugin/target/rpm/hawq-ranger-plugin_*/RPMS/noarch/hawq-ranger-plugin*.rpm ${RPM_PKG_DIR}/
+cp ${SRC_TOP_DIR}/ranger-plugin/target/rpm/hawq-ranger-plugin*/RPMS/noarch/hawq-ranger-plugin*.rpm ${RPM_PKG_DIR}/
 if [ $? != 0 ]; then
     echo "Copy HAWQ Ranger plugin rpm package failed."
     exit $?
