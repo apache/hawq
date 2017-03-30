@@ -41,17 +41,22 @@ buildscript {
     }   
 }
 
-// Hadoop distribution (can be phd or hdp) - needed to set correct classpaths
+// Hadoop distribution (can be hdp or null which would default to apache) - needed to set correct classpaths
 // can be set with -Dhd=<value>
-def hddist = System.properties['hd'] ?: 'hdp';
-if (hddist != 'phd' && hddist != 'hdp') {
+def hddist = System.properties['hd'] ?: '';
+if (hddist != 'hdp' && hddist != '') {
     throw new GradleException("hadoop distribution parameter (hd) set to invalid value: $hddist")
 }
 
 // Some package names need to be renamed to include the version number
 // as part of the package name to enable side by side install of two versions of the same package.
+
 def versionedPackageName(packageName) {
-    packageName + "_" + "${version}".replace(".", "_")
+    if (System.properties['hd'] == 'hdp') {
+        packageName + "_" + "${version}".replace(".", "_")
+    } else {
+        packageName
+    }
 }
 
 subprojects { subProject ->

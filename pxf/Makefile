@@ -47,7 +47,7 @@ help:
 	@echo "help it is then"
 	@echo   "Possible targets"
 	@echo	"  - all (clean, build, unittest, jar, tar, rpm)"
-	@echo	"  -  -  HD=<phd|hdp> - set classpath to match hadoop distribution. default phd"
+	@echo	"  -  -  HD=<hdp> - set classpath to match hadoop distribution. default will be apache hadoop compliant"
 	@echo	"  -  -  LICENSE=<license info> - add license info to created RPMs"
 	@echo	"  -  -  VENDOR=<vendor name> - add vendor name to created RPMs"
 	@echo	"  -  -  PLUGINS_EXCLUDE_RPM=plugin1, plugin2,... - do not build and RPM for given comma-separated list of plugins"
