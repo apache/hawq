@@ -171,8 +171,7 @@ public class Utilities {
         if (serializedLocation == null) {
             throw new IllegalArgumentException("Missing fragment location information");
         }
-        try (ByteArrayInputStream bytesStream = new ByteArrayInputStream(serializedLocation);
-                ObjectInputStream objectStream = new ObjectInputStream(bytesStream)) {
+        try (ObjectInputStream objectStream = new ObjectInputStream(new ByteArrayInputStream(serializedLocation))) {
             long start = objectStream.readLong();
             long end = objectStream.readLong();
             String[] hosts = (String[]) objectStream.readObject();

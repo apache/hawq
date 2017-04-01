@@ -82,6 +82,7 @@ public class AggBridge extends ReadBridge implements Bridge {
                 }
             }
         } catch (Exception ex) {
+            LOG.error("Error occurred when reading next object from aggregate bridge:" + ex.getMessage());
             throw ex;
         }
 

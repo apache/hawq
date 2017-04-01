@@ -66,6 +66,7 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
     private boolean useStats;
     private long count;
     private long objectsEmitted;
+    private OneRow rowToEmitCount;
 
     /**
      * Constructs a HiveORCFileAccessor.
@@ -90,12 +91,11 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
             }
             retrieveStats();
             objectsEmitted = 0;
-            return super.openForRead();
         } else {
             addColumns();
             addFilters();
-            return super.openForRead();
         }
+        return super.openForRead();
     }
 
     /**
@@ -248,8 +248,11 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
          * it's enough to return count for a first split in file.
          * In case file has multiple splits - we don't want to duplicate counts.
          */
-        if (inputData.getFragmentIndex() == 0)
+        if (inputData.getFragmentIndex() == 0) {
             this.count = this.orcReader.getNumberOfRows();
+            rowToEmitCount = new OneRow(key, data);
+        }
+
     }
 
     /**
@@ -262,7 +265,7 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
             case COUNT:
                 if (objectsEmitted < count) {
                     objectsEmitted++;
-                    row = new OneRow(key, data);
+                    row = rowToEmitCount;
                 }
                 break;
             default: {

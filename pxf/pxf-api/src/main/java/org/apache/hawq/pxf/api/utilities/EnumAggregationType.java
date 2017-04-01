@@ -21,8 +21,7 @@ package org.apache.hawq.pxf.api.utilities;
 
 public enum EnumAggregationType {
 
-    COUNT("count", true),
-    UNKNOWN("unknown", false);
+    COUNT("count", true);
 
     private String aggOperationCode;
     private boolean optimizationSupported;
@@ -46,6 +45,6 @@ public enum EnumAggregationType {
                 return at;
             }
         }
-        return EnumAggregationType.UNKNOWN;
+        return null;
     }
 }
