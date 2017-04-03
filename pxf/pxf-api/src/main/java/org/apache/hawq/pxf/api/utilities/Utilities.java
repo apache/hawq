@@ -206,11 +206,12 @@ public class Utilities {
         try {
             isStatsAccessor = ArrayUtils.contains(Class.forName(inputData.getAccessor()).getInterfaces(), StatsAccessor.class);
         } catch (ClassNotFoundException e) {
-            LOG.error("Unable to check whether current accessor implements StatsAccessor interface");
-            LOG.error(e.getMessage());
+            LOG.error("Unable to load accessor class: " + e.getMessage());
             return false;
         }
-        return inputData.getAggType().isOptimizationSupported() && isStatsAccessor;
+        return (inputData != null) && (inputData.getAggType() != null)
+                && inputData.getAggType().isOptimizationSupported()
+                && isStatsAccessor;
     }
 
     /**

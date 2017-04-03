@@ -20,10 +20,14 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
+import org.apache.hadoop.hive.ql.io.orc.Reader;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
 import org.apache.hadoop.mapred.*;
+import org.apache.hawq.pxf.api.OneRow;
+import org.apache.hawq.pxf.api.ReadAccessor;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
+import org.apache.hawq.pxf.api.utilities.EnumAggregationType;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
@@ -39,6 +43,8 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import static org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory.SARG_PUSHDOWN;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertNotNull;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -55,6 +61,7 @@ public class HiveORCAccessorTest {
     @Mock OrcInputFormat orcInputFormat;
     @Mock InputFormat inputFormat;
     @Mock ColumnDescriptor columnDesc;
+    @Mock Reader orcReader;
     JobConf jobConf;
     HiveORCAccessor accessor;
 
@@ -65,6 +72,7 @@ public class HiveORCAccessorTest {
 
         PowerMockito.mockStatic(HiveUtilities.class);
         PowerMockito.when(HiveUtilities.parseHiveUserData(any(InputData.class), any(PXF_HIVE_SERDES[].class))).thenReturn(new HiveUserData("", "", null, HiveDataFragmenter.HIVE_NO_PART_TBL, true, "1", ""));
+        PowerMockito.when(HiveUtilities.getOrcReader(any(InputData.class))).thenReturn(orcReader);
 
         PowerMockito.mockStatic(HdfsUtilities.class);
 
@@ -121,4 +129,25 @@ public class HiveORCAccessorTest {
         assertEquals(sarg.toKryo(), jobConf.get(SARG_PUSHDOWN));
     }
 
+    @Test(expected=IllegalStateException.class)
+    public void emitAggObjectCountStatsNotInitialized() {
+        accessor.emitAggObject();
+    }
+
+    @Test
+    public void emitAggObjectCount() throws Exception {
+        when(inputData.getAggType()).thenReturn(EnumAggregationType.COUNT);
+        when(inputData.hasFilter()).thenReturn(false);
+        PowerMockito.when(orcReader.getNumberOfRows()).thenReturn(100l);
+        accessor = new HiveORCAccessor(inputData);
+        accessor.openForRead();
+        accessor.retrieveStats();
+        OneRow row = null;
+        for (int i=0; i<100; i++) {
+            row = accessor.emitAggObject();
+            assertNotNull(row);
+        }
+        row = accessor.emitAggObject();
+        assertNull(row);
+    }
 }

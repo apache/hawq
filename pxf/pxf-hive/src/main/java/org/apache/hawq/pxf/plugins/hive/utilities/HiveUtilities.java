@@ -632,17 +632,20 @@ public class HiveUtilities {
         return deserializer;
     }
 
+    /**
+     * Creates ORC file reader.
+     * @param inputData input data with given data source
+     * @return ORC file reader
+     */
     public static Reader getOrcReader(InputData inputData) {
         try {
-
             Path path = new Path(inputData.getDataSource());
             Reader reader = OrcFile.createReader(path.getFileSystem(new Configuration()), path);
 
             return reader;
 
         } catch (Exception e) {
-            throw new RuntimeException(
-                    "Exception while getting orc reader", e);
+            throw new RuntimeException("Exception while getting orc reader", e);
         }
     }
 }

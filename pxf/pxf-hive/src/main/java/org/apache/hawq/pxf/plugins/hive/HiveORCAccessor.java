@@ -68,6 +68,8 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
     private long objectsEmitted;
     private OneRow rowToEmitCount;
 
+    private boolean statsInitialized;
+
     /**
      * Constructs a HiveORCFileAccessor.
      *
@@ -242,7 +244,9 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
      */
     @Override
     public void retrieveStats() throws Exception {
-        FragmentMetadata fragmentMetadata = Utilities.parseFragmentMetadata(inputData);
+        if (!this.useStats) {
+            throw new IllegalStateException("Accessor is not using statistics in current context.");
+        }
         /*
          * We are using file-level stats therefore if file has multiple splits,
          * it's enough to return count for a first split in file.
@@ -252,6 +256,7 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
             this.count = this.orcReader.getNumberOfRows();
             rowToEmitCount = new OneRow(key, data);
         }
+        statsInitialized = true;
 
     }
 
@@ -260,7 +265,12 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
      */
     @Override
     public OneRow emitAggObject() {
+        if(!statsInitialized) {
+            throw new IllegalStateException("retrieveStats() should be called before calling emitAggObject()");
+        }
         OneRow row = null;
+        if (inputData.getAggType() == null)
+            throw new UnsupportedOperationException("Aggregate opration is required");
         switch (inputData.getAggType()) {
             case COUNT:
                 if (objectsEmitted < count) {
@@ -269,8 +279,7 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
                 }
                 break;
             default: {
-                throw new UnsupportedOperationException(
-                        "Aggregation operation is not supoorted.");
+                throw new UnsupportedOperationException("Aggregation operation is not supported.");
             }
         }
         return row;

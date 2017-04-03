@@ -22,10 +22,19 @@ package org.apache.hawq.pxf.api.utilities;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
+
+import org.apache.hawq.pxf.api.Metadata;
+import org.apache.hawq.pxf.api.OneRow;
+import org.apache.hawq.pxf.api.ReadAccessor;
+import org.apache.hawq.pxf.api.StatsAccessor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.junit.Test;
@@ -37,6 +46,49 @@ import org.powermock.modules.junit4.PowerMockRunner;
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({Class.class})
 public class UtilitiesTest {
+    class StatsAccessorImpl implements StatsAccessor {
+
+        @Override
+        public boolean openForRead() throws Exception {
+            return false;
+        }
+
+        @Override
+        public OneRow readNextObject() throws Exception {
+            return null;
+        }
+
+        @Override
+        public void closeForRead() throws Exception {
+        }
+
+        @Override
+        public void retrieveStats() throws Exception {
+        }
+
+        @Override
+        public OneRow emitAggObject() {
+            return null;
+        }
+    }
+
+    class NonStatsAccessorImpl implements ReadAccessor {
+
+        @Override
+        public boolean openForRead() throws Exception {
+            return false;
+        }
+
+        @Override
+        public OneRow readNextObject() throws Exception {
+            return null;
+        }
+
+        @Override
+        public void closeForRead() throws Exception {
+        }
+    }
+
     @Test
     public void byteArrayToOctalStringNull() throws Exception {
         StringBuilder sb = null;
@@ -113,5 +165,44 @@ public class UtilitiesTest {
         input = "http://www.beatles.com/info?query=whoisthebest";
         result = Utilities.maskNonPrintables(input);
         assertEquals("http://www.beatles.com/info.query.whoisthebest", result);
+    }
+
+    @Test
+    public void parseFragmentMetadata() throws Exception {
+        InputData metaData = mock(InputData.class);
+        ByteArrayOutputStream bas = new ByteArrayOutputStream();
+        ObjectOutputStream os = new ObjectOutputStream(bas);
+        os.writeLong(10);
+        os.writeLong(100);
+        os.writeObject(new String[] { "hostname" });
+        os.close();
+        when(metaData.getFragmentMetadata()).thenReturn(bas.toByteArray());
+        FragmentMetadata fragmentMetadata = Utilities.parseFragmentMetadata(metaData);
+
+        assertEquals(10, fragmentMetadata.getStart());
+        assertEquals(100, fragmentMetadata.getEnd());
+        assertEquals(new String[] { "hostname" }, fragmentMetadata.getHosts());
+    }
+
+    @Test
+    public void useAggBridge() {
+        InputData metaData = mock(InputData.class);
+        when(metaData.getAccessor()).thenReturn(StatsAccessorImpl.class.getName());
+        when(metaData.getAggType()).thenReturn(EnumAggregationType.COUNT);
+        assertTrue(Utilities.useAggBridge(metaData));
+
+        when(metaData.getAccessor()).thenReturn(UtilitiesTest.class.getName());
+        when(metaData.getAggType()).thenReturn(EnumAggregationType.COUNT);
+        assertFalse(Utilities.useAggBridge(metaData));
+    }
+
+    @Test
+    public void useStats() {
+        InputData metaData = mock(InputData.class);
+        ReadAccessor accessor = new StatsAccessorImpl();
+        when(metaData.getAggType()).thenReturn(EnumAggregationType.COUNT);
+        assertTrue(Utilities.useStats(accessor, metaData));
+        ReadAccessor nonStatusAccessor = new NonStatsAccessorImpl();
+        assertFalse(Utilities.useStats(nonStatusAccessor, metaData));
     }
 }
