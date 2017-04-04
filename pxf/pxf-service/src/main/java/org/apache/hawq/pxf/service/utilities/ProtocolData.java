@@ -31,6 +31,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
+import org.apache.hawq.pxf.api.utilities.EnumAggregationType;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.ProfilesConf;
 
@@ -115,6 +116,18 @@ public class ProtocolData extends InputData {
 
         // Store alignment for global use as a system property
         System.setProperty("greenplum.alignment", getProperty("ALIGNMENT"));
+
+        //Get aggregation operation
+        String aggTypeOperationName = getOptionalProperty("AGG-TYPE");
+
+        this.setAggType(EnumAggregationType.getAggregationType(aggTypeOperationName));
+
+        //Get fragment index
+        String fragmentIndexStr = getOptionalProperty("FRAGMENT-INDEX");
+
+        if (fragmentIndexStr != null) {
+            this.setFragmentIndex(Integer.parseInt(fragmentIndexStr));
+        }
     }
 
     /**

@@ -52,6 +52,8 @@ public class InputData {
     protected String remoteLogin;
     protected String remoteSecret;
     protected int dataFragment; /* should be deprecated */
+    private EnumAggregationType aggType;
+    private int fragmentIndex;
 
     /**
      * When false the bridge has to run in synchronized mode. default value -
@@ -333,6 +335,38 @@ public class InputData {
      */
     public int getDataFragment() {
         return dataFragment;
+    }
+
+    /**
+     * Returns aggregate type, i.e - count, min, max, etc
+     * @return aggregate type
+     */
+    public EnumAggregationType getAggType() {
+        return aggType;
+    }
+
+    /**
+     * Sets aggregate type, one of @see EnumAggregationType value
+     * @param aggType aggregate type
+     */
+    public void setAggType(EnumAggregationType aggType) {
+        this.aggType = aggType;
+    }
+
+    /**
+     * Returns index of a fragment in a file
+     * @return index of a fragment
+     */
+    public int getFragmentIndex() {
+        return fragmentIndex;
+    }
+
+    /**
+     * Sets index of a fragment in a file
+     * @param fragmentIndex index of a fragment
+     */
+    public void setFragmentIndex(int fragmentIndex) {
+        this.fragmentIndex = fragmentIndex;
     }
 
 }

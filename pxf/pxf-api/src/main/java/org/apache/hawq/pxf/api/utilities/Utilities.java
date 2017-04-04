@@ -20,9 +20,15 @@ package org.apache.hawq.pxf.api.utilities;
  */
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hawq.pxf.api.ReadAccessor;
+import org.apache.hawq.pxf.api.StatsAccessor;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
@@ -150,5 +156,79 @@ public class Utilities {
             return input;
         }
         return input.replaceAll("[^a-zA-Z0-9_:/-]", ".");
+    }
+
+    /**
+     * Parses input data and returns fragment metadata.
+     * 
+     * @param inputData input data which has protocol information
+     * @return fragment metadata
+     * @throws IllegalArgumentException if fragment metadata information wasn't found in input data
+     * @throws Exception
+     */
+    public static FragmentMetadata parseFragmentMetadata(InputData inputData) throws Exception {
+        byte[] serializedLocation = inputData.getFragmentMetadata();
+        if (serializedLocation == null) {
+            throw new IllegalArgumentException("Missing fragment location information");
+        }
+        try (ObjectInputStream objectStream = new ObjectInputStream(new ByteArrayInputStream(serializedLocation))) {
+            long start = objectStream.readLong();
+            long end = objectStream.readLong();
+            String[] hosts = (String[]) objectStream.readObject();
+            if (LOG.isDebugEnabled()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("parsed file split: path ");
+                sb.append(inputData.getDataSource());
+                sb.append(", start ");
+                sb.append(start);
+                sb.append(", end ");
+                sb.append(end);
+                sb.append(", hosts ");
+                sb.append(ArrayUtils.toString(hosts));
+                LOG.debug(sb.toString());
+            }
+            FragmentMetadata fragmentMetadata = new FragmentMetadata(start, end, hosts);
+            return fragmentMetadata;
+        } catch (Exception e) {
+            LOG.error("Unable to parse fragment metadata");
+            throw e;
+        }
+    }
+
+    /**
+     * Based on accessor information determines whether to use AggBridge
+     * 
+     * @param protData
+     * @return true if AggBridge is applicable for current context
+     */
+    public static boolean useAggBridge(InputData inputData) {
+        boolean isStatsAccessor = false;
+        try {
+            isStatsAccessor = ArrayUtils.contains(Class.forName(inputData.getAccessor()).getInterfaces(), StatsAccessor.class);
+        } catch (ClassNotFoundException e) {
+            LOG.error("Unable to load accessor class: " + e.getMessage());
+            return false;
+        }
+        return (inputData != null) && (inputData.getAggType() != null)
+                && inputData.getAggType().isOptimizationSupported()
+                && isStatsAccessor;
+    }
+
+    /**
+     * Determines whether accessor should use statistics to optimize reading results
+     * 
+     * @param accessor accessor instance
+     * @param inputData input data which has protocol information
+     * @return true if this accessor should use statistic information
+     */
+    public static boolean useStats(ReadAccessor accessor, InputData inputData) {
+        if (accessor instanceof StatsAccessor) {
+            if (inputData != null && !inputData.hasFilter()
+                    && inputData.getAggType() != null
+                    && inputData.getAggType().isOptimizationSupported()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -39,7 +39,8 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.catalina.connector.ClientAbortException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
+import org.apache.hawq.pxf.api.utilities.Utilities;
+import org.apache.hawq.pxf.service.AggBridge;
 import org.apache.hawq.pxf.service.Bridge;
 import org.apache.hawq.pxf.service.ReadBridge;
 import org.apache.hawq.pxf.service.ReadSamplingBridge;
@@ -98,6 +99,8 @@ public class BridgeResource extends RestResource {
         float sampleRatio = protData.getStatsSampleRatio();
         if (sampleRatio > 0) {
             bridge = new ReadSamplingBridge(protData);
+        } else if (Utilities.useAggBridge(protData)) {
+            bridge = new AggBridge(protData);
         } else {
             bridge = new ReadBridge(protData);
         }

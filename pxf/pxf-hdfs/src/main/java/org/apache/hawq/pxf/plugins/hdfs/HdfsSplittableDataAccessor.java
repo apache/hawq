@@ -75,7 +75,7 @@ public abstract class HdfsSplittableDataAccessor extends Plugin implements
     @Override
     public boolean openForRead() throws Exception {
         LinkedList<InputSplit> requestSplits = new LinkedList<InputSplit>();
-        FileSplit fileSplit = HdfsUtilities.parseFragmentMetadata(inputData);
+        FileSplit fileSplit = HdfsUtilities.parseFileSplit(inputData);
         requestSplits.add(fileSplit);
 
         // Initialize record reader based on current split

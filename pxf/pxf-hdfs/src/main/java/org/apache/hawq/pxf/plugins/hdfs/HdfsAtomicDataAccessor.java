@@ -65,7 +65,7 @@ public abstract class HdfsAtomicDataAccessor extends Plugin implements ReadAcces
         // 1. Load Hadoop configuration defined in $HADOOP_HOME/conf/*.xml files
         conf = new Configuration();
 
-        fileSplit = HdfsUtilities.parseFragmentMetadata(inputData);
+        fileSplit = HdfsUtilities.parseFileSplit(inputData);
     }
 
     /**

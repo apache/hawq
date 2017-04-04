@@ -21,10 +21,12 @@ package org.apache.hawq.pxf.plugins.hdfs.utilities;
 
 
 import org.apache.hawq.pxf.api.OneField;
+import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.compress.*;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -35,6 +37,8 @@ import org.powermock.core.classloader.annotations.SuppressStaticInitializationFo
 import org.powermock.modules.junit4.PowerMockRunner;
 import org.powermock.reflect.Whitebox;
 
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -197,5 +201,22 @@ public class HdfsUtilitiesTest {
         assertEquals("uno", HdfsUtilities.toString(Collections.singletonList(oneFields.get(0)), "!"));
 
         assertEquals("", HdfsUtilities.toString(Collections.<OneField>emptyList(), "!"));
+    }
+
+    @Test
+    public void testParseFileSplit() throws Exception {
+        InputData inputData = mock(InputData.class);
+        when(inputData.getDataSource()).thenReturn("/abc/path/to/data/source");
+        ByteArrayOutputStream bas = new ByteArrayOutputStream();
+        ObjectOutputStream os = new ObjectOutputStream(bas);
+        os.writeLong(10);
+        os.writeLong(100);
+        os.writeObject(new String[] { "hostname" });
+        os.close();
+        when(inputData.getFragmentMetadata()).thenReturn(bas.toByteArray());
+        FileSplit fileSplit = HdfsUtilities.parseFileSplit(inputData);
+        assertEquals(fileSplit.getStart(), 10);
+        assertEquals(fileSplit.getLength(), 100);
+        assertEquals(fileSplit.getPath().toString(), "/abc/path/to/data/source");
     }
 }
