@@ -1846,6 +1846,7 @@ typedef struct ExternalScanState
 	struct FileScanDescData *ess_ScanDesc;
 	bool cdb_want_ctid;
 	ItemPointerData cdb_fake_ctid;
+	int parent_agg_type;
 } ExternalScanState;
 
 /* ----------------

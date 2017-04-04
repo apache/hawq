@@ -80,7 +80,7 @@ ExternalNext(ExternalScanState *node)
 	/*
 	 * get the next tuple from the file access methods
 	 */
-	externalSelectDesc = external_getnext_init(&(node->ss.ps));
+	externalSelectDesc = external_getnext_init(&(node->ss.ps), node);
 	tuple = external_getnext(scandesc, direction, externalSelectDesc);
 
 	/*
@@ -236,6 +236,11 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 	 */
 	externalstate->ss.ps.delayEagerFree =
 		((eflags & (EXEC_FLAG_REWIND | EXEC_FLAG_BACKWARD | EXEC_FLAG_MARK)) != 0);
+
+	/*
+	 * If eflag contains EXEC_FLAG_EXTERNAL_AGG_COUNT then notify the underlying storage level
+	 */
+	externalstate->parent_agg_type = (eflags & EXEC_FLAG_EXTERNAL_AGG_COUNT);
 
 	initGpmonPktForExternalScan((Plan *)node, &externalstate->ss.ps.gpmon_pkt, estate);
 

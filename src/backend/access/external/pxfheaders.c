@@ -110,6 +110,18 @@ void build_http_header(PxfInputData *input)
 	else
 		churl_headers_append(headers, "X-GP-HAS-FILTER", "0");
 
+	/* Aggregate information */
+	if (input->agg_type) {
+		switch(input->agg_type) {
+		case EXEC_FLAG_EXTERNAL_AGG_COUNT:
+			churl_headers_append(headers, "X-GP-AGG-TYPE", "count");
+			break;
+		default:
+			churl_headers_append(headers, "X-GP-AGG-TYPE", "unknown");
+			break;
+		}
+	}
+
 	add_delegation_token_headers(headers, input);
 	add_remote_credentials(headers);
 }

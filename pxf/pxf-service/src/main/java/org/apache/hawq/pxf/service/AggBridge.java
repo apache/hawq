@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.service;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.hawq.pxf.api.BadRecordException;
@@ -40,7 +41,7 @@ import org.apache.commons.collections.map.LRUMap;
 public class AggBridge extends ReadBridge implements Bridge {
     private static final Log LOG = LogFactory.getLog(AggBridge.class);
     /* Avoid resolving rows with the same key twice */
-    private LRUMap resolvedFieldsCache;
+    private LRUMap outputCache;
 
     public AggBridge(ProtocolData protData) throws Exception {
         super(protData);
@@ -49,15 +50,17 @@ public class AggBridge extends ReadBridge implements Bridge {
     @Override
     public boolean beginIteration() throws Exception {
         /* Initialize LRU cache with 100 items*/
-        resolvedFieldsCache = new LRUMap();
-        return super.fileAccessor.openForRead();
+        outputCache = new LRUMap();
+        boolean openForReadStatus = super.fileAccessor.openForRead();
+        ((StatsAccessor) fileAccessor).retrieveStats();
+        return openForReadStatus;
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public Writable getNext() throws Exception {
         Writable output = null;
-        List<OneField> resolvedFields = null;
+        LinkedList<Writable> cachedOutput = null;
         OneRow onerow = null;
 
         if (!outputQueue.isEmpty()) {
@@ -70,12 +73,12 @@ public class AggBridge extends ReadBridge implements Bridge {
                 if (onerow == null) {
                     break;
                 }
-                resolvedFields = (List<OneField>) resolvedFieldsCache.get(onerow.getKey());
-                if (resolvedFields == null) {
-                    resolvedFields = fieldsResolver.getFields(onerow);
-                    resolvedFieldsCache.put(onerow.getKey(), resolvedFields);
+                cachedOutput = (LinkedList<Writable>) outputCache.get(onerow.getKey());
+                if (cachedOutput == null) {
+                    cachedOutput = outputBuilder.makeOutput(fieldsResolver.getFields(onerow));
+                    outputCache.put(onerow.getKey(), cachedOutput);
                 }
-                outputQueue = outputBuilder.makeOutput(resolvedFields);
+                outputQueue.addAll(cachedOutput);
                 if (!outputQueue.isEmpty()) {
                     output = outputQueue.pop();
                     break;

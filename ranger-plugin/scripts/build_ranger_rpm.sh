@@ -20,9 +20,12 @@ MVN_OPTS="-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenT
 
 # Set HAWQ ranger-plugin rpm build number to 1 as default
 BUILD_NUMBER=1
+BUILD_OPTS="-Drelease.version=${BUILD_NUMBER}"
+BUILD_OPTS="${BUILD_OPTS} -Dbuild.suffix= -Dhawq.dep.name=apache-hawq"
+BUILD_OPTS="${BUILD_OPTS} -Ddestination.dir=/usr/local/apache-hawq/ranger"
 
 # Get current HAWQ releave version number.
-if [  -z "${HAWQ_RELEASE_VERSION}" ]; then
+if [ -z "${HAWQ_RELEASE_VERSION}" ]; then
     HAWQ_RELEASE_VERSION=$(cat ../getversion| grep ^GP_VERSION | cut -d '=' -f2 | sed 's|"||g' | cut -d '-' -f1)
 fi
 
@@ -30,21 +33,21 @@ fi
 mvn ${MVN_OPTS} versions:set -DnewVersion=${HAWQ_RELEASE_VERSION}
 if [ $? != 0 ]; then
     echo "Set HAWQ ranger-plugin failed."
-    exit 1
+    exit $?
 fi
 
 # generate jar and war files.
 mvn ${MVN_OPTS} clean package
 if [ $? != 0 ]; then
     echo "Generate HAWQ ranger-plugin jar and war files failed."
-    exit 1
+    exit $?
 fi
 
 # build rpm
-mvn ${MVN_OPTS} -N -Drelease.version=${BUILD_NUMBER} install
+mvn ${MVN_OPTS} -N ${BUILD_OPTS} install
 if [ $? != 0 ]; then
     echo "Build HAWQ ranger-plugin rpm package failed."
-    exit 1
+    exit $?
 fi
 
 exit 0

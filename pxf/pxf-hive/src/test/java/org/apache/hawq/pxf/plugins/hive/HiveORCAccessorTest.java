@@ -134,20 +134,4 @@ public class HiveORCAccessorTest {
         accessor.emitAggObject();
     }
 
-    @Test
-    public void emitAggObjectCount() throws Exception {
-        when(inputData.getAggType()).thenReturn(EnumAggregationType.COUNT);
-        when(inputData.hasFilter()).thenReturn(false);
-        PowerMockito.when(orcReader.getNumberOfRows()).thenReturn(100l);
-        accessor = new HiveORCAccessor(inputData);
-        accessor.openForRead();
-        accessor.retrieveStats();
-        OneRow row = null;
-        for (int i=0; i<100; i++) {
-            row = accessor.emitAggObject();
-            assertNotNull(row);
-        }
-        row = accessor.emitAggObject();
-        assertNull(row);
-    }
 }

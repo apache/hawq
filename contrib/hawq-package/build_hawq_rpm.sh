@@ -54,9 +54,14 @@ fi
 
 # Copy HAWQ source code tarball for rpm build
 if [ -f "${HAWQ_SOURCE_TARBALL_PATH}/${HAWQ_SOURCE_TARBALL_FILE}" ]; then
+    echo "Using HAWQ source code tarball: ${HAWQ_SOURCE_TARBALL_PATH}/${HAWQ_SOURCE_TARBALL_FILE}"
     cp ${HAWQ_SOURCE_TARBALL_PATH}/${HAWQ_SOURCE_TARBALL_FILE} rpmbuild/SOURCES/
 else
-    echo "Can not find ${HAWQ_SOURCE_TARBALL_PATH}/${HAWQ_SOURCE_TARBALL_FILE} "
+    echo "========================================================================="
+    echo "Can not find ${HAWQ_SOURCE_TARBALL_PATH}/${HAWQ_SOURCE_TARBALL_FILE}"
+    echo "Please copy the source code tarball in place."
+    echo "Or use environment variable 'HAWQ_SOURCE_TARBALL_PATH' to specify the find path of HAWQ source tarball."
+    echo "========================================================================="
     exit 1
 fi
 
@@ -71,8 +76,14 @@ rpmbuild --define "_topdir ${RPM_TOP_DIR}" \
          -bb SPECS/hawq.spec
 if [ $? != 0 ]; then
     echo "Build HAWQ rpm package failed, exit..."
-    exit 0
+    exit $?
 fi
 
 set +x
 popd > /dev/null
+
+echo "========================================================================="
+echo "Build HAWQ rpm package successfully."
+echo "========================================================================="
+echo ""
+exit 0

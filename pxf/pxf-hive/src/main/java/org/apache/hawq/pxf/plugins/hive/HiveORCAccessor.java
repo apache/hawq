@@ -91,7 +91,6 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
             if (orcReader == null) {
                 return false;
             }
-            retrieveStats();
             objectsEmitted = 0;
         } else {
             addColumns();
@@ -254,7 +253,7 @@ public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
          */
         if (inputData.getFragmentIndex() == 0) {
             this.count = this.orcReader.getNumberOfRows();
-            rowToEmitCount = new OneRow(key, data);
+            rowToEmitCount = readNextObject();
         }
         statsInitialized = true;
 

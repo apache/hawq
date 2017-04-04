@@ -38,6 +38,9 @@
         <release.version>1</release.version>
         <postgresql.version>9.1-901-1.jdbc4</postgresql.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <build.suffix>_${hawq.name.version}</build.suffix>
+        <hawq.dep.name>hawq_${hawq.name.version}</hawq.dep.name>
+        <destination.dir>/usr/local/hawq${build.suffix}/ranger</destination.dir>
     </properties>
 
     <build>
@@ -69,23 +72,24 @@
                 <configuration>
                     <copyright>ASL 2.0</copyright>
                     <group>org.apache.hawq.ranger</group>
-                    <name>hawq-ranger-plugin_${hawq.name.version}</name>
+                    <name>hawq-ranger-plugin${build.suffix}</name>
                     <defaultUsername>gpadmin</defaultUsername>
                     <defaultGroupname>gpadmin</defaultGroupname>
+                    <needarch>noarch</needarch>
                     <description>
                         HAWQ Ranger plugin.
                     </description>
                     <release>${release.version}%{?dist}</release>
                     <requires>
                         <require>bigtop-tomcat</require>
-                        <require>hawq_${hawq.name.version} &gt;= ${project.version}</require>
+                        <require>${hawq.dep.name} &gt;= ${project.version}</require>
                     </requires>
                     <mappings>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger</directory>
+                            <directory>${destination.dir}</directory>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/bin</directory>
+                            <directory>${destination.dir}/bin</directory>
                             <filemode>750</filemode>
                             <sources>
                                 <source>
@@ -100,7 +104,7 @@
                             </sources>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/etc</directory>
+                            <directory>${destination.dir}/etc</directory>
                             <sources>
                                 <source>
                                     <location>conf/ranger-servicedef-hawq.json</location>
@@ -121,7 +125,7 @@
                             </sources>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/lib</directory>
+                            <directory>${destination.dir}/lib</directory>
                             <sources>
                                 <source>
                                     <location>admin-plugin/target/ranger-plugin-admin-${project.version}.jar</location>
@@ -132,10 +136,10 @@
                             </sources>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service</directory>
+                            <directory>${destination.dir}/plugin-service</directory>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/bin</directory>
+                            <directory>${destination.dir}/plugin-service/bin</directory>
                             <sources>
                                 <source>
                                     <location>scripts/setenv.sh</location>
@@ -143,7 +147,7 @@
                             </sources>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/conf</directory>
+                            <directory>${destination.dir}/plugin-service/conf</directory>
                             <sources>
                                 <source>
                                     <location>conf/server.xml</location>
@@ -154,7 +158,7 @@
                             </sources>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/lib</directory>
+                            <directory>${destination.dir}/plugin-service/lib</directory>
                             <sources>
                                 <source>
                                     <location>service/target/ranger-plugin-service-${project.version}/WEB-INF/lib</location>
@@ -162,19 +166,19 @@
                             </sources>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/logs</directory>
+                            <directory>${destination.dir}/plugin-service/logs</directory>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/temp</directory>
+                            <directory>${destination.dir}/plugin-service/temp</directory>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/work</directory>
+                            <directory>${destination.dir}/plugin-service/work</directory>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/work/policycache</directory>
+                            <directory>${destination.dir}/plugin-service/work/policycache</directory>
                         </mapping>
                         <mapping>
-                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/webapps</directory>
+                            <directory>${destination.dir}/plugin-service/webapps</directory>
                             <sources>
                                 <source>
                                     <location>service/target/ranger-plugin-service-${project.version}.war</location>
