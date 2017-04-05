@@ -40,9 +40,9 @@ class CFile(object):
     # function pattern
     func_pat = re.compile(
         # modifier
-        r'(?:(static|inline|__inline__|__inline)\s+)*' +
+        r'(?:(static|inline|__inline__|__inline|__MAYBE_UNUSED)\s+)*' +
         # rettype
-        r'((?:const\s+)?(?:struct\s+|unsigned\s+)?\w+(?:[\s\*]+|\s+))(?:inline\s+|static\s+)?' +
+        r'((?:const\s+)?(?:struct\s+|unsigned\s+)?\w+(?:[\s\*]+|\s+))(?:inline\s+|static\s+|__MAYBE_UNUSED\s+)?' +
         # funcname
         r'(\w+)\s*'
         # arguments
@@ -187,6 +187,7 @@ class FuncSignature(object):
     def __init__(self, modifier, rettype, funcname, args):
         self.modifier = modifier.strip()
         self.rettype = re.sub('inline', '', rettype).strip()
+        self.rettype = re.sub('__MAYBE_UNUSED', '', rettype).strip()
         self.funcname = funcname.strip()
         self.args = self.parse_args(args)
 
