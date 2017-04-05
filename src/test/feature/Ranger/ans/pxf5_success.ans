@@ -1,0 +1,13 @@
+-- start_ignore
+-- end_ignore
+set session role= 'userpxf3';
+SET
+SELECT * FROM pxf_hdfs_textsimple_r1;
+ location  | month | num_orders | total_sales 
+-----------+-------+------------+-------------
+ Cleveland | Oct   |       3812 |    96645.37
+ Frankfurt | Mar   |        777 |     3956.98
+(2 rows)
+
+drop external table pxf_hdfs_textsimple_r1;
+DROP EXTERNAL TABLE

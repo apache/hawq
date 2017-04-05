@@ -18,6 +18,7 @@
  */
 
 #include "test_ranger.h"
+#include "policy_helper.h"
 
 #include <string>
 #include <pwd.h>
@@ -123,7 +124,6 @@ TEST_F(TestHawqRanger, BasicTest) {
 			string super_ansfile_success = hawq::test::stringFormat("Ranger/ans/super%d_success.ans", i);
 
 			cmd = hawq::test::stringFormat("ls -l %s/Ranger/policy/%d/ 2>/dev/null| grep \"^-\" | wc -l", rootPath.c_str(), i);
-			int policy_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 
 			cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/super/%d.sql 2>/dev/null | grep \"^-\" | wc -l", rootPath.c_str(), i);
 			int supersqlexist = std::atoi(Command::getCommandOutput(cmd).c_str());
@@ -314,7 +314,11 @@ TEST_F(TestHawqRanger, ResourceIncludeATest) {
 	}
 }
 
-TEST_F(TestHawqRanger, HcatalogTest) {
+
+/**
+ * read HIVE data using hcatalog(read-only) with PXF
+ */ 
+TEST_F(TestHawqRanger, PXFHcatalogTest) {
 	SQLUtility util;
 	if (util.getGUCValue("hawq_acl_type") == "ranger")
 	{
@@ -322,8 +326,6 @@ TEST_F(TestHawqRanger, HcatalogTest) {
 		 * create a table in hive and populate some rows
 		 */
 		clearEnv(&util, "pxf", 1);
-		clearEnv(&util, "pxf", 2);
-		clearEnv(&util, "pxf", 3);
 		string rootPath(util.getTestRootPath());
 		string sqlPath = rootPath + "/Ranger/data/testhive.sql";
 		auto cmd =  hawq::test::stringFormat("hive -f %s", sqlPath.c_str());
@@ -338,11 +340,206 @@ TEST_F(TestHawqRanger, HcatalogTest) {
 		/*
 		 * add allow policies for this user and query again, succeed.
 		 */
-		addPolicy(&util, "pxf", 1); // usage of default
-		addPolicy(&util, "pxf", 2); // select of table
-		addPolicy(&util, "pxf", 3); // usage of current schema(e.g.testhawqranger_hcatalogtest)
+		/*
+			usage of default
+			select of table
+			usage of current schema(e.g.testhawqranger_hcatalogtest)
+		*/
+		addPolicy(&util, "pxf", 1); 
 		runSQLFile(&util, "pxf", "success", 1);
+		
+		//clean
+		clearEnv(&util, "pxf", 1);
 	}
+}
+
+/**
+ * read and write HDFS data using external table with PXF
+ */ 
+TEST_F(TestHawqRanger, PXFHDFSTest) {
+	SQLUtility util;
+	PolicyHelper helper(util.getTestRootPath(), rangerHost);
+
+	//case idx and folder prefix
+	const char * prefix = "pxf";
+	int idx = 0;
+	int ret = 0;
+
+	if (util.getGUCValue("hawq_acl_type") == "ranger")
+	{
+		std::string db = "hawq_feature_test_db";
+		std::string user; 
+
+		// clean hdfs folder
+		std::string cmd = "";
+		cmd =  hawq::test::stringFormat("hdfs dfs -rm -r /ranger_test/");
+		Command::getCommandStatus(cmd);
+		cmd =  hawq::test::stringFormat("hdfs dfs -mkdir /ranger_test/");
+		Command::getCommandStatus(cmd);
+
+		// -- write --
+		idx = 2;
+		addUser(&util, prefix, idx, false); 
+		user = hawq::test::stringFormat("user%s%d", prefix ,idx); 
+
+		runSQLFile(&util, prefix, "fail", 2, true, false, true); // create writable table
+		
+		// all needed policies
+		helper.AddSchemaPolicy("pxfpolicy2-1", user, db, "public", {"usage-schema","create"});
+		helper.AddProtocolPolicy("pxfpolicy2-2", user, "pxf", {"insert"});
+		helper.AddTablePolicy("pxfpolicy2-3", user, db, "public", "pxf_hdfs_writabletbl_1", {"insert"});
+
+		ret = helper.ActivateAllPoliciesOnRanger();
+		EXPECT_EQ(0,ret);
+		runSQLFile(&util, prefix, "success", 2, true, false, true); // create table
+		runSQLFile(&util, prefix, "success", 3, true, false, true); // insert
+		
+		
+		// -- read --
+		idx = 3;
+		addUser(&util, prefix, idx, false);
+		user = hawq::test::stringFormat("user%s%d", prefix ,idx); 
+			
+		runSQLFile(&util, prefix, "fail", 4, true, false, true); // create readable table
+
+		helper.Reset();
+		// all needed policies
+		helper.AddSchemaPolicy("pxfpolicy3-1", user, db, "public", {"usage-schema","create"});
+		helper.AddProtocolPolicy("pxfpolicy3-2", user, "pxf", {"select"});
+		helper.AddTablePolicy("pxfpolicy3-3", user, db, "public", "pxf_hdfs_textsimple_r1", {"select"});
+
+		ret = helper.ActivateAllPoliciesOnRanger();
+		EXPECT_EQ(0,ret);
+		runSQLFile(&util, prefix, "success", 4, true, false, true); // create table
+		runSQLFile(&util, prefix, "success", 5, true, false, true); // select
+
+		//delete user 
+		delUser(&util, prefix, 2); 
+		delUser(&util, prefix, 3); 
+
+		//delete policy
+		helper.DeletePolicyOnRanger("pxfpolicy2-1");
+		helper.DeletePolicyOnRanger("pxfpolicy2-2");
+		helper.DeletePolicyOnRanger("pxfpolicy2-3");
+		helper.DeletePolicyOnRanger("pxfpolicy3-1");
+		helper.DeletePolicyOnRanger("pxfpolicy3-2");
+		helper.DeletePolicyOnRanger("pxfpolicy3-3");
+	}
+}
+
+/**
+ * read Hive data using external table with PXF
+ */ 
+TEST_F(TestHawqRanger, PXFHiveTest) {
+	SQLUtility util;
+	PolicyHelper helper(util.getTestRootPath(), rangerHost);
+
+	//case idx and folder prefix
+	const char * prefix = "pxf";
+	int idx = 0;
+	int ret = 0;
+
+	if (util.getGUCValue("hawq_acl_type") == "ranger")
+	{
+		std::string db = "hawq_feature_test_db";
+		std::string user; 
+		
+		// create hive table
+		string rootPath(util.getTestRootPath());
+		string sqlPath = rootPath + "/Ranger/data/testhive_externaltable.sql";
+		auto cmd =  hawq::test::stringFormat("hive -f %s", sqlPath.c_str());
+		Command::getCommandStatus(cmd);
+
+		// -- read --
+		idx = 4;
+		addUser(&util, prefix, idx, false);
+		user = hawq::test::stringFormat("user%s%d", prefix ,idx); 
+			
+		runSQLFile(&util, prefix, "fail", 6, true, false, true); // create readable table
+
+		helper.Reset();
+		// all needed policies
+		helper.AddSchemaPolicy("pxfpolicy4-1", user, db, "public", {"usage-schema","create"});
+		helper.AddProtocolPolicy("pxfpolicy4-2", user, "pxf", {"select"});
+		helper.AddTablePolicy("pxfpolicy4-3", user, db, "public", "testhive_ext", {"select"});
+
+		ret = helper.ActivateAllPoliciesOnRanger();
+		EXPECT_EQ(0,ret);
+		runSQLFile(&util, prefix, "success", 6, true, false, true); // create table
+		runSQLFile(&util, prefix, "success", 7, true, false, true); // select
+
+		//delete user 
+		delUser(&util, prefix, idx); 
+
+		//delete policy
+		helper.DeletePolicyOnRanger("pxfpolicy4-1");
+		helper.DeletePolicyOnRanger("pxfpolicy4-2");
+		helper.DeletePolicyOnRanger("pxfpolicy4-3");
+	}
+}
+
+/**
+ * read HBase data using external table with PXF
+ */ 
+TEST_F(TestHawqRanger, PXFHBaseTest) {
+	SQLUtility util;
+	PolicyHelper helper(util.getTestRootPath(), rangerHost);
+
+	//case idx and folder prefix
+	const char * prefix = "pxf";
+	int idx = 0;
+	int ret = 0;
+
+	if (util.getGUCValue("hawq_acl_type") == "ranger")
+	{
+		std::string db = "hawq_feature_test_db";
+		std::string user; 
+		
+		// create hbase table
+		auto cmd =  hawq::test::stringFormat(
+			"echo \" create 'test_hbase','f1'; put 'test_hbase','r1', 'f1:col1','100' \" | hbase shell");
+		Command::getCommandStatus(cmd);
+
+		// -- read --
+		idx = 5;
+		addUser(&util, prefix, idx, false);
+		user = hawq::test::stringFormat("user%s%d", prefix ,idx); 
+			
+		runSQLFile(&util, prefix, "fail", 8, true, false, true); // create readable table
+
+		helper.Reset();
+		// all needed policies
+		helper.AddSchemaPolicy("pxfpolicy5-1", user, db, "public", {"usage-schema","create"});
+		helper.AddProtocolPolicy("pxfpolicy5-2", user, "pxf", {"select"});
+		helper.AddTablePolicy("pxfpolicy5-3", user, db, "public", "test_hbase", {"select"});
+
+		ret = helper.ActivateAllPoliciesOnRanger();
+		EXPECT_EQ(0,ret);
+		runSQLFile(&util, prefix, "success", 8, true, false, true); // create table
+		runSQLFile(&util, prefix, "success", 9, true, false, true); // select
+
+		//delete user 
+		delUser(&util, prefix, idx); 
+
+		//delete policy
+		helper.DeletePolicyOnRanger("pxfpolicy5-1");
+		helper.DeletePolicyOnRanger("pxfpolicy5-2");
+		helper.DeletePolicyOnRanger("pxfpolicy5-3");
+		
+		// drop hbase table
+		cmd =  hawq::test::stringFormat(
+			"echo \" disable 'test_hbase'; drop 'test_hbase' \" | hbase shell");
+		Command::getCommandStatus(cmd);
+	}
+}
+
+// only drop user in database
+void TestHawqRanger::delUser(hawq::test::SQLUtility* util, std::string case_name, int user_index)
+{
+	string rootPath = util->getTestRootPath();
+	string cmd = "";
+	std::string username = hawq::test::stringFormat("user%s%d", case_name.c_str(), user_index);
+	util->execute(hawq::test::stringFormat("drop role %s;", username.c_str()), false);
 }
 
 void TestHawqRanger::addUser(hawq::test::SQLUtility* util, std::string case_name, int user_index, bool full_policy, int writable_index)
@@ -425,7 +622,7 @@ void TestHawqRanger::clearEnv(hawq::test::SQLUtility* util, std::string case_nam
 	}
 }
 
-void TestHawqRanger::runSQLFile(hawq::test::SQLUtility* util, std::string case_name, std::string ans_suffix, int sql_index)
+void TestHawqRanger::runSQLFile(hawq::test::SQLUtility* util, std::string case_name, std::string ans_suffix, int sql_index, bool usingDefaultSchema, bool printTupleOnly, bool focus_run)
 {
 	string rootPath = util->getTestRootPath();
 	auto cmd = hawq::test::stringFormat("ls -l %s/Ranger/sql/%s/*.sql 2>/dev/null| grep \"^-\" | wc -l", rootPath.c_str(), case_name.c_str());
@@ -441,8 +638,8 @@ void TestHawqRanger::runSQLFile(hawq::test::SQLUtility* util, std::string case_n
 			auto cmd = hawq::test::stringFormat("ls -l %s/Ranger/%spolicy/%d/ 2>/dev/null| grep \"^-\"| wc -l", rootPath.c_str(), case_name.c_str(), i);
 			int policy_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 
-			if (policy_num > 0){
-				util->execSQLFile(deny_sqlfile, deny_ansfile_succeed, initfile);
+			if (focus_run || policy_num > 0){
+				util->execSQLFile(deny_sqlfile, deny_ansfile_succeed, initfile, usingDefaultSchema, printTupleOnly);
 			}
 		}
 	} else {
@@ -452,8 +649,8 @@ void TestHawqRanger::runSQLFile(hawq::test::SQLUtility* util, std::string case_n
 		auto cmd = hawq::test::stringFormat("ls -l %s/Ranger/%spolicy/%d/ 2>/dev/null| grep \"^-\"| wc -l", rootPath.c_str(), case_name.c_str(), sql_index);
 		int policy_num = std::atoi(Command::getCommandOutput(cmd).c_str());
 
-		if (policy_num > 0){
-			util->execSQLFile(deny_sqlfile, deny_ansfile_succeed, initfile);
+		if (focus_run || policy_num > 0){
+			util->execSQLFile(deny_sqlfile, deny_ansfile_succeed, initfile, usingDefaultSchema, printTupleOnly);
 		}
 	}
 }

@@ -1,0 +1,14 @@
+-- start_ignore
+-- end_ignore
+set session role= 'userpxf4';
+SET
+select * from testhive_ext;
+ a | b 
+---+---
+ 1 | 2
+ 2 | 4
+ 3 | 6
+(3 rows)
+
+drop external table testhive_ext;
+DROP EXTERNAL TABLE
