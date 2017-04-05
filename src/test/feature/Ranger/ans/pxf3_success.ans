@@ -1,0 +1,10 @@
+-- start_ignore
+-- end_ignore
+set session role= 'userpxf2';
+SET
+INSERT INTO pxf_hdfs_writabletbl_1 VALUES ( 'Frankfurt', 'Mar', 777, 3956.98 );
+INSERT 0 1
+INSERT INTO pxf_hdfs_writabletbl_1 VALUES ( 'Cleveland', 'Oct', 3812, 96645.37 );
+INSERT 0 1
+drop external table pxf_hdfs_writabletbl_1;
+DROP EXTERNAL TABLE

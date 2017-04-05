@@ -46,6 +46,7 @@ class RangerRestHelper(object):
                 error_message = e.read()
                 print error_message
                 return error_message, False
+            return "HTTPError", False
     
     def get_policy(self, service_name, policy_name):
         url = 'http://' + self.host + ':' + self.port + '/service/public/v2/api/service/' + \

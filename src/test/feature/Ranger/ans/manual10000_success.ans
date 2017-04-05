@@ -1,6 +1,6 @@
 -- start_ignore
 -- end_ignore
-set session role=usertest10000;
+set session role=usermanual10000;
 SET
 select count(*) from information_schema.view_table_usage;
 0
