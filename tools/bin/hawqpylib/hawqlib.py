@@ -203,6 +203,13 @@ def check_hostname_equal(remote_host, user = ""):
     cmd = "hostname"
     result_local, local_hostname, stderr_remote  = local_ssh_output(cmd)
     result_remote, remote_hostname, stderr_remote = remote_ssh_output(cmd, remote_host, user)
+    if result_remote != 0:
+        print "Execute command '%s' failed with return code %d on %s." % (cmd, result_remote, remote_host)
+        print "Either ssh connection fails or command exits with error. Details:"
+        print stderr_remote
+        print "For ssh connection issue, please make sure passwordless ssh is enabled or check remote host."
+        sys.exit(result_remote)
+
     if local_hostname.strip() == remote_hostname.strip():
         return True
     else:
@@ -265,9 +272,9 @@ def local_ssh_output(cmd):
 def remote_ssh(cmd, host, user):
 
     if user == "":
-        remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s \"%s\"" % (host, cmd)
+        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s \"%s\"" % (host, cmd)
     else:
-        remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s@%s \"%s\"" % (user, host, cmd)
+        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s@%s \"%s\"" % (user, host, cmd)
     try:
         result = subprocess.Popen(remote_cmd_str, shell=True).wait()
     except subprocess.CalledProcessError:
@@ -280,14 +287,14 @@ def remote_ssh(cmd, host, user):
 def remote_ssh_output(cmd, host, user):
 
     if user == "":
-        remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s \"%s\"" % (host, cmd)
+        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s \"%s\"" % (host, cmd)
     else:
-        remote_cmd_str = "ssh -o 'StrictHostKeyChecking no' %s@%s \"%s\"" % (user, host, cmd)
+        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s@%s \"%s\"" % (user, host, cmd)
 
     try:
         result = subprocess.Popen(remote_cmd_str, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
         stdout,stderr = result.communicate()
-    except subprocess.CalledProcessError:
+    except:
         print "Execute shell command on %s failed" % host
         pass
 
