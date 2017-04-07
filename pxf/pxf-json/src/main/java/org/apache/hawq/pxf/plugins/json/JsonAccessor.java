@@ -19,7 +19,7 @@ package org.apache.hawq.pxf.plugins.json;
  * under the License.
  */
 
-import static org.apache.commons.lang3.StringUtils.isEmpty;
+import static org.apache.commons.lang.StringUtils.isEmpty;
 
 import java.io.IOException;
 
