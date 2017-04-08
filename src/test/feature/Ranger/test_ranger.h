@@ -40,6 +40,8 @@ public:
 	void addUser(hawq::test::SQLUtility* util, std::string case_name, int user_index = -1, bool full_policy = false,
 			int writable_index = -1);
 	void delUser(hawq::test::SQLUtility* util, std::string case_name, int user_index);
+
+	std::string get_private_schema_name();
 };
 
 #endif

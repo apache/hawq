@@ -1,0 +1,10 @@
+#PARALLEL=* are the parallel tests to run, optional but should not be empty
+#SERIAL=* are the serial tests to run, optional but should not be empty
+#you can have several PARALLEL or SRRIAL
+
+
+#PARALLEL=TestInterma.P1Test:TestInterma.P2Test
+#SERIAL=TestInterma.S1Test:TestInterma.S2Test
+#SERIAL=TestInterma.SchemaNameTest
+#SERIAL=TestRangerPolicyHelper.DuplicateResource
+SERIAL=TestHawqRanger.FallbackTest
