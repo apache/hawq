@@ -209,7 +209,8 @@ public class Utilities {
             LOG.error("Unable to load accessor class: " + e.getMessage());
             return false;
         }
-        return (inputData != null) && (inputData.getAggType() != null)
+        return (inputData != null) && !inputData.hasFilter()
+                && (inputData.getAggType() != null)
                 && inputData.getAggType().isOptimizationSupported()
                 && isStatsAccessor;
     }

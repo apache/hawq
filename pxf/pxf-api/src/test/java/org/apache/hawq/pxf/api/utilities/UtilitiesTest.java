@@ -194,6 +194,12 @@ public class UtilitiesTest {
         when(metaData.getAccessor()).thenReturn(UtilitiesTest.class.getName());
         when(metaData.getAggType()).thenReturn(EnumAggregationType.COUNT);
         assertFalse(Utilities.useAggBridge(metaData));
+
+        //Do not use AggBridge when input data has filter
+        when(metaData.getAccessor()).thenReturn(StatsAccessorImpl.class.getName());
+        when(metaData.getAggType()).thenReturn(EnumAggregationType.COUNT);
+        when(metaData.hasFilter()).thenReturn(true);
+        assertFalse(Utilities.useAggBridge(metaData));
     }
 
     @Test
@@ -204,5 +210,9 @@ public class UtilitiesTest {
         assertTrue(Utilities.useStats(accessor, metaData));
         ReadAccessor nonStatusAccessor = new NonStatsAccessorImpl();
         assertFalse(Utilities.useStats(nonStatusAccessor, metaData));
+
+        //Do not use stats when input data has filter
+        when(metaData.hasFilter()).thenReturn(true);
+        assertFalse(Utilities.useStats(accessor, metaData));
     }
 }
