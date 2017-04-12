@@ -209,7 +209,9 @@ public class Utilities {
             LOG.error("Unable to load accessor class: " + e.getMessage());
             return false;
         }
-        return (inputData != null) && (inputData.getAggType() != null)
+        /* Make sure filter is not present, aggregate operation supports optimization and accessor implements StatsAccessor interface */
+        return (inputData != null) && !inputData.hasFilter()
+                && (inputData.getAggType() != null)
                 && inputData.getAggType().isOptimizationSupported()
                 && isStatsAccessor;
     }
@@ -223,6 +225,7 @@ public class Utilities {
      */
     public static boolean useStats(ReadAccessor accessor, InputData inputData) {
         if (accessor instanceof StatsAccessor) {
+            /* Make sure filter is not present and aggregate operation supports optimization */
             if (inputData != null && !inputData.hasFilter()
                     && inputData.getAggType() != null
                     && inputData.getAggType().isOptimizationSupported()) {
