@@ -4421,7 +4421,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	{
 		elog(ERROR, "invalid acl check type : %s.", acl_type);
 	}
-	elog(LOG, "acl check type is %s, the acl type value is %d.", acl_type, aclType);
+	elog(RANGER_LOG, "acl check type is %s, the acl type value is %d.", acl_type, aclType);
 	/* for acl_type is ranger*/
 	if (AmIMaster() && aclType == HAWQ_ACL_RANGER && !curl_context_ranger.hasInited)
 	{
@@ -4438,7 +4438,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 		curl_context_ranger.hasInited = true;
 		curl_context_ranger.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
 		curl_context_ranger.response.buffer_size = CURL_RES_BUFFER_SIZE;
-		elog(DEBUG3, "initialize global curl context for privileges check.");
+		elog(RANGER_LOG, "initialize global curl context for privileges check.");
 		on_proc_exit(curl_finalize, 0);
 	}
 	/*
@@ -5382,7 +5382,7 @@ curl_finalize(int code, Datum arg __MAYBE_UNUSED)
 		/* we're done with libcurl, so clean it up */
 		curl_global_cleanup();
 		curl_context_ranger.hasInited = false;
-		elog(DEBUG3, "finalize the global struct for curl handle context.");
+		elog(RANGER_LOG, "finalize the global struct for curl handle context.");
 	}
 }
 
