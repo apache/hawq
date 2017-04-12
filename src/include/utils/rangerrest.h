@@ -39,6 +39,8 @@
 #define HOST_BUFFER_SIZE 1025
 #define CURL_RES_BUFFER_SIZE 1024
 
+#define RANGER_LOG DEBUG3
+
 typedef enum
 {
   RANGERCHECK_OK = 0,

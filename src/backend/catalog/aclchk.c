@@ -2746,7 +2746,7 @@ List *pg_rangercheck_batch(List *arg_list)
 	List *aclresults = NIL;
 	List *requestargs = NIL;
 	ListCell *arg;
-	elog(DEBUG3, "ranger acl batch check, acl list length: %d\n", arg_list->length);
+	elog(RANGER_LOG, "ranger acl batch check, acl list length: %d\n", arg_list->length);
 	foreach(arg, arg_list)
 	{
 		RangerPrivilegeArgs *arg_ptr = (RangerPrivilegeArgs *) lfirst(arg);
@@ -2816,7 +2816,7 @@ pg_rangercheck(AclObjectKind objkind, Oid object_oid, Oid roleid,
 	List* actions = getActionName(mask);
 	bool isAll = (how == ACLMASK_ALL) ? true: false;
 
-	elog(DEBUG3, "ranger acl check kind: %d, object name: %s, object oid:%d, role: %s, mask: %u\n",
+	elog(RANGER_LOG, "ranger acl check kind: %d, object name: %s, object oid:%d, role: %s, mask: %u\n",
 			objkind, objectname, object_oid, rolename, mask);
 
 	List *resultargs = NIL;

@@ -80,7 +80,7 @@ static int parse_ranger_response(char* buffer, List *result_list)
 	if (buffer == NULL || strlen(buffer) == 0)
 		return -1;
 
-	elog(DEBUG3, "parse ranger restful response content : %s", buffer);
+	elog(RANGER_LOG, "parse ranger restful response content : %s", buffer);
 
 	struct json_object *response = json_tokener_parse(buffer);
 	if (response == NULL) 
@@ -97,7 +97,7 @@ static int parse_ranger_response(char* buffer, List *result_list)
 	}
 
 	int arraylen = json_object_array_length(accessObj);
-	elog(DEBUG3, "parse ranger response result array length: %d",arraylen);
+	elog(RANGER_LOG, "parse ranger response result array length: %d",arraylen);
 	for (int i=0; i< arraylen; i++){
 		struct json_object *jvalue = NULL;
 		struct json_object *jallow = NULL;
@@ -120,7 +120,7 @@ static int parse_ranger_response(char* buffer, List *result_list)
 		const char *privilege_str = json_object_get_string(jprivilege);
 		uint32 resource_sign = string_hash(resource_str, strlen(resource_str));
 		uint32 privilege_sign = string_hash(privilege_str, strlen(privilege_str));
-		elog(DEBUG3, "ranger response access sign, resource_str: %s, privilege_str: %s",
+		elog(RANGER_LOG, "ranger response access sign, resource_str: %s, privilege_str: %s",
 			resource_str, privilege_str);
 
 		ListCell *result;
@@ -215,7 +215,7 @@ static json_object *create_ranger_request_json(List *request_list, List *result_
 		AclObjectKind kind = arg_ptr->kind;
 		char* object = arg_ptr->object;
 		Assert(user != NULL && object != NULL);
-		elog(DEBUG3, "build json for ranger restful request, user:%s, kind:%s, object:%s",
+		elog(RANGER_LOG, "build json for ranger restful request, user:%s, kind:%s, object:%s",
 				user, AclObjectKindStr[kind], object);
 
 		json_object *jelement = json_object_new_object();
@@ -318,7 +318,7 @@ static json_object *create_ranger_request_json(List *request_list, List *result_
 		const char *privilege_str = json_object_to_json_string(jactions);
 		result_ptr->resource_sign = string_hash(resource_str, strlen(resource_str));
 		result_ptr->privilege_sign = string_hash(privilege_str, strlen(privilege_str));
-		elog(DEBUG3, "request access sign, resource_str:%s, privilege_str:%s", 
+		elog(RANGER_LOG, "request access sign, resource_str:%s, privilege_str:%s",
 			resource_str, privilege_str);
 		j++;
 	} // foreach
@@ -349,7 +349,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 	CURL_HANDLE curl = (CURL_HANDLE) userp;
 	Assert(curl != NULL);
 
-	elog(DEBUG3, "ranger restful response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
+	elog(RANGER_LOG, "ranger restful response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
 	int original_size = curl->response.buffer_size;
 	while(curl->response.response_size + realsize >= curl->response.buffer_size)
 	{
@@ -361,7 +361,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 		/* repalloc is not same as realloc, repalloc's first parameter cannot be NULL */
 		curl->response.buffer = repalloc(curl->response.buffer, curl->response.buffer_size);
 	}
-	elog(DEBUG3, "ranger restful response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
+	elog(RANGER_LOG, "ranger restful response size is %d. response buffer size is %d.", curl->response.response_size, curl->response.buffer_size);
 	if (curl->response.buffer == NULL)
 	{
 		/* allocate memory failed. probably out of memory */
@@ -369,7 +369,7 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 		return 0;
 	}
 	memcpy(curl->response.buffer + curl->response.response_size, contents, realsize);
-	elog(DEBUG3, "read from ranger restful response: %s", curl->response.buffer);
+	elog(RANGER_LOG, "read from ranger restful response: %s", curl->response.buffer);
 	curl->response.response_size += realsize;
 	curl->response.buffer[curl->response.response_size] = '\0';
 	return realsize;
@@ -431,7 +431,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	else
 	{
 		ret = 0;
-		elog(DEBUG3, "retrieved %d bytes data from ranger restful response.",
+		elog(RANGER_LOG, "retrieved %d bytes data from ranger restful response.",
 			curl_handle->response.response_size);
 	}
 
@@ -451,7 +451,7 @@ int check_privilege_from_ranger(List *request_list, List *result_list)
 
 	const char *request = json_object_to_json_string(jrequest);
 	Assert(request != NULL);
-	elog(DEBUG3, "send json request to ranger : %s", request);
+	elog(RANGER_LOG, "send json request to ranger : %s", request);
 
 	/* call GET method to send request*/
 	Assert(curl_context_ranger.hasInited);
