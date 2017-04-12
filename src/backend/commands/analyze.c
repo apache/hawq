@@ -782,12 +782,6 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		UnsetActiveQueryResource();
 		SetActiveQueryResource(savedResource);
 		
-		ResourceOwnerRelease(owner,
-				RESOURCE_RELEASE_BEFORE_LOCKS,
-				false, true);
-		CurrentResourceOwner = oldOwner;
-		ResourceOwnerDelete(owner);
-
 		/* Carry on with error handling. */
 		PG_RE_THROW();
 	}
@@ -803,7 +797,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 
 	ResourceOwnerRelease(owner,
             RESOURCE_RELEASE_BEFORE_LOCKS,
-            false, true);
+            false, false);
 	CurrentResourceOwner = oldOwner;
 	ResourceOwnerDelete(owner);
 
