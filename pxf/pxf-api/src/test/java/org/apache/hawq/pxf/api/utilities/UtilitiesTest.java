@@ -189,6 +189,7 @@ public class UtilitiesTest {
         InputData metaData = mock(InputData.class);
         when(metaData.getAccessor()).thenReturn(StatsAccessorImpl.class.getName());
         when(metaData.getAggType()).thenReturn(EnumAggregationType.COUNT);
+        when(metaData.getAccessor()).thenReturn("org.apache.hawq.pxf.api.utilities.UtilitiesTest$StatsAccessorImpl");
         assertTrue(Utilities.useAggBridge(metaData));
 
         when(metaData.getAccessor()).thenReturn(UtilitiesTest.class.getName());
@@ -207,12 +208,18 @@ public class UtilitiesTest {
         InputData metaData = mock(InputData.class);
         ReadAccessor accessor = new StatsAccessorImpl();
         when(metaData.getAggType()).thenReturn(EnumAggregationType.COUNT);
+        when(metaData.getAccessor()).thenReturn("org.apache.hawq.pxf.api.utilities.UtilitiesTest$StatsAccessorImpl");
         assertTrue(Utilities.useStats(accessor, metaData));
         ReadAccessor nonStatusAccessor = new NonStatsAccessorImpl();
         assertFalse(Utilities.useStats(nonStatusAccessor, metaData));
 
         //Do not use stats when input data has filter
         when(metaData.hasFilter()).thenReturn(true);
+        assertFalse(Utilities.useStats(accessor, metaData));
+
+        //Do not use stats when more than one column is projected
+        when(metaData.hasFilter()).thenReturn(false);
+        when(metaData.getNumAttrsProjected()).thenReturn(1);
         assertFalse(Utilities.useStats(accessor, metaData));
     }
 }
