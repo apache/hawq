@@ -42,6 +42,7 @@ public abstract class ServiceTestBase {
     public final TestName testName = new TestName();
 
     protected static final String PUBLIC_GROUP = "public";
+    protected static final String TEST_GROUP = "test";
     protected static final String GPADMIN_USER = "gpadmin";
     protected static final String TEST_USER = "maria_dev";
     protected static final String UNKNOWN = "unknown";

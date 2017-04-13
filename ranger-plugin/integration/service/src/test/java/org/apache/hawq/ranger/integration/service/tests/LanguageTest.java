@@ -78,11 +78,11 @@ public class LanguageTest extends ComplexResourceTestBase {
     }
 
     @Override
-    protected Policy getResourceGroupPolicy() {
+    protected Policy getResourceGroupPolicy(String group) {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
                 .resource(language, TEST_LANGUAGE)
-                .groupAccess(PUBLIC_GROUP, privileges)
+                .groupAccess(group, privileges)
                 .build();
         return policy;
     }

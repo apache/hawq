@@ -64,12 +64,26 @@ public abstract class SimpleResourceTestBase extends ServiceTestBase {
 
     @Test
     public void testSpecificResourcePublicGroupPolicy() throws IOException {
-        Policy policy = getResourceGroupPolicy();
+        Policy policy = getResourceGroupPolicy(PUBLIC_GROUP);
         createPolicy(policy);
         checkUserHasResourceAccess(TEST_USER, specificResource, privileges);
         // user NOT in the policy --> has access to the specific resource
         assertTrue(hasAccess(UNKNOWN, specificResource, privileges));
         // user IN the policy --> has NO access to the unknown resource
+        assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
+        // test that user doesn't have access if policy is deleted
+        deletePolicy(policy);
+        assertFalse(hasAccess(TEST_USER, specificResource, privileges));
+    }
+
+    @Test
+    public void testSpecificResourceUserGroupPolicy() throws IOException {
+        Policy policy = getResourceGroupPolicy(TEST_GROUP);
+        createPolicy(policy);
+        checkUserHasResourceAccess(TEST_USER, specificResource, privileges);
+        // user NOT in the group --> has NO access to the specific resource
+        assertFalse(hasAccess(UNKNOWN, specificResource, privileges));
+        // user IN the group --> has NO access to the unknown resource
         assertFalse(hasAccess(TEST_USER, unknownResource, privileges));
         // test that user doesn't have access if policy is deleted
         deletePolicy(policy);
@@ -110,5 +124,5 @@ public abstract class SimpleResourceTestBase extends ServiceTestBase {
     }
 
     abstract protected Policy getResourceUserPolicy();
-    abstract protected Policy getResourceGroupPolicy();
+    abstract protected Policy getResourceGroupPolicy(String group);
 }

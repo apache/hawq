@@ -24,11 +24,13 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.ranger.authorization.model.AuthorizationRequest;
 import org.apache.hawq.ranger.authorization.model.AuthorizationResponse;
 import org.apache.hawq.ranger.authorization.model.HawqPrivilege;
 import org.apache.hawq.ranger.authorization.model.HawqResource;
 import org.apache.hawq.ranger.authorization.model.ResourceAccess;
+import org.apache.ranger.audit.provider.MiscUtil;
 import org.apache.ranger.plugin.audit.RangerDefaultAuditHandler;
 import org.apache.ranger.plugin.policyengine.RangerAccessRequestImpl;
 import org.apache.ranger.plugin.policyengine.RangerAccessResource;
@@ -117,12 +119,12 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
         for (Map.Entry<HawqResource, String> resourceEntry : resourceAccess.getResource().entrySet()) {
             rangerResource.setValue(resourceEntry.getKey().name(), resourceEntry.getValue());
         }
+        // determine user groups
+        Set<String> userGroups = getUserGroups(user);
 
         boolean accessAllowed = true;
         // iterate over all privileges requested
         for (HawqPrivilege privilege : resourceAccess.getPrivileges()) {
-            // TODO not clear how we will get user groups -- Kerberos case ?
-            Set<String> userGroups = Collections.emptySet();
             boolean privilegeAuthorized = authorizeResourcePrivilege(rangerResource, privilege.name(), user, userGroups, clientIp, context);
             // ALL model of evaluation -- all privileges must be authorized for access to be allowed
             if (!privilegeAuthorized) {
@@ -242,6 +244,25 @@ public class RangerHawqAuthorizer implements HawqAuthorizer {
         if (CollectionUtils.isEmpty(access.getPrivileges())) {
             throw new IllegalArgumentException("set of privileges is missing empty in the request");
         }
+    }
+
+    /**
+     * Returns a set of groups the user belongs to
+     * @param user user name
+     * @return set of groups for the user
+     */
+    private Set<String> getUserGroups(String user) {
+        String[] userGroups = null;
+        try {
+            UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+            userGroups = ugi.getGroupNames();
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(String.format("Determined user=%s belongs to groups=%s", user, Arrays.toString(userGroups)));
+            }
+        } catch (Throwable e) {
+            LOG.warn("Failed to determine groups for user=" + user, e);
+        }
+        return userGroups == null ? Collections.<String>emptySet() : new HashSet<String>(Arrays.asList(userGroups));
     }
 
 

@@ -83,12 +83,12 @@ public class SchemaTest extends ComplexResourceTestBase {
     }
 
     @Override
-    protected Policy getResourceGroupPolicy() {
+    protected Policy getResourceGroupPolicy(String group) {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
                 .resource(schema, TEST_SCHEMA)
                 .resource(table, STAR)
-                .groupAccess(PUBLIC_GROUP, SPECIAL_PRIVILEGES)
+                .groupAccess(group, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
     }
