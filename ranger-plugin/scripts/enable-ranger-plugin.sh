@@ -214,6 +214,7 @@ function update_ranger_url() {
 function update_java_home() {
   local jdk64="/usr/jdk64"
   local java_sdk="/etc/alternatives/java_sdk"
+  local prop_file=$(dirname ${SCRIPT_DIR})/etc/rps.properties
 
   if [[ -d ${jdk64} ]]; then
     local DIR_NAME=$(ls ${jdk64} | sort -r | head -1)
@@ -225,7 +226,6 @@ function update_java_home() {
   fi
 
   if [[ ${JAVA_HOME_DIR} ]]; then
-    local prop_file=$(dirname ${SCRIPT_DIR})/etc/rps.properties
     sed -i -e "s|/usr/java/default|${JAVA_HOME_DIR}|g" ${prop_file}
     echo "Updated default value of JAVA_HOME to ${JAVA_HOME_DIR} in ${prop_file}"
   elif [[ ! ${JAVA_HOME} ]]; then
