@@ -484,9 +484,13 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 			}
 			else
 			{
-				memlimit_value = true;
-				res = SimpleStringToStorageSizeMB(attrvalue,
-												  (uint32_t *) &(queue->ClusterMemoryMB));
+				res = RESQUEMGR_WRONG_RES_QUOTA_EXP;
+				snprintf(errorbuf, errorbufsize,
+						"%s format \'%s\' is invalid, only support percentage now.",
+						loadcatalog ?
+								RSQTBLAttrNames[RSQ_TBL_ATTR_MEMORY_LIMIT_CLUSTER] :
+								RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
+						attrvalue->Str);
 			}
 			break;
 
@@ -501,8 +505,13 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 			}
 			else
 			{
-				corelimit_value = true;
-				res = SimpleStringToDouble(attrvalue, &(queue->ClusterVCore));
+				res = RESQUEMGR_WRONG_RES_QUOTA_EXP;
+				snprintf(errorbuf, errorbufsize,
+						"%s format \'%s\' is invalid, only support percentage now.",
+						loadcatalog ?
+								RSQTBLAttrNames[RSQ_TBL_ATTR_CORE_LIMIT_CLUSTER] :
+								RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER],
+						attrvalue->Str);
 			}
 			break;
 
