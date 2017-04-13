@@ -44,10 +44,10 @@ public class TablespaceTest extends SimpleResourceTestBase {
     }
 
     @Override
-    protected Policy getResourceGroupPolicy() {
+    protected Policy getResourceGroupPolicy(String group) {
         Policy policy = policyBuilder
                 .resource(tablespace, TEST_TABLESPACE)
-                .groupAccess(PUBLIC_GROUP, privileges)
+                .groupAccess(group, privileges)
                 .build();
         return policy;
     }

@@ -17,6 +17,8 @@
 
 package org.apache.hawq.ranger.authorization;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.ranger.authorization.model.AuthorizationRequest;
 import org.apache.hawq.ranger.authorization.model.AuthorizationResponse;
 import org.apache.hawq.ranger.authorization.model.HawqPrivilege;
@@ -32,11 +34,11 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.internal.util.collections.Sets;
 import org.mockito.runners.MockitoJUnitRunner;
+import org.powermock.api.mockito.PowerMockito;
+import org.powermock.core.classloader.annotations.PrepareForTest;
+import org.powermock.modules.junit4.PowerMockRunner;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static junit.framework.TestCase.assertEquals;
 import static junit.framework.TestCase.assertNotNull;
@@ -45,8 +47,8 @@ import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(PowerMockRunner.class)
+@PrepareForTest(UserGroupInformation.class)
 public class RangerHawqAuthorizerTest {
 
     private static final Integer TEST_REQUEST_ID = 1;
@@ -138,6 +140,24 @@ public class RangerHawqAuthorizerTest {
         when(mockRangerPlugin.isAccessAllowed(argThat(new PrivilegeMatcher("usage-schema")))).thenReturn(mockRangerAccessResultUsage);
         when(mockRangerAccessResultUsage.getIsAllowed()).thenReturn(true);
         testRequest(TEST_RESOURCE_REQUEST_USAGE_SCHEMA, TEST_RESOURCE_RESPONSE_USAGE_SCHEMA);
+    }
+
+    @Test
+    public void testAuthorize_allAllowed_group() throws Exception {
+        UserGroupInformation mockUgi = mock(UserGroupInformation.class);
+        when(mockUgi.getGroupNames()).thenReturn(new String[]{"foo", "bar"});
+        PowerMockito.mockStatic(UserGroupInformation.class);
+        when(UserGroupInformation.createRemoteUser(TEST_USER)).thenReturn(mockUgi);
+        when(mockRangerPlugin.isAccessAllowed(argThat(new UGIMatcher(TEST_USER, "foo", "bar")))).thenReturn(mockRangerAccessResult);
+        when(mockRangerAccessResult.getIsAllowed()).thenReturn(true);
+        testRequest(TEST_RESOURCE_REQUEST, TEST_RESOURCE_RESPONSE_ALL_TRUE);
+    }
+
+    @Test
+    public void testAuthorize_allAllowed_noGroup() throws Exception {
+        when(mockRangerPlugin.isAccessAllowed(argThat(new UGIMatcher(TEST_USER, null)))).thenReturn(mockRangerAccessResult);
+        when(mockRangerAccessResult.getIsAllowed()).thenReturn(true);
+        testRequest(TEST_RESOURCE_REQUEST, TEST_RESOURCE_RESPONSE_ALL_TRUE);
     }
 
     /* ----- VALIDATION TESTS ----- */
@@ -319,6 +339,21 @@ public class RangerHawqAuthorizerTest {
         public boolean matches(Object request) {
             return request == null ? false :
                     privileges.contains(((RangerAccessRequest) request).getAccessType());
+        }
+    };
+
+    private class UGIMatcher extends ArgumentMatcher<RangerAccessRequest> {
+        private String user;
+        private Set<String> groups;
+        public UGIMatcher(String user, String... groups) {
+            this.user = user;
+            this.groups = groups == null ? Collections.<String>emptySet() : Sets.newSet(groups);
+        }
+        @Override
+        public boolean matches(Object request) {
+            return request == null ? false :
+                    user.equals(((RangerAccessRequest) request).getUser()) &&
+                    CollectionUtils.isEqualCollection(groups, (((RangerAccessRequest) request).getUserGroups()));
         }
     };
 
