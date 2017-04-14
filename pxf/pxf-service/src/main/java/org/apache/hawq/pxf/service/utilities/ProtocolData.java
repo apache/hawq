@@ -383,6 +383,7 @@ public class ProtocolData extends InputData {
         List<Integer> columnProjList = new ArrayList<Integer>();
         if(columnProjStr != null) {
             int columnProj = Integer.parseInt(columnProjStr);
+            numAttrsProjected = columnProj;
             if(columnProj > 0) {
                 String columnProjIndexStr = getProperty("ATTRS-PROJ-IDX");
                 String columnProjIdx[] = columnProjIndexStr.split(",");

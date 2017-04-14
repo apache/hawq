@@ -75,6 +75,16 @@ public class InputData {
     protected ColumnDescriptor recordkeyColumn;
 
     /**
+     * Number of attributes projected in query.
+     *
+     * Example:
+     * SELECT col1, col2, col3... : number of attributes projected - 3
+     * SELECT col1, col2, col3... WHERE col4=a : number of attributes projected - 4
+     * SELECT *... : number of attributes projected - 0
+     */
+    protected int numAttrsProjected;
+
+    /**
      * Constructs an empty InputData
      */
     public InputData() {
@@ -367,6 +377,22 @@ public class InputData {
      */
     public void setFragmentIndex(int fragmentIndex) {
         this.fragmentIndex = fragmentIndex;
+    }
+
+    /**
+     * Returns number of attributes projected in a query
+     * @return number of attributes projected
+     */
+    public int getNumAttrsProjected() {
+        return numAttrsProjected;
+    }
+
+    /**
+     * Sets number of attributes projected
+     * @param numAttrsProjected number of attrivutes projected
+     */
+    public void setNumAttrsProjected(int numAttrsProjected) {
+        this.numAttrsProjected = numAttrsProjected;
     }
 
 }

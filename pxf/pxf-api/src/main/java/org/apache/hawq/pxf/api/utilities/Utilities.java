@@ -204,6 +204,9 @@ public class Utilities {
     public static boolean useAggBridge(InputData inputData) {
         boolean isStatsAccessor = false;
         try {
+            if (inputData == null || inputData.getAccessor() == null) {
+                throw new IllegalArgumentException("Missing accessor information");
+            }
             isStatsAccessor = ArrayUtils.contains(Class.forName(inputData.getAccessor()).getInterfaces(), StatsAccessor.class);
         } catch (ClassNotFoundException e) {
             LOG.error("Unable to load accessor class: " + e.getMessage());
@@ -213,6 +216,7 @@ public class Utilities {
         return (inputData != null) && !inputData.hasFilter()
                 && (inputData.getAggType() != null)
                 && inputData.getAggType().isOptimizationSupported()
+                && inputData.getNumAttrsProjected() == 0
                 && isStatsAccessor;
     }
 
@@ -224,14 +228,10 @@ public class Utilities {
      * @return true if this accessor should use statistic information
      */
     public static boolean useStats(ReadAccessor accessor, InputData inputData) {
-        if (accessor instanceof StatsAccessor) {
-            /* Make sure filter is not present and aggregate operation supports optimization */
-            if (inputData != null && !inputData.hasFilter()
-                    && inputData.getAggType() != null
-                    && inputData.getAggType().isOptimizationSupported()) {
+        if (accessor instanceof StatsAccessor && useAggBridge(inputData)) {
                 return true;
-            }
+        } else {
+            return false;
         }
-        return false;
     }
 }
