@@ -44,6 +44,7 @@ import org.apache.hawq.pxf.service.AggBridge;
 import org.apache.hawq.pxf.service.Bridge;
 import org.apache.hawq.pxf.service.ReadBridge;
 import org.apache.hawq.pxf.service.ReadSamplingBridge;
+import org.apache.hawq.pxf.service.ReadVectorizedBridge;
 import org.apache.hawq.pxf.service.io.Writable;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
 import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
@@ -101,6 +102,8 @@ public class BridgeResource extends RestResource {
             bridge = new ReadSamplingBridge(protData);
         } else if (Utilities.useAggBridge(protData)) {
             bridge = new AggBridge(protData);
+        } else if (Utilities.useVectorization(protData)) {
+            bridge = new ReadVectorizedBridge(protData);
         } else {
             bridge = new ReadBridge(protData);
         }

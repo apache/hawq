@@ -289,7 +289,7 @@ public class HiveDataFragmenter extends Fragmenter {
         if (inputData.getProfile() != null) {
             // evaluate optimal profile based on file format if profile was explicitly specified in url
             // if user passed accessor+fragmenter+resolver - use them
-            profile = ProfileFactory.get(fformat, hasComplexTypes);
+            profile = ProfileFactory.get(fformat, hasComplexTypes, inputData.getProfile());
         }
         String fragmenterForProfile = null;
         if (profile != null) {

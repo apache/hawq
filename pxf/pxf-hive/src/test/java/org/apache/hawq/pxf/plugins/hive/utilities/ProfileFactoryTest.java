@@ -34,31 +34,31 @@ public class ProfileFactoryTest {
     public void get() throws Exception {
 
         // For TextInputFormat when table has no complex types, HiveText profile should be used
-        String profileName = ProfileFactory.get(new TextInputFormat(), false);
+        String profileName = ProfileFactory.get(new TextInputFormat(), false, null);
         assertEquals("HiveText", profileName);
 
         // For TextInputFormat when table has complex types, Hive profile should be used, HiveText doesn't support complex types yet
-        profileName = ProfileFactory.get(new TextInputFormat(), true);
+        profileName = ProfileFactory.get(new TextInputFormat(), true, null);
         assertEquals("Hive", profileName);
 
         // For RCFileInputFormat when table has complex types, HiveRC profile should be used
-        profileName = ProfileFactory.get(new RCFileInputFormat(), true);
+        profileName = ProfileFactory.get(new RCFileInputFormat(), true, null);
         assertEquals("HiveRC", profileName);
 
         // For RCFileInputFormat when table has no complex types, HiveRC profile should be used
-        profileName = ProfileFactory.get(new RCFileInputFormat(), false);
+        profileName = ProfileFactory.get(new RCFileInputFormat(), false, null);
         assertEquals("HiveRC", profileName);
 
         // For OrcInputFormat when table has complex types, HiveORC profile should be used
-        profileName = ProfileFactory.get(new OrcInputFormat(), true);
+        profileName = ProfileFactory.get(new OrcInputFormat(), true, null);
         assertEquals("HiveORC", profileName);
 
         // For OrcInputFormat when table has no complex types, HiveORC profile should be used
-        profileName = ProfileFactory.get(new OrcInputFormat(), false);
+        profileName = ProfileFactory.get(new OrcInputFormat(), false, null);
         assertEquals("HiveORC", profileName);
 
         // For other formats Hive profile should be used
-        profileName = ProfileFactory.get(new SequenceFileInputFilter(), false);
+        profileName = ProfileFactory.get(new SequenceFileInputFilter(), false, null);
         assertEquals("Hive", profileName);
     }
 

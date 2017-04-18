@@ -149,9 +149,10 @@ public class ReadBridge implements Bridge {
                 inputData.getAccessor(), inputData);
     }
 
-    public static ReadResolver getFieldsResolver(InputData inputData)
+    @SuppressWarnings("unchecked")
+    public static <T> T getFieldsResolver(InputData inputData)
             throws Exception {
-        return (ReadResolver) Utilities.createAnyInstance(InputData.class,
+        return (T) Utilities.createAnyInstance(InputData.class,
                 inputData.getResolver(), inputData);
     }
 

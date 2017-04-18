@@ -35,16 +35,20 @@ public class ProfileFactory {
     private static final String HIVE_RC_PROFILE = "HiveRC";
     private static final String HIVE_ORC_PROFILE = "HiveORC";
     private static final String HIVE_PROFILE = "Hive";
+    private static final String HIVE_ORC_VECTORIZED_PROFILE = "HiveVectorizedORC";
 
     /**
      * The method which returns optimal profile
      *
      * @param inputFormat input format of table/partition
      * @param hasComplexTypes whether record has complex types, see @EnumHiveToHawqType
+     * @param userProfileName profile name provided by user
      * @return name of optimal profile
      */
-    public static String get(InputFormat inputFormat, boolean hasComplexTypes) {
+    public static String get(InputFormat inputFormat, boolean hasComplexTypes, String userProfileName) {
         String profileName = null;
+        if (HIVE_ORC_VECTORIZED_PROFILE.equals(userProfileName))
+            return userProfileName;
         if (inputFormat instanceof TextInputFormat && !hasComplexTypes) {
             profileName = HIVE_TEXT_PROFILE;
         } else if (inputFormat instanceof RCFileInputFormat) {

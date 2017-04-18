@@ -136,7 +136,7 @@ public class HiveMetadataFetcher extends MetadataFetcher {
     private OutputFormat getOutputFormat(String inputFormat, boolean hasComplexTypes) throws Exception {
         OutputFormat outputFormat = null;
         InputFormat<?, ?> fformat = HiveDataFragmenter.makeInputFormat(inputFormat, jobConf);
-        String profile = ProfileFactory.get(fformat, hasComplexTypes);
+        String profile = ProfileFactory.get(fformat, hasComplexTypes, null);
         String outputFormatClassName = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OUTPUTFORMAT");
         outputFormat = OutputFormat.getOutputFormat(outputFormatClassName);
         return outputFormat;

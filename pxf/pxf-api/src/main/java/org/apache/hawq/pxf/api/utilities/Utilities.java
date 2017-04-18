@@ -24,6 +24,7 @@ import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.pxf.api.ReadAccessor;
+import org.apache.hawq.pxf.api.ReadVectorizedResolver;
 import org.apache.hawq.pxf.api.StatsAccessor;
 
 import java.io.ByteArrayInputStream;
@@ -233,5 +234,16 @@ public class Utilities {
         } else {
             return false;
         }
+    }
+
+    public static boolean useVectorization(InputData inputData) {
+        boolean isVectorizedResolver = false;
+        try {
+            isVectorizedResolver = ArrayUtils.contains(Class.forName(inputData.getResolver()).getInterfaces(), ReadVectorizedResolver.class);
+        } catch (ClassNotFoundException e) {
+            LOG.error("Unable to load resolver class: " + e.getMessage());
+            return false;
+        }
+        return isVectorizedResolver;
     }
 }
