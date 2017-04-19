@@ -75,8 +75,6 @@ public class JdbcPlugin extends Plugin {
         tblName = input.getDataSource();
         if (tblName == null) {
             throw new UserDataException("TABLE_NAME must be set as DataSource.");
-        } else {
-            tblName = tblName.toUpperCase();
         }
     }
 
