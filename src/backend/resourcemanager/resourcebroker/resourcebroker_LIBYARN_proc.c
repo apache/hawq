@@ -580,7 +580,8 @@ int handleRM2RB_GetClusterReport(void)
 								 &maxcap,
 								 &haschildren);
 	if ( res != FUNCTION_SUCCEEDED ) {
-		return sendRBGetClusterReportErrorData(RESBROK_ERROR_GRM);
+		sendRBGetClusterReportErrorData(RESBROK_ERROR_GRM);
+		return RESBROK_ERROR_GRM;
 	}
 
 	elog(LOG, "get YARN resource queue %s report: "
@@ -598,7 +599,8 @@ int handleRM2RB_GetClusterReport(void)
 
 	if ( res != FUNCTION_SUCCEEDED )
 	{
-		return sendRBGetClusterReportErrorData(RESBROK_ERROR_GRM);
+		sendRBGetClusterReportErrorData(RESBROK_ERROR_GRM);
+		return RESBROK_ERROR_GRM;
 	}
 
 	elog(DEBUG3, "YARN resource tight test (%d MB, %d CORE)",
@@ -622,7 +624,8 @@ int handleRM2RB_GetClusterReport(void)
 		if ( res != FUNCTION_SUCCEEDED )
 		{
 			RB2YARN_freeContainersInMemory(&ctnids, &ctnhosts);
-			return sendRBGetClusterReportErrorData(RESBROK_ERROR_GRM);
+			sendRBGetClusterReportErrorData(RESBROK_ERROR_GRM);
+			return RESBROK_ERROR_GRM;
 		}
 
 		if ( ctnids.NodeCount > 0 )
@@ -640,13 +643,14 @@ int handleRM2RB_GetClusterReport(void)
 			DQUEUE_LOOP_END
 			RB2YARN_freeContainersInMemory(&ctnids, &ctnhosts);
 			res = RB2YARN_returnResource(ctnidarr, idx);
-		    if ( res != FUNCTION_SUCCEEDED )
-		    {
-		    	rm_pfree(PCONTEXT, ctnidarr);
-		    	return sendRBReturnResourceErrorData(RESBROK_ERROR_GRM);
-		    }
-		    YARNResourceTight = false;
-		    elog(DEBUG3, "YARN mode resource broker consider the target queue not busy.");
+			if ( res != FUNCTION_SUCCEEDED )
+			{
+				rm_pfree(PCONTEXT, ctnidarr);
+				sendRBReturnResourceErrorData(RESBROK_ERROR_GRM);
+				return RESBROK_ERROR_GRM;
+			}
+			YARNResourceTight = false;
+			elog(DEBUG3, "YARN mode resource broker consider the target queue not busy.");
 		}
 		else
 		{
@@ -865,18 +869,19 @@ int handleRM2RB_AllocateResource(void)
 										 &acquiredcontids,
 										 &acquiredconthosts);
 
-    if ( libyarnres != FUNCTION_SUCCEEDED )
-    {
-    	if (pBuffer != NULL)
-    	{
-    		rm_pfree(PCONTEXT, pBuffer);
-    	}
-    	if (preferredArray != NULL)
-    	{
-    		rm_pfree(PCONTEXT, preferredArray);
-    	}
-    	return sendRBAllocateResourceErrorData(RESBROK_ERROR_GRM, &request);
-    }
+	if ( libyarnres != FUNCTION_SUCCEEDED )
+	{
+		if (pBuffer != NULL)
+		{
+			rm_pfree(PCONTEXT, pBuffer);
+		}
+		if (preferredArray != NULL)
+		{
+			rm_pfree(PCONTEXT, preferredArray);
+		}
+		sendRBAllocateResourceErrorData(RESBROK_ERROR_GRM, &request);
+		return RESBROK_ERROR_GRM;
+	}
 
 	/*
 	 * Build response message.
@@ -1060,7 +1065,8 @@ int handleRM2RB_ReturnResource(void)
     	if( containerids != NULL ) {
     		rm_pfree(PCONTEXT, containerids);
     	}
-    	return sendRBReturnResourceErrorData(RESBROK_ERROR_GRM);
+    	sendRBReturnResourceErrorData(RESBROK_ERROR_GRM);
+    	return RESBROK_ERROR_GRM;
     }
 
 	/*
@@ -1167,7 +1173,8 @@ int handleRM2RB_GetContainerReport(void)
     	{
     		rm_pfree(PCONTEXT, ctnstats);
     	}
-    	return sendRBGetContainerReportErrorData(RESBROK_ERROR_GRM);
+    	sendRBGetContainerReportErrorData(RESBROK_ERROR_GRM);
+    	return RESBROK_ERROR_GRM;
     }
 
     elog(LOG, "YARN mode resource broker got total %d containers", size);
