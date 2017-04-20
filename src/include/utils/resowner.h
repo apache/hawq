@@ -67,6 +67,7 @@ typedef void (*ResourceReleaseCallback) (ResourceReleasePhase phase,
  */
 
 /* generic routines */
+extern ResourceOwner GetTopResourceOwner();
 extern ResourceOwner ResourceOwnerCreate(ResourceOwner parent,
 					const char *name);
 extern void ResourceOwnerRelease(ResourceOwner owner,
@@ -74,6 +75,7 @@ extern void ResourceOwnerRelease(ResourceOwner owner,
 					 bool isCommit,
 					 bool isTopLevel);
 extern void ResourceOwnerDelete(ResourceOwner owner);
+extern void DeleteTopResourceOwner();
 extern ResourceOwner ResourceOwnerGetParent(ResourceOwner owner);
 extern void ResourceOwnerNewParent(ResourceOwner owner,
 					   ResourceOwner newparent);

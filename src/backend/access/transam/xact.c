@@ -2458,7 +2458,7 @@ CommitTransaction(void)
 	//AtEOXact_Snapshot(true);
 	pgstat_report_xact_timestamp(0);
 
-	CurrentResourceOwner = NULL;
+	CurrentResourceOwner = GetTopResourceOwner();
 	ResourceOwnerDelete(TopTransactionResourceOwner);
 	s->curTransactionOwner = NULL;
 	CurTransactionResourceOwner = NULL;
@@ -2687,7 +2687,7 @@ PrepareTransaction(void)
 	AtEOXact_HashTables(true);
 	/* don't call AtEOXact_PgStat here */
 
-	CurrentResourceOwner = NULL;
+	CurrentResourceOwner = GetTopResourceOwner();
 	ResourceOwnerDelete(TopTransactionResourceOwner);
 	s->curTransactionOwner = NULL;
 	CurTransactionResourceOwner = NULL;
@@ -2933,7 +2933,7 @@ CleanupTransaction(void)
 	 */
 	AtCleanup_Portals();		/* now safe to release portal memory */
 
-	CurrentResourceOwner = NULL;	/* and resource owner */
+	CurrentResourceOwner = GetTopResourceOwner();	/* and resource owner */
 	if (TopTransactionResourceOwner)
 		ResourceOwnerDelete(TopTransactionResourceOwner);
 	s->curTransactionOwner = NULL;

@@ -6561,7 +6561,7 @@ StartupXLOG(void)
 					(errmsg("redo done at %X/%X",
 							ReadRecPtr.xlogid, ReadRecPtr.xrecoff)));
 
-			CurrentResourceOwner = NULL;
+			CurrentResourceOwner = GetTopResourceOwner();
 
 			InRedo = false;
 
@@ -7574,7 +7574,7 @@ XLogStandbyRecoverRange(XLogRecPtr *redoCheckpointLoc, CheckPoint *redoCheckPoin
 	 */
 	FlushBufferPool();
 
-	CurrentResourceOwner = NULL;
+	CurrentResourceOwner = GetTopResourceOwner();
 
 	InRedo = false;
 	InRecovery = false;
