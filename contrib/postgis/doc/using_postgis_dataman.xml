@@ -1,0 +1,2496 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<chapter id="using_postgis_dbmanagement">
+  <title>Using PostGIS: Data Management and Queries</title>
+
+  <sect1 id="RefObject">
+	<title>GIS Objects</title>
+
+	<para>The GIS objects supported by PostGIS are a superset of the "Simple
+	Features" defined by the OpenGIS Consortium (OGC). As of version 0.9,
+	PostGIS supports all the objects and functions specified in the OGC
+	"Simple Features for SQL" specification.</para>
+
+	<para>PostGIS extends the standard with support for 3DZ,3DM and 4D
+	coordinates.</para>
+
+	<sect2 id="OpenGISWKBWKT">
+	  <title>OpenGIS WKB and WKT</title>
+
+	  <para>The OpenGIS specification defines two standard ways of expressing
+	  spatial objects: the Well-Known Text (WKT) form and the Well-Known
+	  Binary (WKB) form. Both WKT and WKB include information about the type
+	  of the object and the coordinates which form the object.</para>
+
+	  <para>Examples of the text representations (WKT) of the spatial objects
+	  of the features are as follows:</para>
+
+	  <itemizedlist>
+		<listitem>
+		  <para>POINT(0 0)</para>
+		</listitem>
+
+		<listitem>
+		  <para>LINESTRING(0 0,1 1,1 2)</para>
+		</listitem>
+
+		<listitem>
+		  <para>POLYGON((0 0,4 0,4 4,0 4,0 0),(1 1, 2 1, 2 2, 1 2,1 1))</para>
+		</listitem>
+
+		<listitem>
+		  <para>MULTIPOINT(0 0,1 2)</para>
+		</listitem>
+
+		<listitem>
+		  <para>MULTILINESTRING((0 0,1 1,1 2),(2 3,3 2,5 4))</para>
+		</listitem>
+
+		<listitem>
+		  <para>MULTIPOLYGON(((0 0,4 0,4 4,0 4,0 0),(1 1,2 1,2 2,1 2,1 1)),
+		  ((-1 -1,-1 -2,-2 -2,-2 -1,-1 -1)))</para>
+		</listitem>
+
+		<listitem>
+		  <para>GEOMETRYCOLLECTION(POINT(2 3),LINESTRING(2 3,3 4))</para>
+		</listitem>
+	  </itemizedlist>
+
+	  <para>The OpenGIS specification also requires that the internal storage
+	  format of spatial objects include a spatial referencing system
+	  identifier (SRID). The SRID is required when creating spatial objects
+	  for insertion into the database.</para>
+
+	  <para>Input/Output of these formats are available using the following
+	  interfaces:</para>
+
+	  <programlisting>bytea WKB = ST_AsBinary(geometry);
+text WKT = ST_AsText(geometry);
+geometry = ST_GeomFromWKB(bytea WKB, SRID);
+geometry = ST_GeometryFromText(text WKT, SRID);</programlisting>
+
+	  <para>For example, a valid insert statement to create and insert an OGC
+	  spatial object would be:</para>
+
+	  <programlisting>INSERT INTO geotable ( the_geom, the_name )
+  VALUES ( ST_GeomFromText('POINT(-126.4 45.32)', 312), 'A Place');</programlisting>
+	</sect2>
+
+	<sect2 id="EWKB_EWKT">
+	  <title>PostGIS EWKB, EWKT and Canonical Forms</title>
+
+	  <para>OGC formats only support 2d geometries, and the associated SRID is
+	  *never* embedded in the input/output representations.</para>
+
+	  <para>PostGIS extended formats are currently superset of OGC one (every
+	  valid WKB/WKT is a valid EWKB/EWKT) but this might vary in the future,
+	  specifically if OGC comes out with a new format conflicting with our
+	  extensions. Thus you SHOULD NOT rely on this feature!</para>
+
+	  <para>PostGIS EWKB/EWKT add 3dm,3dz,4d coordinates support and embedded
+	  SRID information.</para>
+
+	  <para>Examples of the text representations (EWKT) of the extended
+	  spatial objects of the features are as follows. The * ones are new in this version of PostGIS:</para>
+
+	  <itemizedlist>
+		<listitem>
+		  <para>POINT(0 0 0) -- XYZ</para>
+		</listitem>
+
+		<listitem>
+		  <para>SRID=32632;POINT(0 0) -- XY with SRID</para>
+		</listitem>
+
+		<listitem>
+		  <para>POINTM(0 0 0) -- XYM</para>
+		</listitem>
+
+		<listitem>
+		  <para>POINT(0 0 0 0) -- XYZM</para>
+		</listitem>
+
+		<listitem>
+		  <para>SRID=4326;MULTIPOINTM(0 0 0,1 2 1) -- XYM with SRID</para>
+		</listitem>
+
+		<listitem>
+		  <para>MULTILINESTRING((0 0 0,1 1 0,1 2 1),(2 3 1,3 2 1,5 4
+		  1))</para>
+		</listitem>
+
+		<listitem>
+		  <para>POLYGON((0 0 0,4 0 0,4 4 0,0 4 0,0 0 0),(1 1 0,2 1 0,2 2 0,1 2
+		  0,1 1 0))</para>
+		</listitem>
+
+		<listitem>
+		  <para>MULTIPOLYGON(((0 0 0,4 0 0,4 4 0,0 4 0,0 0 0),(1 1 0,2 1 0,2 2
+		  0,1 2 0,1 1 0)),((-1 -1 0,-1 -2 0,-2 -2 0,-2 -1 0,-1 -1 0)))</para>
+		</listitem>
+
+		<listitem>
+		  <para>GEOMETRYCOLLECTIONM( POINTM(2 3 9), LINESTRINGM(2 3 4, 3 4 5) )</para>
+		</listitem>
+		
+		<listitem>
+		    <para>MULTICURVE( (0 0, 5 5), CIRCULARSTRING(4 0, 4 4, 8 4) )</para>
+		</listitem>
+		
+		<listitem>
+		  <para>POLYHEDRALSURFACE( ((0 0 0, 0 0 1, 0 1 1, 0 1 0, 0 0 0)),  
+((0 0 0, 0 1 0, 1 1 0, 1 0 0, 0 0 0)), ((0 0 0, 1 0 0, 1 0 1, 0 0 1, 0 0 0)),  ((1 1 0, 1 1 1, 1 0 1, 1 0 0, 1 1 0)),  
+((0 1 0, 0 1 1, 1 1 1, 1 1 0, 0 1 0)),  ((0 0 1, 1 0 1, 1 1 1, 0 1 1, 0 0 1)) )</para>
+		</listitem>
+		
+		<listitem>
+		  <para>TRIANGLE ((0 0, 0 9, 9 0, 0 0))</para>
+		</listitem>
+		
+		<listitem>
+		  <para>TIN( ((0 0 0, 0 0 1, 0 1 0, 0 0 0)), 
+		  ((0 0 0, 0 1 0, 1 1 0, 0 0 0)) )</para>
+		</listitem>
+	  </itemizedlist>
+
+	  <para>Input/Output of these formats are available using the following
+	  interfaces:</para>
+
+	  <programlisting>bytea EWKB = ST_AsEWKB(geometry);
+text EWKT = ST_AsEWKT(geometry);
+geometry = ST_GeomFromEWKB(bytea EWKB);
+geometry = ST_GeomFromEWKT(text EWKT);</programlisting>
+
+	  <para>For example, a valid insert statement to create and insert a
+	  PostGIS spatial object would be:</para>
+
+	  <programlisting>INSERT INTO geotable ( the_geom, the_name )
+  VALUES ( ST_GeomFromEWKT('SRID=312;POINTM(-126.4 45.32 15)'), 'A Place' )</programlisting>
+
+	  <para>The "canonical forms" of a PostgreSQL type are the representations
+	  you get with a simple query (without any function call) and the one
+	  which is guaranteed to be accepted with a simple insert, update or copy.
+	  For the postgis 'geometry' type these are: <programlisting>- Output
+  - binary: EWKB
+	ascii: HEXEWKB (EWKB in hex form)
+- Input
+  - binary: EWKB
+	ascii: HEXEWKB|EWKT </programlisting></para>
+
+	  <para>For example this statement reads EWKT and returns HEXEWKB in the
+	  process of canonical ascii input/output:</para>
+
+	  <programlisting>=# SELECT 'SRID=4;POINT(0 0)'::geometry;
+
+geometry
+----------------------------------------------------
+01010000200400000000000000000000000000000000000000
+(1 row)</programlisting>
+	</sect2>
+	<sect2 id="SQL_MM_Part3">
+	  <title>SQL-MM Part 3</title>
+
+	  <para>The SQL Multimedia Applications Spatial specification extends the
+	  simple features for SQL spec by defining a number of circularly
+	  interpolated curves.</para>
+
+	  <para>The SQL-MM definitions include 3dm, 3dz and 4d coordinates, but do
+	  not allow the embedding of SRID information.</para>
+
+	  <para>The well-known text extensions are not yet fully supported.
+	  Examples of some simple curved geometries are shown below:</para>
+
+	  <itemizedlist>
+		<listitem>
+		  <para>CIRCULARSTRING(0 0, 1 1, 1 0)</para>
+		  <para>CIRCULARSTRING(0 0, 4 0, 4 4, 0 4, 0 0)</para>
+		  <para>The CIRCULARSTRING is the basic curve type, similar to a
+		  LINESTRING in the linear world.  A single segment required three
+		  points, the start and end points (first and third) and any other
+		  point on the arc.  The exception to this is for a closed circle,
+		  where the start and end points are the same.  In this case the
+		  second point MUST be the center of the arc, ie the opposite side of
+		  the circle.  To chain arcs together, the last point of the previous
+		  arc becomes the first point of the next arc, just like in
+		  LINESTRING.  This means that a valid circular string must have an
+		  odd number of points greated than 1.</para>
+		</listitem>
+
+		<listitem>
+		  <para>COMPOUNDCURVE(CIRCULARSTRING(0 0, 1 1, 1 0),(1 0, 0 1))</para>
+		  <para>A compound curve is a single, continuous curve that has both
+		  curved (circular) segments and linear segments.  That means that
+		  in addition to having well-formed components, the end point of
+		  every component (except the last) must be coincident with the
+		  start point of the following component.</para>
+		</listitem>
+
+		<listitem>
+		  <para>CURVEPOLYGON(CIRCULARSTRING(0 0, 4 0, 4 4, 0 4, 0 0),(1 1, 3
+		  3, 3 1, 1 1))</para>
+		  <para>Example compound curve in a curve polygon:
+				CURVEPOLYGON(COMPOUNDCURVE(CIRCULARSTRING(0 0,2 0, 2 1, 2 3, 4 3),(4 3, 4 5, 1 4, 0 0)),
+					CIRCULARSTRING(1.7 1, 1.4 0.4, 1.6 0.4, 1.6 0.5, 1.7 1) )
+		  </para>
+		  <para>A CURVEPOLYGON is just like a polygon, with an outer ring
+		  and zero or more inner rings.  The difference is that a ring can
+		  take the form of a circular string, linear string or compound
+		  string.</para>
+		  <para>As of PostGIS 1.4 PostGIS supports compound curves in a curve polygon.</para>
+		</listitem>
+
+		<listitem>
+		  <para>MULTICURVE((0 0, 5 5),CIRCULARSTRING(4 0, 4 4, 8 4))</para>
+		  <para>The MULTICURVE is a collection of curves, which can include
+		  linear strings, circular strings or compound strings.</para>
+		</listitem>
+
+		<listitem>
+		  <para>MULTISURFACE(CURVEPOLYGON(CIRCULARSTRING(0 0, 4 0, 4 4, 0 4, 0
+		  0),(1 1, 3 3, 3 1, 1 1)),((10 10, 14 12, 11 10, 10 10),(11 11, 11.5
+		  11, 11 11.5, 11 11)))</para>
+		  <para>This is a collection of surfaces, which can be (linear)
+		  polygons or curve polygons.</para>
+		</listitem>
+	  </itemizedlist>
+
+	  <note>
+		<para>PostGIS prior to 1.4 does not support compound curves in a curve polygon, but
+				PostGIS 1.4 and above do support the use of Compound Curves in
+		a Curve Polygon.</para>
+	  </note>
+
+	  <note>
+		<para>All floating point comparisons within the SQL-MM implementation
+		are performed to a specified tolerance, currently 1E-8.</para>
+	  </note>
+	</sect2>
+  </sect1>
+  <sect1 id="PostGIS_Geography">
+	  <title>PostGIS Geography Type</title>
+
+	  <para>The geography type provides native support for spatial features represented on "geographic" coordinates (sometimes called "geodetic" coordinates, or "lat/lon", or "lon/lat"). Geographic coordinates are spherical coordinates expressed in angular units (degrees). </para>
+
+	  <para>The basis for the PostGIS geometry type is a plane. The shortest path between two points on the plane is a straight line. That means calculations on geometries (areas, distances, lengths, intersections, etc) can be calculated using cartesian mathematics and straight line vectors.</para>
+
+	  <para>The basis for the PostGIS geographic type is a sphere. The shortest path between two points on the sphere is a great circle arc. That means that calculations on geographies (areas, distances, lengths, intersections, etc) must be calculated on the sphere, using more complicated mathematics. For more accurate measurements, the calculations must take the actual spheroidal shape of the world into account, and the mathematics becomes very complicated indeed.</para>
+
+	  <para>Because the underlying mathematics is much more complicated, there are fewer functions defined for the geography type than for the geometry type. Over time, as new algorithms are added, the capabilities of the geography type will expand.</para>
+	 <!-- TODO: Fill in more information -->
+
+	  <para>One restriction is that it only supports WGS 84 long lat (SRID:4326).  It uses a new data type called
+	  geography.  None of the GEOS functions support this new
+	  type. As a workaround one can convert back and forth between geometry and geography types.</para>
+
+	  <para>The new geography type uses the PostgreSQL 8.3+ typmod definition format so that a table with a geography field
+			can be added in a single step.  All the standard OGC formats except for curves are supported.</para>
+			
+	<sect2 id="Geography_Basics">
+		<title>Geography Basics</title>
+		<para>The geography type only supports the simplest of simple features. Standard geometry type data will autocast to geography if it is of SRID 4326.  You can also use the EWKT and EWKB
+			conventions to insert data.</para>
+
+		<itemizedlist>
+		<listitem>
+		  <para>POINT: Creating a table with 2d point geometry:</para>
+		  <para><programlisting>CREATE TABLE testgeog(gid serial PRIMARY KEY, the_geog geography(POINT,4326) );</programlisting></para>
+		  <para>Creating a table with z coordinate point</para>
+		  <para><programlisting>CREATE TABLE testgeog(gid serial PRIMARY KEY, the_geog geography(POINTZ,4326) );</programlisting></para>
+		</listitem>
+		<listitem>
+			<para>LINESTRING</para>
+		</listitem>
+		<listitem>
+			<para>POLYGON</para>
+		</listitem>
+		<listitem>
+			<para>MULTIPOINT</para>
+		</listitem>
+		<listitem>
+			<para>MULTILINESTRING</para>
+		</listitem>
+		<listitem>
+			<para>MULTIPOLYGON</para>
+		</listitem>
+		<listitem>
+			<para>GEOMETRYCOLLECTION</para>
+		</listitem>
+		<!-- TODO: Add other examples -->
+		</itemizedlist>
+		<para>The new geography fields don't get registered in the <varname>geometry_columns</varname>.  They get registered in a new view called
+				geography_columns which is a view against the system catalogs so is always automatically kept up to date without need
+					for an AddGeom... like function.</para>
+
+		<para>Now, check the "geography_columns" view and see that your table is listed.</para>
+
+		<para>You can create a new table with a GEOGRAPHY column using the CREATE TABLE syntax. 
+			Unlike GEOMETRY, there is no need to run a separate AddGeometryColumns() process to register the column in metadata.</para>
+
+		<para>
+<programlisting>CREATE TABLE global_points ( 
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(64),
+    location GEOGRAPHY(POINT,4326)
+  );</programlisting>
+  		</para>
+		
+		<para>Note that the location column has type GEOGRAPHY and that geography type supports two optional modifier: a type modifier that restricts the kind of shapes and dimensions allowed in the column; an SRID modifier that restricts the coordinate reference identifier to a particular number.</para>
+		<para>Allowable values for the type modifier are: POINT, LINESTRING, POLYGON, MULTIPOINT, MULTILINESTRING, MULTIPOLYGON. The modifier also supports dimensionality restrictions through suffixes: Z, M and ZM. So, for example a modifier of 'LINESTRINGM' would only allow line strings with three dimensions in, and would treat the third dimension as a measure. 
+		Similarly, 'POINTZM' would expect four dimensional data.</para>
+		<para>The SRID modifier is currently of limited use: only 4326 (WGS84) is allowed as a value. If you do not specify an SRID, the a value 0 (undefined spheroid) will be used, and all calculations will proceed using WGS84 anyways.</para> 
+		<para>In the future, alternate SRIDs will allow calculations on spheroids other than WGS84.</para>
+		<para>Once you have created your table, you can see it in the GEOGRAPHY_COLUMNS table:</para>
+		<para><programlisting>
+-- See the contents of the metadata view
+SELECT * FROM geography_columns;</programlisting></para>
+
+<para>You can insert data into the table the same as you would if it was using a GEOMETRY column:</para>
+
+<para><programlisting>-- Add some data into the test table
+INSERT INTO global_points (name, location) VALUES ('Town', ST_GeographyFromText('SRID=4326;POINT(-110 30)') );
+INSERT INTO global_points (name, location) VALUES ('Forest', ST_GeographyFromText('SRID=4326;POINT(-109 29)') );
+INSERT INTO global_points (name, location) VALUES ('London', ST_GeographyFromText('SRID=4326;POINT(0 49)') );</programlisting></para>
+
+<para>Creating an index works the same as GEOMETRY. 
+	PostGIS will note that the column type is GEOGRAPHY and create an appropriate sphere-based index instead of the usual planar index used for GEOMETRY.</para>
+
+<para><programlisting>-- Index the test table with a spherical index
+  CREATE INDEX global_points_gix ON global_points USING GIST ( location );</programlisting>
+</para>
+
+<para>Query and measurement functions use units of meters. So distance parameters should be expressed in meters, and return values should be expected in meters (or square meters for areas).</para>
+
+<para><programlisting>-- Show a distance query and note, London is outside the 1000km tolerance
+  SELECT name FROM global_points WHERE ST_DWithin(location, ST_GeographyFromText('SRID=4326;POINT(-110 29)'), 1000000);</programlisting>
+</para>
+
+<para>You can see the power of GEOGRAPHY in action by calculating the how close a plane flying from Seattle to London (LINESTRING(-122.33 47.606, 0.0 51.5)) comes to Reykjavik (POINT(-21.96 64.15)).</para>
+
+<para><programlisting>-- Distance calculation using GEOGRAPHY (122.2km)
+  SELECT ST_Distance('LINESTRING(-122.33 47.606, 0.0 51.5)'::geography, 'POINT(-21.96 64.15)':: geography);</programlisting>
+</para>
+
+<para><programlisting>-- Distance calculation using GEOMETRY (13.3 "degrees")
+  SELECT ST_Distance('LINESTRING(-122.33 47.606, 0.0 51.5)'::geometry, 'POINT(-21.96 64.15)':: geometry);</programlisting>
+</para>
+
+<para>The GEOGRAPHY type calculates the true shortest distance over the sphere between Reykjavik and the great circle flight path between Seattle and London.</para>
+
+<para> <ulink url="http://gc.kls2.com/cgi-bin/gc?PATH=SEA-LHR">Great Circle mapper</ulink>
+The GEOMETRY type calculates a meaningless cartesian distance between Reykjavik and the straight line path from Seattle to London plotted on a flat map of the world. The nominal units of the result might be called "degrees", but the result doesn't correspond to any true angular difference between the points, so even calling them "degrees" is inaccurate.</para>
+	</sect2>
+	<sect2 id="PostGIS_GeographyVSGeometry">
+	  <title>When to use Geography Data type over Geometry data type</title>
+	  <para>The new GEOGRAPHY type allows you to store data in longitude/latitude coordinates, but at a cost: there are fewer functions defined on GEOGRAPHY than there are on GEOMETRY; those functions that are defined take more CPU time to execute.</para>
+	  <para>The type you choose should be conditioned on the expected working area of the application you are building. Will your data span the globe or a large continental area, or is it local to a state, county or municipality? </para>
+	  <itemizedlist>
+		<listitem><para>If your data is contained in a small area, you might find that choosing an appropriate projection and using GEOMETRY is the best solution, in terms of performance and functionality available.</para></listitem>
+		<listitem><para>If your data is global or covers a continental region, you may find that GEOGRAPHY allows you to build a system without having to worry about projection details. 
+				You store your data in longitude/latitude, and use the functions that have been defined on GEOGRAPHY.</para></listitem>
+		<listitem><para>If you don't understand projections, and you don't want to learn about them, and you're prepared to accept the limitations in functionality available in GEOGRAPHY, then it might be easier for you to use GEOGRAPHY than GEOMETRY. 
+		Simply load your data up as longitude/latitude and go from there.</para></listitem>
+	</itemizedlist>
+	<para>Refer to <xref linkend="PostGIS_TypeFunctionMatrix" /> for compare between
+			what is supported for Geography vs. Geometry.  For a brief listing and description of Geography functions, refer to
+				<xref linkend="PostGIS_GeographyFunctions" />
+		</para>
+	</sect2>
+	<sect2 id="PostGIS_Geography_AdvancedFAQ">
+			<title>Geography Advanced FAQ</title>
+			<qandaset>
+				<qandaentry>
+				  <question>
+					<para>Do you calculate on the sphere or the spheroid?</para>
+				  </question>
+			
+				  <answer>
+					<para> By default, all distance and area calculations are done on the spheroid. You should find that the results of calculations in local areas match up will with local planar results in good local projections. 
+					Over larger areas, the spheroidal calculations will be more accurate than any calculation done on a projected plane.
+					</para>
+					<para>All the geography functions have the option of using a sphere calculation, by setting a final boolean parameter to 'FALSE'. This will somewhat speed up calculations, particularly for cases where the geometries are very simple.</para>
+				  </answer>
+				</qandaentry>
+				
+				<qandaentry>
+				  <question>
+					<para>What about the date-line and the poles?</para>
+				  </question>
+			
+				  <answer>
+					<para> All the calculations have no conception of date-line or poles, the coordinates are spherical (longitude/latitude) 
+					so a shape that crosses the dateline is, from a calculation point of view, no different from any other shape.
+					</para>
+				  </answer>
+				</qandaentry>
+				
+				<qandaentry>
+				  <question>
+					<para>What is the longest arc you can process?</para>
+				  </question>
+			
+				  <answer>
+					<para>We use great circle arcs as the "interpolation line" between two points. That means any two points are actually joined up two ways, depending on which direction you travel along the great circle. All our code assumes that the points are joined by the *shorter* of the two paths along the great circle. 
+					As a consequence, shapes that have arcs of more than 180 degrees will not be correctly modelled.</para>
+				  </answer>
+				</qandaentry>
+				
+				<qandaentry>
+				  <question>
+					<para>Why is it so slow to calculate the area of Europe / Russia / insert big geographic region here ?</para>
+				  </question>
+			
+				  <answer>
+					<para>Because the polygon is so darned huge! Big areas are bad for two reasons: their bounds are huge, 
+						so the index tends to pull the feature no matter what query you run; the number of vertices is huge, 
+						and tests (distance, containment) have to traverse the vertex list at least once and sometimes N times 
+						(with N being the number of vertices in the other candidate feature). 
+					</para>
+					<para>As with GEOMETRY, we recommend that when you have very large polygons, but are doing queries in small areas, you "denormalize" your geometric data into smaller chunks so that the index can effectively subquery parts of the object and so queries don't have to pull out the whole object every time. 
+					Just because you *can* store all of Europe in one polygon doesn't mean you *should*.</para>
+				  </answer>
+				</qandaentry>
+			</qandaset>
+	</sect2>
+</sect1>
+
+  <sect1>
+	<title>Using OpenGIS Standards</title>
+
+	<para>The OpenGIS "Simple Features Specification for SQL" defines standard
+	GIS object types, the functions required to manipulate them, and a set of
+	meta-data tables. In order to ensure that meta-data remain consistent,
+	operations such as creating and removing a spatial column are carried out
+	through special procedures defined by OpenGIS.</para>
+
+	<para>There are two OpenGIS meta-data tables:
+	<varname>SPATIAL_REF_SYS</varname> and
+	<varname>GEOMETRY_COLUMNS</varname>. The
+	<varname>SPATIAL_REF_SYS</varname> table holds the numeric IDs and textual
+	descriptions of coordinate systems used in the spatial database.</para>
+
+	<sect2 id="spatial_ref_sys">
+	  <title>The SPATIAL_REF_SYS Table and Spatial Reference Systems</title>
+
+	  <para>The spatial_ref_sys table is a PostGIS included and OGC compliant database table that lists over 3000
+			known <ulink url="http://www.sharpgis.net/post/2007/05/Spatial-references2c-coordinate-systems2c-projections2c-datums2c-ellipsoids-e28093-confusing.aspx">spatial reference systems</ulink>
+			and details needed to transform/reproject between them.</para>
+
+	  <para>Although the PostGIS spatial_ref_sys table contains over 3000 of the more commonly used spatial reference system definitions that can be handled by the proj library, it does not contain all known to man and
+			you can even define your own custom projection if you are familiar with proj4 constructs.  Keep in mind that most spatial reference systems are regional and have no meaning when used outside of the bounds they were intended for.</para>
+
+	  <para>An excellent resource for finding spatial reference systems not defined in the core set is <ulink url="http://spatialreference.org/">http://spatialreference.org/</ulink></para>
+
+	  <para>Some of the more commonly used spatial reference systems are: <ulink url="http://spatialreference.org/ref/epsg/4326/">4326 - WGS 84 Long Lat</ulink>,
+			<ulink url="http://spatialreference.org/ref/epsg/4269/">4269 - NAD 83 Long Lat</ulink>,
+			<ulink url="http://spatialreference.org/ref/epsg/3395/">3395 - WGS 84 World Mercator</ulink>,
+			<ulink url="http://spatialreference.org/ref/epsg/2163/">2163 - US National Atlas Equal Area</ulink>,
+			Spatial reference systems for each NAD 83, WGS 84 UTM zone - UTM zones are one of the most ideal for measurement, but only cover 6-degree regions.
+	</para>
+	<para>
+		Various US state plane spatial reference systems (meter or feet based) - usually one or 2 exists per US state.  Most of the meter ones are in the core set, but many of the
+		feet based ones or ESRI created ones you will need to pull from <ulink url="http://spatialreference.org">spatialreference.org</ulink>.
+	</para>
+	<para>
+		For details on determining which UTM zone to use for your area of interest, check out the <ulink url="http://trac.osgeo.org/postgis/wiki/UsersWikiplpgsqlfunctionsDistance">utmzone PostGIS plpgsql helper function</ulink>.
+	</para>
+
+	  <para>The <varname>SPATIAL_REF_SYS</varname> table definition is as
+	  follows:</para>
+
+	  <programlisting>CREATE TABLE spatial_ref_sys (
+  srid       INTEGER NOT NULL PRIMARY KEY,
+  auth_name  VARCHAR(256),
+  auth_srid  INTEGER,
+  srtext     VARCHAR(2048),
+  proj4text  VARCHAR(2048)
+)</programlisting>
+
+	  <para>The <varname>SPATIAL_REF_SYS</varname> columns are as
+	  follows:</para>
+
+	  <variablelist>
+		<varlistentry>
+		  <term><ulink url="http://en.wikipedia.org/wiki/SRID">SRID</ulink></term>
+
+		  <listitem>
+			<para>An integer value that uniquely identifies the Spatial
+			Referencing System (SRS) within the database.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>AUTH_NAME</term>
+
+		  <listitem>
+			<para>The name of the standard or standards body that is being
+			cited for this reference system. For example, "EPSG" would be a
+			valid <varname>AUTH_NAME</varname>.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>AUTH_SRID</term>
+
+		  <listitem>
+			<para>The ID of the Spatial Reference System as defined by the
+			Authority cited in the <varname>AUTH_NAME</varname>. In the case
+			of EPSG, this is where the EPSG projection code would go.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>SRTEXT</term>
+
+		  <listitem>
+			<para>The Well-Known Text representation of the Spatial Reference
+			System. An example of a WKT SRS representation is:</para>
+
+			<programlisting>PROJCS["NAD83 / UTM Zone 10N",
+  GEOGCS["NAD83",
+	DATUM["North_American_Datum_1983",
+	  SPHEROID["GRS 1980",6378137,298.257222101]
+	],
+	PRIMEM["Greenwich",0],
+	UNIT["degree",0.0174532925199433]
+  ],
+  PROJECTION["Transverse_Mercator"],
+  PARAMETER["latitude_of_origin",0],
+  PARAMETER["central_meridian",-123],
+  PARAMETER["scale_factor",0.9996],
+  PARAMETER["false_easting",500000],
+  PARAMETER["false_northing",0],
+  UNIT["metre",1]
+]</programlisting>
+
+			<para>For a listing of EPSG projection codes and their
+			corresponding WKT representations, see <ulink
+			url="http://www.opengeospatial.org/">http://www.opengeospatial.org/</ulink>.
+			For a discussion of WKT in general, see the OpenGIS "Coordinate
+			Transformation Services Implementation Specification" at <ulink
+			url="http://www.opengeospatial.org/standards">http://www.opengeospatial.org/standards</ulink>.
+			For information on the European Petroleum Survey Group (EPSG) and
+			their database of spatial reference systems, see <ulink
+			url="http://www.epsg.org/">http://www.epsg.org</ulink>.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>PROJ4TEXT</term>
+
+		  <listitem>
+			<para>PostGIS uses the Proj4 library to provide coordinate
+			transformation capabilities. The <varname>PROJ4TEXT</varname>
+			column contains the Proj4 coordinate definition string for a
+			particular SRID. For example:</para>
+
+			<programlisting>+proj=utm +zone=10 +ellps=clrk66 +datum=NAD27 +units=m</programlisting>
+
+			<para>For more information about, see the Proj4 web site at <ulink
+			url="http://trac.osgeo.org/proj/">http://trac.osgeo.org/proj/</ulink>.
+			The <filename>spatial_ref_sys.sql</filename> file contains both
+			<varname>SRTEXT</varname> and <varname>PROJ4TEXT</varname>
+			definitions for all EPSG projections.</para>
+		  </listitem>
+		</varlistentry>
+	  </variablelist>
+	</sect2>
+
+	<sect2 id="geometry_columns">
+	  <title>The GEOMETRY_COLUMNS VIEW</title>
+
+	  <para>In versions of PostGIS prior to 2.0.0, geometry_columns was a table that could be directly edited, and sometimes got out of synch with the actual definition of the geometry columns.
+	  In PostGIS 2.0.0, <varname>GEOMETRY_COLUMNS</varname> became a view with the same front-facing structure as prior versions, but reading from database system catalogs
+	  Its structure is as follows:</para>
+
+	  <programlisting>\d geometry_columns</programlisting>
+<screen>             View "public.geometry_columns"
+      Column       |          Type          | Modifiers
+-------------------+------------------------+-----------
+ f_table_catalog   | character varying(256) |
+ f_table_schema    | character varying(256) |
+ f_table_name      | character varying(256) |
+ f_geometry_column | character varying(256) |
+ coord_dimension   | integer                |
+ srid              | integer                |
+ type              | character varying(30)  |</screen>
+
+	  <para>The column meanings have not changed from prior versions and are:</para>
+
+	  <variablelist>
+		<varlistentry>
+		  <term>F_TABLE_CATALOG, F_TABLE_SCHEMA, F_TABLE_NAME</term>
+
+		  <listitem>
+			<para>The fully qualified name of the feature table containing the
+			geometry column. Note that the terms "catalog" and "schema" are
+			Oracle-ish. There is not PostgreSQL analogue of "catalog" so that
+			column is left blank -- for "schema" the PostgreSQL schema name is
+			used (<varname>public</varname> is the default).</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>F_GEOMETRY_COLUMN</term>
+
+		  <listitem>
+			<para>The name of the geometry column in the feature table.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>COORD_DIMENSION</term>
+
+		  <listitem>
+			<para>The spatial dimension (2, 3 or 4 dimensional) of the
+			column.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>SRID</term>
+
+		  <listitem>
+			<para>The ID of the spatial reference system used for the
+			coordinate geometry in this table. It is a foreign key reference
+			to the <varname>SPATIAL_REF_SYS</varname>.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>TYPE</term>
+
+		  <listitem>
+			<para>The type of the spatial object. To restrict the spatial
+			column to a single type, use one of: POINT, LINESTRING, POLYGON,
+			MULTIPOINT, MULTILINESTRING, MULTIPOLYGON, GEOMETRYCOLLECTION or
+			corresponding XYM versions POINTM, LINESTRINGM, POLYGONM,
+			MULTIPOINTM, MULTILINESTRINGM, MULTIPOLYGONM, GEOMETRYCOLLECTIONM.
+			For heterogeneous (mixed-type) collections, you can use "GEOMETRY"
+			as the type.</para>
+
+			<note>
+			  <para>This attribute is (probably) not part of the OpenGIS
+			  specification, but is required for ensuring type
+			  homogeneity.</para>
+			</note>
+		  </listitem>
+		</varlistentry>
+	  </variablelist>
+	</sect2>
+
+	<sect2 id="Create_Spatial_Table">
+	  <title>Creating a Spatial Table</title>
+
+	  <para>Creating a table with spatial data, can be done in one step. As shown in the following example
+	  which creates a roads table with a 2D linestring geometry column in WGS84 long lat</para>
+	  <programlisting>CREATE TABLE ROADS ( ID int4
+	  	, ROAD_NAME varchar(25), geom geometry(LINESTRING,4326) );</programlisting>
+	  	
+	  <para>We can add additional columns using standard ALTER TABLE command as we do in this next example where we add a 3-D linestring.</para>
+	  <programlisting>ALTER TABLE roads ADD COLUMN geom2 geometry(LINESTRINGZ,4326);</programlisting>
+	  
+	  <para>For backwards compability, you can still create a spatial table in two stages using the management functions.</para>
+
+	  <itemizedlist>
+		<listitem>
+		  <para>Create a normal non-spatial table.</para>
+
+		  <para>For example: <command>CREATE TABLE ROADS ( ID int4, ROAD_NAME
+		  varchar(25) )</command></para>
+		</listitem>
+
+		<listitem>
+		  <para>Add a spatial column to the table using the OpenGIS
+		  "AddGeometryColumn" function. Refer to <xref linkend="AddGeometryColumn" /> for more details.</para>
+
+		  <para>The syntax is: <programlisting>AddGeometryColumn(
+  &lt;schema_name&gt;,
+  &lt;table_name&gt;,
+  &lt;column_name&gt;,
+  &lt;srid&gt;,
+  &lt;type&gt;,
+  &lt;dimension&gt;
+)</programlisting> Or, using current schema: <programlisting>AddGeometryColumn(
+  &lt;table_name&gt;,
+  &lt;column_name&gt;,
+  &lt;srid&gt;,
+  &lt;type&gt;,
+  &lt;dimension&gt;
+)</programlisting></para>
+
+		  <para>Example1: <command>SELECT AddGeometryColumn('public',
+		  'roads', 'geom', 423, 'LINESTRING', 2)</command></para>
+
+		  <para>Example2: <command>SELECT AddGeometryColumn( 'roads',
+		  'geom', 423, 'LINESTRING', 2)</command></para>
+		</listitem>
+	  </itemizedlist>
+
+	  <para>Here is an example of SQL used to create a table and add a spatial
+	  column (assuming that an SRID of 128 exists already):</para>
+
+	  <programlisting>CREATE TABLE parks (
+  park_id    INTEGER,
+  park_name  VARCHAR,
+  park_date  DATE,
+  park_type  VARCHAR
+);
+SELECT AddGeometryColumn('parks', 'park_geom', 128, 'MULTIPOLYGON', 2 );</programlisting>
+
+	  <para>Here is another example, using the generic "geometry" type and the
+	  undefined SRID value of 0:</para>
+
+	  <programlisting>CREATE TABLE roads (
+  road_id INTEGER,
+  road_name VARCHAR
+);
+SELECT AddGeometryColumn( 'roads', 'roads_geom', 0, 'GEOMETRY', 3 );</programlisting>
+	</sect2>
+
+	<sect2 id="Manual_Register_Spatial_Column">
+		<title>Manually Registering Geometry Columns in geometry_columns</title>
+		<para>The AddGeometryColumn() approach creates a geometry column and also registers the new
+		column in the geometry_columns table.  If your software utilizes geometry_columns, then
+		any geometry columns you need to query by must be registered in this view.  
+		Starting with PoastGIS 2.0, geometry_columns is no longer editable and all geometry columns are autoregistered.</para>
+		<para>However they may be registered as a generic geometry column if the column was not defined as a specific type during creation.</para>
+		
+		<para>Two of the cases
+		where this may happen, but you can't use
+		AddGeometryColumn, is in the case of SQL Views and bulk inserts.  For these cases, you can correct the registration in the geometry_columns table
+		by constraining the column.  Note in PostGIS 2.0+ if your column is typmod based, the creation process would register it correctly, so no need to do anything.</para>
+
+		<programlisting>--Lets say you have a view created like this
+CREATE VIEW  public.vwmytablemercator AS
+	SELECT gid, ST_Transform(geom,3395) As geom, f_name
+	FROM public.mytable;
+	
+-- For it to register correctly in PostGIS 2.0+ 
+-- You need to cast the geometry
+--
+DROP VIEW public.vwmytablemercator;
+CREATE VIEW  public.vwmytablemercator AS
+	SELECT gid, ST_Transform(geom,3395)::geometry(Geometry, 3395) As geom, f_name
+	FROM public.mytable;
+	
+-- If you know the geometry type for sure is a 2D POLYGON then you could do
+DROP VIEW public.vwmytablemercator;
+CREATE VIEW  public.vwmytablemercator AS
+	SELECT gid, ST_Transform(geom,3395)::geometry(Polygon, 3395) As geom, f_name
+	FROM public.mytable;</programlisting>
+		<programlisting>--Lets say you created a derivative table by doing a bulk insert
+SELECT poi.gid, poi.geom, citybounds.city_name
+INTO myschema.my_special_pois
+FROM poi INNER JOIN citybounds ON ST_Intersects(citybounds.geom, poi.geom);
+
+--Create 2d index on new table
+CREATE INDEX idx_myschema_myspecialpois_geom_gist
+  ON myschema.my_special_pois USING gist(geom);
+  
+-- If your points are 3D points or 3M points, 
+-- then you might want to create an nd index instead of a 2d index
+-- like so
+CREATE INDEX my_special_pois_geom_gist_nd 
+	ON my_special_pois USING gist(geom gist_geometry_ops_nd);
+
+--To manually register this new table's geometry column in geometry_columns
+-- Note that this approach will work for both PostGIS 2.0+ and PostGIS 1.4+
+-- For PostGIS 2.0 it will also change the underlying structure of the table to
+-- to make the column typmod based.
+-- For PostGIS prior to 2.0, this technique can also be used to register views
+SELECT populate_geometry_columns('myschema.my_special_pois'::regclass); 
+
+--If you are using PostGIS 2.0 and for whatever reason, you
+-- you need the old constraint based definition behavior 
+-- (such as case of inherited tables where all children do not have the same type and srid)
+-- set new optional  use_typmod argument to false
+SELECT populate_geometry_columns('myschema.my_special_pois'::regclass, false); </programlisting>
+
+<para>Although the old-constraint based method is still supported, a constraint-based geomentry column used directly
+in a view, will not register correctly in geometry_columns, as will a typmod one. 
+In this example we define a column using typmod and another using constraints.</para>
+<programlisting>CREATE TABLE pois_ny(gid SERIAL PRIMARY KEY
+   , poi_name text, cat varchar(20)
+   , geom geometry(POINT,4326) );
+SELECT AddGeometryColumn('pois_ny', 'geom_2160', 2160, 'POINT', 2, false);</programlisting>
+<para>If we run in psql</para>
+<programlisting>\d pois_ny;</programlisting>
+<para>We observe they are defined differently -- one is typmod, one is constraint</para>
+<screen>                                  Table "public.pois_ny"
+  Column   |         Type          |                       Modifiers
+
+-----------+-----------------------+------------------------------------------------------
+ gid       | integer               | not null default nextval('pois_ny_gid_seq'::regclass)
+ poi_name  | text                  |
+ cat       | character varying(20) |
+ geom      | geometry(Point,4326)  |
+ geom_2160 | geometry              |
+Indexes:
+    "pois_ny_pkey" PRIMARY KEY, btree (gid)
+Check constraints:
+    "enforce_dims_geom_2160" CHECK (st_ndims(geom_2160) = 2)
+    "enforce_geotype_geom_2160" CHECK (geometrytype(geom_2160) = 'POINT'::text 
+        OR geom_2160 IS NULL)
+    "enforce_srid_geom_2160" CHECK (st_srid(geom_2160) = 2160)</screen>
+<para>In geometry_columns, they both register correctly</para>
+<programlisting>SELECT f_table_name, f_geometry_column, srid, type 
+	FROM geometry_columns 
+	WHERE f_table_name = 'pois_ny';</programlisting>
+<screen>f_table_name | f_geometry_column | srid | type
+-------------+-------------------+------+-------
+pois_ny      | geom              | 4326 | POINT
+pois_ny      | geom_2160         | 2160 | POINT</screen>
+<para>However -- if we were to create a view like this</para>
+<programlisting>CREATE VIEW vw_pois_ny_parks AS 
+SELECT * 
+  FROM pois_ny 
+  WHERE cat='park';
+  
+SELECT f_table_name, f_geometry_column, srid, type 
+	FROM geometry_columns 
+	WHERE f_table_name = 'vw_pois_ny_parks';</programlisting> 
+<para>The typmod based geom view column registers correctly,
+but the constraint based one does not.</para>
+<screen>   f_table_name   | f_geometry_column | srid |   type
+------------------+-------------------+------+----------
+ vw_pois_ny_parks | geom              | 4326 | POINT
+ vw_pois_ny_parks | geom_2160         |    0 | GEOMETRY</screen>
+ 
+<para>This may change in future versions of PostGIS, but for now
+To force the constraint based view column to register correctly, we need to do this:</para>
+<programlisting>DROP VIEW vw_pois_ny_parks;
+CREATE VIEW vw_pois_ny_parks AS 
+SELECT gid, poi_name, cat
+  , geom
+  , geom_2160::geometry(POINT,2160) As geom_2160 
+  FROM pois_ny 
+  WHERE cat='park';
+SELECT f_table_name, f_geometry_column, srid, type 
+	FROM geometry_columns 
+	WHERE f_table_name = 'vw_pois_ny_parks';</programlisting>
+<screen>   f_table_name   | f_geometry_column | srid | type
+------------------+-------------------+------+-------
+ vw_pois_ny_parks | geom              | 4326 | POINT
+ vw_pois_ny_parks | geom_2160         | 2160 | POINT</screen>
+ </sect2>
+
+	<sect2 id="OGC_Validity">
+	  <title>Ensuring OpenGIS compliancy of geometries</title>
+
+	  <para>PostGIS is compliant with the Open Geospatial Consortium’s (OGC)
+	  OpenGIS Specifications.  As such, many PostGIS methods require, or more
+	  accurately, assume that geometries that are operated on are both simple
+	  and valid. For example, it does not make sense to calculate the area of
+	  a polygon that has a hole defined outside of the polygon, or to construct
+	  a polygon from a non-simple boundary line.</para>
+
+	  <para>According to the OGC Specifications, a <emphasis>simple</emphasis>
+	  geometry is one that has no anomalous geometric points, such as self
+	  intersection or self tangency and primarily refers to 0 or 1-dimensional
+	  geometries (i.e. <varname>[MULTI]POINT, [MULTI]LINESTRING</varname>).
+	  Geometry validity, on the other hand, primarily refers to 2-dimensional
+	  geometries (i.e. <varname>[MULTI]POLYGON)</varname> and defines the set
+	  of assertions that characterizes a valid polygon. The description of each
+	  geometric class includes specific conditions that further detail geometric
+	  simplicity and validity.</para>
+
+	  <para>A <varname>POINT</varname> is inheritably <emphasis>simple</emphasis>
+	  as a 0-dimensional geometry object.</para>
+
+	  <para><varname>MULTIPOINT</varname>s are <emphasis>simple</emphasis> if
+	  no two coordinates (<varname>POINT</varname>s) are equal (have identical
+	  coordinate values).</para>
+
+	  <para>A <varname>LINESTRING</varname> is <emphasis>simple</emphasis> if
+	  it does not pass through the same <varname>POINT</varname> twice (except
+	  for the endpoints, in which case it is referred to as a linear ring and
+	  additionally considered closed).</para>
+
+	  <informaltable border="0" frame="none">
+		<tgroup cols="2" align="center">
+		  <tbody>
+			<row>
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_issimple01.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(a)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_issimple02.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(b)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+			</row>
+
+			<row>
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_issimple03.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(c)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_issimple04.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(d)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+			</row>
+		  </tbody>
+		</tgroup>
+
+		<tgroup cols="1">
+		  <tbody>
+			<row>
+				<entry><para><emphasis role="bold">(a)</emphasis> and
+				<emphasis role="bold">(c)</emphasis> are simple
+				<varname>LINESTRING</varname>s, <emphasis role="bold">(b)</emphasis>
+				and <emphasis role="bold">(d)</emphasis> are not.</para></entry>
+			</row>
+		  </tbody>
+		</tgroup>
+	  </informaltable>
+
+	  <para>A <varname>MULTILINESTRING</varname> is <emphasis>simple</emphasis>
+	  only if all of its elements are simple and the only intersection between
+	  any two elements occurs at <varname>POINT</varname>s that are on the
+	  boundaries of both elements.  </para>
+
+	  <informaltable border="0" frame="none">
+		<tgroup cols="3" align="center">
+		  <tbody>
+			<row>
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_issimple05.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(e)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_issimple06.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(f)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_issimple07.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(g)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+			</row>
+		  </tbody>
+		</tgroup>
+
+		<tgroup cols="1">
+		  <tbody>
+			<row>
+				<entry><para><emphasis role="bold">(e)</emphasis> and
+				<emphasis role="bold">(f)</emphasis> are simple
+				<varname>MULTILINESTRING</varname>s, <emphasis role="bold">(g)</emphasis>
+				is not.</para></entry>
+			</row>
+		  </tbody>
+		</tgroup>
+	  </informaltable>
+
+	  <para>By definition, a <varname>POLYGON</varname> is always
+	  <emphasis>simple</emphasis>.  It is <emphasis>valid</emphasis> if no two
+	  rings in the boundary (made up of an exterior ring and interior rings)
+	  cross.  The boundary of a <varname>POLYGON</varname> may intersect at a
+	  <varname>POINT</varname> but only as a tangent (i.e. not on a line).
+	  A <varname>POLYGON</varname> may not have cut lines or spikes and the
+	  interior rings must be contained entirely within the exterior ring.</para>
+
+	  <informaltable border="0" frame="none">
+		<tgroup cols="3" align="center">
+		  <tbody>
+			<row>
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid01.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(h)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid02.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(i)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid03.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(j)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+			</row>
+			<row>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid04.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(k)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid05.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(l)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid06.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(m)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+			</row>
+		  </tbody>
+		</tgroup>
+		<tgroup cols="1">
+		  <tbody>
+			<row>
+				<entry><para><emphasis role="bold">(h)</emphasis> and
+				<emphasis role="bold">(i)</emphasis> are valid
+				<varname>POLYGON</varname>s, <emphasis role="bold">(j-m)</emphasis>
+				cannot be represented as single <varname>POLYGON</varname>s, but
+				<emphasis role="bold">(j)</emphasis> and <emphasis role="bold">(m)</emphasis>
+				could be represented as a valid <varname>MULTIPOLYGON</varname>.
+				</para></entry>
+			</row>
+		  </tbody>
+		</tgroup>
+	  </informaltable>
+
+	  <para>A <varname>MULTIPOLYGON</varname> is <emphasis>valid</emphasis>
+	  if and only if all of its elements are valid and the interiors of no two
+	  elements intersect.  The boundaries of any two elements may touch, but
+	  only at a finite number of <varname>POINT</varname>s.</para>
+
+	  <informaltable border="0" frame="none">
+		<tgroup cols="2" align="center">
+		  <tbody>
+			<row>
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid07.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(n)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid08.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(o)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+				
+			  <entry><para><informalfigure>
+				  <mediaobject>
+					<imageobject>
+					  <imagedata fileref="images/st_isvalid09.png" />
+					</imageobject>
+
+					<caption><para><emphasis role="bold">(p)</emphasis></para></caption>
+				  </mediaobject>
+				</informalfigure></para></entry>
+			</row>
+		  </tbody>
+		</tgroup>
+		<tgroup cols="1">
+		  <tbody>
+			<row>
+				<entry><para><emphasis role="bold">(n)</emphasis> and
+				<emphasis role="bold">(o)</emphasis> are not valid
+				<varname>MULTIPOLYGON</varname>s.  
+				<emphasis role="bold">(p)</emphasis>, however, is valid.</para></entry>
+			</row>
+		  </tbody>
+		</tgroup>
+	  </informaltable>
+
+	  <para>Most of the functions implemented by the GEOS library rely on the
+	  assumption that your geometries are valid as specified by the OpenGIS
+	  Simple Feature Specification. To check simplicity or validity of
+	  geometries you can use the <link linkend="ST_IsSimple">ST_IsSimple()</link> and
+	  <link linkend="ST_IsValid">ST_IsValid()</link></para>
+
+	  <programlisting>-- Typically, it doesn't make sense to check
+-- for validity on linear features since it will always return TRUE.
+-- But in this example, PostGIS extends the definition of the OGC IsValid
+-- by returning false if a LineString has less than 2 *distinct* vertices.
+gisdb=# SELECT
+   ST_IsValid('LINESTRING(0 0, 1 1)'),
+   ST_IsValid('LINESTRING(0 0, 0 0, 0 0)');
+
+ st_isvalid | st_isvalid
+------------+-----------
+      t     |     f</programlisting>
+
+	  <para>By default, PostGIS does not apply this validity check on geometry
+	  input, because testing for validity needs lots of CPU time for complex
+	  geometries, especially polygons. If you do not trust your data sources,
+	  you can manually enforce such a check to your tables by adding a check
+	  constraint:</para>
+
+	  <programlisting>ALTER TABLE mytable
+  ADD CONSTRAINT geometry_valid_check
+	CHECK (ST_IsValid(the_geom));</programlisting>
+
+	  <para>If you encounter any strange error messages such as "GEOS
+	  Intersection() threw an error!" or "JTS Intersection() threw an error!"
+	  when calling PostGIS functions with valid input geometries, you likely
+	  found an error in either PostGIS or one of the libraries it uses, and
+	  you should contact the PostGIS developers. The same is true if a PostGIS
+	  function returns an invalid geometry for valid input.</para>
+
+	  <note>
+		<para>Strictly compliant OGC geometries cannot have Z or M values. The
+		<link linkend="ST_IsValid">ST_IsValid()</link> function won't consider
+		higher dimensioned geometries invalid! Invocations of <link
+		linkend="AddGeometryColumn">AddGeometryColumn()</link> will add a
+		constraint checking geometry dimensions, so it is enough to specify 2
+		there.</para>
+	  </note>
+	</sect2>
+	
+      <sect2 id="DE-9IM">
+        <title>Dimensionally Extended 9 Intersection Model (DE-9IM)</title>
+
+        <para>It is sometimes the case that the typical spatial predicates
+        (<xref linkend="ST_Contains" />, <xref linkend="ST_Crosses" />, 
+         <xref linkend="ST_Intersects" />, <xref linkend="ST_Touches" />, ...) are
+        insufficient in and of themselves to adequately provide that desired
+        spatial filter.</para>
+
+        <informaltable frame="none" border="0">
+          <tgroup cols="1">
+            <tbody>
+              <row>
+                <entry><para><informalfigure float="1" floatstyle="left">
+                    <graphic align="left" fileref="images/de9im01.png" />
+                  </informalfigure></para><para>For example, consider a linear
+                dataset representing a road network. It may be the task of a
+                GIS analyst to identify all road segments that cross
+                each other, not at a point, but on a line, perhaps invalidating
+                some business rule. In this case, <xref linkend="ST_Crosses" /> does not
+                adequately provide the necessary spatial filter since, for
+                linear features, it returns <varname>true</varname> only where
+                they cross at a point.</para> <para>One two-step solution
+                might be to first perform the actual intersection
+                (<xref linkend="ST_Intersection" />) of pairs of road segments that spatially
+                intersect (<xref linkend="ST_Intersects" />), and then compare the intersection's
+                <xref linkend="ST_GeometryType" /> with '<varname>LINESTRING</varname>' (properly
+                dealing with cases that return
+                <varname>GEOMETRYCOLLECTION</varname>s of
+                <varname>[MULTI]POINT</varname>s,
+                <varname>[MULTI]LINESTRING</varname>s, etc.).</para> <para>A
+                more elegant / faster solution may indeed be
+                desirable.</para></entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </informaltable>
+
+        <informaltable frame="none" border="0">
+          <tgroup cols="1">
+            <tbody>
+              <row>
+                <entry><para> <informalfigure float="1" floatstyle="right">
+                    <graphic align="right" fileref="images/de9im02.png" />
+                  </informalfigure></para> <para>A second [theoretical]
+                example may be that of a GIS analyst trying to locate all
+                wharfs or docks that intersect a lake's boundary on a line and
+                where only one end of the wharf is up on shore. In other
+                words, where a wharf is within, but not completely within a
+                lake, intersecting the boundary of a lake on a line, and where
+                the wharf's endpoints are both completely within and on the
+                boundary of the lake. The analyst may need to use a
+                combination of spatial predicates to isolate the sought after
+                features:</para> <itemizedlist>
+                    <listitem>
+                      <para><xref linkend="ST_Contains" />(lake, wharf) = TRUE</para>
+                    </listitem>
+
+                    <listitem>
+                      <para><xref linkend="ST_ContainsProperly" />(lake, wharf) = FALSE</para>
+                    </listitem>
+
+                    <listitem>
+                      <para><xref linkend="ST_GeometryType" />(<xref linkend="ST_Intersection" />(wharf, lake)) =
+                      'LINESTRING'</para>
+                    </listitem>
+
+                    <listitem>
+                      <para><xref linkend="ST_NumGeometries" />(<xref linkend="ST_Multi" />(<xref linkend="ST_Intersection" />(<xref linkend="ST_Boundary" />(wharf),
+                      <xref linkend="ST_Boundary" />(lake)))) = 1</para>
+
+                      <para>... (needless to say, this could get quite
+                      complicated)</para>
+                    </listitem>
+                  </itemizedlist></entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </informaltable>
+
+        <para>So enters the Dimensionally Extended 9 Intersection Model, or
+        DE-9IM for short.</para>
+
+        <sect3>
+          <title>Theory</title>
+
+          <para>According to the <ulink
+          url="http://www.opengeospatial.org/standards/sfs">OpenGIS Simple
+          Features Implementation Specification for SQL</ulink>, "the basic
+          approach to comparing two geometries is to make pair-wise tests of
+          the intersections between the Interiors, Boundaries and Exteriors of
+          the two geometries and to classify the relationship between the two
+          geometries based on the entries in the resulting 'intersection'
+          matrix."</para>
+
+          <glosslist>
+            <glossentry>
+              <glossterm>Boundary</glossterm>
+
+              <glossdef>
+                <para>The boundary of a geometry is the set of geometries of
+                the next lower dimension. For <varname>POINT</varname>s, which
+                have a dimension of 0, the boundary is the empty set. The
+                boundary of a <varname>LINESTRING</varname> are the two
+                endpoints. For <varname>POLYGON</varname>s, the boundary is
+                the linework that make up the exterior and interior
+                rings.</para>
+              </glossdef>
+            </glossentry>
+
+            <glossentry>
+              <glossterm>Interior</glossterm>
+
+              <glossdef>
+                <para>The interior of a geometry are those points of a
+                geometry that are left when the boundary is removed. For
+                <varname>POINT</varname>s, the interior is the
+                <varname>POINT</varname> itself. The interior of a
+                <varname>LINESTRING</varname> are the set of real points
+                between the endpoints. For <varname>POLYGON</varname>s, the
+                interior is the areal surface inside the polygon.</para>
+              </glossdef>
+            </glossentry>
+
+            <glossentry>
+              <glossterm>Exterior</glossterm>
+
+              <glossdef>
+                <para>The exterior of a geometry is the universe, an areal
+                surface, not on the interior or boundary of the
+                geometry.</para>
+              </glossdef>
+            </glossentry>
+          </glosslist>
+
+          <para>Given geometry <emphasis>a</emphasis>, where the
+          <emphasis>I(a)</emphasis>, <emphasis>B(a)</emphasis>, and
+          <emphasis>E(a)</emphasis> are the <emphasis>Interior</emphasis>,
+          <emphasis>Boundary</emphasis>, and <emphasis>Exterior</emphasis> of
+          a, the mathematical representation of the matrix is:</para>
+
+          <informaltable tabstyle="styledtable">
+            <tgroup align="center" cols="4">
+              <thead>
+                <row>
+                  <entry></entry>
+
+                  <entry><emphasis role="bold">Interior</emphasis></entry>
+
+                  <entry><emphasis role="bold">Boundary</emphasis></entry>
+
+                  <entry><emphasis role="bold">Exterior</emphasis></entry>
+                </row>
+              </thead>
+
+              <tbody>
+                <row>
+                  <entry><emphasis role="bold">Interior</emphasis></entry>
+                  <entry><emphasis>dim( I(a) ∩ I(b) )</emphasis></entry>
+                  <entry><emphasis>dim( I(a) ∩ B(b) )</emphasis></entry>
+                  <entry><emphasis>dim( I(a) ∩ E(b) )</emphasis></entry>
+                </row>
+
+                <row>
+                  <entry><emphasis role="bold">Boundary</emphasis></entry>
+                  <entry><emphasis>dim( B(a) ∩ I(b) )</emphasis></entry>
+                  <entry><emphasis>dim( B(a) ∩ B(b) )</emphasis></entry>
+                  <entry><emphasis>dim( B(a) ∩ E(b) )</emphasis></entry>
+                </row>
+
+                <row>
+                  <entry><emphasis role="bold">Exterior</emphasis></entry>
+                  <entry><emphasis>dim( E(a) ∩ I(b) )</emphasis></entry>
+                  <entry><emphasis>dim( E(a) ∩ B(b) )</emphasis></entry>
+                  <entry><emphasis>dim( E(a) ∩ E(b) )</emphasis></entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </informaltable>
+
+          <para>Where <emphasis>dim(a)</emphasis> is the dimension of
+          <emphasis>a</emphasis> as specified by
+          <xref linkend="ST_Dimension" /> but has the domain of
+          <literal>{0,1,2,T,F,*}</literal></para>
+
+          <itemizedlist spacing="compact">
+            <listitem>
+              <para><literal>0</literal> =&gt; point</para>
+            </listitem>
+
+            <listitem>
+              <para><literal>1</literal> =&gt; line</para>
+            </listitem>
+
+            <listitem>
+              <para><literal>2</literal> =&gt; area</para>
+            </listitem>
+
+            <listitem>
+              <para><literal>T</literal> =&gt;
+              <literal>{0,1,2}</literal></para>
+            </listitem>
+
+            <listitem>
+              <para><literal>F</literal> =&gt; empty set</para>
+            </listitem>
+
+            <listitem>
+              <para><literal>*</literal> =&gt; don't care</para>
+            </listitem>
+          </itemizedlist>
+
+          <para>Visually, for two overlapping polygonal geometries, this looks
+          like:</para>
+
+          <informaltable frame="none" border="0">
+            <tgroup cols="2">
+              <colspec colwidth="80pt" />
+
+              <tbody>
+                <row>
+                  <entry></entry>
+
+                  <entry align="center"><para><informalfigure>
+                      <graphic align="center" fileref="images/de9im04.png"
+                               valign="middle" />
+                    </informalfigure></para></entry>
+                </row>
+
+                <row>
+                  <entry align="center" valign="middle"><para><informalfigure>
+                      <graphic align="center" fileref="images/de9im03.png"
+                               valign="middle" />
+                    </informalfigure></para></entry>
+
+                  <entry><para> <informaltable tabstyle="styledtable">
+                      <tgroup align="center" cols="4">
+                        <thead valign="middle">
+                          <row>
+                            <entry></entry>
+
+                            <entry><emphasis
+                            role="bold">Interior</emphasis></entry>
+
+                            <entry><emphasis
+                            role="bold">Boundary</emphasis></entry>
+
+                            <entry><emphasis
+                            role="bold">Exterior</emphasis></entry>
+                          </row>
+                        </thead>
+
+                        <tbody valign="middle">
+                          <row>
+                            <entry spanname="de9im_a" style=""><emphasis
+                            role="bold">Interior</emphasis></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im05.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">2</emphasis></para></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im06.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">1</emphasis></para></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im07.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">2</emphasis></para></entry>
+                          </row>
+
+                          <row>
+                            <entry><emphasis
+                            role="bold">Boundary</emphasis></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im08.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">1</emphasis></para></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im09.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">0</emphasis></para></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im10.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">1</emphasis></para></entry>
+                          </row>
+
+                          <row>
+                            <entry><emphasis
+                            role="bold">Exterior</emphasis></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im11.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">2</emphasis></para></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im12.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">1</emphasis></para></entry>
+
+                            <entry><para><informalfigure>
+                                <graphic fileref="images/de9im13.png" />
+                              </informalfigure></para><para><emphasis>dim(...) =
+                            </emphasis><emphasis
+                            role="bold">2</emphasis></para></entry>
+                          </row>
+                        </tbody>
+                      </tgroup>
+                    </informaltable></para></entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </informaltable>
+
+          <para>Read from left to right and from top to bottom, the dimensional matrix is
+          represented, '<emphasis role="bold">212101212</emphasis>'.</para>
+
+          <para>A relate matrix that would therefore represent our first
+          example of two lines that intersect on a line would be: '<emphasis
+          role="bold">1*1***1**</emphasis>'</para>
+
+          <programlisting>-- Identify road segments that cross on a line
+SELECT a.id
+FROM roads a, roads b
+WHERE a.id != b.id 
+AND a.geom &amp;&amp; b.geom
+AND ST_Relate(a.geom, b.geom, '1*1***1**');</programlisting>
+
+          <para>A relate matrix that represents the second example of wharfs
+          partly on the lake's shoreline would be '<emphasis
+          role="bold">102101FF2</emphasis>'</para>
+
+          <programlisting>-- Identify wharfs partly on a lake's shoreline
+SELECT a.lake_id, b.wharf_id
+FROM lakes a, wharfs b
+WHERE a.geom &amp;&amp; b.geom
+AND ST_Relate(a.geom, b.geom, '102101FF2');</programlisting>
+
+          <para>For more information or reading, see:</para>
+          
+          <itemizedlist spacing="compact">
+            <listitem>
+              <para><ulink url="http://www.opengeospatial.org/standards/sfs">OpenGIS Simple
+          Features Implementation Specification for SQL</ulink> (version 1.1, section 2.1.13.2)</para>
+            </listitem>
+
+            <listitem>
+              <para><ulink url="http://gis.hsr.ch/wiki/images/3/3d/9dem_springer.pdf">Dimensionally 
+              Extended Nine-Intersection Model (DE-9IM) by Christian Strobl</ulink></para>
+            </listitem>
+            <listitem>
+              <para><ulink url="http://docs.geotools.org/latest/userguide/library/jts/dim9.html">GeoTools: Point Set Theory and the DE-9IM Matrix</ulink></para>
+            </listitem>
+            <listitem>
+              <para><emphasis>Encyclopedia of GIS</emphasis> By Hui Xiong</para>
+            </listitem>
+          </itemizedlist>
+
+        </sect3>
+      </sect2>
+	
+  </sect1>
+
+  <sect1>
+	<title>Loading GIS Data</title>
+
+	<para>Once you have created a spatial table, you are ready to upload GIS
+	data to the database. Currently, there are two ways to get data into a
+	PostGIS/PostgreSQL database: using formatted SQL statements or using the
+	Shape file loader/dumper.</para>
+
+	<sect2>
+	  <title>Using SQL</title>
+
+	  <para>If you can convert your data to a text representation, then using
+	  formatted SQL might be the easiest way to get your data into PostGIS. As
+	  with Oracle and other SQL databases, data can be bulk loaded by piping a
+	  large text file full of SQL "INSERT" statements into the SQL terminal
+	  monitor.</para>
+
+	  <para>A data upload file (<filename>roads.sql</filename> for example)
+	  might look like this:</para>
+
+	  <programlisting>BEGIN;
+INSERT INTO roads (road_id, roads_geom, road_name)
+  VALUES (1,ST_GeomFromText('LINESTRING(191232 243118,191108 243242)',-1),'Jeff Rd');
+INSERT INTO roads (road_id, roads_geom, road_name)
+  VALUES (2,ST_GeomFromText('LINESTRING(189141 244158,189265 244817)',-1),'Geordie Rd');
+INSERT INTO roads (road_id, roads_geom, road_name)
+  VALUES (3,ST_GeomFromText('LINESTRING(192783 228138,192612 229814)',-1),'Paul St');
+INSERT INTO roads (road_id, roads_geom, road_name)
+  VALUES (4,ST_GeomFromText('LINESTRING(189412 252431,189631 259122)',-1),'Graeme Ave');
+INSERT INTO roads (road_id, roads_geom, road_name)
+  VALUES (5,ST_GeomFromText('LINESTRING(190131 224148,190871 228134)',-1),'Phil Tce');
+INSERT INTO roads (road_id, roads_geom, road_name)
+  VALUES (6,ST_GeomFromText('LINESTRING(198231 263418,198213 268322)',-1),'Dave Cres');
+COMMIT;</programlisting>
+
+	  <para>The data file can be piped into PostgreSQL very easily using the
+	  "psql" SQL terminal monitor:</para>
+
+	  <programlisting>psql -d [database] -f roads.sql</programlisting>
+	</sect2>
+
+<sect2 id="shp2pgsql_usage">
+  <title>Using the Loader</title>
+
+  <para>
+    The <filename>shp2pgsql</filename> data loader converts ESRI Shape files into SQL suitable for
+    insertion into a PostGIS/PostgreSQL database either in geometry or geography format. The loader has several operating modes
+    distinguished by command line flags:
+  </para>
+  <para>In addition to the shp2pgsql command-line loader, there is an <filename>shp2pgsql-gui</filename> graphical interface with most
+  	of the options as the command-line loader, but may be easier to use for one-off non-scripted loading or if you are new to PostGIS.
+	It can also be configured as a plugin to PgAdminIII.
+	</para>
+
+  <variablelist>
+    <varlistentry>
+      <term>(c|a|d|p) These are mutually exclusive options:</term>
+      <listitem>
+        <para>
+          <variablelist>
+            <varlistentry>
+              <term>-c</term>
+              <listitem>
+                <para>
+                  Creates a new table and populates it from the shapefile. <emphasis>This is the
+                  default mode.</emphasis>
+                </para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term>-a</term>
+              <listitem>
+                <para>
+                  Appends data from the Shape file into the database table. Note that to use this
+                  option to load multiple files, the files must have the same attributes and same
+                  data types.
+                </para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term>-d</term>
+              <listitem>
+                <para>
+                  Drops the database table before creating a new table with the data in the Shape
+                  file.
+                </para>
+              </listitem>
+            </varlistentry>
+
+            <varlistentry>
+              <term>-p</term>
+              <listitem>
+                <para>
+                  Only produces the table creation SQL code, without adding any actual data. This
+                  can be used if you need to completely separate the table creation and data loading
+                  steps.
+                </para>
+              </listitem>
+            </varlistentry>
+          </variablelist>
+        </para>
+      </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+      <term>-?</term>
+      <listitem>
+        <para>
+          Display help screen.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>-D</term>
+      <listitem>
+        <para>
+          Use the PostgreSQL "dump" format for the output data. This can be combined with -a, -c and
+          -d. It is much faster to load than the default "insert" SQL format. Use this for very
+          large data sets.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>-s [&lt;FROM_SRID%gt;:]&lt;SRID&gt;</term>
+      <listitem>
+        <para>
+          Creates and populates the geometry tables with the specified SRID.
+          Optionally specifies that the input shapefile uses the given
+          FROM_SRID, in which case the geometries will be reprojected to the
+          target SRID.
+	  FROM_SRID cannot be specified with -D.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>-k</term>
+      <listitem>
+        <para>
+          Keep identifiers' case (column, schema and attributes). Note that attributes in Shapefile
+          are all UPPERCASE.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>-i</term>
+      <listitem>
+        <para>
+          Coerce all integers to standard 32-bit integers, do not create 64-bit bigints, even if the
+          DBF header signature appears to warrant it.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>-I</term>
+      <listitem>
+        <para>
+          Create a GiST index on the geometry column.
+        </para>
+      </listitem>
+    </varlistentry>
+        <varlistentry>
+      <term>-S </term>
+      <listitem>
+        <para>
+          Generate simple geometries instead of MULTI geometries.  Will only succeed if
+          all the geometries are actually single (I.E. a MULTIPOLYGON with a single shell, or
+          or a MULTIPOINT with a single vertex).
+        </para>
+      </listitem>
+    </varlistentry>
+
+     <varlistentry>
+      <term>-t &lt;dimensionality&gt;</term>
+      <listitem>
+        <para>
+          Force the output geometry to have the specified dimensionality. Use the following 
+          strings to indicate the dimensionality: 2D, 3DZ, 3DM, 4D.
+        </para>
+        <para>
+	        If the input has fewer dimensions that specified, the output will have those dimensions filled
+	        in with zeroes. If the input has more dimensions that specified, the unwanted dimensions will
+	        be stripped.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>-w</term>
+      <listitem>
+        <para>
+          Output WKT format, instead of WKB.  Note that this can
+          introduce coordinate drifts due to loss of precision.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>-e</term>
+      <listitem>
+        <para>
+          Execute each statement on its own, without using a transaction.
+          This allows loading of the majority of good data when there are some bad
+          geometries that generate errors.  Note that this cannot be used with the
+          -D flag as the "dump" format always uses a transaction.
+        </para>
+      </listitem>
+    </varlistentry>
+
+    <varlistentry>
+      <term>-W &lt;encoding&gt;</term>
+      <listitem>
+        <para>
+          Specify encoding of the input data (dbf file). When used, all attributes of the dbf are
+          converted from the specified encoding to UTF8. The resulting SQL output will contain a
+          <code>SET CLIENT_ENCODING to UTF8</code> command, so that the backend will be able to
+          reconvert from UTF8 to whatever encoding the database is configured to use internally.
+        </para>
+      </listitem>
+    </varlistentry>
+    
+    <varlistentry>
+      <term>-N &lt;policy&gt;</term>
+      <listitem>
+        <para>
+           NULL geometries handling policy (insert*,skip,abort)
+        </para>
+      </listitem>
+    </varlistentry>
+    <varlistentry>
+      <term>-n</term>
+      <listitem>
+        <para>
+          -n  Only import DBF file.  If your data has no corresponding shapefile, it will automatically switch to this mode 
+          	and load just the dbf.  So setting this flag is only needed if you have a full shapefile set, and you only want the attribute data and no geometry.
+        </para>
+      </listitem>
+    </varlistentry>
+	
+	<varlistentry>
+	  <term>-G</term>
+	  <listitem>
+		<para>
+			Use geography type instead of geometry (requires lon/lat data) in WGS84 long lat (SRID=4326)
+		</para>
+	  </listitem>
+	</varlistentry>
+    <varlistentry>
+      <term>-T &lt;tablespace&gt;</term>
+      <listitem>
+        <para>
+          Specify the tablespace for the new table.  Indexes will still use the
+          default tablespace unless the -X parameter is also used.  The PostgreSQL
+          documentation has a good description on when to use custom tablespaces.
+        </para>
+      </listitem>
+    </varlistentry>
+    <varlistentry>
+      <term>-X &lt;tablespace&gt;</term>
+      <listitem>
+        <para>
+          Specify the tablespace for the new table's indexes.  This applies to
+          the primary key index, and the GIST spatial index if -I is also used.
+        </para>
+      </listitem>
+    </varlistentry>
+  </variablelist>
+
+  <para>
+    An example session using the loader to create an input file and uploading it might look like
+    this:
+  </para>
+
+  <programlisting># shp2pgsql -c -D -s 4269 -i -I shaperoads.shp myschema.roadstable &gt; roads.sql
+# psql -d roadsdb -f roads.sql</programlisting>
+
+  <para>
+    A conversion and upload can be done all in one step using UNIX pipes:
+  </para>
+
+  <programlisting># shp2pgsql shaperoads.shp myschema.roadstable | psql -d roadsdb</programlisting>
+</sect2>
+  </sect1>
+
+  <sect1>
+	<title>Retrieving GIS Data</title>
+
+	<para>Data can be extracted from the database using either SQL or the
+	Shape file loader/dumper. In the section on SQL we will discuss some of
+	the operators available to do comparisons and queries on spatial
+	tables.</para>
+
+	<sect2>
+	  <title>Using SQL</title>
+
+	  <para>The most straightforward means of pulling data out of the
+        database is to use a SQL select query to reduce the number of RECORDS and COLUMNS returned
+        and dump the resulting columns
+        into a parsable text file:</para>
+
+	  <programlisting>db=# SELECT road_id, ST_AsText(road_geom) AS geom, road_name FROM roads;
+
+road_id | geom                                    | road_name
+--------+-----------------------------------------+-----------
+	  1 | LINESTRING(191232 243118,191108 243242) | Jeff Rd
+	  2 | LINESTRING(189141 244158,189265 244817) | Geordie Rd
+	  3 | LINESTRING(192783 228138,192612 229814) | Paul St
+	  4 | LINESTRING(189412 252431,189631 259122) | Graeme Ave
+	  5 | LINESTRING(190131 224148,190871 228134) | Phil Tce
+	  6 | LINESTRING(198231 263418,198213 268322) | Dave Cres
+	  7 | LINESTRING(218421 284121,224123 241231) | Chris Way
+(6 rows)</programlisting>
+
+	  <para>However, there will be times when some kind of restriction is
+	  necessary to cut down the number of fields returned. In the case of
+	  attribute-based restrictions, just use the same SQL syntax as normal
+	  with a non-spatial table. In the case of spatial restrictions, the
+	  following operators are available/useful:</para>
+
+	  <variablelist>
+		<varlistentry>
+		  <term>&amp;&amp;</term>
+
+		  <listitem>
+			<para>This operator tells whether the bounding box of one geometry
+			intersects the bounding box of another.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>ST_OrderingEquals</term>
+
+		  <listitem>
+			<para>This tests whether two geometries are
+			geometrically identical. For example, if 'POLYGON((0 0,1 1,1 0,0
+			0))' is the same as 'POLYGON((0 0,1 1,1 0,0 0))' (it is).</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>=</term>
+
+		  <listitem>
+			<para>This operator is a little more naive, it only tests whether
+			the bounding boxes of two geometries are the same.</para>
+		  </listitem>
+		</varlistentry>
+	  </variablelist>
+
+	  <para>Next, you can use these operators in queries. Note that when
+	  specifying geometries and boxes on the SQL command line, you must
+	  explicitly turn the string representations into geometries by using the
+	  "ST_GeomFromText()" function. The 312 is a fictitious spatial reference system that matches our data.  
+	  So, for example:</para>
+
+	  <programlisting>SELECT road_id, road_name
+  FROM roads
+  WHERE ST_OrderingEquals(roads_geom , ST_GeomFromText('LINESTRING(191232 243118,191108 243242)',312) ) ;</programlisting>
+
+	  <para>The above query would return the single record from the
+	  "ROADS_GEOM" table in which the geometry was equal to that value.</para>
+
+	  <para>When using the "&amp;&amp;" operator, you can specify either a
+	  BOX3D as the comparison feature or a GEOMETRY. When you specify a
+	  GEOMETRY, however, its bounding box will be used for the
+	  comparison.</para>
+
+	  <programlisting>SELECT road_id, road_name
+FROM roads
+WHERE roads_geom &amp;&amp; ST_GeomFromText('POLYGON((...))',312);</programlisting>
+
+	  <para>The above query will use the bounding box of the polygon for
+	  comparison purposes.</para>
+
+	  <para>The most common spatial query will probably be a "frame-based"
+	  query, used by client software, like data browsers and web mappers, to
+	  grab a "map frame" worth of data for display. Using a "BOX3D" object for
+	  the frame, such a query looks like this:</para>
+
+	  <programlisting>SELECT ST_AsText(roads_geom) AS geom
+FROM roads
+WHERE
+  roads_geom &amp;&amp; ST_MakeEnvelope(191232, 243117,191232, 243119,312);</programlisting>
+
+	  <para>Note the use of the SRID 312, to specify the projection of the envelope.</para>
+	</sect2>
+
+	<sect2>
+	  <title>Using the Dumper</title>
+
+	  <para>The <filename>pgsql2shp</filename> table dumper connects directly
+	  to the database and converts a table (possibly defined by a query) into
+	  a shape file. The basic syntax is:</para>
+
+	  <programlisting>pgsql2shp [&lt;options&gt;] &lt;database&gt; [&lt;schema&gt;.]&lt;table&gt;</programlisting>
+
+	  <programlisting>pgsql2shp [&lt;options&gt;] &lt;database&gt; &lt;query&gt;</programlisting>
+
+	  <para>The commandline options are:</para>
+
+	  <variablelist>
+		<varlistentry>
+		  <term>-f &lt;filename&gt;</term>
+
+		  <listitem>
+			<para>Write the output to a particular filename.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>-h &lt;host&gt;</term>
+
+		  <listitem>
+			<para>The database host to connect to.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>-p &lt;port&gt;</term>
+
+		  <listitem>
+			<para>The port to connect to on the database host.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>-P &lt;password&gt;</term>
+
+		  <listitem>
+			<para>The password to use when connecting to the database.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>-u &lt;user&gt;</term>
+
+		  <listitem>
+			<para>The username to use when connecting to the database.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>-g &lt;geometry column&gt;</term>
+
+		  <listitem>
+			<para>In the case of tables with multiple geometry columns, the
+			geometry column to use when writing the shape file.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>-b</term>
+
+		  <listitem>
+			<para>Use a binary cursor. This will make the operation faster,
+			but will not work if any NON-geometry attribute in the table lacks
+			a cast to text.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>-r</term>
+
+		  <listitem>
+			<para>Raw mode. Do not drop the <varname>gid</varname> field, or
+			escape column names.</para>
+		  </listitem>
+		</varlistentry>
+
+		<varlistentry>
+		  <term>-d</term>
+
+		  <listitem>
+			<para>For backward compatibility: write a 3-dimensional shape file
+			when dumping from old (pre-1.0.0) postgis databases (the default
+			is to write a 2-dimensional shape file in that case). Starting
+			from postgis-1.0.0+, dimensions are fully encoded.</para>
+		  </listitem>
+		</varlistentry>
+		
+		<varlistentry>
+		  <term>-m <varname>filename</varname></term>
+		  <listitem>
+			<para> Remap identifiers to ten character names.
+			The content of the file is lines of two symbols separated by
+			a single white space and no trailing or leading space:
+			VERYLONGSYMBOL SHORTONE
+			ANOTHERVERYLONGSYMBOL SHORTER
+			etc.</para>
+		  </listitem>
+		</varlistentry>
+	  </variablelist>
+	</sect2>
+  </sect1>
+
+  <sect1>
+	<title>Building Indexes</title>
+
+	<para>Indexes are what make using a spatial database for large data sets
+	possible. Without indexing, any search for a feature would require a
+	"sequential scan" of every record in the database. Indexing speeds up
+	searching by organizing the data into a search tree which can be quickly
+	traversed to find a particular record. PostgreSQL supports three kinds of
+	indexes by default: B-Tree indexes, R-Tree indexes, and GiST
+	indexes.</para>
+
+	<itemizedlist>
+	  <listitem>
+		<para>B-Trees are used for data which can be sorted along one axis;
+		for example, numbers, letters, dates. GIS data cannot be rationally
+		sorted along one axis (which is greater, (0,0) or (0,1) or (1,0)?) so
+		B-Tree indexing is of no use for us.</para>
+	  </listitem>
+
+	  <listitem>
+		<para>R-Trees break up data into rectangles, and sub-rectangles, and
+		sub-sub rectangles, etc. R-Trees are used by some spatial databases to
+		index GIS data, but the PostgreSQL R-Tree implementation is not as
+		robust as the GiST implementation.</para>
+	  </listitem>
+
+	  <listitem>
+		<para>GiST (Generalized Search Trees) indexes break up data into
+		"things to one side", "things which overlap", "things which are
+		inside" and can be used on a wide range of data-types, including GIS
+		data. PostGIS uses an R-Tree index implemented on top of GiST to index
+		GIS data.</para>
+	  </listitem>
+	</itemizedlist>
+
+	<sect2 id="gist_indexes">
+	  <title>GiST Indexes</title>
+
+	  <para>GiST stands for "Generalized Search Tree" and is a generic form of
+	  indexing. In addition to GIS indexing, GiST is used to speed up searches
+	  on all kinds of irregular data structures (integer arrays, spectral
+	  data, etc) which are not amenable to normal B-Tree indexing.</para>
+
+	  <para>Once a GIS data table exceeds a few thousand rows, you will want
+	  to build an index to speed up spatial searches of the data (unless all
+	  your searches are based on attributes, in which case you'll want to
+	  build a normal index on the attribute fields).</para>
+
+	  <para>The syntax for building a GiST index on a "geometry" column is as
+	  follows:</para>
+
+	  <para><programlisting>CREATE INDEX [indexname] ON [tablename] USING GIST ( [geometryfield] ); </programlisting></para>
+	  <para>The above syntax will always build a 2D-index.  To get the an n-dimensional index supported in PostGIS 2.0+ for the geometry type, you can create one using this syntax</para>
+	  <programlisting>CREATE INDEX [indexname] ON [tablename] USING GIST ([geometryfield] gist_geometry_ops_nd);</programlisting>
+
+	  <para>Building a spatial index is a computationally intensive exercise:
+	  on tables of around 1 million rows, on a 300MHz Solaris machine, we have
+	  found building a GiST index takes about 1 hour. After building an index,
+	  it is important to force PostgreSQL to collect table statistics, which
+	  are used to optimize query plans:</para>
+
+	  <para><programlisting>VACUUM ANALYZE [table_name] [(column_name)];
+-- This is only needed for PostgreSQL 7.4 installations and below
+SELECT UPDATE_GEOMETRY_STATS([table_name], [column_name]);</programlisting></para>
+
+	  <para>GiST indexes have two advantages over R-Tree indexes in
+	  PostgreSQL. Firstly, GiST indexes are "null safe", meaning they can
+	  index columns which include null values. Secondly, GiST indexes support
+	  the concept of "lossiness" which is important when dealing with GIS
+	  objects larger than the PostgreSQL 8K page size. Lossiness allows
+	  PostgreSQL to store only the "important" part of an object in an index
+	  -- in the case of GIS objects, just the bounding box. GIS objects larger
+	  than 8K will cause R-Tree indexes to fail in the process of being
+	  built.</para>
+	</sect2>
+
+	<sect2>
+	  <title>Using Indexes</title>
+
+	  <para>Ordinarily, indexes invisibly speed up data access: once the index
+	  is built, the query planner transparently decides when to use index
+	  information to speed up a query plan. Unfortunately, the PostgreSQL
+	  query planner does not optimize the use of GiST indexes well, so
+	  sometimes searches which should use a spatial index instead default to a
+	  sequence scan of the whole table.</para>
+
+	  <para>If you find your spatial indexes are not being used (or your
+	  attribute indexes, for that matter) there are a couple things you can
+	  do:</para>
+
+	  <itemizedlist>
+		<listitem>
+		  <para>Firstly, make sure statistics are gathered about the number
+		  and distributions of values in a table, to provide the query planner
+		  with better information to make decisions around index usage. For
+		  PostgreSQL 7.4 installations and below this is done by running
+		  <command>update_geometry_stats([table_name, column_name])</command>
+		  (compute distribution) and <command>VACUUM ANALYZE [table_name]
+		  [column_name]</command> (compute number of values). Starting with
+		  PostgreSQL 8.0 running <command>VACUUM ANALYZE</command> will do
+		  both operations. You should regularly vacuum your databases anyways
+		  -- many PostgreSQL DBAs have <command>VACUUM</command> run as an
+		  off-peak cron job on a regular basis.</para>
+		</listitem>
+
+		<listitem>
+		  <para>If vacuuming does not work, you can force the planner to use
+		  the index information by using the <command>SET
+		  ENABLE_SEQSCAN=OFF</command> command. You should only use this
+		  command sparingly, and only on spatially indexed queries: generally
+		  speaking, the planner knows better than you do about when to use
+		  normal B-Tree indexes. Once you have run your query, you should
+		  consider setting <varname>ENABLE_SEQSCAN</varname> back on, so that
+		  other queries will utilize the planner as normal.</para>
+
+		  <note>
+			<para>As of version 0.6, it should not be necessary to force the
+			planner to use the index with
+			<varname>ENABLE_SEQSCAN</varname>.</para>
+		  </note>
+		</listitem>
+
+		<listitem>
+		  <para>If you find the planner wrong about the cost of sequential vs
+		  index scans try reducing the value of random_page_cost in
+		  postgresql.conf or using SET random_page_cost=#. Default value for
+		  the parameter is 4, try setting it to 1 or 2. Decrementing the value
+		  makes the planner more inclined of using Index scans.</para>
+		</listitem>
+	  </itemizedlist>
+	</sect2>
+  </sect1>
+
+  <sect1>
+	<title>Complex Queries</title>
+
+	<para>The <emphasis>raison d'etre</emphasis> of spatial database
+	functionality is performing queries inside the database which would
+	ordinarily require desktop GIS functionality. Using PostGIS effectively
+	requires knowing what spatial functions are available, and ensuring that
+	appropriate indexes are in place to provide good performance. The SRID of 312 used in these
+	examples is purely for demonstration.  You should be using a REAL SRID listed in the the spatial_ref_sys table
+	and one that matches the projection of your data.  If your data has no spatial reference system 
+	specified, you should be THINKING very thoughtfully why it doesn't and maybe it should.
+	If your reason is because you are modeling something that doesn't have a geographic spatial reference system defined such as the internals of a molecule
+	or a good location
+	on Mars to transport the human race in the event of a nuclear holocaust,
+	then simply leave out the SRID or make one up and insert it in the <varname>spatial_ref_sys</varname> table.</para>
+
+	<sect2>
+	  <title>Taking Advantage of Indexes</title>
+
+	  <para>When constructing a query it is important to remember that only
+	  the bounding-box-based operators such as &amp;&amp; can take advantage
+	  of the GiST spatial index. Functions such as
+	  <varname>ST_Distance()</varname> cannot use the index to optimize their
+	  operation. For example, the following query would be quite slow on a
+	  large table:</para>
+
+	  <programlisting>SELECT the_geom
+FROM geom_table
+WHERE ST_Distance(the_geom, ST_GeomFromText('POINT(100000 200000)', 312)) &lt; 100</programlisting>
+
+	  <para>This query is selecting all the geometries in geom_table which are
+	  within 100 units of the point (100000, 200000). It will be slow because
+	  it is calculating the distance between each point in the table and our
+	  specified point, ie. one <varname>ST_Distance()</varname> calculation
+	  for each row in the table. We can avoid this by using the &amp;&amp;
+	  operator to reduce the number of distance calculations required:</para>
+
+	  <programlisting>SELECT the_geom
+FROM geom_table
+WHERE ST_DWithin(the_geom,  ST_MakeEnvelope(90900, 190900, 100100, 200100,312), 100)
+</programlisting>
+
+	  <para>This query selects the same geometries, but it does it in a more
+	  efficient way. Assuming there is a GiST index on the_geom, the query
+	  planner will recognize that it can use the index to reduce the number of
+	  rows before calculating the result of the <varname>ST_distance()</varname>
+	  function. Notice that the <varname>ST_MakeEnvelope</varname> geometry which is
+	  used in the &amp;&amp; operation is a 200 unit square box centered on
+	  the original point - this is our "query box". The &amp;&amp; operator
+	  uses the index to quickly reduce the result set down to only those
+	  geometries which have bounding boxes that overlap the "query box".
+	  Assuming that our query box is much smaller than the extents of the
+	  entire geometry table, this will drastically reduce the number of
+	  distance calculations that need to be done.</para>
+
+	  <note>
+		<title>Change in Behavior</title>
+
+		<para>As of PostGIS 1.3.0, most of the Geometry Relationship
+		Functions, with the notable exceptions of ST_Disjoint and ST_Relate,
+		include implicit bounding box overlap operators.</para>
+	  </note>
+	</sect2>
+
+	<sect2>
+	  <title>Examples of Spatial SQL</title>
+
+	  <para>The examples in this section will make use of two tables, a table
+	  of linear roads, and a table of polygonal municipality boundaries. The
+	  table definitions for the <varname>bc_roads</varname> table is:</para>
+
+	  <programlisting>Column      | Type              | Description
+------------+-------------------+-------------------
+gid         | integer           | Unique ID
+name        | character varying | Road Name
+the_geom    | geometry          | Location Geometry (Linestring)</programlisting>
+
+	  <para>The table definition for the <varname>bc_municipality</varname>
+	  table is:</para>
+
+	  <programlisting>Column     | Type              | Description
+-----------+-------------------+-------------------
+gid        | integer           | Unique ID
+code       | integer           | Unique ID
+name       | character varying | City / Town Name
+the_geom   | geometry          | Location Geometry (Polygon)</programlisting>
+
+	  <qandaset>
+		<qandaentry>
+		  <question>
+			<para>What is the total length of all roads, expressed in
+			kilometers?</para>
+		  </question>
+
+		  <answer>
+			<para>You can answer this question with a very simple piece of
+			SQL:</para>
+
+			<programlisting>SELECT sum(ST_Length(the_geom))/1000 AS km_roads FROM bc_roads;
+
+km_roads
+------------------
+70842.1243039643
+(1 row)</programlisting>
+		  </answer>
+		</qandaentry>
+
+		<qandaentry>
+		  <question>
+			<para>How large is the city of Prince George, in hectares?</para>
+		  </question>
+
+		  <answer>
+			<para>This query combines an attribute condition (on the
+			municipality name) with a spatial calculation (of the
+			area):</para>
+
+			<programlisting>SELECT
+  ST_Area(the_geom)/10000 AS hectares
+FROM bc_municipality
+WHERE name = 'PRINCE GEORGE';
+
+hectares
+------------------
+32657.9103824927
+(1 row)</programlisting>
+		  </answer>
+		</qandaentry>
+
+		<qandaentry>
+		  <question>
+			<para>What is the largest municipality in the province, by
+			area?</para>
+		  </question>
+
+		  <answer>
+			<para>This query brings a spatial measurement into the query
+			condition. There are several ways of approaching this problem, but
+			the most efficient is below:</para>
+
+			<programlisting>SELECT
+  name,
+  ST_Area(the_geom)/10000 AS hectares
+FROM
+  bc_municipality
+ORDER BY hectares DESC
+LIMIT 1;
+
+name           | hectares
+---------------+-----------------
+TUMBLER RIDGE  | 155020.02556131
+(1 row)</programlisting>
+
+			<para>Note that in order to answer this query we have to calculate
+			the area of every polygon. If we were doing this a lot it would
+			make sense to add an area column to the table that we could
+			separately index for performance. By ordering the results in a
+			descending direction, and them using the PostgreSQL "LIMIT"
+			command we can easily pick off the largest value without using an
+			aggregate function like max().</para>
+		  </answer>
+		</qandaentry>
+
+		<qandaentry>
+		  <question>
+			<para>What is the length of roads fully contained within each
+			municipality?</para>
+		  </question>
+
+		  <answer>
+			<para>This is an example of a "spatial join", because we are
+			bringing together data from two tables (doing a join) but using a
+			spatial interaction condition ("contained") as the join condition
+			rather than the usual relational approach of joining on a common
+			key:</para>
+
+			<programlisting>SELECT
+  m.name,
+  sum(ST_Length(r.the_geom))/1000 as roads_km
+FROM
+  bc_roads AS r,
+  bc_municipality AS m
+WHERE
+  ST_Contains(m.the_geom,r.the_geom)
+GROUP BY m.name
+ORDER BY roads_km;
+
+name                        | roads_km
+----------------------------+------------------
+SURREY                      | 1539.47553551242
+VANCOUVER                   | 1450.33093486576
+LANGLEY DISTRICT            | 833.793392535662
+BURNABY                     | 773.769091404338
+PRINCE GEORGE               | 694.37554369147
+...</programlisting>
+
+			<para>This query takes a while, because every road in the table is
+			summarized into the final result (about 250K roads for our
+			particular example table). For smaller overlays (several thousand
+			records on several hundred) the response can be very fast.</para>
+		  </answer>
+		</qandaentry>
+
+		<qandaentry>
+		  <question>
+			<para>Create a new table with all the roads within the city of
+			Prince George.</para>
+		  </question>
+
+		  <answer>
+			<para>This is an example of an "overlay", which takes in two
+			tables and outputs a new table that consists of spatially clipped
+			or cut resultants. Unlike the "spatial join" demonstrated above,
+			this query actually creates new geometries. An overlay is like a
+			turbo-charged spatial join, and is useful for more exact analysis
+			work:</para>
+
+			<programlisting>CREATE TABLE pg_roads as
+SELECT
+  ST_Intersection(r.the_geom, m.the_geom) AS intersection_geom,
+  ST_Length(r.the_geom) AS rd_orig_length,
+  r.*
+FROM
+  bc_roads AS r,
+  bc_municipality AS m
+WHERE  m.name = 'PRINCE GEORGE' AND ST_Intersects(r.the_geom, m.the_geom);</programlisting>
+		  </answer>
+		</qandaentry>
+
+		<qandaentry>
+		  <question>
+			<para>What is the length in kilometers of "Douglas St" in
+			Victoria?</para>
+		  </question>
+
+		  <answer>
+			<programlisting>SELECT
+  sum(ST_Length(r.the_geom))/1000 AS kilometers
+FROM
+  bc_roads r,
+  bc_municipality m
+WHERE  r.name = 'Douglas St' AND m.name = 'VICTORIA'
+	AND ST_Contains(m.the_geom, r.the_geom) ;
+
+kilometers
+------------------
+4.89151904172838
+(1 row)</programlisting>
+		  </answer>
+		</qandaentry>
+
+		<qandaentry>
+		  <question>
+			<para>What is the largest municipality polygon that has a
+			hole?</para>
+		  </question>
+
+		  <answer>
+			<programlisting>SELECT gid, name, ST_Area(the_geom) AS area
+FROM bc_municipality
+WHERE ST_NRings(the_geom) &gt; 1
+ORDER BY area DESC LIMIT 1;
+
+gid  | name         | area
+-----+--------------+------------------
+12   | SPALLUMCHEEN | 257374619.430216
+(1 row)</programlisting>
+		  </answer>
+		</qandaentry>
+	  </qandaset>
+	</sect2>
+  </sect1>
+</chapter>
