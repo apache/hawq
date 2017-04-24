@@ -4499,6 +4499,15 @@ void timeoutDeadResourceAllocation(void)
 	{
 		ConnectionTrack curcon = (ConnectionTrack)(((PAIR)lfirst(cell))->Value);
 
+		if ( curmsec < curcon->LastActTime ) {
+			/*
+			 * if system time is changed to an earlier point, update the last
+			 * action time to avoid triggering timeout action.
+			 */
+			curcon->LastActTime = curmsec;
+			continue;
+		}
+
 		switch(curcon->Progress)
 		{
 
@@ -4703,12 +4712,15 @@ void timeoutQueuedRequest(void)
 			 * 		   request is at the head of the queue.
 			 */
 			if ( ( (PQUEMGR->RootTrack->ClusterSegNumberMax == 0) &&
+				   (curmsec > curcon->ResRequestTime) &&
 				   (curmsec - curcon->ResRequestTime >
 						1000000L * rm_resource_allocation_timeout ) ) ||
 				 ( (PQUEMGR->RatioTrackers[index]->TotalPendingStartTime > 0) &&
+				   (curmsec > PQUEMGR->RatioTrackers[index]->TotalPendingStartTime) &&
 				   (curmsec - PQUEMGR->RatioTrackers[index]->TotalPendingStartTime >
 						1000000L * rm_resource_allocation_timeout) &&
 				   (curcon->HeadQueueTime > 0) &&
+				   (curmsec > curcon->HeadQueueTime) &&
 				   (curmsec - curcon->HeadQueueTime >
 				 	 	1000000L * rm_resource_allocation_timeout) ) )
 			{
@@ -4729,6 +4741,7 @@ void timeoutQueuedRequest(void)
 
 			/* Case 3. Check if resource fragment problem lasts too long time. */
 			if ( curcon->troubledByFragment &&
+				 curmsec > curcon->troubledByFragmentTimestamp &&
 			     curmsec - curcon->troubledByFragmentTimestamp >
 					 1000000L * rm_resource_allocation_timeout &&
 				 ((DynResourceQueueTrack)(curcon->QueueTrack))->NumOfRunningQueries == 0 )
