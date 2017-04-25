@@ -53,24 +53,35 @@ ABS_PLR_SRCDIR = $(abs_top_srcdir)/$(subdir)/plr
 HAWQ_VERSION := $(shell cat $(abs_top_srcdir)/VERSION | awk '{print $$1}')
 HAWQ_VERSION_STR := $(shell cat $(abs_top_srcdir)/VERSION | awk '{print $$1}' | sed 's/\./_/g')
 HAWQ_BUILD_NUMBER := $(shell cat $(abs_top_srcdir)/VERSION | awk '{print $$3}')
-REDHAT_MAJOR_VERSION := $(shell cat /etc/redhat-release | sed s/.*release\ // | sed s/\ .*// | awk -F '.' '{print $$1}')
+OS_VERSION_DISTRO := $(shell \
+distro_name=""; \
+distro_version=""; \
+if [ -f /etc/redhat-release ]; then \
+        distro_name="el"; \
+        distro_version=`cat /etc/redhat-release | sed 's/.*release\ //' | sed 's/\ .*//' | awk -F '.' '{print $$1}'`; \
+elif [ -f /etc/SuSE-release ]; then \
+        distro_name="sles"; \
+        distro_version=`cat /etc/SuSE-release | grep 'VERSION'  | awk -F '=' '{print $$2}'| sed 's/\ *//' | awk -F '.' '{print $$1}'`; \
+fi; \
+echo $$distro_name$$distro_version; \
+)
 
 # rpm only so far.
 plr_pkgbuild: plr_prepare
-	if [ ! -f /etc/redhat-release ]; then echo "rpm build is not supported on the platform."; exit 1; fi
+	if [ ! -f /etc/redhat-release ] && [ ! -f /etc/SuSE-release ]; then echo "rpm build is not supported on the platform."; exit 1; fi
 	if [ ! -f $(abs_top_srcdir)/VERSION ]; then echo "VERSION file is missing. Forgot to run configure?"; exit 1; fi
-	rm -rf plr/build; mkdir -p plr/build;
+	rm -rf plr/build; mkdir -p plr/build/BUILD; mkdir -p plr/build/RPMS/;
 	rpmbuild -bb plr.spec --define 'plr_srcdir $(ABS_PLR_SRCDIR)' \
         --define 'hawq_version $(HAWQ_VERSION)' \
         --define 'hawq_version_str $(HAWQ_VERSION_STR)' \
         --define 'hawq_build_number $(HAWQ_BUILD_NUMBER)' \
-        --define 'redhat_major_version $(REDHAT_MAJOR_VERSION)' \
+        --define 'os_version_distro $(OS_VERSION_DISTRO)' \
         --define '_topdir $(ABS_PLR_SRCDIR)/build' --define '__os_install_post \%{nil}'
 	rpmbuild -bb vplr.spec \
         --define 'hawq_version $(HAWQ_VERSION)' \
         --define 'hawq_version_str $(HAWQ_VERSION_STR)' \
         --define 'hawq_build_number $(HAWQ_BUILD_NUMBER)' \
-        --define 'redhat_major_version $(REDHAT_MAJOR_VERSION)' \
+        --define 'os_version_distro $(OS_VERSION_DISTRO)' \
         --define '_topdir $(ABS_PLR_SRCDIR)/build'
 
 ifeq ($(with_r), yes)

@@ -20,7 +20,8 @@ subdir = src/bin/gpfdist
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
-LIBS := -levent -lyaml -lz -lbz2 -lssl -lcrypto
+#LIBS := -levent -lyaml -lz -lbz2 -lssl -lcrypto
+LIBS := $(LDFLAGS) -levent -lyaml -lz -lbz2 -lssl -lcrypto
 ifeq ($(BUILD_TYPE), gcov)
 LIBS   := -lgcov $(LIBS)
 CFLAGS := -fprofile-arcs -ftest-coverage $(CFLAGS)

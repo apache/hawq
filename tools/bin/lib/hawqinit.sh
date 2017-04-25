@@ -192,6 +192,8 @@ LOAD_GP_TOOLKIT () {
 get_master_ipv6_addresses() {
     if [ "${distro_based_on}" = "Mac" ]; then
         MASTER_IPV6_LOCAL_ADDRESS_ALL=(`${IFCONFIG} | ${GREP} inet6 | ${AWK} '{print $2}' | cut -d'%' -f1`)
+    elif [ -f /etc/SuSE-release ]; then
+        MASTER_IPV6_LOCAL_ADDRESS_ALL=(`${IFCONFIG} | ${GREP} inet6 | ${AWK} '{print $3}' | cut -d'%' -f1 | awk -F '/' '{print $1}'`)
     else
         MASTER_IPV6_LOCAL_ADDRESS_ALL=(`ip -6 address show |${GREP} inet6|${AWK} '{print $2}' |cut -d'/' -f1`)
     fi

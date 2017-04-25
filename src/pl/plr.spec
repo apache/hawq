@@ -1,12 +1,14 @@
 Summary:        PL/R module for HAWQ
 Name:           plr-hawq_%{hawq_version_str}
 Version:        08.03.00.14.%{hawq_version}
-Release:		%{hawq_build_number}.el%{redhat_major_version}
+Release:		%{hawq_build_number}.%{os_version_distro}
 Prefix:         /usr/local/hawq_%{hawq_version_str}
 License:		GPL
+Group:      	Applications/Databases
 BuildRequires:  R-core-devel
 Requires:       R
 Provides:       plr-hawq
+BuildRoot:      %{_tmppath}/%{name}-buildroot
 
 %define _unpackaged_files_terminate_build 0
 

@@ -835,13 +835,13 @@ class HawqRegister(object):
     def _check_parquet_format(self, files):
         '''Check whether the file to be registered is parquet format'''
         for f in files:
-            hdfscmd = 'hadoop fs -du -h %s | head -c 1' % f
+            hdfscmd = 'hadoop fs -du -h %s | head -c1' % f
             rc, out, err = local_ssh_output(hdfscmd)
             if out == '0':
                 continue
-            hdfscmd = 'hadoop fs -cat %s | head -c 4 | grep PAR1' % f
+            hdfscmd = 'hadoop fs -cat %s | head -c4 | grep PAR1' % f
             result1 = local_ssh(hdfscmd)
-            hdfscmd = 'hadoop fs -cat %s | tail -c 4 | grep PAR1' % f
+            hdfscmd = 'hadoop fs -cat %s | tail -c4 | grep PAR1' % f
             result2 = local_ssh(hdfscmd)
             if result1 or result2:
                 logger.error('File %s is not parquet format' % f)
