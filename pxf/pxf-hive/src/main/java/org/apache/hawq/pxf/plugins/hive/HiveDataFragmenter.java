@@ -466,7 +466,14 @@ public class HiveDataFragmenter extends Fragmenter {
      */
     @Override
     public FragmentsStats getFragmentsStats() throws Exception {
-        throw new UnsupportedOperationException(
-                "ANALYZE for Hive plugin is not supported");
+        Metadata.Item tblDesc = HiveUtilities.extractTableFromName(inputData.getDataSource());
+        Table tbl = HiveUtilities.getHiveTable(client, tblDesc);
+        Metadata metadata = new Metadata(tblDesc);
+        HiveUtilities.getSchema(tbl, metadata);
+
+        long split_count = Long.parseLong(tbl.getParameters().get("numFiles"));
+        long totalSize = Long.parseLong(tbl.getParameters().get("totalSize"));
+        long firstFragmentSize = totalSize / split_count;
+        return new FragmentsStats(split_count, firstFragmentSize, totalSize);
     }
 }
