@@ -114,7 +114,7 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 	ccname = FSYS_UDF_GET_CCNAME(fcinfo);
 
 	if (NULL == host) {
-		elog(WARNING, "get host invalid in %s __func__);
+		elog(WARNING, "get host invalid in %s" __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
