@@ -102,7 +102,7 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_connect outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -114,13 +114,13 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 	ccname = FSYS_UDF_GET_CCNAME(fcinfo);
 
 	if (NULL == host) {
-		elog(WARNING, "get host invalid in gpfs_hdfs_connect");
+		elog(WARNING, "get host invalid in %s __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (port < 0) {
-		elog(WARNING, "get port invalid in gpfs_hdfs_connect: %d", port);
+		elog(WARNING, "get port invalid in %s %d", __func__, port);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -129,7 +129,7 @@ gpfs_hdfs_connect(PG_FUNCTION_ARGS)
 	builder = hdfsNewBuilder();
 
 	if (NULL == builder) {
-		elog(WARNING, "failed to create hdfs connection builder in gpfs_hdfs_connect");
+		elog(WARNING, "failed to create hdfs connection builder in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -171,7 +171,7 @@ gpfs_hdfs_disconnect(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_disconnect outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -180,7 +180,7 @@ gpfs_hdfs_disconnect(PG_FUNCTION_ARGS)
 	hdfs = FSYS_UDF_GET_HDFS(fcinfo);
 
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfs invalid in gpfs_hdfs_disconnect");
+		elog(WARNING, "get hdfs invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -211,7 +211,7 @@ gpfs_hdfs_openfile(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_openfile outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -225,20 +225,20 @@ gpfs_hdfs_openfile(PG_FUNCTION_ARGS)
 	blocksize = FSYS_UDF_GET_FILEBLKSIZE(fcinfo);
 
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfs invalid in gpfs_hdfs_openfile");
+		elog(WARNING, "get hdfs invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == path || '\0' == *path) {
-		elog(WARNING, "get path invalid in gpfs_hdfs_openfile");
+		elog(WARNING, "get path invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (bufferSize < 0 || rep < 0 || blocksize < 0) {
-		elog(WARNING, "get param error in gpfs_hdfs_openfile: bufferSize[%d], rep[%d], blocksize["INT64_FORMAT"]",
-			 bufferSize, rep, blocksize);
+		elog(WARNING, "get param error in %s: bufferSize[%d], rep[%d], blocksize["INT64_FORMAT"]",
+			 __func__, bufferSize, rep, blocksize);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -274,7 +274,7 @@ gpfs_hdfs_sync(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_sync outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -283,13 +283,13 @@ gpfs_hdfs_sync(PG_FUNCTION_ARGS)
 	hdfs = FSYS_UDF_GET_HDFS(fcinfo);
 	hFile = FSYS_UDF_GET_HFILE(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_sync");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == hFile) {
-		elog(WARNING, "get hdfsFile invalid in gpfs_hdfs_sync");
+		elog(WARNING, "get hdfsFile invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -312,7 +312,7 @@ gpfs_hdfs_closefile(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_closefile outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -321,13 +321,13 @@ gpfs_hdfs_closefile(PG_FUNCTION_ARGS)
 	hdfs = FSYS_UDF_GET_HDFS(fcinfo);
 	hFile = FSYS_UDF_GET_HFILE(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_closefile");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == hFile) {
-		elog(WARNING, "get hdfsFile invalid in gpfs_hdfs_closefile");
+		elog(WARNING, "get hdfsFile invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -350,7 +350,7 @@ gpfs_hdfs_createdirectory(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_createdirectory outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -359,13 +359,13 @@ gpfs_hdfs_createdirectory(PG_FUNCTION_ARGS)
 	hdfs = FSYS_UDF_GET_HDFS(fcinfo);
 	path = FSYS_UDF_GET_PATH(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_createdirectory");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == path) {
-		elog(WARNING, "get path invalid in gpfs_hdfs_createdirectory");
+		elog(WARNING, "get path invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -389,7 +389,7 @@ gpfs_hdfs_delete(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_delete outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -399,13 +399,13 @@ gpfs_hdfs_delete(PG_FUNCTION_ARGS)
 	path = FSYS_UDF_GET_PATH(fcinfo);
 	recursive = FSYS_UDF_GET_RECURSIVE(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_delete");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == path) {
-		elog(WARNING, "get path invalid in gpfs_hdfs_delete");
+		elog(WARNING, "get path invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -429,7 +429,7 @@ gpfs_hdfs_chmod(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_chmod outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -439,13 +439,13 @@ gpfs_hdfs_chmod(PG_FUNCTION_ARGS)
 	path = FSYS_UDF_GET_PATH(fcinfo);
 	mod = FSYS_UDF_GET_MODE(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_chmod");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == path) {
-		elog(WARNING, "get path invalid in gpfs_hdfs_chmod");
+		elog(WARNING, "get path invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -470,7 +470,7 @@ gpfs_hdfs_read(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_read outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -481,25 +481,25 @@ gpfs_hdfs_read(PG_FUNCTION_ARGS)
 	buf = FSYS_UDF_GET_DATABUF(fcinfo);
 	length = FSYS_UDF_GET_BUFLEN(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_read");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == hFile) {
-		elog(WARNING, "get hdfsFile invalid in gpfs_hdfs_read");
+		elog(WARNING, "get hdfsFile invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == buf) {
-		elog(WARNING, "get buffer invalid in gpfs_hdfs_read");
+		elog(WARNING, "get buffer invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (length < 0) { /* TODO liugd: or <= 0 ? */
-		elog(WARNING, "get length[%d] invalid in gpfs_hdfs_read", length);
+		elog(WARNING, "get length[%d] invalid in %s", length, __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -524,7 +524,7 @@ gpfs_hdfs_write(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_write outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -535,25 +535,25 @@ gpfs_hdfs_write(PG_FUNCTION_ARGS)
 	buf = FSYS_UDF_GET_DATABUF(fcinfo);
 	length = FSYS_UDF_GET_BUFLEN(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_write");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == hFile) {
-		elog(WARNING, "get hdfsFile invalid in gpfs_hdfs_write");
+		elog(WARNING, "get hdfsFile invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == buf) {
-		elog(WARNING, "get buffer invalid in gpfs_hdfs_write");
+		elog(WARNING, "get buffer invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (length < 0) { /* TODO liugd: or <= 0 ? */
-		elog(WARNING, "get length[%d] invalid in gpfs_hdfs_write", length);
+		elog(WARNING, "get length[%d] invalid in %s", length, __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -577,7 +577,7 @@ gpfs_hdfs_seek(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_seek outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
@@ -587,19 +587,20 @@ gpfs_hdfs_seek(PG_FUNCTION_ARGS)
 	hFile = FSYS_UDF_GET_HFILE(fcinfo);
 	pos = FSYS_UDF_GET_POS(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_seek");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
 	}
 	if (NULL == hFile) {
-		elog(WARNING, "get hdfsFile invalid in gpfs_hdfs_seek");
+		elog(WARNING, "get hdfsFile invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
 	}
 	if (pos < 0) {
-		elog(WARNING, "get pos["INT64_FORMAT"] invalid in gpfs_hdfs_seek", pos);
+		elog(WARNING, "get pos["INT64_FORMAT"] invalid in %s", 
+            pos, __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
@@ -622,7 +623,7 @@ gpfs_hdfs_tell(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_tell outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
@@ -631,13 +632,13 @@ gpfs_hdfs_tell(PG_FUNCTION_ARGS)
 	hdfs = FSYS_UDF_GET_HDFS(fcinfo);
 	hFile = FSYS_UDF_GET_HFILE(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_tell");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
 	}
 	if (NULL == hFile) {
-		elog(WARNING, "get hdfsFile invalid in gpfs_hdfs_tell");
+		elog(WARNING, "get hdfsFile invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
@@ -662,7 +663,7 @@ gpfs_hdfs_truncate(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_truncate outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -672,19 +673,19 @@ gpfs_hdfs_truncate(PG_FUNCTION_ARGS)
 	path = FSYS_UDF_GET_PATH(fcinfo);
 	pos = FSYS_UDF_GET_POS(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_truncate");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == path) {
-		elog(WARNING, "get hdfsFile invalid in gpfs_hdfs_truncate");
+		elog(WARNING, "get hdfsFile invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (pos < 0) {
-		elog(WARNING, "get pos["INT64_FORMAT"] invalid in gpfs_hdfs_truncate", pos);
+		elog(WARNING, "get pos["INT64_FORMAT"] invalid in %s", pos, __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -717,7 +718,7 @@ gpfs_hdfs_getpathinfo(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_getpathinfo outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -726,13 +727,13 @@ gpfs_hdfs_getpathinfo(PG_FUNCTION_ARGS)
 	hdfs = FSYS_UDF_GET_HDFS(fcinfo);
 	path = FSYS_UDF_GET_PATH(fcinfo);
 	if (NULL == hdfs) {
-		elog(WARNING, "get hdfsFS invalid in gpfs_hdfs_getpathinfo");
+		elog(WARNING, "get hdfsFS invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
 	}
 	if (NULL == path) {
-		elog(WARNING, "get file path invalid in gpfs_hdfs_getpathinfo");
+		elog(WARNING, "get file path invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT32(retval);
@@ -757,7 +758,7 @@ gpfs_hdfs_freefileinfo(PG_FUNCTION_ARGS)
 
 	/* Must be called via the filesystem manager */
 	if (!CALLED_AS_GPFILESYSTEM(fcinfo)) {
-		elog(WARNING, "cannot execute gpfs_hdfs_freefileinfo outside filesystem manager");
+		elog(WARNING, "cannot execute %s outside filesystem manager", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
@@ -766,13 +767,13 @@ gpfs_hdfs_freefileinfo(PG_FUNCTION_ARGS)
 	fileinfo = FSYS_UDF_GET_FILEINFO(fcinfo);
 	numEntries = FSYS_UDF_GET_FILEINFONUM(fcinfo);
 	if (NULL == fileinfo) {
-		elog(WARNING, "get hdfsFileInfo invalid in gpfs_hdfs_freefileinfo");
+		elog(WARNING, "get hdfsFileInfo invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
 	}
 	if (numEntries < 0) {
-		elog(WARNING, "get hdfsFileInfo numEntries invalid in gpfs_hdfs_freefileinfo");
+		elog(WARNING, "get hdfsFileInfo numEntries invalid in %s", __func__);
 		retval = -1;
 		errno = EINVAL;
 		PG_RETURN_INT64(retval);
