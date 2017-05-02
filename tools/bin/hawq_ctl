@@ -909,9 +909,16 @@ class HawqStop:
                       (source_hawq_env, self.GPHOME, self.segment_data_directory, log_filename)
             return cmd_str
         else:
+            # If stop cluster, firstly master stopped, then segment maybe hung at recv() from master.
+            # So here change segment stop mode from smart to fast, so that segment don't wait
+            # connection from master to be closed.
+            seg_stop_mod = self.stop_mode
+            if(self.node_type == 'cluster' and seg_stop_mod =='smart'):
+                seg_stop_mod = 'fast'
+
             cmd_str = "%s; %s/bin/pg_ctl stop -w -t %s -D %s -l %s/pg_log/startup.log -m %s >> %s" % \
                       (source_hawq_env, self.GPHOME, self.timeout, self.segment_data_directory,
-                       self.segment_data_directory, self.stop_mode, log_filename)
+                       self.segment_data_directory, seg_stop_mod, log_filename)
             return cmd_str
 
     def _stop_segment(self):
