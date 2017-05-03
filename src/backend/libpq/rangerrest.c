@@ -26,6 +26,8 @@
  */
 #include "utils/rangerrest.h"
 #include "utils/hsearch.h"
+#include "cdb/cdbvars.h"
+
 /*
  * A mapping from AclObjectKind to string
  */
@@ -399,11 +401,11 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	StringInfoData tname;
 	initStringInfo(&tname);
 	appendStringInfo(&tname, "http://");
-	appendStringInfo(&tname, "%s", rps_addr_host);
+	appendStringInfo(&tname, "%s", master_addr_host);
 	appendStringInfo(&tname, ":");
 	appendStringInfo(&tname, "%d", rps_addr_port);
 	appendStringInfo(&tname, "/");
-	appendStringInfo(&tname, "%s", rps_addr_suffix);
+	appendStringInfo(&tname, "%s", "rps");
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
 	pfree(tname.data);	
 
@@ -425,8 +427,8 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	/* check for errors */
 	if(res != CURLE_OK)
 	{
-		elog(ERROR, "ranger plugin service from http://%s:%d/%s is unavailable : %s.\n",
-				rps_addr_host, rps_addr_port, rps_addr_suffix, curl_easy_strerror(res));
+		elog(ERROR, "ranger plugin service from http://%s:%d/rps is unavailable : %s.\n",
+				master_addr_host, rps_addr_port, curl_easy_strerror(res));
 	}
 	else
 	{

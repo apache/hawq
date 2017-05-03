@@ -74,7 +74,7 @@ def get_guc_value(guc):
 def check_rps_status(master_or_standby):
     hawq_rps_address_host = get_guc_value(master_or_standby)
     hawq_rps_address_port = get_guc_value("hawq_rps_address_port")
-    hawq_rps_address_suffix = get_guc_value("hawq_rps_address_suffix")
+    hawq_rps_address_suffix = "rps"
     params = ["curl --connect-timeout 2 http://", hawq_rps_address_host.strip(), ":", hawq_rps_address_port.strip(), "/", hawq_rps_address_suffix.strip(), "/version"]
     check_cmd = ''.join(params)
     status, output = commands.getstatusoutput(check_cmd)
