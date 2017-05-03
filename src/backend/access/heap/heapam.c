@@ -1269,6 +1269,14 @@ relation_close(Relation relation, LOCKMODE lockmode)
 }
 
 
+void
+relation_close_at_resource_owner(Relation relation, LOCKMODE lockmode, ResourceOwner resowner)
+{
+	ResourceOwner oldOwner = CurrentResourceOwner;
+	CurrentResourceOwner = resowner;
+	relation_close(relation, lockmode);
+	CurrentResourceOwner = oldOwner;
+}
 /* ----------------
  *		heap_open - open a heap relation by relation OID
  *
