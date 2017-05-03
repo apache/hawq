@@ -784,8 +784,6 @@ bool gp_called_by_pgdump = false;
 
 char   *acl_type;
 
-char   *rps_addr_host;
-char   *rps_addr_suffix;
 int     rps_addr_port;
 
 /*
@@ -8178,24 +8176,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&master_addr_host,
 		"localhost", NULL, NULL
-	},
-
-	{
-		{"hawq_rps_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
-			gettext_noop("ranger plugin server address hostname"),
-			NULL
-		},
-		&rps_addr_host,
-		"localhost", NULL, NULL
-	},
-
-	{
-		{"hawq_rps_address_suffix", PGC_POSTMASTER, PRESET_OPTIONS,
-			gettext_noop("ranger plugin server suffix of restful service address"),
-			NULL
-		},
-		&rps_addr_suffix,
-		"rps", NULL, NULL
 	},
 
 	{

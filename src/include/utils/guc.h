@@ -457,11 +457,7 @@ extern bool	optimizer_partition_selection_log;
 /* acl type for privileges check */
 extern char   *acl_type;
 
-/**
- * rps host and port
- */
-extern char   *rps_addr_host;
-extern char   *rps_addr_suffix;
+/* rps port*/
 extern int     rps_addr_port;
 /*
  * During insertion in a table with parquet partitions,
