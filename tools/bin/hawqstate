@@ -142,7 +142,7 @@ def show_brief_status(hawq_site, segment_list, standby_host):
     logger.info("-   Current HAWQ acl type                          = %s" % hawq_acl_type)
     if hawq_acl_type == "ranger":
         hawq_master_rps_status = check_rps_status('hawq_master_address_host')
-        logger.info("-   HAWQ master  Ranger plugin service state       = %s" % hawq_master_rps_status)
+        logger.info("-   HAWQ master Ranger plugin service state        = %s" % hawq_master_rps_status)
         if 'hawq_standby_address_host' in hawq_site.hawq_dict:
             hawq_standby_rps_status = check_rps_status('hawq_standby_address_host')
             logger.info("-   HAWQ standby Ranger plugin service state       = %s" % hawq_standby_rps_status)
