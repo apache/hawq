@@ -739,16 +739,16 @@ class HawqStart:
             logger.info("Segments started successfully")
         return node_init.return_flag
 
-    def _start_rps(self, master_or_standby):
-        logger.info("Start ranger plugin service on %s" % master_or_standby)
+    def _start_rps(self, rps_hostname):
+        logger.info("Start ranger plugin service on %s" % rps_hostname)
         cmd_str = "%s/ranger/bin/rps.sh start" % (self.GPHOME)
-        result = remote_ssh(cmd_str, master_or_standby, self.user)
+        result = remote_ssh(cmd_str, rps_hostname, self.user)
         return result
 
-    def start_rps(self, master_or_standby):
-        check_return_code(self._start_rps(master_or_standby), logger, \
-                          "Ranger plugin service start on %s failed, exit" % master_or_standby, \
-                          "Ranger plugin service started on %s successfully" % master_or_standby)
+    def start_rps(self, rps_hostname):
+        check_return_code(self._start_rps(rps_hostname), logger, \
+                          "Ranger plugin service start on %s failed, exit" % rps_hostname, \
+                          "Ranger plugin service started on %s successfully" % rps_hostname)
 
     def run(self):
         if self.node_type == "master":
@@ -1046,7 +1046,7 @@ class HawqStop:
         return total_return_flag
 
 
-    def _stop_rps(self, master_or_standby, acl_type):
+    def _stop_rps(self, rps_hostname, acl_type):
         if self.hawq_reload:
             # not stop RPS when running 'hawq stop --reload'.
             return
@@ -1054,13 +1054,13 @@ class HawqStop:
         if acl_type == 'unknown':
             logger.warning("Try to stop RPS when hawq_acl_type is unknown")
             check_ret = False
-        logger.info("Stop ranger plugin service on %s" % master_or_standby)
+        logger.info("Stop ranger plugin service on %s" % rps_hostname)
         cmd_str = "%s/ranger/bin/rps.sh stop" % (self.GPHOME)
-        result = remote_ssh(cmd_str, master_or_standby, self.user)
+        result = remote_ssh(cmd_str, rps_hostname, self.user)
         if check_ret:
             check_return_code(result, logger, \
-                          "Ranger plugin service stop failed on %s, exit" % master_or_standby, \
-                          "Ranger plugin service stopped on %s successfully" % master_or_standby)
+                          "Ranger plugin service stop failed on %s, exit" % rps_hostname, \
+                          "Ranger plugin service stopped on %s successfully" % rps_hostname)
 
     def run(self):
         if self.node_type == "master":
