@@ -4471,7 +4471,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 * NOTE: we init entrydb as QE
 	 */
 	if (MyProcPort == NULL ||
-	    (AmIMaster() && Gp_role != GP_ROLE_EXECUTE) || AmIStandby() ||
+	    AmIMaster() || AmIStandby() ||
 	    MyProcPort->bootstrap_user == NULL){
 		am_superuser = InitPostgres(dbname, InvalidOid, username, NULL);
 	}

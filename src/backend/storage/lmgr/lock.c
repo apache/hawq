@@ -1019,7 +1019,6 @@ LockCheckConflicts(LockMethod lockMethodTable,
 				   PGPROC *proc)
 {
 	int			numLockModes = lockMethodTable->numLockModes;
-	LOCKMASK	myLocks;
 	LOCKMASK	otherLocks;
 	int			i;
 
@@ -1043,13 +1042,51 @@ LockCheckConflicts(LockMethod lockMethodTable,
 	 * to construct a conflict mask that does not reflect our own locks, but
 	 * only lock types held by other processes.
 	 */
-	myLocks = proclock->holdMask;
 	otherLocks = 0;
 	for (i = 1; i <= numLockModes; i++)
 	{
-		int			myHolding = (myLocks & LOCKBIT_ON(i)) ? 1 : 0;
+		int				ourHolding = 0;
 
-		if (lock->granted[i] > myHolding)
+		/*
+		 * If I'm not part of MPP session, consider I am only one process
+		 * in a session.
+		 */
+		if (proc->mppSessionId <= 0)
+		{
+			LOCKMASK	myLocks = proclock->holdMask;
+			if (myLocks & LOCKBIT_ON(i))
+				ourHolding = 1;
+		}
+		else
+		{
+			SHM_QUEUE	   *procLocks = &(lock->procLocks);
+			PROCLOCK	   *otherProclock =
+					(PROCLOCK *) SHMQueueNext(procLocks, procLocks,
+											  offsetof(PROCLOCK, lockLink));
+			/*
+			 * Go through the proclock queue in the lock.  otherProclock
+			 * may be this process itself.
+			 */
+			while (otherProclock)
+			{
+				PGPROC	   *otherProc = otherProclock->tag.myProc;
+
+				/*
+				 * If processes in my session are holding the lock, mask
+				 * it out so that we won't be blocked by them.
+				 */
+				if (otherProc->mppSessionId == proc->mppSessionId &&
+					otherProclock->holdMask & LOCKBIT_ON(i))
+					ourHolding++;
+
+				otherProclock =
+					(PROCLOCK *) SHMQueueNext(procLocks,
+											  &otherProclock->lockLink,
+											  offsetof(PROCLOCK, lockLink));
+			}
+		}
+
+		if (lock->granted[i] > ourHolding)
 			otherLocks |= LOCKBIT_ON(i);
 	}
 

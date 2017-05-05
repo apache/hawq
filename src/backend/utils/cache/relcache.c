@@ -1344,8 +1344,7 @@ RelationInitPhysicalAddr(Relation relation)
 	if (relation->rd_rel->relisshared)
 		relation->rd_node.dbNode = InvalidOid;
 	else if (relation->rd_id < FirstNormalObjectId ||
-			(AmActiveMaster() && Gp_role != GP_ROLE_EXECUTE) ||
-			AmStandbyMaster())
+			AmActiveMaster() || AmStandbyMaster())
 		relation->rd_node.dbNode = MyDatabaseId;
 	else
 		relation->rd_node.dbNode = MyProcPort->dboid;
