@@ -41,19 +41,20 @@
 #include "postgres.h"
 
 #include "executor/executor.h"
-#include "executor/nodeMaterial.h"
 #include "executor/instrument.h"        /* Instrumentation */
 #include "utils/tuplestorenew.h"
-
+#include "executor/nodeMaterial.h"
 #include "miscadmin.h"
 
 #include "cdb/cdbvars.h"
+#include "postmaster/primary_mirror_mode.h"
+
 
 static void ExecMaterialExplainEnd(PlanState *planstate, struct StringInfoData *buf);
 static void ExecChildRescan(MaterialState *node, ExprContext *exprCtxt);
 static void DestroyTupleStore(MaterialState *node);
 static void ExecMaterialResetWorkfileState(MaterialState *node);
-
+static void mkLockFileForWriter(int size, int share_id, char * name);
 
 /* ----------------------------------------------------------------
  *		ExecMaterial
@@ -115,6 +116,7 @@ ExecMaterial(MaterialState *node)
 
 			ts = ntuplestore_create_readerwriter(rwfile_prefix, PlanStateOperatorMemKB((PlanState *)node) * 1024, true);
 			tsa = ntuplestore_create_accessor(ts, true);
+			mkLockFileForWriter(MAXPGPATH, ma->share_id, "writer");
 		}
 		else
 		{
@@ -759,3 +761,30 @@ ExecEagerFreeMaterial(MaterialState *node)
 	}
 }
 
+
+/*
+ * mkLockFileForWriter
+ *
+ * Create a unique lock file for writer, then use flock() to lock/unlock the lock file.
+ * We can make sure the lock file will be locked forerver until the writer process quits.
+ */
+static void mkLockFileForWriter(int size, int share_id, char * name)
+{
+	char *lock_file;
+	int lock;
+
+	lock_file = (char *)palloc0(size);
+	generate_lock_file_name(lock_file, size, share_id, name);
+	elog(DEBUG3, "The lock file for writer in SISC is %s", lock_file);
+	sisc_writer_lock_fd = open(lock_file, O_CREAT, S_IRWXU);
+	if(sisc_writer_lock_fd < 0)
+	{
+		elog(ERROR, "Could not create lock file %s for writer in SISC. The error number is %d", lock_file, errno);
+	}
+	lock = flock(sisc_writer_lock_fd, LOCK_EX | LOCK_NB);
+	if(lock == -1)
+		elog(DEBUG3, "Could not lock lock file  \"%s\" for writer in SISC . The error number is %d", lock_file, errno);
+	else if(lock == 0)
+		elog(LOG, "Successfully locked lock file  \"%s\" for writer in SISC.", lock_file);
+	pfree(lock_file);
+}
