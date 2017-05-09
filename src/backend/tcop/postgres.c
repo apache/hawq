@@ -4436,6 +4436,8 @@ PostgresMain(int argc, char *argv[], const char *username)
 			elog(ERROR, "initialize global curl context failed.");
 		}
 		curl_context_ranger.hasInited = true;
+		curl_context_ranger.talkingWithStandby = false;
+		curl_context_ranger.lastCheckTimestamp = 0;
 		curl_context_ranger.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
 		curl_context_ranger.response.buffer_size = CURL_RES_BUFFER_SIZE;
 		elog(RANGER_LOG, "initialize global curl context for privileges check.");
