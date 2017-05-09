@@ -20,7 +20,7 @@
 #
 
 function usage() {
-  echo "USAGE: enable-ranger-plugin.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password -h hawq_host:hawq_port -w hawq_user -q hawq_password"
+  echo "USAGE: enable-ranger-plugin.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password [-h hawq_host:hawq_port] -w hawq_user -q hawq_password"
   exit 1
 }
 
@@ -70,14 +70,41 @@ function get_ranger_password() {
   done
 }
 
+# get property value from hawq-site.xml
+function get_hawq_property() {
+  local hawq_site_file="$HAWQ_DIR/etc/hawq-site.xml"
+  local tag=$1
+  local value=''
+  if [ -f $hawq_site_file ] ; then
+    value=`cat $hawq_site_file | tr '\n' ' ' | awk -F '<property>' '{ for(i = 1; i <= NF; i++) { print $i; } }' | grep $tag | sed -n 's|.*<value>\(.*\)</value>.*|\1|p'`
+  fi
+  echo $value
+}
+
 function get_hawq_url() {
-  #todo read hawq-site.xml ?
+
+  # get hawq master host and port
+  # 1. read from command parameter -h
+  # 2. read from hawq-site.xml
+  if [[ -z "$HAWQ_URL" ]]; then
+    local host=$(get_hawq_property hawq_master_address_host)
+    local port=$(get_hawq_property hawq_master_address_port)
+
+    if [[ -z "$host" || -z "$port" ]]; then
+      HAWQ_URL=''
+    else
+      HAWQ_URL="$host:$port"
+    fi
+  fi
+
+  # 3. read from user input
   local default=`hostname -f`
   default="${default}:5432"
   while [[ -z "$HAWQ_URL" ]]
   do
     HAWQ_URL=$(read_value "HAWQ Master host and port [${default}]")
   done
+
   local prefix="http://"
   HAWQ_URL=${HAWQ_URL#$prefix}
   local parts=(${HAWQ_URL//:/ })
@@ -86,6 +113,7 @@ function get_hawq_url() {
   fi
   HAWQ_HOST=${parts[0]}
   HAWQ_PORT=${parts[1]}
+
 }
 
 function get_hawq_user() {
@@ -95,7 +123,6 @@ function get_hawq_user() {
     HAWQ_USER=$(read_value "HAWQ user name [${default}]")
   done
 }
-
 function get_hawq_password() {
   while [[ -z "$HAWQ_PASSWORD" ]]
   do
@@ -105,7 +132,7 @@ function get_hawq_password() {
 }
 
 function parse_params() {
-  while [[ $# -gt 0 ]] 
+  while [[ $# -gt 0 ]]
   do
     key="$1"
     case $key in
@@ -148,13 +175,13 @@ function validate_params() {
   get_hawq_url
   get_hawq_user
   get_hawq_password
-  echo "RANGER URL  = ${RANGER_URL}" 
-  echo "RANGER User = ${RANGER_USER}" 
+  echo "RANGER URL  = ${RANGER_URL}"
+  echo "RANGER User = ${RANGER_USER}"
   echo "RANGER Password = $(mask ${RANGER_PASSWORD})"
   echo "HAWQ HOST = ${HAWQ_HOST}"
-  echo "HAWQ PORT = ${HAWQ_PORT}"  
-  echo "HAWQ User = ${HAWQ_USER}" 
-  echo "HAWQ Password = $(mask ${HAWQ_PASSWORD})" 
+  echo "HAWQ PORT = ${HAWQ_PORT}"
+  echo "HAWQ User = ${HAWQ_USER}"
+  echo "HAWQ Password = $(mask ${HAWQ_PASSWORD})"
 }
 
 function check_hawq_service_definition() {
@@ -174,7 +201,7 @@ function create_hawq_service_definition() {
       fail "Creation of HAWQ service definition from ${json_file} in Ranger Admin at ${RANGER_URL} failed. ${output}"
     fi
   else
-    echo "HAWQ service definition already exists in Ranger Admin, nothing to do." 
+    echo "HAWQ service definition already exists in Ranger Admin, nothing to do."
   fi
 }
 
@@ -238,6 +265,7 @@ main() {
     usage
   fi
   SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd -P)"
+  HAWQ_DIR="$SCRIPT_DIR/../.."
   parse_params "$@"
   validate_params
   create_hawq_service_definition
