@@ -23,8 +23,6 @@
 # make `all' the default target
 all:
 
-feature-test:
-
 # Delete target files if the command fails after it has
 # started to update the file.
 .DELETE_ON_ERROR:
