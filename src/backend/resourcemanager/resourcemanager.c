@@ -69,7 +69,7 @@ extern bool FindMyDatabase(const char *name, Oid *db_id, Oid *db_tablespace);
 static char *probeDatabase = "template1";
 
 /* Bitmap to monitor segment health info (up/down). */
-bits8 *shm_segment_status;
+static bits8 *shm_segment_status;
 void MarkSegmentUp(int x);
 void MarkSegmentDown(int x);
 

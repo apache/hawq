@@ -170,9 +170,12 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		size = add_size(size, PersistentRelfile_ShmemSize());
 		size = add_size(size, Pass2Recovery_ShmemSize());
 		size = add_size(size, FSCredShmemSize());
-		size = add_size(size, SegmentStatus_ShmSize());
+		if ((AmIMaster() || AmIStandby()) && Gp_role == GP_ROLE_DISPATCH) {
+			size = add_size(size, SegmentStatus_ShmSize());
+			elog(WARNING, "add_size %d on pid %d", (int)size, getpid());
+		}
 
-        if (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY)
+		if ((AmIMaster() || AmIStandby()) && (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY))
         {
             size = add_size(size, MetadataCache_ShmemSize());
             elog(LOG, "Metadata Cache Share Memory Size : %lu", MetadataCache_ShmemSize());
@@ -294,7 +297,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	PersistentRelation_ShmemInit();
 	PersistentRelfile_ShmemInit();
 	Pass2Recovery_ShmemInit();
-    if (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY)
+	if ((AmIMaster() || AmIStandby()) && (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY))
     {
         MetadataCache_ShmemInit();
     }
@@ -366,7 +369,9 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 
 	FSCredShmemInit();
 
-	SegmentStatusShmemInit();
+	if ((AmIMaster() || AmIStandby()) && Gp_role == GP_ROLE_DISPATCH)
+		SegmentStatusShmemInit();
+
 #ifdef EXEC_BACKEND
 
 	/*
