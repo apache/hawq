@@ -399,7 +399,8 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 			curl_handle->talkingWithStandby = false;
 			curl_handle->lastCheckTimestamp = 0;
 			elog(RANGER_LOG,
-					"master has been talking to standby RPS for a predefined period, try switching to master RPS");
+				"master has been talking to standby RPS for more than %d seconds, try switching to master RPS",
+				rps_check_local_interval);
 		}
 	}
 
@@ -426,8 +427,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 		appendStringInfo(&tname, "%s", curl_handle->talkingWithStandby?standby_addr_host:master_addr_host);
 		appendStringInfo(&tname, ":");
 		appendStringInfo(&tname, "%d", rps_addr_port);
-		appendStringInfo(&tname, "/");
-		appendStringInfo(&tname, "%s", "rps");
+		appendStringInfo(&tname, "/rps");
 		curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
 		pfree(tname.data);
 
