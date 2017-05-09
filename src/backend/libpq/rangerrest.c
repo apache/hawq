@@ -383,58 +383,100 @@ static size_t write_callback(char *contents, size_t size, size_t nitems,
 static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 {
 	int ret = -1;
+	int retry = 2;
 	CURLcode res;
 	Assert(request != NULL);
 
 	/*
-	 * Re-initializes all options previously set on a specified CURL handle
-	 * to the default values. This puts back the handle to the same state as
-	 * it was in when it was just created with curl_easy_init.It does not
-	 * change the following information kept in the handle: live connections,
-	 * the Session ID cache, the DNS cache, the cookies and shares.
+	 * If master is talking with standby RPS, for every predefined interval
+	 * (controlled by a GUC hawq_rps_check_local_interval) it will check if local RPS works now.
 	 */
-	curl_easy_reset(curl_handle->curl_handle);
-	/* timeout: hard-coded temporarily and maybe should be a guc in future */
-	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_TIMEOUT, 30L);
-
-	/* specify URL to get */
-	StringInfoData tname;
-	initStringInfo(&tname);
-	appendStringInfo(&tname, "http://");
-	appendStringInfo(&tname, "%s", master_addr_host);
-	appendStringInfo(&tname, ":");
-	appendStringInfo(&tname, "%d", rps_addr_port);
-	appendStringInfo(&tname, "/");
-	appendStringInfo(&tname, "%s", "rps");
-	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
-	pfree(tname.data);	
-
-	struct curl_slist *headers = NULL;
-	headers = curl_slist_append(headers, "Content-Type:application/json");
-	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_HTTPHEADER, headers);
-
-	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_POSTFIELDS,request);
-	/* send all data to this function  */
-	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_WRITEFUNCTION, write_callback);
-	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_WRITEDATA, (void *)curl_handle);
-
-	res = curl_easy_perform(curl_handle->curl_handle);
-	if(request_id == INT_MAX)
+	if (curl_handle->talkingWithStandby)
 	{
-		request_id = 0;
+		uint64_t current_time = gettime_microsec();
+		if ((current_time - curl_handle->lastCheckTimestamp) > 1000000LL * rps_check_local_interval)
+		{
+			curl_handle->talkingWithStandby = false;
+			curl_handle->lastCheckTimestamp = 0;
+			elog(RANGER_LOG,
+				"master has been talking to standby RPS for more than %d seconds, try switching to master RPS",
+				rps_check_local_interval);
+		}
 	}
-	request_id++;
-	/* check for errors */
-	if(res != CURLE_OK)
+
+	/*
+	 * try to connect standby's RPS if fail in connecting master's RPS
+	 */
+	while(retry > 0 && ret != 0)
 	{
-		elog(ERROR, "ranger plugin service from http://%s:%d/rps is unavailable : %s.\n",
-				master_addr_host, rps_addr_port, curl_easy_strerror(res));
-	}
-	else
-	{
-		ret = 0;
-		elog(RANGER_LOG, "retrieved %d bytes data from ranger restful response.",
-			curl_handle->response.response_size);
+		/*
+		 * Re-initializes all options previously set on a specified CURL handle
+		 * to the default values. This puts back the handle to the same state as
+		 * it was in when it was just created with curl_easy_init.It does not
+		 * change the following information kept in the handle: live connections,
+		 * the Session ID cache, the DNS cache, the cookies and shares.
+		 */
+		curl_easy_reset(curl_handle->curl_handle);
+		/* timeout: hard-coded temporarily and maybe should be a guc in future */
+		curl_easy_setopt(curl_handle->curl_handle, CURLOPT_TIMEOUT, 30L);
+
+		/* specify URL to get */
+		StringInfoData tname;
+		initStringInfo(&tname);
+		appendStringInfo(&tname, "http://");
+		appendStringInfo(&tname, "%s", curl_handle->talkingWithStandby?standby_addr_host:master_addr_host);
+		appendStringInfo(&tname, ":");
+		appendStringInfo(&tname, "%d", rps_addr_port);
+		appendStringInfo(&tname, "/rps");
+		curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
+		pfree(tname.data);
+
+		struct curl_slist *headers = NULL;
+		headers = curl_slist_append(headers, "Content-Type:application/json");
+		curl_easy_setopt(curl_handle->curl_handle, CURLOPT_HTTPHEADER, headers);
+
+		curl_easy_setopt(curl_handle->curl_handle, CURLOPT_POSTFIELDS,request);
+		/* send all data to this function  */
+		curl_easy_setopt(curl_handle->curl_handle, CURLOPT_WRITEFUNCTION, write_callback);
+		curl_easy_setopt(curl_handle->curl_handle, CURLOPT_WRITEDATA, (void *)curl_handle);
+
+		res = curl_easy_perform(curl_handle->curl_handle);
+		if(request_id == INT_MAX)
+		{
+			request_id = 0;
+		}
+		request_id++;
+		/* check for errors */
+		if(res != CURLE_OK)
+		{
+			if (retry > 1)
+			{
+				elog(WARNING, "ranger plugin service from http://%s:%d/rps is unavailable : %s, try another http://%s:%d/rps\n",
+						curl_handle->talkingWithStandby?standby_addr_host:master_addr_host, rps_addr_port, curl_easy_strerror(res),
+						curl_handle->talkingWithStandby?master_addr_host:standby_addr_host, rps_addr_port);
+				curl_handle->talkingWithStandby = !curl_handle->talkingWithStandby;
+			}
+			else
+			{
+				elog(ERROR, "ranger plugin service from http://%s:%d/rps is unavailable : %s.\n",
+						curl_handle->talkingWithStandby?standby_addr_host:master_addr_host, rps_addr_port, curl_easy_strerror(res));
+			}
+		}
+		else
+		{
+			if (curl_handle->talkingWithStandby && curl_handle->lastCheckTimestamp == 0)
+			{
+				curl_handle->lastCheckTimestamp = gettime_microsec();
+			}
+			else if (!curl_handle->talkingWithStandby && curl_handle->lastCheckTimestamp != 0)
+			{
+				curl_handle->lastCheckTimestamp = 0;
+			}
+			ret = 0;
+			elog(RANGER_LOG, "retrieved %d bytes data from ranger restful response.",
+				curl_handle->response.response_size);
+		}
+		retry--;
 	}
 
 	return ret;

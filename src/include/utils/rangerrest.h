@@ -69,6 +69,8 @@ typedef struct curl_context_t
   char* last_http_reponse;
 
   bool hasInited;
+  bool talkingWithStandby;      /* if it is talking with standby RPS or not */
+  uint64_t lastCheckTimestamp;  /* last check timestamp for master RPS */
 } curl_context_t;
 
 typedef curl_context_t* CURL_HANDLE;
