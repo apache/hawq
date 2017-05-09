@@ -387,6 +387,10 @@ class HawqInit:
                  (self.GPHOME, self.standby_host_name, self.GPHOME)
         check_return_code(remote_ssh(scpcmd, self.master_host_name, self.user), \
                           logger, "Sync slaves file failed")
+        scpcmd = "scp %s/ranger/etc/* %s:%s/ranger/etc/ > /dev/null" % \
+                 (self.GPHOME, self.standby_host_name, self.GPHOME)
+        check_return_code(remote_ssh(scpcmd, self.master_host_name, self.user), \
+                          logger, "Sync rps configuration files failed")
 
         standby_init_cmd = self._get_standby_init_cmd()
 
