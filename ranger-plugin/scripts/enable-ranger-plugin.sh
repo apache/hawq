@@ -72,14 +72,13 @@ function get_ranger_password() {
 
 # get property value from hawq-site.xml
 function get_hawq_property() {
-  local hawq_site_file="$GPHOME/etc/hawq-site.xml"
-  tag=$1
-
+  local hawq_site_file="$HAWQ_DIR/etc/hawq-site.xml"
+  local tag=$1
+  local value=''
   if [ -f $hawq_site_file ] ; then
     value=`cat $hawq_site_file | tr '\n' ' ' | awk -F '<property>' '{ for(i = 1; i <= NF; i++) { print $i; } }' | grep $tag | sed -n 's|.*<value>\(.*\)</value>.*|\1|p'`
-  else
-    value=''
   fi
+  echo $value
 }
 
 function get_hawq_url() {
@@ -88,13 +87,9 @@ function get_hawq_url() {
   # 1. read from command parameter -h
   # 2. read from hawq-site.xml
   if [[ -z "$HAWQ_URL" ]]; then
-    value=''
-    get_hawq_property hawq_master_address_host
-    local host=$value
+    local host=$(get_hawq_property hawq_master_address_host)
+    local port=$(get_hawq_property hawq_master_address_port)
 
-    value=''
-    get_hawq_property hawq_master_address_port
-    local port=$value
 
     if [[ -z "$host" || -z "$port" ]]; then
       HAWQ_URL=''
@@ -124,9 +119,7 @@ fi
   # 1. read from command parameter -s
   # 2. read from hawq-site.xml
   if [[ -z "$HAWQ_STANDBY_HOST" ]]; then
-    value=''
-    get_hawq_property hawq_standby_address_host
-    local host=$value
+    local host=$(get_hawq_property hawq_standby_address_host)
 
     if [[ "$host" == "none" ]]; then
       HAWQ_STANDBY_HOST=''
@@ -134,12 +127,6 @@ fi
       HAWQ_STANDBY_HOST=$host
     fi
   fi
-
-  # 3. read from user input
-  while [[ -z "$HAWQ_STANDBY_HOST" ]]
-  do
-    HAWQ_STANDBY_HOST=$(read_value "HAWQ Standby host")
-  done
 }
 
 function get_hawq_user() {
@@ -158,11 +145,13 @@ function get_hawq_password() {
 }
 
 function sync_rps_configuration() {
-  if [[ -d $GPHOME/ranger/etc/ && ! -z $HAWQ_STANDBY_HOST ]]; then
-    cmd="scp $GPHOME/ranger/etc/* $HAWQ_STANDBY_HOST:$GPHOME/ranger/etc/"
+  local rps_conf_dir="$HAWQ_DIR/ranger/etc"
+  if [[ -d $rps_conf_dir && ! -z $HAWQ_STANDBY_HOST ]]; then
+    echo "Copying RPS configuration files to Standby."
+    cmd="scp $rps_conf_dir/* $HAWQ_STANDBY_HOST:$rps_conf_dir/"
     $cmd
-    if [ $? != 0 ]; then
-      fail "Scp RPS configuration files to Standby failed."
+    if [[ $? != 0 ]]; then
+      fail "scp RPS configuration files to Standby failed. Command [$cmd]"
     fi
   fi
 }
@@ -305,16 +294,14 @@ main() {
   if [[ $# -lt 1 ]]; then
     usage
   fi
-  if [[ -z "$GPHOME" ]]; then
-    GPHOME="/usr/local/hawq"
-  fi
   SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd -P)"
+  HAWQ_DIR="$SCRIPT_DIR/../.."
   parse_params "$@"
   validate_params
-  sync_rps_configuration
   create_hawq_service_definition
   create_hawq_service_instance
   update_ranger_url
   update_java_home
+  sync_rps_configuration
 }
 main "$@"
