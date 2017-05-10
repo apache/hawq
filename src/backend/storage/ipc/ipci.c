@@ -170,10 +170,9 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		size = add_size(size, PersistentRelfile_ShmemSize());
 		size = add_size(size, Pass2Recovery_ShmemSize());
 		size = add_size(size, FSCredShmemSize());
-		if ((AmIMaster() || AmIStandby()) && Gp_role == GP_ROLE_DISPATCH) {
+
+		if ((AmIMaster() || AmIStandby()) && (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY))
 			size = add_size(size, SegmentStatus_ShmSize());
-			elog(WARNING, "add_size %d on pid %d", (int)size, getpid());
-		}
 
 		if ((AmIMaster() || AmIStandby()) && (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY))
         {
@@ -369,7 +368,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 
 	FSCredShmemInit();
 
-	if ((AmIMaster() || AmIStandby()) && Gp_role == GP_ROLE_DISPATCH)
+	if ((AmIMaster() || AmIStandby()) && (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY))
 		SegmentStatusShmemInit();
 
 #ifdef EXEC_BACKEND
