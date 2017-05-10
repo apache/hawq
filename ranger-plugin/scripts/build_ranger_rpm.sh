@@ -16,38 +16,35 @@
 # specific language governing permissions and limitations
 # under the License.
 
+set -eox pipefail
+
 MVN_OPTS="-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -B -e"
 
-# Set HAWQ ranger-plugin rpm build number to 1 as default
-BUILD_NUMBER=1
-BUILD_OPTS="-Drelease.version=${BUILD_NUMBER}"
-BUILD_OPTS="${BUILD_OPTS} -Dbuild.suffix= -Dhawq.dep.name=apache-hawq"
-BUILD_OPTS="${BUILD_OPTS} -Ddestination.dir=/usr/local/apache-hawq/ranger"
+# Set HAWQ ranger-plugin rpm build number to 777 as default
+BUILD_NUMBER=${BUILD_NUMBER:-777}
 
 # Get current HAWQ releave version number.
-if [ -z "${HAWQ_RELEASE_VERSION}" ]; then
-    HAWQ_RELEASE_VERSION=$(cat ../getversion| grep ^GP_VERSION | cut -d '=' -f2 | sed 's|"||g' | cut -d '-' -f1)
+if [ -f ../getversion ] ; then
+  HAWQ_RELEASE_VERSION=$(cat ../getversion| grep ^GP_VERSION | cut -d '=' -f2 | sed 's|"||g' | cut -d '-' -f1)
+else
+  HAWQ_RELEASE_VERSION=$(mvn ${MVN_OPTS} org.apache.maven.plugins:maven-help-plugin:2.2:evaluate \
+                        -Dexpression=project.version | grep -Ev "^\[INFO\]")
 fi
+HAWQ_VERSION=${HAWQ_VERSION:-${HAWQ_RELEASE_VERSION}}
 
-# Set HAWQ ranger-plugin.
-mvn ${MVN_OPTS} versions:set -DnewVersion=${HAWQ_RELEASE_VERSION}
-if [ $? != 0 ]; then
-    echo "Set HAWQ ranger-plugin failed."
-    exit $?
-fi
+# Set build options
+HAWQ_DEP_NAME=${HAWQ_DEP_NAME:-apache-hawq}
+BUILD_SUFFIX=${BUILD_SUFFIX:-}
+BUILD_OPTS="-Drelease.version=${BUILD_NUMBER} -Dbuild.suffix=${BUILD_SUFFIX} -Dhawq.dep.name=${HAWQ_DEP_NAME}"
+
+# set plugin version
+mvn ${MVN_OPTS} versions:set -DnewVersion=${HAWQ_VERSION}
 
 # generate jar and war files.
 mvn ${MVN_OPTS} clean package
-if [ $? != 0 ]; then
-    echo "Generate HAWQ ranger-plugin jar and war files failed."
-    exit $?
-fi
 
 # build rpm
-mvn ${MVN_OPTS} -N ${BUILD_OPTS} install
-if [ $? != 0 ]; then
-    echo "Build HAWQ ranger-plugin rpm package failed."
-    exit $?
-fi
+mvn ${MVN_OPTS} -N ${BUILD_OPTS} rpm:rpm
 
-exit 0
+# verify the size of plugin rpm
+find target/rpm -name *.rpm | xargs ls -l
