@@ -20,7 +20,7 @@
 #
 
 function usage() {
-  echo "USAGE: enable-ranger-plugin.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password [-h hawq_host:hawq_port] [-s hawq_standby_host] -w hawq_user -q hawq_password"
+  echo "USAGE: enable-ranger-plugin.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password [-h hawq_host:hawq_port] -w hawq_user -q hawq_password"
   exit 1
 }
 
@@ -90,13 +90,12 @@ function get_hawq_url() {
     local host=$(get_hawq_property hawq_master_address_host)
     local port=$(get_hawq_property hawq_master_address_port)
 
-
     if [[ -z "$host" || -z "$port" ]]; then
       HAWQ_URL=''
     else
       HAWQ_URL="$host:$port"
     fi
-fi
+  fi
 
   # 3. read from user input
   local default=`hostname -f`
@@ -115,18 +114,6 @@ fi
   HAWQ_HOST=${parts[0]}
   HAWQ_PORT=${parts[1]}
 
-  # get hawq standby host
-  # 1. read from command parameter -s
-  # 2. read from hawq-site.xml
-  if [[ -z "$HAWQ_STANDBY_HOST" ]]; then
-    local host=$(get_hawq_property hawq_standby_address_host)
-
-    if [[ "$host" == "none" ]]; then
-      HAWQ_STANDBY_HOST=''
-    else
-      HAWQ_STANDBY_HOST=$host
-    fi
-  fi
 }
 
 function get_hawq_user() {
@@ -142,18 +129,6 @@ function get_hawq_password() {
     HAWQ_PASSWORD=$(read_password "HAWQ password")
     echo
   done
-}
-
-function sync_rps_configuration() {
-  local rps_conf_dir="$HAWQ_DIR/ranger/etc"
-  if [[ -d $rps_conf_dir && ! -z $HAWQ_STANDBY_HOST ]]; then
-    echo "Copying RPS configuration files to Standby."
-    cmd="scp $rps_conf_dir/* $HAWQ_STANDBY_HOST:$rps_conf_dir/"
-    $cmd
-    if [[ $? != 0 ]]; then
-      fail "scp RPS configuration files to Standby failed. Command [$cmd]"
-    fi
-  fi
 }
 
 function parse_params() {
@@ -175,10 +150,6 @@ function parse_params() {
         ;;
       -h)
         HAWQ_URL="$2"
-        shift
-        ;;
-      -s)
-        HAWQ_STANDBY_HOST="$2"
         shift
         ;;
       -w)
@@ -209,7 +180,6 @@ function validate_params() {
   echo "RANGER Password = $(mask ${RANGER_PASSWORD})"
   echo "HAWQ HOST = ${HAWQ_HOST}"
   echo "HAWQ PORT = ${HAWQ_PORT}"
-  echo "HAWQ STANDBY HOST = ${HAWQ_STANDBY_HOST}"
   echo "HAWQ User = ${HAWQ_USER}"
   echo "HAWQ Password = $(mask ${HAWQ_PASSWORD})"
 }
@@ -302,6 +272,5 @@ main() {
   create_hawq_service_instance
   update_ranger_url
   update_java_home
-  sync_rps_configuration
 }
 main "$@"
