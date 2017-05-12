@@ -241,6 +241,29 @@
     },
     {
       "itemId": 3,
+      "name": "authentication",
+      "type": "enum",
+      "subType": "authnType",
+      "mandatory": true,
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "HAWQ Authentication Type",
+      "defaultValue": "simple"
+    },
+    {
+      "itemId": 4,
+      "name": "principal",
+      "type": "string",
+      "mandatory": false,
+      "validationRegEx": "",
+      "validationMessage": "",
+      "uiHint": "",
+      "label": "HAWQ Kerberos Principal",
+      "defaultValue": ""
+    },
+    {
+      "itemId": 5,
       "name": "hostname",
       "type": "string",
       "mandatory": true,
@@ -250,7 +273,7 @@
       "label": "HAWQ Master Hostname"
     },
     {
-      "itemId": 4,
+      "itemId": 6,
       "name": "port",
       "type": "int",
       "mandatory": true,
@@ -261,7 +284,27 @@
       "defaultValue": 5432
     }
   ],
-  "enums": [],
+  "enums": 
+  [
+    {
+      "itemId": 1,
+      "name": "authnType",
+      "elements": 
+      [
+        {
+          "itemId": 1,
+          "name": "simple",
+          "label": "Simple"
+        },
+        {
+          "itemId": 2,
+          "name": "kerberos",
+          "label": "Kerberos"
+        }
+      ],
+      "defaultIndex": 0
+    }
+  ],
   "contextEnrichers": [],
   "policyConditions": [],
   "dataMaskDef": {},
