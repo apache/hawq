@@ -11,7 +11,7 @@ PostgreSQL documentation
 
  <refnamediv>
   <refname>ALTER SCHEMA</refname>
-  <refpurpose>change the definition of a schema</refpurpose>
+  <refpurpose>change the definition of a schema, which is not supported yet</refpurpose>
  </refnamediv>
 
  <indexterm zone="sql-alterschema">
