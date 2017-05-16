@@ -386,6 +386,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	int retry = 2;
 	CURLcode res;
 	Assert(request != NULL);
+	bool switchToMaster = false;
 
 	/*
 	 * If master is talking with standby RPS, for every predefined interval
@@ -401,6 +402,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 			elog(RANGER_LOG,
 				"master has been talking to standby RPS for more than %d seconds, try switching to master RPS",
 				rps_check_local_interval);
+			switchToMaster = true;
 		}
 	}
 
@@ -464,6 +466,11 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 		}
 		else
 		{
+			if (switchToMaster)
+			{
+				/* master's RPS has recovered, switch from standby's RPS to master's RPS */
+				elog(NOTICE, "switch from standby's RPS to master's RPS");
+			}
 			if (curl_handle->talkingWithStandby && curl_handle->lastCheckTimestamp == 0)
 			{
 				curl_handle->lastCheckTimestamp = gettime_microsec();
