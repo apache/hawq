@@ -1,0 +1,14 @@
+-- start_ignore
+SET SEARCH_PATH=TestHawqRanger_HcatalogTest;
+SET
+-- end_ignore
+set session role= 'userpxf1';
+SET
+select * from hcatalog.default.testhive;
+ a | b 
+---+---
+ 1 | 2
+ 2 | 4
+ 3 | 6
+(3 rows)
+

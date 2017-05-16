@@ -783,10 +783,8 @@ bool gp_plpgsql_clear_cache_always = false;
 bool gp_called_by_pgdump = false;
 
 char   *acl_type;
-
-char   *rps_addr_host;
-char   *rps_addr_suffix;
-int     rps_addr_port;
+int    rps_addr_port;
+int    rps_check_local_interval;
 
 /*
  * Displayable names for context types (enum GucContext)
@@ -6268,13 +6266,22 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-    {"hawq_rps_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
-      gettext_noop("ranger plugin server address port number"),
-      NULL
-    },
-    &rps_addr_port,
-    8432, 1, 65535, NULL, NULL
-  },
+		{"hawq_rps_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
+			gettext_noop("ranger plugin server address port number"),
+			NULL
+		},
+		&rps_addr_port,
+		8432, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_rps_check_local_interval", PGC_POSTMASTER, PRESET_OPTIONS,
+			gettext_noop("interval of checking master's RPS if talking with standby's RPS"),
+			NULL
+		},
+		&rps_check_local_interval,
+		300, 1, 65535, NULL, NULL
+	},
 
 	{
 		{"hawq_segment_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
@@ -8178,24 +8185,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&master_addr_host,
 		"localhost", NULL, NULL
-	},
-
-	{
-		{"hawq_rps_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
-			gettext_noop("ranger plugin server address hostname"),
-			NULL
-		},
-		&rps_addr_host,
-		"localhost", NULL, NULL
-	},
-
-	{
-		{"hawq_rps_address_suffix", PGC_POSTMASTER, PRESET_OPTIONS,
-			gettext_noop("ranger plugin server suffix of restful service address"),
-			NULL
-		},
-		&rps_addr_suffix,
-		"rps", NULL, NULL
 	},
 
 	{

@@ -1107,7 +1107,7 @@ BuildFlatFiles(bool database_only)
 		write_auth_time_file(rel_authid, rel_authtime);
 	}
 
-	CurrentResourceOwner = NULL;
+	CurrentResourceOwner = GetTopResourceOwner();
 	ResourceOwnerDelete(owner);
 
 	XLogCloseRelationCache();

@@ -13,6 +13,8 @@ AC_DEFUN([PGAC_CATALINA_HOME],
   dnl /usr/lib/bigtop-tomcat
   if test -x "${CATALINA_HOME}/bin/catalina.sh"; then
     TOMCAT="${CATALINA_HOME}"
+  elif test -x "/usr/local/Cellar/tomcat@6/6.0.45/libexec/bin/catalina.sh"; then
+    TOMCAT="/usr/local/Cellar/tomcat@6/6.0.45/libexec/"
   elif test -x "/usr/lib/bigtop-tomcat/bin/catalina.sh"; then
     TOMCAT="/usr/lib/bigtop-tomcat/"
   else

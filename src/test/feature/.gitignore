@@ -23,3 +23,5 @@ testlib/ans/template.ans
 testlib/sql/template.sql
 utility/ans/copytest.csv
 utility/ans/onek.data
+
+*.pyc

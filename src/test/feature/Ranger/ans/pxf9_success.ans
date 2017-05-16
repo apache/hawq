@@ -1,0 +1,12 @@
+-- start_ignore
+-- end_ignore
+set session role= 'userpxf5';
+SET
+select * from test_hbase;
+ recordkey | f1:col1 
+-----------+---------
+ r1        |     100
+(1 row)
+
+drop EXTERNAL TABLE test_hbase;
+DROP EXTERNAL TABLE

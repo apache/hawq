@@ -28,6 +28,7 @@ clean distclean maintainer-clean:
 	@for dir in $(WANTED_DIRS); do \
 		$(MAKE) -C $$dir $@ || true; \
 	done
+	$(MAKE) -C hawq-package $@
 
 # We'd like check operations to run all the subtests before failing.
 check installcheck: pgcrypto_prepare

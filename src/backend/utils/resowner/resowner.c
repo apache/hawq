@@ -70,6 +70,7 @@ typedef struct ResourceOwnerData
  *	  GLOBAL MEMORY															 *
  *****************************************************************************/
 
+static ResourceOwner TopResourceOwner = NULL;
 ResourceOwner CurrentResourceOwner = NULL;
 ResourceOwner CurTransactionResourceOwner = NULL;
 ResourceOwner TopTransactionResourceOwner = NULL;
@@ -94,22 +95,21 @@ static void ResourceOwnerReleaseInternal(ResourceOwner owner,
 							 bool isTopLevel);
 static void PrintRelCacheLeakWarning(Relation rel);
 static void PrintTupleDescLeakWarning(TupleDesc tupdesc);
-
-
+static ResourceOwner ResourceOwnerCreateInternal(ResourceOwner parent,
+					const char *name);
 /*****************************************************************************
  *	  EXPORTED ROUTINES														 *
  *****************************************************************************/
 
-
 /*
- * ResourceOwnerCreate
- *		Create an empty ResourceOwner.
+ * ResourceOwnerCreateInternal
+ *		Create an empty ResourceOwner. This is only internal usage.
  *
  * All ResourceOwner objects are kept in TopMemoryContext, since they should
  * only be freed explicitly.
  */
-ResourceOwner
-ResourceOwnerCreate(ResourceOwner parent, const char *name)
+static ResourceOwner
+ResourceOwnerCreateInternal(ResourceOwner parent, const char *name)
 {
 	ResourceOwner owner;
 
@@ -126,7 +126,35 @@ ResourceOwnerCreate(ResourceOwner parent, const char *name)
 
 	return owner;
 }
+/*
+ * GetTopResourceOwner
+ *		Get a singleton TopResourceOwner, if it doesn't exist, create a new ResourceOwner.
+ *
+ * It will register callback fucntion to delete it for process exits when it is created,
+ * so that we did not need to call it in every process.
+ */
+ResourceOwner
+GetTopResourceOwner()
+{
+	if(TopResourceOwner == NULL){
+	    TopResourceOwner = ResourceOwnerCreateInternal(NULL, "Default TopResourceOwner");
+	    /* Register to automatically delete TopResourceOwner when process exit */
+	    on_proc_exit(DeleteTopResourceOwner, 0);
+	}
 
+	return TopResourceOwner;
+}
+/*
+ * ResourceOwnerCreate
+ *
+ * If parent is NULL, we will set parent to TopResourceOwner, so that all resource owner can be
+ * traced by only one TopResourceOwner.
+ */
+ResourceOwner
+ResourceOwnerCreate(ResourceOwner parent, const char *name)
+{
+	return ResourceOwnerCreateInternal(parent == NULL?GetTopResourceOwner():parent, name);
+}
 /*
  * ResourceOwnerRelease
  *		Release all resources owned by a ResourceOwner and its descendants,
@@ -285,7 +313,7 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 		{
 			if (isCommit)
 				PrintCatCacheLeakWarning(owner->catrefs[owner->ncatrefs - 1],
-                                         owner->name);
+	                                     owner->name);
 			ReleaseCatCache(owner->catrefs[owner->ncatrefs - 1]);
 		}
 		/* Ditto for catcache lists */
@@ -293,7 +321,7 @@ ResourceOwnerReleaseInternal(ResourceOwner owner,
 		{
 			if (isCommit)
 				PrintCatCacheListLeakWarning(owner->catlistrefs[owner->ncatlistrefs - 1],
-                                             owner->name);
+	                                         owner->name);
 			ReleaseCatCacheList(owner->catlistrefs[owner->ncatlistrefs - 1]);
 		}
 		/* Ditto for tupdesc references */
@@ -363,6 +391,26 @@ ResourceOwnerDelete(ResourceOwner owner)
 	pfree(owner);
 }
 
+/*
+ * DeleteTopResourceOwner
+ *		Firstly release all resource, then Delete TopResourceOwner object and its descendants.
+ *
+ * This function can be called serveral times because it need to be registerred in a callback
+ * function, which may occurs serveral times.
+ */
+void
+DeleteTopResourceOwner()
+{
+	if(TopResourceOwner == NULL)
+	    return;
+
+	ResourceOwnerRelease(TopResourceOwner,
+	        RESOURCE_RELEASE_BEFORE_LOCKS,
+	        false, true);
+	CurrentResourceOwner = NULL;
+	ResourceOwnerDelete(TopResourceOwner);
+	TopResourceOwner = NULL;
+}
 /*
  * Fetch parent of a ResourceOwner (returns NULL if top-level owner)
  */

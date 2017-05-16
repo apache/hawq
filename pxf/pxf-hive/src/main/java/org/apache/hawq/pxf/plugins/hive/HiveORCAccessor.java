@@ -23,16 +23,24 @@ package org.apache.hawq.pxf.plugins.hive;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
+import org.apache.hadoop.hive.ql.io.orc.Reader;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
 import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hawq.pxf.api.BasicFilter;
 import org.apache.hawq.pxf.api.LogicalFilter;
+import org.apache.hawq.pxf.api.OneRow;
+import org.apache.hawq.pxf.api.StatsAccessor;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
+import org.apache.hawq.pxf.api.utilities.EnumAggregationType;
+import org.apache.hawq.pxf.api.utilities.FragmentMetadata;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.mapred.*;
 
+import java.io.IOException;
 import java.sql.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,7 +53,7 @@ import static org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities.PXF_HIVE_
  * This class replaces the generic HiveAccessor for a case where a table is stored entirely as ORC files.
  * Use together with {@link HiveInputFormatFragmenter}/{@link HiveColumnarSerdeResolver}
  */
-public class HiveORCAccessor extends HiveAccessor {
+public class HiveORCAccessor extends HiveAccessor implements StatsAccessor {
 
     private static final Log LOG = LogFactory.getLog(HiveORCAccessor.class);
 
@@ -53,6 +61,14 @@ public class HiveORCAccessor extends HiveAccessor {
     private final String READ_ALL_COLUMNS = "hive.io.file.read.all.columns";
     private final String READ_COLUMN_NAMES_CONF_STR = "hive.io.file.readcolumn.names";
     private final String SARG_PUSHDOWN = "sarg.pushdown";
+    protected Reader orcReader;
+
+    private boolean useStats;
+    private long count;
+    private long objectsEmitted;
+    private OneRow rowToEmitCount;
+
+    private boolean statsInitialized;
 
     /**
      * Constructs a HiveORCFileAccessor.
@@ -65,12 +81,21 @@ public class HiveORCAccessor extends HiveAccessor {
         HiveUserData hiveUserData = HiveUtilities.parseHiveUserData(input, PXF_HIVE_SERDES.ORC_SERDE);
         initPartitionFields(hiveUserData.getPartitionKeys());
         filterInFragmenter = hiveUserData.isFilterInFragmenter();
+        useStats = Utilities.useStats(this, inputData);
     }
 
     @Override
     public boolean openForRead() throws Exception {
-        addColumns();
-        addFilters();
+        if (useStats) {
+            orcReader = HiveUtilities.getOrcReader(inputData);
+            if (orcReader == null) {
+                return false;
+            }
+            objectsEmitted = 0;
+        } else {
+            addColumns();
+            addFilters();
+        }
         return super.openForRead();
     }
 
@@ -211,6 +236,52 @@ public class HiveORCAccessor extends HiveAccessor {
             }
         }
         return true;
+    }
+
+    /**
+     * Fetches file-level statistics from an ORC file.
+     */
+    @Override
+    public void retrieveStats() throws Exception {
+        if (!this.useStats) {
+            throw new IllegalStateException("Accessor is not using statistics in current context.");
+        }
+        /*
+         * We are using file-level stats therefore if file has multiple splits,
+         * it's enough to return count for a first split in file.
+         * In case file has multiple splits - we don't want to duplicate counts.
+         */
+        if (inputData.getFragmentIndex() == 0) {
+            this.count = this.orcReader.getNumberOfRows();
+            rowToEmitCount = readNextObject();
+        }
+        statsInitialized = true;
+
+    }
+
+    /**
+     * Emits tuple without reading from disk, currently supports COUNT
+     */
+    @Override
+    public OneRow emitAggObject() {
+        if(!statsInitialized) {
+            throw new IllegalStateException("retrieveStats() should be called before calling emitAggObject()");
+        }
+        OneRow row = null;
+        if (inputData.getAggType() == null)
+            throw new UnsupportedOperationException("Aggregate opration is required");
+        switch (inputData.getAggType()) {
+            case COUNT:
+                if (objectsEmitted < count) {
+                    objectsEmitted++;
+                    row = rowToEmitCount;
+                }
+                break;
+            default: {
+                throw new UnsupportedOperationException("Aggregation operation is not supported.");
+            }
+        }
+        return row;
     }
 
 }

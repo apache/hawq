@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include "storage/ipc.h"
 
 #include "dynrm.h"
 /*
@@ -41,9 +42,23 @@ static void cleanupSocketConnectionPool(int code, Datum arg);
 
 uint64_t gettime_microsec(void)
 {
-    static struct timeval t;
-    gettimeofday(&t,NULL);
-    return 1000000ULL * t.tv_sec + t.tv_usec;
+	struct timeval newTime;
+	int status = 1;
+	uint64_t t = 0;
+
+#if HAVE_LIBRT
+	struct timespec ts;
+	status = clock_gettime(CLOCK_MONOTONIC, &ts);
+	newTime.tv_sec = ts.tv_sec;
+	newTime.tv_usec = ts.tv_nsec / 1000;
+#endif
+
+	if (status != 0)
+	{
+		gettimeofday(&newTime, NULL);
+	}
+	t = ((uint64_t)newTime.tv_sec) * USECS_PER_SECOND + newTime.tv_usec;
+	return t;
 }
 
 int getHostIPV4AddressesByHostNameAsString(MCTYPE 	 		context,

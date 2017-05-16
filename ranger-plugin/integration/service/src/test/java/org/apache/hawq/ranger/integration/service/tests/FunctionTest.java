@@ -84,12 +84,12 @@ public class FunctionTest extends ComplexResourceTestBase {
     }
 
     @Override
-    protected Policy getResourceGroupPolicy() {
+    protected Policy getResourceGroupPolicy(String group) {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
                 .resource(schema, TEST_SCHEMA)
                 .resource(function, TEST_FUNCTION)
-                .groupAccess(PUBLIC_GROUP, privileges)
+                .groupAccess(group, privileges)
                 .build();
         return policy;
     }

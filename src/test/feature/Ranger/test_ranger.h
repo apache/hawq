@@ -33,12 +33,15 @@ public:
 	std::string initfile;
 
 	void clearEnv(hawq::test::SQLUtility* util, std::string case_name, int user_index);
-	void runSQLFile(hawq::test::SQLUtility* util, std::string case_name,
-			std::string ans_suffix, int sql_index = -1);
+	void runSQLFile(hawq::test::SQLUtility* util, std::string case_name, std::string ans_suffix, int sql_index = -1, 
+		bool usingDefaultSchema = false, bool printTupleOnly = false, bool focus_run = false);
 
 	void addPolicy(hawq::test::SQLUtility* util, std::string case_name, int policy_index);
 	void addUser(hawq::test::SQLUtility* util, std::string case_name, int user_index = -1, bool full_policy = false,
 			int writable_index = -1);
+	void delUser(hawq::test::SQLUtility* util, std::string case_name, int user_index);
+
+	std::string get_private_schema_name();
 };
 
 #endif

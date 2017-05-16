@@ -58,16 +58,16 @@ MACHINE := $(shell uname -m)
 all: pljava_all deploy_all c_all examples_all
 
 install: all c_install
-	$(mkinstalldirs) '$(datadir)/pljava'
-	$(mkinstalldirs) '$(pkglibdir)/java'
-	$(INSTALL_DATA) '$(TARGETDIR)/pljava.jar' '$(pkglibdir)/.'
-	$(INSTALL_DATA) '$(SQLDIR)/install.sql' '$(datadir)/pljava/.'
-	$(INSTALL_DATA) '$(SQLDIR)/uninstall.sql' '$(datadir)/pljava/.'
-	$(INSTALL_DATA) '$(SQLDIR)/examples.sql' '$(datadir)/pljava/.'
-	$(INSTALL_SCRIPT) '$(SQLDIR)/pljava_install.sh' '$(datadir)/pljava/.'
-	$(INSTALL_DATA) '$(TARGETDIR)/examples.jar' '$(datadir)/pljava/.'
-	$(INSTALL_DATA) '$(TARGETDIR)/examples.jar' '$(pkglibdir)/java/.'
-	$(INSTALL_DATA) '$(top_srcdir)/$(subdir)/COPYRIGHT' '$(datadir)/pljava/.'
+	$(mkinstalldirs) '$(DESTDIR)$(datadir)/pljava'
+	$(mkinstalldirs) '$(DESTDIR)$(pkglibdir)/java'
+	$(INSTALL_DATA) '$(TARGETDIR)/pljava.jar' '$(DESTDIR)$(pkglibdir)/.'
+	$(INSTALL_DATA) '$(SQLDIR)/install.sql' '$(DESTDIR)$(datadir)/pljava/.'
+	$(INSTALL_DATA) '$(SQLDIR)/uninstall.sql' '$(DESTDIR)$(datadir)/pljava/.'
+	$(INSTALL_DATA) '$(SQLDIR)/examples.sql' '$(DESTDIR)$(datadir)/pljava/.'
+	$(INSTALL_SCRIPT) '$(SQLDIR)/pljava_install.sh' '$(DESTDIR)$(datadir)/pljava/.'
+	$(INSTALL_DATA) '$(TARGETDIR)/examples.jar' '$(DESTDIR)$(datadir)/pljava/.'
+	$(INSTALL_DATA) '$(TARGETDIR)/examples.jar' '$(DESTDIR)$(pkglibdir)/java/.'
+	$(INSTALL_DATA) '$(top_srcdir)/$(subdir)/COPYRIGHT' '$(DESTDIR)$(datadir)/pljava/.'
 
 uninstall: c_uninstall
 	rm -f $(pkglibdir)/pljava.jar

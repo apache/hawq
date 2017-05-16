@@ -182,8 +182,13 @@ void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
 	inputData.quals = EXTPROTOCOL_GET_SCANQUALS(fcinfo);
 	inputData.filterstr = serializePxfFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
-	if (EXTPROTOCOL_GET_SELECTDESC(fcinfo))
+	if (EXTPROTOCOL_GET_SELECTDESC(fcinfo)) {
 		inputData.proj_info = EXTPROTOCOL_GET_PROJINFO(fcinfo);
+		int agg_type = EXTPROTOCOL_GET_AGG_TYPE(fcinfo);
+		if (agg_type) {
+			inputData.agg_type = agg_type;
+		}
+	}
 	add_delegation_token(&inputData);
 	
 	build_http_header(&inputData);
@@ -215,6 +220,7 @@ void set_current_fragment_headers(gphadoop_context* context)
 	churl_headers_override(context->churl_headers, "X-GP-DATA-DIR", frag_data->source_name);
 	churl_headers_override(context->churl_headers, "X-GP-DATA-FRAGMENT", frag_data->index);
 	churl_headers_override(context->churl_headers, "X-GP-FRAGMENT-METADATA", frag_data->fragment_md);
+	churl_headers_override(context->churl_headers, "X-GP-FRAGMENT-INDEX", frag_data->index);
 
 	if (frag_data->user_data)
 	{

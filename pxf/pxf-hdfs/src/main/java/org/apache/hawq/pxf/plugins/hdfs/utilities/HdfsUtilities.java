@@ -22,6 +22,7 @@ package org.apache.hawq.pxf.plugins.hdfs.utilities;
 
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.OneField;
+import org.apache.hawq.pxf.api.utilities.FragmentMetadata;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.avro.Schema;
@@ -30,7 +31,6 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.mapred.FsInput;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -171,29 +171,11 @@ public class HdfsUtilities {
      * @param inputData request input data
      * @return FileSplit with fragment metadata
      */
-    public static FileSplit parseFragmentMetadata(InputData inputData) {
+    public static FileSplit parseFileSplit(InputData inputData) {
         try {
-            byte[] serializedLocation = inputData.getFragmentMetadata();
-            if (serializedLocation == null) {
-                throw new IllegalArgumentException(
-                        "Missing fragment location information");
-            }
+            FragmentMetadata fragmentMetadata = Utilities.parseFragmentMetadata(inputData);
 
-            ByteArrayInputStream bytesStream = new ByteArrayInputStream(
-                    serializedLocation);
-            ObjectInputStream objectStream = new ObjectInputStream(bytesStream);
-
-            long start = objectStream.readLong();
-            long end = objectStream.readLong();
-
-            String[] hosts = (String[]) objectStream.readObject();
-
-            FileSplit fileSplit = new FileSplit(new Path(
-                    inputData.getDataSource()), start, end, hosts);
-
-            LOG.debug("parsed file split: path " + inputData.getDataSource()
-                    + ", start " + start + ", end " + end + ", hosts "
-                    + ArrayUtils.toString(hosts));
+            FileSplit fileSplit = new FileSplit(new Path(inputData.getDataSource()), fragmentMetadata.getStart(), fragmentMetadata.getEnd(), fragmentMetadata.getHosts());
 
             return fileSplit;
 

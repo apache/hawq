@@ -44,10 +44,10 @@ public class ProtocolTest extends SimpleResourceTestBase {
     }
 
     @Override
-    protected Policy getResourceGroupPolicy() {
+    protected Policy getResourceGroupPolicy(String group) {
         Policy policy = policyBuilder
                 .resource(protocol, TEST_PROTOCOL)
-                .groupAccess(PUBLIC_GROUP, privileges)
+                .groupAccess(group, privileges)
                 .build();
         return policy;
     }

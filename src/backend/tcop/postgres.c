@@ -4421,7 +4421,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	{
 		elog(ERROR, "invalid acl check type : %s.", acl_type);
 	}
-	elog(LOG, "acl check type is %s, the acl type value is %d.", acl_type, aclType);
+	elog(RANGER_LOG, "acl check type is %s, the acl type value is %d.", acl_type, aclType);
 	/* for acl_type is ranger*/
 	if (AmIMaster() && aclType == HAWQ_ACL_RANGER && !curl_context_ranger.hasInited)
 	{
@@ -4436,9 +4436,11 @@ PostgresMain(int argc, char *argv[], const char *username)
 			elog(ERROR, "initialize global curl context failed.");
 		}
 		curl_context_ranger.hasInited = true;
+		curl_context_ranger.talkingWithStandby = false;
+		curl_context_ranger.lastCheckTimestamp = 0;
 		curl_context_ranger.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
 		curl_context_ranger.response.buffer_size = CURL_RES_BUFFER_SIZE;
-		elog(DEBUG3, "initialize global curl context for privileges check.");
+		elog(RANGER_LOG, "initialize global curl context for privileges check.");
 		on_proc_exit(curl_finalize, 0);
 	}
 	/*
@@ -4469,7 +4471,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	 * NOTE: we init entrydb as QE
 	 */
 	if (MyProcPort == NULL ||
-	    (AmIMaster() && Gp_role != GP_ROLE_EXECUTE) || AmIStandby() ||
+	    AmIMaster() || AmIStandby() ||
 	    MyProcPort->bootstrap_user == NULL){
 		am_superuser = InitPostgres(dbname, InvalidOid, username, NULL);
 	}
@@ -5382,7 +5384,7 @@ curl_finalize(int code, Datum arg __MAYBE_UNUSED)
 		/* we're done with libcurl, so clean it up */
 		curl_global_cleanup();
 		curl_context_ranger.hasInited = false;
-		elog(DEBUG3, "finalize the global struct for curl handle context.");
+		elog(RANGER_LOG, "finalize the global struct for curl handle context.");
 	}
 }
 

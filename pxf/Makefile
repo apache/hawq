@@ -44,19 +44,20 @@ endif
 
 help:
 	@echo 
-	@echo"help it is then"
+	@echo "help it is then"
 	@echo   "Possible targets"
 	@echo	"  - all (clean, build, unittest, jar, tar, rpm)"
-	@echo	"  -  -  HD=<phd|hdp> - set classpath to match hadoop distribution. default phd"
+	@echo	"  -  -  HD=<hdp> - set classpath to match hadoop distribution. default will be apache hadoop compliant"
 	@echo	"  -  -  LICENSE=<license info> - add license info to created RPMs"
 	@echo	"  -  -  VENDOR=<vendor name> - add vendor name to created RPMs"
+	@echo	"  -  -  PLUGINS_EXCLUDE_RPM=plugin1, plugin2,... - do not build and RPM for given comma-separated list of plugins"
 	@echo	"  - tomcat - builds tomcat rpm from downloaded tarball"
 	@echo	"  -  -  LICENSE and VENDOR parameters can be used as well"
 	@echo	"  - deploy - setup PXF along with tomcat in the configured deployPath"
 	@echo	"  - doc - creates aggregate javadoc under docs"
 
-all: 
-	./gradlew clean release $(BUILD_PARAMS)
+all:
+	./gradlew clean release $(BUILD_PARAMS) $$(echo $$(for i in $$(echo ${PLUGINS_EXCLUDE_RPM} | sed 's/,/ /g'); do echo -x $$i:buildRpm ; done))
 	
 unittest:
 	./gradlew test
@@ -67,11 +68,14 @@ jar:
 tar:
 	./gradlew tar $(BUILD_PARAMS)
 
-rpm:
+rpm: tomcat
 	./gradlew rpm $(BUILD_PARAMS)
 	
 clean:
 	./gradlew clean
+	@rm -rf ./distributions/apache-tomcat*.rpm
+
+distclean maintainer-clean: clean
 
 doc:
 	./gradlew aggregateJavadoc 

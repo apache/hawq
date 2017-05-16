@@ -52,6 +52,8 @@ public class InputData {
     protected String remoteLogin;
     protected String remoteSecret;
     protected int dataFragment; /* should be deprecated */
+    private EnumAggregationType aggType;
+    private int fragmentIndex;
 
     /**
      * When false the bridge has to run in synchronized mode. default value -
@@ -71,6 +73,16 @@ public class InputData {
      * returned.
      */
     protected ColumnDescriptor recordkeyColumn;
+
+    /**
+     * Number of attributes projected in query.
+     *
+     * Example:
+     * SELECT col1, col2, col3... : number of attributes projected - 3
+     * SELECT col1, col2, col3... WHERE col4=a : number of attributes projected - 4
+     * SELECT *... : number of attributes projected - 0
+     */
+    protected int numAttrsProjected;
 
     /**
      * Constructs an empty InputData
@@ -333,6 +345,54 @@ public class InputData {
      */
     public int getDataFragment() {
         return dataFragment;
+    }
+
+    /**
+     * Returns aggregate type, i.e - count, min, max, etc
+     * @return aggregate type
+     */
+    public EnumAggregationType getAggType() {
+        return aggType;
+    }
+
+    /**
+     * Sets aggregate type, one of @see EnumAggregationType value
+     * @param aggType aggregate type
+     */
+    public void setAggType(EnumAggregationType aggType) {
+        this.aggType = aggType;
+    }
+
+    /**
+     * Returns index of a fragment in a file
+     * @return index of a fragment
+     */
+    public int getFragmentIndex() {
+        return fragmentIndex;
+    }
+
+    /**
+     * Sets index of a fragment in a file
+     * @param fragmentIndex index of a fragment
+     */
+    public void setFragmentIndex(int fragmentIndex) {
+        this.fragmentIndex = fragmentIndex;
+    }
+
+    /**
+     * Returns number of attributes projected in a query
+     * @return number of attributes projected
+     */
+    public int getNumAttrsProjected() {
+        return numAttrsProjected;
+    }
+
+    /**
+     * Sets number of attributes projected
+     * @param numAttrsProjected number of attrivutes projected
+     */
+    public void setNumAttrsProjected(int numAttrsProjected) {
+        this.numAttrsProjected = numAttrsProjected;
     }
 
 }

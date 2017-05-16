@@ -62,6 +62,10 @@ def pg_config(s):
         raise Exception("pg_config tool is not available.")
     if not d:
         raise Exception("Could not get %s information." % s)
+
+    DESTDIR = os.getenv('DESTDIR')
+    if DESTDIR:
+        d = DESTDIR + d
     return d
 
 def mk_include():

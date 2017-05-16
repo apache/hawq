@@ -1,0 +1,10 @@
+-- start_ignore
+SET SEARCH_PATH=TestHawqRanger_HcatalogTest;
+SET
+-- end_ignore
+set session role= 'userpxf1';
+SET
+select * from hcatalog.default.testhive;
+psql:/tmp/TestHawqRanger_PXFHcatalogTest.sql:5: ERROR:  permission denied for schema default
+LINE 1: select * from hcatalog.default.testhive;
+                      ^

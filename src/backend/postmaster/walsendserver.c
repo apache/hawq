@@ -306,8 +306,9 @@ WalSendServer_ServicePostmasterDied(void)
 		 */
 		ereport(LOG,
 				(errmsg("exiting because postmaster has died")));
-		proc_exit(1);
 	}
+
+	proc_exit(1);
 }
 
 //==============================================================================

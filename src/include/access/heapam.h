@@ -211,6 +211,7 @@ extern Relation try_relation_openrv(const RangeVar *relation, LOCKMODE lockmode,
 									bool noWait);
 
 extern void relation_close(Relation relation, LOCKMODE lockmode);
+extern void relation_close_at_resource_owner(Relation relation, LOCKMODE lockmode, ResourceOwner resowner);
 
 extern Relation heap_open(Oid relationId, LOCKMODE lockmode);
 extern Relation heap_openrv(const RangeVar *relation, LOCKMODE lockmode);

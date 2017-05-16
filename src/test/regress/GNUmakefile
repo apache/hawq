@@ -66,7 +66,7 @@ $(top_builddir)/src/port/pg_config_paths.h: $(top_builddir)/src/Makefile.global
 
 install: all installdirs
 	$(INSTALL_PROGRAM) pg_regress$(X) '$(DESTDIR)$(pgxsdir)/$(subdir)/pg_regress$(X)'
-	for file in *.pl ; do $(INSTALL_PROGRAM) $${file} ${bindir}; done
+	for file in *.pl ; do $(INSTALL_PROGRAM) $${file} $(DESTDIR)${bindir}; done
 
 uninstall:
 	rm -f '$(DESTDIR)$(pgxsdir)/$(subdir)/pg_regress$(X)'

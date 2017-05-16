@@ -62,26 +62,30 @@ def create_policy(policy_json_file_name, rangerhelper):
             policy_end_pos = response.find("], service=[")
             dup_policy_name = response[0:policy_end_pos]
             
-            #get dupulicate policy and add privilege item.
+            #get duplicate policy and add privilege item.
             service_name = 'hawq'
-            print dup_policy_name;
-            response, is_success = rangerhelper.get_policy(service_name, dup_policy_name);
-            response_dict = json.load(response)
-            for new_policy_item in json_decode['policyItems']:
-                response_dict["policyItems"].append(new_policy_item)
-            for new_policy_item in json_decode['denyPolicyItems']:
-                response_dict["denyPolicyItems"].append(new_policy_item)
-            for new_policy_item in json_decode['allowExceptions']:
-                response_dict["allowExceptions"].append(new_policy_item)
-            for new_policy_item in json_decode['denyExceptions']:
-                response_dict["denyExceptions"].append(new_policy_item)
+            print "find duplicate policy, try to update [%s]" % (dup_policy_name)
+            response, is_success = rangerhelper.get_policy(service_name, dup_policy_name)
+            if is_success:
+                response_dict = json.load(response)
+                for new_policy_item in json_decode['policyItems']:
+                    response_dict["policyItems"].append(new_policy_item)
+                for new_policy_item in json_decode['denyPolicyItems']:
+                    response_dict["denyPolicyItems"].append(new_policy_item)
+                for new_policy_item in json_decode['allowExceptions']:
+                    response_dict["allowExceptions"].append(new_policy_item)
+                for new_policy_item in json_decode['denyExceptions']:
+                    response_dict["denyExceptions"].append(new_policy_item)
+                response, is_success = rangerhelper.update_policy(service_name, dup_policy_name, \
+                    json.dumps(response_dict))
+            else:
+                return policyname, False
                 
-            rangerhelper.update_policy(service_name, dup_policy_name, \
-                                    json.dumps(response_dict));
-        return policyname
+        return policyname, is_success
 
 def delete_policy(delete_policy_name, rangerhelper):
-    rangerhelper.delete_policy("hawq", delete_policy_name);
+    response, is_success = rangerhelper.delete_policy("hawq", delete_policy_name)
+    return is_success
     
     
 if __name__ == '__main__':
@@ -96,12 +100,22 @@ if __name__ == '__main__':
     delete_policy_name = options.deletedpolicyname
     
     #init rangerresthelper
-    helper = RangerRestHelper(host, port, rangeruser, rangerpasswd);
+    helper = RangerRestHelper(host, port, rangeruser, rangerpasswd)
     
     if new_policy_json_file_name != "":
-        policyname = create_policy(new_policy_json_file_name, helper)
-        print "policy {} created".format(policyname)
+        policyname, is_success = create_policy(new_policy_json_file_name, helper)
+        if is_success:
+            print "policy {} created".format(policyname)
+        else:
+            print "policy {} create failed".format(policyname)
+            sys.exit(-1)
         
     if delete_policy_name != "":
-        delete_policy(delete_policy_name, helper)
-        print "policy {} deleted".format(delete_policy_name)
+        is_success = delete_policy(delete_policy_name, helper)
+        if is_success:
+            print "policy {} deleted".format(delete_policy_name)
+        else:
+            print "policy {} delete failed".format(delete_policy_name)
+            sys.exit(-1)
+
+    sys.exit(0)

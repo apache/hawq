@@ -60,7 +60,7 @@ PYGRESQL_DIR=PyGreSQL-$(PYGRESQL_VERSION)
 
 pygresql:
 	@echo "--- PyGreSQL"
-	cd $(PYLIB_SRC)/$(PYGRESQL_DIR) && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="-L$(top_builddir)/src/interfaces/libpq ${LDFLAGS}" python setup.py build
+	cd $(PYLIB_SRC)/$(PYGRESQL_DIR) && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="-L$(top_builddir)/src/interfaces/libpq ${LDFLAGS}" DESTDIR="${DESTDIR}" python setup.py build
 	mkdir -p $(PYLIB_DIR)/pygresql
 	cp -r $(PYLIB_SRC)/$(PYGRESQL_DIR)/build/lib.*/* $(PYLIB_DIR)/pygresql
 	touch $(PYLIB_DIR)/__init__.py
@@ -189,11 +189,11 @@ distclean: clean
 
 SKIP_INSTALL=.epydoc.config|.gitignore|.p4ignore|.rcfile|Makefile|generate-greenplum-path.sh
 install: all
-	${INSTALL_SCRIPT} -d ${bindir}
-	for files in `find * -maxdepth 0 -type f | grep -x -v -E "${SKIP_INSTALL}"`; do ${INSTALL_SCRIPT} $${files} ${bindir}; done
+	${INSTALL_SCRIPT} -d ${DESTDIR}${bindir}
+	for files in `find * -maxdepth 0 -type f | grep -x -v -E "${SKIP_INSTALL}"`; do ${INSTALL_SCRIPT} $${files} ${DESTDIR}${bindir}; done
 	${MAKE} -C gppylib $@
 	${MAKE} -C hawqpylib $@
 	${MAKE} -C ext $@
-	${INSTALL_SCRIPT} -d ${bindir}/lib
-	for files in `find lib -type f`; do ${INSTALL_SCRIPT} $${files} ${bindir}/lib; done
-	unset LIBPATH; ./generate-greenplum-path.sh $(prefix) > ${prefix}/greenplum_path.sh
+	${INSTALL_SCRIPT} -d ${DESTDIR}${bindir}/lib
+	for files in `find lib -type f`; do ${INSTALL_SCRIPT} $${files} ${DESTDIR}${bindir}/lib; done
+	unset LIBPATH; ./generate-greenplum-path.sh $(prefix) > ${DESTDIR}${prefix}/greenplum_path.sh

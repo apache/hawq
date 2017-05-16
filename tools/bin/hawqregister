@@ -39,6 +39,12 @@ logger = get_default_logger()
 EXECNAME = os.path.split(__file__)[-1]
 setup_tool_logging(EXECNAME, getLocalHostname(), getUserName())
 
+# print executing command
+cmd = "Executing Command: ";
+for arg in sys.argv:
+    cmd += arg + " "
+logger.info(cmd);
+
 def option_parser():
     '''option parser'''
     parser = OptParser(option_class=OptChecker,

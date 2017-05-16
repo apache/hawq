@@ -66,8 +66,8 @@ typedef ExtProtocolData *ExtProtocol;
 #define EXTPROTOCOL_GET_USER_CTX(fcinfo)   (((ExtProtocolData*) fcinfo->context)->prot_user_ctx)
 #define EXTPROTOCOL_GET_SELECTDESC(fcinfo)   (((ExtProtocolData*) fcinfo->context)->desc)
 #define EXTPROTOCOL_GET_PROJINFO(fcinfo) (((ExtProtocolData*) fcinfo->context)->desc->projInfo)
+#define EXTPROTOCOL_GET_AGG_TYPE(fcinfo) (((ExtProtocolData*) fcinfo->context)->desc->agg_type)
 #define EXTPROTOCOL_IS_LAST_CALL(fcinfo)   (((ExtProtocolData*) fcinfo->context)->prot_last_call)
-
 #define EXTPROTOCOL_SET_LAST_CALL(fcinfo)  (((ExtProtocolData*) fcinfo->context)->prot_last_call = true)
 #define EXTPROTOCOL_SET_USER_CTX(fcinfo, p) \
 	(((ExtProtocolData*) fcinfo->context)->prot_user_ctx = p)

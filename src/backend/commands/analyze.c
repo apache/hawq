@@ -308,6 +308,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	ListCell				*le1 = NULL;
 	int 					successCount = 0, failCount = 0;
 	StringInfoData 			failNames;
+	ResourceOwner asOwner, oldOwner1;  /* asOwner for analyzeStmt resource owner */
 
 	/**
 	 * Ensure that an ANALYZE is requested.
@@ -477,6 +478,13 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	}
 
 	/**
+	 * Create a resource owner to keep track of our resources even not in trasaction block
+	 */
+	asOwner = ResourceOwnerCreate(CurrentResourceOwner, "analyzeStmt");
+	oldOwner1 = CurrentResourceOwner;
+	CurrentResourceOwner = asOwner;
+
+	/**
 	 *  we use preferred_seg_num as default and
 	 *  compute target_seg_num based on data size and distributed type
 	 *  if there is no preferred_seg_num.
@@ -604,12 +612,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 						        (errmsg("skipping \"%s\" --- cannot analyze indexes, views, external tables or special system tables",
 						                RelationGetRelationName(candidateRelation))));
 
-						relation_close(candidateRelation, ShareUpdateExclusiveLock);
+						relation_close_at_resource_owner(candidateRelation, ShareUpdateExclusiveLock, asOwner);
 					}
 					else if (isOtherTempNamespace(RelationGetNamespace(candidateRelation)))
 					{
 						/* Silently ignore tables that are temp tables of other backends. */
-						relation_close(candidateRelation, ShareUpdateExclusiveLock);
+						relation_close_at_resource_owner(candidateRelation, ShareUpdateExclusiveLock, asOwner);
 					}
 					else if (RelationIsExternalPxfReadOnly(candidateRelation, &ext_uri) &&
 					         (!pxf_enable_stat_collection))
@@ -619,7 +627,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 						        (errmsg("skipping \"%s\" --- analyze for PXF tables is turned off by 'pxf_enable_stat_collection'",
 						                RelationGetRelationName(candidateRelation))));
 
-						relation_close(candidateRelation, ShareUpdateExclusiveLock);
+						relation_close_at_resource_owner(candidateRelation, ShareUpdateExclusiveLock, asOwner);
 					}
 					else
 					{
@@ -714,7 +722,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 						 * releasing the lock before commit would expose
 						 * us to concurrent-update failures.)
 						 */
-						relation_close(candidateRelation, NoLock);
+						relation_close_at_resource_owner(candidateRelation, NoLock, asOwner);
 
 						/* MPP-6929: metadata tracking */
 						if (!bTemp && (Gp_role == GP_ROLE_DISPATCH))
@@ -745,7 +753,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 					        (errmsg("Skipping \"%s\" --- only table or database owner can analyze it",
 					                RelationGetRelationName(candidateRelation))));
 
-					relation_close(candidateRelation, ShareUpdateExclusiveLock);
+					relation_close_at_resource_owner(candidateRelation, ShareUpdateExclusiveLock, asOwner);
 				} /* if (analyzePermitted(RelationGetRelid(candidateRelation))) */
 			}
 			else
@@ -773,7 +781,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		resource = NULL;
 		UnsetActiveQueryResource();
 		SetActiveQueryResource(savedResource);
-
+		
 		/* Carry on with error handling. */
 		PG_RE_THROW();
 	}
@@ -786,6 +794,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	resource = NULL;
 	UnsetActiveQueryResource();
 	SetActiveQueryResource(savedResource);
+
+	ResourceOwnerRelease(asOwner,
+            RESOURCE_RELEASE_BEFORE_LOCKS,
+            false, false);
+	CurrentResourceOwner = oldOwner1;
+	ResourceOwnerDelete(asOwner);
 
 	if (bUseOwnXacts)
 	{

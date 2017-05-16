@@ -457,12 +457,11 @@ extern bool	optimizer_partition_selection_log;
 /* acl type for privileges check */
 extern char   *acl_type;
 
-/**
- * rps host and port
- */
-extern char   *rps_addr_host;
-extern char   *rps_addr_suffix;
+/* rps port*/
 extern int     rps_addr_port;
+
+/* interval of checking local RPS */
+extern int     rps_check_local_interval;
 /*
  * During insertion in a table with parquet partitions,
  * require tuples to be sorted by partition key.

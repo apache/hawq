@@ -49,12 +49,12 @@ public class DatabaseTest extends SimpleResourceTestBase {
     }
 
     @Override
-    protected Policy getResourceGroupPolicy() {
+    protected Policy getResourceGroupPolicy(String group) {
         Policy policy = policyBuilder
                 .resource(database, TEST_DB)
                 .resource(schema, STAR)
                 .resource(table, STAR)
-                .groupAccess(PUBLIC_GROUP, SPECIAL_PRIVILEGES)
+                .groupAccess(group, SPECIAL_PRIVILEGES)
                 .build();
         return policy;
     }

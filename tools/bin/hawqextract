@@ -145,6 +145,23 @@ class GpMetadataAccessor:
         rows = self.exec_query(qry)
         return [r['fselocation'] for r in rows]
 
+    def get_seg_name(self, oid):
+        '''
+        Return relname of pg_aoseg_`oid` table
+
+        Example:
+        >>> accessor.get_seg_name(35709)
+        >>> [{'relname':'pg_aoseg_35709'}]
+        '''
+        qry = """
+        SELECT pg_class2.relname
+        FROM pg_class as pg_class1, pg_appendonly, pg_class as pg_class2
+        WHERE pg_class1.oid = %d
+        AND pg_class1.oid = pg_appendonly.relid
+        AND pg_appendonly.segrelid = pg_class2.oid;
+        """ % oid
+        return self.exec_query(qry)
+
     def get_aoseg_files(self, oid):
         '''
         Return rows in pg_aoseg_`oid` table
@@ -155,12 +172,13 @@ class GpMetadataAccessor:
         ...  {'fileno':'2', 'filesize':'880', 'tupcount':'27', 'varblockcount':'3', eofuncompressed:'880'},
         ...  {'fileno':'3', 'filesize':'160', 'tupcount':'5', 'varblockcount':'2', eofuncompressed:'160'}]
         '''
+        seg_name = self.get_seg_name(oid)[0]['relname']
         qry = """
         SELECT segno as fileno, eof as filesize, tupcount as tupcount,
         varblockcount as varblockcount, eofuncompressed as eofuncompressed
-        FROM pg_aoseg.pg_aoseg_%d
+        FROM pg_aoseg.%s
         ORDER by fileno;
-        """ % oid
+        """ % seg_name
         return self.exec_query(qry)
 
     def get_paqseg_files(self, oid):
@@ -174,11 +192,12 @@ class GpMetadataAccessor:
         ...  {'fileno':'2', 'filesize':'880', 'tupcount':'27', 'eofuncompressed':'880'},
         ...  {'fileno':'3', 'filesize':'160', 'tupcount':'5', 'eofuncompressed':'160'}]
         '''
+        seg_name = self.get_seg_name(oid)[0]['relname']
         qry = """
         SELECT segno as fileno, eof as filesize, tupcount, eofuncompressed
-        FROM pg_aoseg.pg_paqseg_%d
+        FROM pg_aoseg.%s
         ORDER by fileno;
-        """ % oid
+        """ % seg_name
         return self.exec_query(qry)
 
     def get_pgclass(self, nspname, relname):
