@@ -385,8 +385,8 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 	int ret = -1;
 	int retry = 2;
 	CURLcode res;
-	Assert(request != NULL);
 	bool switchToMaster = false;
+	Assert(request != NULL);
 
 	/*
 	 * If master is talking with standby RPS, for every predefined interval
