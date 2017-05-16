@@ -466,7 +466,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 		}
 		else
 		{
-			if (switchToMaster)
+			if (switchToMaster && !curl_handle->talkingWithStandby)
 			{
 				/* master's RPS has recovered, switch from standby's RPS to master's RPS */
 				elog(NOTICE, "switch from standby's RPS to master's RPS");
