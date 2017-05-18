@@ -453,15 +453,23 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 		{
 			if (retry > 1)
 			{
-				elog(WARNING, "ranger plugin service from http://%s:%d/rps is unavailable : %s, try another http://%s:%d/rps\n",
+				/* Don't expose this warning message to client, just record in log.
+				 * The value of whereToSendOutput is DestRemote, so set it to DestNone
+				 * and set back after write a warning message in log file.
+				 */
+				CommandDest commandDest = whereToSendOutput;
+				whereToSendOutput = DestNone;
+				elog(WARNING, "ranger plugin service from http://%s:%d/rps is unavailable : %s, "
+						"trying ranger plugin service at http://%s:%d/rps\n",
 						curl_handle->talkingWithStandby?standby_addr_host:master_addr_host, rps_addr_port, curl_easy_strerror(res),
 						curl_handle->talkingWithStandby?master_addr_host:standby_addr_host, rps_addr_port);
 				curl_handle->talkingWithStandby = !curl_handle->talkingWithStandby;
+				whereToSendOutput = commandDest;
 			}
 			else
 			{
-				elog(ERROR, "ranger plugin service from http://%s:%d/rps is unavailable : %s.\n",
-						curl_handle->talkingWithStandby?standby_addr_host:master_addr_host, rps_addr_port, curl_easy_strerror(res));
+				elog(ERROR, "permission is unknown due to authorization failure, "
+					"ranger plugin service is unavailable : %s.\n", curl_easy_strerror(res));
 			}
 		}
 		else
@@ -469,7 +477,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 			if (switchToMaster && !curl_handle->talkingWithStandby)
 			{
 				/* master's RPS has recovered, switch from standby's RPS to master's RPS */
-				elog(NOTICE, "switch from standby's RPS to master's RPS");
+				elog(LOG, "switched from standby's ranger plugin service to master's.");
 			}
 			if (curl_handle->talkingWithStandby && curl_handle->lastCheckTimestamp == 0)
 			{
