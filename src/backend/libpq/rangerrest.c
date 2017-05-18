@@ -468,7 +468,8 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 			}
 			else
 			{
-				elog(ERROR, "ranger plugin service is unavailable : %s.\n", curl_easy_strerror(res));
+				elog(ERROR, "permission is unknown due to authorization failure,"
+					"ranger plugin service is unavailable : %s.\n", curl_easy_strerror(res));
 			}
 		}
 		else
@@ -476,7 +477,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 			if (switchToMaster && !curl_handle->talkingWithStandby)
 			{
 				/* master's RPS has recovered, switch from standby's RPS to master's RPS */
-				elog(LOG, "switch from standby's RPS to master's RPS");
+				elog(LOG, "switched from standby's ranger plugin service to master's.");
 			}
 			if (curl_handle->talkingWithStandby && curl_handle->lastCheckTimestamp == 0)
 			{
