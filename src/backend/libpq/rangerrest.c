@@ -468,7 +468,7 @@ static int call_ranger_rest(CURL_HANDLE curl_handle, const char* request)
 			}
 			else
 			{
-				elog(ERROR, "permission is unknown due to authorization failure,"
+				elog(ERROR, "permission is unknown due to authorization failure, "
 					"ranger plugin service is unavailable : %s.\n", curl_easy_strerror(res));
 			}
 		}
