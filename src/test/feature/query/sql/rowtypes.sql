@@ -99,11 +99,11 @@ select ROW('ABC','DEF') ~>=~ ROW('DEF','ABC') as false;
 select ROW('ABC','DEF') ~~ ROW('DEF','ABC') as fail;
 
 -- Check row comparison with a subselect
-select unique1, unique2 from tenk1
-where (unique1, unique2) < any (select ten, ten from tenk1 where hundred < 3);
+select unique1, unique2 from TestRowTypes.BasicTest.tenk1
+where (unique1, unique2) < any (select ten, ten from TestRowTypes.BasicTest.tenk1 where hundred < 3);
 
 -- Also check row comparison with an indexable condition
-select thousand, tenthous from tenk1
+select thousand, tenthous from TestRowTypes.BasicTest.tenk1
 where (thousand, tenthous) >= (997, 5000)
 order by thousand, tenthous;
 
