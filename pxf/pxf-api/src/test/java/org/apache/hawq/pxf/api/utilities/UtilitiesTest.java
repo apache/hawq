@@ -30,10 +30,14 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayOutputStream;
 import java.io.ObjectOutputStream;
+import java.util.List;
 
 import org.apache.hawq.pxf.api.Metadata;
+import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
 import org.apache.hawq.pxf.api.ReadAccessor;
+import org.apache.hawq.pxf.api.ReadResolver;
+import org.apache.hawq.pxf.api.ReadVectorizedResolver;
 import org.apache.hawq.pxf.api.StatsAccessor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Utilities;
@@ -86,6 +90,22 @@ public class UtilitiesTest {
 
         @Override
         public void closeForRead() throws Exception {
+        }
+    }
+
+    class ReadVectorizedResolverImpl implements ReadVectorizedResolver {
+
+        @Override
+        public List<List<OneField>> getFieldsForBatch(OneRow batch) {
+            return null;
+        }
+    }
+
+    class ReadResolverImpl implements ReadResolver {
+
+        @Override
+        public List<OneField> getFields(OneRow row) throws Exception {
+            return null;
         }
     }
 
@@ -221,5 +241,14 @@ public class UtilitiesTest {
         when(metaData.hasFilter()).thenReturn(false);
         when(metaData.getNumAttrsProjected()).thenReturn(1);
         assertFalse(Utilities.useStats(accessor, metaData));
+    }
+
+    @Test
+    public void useVectorization() {
+        InputData metaData = mock(InputData.class);
+        when(metaData.getResolver()).thenReturn("org.apache.hawq.pxf.api.utilities.UtilitiesTest$ReadVectorizedResolverImpl");
+        assertTrue(Utilities.useVectorization(metaData));
+        when(metaData.getResolver()).thenReturn("org.apache.hawq.pxf.api.utilities.UtilitiesTest$ReadResolverImpl");
+        assertFalse(Utilities.useVectorization(metaData));
     }
 }

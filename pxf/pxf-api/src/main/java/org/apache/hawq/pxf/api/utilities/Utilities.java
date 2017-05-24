@@ -165,7 +165,7 @@ public class Utilities {
      * @param inputData input data which has protocol information
      * @return fragment metadata
      * @throws IllegalArgumentException if fragment metadata information wasn't found in input data
-     * @throws Exception
+     * @throws Exception when error occurred during metadata parsing
      */
     public static FragmentMetadata parseFragmentMetadata(InputData inputData) throws Exception {
         byte[] serializedLocation = inputData.getFragmentMetadata();
@@ -199,7 +199,7 @@ public class Utilities {
     /**
      * Based on accessor information determines whether to use AggBridge
      * 
-     * @param protData
+     * @param inputData input protocol data
      * @return true if AggBridge is applicable for current context
      */
     public static boolean useAggBridge(InputData inputData) {
@@ -236,13 +236,17 @@ public class Utilities {
         }
     }
 
+    /**
+     * Determines whether use vectorization
+     * @param inputData input protocol data
+     * @return true if vectorization is applicable in a current context
+     */
     public static boolean useVectorization(InputData inputData) {
         boolean isVectorizedResolver = false;
         try {
             isVectorizedResolver = ArrayUtils.contains(Class.forName(inputData.getResolver()).getInterfaces(), ReadVectorizedResolver.class);
         } catch (ClassNotFoundException e) {
             LOG.error("Unable to load resolver class: " + e.getMessage());
-            return false;
         }
         return isVectorizedResolver;
     }

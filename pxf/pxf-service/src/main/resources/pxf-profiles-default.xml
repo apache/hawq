@@ -106,8 +106,8 @@ under the License.
         <description></description>
         <plugins>
             <fragmenter>org.apache.hawq.pxf.plugins.hive.HiveInputFormatFragmenter</fragmenter>
-            <accessor>org.apache.hawq.pxf.plugins.hive.HiveORCBatchAccessor</accessor>
-            <resolver>org.apache.hawq.pxf.plugins.hive.HiveORCBatchResolver</resolver>
+            <accessor>org.apache.hawq.pxf.plugins.hive.HiveORCVectorizedAccessor</accessor>
+            <resolver>org.apache.hawq.pxf.plugins.hive.HiveORCVectorizedResolver</resolver>
             <metadata>org.apache.hawq.pxf.plugins.hive.HiveMetadataFetcher</metadata>
             <outputFormat>org.apache.hawq.pxf.service.io.GPDBWritable</outputFormat>
         </plugins>

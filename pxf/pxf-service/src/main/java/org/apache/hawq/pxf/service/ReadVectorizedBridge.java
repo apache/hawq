@@ -19,31 +19,24 @@ package org.apache.hawq.pxf.service;
  * under the License.
  */
 
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
-
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.pxf.api.BadRecordException;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
-import org.apache.hawq.pxf.api.ReadAccessor;
 import org.apache.hawq.pxf.api.ReadVectorizedResolver;
 import org.apache.hawq.pxf.service.io.Writable;
 import org.apache.hawq.pxf.service.utilities.ProtocolData;
 
-public class ReadVectorizedBridge implements Bridge {
 
-    ReadAccessor fileAccessor = null;
-    ReadVectorizedResolver fieldsResolver;
-    BridgeOutputBuilder outputBuilder = null;
-    LinkedList<Writable> outputQueue = null;
+public class ReadVectorizedBridge extends ReadBridge {
+
+    private static final Log LOG = LogFactory.getLog(ReadVectorizedBridge.class);
 
     public ReadVectorizedBridge(ProtocolData protData) throws Exception {
-        outputBuilder = new BridgeOutputBuilder(protData);
-        outputQueue = new LinkedList<Writable>();
-        fileAccessor = ReadBridge.getFileAccessor(protData);
-        fieldsResolver = ReadBridge.getFieldsResolver(protData);
+        super(protData);
     }
 
     @Override
@@ -61,7 +54,7 @@ public class ReadVectorizedBridge implements Bridge {
                 if (batch == null) {
                     output = outputBuilder.getPartialLine();
                     if (output != null) {
-                        //LOG.warn("A partial record in the end of the fragment");
+                        LOG.warn("A partial record in the end of the fragment");
                     }
                     // if there is a partial line, return it now, otherwise it
                     // will return null
@@ -70,7 +63,7 @@ public class ReadVectorizedBridge implements Bridge {
 
                 // we checked before that outputQueue is empty, so we can
                 // override it.
-                List<List<OneField>> resolvedBatch = fieldsResolver.getFieldsForBatch(batch);
+                List<List<OneField>> resolvedBatch = ((ReadVectorizedResolver) fieldsResolver).getFieldsForBatch(batch);
                 outputQueue = outputBuilder.makeVectorizedOutput(resolvedBatch);
                 if (!outputQueue.isEmpty()) {
                     output = outputQueue.pop();
@@ -78,9 +71,9 @@ public class ReadVectorizedBridge implements Bridge {
                 }
             }
         } catch (IOException ex) {
-            /*if (!isDataException(ex)) {
+            if (!isDataException(ex)) {
                 throw ex;
-            }*/
+            }
             output = outputBuilder.getErrorOutput(ex);
         } catch (BadRecordException ex) {
             String row_info = "null";
@@ -88,10 +81,10 @@ public class ReadVectorizedBridge implements Bridge {
                 row_info = batch.toString();
             }
             if (ex.getCause() != null) {
-                /*LOG.debug("BadRecordException " + ex.getCause().toString()
-                        + ": " + row_info);*/
+                LOG.debug("BadRecordException " + ex.getCause().toString()
+                        + ": " + row_info);
             } else {
-                //LOG.debug(ex.toString() + ": " + row_info);
+                LOG.debug(ex.toString() + ": " + row_info);
             }
             output = outputBuilder.getErrorOutput(ex);
         } catch (Exception ex) {
@@ -99,23 +92,6 @@ public class ReadVectorizedBridge implements Bridge {
         }
 
         return output;
-    }
-
-    @Override
-    public boolean beginIteration() throws Exception {
-        return fileAccessor.openForRead();
-    }
-
-    @Override
-    public boolean setNext(DataInputStream inputStream) throws Exception {
-        // TODO Auto-generated method stub
-        return false;
-    }
-
-    @Override
-    public boolean isThreadSafe() {
-        // TODO Auto-generated method stub
-        return false;
     }
 
     @Override

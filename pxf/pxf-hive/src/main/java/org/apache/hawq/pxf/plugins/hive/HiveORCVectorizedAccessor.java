@@ -20,22 +20,13 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.*;
 import org.apache.hawq.pxf.api.OneRow;
-import org.apache.hawq.pxf.api.ReadAccessor;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.hawq.pxf.api.utilities.Plugin;
-import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.hadoop.hive.ql.io.orc.OrcFile;
-import org.apache.hadoop.hive.ql.io.orc.Reader;
 import org.apache.hadoop.hive.ql.io.orc.Reader.Options;
 import org.apache.hadoop.hive.ql.io.orc.RecordReader;
 import org.apache.hadoop.io.LongWritable;
@@ -45,23 +36,23 @@ import org.apache.hadoop.io.LongWritable;
  * One batch is 1024 rows of all projected columns
  *
  */
-public class HiveORCBatchAccessor extends Plugin implements ReadAccessor {
+public class HiveORCVectorizedAccessor extends HiveORCAccessor {
 
-    protected RecordReader vrr;
+    private RecordReader vrr;
     private int batchIndex;
     private VectorizedRowBatch batch;
 
-    public HiveORCBatchAccessor(InputData input) throws Exception {
+    public HiveORCVectorizedAccessor(InputData input) throws Exception {
         super(input);
     }
 
     @Override
     public boolean openForRead() throws Exception {
-        Reader reader = HiveUtilities.getOrcReader(inputData);
         Options options = new Options();
         addColumns(options);
         addFragments(options);
-        vrr = reader.rowsOptions(options);
+        orcReader = HiveUtilities.getOrcReader(inputData);
+        vrr = orcReader.rowsOptions(options);
         return vrr.hasNext();
     }
 
@@ -92,7 +83,7 @@ public class HiveORCBatchAccessor extends Plugin implements ReadAccessor {
     }
 
     /**
-     * This method updated reader optionst to include projected columns only.
+     * This method updated reader options to include projected columns only.
      * @param options reader options to modify
      * @throws Exception
      */

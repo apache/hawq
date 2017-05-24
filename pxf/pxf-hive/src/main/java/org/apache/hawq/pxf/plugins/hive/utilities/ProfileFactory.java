@@ -23,7 +23,6 @@ import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.TextInputFormat;
-import org.apache.hawq.pxf.api.Metadata;
 
 /**
  * Factory class which returns optimal profile for given input format
@@ -59,6 +58,14 @@ public class ProfileFactory {
             //Default case
             profileName = HIVE_PROFILE;
         }
+        return profileName;
+    }
+
+    /**
+     * @see ProfileFactory#get(InputFormat, boolean, String)
+     */
+    public static String get(InputFormat inputFormat, boolean hasComplexTypes) {
+        String profileName = get(inputFormat, hasComplexTypes, null);
         return profileName;
     }
 

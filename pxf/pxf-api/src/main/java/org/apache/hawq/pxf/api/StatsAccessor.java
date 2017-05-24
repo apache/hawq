@@ -29,11 +29,13 @@ public interface StatsAccessor extends ReadAccessor {
 
     /**
      * Method which reads needed statistics for current split
+     * @throws Exception when unable to retrieve statistics
      */
     public void retrieveStats() throws Exception;
 
     /**
      * Returns next tuple based on statistics information without actual reading of data
+     * @return next row without reading it from disk
      */
     public OneRow emitAggObject();
 

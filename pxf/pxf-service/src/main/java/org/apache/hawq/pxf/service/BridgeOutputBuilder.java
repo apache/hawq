@@ -139,13 +139,14 @@ public class BridgeOutputBuilder {
 
     public LinkedList<Writable> makeVectorizedOutput(List<List<OneField>> recordsBatch) throws BadRecordException {
         outputList.clear();
-        for (List<OneField> record : recordsBatch) {
-            if (inputData.outputFormat() == OutputFormat.GPDBWritable) {
-                makeGPDBWritableOutput();
+        if (recordsBatch != null) {
+            for (List<OneField> record : recordsBatch) {
+                if (inputData.outputFormat() == OutputFormat.GPDBWritable) {
+                    makeGPDBWritableOutput();
+                }
+                fillOutputRecord(record);
             }
-            fillOutputRecord(record);
         }
-
         return outputList;
     }
 
