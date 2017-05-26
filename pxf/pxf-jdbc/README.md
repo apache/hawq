@@ -105,8 +105,6 @@ The `PARTITION_BY` parameter can be null, and there will be only one fragment.
 
 The `RANGE` parameter indicates the range of data to be queried , it can be split by colon(':').
  The range is left-closed, ie: `>= start_value AND < end_value` .
- If the `column_type` is `int`, the `end_value` can be empty.
- If the `column_type` is `enum`,the parameter `RANGE` can be empty.
 
 The `INTERVAL` parameter can be split by colon(':'), indicate the interval
  value of one fragment. When `column_type` is `date`,this parameter must

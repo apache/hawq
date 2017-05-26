@@ -25,7 +25,6 @@ import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
 import org.junit.Test;
 
-import java.text.ParseException;
 import java.util.Calendar;
 import java.util.List;
 
@@ -140,7 +139,7 @@ public class JdbcPartitionFragmenterTest {
     }
 
     @Test
-    public void inValidPartitiontype() throws Exception {
+    public void testInValidPartitiontype() throws Exception {
         prepareConstruction();
         when(inputData.getDataSource()).thenReturn("sales");
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("level:float");
@@ -155,7 +154,7 @@ public class JdbcPartitionFragmenterTest {
     }
 
     @Test
-    public void inValidParameterFormat() throws Exception {
+    public void testInValidParameterFormat() throws Exception {
         prepareConstruction();
         when(inputData.getDataSource()).thenReturn("sales");
 
@@ -164,8 +163,8 @@ public class JdbcPartitionFragmenterTest {
         when(inputData.getUserProperty("RANGE")).thenReturn("100:200");
         try {
             new JdbcPartitionFragmenter(inputData);
-            fail("Expected an ArrayIndexOutOfBoundsException");
-        } catch (ArrayIndexOutOfBoundsException ex) {
+            fail("Expected an UserDataException");
+        } catch (UserDataException ex) {
         }
 
         //date string must be yyyy-MM-dd
@@ -181,7 +180,7 @@ public class JdbcPartitionFragmenterTest {
     }
 
     @Test
-    public void inValidParameterValue() throws Exception {
+    public void testInValidParameterValue() throws Exception {
         prepareConstruction();
         //INTERVAL must be greater than 0
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
@@ -195,7 +194,7 @@ public class JdbcPartitionFragmenterTest {
     }
 
     @Test
-    public void inValidIntervaltype() throws Exception {
+    public void testInValidIntervaltype() throws Exception {
         prepareConstruction();
         when(inputData.getDataSource()).thenReturn("sales");
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
@@ -208,6 +207,90 @@ public class JdbcPartitionFragmenterTest {
             fail("Expected an UserDataException");
         } catch (UserDataException ex) {
         }
+    }
+
+    @Test
+    public void testIntervaltypeMissing() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+        when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
+        when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2011-01-01");
+        when(inputData.getUserProperty("INTERVAL")).thenReturn("6");
+
+        try {
+            JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+            fragment.getFragments();
+            fail("Expected an UserDataException");
+        } catch (UserDataException ex) {
+        }
+    }
+
+    @Test
+    public void testIntervaltypeMissingValid() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+        when(inputData.getUserProperty("PARTITION_BY")).thenReturn("year:int");
+        when(inputData.getUserProperty("RANGE")).thenReturn("2001:2012");
+        when(inputData.getUserProperty("INTERVAL")).thenReturn("1");
+
+        JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+        List<Fragment> fragments = fragment.getFragments();
+        assertEquals(fragments.size(), 11);
+    }
+
+    @Test
+    public void testIntervalMissingEnum() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+        when(inputData.getUserProperty("PARTITION_BY")).thenReturn("level:enum");
+        when(inputData.getUserProperty("RANGE")).thenReturn("100:200:300");
+
+        JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+        List<Fragment> fragments = fragment.getFragments();
+        assertEquals(fragments.size(), 3);
+    }
+
+    @Test
+    public void testRangeMissingEndValue() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+        when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
+        when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01");
+        when(inputData.getUserProperty("INTERVAL")).thenReturn("1:year");
+
+        try {
+            JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+            fragment.getFragments();
+            fail("Expected an UserDataException");
+        } catch (UserDataException ex) {
+        }
+    }
+
+    @Test
+    public void testRangeMissing() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+        when(inputData.getUserProperty("PARTITION_BY")).thenReturn("year:int");
+        when(inputData.getUserProperty("INTERVAL")).thenReturn("1");
+
+        try {
+            JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+            fragment.getFragments();
+            fail("Expected an UserDataException");
+        } catch (UserDataException ex) {
+        }
+    }
+
+    @Test
+    public void testRangeSingleValueEnum() throws Exception {
+        prepareConstruction();
+        when(inputData.getDataSource()).thenReturn("sales");
+        when(inputData.getUserProperty("PARTITION_BY")).thenReturn("level:enum");
+        when(inputData.getUserProperty("RANGE")).thenReturn("100");
+
+        JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
+        List<Fragment> fragments = fragment.getFragments();
+        assertEquals(fragments.size(), 1);
     }
 
     @Test
