@@ -19,6 +19,8 @@
 package org.apache.hawq.ranger.service;
 
 import org.apache.ranger.plugin.client.HadoopException;
+import org.apache.ranger.plugin.model.RangerService;
+import org.apache.ranger.plugin.model.RangerServiceDef;
 import org.apache.ranger.plugin.service.RangerBaseService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -30,6 +32,15 @@ public class RangerServiceHawq extends RangerBaseService {
 
     private static final Log LOG = LogFactory.getLog(RangerServiceHawq.class);
 
+    public RangerServiceHawq() {
+		super();
+	}
+	
+	@Override
+	public void init(RangerServiceDef serviceDef, RangerService service) {
+		super.init(serviceDef, service);
+	}
+	
     @Override
     public HashMap<String, Object> validateConfig() throws Exception {
         boolean isDebugEnabled = LOG.isDebugEnabled();
@@ -39,10 +50,10 @@ public class RangerServiceHawq extends RangerBaseService {
         }
 
         HashMap<String, Object> result = new HashMap<>();
-
+        String 	serviceName = getServiceName();
         if (configs != null) {
             try  {
-                HawqClient hawqClient = new HawqClient(configs);
+                HawqClient hawqClient = new HawqClient(serviceName, configs);
                 result = hawqClient.checkConnection(configs);
             } catch (HadoopException e) {
                 LOG.error("<== RangerServiceHawq.validateConfig Error:" + e);
@@ -58,7 +69,10 @@ public class RangerServiceHawq extends RangerBaseService {
 
     @Override
     public List<String> lookupResource(ResourceLookupContext context) throws Exception {
-        List<String> resources = HawqResourceMgr.getHawqResources(getConfigs(), context);
+    		String 	serviceName = getServiceName();
+    		String	serviceType = getServiceType();
+    		
+        List<String> resources = HawqResourceMgr.getHawqResources(serviceName, serviceType, getConfigs(), context);
 
         return resources;
     }

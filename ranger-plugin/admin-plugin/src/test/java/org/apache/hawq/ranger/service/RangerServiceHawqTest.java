@@ -18,6 +18,7 @@
 package org.apache.hawq.ranger.service;
 
 import org.apache.ranger.plugin.client.BaseClient;
+import org.apache.hawq.ranger.service.HawqClient;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -25,25 +26,25 @@ import org.mockito.Mock;
 import org.powermock.api.mockito.PowerMockito;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
-
+import static org.powermock.api.mockito.PowerMockito.*;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
+import static org.mockito.Matchers.*;
 
+import static org.powermock.api.support.membermodification.MemberMatcher.method;
 import static org.apache.hawq.ranger.service.HawqClient.CONNECTION_SUCCESSFUL_MESSAGE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyString;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import static org.powermock.api.mockito.PowerMockito.when;
 import static org.powermock.api.support.membermodification.MemberMatcher.constructor;
 import static org.powermock.api.support.membermodification.MemberModifier.suppress;
 
+
 @RunWith(PowerMockRunner.class)
-@PrepareForTest(HawqClient.class)
+@PrepareForTest({HawqClient.class, RangerServiceHawq.class})
 public class RangerServiceHawqTest {
 
     private RangerServiceHawq service;
@@ -53,6 +54,8 @@ public class RangerServiceHawqTest {
     HawqClient mockHawqClient;
     @Mock
     Connection conn;
+    
+    private Map<String, String> connectionProperties;
 
     @Before
     public void setup() {
@@ -73,13 +76,18 @@ public class RangerServiceHawqTest {
 
     @Test
     public void testValidateConfigSuccess() throws Exception {
+		suppress(constructor(BaseClient.class, String.class, Map.class));
+		suppress(method(HawqClient.class, "initHawq"));
+    	    
         HashMap<String, Object> result = new HashMap<>();
         result.put("message", "ConnectionTest Successful");
         result.put("description", "ConnectionTest Successful");
         result.put("connectivityStatus", true);
-
-        suppress(constructor(BaseClient.class, String.class, Map.class));
-        PowerMockito.when(DriverManager.getConnection(anyString(), any(Properties.class))).thenReturn(conn);
+        
+        mockHawqClient = new HawqClient("hawq", connectionProperties);
+        mockHawqClient.setConnection(conn);
+        PowerMockito.whenNew(HawqClient.class).withArguments(anyObject(),anyObject()).thenReturn(mockHawqClient);
+        
         when(conn.getCatalog()).thenReturn("catalog");
 
         HashMap<String, Object> response = service.validateConfig();

@@ -19,53 +19,124 @@ package org.apache.hawq.ranger.service;
 
 import org.apache.hawq.ranger.model.HawqResource;
 import org.apache.ranger.plugin.service.ResourceLookupContext;
+import org.apache.ranger.plugin.util.TimedEventUtil;
+import org.apache.log4j.Logger;
+
 
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.Collections;
 
 public abstract class HawqResourceMgr {
 
-    public static List<String> getHawqResources(Map<String, String> configs,
-                                                ResourceLookupContext context) throws SQLException {
-        String userInput = context.getUserInput();
+	private static final Logger LOG = Logger.getLogger(HawqResourceMgr.class);
+	
+    public static List<String> getHawqResources(String serviceName, String serviceType, Map<String, String> configs,
+                                                ResourceLookupContext context) throws Exception {
+      	final String userInput = context.getUserInput();
         HawqResource hawqResource = HawqResource.valueOf(context.getResourceName().toUpperCase());
-        Map<String, List<String>> resources = context.getResources();
-
-        List<String> result;
-        HawqClient hawqClient = new HawqClient(configs);
-
-        switch (hawqResource) {
-            case DATABASE:
-                result = hawqClient.getDatabaseList(userInput);
-                break;
-            case TABLESPACE:
-                result = hawqClient.getTablespaceList(userInput);
-                break;
-            case PROTOCOL:
-                result = hawqClient.getProtocolList(userInput);
-                break;
-            case SCHEMA:
-                result = hawqClient.getSchemaList(userInput, resources);
-                break;
-            case LANGUAGE:
-                result = hawqClient.getLanguageList(userInput, resources);
-                break;
-            case TABLE:
-                result = hawqClient.getTableList(userInput, resources);
-                break;
-            case SEQUENCE:
-                result = hawqClient.getSequenceList(userInput, resources);
-                break;
-            case FUNCTION:
-                result = hawqClient.getFunctionList(userInput, resources);
-                break;
-            default:
-                throw new IllegalArgumentException("Resource requested does not exist.");
+        final Map<String, List<String>> resources = context.getResources();
+        
+        List<String> result = null;
+        if (serviceName != null && userInput != null) {
+	        try {
+	        	
+	        		if(LOG.isDebugEnabled()) {
+					LOG.debug("==> HawqResourceMgr.getHawqResources() UserInput: "+ userInput  + " configs: " + configs);
+				}
+	        		final HawqClient hawqClient =new HawqClient(serviceName, configs);
+		        Callable<List<String>> callableObj = null;
+		        
+	            if(hawqClient != null) {
+	             	    switch (hawqResource) {
+	            	        case DATABASE:
+	          	    	        callableObj = new Callable<List<String>>() {
+	            	    	        	    @Override
+	            	    	        	    public List<String> call() throws SQLException{
+	              	    	        	    return hawqClient.getDatabaseList(userInput);
+	            	    	        	    }
+	            	    	        };
+	            	    	        break;
+	            	        case TABLESPACE:
+	        	    	            callableObj = new Callable<List<String>>() {
+	        	    	        	        @Override
+	        	    	        	        public List<String> call() throws SQLException{
+	          	    	        	        return hawqClient.getTablespaceList(userInput);
+	        	    	        	        }
+	        	    	            };
+	        	    	            break;
+	            	        case PROTOCOL:
+		    	    	            callableObj = new Callable<List<String>>() {
+		    	    	        	        @Override
+		    	    	        	        public List<String> call() throws SQLException{
+		      	    	        	        return hawqClient.getProtocolList(userInput);
+		    	    	        	        }
+		    	    	            };
+		    	    	            break;
+	            	        case SCHEMA:
+		    	    	            callableObj = new Callable<List<String>>() {
+		    	    	        	        @Override
+		    	    	        	        public List<String> call() throws SQLException{
+		      	    	        	        return hawqClient.getSchemaList(userInput, resources);
+		    	    	        	        }
+		    	    	            };
+		    	    	            break;
+	            	        case LANGUAGE:
+		    	    	            callableObj = new Callable<List<String>>() {
+		    	    	        	        @Override
+		    	    	        	        public List<String> call() throws SQLException{
+		      	    	        	        return hawqClient.getLanguageList(userInput, resources);
+		    	    	        	        }
+		    	    	            };
+		    	    	            break;
+	            	        case TABLE:
+		    	    	            callableObj = new Callable<List<String>>() {
+		    	    	        	        @Override
+		    	    	        	        public List<String> call() throws SQLException{
+		      	    	        	        return hawqClient.getTableList(userInput, resources);
+		    	    	        	        }
+		    	    	            };
+		    	    	            break;
+	            	        case SEQUENCE:
+		    	    	            callableObj = new Callable<List<String>>() {
+		    	    	        	        @Override
+		    	    	        	        public List<String> call() throws SQLException {
+		      	    	        	        return hawqClient.getSequenceList(userInput, resources);
+		    	    	        	        }
+		    	    	            };
+		    	    	            break;
+	            	        case FUNCTION:
+		    	    	            callableObj = new Callable<List<String>>() {
+		    	    	        	        @Override
+		    	    	        	        public List<String> call() throws SQLException{
+		      	    	        	        return hawqClient.getFunctionList(userInput, resources);
+		    	    	        	        }
+		    	    	            };
+		    	    	            break;
+					    default:
+					        throw new IllegalArgumentException("Resource requested does not exist.");
+		        		}
+		        }
+		        
+		        if (callableObj != null) {
+					synchronized (hawqClient) {
+						result = TimedEventUtil.timedTask(callableObj, 5,
+								TimeUnit.SECONDS);
+					}
+				} else {
+					LOG.error("Could not initiate at timedTask");
+				}
+		      
+		
+		        Collections.sort(result);
+	        } catch (Exception e) {
+				LOG.error("Unable to get hive resources.", e);
+				throw e;
+	        }
         }
-
-        Collections.sort(result);
         return result;
     }
 }
