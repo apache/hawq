@@ -30,6 +30,7 @@ install:
 	$(MAKE) -C contrib $@
 	$(MAKE) -C tools $@
 	$(MAKE) -C ranger-plugin $@
+	$(MAKE) -C dist $@
 	@echo "HAWQ installation complete."
 
 installdirs uninstall:
