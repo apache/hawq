@@ -72,7 +72,7 @@ public class HawqClient extends BaseClient {
     private static final String DEFAULT_DATABASE = "postgres";
     private static final String JDBC_DRIVER_CLASS = "org.postgresql.Driver";
 
-    private boolean isKerberosAuth;
+    private boolean isKerberosAuth = false;
     private Connection con;
     private Map<String, String> connectionProperties;
     
@@ -94,7 +94,9 @@ public class HawqClient extends BaseClient {
     }
     
     public void initHawq() throws Exception {
-		isKerberosAuth = connectionProperties.get(AUTHENTICATION).equals(KERBEROS);
+    	if(connectionProperties.containsKey(AUTHENTICATION)) {
+    		isKerberosAuth = connectionProperties.get(AUTHENTICATION).equals(KERBEROS);
+    	}
 		if (isKerberosAuth) {
 			LOG.info("Secured Mode: JDBC Connection done with preAuthenticated Subject");
 			
