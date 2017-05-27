@@ -70,6 +70,7 @@ public class HawqClientTest {
 
         suppress(constructor(BaseClient.class, String.class, Map.class));
         suppress(method(HawqClient.class, "initHawq"));
+        suppress(method(HawqClient.class, "resetConnection"));
         hawqClient = new HawqClient("hawq", connectionProperties);
         hawqClient.setConnection(conn);
         hawqClientSpy = PowerMockito.spy(hawqClient);

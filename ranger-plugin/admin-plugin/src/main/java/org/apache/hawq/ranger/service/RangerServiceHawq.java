@@ -55,6 +55,7 @@ public class RangerServiceHawq extends RangerBaseService {
             try  {
                 HawqClient hawqClient = new HawqClient(serviceName, configs);
                 result = hawqClient.checkConnection(configs);
+                hawqClient.close();
             } catch (HadoopException e) {
                 LOG.error("<== RangerServiceHawq.validateConfig Error:" + e);
                 throw e;

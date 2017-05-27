@@ -132,6 +132,7 @@ public abstract class HawqResourceMgr {
 		      
 		
 		        Collections.sort(result);
+		        hawqClient.close();
 	        } catch (Exception e) {
 				LOG.error("Unable to get hive resources.", e);
 				throw e;

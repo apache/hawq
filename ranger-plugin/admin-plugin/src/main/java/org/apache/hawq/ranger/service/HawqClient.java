@@ -29,6 +29,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.ResultSet;
+import java.sql.*;
 import java.util.*;
 
 import javax.security.auth.Subject;
@@ -70,10 +71,12 @@ public class HawqClient extends BaseClient {
 
     public static final List<String> INTERNAL_PROTOCOLS = HawqProtocols.getAllProtocols();
     private static final String DEFAULT_DATABASE = "postgres";
+    private static final String DEFAULT_DATABASE_TEMPLATE = "DBTOBEREPLACEDINJDBCURL";
     private static final String JDBC_DRIVER_CLASS = "org.postgresql.Driver";
 
     private boolean isKerberosAuth = false;
     private Connection con;
+    private String jdbc_url_template = "";
     private Map<String, String> connectionProperties;
     
     // we need to load class for the Postgres Driver directly to allow it to register with DriverManager
@@ -124,13 +127,13 @@ public class HawqClient extends BaseClient {
 			}});
 		}
 		else {
-			LOG.info("Trying to use UnSecure client with username and password");
+			LOG.info("Trying to use UnSecure client with username "+ getConfigHolder().getUserName() +" and password");
 			final String userName = getConfigHolder().getUserName();
 			final String password = getConfigHolder().getPassword();
 			initConnection(userName, password);
 		}
 	}
-    
+
     private void initConnectionKerberos(String serverPricipal, String userPrincipal) throws SQLException{
 	    try {
 	    		String url = String.format("jdbc:postgresql://%s:%s/%s?kerberosServerName=%s&jaasApplicationName=pgjdbc&user=%s", 
@@ -142,6 +145,11 @@ public class HawqClient extends BaseClient {
 	    			LOG.debug("InitConnectionKerberos "+ url);
 	    		}
 	    		con = DriverManager.getConnection(url); 
+	    		jdbc_url_template = String.format("jdbc:postgresql://%s:%s/%s?kerberosServerName=%s&jaasApplicationName=pgjdbc&user=%s", 
+	    				connectionProperties.get("hostname"), 
+	    				connectionProperties.get("port"), DEFAULT_DATABASE_TEMPLATE, 
+	    				serverPricipal, userPrincipal
+	    				);
 	    } catch (SQLException e) {
 	      e.printStackTrace();
           LOG.error("Unable to Connect to Hawq", e);
@@ -159,6 +167,7 @@ public class HawqClient extends BaseClient {
 				LOG.debug("InitConnectionKerberos "+ url);
 			}
 			con = DriverManager.getConnection(url, userName, password);
+			jdbc_url_template = String.format("jdbc:postgresql://%s:%s/%s", connectionProperties.get("hostname"), connectionProperties.get("port"), DEFAULT_DATABASE_TEMPLATE);
 		} catch (SQLException e) {
 			  e.printStackTrace();
 	          LOG.error("Unable to Connect to Hawq", e);
@@ -170,6 +179,36 @@ public class HawqClient extends BaseClient {
 
 	public void setConnection(Connection conn) {
 		con = conn;
+	}
+	
+	public void resetConnection(String db) throws SQLException{
+		try {
+			if(db == null) {
+				return;
+			}
+			String newdb = db;
+			LOG.debug("resetconnectionbefore "+ jdbc_url_template + newdb);
+    		String url = jdbc_url_template.replace(DEFAULT_DATABASE_TEMPLATE, newdb);
+    		if (LOG.isDebugEnabled()) {
+    			LOG.debug("resetconnection "+ jdbc_url_template+ url);
+    		}
+    		if(con !=null && !con.isClosed()){
+    			con.close();
+    		}
+    		if (isKerberosAuth) {
+    			con = DriverManager.getConnection(url); 
+    		} else {
+    			final String userName = getConfigHolder().getUserName();
+    			final String password = getConfigHolder().getPassword();
+    			con = DriverManager.getConnection(url, userName, password);
+    		} 
+		} catch (SQLException e) {
+			e.printStackTrace();
+			LOG.error("Unable to Connect to Hawq", e);
+			throw e;
+		} catch (SecurityException se) {
+			se.printStackTrace();
+		}
 	}
 
     /**
@@ -205,7 +244,6 @@ public class HawqClient extends BaseClient {
         String message = isConnected ? CONNECTION_SUCCESSFUL_MESSAGE : CONNECTION_FAILURE_MESSAGE;
 
         generateResponseDataMap(isConnected, message, description, null, null, result);
-
         return result;
     }
 
@@ -278,22 +316,22 @@ public class HawqClient extends BaseClient {
         		return new ArrayList<>(uniqueResults); 
         }
         for (String db: databases) {
+        	resetConnection(db);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("<== HawqClient.queryHawqPerDbAndSchema: Connecting to db: " + db);
             }
 
             try {
                 preparedStatement = handleWildcardPreparedStatement(userInput, query, con);
-
+                
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("<== HawqClient.queryHawqPerDbAndSchema Starting query: " + query);
+                    LOG.debug("<== HawqClient.queryHawqPerDbAndSchema Starting query: " + preparedStatement.toString());
                 }
-
+                
                 resultSet = preparedStatement.executeQuery();
-
                 while(resultSet.next()) {
-                    if(schemas.contains(resultSet.getString(schemaColumnName)) || schemas.contains(WILDCARD)) {
-                        uniqueResults.add(resultSet.getString(resultColumnName));
+                		if(schemas.contains(resultSet.getString(schemaColumnName)) || schemas.contains(WILDCARD)) {
+                			uniqueResults.add(resultSet.getString(resultColumnName));
                     }
                 }
 
@@ -317,14 +355,15 @@ public class HawqClient extends BaseClient {
         ResultSet resultSet = null;
 
         try {
-	        	if(con == null) {
-	        		return result; 
+            resetConnection(database);
+            if(con == null) {
+	       		return result; 
 	        }
 
             preparedStatement = handleWildcardPreparedStatement(userInput, query, con);
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("<== HawqClient.queryHawq Starting query: " + query);
+                LOG.debug("<== HawqClient.queryHawq Starting query: " + preparedStatement.toString());
             }
 
             resultSet = preparedStatement.executeQuery();
