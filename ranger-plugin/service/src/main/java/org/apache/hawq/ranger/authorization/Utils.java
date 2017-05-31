@@ -40,6 +40,15 @@ public abstract class Utils {
     public static final String VERSION_PROPERTY_KEY_FILE = "RPS_VERSION";
     public static final String RANGER_SERVICE_PROPERTY_FILE = "rps.properties";
 
+    //kerberos support property
+    public static final String AUTH_KEY_ENV = "auth";
+    public static final String AUTH_KEY_FILE = "RPS_AUTH";
+    public static final String PRINCIPAL_KEY_ENV = "principal";
+    public static final String PRINCIPAL_KEY_FILE = "RPS_PRINCIPAL";
+    public static final String KEYTAB_KEY_ENV = "keytab";
+    public static final String KEYTAB_KEY_FILE = "RPS_KEYTAB";
+
+
     private static final Log LOG = LogFactory.getLog(Utils.class);
     private static final Properties properties = readPropertiesFromFile();
 
@@ -65,6 +74,30 @@ public abstract class Utils {
      */
     public static String getVersion() {
         return System.getProperty(VERSION_PROPERTY_KEY_ENV, properties.getProperty(VERSION_PROPERTY_KEY_FILE, UNKNOWN));
+    }
+
+    /**
+     * Retrieves the authentication
+     * @return kerberos or simple[default]
+     */
+    public static String getAuth() {
+        return System.getProperty(AUTH_KEY_ENV, properties.getProperty(AUTH_KEY_FILE, "simple"));
+    }
+
+    /**
+     * Retrieves the kerberos client principal
+     * @return principal name or ""[default]
+     */
+    public static String getPrincipal() {
+        return System.getProperty(PRINCIPAL_KEY_ENV, properties.getProperty(PRINCIPAL_KEY_FILE, ""));
+    }
+
+    /**
+     * Retrieves the kerberos keytab file path
+     * @return keytab file path or ""[default]
+     */
+    public static String getKeytab() {
+        return System.getProperty(KEYTAB_KEY_ENV, properties.getProperty(KEYTAB_KEY_FILE, ""));
     }
 
     /**
