@@ -28,7 +28,9 @@ import org.apache.hawq.ranger.authorization.model.AuthorizationResponse;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.Date;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * JAX-RS resource for the authorization endpoint.
@@ -45,8 +47,46 @@ public class RangerHawqPluginResource {
     /**
      * Constructor. Creates a new instance of the resource that uses <code>RangerHawqAuthorizer</code>.
      */
-    public RangerHawqPluginResource() {
+    public RangerHawqPluginResource()
+    {
+        // set UserGroupInformation under kerberos authentication
+        if (Utils.getAuth() == Utils.AuthMethod.KERBEROS)
+        {
+            Configuration conf = new Configuration();
+            conf.set("hadoop.security.authentication", "kerberos");
+            UserGroupInformation.setConfiguration(conf);
+
+            String prin = Utils.getPrincipal();
+            String keytab = Utils.getKeytab();
+
+            if ( !prin.equals("") && !keytab.equals("") )
+            {
+                try
+                {
+                    UserGroupInformation.loginUserFromKeytab(prin, keytab);
+                }
+                catch (Exception e)
+                {
+                    LOG.warn(String.format("loginUserFromKeytab failed, user[%s], keytab[%s]", prin, keytab));
+                }
+            }
+        }
+
+        if (LOG.isDebugEnabled())
+        {
+            try
+            {
+                UserGroupInformation user = UserGroupInformation.getLoginUser();
+                LOG.debug(String.format("login user: %s", user));
+            }
+            catch (Exception e)
+            {
+                LOG.warn("get login user failed exception: " + e);
+            }
+        }
+
         this.authorizer = RangerHawqAuthorizer.getInstance();
+
     }
 
 
