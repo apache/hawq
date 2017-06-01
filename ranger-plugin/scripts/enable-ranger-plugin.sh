@@ -20,7 +20,7 @@
 #
 
 function usage() {
-  echo "USAGE: enable-ranger-plugin.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password [-h hawq_host:hawq_port] -w hawq_user -q hawq_password"
+  echo "USAGE: enable-ranger-plugin.sh -r ranger_host:ranger_port -u ranger_user -p ranger_password [-h hawq_host:hawq_port -t lookup_authentication_type -s hawq_kerberos_service_name] -w hawq_user -q hawq_password"
   exit 1
 }
 
@@ -131,6 +131,18 @@ function get_hawq_password() {
   done
 }
 
+function get_hawq_kerberos_service_name() {
+  if [[ -z "$HAWQ_KERBEROS_SERVICE_NAME" ]]; then
+    HAWQ_KERBEROS_SERVICE_NAME="postgres"
+  fi
+}
+
+function get_lookup_authentication_type() {
+  if [[ -z "$LOOKUP_AUTHENTICATION_TYPE" ]]; then
+    LOOKUP_AUTHENTICATION_TYPE="simple"
+  fi
+}
+
 function parse_params() {
   while [[ $# -gt 0 ]]
   do
@@ -160,6 +172,14 @@ function parse_params() {
         HAWQ_PASSWORD="$2"
         shift
         ;;
+      -s)
+        HAWQ_KERBEROS_SERVICE_NAME="$2"
+        shift
+        ;;
+      -t)
+        LOOKUP_AUTHENTICATION_TYPE="$2"
+        shift
+        ;;
       *)
         usage
         ;;
@@ -175,6 +195,8 @@ function validate_params() {
   get_hawq_url
   get_hawq_user
   get_hawq_password
+  get_hawq_kerberos_service_name
+  get_lookup_authentication_type
   echo "RANGER URL  = ${RANGER_URL}"
   echo "RANGER User = ${RANGER_USER}"
   echo "RANGER Password = $(mask ${RANGER_PASSWORD})"
@@ -182,6 +204,8 @@ function validate_params() {
   echo "HAWQ PORT = ${HAWQ_PORT}"
   echo "HAWQ User = ${HAWQ_USER}"
   echo "HAWQ Password = $(mask ${HAWQ_PASSWORD})"
+  echo "HAWQ Lookup Authentication Type = ${LOOKUP_AUTHENTICATION_TYPE}"
+  echo "HAWQ Kerberos Service Name = ${HAWQ_KERBEROS_SERVICE_NAME}"
 }
 
 function check_hawq_service_definition() {
@@ -217,6 +241,8 @@ function create_hawq_service_instance() {
                     \"isEnabled\":true,
                     \"configs\":{\"username\":\"${HAWQ_USER}\",
                                \"password\":\"${HAWQ_PASSWORD}\",
+                               \"authentication\":\"${LOOKUP_AUTHENTICATION_TYPE}\",
+                               \"principal\":\"${HAWQ_KERBEROS_SERVICE_NAME}\",
                                \"hostname\":\"${HAWQ_HOST}\",
                                \"port\":\"${HAWQ_PORT}\"}}"
 
