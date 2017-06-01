@@ -244,7 +244,7 @@
       "name": "authentication",
       "type": "enum",
       "subType": "authType",
-      "mandatory": false,
+      "mandatory": true,
       "validationRegEx": "",
       "validationMessage": "",
       "uiHint": "",
