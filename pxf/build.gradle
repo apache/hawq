@@ -111,10 +111,6 @@ subprojects { subProject ->
             force 'org.codehaus.jackson:jackson-mapper-asl:1.9.13'
             force 'junit:junit:4.11'
         }
-        configurations {
-            exclude group: 'org.json', module: 'json'
-        }
-
     }
 
     task distTar(type: Tar) {
@@ -481,7 +477,7 @@ def buildNumber() {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.14.1'
+    gradleVersion = '2.11'
 }
 
 def distSubprojects = subprojects - project(':pxf-api')

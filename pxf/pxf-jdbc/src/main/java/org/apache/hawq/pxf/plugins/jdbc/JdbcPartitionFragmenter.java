@@ -31,6 +31,9 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
 
 /**
  * Fragmenter class for JDBC data resources.
@@ -116,8 +119,9 @@ public class JdbcPartitionFragmenter extends Fragmenter {
 
         //parse and validate parameter-RANGE
         try {
-            if (inConf.getUserProperty("RANGE") != null) {
-                range = inConf.getUserProperty("RANGE").split(":");
+            String rangeStr = inConf.getUserProperty("RANGE");
+            if (rangeStr != null) {
+                range = rangeStr.split(":");
                 if (range.length == 1 && partitionType != PartitionType.ENUM)
                     throw new UserDataException("The parameter 'RANGE' does not specify '[:end_value]'");
             } else
@@ -128,8 +132,9 @@ public class JdbcPartitionFragmenter extends Fragmenter {
 
         //parse and validate parameter-INTERVAL
         try {
-            if (inConf.getUserProperty("INTERVAL") != null) {
-                interval = inConf.getUserProperty("INTERVAL").split(":");
+            String intervalStr = inConf.getUserProperty("INTERVAL");
+            if (intervalStr != null) {
+                interval = intervalStr.split(":");
                 intervalNum = Integer.parseInt(interval[0]);
                 if (interval.length > 1)
                     intervalType = IntervalType.type(interval[1]);
@@ -153,7 +158,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 rangeEnd.setTime(df.parse(range[1]));
             }
         } catch (ParseException e) {
-            throw new UserDataException("The parameter 'RANGE' has invalid date format.");
+            throw new UserDataException("The parameter 'RANGE' has invalid date format. Expected format is 'YYYY-MM-DD'");
         }
     }
 

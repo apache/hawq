@@ -35,7 +35,7 @@ public interface StatsAccessor extends ReadAccessor {
 
     /**
      * Returns next tuple based on statistics information without actual reading of data
-     * @return only one row
+     * @return next row without reading it from disk
      */
     public OneRow emitAggObject();
 
