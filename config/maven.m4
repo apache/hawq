@@ -13,9 +13,11 @@ fi
 
 if test "$MAVEN"; then
   pgac_maven_version=`$MAVEN --version 2>/dev/null | sed q | $AWK '{print [$]1" "[$]2" "[$]3;}'`
+  pgac_maven_major_version=`$MAVEN --version 2>/dev/null | sed q | $AWK '{print [$]3;}' | sed -e 's|\([[0-9]]\).*|\1|g'`
+
   AC_MSG_NOTICE([using $pgac_maven_version])
-  if echo "$pgac_maven_version" | sed ['s/[^0-9]/ /g'] | $AWK '{ if ([$]1 < 3) exit 0; else exit 1;}'
-  then
+
+  if test $pgac_maven_major_version -lt 3; then
     AC_MSG_WARN([
 *** The installed version of Maven, $MAVEN, is too old to use with HAWQ.
 *** Maven version 3.0.0 or later is required, but this is $pgac_maven_version.])
@@ -31,5 +33,3 @@ fi
 # We don't need AC_SUBST(MAVEN) because AC_PATH_PROG did it.
 AC_SUBST(MAVEN)
 ])# PGAC_PATH_MAVEN
-
-
