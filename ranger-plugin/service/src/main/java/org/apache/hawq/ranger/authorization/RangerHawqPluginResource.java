@@ -50,7 +50,7 @@ public class RangerHawqPluginResource {
     public RangerHawqPluginResource()
     {
         // set UserGroupInformation under kerberos authentication
-        if (Utils.getAuth().equals("kerberos"))
+        if (Utils.getAuth() == Utils.AuthMethod.KERBEROS)
         {
             Configuration conf = new Configuration();
             conf.set("hadoop.security.authentication", "kerberos");
@@ -72,14 +72,17 @@ public class RangerHawqPluginResource {
             }
         }
 
-        try
+        if (LOG.isDebugEnabled())
         {
-            UserGroupInformation user = UserGroupInformation.getLoginUser();
-            LOG.info(String.format("login user: %s", user));
-        }
-        catch (Exception e)
-        {
-            LOG.warn("get login user failed");
+            try
+            {
+                UserGroupInformation user = UserGroupInformation.getLoginUser();
+                LOG.debug(String.format("login user: %s", user));
+            }
+            catch (Exception e)
+            {
+                LOG.warn("get login user failed exception: " + e);
+            }
         }
 
         this.authorizer = RangerHawqAuthorizer.getInstance();
