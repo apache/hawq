@@ -31,11 +31,15 @@ PROG = test_main.cpp $(wildcard */*.cpp)
 OBJS = $(patsubst %.cpp,%.o,$(PROG))
 RM = rm -rf
 
-.PHONY: all sharelib sharelibclean distclean clean doc
+.PHONY: all sharelib sharelibclean distclean maintainer-clean clean doc install installdirs uninstall distprep
 
 all: $(OBJS) sharelib
 	$(MAKE) -C lib all
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(OBJS) $(LDFLAGS) $(LIBS) -o feature-test
+
+install: all
+
+installdirs uninstall distprep:
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $? -o $@
@@ -51,7 +55,7 @@ sharelibclean:
 doc:
 	doxygen doxygen_template
 
-clean distclean: sharelibclean
+clean distclean maintainer-clean: sharelibclean
 	find . -type f -name "*.out" -exec $(RM) {} +
 	$(RM) ExternalSource/ans/external_oid.ans ExternalSource/ans/exttab1.ans ExternalSource/sql/external_oid.sql ExternalSource/sql/exttab1.sql
 	$(RM) UDF/ans/function_c.ans UDF/ans/function_creation.ans UDF/sql/function_c.sql UDF/sql/function_creation.sql

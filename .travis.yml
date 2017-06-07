@@ -57,8 +57,7 @@ before_script:
 
 script:
   - make -j$(sysctl -n hw.ncpu)
-  - make feature-test
-  - make feature-test-clean
+  - make -C src/test/feature all
 
 branches:
   except:

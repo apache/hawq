@@ -52,12 +52,6 @@ rpm:
 	$(MAKE) -C ranger-plugin $@
 	$(MAKE) -C contrib/hawq-package rpm-tarball
 
-feature-test:
-	$(MAKE) -C src feature-test
-
-feature-test-clean:
-	$(MAKE) -C src feature-test-clean
-
 # clean, distclean, etc should apply to contrib too, even though
 # it's not built by default
 clean:
@@ -73,7 +67,6 @@ clean:
 	$(MAKE) -C contrib/hawq-package $@
 	$(MAKE) -C pxf $@
 	$(MAKE) -C ranger-plugin $@
-	-$(MAKE) -C src feature-test-clean
 # Garbage from autoconf:
 	@rm -rf autom4te.cache/
 
@@ -87,7 +80,6 @@ distclean maintainer-clean:
 	-$(MAKE) -C depends/libyarn $@
 	-$(MAKE) -C config $@
 	-$(MAKE) -C tools $@
-	-$(MAKE) -C src feature-test-clean
 	-$(MAKE) -C src $@
 	-$(MAKE) -C pxf $@
 	-$(MAKE) -C ranger-plugin $@
