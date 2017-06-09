@@ -19,19 +19,21 @@ package org.apache.hawq.pxf.plugins.jdbc;
  * under the License.
  */
 
+import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.FragmentsStats;
 import org.apache.hawq.pxf.api.UserDataException;
-import org.apache.hawq.pxf.plugins.jdbc.utils.DbProduct;
-import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
-import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
+import org.apache.hawq.pxf.plugins.jdbc.utils.DbProduct;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
 
 /**
  * Fragmenter class for JDBC data resources.
@@ -111,30 +113,42 @@ public class JdbcPartitionFragmenter extends Fragmenter {
             partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
             partitionColumn = partitionBy[0];
             partitionType = PartitionType.getType(partitionBy[1]);
-        } catch (IllegalArgumentException e1) {
+        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e1) {
             throw new UserDataException("The parameter 'PARTITION_BY' invalid, the pattern is 'column_name:date|int|enum'");
         }
 
+        //parse and validate parameter-RANGE
         try {
-            range = inConf.getUserProperty("RANGE").split(":");
+            String rangeStr = inConf.getUserProperty("RANGE");
+            if (rangeStr != null) {
+                range = rangeStr.split(":");
+                if (range.length == 1 && partitionType != PartitionType.ENUM)
+                    throw new UserDataException("The parameter 'RANGE' does not specify '[:end_value]'");
+            } else
+                throw new UserDataException("The parameter 'RANGE' must be specified along with 'PARTITION_BY'");
         } catch (IllegalArgumentException e1) {
             throw new UserDataException("The parameter 'RANGE' invalid, the pattern is 'start_value[:end_value]'");
         }
+
+        //parse and validate parameter-INTERVAL
         try {
-            //parse and validate parameter-INTERVAL
-            if (inConf.getUserProperty("INTERVAL") != null) {
-                interval = inConf.getUserProperty("INTERVAL").split(":");
+            String intervalStr = inConf.getUserProperty("INTERVAL");
+            if (intervalStr != null) {
+                interval = intervalStr.split(":");
                 intervalNum = Integer.parseInt(interval[0]);
                 if (interval.length > 1)
                     intervalType = IntervalType.type(interval[1]);
-            }
+                if (interval.length == 1 && partitionType == PartitionType.DATE)
+                    throw new UserDataException("The parameter 'INTERVAL' does not specify unit [:year|month|day]");
+            } else if (partitionType != PartitionType.ENUM)
+                throw new UserDataException("The parameter 'INTERVAL' must be specified along with 'PARTITION_BY'");
             if (intervalNum < 1)
                 throw new UserDataException("The parameter 'INTERVAL' must > 1, but actual is '" + intervalNum + "'");
         } catch (IllegalArgumentException e1) {
             throw new UserDataException("The parameter 'INTERVAL' invalid, the pattern is 'interval_num[:interval_unit]'");
-        } catch (UserDataException e2) {
-            throw e2;
         }
+
+        //parse any date values
         try {
             if (partitionType == PartitionType.DATE) {
                 SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
@@ -144,7 +158,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 rangeEnd.setTime(df.parse(range[1]));
             }
         } catch (ParseException e) {
-            throw new UserDataException("The parameter 'RANGE' include invalid date format.");
+            throw new UserDataException("The parameter 'RANGE' has invalid date format. Expected format is 'YYYY-MM-DD'");
         }
     }
 

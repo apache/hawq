@@ -520,7 +520,7 @@ def tomcatTargetDir = "tomcat/build"
 task tomcatGet << {
 
     apply plugin: 'de.undercouch.download'
-    
+
     def TarGzSuffix = ".tar.gz"
     def tomcatTar = "${tomcatName}${TarGzSuffix}"
     def tomcatUrl = "http://archive.apache.org/dist/tomcat/tomcat-7/v${tomcatVersion}/bin/${tomcatTar}"
