@@ -25,41 +25,48 @@ import org.apache.ranger.plugin.service.RangerBaseService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.ranger.plugin.service.ResourceLookupContext;
+import org.apache.ranger.plugin.util.PasswordUtils;
 
 import java.util.*;
+import java.io.IOException;
 
 public class RangerServiceHawq extends RangerBaseService {
 
     private static final Log LOG = LogFactory.getLog(RangerServiceHawq.class);
 
     public RangerServiceHawq() {
-		super();
-	}
-	
-	@Override
-	public void init(RangerServiceDef serviceDef, RangerService service) {
-		super.init(serviceDef, service);
-	}
-	
+        super();
+    }
+
+    @Override
+    public void init(RangerServiceDef serviceDef, RangerService service) {
+        super.init(serviceDef, service);
+    }
+
     @Override
     public HashMap<String, Object> validateConfig() throws Exception {
         boolean isDebugEnabled = LOG.isDebugEnabled();
 
-        if(isDebugEnabled) {
+        if (isDebugEnabled) {
             LOG.debug("==> RangerServiceHawq.validateConfig Service: (hawq)");
         }
 
         HashMap<String, Object> result = new HashMap<>();
-        String 	serviceName = getServiceName();
         if (configs != null) {
-            try  {
-                HawqClient hawqClient = new HawqClient(serviceName, configs);
-                result = hawqClient.checkConnection(configs);
-                hawqClient.close();
-            } catch (HadoopException e) {
-                LOG.error("<== RangerServiceHawq.validateConfig Error:" + e);
-                throw e;
+            boolean retry = false;
+
+            // try normal password (user input in webform)
+            result = check_connection(configs);
+            if (!(boolean)(result.get("connectivityStatus"))) {
+                retry = true;
             }
+
+            if (retry) {
+                // try decrypt password
+                decrypt_password(configs);
+                result = check_connection(configs);
+            }
+
         }
 
         if (isDebugEnabled) {
@@ -70,12 +77,45 @@ public class RangerServiceHawq extends RangerBaseService {
 
     @Override
     public List<String> lookupResource(ResourceLookupContext context) throws Exception {
-    		String 	serviceName = getServiceName();
-    		String	serviceType = getServiceType();
-    		
-        List<String> resources = HawqResourceMgr.getHawqResources(serviceName, serviceType, getConfigs(), context);
+        String serviceName = getServiceName();
+        String serviceType = getServiceType();
+
+        // lookup always need decrypt password
+        //Map<String, String> configs = getConfigs();
+        decrypt_password(configs);
+
+        List<String> resources = HawqResourceMgr.getHawqResources(serviceName, serviceType, configs, context);
 
         return resources;
+    }
+
+    private HashMap<String, Object> check_connection(Map<String, String> configs) throws Exception {
+        HashMap<String, Object> result;
+        String serviceName = getServiceName();
+
+        try {
+            HawqClient hawqClient = new HawqClient(serviceName, configs);
+            result = hawqClient.checkConnection(configs);
+        } catch (HadoopException e) {
+            LOG.error("<== RangerServiceHawq.validateConfig Error:" + e);
+            throw e;
+        }
+
+        return result;
+    }
+
+    private void decrypt_password(Map<String, String> configs) throws Exception {
+        if (configs.containsKey("password")) {
+            String normal_password = configs.get("password");
+            try {
+                normal_password = PasswordUtils.decryptPassword(normal_password);
+            }
+            catch (java.io.IOException e) {
+                // when decrypt failed do nothing
+                LOG.warn("decrypt_password failed: " + e);
+            }
+            configs.put("password", normal_password);
+        }
     }
 
 }
