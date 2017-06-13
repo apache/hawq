@@ -489,7 +489,23 @@ errstart(int elevel, const char *filename, int lineno,
     edata->saved_errno = errno;
 
 #ifndef WIN32
+    bool save_ImmediateInterruptOK = ImmediateInterruptOK;
+    /*
+     * We may be called while ImmediateInterruptOK is true; turn it off
+     * while messing with elog processing.
+     */
+    ImmediateInterruptOK = false;
+
     edata->stacktracesize = backtrace(edata->stacktracearray, 30);
+
+    /*
+     * Restore ImmediateInterruptOK, and check for interrupts if needed.
+     */
+    ImmediateInterruptOK = save_ImmediateInterruptOK;
+    if (save_ImmediateInterruptOK)
+    {
+        CHECK_FOR_INTERRUPTS();
+    }
 #else
     edata->stacktracesize = 0;
 #endif
@@ -4371,7 +4387,23 @@ uint32 gp_backtrace(void **stackAddresses, uint32 maxStackDepth)
 	}
 	else
 	{
+		bool save_ImmediateInterruptOK = ImmediateInterruptOK;
+		/*
+		 * We may be called while ImmediateInterruptOK is true; turn it off
+		 * while messing with elog processing.
+		 */
+		ImmediateInterruptOK = false;
+
 		depth  = backtrace(stackAddresses, maxStackDepth);
+
+		/*
+		 * Restore ImmediateInterruptOK, and check for interrupts if needed.
+		 */
+		ImmediateInterruptOK = save_ImmediateInterruptOK;
+		if (save_ImmediateInterruptOK)
+		{
+			CHECK_FOR_INTERRUPTS();
+		}
 	}
 
 	Assert(depth > 0);
@@ -4379,7 +4411,29 @@ uint32 gp_backtrace(void **stackAddresses, uint32 maxStackDepth)
 	return depth;
 
 #else
-	return backtrace(stackAddresses, maxStackDepth);
+	bool save_ImmediateInterruptOK = ImmediateInterruptOK;
+	/*
+	 * We may be called while ImmediateInterruptOK is true; turn it off
+	 * while messing with elog processing.
+	 */
+	ImmediateInterruptOK = false;
+
+	uint32 depth = 0;
+
+	depth = backtrace(stackAddresses, maxStackDepth);
+
+	Assert (depth > 0);
+
+	/*
+	 * Restore ImmediateInterruptOK, and check for interrupts if needed.
+	 */
+	ImmediateInterruptOK = save_ImmediateInterruptOK;
+	if (save_ImmediateInterruptOK)
+	{
+		CHECK_FOR_INTERRUPTS();
+	}
+
+	return depth;
 #endif
 }
 
