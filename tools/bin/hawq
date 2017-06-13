@@ -120,6 +120,19 @@ def main():
         if second_arg not in cluster_type_list:
             print STOP_HELP
             sys.exit(1)
+        # Redirects users to use reload-config when using old syntax "hawq stop <object> -u" to reload GUC
+        if "-u" in sub_args or "--reload" in sub_args or "u" in sub_args.split("-")[1]:
+            print "To reload GUC values without restarting hawq cluster use 'hawq reload-config <object>'"
+            sys.exit(1)
+        cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
+        result = local_run(cmd)
+    elif hawq_command == "reload-config":
+        hawq_command="stop"
+        sub_args_list.append("-u")
+        sub_args=" ".join(sub_args_list)
+        if second_arg not in cluster_type_list:
+            print RELOAD_CONFIG_HELP
+            sys.exit(1)
         cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
         result = local_run(cmd)
     elif hawq_command == "init":
