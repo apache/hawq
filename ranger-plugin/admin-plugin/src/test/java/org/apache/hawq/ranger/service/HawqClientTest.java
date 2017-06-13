@@ -27,20 +27,23 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.List;
 import java.util.Arrays;
 import java.util.Collections;
 
 import static org.apache.hawq.ranger.service.HawqClient.*;
 import static org.junit.Assert.*;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyMap;
+import static org.mockito.Matchers.anyString;
 import static org.powermock.api.mockito.PowerMockito.*;
-import static org.powermock.api.support.membermodification.MemberMatcher.method;
-import static org.powermock.api.support.membermodification.MemberModifier.suppress;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(HawqClient.class)
@@ -68,11 +71,10 @@ public class HawqClientTest {
         connectionProperties.put("username", "username");
         connectionProperties.put("password", "password");
 
+        mockStatic(DriverManager.class);
         suppress(constructor(BaseClient.class, String.class, Map.class));
-        suppress(method(HawqClient.class, "initHawq"));
-        suppress(method(HawqClient.class, "resetConnection"));
         hawqClient = new HawqClient("hawq", connectionProperties);
-        hawqClient.setConnection(conn);
+
         hawqClientSpy = PowerMockito.spy(hawqClient);
 
         resources = new HashMap<>();
@@ -84,6 +86,7 @@ public class HawqClientTest {
 
     @Test
     public void testCheckConnection_Failure() throws Exception {
+        when(DriverManager.getConnection(anyString(), any(Properties.class))).thenReturn(conn);
         when(conn.getCatalog()).thenReturn(null);
         Map<String, Object> response = hawqClient.checkConnection(connectionProperties);
         assertEquals(CONNECTION_FAILURE_MESSAGE, response.get("message"));
@@ -92,6 +95,7 @@ public class HawqClientTest {
 
     @Test
     public void testCheckConnection_Success() throws Exception {
+        when(DriverManager.getConnection(anyString(), any(Properties.class))).thenReturn(conn);
         when(conn.getCatalog()).thenReturn("catalog");
         Map<String, Object> response = hawqClient.checkConnection(connectionProperties);
         assertEquals(CONNECTION_SUCCESSFUL_MESSAGE, response.get("message"));
@@ -100,8 +104,8 @@ public class HawqClientTest {
 
     @Test
     public void testCheckConnection_ThrowsSQLException_Failure() throws Exception {
-    		when(conn.getCatalog()).thenThrow(new SQLException("Failed to connect"));
-    		Map<String, Object> response = hawqClient.checkConnection(connectionProperties);
+        when(DriverManager.getConnection(anyString(), any(Properties.class))).thenThrow(new SQLException("Failed to connect"));
+        Map<String, Object> response = hawqClient.checkConnection(connectionProperties);
         assertEquals(CONNECTION_FAILURE_MESSAGE, response.get("message"));
         assertEquals("Failed to connect", response.get("description"));
         assertFalse((Boolean) response.get("connectivityStatus"));
@@ -113,6 +117,7 @@ public class HawqClientTest {
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
         when(resultSet.getString(DATNAME)).thenReturn("db1").thenReturn("db2");
+        PowerMockito.doReturn(conn).when(hawqClientSpy, "getConnection", anyMap(), anyString());
         assertEquals(Arrays.asList("db1", "db2"), hawqClientSpy.getDatabaseList("d"));
     }
 
@@ -163,6 +168,7 @@ public class HawqClientTest {
 
     @Test
     public void testTableList_Success() throws Exception {
+        PowerMockito.doReturn(conn).when(hawqClientSpy, "getConnection", anyMap(), anyString());
         when(conn.prepareStatement(TABLE_LIST_QUERY)).thenReturn(preparedStatement);
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
@@ -175,6 +181,7 @@ public class HawqClientTest {
 
     @Test
     public void testSequenceList_Success() throws Exception {
+        PowerMockito.doReturn(conn).when(hawqClientSpy, "getConnection", anyMap(), anyString());
         when(conn.prepareStatement(SEQUENCE_LIST_QUERY)).thenReturn(preparedStatement);
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
@@ -187,6 +194,7 @@ public class HawqClientTest {
 
     @Test
     public void testSequenceList_SchemaFiltered_Success() throws Exception {
+        PowerMockito.doReturn(conn).when(hawqClientSpy, "getConnection", anyMap(), anyString());
         when(conn.prepareStatement(SEQUENCE_LIST_QUERY)).thenReturn(preparedStatement);
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
@@ -197,6 +205,7 @@ public class HawqClientTest {
 
     @Test
     public void testFunctionList_Success() throws Exception {
+        PowerMockito.doReturn(conn).when(hawqClientSpy, "getConnection", anyMap(), anyString());
         when(conn.prepareStatement(FUNCTION_LIST_QUERY)).thenReturn(preparedStatement);
         when(preparedStatement.executeQuery()).thenReturn(resultSet);
         when(resultSet.next()).thenReturn(true).thenReturn(true).thenReturn(false);
