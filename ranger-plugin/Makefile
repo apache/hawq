@@ -18,6 +18,7 @@
 # HAWQ ranger-plugin makefile
 subdir = ranger-plugin
 top_builddir = ../
+ranger_dir = $(prefix)/ranger
 include Makefile.global
 
 MVN_OPTS="-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn -B -e"
@@ -25,31 +26,42 @@ MVN_OPTS="-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenT
 #
 .PHONY: all install distclean clean uninstall
 
-rpm:
-	@echo "Build rpm package for HAWQ ranger-plugin."
-	./scripts/build_ranger_rpm.sh
-
 ifeq ($(enable_rps), yes)
 
 all:
 ifdef MAVEN
 	$(MAVEN) $(MVN_OPTS) clean
 	$(MAVEN) $(MVN_OPTS) package
-	$(MAVEN) $(MVN_OPTS) install
 else
 	@$(missing) mvn $< $(MVN_OPTS) clean
 	@$(missing) mvn $< $(MVN_OPTS) package
-	@$(missing) mvn $< $(MVN_OPTS) install
 endif
 
 install:
-	@echo "Install ranger-plugin by copy ranger-plugin to HAWQ install dir."
-	@echo "install `find $(top_builddir)$(subdir)/target -name ranger` into ${prefix}/ranger"
-	cp -r `find $(top_builddir)$(subdir)/target -name ranger` ${prefix}/
-	chmod -R 750 $(prefix)/ranger/bin
+	@echo "Install ranger-plugin by copy corresponding files to HAWQ install dir."
+	mkdir -p $(ranger_dir)/{bin,etc,lib,plugin-service}
+	mkdir -p $(ranger_dir)/plugin-service/{bin,conf,lib,logs,temp,webapps,work}
+	mkdir -p $(ranger_dir)/plugin-service/work/policycache
+	cp $(top_builddir)$(subdir)/scripts/enable-ranger-plugin.sh  $(ranger_dir)/bin
+	cp $(top_builddir)$(subdir)/scripts/rps.sh                   $(ranger_dir)/bin
+	cp $(top_builddir)$(subdir)/scripts/catalina.sh              $(ranger_dir)/bin
+	chmod -R 750 $(ranger_dir)/bin
+	cp $(top_builddir)$(subdir)/conf/ranger-servicedef-hawq.json              $(ranger_dir)/etc
+	cp $(top_builddir)$(subdir)/service/target/conf/ranger-hawq-security.xml  $(ranger_dir)/etc
+	cp $(top_builddir)$(subdir)/service/target/conf/ranger-hawq-audit.xml     $(ranger_dir)/etc
+	cp $(top_builddir)$(subdir)/service/target/conf/rps.properties            $(ranger_dir)/etc
+	cp $(top_builddir)$(subdir)/service/target/conf/log4j.properties          $(ranger_dir)/etc
+	cp $(top_builddir)$(subdir)/admin-plugin/target/ranger-plugin-admin-*.jar $(ranger_dir)/lib
+	cp $(top_builddir)$(subdir)/admin-plugin/target/lib/postgresql-*.jar      $(ranger_dir)/lib
+	cp $(top_builddir)$(subdir)/scripts/setenv.sh                                      $(ranger_dir)/plugin-service/bin
+	cp $(top_builddir)$(subdir)/conf/server.xml                                        $(ranger_dir)/plugin-service/conf
+	cp $(top_builddir)$(subdir)/conf/catalina.properties                               $(ranger_dir)/plugin-service/conf
+	cp $(top_builddir)$(subdir)/service/target/ranger-plugin-service-*/WEB-INF/lib/*   $(ranger_dir)/plugin-service/lib/
+	rm $(ranger_dir)/plugin-service/lib/jersey-*-1.9.jar
+	cp $(top_builddir)$(subdir)/service/target/ranger-plugin-service-*.war             $(ranger_dir)/plugin-service/webapps/rps.war
 
 uninstall:
-	rm -rf $(prefix)/ranger
+	rm -rf $(ranger_dir)
 
 clean:
 ifdef MAVEN
@@ -65,8 +77,13 @@ else
 all install distclean clean uninstall:
 
 clean:
-	rm -rf target/rpm/*
+	-rm -rf admin-plugin/target
+	-rm -rf service/target
 
 distclean: clean
 
 endif
+
+rpm:
+	@echo "Build rpm package for HAWQ ranger-plugin."
+	./scripts/build_ranger_rpm.sh
