@@ -57,6 +57,7 @@ install:
 	cp $(top_builddir)$(subdir)/conf/server.xml                                        $(ranger_dir)/plugin-service/conf
 	cp $(top_builddir)$(subdir)/conf/catalina.properties                               $(ranger_dir)/plugin-service/conf
 	cp $(top_builddir)$(subdir)/service/target/ranger-plugin-service-*/WEB-INF/lib/*   $(ranger_dir)/plugin-service/lib/
+	rm $(ranger_dir)/plugin-service/lib/jersey-*-1.9.jar
 	cp $(top_builddir)$(subdir)/service/target/ranger-plugin-service-*.war             $(ranger_dir)/plugin-service/webapps/rps.war
 
 uninstall:
@@ -86,4 +87,3 @@ endif
 rpm:
 	@echo "Build rpm package for HAWQ ranger-plugin."
 	./scripts/build_ranger_rpm.sh
-
