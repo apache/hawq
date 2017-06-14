@@ -94,19 +94,25 @@ public class HawqClient extends BaseClient {
 
     /**
      * clone a new Properties for debug logging:
-     *  1. remove password field for preventing plain password leak in log
-     *  2. add a _password_length field for debug
+     *  1. remove all password fields for preventing plain password leak in log
+     *  2. add _password_length fields for debug
      *
      * @param connectionProperties
      * @return a new cloned Map for debug logging
      */
     private Map<String, String> removePassword(Map<String, String> connectionProperties) {
         Map<String, String> new_property = new HashMap<String, String>(connectionProperties);
-        if (new_property.containsKey("password")) {
-            String password = new_property.get("password");
-            new_property.remove("password");
-            new_property.put("_password_length", Integer.toString(password.length()));
+
+        String pass_fields[] = {"password", "password_jdbc"};
+        for (int i = 0; i < pass_fields.length; i++) {
+            String field = pass_fields[i];
+            if (new_property.containsKey(field)) {
+                String password = new_property.get(field);
+                new_property.remove(field);
+                new_property.put("_"+field+"_length", Integer.toString(password.length()));
+            }
         }
+
         return new_property;
     }
 
@@ -130,10 +136,13 @@ public class HawqClient extends BaseClient {
             props.setProperty("jaasApplicationName", "pgjdbc");
         }
 
+        String password = connectionProperties.get("password");
+        if (connectionProperties.containsKey("password_jdbc"))
+            password = connectionProperties.get("password_jdbc");
 
         String url = String.format("jdbc:postgresql://%s:%s/%s", connectionProperties.get("hostname"), connectionProperties.get("port"), db);
         props.setProperty("user", connectionProperties.get("username"));
-        props.setProperty("password", connectionProperties.get("password"));
+        props.setProperty("password", password);
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("<== HawqClient.checkConnection Connecting to: (" + url + ") with user: " + connectionProperties.get("username"));

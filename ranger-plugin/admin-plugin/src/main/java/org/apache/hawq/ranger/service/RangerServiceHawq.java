@@ -102,6 +102,13 @@ public class RangerServiceHawq extends RangerBaseService {
         return result;
     }
 
+    /**
+     * decrypt password field of configs
+     * Note:
+     *  the decrypted password is set in a new password_jdbc field
+     * @param configs
+     * @throws Exception
+     */
     private void decryptPassword(Map<String, String> configs) throws Exception {
         if (configs.containsKey("password")) {
             String normal_password = configs.get("password");
@@ -112,7 +119,7 @@ public class RangerServiceHawq extends RangerBaseService {
                 // when decrypt failed do nothing
                 LOG.warn("decrypt_password failed: " + e);
             }
-            configs.put("password", normal_password);
+            configs.put("password_jdbc", normal_password);
         }
     }
 
