@@ -28,7 +28,6 @@ import org.apache.ranger.plugin.service.ResourceLookupContext;
 import org.apache.ranger.plugin.util.PasswordUtils;
 
 import java.util.*;
-import java.io.IOException;
 
 public class RangerServiceHawq extends RangerBaseService {
 
@@ -55,16 +54,16 @@ public class RangerServiceHawq extends RangerBaseService {
         if (configs != null) {
             boolean retry = false;
 
-            // try normal password (user input in webform)
-            result = check_connection(configs);
-            if (!(boolean)(result.get("connectivityStatus"))) {
+            // try normal password (user input in RangerUI form)
+            result = checkConnection(configs);
+            if (result.containsKey("connectivityStatus") && !(boolean)(result.get("connectivityStatus"))) {
                 retry = true;
             }
 
             if (retry) {
                 // try decrypt password
-                decrypt_password(configs);
-                result = check_connection(configs);
+                decryptPassword(configs);
+                result = checkConnection(configs);
             }
 
         }
@@ -80,16 +79,15 @@ public class RangerServiceHawq extends RangerBaseService {
         String serviceName = getServiceName();
         String serviceType = getServiceType();
 
-        // lookup always need decrypt password
-        //Map<String, String> configs = getConfigs();
-        decrypt_password(configs);
+        // lookup always need decrypt password (fetch from database)
+        decryptPassword(configs);
 
         List<String> resources = HawqResourceMgr.getHawqResources(serviceName, serviceType, configs, context);
 
         return resources;
     }
 
-    private HashMap<String, Object> check_connection(Map<String, String> configs) throws Exception {
+    private HashMap<String, Object> checkConnection(Map<String, String> configs) throws Exception {
         HashMap<String, Object> result;
         String serviceName = getServiceName();
 
@@ -104,7 +102,7 @@ public class RangerServiceHawq extends RangerBaseService {
         return result;
     }
 
-    private void decrypt_password(Map<String, String> configs) throws Exception {
+    private void decryptPassword(Map<String, String> configs) throws Exception {
         if (configs.containsKey("password")) {
             String normal_password = configs.get("password");
             try {

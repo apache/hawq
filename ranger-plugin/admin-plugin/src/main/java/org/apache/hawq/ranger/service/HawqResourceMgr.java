@@ -45,7 +45,7 @@ public abstract class HawqResourceMgr {
             try {
 
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("==> HawqResourceMgr.getHawqResources() UserInput: " + userInput + " configs: " + configs);
+                    LOG.debug("==> HawqResourceMgr.getHawqResources() UserInput: " + userInput);
                 }
                 final HawqClient hawqClient = new HawqClient(serviceName, configs);
                 Callable<List<String>> callableObj;

@@ -92,6 +92,23 @@ public class HawqClient extends BaseClient {
         this.connectionProperties = connectionProperties;
     }
 
+    /**
+     * clone a new Properties for debug logging:
+     *  1. remove password field for preventing plain password leak in log
+     *  2. add a _password_length field for debug
+     *
+     * @param connectionProperties
+     * @return a new cloned Map for debug logging
+     */
+    private Map<String, String> removePassword(Map<String, String> connectionProperties) {
+        Map<String, String> new_property = new HashMap<String, String>(connectionProperties);
+        if (new_property.containsKey("password")) {
+            String password = new_property.get("password");
+            new_property.remove("password");
+            new_property.put("_password_length", Integer.toString(password.length()));
+        }
+        return new_property;
+    }
 
     private Connection getConnection(Map<String, String> connectionProperties) throws SQLException {
         return getConnection(connectionProperties, null);
@@ -103,7 +120,8 @@ public class HawqClient extends BaseClient {
         Properties props = new Properties();
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("<== HawqClient.checkConnection configuration" + connectionProperties );
+            Map<String, String> debugProperties = removePassword(connectionProperties);
+            LOG.debug("<== HawqClient.checkConnection configuration" + debugProperties );
         }
 
         if (connectionProperties.containsKey(AUTHENTICATION) && connectionProperties.get(AUTHENTICATION).equals(KERBEROS)) {
