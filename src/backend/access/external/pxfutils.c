@@ -108,6 +108,8 @@ static void process_request(ClientContext* client_context, char *uri)
 
 	print_http_headers(client_context->http_headers);
 	client_context->handle = churl_init_download(uri, client_context->http_headers);
+	if (client_context->handle == NULL) 
+		elog(ERROR, "Unsuccessful connection to uri: %s", uri);
 	memset(buffer, 0, RAW_BUF_SIZE);
 	resetStringInfo(&(client_context->the_rest_buf));
 
