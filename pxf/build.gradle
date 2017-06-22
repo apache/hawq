@@ -79,6 +79,16 @@ subprojects { subProject ->
             "-Xlint:-fallthrough", "-Xlint:-deprecation", "-Xlint:-unchecked", "-Xlint:-options"
     ]
 
+    // Add LICENSE, DISCLAIMER and NOTICE to generated jar files.
+    sourceSets {
+        main {
+            resources {
+                srcDir '../resources'
+                include '**/*'
+            }
+        }
+    }
+
     repositories {
         // mavenCentral without https:
         maven { url 'http://repo1.maven.org/maven2' }
