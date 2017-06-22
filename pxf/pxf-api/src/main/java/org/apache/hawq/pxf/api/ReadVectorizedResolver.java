@@ -1,3 +1,5 @@
+package org.apache.hawq.pxf.api;
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -6,9 +8,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -17,26 +19,21 @@
  * under the License.
  */
 
-package org.apache.hawq.pxf.api;
-
-import org.apache.hawq.pxf.api.OneRow;
+import java.util.List;
 
 /**
- * Interface of accessor which can leverage statistic information for aggregate queries
+ * 
+ * Interface that defines deserialization batch of records at once.
  *
  */
-public interface StatsAccessor extends ReadAccessor {
+public interface ReadVectorizedResolver {
 
     /**
-     * Method which reads needed statistics for current split
-     * @throws Exception when unable to retrieve statistics
+     * Returns resolved list of tuples
+     * 
+     * @param batch unresolved batch
+     * @return list of tuples
      */
-    public void retrieveStats() throws Exception;
-
-    /**
-     * Returns next tuple based on statistics information without actual reading of data
-     * @return next row without reading it from disk
-     */
-    public OneRow emitAggObject();
+    public List<List<OneField>> getFieldsForBatch(OneRow batch);
 
 }

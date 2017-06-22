@@ -166,7 +166,7 @@ public class ReadBridge implements Bridge {
      * analyzing the exception type, and when we discover that the actual
      * problem was a data problem, we return the errorOutput GPDBWritable.
      */
-    private boolean isDataException(IOException ex) {
+    protected boolean isDataException(IOException ex) {
         return (ex instanceof EOFException
                 || ex instanceof CharacterCodingException
                 || ex instanceof CharConversionException
