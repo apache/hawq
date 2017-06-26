@@ -482,6 +482,13 @@ project('pxf-jdbc') {
     }
 }
 
+project('pxf-local') {
+    dependencies {
+        compile(project(':pxf-api'))
+        compile(project(':pxf-service'))
+    }
+}
+
 def buildNumber() {
     System.getenv('BUILD_NUMBER') ?: System.getProperty('user.name')
 }
