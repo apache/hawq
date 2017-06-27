@@ -319,6 +319,7 @@ project('pxf') {
         requires(versionedPackageName('pxf-hive'), project.version, GREATER | EQUAL)
         requires(versionedPackageName('pxf-hbase'), project.version, GREATER | EQUAL)
         requires(versionedPackageName('pxf-json'), project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-jdbc'), project.version, GREATER | EQUAL)
 
         preInstall file('src/scripts/pre-install.sh')
         postInstall file('src/scripts/post-install.sh')
