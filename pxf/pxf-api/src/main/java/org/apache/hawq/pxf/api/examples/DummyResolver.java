@@ -1,4 +1,4 @@
-package org.apache.hawq.pxf.plugins.local;
+package org.apache.hawq.pxf.api.examples;
 
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.OneRow;
@@ -10,9 +10,9 @@ import java.util.List;
 import static org.apache.hawq.pxf.api.io.DataType.INTEGER;
 import static org.apache.hawq.pxf.api.io.DataType.VARCHAR;
 
-public class LocalTextResolver extends Plugin implements ReadResolver {
+public class DummyResolver extends Plugin implements ReadResolver {
     private int rowNumber;
-    public LocalTextResolver(InputData metaData) {
+    public DummyResolver(InputData metaData) {
         super(metaData);
         rowNumber = 0;
     }

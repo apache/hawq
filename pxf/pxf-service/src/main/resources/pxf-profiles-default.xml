@@ -186,15 +186,4 @@ under the License.
             <resolver>org.apache.hawq.pxf.plugins.jdbc.JdbcReadResolver</resolver>
         </plugins>
     </profile>
-	<profile>
-		<name>LocalText</name>
-		<description>This profile is suitable for accessing text on the local file system. 
-			Primarily intended to test PXF functionality without any outside dependencies.
-		</description>
-		<plugins>
-			<fragmenter>org.apache.hawq.pxf.plugins.local.LocalTextFragmenter</fragmenter>
-			<accessor>org.apache.hawq.pxf.plugins.local.LocalTextAccessor</accessor>
-			<resolver>org.apache.hawq.pxf.plugins.local.LocalTextResolver</resolver>
-		</plugins>
-	</profile>
 </profiles>

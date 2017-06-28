@@ -1,17 +1,17 @@
-package org.apache.hawq.pxf.plugins.local;
+package org.apache.hawq.pxf.api.examples;
 
-import org.apache.hawq.pxf.api.ReadAccessor;
 import org.apache.hawq.pxf.api.OneRow;
+import org.apache.hawq.pxf.api.ReadAccessor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-public class LocalTextAccessor extends Plugin implements ReadAccessor {
-    private static final Log LOG = LogFactory.getLog(LocalTextAccessor.class);
+public class DummyAccessor extends Plugin implements ReadAccessor {
+    private static final Log LOG = LogFactory.getLog(DummyAccessor.class);
     private int rowNumber;
     private int fragmentNumber;
-    public LocalTextAccessor(InputData metaData) {
+    public DummyAccessor(InputData metaData) {
         super(metaData);
     }
     @Override

@@ -1,4 +1,4 @@
-package org.apache.hawq.pxf.plugins.local;
+package org.apache.hawq.pxf.api.examples;
 
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.Fragment;
@@ -12,8 +12,8 @@ import java.util.List;
  * the data into fragments and return a list of them along with a list of
  * host:port locations for each.
  */
-public class LocalTextFragmenter extends Fragmenter{
-    public LocalTextFragmenter(InputData metaData) {
+public class DummyFragmenter extends Fragmenter{
+    public DummyFragmenter(InputData metaData) {
         super(metaData);
     }
     /*
