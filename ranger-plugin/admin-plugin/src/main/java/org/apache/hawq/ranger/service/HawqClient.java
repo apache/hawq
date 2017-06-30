@@ -23,17 +23,15 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.ranger.model.HawqProtocols;
 import org.apache.ranger.plugin.client.BaseClient;
 
-import java.security.PrivilegedAction;
-import java.security.PrivilegedExceptionAction;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.ResultSet;
-import java.sql.*;
 import java.util.*;
 
-import javax.security.auth.Subject;
+import org.apache.ranger.audit.utils.InMemoryJAASConfiguration;
+
 
 public class HawqClient extends BaseClient {
 
@@ -74,7 +72,7 @@ public class HawqClient extends BaseClient {
     private static final String DEFAULT_DATABASE = "postgres";
     private static final String DEFAULT_DATABASE_TEMPLATE = "DBTOBEREPLACEDINJDBCURL";
     private static final String JDBC_DRIVER_CLASS = "org.postgresql.Driver";
-
+    private static final String jaasApplicationName = "pgjdbc";
 
     // we need to load class for the Postgres Driver directly to allow it to register with DriverManager
     // since DriverManager's classloader will not be able to find it by itself due to plugin's special classloaders
@@ -90,6 +88,8 @@ public class HawqClient extends BaseClient {
     public HawqClient(String serviceName, Map<String, String> connectionProperties) throws Exception {
         super(serviceName, connectionProperties);
         this.connectionProperties = connectionProperties;
+
+
     }
 
     /**
@@ -131,9 +131,22 @@ public class HawqClient extends BaseClient {
         }
 
         if (connectionProperties.containsKey(AUTHENTICATION) && connectionProperties.get(AUTHENTICATION).equals(KERBEROS)) {
+
+            Properties props_jaas = new Properties();
+            props_jaas.put("xasecure.audit.jaas."+jaasApplicationName+".loginModuleName", "com.sun.security.auth.module.Krb5LoginModule");
+            props_jaas.put("xasecure.audit.jaas."+jaasApplicationName+".loginModuleControlFlag", "required");
+
+            try {
+                InMemoryJAASConfiguration.init(props_jaas);
+            } catch (Exception e) {
+                LOG.error("InMemoryJAASConfiguration failed: " + e.getMessage());
+                e.printStackTrace();
+            }
+
             //kerberos mode
             props.setProperty("kerberosServerName", connectionProperties.get("principal"));
-            props.setProperty("jaasApplicationName", "pgjdbc");
+            props.setProperty("jaasApplicationName", jaasApplicationName);
+
         }
 
         String password = connectionProperties.get("password");
