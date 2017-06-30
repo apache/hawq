@@ -36,6 +36,7 @@ pxf/pxf-hbase-*[0-9].jar
 pxf/pxf-hdfs-*[0-9].jar
 pxf/pxf-hive-*[0-9].jar
 pxf/pxf-json-*[0-9].jar
+pxf/pxf-jdbc-*[0-9].jar
 
 # Hadoop Libraries
 hadoop/share/hadoop/hdfs/hadoop-hdfs-*[0-9].jar

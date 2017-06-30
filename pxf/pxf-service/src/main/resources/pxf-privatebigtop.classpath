@@ -60,3 +60,4 @@
 /usr/lib/pxf/pxf-hdfs-*[0-9].jar
 /usr/lib/pxf/pxf-hive-*[0-9].jar
 /usr/lib/pxf/pxf-json-*[0-9].jar
+/usr/lib/pxf/pxf-jdbc-*[0-9].jar
