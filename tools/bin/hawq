@@ -121,12 +121,13 @@ def main():
             print STOP_HELP
             sys.exit(1)
         # Prints deprecation warning when using old syntax "hawq stop <object> -u" to reload GUC
-        if "-u" in sub_args or "--reload" in sub_args or "u" in sub_args.split("-")[1]:
-            deprecationMessage = """
-            hawq stop <object> -u is being deprecated and replaced by 'hawq reload <object>'
-            Current syntax will work but please use 'hawq reload <object>' going forward. 
-            """
-            print deprecationMessage
+        if len(sub_args.split("-")) > 1:
+            if "-u" in sub_args or "--reload" in sub_args or "u" in sub_args.split("-")[1]:
+                deprecationMessage = """
+                hawq stop <object> -u is being deprecated and replaced by 'hawq reload <object>'
+                Current syntax will work but please use 'hawq reload <object>' going forward. 
+                """
+                print deprecationMessage
         cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
         result = local_run(cmd)
     elif hawq_command == "reload":
