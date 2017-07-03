@@ -444,8 +444,6 @@ extern bool optimizer_prefer_scalar_dqa_multistage_agg;
 extern bool optimizer_parallel_union;
 extern bool optimizer_array_constraints;
 
-/* Timeout for shareinputscan writer/reader wait for lock files */ 
-extern int share_input_scan_wait_lockfile_timeout;
 
 /* fallback in ranger ACL check */
 extern int information_schema_namespace_oid;

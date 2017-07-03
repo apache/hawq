@@ -15,7 +15,6 @@
 #define NODEMATERIAL_H
 
 #include "nodes/execnodes.h"
-#include "executor/nodeShareInputScan.h"
 
 extern int	ExecCountSlotsMaterial(Material *node);
 extern MaterialState *ExecInitMaterial(Material *node, EState *estate, int eflags);
