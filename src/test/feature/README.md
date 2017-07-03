@@ -15,8 +15,9 @@ Before building the code of feature tests part, just make sure your compiler sup
 1. Make sure HAWQ is running correctly. If not, `init` or `start` HAWQ at first. Note please don't set locale related arguments for hawq init.
 2. Load environment configuration by running `source $INSTALL_PREFIX/greenplum_path.sh`.
 3. Load hdfs configuration. For example, `export HADOOP_HOME=/Users/wuhong/hadoop-2.7.2 && export PATH=${PATH}:${HADOOP_HOME}/bin`. Since some test cases need `hdfs` and `hadoop` command, just ensure these commands work before running. Otherwise you will get failure.
-4. Run the cases with`./parallel-run-feature-test.sh 8 ./feature-test`(in this case 8 threads in parallel), you could use `--gtest_filter` option to filter test cases(both positive and negative patterns are supported). Please see more options by running `./feature-test --help`. 
-5.You can also run cases with `./parallel-run-feature-test.sh 8 ./feature-test --gtest_schedule` (eg. --gtest_schedule=./full_tests.txt) if you want to run cases in both parallel way and serial way.The schedule file sample is full_tests.txt which stays in the same directory.
+4. Run the cases with`./parallel-run-feature-test.sh 8 ./feature-test`(in this case 8 threads in parallel), you could use `--gtest_filter` option to filter test cases(both positive and negative patterns are supported). Please see more options by running `./feature-test --help`. You can also run cases with `./parallel-run-feature-test.sh 8 ./feature-test --gtest_schedule` (eg. --gtest_schedule=./full_tests.txt) if you want to run cases in both parallel way and serial way.The schedule file sample is full_tests.txt which stays in the same directory.
+
+**NOTE**: To ensure all answer files(files with extension .ans) are uniform in their output format, certain properties are set in parallel-run-feature-test.sh. Therefore running tests direclty using `./feature-test` might cause some tests to fail.  
 
 # Development
 In contribution to HAWQ, we suggest developers submitting feature tests related to your feature development. In writting a featurte test, you need to write a cpp file inside corresponding folders. There are two recommended way to write this cpp file:
