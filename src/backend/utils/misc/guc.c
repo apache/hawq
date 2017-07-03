@@ -6693,7 +6693,7 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&share_input_scan_wait_lockfile_timeout,
-		300000, 1, INT_MAX, NULL, NULL
+		300000, 1, 65536, NULL, NULL
 	},
 
 
