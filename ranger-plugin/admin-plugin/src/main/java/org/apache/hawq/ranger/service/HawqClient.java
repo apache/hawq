@@ -72,7 +72,7 @@ public class HawqClient extends BaseClient {
     private static final String DEFAULT_DATABASE = "postgres";
     private static final String DEFAULT_DATABASE_TEMPLATE = "DBTOBEREPLACEDINJDBCURL";
     private static final String JDBC_DRIVER_CLASS = "org.postgresql.Driver";
-    private static final String jaasApplicationName = "pgjdbc";
+    private static final String JAAS_APPLICATION_NAME = "pgjdbc";
 
     // we need to load class for the Postgres Driver directly to allow it to register with DriverManager
     // since DriverManager's classloader will not be able to find it by itself due to plugin's special classloaders
@@ -88,8 +88,6 @@ public class HawqClient extends BaseClient {
     public HawqClient(String serviceName, Map<String, String> connectionProperties) throws Exception {
         super(serviceName, connectionProperties);
         this.connectionProperties = connectionProperties;
-
-
     }
 
     /**
@@ -133,8 +131,8 @@ public class HawqClient extends BaseClient {
         if (connectionProperties.containsKey(AUTHENTICATION) && connectionProperties.get(AUTHENTICATION).equals(KERBEROS)) {
 
             Properties props_jaas = new Properties();
-            props_jaas.put("xasecure.audit.jaas."+jaasApplicationName+".loginModuleName", "com.sun.security.auth.module.Krb5LoginModule");
-            props_jaas.put("xasecure.audit.jaas."+jaasApplicationName+".loginModuleControlFlag", "required");
+            props_jaas.put("xasecure.audit.jaas."+ JAAS_APPLICATION_NAME +".loginModuleName", "com.sun.security.auth.module.Krb5LoginModule");
+            props_jaas.put("xasecure.audit.jaas."+ JAAS_APPLICATION_NAME +".loginModuleControlFlag", "required");
 
             try {
                 InMemoryJAASConfiguration.init(props_jaas);
@@ -145,7 +143,7 @@ public class HawqClient extends BaseClient {
 
             //kerberos mode
             props.setProperty("kerberosServerName", connectionProperties.get("principal"));
-            props.setProperty("jaasApplicationName", jaasApplicationName);
+            props.setProperty("jaasApplicationName", JAAS_APPLICATION_NAME);
 
         }
 
