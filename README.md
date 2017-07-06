@@ -4,7 +4,7 @@
 
 |CI Process|Status|
 |---|---|
-|Travis CI Build|[![https://travis-ci.org/apache/incubator-hawq.png](https://travis-ci.org/apache/incubator-hawq.png)](https://travis-ci.org/apache/incubator-hawq)|
+|Travis CI Build|[![https://travis-ci.org/apache/incubator-hawq.svg?branch=master](https://travis-ci.org/apache/incubator-hawq.png?branch=master)](https://travis-ci.org/apache/incubator-hawq?branch=master)|
 |Apache Release Audit Tool ([RAT](https://creadur.apache.org/rat/))|[![Rat Status](https://builds.apache.org/buildStatus/icon?job=HAWQ-rat)](https://builds.apache.org/view/HAWQ/job/HAWQ-rat/)|
 |Coverity Static Analysis   |[![Coverity Scan Build](https://scan.coverity.com/projects/apache-incubator-hawq/badge.svg)](https://scan.coverity.com/projects/apache-incubator-hawq)|
 
