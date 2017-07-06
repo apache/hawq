@@ -43,6 +43,7 @@ public class DemoResolver extends Plugin implements ReadResolver {
     public DemoResolver(InputData metaData) {
         super(metaData);
     }
+
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
         List<OneField> output = new LinkedList<OneField>();

@@ -36,6 +36,7 @@ public class DemoAccessor extends Plugin implements ReadAccessor {
     private static final Log LOG = LogFactory.getLog(DemoAccessor.class);
     private int rowNumber;
     private int fragmentNumber;
+    private static int NUM_ROWS = 2;
     /**
      * Constructs a DemoAccessor
      *
@@ -59,10 +60,10 @@ public class DemoAccessor extends Plugin implements ReadAccessor {
         String fragmentMetadata = new String(inputData.getFragmentMetadata());
         /* generate row */
         OneRow row = new OneRow(fragment + "." + rowNumber,
-                rowNumber + "," + "Hello World!" + "," + fragment);
+                rowNumber + "," + fragmentMetadata + "," + fragment);
         /* advance */
         rowNumber += 1;
-        if (rowNumber == 2) {
+        if (rowNumber == NUM_ROWS) {
             rowNumber = 0;
             fragmentNumber += 1;
         }
