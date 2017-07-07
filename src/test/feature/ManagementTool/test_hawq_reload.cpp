@@ -33,7 +33,7 @@ using hawq::test::Command;
 /*
 Test case for hawq reload <object>. This test changes the value of GUC 
 log_min_messages to debug. Reloads the cluster and verifies if the change
-was reloaded successfully. After the test it resets the valueof GUC to 
+was reloaded successfully. After the test it resets the value of GUC to 
 default.
 */
 TEST_F(TestHawqReload,TestReloadLogMinMessages) {

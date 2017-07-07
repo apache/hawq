@@ -23,11 +23,12 @@ try:
     import subprocess
     from hawqpylib.HAWQ_HELP import *
     from hawqpylib.hawqlib import *
+    from gppylib.gplog import get_default_logger
 except ImportError, e:
     sys.exit('ERROR: Cannot import modules.  Please check that you '
                  'have sourced greenplum_path.sh.  Detail: ' + str(e))
 
-global hawq_home, source_hawq_env
+global hawq_home, source_hawq_env, logger
 
 
 def print_version():
@@ -53,6 +54,7 @@ def check_master_or_standby_host(master_host_name='localhost', standby_host_name
         return True
 
 def main():
+    logger = get_default_logger()
     hawq_home = os.getenv('GPHOME')
     if not hawq_home:
         print "HAWQ home directory not defined, please check GPHOME settings."
@@ -123,20 +125,17 @@ def main():
         # Prints deprecation warning when using old syntax "hawq stop <object> -u" to reload GUC
         if len(sub_args.split("-")) > 1:
             if "-u" in sub_args or "--reload" in sub_args or "u" in sub_args.split("-")[1]:
-                deprecationMessage = """
-                hawq stop <object> -u is being deprecated and replaced by 'hawq reload <object>'
-                Current syntax will work but please use 'hawq reload <object>' going forward. 
-                """
-                print deprecationMessage
+                logger.info("hawq stop <object> -u is being deprecated and replaced by 'hawq reload <object>'")
+                logger.info("Current syntax will work, please use 'hawq reload <object>' going forward.")
         cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
         result = local_run(cmd)
     elif hawq_command == "reload":
-        hawq_command="stop"
-        sub_args_list.append("-u")
-        sub_args=" ".join(sub_args_list)
         if second_arg not in cluster_type_list:
             print RELOAD_CONFIG_HELP
             sys.exit(1)
+        hawq_command="stop"
+        sub_args_list.append("-u")
+        sub_args=" ".join(sub_args_list)
         cmd = "%s; hawq_ctl %s %s" % (source_hawq_env, hawq_command, sub_args)
         result = local_run(cmd)
     elif hawq_command == "init":
