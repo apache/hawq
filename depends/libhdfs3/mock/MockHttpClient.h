@@ -1,5 +1,5 @@
 /********************************************************************
- * 2014 -
+ * 2014 - 
  * open source under Apache License Version 2.0
  ********************************************************************/
 /**
@@ -19,27 +19,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "Permission.h"
+#ifndef _HDFS_LIBHDFS3_MOCK_HTTPCLIENT_H_
+#define _HDFS_LIBHDFS3_MOCK_HTTPCLIENT_H_
 
-#include "Exception.h"
-#include "ExceptionInternal.h"
+#include "gmock/gmock.h"
 
-namespace Hdfs {
+#include "client/HttpClient.h"
+#include "client/KmsClientProvider.h"
+#include <boost/property_tree/ptree.hpp>
 
-Permission::Permission(uint16_t mode) {
-	uint16_t fileEncryptionBit = (1 << 13);
-	bool isFileEncryption = (((mode & fileEncryptionBit) != 0) ? true : false);
+using boost::property_tree::ptree;
 
-    if (!isFileEncryption && mode >> 10) {
-        THROW(InvalidParameter,
-              "Invalid parameter: cannot convert %u to \"Permission\"",
-              static_cast<unsigned int>(mode));
-    }
+class MockHttpClient: public Hdfs::HttpClient {
+public:
+  MOCK_METHOD0(post, std::string());
+  MOCK_METHOD0(del, std::string());
+  MOCK_METHOD0(put, std::string());
+  MOCK_METHOD0(get, std::string());
 
-    userAction = (Action)((mode >> 6) & 7);
-    groupAction = (Action)((mode >> 3) & 7);
-    otherAction = (Action)(mode & 7);
-    stickyBit = (((mode >> 9) & 1) == 1);
-}
+  std::string getPostResult(FileEncryptionInfo &encryptionInfo) {
+	ptree map;
+	map.put("name", encryptionInfo.getKeyName());
+	map.put("iv", encryptionInfo.getIv());
+	map.put("material", encryptionInfo.getKey());
 
-}
+	std::string json = KmsClientProvider::toJson(map);
+	return json;
+  }
+
+
+};
+
+#endif /* _HDFS_LIBHDFS3_MOCK_HTTPCLIENT_H_ */
