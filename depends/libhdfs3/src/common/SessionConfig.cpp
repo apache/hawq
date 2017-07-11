@@ -127,17 +127,18 @@ SessionConfig::SessionConfig(const Config & conf) {
         }, {
             &socketCacheCapacity, "dfs.client.socketcache.capacity", 16, bind(CheckRangeGE<int32_t>, _1, _2, 0)
         }, {
-			&cryptoBufferSize, "hadoop.security.crypto.buffer.size", 8192
-		},{
-			&httpRequestRetryTimes, "kms.send.request.retry.times", 4
-		}
+            &cryptoBufferSize, "hadoop.security.crypto.buffer.size", 8192
+        }, {
+            &httpRequestRetryTimes, "kms.send.request.retry.times", 4
+        }
     };
     ConfigDefault<int64_t> i64Values [] = {
         {
             &defaultBlockSize, "dfs.default.blocksize", 64 * 1024 * 1024, bind(CheckMultipleOf<int64_t>, _1, _2, 512)
-        }, {
+        },
+        {
             &curlTimeout, "kms.send.request.timeout", 20L
-		}
+        }
     };
 
     ConfigDefault<std::string> strValues [] = {
@@ -146,8 +147,8 @@ SessionConfig::SessionConfig(const Config & conf) {
         {&kerberosCachePath, "hadoop.security.kerberos.ticket.cache.path", "" },
         {&logSeverity, "dfs.client.log.severity", "INFO" },
         {&domainSocketPath, "dfs.domain.socket.path", ""},
-		{&kmsUrl, "dfs.encryption.key.provider.uri", ""},
-		{&kmsAuthMethod, "hadoop.kms.authentication.type", "simple" }
+        {&kmsUrl, "dfs.encryption.key.provider.uri", "" },
+        {&kmsAuthMethod, "hadoop.kms.authentication.type", "simple" }
     };
 
     for (size_t i = 0; i < ARRAYSIZE(boolValues); ++i) {

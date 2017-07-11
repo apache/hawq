@@ -19,34 +19,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _HDFS_LIBHDFS3_MOCK_HTTPCLIENT_H_
-#define _HDFS_LIBHDFS3_MOCK_HTTPCLIENT_H_
+#ifndef _HDFS_LIBHDFS3_MOCK_CRYPTOCODEC_H_
+#define _HDFS_LIBHDFS3_MOCK_CRYPTOCODEC_H_
 
 #include "gmock/gmock.h"
 
-#include "client/HttpClient.h"
+#include "client/CryptoCodec.h"
 #include "client/KmsClientProvider.h"
-#include <boost/property_tree/ptree.hpp>
 
-using boost::property_tree::ptree;
-
-class MockHttpClient: public Hdfs::HttpClient {
+class MockCryptoCodec: public Hdfs::CryptoCodec {
 public:
-    MOCK_METHOD0(post, std::string());
-    MOCK_METHOD0(del, std::string());
-    MOCK_METHOD0(put, std::string());
-    MOCK_METHOD0(get, std::string());
-
-    std::string getPostResult(FileEncryptionInfo &encryptionInfo) {
-        ptree map;
-        map.put("name", encryptionInfo.getKeyName());
-        map.put("iv", encryptionInfo.getIv());
-        map.put("material", encryptionInfo.getKey());
-
-        std::string json = KmsClientProvider::toJson(map);
-        return json;
-    }
-
+  MockCryptoCodec(FileEncryptionInfo *encryptionInfo, shared_ptr<KmsClientProvider> kcp, int32_t bufSize) : CryptoCodec(encryptionInfo, kcp, bufSize) {}
+  MOCK_METHOD2(encode, std::string(const char * buffer,int64_t size));
+  MOCK_METHOD2(decode, std::string(const char * buffer,int64_t size));
 };
 
-#endif /* _HDFS_LIBHDFS3_MOCK_HTTPCLIENT_H_ */
+#endif /* _HDFS_LIBHDFS3_MOCK_CRYPTOCODEC_H_ */

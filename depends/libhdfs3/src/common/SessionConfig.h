@@ -301,23 +301,23 @@ public:
       return socketCacheCapacity;
     }
 
-	const std::string& getKmsUrl() const {
-      return kmsUrl;
+    const std::string& getKmsUrl() const {
+        return kmsUrl;
     }
 
-	const std::string& getKmsMethod() const {
+    const std::string& getKmsMethod() const {
         return kmsAuthMethod;
     }
 
-	int32_t getCryptoBufferSize() const {
+    int32_t getCryptoBufferSize() const {
         return cryptoBufferSize;
     }
 
-	int32_t getHttpRequestRetryTimes() const {
+    int32_t getHttpRequestRetryTimes() const {
         return httpRequestRetryTimes;
     }
 
-	int64_t getCurlTimeOut() const {
+    int64_t getCurlTimeOut() const {
         return curlTimeout;
     }
 
@@ -379,12 +379,12 @@ public:
     int32_t packetPoolSize;
     int32_t heartBeatInterval;
     int32_t closeFileTimeout;
-	std::string kmsUrl;
-	std::string kmsAuthMethod;
-	int32_t cryptoBufferSize;
-	int32_t httpRequestRetryTimes;
-	int64_t curlTimeout;
-	
+    std::string kmsUrl;
+    std::string kmsAuthMethod;
+    int32_t cryptoBufferSize;
+    int32_t httpRequestRetryTimes;
+    int64_t curlTimeout;
+
 };
 
 }

@@ -33,7 +33,7 @@
 #include <vector>
 #include "common/SessionConfig.h"
 #include "rpc/RpcAuth.h"
-
+#include "common/Memory.h"
 #include <boost/property_tree/ptree.hpp>
 
 using boost::property_tree::ptree;
@@ -45,97 +45,97 @@ namespace Hdfs {
 class KmsClientProvider {
 public:
 
-	/**
+    /**
      * Construct a KmsClientProvider instance.
      * @param auth RpcAuth to get the auth method and user info.
-	 * @param conf a SessionConfig to get the configuration.
+     * @param conf a SessionConfig to get the configuration.
      */
-	KmsClientProvider(std::shared_ptr<RpcAuth> auth, std::shared_ptr<SessionConfig> conf);
+    KmsClientProvider(shared_ptr<RpcAuth> auth, shared_ptr<SessionConfig> conf);
 
-	/**
+    /**
      * Destroy a KmsClientProvider instance.
      */
-	virtual ~KmsClientProvider(){
-	}
+    virtual ~KmsClientProvider() {
+    }
 
-	/**
-	 * Set HttpClient object.
-	 */
-	void setHttpClient(std::shared_ptr<HttpClient> hc);
+    /**
+     * Set HttpClient object.
+     */
+    void setHttpClient(shared_ptr<HttpClient> hc);
 
-	/**
-	 * Create an encryption key from kms.
-	 * @param keyName the name of this key.
-	 * @param cipher the ciphertext of this key. e.g. "AES/CTR/NoPadding" .
-	 * @param length the length of this key.
-	 * @param material will be encode to base64.
-	 * @param description key's info.
- 	*/	
-	virtual void createKey(const std::string &keyName, const std::string &cipher, const int length, const std::string &material, const std::string &description);
+    /**
+     * Create an encryption key from kms.
+     * @param keyName the name of this key.
+     * @param cipher the ciphertext of this key. e.g. "AES/CTR/NoPadding" .
+     * @param length the length of this key.
+     * @param material will be encode to base64.
+     * @param description key's info.
+     */
+    virtual void createKey(const std::string &keyName, const std::string &cipher, const int length, const std::string &material, const std::string &description);
 
-	/**
-	 * Get key metadata based on encrypted file's key name.
-	 * @param encryptionInfo the encryption info of file.
- 	* @return return response info about key metadata from kms server.
-	 */
-	virtual ptree getKeyMetadata(const FileEncryptionInfo &encryptionInfo);
+    /**
+     * Get key metadata based on encrypted file's key name.
+     * @param encryptionInfo the encryption info of file.
+     * @return return response info about key metadata from kms server.
+     */
+    virtual ptree getKeyMetadata(const FileEncryptionInfo &encryptionInfo);
 
-	/**
- 	 * Delete an encryption key from kms.
-	 * @param encryptionInfo the encryption info of file.
-	 */
-	virtual void deleteKey(const FileEncryptionInfo &encryptionInfo);
+    /**
+     * Delete an encryption key from kms.
+     * @param encryptionInfo the encryption info of file.
+     */
+    virtual void deleteKey(const FileEncryptionInfo &encryptionInfo);
 
-	/**
- 	 * Decrypt an encrypted key from kms.
-	 * @param encryptionInfo the encryption info of file.
-	 * @return return decrypted key.
-	 */
-	virtual ptree decryptEncryptedKey(const FileEncryptionInfo &encryptionInfo);
+    /**
+     * Decrypt an encrypted key from kms.
+     * @param encryptionInfo the encryption info of file.
+     * @return return decrypted key.
+     */
+    virtual ptree decryptEncryptedKey(const FileEncryptionInfo &encryptionInfo);
 
-	/**
-	 * Encode string to base64.
-	 */
-	static std::string	base64Encode(const std::string &data);
+    /**
+     * Encode string to base64.
+     */
+    static std::string base64Encode(const std::string &data);
 
-	/**
-	 * Decode base64 to string.
-	 */	
-	static std::string	base64Decode(const std::string &data);
+    /**
+     * Decode base64 to string.
+     */
+    static std::string base64Decode(const std::string &data);
 
 private:
 
-	/**
-	 * Convert ptree format to json format.
-	 */
-	static std::string  toJson(const ptree &data);
+    /**
+     * Convert ptree format to json format.
+     */
+    static std::string toJson(const ptree &data);
 
-	/**
- 	 * Convert json format to ptree format.
-	 */
-	static ptree		fromJson(const std::string &data);
+    /**
+     * Convert json format to ptree format.
+     */
+    static ptree fromJson(const std::string &data);
 
-	/**
-	 * Parse kms url from configure file.
-	 */
-	std::string 		parseKmsUrl();
+    /**
+     * Parse kms url from configure file.
+     */
+    std::string parseKmsUrl();
 
-	/**
-	 * Build kms url based on urlSuffix and different auth method.
-	 */
-	std::string 		buildKmsUrl(const std::string &url, const std::string &urlSuffix);
-	/**
- 	 * Set common headers for kms API.
- 	 */
-	void setCommonHeaders(std::vector<std::string>& headers);	
+    /**
+     * Build kms url based on urlSuffix and different auth method.
+     */
+    std::string buildKmsUrl(const std::string &url, const std::string &urlSuffix);
+    /**
+     * Set common headers for kms API.
+     */
+    void setCommonHeaders(std::vector<std::string>& headers);
 
-	std::shared_ptr<HttpClient> 	hc;
-	std::string						url;
+    shared_ptr<HttpClient> hc;
+    std::string url;
 
-	std::shared_ptr<RpcAuth> 		auth;
-	AuthMethod						method;
-	std::shared_ptr<SessionConfig> 	conf;
-	
+    shared_ptr<RpcAuth> auth;
+    AuthMethod method;
+    shared_ptr<SessionConfig> conf;
+
 };
 
 }

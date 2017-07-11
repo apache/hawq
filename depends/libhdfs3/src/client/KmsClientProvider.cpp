@@ -34,87 +34,85 @@ namespace Hdfs {
 /**
  * Convert ptree format to json format
  */
-std::string KmsClientProvider::toJson(const ptree &data)
-{
-	std::ostringstream buf;
-	try {
-		write_json(buf, data, false);
-		std::string json = buf.str();
-		return json;
-	} catch (...) {
-		THROW(HdfsIOException, "KmsClientProvider : Write json failed.");
-	}	
+std::string KmsClientProvider::toJson(const ptree &data) {
+    std::ostringstream buf;
+    try {
+        write_json(buf, data, false);
+        std::string json = buf.str();
+        return json;
+    } catch (...) {
+        THROW(HdfsIOException, "KmsClientProvider : Write json failed.");
+    }
 }
 
 /**
  * Convert json format to ptree format
  */
-ptree KmsClientProvider::fromJson(const std::string &data)
-{
-	ptree pt2;
-	try {
-		std::istringstream is(data);
-		read_json(is, pt2);
-		return pt2;
-	} catch (...) {
-		THROW(HdfsIOException, "KmsClientProvider : Read json failed.");
-	}
+ptree KmsClientProvider::fromJson(const std::string &data) {
+    ptree pt2;
+    try {
+        std::istringstream is(data);
+        read_json(is, pt2);
+        return pt2;
+    } catch (...) {
+        THROW(HdfsIOException, "KmsClientProvider : Read json failed.");
+    }
 }
 
 /**
  * Encode string to base64. 
  */
-std::string	KmsClientProvider::base64Encode(const std::string &data)
-{
-	char * buffer = NULL;
-	size_t len = 0;
-	int rc = 0;
-	std::string result;
+std::string KmsClientProvider::base64Encode(const std::string &data) {
+    char * buffer = NULL;
+    size_t len = 0;
+    int rc = 0;
+    std::string result;
 
-	LOG(DEBUG1, "KmsClientProvider : Encode data is %s", data.c_str());
+    LOG(DEBUG3, "KmsClientProvider : Encode data is %s", data.c_str());
 
-	if (GSASL_OK != (rc = gsasl_base64_to(data.c_str(), data.size(), &buffer, &len))) {
-		assert(GSASL_MALLOC_ERROR == rc);
+    if (GSASL_OK != (rc = gsasl_base64_to(data.data(), data.size(), &buffer, &len))) {
+        assert(GSASL_MALLOC_ERROR == rc);
         throw std::bad_alloc();
-	}
-
-	if (buffer) {
-		result.assign(buffer, len);
-		free(buffer);
-	} 
-
-	if (!buffer || result.length() != len) {
-        THROW(HdfsIOException, "KmsClientProvider: Failed to encode string to base64");
     }
 
-	return result;	
+    if (buffer) {
+        result.assign(buffer, len);
+        free(buffer);
+    }
+
+    if (!buffer || result.length() != len) {
+        THROW(HdfsIOException,
+                "KmsClientProvider: Failed to encode string to base64");
+    }
+
+    return result;
 }
 
 /**
  * Decode base64 to string.
  */
-std::string	KmsClientProvider::base64Decode(const std::string &data)
-{
-	char * buffer = NULL;
-	size_t len = 0;
-	int rc = 0;
-	std::string result;
+std::string KmsClientProvider::base64Decode(const std::string &data) {
+    char * buffer = NULL;
+    size_t len = 0;
+    int rc = 0;
+    std::string result;
 
-	if (GSASL_OK != (rc = gsasl_base64_from(data.c_str(), data.size(), &buffer, &len))) {
-		assert(GSASL_MALLOC_ERROR == rc);
+    if (GSASL_OK != (rc = gsasl_base64_from(data.data(), data.size(), &buffer, &len))) {
+        assert(GSASL_MALLOC_ERROR == rc);
         throw std::bad_alloc();
-	}
-
-	if (buffer) {
-		result.assign(buffer, len);
-		free(buffer);
-	} 
-
-	if (!buffer || result.length() != len) {
-        THROW(HdfsIOException, "KmsClientProvider: Failed to decode base64 to string");
     }
 
-	return result;	
+    if (buffer) {
+        result.assign(buffer, len);
+        free(buffer);
+    }
+
+    if (!buffer || result.length() != len) {
+        THROW(HdfsIOException,
+                "KmsClientProvider: Failed to decode base64 to string");
+    }
+
+    return result;
 }
 
 /**
@@ -122,18 +120,18 @@ std::string	KmsClientProvider::base64Decode(const std::string &data)
  * @param auth RpcAuth to get the auth method and user info.
  * @param conf a SessionConfig to get the configuration.
  */
-KmsClientProvider::KmsClientProvider(std::shared_ptr<RpcAuth> rpcAuth, std::shared_ptr<SessionConfig> config) : auth(rpcAuth), conf(config)
+KmsClientProvider::KmsClientProvider(shared_ptr<RpcAuth> rpcAuth, shared_ptr<SessionConfig> config) : auth(rpcAuth), conf(config)
 {
-	hc.reset(new HttpClient());
-	method = RpcAuth::ParseMethod(conf->getKmsMethod());
+    hc.reset(new HttpClient());
+    method = RpcAuth::ParseMethod(conf->getKmsMethod());
 }
 
 /**
  * Set HttpClient object.
  */
-void KmsClientProvider::setHttpClient(std::shared_ptr<HttpClient> hc)
+void KmsClientProvider::setHttpClient(shared_ptr<HttpClient> hc)
 {
-	this->hc = hc;
+    this->hc = hc;
 }
 
 /**
@@ -141,23 +139,21 @@ void KmsClientProvider::setHttpClient(std::shared_ptr<HttpClient> hc)
  */
 std::string KmsClientProvider::parseKmsUrl() 
 {
-	std::string start = "kms://";
+    std::string start = "kms://";
     std::string http = "http@";
     std::string https = "https@";
-	std::string urlParse = conf->getKmsUrl();
-	LOG(DEBUG2, "KmsClientProvider : Get kms url from conf : %s.", urlParse.c_str());
+    std::string urlParse = conf->getKmsUrl();
+    LOG(DEBUG3, "KmsClientProvider : Get kms url from conf : %s.",
+            urlParse.c_str());
     if (urlParse.compare(0, start.length(), start) == 0) {
         start = urlParse.substr(start.length());
         if (start.compare(0, http.length(), http) == 0) {
             return "http://" + start.substr(http.length());
-        }
-        else if (start.compare(0, https.length(), https) == 0) {
+        } else if (start.compare(0, https.length(), https) == 0) {
             return "https://" + start.substr(https.length());
-        }
-        else
+        } else
             THROW(HdfsIOException, "Bad KMS provider URL: %s", urlParse.c_str());
-    }
-    else
+    } else
         THROW(HdfsIOException, "Bad KMS provider URL: %s", urlParse.c_str());
 
 }
@@ -167,25 +163,27 @@ std::string KmsClientProvider::parseKmsUrl()
  */
 std::string KmsClientProvider::buildKmsUrl(const std::string &url, const std::string &urlSuffix)
 {
-		std::string baseUrl = url;
-        baseUrl = url + "/v1/" + urlSuffix;
-		std::size_t found = urlSuffix.find('?');
+    std::string baseUrl = url;
+    baseUrl = url + "/v1/" + urlSuffix;
+    std::size_t found = urlSuffix.find('?');
 
-        if (method == AuthMethod::KERBEROS) {
-            // todo
-			THROW(InvalidParameter, "KmsClientProvider : Not support kerberos yet.");
-        } else if (method == AuthMethod::SIMPLE) {
-            std::string user = auth->getUser().getRealUser();
-			LOG(DEBUG1, "KmsClientProvider : Kms urlSuffix is : %s. Auth real user is : %s.", urlSuffix.c_str(), user.c_str());
-            if (user.length() == 0)
-                user = auth->getUser().getKrbName();
-			if (found != std::string::npos)
-            	return baseUrl + "&user.name=" + user;
-			else
-				return baseUrl + "?user.name=" + user;
-        } else {
-            return baseUrl;
-        }	
+    if (method == AuthMethod::KERBEROS) {
+        // todo
+        THROW(InvalidParameter, "KmsClientProvider : Not support kerberos yet.");
+    } else if (method == AuthMethod::SIMPLE) {
+        std::string user = auth->getUser().getRealUser();
+        LOG(DEBUG3,
+                "KmsClientProvider : Kms urlSuffix is : %s. Auth real user is : %s.",
+                urlSuffix.c_str(), user.c_str());
+        if (user.length() == 0)
+            user = auth->getUser().getKrbName();
+        if (found != std::string::npos)
+            return baseUrl + "&user.name=" + user;
+        else
+            return baseUrl + "?user.name=" + user;
+    } else {
+        return baseUrl;
+    }
 }
 
 /**
@@ -193,8 +191,8 @@ std::string KmsClientProvider::buildKmsUrl(const std::string &url, const std::st
  */
 void KmsClientProvider::setCommonHeaders(std::vector<std::string>& headers)
 {
-	headers.push_back("Content-Type: application/json");
- 	headers.push_back("Accept: *");
+    headers.push_back("Content-Type: application/json");
+    headers.push_back("Accept: *");
 }
 
 
@@ -208,31 +206,34 @@ void KmsClientProvider::setCommonHeaders(std::vector<std::string>& headers)
  */
 void KmsClientProvider::createKey(const std::string &keyName, const std::string &cipher, const int length, const std::string &material, const std::string &description)
 {
-	hc->init();
-	/* Prepare url for HttpClient.*/
-	url = parseKmsUrl(); 
-	std::string urlSuffix = "keys";
-	url = buildKmsUrl(url, urlSuffix);
-	/* Prepare headers for HttpClient.*/
-	std::vector<std::string> headers;
-	setCommonHeaders(headers);
-	/* Prepare body for HttpClient. */
-	ptree map;
+    hc->init();
+    /* Prepare url for HttpClient.*/
+    url = parseKmsUrl();
+    std::string urlSuffix = "keys";
+    url = buildKmsUrl(url, urlSuffix);
+    /* Prepare headers for HttpClient.*/
+    std::vector<std::string> headers;
+    setCommonHeaders(headers);
+    /* Prepare body for HttpClient. */
+    ptree map;
     map.put("name", keyName);
     map.put("cipher", cipher);
-	map.put("description", description);
-    std::string body = toJson(map);	
-	/* Set options for HttpClient to get response. */
-	hc->setURL(url);
-	hc->setHeaders(headers);
-	hc->setBody(body);
-	hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
-	hc->setRequestTimeout(conf->getCurlTimeOut());
-	hc->setExpectedResponseCode(201);
-	std::string response = hc->post();
+    map.put("description", description);
+    std::string body = toJson(map);
+    /* Set options for HttpClient to get response. */
+    hc->setURL(url);
+    hc->setHeaders(headers);
+    hc->setBody(body);
+    hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
+    hc->setRequestTimeout(conf->getCurlTimeOut());
+    hc->setExpectedResponseCode(201);
+    std::string response = hc->post();
 
-	LOG(INFO, "KmsClientProvider::createKey : The key name, key cipher, key length, key material, description are : %s, %s, %s, %s, %s. The kms url is : %s . The kms body is : %s. The response of kms server is : %s ." , keyName.c_str(), cipher.c_str(), length, material.c_str(), description.c_str(), url.c_str(), body.c_str(), response.c_str());
-		
+    LOG(INFO,
+            "KmsClientProvider::createKey : The key name, key cipher, key length, key material, description are : %s, %s, %d, %s, %s. The kms url is : %s . The kms body is : %s. The response of kms server is : %s .",
+            keyName.c_str(), cipher.c_str(), length, material.c_str(),
+            description.c_str(), url.c_str(), body.c_str(), response.c_str());
+
 } 
 
 /**
@@ -242,20 +243,22 @@ void KmsClientProvider::createKey(const std::string &keyName, const std::string 
  */
 ptree KmsClientProvider::getKeyMetadata(const FileEncryptionInfo &encryptionInfo)
 {
-	hc->init();
-	url = parseKmsUrl(); 
-	std::string urlSuffix = "key/" + hc->escape(encryptionInfo.getKeyName()) + "/_metadata";
-	url = buildKmsUrl(url, urlSuffix);
-	
-	hc->setURL(url);
-	hc->setExpectedResponseCode(200);
-	hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
-	hc->setRequestTimeout(conf->getCurlTimeOut());
-	std::string response = hc->get();
-	
-	LOG(INFO, "KmsClientProvider::getKeyMetadata : The kms url is : %s. The response of kms server is : %s ." , url.c_str(), response.c_str());
+    hc->init();
+    url = parseKmsUrl();
+    std::string urlSuffix = "key/" + hc->escape(encryptionInfo.getKeyName()) + "/_metadata";
+    url = buildKmsUrl(url, urlSuffix);
 
-	return fromJson(response);
+    hc->setURL(url);
+    hc->setExpectedResponseCode(200);
+    hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
+    hc->setRequestTimeout(conf->getCurlTimeOut());
+    std::string response = hc->get();
+
+    LOG(INFO,
+            "KmsClientProvider::getKeyMetadata : The kms url is : %s. The response of kms server is : %s .",
+            url.c_str(), response.c_str());
+
+    return fromJson(response);
 
 }
 
@@ -265,18 +268,20 @@ ptree KmsClientProvider::getKeyMetadata(const FileEncryptionInfo &encryptionInfo
  */
 void KmsClientProvider::deleteKey(const FileEncryptionInfo &encryptionInfo)
 {
-	hc->init();
-	url = parseKmsUrl(); 
-	std::string urlSuffix = "key/" + hc->escape(encryptionInfo.getKeyName());
-	url = buildKmsUrl(url, urlSuffix);
-	
-    hc->setURL(url);
-	hc->setExpectedResponseCode(200);
-	hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
-	hc->setRequestTimeout(conf->getCurlTimeOut());
-	std::string response = hc->del();
+    hc->init();
+    url = parseKmsUrl();
+    std::string urlSuffix = "key/" + hc->escape(encryptionInfo.getKeyName());
+    url = buildKmsUrl(url, urlSuffix);
 
-	LOG(INFO, "KmsClientProvider::deleteKey : The kms url is : %s. The response of kms server is : %s ." , url.c_str(), response.c_str());
+    hc->setURL(url);
+    hc->setExpectedResponseCode(200);
+    hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
+    hc->setRequestTimeout(conf->getCurlTimeOut());
+    std::string response = hc->del();
+
+    LOG(INFO,
+            "KmsClientProvider::deleteKey : The kms url is : %s. The response of kms server is : %s .",
+            url.c_str(), response.c_str());
 }
 
 /**
@@ -286,32 +291,34 @@ void KmsClientProvider::deleteKey(const FileEncryptionInfo &encryptionInfo)
  */
 ptree KmsClientProvider::decryptEncryptedKey(const FileEncryptionInfo &encryptionInfo)
 {
-	hc->init();
-	/* Prepare HttpClient url. */
-	url = parseKmsUrl(); 
-	std::string urlSuffix = "keyversion/" + hc->escape(encryptionInfo.getEzKeyVersionName()) + "/_eek?eek_op=decrypt";
-	url = buildKmsUrl(url, urlSuffix);
-	/* Prepare HttpClient headers. */
-	std::vector<std::string> headers;
-	setCommonHeaders(headers);
-	/* Prepare HttpClient body with json format. */
-	ptree map;
+    hc->init();
+    /* Prepare HttpClient url. */
+    url = parseKmsUrl();
+    std::string urlSuffix = "keyversion/" + hc->escape(encryptionInfo.getEzKeyVersionName()) + "/_eek?eek_op=decrypt";
+    url = buildKmsUrl(url, urlSuffix);
+    /* Prepare HttpClient headers. */
+    std::vector<std::string> headers;
+    setCommonHeaders(headers);
+    /* Prepare HttpClient body with json format. */
+    ptree map;
     map.put("name", encryptionInfo.getKeyName());
     map.put("iv", base64Encode(encryptionInfo.getIv()));
     map.put("material", base64Encode(encryptionInfo.getKey()));
-    std::string body = toJson(map);	
+    std::string body = toJson(map);
 
-	/* Set options for HttpClient. */
-	hc->setURL(url);
-	hc->setHeaders(headers);
-	hc->setBody(body);
-	hc->setExpectedResponseCode(200);
-	hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
-	hc->setRequestTimeout(conf->getCurlTimeOut());
-	std::string response = hc->post();
+    /* Set options for HttpClient. */
+    hc->setURL(url);
+    hc->setHeaders(headers);
+    hc->setBody(body);
+    hc->setExpectedResponseCode(200);
+    hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
+    hc->setRequestTimeout(conf->getCurlTimeOut());
+    std::string response = hc->post();
 
-	LOG(INFO, "KmsClientProvider::decryptEncryptedKey : The kms url is : %s . The kms body is : %s. The response of kms server is : %s ." , url.c_str(), body.c_str(), response.c_str());
-	return fromJson(response);
+    LOG(INFO,
+            "KmsClientProvider::decryptEncryptedKey : The kms url is : %s . The kms body is : %s. The response of kms server is : %s .",
+            url.c_str(), body.c_str(), response.c_str());
+    return fromJson(response);
 }
 
 }
