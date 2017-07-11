@@ -74,7 +74,7 @@ public class DemoAccessor extends Plugin implements ReadAccessor {
         for(int colIndex=1; colIndex<colCount; colIndex++) {
             colValue.append(",").append("value" + colIndex);
         }
-        OneRow row = new OneRow(fragment + "." + rowNumber, colValue);
+        OneRow row = new OneRow(fragment + "." + rowNumber, colValue.toString());
 
         /* advance */
         rowNumber += 1;
