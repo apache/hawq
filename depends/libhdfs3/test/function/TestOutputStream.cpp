@@ -517,7 +517,7 @@ TEST_F(TestOutputStream, TestOpenFileForWrite) {
 }
 
 
-TEST_F(TestOutputStream, DISABLE_TestOpenFileForWriteTDE){
+TEST_F(TestOutputStream, TestOpenFileForWriteTDE){
     conf.set("output.default.packetsize", 1024);
     fs = new FileSystem(conf);
     fs->connect();

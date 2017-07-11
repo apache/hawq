@@ -46,15 +46,15 @@ class KmsClientProvider {
 public:
 
 	/**
-     * Construct a KmsClientProvider instance.
-     * @param auth RpcAuth to get the auth method and user info.
+	 * Construct a KmsClientProvider instance.
+	 * @param auth RpcAuth to get the auth method and user info.
 	 * @param conf a SessionConfig to get the configuration.
-     */
+	 */
 	KmsClientProvider(std::shared_ptr<RpcAuth> auth, std::shared_ptr<SessionConfig> conf);
 
 	/**
-     * Destroy a KmsClientProvider instance.
-     */
+	 * Destroy a KmsClientProvider instance.
+	 */
 	virtual ~KmsClientProvider(){
 	}
 
@@ -76,7 +76,7 @@ public:
 	/**
 	 * Get key metadata based on encrypted file's key name.
 	 * @param encryptionInfo the encryption info of file.
- 	* @return return response info about key metadata from kms server.
+	 * @return return response info about key metadata from kms server.
 	 */
 	virtual ptree getKeyMetadata(const FileEncryptionInfo &encryptionInfo);
 
@@ -108,33 +108,33 @@ private:
 	/**
 	 * Convert ptree format to json format.
 	 */
-	static std::string  toJson(const ptree &data);
+	static std::string	toJson(const ptree &data);
 
 	/**
  	 * Convert json format to ptree format.
 	 */
-	static ptree		fromJson(const std::string &data);
+	static ptree	fromJson(const std::string &data);
 
 	/**
 	 * Parse kms url from configure file.
 	 */
-	std::string 		parseKmsUrl();
+	std::string	parseKmsUrl();
 
 	/**
 	 * Build kms url based on urlSuffix and different auth method.
 	 */
-	std::string 		buildKmsUrl(const std::string &url, const std::string &urlSuffix);
+	std::string	buildKmsUrl(const std::string &url, const std::string &urlSuffix);
 	/**
  	 * Set common headers for kms API.
  	 */
-	void setCommonHeaders(std::vector<std::string>& headers);	
+	void	setCommonHeaders(std::vector<std::string>& headers);	
 
-	std::shared_ptr<HttpClient> 	hc;
-	std::string						url;
+	std::shared_ptr<HttpClient>	hc;
+	std::string	url;
 
-	std::shared_ptr<RpcAuth> 		auth;
-	AuthMethod						method;
-	std::shared_ptr<SessionConfig> 	conf;
+	std::shared_ptr<RpcAuth>	auth;
+	AuthMethod	method;
+	std::shared_ptr<SessionConfig>	conf;
 	
 };
 

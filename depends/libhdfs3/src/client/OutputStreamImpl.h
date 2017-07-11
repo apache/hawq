@@ -35,6 +35,8 @@
 #include "server/LocatedBlock.h"
 #include "SessionConfig.h"
 #include "Thread.h"
+#include "CryptoCodec.h"
+#include "KmsClientProvider.h"
 #ifdef MOCK
 #include "PipelineStub.h"
 #endif
@@ -104,6 +106,26 @@ public:
      */
     void setError(const exception_ptr & error);
 
+    /**
+     * Get KmsClientProvider.
+     */
+    shared_ptr<KmsClientProvider> getKmsClientProvider();
+
+    /**
+     * Set KmsClientProvider.
+     */
+    void setKmsClientProvider(shared_ptr<KmsClientProvider> kcp);
+	
+    /**
+     * Get CryptoCodec.
+     */
+    shared_ptr<CryptoCodec> getCryptoCodec();
+	
+    /**
+     * Set CryptoCodec.
+     */
+    void setCryptoCodec(shared_ptr<CryptoCodec> cryptoCodec);
+
 private:
     void appendChunkToPacket(const char * buf, int size);
     void appendInternal(const char * buf, int64_t size);
@@ -153,6 +175,10 @@ private:
     std::vector<char> buffer;
     steady_clock::time_point lastSend;
     //thread heartBeatSender;
+    FileStatus fileStatus;
+    shared_ptr<CryptoCodec> cryptoCodec;
+    shared_ptr<KmsClientProvider> kcp;
+    shared_ptr<RpcAuth> auth;
 
     friend class Pipeline;
 #ifdef MOCK

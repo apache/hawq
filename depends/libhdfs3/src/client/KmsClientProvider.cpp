@@ -75,7 +75,7 @@ std::string	KmsClientProvider::base64Encode(const std::string &data)
 
 	if (GSASL_OK != (rc = gsasl_base64_to(data.c_str(), data.size(), &buffer, &len))) {
 		assert(GSASL_MALLOC_ERROR == rc);
-        throw std::bad_alloc();
+		throw std::bad_alloc();
 	}
 
 	if (buffer) {
@@ -84,7 +84,7 @@ std::string	KmsClientProvider::base64Encode(const std::string &data)
 	} 
 
 	if (!buffer || result.length() != len) {
-        THROW(HdfsIOException, "KmsClientProvider: Failed to encode string to base64");
+		THROW(HdfsIOException, "KmsClientProvider: Failed to encode string to base64");
     }
 
 	return result;	
@@ -102,7 +102,7 @@ std::string	KmsClientProvider::base64Decode(const std::string &data)
 
 	if (GSASL_OK != (rc = gsasl_base64_from(data.c_str(), data.size(), &buffer, &len))) {
 		assert(GSASL_MALLOC_ERROR == rc);
-        throw std::bad_alloc();
+		throw std::bad_alloc();
 	}
 
 	if (buffer) {
@@ -111,7 +111,7 @@ std::string	KmsClientProvider::base64Decode(const std::string &data)
 	} 
 
 	if (!buffer || result.length() != len) {
-        THROW(HdfsIOException, "KmsClientProvider: Failed to decode base64 to string");
+		THROW(HdfsIOException, "KmsClientProvider: Failed to decode base64 to string");
     }
 
 	return result;	
@@ -142,23 +142,23 @@ void KmsClientProvider::setHttpClient(std::shared_ptr<HttpClient> hc)
 std::string KmsClientProvider::parseKmsUrl() 
 {
 	std::string start = "kms://";
-    std::string http = "http@";
-    std::string https = "https@";
+	std::string http = "http@";
+	std::string https = "https@";
 	std::string urlParse = conf->getKmsUrl();
 	LOG(DEBUG2, "KmsClientProvider : Get kms url from conf : %s.", urlParse.c_str());
-    if (urlParse.compare(0, start.length(), start) == 0) {
-        start = urlParse.substr(start.length());
-        if (start.compare(0, http.length(), http) == 0) {
-            return "http://" + start.substr(http.length());
-        }
-        else if (start.compare(0, https.length(), https) == 0) {
-            return "https://" + start.substr(https.length());
-        }
-        else
-            THROW(HdfsIOException, "Bad KMS provider URL: %s", urlParse.c_str());
-    }
-    else
-        THROW(HdfsIOException, "Bad KMS provider URL: %s", urlParse.c_str());
+	if (urlParse.compare(0, start.length(), start) == 0) {
+		start = urlParse.substr(start.length());
+		if (start.compare(0, http.length(), http) == 0) {
+			return "http://" + start.substr(http.length());
+		}
+		else if (start.compare(0, https.length(), https) == 0) {
+			return "https://" + start.substr(https.length());
+		}
+		else
+			THROW(HdfsIOException, "Bad KMS provider URL: %s", urlParse.c_str());
+	}
+	else
+		THROW(HdfsIOException, "Bad KMS provider URL: %s", urlParse.c_str());
 
 }
 
@@ -167,25 +167,25 @@ std::string KmsClientProvider::parseKmsUrl()
  */
 std::string KmsClientProvider::buildKmsUrl(const std::string &url, const std::string &urlSuffix)
 {
-		std::string baseUrl = url;
-        baseUrl = url + "/v1/" + urlSuffix;
-		std::size_t found = urlSuffix.find('?');
+	std::string baseUrl = url;
+	baseUrl = url + "/v1/" + urlSuffix;
+	std::size_t found = urlSuffix.find('?');
 
-        if (method == AuthMethod::KERBEROS) {
-            // todo
-			THROW(InvalidParameter, "KmsClientProvider : Not support kerberos yet.");
-        } else if (method == AuthMethod::SIMPLE) {
-            std::string user = auth->getUser().getRealUser();
-			LOG(DEBUG1, "KmsClientProvider : Kms urlSuffix is : %s. Auth real user is : %s.", urlSuffix.c_str(), user.c_str());
-            if (user.length() == 0)
-                user = auth->getUser().getKrbName();
-			if (found != std::string::npos)
-            	return baseUrl + "&user.name=" + user;
-			else
-				return baseUrl + "?user.name=" + user;
-        } else {
-            return baseUrl;
-        }	
+	if (method == AuthMethod::KERBEROS) {
+	// todo
+		THROW(InvalidParameter, "KmsClientProvider : Not support kerberos yet.");
+	} else if (method == AuthMethod::SIMPLE) {
+		std::string user = auth->getUser().getRealUser();
+		LOG(DEBUG1, "KmsClientProvider : Kms urlSuffix is : %s. Auth real user is : %s.", urlSuffix.c_str(), user.c_str());
+		if (user.length() == 0)
+			user = auth->getUser().getKrbName();
+		if (found != std::string::npos)
+			return baseUrl + "&user.name=" + user;
+		else
+			return baseUrl + "?user.name=" + user;
+	} else {
+		return baseUrl;
+	}	
 }
 
 /**
@@ -218,10 +218,10 @@ void KmsClientProvider::createKey(const std::string &keyName, const std::string 
 	setCommonHeaders(headers);
 	/* Prepare body for HttpClient. */
 	ptree map;
-    map.put("name", keyName);
-    map.put("cipher", cipher);
+	map.put("name", keyName);
+	map.put("cipher", cipher);
 	map.put("description", description);
-    std::string body = toJson(map);	
+	std::string body = toJson(map);	
 	/* Set options for HttpClient to get response. */
 	hc->setURL(url);
 	hc->setHeaders(headers);
@@ -231,7 +231,7 @@ void KmsClientProvider::createKey(const std::string &keyName, const std::string 
 	hc->setExpectedResponseCode(201);
 	std::string response = hc->post();
 
-	LOG(INFO, "KmsClientProvider::createKey : The key name, key cipher, key length, key material, description are : %s, %s, %s, %s, %s. The kms url is : %s . The kms body is : %s. The response of kms server is : %s ." , keyName.c_str(), cipher.c_str(), length, material.c_str(), description.c_str(), url.c_str(), body.c_str(), response.c_str());
+	LOG(INFO, "KmsClientProvider::createKey : The key name, key cipher, key length, key material, description are : %s, %s, %d, %s, %s. The kms url is : %s . The kms body is : %s. The response of kms server is : %s ." , keyName.c_str(), cipher.c_str(), length, material.c_str(), description.c_str(), url.c_str(), body.c_str(), response.c_str());
 		
 } 
 
@@ -270,7 +270,7 @@ void KmsClientProvider::deleteKey(const FileEncryptionInfo &encryptionInfo)
 	std::string urlSuffix = "key/" + hc->escape(encryptionInfo.getKeyName());
 	url = buildKmsUrl(url, urlSuffix);
 	
-    hc->setURL(url);
+	hc->setURL(url);
 	hc->setExpectedResponseCode(200);
 	hc->setRequestRetryTimes(conf->getHttpRequestRetryTimes());
 	hc->setRequestTimeout(conf->getCurlTimeOut());
@@ -296,10 +296,10 @@ ptree KmsClientProvider::decryptEncryptedKey(const FileEncryptionInfo &encryptio
 	setCommonHeaders(headers);
 	/* Prepare HttpClient body with json format. */
 	ptree map;
-    map.put("name", encryptionInfo.getKeyName());
-    map.put("iv", base64Encode(encryptionInfo.getIv()));
-    map.put("material", base64Encode(encryptionInfo.getKey()));
-    std::string body = toJson(map);	
+	map.put("name", encryptionInfo.getKeyName());
+	map.put("iv", base64Encode(encryptionInfo.getIv()));
+	map.put("material", base64Encode(encryptionInfo.getKey()));
+	std::string body = toJson(map);	
 
 	/* Set options for HttpClient. */
 	hc->setURL(url);

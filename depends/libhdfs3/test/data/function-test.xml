@@ -114,4 +114,19 @@
 		<name>dfs.client.socketcache.capacity</name>
 		<value>1</value>
 	</property>
+
+	<property>
+		<name>dfs.encryption.key.provider.uri</name>
+		<value>kms://http@localhost:16000/kms</value>
+	</property>
+
+	<property>
+		<name>hadoop.kms.authentication.type</name>
+		<value>simple</value>
+	</property>
+
+	<property>
+		<name>hadoop.security.crypto.buffer.size</name>
+		<value>8192</value>
+	</property>
 </configuration>
