@@ -49,23 +49,22 @@ public class DemoResolverTest {
     public void setup() throws Exception {
         customResolver = new DemoResolver(inputData);
         textResolver = new DemoTextResolver(inputData);
-        row = new OneRow("0.0","1,metadata,0");
+        row = new OneRow("0.0","value1,value2");
     }
 
     @Test
     public void testCustomData() throws Exception {
 
         List<OneField> output = customResolver.getFields(row);
-        assertEquals("1", output.get(0).toString());
-        assertEquals("metadata", output.get(1).toString());
-        assertEquals("0", output.get(2).toString());
+        assertEquals("value1", output.get(0).toString());
+        assertEquals("value2", output.get(1).toString());
     }
 
     @Test
     public void testTextData() throws Exception {
 
         List<OneField> output = textResolver.getFields(row);
-        assertEquals("1,metadata,0", output.get(0).toString());
+        assertEquals("value1,value2", output.get(0).toString());
 
     }
 }

@@ -28,7 +28,7 @@ import java.util.List;
  * Class that defines the splitting of a data resource into fragments that can be processed in parallel
  * getFragments() returns the fragments information of a given path (source name and location of each fragment).
  *
- * Dummy implementation
+ * Demo implementation
  */
 
 public class DemoFragmenter extends Fragmenter{
@@ -41,6 +41,11 @@ public class DemoFragmenter extends Fragmenter{
         super(metaData);
     }
 
+    /**
+     * Provide metadata for each data partition of the given datasource
+     *
+     * @return list of fragments
+     */
     @Override
     public List<Fragment> getFragments() throws Exception {
         String localhostname = java.net.InetAddress.getLocalHost().getHostName();

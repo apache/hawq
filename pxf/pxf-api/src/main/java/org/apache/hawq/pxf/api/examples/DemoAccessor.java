@@ -30,17 +30,19 @@ import org.apache.commons.logging.LogFactory;
  * Internal interface that would defined the access to a file on HDFS, but in
  * this case contains the data required.
  *
- * Dummy implementation
+ * Demo implementation
  */
 public class DemoAccessor extends Plugin implements ReadAccessor {
+
     private static final Log LOG = LogFactory.getLog(DemoAccessor.class);
     private int rowNumber;
     private int fragmentNumber;
     private static int NUM_ROWS = 2;
+
     /**
      * Constructs a DemoAccessor
      *
-     * @param metaData
+     * @param metaData the InputData
      */
     public DemoAccessor(InputData metaData) {
         super(metaData);
@@ -50,6 +52,13 @@ public class DemoAccessor extends Plugin implements ReadAccessor {
         /* no-op, because this plugin doesn't read a file. */
         return true;
     }
+
+    /**
+     * Read the next record
+     * The record contains as many fields as defined by the DDL schema.
+     *
+     * @return one row which corresponds to one record
+     */
     @Override
     public OneRow readNextObject() throws Exception {
         /* return next row , <key=fragmentNo.rowNo, val=rowNo,text,fragmentNo>*/
@@ -58,20 +67,32 @@ public class DemoAccessor extends Plugin implements ReadAccessor {
             return null; /* signal EOF, close will be called */
         int fragment = inputData.getDataFragment();
         String fragmentMetadata = new String(inputData.getFragmentMetadata());
-        /* generate row */
-        OneRow row = new OneRow(fragment + "." + rowNumber,
-                rowNumber + "," + fragmentMetadata + "," + fragment);
+        int colCount = inputData.getColumns();
+
+        /* generate row with (colCount) columns */
+        StringBuilder colValue = new StringBuilder(fragmentMetadata + " row" + (rowNumber+1));
+        for(int colIndex=1; colIndex<colCount; colIndex++) {
+            colValue.append(",").append("value" + colIndex);
+        }
+        OneRow row = new OneRow(fragment + "." + rowNumber, colValue);
+
         /* advance */
         rowNumber += 1;
         if (rowNumber == NUM_ROWS) {
             rowNumber = 0;
             fragmentNumber += 1;
         }
+
         /* return data */
         return row;
     }
+
+    /**
+     * close the reader. no action here
+     *
+     */
     @Override
     public void closeForRead() throws Exception {
-        /* Dummy close doesn't do anything */
+        /* Demo close doesn't do anything */
     }
 }

@@ -34,7 +34,7 @@ import static org.apache.hawq.pxf.api.io.DataType.VARCHAR;
 /**
  * Class that defines the deserializtion of one record brought from the external input data.
  *
- * Dummy implementation
+ * Demo implementation of resolver that returns text format
  */
 public class DemoTextResolver extends Plugin implements ReadResolver {
     /**
@@ -45,6 +45,14 @@ public class DemoTextResolver extends Plugin implements ReadResolver {
     public DemoTextResolver(InputData metaData) {
         super(metaData);
     }
+
+    /**
+     * Read the next record
+     * The record contains as many fields as defined by the DDL schema.
+     *
+     * @param row one record
+     * @return the first column contains the entire text data
+     */
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
         List<OneField> output = new LinkedList<OneField>();

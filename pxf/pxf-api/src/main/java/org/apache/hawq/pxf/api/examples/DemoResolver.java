@@ -32,7 +32,7 @@ import static org.apache.hawq.pxf.api.io.DataType.VARCHAR;
 /**
  * Class that defines the deserializtion of one record brought from the external input data.
  *
- * Dummy implementation
+ * Demo implementation that returns record custom format
  */
 public class DemoResolver extends Plugin implements ReadResolver {
     /**
@@ -44,6 +44,13 @@ public class DemoResolver extends Plugin implements ReadResolver {
         super(metaData);
     }
 
+    /**
+     * Read the next record
+     * The record contains as many fields as defined by the DDL schema.
+     *
+     * @param row one record
+     * @return list of fields or columns
+     */
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
         List<OneField> output = new LinkedList<OneField>();
@@ -51,9 +58,10 @@ public class DemoResolver extends Plugin implements ReadResolver {
 
         /* break up the row into fields */
         String[] fields = ((String) data).split(",");
-        output.add(new OneField(INTEGER.getOID(), Integer.parseInt(fields[0])));
-        output.add(new OneField(VARCHAR.getOID(), fields[1]));
-        output.add(new OneField(INTEGER.getOID(), Integer.parseInt(fields[2])));
+        for(int colIndex=0; colIndex<fields.length; colIndex++) {
+            output.add(new OneField(VARCHAR.getOID(), fields[colIndex]));
+        }
+
         return output;
     }
 }

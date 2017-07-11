@@ -48,15 +48,31 @@ public class DemoAccessorTest {
     }
 
     @Test
-    public void testRows() throws Exception {
+    public void testRowsWithSingleColumn() throws Exception {
 
         when(inputData.getDataFragment()).thenReturn(0);
         when(inputData.getFragmentMetadata()).thenReturn("fragment1".getBytes(), "fragment1".getBytes());
+        when(inputData.getColumns()).thenReturn(1);
 
         int numRows = 2;
         for (int i = 0; i < numRows; i++) {
             OneRow row = accessor.readNextObject();
-            assertEquals(row.toString(),  "OneRow:0." + i + "->" + i + ",fragment1,0");
+            assertEquals(row.toString(),  "OneRow:0." + i + "->fragment1 row" + (i+1));
+        }
+        assertNull(accessor.readNextObject());
+    }
+
+    @Test
+    public void testRowsWithMultipleColumns() throws Exception {
+
+        when(inputData.getDataFragment()).thenReturn(0);
+        when(inputData.getFragmentMetadata()).thenReturn("fragment1".getBytes(), "fragment1".getBytes());
+        when(inputData.getColumns()).thenReturn(3);
+
+        int numRows = 2;
+        for (int i = 0; i < numRows; i++) {
+            OneRow row = accessor.readNextObject();
+            assertEquals(row.toString(),  "OneRow:0." + i + "->fragment1 row" + (i+1) + ",value1,value2");
         }
         assertNull(accessor.readNextObject());
     }
