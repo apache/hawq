@@ -59,6 +59,10 @@ public:
         this->effectiveUser = KerberosName(effectiveUser);
     }
 
+	std::string getKrbName() const {
+	    return effectiveUser.getName();
+      
+	}
     std::string getPrincipal() const {
         return effectiveUser.getPrincipal();
     }
