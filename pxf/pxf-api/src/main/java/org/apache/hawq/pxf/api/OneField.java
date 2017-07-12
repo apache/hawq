@@ -43,4 +43,9 @@ public class OneField {
         this.type = type;
         this.val = val;
     }
+
+    @Override
+    public String toString() {
+        return val.toString();
+    }
 }
