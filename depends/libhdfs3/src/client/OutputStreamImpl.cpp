@@ -86,20 +86,20 @@ void OutputStreamImpl::setError(const exception_ptr & error) {
     }
 }
 
-shared_ptr<CryptoCodec> OutputStreamImpl::getCryptoCodec(){
-	return cryptoCodec;
+shared_ptr<CryptoCodec> OutputStreamImpl::getCryptoCodec() {
+    return cryptoCodec;
 }
 
-void OutputStreamImpl::setCryptoCodec(shared_ptr<CryptoCodec> cryptoCodec){
-	this->cryptoCodec = cryptoCodec;
+void OutputStreamImpl::setCryptoCodec(shared_ptr<CryptoCodec> cryptoCodec) {
+    this->cryptoCodec = cryptoCodec;
 }
 
-shared_ptr<KmsClientProvider> OutputStreamImpl::getKmsClientProvider(){
-	return kcp;
+shared_ptr<KmsClientProvider> OutputStreamImpl::getKmsClientProvider() {
+    return kcp;
 }
 
-void OutputStreamImpl::setKmsClientProvider(shared_ptr<KmsClientProvider> kcp){
-	this->kcp = kcp;
+void OutputStreamImpl::setKmsClientProvider(shared_ptr<KmsClientProvider> kcp) {
+    this->kcp = kcp;
 }
 /**
  * To create or append a file.
@@ -251,15 +251,15 @@ void OutputStreamImpl::openInternal(shared_ptr<FileSystemInter> fs, const char *
 
     try {
         if (flag & Append) {
-			fileStatus = fs->getFileStatus(this->path.c_str());
-			FileEncryptionInfo *fileEnInfo = fileStatus.getFileEncryption();
-			if (fileStatus.isFileEncrypted()) {
-				if (cryptoCodec == NULL) {
-					auth = shared_ptr<RpcAuth> (new RpcAuth(fs->getUserInfo(), RpcAuth::ParseMethod(conf->getKmsMethod())));
-					kcp = shared_ptr<KmsClientProvider> (new KmsClientProvider(auth, conf));	
-					cryptoCodec = shared_ptr<CryptoCodec> (new CryptoCodec(fileEnInfo, kcp, conf->getCryptoBufferSize()));
-				}
-			} 	
+            fileStatus = fs->getFileStatus(this->path.c_str());
+            FileEncryptionInfo *fileEnInfo = fileStatus.getFileEncryption();
+            if (fileStatus.isFileEncrypted()) {
+                if (cryptoCodec == NULL) {
+                    auth = shared_ptr<RpcAuth> (new RpcAuth(fs->getUserInfo(), RpcAuth::ParseMethod(conf->getKmsMethod())));
+                    kcp = shared_ptr<KmsClientProvider> (new KmsClientProvider(auth, conf));
+                    cryptoCodec = shared_ptr<CryptoCodec> (new CryptoCodec(fileEnInfo, kcp, conf->getCryptoBufferSize()));
+                }
+            }
             initAppend();
             LeaseRenewer::GetLeaseRenewer().StartRenew(filesystem);
             return;
@@ -272,7 +272,21 @@ void OutputStreamImpl::openInternal(shared_ptr<FileSystemInter> fs, const char *
 
     assert((flag & Create) || (flag & Overwrite));
     fs->create(this->path, permission, flag, createParent, this->replication,
-               this->blockSize);
+            this->blockSize);
+    fileStatus = fs->getFileStatus(this->path.c_str());
+    FileEncryptionInfo *fileEnInfo = fileStatus.getFileEncryption();
+    if (fileStatus.isFileEncrypted()) {
+        if (cryptoCodec == NULL) {
+            auth = shared_ptr<RpcAuth>(
+                    new RpcAuth(fs->getUserInfo(),
+                            RpcAuth::ParseMethod(conf->getKmsMethod())));
+            kcp = shared_ptr<KmsClientProvider>(
+                    new KmsClientProvider(auth, conf));
+            cryptoCodec = shared_ptr<CryptoCodec>(
+                    new CryptoCodec(fileEnInfo, kcp,
+                            conf->getCryptoBufferSize()));
+        }
+    }
     closed = false;
     computePacketChunkSize();
     LeaseRenewer::GetLeaseRenewer().StartRenew(filesystem);
@@ -302,10 +316,10 @@ void OutputStreamImpl::append(const char * buf, int64_t size) {
 
 void OutputStreamImpl::appendInternal(const char * buf, int64_t size) {
     int64_t todo = size;
-	if (fileStatus.isFileEncrypted()) {
-		buf = cryptoCodec->encode(buf, size).c_str();
-		
-	}
+    if (fileStatus.isFileEncrypted()) {
+        buf = cryptoCodec->encode(buf, size).c_str();
+
+    }
     while (todo > 0) {
         int batch = buffer.size() - position;
         batch = batch < todo ? batch : static_cast<int>(todo);

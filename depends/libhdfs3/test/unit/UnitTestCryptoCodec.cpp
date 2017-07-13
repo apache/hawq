@@ -65,69 +65,69 @@ protected:
 };
 
 TEST_F(TestCryptoCodec, KmsGetKey_Success) {
-	FileEncryptionInfo encryptionInfo;
-	encryptionInfo.setKeyName("KmsName");
-	encryptionInfo.setIv("KmsIv");
-	encryptionInfo.setEzKeyVersionName("KmsVersionName");
-	encryptionInfo.setKey("KmsKey");
-	Config conf;
-	conf.set("hadoop.kms.authentication.type", "simple");
-	conf.set("dfs.encryption.key.provider.uri","kms://http@0.0.0.0:16000/kms");
-	shared_ptr<SessionConfig> sconf(new SessionConfig(conf));
-	UserInfo userInfo;
-	userInfo.setRealUser("abai");
-	shared_ptr<RpcAuth> auth(new RpcAuth(userInfo, RpcAuth::ParseMethod(sconf->getKmsMethod())));		
-	
-	KmsClientProvider kcp(auth, sconf);
-	shared_ptr<MockHttpClient> hc(new MockHttpClient());	
-	kcp.setHttpClient(hc);
+    FileEncryptionInfo encryptionInfo;
+    encryptionInfo.setKeyName("KmsName");
+    encryptionInfo.setIv("KmsIv");
+    encryptionInfo.setEzKeyVersionName("KmsVersionName");
+    encryptionInfo.setKey("KmsKey");
+    Config conf;
+    conf.set("hadoop.kms.authentication.type", "simple");
+    conf.set("dfs.encryption.key.provider.uri", "kms://http@0.0.0.0:16000/kms");
+    shared_ptr<SessionConfig> sconf(new SessionConfig(conf));
+    UserInfo userInfo;
+    userInfo.setRealUser("abai");
+    shared_ptr<RpcAuth> auth(new RpcAuth(userInfo, RpcAuth::ParseMethod(sconf->getKmsMethod())));
 
-	EXPECT_CALL(*hc, post()).Times(1).WillOnce(Return(hc->getPostResult(encryptionInfo)));
-	
-	ptree map = kcp.decryptEncryptedKey(encryptionInfo);
-	std::string KmsKey = map.get<std::string>("material");
+    KmsClientProvider kcp(auth, sconf);
+    shared_ptr<MockHttpClient> hc(new MockHttpClient());
+    kcp.setHttpClient(hc);
 
-	ASSERT_STREQ("KmsKey", KmsKey.c_str());
+    EXPECT_CALL(*hc, post()).Times(1).WillOnce(
+            Return(hc->getPostResult(encryptionInfo)));
+
+    ptree map = kcp.decryptEncryptedKey(encryptionInfo);
+    std::string KmsKey = map.get < std::string > ("material");
+
+    ASSERT_STREQ("KmsKey", KmsKey.c_str());
 }
 
 TEST_F(TestCryptoCodec, encode_Success) {
-	FileEncryptionInfo encryptionInfo;
-	encryptionInfo.setKeyName("ESKeyName");
-	encryptionInfo.setIv("ESIv");
-	encryptionInfo.setEzKeyVersionName("ESVersionName");
+    FileEncryptionInfo encryptionInfo;
+    encryptionInfo.setKeyName("ESKeyName");
+    encryptionInfo.setIv("ESIv");
+    encryptionInfo.setEzKeyVersionName("ESVersionName");
 
-	Config conf;
-	conf.set("hadoop.kms.authentication.type", "simple");
-	conf.set("dfs.encryption.key.provider.uri","kms://http@0.0.0.0:16000/kms");
-	shared_ptr<SessionConfig> sconf(new SessionConfig(conf));
-	UserInfo userInfo;
-	userInfo.setRealUser("abai");
-	shared_ptr<RpcAuth> auth(new RpcAuth(userInfo, RpcAuth::ParseMethod(sconf->getKmsMethod())));		
-	
-	shared_ptr<MockKmsClientProvider> kcp(new MockKmsClientProvider(auth, sconf));
+    Config conf;
+    conf.set("hadoop.kms.authentication.type", "simple");
+    conf.set("dfs.encryption.key.provider.uri", "kms://http@0.0.0.0:16000/kms");
+    shared_ptr<SessionConfig> sconf(new SessionConfig(conf));
+    UserInfo userInfo;
+    userInfo.setRealUser("abai");
+    shared_ptr<RpcAuth> auth(
+            new RpcAuth(userInfo, RpcAuth::ParseMethod(sconf->getKmsMethod())));
 
-			
-	//char buf[1024] = "encode hello world";
-	char buf[1024];
-	Hdfs::FillBuffer(buf, sizeof(buf), 2048);
+    shared_ptr<MockKmsClientProvider> kcp(
+            new MockKmsClientProvider(auth, sconf));
 
-	int32_t bufSize = 1024;
+    //char buf[1024] = "encode hello world";
+    char buf[1024];
+    Hdfs::FillBuffer(buf, sizeof(buf), 2048);
 
-	std::string Key[3] = {
-		"012345678901234567890123456789ab",
-		"0123456789012345",
-		"OTHER LENGTH"
-	};
-	for(int i=0; i<3; i++) {
-		encryptionInfo.setKey(Key[i]);
-		shared_ptr<MockHttpClient> hc(new MockHttpClient());	
-		kcp->setHttpClient(hc);
-		CryptoCodec es(&encryptionInfo, kcp, bufSize);
-		EXPECT_CALL(*kcp, decryptEncryptedKey(_)).Times(2).WillRepeatedly(Return(kcp->getEDKResult(encryptionInfo)));
-		std::string encodeStr = es.encode(buf, strlen(buf));
-		ASSERT_NE(0, memcmp(buf, encodeStr.c_str(), strlen(buf)));	
+    int32_t bufSize = 1024;
 
-		std::string decodeStr = es.decode(encodeStr.c_str(), strlen(buf));
-		ASSERT_STREQ(decodeStr.c_str(), buf); 
-	}
+    std::string Key[2] = { "012345678901234567890123456789ab",
+            "0123456789012345"};
+    for (int i = 0; i < 2; i++) {
+        encryptionInfo.setKey(Key[i]);
+        shared_ptr<MockHttpClient> hc(new MockHttpClient());
+        kcp->setHttpClient(hc);
+        CryptoCodec es(&encryptionInfo, kcp, bufSize);
+        EXPECT_CALL(*kcp, decryptEncryptedKey(_)).Times(2).WillRepeatedly(
+                Return(kcp->getEDKResult(encryptionInfo)));
+        std::string encodeStr = es.encode(buf, strlen(buf));
+        ASSERT_NE(0, memcmp(buf, encodeStr.c_str(), strlen(buf)));
+
+        std::string decodeStr = es.decode(encodeStr.c_str(), strlen(buf));
+        ASSERT_STREQ(decodeStr.c_str(), buf);
+    }
 }

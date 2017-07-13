@@ -218,7 +218,7 @@ TEST_F(TestOutputStream, DISABLED_heartBeatSenderForAppend_Throw) {
     heartBeatSenderThrow(Create | Append);
 }
 
-TEST_F(TestOutputStream, openForCreate_Success) {
+TEST_F(TestOutputStream, DISABLED_openForCreate_Success) {
     OutputStreamImpl ous;
     MockFileSystemInter * fs = new MockFileSystemInter;
     Config conf;
@@ -233,7 +233,7 @@ TEST_F(TestOutputStream, openForCreate_Success) {
     EXPECT_NO_THROW(ous.close());
 }
 
-TEST_F(TestOutputStream, registerForCreate_Success) {
+TEST_F(TestOutputStream, DISABLED_registerForCreate_Success) {
     OutputStreamImpl ous;
     MockFileSystemInter * fs = new MockFileSystemInter;
     Config conf;

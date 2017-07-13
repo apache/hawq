@@ -384,7 +384,7 @@ public:
     int32_t cryptoBufferSize;
     int32_t httpRequestRetryTimes;
     int64_t curlTimeout;
-	
+
 };
 
 }

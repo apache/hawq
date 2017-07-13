@@ -30,12 +30,12 @@ using namespace Hdfs::Internal;
 
 class MockKmsClientProvider: public Hdfs::KmsClientProvider {
 public:
-  MockKmsClientProvider(std::shared_ptr<RpcAuth> auth, std::shared_ptr<SessionConfig> conf) : KmsClientProvider(auth, conf) {}
-  MOCK_METHOD1(setHttpClient, void(std::shared_ptr<HttpClient> hc));
-  MOCK_METHOD1(getKeyMetadata, ptree(const FileEncryptionInfo &encryptionInfo));
-  MOCK_METHOD1(deleteKey, void(const FileEncryptionInfo &encryptionInfo));
-  MOCK_METHOD1(decryptEncryptedKey, ptree(const FileEncryptionInfo &encryptionInfo));
-  MOCK_METHOD5(createKey, void(const std::string &keyName, const std::string &cipher, const int length, const std::string &material, const std::string &description));
+    MockKmsClientProvider(shared_ptr<RpcAuth> auth, shared_ptr<SessionConfig> conf) : KmsClientProvider(auth, conf) {}
+    MOCK_METHOD1(setHttpClient, void(shared_ptr<HttpClient> hc));
+    MOCK_METHOD1(getKeyMetadata, ptree(const FileEncryptionInfo &encryptionInfo));
+    MOCK_METHOD1(deleteKey, void(const FileEncryptionInfo &encryptionInfo));
+    MOCK_METHOD1(decryptEncryptedKey, ptree(const FileEncryptionInfo &encryptionInfo));
+    MOCK_METHOD5(createKey, void(const std::string &keyName, const std::string &cipher, const int length, const std::string &material, const std::string &description));
 
  ptree getEDKResult(FileEncryptionInfo &encryptionInfo) {
     ptree map;

@@ -33,17 +33,17 @@ namespace Hdfs {
  * @param kcp a KmsClientProvider instance to get key from kms server.
  * @param bufSize crypto buffer size.
  */
-CryptoCodec::CryptoCodec(FileEncryptionInfo *encryptionInfo, std::shared_ptr<KmsClientProvider> kcp, int32_t bufSize) : encryptionInfo(encryptionInfo), kcp(kcp), bufSize(bufSize)
+CryptoCodec::CryptoCodec(FileEncryptionInfo *encryptionInfo, shared_ptr<KmsClientProvider> kcp, int32_t bufSize) : encryptionInfo(encryptionInfo), kcp(kcp), bufSize(bufSize)
 {
-		
-	/* Init global status. */
-	ERR_load_crypto_strings();
-	OpenSSL_add_all_algorithms();
-	OPENSSL_config(NULL);
 
-	/* Create cipher context. */
-	encryptCtx = EVP_CIPHER_CTX_new();		
-	cipher = NULL;	
+    /* Init global status. */
+    ERR_load_crypto_strings();
+    OpenSSL_add_all_algorithms();
+    OPENSSL_config(NULL);
+
+    /* Create cipher context. */
+    encryptCtx = EVP_CIPHER_CTX_new();
+    cipher = NULL;
 
 }
 
@@ -52,8 +52,8 @@ CryptoCodec::CryptoCodec(FileEncryptionInfo *encryptionInfo, std::shared_ptr<Kms
  */
 CryptoCodec::~CryptoCodec()
 {
-	if (encryptCtx) 
-		EVP_CIPHER_CTX_free(encryptCtx);
+    if (encryptCtx)
+        EVP_CIPHER_CTX_free(encryptCtx);
 }
 
 /**
@@ -61,25 +61,30 @@ CryptoCodec::~CryptoCodec()
  */
 std::string CryptoCodec::getDecryptedKeyFromKms()
 {
-	ptree map = kcp->decryptEncryptedKey(*encryptionInfo);
-	std::string key = map.get<std::string>("material");
+    ptree map = kcp->decryptEncryptedKey(*encryptionInfo);
+    std::string key;
+    try {
+        key = map.get < std::string > ("material");
+    } catch (...) {
+        THROW(HdfsIOException, "CryptoCodec : Can not get key from kms.");
+    }
 
-	int rem = key.length() % 4;
-	if (rem) {
-		rem = 4 - rem;
-		while (rem != 0) {
-			key = key + "=";
-			rem--;
-		}
-	}
+    int rem = key.length() % 4;
+    if (rem) {
+        rem = 4 - rem;
+        while (rem != 0) {
+            key = key + "=";
+            rem--;
+        }
+    }
 
-	std::replace(key.begin(), key.end(), '-', '+');
-	std::replace(key.begin(), key.end(), '_', '/');
+    std::replace(key.begin(), key.end(), '-', '+');
+    std::replace(key.begin(), key.end(), '_', '/');
 
-	LOG(INFO, "material is :%s", key.c_str());
-	
-	key = KmsClientProvider::base64Decode(key);
-	return key;
+    LOG(INFO, "CryptoCodec : getDecryptedKeyFromKms material is :%s", key.c_str());
+
+    key = KmsClientProvider::base64Decode(key);
+    return key;
 
 	
 }
@@ -93,54 +98,64 @@ std::string CryptoCodec::getDecryptedKeyFromKms()
  */
 std::string CryptoCodec::endecInternal(const char * buffer, int64_t size, bool enc)
 {
-	std::string key = encryptionInfo->getKey();
-	std::string iv = encryptionInfo->getIv();
-	LOG(INFO, "CryptoCodec : endecInternal info. key:%s iv:%s buffer:%s size:%ld is_encode:%b", key.c_str(), iv.c_str(), buffer, size, enc);
+    std::string key = encryptionInfo->getKey();
+    std::string iv = encryptionInfo->getIv();
+    LOG(INFO,
+            "CryptoCodec : endecInternal info. key:%s, iv:%s, buffer:%s, size:%d, is_encode:%d.",
+            key.c_str(), iv.c_str(), buffer, size, enc);
 	
-	/* Get decrypted key from KMS */
-	key = getDecryptedKeyFromKms();
+    /* Get decrypted key from KMS */
+    key = getDecryptedKeyFromKms();
 
-	/* Select cipher method based on the key length. */
-	if (key.length() == KEY_LENGTH_256) {
-		cipher = EVP_aes_256_ctr();	
-	} else if (key.length() == KEY_LENGTH_128) {
-		cipher = EVP_aes_128_ctr();
-	} else {
-		cipher = EVP_aes_192_ctr();
-	}
+    /* Select cipher method based on the key length. */
+    if (key.length() == KEY_LENGTH_256) {
+        cipher = EVP_aes_256_ctr();
+    } else if (key.length() == KEY_LENGTH_128) {
+        cipher = EVP_aes_128_ctr();
+    } else {
+        THROW(InvalidParameter, "CryptoCodec : Invalid key length.");
+    }
 
-	/* Init cipher context with cipher method, encrypted key and IV from KMS. */
-	int encode = enc ? 1 : 0;
-	if (!EVP_CipherInit_ex(encryptCtx, cipher, NULL, (const unsigned char *)key.c_str(), (const unsigned char *)iv.c_str(), encode)) {
-		LOG(WARNING, "EVP_CipherInit_ex failed");
-	}
-	LOG(DEBUG1, "EVP_CipherInit_ex successfully");
-	EVP_CIPHER_CTX_set_padding(encryptCtx, 0);
+    /* Init cipher context with cipher method, encrypted key and IV from KMS. */
+    int encode = enc ? 1 : 0;
+    if (!EVP_CipherInit_ex(encryptCtx, cipher, NULL,
+            (const unsigned char *) key.c_str(),
+            (const unsigned char *) iv.c_str(), encode)) {
+        LOG(WARNING, "EVP_CipherInit_ex failed");
+    }
+    LOG(DEBUG3, "EVP_CipherInit_ex successfully");
+    EVP_CIPHER_CTX_set_padding(encryptCtx, 0);
 
-	/* Encode/decode buffer within cipher context. */
-	std::string result;
-	result.resize(size);
-	int offset = 0;
-	int remaining = size;
-	int len = 0;
-	/* If the encode/decode buffer size larger than crypto buffer size, encode/decode buffer one by one. */ 
-	while (remaining > bufSize) {
-		if (!EVP_CipherUpdate(encryptCtx, (unsigned char *)&result[offset], &len, (const unsigned char *)buffer+offset, bufSize)) {
-			std::string err = ERR_lib_error_string(ERR_get_error());
-			THROW(HdfsIOException, "CryptoCodec : Cannot encrypt AES data %s", err.c_str());
-		}
-		offset += len;
-		remaining -= len;
-		LOG(DEBUG1, "CryptoCodec : EVP_CipherUpdate successfully, result:%s, len:%d", result.c_str(), len);
-	}
-	if (remaining) {
-		if (!EVP_CipherUpdate(encryptCtx, (unsigned char *)&result[offset], &len, (const unsigned char *)buffer+offset, remaining)) {
-			std::string err = ERR_lib_error_string(ERR_get_error());
-			THROW(HdfsIOException, "CryptoCodec : Cannot encrypt AES data %s", err.c_str());
-		}
-	}
+    /* Encode/decode buffer within cipher context. */
+    std::string result;
+    result.resize(size);
+    int offset = 0;
+    int remaining = size;
+    int len = 0;
+    /* If the encode/decode buffer size larger than crypto buffer size, encode/decode buffer one by one. */
+    while (remaining > bufSize) {
+        if (!EVP_CipherUpdate(encryptCtx, (unsigned char *) &result[offset],
+                &len, (const unsigned char *) buffer + offset, bufSize)) {
+            std::string err = ERR_lib_error_string(ERR_get_error());
+            THROW(HdfsIOException, "CryptoCodec : Cannot encrypt AES data %s",
+                    err.c_str());
+        }
+        offset += len;
+        remaining -= len;
+        LOG(DEBUG3,
+                "CryptoCodec : EVP_CipherUpdate successfully, result:%s, len:%d",
+                result.c_str(), len);
+    }
+    if (remaining) {
+        if (!EVP_CipherUpdate(encryptCtx, (unsigned char *) &result[offset],
+                &len, (const unsigned char *) buffer + offset, remaining)) {
+            std::string err = ERR_lib_error_string(ERR_get_error());
+            THROW(HdfsIOException, "CryptoCodec : Cannot encrypt AES data %s",
+                    err.c_str());
+        }
+    }
 
-	return result;
+    return result;
 }
 
 /**
@@ -148,7 +163,7 @@ std::string CryptoCodec::endecInternal(const char * buffer, int64_t size, bool e
  */
 std::string CryptoCodec::encode(const char * buffer, int64_t size)
 {
-	return endecInternal(buffer, size, true);
+    return endecInternal(buffer, size, true);
 }
 
 /**
@@ -156,8 +171,8 @@ std::string CryptoCodec::encode(const char * buffer, int64_t size)
  */	
 std::string CryptoCodec::decode(const char * buffer, int64_t size)
 {
-	return endecInternal(buffer, size, false);
+    return endecInternal(buffer, size, false);
 }
-	
+
 }
 
