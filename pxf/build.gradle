@@ -491,7 +491,7 @@ task wrapper(type: Wrapper) {
     gradleVersion = '2.11'
 }
 
-def distSubprojects = subprojects - project(':pxf-api')
+def distSubprojects = subprojects
 
 task release(type: Copy, dependsOn: [subprojects.build, subprojects.javadoc, distSubprojects.buildRpm, distSubprojects.distTar]) {
     delete 'build'
