@@ -35,7 +35,7 @@ RUN yum install -y epel-release && \
 
 # update gcc
 RUN wget -O /etc/yum.repos.d/slc6-devtoolset.repo http://linuxsoft.cern.ch/cern/devtoolset/slc6-devtoolset.repo && \
- rpm --import http://ftp.scientificlinux.org/linux/scientific/5x/x86_64/RPM-GPG-KEYs/RPM-GPG-KEY-cern && \
+ rpm --import http://linuxsoft.cern.ch/cern/slc68/x86_64/RPM-GPG-KEY-cern && \
  yum install -y devtoolset-2-gcc devtoolset-2-binutils devtoolset-2-gcc-c++ && \
  echo "source /opt/rh/devtoolset-2/enable" >> ~/.bashrc && \
  source ~/.bashrc
