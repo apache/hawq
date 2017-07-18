@@ -19,21 +19,20 @@ DESCRIPTION
 *****************************************************
 
 The gplogfilter utility can be used to search through a 
-HAWQ log file for entries matching the specified 
+HAWQ log file for entries matching the specified search 
 criteria. If an input file is not supplied, then gplogfilter will 
-use the default MASTER_DATA_DIRECTORY variable to 
-locate the HAWQ master log file. To read from standard input, 
-use a dash (-) as the input file name. Input files may be compressed 
-using gzip. In an input file, a log entry is identified by its 
-timestamp in YYYY-MM-DD [hh:mm[:ss]] format.
+use master data directory locate the HAWQ master log file. 
+To read from standard input,use a dash (-) as the input file name. 
+Input files may be compressed using gzip. In an input file, a log 
+entry is identified by its timestamp in YYYY-MM-DD [hh:mm[:ss]] format.
 
 You can also use gplogfilter to search through all segment log 
-files at once by running it through the gpssh utility. For example, 
+files at once by running it through the hawq ssh utility. For example, 
 to display the last three lines of each segment log file:
 
-      gpssh -f seg_host_file
-            => source /usr/local/greenplum-db/greenplum_path.sh
-            => gplogfilter -n 3 /gpdata/gp*.log
+      hawq ssh -f seg_host_file
+            => source /usr/local/hawq/greenplum_path.sh
+            => gplogfilter -n 3 /data/hawq/segment/pg_log/hawq-*
 
 By default, the output of gplogfilter is sent to standard output. 
 Use the -o option to send the output to a file or a directory.
@@ -156,10 +155,9 @@ INPUT OPTIONS
 <input_file>
 
 The name of the input log file(s) to search through. If 
-an input file is not supplied, gplogfilter will use the 
-default MASTER_DATA_DIRECTORY variable to locate the 
-HAWQ master log file. To read from standard input, 
-use a dash (-) as the input file name.
+an input file is not supplied, gplogfilter will use master 
+data directory to locate the HAWQ master log file. To read 
+from standard input, use a dash (-) as the input file name.
 
 -u | --unzip
 
@@ -196,17 +194,17 @@ string '|con6 cmd11|':
 gplogfilter -f '|con6 cmd11|'
 
 
-Using gpssh, run gplogfilter on the segment hosts and search 
+Using hawq ssh, run gplogfilter on the segment hosts and search 
 for log messages in the segment log files containing the string 
 'con6' and save output to a file.
 
-gpssh -f seg_hosts_file -e 'source 
-/usr/local/greenplum-db/greenplum_path.sh ; gplogfilter -f 
-con6 /gpdata/*/gp*.log' > seglog.out
+hawq ssh -f seg_hosts_file -e 'source 
+/usr/local/hawq/greenplum_path.sh ; gplogfilter -f 
+con6 /data/hawq/segment/pg_log/hawq-*' > seglog.out
 
 
 *****************************************************
 SEE ALSO
 *****************************************************
 
-gpssh, gpscp
+hawq ssh, hawq scp

@@ -84,8 +84,8 @@ file(s) or standard output.
 """)
 
 _help = ["""
-If no input file is specified, the value of the MASTER_DATA_DIRECTORY
-is used.  If an input file is a
+If no input file is specified, gplogfilter will use master data directory
+to locate the hawq master log file. If an input file is a
 directory, the suffix ".log" is appended to obtain the input file name.
 To read from standard input, specify input file "-".
 ""","""
@@ -381,7 +381,7 @@ if (options.zip is None and
     options.zip = '9'
 
 try:
-    # If no inputfile arg, use MASTER_DATA_DIRECTORY variable as default
+    # If no inputfile arg, use location of master data directory as default
     if len(args) == 0:
         s = gp.get_masterdatadir()
         if s:
