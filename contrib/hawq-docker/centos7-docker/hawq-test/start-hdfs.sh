@@ -24,7 +24,7 @@ if [ -f /etc/profile.d/hadoop.sh ]; then
 fi
 
 if [ "${NAMENODE}" == "${HOSTNAME}" ]; then
-  if [ ! -d /tmp/hdfs/name/current ]; then
+  if [ ! -d /tmp/hadoop-hdfs/dfs/name/current ]; then
     su -l hdfs -c "hdfs namenode -format"
   fi
   
