@@ -120,11 +120,11 @@ static void fileMD5(const char* strFilePath, char* result) {
     }
 }
 
-static void bufferMD5(const char* strFilePath, char* result) {
+static void bufferMD5(const char* strFilePath, int size, char* result) {
     unsigned char digest[16] = { 0 };
     MD5_CTX ctx;
     MD5_Init(&ctx);
-    MD5_Update(&ctx, strFilePath, strlen(strFilePath));
+    MD5_Update(&ctx, strFilePath, size);
     MD5_Final(digest, &ctx);
     int i = 0;
     char tmp[3] = { 0 };
@@ -348,21 +348,20 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
     const char *tdefile = "/TDE/testfile";
     ASSERT_TRUE(CreateFile(fs, tdefile, 0, 0));
 
-    hdfsFile out;
+    int size = 1024 * 32;
     size_t offset = 0;
-    int64_t todo = 1024 * 32, batch;
-    std::vector<char> buffer(32 * 1024);
+    hdfsFile out;
+    int64_t todo = size;
+    std::vector<char> buffer(size);
     int rc = -1;
     do {
         if (NULL == (out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_APPEND, 0, 0, 1024))) {
             break;
         }
+        Hdfs::FillBuffer(&buffer[0], buffer.size(), 1024);
+        buffer.push_back(0);
         while (todo > 0) {
-            batch = todo < static_cast<int32_t>(buffer.size()) ?
-                    todo : buffer.size();
-            Hdfs::FillBuffer(&buffer[0], batch, 1024);
-
-            if (0 > (rc = hdfsWrite(fs, out, &buffer[0], batch))) {
+            if (0 > (rc = hdfsWrite(fs, out, &buffer[offset], todo))) {
                 break;
             }
             todo -= rc;
@@ -370,14 +369,14 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
         }
         rc = hdfsCloseFile(fs, out);
     } while (0);
-
+    system("rm -rf ./testfile");
     system("hadoop fs -get /TDE/testfile ./");
     char resultFile[33] = { 0 };
     fileMD5("./testfile", resultFile);
     std::cout << "resultFile is " << resultFile << std::endl;
     char resultBuffer[33] = { 0 };
     LOG(INFO, "buffer is %s", &buffer[0]);
-    bufferMD5(&buffer[0], resultBuffer);
+    bufferMD5(&buffer[0], size, resultBuffer);
     std::cout << "result is " << resultBuffer << std::endl;
     ASSERT_STREQ(resultFile, resultBuffer);
     system("rm ./testfile");

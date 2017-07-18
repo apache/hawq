@@ -316,8 +316,10 @@ void OutputStreamImpl::append(const char * buf, int64_t size) {
 
 void OutputStreamImpl::appendInternal(const char * buf, int64_t size) {
     int64_t todo = size;
+	std::string bufEncode;
     if (fileStatus.isFileEncrypted()) {
-        buf = cryptoCodec->encode(buf, size).c_str();
+		bufEncode = cryptoCodec->encode(buf, size);
+        buf = bufEncode.c_str();
 
     }
     while (todo > 0) {
