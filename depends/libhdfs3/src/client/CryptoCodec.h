@@ -35,54 +35,68 @@
 
 namespace Hdfs {
 
-class CryptoCodec {
-public:
-    /**
-     * Construct a CryptoCodec instance.
-     * @param encryptionInfo the encryption info of file.
-     * @param kcp a KmsClientProvider instance to get key from kms server.
-     * @param bufSize crypto buffer size.
-     */
-    CryptoCodec(FileEncryptionInfo *encryptionInfo, shared_ptr<KmsClientProvider> kcp, int32_t bufSize);
+	enum CryptoMethod {
+		DECRYPT = 0,
+		ENCRYPT = 1
+	};
 
-    /**
-     * Destroy a CryptoCodec instance.
-     */
-    virtual ~CryptoCodec();
+	class CryptoCodec {
+	public:
+		/**
+		 * Construct a CryptoCodec instance.
+		 * @param encryptionInfo the encryption info of file.
+		 * @param kcp a KmsClientProvider instance to get key from kms server.
+		 * @param bufSize crypto buffer size.
+		 */
+		CryptoCodec(FileEncryptionInfo *encryptionInfo, shared_ptr<KmsClientProvider> kcp, int32_t bufSize);
 
-    /**
-     * Encode buffer.
-     */
-    virtual std::string encode(const char * buffer, int64_t size);
+		/**
+		 * Destroy a CryptoCodec instance.
+		 */
+		virtual ~CryptoCodec();
 
-    /**
-     * Decode buffer.
-     */
-    virtual std::string decode(const char * buffer, int64_t size);
+		/**
+		 * encrypt/decrypt(depends on init()) buffer data
+		 * @param buffer
+		 * @param size
+		 * @return encrypt/decrypt result string
+		 */
+		virtual std::string cipher_wrap(const char * buffer, int64_t size);
 
-private:
+		/**
+		 * init CryptoCodec
+		 * @param method CryptoMethod
+		 * @param stream_offset 0 when open a new file; file_lenght when append a existed file
+		 * @return 1 success; 0 no need(already inited); -1 failed
+		 */
+		virtual int init(CryptoMethod crypto_method, int64_t stream_offset = 0);
 
-    /**
-     * Common encode/decode buffer method.
-     * @param buffer the buffer to be encode/decode.
-     * @param size the size of buffer.
-     * @param enc true is for encode, false is for decode.
-     * @return return the encode/decode buffer.
-     */
-    std::string endecInternal(const char *buffer, int64_t size, bool enc);
+	private:
 
-    /**
-     * Get decrypted key from kms.
-     */
-    std::string getDecryptedKeyFromKms();
+		/**
+		 * Get decrypted key from kms.
+		 */
+		std::string getDecryptedKeyFromKms();
 
-    shared_ptr<KmsClientProvider> kcp;
-    FileEncryptionInfo *encryptionInfo;
-    EVP_CIPHER_CTX *encryptCtx;
-    EVP_CIPHER_CTX *decryptCtx;
-    const EVP_CIPHER *cipher;
-    int32_t bufSize;
-};
+		/**
+		 * calculate new IV for appending a existed file
+		 * @param initIV
+		 * @param counter
+		 * @return new IV string
+		 */
+		std::string calculateIV(const std::string& initIV, unsigned long counter);
+
+		shared_ptr<KmsClientProvider> kcp;
+		FileEncryptionInfo* encryptionInfo;
+		EVP_CIPHER_CTX*     cipherCtx;
+		const EVP_CIPHER*   cipher;
+		CryptoMethod	method;
+
+		bool	is_init;
+		int32_t		bufSize;
+		int64_t		padding;
+		int64_t		counter;
+	};
 
 }
 #endif

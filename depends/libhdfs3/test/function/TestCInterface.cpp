@@ -134,6 +134,20 @@ static void bufferMD5(const char* strFilePath, int size, char* result) {
     }
 }
 
+static void diff_file2buffer(const char *file_path, const char *buf) {
+    std::cout << "diff file: " << file_path << std::endl;
+    char resultFile[33] = { 0 };
+    char resultBuffer[33] = { 0 };
+
+    fileMD5(file_path, resultFile);
+    std::cout << "resultFile is " << resultFile << std::endl;
+
+    bufferMD5(buf, strlen(buf), resultBuffer);
+    std::cout << "resultBuf is " << resultBuffer << std::endl;
+
+    ASSERT_STREQ(resultFile, resultBuffer);
+}
+
 bool CheckFileContent(hdfsFS fs, const char * path, int64_t len, size_t offset) {
     hdfsFile in = hdfsOpenFile(fs, path, O_RDONLY, 0, 0, 0);
 
@@ -348,6 +362,7 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
     const char *tdefile = "/TDE/testfile";
     ASSERT_TRUE(CreateFile(fs, tdefile, 0, 0));
 
+    //case1: append
     int size = 1024 * 32;
     size_t offset = 0;
     hdfsFile out;
@@ -371,21 +386,118 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
     } while (0);
     system("rm -rf ./testfile");
     system("hadoop fs -get /TDE/testfile ./");
-    char resultFile[33] = { 0 };
-    fileMD5("./testfile", resultFile);
-    std::cout << "resultFile is " << resultFile << std::endl;
-    char resultBuffer[33] = { 0 };
-    LOG(INFO, "buffer is %s", &buffer[0]);
-    bufferMD5(&buffer[0], size, resultBuffer);
-    std::cout << "result is " << resultBuffer << std::endl;
-    ASSERT_STREQ(resultFile, resultBuffer);
-    system("rm ./testfile");
-    system("hadoop fs -rmr /TDE");
+    diff_file2buffer("testfile", &buffer[0]);
+	system("rm ./testfile");
+	
+	//case5: a large file (> 64M) TODO
+    
+	system("hadoop fs -rmr /TDE");
     system("hadoop key delete keytde4append -f");
     ASSERT_EQ(hdfsDisconnect(fs), 0);
     hdfsFreeBuilder(bld);
 }
 
+
+TEST(TestCInterfaceTDE, TestAppendMultiTimes) {
+    hdfsFS fs = NULL;
+    hdfsEncryptionZoneInfo * enInfo = NULL;
+    char * uri = NULL;
+    setenv("LIBHDFS3_CONF", "function-test.xml", 1);
+    struct hdfsBuilder * bld = hdfsNewBuilder();
+    assert(bld != NULL);
+    hdfsBuilderSetNameNode(bld, "default");
+    fs = hdfsBuilderConnect(bld);
+    ASSERT_TRUE(fs != NULL);
+
+    //creake iey and encryption zone
+    system("hadoop fs -rmr /TDE");
+    system("hadoop key delete keytde4append -f");
+    system("hadoop key create keytde4append");
+    system("hadoop fs -mkdir /TDE");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDE", "keytde4append"));
+    enInfo = hdfsGetEZForPath(fs, "/TDE");
+    ASSERT_TRUE(enInfo != NULL);
+    EXPECT_TRUE(enInfo->mKeyName != NULL);
+    hdfsFreeEncryptionZoneInfo(enInfo, 1);
+
+    hdfsFile out;
+    //case2: close and append
+    const char *tdefile2 = "/TDE/testfile2";
+    char out_data2[] = "12345678";
+    ASSERT_TRUE(CreateFile(fs, tdefile2, 0, 0));
+    out = hdfsOpenFile(fs, tdefile2, O_WRONLY | O_APPEND, 0, 0, 0);
+    hdfsWrite(fs, out, out_data2, 4);
+    hdfsCloseFile(fs, out);
+
+    out = hdfsOpenFile(fs, tdefile2, O_WRONLY | O_APPEND, 0, 0, 0);
+    hdfsWrite(fs, out, out_data2+4, 4);
+    hdfsCloseFile(fs, out);
+    system("rm ./testfile2");
+    system("hadoop fs -get /TDE/testfile2 ./");
+    diff_file2buffer("testfile2", out_data2);
+
+    //case3: multi-append
+    const char *tdefile3 = "/TDE/testfile3";
+    char out_data3[] = "1234567812345678123456781234567812345678123456781234567812345678"; //16*4byte
+    ASSERT_TRUE(CreateFile(fs, tdefile3, 0, 0));
+    out = hdfsOpenFile(fs, tdefile3, O_WRONLY | O_APPEND, 0, 0, 0);
+    hdfsWrite(fs, out, out_data3, 5);
+    hdfsWrite(fs, out, out_data3+5, 28);
+    hdfsWrite(fs, out, out_data3+33, 15);
+    hdfsWrite(fs, out, out_data3+48, 16);
+    hdfsCloseFile(fs, out);
+    system("rm ./testfile3");
+    system("hadoop fs -get /TDE/testfile3 ./");
+    diff_file2buffer("testfile3", out_data3);
+
+
+    //case4: multi-append > bufsize(8k)
+    const char *tdefile4 = "/TDE/testfile4";
+    int data_size = 13*1024+1;
+    char *out_data4 = (char *)malloc(data_size);
+    Hdfs::FillBuffer(out_data4, data_size-1, 1024);
+    out_data4[data_size-1] = 0;
+    ASSERT_TRUE(CreateFile(fs, tdefile4, 0, 0));
+    out = hdfsOpenFile(fs, tdefile4, O_WRONLY | O_APPEND, 0, 0, 0);
+
+    int todo = 0;
+    int offset = 0;
+    todo = 9*1024-1;
+    while (todo > 0) {
+        int rc = 0;
+        if (0 > (rc = hdfsWrite(fs, out, out_data4+offset, todo))) {
+            break;
+        }
+        todo -= rc;
+        offset += rc;
+    }
+
+    todo = 4*1024+1;
+    while (todo > 0) {
+        int rc = 0;
+        if (0 > (rc = hdfsWrite(fs, out, out_data4+offset, todo))) {
+            break;
+        }
+        todo -= rc;
+        offset += rc;
+    }
+
+
+    ASSERT_EQ(data_size-1, offset);
+
+    hdfsCloseFile(fs, out);
+    system("rm ./testfile4");
+    system("hadoop fs -get /TDE/testfile4 ./");
+    diff_file2buffer("testfile4", out_data4);
+    free(out_data4);
+
+
+
+    system("hadoop fs -rmr /TDE");
+    system("hadoop key delete keytde4append -f");
+    ASSERT_EQ(hdfsDisconnect(fs), 0);
+    hdfsFreeBuilder(bld);
+}
 
 TEST(TestErrorMessage, TestErrorMessage) {
     EXPECT_NO_THROW(hdfsGetLastError());
