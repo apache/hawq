@@ -186,7 +186,6 @@ TEST_F(TestKmsClient, DecryptEncryptedKeySuccess) {
 TEST_F(TestKmsClient, CreateKeyFailediBadUrl) {
     std::string keyName = "testcreatekeyfailname";
     std::string cipher = "AES/CTR/NoPadding";
-    int length = 128;
     std::string material = "testCreateKey";
 
     std::string url[4] = { "ftp:///http@localhost:16000/kms",

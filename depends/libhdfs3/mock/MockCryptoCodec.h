@@ -30,8 +30,9 @@
 class MockCryptoCodec: public Hdfs::CryptoCodec {
 public:
   MockCryptoCodec(FileEncryptionInfo *encryptionInfo, shared_ptr<KmsClientProvider> kcp, int32_t bufSize) : CryptoCodec(encryptionInfo, kcp, bufSize) {}
-  MOCK_METHOD2(encode, std::string(const char * buffer,int64_t size));
-  MOCK_METHOD2(decode, std::string(const char * buffer,int64_t size));
+
+  MOCK_METHOD2(init, int(CryptoMethod crypto_method, int64_t stream_offset));
+  MOCK_METHOD2(cipher_wrap, std::string(const char * buffer,int64_t size));
 };
 
 #endif /* _HDFS_LIBHDFS3_MOCK_CRYPTOCODEC_H_ */

@@ -339,6 +339,8 @@ std::string HttpClient::escape(const std::string &data) {
     } else {
         LOG(WARNING, "HttpClient : Curl in escape method is NULL");
     }
+    std::string empty;
+    return empty;
 }
 }
 

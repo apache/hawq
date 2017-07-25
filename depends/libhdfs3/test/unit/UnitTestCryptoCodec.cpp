@@ -111,7 +111,8 @@ TEST_F(TestCryptoCodec, encode_Success) {
 
     //char buf[1024] = "encode hello world";
     char buf[1024];
-    Hdfs::FillBuffer(buf, sizeof(buf), 2048);
+    Hdfs::FillBuffer(buf, sizeof(buf)-1, 2048);
+    buf[sizeof(buf)-1] = 0;
 
     int32_t bufSize = 1024;
 
@@ -121,13 +122,20 @@ TEST_F(TestCryptoCodec, encode_Success) {
         encryptionInfo.setKey(Key[i]);
         shared_ptr<MockHttpClient> hc(new MockHttpClient());
         kcp->setHttpClient(hc);
-        CryptoCodec es(&encryptionInfo, kcp, bufSize);
+
         EXPECT_CALL(*kcp, decryptEncryptedKey(_)).Times(2).WillRepeatedly(
                 Return(kcp->getEDKResult(encryptionInfo)));
-        std::string encodeStr = es.encode(buf, strlen(buf));
+
+        CryptoCodec es(&encryptionInfo, kcp, bufSize);
+        es.init(CryptoMethod::ENCRYPT);
+        CryptoCodec ds(&encryptionInfo, kcp, bufSize);
+        ds.init(CryptoMethod::DECRYPT);
+
+
+        std::string encodeStr = es.cipher_wrap(buf, strlen(buf));
         ASSERT_NE(0, memcmp(buf, encodeStr.c_str(), strlen(buf)));
 
-        std::string decodeStr = es.decode(encodeStr.c_str(), strlen(buf));
+        std::string decodeStr = ds.cipher_wrap(encodeStr.c_str(), strlen(buf));
         ASSERT_STREQ(decodeStr.c_str(), buf);
     }
 }

@@ -255,9 +255,18 @@ void OutputStreamImpl::openInternal(shared_ptr<FileSystemInter> fs, const char *
             FileEncryptionInfo *fileEnInfo = fileStatus.getFileEncryption();
             if (fileStatus.isFileEncrypted()) {
                 if (cryptoCodec == NULL) {
-                    auth = shared_ptr<RpcAuth> (new RpcAuth(fs->getUserInfo(), RpcAuth::ParseMethod(conf->getKmsMethod())));
-                    kcp = shared_ptr<KmsClientProvider> (new KmsClientProvider(auth, conf));
-                    cryptoCodec = shared_ptr<CryptoCodec> (new CryptoCodec(fileEnInfo, kcp, conf->getCryptoBufferSize()));
+                    auth = shared_ptr<RpcAuth> (
+                            new RpcAuth(fs->getUserInfo(), RpcAuth::ParseMethod(conf->getKmsMethod())));
+                    kcp = shared_ptr<KmsClientProvider> (
+                            new KmsClientProvider(auth, conf));
+                    cryptoCodec = shared_ptr<CryptoCodec> (
+                            new CryptoCodec(fileEnInfo, kcp, conf->getCryptoBufferSize()));
+
+                    int64_t file_length = fileStatus.getLength();
+                    int ret = cryptoCodec->init(CryptoMethod::ENCRYPT, file_length);
+                    if (ret < 0) {
+                        THROW(HdfsIOException, "init CryptoCodec failed, file:%s", this->path.c_str());
+                    }
                 }
             }
             initAppend();
@@ -278,13 +287,18 @@ void OutputStreamImpl::openInternal(shared_ptr<FileSystemInter> fs, const char *
     if (fileStatus.isFileEncrypted()) {
         if (cryptoCodec == NULL) {
             auth = shared_ptr<RpcAuth>(
-                    new RpcAuth(fs->getUserInfo(),
-                            RpcAuth::ParseMethod(conf->getKmsMethod())));
+                    new RpcAuth(fs->getUserInfo(), RpcAuth::ParseMethod(conf->getKmsMethod())));
             kcp = shared_ptr<KmsClientProvider>(
                     new KmsClientProvider(auth, conf));
             cryptoCodec = shared_ptr<CryptoCodec>(
-                    new CryptoCodec(fileEnInfo, kcp,
-                            conf->getCryptoBufferSize()));
+                    new CryptoCodec(fileEnInfo, kcp, conf->getCryptoBufferSize()));
+
+            int64_t file_length = fileStatus.getLength();
+            assert(file_length == 0);
+            int ret = cryptoCodec->init(CryptoMethod::ENCRYPT, file_length);
+            if (ret < 0) {
+                THROW(HdfsIOException, "init CryptoCodec failed, file:%s", this->path.c_str());
+            }
         }
     }
     closed = false;
@@ -317,8 +331,10 @@ void OutputStreamImpl::append(const char * buf, int64_t size) {
 void OutputStreamImpl::appendInternal(const char * buf, int64_t size) {
     int64_t todo = size;
 	std::string bufEncode;
+
     if (fileStatus.isFileEncrypted()) {
-		bufEncode = cryptoCodec->encode(buf, size);
+        //encrypt buf
+        bufEncode = cryptoCodec->cipher_wrap(buf, size);
         buf = bufEncode.c_str();
 
     }
