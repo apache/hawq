@@ -260,7 +260,6 @@ TEST(TestCInterfaceConnect, TestConnect_Success) {
 TEST(TestCInterfaceTDE, DISABLED_TestCreateEnRPC_Success) {
     hdfsFS fs = NULL;
     hdfsEncryptionZoneInfo * enInfo = NULL;
-    char * uri = NULL;
     setenv("LIBHDFS3_CONF", "function-test.xml", 1);
     struct hdfsBuilder * bld = hdfsNewBuilder();
     assert(bld != NULL);
@@ -288,8 +287,7 @@ TEST(TestCInterfaceTDE, DISABLED_TestCreateEnRPC_Success) {
         system(tdeKey.c_str());
         system(mkTde.c_str());
         ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, tde.c_str(), key.c_str()));
-    } 
-    hdfsEncryptionZoneInfo * enZoneInfos = NULL;
+    }
     int num = 0;
     hdfsListEncryptionZones(fs, &num);
     EXPECT_EQ(num, 12); 
@@ -300,7 +298,6 @@ TEST(TestCInterfaceTDE, DISABLED_TestCreateEnRPC_Success) {
 TEST(TestCInterfaceTDE, TestAppendWithTDE_Success) {
     hdfsFS fs = NULL;
     hdfsEncryptionZoneInfo * enInfo = NULL;
-    char * uri = NULL;
     setenv("LIBHDFS3_CONF", "function-test.xml", 1);
     struct hdfsBuilder * bld = hdfsNewBuilder();
     assert(bld != NULL);
@@ -341,7 +338,6 @@ TEST(TestCInterfaceTDE, TestAppendWithTDE_Success) {
 TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
     hdfsFS fs = NULL;
     hdfsEncryptionZoneInfo * enInfo = NULL;
-    char * uri = NULL;
     setenv("LIBHDFS3_CONF", "function-test.xml", 1);
     struct hdfsBuilder * bld = hdfsNewBuilder();
     assert(bld != NULL);
@@ -390,8 +386,7 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
 	system("rm ./testfile");
 	
 	//case5: a large file (> 64M) TODO
-    
-	system("hadoop fs -rmr /TDE");
+    system("hadoop fs -rmr /TDE");
     system("hadoop key delete keytde4append -f");
     ASSERT_EQ(hdfsDisconnect(fs), 0);
     hdfsFreeBuilder(bld);
@@ -401,7 +396,6 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
 TEST(TestCInterfaceTDE, TestAppendMultiTimes) {
     hdfsFS fs = NULL;
     hdfsEncryptionZoneInfo * enInfo = NULL;
-    char * uri = NULL;
     setenv("LIBHDFS3_CONF", "function-test.xml", 1);
     struct hdfsBuilder * bld = hdfsNewBuilder();
     assert(bld != NULL);

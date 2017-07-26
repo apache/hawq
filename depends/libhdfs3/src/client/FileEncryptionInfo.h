@@ -81,8 +81,8 @@ public:
     }
 
 private:
-    int suite;
     int cryptoProtocolVersion;
+    int suite;
     std::string key;
     std::string iv;
     std::string keyName;

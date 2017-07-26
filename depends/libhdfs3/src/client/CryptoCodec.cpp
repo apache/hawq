@@ -106,14 +106,7 @@ namespace Hdfs {
 			return 0;
 
 		// Get decrypted key from KMS
-		std::string key;
-		try {
-			key = getDecryptedKeyFromKms();
-		}
-		catch (...) {
-			LOG(WARNING, "getDecryptedKeyFromKms failed");
-			return -1;
-		}
+		std::string key = getDecryptedKeyFromKms();
 
 		// Select cipher method based on the key length
 		uint64_t AlgorithmBlockSize = key.length();

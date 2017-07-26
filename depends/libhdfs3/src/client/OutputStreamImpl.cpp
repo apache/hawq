@@ -334,7 +334,7 @@ void OutputStreamImpl::appendInternal(const char * buf, int64_t size) {
 
     if (fileStatus.isFileEncrypted()) {
         //encrypt buf
-		bufEncode = cryptoCodec->cipher_wrap(buf, size);
+        bufEncode = cryptoCodec->cipher_wrap(buf, size);
         buf = bufEncode.c_str();
 
     }
