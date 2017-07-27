@@ -52,6 +52,7 @@ install:
 
 before_script:
   - mvn apache-rat:check
+  - export DEPENDENCY_INSTALL_PREFIX=/usr/local/opt/openssl
   - cd $TRAVIS_BUILD_DIR
   - ./configure
 
