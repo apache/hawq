@@ -42,7 +42,7 @@ LIBS := $(LIBS) $(CPLUSPLUSLIB)
 #LIBS := $(LIBS) $(GLIBLIB)
 
 
-MOCK_LIBS := -ldl -lesmtp $(filter-out -lpgport -lesmtp -ledit, $(LIBS))
+MOCK_LIBS := -ldl -lpthread -lesmtp $(filter-out -lpgport -lesmtp -ledit, $(LIBS))
  
 
 # We are unable to mock them up at the moment.  Real objects should contain them.
