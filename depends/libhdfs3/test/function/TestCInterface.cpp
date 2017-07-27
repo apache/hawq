@@ -269,7 +269,7 @@ TEST(TestCInterfaceTDE, DISABLED_TestCreateEnRPC_Success) {
     system("hadoop fs -rmr /TDE");
     system("hadoop key create keytde");
     system("hadoop fs -mkdir /TDE");
-    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDE", "keytde")); 
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDE", "keytde"));
     enInfo = hdfsGetEZForPath(fs, "/TDE");
     ASSERT_TRUE(enInfo != NULL);
     EXPECT_TRUE(enInfo->mKeyName != NULL);
@@ -290,7 +290,7 @@ TEST(TestCInterfaceTDE, DISABLED_TestCreateEnRPC_Success) {
     }
     int num = 0;
     hdfsListEncryptionZones(fs, &num);
-    EXPECT_EQ(num, 12); 
+    EXPECT_EQ(num, 12);
     ASSERT_EQ(hdfsDisconnect(fs), 0);
     hdfsFreeBuilder(bld);
 }
@@ -383,9 +383,9 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
     system("rm -rf ./testfile");
     system("hadoop fs -get /TDE/testfile ./");
     diff_file2buffer("testfile", &buffer[0]);
-	system("rm ./testfile");
-	
-	//case5: a large file (> 64M) TODO
+    system("rm ./testfile");
+
+    //case5: a large file (> 64M) TODO
     system("hadoop fs -rmr /TDE");
     system("hadoop key delete keytde4append -f");
     ASSERT_EQ(hdfsDisconnect(fs), 0);
@@ -393,7 +393,7 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
 }
 
 
-TEST(TestCInterfaceTDE, TestAppendMultiTimes) {
+TEST(TestCInterfaceTDE, TestAppendMultiTimes_Success) {
     hdfsFS fs = NULL;
     hdfsEncryptionZoneInfo * enInfo = NULL;
     setenv("LIBHDFS3_CONF", "function-test.xml", 1);
@@ -1878,4 +1878,28 @@ TEST_F(TestCInterface, TestGetHosts_Success) {
     EXPECT_TRUE(NULL == hosts[2]);
     hdfsFreeHosts(hosts);
     hdfsCloseFile(fs, out);
+}
+
+// test concurrent write to a same file
+// expected:
+//  At any point there can only be 1 writer.
+//  This is enforced by requiring the writer to acquire leases.
+TEST_F(TestCInterface, TestConcurrentWrite_Failure) {
+    hdfsFS fs = NULL;
+    setenv("LIBHDFS3_CONF", "function-test.xml", 1);
+    struct hdfsBuilder * bld = hdfsNewBuilder();
+    assert(bld != NULL);
+    hdfsBuilderSetNameNode(bld, "default");
+    fs = hdfsBuilderConnect(bld);
+    ASSERT_TRUE(fs != NULL);
+
+    const char *file_path = BASE_DIR "/concurrent_write";
+    char buf[] = "1234";
+    hdfsFile fout1 = hdfsOpenFile(fs, file_path, O_WRONLY | O_APPEND, 0, 0, 0);
+    hdfsFile fout2 = hdfsOpenFile(fs, file_path, O_WRONLY | O_APPEND, 0, 0, 0);
+    ASSERT_TRUE(fout2 == NULL); //must failed
+    int rc = hdfsWrite(fs, fout1, buf, sizeof(buf)-1);
+    ASSERT_TRUE(rc > 0);
+    int retval = hdfsCloseFile(fs, fout1);
+    ASSERT_TRUE(retval == 0);
 }
