@@ -86,16 +86,16 @@ namespace Hdfs {
 		 */
 		std::string calculateIV(const std::string& initIV, unsigned long counter);
 
-		shared_ptr<KmsClientProvider> kcp;
-		FileEncryptionInfo* encryptionInfo;
-		EVP_CIPHER_CTX*     cipherCtx;
-		const EVP_CIPHER*   cipher;
+		shared_ptr<KmsClientProvider>	kcp;
+		FileEncryptionInfo*	encryptionInfo;
+		EVP_CIPHER_CTX*	cipherCtx;
+		const EVP_CIPHER*	cipher;
 		CryptoMethod	method;
 
 		bool	is_init;
-		int32_t		bufSize;
-		int64_t		padding;
-		int64_t		counter;
+		int32_t	bufSize;
+		int64_t	padding;
+		int64_t	counter;
 	};
 
 }

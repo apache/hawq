@@ -76,38 +76,6 @@ protected:
     shared_ptr<FileSystem> fs;
 };
 
-static bool CreateFile(hdfsFS fs, const char * path, int64_t blockSize, int64_t fileSize) {
-    hdfsFile out;
-    size_t offset = 0;
-    int64_t todo = fileSize, batch;
-    std::vector<char> buffer(32 * 1024);
-    int rc = -1;
-
-    do {
-        if (NULL == (out = hdfsOpenFile(fs, path, O_WRONLY, 0, 0, blockSize))) {
-            break;
-        }
-
-        while (todo > 0) {
-            batch = todo < static_cast<int32_t>(buffer.size()) ?
-                    todo : buffer.size();
-            Hdfs::FillBuffer(&buffer[0], batch, offset);
-
-            if (0 > (rc = hdfsWrite(fs, out, &buffer[0], batch))) {
-                break;
-            }
-
-            todo -= rc;
-            offset += rc;
-        }
-
-        rc = hdfsCloseFile(fs, out);
-    } while (0);
-
-    return rc >= 0;
-}
-
-
 TEST_F(TestKmsClient, CreateKeySuccess) {
     std::string keyName = "testcreatekeyname";
     std::string cipher = "AES/CTR/NoPadding";
@@ -160,14 +128,16 @@ TEST_F(TestKmsClient, DecryptEncryptedKeySuccess) {
     //create encryption zone and encrypted file
     ASSERT_EQ(0,
             hdfsCreateEncryptionZone(hfs, BASE_DIR"/testDEKey", "testdekeyname"));
-    const char * tdeFile = BASE_DIR"/testDEKey/tdefile";
-    ASSERT_TRUE(CreateFile(hfs, tdeFile, 0, 0));
+    std::string hadoop_command = "hadoop fs -touchz ";
+    std::string tdeFile = BASE_DIR"/testDEKey/tdefile";
+    std::string createFile = hadoop_command + tdeFile;
+    std::system(createFile.c_str());
 
     //decrypt encrypted key
     hc.reset(new HttpClient());
     kcp.reset(new KmsClientProvider(auth, sconf));
     kcp->setHttpClient(hc);
-    FileStatus fileStatus = fs->getFileStatus(tdeFile);
+    FileStatus fileStatus = fs->getFileStatus(tdeFile.c_str());
     FileEncryptionInfo *enInfo = fileStatus.getFileEncryption();
     ptree map = kcp->decryptEncryptedKey(*enInfo);
     std::string versionName = map.get < std::string > ("versionName");

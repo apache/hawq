@@ -94,7 +94,7 @@ namespace Hdfs {
 		std::replace(key.begin(), key.end(), '-', '+');
 		std::replace(key.begin(), key.end(), '_', '/');
 
-		LOG(INFO, "CryptoCodec : getDecryptedKeyFromKms material is :%s", key.c_str());
+		LOG(DEBUG3, "CryptoCodec : getDecryptedKeyFromKms material is :%s", key.c_str());
 
 		key = KmsClientProvider::base64Decode(key);
 		return key;
@@ -144,7 +144,7 @@ namespace Hdfs {
 		//AES/CTR/NoPadding 
 		EVP_CIPHER_CTX_set_padding(cipherCtx, 0);
 
-		LOG(INFO, "CryptoCodec init success, key_length:%llu, is_encode:%d", AlgorithmBlockSize, enc);
+		LOG(DEBUG3, "CryptoCodec init success, key_length:%llu, is_encode:%d", AlgorithmBlockSize, enc);
 		is_init = true;
 		return 1;
 	}

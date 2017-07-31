@@ -47,7 +47,7 @@ using namespace Hdfs::Internal;
 
 #define BASE_DIR TEST_HDFS_PREFIX"/testCInterface/"
 #define MAXDATABUFF 1024
-#define MD5LENTH 16
+#define MD5LENTH 33
 
 using namespace std;
 using Hdfs::CheckBuffer;
@@ -136,8 +136,8 @@ static void bufferMD5(const char* strFilePath, int size, char* result) {
 
 static void diff_file2buffer(const char *file_path, const char *buf) {
     std::cout << "diff file: " << file_path << std::endl;
-    char resultFile[33] = { 0 };
-    char resultBuffer[33] = { 0 };
+    char resultFile[MD5LENTH] = { 0 };
+    char resultBuffer[MD5LENTH] = { 0 };
 
     fileMD5(file_path, resultFile);
     std::cout << "resultFile is " << resultFile << std::endl;
@@ -266,23 +266,25 @@ TEST(TestCInterfaceTDE, DISABLED_TestCreateEnRPC_Success) {
     hdfsBuilderSetNameNode(bld, "default");
     fs = hdfsBuilderConnect(bld);
     ASSERT_TRUE(fs != NULL);
-    system("hadoop fs -rmr /TDE");
-    system("hadoop key create keytde");
-    system("hadoop fs -mkdir /TDE");
-    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDE", "keytde"));
-    enInfo = hdfsGetEZForPath(fs, "/TDE");
+    //Test TDE API.
+    system("hadoop fs -rmr /TDEEnRPC");
+    system("hadoop key create keytderpc");
+    system("hadoop fs -mkdir /TDEEnRPC");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDEEnRPC", "keytderpc"));
+    enInfo = hdfsGetEZForPath(fs, "/TDEEnRPC");
     ASSERT_TRUE(enInfo != NULL);
-    EXPECT_TRUE(enInfo->mKeyName != NULL);
+    ASSERT_STREQ("keytderpc", enInfo->mKeyName);
     std::cout << "----hdfsEncryptionZoneInfo----:" << " KeyName : " << enInfo->mKeyName << " Suite : " << enInfo->mSuite << " CryptoProtocolVersion : " << enInfo->mCryptoProtocolVersion << " Id : " << enInfo->mId << " Path : " << enInfo->mPath << std::endl;
     hdfsFreeEncryptionZoneInfo(enInfo, 1);
-    for (int i = 0; i <= 10; i++){
+    //Test create multiple encryption zones.
+    for (int i = 0; i < 10; i++){
         std::stringstream newstr;
         newstr << i;
-        std::string tde = "/TDE" + newstr.str();
-        std::string key = "keytde" + newstr.str();
-        std::string rmTde = "hadoop fs -rmr /TDE" + newstr.str();
-        std::string tdeKey = "hadoop key create keytde" + newstr.str();
-        std::string mkTde = "hadoop fs -mkdir /TDE" + newstr.str();
+        std::string tde = "/TDEEnRPC" + newstr.str();
+        std::string key = "keytderpc" + newstr.str();
+        std::string rmTde = "hadoop fs -rmr /TDEEnRPC" + newstr.str();
+        std::string tdeKey = "hadoop key create keytderpc" + newstr.str();
+        std::string mkTde = "hadoop fs -mkdir /TDEEnRPC" + newstr.str();
         system(rmTde.c_str());
         system(tdeKey.c_str());
         system(mkTde.c_str());
@@ -295,9 +297,8 @@ TEST(TestCInterfaceTDE, DISABLED_TestCreateEnRPC_Success) {
     hdfsFreeBuilder(bld);
 }
 
-TEST(TestCInterfaceTDE, TestAppendWithTDE_Success) {
+TEST(TestCInterfaceTDE, TestOpenCreateWithTDE_Success) {
     hdfsFS fs = NULL;
-    hdfsEncryptionZoneInfo * enInfo = NULL;
     setenv("LIBHDFS3_CONF", "function-test.xml", 1);
     struct hdfsBuilder * bld = hdfsNewBuilder();
     assert(bld != NULL);
@@ -305,61 +306,139 @@ TEST(TestCInterfaceTDE, TestAppendWithTDE_Success) {
     fs = hdfsBuilderConnect(bld);
     hdfsBuilderSetUserName(bld, HDFS_SUPERUSER);
     ASSERT_TRUE(fs != NULL);
-    system("hadoop fs -rmr /TDE");
-    system("hadoop key delete keytde4append -f");
-    system("hadoop key create keytde4append");
-    system("hadoop fs -mkdir /TDE");
-    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDE", "keytde4append"));
-    enInfo = hdfsGetEZForPath(fs, "/TDE");
-    ASSERT_TRUE(enInfo != NULL);
-    EXPECT_TRUE(enInfo->mKeyName != NULL);
-    hdfsFreeEncryptionZoneInfo(enInfo, 1);
-    const char *tdefile = "/TDE/testfile";
-    ASSERT_TRUE(CreateFile(fs, tdefile, 0, 0));
-
-    const char *buffer = "hello world";
-    hdfsFile out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_APPEND, 0, 0, 0);
+    //Create encryption zone for test.
+    system("hadoop fs -rmr /TDEOpen");
+    system("hadoop key create keytde4open");
+    system("hadoop fs -mkdir /TDEOpen");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDEOpen", "keytde4open"));
+    //Create tdefile under the encryption zone for TDE to write.
+    const char *tdefile = "/TDEOpen/testfile";;
+    //Write buffer to tdefile.
+    const char *buffer = "test tde open file with create flag success";
+    hdfsFile out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_CREAT, 0, 0, 0);
     ASSERT_TRUE(out != NULL)<< hdfsGetLastError();
     EXPECT_EQ(strlen(buffer), hdfsWrite(fs, out, (const void *)buffer, strlen(buffer)))
             << hdfsGetLastError();
     hdfsCloseFile(fs, out);
-    FILE *file = popen("hadoop fs -cat /TDE/testfile", "r");
+    //Read buffer from tdefile with hadoop API.
+    FILE *file = popen("hadoop fs -cat /TDEOpen/testfile", "r");
     char bufGets[128];
     while (fgets(bufGets, sizeof(bufGets), file)) {
     }
     pclose(file);
+    //Check the buffer is eaqual to the data reading from tdefile.
     ASSERT_STREQ(bufGets, buffer);
-    system("hadoop fs -rmr /TDE");
-    system("hadoop key delete keytde4append -f");
+    system("hadoop fs -rmr /TDEOpen");
+    system("hadoop key delete keytde4open -f");
     ASSERT_EQ(hdfsDisconnect(fs), 0);
     hdfsFreeBuilder(bld);
 }
 
-TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
+TEST(TestCInterfaceTDE, TestAppendOnceWithTDE_Success) {
     hdfsFS fs = NULL;
-    hdfsEncryptionZoneInfo * enInfo = NULL;
     setenv("LIBHDFS3_CONF", "function-test.xml", 1);
     struct hdfsBuilder * bld = hdfsNewBuilder();
     assert(bld != NULL);
     hdfsBuilderSetNameNode(bld, "default");
     fs = hdfsBuilderConnect(bld);
+    hdfsBuilderSetUserName(bld, HDFS_SUPERUSER);
     ASSERT_TRUE(fs != NULL);
-
-    //creake key and encryption zone
-    system("hadoop fs -rmr /TDE");
-    system("hadoop key delete keytde4append -f");
-    system("hadoop key create keytde4append");
-    system("hadoop fs -mkdir /TDE");
-    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDE", "keytde4append"));
-    enInfo = hdfsGetEZForPath(fs, "/TDE");
-    ASSERT_TRUE(enInfo != NULL);
-    EXPECT_TRUE(enInfo->mKeyName != NULL);
-    hdfsFreeEncryptionZoneInfo(enInfo, 1);
-    const char *tdefile = "/TDE/testfile";
+    //Create encryption zone for test.
+    system("hadoop fs -rmr /TDEAppend1");
+    //system("hadoop key delete keytde4append1 -f");
+    system("hadoop key create keytde4append1");
+    system("hadoop fs -mkdir /TDEAppend1");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDEAppend1", "keytde4append1"));
+    //Create tdefile under the encryption zone for TDE to write.
+    const char *tdefile = "/TDEAppend1/testfile";
     ASSERT_TRUE(CreateFile(fs, tdefile, 0, 0));
+    //Write buffer to tdefile.
+    const char *buffer = "test tde append once success";
+    hdfsFile out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_APPEND, 0, 0, 0);
+    ASSERT_TRUE(out != NULL)<< hdfsGetLastError();
+    EXPECT_EQ(strlen(buffer), hdfsWrite(fs, out, (const void *)buffer, strlen(buffer)))
+            << hdfsGetLastError();
+    hdfsCloseFile(fs, out);
+    //Read buffer from tdefile with hadoop API.
+    FILE *file = popen("hadoop fs -cat /TDEAppend1/testfile", "r");
+    char bufGets[128];
+    while (fgets(bufGets, sizeof(bufGets), file)) {
+    }
+    pclose(file);
+    //Check the buffer is eaqual to the data reading from tdefile.
+    ASSERT_STREQ(bufGets, buffer);
+    system("hadoop fs -rmr /TDEAppend1");
+    system("hadoop key delete keytde4append1 -f");
+    ASSERT_EQ(hdfsDisconnect(fs), 0);
+    hdfsFreeBuilder(bld);
+}
 
-    //case1: append
-    int size = 1024 * 32;
+TEST(TestCInterfaceTDE, TestMultipleAppendReopenfileWithTDE_Success) {
+    hdfsFS fs = NULL;
+    setenv("LIBHDFS3_CONF", "function-test.xml", 1);
+    struct hdfsBuilder * bld = hdfsNewBuilder();
+    assert(bld != NULL);
+    hdfsBuilderSetNameNode(bld, "default");
+    fs = hdfsBuilderConnect(bld);
+    hdfsBuilderSetUserName(bld, HDFS_SUPERUSER);
+    ASSERT_TRUE(fs != NULL);
+    //Create encryption zone for test.
+    system("hadoop fs -rmr /TDEAppend2");
+    system("hadoop key delete keytde4append2 -f");
+    system("hadoop key create keytde4append2");
+    system("hadoop fs -mkdir /TDEAppend2");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDEAppend2", "keytde4append2"));
+    //Create tdefile under the encryption zone for TDE to write.
+    const char *tdefile = "/TDEAppend2/testfile";
+    ASSERT_TRUE(CreateFile(fs, tdefile, 0, 0));
+    //Write buffer to tdefile.
+    std::string buffer1 = "test tde multiple append";
+    std::string buffer2 = "with reopen file success";
+    std::string buffer = buffer1 + buffer2;
+    hdfsFile out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_APPEND, 0, 0, 0);
+    ASSERT_TRUE(out != NULL)<< hdfsGetLastError();
+    EXPECT_EQ(buffer1.length(), hdfsWrite(fs, out, (const void *)buffer1.c_str(), buffer1.length()))
+            << hdfsGetLastError();
+    hdfsCloseFile(fs, out);
+    //Reopen tdefile to append buffer.
+    out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_APPEND, 0, 0, 0);
+    EXPECT_EQ(buffer2.length(), hdfsWrite(fs, out, (const void *)buffer2.c_str(), buffer2.length())) << hdfsGetLastError();
+    hdfsCloseFile(fs, out);
+    //Read buffer from tdefile with hadoop API.
+    FILE *file = popen("hadoop fs -cat /TDEAppend2/testfile", "r");
+    char bufGets[128];
+    while (fgets(bufGets, sizeof(bufGets), file)) {
+    }
+    pclose(file);
+    //Check the buffer is eaqual to the data reading from tdefile.
+    ASSERT_STREQ(bufGets, buffer.c_str());
+    system("hadoop fs -rmr /TDEAppend2");
+    system("hadoop key delete keytde4append2 -f");
+    ASSERT_EQ(hdfsDisconnect(fs), 0);
+    hdfsFreeBuilder(bld);
+}
+
+
+TEST(TestCInterfaceTDE, TestMultipleAppendfileWithTDE_Success) {
+    hdfsFS fs = NULL;
+    setenv("LIBHDFS3_CONF", "function-test.xml", 1);
+    struct hdfsBuilder * bld = hdfsNewBuilder();
+    assert(bld != NULL);
+    hdfsBuilderSetNameNode(bld, "default");
+    fs = hdfsBuilderConnect(bld);
+    hdfsBuilderSetUserName(bld, HDFS_SUPERUSER);
+    ASSERT_TRUE(fs != NULL);
+    //Create encryption zone for test.
+    system("hadoop fs -rmr /TDEAppend3");
+    system("hadoop key delete keytde4append3 -f");
+    system("hadoop key create keytde4append3");
+    system("hadoop fs -mkdir /TDEAppend3");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDEAppend3", "keytde4append3"));
+    //Create tdefile under the encryption zone for TDE to write.
+    const char *tdefile = "/TDEAppend3/testfile";
+    ASSERT_TRUE(CreateFile(fs, tdefile, 0, 0));
+    //Write buffer to tdefile with multiple append.
+    int size = 3 * 128;
     size_t offset = 0;
     hdfsFile out;
     int64_t todo = size;
@@ -369,10 +448,9 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
         if (NULL == (out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_APPEND, 0, 0, 1024))) {
             break;
         }
-        Hdfs::FillBuffer(&buffer[0], buffer.size(), 1024);
-        buffer.push_back(0);
+        Hdfs::FillBuffer(&buffer[0], 128 * 3, 1024);
         while (todo > 0) {
-            if (0 > (rc = hdfsWrite(fs, out, &buffer[offset], todo))) {
+            if (0 > (rc = hdfsWrite(fs, out, &buffer[offset], 128))) {
                 break;
             }
             todo -= rc;
@@ -380,18 +458,144 @@ TEST(TestCInterfaceTDE, TestAppendWithTDELargeFiles_Success) {
         }
         rc = hdfsCloseFile(fs, out);
     } while (0);
-    system("rm -rf ./testfile");
-    system("hadoop fs -get /TDE/testfile ./");
-    diff_file2buffer("testfile", &buffer[0]);
-    system("rm ./testfile");
 
-    //case5: a large file (> 64M) TODO
-    system("hadoop fs -rmr /TDE");
-    system("hadoop key delete keytde4append -f");
+    //Read buffer from tdefile with hadoop API.
+    FILE *file = popen("hadoop fs -cat /TDEAppend3/testfile", "r");
+    char bufGets[128];
+    while (fgets(bufGets, sizeof(bufGets), file)) {
+    }
+    pclose(file);
+    //Check the buffer's md5 value is eaqual to the tdefile's md5 value.
+    system("rm -rf ./testfile");
+    system("hadoop fs -get /TDEAppend3/testfile ./");
+    char resultFile[MD5LENTH] = { 0 };
+    fileMD5("./testfile", resultFile);
+    char resultBuffer[MD5LENTH] = { 0 };
+    bufferMD5(&buffer[0], size, resultBuffer);
+    ASSERT_STREQ(resultFile, resultBuffer);
+    system("rm ./testfile");
+    system("hadoop fs -rmr /TDEAppend3");
+    system("hadoop key delete keytde4append3 -f");
     ASSERT_EQ(hdfsDisconnect(fs), 0);
     hdfsFreeBuilder(bld);
 }
 
+
+TEST(TestCInterfaceTDE, TestAppendWithTDEMultipleChunks_Success) {
+    hdfsFS fs = NULL;
+    setenv("LIBHDFS3_CONF", "function-test.xml", 1);
+    struct hdfsBuilder * bld = hdfsNewBuilder();
+    assert(bld != NULL);
+    hdfsBuilderSetNameNode(bld, "default");
+    fs = hdfsBuilderConnect(bld);
+    ASSERT_TRUE(fs != NULL);
+    //creake key and encryption zone
+    system("hadoop fs -rmr /TDEAppend4");
+    system("hadoop key delete keytde4append4 -f");
+    system("hadoop key create keytde4append4");
+    system("hadoop fs -mkdir /TDEAppend4");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDEAppend4", "keytde4append4"));
+    const char *tdefile = "/TDEAppend4/testfile";
+    ASSERT_TRUE(CreateFile(fs, tdefile, 0, 0));
+    //Write buffer to tdefile.
+    int size = 1024;
+    size_t offset = 0;
+    hdfsFile out;
+    int64_t todo = size;
+	int64_t batch;
+    std::vector<char> buffer(size);
+    int rc = -1;
+    do {
+        if (NULL == (out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_APPEND, 0, 0, 1024))) {
+            break;
+        }
+        while (todo > 0) {
+            batch = todo < static_cast<int32_t>(buffer.size()) ?
+                    todo : buffer.size();
+
+            Hdfs::FillBuffer(&buffer[0], batch, offset);
+
+            if (0 > (rc = hdfsWrite(fs, out, &buffer[offset], batch))) {
+                break;
+            }
+            LOG(INFO, "todo is %d. offset is %d", todo, offset);
+            todo -= rc;
+            offset += rc;
+        }
+        rc = hdfsCloseFile(fs, out);
+    } while (0);
+    //Check the testfile's md5 value is equal to buffer's md5 value.
+    system("rm -rf ./testfile");
+    system("hadoop fs -get /TDEAppend4/testfile ./");
+    char resultFile[MD5LENTH] = { 0 };
+    fileMD5("./testfile", resultFile);
+    char resultBuffer[MD5LENTH] = { 0 };
+    bufferMD5(&buffer[0], size, resultBuffer);
+    ASSERT_STREQ(resultFile, resultBuffer);
+    system("rm ./testfile");
+    system("hadoop fs -rmr /TDEAppend4");
+    system("hadoop key delete keytde4append4 -f");
+    ASSERT_EQ(hdfsDisconnect(fs), 0);
+    hdfsFreeBuilder(bld);
+}
+
+TEST(TestCInterfaceTDE, TestAppendWithTDEMultipleBlocks_Success) {
+    hdfsFS fs = NULL;
+    setenv("LIBHDFS3_CONF", "function-test.xml", 1);
+    struct hdfsBuilder * bld = hdfsNewBuilder();
+    assert(bld != NULL);
+    hdfsBuilderSetNameNode(bld, "default");
+    fs = hdfsBuilderConnect(bld);
+    ASSERT_TRUE(fs != NULL);
+    //creake key and encryption zone
+    system("hadoop fs -rmr /TDEAppend5");
+    system("hadoop key delete keytde4append5 -f");
+    system("hadoop key create keytde4append5");
+    system("hadoop fs -mkdir /TDEAppend5");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDEAppend5", "keytde4append5"));
+    const char *tdefile = "/TDEAppend5/testfile";
+    ASSERT_TRUE(CreateFile(fs, tdefile, 0, 0));
+    //Write buffer to tdefile.
+    int size = 256 * 1024 * 1024;
+    size_t offset = 0;
+    hdfsFile out;
+    int64_t todo = size;
+    int64_t batch;
+    std::vector<char> buffer(size);
+    int rc = -1;
+    do {
+        if (NULL == (out = hdfsOpenFile(fs, tdefile, O_WRONLY | O_APPEND, 0, 0, 1024))) {
+            break;
+        }
+        while (todo > 0) {
+            batch = todo < static_cast<int32_t>(buffer.size()) ?
+                    todo : buffer.size();
+
+            Hdfs::FillBuffer(&buffer[0], batch, offset);
+
+            if (0 > (rc = hdfsWrite(fs, out, &buffer[offset], batch))) {
+                break;
+            }
+            LOG(INFO, "todo is %d. offset is %d", todo, offset);
+            todo -= rc;
+            offset += rc;
+        }
+        rc = hdfsCloseFile(fs, out);
+    } while (0);
+    //Check the testfile's md5 value is equal to buffer's md5 value.
+    system("rm -rf ./testfile");
+    system("hadoop fs -get /TDEAppend5/testfile ./");
+    char resultFile[MD5LENTH] = { 0 };
+    fileMD5("./testfile", resultFile);
+    char resultBuffer[MD5LENTH] = { 0 };
+    bufferMD5(&buffer[0], size, resultBuffer);
+    ASSERT_STREQ(resultFile, resultBuffer);
+    system("rm ./testfile");
+    system("hadoop fs -rmr /TDEAppend5");
+    system("hadoop key delete keytde4append5 -f");
+    ASSERT_EQ(hdfsDisconnect(fs), 0);
+    hdfsFreeBuilder(bld);
+}
 
 TEST(TestCInterfaceTDE, TestAppendMultiTimes_Success) {
     hdfsFS fs = NULL;
@@ -442,6 +646,7 @@ TEST(TestCInterfaceTDE, TestAppendMultiTimes_Success) {
     hdfsCloseFile(fs, out);
     system("rm ./testfile3");
     system("hadoop fs -get /TDE/testfile3 ./");
+
     diff_file2buffer("testfile3", out_data3);
 
 
@@ -475,7 +680,6 @@ TEST(TestCInterfaceTDE, TestAppendMultiTimes_Success) {
         todo -= rc;
         offset += rc;
     }
-
 
     ASSERT_EQ(data_size-1, offset);
 
