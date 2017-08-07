@@ -101,15 +101,15 @@ namespace Hdfs {
 	}
 
 	int CryptoCodec::init(CryptoMethod crypto_method, int64_t stream_offset) {
-		//check already init
+		// Check CryptoCodec init or not.
 		if (is_init)
 			return 0;
 
-		// Get decrypted key from KMS
-		std::string key = getDecryptedKeyFromKms();
+		// Get decrypted key from KMS.
+		decryptedKey = getDecryptedKeyFromKms();
 
-		// Select cipher method based on the key length
-		uint64_t AlgorithmBlockSize = key.length();
+		// Select cipher method based on the decrypted key length.
+		AlgorithmBlockSize = decryptedKey.length();
 		if (AlgorithmBlockSize == KEY_LENGTH_256) {
 			cipher = EVP_aes_256_ctr();
 		} else if (AlgorithmBlockSize == KEY_LENGTH_128) {
@@ -119,7 +119,17 @@ namespace Hdfs {
 			return -1;
 		}
 
-		//calculate new IV when appending a existed file
+		// Calculate iv and counter in order to init cipher context with cipher method. Default value is 0.
+		resetStreamOffset(crypto_method, stream_offset);
+
+		LOG(DEBUG3, "CryptoCodec init success, length of the decrypted key is : %llu, crypto method is : %d", AlgorithmBlockSize, crypto_method);
+		is_init = true;
+		return 1;
+
+	}
+
+	int CryptoCodec::resetStreamOffset(CryptoMethod crypto_method, int64_t stream_offset) {
+		// Calculate new IV when appending an existed file.
 		std::string iv = encryptionInfo->getIv();
 		if (stream_offset > 0) {
 			counter = stream_offset / AlgorithmBlockSize;
@@ -127,25 +137,20 @@ namespace Hdfs {
 			iv = this->calculateIV(iv, counter);
 		}
 
-		//judge encrypt/decrypt
-		int enc = 0;
-		method = crypto_method;
-		if (method == CryptoMethod::ENCRYPT)
-			enc = 1;
+		// Judge the crypto method is encrypt or decrypt.
+		int enc = (method == CryptoMethod::ENCRYPT) ? 1 : 0;
 
-		// Init cipher context with cipher method
+		// Init cipher context with cipher method.
 		if (!EVP_CipherInit_ex(cipherCtx, cipher, NULL,
-				(const unsigned char *) key.c_str(), (const unsigned char *) iv.c_str(),
+				(const unsigned char *) decryptedKey.c_str(), (const unsigned char *) iv.c_str(),
 				enc)) {
 			LOG(WARNING, "EVP_CipherInit_ex failed");
 			return -1;
 		}
 
-		//AES/CTR/NoPadding 
+		// AES/CTR/NoPadding, set padding to 0.
 		EVP_CIPHER_CTX_set_padding(cipherCtx, 0);
 
-		LOG(DEBUG3, "CryptoCodec init success, key_length:%llu, is_encode:%d", AlgorithmBlockSize, enc);
-		is_init = true;
 		return 1;
 	}
 

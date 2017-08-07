@@ -71,6 +71,14 @@ namespace Hdfs {
 		 */
 		virtual int init(CryptoMethod crypto_method, int64_t stream_offset = 0);
 
+		/**
+		 * Reset iv and padding value when seek file.
+		 * @param crypto_method do encrypt/decrypt work according to crypto_method.
+		 * @param stream_offset the offset of the current file.
+		 * @return 1 sucess; 0 already initialized; -1 failed.
+		 */
+		virtual int resetStreamOffset(CryptoMethod crypto_method, int64_t stream_offset);
+
 	private:
 
 		/**
@@ -96,6 +104,8 @@ namespace Hdfs {
 		int32_t	bufSize;
 		int64_t	padding;
 		int64_t	counter;
+		std::string decryptedKey;
+		uint64_t AlgorithmBlockSize;
 	};
 
 }
