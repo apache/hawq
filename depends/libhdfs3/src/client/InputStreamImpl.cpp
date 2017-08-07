@@ -648,8 +648,8 @@ int32_t InputStreamImpl::readInternal(char * buf, int32_t size) {
             std::string bufDecode;
             if (fileStatus.isFileEncrypted()) {
                 /* Decrypt buffer if the file is encrypted. */
-                bufDecode = cryptoCodec->cipher_wrap(buf, size);
-                memcpy(buf, bufDecode.c_str(), size);
+                bufDecode = cryptoCodec->cipher_wrap(buf, retval);
+                memcpy(buf, bufDecode.c_str(), retval);
             }
 
             return retval;
@@ -766,7 +766,7 @@ void InputStreamImpl::seekInternal(int64_t pos) {
                 int ret = cryptoCodec->resetStreamOffset(CryptoMethod::DECRYPT,
                         cursor);
                 if (ret < 0) {
-                    THROW(HdfsIOException, "init CryptoCodec failed, file:%s",
+                    THROW(HdfsIOException, "Reset offset failed, file:%s",
                             this->path.c_str());
                 }
             }

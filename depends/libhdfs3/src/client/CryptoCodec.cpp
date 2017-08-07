@@ -119,16 +119,22 @@ namespace Hdfs {
 			return -1;
 		}
 
+		is_init = true;
 		// Calculate iv and counter in order to init cipher context with cipher method. Default value is 0.
-		resetStreamOffset(crypto_method, stream_offset);
+		if ((resetStreamOffset(crypto_method, stream_offset)) < 0) {
+			is_init = false;
+			return -1;
+		}
 
 		LOG(DEBUG3, "CryptoCodec init success, length of the decrypted key is : %llu, crypto method is : %d", AlgorithmBlockSize, crypto_method);
-		is_init = true;
 		return 1;
 
 	}
 
 	int CryptoCodec::resetStreamOffset(CryptoMethod crypto_method, int64_t stream_offset) {
+		// Check CryptoCodec init or not.
+		if (is_init == false)
+			return -1;
 		// Calculate new IV when appending an existed file.
 		std::string iv = encryptionInfo->getIv();
 		if (stream_offset > 0) {
