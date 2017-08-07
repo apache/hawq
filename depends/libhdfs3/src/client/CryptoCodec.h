@@ -75,7 +75,7 @@ namespace Hdfs {
 		 * Reset iv and padding value when seek file.
 		 * @param crypto_method do encrypt/decrypt work according to crypto_method.
 		 * @param stream_offset the offset of the current file.
-		 * @return 1 sucess; 0 already initialized; -1 failed.
+		 * @return 1 sucess; -1 failed.
 		 */
 		virtual int resetStreamOffset(CryptoMethod crypto_method, int64_t stream_offset);
 
