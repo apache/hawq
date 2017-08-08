@@ -121,8 +121,10 @@ namespace Hdfs {
 
 		is_init = true;
 		// Calculate iv and counter in order to init cipher context with cipher method. Default value is 0.
-		if ((resetStreamOffset(crypto_method, stream_offset)) < 0)
+		if ((resetStreamOffset(crypto_method, stream_offset)) < 0) {
+			is_init = false;
 			return -1;
+		}
 
 		LOG(DEBUG3, "CryptoCodec init success, length of the decrypted key is : %llu, crypto method is : %d", AlgorithmBlockSize, crypto_method);
 		return 1;
