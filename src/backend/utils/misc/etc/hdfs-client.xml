@@ -328,4 +328,13 @@ HA -->
 		</description>
 	</property>
 
+	<property>
+		<name>dfs.encryption.key.provider.uri</name>
+		<value>kms://http@localhost:16000/kms</value>
+		<description>
+		The KeyProvider to use when interacting with encryption keys used
+		when reading and writing to an encryption zone.
+		</description>
+	</property>
+
 </configuration>

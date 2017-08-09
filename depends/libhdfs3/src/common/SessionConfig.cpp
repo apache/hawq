@@ -129,7 +129,7 @@ SessionConfig::SessionConfig(const Config & conf) {
         }, {
             &cryptoBufferSize, "hadoop.security.crypto.buffer.size", 8192
         }, {
-            &httpRequestRetryTimes, "kms.send.request.retry.times", 4
+            &httpRequestRetryTimes, "kms.send.request.retry.times", 0
         }
     };
     ConfigDefault<int64_t> i64Values [] = {
