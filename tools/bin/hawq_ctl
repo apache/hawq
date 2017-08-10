@@ -1477,6 +1477,9 @@ if __name__ == '__main__':
     (opts, hawq_dict) = get_args()
 
     if opts.hawq_command == 'start':
+        if opts.prompt:
+            if not userinput.ask_yesno(None, "\nContinue with HAWQ service start", 'N'):
+                sys.exit(1)
         start_hawq(opts, hawq_dict)
     elif opts.hawq_command == 'stop':
         if opts.prompt:
