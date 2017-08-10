@@ -2129,6 +2129,9 @@ void PersistentFileSysObj_EndXactDrop(
 							ignoreNonExistence,
 							Debug_persistent_print,
 							Persistent_DebugPrintLevel());
+
+	// clean up alive connections that are used for deleting hdfs objects
+	cleanup_hdfs_handlers_for_dropping();
 }
 
 void PersistentFileSysObj_UpdateRelationBufpoolKind(
