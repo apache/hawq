@@ -2489,7 +2489,6 @@ HdfsGetConnection(const char * path, bool isForDrop)
 		}
 		else
 		{
-			elog(LOG, "search 4 drop 1");
 			entry = (struct FsEntry *) hash_search(HdfsFsTable4Drop,
 												   location,
 												   HASH_ENTER,
@@ -2528,7 +2527,6 @@ HdfsGetConnection(const char * path, bool isForDrop)
 						if (!isForDrop)
 							hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
 						else {
-							elog(LOG, "search 4 drop 2");
 							hash_search(HdfsFsTable4Drop, location, HASH_REMOVE, &found);
 						}
 						errno = EACCES;
