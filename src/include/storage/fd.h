@@ -113,6 +113,7 @@ extern char *DeserializeDelegationToken(void *binary, int size);
 
 extern void cleanup_lru_opened_files(void);
 extern void cleanup_filesystem_handler(void);
+extern void cleanup_hdfs_handlers_for_dropping(void);
 
 /* abstract file system */
 extern File FileNameOpenFile(FileName fileName, const char *temp_dir, int fileFlags, int fileMode);
