@@ -112,6 +112,7 @@ The "options" are:
    --max_connections    Sets the max_connections for formatting hawq database.
    --shared_buffers     Sets the shared_buffers for initializing hawq.
    --bucket_number      Sets the GUC value of default_hash_table_bucket_number.
+   --tde_keyname        Sets the encryption zone key(EZK) name for the hawq directory(hawq_dfs_url).
 
 See 'hawq --help' for more information on other commands.
 """

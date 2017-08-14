@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -69,8 +69,9 @@ int testHdfsConnect(hdfsFS * fs, const char * host, int port,
 
 /*
  * test whether the filepath which dfs_url defined in hdfs is existed or not.
+ * Note: if tde_keyname is not NULL, create an encryption zone on filepath by this key.
  */
-int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteurl);
+int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteurl, const char * tde_keyname);
 
 /*
  * test whether basic file operation in hdfs is worked well or not
@@ -85,21 +86,24 @@ int main(int argc, char * argv[]) {
     *  argv[3]:krb status
     *  argv[4]:krb service name
     *  argv[5]:krb keytab file
+    *  argv[6]:--with-tde
+    *  argv[7]:tde encryption zone key name
     */
-    if (argc < 3 || argc > 6
+    if (argc < 3 || argc > 8
             || ((argc == 4 || argc == 5) && 0 != strcasecmp(argv[3], "off") && 0 != strcasecmp(argv[3], "false"))) {
         fprintf(stderr,
                 "ERROR: gpcheckhdfs parameter error, Please check your config file\n"
-                        "\tDFS_NAME and DFS_URL are required, KERBEROS_SERVICENAME, KERBEROS_KEYFILE and "
-                        "ENABLE_SECURE_FILESYSTEM are optional\n");
+                        "\tDFS_NAME and DFS_URL are required, KERBEROS_SERVICENAME, KERBEROS_KEYFILE "
+                        "ENABLE_SECURE_FILESYSTEM and TDE_KeyName are optional\n");
         return GPCHKHDFS_ERR;
-    } 
+    }
 
     char * dfs_name = argv[1];
     char * dfs_url = argv[2];
     char * krbstatus = NULL;
     char * krb_srvname = NULL;
     char * krb_keytabfile = NULL;
+    char * tde_keyname = NULL;
 
     if (argc >= 4) {
         krbstatus = argv[3];
@@ -108,6 +112,12 @@ int main(int argc, char * argv[]) {
     if (argc >= 6) {
         krb_srvname = argv[4];
         krb_keytabfile = argv[5];
+    }
+
+    //get tde key name param
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--with-tde") == 0 && i+1 < argc)
+            tde_keyname = argv[i+1];
     }
 
     char * host = (char *)malloc(255 * sizeof(char));
@@ -141,7 +151,7 @@ int main(int argc, char * argv[]) {
     * check hdfs's directory configured in dfs_url
     * such as sdw2:8020/gpsql/,the filepath is /gpsql
     * */
-    int checkdirErrCode = testHdfsExisted(fs, filepath, dfscompleteurl);
+    int checkdirErrCode = testHdfsExisted(fs, filepath, dfscompleteurl, tde_keyname);
 
     if (checkdirErrCode) {
         return checkdirErrCode;
@@ -260,7 +270,7 @@ int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort,
     return 0;
 }
 
-int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteurl) {
+int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteurl, const char * tde_keyname) {
     int notExisted = hdfsExists(fs, filepath);
 
     if (notExisted) {
@@ -278,6 +288,15 @@ int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteur
         if (NULL == fi || num != 0) {
             fprintf(stderr, "ERROR: failed to list directory %s or it is not empty\n"
                     "Please Check your filepath before doing HAWQ cluster initialization.\n", dfscompleteurl);
+            return DFSDIR_ERR;
+        }
+    }
+
+    if (tde_keyname != NULL && strlen(tde_keyname) > 0) {
+        int ret = hdfsCreateEncryptionZone(fs, filepath, tde_keyname);
+        if (ret != 0) {
+            fprintf(stderr, "ERROR: create encryption zone on directory %s failed, key_name:%s.\n",
+                dfscompleteurl, tde_keyname);
             return DFSDIR_ERR;
         }
     }
