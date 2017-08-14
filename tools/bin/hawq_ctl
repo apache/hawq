@@ -68,6 +68,7 @@ class HawqInit:
         self.max_connections = opts.max_connections
         self.shared_buffers = opts.shared_buffers
         self.default_hash_table_bucket_number = opts.default_hash_table_bucket_number
+        self.tde_keyname= opts.tde_keyname
         self.lock = threading.Lock()
         self.ignore_bad_hosts = opts.ignore_bad_hosts
         self._get_config()
@@ -170,11 +171,21 @@ class HawqInit:
             local_ssh(cmd, logger)
 
     def check_hdfs_path(self):
-        cmd = "%s/bin/gpcheckhdfs hdfs %s %s %s %s" % \
-              (self.GPHOME, self.dfs_url, self.enable_secure_filesystem, self.krb_srvname, self.krb_server_keyfile)
+        if self.tde_keyname:
+            cmd = "%s/bin/gpcheckhdfs hdfs %s %s %s %s --with-tde %s" % \
+              (self.GPHOME, self.dfs_url, self.enable_secure_filesystem, \
+               self.krb_srvname, self.krb_server_keyfile, self.tde_keyname)
+        else:
+            cmd = "%s/bin/gpcheckhdfs hdfs %s %s %s %s" % \
+              (self.GPHOME, self.dfs_url, self.enable_secure_filesystem, \
+               self.krb_srvname, self.krb_server_keyfile)
+
         logger.info("Check if hdfs path is available")
         logger.debug("Check hdfs: %s" % cmd)
         check_return_code(local_ssh(cmd, logger, warning = True), logger, "Check hdfs failed, please verify your hdfs settings")
+        if self.tde_keyname:
+            logger.info("Create encryption zone successfully, key_name:%s" % (self.tde_keyname))
+
 
     def set_new_standby_host(self):
         if self.new_standby_hostname == self.master_host_name:
@@ -1429,6 +1440,10 @@ def create_parser():
                       type="int",
                       dest="default_hash_table_bucket_number",
                       help="Sets maximum number of virtual segments per node")
+    parser.add_option("--tde_keyname",
+                      dest="tde_keyname",
+                      default="",
+                      help="Sets the encryption zone key(EZK) name for the hawq directory(hawq_dfs_url)")
     parser.add_option("--locale",
                       dest="hawq_locale",
                       default="en_US.utf8",
