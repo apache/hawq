@@ -115,6 +115,7 @@ int main(int argc, char * argv[]) {
     }
 
     //get tde key name param
+    //to avoid the empty param's influences before it, use loop find
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--with-tde") == 0 && i+1 < argc)
             tde_keyname = argv[i+1];
