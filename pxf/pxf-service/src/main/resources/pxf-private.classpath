@@ -53,7 +53,7 @@ hadoop/share/hadoop/common/lib/commons-io-*[0-9].jar
 hadoop/share/hadoop/common/lib/commons-lang-*[0-9].jar
 hadoop/share/hadoop/common/lib/commons-logging-*[0-9].jar
 hadoop/share/hadoop/common/lib/guava-*[0-9].jar
-hadoop/share/hadoop/common/lib/htrace-core-*[0-9]*.jar
+hadoop/share/hadoop/common/lib/htrace-core*.jar
 hadoop/share/hadoop/common/lib/jetty-*.jar
 hadoop/share/hadoop/common/lib/jackson-core-asl-*[0-9].jar
 hadoop/share/hadoop/common/lib/jackson-mapper-asl-*[0-9].jar
@@ -64,20 +64,20 @@ hadoop/share/hadoop/common/lib/protobuf-java-*[0-9].jar
 hadoop/share/hadoop/common/lib/slf4j-api-*[0-9].jar
 
 # Hive Libraries
-hive/lib/antlr-runtime-*[0-9].jar
-hive/lib/datanucleus-api-jdo-*[0-9].jar
-hive/lib/datanucleus-core-*[0-9].jar
-hive/lib/hive-exec-*[0-9].jar
-hive/lib/hive-metastore-*[0-9].jar
-hive/lib/jdo-api-*[0-9].jar
-hive/lib/libfb303-*[0-9].jar
+hive/lib/antlr-runtime*.jar
+hive/lib/datanucleus-api-jdo*.jar
+hive/lib/datanucleus-core*.jar
+hive/lib/hive-exec*.jar
+hive/lib/hive-metastore*.jar
+hive/lib/jdo-api*.jar
+hive/lib/libfb303*.jar
 # when running on OSx, 1.0.5 or higher version is required
-hive/lib/snappy-java-*[0-9].jar
+hive/lib/snappy-java*.jar
 
 # HBase Libraries
-hbase/lib/hbase-client-*[0-9].jar
-hbase/lib/hbase-common-*[0-9].jar
-hbase/lib/hbase-protocol-*[0-9].jar
-hbase/lib/htrace-core-*[0-9]*.jar
-hbase/lib/netty-*[0-9].Final.jar
-hbase/lib/zookeeper-*[0-9].jar
+hbase/lib/hbase-client*.jar
+hbase/lib/hbase-common*.jar
+hbase/lib/hbase-protocol*.jar
+hbase/lib/htrace-core*.jar
+hbase/lib/netty*.jar
+hbase/lib/zookeeper*.jar
