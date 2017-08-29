@@ -57,6 +57,8 @@
 #define KRBLOGIN_ERR 107
 #define DIRECTORY_ERR 108
 
+#define TRASH_DIRECTORY_NAME ".Trash"
+
 char * conncat(const char * dfs_name, const char * dfs_url);
 void getHostAndPort(const char * dfs_url, char * host, char * port);
 
@@ -271,6 +273,21 @@ int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort,
     return 0;
 }
 
+/*
+ * check path is a trash directory
+ * path, e.g: /hawq_default/.Trash
+ */
+static int is_trash_directory(const char *path) {
+    if (path == NULL)
+        return 0;
+    size_t len = strlen(TRASH_DIRECTORY_NAME);
+    size_t path_len = strlen(path);
+    if (path_len <= len)
+        return 0;
+
+    return strncmp(path+path_len-len, TRASH_DIRECTORY_NAME, len+1) == 0;
+}
+
 int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteurl, const char * tde_keyname) {
     int notExisted = hdfsExists(fs, filepath);
 
@@ -283,10 +300,13 @@ int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteur
             return DFSDIR_ERR;
         }
     } else {
-        int num;
+        int num = 0;
         hdfsFileInfo * fi = hdfsListDirectory(fs, filepath, &num);
 
-        if (NULL == fi || num != 0) {
+        if (NULL == fi || num > 1 ||
+            (num == 1 && !is_trash_directory(fi[0].mName)) /* skip Trash directory */
+            )
+        {
             fprintf(stderr, "ERROR: failed to list directory %s or it is not empty\n"
                     "Please Check your filepath before doing HAWQ cluster initialization.\n", dfscompleteurl);
             return DFSDIR_ERR;
