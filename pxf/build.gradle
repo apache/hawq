@@ -616,6 +616,13 @@ task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
     from("pxf-service/src/configs/tomcat") { into 'tomcat-templates' }
 }
 
+task bundle(type: Tar) {
+    baseName = "${project.name}"
+    compression = Compression.GZIP
+    extension = 'tar.gz'
+    from install.outputs.files
+    into "${project.name}"
+}
 
 buildDir = '.'
 apply plugin: 'nebula-aggregate-javadocs'

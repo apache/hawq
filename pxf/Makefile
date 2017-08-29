@@ -53,7 +53,8 @@ help:
 	@echo	"  -  -  PLUGINS_EXCLUDE_RPM=plugin1, plugin2,... - do not build and RPM for given comma-separated list of plugins"
 	@echo	"  - tomcat - builds tomcat rpm from downloaded tarball"
 	@echo	"  -  -  LICENSE and VENDOR parameters can be used as well"
-	@echo	"  - deploy - setup PXF along with tomcat in the configured deployPath"
+	@echo	"  - install - setup PXF along with tomcat in the configured deployPath"
+	@echo	"  - bundle - bundle PXF along with tomcat into a single tarball"
 	@echo	"  - doc - creates aggregate javadoc under docs"
 
 all:
@@ -86,3 +87,6 @@ tomcat:
 
 install:
 	./gradlew install $(BUILD_PARAMS)
+
+bundle:
+	./gradlew bundle $(BUILD_PARAMS)
