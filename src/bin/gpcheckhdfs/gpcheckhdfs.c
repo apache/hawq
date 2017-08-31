@@ -277,7 +277,7 @@ int testHdfsConnect(hdfsFS * fsptr, const char * host, int iPort,
  * check path is a trash directory
  * path, e.g: /hawq_default/.Trash
  */
-static int is_trash_directory(const char *path) {
+static int isTrashDirectory(const char *path) {
     if (path == NULL)
         return 0;
     size_t len = strlen(TRASH_DIRECTORY_NAME);
@@ -304,7 +304,7 @@ int testHdfsExisted(hdfsFS fs, const char * filepath, const char * dfscompleteur
         hdfsFileInfo * fi = hdfsListDirectory(fs, filepath, &num);
 
         if (NULL == fi || num > 1 ||
-            (num == 1 && !is_trash_directory(fi[0].mName)) /* skip Trash directory */
+            (num == 1 && !isTrashDirectory(fi[0].mName)) /* skip Trash directory */
             )
         {
             fprintf(stderr, "ERROR: failed to list directory %s or it is not empty\n"
