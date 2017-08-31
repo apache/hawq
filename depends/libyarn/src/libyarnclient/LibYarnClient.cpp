@@ -245,7 +245,7 @@ int LibYarnClient::createJob(string &jobName, string &queue, string &jobId) {
 
         LOG(DEBUG1, "LibYarnClient::createJob, after AM register to RM, a heartbeat thread has been started");
         //6. return jobId
-        stringstream ss;
+        std::stringstream ss;
         ss << "job_" << appId.getClusterTimestamp() << "_" << appId.getId();
         jobId = ss.str();
 
@@ -254,17 +254,17 @@ int LibYarnClient::createJob(string &jobName, string &queue, string &jobId) {
         clientJobId = jobId;
         return FR_SUCCEEDED;
     } catch (const YarnNetworkConnectException &e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::createJob, catch network connection exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (const std::exception &e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::createJob, catch exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::createJob, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -296,7 +296,7 @@ int LibYarnClient::forceKillJob(string &jobId) {
         needHeartbeatAlive = false;
         for (map<int64_t, Container*>::iterator it = jobIdContainers.begin();
                 it != jobIdContainers.end(); it++) {
-            ostringstream key;
+            std::ostringstream key;
             Container *container = it->second;
             key << container->getNodeId().getHost() << ":" << container->getNodeId().getPort();
             Token nmToken = nmTokenCache[key.str()];
@@ -318,12 +318,12 @@ int LibYarnClient::forceKillJob(string &jobId) {
         activeFailContainerIds.clear();
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::forceKillJob, catch the exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::forceKillJob, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -456,12 +456,12 @@ int LibYarnClient::addContainerRequests(string &jobId, Resource &capability,
 
         return FR_SUCCEEDED;
     } catch (std::exception &e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::addContainerRequests catch std exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::addContainerRequests catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -628,7 +628,7 @@ int LibYarnClient::allocateResources(string &jobId,
 
         return FR_SUCCEEDED;
     } catch(std::exception &e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
 
         errorMsg << "LibYarnClient::allocateResources, catch exception:" << e.what();
         setErrorMessage(errorMsg.str());
@@ -636,7 +636,7 @@ int LibYarnClient::allocateResources(string &jobId,
         pthread_mutex_unlock(&heartbeatLock);
         return FR_FAILED;
     } catch (const ApplicationMasterNotRegisteredException &e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
 
         errorMsg << "LibYarnClient::allocateResources, "
                     "catch ApplicationMasterNotRegisteredException." << e.what();
@@ -645,7 +645,7 @@ int LibYarnClient::allocateResources(string &jobId,
         pthread_mutex_unlock(&heartbeatLock);
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
 
         errorMsg << "LibYarnClient::allocateResources, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
@@ -710,13 +710,13 @@ int LibYarnClient::releaseResources(string &jobId,int64_t releaseContainerIds[],
         pthread_mutex_unlock(&heartbeatLock);
         return FR_SUCCEEDED;
     } catch (std::exception &e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::releaseResources, catch exception:" << e.what();
         setErrorMessage(errorMsg.str());
         pthread_mutex_unlock(&heartbeatLock);
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::releaseResources, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         pthread_mutex_unlock(&heartbeatLock);
@@ -764,7 +764,7 @@ int LibYarnClient::activeResources(string &jobId,int64_t activeContainerIds[],in
             if (it != jobIdContainers.end()) {
                 try {
                     Container *container = it->second;
-                    ostringstream key;
+                    std::ostringstream key;
                     key << container->getNodeId().getHost() << ":" << container->getNodeId().getPort();
 
                     Token nmToken = nmTokenCache[key.str()];
@@ -791,12 +791,12 @@ int LibYarnClient::activeResources(string &jobId,int64_t activeContainerIds[],in
                   activeContainerSize);
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::activeResources, Catch the Exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::activeResources, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -833,7 +833,7 @@ int LibYarnClient::finishJob(string &jobId, FinalApplicationStatus finalStatus) 
 
         //1. we should stop all containers related with this job
         for (map<int64_t, Container*>::iterator it = jobIdContainers.begin(); it != jobIdContainers. end(); it++) {
-            ostringstream key;
+            std::ostringstream key;
             Container *container = it->second;
             key << container->getNodeId().getHost() << ":" << container->getNodeId().getPort();
             Token nmToken = nmTokenCache[key.str()];
@@ -858,18 +858,18 @@ int LibYarnClient::finishJob(string &jobId, FinalApplicationStatus finalStatus) 
 
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::finishJob, catch the Exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (const ApplicationMasterNotRegisteredException &e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::finishJob, "
                     "catch ApplicationMasterNotRegisteredException." << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::finishJob, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -896,13 +896,13 @@ int LibYarnClient::getApplicationReport(string &jobId,ApplicationReport &applica
 
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getApplicationReport, Catch the Exception:"
                 << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getApplicationReport, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -924,12 +924,12 @@ int LibYarnClient::getContainerReports(string &jobId,list<ContainerReport> &cont
         containerReports = ((ApplicationClient*) appClient)->getContainers(clientAppAttempId);
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getContainerReports, catch the Exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getContainerReports, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -954,7 +954,7 @@ int LibYarnClient::getContainerStatuses(string &jobId, int64_t containerIds[],
             if (it != jobIdContainers.end()) {
                 try {
                     Container *container = it->second;
-                    ostringstream key;
+                    std::ostringstream key;
                     key << container->getNodeId().getHost() << ":"<< container->getNodeId().getPort();
                     Token nmToken = nmTokenCache[key.str()];
                     ContainerStatus containerStatus = ((ContainerManagement*) nmClient)->getContainerStatus((*container),  nmToken);
@@ -970,12 +970,12 @@ int LibYarnClient::getContainerStatuses(string &jobId, int64_t containerIds[],
         }
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getContainerStatuses, Catch the Exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getContainerStatuses, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -994,12 +994,12 @@ int LibYarnClient::getQueueInfo(string &queue, bool includeApps,
                 includeApps, includeChildQueues, recursive);
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getQueueInfo, Catch the Exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getQueueInfo, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
@@ -1014,12 +1014,12 @@ int LibYarnClient::getClusterNodes(list<NodeState> &states,list<NodeReport> &nod
         nodeReports = ((ApplicationClient*) appClient)->getClusterNodes(states);
         return FR_SUCCEEDED;
     } catch (std::exception& e) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getClusterNodes, Catch the Exception:" << e.what();
         setErrorMessage(errorMsg.str());
         return FR_FAILED;
     } catch (...) {
-        stringstream errorMsg;
+        std::stringstream errorMsg;
         errorMsg << "LibYarnClient::getClusterNodes, catch unexpected exception.";
         setErrorMessage(errorMsg.str());
         return FR_FAILED;

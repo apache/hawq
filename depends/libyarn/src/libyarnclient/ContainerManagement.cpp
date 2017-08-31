@@ -63,7 +63,7 @@ StartContainerResponse ContainerManagement::startContainer(Container &container,
 		StartContainerRequest &request, Token &nmToken) {
 	//1. setup Connection to NodeManager
 	string host = container.getNodeId().getHost();
-	ostringstream oss;
+	std::ostringstream oss;
 	oss << container.getNodeId().getPort();
 	string port(oss.str());
 
@@ -127,7 +127,7 @@ StartContainerResponse ContainerManagement::startContainer(Container &container,
 void ContainerManagement::stopContainer(Container &container, Token &nmToken) {
 	//1. setup Connection to NodeManager
 	string host = container.getNodeId().getHost();
-	ostringstream oss;
+	std::ostringstream oss;
 	oss << container.getNodeId().getPort();
 	string port(oss.str());
 
@@ -170,7 +170,7 @@ ContainerStatus ContainerManagement::getContainerStatus(Container &container,
 		Token &nmToken) {
 	//1. setup Connection to NodeManager
 	string host = container.getNodeId().getHost();
-	ostringstream oss;
+	std::ostringstream oss;
 	oss << container.getNodeId().getPort();
 	string port(oss.str());
 
