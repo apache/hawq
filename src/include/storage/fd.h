@@ -184,7 +184,11 @@ extern size_t GetTempFilePrefix(char * buf, size_t buflen, const char * fileName
 extern bool TestFileValid(File file);
 
 extern bool HdfsPathExist(char *path);
-extern bool HdfsPathExistAndNonEmpty(char *path, bool *existed);
+
+/* hdfs trash direcotry name */
+#define TRASH_DIRECTORY_NAME ".Trash"
+
+extern bool HdfsPathExistAndNonEmpty(char *path, bool *existed, bool skip_trash);
 
 extern int64 HdfsPathSize(const char *path);
 

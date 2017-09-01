@@ -3448,8 +3448,25 @@ HdfsPathExist(char *path)
 	return 0 == hdfsExists(fs, relative_path);
 }
 
+/*
+ * check path is a trash directory
+ * path, e.g: /hawq_default/.Trash
+ */
+static int 
+isTrashDirectory(const char *path) 
+{
+  if (path == NULL)
+    return 0;
+  size_t len = strlen(TRASH_DIRECTORY_NAME);
+  size_t path_len = strlen(path);
+  if (path_len <= len)
+    return 0;
+
+  return strncmp(path+path_len-len, TRASH_DIRECTORY_NAME, len+1) == 0;
+}
+
 bool
-HdfsPathExistAndNonEmpty(char *path, bool *existed)
+HdfsPathExistAndNonEmpty(char *path, bool *existed, bool skip_trash)
 {
   char  relative_path[MAXPGPATH + 1];
   char   *protocol;
@@ -3480,7 +3497,9 @@ HdfsPathExistAndNonEmpty(char *path, bool *existed)
     int num;
     hdfsFileInfo  *fi = hdfsListDirectory(fs, relative_path, &num);
     *existed = true;
-    if (NULL == fi || 0 != num)
+    if (NULL == fi || num > 1 ||
+      (skip_trash && num == 1 && !isTrashDirectory(fi[0].mName)) /* skip Trash directory */
+      )
     {
       return true;
     }
