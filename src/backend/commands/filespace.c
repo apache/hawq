@@ -318,11 +318,10 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 	encoded = EncodeFileLocations(stmt->fsysname, fsrep, stmt->location);
 
 	bool existed;
-	if (HdfsPathExistAndNonEmpty(encoded, &existed))
+	if (HdfsPathExistAndNonEmpty(encoded, &existed, true)) /* skip hdfs trash directory */
 		ereport(ERROR, 
 				(errcode_for_file_access(),
 				 errmsg("%s: File exists and non empty", encoded)));
-
 	add_catalog_filespace_entry(rel, fsoid, 0, encoded);
 
 	heap_close(rel, RowExclusiveLock);
