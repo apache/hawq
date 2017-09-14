@@ -10472,6 +10472,9 @@ DESCR("Check whether metadata cache key exists");
 DATA(insert OID = 8083 ( gp_metadata_cache_info  PGNSP PGUID 12 f f t f s 4 25 f "26 26 26 23" _null_ _null_ _null_ gp_metadata_cache_info - _null_ n ));
 DESCR("Get metadata cache info for specific key");
 
+/* gp_is_filespace_encrypted =>  bool*/
+DATA(insert OID = 8086 ( gp_is_filespace_encrypted PGNSP PGUID 12 f f t f s 1 16 f "19" _null_ _null_ _null_ gp_is_filespace_encrypted - _null_ n ));
+DESCR("Check whether filespace is encrypted");
 
 /* TIDYCAT_END_PG_PROC_GEN */
 

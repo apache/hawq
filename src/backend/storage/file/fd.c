@@ -76,12 +76,15 @@
 #include "libpq/auth.h"
 #include "libpq/pqformat.h"
 #include "utils/workfile_mgr.h"
-
+#include "hdfs/hdfs.h"
 /* Debug_filerep_print guc temporaly added for troubleshooting */
 #include "utils/guc.h"
 #include "utils/faultinjector.h"
 
 #include "utils/memutils.h"
+
+#include "catalog/catalog.h"
+#include "catalog/catquery.h"
 
 bool	enable_secure_filesystem = 0;
 extern bool		filesystem_support_truncate;
@@ -3694,4 +3697,97 @@ BlockLocation *
 HdfsGetFileBlockLocations(const char *path, int64 length, int *block_num)
 {
     return HdfsGetFileBlockLocations2(path, 0, length, block_num);
+}
+
+/*
+ *  TDE UDF
+ *
+ *  User is able to check if HAWQ filespace is TDE encrypted.
+ */
+extern Datum gp_is_filespace_encrypted(PG_FUNCTION_ARGS) {
+    char * filespace_name = NULL;
+    hdfsFS fs = NULL;
+    hdfsEncryptionZoneInfo *enInfo = NULL;
+    bool encryptedTag = false;
+    int MAX_LENGTH = 1024;
+
+    HeapTuple tuple;
+    cqContext *pcqCtx;
+    Oid oid;
+    char * path = NULL;
+
+    char *host = NULL, *protocol = NULL;
+    int port = 0, pathLen = 0;
+
+    filespace_name = PG_GETARG_CSTRING(0);
+    if (filespace_name == NULL || strlen(filespace_name) > MAX_LENGTH)
+        elog(ERROR, "Input of filespace name is illegal.");
+    else if (strcmp(filespace_name, "") == 0)
+        elog(INFO, "Please input the filespace name you want to check.");
+
+    /* Scan the pg_filespace table to get the corresponding oid. */
+    pcqCtx = caql_beginscan(NULL,
+            cql("SELECT oid FROM pg_filespace WHERE fsname = :1 ",
+            CStringGetDatum(filespace_name)));
+    tuple = caql_getnext(pcqCtx);
+    if (!HeapTupleIsValid(tuple))
+        elog(ERROR, "cache look up failed for pg_filsespace %s", filespace_name);
+    oid = HeapTupleHeaderGetOid(tuple->t_data);
+    caql_endscan(pcqCtx);
+
+    /* Scan the pg_filespace_entry to get the filespace entry. */
+    path = caql_getcstring(NULL,
+                    cql("SELECT fselocation FROM pg_filespace_entry WHERE fsefsoid = :1 ",
+                    ObjectIdGetDatum(oid)));
+    if (path == NULL)
+        elog(ERROR, "cache look up failed for pg_filespace_entry");
+
+    /* Connect to hdfs and parse the filespace entry to get the correct path. */
+    fs = HdfsGetConnection(path, false);
+    if (fs == NULL)
+        elog(ERROR, "Connect to hdfs failed, the path is %s", path);
+    else {
+        if (HdfsParsePath(path, &protocol, &host, &port, NULL)
+                || protocol == NULL || host == NULL || port < 0) {
+            if (protocol)
+                pfree(protocol);
+            if (host)
+                pfree(host);
+            elog(ERROR, "Parse hdfs path of %s failed.", path);
+        }
+        else {
+
+            /* The normal path is like "<protocol>://<host>:<port>/<directory>".
+             * If port is not null, there will be 4 characters to be added which is "://:".
+             * If port is null, there will be 3 characters to be added which is "://".
+             */
+            if (port > 0) {
+                char sPort[strlen(path)];
+                sprintf(sPort, "%d", port);
+                pathLen = strlen(protocol) + strlen(host) + strlen(sPort) + 4;
+            } else if (port == 0) {
+                pathLen = strlen(protocol) + strlen(host) + 3;
+            }
+            elog(DEBUG1, "The path of the hdfs is %s. The protocol is %s. The host is %s. The port is %d",
+                    path, protocol, host, port);
+            
+            pfree(protocol);
+            pfree(host);
+        }
+    }
+    if ((strlen(path) - pathLen) <= 0)
+        elog(ERROR, "Wrong length parsed from hdfs path %s.", path);
+    char enPath[strlen(path) - pathLen + 1];
+    strncpy(enPath, path + pathLen, strlen(path) - pathLen);
+    elog(DEBUG1, "The filespace entry to be check is %s", enPath);
+    pfree(path);
+    /* Check whether the path is encrypted or not. */
+    enInfo = hdfsGetEZForPath(fs, enPath);
+
+    if (enInfo != NULL) {
+        encryptedTag = true;
+        hdfsFreeEncryptionZoneInfo(enInfo, 1);
+    }
+
+    PG_RETURN_BOOL(encryptedTag);
 }
