@@ -310,6 +310,16 @@ InMemHeap_BeginScan(InMemHeapRelation memheap, int nkeys,
     InMemHeapScanDesc scan = palloc0(sizeof (InMemHeapScanDescData));
     Assert(NULL != scan);
 
+    /*
+     * HAWQ-1525
+     *
+     * The rel in InMemHeapRelation is a pointer, which is the address of heap relation
+     * in relcache. When the heap relation in relcache is clear for some reason,
+     * the value of rel in InMemHeapRelation is wrong. So we should reopen this relation
+     * to make sure it's correct.
+     */
+    memheap->rel = RelationIdGetRelation(memheap->relid);
+
     scan->rs_rd = memheap;
     scan->rs_nkeys = nkeys;
     scan->rs_index = -1;
@@ -407,6 +417,8 @@ void
 InMemHeap_EndScan(InMemHeapScanDesc scan)
 {
     Assert(NULL != scan);
+
+    RelationClose(scan->rs_rd->rel);
 
     if (NULL != scan->rs_key)
     {
