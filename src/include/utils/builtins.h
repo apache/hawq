@@ -1225,4 +1225,6 @@ extern Datum gp_metadata_cache_put_entry_for_test(PG_FUNCTION_ARGS);
 /* PXF functions */
 extern Datum pxf_get_item_fields(PG_FUNCTION_ARGS);
 
+/* TDE UDF */
+extern Datum gp_is_filespace_encrypted(PG_FUNCTION_ARGS);
 #endif   /* BUILTINS_H */

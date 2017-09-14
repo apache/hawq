@@ -5529,3 +5529,5 @@
  CREATE FUNCTION gp_metadata_cache_put_entry_for_test(tablespace_oid, database_oid, relation_oid, segno) RETURNS text LANGUAGE internal STABLE STRICT AS 'gp_metadata_cache_put_entry_for_test' WITH (OID=8085, DESCRIPTION="Put entries into metadata cache for test");
  
  CREATE FUNCTION dump_resource_manager_status(info_type) RETURNS text LANGUAGE internal STABLE STRICT AS 'dump_resource_manager_status' WITH (OID=6450, DESCRIPTION="Dump resource manager status for testing");
+
+ CREATE FUNCTION gp_is_filespace_encrypted(filespace_name) RETURNS bool LANGUAGE internal STABLE STRICT AS 'gp_is_filespace_encrypted' WITH (OID=8086, DESCRIPTION="Check whether filespace is encrypted");
