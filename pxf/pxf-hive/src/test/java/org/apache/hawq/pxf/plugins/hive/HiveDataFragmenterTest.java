@@ -145,6 +145,113 @@ public class HiveDataFragmenterTest {
         }
     }
 
+    @Test
+    public void testIntegralPushdown() throws Exception {
+        prepareConstruction();
+        fragmenter = new HiveDataFragmenter(inputData);
+        // Mock private field partitionkeyTypes
+        Field partitionkeyTypes = PowerMockito.field(HiveDataFragmenter.class, "partitionkeyTypes");
+        // Mock private method buildSingleFilter
+        Method method = PowerMockito.method(HiveDataFragmenter.class, "buildSingleFilter",
+                new Class[]{Object.class,StringBuilder.class,String.class});
+        //Mock private field setPartitions
+        Field setPartitions = PowerMockito.field(HiveDataFragmenter.class, "setPartitions");
+        //Mock private field canPushDownIntegral
+        Field canPushDownIntegral = PowerMockito.field(HiveDataFragmenter.class, "canPushDownIntegral");
+        canPushDownIntegral.set(fragmenter,true);
+
+        ColumnDescriptor dateColumnDescriptor =
+                new ColumnDescriptor("dateColumn", 1082, 1, "date", null, true);
+        ColumnDescriptor stringColumnDescriptor =
+                new ColumnDescriptor("stringColumn", 25, 1, "string", null, true);
+        ColumnDescriptor intColumnDescriptor =
+                new ColumnDescriptor("intColumn", 23, 1, "int", null, true);
+        ColumnDescriptor bigIntColumnDescriptor =
+                new ColumnDescriptor("bigIntColumn", 20, 1, "bigint", null, true);
+        ColumnDescriptor smallIntColumnDescriptor =
+                new ColumnDescriptor("smallIntColumn", 21, 1, "smallint", null, true);
+        List<ColumnDescriptor> columnDescriptors = new ArrayList<>();
+
+        columnDescriptors.add(dateColumnDescriptor);
+        columnDescriptors.add(stringColumnDescriptor);
+        columnDescriptors.add(intColumnDescriptor);
+        columnDescriptors.add(bigIntColumnDescriptor);
+        columnDescriptors.add(smallIntColumnDescriptor);
+
+        for (ColumnDescriptor cd : columnDescriptors){
+
+            checkPushDownFilter(fragmenter, cd, method, partitionkeyTypes,setPartitions);
+        }
+    }
+
+    private void checkPushDownFilter(HiveDataFragmenter fragmenter, ColumnDescriptor columnDescriptor, Method method,
+                                     Field partitionkeyTypes, Field setPartitions) throws Exception{
+        String filterColumnName=columnDescriptor.columnName();
+        int filterColumnIndex = columnDescriptor.columnIndex();
+        String typeName = columnDescriptor.columnTypeName();
+        int typeCode = columnDescriptor.columnTypeCode();
+        String data = "2016-08-11";
+        String dataIntegralDataTypes= "126";
+        String filterString = "a"+filterColumnIndex+"c"+typeCode+"s"+data.length()+"d"+data+"o";
+        String filterIntegralDataTypes =
+                "a"+filterColumnIndex+"c"+typeCode+"s"+dataIntegralDataTypes.length()+"d"+dataIntegralDataTypes+"o";
+        int notEquals=6;
+        int equals=5;
+        int greaterEquals=4;
+
+        when(inputData.getColumn(filterColumnIndex)).thenReturn(columnDescriptor);
+        //Set partition Key type
+        Map<String, String> localpartitionkeyTypes = new HashMap<>();
+        localpartitionkeyTypes.put(filterColumnName,typeName);
+        partitionkeyTypes.set(fragmenter,localpartitionkeyTypes);
+        // Set column as partition
+        Set<String> localSetPartitions = new TreeSet<String>(
+                String.CASE_INSENSITIVE_ORDER);
+        localSetPartitions.add(filterColumnName);
+        setPartitions.set(fragmenter,localSetPartitions);
+
+        switch(typeName){
+
+            case "date":
+                assertFalse(isColumnStringOrIntegral(method, filterString+notEquals));
+                assertFalse(isColumnStringOrIntegral(method, filterString+equals));
+                assertFalse(isColumnStringOrIntegral(method, filterString+greaterEquals));
+                break;
+            case "string":
+                assertTrue(isColumnStringOrIntegral(method, filterString+notEquals));
+                assertTrue(isColumnStringOrIntegral(method, filterString+equals));
+                assertTrue(isColumnStringOrIntegral(method, filterString+greaterEquals));
+                break;
+            case "int":
+                assertTrue(isColumnStringOrIntegral(method, filterIntegralDataTypes+notEquals));
+                assertTrue(isColumnStringOrIntegral(method, filterIntegralDataTypes+equals));
+                assertFalse(isColumnStringOrIntegral(method, filterIntegralDataTypes+greaterEquals));
+                break;
+            case "bigint":
+                assertTrue(isColumnStringOrIntegral(method, filterIntegralDataTypes+notEquals));
+                assertTrue(isColumnStringOrIntegral(method, filterIntegralDataTypes+equals));
+                assertFalse(isColumnStringOrIntegral(method, filterIntegralDataTypes+greaterEquals));
+                break;
+            case "smallint":
+                assertTrue(isColumnStringOrIntegral(method, filterIntegralDataTypes+notEquals));
+                assertTrue(isColumnStringOrIntegral(method, filterIntegralDataTypes+equals));
+                assertFalse(isColumnStringOrIntegral(method, filterIntegralDataTypes+greaterEquals));
+                break;
+        }
+    }
+
+    private boolean isColumnStringOrIntegral(Method method, String filterString) throws Exception{
+        BasicFilter bFilter;
+        String prefix="";
+        StringBuilder localFilterString = new StringBuilder();
+        boolean result;
+        HiveFilterBuilder builder = new HiveFilterBuilder(null);
+
+        bFilter = (BasicFilter) builder.getFilterObject(filterString);
+        result = (Boolean)method.invoke(fragmenter, new Object[]{bFilter,localFilterString,prefix});
+        return result;
+    }
+
     private void checkFilters(HiveDataFragmenter fragmenter, BasicFilter bFilter, FilterParser.Operation operation)
             throws Exception{
 
