@@ -125,6 +125,39 @@ test__build_http_header__remote_credentials_are_not_null(void **state)
 	build_http_header(input_data);
 }
 
+/**
+ * Query has valid projection info,
+ * but some of expression in WHERE clause is not supported
+ * Make sure we are not sending any projection information at all,
+ * to avoid incorrect results.
+ */
+void test__build_http_header__where_is_not_supported(void **state)
+{
+
+	expect_external_vars();
+
+	expect_any(extractPxfAttributes, quals);
+	expect_any(extractPxfAttributes, qualsAreSupported);
+	will_return(extractPxfAttributes, NIL);
+	will_assign_value(extractPxfAttributes, qualsAreSupported, false);
+
+	expect_churl_headers("X-GP-SEGMENT-ID", mock_extvar->GP_SEGMENT_ID);
+	expect_churl_headers("X-GP-SEGMENT-COUNT", mock_extvar->GP_SEGMENT_COUNT);
+	expect_churl_headers("X-GP-XID", mock_extvar->GP_XID);
+	expect_churl_headers_alignment();
+	expect_churl_headers("X-GP-URL-HOST", gphd_uri->host);
+	expect_churl_headers("X-GP-URL-PORT", gphd_uri->port);
+	expect_churl_headers("X-GP-DATA-DIR", gphd_uri->data);
+	expect_churl_headers("X-GP-URI", gphd_uri->uri);
+	expect_churl_headers("X-GP-HAS-FILTER", "0");
+
+	input_data->proj_info = palloc0(sizeof(ProjectionInfo));
+	input_data->proj_info->pi_isVarList = true;
+	input_data->quals = list_make1("Some not supported quals");
+
+	build_http_header(input_data);
+}
+
 void
 test__get_format_name(void **state)
 {
@@ -262,6 +295,8 @@ main(int argc, char* argv[])
 		unit_test_setup_teardown(test__build_http_header__remote_credentials_are_not_null, 
 								 common_setup, common_teardown),
 		unit_test_setup_teardown(test__get_format_name,
+								 common_setup, common_teardown),
+		unit_test_setup_teardown(test__build_http_header__where_is_not_supported,
 								 common_setup, common_teardown)
 	};
 
