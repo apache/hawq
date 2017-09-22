@@ -44,6 +44,7 @@ static void scalar_const_to_str(Const *constval, StringInfo buf);
 static void list_const_to_str(Const *constval, StringInfo buf);
 static List* append_attr_from_var(Var* var, List* attrs);
 static void enrich_trivial_expression(List *expressionItems);
+static List* get_attrs_from_expr(Expr *expr, bool* expressionIsSupported);
 
 /*
  * All supported HAWQ operators, and their respective HDFS operator code.
@@ -851,12 +852,51 @@ append_attr_from_var(Var* var, List* attrs)
 	return attrs;
 }
 
+/*
+ * append_attr_from_func_args
+ *
+ * extracts all columns from FuncExpr into attrs
+ * assigns false to expressionIsSupported if at least one of items is not supported
+ */
 static List*
-get_attrs_from_expr(Expr *expr)
+append_attr_from_func_args(FuncExpr *expr, List* attrs, bool* expressionIsSupported) {
+	if (!expressionIsSupported) {
+		return NIL;
+	}
+	ListCell *lc = NULL;
+	foreach (lc, expr->args)
+	{
+		Node *node = (Node *) lfirst(lc);
+		if (IsA(node, FuncExpr)) {
+			attrs = append_attr_from_func_args((FuncExpr *) node, attrs, expressionIsSupported);
+		} else if (IsA(node, Var)) {
+			attrs = append_attr_from_var((Var *) node, attrs);
+		} else if (IsA(node, OpExpr)) {
+			attrs = get_attrs_from_expr((OpExpr *) node, expressionIsSupported);
+		} else {
+			*expressionIsSupported = false;
+			return NIL;
+		}
+	}
+
+	return attrs;
+
+}
+
+/*
+ * get_attrs_from_expr
+ *
+ * extracts and returns list of all columns from Expr
+ * assigns false to expressionIsSupported if at least one of items is not supported
+ */
+static List*
+get_attrs_from_expr(Expr *expr, bool* expressionIsSupported)
 {
-	Node	*leftop 	= NULL;
-	Node	*rightop	= NULL;
-	List	*attrs = NIL;
+	Node *leftop = NULL;
+	Node *rightop = NULL;
+	List *attrs = NIL;
+
+	*expressionIsSupported = true;
 
 	if ((!expr))
 		return attrs;
@@ -870,30 +910,46 @@ get_attrs_from_expr(Expr *expr)
 		ScalarArrayOpExpr *saop = (ScalarArrayOpExpr *) expr;
 		leftop = (Node *) linitial(saop->args);
 		rightop = (Node *) lsecond(saop->args);
+	} else {
+		// If expression type is not known, report that it's not supported
+		*expressionIsSupported = false;
+		return NIL;
 	}
 
-	//Process left operand
-	//For most of datatypes column is represented by Var node
-	if (IsA(leftop, Var))
+	// We support following combinations of operands:
+	// Var, Const
+	// Relabel, Const
+	// FuncExpr, Const
+	// Const, Var
+	// Const, Relabel
+	// Const, FuncExpr
+	// For most of datatypes column is represented by Var node
+	// For varchar column is represented by RelabelType node
+	if (IsA(leftop, Var) && IsA(rightop, Const))
 	{
 		attrs = append_attr_from_var((Var *) leftop, attrs);
-	}
-	//For varchar column is represented by RelabelType node
-	if (IsA(leftop, RelabelType))
+	} else if (IsA(leftop, RelabelType) && IsA(rightop, Const))
 	{
 		attrs = append_attr_from_var((Var *) ((RelabelType *) leftop)->arg, attrs);
+	} else if (IsA(leftop, FuncExpr) && IsA(rightop, Const)) {
+		FuncExpr *expr = (FuncExpr *) leftop;
+		attrs = append_attr_from_func_args(expr, attrs, expressionIsSupported);
 	}
-
-	//Process right operand
-	//For most of datatypes column is represented by Var node
-	if (IsA(rightop, Var))
+	else if (IsA(rightop, Var) && IsA(leftop, Const))
 	{
 		attrs = append_attr_from_var((Var *) rightop, attrs);
-	}
-	//For varchar column is represented by RelabelType node
-	if (IsA(rightop, RelabelType))
+	} else if (IsA(rightop, RelabelType) && IsA(leftop, Const))
 	{
 		attrs = append_attr_from_var((Var *) ((RelabelType *) rightop)->arg, attrs);
+	} else if (IsA(rightop, FuncExpr) && IsA(leftop, Const)) {
+		FuncExpr *expr = (FuncExpr *) rightop;
+		attrs = append_attr_from_func_args(expr, attrs, expressionIsSupported);
+	}
+	else {
+		// If operand type or combination is not known, report that it's not supported
+		// to avoid partially extracted attributes from expression
+		*expressionIsSupported = false;
+		return NIL;
 	}
 
 	return attrs;
@@ -1251,11 +1307,16 @@ void enrich_trivial_expression(List *expressionItems) {
  * List might contain duplicates.
  * Caller should release memory once result is not needed.
  */
-List* extractPxfAttributes(List* quals)
+List* extractPxfAttributes(List* quals, bool* qualsAreSupported)
 {
 
+	if (!(*qualsAreSupported)) {
+		return NIL;
+	}
 	ListCell		*lc = NULL;
 	List *attributes = NIL;
+	bool expressionIsSupported;
+	*qualsAreSupported = true;
 
 	if (list_length(quals) == 0)
 		return NIL;
@@ -1271,14 +1332,23 @@ List* extractPxfAttributes(List* quals)
 			case T_ScalarArrayOpExpr:
 			{
 				Expr* expr = (Expr *) node;
-				List			*attrs = get_attrs_from_expr(expr);
+				List			*attrs = get_attrs_from_expr(expr, &expressionIsSupported);
+				if (!expressionIsSupported) {
+					*qualsAreSupported = false;
+					return NIL;
+				}
 				attributes = list_concat(attributes, attrs);
 				break;
 			}
 			case T_BoolExpr:
 			{
 				BoolExpr* expr = (BoolExpr *) node;
-				List *inner_result = extractPxfAttributes(expr->args);
+				bool innerBoolQualsAreSupported = true;
+				List *inner_result = extractPxfAttributes(expr->args, &innerBoolQualsAreSupported);
+				if (!innerBoolQualsAreSupported) {
+					*qualsAreSupported = false;
+					return NIL;
+				}
 				attributes = list_concat(attributes, inner_result);
 				break;
 			}

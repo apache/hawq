@@ -30,6 +30,10 @@ void run__scalar_const_to_str__negative(Const* input, StringInfo result, char* v
 void run__list_const_to_str(Const* input, StringInfo result, char* expected);
 void run__list_const_to_str__negative(Const* input, StringInfo result, int len, Datum *dats);
 
+
+/* date_eq(date, date) => bool */
+#define DateEqualFuncId 1086
+
 void
 test__supported_filter_type(void **state)
 {
@@ -541,13 +545,13 @@ Var* build_var(Oid oid, int attno) {
 	return arg_var;
 }
 
-Const* build_const(Oid oid, char* value)
+Const* build_const(Oid oid, char* value, bool expectToBeRead)
 {
 	Const* arg_const = (Const*) palloc0(sizeof(Const));
 	arg_const->xpr.type = T_Const;
 	arg_const->constisnull = (value == NULL);
 	arg_const->consttype = oid;
-	if (value != NULL)
+	if (value != NULL && expectToBeRead)
 	{
 		mock__scalar_const_to_str(oid, value);
 	}
@@ -594,7 +598,7 @@ ExpressionItem* build_expression_item(int lattnum, Oid lattrtype, char* rconstst
 {
 	ExpressionItem *expressionItem = (ExpressionItem*) palloc0(sizeof(ExpressionItem));
 	Var *leftop = build_var(lattrtype, lattnum);
-	Const *rightop = build_const(rattrtype, strdup(rconststr));
+	Const *rightop = build_const(rattrtype, strdup(rconststr), true);
 	OpExpr *operationExpression = build_op_expr(leftop, rightop, op);
 
 	expressionItem->node = operationExpression;
@@ -604,12 +608,44 @@ ExpressionItem* build_expression_item(int lattnum, Oid lattrtype, char* rconstst
 	return expressionItem;
 }
 
+FuncExpr* build_func_expr_operand(List *args, CoercionForm funcformat) {
+	FuncExpr* operand = palloc0(sizeof(FuncExpr));
+	((Node*) operand)->type = T_FuncExpr;
+	operand->args = args;
+	operand->funcformat = funcformat;
+	return operand;
+}
+
+/**
+ * builds FuncExpr for a following expression: function(column1, column2,...,columnk)
+ * columnOids - oids of column1, column2, ... types
+ *
+ * Typical representation of a functions we support:
+ * COERCE_EXPLICIT_CAST->COERCE_EXPLICIT_CALL->COERCE_IMPLICIT_CAST->T_Var,
+ * where Var holds actual arguments - column1, column2,...,columnk
+ */
+FuncExpr* build_nested_func_expr_operand(List *columnsOids, List *attrsIndices) {
+	assert_int_equal(columnsOids->length, attrsIndices->length);
+	ListCell *columnOidLc = NULL, *attrIndexLc = NULL;
+	Var *var = NULL;
+	List* args = NIL;
+	forboth(columnOidLc, columnsOids, attrIndexLc, attrsIndices) {
+		var = build_var(lfirst(columnOidLc), lfirst(attrIndexLc));
+		args = lappend(args, var);
+	}
+	FuncExpr* operandImplicitCast = build_func_expr_operand(args, COERCE_IMPLICIT_CAST);
+	FuncExpr* operandExplicitCall = build_func_expr_operand(list_make1(operandImplicitCast), COERCE_EXPLICIT_CALL);
+	FuncExpr* operandExplicitCast = build_func_expr_operand(list_make1(operandExplicitCall), COERCE_EXPLICIT_CALL);
+
+	return operandExplicitCast;
+}
+
 void run__opexpr_to_pxffilter__positive(Oid dbop, PxfOperatorCode expectedPxfOp)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 1);
 	char* const_value = strdup("1984"); /* will be free'd by const_to_str */
-	Const* arg_const = build_const(INT2OID, const_value);
+	Const* arg_const = build_const(INT2OID, const_value, true);
 
 	OpExpr *expr = build_op_expr(arg_var, arg_const, dbop);
 	PxfFilterDesc* expected = build_filter(
@@ -657,7 +693,8 @@ test__opexpr_to_pxffilter__attributeEqualsNull(void **state)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 1);
-	Const* arg_const = build_const(INT2OID, NULL);
+	Const* arg_const = build_const(INT2OID, NULL, true
+			);
 	OpExpr *expr = build_op_expr(arg_var, arg_const, 94 /* int2eq */);
 
 	PxfFilterDesc* expected = build_filter(
@@ -698,7 +735,7 @@ test__opexpr_to_pxffilter__differentTypes(void **state)
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 3);
 	char* const_value = strdup("13"); /* will be free'd by const_to_str */
-	Const *arg_const = build_const(INT8OID, const_value);
+	Const *arg_const = build_const(INT8OID, const_value, true);
 	OpExpr *expr = build_op_expr(arg_const, arg_var, 1864 /* int28lt */);
 
 
@@ -720,7 +757,7 @@ test__opexpr_to_pxffilter__unsupportedTypeCircle(void **state)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(CIRCLEOID, 8);
-	Const *arg_const = build_const(CIRCLEOID, NULL);
+	Const *arg_const = build_const(CIRCLEOID, NULL, true);
 	OpExpr *expr = build_op_expr(arg_const, arg_var, 0 /* whatever */);
 
 	/* run test */
@@ -754,7 +791,7 @@ test__opexpr_to_pxffilter__unsupportedOpNot(void **state)
 {
 	PxfFilterDesc *filter = (PxfFilterDesc*) palloc0(sizeof(PxfFilterDesc));
 	Var *arg_var = build_var(INT2OID, 3);
-	Const *arg_const = build_const(INT2OID, NULL);
+	Const *arg_const = build_const(INT2OID, NULL, true);
 	OpExpr *expr = build_op_expr(arg_const, arg_var, 1877 /* int2not */);
 
 	/* run test */
@@ -837,6 +874,63 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	expressionItems = NIL;
 }
 
+void
+test__extractPxfAttributes_empty_quals(void **state)
+{
+	bool qualsAreSupported;
+	qualsAreSupported = true;
+	List* quals = NIL;
+	extractPxfAttributes(quals, &qualsAreSupported);
+	assert_true(qualsAreSupported);
+}
+
+/**
+ * covers queries like:
+ * SELECT a,b,c
+ * FROM tab1
+ * WHERE d = function(e) = const
+ *
+ * d is a column number 5 of int4 datatype
+ * e is a column number 7 of date datatype
+ * const is a int4 datatype
+ *
+ */
+void
+test__extractPxfAttributes_supported_function_one_arg(void **state) {
+
+	int argumentColumnIndex = 6; // index starts from 0
+	bool qualsAreSupported;
+	qualsAreSupported = true;
+	List* columnsOids = list_make1(DATEOID);
+	List* attrsIndices = list_make1(argumentColumnIndex);
+
+	// Create operands FuncExpr, Const
+	FuncExpr* leftop = build_nested_func_expr_operand(columnsOids, attrsIndices);
+
+	// extractPxfAttributes just extracts columns, doesn't read values of constants
+	Node* rightop = build_const(INT4OID, strdup("42"), false);
+	OpExpr* opExpr = build_op_expr(leftop, rightop, Int4EqualOperator);
+	List* quals = list_make1(opExpr);
+
+	// Extract columns(attributes) from WHERE clause
+	List* attrs = extractPxfAttributes(quals, &qualsAreSupported);
+
+	// Make sure we extracted one attribute, column e
+	assert_int_equal(1, attrs->length);
+
+	// Make sure it's supported
+	assert_true(qualsAreSupported);
+
+	ListCell* lc = NULL;
+	int attnum;
+	foreach(lc, attrs)
+	{
+		attnum = lfirst_int(lc);
+		// Index of attnum starts from 0
+		assert_int_equal(attnum + 1, argumentColumnIndex);
+	}
+}
+
 int 
 main(int argc, char* argv[]) 
 {
@@ -865,7 +959,9 @@ main(int argc, char* argv[])
 			unit_test(test__opexpr_to_pxffilter__attributeIsNull),
 			unit_test(test__pxf_serialize_filter_list__oneFilter),
 			unit_test(test__pxf_serialize_fillter_list__nullFilter),
-			unit_test(test__pxf_serialize_filter_list__manyFilters)
+			unit_test(test__pxf_serialize_filter_list__manyFilters),
+			unit_test(test__extractPxfAttributes_empty_quals),
+			unit_test(test__extractPxfAttributes_supported_function_one_arg)
 	};
 	return run_tests(tests);
 }
