@@ -27,6 +27,7 @@
 #include "communication/rmcomm_RMSEG2RM.h"
 #include "resourceenforcer/resourceenforcer.h"
 #include "cdb/cdbtmpdir.h"
+#include "storage/pmsignal.h" /* PostmasterIsAlive */
 
 int ResManagerMainSegment2ndPhase(void)
 {
