@@ -19,6 +19,13 @@
 
 import org.apache.tools.ant.filters.ReplaceTokens
 
+// Get database property, use HAWQ as a default database
+def database = System.getProperty("database", "hawq");
+def databaseFileName = "gradle/profiles/" + database + ".properties";
+assert file(databaseFileName).exists()
+def databaseProperties = new Properties()
+file(databaseFileName).withInputStream { databaseProperties.load(it) }
+
 buildscript {
     repositories {
         // mavenCentral without https:
@@ -263,6 +270,10 @@ project('pxf-service') {
         from('src/scripts/pxf-env.sh') {
             fileMode 0755
             fileType NOREPLACE
+            filter(ReplaceTokens,
+                    tokens: ['pxfLogDir'     : databaseProperties.pxfLogDir,
+                             'pxfRunDir'     : databaseProperties.pxfRunDir,
+                             'pxfDefaultUser': databaseProperties.pxfDefaultUser])
             into "/etc/pxf-${project.version}/conf"
         }
         
@@ -612,8 +623,14 @@ task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
     from("${tomcatTargetDir}/${tomcatName}") { into 'apache-tomcat' }
     from("pxf-service/src/main/resources") { into 'conf' }
     from("pxf-service/src/configs/pxf-site.xml") { into 'conf' }
-    from("pxf-service/src/scripts/pxf-env.sh") { into 'conf' }
+    from("pxf-service/src/scripts/pxf-env.sh") {
+        filter(ReplaceTokens,
+                tokens: ['pxfLogDir'     : databaseProperties.pxfLogDir,
+                         'pxfRunDir'     : databaseProperties.pxfRunDir,
+                         'pxfDefaultUser': databaseProperties.pxfDefaultUser]) into 'conf'
+    }
     from("pxf-service/src/configs/tomcat") { into 'tomcat-templates' }
+    from("pxf-service/src/configs/templates") { into 'conf-templates' }
 }
 
 task bundle(type: Tar) {
