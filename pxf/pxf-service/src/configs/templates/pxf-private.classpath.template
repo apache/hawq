@@ -1,0 +1,80 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+##################################################################
+# This file contains the internal classpaths required to run PXF.
+# Edit to set the base paths according to your specific package layout
+# Adding new resources should be done using pxf-public.classpath file.
+##################################################################
+
+# PXF Configuration
+PXF_HOME/conf
+
+# PXF Libraries
+PXF_HOME/lib/pxf-hbase-*[0-9].jar
+PXF_HOME/lib/pxf-hdfs-*[0-9].jar
+PXF_HOME/lib/pxf-hive-*[0-9].jar
+PXF_HOME/lib/pxf-json-*[0-9].jar
+PXF_HOME/lib/pxf-jdbc-*[0-9].jar
+
+# Hadoop/Hive/HBase configurations
+HADOOP_HOME/etc/hadoop
+HIVE_HOME/conf
+HBASE_HOME/conf
+
+# Hadoop Libraries
+HADOOP_HOME/share/hadoop/common/hadoop-common-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/hadoop-auth-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/asm-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/avro-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/commons-cli-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/commons-codec-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/commons-collections-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/commons-configuration-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/commons-io-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/commons-lang-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/commons-logging-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/guava-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/htrace-core*.jar
+HADOOP_HOME/share/hadoop/common/lib/jetty-*.jar
+HADOOP_HOME/share/hadoop/common/lib/jersey-core-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/jersey-server-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/log4j-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/protobuf-java-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/slf4j-api-*[0-9].jar
+HADOOP_HOME/share/hadoop/common/lib/snappy-java-*[0-9].jar
+HADOOP_HOME/share/hadoop/hdfs/hadoop-hdfs-*[0-9].jar
+HADOOP_HOME/share/hadoop/hdfs/lib/jackson-core-asl-*[0-9].jar
+HADOOP_HOME/share/hadoop/hdfs/lib/jackson-mapper-asl-*[0-9].jar
+HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-client-core-*[0-9].jar
+# CDH only Library
+HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-client-common-*[0-9].jar
+
+# Hive Libraries
+HIVE_HOME/lib/antlr-runtime*.jar
+HIVE_HOME/lib/datanucleus-api-jdo*.jar
+HIVE_HOME/lib/datanucleus-core*.jar
+HIVE_HOME/lib/hive-exec*.jar
+HIVE_HOME/lib/hive-metastore*.jar
+HIVE_HOME/lib/jdo-api*.jar
+HIVE_HOME/lib/libfb303*.jar
+
+# HBase Libraries
+HBASE_HOME/lib/hbase-client*.jar
+HBASE_HOME/lib/hbase-common*.jar
+HBASE_HOME/lib/hbase-protocol*.jar
+HBASE_HOME/lib/htrace-core*.jar
+HBASE_HOME/lib/netty*.jar
+HBASE_HOME/lib/zookeeper*.jar

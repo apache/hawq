@@ -22,7 +22,8 @@
 
 
 if [ -z $PXF_HOME ]; then
-    env_script=/etc/pxf/conf/pxf-env.sh
+    parent_script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+    env_script=$parent_script_dir/conf/pxf-env.sh
 else
     env_script=$PXF_HOME/conf/pxf-env.sh
 fi
@@ -55,13 +56,6 @@ else
 fi
 
 curl=`which curl`
-
-
-# validate JAVA_HOME
-if [ ! -x $JAVA_HOME/bin/java ]; then
-	echo ERROR: \$JAVA_HOME is invalid
-	exit 1
-fi
 
 #
 # createInstance creates a tomcat instance 
@@ -113,7 +107,9 @@ function configureInstance()
 	# set pid
 	catalinaEnv=$instance_root/$instance_name/bin/setenv.sh
 	cat $catalinaEnv | \
-	sed -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" \
+	sed -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" | \
+	sed -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=$PXF_LOGDIR |g" | \
+	sed -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=$PXF_LOGDIR/catalina.out|g" \
 	> ${catalinaEnv}.tmp
 	rm $catalinaEnv
 	mv ${catalinaEnv}.tmp $catalinaEnv
@@ -208,10 +204,24 @@ function doInit()
 		echo WARNING: instance already exists in $instance_root, nothing to do...
 		return 0
 	fi
-
-    createInstance || return 1
+	# Generate private classpath file only if user specified hadoop_home option
+	# Otherwise use default file
+    if [ ! -z $hadoop_home ]; then
+        generatePrivateClasspath || return 1
+    else
+        if [ ! -z $hbase_home ]; then
+            echo WARNING: hbase_home option will be ignored, please specify hadoop_home
+        fi
+        if [ ! -z $hive_home ]; then
+            echo WARNING: hive_home option will be ignored, please specify hadoop_home
+        fi
+    fi
+	createInstance || return 1
 	configureInstance || return 1
 	deployWebapp || return 1
+	createLogsDir || return 1
+	createRunDir  || return 1
+
 }
 
 #
@@ -247,11 +257,97 @@ function commandWebapp()
 {
     command=$1
     pushd $instance_root
-    su $pxf_user -c "$instance_root/$instance_name/bin/catalina.sh $command"
+    sudo -u $pxf_user $instance_root/$instance_name/bin/catalina.sh $command
     if [ $? -ne 0 ]; then
         return 1
     fi
     popd
+}
+
+function createLogsDir()
+{
+    mkdir -p $PXF_LOGDIR
+    chown -R $instance_owner $PXF_LOGDIR
+    chmod 700 $PXF_LOGDIR
+    return 0
+}
+
+function createRunDir()
+{
+    mkdir -p $PXF_RUNDIR
+    chown -R $instance_owner $PXF_RUNDIR
+    chmod 700 $PXF_RUNDIR
+    return 0
+}
+
+function generatePrivateClasspath()
+{
+    echo "Generating private classpath file..."
+    #Create intial version of the file
+    sed -e "s|PXF_HOME|$PXF_HOME|g" $PXF_HOME/conf-templates/pxf-private.classpath.template > $PXF_HOME/conf/pxf-private.classpath
+    #Make sure $hadoop_home is defined
+    if [ -z $hadoop_home ]; then
+        echo ERROR: cant generate private classpath without hadoop_home value
+        return 1
+    fi
+    #Substitute HADOOP_HOME value
+    sed -i -e "s|HADOOP_HOME|$hadoop_home|g" $PXF_HOME/conf/pxf-private.classpath
+    if [ ! -z $hbase_home ]; then
+        #Substitute HBASE_HOME if hbase_home was set
+        sed -i -e "s|HBASE_HOME|$hbase_home|g" $PXF_HOME/conf/pxf-private.classpath
+    else
+        #Delete lines with HBASE_HOME if hbase_home wasn't set
+        sed -i  "/HBASE_HOME/d" $PXF_HOME/conf/pxf-private.classpath
+    fi
+    if [ ! -z $hive_home ]; then
+        #Substitute HIVE_HOME if hive_home was set
+        sed -i -e "s|HIVE_HOME|$hive_home|g" $PXF_HOME/conf/pxf-private.classpath
+    else
+        #Delete lines with HIVE_HOME if hive_home wasn't set
+        sed -i  "/HIVE_HOME/d" $PXF_HOME/conf/pxf-private.classpath
+    fi
+}
+
+function printUsage()
+{
+    echo $"Usage: $0 {start|stop|restart|init --hadoop-home HADOOP_LOCATION [--hive-home HIVE_LOCATION --hbase-home HBASE_LOCATION]|status}"
+
+}
+
+function validateParameters()
+{
+
+    # validate curl
+    which curl &> /dev/null
+    if [ "$?" -ne "0" ]
+    then
+        echo "ERROR: curl is not installed, please install"
+        exit 1
+    fi
+
+    # validate unzip
+    which unzip &> /dev/null
+    if [ "$?" -ne "0" ]
+    then
+        echo "ERROR: unzip is not installed, please install"
+        exit 1
+    fi
+
+    # validate pxf user
+    id $pxf_user  &> /dev/null;
+    if [ "$?" -ne "0" ]
+    then
+        echo "ERROR: User $pxf_user doesn't exist. Please set valid user via \$PXF_USER variable"
+        exit 1
+    fi
+
+    # validate JAVA_HOME
+    if [ ! -x $JAVA_HOME/bin/java ]; then
+        echo ERROR: \$JAVA_HOME is invalid
+        exit 1
+    fi
+
+    return 0
 }
 
 # 
@@ -297,24 +393,54 @@ command=$1
 
 case "$command" in
 	"init" )
+		shift
+		while [[ $# -gt 1 ]]
+		do
+			name="$1"
+			value="$2"
+			case $name in
+				--hadoop-home)
+				hadoop_home="$2"
+				shift
+				;;
+				--hive-home)
+                                hive_home="$2"
+                                shift
+                                ;;
+				--hbase-home)
+                                hbase_home="$2"
+                                shift
+                                ;;
+				*)
+                                echo "$name is an unknown option"
+                                printUsage
+                                exit 1
+			esac
+			shift
+		done
+		validateParameters
 		doInit
 		;;
 	"start" )
+		validateParameters
 		doStart
 		;;
 	"stop" )
+		validateParameters
 		doStop
 		;;
 	"restart" )
+		validateParameters
 		doStop
 		sleep 1s
 		doStart
 		;;
 	"status" )
+		validateParameters
 		doStatus
 		;;
 	* )
-		echo $"Usage: $0 {start|stop|restart|init|status}"
+		printUsage
 		exit 2
 		;;
 esac
