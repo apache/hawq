@@ -66,6 +66,7 @@ public class HiveORCAccessorTest {
     HiveORCAccessor accessor;
 
     @Before
+    @SuppressWarnings("unchecked")
     public void setup() throws Exception {
         jobConf = new JobConf();
         PowerMockito.whenNew(JobConf.class).withAnyArguments().thenReturn(jobConf);

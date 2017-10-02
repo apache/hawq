@@ -274,7 +274,7 @@ public class HiveUtilitiesTest {
     @Test
     public void extractModifiers() throws Exception {
         Integer[] mods = EnumHiveToHawqType.extractModifiers("decimal(10,2)");
-        assertEquals(mods, new Integer[]{10, 2});
+        assertArrayEquals(mods, new Integer[]{10, 2});
     }
 
     @Test
@@ -409,6 +409,7 @@ public class HiveUtilitiesTest {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     public void createDeserializer() throws Exception {
         SerDe serde = HiveUtilities.createDeserializer(HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE, HiveUtilities.PXF_HIVE_SERDES.ORC_SERDE);
         assertTrue(serde instanceof OrcSerde);

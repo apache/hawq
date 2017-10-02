@@ -20,6 +20,7 @@ package org.apache.hawq.pxf.api.utilities;
  */
 
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -201,7 +202,7 @@ public class UtilitiesTest {
 
         assertEquals(10, fragmentMetadata.getStart());
         assertEquals(100, fragmentMetadata.getEnd());
-        assertEquals(new String[] { "hostname" }, fragmentMetadata.getHosts());
+        assertArrayEquals(new String[] { "hostname" }, fragmentMetadata.getHosts());
     }
 
     @Test

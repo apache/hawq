@@ -35,7 +35,7 @@ public class DemoFragmenter extends Fragmenter{
     /**
      * Constructs the DemoFragmenter
      *
-     * @param metaData
+     * @param metaData the InputData
      */
     public DemoFragmenter(InputData metaData) {
         super(metaData);

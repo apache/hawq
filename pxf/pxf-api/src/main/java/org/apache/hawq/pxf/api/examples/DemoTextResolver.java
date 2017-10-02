@@ -40,7 +40,7 @@ public class DemoTextResolver extends Plugin implements ReadResolver {
     /**
      * Constructs the DemoResolver
      *
-     * @param metaData
+     * @param metaData the InputData
      */
     public DemoTextResolver(InputData metaData) {
         super(metaData);
