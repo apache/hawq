@@ -34,7 +34,9 @@ export PXF_LOGDIR=@pxfLogDir@
 export PXF_RUNDIR=@pxfRunDir@
 
 # Configured user
-export PXF_USER=${PXF_USER:-@pxfDefaultUser@}
+if [ ! -z '@pxfDefaultUser@' ]; then
+    export PXF_USER=${PXF_USER:-@pxfDefaultUser@}
+fi
 
 # Port
 export PXF_PORT=${PXF_PORT:-51200}
