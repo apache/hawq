@@ -92,6 +92,11 @@ tomcat:
 
 install:
 	./gradlew install $(BUILD_PARAMS)
+	# Create symlink for PXF jars
+	@pushd $(PXF_HOME)/lib && \
+	    for X in pxf-*-[0-9]*.jar; do \
+            ln -sf $$X `echo $$X | sed -e 's/-[a-zA-Z0-9.]*.jar/.jar/'`; \
+        done && popd
 
 bundle:
 	./gradlew bundle $(BUILD_PARAMS)
