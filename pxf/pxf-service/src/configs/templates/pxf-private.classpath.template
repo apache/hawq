@@ -23,16 +23,15 @@
 PXF_HOME/conf
 
 # PXF Libraries
-PXF_HOME/lib/pxf-hbase-*[0-9].jar
-PXF_HOME/lib/pxf-hdfs-*[0-9].jar
-PXF_HOME/lib/pxf-hive-*[0-9].jar
-PXF_HOME/lib/pxf-json-*[0-9].jar
-PXF_HOME/lib/pxf-jdbc-*[0-9].jar
+PXF_HOME/lib/pxf-hbase.jar
+PXF_HOME/lib/pxf-hdfs.jar
+PXF_HOME/lib/pxf-hive.jar
+PXF_HOME/lib/pxf-json.jar
+PXF_HOME/lib/pxf-jdbc.jar
 
-# Hadoop/Hive/HBase configurations
+# Hadoop/Hive configurations
 HADOOP_HOME/etc/hadoop
 HIVE_HOME/conf
-HBASE_HOME/conf
 
 # Hadoop Libraries
 HADOOP_HOME/share/hadoop/common/hadoop-common-*[0-9].jar
@@ -70,11 +69,3 @@ HIVE_HOME/lib/hive-exec*.jar
 HIVE_HOME/lib/hive-metastore*.jar
 HIVE_HOME/lib/jdo-api*.jar
 HIVE_HOME/lib/libfb303*.jar
-
-# HBase Libraries
-HBASE_HOME/lib/hbase-client*.jar
-HBASE_HOME/lib/hbase-common*.jar
-HBASE_HOME/lib/hbase-protocol*.jar
-HBASE_HOME/lib/htrace-core*.jar
-HBASE_HOME/lib/netty*.jar
-HBASE_HOME/lib/zookeeper*.jar
