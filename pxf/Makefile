@@ -24,6 +24,7 @@ else
     ifneq "$(PXF_HOME)" ""
         BUILD_PARAMS= -DdeployPath=$(PXF_HOME)
     else ifneq "$(GPHOME)" ""
+        PXF_HOME= $(GPHOME)/pxf
         BUILD_PARAMS= -DdeployPath="$(GPHOME)/pxf"
     else
 		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
