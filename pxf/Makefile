@@ -24,10 +24,13 @@ else
     ifneq "$(PXF_HOME)" ""
         BUILD_PARAMS= -DdeployPath=$(PXF_HOME)
     else ifneq "$(GPHOME)" ""
+        PXF_HOME= $(GPHOME)/pxf
         BUILD_PARAMS= -DdeployPath="$(GPHOME)/pxf"
     else
 		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
+        exit 1
     endif
+    LINK = 1
 endif
 
 ifneq "$(LICENSE)" ""
@@ -92,6 +95,13 @@ tomcat:
 
 install:
 	./gradlew install $(BUILD_PARAMS)
+ifneq "$(LINK)" ""
+    # Create PXF Symlinks
+	@pushd $(PXF_HOME)/lib && \
+	    for X in pxf-*-[0-9]*.jar; do \
+            ln -sf $$X `echo $$X | sed -e 's/-[a-zA-Z0-9.]*.jar/.jar/'`; \
+        done && popd
+endif
 
 bundle:
 	./gradlew bundle $(BUILD_PARAMS)

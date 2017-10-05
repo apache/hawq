@@ -614,7 +614,7 @@ def pxfTargetDir = System.properties['deployPath'] ?: "build/"
 
 task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
     into "${pxfTargetDir}"
-    subprojects { subProject ->
+    subprojects { project ->
         from("${project.name}/build/libs") { into 'lib' }
     }
     from("pxf-service/src/scripts/pxf-service") {
