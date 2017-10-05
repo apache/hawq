@@ -273,7 +273,7 @@ project('pxf-service') {
             filter(ReplaceTokens,
                     tokens: ['pxfLogDir'     : databaseProperties.pxfLogDir,
                              'pxfRunDir'     : databaseProperties.pxfRunDir,
-                             'pxfDefaultUser': databaseProperties.pxfDefaultUser])
+                             'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
             into "/etc/pxf-${project.version}/conf"
         }
         
@@ -300,6 +300,9 @@ project('pxf-service') {
             fileMode 0755
             addParentDirs false
             into "/opt/pxf-${project.version}"
+            filter(ReplaceTokens,
+                    tokens: [
+                            'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
         }
 
         link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
@@ -618,6 +621,9 @@ task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
         into 'bin'
         fileMode 0755
         rename('pxf-service', 'pxf')
+        filter(ReplaceTokens,
+                tokens: [
+                        'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
     }
 
     from("${tomcatTargetDir}/${tomcatName}") { into 'apache-tomcat' }
@@ -627,7 +633,7 @@ task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
         filter(ReplaceTokens,
                 tokens: ['pxfLogDir'     : databaseProperties.pxfLogDir,
                          'pxfRunDir'     : databaseProperties.pxfRunDir,
-                         'pxfDefaultUser': databaseProperties.pxfDefaultUser]) into 'conf'
+                         'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)]) into 'conf'
     }
     from("pxf-service/src/configs/tomcat") { into 'tomcat-templates' }
     from("pxf-service/src/configs/templates") { into 'conf-templates' }
