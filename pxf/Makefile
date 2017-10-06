@@ -19,33 +19,33 @@
 default: all
 
 ifneq "$(HD)" ""
-	BUILD_PARAMS= -Dhd=$(HD)
+    BUILD_PARAMS= -Dhd=$(HD)
 else
-	ifneq "$(PXF_HOME)" ""
-		BUILD_PARAMS= -DdeployPath=$(PXF_HOME)
-	else ifneq "$(GPHOME)" ""
-		BUILD_PARAMS= -DdeployPath=$(PXF_HOME)
-		PXF_HOME="$(GPHOME)/pxf"
-	else
+    ifneq "$(PXF_HOME)" ""
+        BUILD_PARAMS= -DdeployPath="$(PXF_HOME)"
+    else ifneq "$(GPHOME)" ""
+        PXF_HOME= "$(GPHOME)/pxf"
+        BUILD_PARAMS= -DdeployPath="$(PXF_HOME)"
+    else
 		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
-		exit 1
-	endif
+		exit
+    endif
 endif
 
 ifneq "$(LICENSE)" ""
-	BUILD_PARAMS+= -Plicense="$(LICENSE)"
+    BUILD_PARAMS+= -Plicense="$(LICENSE)"
 endif
 
 ifneq "$(VENDOR)" ""
-	BUILD_PARAMS+= -Pvendor="$(VENDOR)"
+    BUILD_PARAMS+= -Pvendor="$(VENDOR)"
 endif
 
 ifneq "$(PXF_VERSION)" ""
-	BUILD_PARAMS+= -Pversion="$(PXF_VERSION)"
+    BUILD_PARAMS+= -Pversion="$(PXF_VERSION)"
 endif
 
 ifneq "$(DATABASE)" ""
-	BUILD_PARAMS+= -Ddatabase="$(DATABASE)"
+    BUILD_PARAMS+= -Ddatabase="$(DATABASE)"
 endif
 
 help:
@@ -66,19 +66,19 @@ help:
 
 all:
 	./gradlew clean release $(BUILD_PARAMS) $$(echo $$(for i in $$(echo ${PLUGINS_EXCLUDE_RPM} | sed 's/,/ /g'); do echo -x $$i:buildRpm ; done))
-
+	
 unittest:
 	./gradlew test
-
+	
 jar:
 	./gradlew jar $(BUILD_PARAMS)
-
+	
 tar:
 	./gradlew tar $(BUILD_PARAMS)
 
 rpm: tomcat
 	./gradlew rpm $(BUILD_PARAMS)
-
+	
 clean:
 	./gradlew clean
 	@rm -rf ./distributions/apache-tomcat*.rpm
