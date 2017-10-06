@@ -290,7 +290,7 @@ public class ProtocolData extends InputData {
 
     /**
      * Returns the current output format, either {@link OutputFormat#TEXT} or
-     * {@link OutputFormat#BINARY}.
+     * {@link OutputFormat#GPDBWritable}.
      *
      * @return output format
      */

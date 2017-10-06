@@ -351,8 +351,8 @@ public class ProtocolDataTest {
 
         ProtocolData protocolData = new ProtocolData(parameters);
 
-        assertEquals(protocolData.getColumn(0).columnTypeModifiers(), new Integer[]{5});
-        assertEquals(protocolData.getColumn(1).columnTypeModifiers(), new Integer[]{10, 2});
+        assertArrayEquals(protocolData.getColumn(0).columnTypeModifiers(), new Integer[]{5});
+        assertArrayEquals(protocolData.getColumn(1).columnTypeModifiers(), new Integer[]{10, 2});
     }
 
     @Test

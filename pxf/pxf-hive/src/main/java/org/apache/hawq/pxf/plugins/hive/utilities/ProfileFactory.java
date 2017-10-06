@@ -63,6 +63,10 @@ public class ProfileFactory {
 
     /**
      * @see ProfileFactory#get(InputFormat, boolean, String)
+     *
+     * @param inputFormat input format of table/partition
+     * @param hasComplexTypes whether record has complex types, see @EnumHiveToHawqType
+     * @return name of optimal profile
      */
     public static String get(InputFormat inputFormat, boolean hasComplexTypes) {
         String profileName = get(inputFormat, hasComplexTypes, null);

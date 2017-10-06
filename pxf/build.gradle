@@ -83,7 +83,7 @@ subprojects { subProject ->
     compileTestJava.options*.compilerArgs = [
             "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
             "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
-            "-Xlint:-fallthrough", "-Xlint:-deprecation", "-Xlint:-unchecked", "-Xlint:-options"
+            "-Xlint:fallthrough", "-Xlint:deprecation", "-Xlint:unchecked", "-Xlint:-options"
     ]
 
     // Add LICENSE, DISCLAIMER and NOTICE to generated jar files.
@@ -502,7 +502,7 @@ def buildNumber() {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.11'
+    gradleVersion = '2.13'
 }
 
 def distSubprojects = subprojects - project(':pxf-api')
