@@ -29,23 +29,23 @@ else
 	else
 		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
 		exit 1
-    endif
+	endif
 endif
 
 ifneq "$(LICENSE)" ""
-    BUILD_PARAMS+= -Plicense="$(LICENSE)"
+	BUILD_PARAMS+= -Plicense="$(LICENSE)"
 endif
 
 ifneq "$(VENDOR)" ""
-    BUILD_PARAMS+= -Pvendor="$(VENDOR)"
+	BUILD_PARAMS+= -Pvendor="$(VENDOR)"
 endif
 
 ifneq "$(PXF_VERSION)" ""
-    BUILD_PARAMS+= -Pversion="$(PXF_VERSION)"
+	BUILD_PARAMS+= -Pversion="$(PXF_VERSION)"
 endif
 
 ifneq "$(DATABASE)" ""
-    BUILD_PARAMS+= -Ddatabase="$(DATABASE)"
+	BUILD_PARAMS+= -Ddatabase="$(DATABASE)"
 endif
 
 help:
@@ -66,19 +66,19 @@ help:
 
 all:
 	./gradlew clean release $(BUILD_PARAMS) $$(echo $$(for i in $$(echo ${PLUGINS_EXCLUDE_RPM} | sed 's/,/ /g'); do echo -x $$i:buildRpm ; done))
-	
+
 unittest:
 	./gradlew test
-	
+
 jar:
 	./gradlew jar $(BUILD_PARAMS)
-	
+
 tar:
 	./gradlew tar $(BUILD_PARAMS)
 
 rpm: tomcat
 	./gradlew rpm $(BUILD_PARAMS)
-	
+
 clean:
 	./gradlew clean
 	@rm -rf ./distributions/apache-tomcat*.rpm
@@ -99,7 +99,7 @@ install:
 		for X in pxf-*-[0-9]*.jar; do \
 			ln -sf $$X `echo $$X | sed -e 's/-[a-zA-Z0-9.]*.jar/.jar/'`; \
 		done && popd; \
-    fi
+	fi
 
 bundle:
 	./gradlew bundle $(BUILD_PARAMS)
