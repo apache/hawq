@@ -22,11 +22,13 @@ ifneq "$(HD)" ""
     BUILD_PARAMS= -Dhd=$(HD)
 else
     ifneq "$(PXF_HOME)" ""
-        BUILD_PARAMS= -DdeployPath=$(PXF_HOME)
+        BUILD_PARAMS= -DdeployPath="$(PXF_HOME)"
     else ifneq "$(GPHOME)" ""
-        BUILD_PARAMS= -DdeployPath="$(GPHOME)/pxf"
+        PXF_HOME= "$(GPHOME)/pxf"
+        BUILD_PARAMS= -DdeployPath="$(PXF_HOME)"
     else
 		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
+		exit
     endif
 endif
 
@@ -92,6 +94,12 @@ tomcat:
 
 install:
 	./gradlew install $(BUILD_PARAMS)
+	@if [ -d "$(PXF_HOME)/lib" ] ; then \
+		pushd $(PXF_HOME)/lib && \
+		for X in pxf-*-[0-9]*.jar; do \
+			ln -sf $$X `echo $$X | sed -e 's/-[a-zA-Z0-9.]*.jar/.jar/'`; \
+		done && popd; \
+	fi
 
 bundle:
 	./gradlew bundle $(BUILD_PARAMS)
