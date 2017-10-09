@@ -28,6 +28,8 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 
+import java.util.Arrays;
+
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
@@ -43,7 +45,7 @@ public class PartitionedJsonParserNoSeekTest {
 		File testsDir = new File("src/test/resources/parser-tests/noseek");
 		File[] jsonFiles = testsDir.listFiles(new FilenameFilter() {
 			public boolean accept(File file, String s) {
-				return s.endsWith(".json");
+				return s.endsWith(".json") && !s.contains("expected");
 			}
 		});
 
@@ -58,13 +60,13 @@ public class PartitionedJsonParserNoSeekTest {
 		try {
 			PartitionedJsonParser parser = new PartitionedJsonParser(jsonInputStream);
 
-			File[] jsonOjbectFiles = jsonFile.getParentFile().listFiles(new FilenameFilter() {
+			File[] jsonObjectFiles = jsonFile.getParentFile().listFiles(new FilenameFilter() {
 				public boolean accept(File file, String s) {
 					return s.contains(jsonFile.getName()) && s.contains("expected");
 				}
 			});
-
-			for (File jsonObjectFile : jsonOjbectFiles) {
+			Arrays.sort(jsonObjectFiles);
+			for (File jsonObjectFile : jsonObjectFiles) {
 				String expected = trimWhitespaces(FileUtils.readFileToString(jsonObjectFile));
 				String result = parser.nextObjectContainingMember("name");
 				assertNotNull(jsonFile.getName() + "/" + jsonObjectFile.getName(), result);
@@ -80,4 +82,5 @@ public class PartitionedJsonParserNoSeekTest {
 	public String trimWhitespaces(String s) {
 		return s.replaceAll("[\\n\\t\\r \\t]+", " ").trim();
 	}
+
 }
