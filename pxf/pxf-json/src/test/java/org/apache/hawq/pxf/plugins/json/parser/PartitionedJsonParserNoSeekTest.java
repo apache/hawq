@@ -19,20 +19,21 @@ package org.apache.hawq.pxf.plugins.json.parser;
  * under the License.
  */
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 public class PartitionedJsonParserNoSeekTest {
 
@@ -64,11 +65,16 @@ public class PartitionedJsonParserNoSeekTest {
 				}
 			});
 
-			for (File jsonObjectFile : jsonOjbectFiles) {
-				String expected = trimWhitespaces(FileUtils.readFileToString(jsonObjectFile));
+			Set<String> resultElements = new HashSet<String>();
+			for(int i=0; i < jsonOjbectFiles.length; i++) {
 				String result = parser.nextObjectContainingMember("name");
-				assertNotNull(jsonFile.getName() + "/" + jsonObjectFile.getName(), result);
-				assertEquals(jsonFile.getName() + "/" + jsonObjectFile.getName(), expected, trimWhitespaces(result));
+				assertNotNull(jsonFile.getName() + " invalid object", result);
+				resultElements.add(trimWhitespaces(result));
+			}
+
+			for(File jsonObjectFile : jsonOjbectFiles) {
+				String expected = trimWhitespaces(FileUtils.readFileToString(jsonObjectFile));
+				assertTrue(jsonFile.getName() + "/" + jsonObjectFile.getName(), resultElements.contains(expected));
 				LOG.info("File " + jsonFile.getName() + "/" + jsonObjectFile.getName() + " passed");
 			}
 
