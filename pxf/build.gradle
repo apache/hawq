@@ -240,10 +240,9 @@ project('pxf-service') {
         obsoletes('pxf-core')
         obsoletes('pxf-api')
 
-        from('src/main/resources/pxf-profiles-default.xml') {
+        from('src/main/resources/pxf-profiles.xml') {
             fileType CONFIG | NOREPLACE
             into "/etc/pxf-${project.version}/conf"
-            rename { 'pxf-profiles.xml' }
         }
 
         from('src/configs/pxf-site.xml') {
@@ -310,7 +309,7 @@ project('pxf-service') {
     }
 
     project.distTar {
-        from('src/main/resources/pxf-profiles-default.xml') { into 'conf' rename { 'pxf-profiles.xml' } }
+        from('src/main/resources/pxf-profiles.xml') { into 'conf' }
         from("src/main/resources") { into 'conf' include '**/pxf-private*.classpath'}
         from("src/main/resources/pxf-private${hddist}.classpath") { into 'conf' rename {'pxf-private.classpath'} }
         from('src/main/resources/pxf-public.classpath') { into 'conf' }

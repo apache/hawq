@@ -20,17 +20,9 @@ under the License.
 -->
 
 <!--
-    PXF profiles definition file.
-    New profiles can be added in the form:
-        <profile>
-            <name>...</name>
-            <description>...</description>
-            <plugins>
-                <plugin_A>...</plugin_A>
-                <plugin_B>...</plugin_B>
-                ...
-            </plugins>
-         </profile>
+    PXF pre-packaged profiles definition file.
+    It's not recommended to add new profiles here.
+    For adding new custom profiles please edit pxf-profiles.xml
 -->
 <profiles>
     <profile>
