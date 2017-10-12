@@ -245,6 +245,11 @@ project('pxf-service') {
             into "/etc/pxf-${project.version}/conf"
         }
 
+        from('src/main/resources/pxf-profiles-default.xml') {
+            fileType CONFIG | NOREPLACE
+            into "/etc/pxf-${project.version}/conf"
+        }
+
         from('src/configs/pxf-site.xml') {
             fileType CONFIG | NOREPLACE
             into "/etc/pxf-${project.version}/conf"
@@ -310,6 +315,7 @@ project('pxf-service') {
 
     project.distTar {
         from('src/main/resources/pxf-profiles.xml') { into 'conf' }
+        from('src/main/resources/pxf-profiles-default.xml') { into 'conf' }
         from("src/main/resources") { into 'conf' include '**/pxf-private*.classpath'}
         from("src/main/resources/pxf-private${hddist}.classpath") { into 'conf' rename {'pxf-private.classpath'} }
         from('src/main/resources/pxf-public.classpath') { into 'conf' }
