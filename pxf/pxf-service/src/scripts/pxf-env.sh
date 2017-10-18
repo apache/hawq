@@ -40,3 +40,20 @@ fi
 
 # Port
 export PXF_PORT=${PXF_PORT:-51200}
+
+# Hadoop Distribution Type for Greenplum-based installations only. Use the following values:
+# HDP  - for RPM-based install of HDP Hadoop clients
+# CDH  - for RPM-based install of CDH Hadoop clients
+# AUTO - for auto discovery of RPM-based install of Hadoop clients
+# TAR  - for tarball-based install of either HDP or Hadoop clients
+# leave empty for non-Greenplum installations
+export HADOOP_DISTRO=@hadoopDistro@
+
+# Optional, required for TAR distro only: location of Hadoop client installation
+export HADOOP_HOME=
+
+# Optional, required for TAR distro only: location of Hive client installation
+export HIVE_HOME=
+
+# Optional, required for TAR distro only: location of HBase client installation
+export HBASE_HOME=

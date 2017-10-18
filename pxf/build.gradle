@@ -270,9 +270,10 @@ project('pxf-service') {
             fileMode 0755
             fileType NOREPLACE
             filter(ReplaceTokens,
-                    tokens: ['pxfLogDir'     : databaseProperties.pxfLogDir,
-                             'pxfRunDir'     : databaseProperties.pxfRunDir,
-                             'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
+                    tokens: ['pxfLogDir'     :  databaseProperties.pxfLogDir,
+                             'pxfRunDir'     :  databaseProperties.pxfRunDir,
+                             'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser),
+                             'hadoopDistro'  : (databaseProperties.hadoopDistro   == null ? "" : databaseProperties.hadoopDistro)])
             into "/etc/pxf-${project.version}/conf"
         }
         
