@@ -81,3 +81,4 @@ hbase/lib/hbase-protocol*.jar
 hbase/lib/htrace-core*.jar
 hbase/lib/netty*.jar
 hbase/lib/zookeeper*.jar
+hbase/lib/metrics-core*.jar

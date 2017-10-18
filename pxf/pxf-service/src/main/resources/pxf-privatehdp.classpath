@@ -51,6 +51,7 @@
 /usr/hdp/current/hbase-client/lib/hbase-common.jar
 /usr/hdp/current/hbase-client/lib/hbase-protocol.jar
 /usr/hdp/current/hbase-client/lib/htrace-core-*[0-9]*.jar
+/usr/hdp/current/hbase-client/lib/metrics-core-*[0-9]*.jar
 /usr/hdp/current/hbase-client/lib/netty-*[0-9].Final.jar
 /usr/hdp/current/zookeeper-client/zookeeper.jar
 /usr/hdp/current/hive-client/lib/antlr-runtime-*[0-9].jar

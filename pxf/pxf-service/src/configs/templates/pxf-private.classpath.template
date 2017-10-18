@@ -78,3 +78,4 @@ HBASE_HOME/lib/hbase-protocol*.jar
 HBASE_HOME/lib/htrace-core*.jar
 HBASE_HOME/lib/netty*.jar
 HBASE_HOME/lib/zookeeper*.jar
+HBASE_HOME/lib/metrics-core*.jar
