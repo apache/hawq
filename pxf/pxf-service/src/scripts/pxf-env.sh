@@ -40,3 +40,14 @@ fi
 
 # Port
 export PXF_PORT=${PXF_PORT:-51200}
+
+# Hadoop Distribution Type (optional), supported values:
+# <empty> - for auto discovery of HDP, CDH or tarball based client installation
+# HDP     - for HDP Hadoop client installation
+# CDH     - for CDH Hadoop client installation
+# CUSTOM  - for custom Hadoop client installation
+export HADOOP_DISTRO=${HADOOP_DISTRO}
+
+# Parent directory of Hadoop client installation (optional)
+# used in case of tarball-based installation when all clients are under a common parent directory
+export HADOOP_ROOT=${HADOOP_ROOT}

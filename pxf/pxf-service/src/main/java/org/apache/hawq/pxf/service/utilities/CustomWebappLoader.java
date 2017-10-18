@@ -217,7 +217,7 @@ public class CustomWebappLoader extends WebappLoader {
 				throw new FileNotFoundException(pathUriStr + " cannot be read");
 			}
 			addRepository(pathUriStr);
-			LOG.debug("Repository " + pathUriStr + " added from entry " + entry);
+			LOG.info("Repository " + pathUriStr + " added from entry " + entry);
 			return true;
 		} catch (Exception e) {
 			LOG.warn("Failed to load path " + path + " to repository: " + e);
