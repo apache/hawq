@@ -61,7 +61,7 @@ curl=`which curl`
 function fail()
 {
     echo "ERROR: $1"
-    return 1
+    exit 1
 }
 
 #

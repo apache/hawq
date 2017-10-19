@@ -49,11 +49,11 @@ export PXF_PORT=${PXF_PORT:-51200}
 # leave empty for non-embedded (standalone) installations
 export HADOOP_DISTRO=@hadoopDistro@
 
-# Location of Hadoop client installation : optional, required for TAR distro only:
+# Location of Hadoop client installation : optional, required for TAR distro only
 export HADOOP_HOME=
 
-# Location of Hive client installation : optional, required for TAR distro only:
+# Location of Hive client installation : optional, required for TAR distro only
 export HIVE_HOME=
 
-# Location of HBase client installation : optional, required for TAR distro only:
+# Location of HBase client installation : optional, required for TAR distro only
 export HBASE_HOME=
