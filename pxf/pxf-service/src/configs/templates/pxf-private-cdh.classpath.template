@@ -76,4 +76,5 @@ PXF_HOME/lib/pxf-jdbc.jar
 /usr/lib/hbase/hbase-common.jar
 /usr/lib/hbase/hbase-protocol.jar
 /usr/lib/hbase/lib/netty-*[0-9].Final.jar
+/usr/lib/hbase/lib/metrics-core*.jar
 /usr/lib/zookeeper/zookeeper.jar
