@@ -213,27 +213,13 @@ function doInit()
 		echo WARNING: instance already exists in $instance_root, nothing to do...
 		return 0
 	fi
-	# Generate private classpath file only if HADOOP_DISTRO is specified in pxf-env.sh
-	# Otherwise the default file will be used
-    if [ ! -z $HADOOP_DISTRO ]; then
-        generatePrivateClasspath || return 1
-    else
-        if [ ! -z $HADOOP_HOME ]; then
-            echo "WARNING: HADOOP_HOME=${HADOOP_HOME} will be ignored, please specify HADOOP_DISTRO in pxf-env.sh"
-        fi
-        if [ ! -z $HBASE_HOME ]; then
-            echo "WARNING: HBASE_HOME=${HBASE_HOME} will be ignored, please specify HADOOP_DISTRO in pxf-env.sh"
-        fi
-        if [ ! -z $HIVE_HOME ]; then
-            echo "WARNING: HIVE_HOME=${HIVE_HOME} will be ignored, please specify HADOOP_DISTRO in pxf-env.sh"
-        fi
-    fi
+    determineHadoopDistro
+	generatePrivateClasspath || return 1
 	createInstance || return 1
 	configureInstance || return 1
 	deployWebapp || return 1
 	createLogsDir || return 1
 	createRunDir  || return 1
-
 }
 
 #
@@ -302,90 +288,90 @@ function createRunDir()
     return 0
 }
 
+function check_hadoop_install()
+{
+    local distro_type=${1}
+    case "${distro_type}" in
+        hdp|HDP)
+            if [ -d "/usr/hdp/current/hadoop-client/client" ]; then
+                DISTRO="hdp"
+                return 0;
+            fi
+            ;;
+        cdh|CDH)
+            if [ -d "/usr/lib/hadoop/client" ]; then
+                DISTRO="cdh"
+                return 0;
+            fi
+            ;;
+        tar|TAR)
+            if [ -n "${HADOOP_ROOT}" ] && [ -d "${HADOOP_ROOT}/hadoop/share/hadoop/common/lib" ]; then
+                DISTRO="tar"
+                return 0;
+            fi
+            ;;
+        custom|CUSTOM)
+            # use tarball template for custom distro, do not require HADOOP_ROOT to be set
+            DISTRO="tar"
+            return 0;
+            ;;
+        *)
+            fail "Unknown distro parameter ${distro_type}"
+            ;;
+    esac
+    # the distro type was not found installed, return failure code
+    return 1
+}
+
 function determineHadoopDistro()
 {
+    DISTRO=""
     # check if the distro is explicitly specified
-    if [ "${HADOOP_DISTRO}" == "AUTO" ] || [ "${HADOOP_DISTRO}" == "auto" ] ; then
-        if [ -d "/usr/hdp/current/hadoop-client/client" ]; then
-            DISTRO="hdp"
-        elif [ -d "/usr/lib/hadoop/client" ]; then
-            DISTRO="cdh"
-        else
-           fail "Hadoop client not found, please install hadoop-client RPM"
-        fi
-    elif [ "${HADOOP_DISTRO}" == "HDP" ] || [ "${HADOOP_DISTRO}" == "hdp" ]; then
-        DISTRO="hdp"
-        if [ ! -d "/usr/hdp/current/hadoop-client/client" ]; then
-            fail "HDP Hadoop client not found, please install hadoop-client RPM"
-        fi
-    elif [ "${HADOOP_DISTRO}" == "CDH" ] || [ "${HADOOP_DISTRO}" == "cdh" ]; then
-        DISTRO="cdh"
-        if [ ! -d "/usr/lib/hadoop/client" ]; then
-            fail "CDH Hadoop client not found, please install hadoop-client RPM"
-        fi
-    elif [ "${HADOOP_DISTRO}" == "TAR" ] || [ "${HADOOP_DISTRO}" == "tar" ]; then
-        DISTRO="tar"
-        # check mandatory property, it must be set and point to existing directory
-        if [ -z "${HADOOP_HOME}" ]; then
-            fail "HADOOP_HOME is not set in pxf-env.sh for TAR distribution"
-        elif [ ! -d "${HADOOP_HOME}/share/hadoop/common/lib" ]; then
-            fail "HADOOP_HOME is set but ${HADOOP_HOME}/share/hadoop/common/lib is not found"
-        fi
-        # check optional properties, should point to existing directories only when actually set
-        if [ -n "${HIVE_HOME}" ] && [ ! -d "${HIVE_HOME}/lib" ]; then
-            fail "HIVE_HOME set but ${HIVE_HOME}/lib is not found"
-        fi
-        if [ -n "${HBASE_HOME}" ] && [ ! -d "${HBASE_HOME}/lib" ]; then
-            fail "HIVE_HOME set but ${HBASE_HOME}/lib is not found"
-        fi
+    if [ -z "${HADOOP_DISTRO}" ]; then
+        # if distro is not specified, try checking for HDP and then CDH
+        check_hadoop_install "hdp" || check_hadoop_install "cdh"
     else
-        fail "Unknown value for HADOOP_DISTRO=${HADOOP_DISTRO}"
+        # check distro specified in the config file
+        check_hadoop_install "${HADOOP_DISTRO}"
     fi
 
-    echo "Determined Hadoop distribution type = ${DISTRO}"
+    # if still not determined, check tarball-based install
+    if [ -z "${DISTRO}" ]; then
+        check_hadoop_install "tar"
+        # if still unknown, then error out
+        if [ -z "${DISTRO}" ]; then
+            fail "Can not determine Hadoop distribution, please install Hadoop clients."
+        fi
+    fi
 }
 
 function generatePrivateClasspath()
 {
-    echo "Generating private classpath file..."
-
-    # check hadoop distribution, it should set DISTRO variable and fail if the data is not consistent
-    determineHadoopDistro
-
-    # verify that a template file for the distribution exists
+    # distro must have been determined by now, but double check
     if [ -z "${DISTRO}" ]; then
         fail "Hadoop distribution was not determined"
     fi
+
+    # verify that a template file for the distribution exists
     local template_file="${PXF_HOME}/conf-templates/pxf-private-${DISTRO}.classpath.template"
     if [ ! -f "${template_file}" ]; then
         fail "Template file ${template_file} not found"
     fi
 
+    echo "Generating private classpath file from ${template_file} ..."
+
     # create initial version of the file by replacing PXF_HOME token (applicable to all templates)
     sed -e "s|PXF_HOME|${PXF_HOME}|g" ${template_file} > ${PXF_HOME}/conf/pxf-private.classpath
 
-    # substitute HADOOP_HOME value if defined
-    if [ -n "${HADOOP_HOME}" ]; then
-        sed -i -e "s|HADOOP_HOME|${HADOOP_HOME}|g" ${PXF_HOME}/conf/pxf-private.classpath
-    fi
-    # substitute HBASE_HOME value if defined, otherwise delete the line containing the token
-    if [ -n "${HBASE_HOME}" ]; then
-        sed -i -e "s|HBASE_HOME|${HBASE_HOME}|g" ${PXF_HOME}/conf/pxf-private.classpath
-    else
-        sed -i -e "/HBASE_HOME/d" ${PXF_HOME}/conf/pxf-private.classpath
-    fi
-    # substitute HIVE_HOME value if defined, otherwise delete the line containing the token
-    if [ -n "${HIVE_HOME}" ]; then
-        sed -i -e "s|HIVE_HOME|${HIVE_HOME}|g" ${PXF_HOME}/conf/pxf-private.classpath
-    else
-        sed -i -e "/HIVE_HOME/d" ${PXF_HOME}/conf/pxf-private.classpath
+    # substitute HADOOP_ROOT value if defined
+    if [ -n "${HADOOP_ROOT}" ]; then
+        sed -i -e "s|HADOOP_ROOT|${HADOOP_ROOT}|g" ${PXF_HOME}/conf/pxf-private.classpath
     fi
 }
 
 function printUsage()
 {
     echo $"Usage: $0 {start|stop|restart|init|status}"
-
 }
 
 function validateParameters()

@@ -41,19 +41,13 @@ fi
 # Port
 export PXF_PORT=${PXF_PORT:-51200}
 
-# Hadoop Distribution Type for embedded installations only. Use the following values:
-# AUTO - for auto discovery of RPM-based install of Hadoop clients
-# HDP  - for RPM-based install of HDP Hadoop clients
-# CDH  - for RPM-based install of CDH Hadoop clients
-# TAR  - for tarball-based install of Hadoop clients
-# leave empty for non-embedded (standalone) installations
-export HADOOP_DISTRO=@hadoopDistro@
+# Hadoop Distribution Type (optional), supported values:
+# <empty> - for auto discovery of HDP, CDH or tarball based client installation
+# HDP     - for HDP Hadoop client installation
+# CDH     - for CDH Hadoop client installation
+# CUSTOM  - for custom Hadoop client installation
+export HADOOP_DISTRO=${HADOOP_DISTRO}
 
-# Location of Hadoop client installation : optional, required for TAR distro only
-export HADOOP_HOME=
-
-# Location of Hive client installation : optional, required for TAR distro only
-export HIVE_HOME=
-
-# Location of HBase client installation : optional, required for TAR distro only
-export HBASE_HOME=
+# Parent directory of Hadoop client installation (optional)
+# used in case of tarball-based installation when all clients are under a common parent directory
+export HADOOP_ROOT=${HADOOP_ROOT}
