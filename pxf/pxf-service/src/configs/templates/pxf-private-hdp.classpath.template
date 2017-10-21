@@ -75,6 +75,7 @@ PXF_HOME/lib/pxf-jdbc.jar
 /usr/hdp/current/hbase-client/lib/hbase-client.jar
 /usr/hdp/current/hbase-client/lib/hbase-common.jar
 /usr/hdp/current/hbase-client/lib/hbase-protocol.jar
+/usr/hdp/current/hbase-client/lib/htrace-core.jar
 /usr/hdp/current/hbase-client/lib/netty-*[0-9].Final.jar
 /usr/hdp/current/hbase-client/lib/metrics-core*.jar
 /usr/hdp/current/zookeeper-client/zookeeper.jar
