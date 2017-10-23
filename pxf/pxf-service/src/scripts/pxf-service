@@ -213,7 +213,7 @@ function doInit()
 		echo WARNING: instance already exists in $instance_root, nothing to do...
 		return 0
 	fi
-    determineHadoopDistro
+	determineHadoopDistro
 	generatePrivateClasspath || return 1
 	createInstance || return 1
 	configureInstance || return 1
