@@ -14,7 +14,8 @@
 # limitations under the License.
 
 ##################################################################
-# This file contains the internal classpaths required to run PXF.
+# This file contains the internal classpaths required to run PXF
+# with RPM-based installation of hadoop clients from CDH distribution.
 # WARNING: DO NOT EDIT!
 # Any change in this file can result in PXF failing to run.
 # Adding resources should be done using pxf-public.classpath file. 

@@ -14,7 +14,8 @@
 # limitations under the License.
 
 ##################################################################
-# This file contains the internal classpaths required to run PXF.
+# This file contains the internal classpaths required to run PXF
+# with tarball based installation of hadoop clients.
 # Edit to set the base paths according to your specific package layout
 # Adding new resources should be done using pxf-public.classpath file.
 ##################################################################
