@@ -316,7 +316,7 @@ function check_hadoop_install()
             return 0;
             ;;
         *)
-            fail "Unknown distro parameter ${distro_type}"
+            fail "Unknown hadoop distribution type: HADOOP_DISTRO=${distro_type}"
             ;;
     esac
     # the distro type was not found installed, return failure code
