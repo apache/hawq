@@ -358,7 +358,7 @@ function generatePrivateClasspath()
         fail "Template file ${template_file} not found"
     fi
 
-    echo "Generating private classpath file from ${template_file} ..."
+    echo "Generating ${PXF_HOME}/conf/pxf-private.classpath file from ${template_file} ..."
 
     # create initial version of the file by replacing PXF_HOME token (applicable to all templates)
     sed -e "s|PXF_HOME|${PXF_HOME}|g" ${template_file} > ${PXF_HOME}/conf/pxf-private.classpath
@@ -408,8 +408,6 @@ function validateParameters()
         echo "ERROR: Cannot run as root user"
         exit 1
     fi
-
-
 
     # validate JAVA_HOME
     if [ ! -x $JAVA_HOME/bin/java ]; then
