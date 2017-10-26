@@ -19,13 +19,13 @@
 default: all
 
 ifneq "$(HD)" ""
-    BUILD_PARAMS= -Dhd=$(HD)
+    BUILD_PARAMS+= -Dhd=$(HD)
 else
     ifneq "$(PXF_HOME)" ""
-        BUILD_PARAMS= -DdeployPath="$(PXF_HOME)"
+        BUILD_PARAMS+= -DdeployPath="$(PXF_HOME)"
     else ifneq "$(GPHOME)" ""
         PXF_HOME= "$(GPHOME)/pxf"
-        BUILD_PARAMS= -DdeployPath="$(PXF_HOME)"
+        BUILD_PARAMS+= -DdeployPath="$(PXF_HOME)"
     else
 		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
 		exit
