@@ -31,8 +31,11 @@ import org.mockito.Mock;
 import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
+import static org.apache.hawq.pxf.api.io.DataType.VARCHAR;
 import static org.junit.Assert.*;
 
 @RunWith(PowerMockRunner.class)
@@ -40,20 +43,24 @@ import static org.junit.Assert.*;
 
 public class DemoResolverTest {
 
+    private static final String DATA = "value1,value2";
+
     @Mock InputData inputData;
     DemoResolver customResolver;
     DemoTextResolver textResolver;
     OneRow row;
+    OneField field;
 
     @Before
     public void setup() throws Exception {
         customResolver = new DemoResolver(inputData);
         textResolver = new DemoTextResolver(inputData);
-        row = new OneRow("0.0","value1,value2");
+        row = new OneRow("0.0", DATA);
+        field = new OneField(VARCHAR.getOID(), DATA.getBytes());
     }
 
     @Test
-    public void testCustomData() throws Exception {
+    public void testGetCustomData() throws Exception {
 
         List<OneField> output = customResolver.getFields(row);
         assertEquals("value1", output.get(0).toString());
@@ -61,10 +68,43 @@ public class DemoResolverTest {
     }
 
     @Test
-    public void testTextData() throws Exception {
+    public void testGetTextData() throws Exception {
 
         List<OneField> output = textResolver.getFields(row);
-        assertEquals("value1,value2", output.get(0).toString());
-
+        assertEquals(DATA, output.get(0).toString());
     }
+
+    @Test
+    public void testSetTextData() throws Exception {
+
+        OneRow output = textResolver.setFields(Collections.singletonList(field));
+        assertArrayEquals(DATA.getBytes(), (byte[]) output.getData());
+    }
+
+    @Test
+    public void testSetEmptyTextData() throws Exception {
+
+        OneField field = new OneField(VARCHAR.getOID(), new byte[]{});
+        OneRow output = textResolver.setFields(Collections.singletonList(field));
+        assertNull(output);
+    }
+
+    @Test(expected = Exception.class)
+    public void testSetTextDataNullInput() throws Exception {
+
+        textResolver.setFields(null);
+    }
+
+    @Test(expected = Exception.class)
+    public void testSetTextDataEmptyInput() throws Exception {
+
+        textResolver.setFields(Collections.emptyList());
+    }
+
+    @Test(expected = Exception.class)
+    public void testSetTextDataManyElements() throws Exception {
+
+        textResolver.setFields(Arrays.asList(field, field));
+    }
+
 }
