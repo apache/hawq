@@ -43,6 +43,15 @@ public class OneRow {
         this.data = data;
     }
 
+    /**
+     * Constructs a OneRow without a key value
+     *
+     * @param data the actual record
+     */
+    public OneRow(Object data) {
+        this.data = data;
+    }
+
     public void setKey(Object key) {
         this.key = key;
     }

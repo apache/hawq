@@ -27,14 +27,12 @@ import org.apache.hawq.pxf.api.utilities.Plugin;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * PXF Accessor for writing text data rows as lines into a local file.
+ * PXF Accessor for writing text data into a local file.
  *
  * Demo implementation.
  */
@@ -42,6 +40,7 @@ import java.nio.file.Path;
 public class DemoFileWritableAccessor extends Plugin implements WriteAccessor {
 
     private OutputStream out;
+
     /**
      * Constructs a DemoFileWritableAccessor.
      *
@@ -51,6 +50,12 @@ public class DemoFileWritableAccessor extends Plugin implements WriteAccessor {
         super(input);
     }
 
+    /**
+     * Opens the resource for write.
+     *
+     * @return true if the resource is successfully opened
+     * @throws Exception if opening the resource failed
+     */
     @Override
     public boolean openForWrite() throws Exception {
         String fileName = inputData.getDataSource();
@@ -65,18 +70,33 @@ public class DemoFileWritableAccessor extends Plugin implements WriteAccessor {
             Files.createDirectories(parent);
         }
 
-        writer = new BufferedOutputStream(Files.newOutputStream(file));
+        out = new BufferedOutputStream(Files.newOutputStream(file));
         return true;
     }
 
+    /**
+     * Writes the next object.
+     *
+     * @param onerow the object to be written
+     * @return true if the write succeeded
+     * @throws Exception writing to the resource failed
+     */
     @Override
     public boolean writeNextObject(OneRow onerow) throws Exception {
-        writer.dos.write((byte[]) onerow.getData());
+        out.write((byte[]) onerow.getData());
         return true;
     }
 
+    /**
+     * Closes the resource for write.
+     *
+     * @throws Exception if closing the resource failed
+     */
     @Override
     public void closeForWrite() throws Exception {
-
+        if (out != null) {
+            out.flush();
+            out.close();
+        }
     }
 }
