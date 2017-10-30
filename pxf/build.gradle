@@ -197,14 +197,9 @@ project('pxf-service') {
     tasks.war {
         archiveName = 'pxf.war'
         processResources {
-            filesMatching('**/pxf-private*.classpath') {
+            filesMatching('**/pxf-*') {
                 details ->
-                if (details.name == "pxf-private${hddist}.classpath") {
-                    details.name = "pxf-private.classpath"
-                } else { 
-                    // exclude classpath file for a different distribution
                     details.exclude()
-                }
             }
         }
     }
