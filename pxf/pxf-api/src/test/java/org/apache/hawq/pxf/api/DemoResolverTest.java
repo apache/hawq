@@ -98,7 +98,7 @@ public class DemoResolverTest {
     @Test(expected = Exception.class)
     public void testSetTextDataEmptyInput() throws Exception {
 
-        textResolver.setFields(Collections.emptyList());
+        textResolver.setFields(Collections.<OneField>emptyList());
     }
 
     @Test(expected = Exception.class)
