@@ -219,7 +219,7 @@ function configureWebapp()
     # set container configs
     catalinaEnv=$instance_root/$instance_name/bin/setenv.sh
     cat $catalinaEnv | \
-    sed -e "s|JVM_OPTS=.*$|JVM_OPTS=\"$PXF_HEAP_OPTS\"|g" | \
+    sed -e "s|JVM_OPTS=.*$|JVM_OPTS=\"$PXF_JVM_OPTS\"|g" | \
     sed -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=$PXF_LOGDIR |g" | \
     sed -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" | \
     sed -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=$PXF_LOGDIR/catalina.out|g" \

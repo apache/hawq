@@ -42,7 +42,7 @@ fi
 export PXF_PORT=${PXF_PORT:-51200}
 
 # Memory
-export PXF_HEAP_OPTS="-Xmx2g -Xms1g"
+export PXF_JVM_OPTS="-Xmx2g -Xms1g"
 
 # Hadoop Distribution Type (optional), supported values:
 # <empty> - for auto discovery of HDP, CDH or tarball based client installation
