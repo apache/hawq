@@ -65,8 +65,8 @@ function fail()
 }
 
 #
-# createInstance creates a tomcat instance 
-# configuration files 
+# createInstance creates a tomcat instance and
+# configures based on pre-configured template files.
 #
 function createInstance()
 {
@@ -83,55 +83,13 @@ function createInstance()
         chown -R $instance_owner $instance_root
     fi
     chmod 700 $instance_root/$instance_name
+
+    # copy configuration files into instance
+    cp $tomcat_templates/bin/setenv.sh $instance_root/$instance_name/bin/setenv.sh
+    cp $tomcat_templates/conf/catalina.properties $instance_root/$instance_name/conf/.
+    cp $tomcat_templates/conf/server.xml $instance_root/$instance_name/conf/.
+    cp $tomcat_templates/conf/web.xml $instance_root/$instance_name/conf/.
     return 0
-}
-
-#
-# configureInstance configures the tomcat instance
-# based on pre-configured template files.
-#
-# specifically:
-#	support up to 30,000 header fields
-#	support up to 1MB size header
-#	change connection timeout to 60 seconds
-#	set port to 51200
-#
-function configureInstance()
-{
-	# copy configuration files into instance
-	cp $tomcat_templates/bin/setenv.sh $instance_root/$instance_name/bin/setenv.sh
-	cp $tomcat_templates/conf/catalina.properties $instance_root/$instance_name/conf/.
-	cp $tomcat_templates/conf/server.xml $instance_root/$instance_name/conf/.
-	cp $tomcat_templates/conf/web.xml $instance_root/$instance_name/conf/.
-	
-	# set port
-	catalinaProperties=$instance_root/$instance_name/conf/catalina.properties
-	cat $catalinaProperties | \
-	sed "s|^[[:blank:]]*connector.http.port=.*$|connector.http.port=$instance_port|g" \
-	> ${catalinaProperties}.tmp
-
-	rm $catalinaProperties
-	mv ${catalinaProperties}.tmp $catalinaProperties
-
-	# set pid
-	catalinaEnv=$instance_root/$instance_name/bin/setenv.sh
-	cat $catalinaEnv | \
-	sed -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" | \
-	sed -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=$PXF_LOGDIR |g" | \
-	sed -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=$PXF_LOGDIR/catalina.out|g" \
-	> ${catalinaEnv}.tmp
-	rm $catalinaEnv
-	mv ${catalinaEnv}.tmp $catalinaEnv
-
-	# set log directories
-	catalinaLog=$instance_root/$instance_name/conf/logging.properties
-	cat $catalinaLog | \
-	sed "s|juli.FileHandler.directory\s*=.*$|juli.FileHandler.directory = $PXF_LOGDIR|g" \
-	> ${catalinaLog}.tmp
-	rm $catalinaLog
-	mv ${catalinaLog}.tmp $catalinaLog
-
-	return 0
 }
 
 #
@@ -216,17 +174,16 @@ function doInit()
 	determineHadoopDistro
 	generatePrivateClasspath || return 1
 	createInstance || return 1
-	configureInstance || return 1
 	deployWebapp || return 1
 	createLogsDir || return 1
 	createRunDir  || return 1
 }
 
 #
-# patchWebapp patches the webapp config files
-# patch applied only if PXF_HOME is defined
+# configureWebapp patches the webapp with pxf and user overriden configs
+# applied only if PXF_HOME is defined
 #
-function patchWebapp()
+function configureWebapp()
 {
     if [ -z $PXF_HOME ]; then
         # webapp doesn't require patch
@@ -249,6 +206,34 @@ function patchWebapp()
     cat $web_file | \
     sed "s:<param-value>.*pxf-log4j.properties<\/param-value>:<param-value>$PXF_HOME\/conf\/pxf-log4j.properties<\/param-value>:" > web.xml.tmp
     mv web.xml.tmp $web_file
+
+    # set port
+    catalinaProperties=$instance_root/$instance_name/conf/catalina.properties
+    cat $catalinaProperties | \
+    sed "s|^[[:blank:]]*connector.http.port=.*$|connector.http.port=$instance_port|g" \
+    > ${catalinaProperties}.tmp
+
+    rm $catalinaProperties
+    mv ${catalinaProperties}.tmp $catalinaProperties
+
+    # set container configs
+    catalinaEnv=$instance_root/$instance_name/bin/setenv.sh
+    cat $catalinaEnv | \
+    sed -e "s|JVM_OPTS=.*$|JVM_OPTS=\"$PXF_JVM_OPTS\"|g" | \
+    sed -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=$PXF_LOGDIR |g" | \
+    sed -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" | \
+    sed -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=$PXF_LOGDIR/catalina.out|g" \
+    > ${catalinaEnv}.tmp
+    rm $catalinaEnv
+    mv ${catalinaEnv}.tmp $catalinaEnv
+
+    # set log directories
+    catalinaLog=$instance_root/$instance_name/conf/logging.properties
+    cat $catalinaLog | \
+    sed "s|juli.FileHandler.directory\s*=.*$|juli.FileHandler.directory = $PXF_LOGDIR|g" \
+    > ${catalinaLog}.tmp
+    rm $catalinaLog
+    mv ${catalinaLog}.tmp $catalinaLog
 }
 
 function commandWebapp()
@@ -432,7 +417,7 @@ function doStart()
 		echo ERROR: cant find PXF instance, maybe call init?
 		return 1
 	fi
-	patchWebapp || return 1
+	configureWebapp || return 1
 	commandWebapp start || return 1
 	checkWebapp 300 || return 1
 }
