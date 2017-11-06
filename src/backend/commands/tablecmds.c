@@ -7742,6 +7742,7 @@ ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 			if (attnum == policy->attrs[ia])
 			{
 				policy->nattrs = 0;
+				policy->bucketnum = 0;
 				rel->rd_cdbpolicy = GpPolicyCopy(GetMemoryChunkContext(rel), policy);
 				GpPolicyReplace(RelationGetRelid(rel), policy);
 				if (Gp_role != GP_ROLE_EXECUTE)
@@ -13078,6 +13079,11 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 			policy = (GpPolicy *) palloc(sizeof(GpPolicy));
 			policy->ptype = POLICYTYPE_PARTITIONED;
 			policy->nattrs = 0;
+			/**
+			 * consider user can modify default_hash_table_bucket_number in session,
+			 * should set bucketnum to the current hash_table_bucket_number during reorganize table
+			 */
+			policy->bucketnum = GetHashDistPartitionNum();
 
 			rel->rd_cdbpolicy = GpPolicyCopy(GetMemoryChunkContext(rel),
 										 policy);
@@ -13122,6 +13128,11 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 							sizeof(policy->attrs[0]) * list_length(ldistro));
 			policy->ptype = POLICYTYPE_PARTITIONED;
 			policy->nattrs = 0;
+			/**
+			 * consider user can modify default_hash_table_bucket_number in session,
+			 * should set bucketnum to the current hash_table_bucket_number during reorganize table
+			 */
+			policy->bucketnum = GetHashDistPartitionNum();
 
 			/* Step (a) */
 			if (!rand_pol)

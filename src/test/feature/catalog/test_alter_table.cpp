@@ -270,3 +270,28 @@ TEST_F(TestAlterTable, TestAlterTableAddColumn) {
   // cleanup
   util.execute("drop table tmp");
 }
+
+TEST_F(TestAlterTable, TestAlterTableDistributed) {
+	hawq::test::SQLUtility util;
+	// prepare
+	util.execute("drop table if exists altable");
+	util.execute("create table altable (a int)");
+	util.execute("insert into altable select generate_series(1,1000);");
+
+	// set bucket_number and do distributed
+	util.execute("set default_hash_table_bucket_number=8;");
+	util.execute("alter table altable set with(reorganize=true) distributed by (a);");
+	// check access ok
+	util.execSQLFile("catalog/sql/alter-table-distributed.sql",
+				   "catalog/ans/alter-table-distributed.ans");
+
+	// set another bucket_number and check again
+	util.execute("set default_hash_table_bucket_number=11;");
+	util.execute("alter table altable set with(reorganize=true) distributed by (a);");
+	// check access ok
+	util.execSQLFile("catalog/sql/alter-table-distributed.sql",
+				   "catalog/ans/alter-table-distributed.ans");
+
+	// cleanup
+	util.execute("drop table altable");
+}

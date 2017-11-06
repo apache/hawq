@@ -296,7 +296,6 @@ GpPolicyStore(Oid tbloid, const GpPolicy *policy)
 /*
  * Sets the policy of a table into the gp_distribution_policy table
  * from a GpPolicy structure.
- *
  */
 void
 GpPolicyReplace(Oid tbloid, const GpPolicy *policy)
@@ -354,7 +353,9 @@ GpPolicyReplace(Oid tbloid, const GpPolicy *policy)
 	repl[0] = false;
 	repl[1] = false;
 	repl[2] = true;
-
+	
+	if (policy->bucketnum > 0)
+		repl[1] = true;
 
 	/*
 	 * Select by value of the localoid field
@@ -534,3 +535,4 @@ checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
 		}
 	}
 }
+
