@@ -13078,10 +13078,15 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 			policy = (GpPolicy *) palloc(sizeof(GpPolicy));
 			policy->ptype = POLICYTYPE_PARTITIONED;
 			policy->nattrs = 0;
+			/**
+			 * consider user can modify default_hash_table_bucket_number in session,
+			 * should set bucketnum to the current hash_table_bucket_number during reorganize table
+			 */
+			policy->bucketnum = default_hash_table_bucket_number;
 
 			rel->rd_cdbpolicy = GpPolicyCopy(GetMemoryChunkContext(rel),
 										 policy);
-			GpPolicyReplace(RelationGetRelid(rel), policy);
+			GpPolicyReplaceWithBucketNum(RelationGetRelid(rel), policy);
 
 			/* only need to rebuild if have new storage options */
 			if (!(DatumGetPointer(newOptions) || force_reorg))
@@ -13122,6 +13127,11 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 							sizeof(policy->attrs[0]) * list_length(ldistro));
 			policy->ptype = POLICYTYPE_PARTITIONED;
 			policy->nattrs = 0;
+			/**
+			 * consider user can modify default_hash_table_bucket_number in session,
+			 * should set bucketnum to the current hash_table_bucket_number during reorganize table
+			 */
+			policy->bucketnum = default_hash_table_bucket_number;
 
 			/* Step (a) */
 			if (!rand_pol)
@@ -13434,7 +13444,7 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		if (change_policy)
-			GpPolicyReplace(tarrelid, policy);
+			GpPolicyReplaceWithBucketNum(tarrelid, policy);
 
 		qe_data = lappend(qe_data, oid_map);
 

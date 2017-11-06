@@ -138,6 +138,9 @@ void
 GpPolicyReplace(Oid tbloid, const GpPolicy *policy);
 
 void
+GpPolicyReplaceWithBucketNum(Oid tbloid, const GpPolicy *policy);
+
+void
 GpPolicyRemove(Oid tbloid);
 
 

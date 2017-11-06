@@ -296,10 +296,10 @@ GpPolicyStore(Oid tbloid, const GpPolicy *policy)
 /*
  * Sets the policy of a table into the gp_distribution_policy table
  * from a GpPolicy structure.
- *
+ * @param update_bucketnum, whether update the bucketnum field
  */
-void
-GpPolicyReplace(Oid tbloid, const GpPolicy *policy)
+static void
+GpPolicyReplace_inner(Oid tbloid, const GpPolicy *policy, bool update_bucketnum)
 {
 	Relation	gp_policy_rel;
 	HeapTuple	gp_policy_tuple = NULL;
@@ -354,7 +354,9 @@ GpPolicyReplace(Oid tbloid, const GpPolicy *policy)
 	repl[0] = false;
 	repl[1] = false;
 	repl[2] = true;
-
+	
+	if (update_bucketnum)
+		repl[1] = true;
 
 	/*
 	 * Select by value of the localoid field
@@ -534,3 +536,15 @@ checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
 		}
 	}
 }
+
+void 
+GpPolicyReplace(Oid tbloid, const GpPolicy *policy)
+{
+	GpPolicyReplace_inner(tbloid, policy, false);
+}
+void 
+GpPolicyReplaceWithBucketNum(Oid tbloid, const GpPolicy *policy)
+{
+	GpPolicyReplace_inner(tbloid, policy, true);
+}
+
