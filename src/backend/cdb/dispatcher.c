@@ -59,6 +59,7 @@
 #include "tcop/pquery.h"			/* PortalGetResource */
 
 #include "resourcemanager/communication/rmcomm_QD2RM.h"
+#include "storage/ipc.h"
 
 /* Define and structure */
 typedef struct DispatchTask
@@ -1414,9 +1415,12 @@ dispatch_cleanup(DispatchData *data)
 	if (dispatcher_is_state_error(data))
 	{
 		/* We cannot unbind executors until we retrieve error message! */
-		dispatch_throw_error(data);
-		Assert(false);
-		return;	/* should not hit */
+		if (!proc_exit_inprogress) {
+			dispatch_throw_error(data);
+			Assert(false);
+			return;	/* should not hit */
+		}
+
 	}
 	
 	dispatch_end_env(data);
