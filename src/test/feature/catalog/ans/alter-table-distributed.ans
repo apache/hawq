@@ -1,0 +1,10 @@
+-- start_ignore
+SET SEARCH_PATH=TestAlterTable_TestAlterTableDistributed;
+SET
+-- end_ignore
+select count(*) from altable;
+ count 
+-------
+  1000
+(1 row)
+
