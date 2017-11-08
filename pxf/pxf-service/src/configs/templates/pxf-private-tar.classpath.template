@@ -57,11 +57,12 @@ HADOOP_ROOT/hadoop/share/hadoop/common/lib/protobuf-java-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/slf4j-api-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/snappy-java-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/hdfs/hadoop-hdfs-*[0-9].jar
-HADOOP_ROOT/hadoop/share/hadoop/hdfs/lib/jackson-core-asl-*[0-9].jar
-HADOOP_ROOT/hadoop/share/hadoop/hdfs/lib/jackson-mapper-asl-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-client-core-*[0-9].jar
-# CDH only Library
 HADOOP_ROOT/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-client-common-*[0-9].jar
+
+# Pick Jackson 1.9 jars from hdfs dir for HDP tar and from mapreduce1 for CDH tar
+HADOOP_ROOT/hadoop/share/hadoop/[hdfs|madreduce1]/lib/jackson-core-asl-1.9*[0-9].jar
+HADOOP_ROOT/hadoop/share/hadoop/[hdfs|madreduce1]/lib/jackson-mapper-asl-1.9*[0-9].jar
 
 # Hive Libraries
 HADOOP_ROOT/hive/lib/antlr-runtime*.jar
