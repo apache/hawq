@@ -298,8 +298,8 @@ GpPolicyStore(Oid tbloid, const GpPolicy *policy)
  * from a GpPolicy structure.
  * @param update_bucketnum, whether update the bucketnum field
  */
-static void
-GpPolicyReplace_inner(Oid tbloid, const GpPolicy *policy, bool update_bucketnum)
+void
+GpPolicyReplace(Oid tbloid, const GpPolicy *policy)
 {
 	Relation	gp_policy_rel;
 	HeapTuple	gp_policy_tuple = NULL;
@@ -355,7 +355,7 @@ GpPolicyReplace_inner(Oid tbloid, const GpPolicy *policy, bool update_bucketnum)
 	repl[1] = false;
 	repl[2] = true;
 	
-	if (update_bucketnum)
+	if (policy->bucketnum > 0)
 		repl[1] = true;
 
 	/*
@@ -535,16 +535,5 @@ checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
 				elog(NOTICE, "updating distribution policy to match new unique index");
 		}
 	}
-}
-
-void 
-GpPolicyReplace(Oid tbloid, const GpPolicy *policy)
-{
-	GpPolicyReplace_inner(tbloid, policy, false);
-}
-void 
-GpPolicyReplaceWithBucketNum(Oid tbloid, const GpPolicy *policy)
-{
-	GpPolicyReplace_inner(tbloid, policy, true);
 }
 
