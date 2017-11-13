@@ -296,7 +296,6 @@ GpPolicyStore(Oid tbloid, const GpPolicy *policy)
 /*
  * Sets the policy of a table into the gp_distribution_policy table
  * from a GpPolicy structure.
- * @param update_bucketnum, whether update the bucketnum field
  */
 void
 GpPolicyReplace(Oid tbloid, const GpPolicy *policy)
