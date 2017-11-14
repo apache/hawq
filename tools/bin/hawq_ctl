@@ -411,7 +411,7 @@ class HawqInit:
 
     def _resync_standby(self):
         logger.info("Re-sync standby")
-        cmd = "%s; hawq stop master -a;" % source_hawq_env
+        cmd = "%s; hawq stop master -a -M %s;" % (source_hawq_env, self.stop_mode)
         check_return_code(local_ssh(cmd, logger), logger, "Stop hawq cluster failed, exit")
         cmd = "cd %s; %s; %s/bin/lib/pysync.py -x gpperfmon/data -x pg_log -x db_dumps %s %s:%s" % \
                  (self.master_data_directory, source_hawq_env,  self.GPHOME, self.master_data_directory,
