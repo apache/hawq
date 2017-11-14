@@ -773,7 +773,7 @@ int handleRB2RM_ClusterReport(void)
 	if ( oldGRMTotalAll.MemoryMB != PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB ||
 		 oldGRMTotalAll.Core	 != PRESPOOL->GRMTotalHavingNoHAWQNode.Core )
 	{
-		elog(LOG, "Resource manager YARN resource broker counted YARN cluster "
+		elog(LOG, "Resource manager YARN. Resource broker counted YARN cluster "
 				  "having total resource (%d MB, %lf CORE).",
 				  PRESPOOL->GRMTotalHavingNoHAWQNode.MemoryMB,
 				  PRESPOOL->GRMTotalHavingNoHAWQNode.Core);
@@ -782,7 +782,7 @@ int handleRB2RM_ClusterReport(void)
 	if ( oldGRMTotal.MemoryMB != PRESPOOL->GRMTotal.MemoryMB ||
 		 oldGRMTotal.Core != PRESPOOL->GRMTotal.Core )
 	{
-		elog(LOG, "Resource manager YARN resource broker counted HAWQ cluster now "
+		elog(LOG, "Resource manager YARN. Resource broker counted each HAWQ segment now "
 				  "having (%d MB, %lf CORE) in a YARN cluster of total resource "
 				  "(%d MB, %lf CORE).",
 				  PRESPOOL->GRMTotal.MemoryMB,
