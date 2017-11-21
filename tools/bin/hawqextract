@@ -28,6 +28,7 @@ Options:
     -o output file: the output metadata file, if not set, will output to terminal.
     -W: force password authentication
     -v: verbose
+    -l: sets the directory for log files
     -?: help
 
 hawq extract output YAML file format:
@@ -105,7 +106,6 @@ except ImportError, e:
 # setup logging
 logger = get_default_logger()
 EXECNAME = os.path.split(__file__)[-1]
-setup_tool_logging(EXECNAME,getLocalHostname(),getUserName())
 
 class GpExtractError(Exception): pass
 
@@ -558,6 +558,7 @@ def create_opt_parser(version):
     parser.add_option('-o', '--output', help="the output metadata file, defaults to stdout", metavar='FILE')
     parser.add_option('-W', action='store_true', dest='use_getpass', help="force password authentication")
     parser.add_option('-v', '--verbose', action='store_true')
+    parser.add_option('-l', '--logdir', dest='logDir', help="Sets the directory for log files")
     return parser
 
 
@@ -565,6 +566,7 @@ def main(args=None):
     parser = create_opt_parser('%prog version $Revision: #1 $')
 
     options, args = parser.parse_args(args)
+    setup_tool_logging(EXECNAME, getLocalHostname(), getUserName(), logdir=options.logDir)
     if len(args) != 1:
         sys.stderr.write('Incorrect number of arguments: missing <tablename>.\n\n')
         parser.print_help(sys.stderr)

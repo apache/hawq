@@ -6,7 +6,7 @@ Extract table's metadata into a YAML file.
 SYNOPSIS
 *****************************************************
 
-hawq extract [-h hostname] [-p port] [-U username] [-d database] [-o output_file] [-W] <tablename>
+hawq extract [-h hostname] [-p port] [-U username] [-d database] [-o output_file] [-W] [-l log_directory] <tablename>
 
 hawq extract help 
 hawq extract -? 
@@ -48,6 +48,10 @@ Specifies the name of a file that hawq extract will write the table's metadata t
 -v (verbose mode)
 
 Optional. Show verbose output of the extract steps as they are executed.
+
+-l log_directory
+
+Specifies the name of the directory where hawq extract log files will be stored
 
 -? (help)
 
