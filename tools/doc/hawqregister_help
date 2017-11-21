@@ -6,8 +6,8 @@ Usage2: Register parquet/ao table from yaml configuration file.
 *****************************************************
 SYNOPSIS
 *****************************************************
-Usage1: hawq register [-h hostname] [-p port] [-U username] [-d databasename] [-f filepath] [-e eof] <tablename>
-Usage2: hawq register [-h hostname] [-p port] [-U username] [-d databasename] [-c config] [-F, --force] <tablename>
+Usage1: hawq register [-h hostname] [-p port] [-U username] [-d databasename] [-f filepath] [-e eof] [-l log_directory] <tablename>
+Usage2: hawq register [-h hostname] [-p port] [-U username] [-d databasename] [-c config] [-F, --force] [-l log_directory] <tablename>
 
 hawq register help
 hawq register -?
@@ -75,6 +75,10 @@ Displays the online help.
 --version
 
 Displays the version of this utility.
+
+-l log_directory
+
+Specifies the name of the directory where hawq register log files will be stored
 
 *****************************************************
 CONNECTION OPTIONS
