@@ -37,7 +37,6 @@ except ImportError, e:
 # setup logging
 logger = get_default_logger()
 EXECNAME = os.path.split(__file__)[-1]
-setup_tool_logging(EXECNAME, getLocalHostname(), getUserName())
 
 # print executing command
 cmd = "Executing Command: ";
@@ -60,6 +59,7 @@ def option_parser():
     parser.add_option('-e', '--eof', dest='filesize', type='int', default=None, help='eof of the file to be registered')
     parser.add_option('-c', '--config', dest='yml_config', default='', help='configuration file in YAML format')
     parser.add_option('-F', '--force', dest='force', action='store_true', default=False)
+    parser.add_option('-l', '--logdir', dest='logDir', help="Sets the directory for log files")
     return parser
 
 
@@ -1198,6 +1198,7 @@ def test(options, args):
 if __name__ == '__main__':
     parser = option_parser()
     options, args = parser.parse_args()
+    setup_tool_logging(EXECNAME, getLocalHostname(), getUserName(), logdir=options.logDir)
     if len(args) != 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
