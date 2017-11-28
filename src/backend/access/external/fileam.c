@@ -2310,6 +2310,43 @@ strtokx2(const char *s,
 	return start;
 }
 
+char *getExtTblFormatterTypeInFmtOptsStr(char *fmtStr)
+{
+	const char	*whitespace = " \t\n\r";
+	const char	*quote = "'";
+	int			encoding = GetDatabaseEncoding();
+
+	char *key = strtokx2(fmtStr, whitespace, NULL, NULL,
+	                     0, false, true, encoding);
+	char *val = strtokx2(NULL, whitespace, NULL, quote,
+	                     0, false, true, encoding);
+
+	while (key && val)
+	{
+		if (pg_strncasecmp(key, "formatter", strlen("formatter")) == 0)
+		{
+			return pstrdup(val);
+		}
+
+		key = strtokx2(NULL, whitespace, NULL, NULL,
+		               0, false, false, encoding);
+		val = strtokx2(NULL, whitespace, NULL, quote,
+		               0, false, true, encoding);
+	}
+
+	return NULL;
+}
+
+char *getExtTblFormatterTypeInFmtOptsList(List *fmtOpts)
+{
+	/* formatter always is at the begin the fmtOpts */
+	char *formatterStr = pstrdup((char *) strVal(linitial(fmtOpts)));
+	char *formatterName = getExtTblFormatterTypeInFmtOptsStr(formatterStr);
+	pfree(formatterStr);
+
+	return formatterName;
+}
+
 /*
  * parseFormatString
  *

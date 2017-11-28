@@ -512,9 +512,12 @@ typedef enum NodeTag
 	T_FormatterData,            /* in access/formatter.h */
 	T_ExtProtocolData,          /* in access/extprotocol.h */
 	T_ExtProtocolValidatorData, /* in access/extprotocol.h */
+	T_PlugStorageData,          /* in access/plugstorage.h */
+	T_PlugStorageValidatorData, /* in access/plugstorage.h */
 	T_FileSystemFunctionData,   /* in storage/filesystem.h */
 	T_PartitionConstraints,     /* in executor/nodePartitionSelector.h */
 	T_SelectedParts,            /* in executor/nodePartitionSelector.h */
+	T_ExtProtocolBlockLocationData, /* in access/extprotocol.h */
 
 	/* CDB: tags for random other stuff */
 	T_CdbExplain_StatHdr = 950,             /* in cdb/cdbexplain.c */

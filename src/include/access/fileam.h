@@ -100,5 +100,7 @@ extern void external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* e
 extern void AtAbort_ExtTables(void);
 char*	linenumber_atoi(char buffer[20],int64 linenumber);
 
+extern char *getExtTblFormatterTypeInFmtOptsStr(char *fmtStr);
+extern char *getExtTblFormatterTypeInFmtOptsList(List *fmtOpts);
 
 #endif   /* FILEAM_H */
