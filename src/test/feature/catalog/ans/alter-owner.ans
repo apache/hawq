@@ -34,14 +34,36 @@ select
 alter database u1 owner to u1;
 psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:24: ERROR:  Cannot support alter database owner statement yet
 alter schema u1 owner to u1;
-psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:25: ERROR:  Cannot support alter schema owner statement yet
-reset session authorization;
+ALTER SCHEMA
+alter schema u1 rename to u2;
+ALTER SCHEMA
+-- test permission
+create role u2;
+psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:29: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+ALTER SCHEMA pg_toast OWNER to u2; -- system schema
+psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:30: ERROR:  permission denied to ALTER SCHEMA "pg_toast"
+DETAIL:  Schema pg_toast is reserved for system use.
+GRANT ALL ON SCHEMA u2 to u2;
+GRANT
+RESET SESSION AUTHORIZATION;
+RESET
+SET SESSION AUTHORIZATION u2;
+SET
+CREATE TABLE u2.grant_test(a int) DISTRIBUTED BY (a);
+CREATE TABLE
+ALTER SCHEMA u2 RENAME to myschema;  -- not the schema owner
+psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:35: ERROR:  must be owner of schema u2
+RESET SESSION AUTHORIZATION;
 RESET
 drop database u1;
 DROP DATABASE
-drop schema u1;
+drop schema u2 CASCADE;
+psql:/tmp/TestAlterOwner_TestAlterOwnerAll.sql:39: NOTICE:  drop cascades to append only table u2.grant_test
 DROP SCHEMA
 drop role u1;
+DROP ROLE
+drop role u2;
 DROP ROLE
 drop role super;
 DROP ROLE
