@@ -5364,6 +5364,26 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+		{"log_max_size", PGC_SIGHUP, LOGGING_WHERE,
+			gettext_noop("Maximum storage size of log files will be allowed. Oldest log files exceed this size will be removed"),
+			NULL,
+			GUC_UNIT_KB
+		},
+		&Log_MaxSize,
+		0, 0, MAX_KILOBYTES, NULL, NULL
+	},
+
+	{
+		{"log_max_age", PGC_SIGHUP, LOGGING_WHERE,
+			gettext_noop("Maximum period of log files will be kept under log_directory"),
+			NULL,
+			GUC_UNIT_MIN
+		},
+		&Log_MaxAge,
+		0, 0, INT_MAX / MINS_PER_HOUR, NULL, NULL
+	},
+
+	{
 		{"tcp_keepalives_interval", PGC_USERSET, CLIENT_CONN_OTHER,
 			gettext_noop("Seconds between TCP keepalive retransmits."),
 			gettext_noop("A value of 0 uses the system default."),
