@@ -54,3 +54,5 @@ export HADOOP_DISTRO=${HADOOP_DISTRO}
 # Parent directory of Hadoop client installation (optional)
 # used in case of tarball-based installation when all clients are under a common parent directory
 export HADOOP_ROOT=${HADOOP_ROOT}
+
+export CATALINA_OPTS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"

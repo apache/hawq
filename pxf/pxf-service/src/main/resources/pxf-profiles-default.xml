@@ -184,4 +184,13 @@ under the License.
             <resolver>org.apache.hawq.pxf.plugins.jdbc.JdbcReadResolver</resolver>
         </plugins>
     </profile>
+    <profile>
+        <name>Parquet</name>
+        <description>A profile for reading and writing Parquet data from HDFS</description>
+        <plugins>
+            <fragmenter>org.apache.hawq.pxf.plugins.hdfs.ParquetDataFragmenter</fragmenter>
+            <accessor>org.apache.hawq.pxf.plugins.hdfs.ParquetFileAccessor</accessor>
+            <resolver>org.apache.hawq.pxf.plugins.hdfs.ParquetResolver</resolver>
+        </plugins>
+    </profile>
 </profiles>

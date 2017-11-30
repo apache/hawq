@@ -19,7 +19,6 @@ package org.apache.hawq.pxf.plugins.hdfs.utilities;
  * under the License.
  */
 
-
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.utilities.FragmentMetadata;
@@ -41,6 +40,9 @@ import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hawq.pxf.plugins.hdfs.ParquetUserData;
+import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.MessageTypeParser;
 
 import java.io.*;
 import java.util.List;
@@ -59,7 +61,7 @@ public class HdfsUtilities {
      * begins with '/'.
      *
      * @param dataSource The HDFS path to a file or directory of interest.
-     *            Retrieved from the client request.
+     *                   Retrieved from the client request.
      * @return an absolute data path
      */
     public static String absoluteDataPath(String dataSource) {
@@ -132,7 +134,7 @@ public class HdfsUtilities {
     /**
      * Checks if requests should be handle in a single thread or not.
      *
-     * @param dataDir hdfs path to the data source
+     * @param dataDir   hdfs path to the data source
      * @param compCodec the fully qualified name of the compression codec
      * @return if the request can be run in multi-threaded mode.
      */
@@ -151,18 +153,42 @@ public class HdfsUtilities {
      * @param fsp file split to be serialized
      * @return byte serialization of fsp
      * @throws IOException if I/O errors occur while writing to the underlying
-     *             stream
+     *                     stream
      */
     public static byte[] prepareFragmentMetadata(FileSplit fsp)
             throws IOException {
-        ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
-        ObjectOutputStream objectStream = new ObjectOutputStream(
-                byteArrayStream);
-        objectStream.writeLong(fsp.getStart());
-        objectStream.writeLong(fsp.getLength());
-        objectStream.writeObject(fsp.getLocations());
+
+        return prepareFragmentMetadata(fsp.getStart(), fsp.getLength(), fsp.getLocations());
+
+    }
+
+    public static byte[] prepareFragmentMetadata(long start, long length, String[] locations)
+            throws IOException {
+
+        ByteArrayOutputStream byteArrayStream = writeBaseFragmentInfo(start, length, locations);
 
         return byteArrayStream.toByteArray();
+
+    }
+
+    private static ByteArrayOutputStream writeBaseFragmentInfo(long start, long length, String[] locations) throws IOException {
+        ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
+        ObjectOutputStream objectStream = new ObjectOutputStream(byteArrayStream);
+        objectStream.writeLong(start);
+        objectStream.writeLong(length);
+        objectStream.writeObject(locations);
+        return byteArrayStream;
+    }
+
+    public static byte[] prepareFragmentMetadata(long start,
+                                                 long length,
+                                                 String[] locations,
+                                                 Object additionalMetadata)
+            throws IOException {
+        ByteArrayOutputStream baos = writeBaseFragmentInfo(start, length, locations);
+        ObjectOutputStream objectStream = new ObjectOutputStream(baos);
+        objectStream.writeObject(additionalMetadata);
+        return baos.toByteArray();
     }
 
     /**
@@ -190,7 +216,7 @@ public class HdfsUtilities {
      * schema. The splittable API (AvroInputFormat) which is the one we will be
      * using to fetch the records, does not support getting the Avro schema yet.
      *
-     * @param conf Hadoop configuration
+     * @param conf       Hadoop configuration
      * @param dataSource Avro file (i.e fileName.avro) path
      * @return the Avro schema
      * @throws IOException if I/O error occurred while accessing Avro schema file
@@ -212,13 +238,13 @@ public class HdfsUtilities {
      * relayed properly to the DB.
      *
      * @param complexRecord list of fields to be stringified
-     * @param delimiter delimiter between fields
+     * @param delimiter     delimiter between fields
      * @return string of serialized fields using delimiter
      */
     public static String toString(List<OneField> complexRecord, String delimiter) {
         StringBuilder buff = new StringBuilder();
         String delim = ""; // first iteration has no delimiter
-        if(complexRecord == null)
+        if (complexRecord == null)
             return "";
         for (OneField complex : complexRecord) {
             if (complex.type == DataType.BYTEA.getOID()) {
@@ -231,5 +257,15 @@ public class HdfsUtilities {
             delim = delimiter;
         }
         return buff.toString();
+    }
+
+    public static byte[] makeParquetUserData(MessageType schema) throws IOException {
+        ParquetUserData userData = new ParquetUserData(schema);
+        return userData.toString().getBytes();
+    }
+
+    public static ParquetUserData parseParquetUserData(InputData input) {
+        MessageType schema = MessageTypeParser.parseMessageType(new String(input.getFragmentUserData()));
+        return new ParquetUserData(schema);
     }
 }
