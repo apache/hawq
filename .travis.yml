@@ -36,6 +36,7 @@ install:
       openssl
       python
       snappy
+      apr
   - brew reinstall
       protobuf
       protobuf-c
@@ -46,6 +47,7 @@ install:
   - brew outdated maven   || brew upgrade maven
   - brew install iproute2mac
   - brew list --versions
+  - brew link apr --force
   - sudo easy_install pip
   - sudo pip install pycrypto
   - sudo cpanm install JSON
