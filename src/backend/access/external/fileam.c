@@ -93,7 +93,9 @@ static void FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 										 Relation 				rel,
 										 TupleDesc 				tupDesc,
 										 FmgrInfo			   *convFuncs,
-										 Oid                   *typioparams);
+										 Oid                   *typioparams,
+										 char				   *url,
+										 ScanState			   *ss);
 
 static void open_external_readable_source(FileScanDesc scan);
 static void open_external_writable_source(ExternalInsertDesc extInsertDesc);
@@ -137,11 +139,24 @@ static FILE *g_dataSource = NULL;
 * ----------------
 */
 FileScanDesc
-external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
-			   List *uriList, List *fmtOpts, char fmtType, bool isMasterOnly,
-			   int rejLimit, bool rejLimitInRows, Oid fmterrtbl, ResultRelSegFileInfo *segfileinfo, int encoding,
-			   List *scanquals)
+external_beginscan(ExternalScan *extScan,
+                   Relation relation,
+                   ResultRelSegFileInfo *segFileInfo,
+                   int formatterType,
+                   char *formatterName)
 {
+	Index scanrelid = extScan->scan.scanrelid;
+	uint32 scancounter = extScan->scancounter;
+	List *uriList = extScan->uriList;
+	List *fmtOpts = extScan->fmtOpts;
+	char fmtType = extScan->fmtType;
+	bool isMasterOnly = extScan->isMasterOnly;
+	int rejLimit = extScan->rejLimit;
+	bool rejLimitInRows = extScan->rejLimitInRows;
+	Oid fmterrtbl = extScan->fmterrtbl;
+	int encoding = extScan->encoding;
+	List *scanquals = extScan->scan.plan.qual;
+
 	FileScanDesc scan;
 	TupleDesc	tupDesc = NULL;
 	int			attnum;
@@ -174,6 +189,9 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 	scan->fs_file = NULL;
 	scan->fs_formatter = NULL;
 
+	scan->fs_formatter_type = formatterType;
+	scan->fs_formatter_name = formatterName;
+
 	/*
 	 * get the external URI assigned to us.
 	 *
@@ -185,8 +203,18 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 	if (Gp_role == GP_ROLE_EXECUTE)
 	{
 		/* this is the normal path for most ext tables */
-		Value *v;
-		int idx = segindex;
+		Value *v = NULL;
+		int idx;
+		if (!fmttype_is_custom(fmtType))
+		{
+			idx = segindex;
+		}
+		else
+		{
+			idx = 0;
+		}
+
+		elog(LOG, "executor index as segment index %d", idx);
 
 		/*
 		 * Segindex may be -1, for the following case.
@@ -229,6 +257,7 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 		/* set external source (uri) */
 		scan->fs_uri = uri;
 
+		elog(LOG, "fs_uri (%d) is set as %s", segindex, uri);
 		/* NOTE: we delay actually opening the data source until external_getnext() */
 	}
 	else
@@ -272,14 +301,15 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 
 	/* Initialize all the parsing and state variables */
 	InitParseState(scan->fs_pstate, relation, NULL, NULL, false, fmtOpts, fmtType,
-				   scan->fs_uri, rejLimit, rejLimitInRows, fmterrtbl, segfileinfo, encoding);
+	               scan->fs_uri, rejLimit, rejLimitInRows, fmterrtbl, segFileInfo, encoding);
 
-	if(fmttype_is_custom(fmtType))
-	{
-		scan->fs_formatter = (FormatterData *) palloc0 (sizeof(FormatterData));
-		initStringInfo(&scan->fs_formatter->fmt_databuf);
-		scan->fs_formatter->fmt_perrow_ctx = scan->fs_pstate->rowcontext;
-	}
+	/*
+	 * We always have custom formatter
+	 */
+	scan->fs_formatter = (FormatterData *) palloc0 (sizeof(FormatterData));
+	initStringInfo(&scan->fs_formatter->fmt_databuf);
+	scan->fs_formatter->fmt_perrow_ctx = scan->fs_pstate->rowcontext;
+	scan->fs_formatter->fmt_user_ctx = NULL;
 
 	/* Set up callback to identify error line number */
 	scan->errcontext.callback = external_scan_error_callback;
@@ -287,6 +317,9 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 	scan->errcontext.previous = error_context_stack;
 
 	//pgstat_initstats(relation);
+
+	/* First call formatter in function to get action mask */
+	external_populate_formatter_actionmask(scan->fs_pstate, scan->fs_formatter);
 
 	return scan;
 }
@@ -391,6 +424,15 @@ external_endscan(FileScanDesc scan)
 	}
 
 	/*
+	 * free formatter name
+	 */
+	if (scan->fs_formatter_name)
+	{
+		pfree(scan->fs_formatter_name);
+		scan->fs_formatter_name = NULL;
+	}
+
+	/*
 	 * free parse state memory
 	 */
 	if (scan->fs_pstate != NULL)
@@ -483,14 +525,17 @@ external_getnext_init(PlanState *state, ExternalScanState *es_state) {
 *		Parse a data file and return its rows in heap tuple form
 * ----------------------------------------------------------------
 */
-HeapTuple
-external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc desc)
+bool
+external_getnext(FileScanDesc scan,
+                 ScanDirection direction,
+                 ExternalSelectDesc desc,
+                 ScanState *ss,
+                 TupleTableSlot *slot)
 {
 	HeapTuple	tuple;
-	ScanState *ss = NULL; /* a temporary dummy for the following steps */
 
 	if (scan->fs_noop)
-		return NULL;
+		return false;
 
 	/*
 	 * open the external source (local file or http).
@@ -503,7 +548,13 @@ external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc 
 	 * they are not expected (see MPP-1261). Therefore we instead do it here on the
 	 * first time around only.
 	 */
-	if (!scan->fs_file)
+
+	/*
+	 * if the formatters do not need external protocol, the framework will not
+	 * load external protocol.
+	 */
+
+	if (scan->fs_file == NULL && (scan->fs_formatter->fmt_mask & FMT_NEEDEXTBUFF))
 		open_external_readable_source(scan);
 
 	/* Note: no locking manipulations needed */
@@ -516,7 +567,7 @@ external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc 
 	{
 		FILEDEBUG_2;			/* external_getnext returning EOS */
 
-		return NULL;
+		return false;
 	}
 
 	/*
@@ -526,7 +577,9 @@ external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc 
 
 	pgstat_count_heap_getnext(scan->fs_rd);
 
-	return tuple;
+	ExecStoreGenericTuple(tuple, slot, true);
+
+	return true;
 }
 
 /*
@@ -696,6 +749,8 @@ external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup)
 									 extInsertDesc->ext_rel,
 									 extInsertDesc->ext_tupDesc,
 									 pstate->out_functions,
+									 NULL,
+									 NULL,
 									 NULL);
 
 		/* Mark the correct record type in the passed tuple */
@@ -1144,7 +1199,9 @@ externalgettup_custom(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss)
 													 scan->fs_rd,
 													 scan->fs_tupDesc,
 													 scan->in_functions,
-													 scan->typioparams);
+													 scan->typioparams,
+													 ((URL_FILE *)(scan->fs_file))->url,
+													 ss);
 						d = FunctionCallInvoke(&fcinfo);
 
 					}
@@ -1616,7 +1673,9 @@ FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 							 Relation 				rel,
 							 TupleDesc 				tupDesc,
 							 FmgrInfo			   *convFuncs,
-							 Oid                   *typioparams)
+							 Oid                   *typioparams,
+							 char				   *url,
+							 ScanState			   *ss)
 {
 	formatter->type = T_FormatterData;
 	formatter->fmt_relation = rel;
@@ -1632,6 +1691,8 @@ FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 	formatter->fmt_needs_transcoding = pstate->need_transcoding;
 	formatter->fmt_conversion_proc = pstate->enc_conversion_proc;
 	formatter->fmt_external_encoding = pstate->client_encoding;
+	formatter->fmt_url = url;
+	formatter->fmt_splits = ss == NULL ? NULL : ss->splits;
 
 	InitFunctionCallInfoData(/* FunctionCallInfoData */ *fcinfo,
 							 /* FmgrInfo */ pstate->custom_formatter_func,
@@ -2658,4 +2719,46 @@ external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char*
     sprintf(extvar->GP_SEG_PORT, "%d", PostPortNumber);
     sprintf(extvar->GP_SESSION_ID, "%d", gp_session_id);
  	sprintf(extvar->GP_SEGMENT_COUNT, "%d", GetQEGangNum());
+}
+
+/* ----------------
+ * external_populate_formatter_actionmask
+ * ----------------
+ */
+void external_populate_formatter_actionmask(struct CopyStateData *pstate,
+                                            FormatterData *formatter)
+{
+	/* We just call the formatter in function to populate the mask */
+	formatter->fmt_mask = FMT_UNSET;
+
+	if (pstate->custom_formatter_func == NULL)
+	{
+		formatter->fmt_mask |= FMT_NEEDEXTBUFF;
+		elog(LOG, "external scan needs an external protocol to cooperate");
+		return;
+	}
+
+	Datum d;
+	FunctionCallInfoData fcinfo;
+	/* per call formatter prep */
+	FunctionCallPrepareFormatter(&fcinfo,
+								 0,
+								 pstate,
+								 formatter,
+								 NULL,
+								 NULL,
+								 NULL,
+								 NULL,
+								 NULL,
+								 NULL);
+	d = FunctionCallInvoke(&fcinfo);
+
+	if (formatter->fmt_mask & FMT_NEEDEXTBUFF)
+	{
+		elog(LOG, "external scan needs an external protocol to cooperate");
+	}
+	else
+	{
+		elog(LOG, "external scan needs only formatter to manipulate data");
+	}
 }

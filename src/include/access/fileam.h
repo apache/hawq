@@ -37,6 +37,7 @@
 #include "utils/rel.h"
 #include "utils/tqual.h"
 #include "access/url.h"
+#include "access/plugstorage_utils.h"
 
 
 
@@ -55,7 +56,13 @@ typedef struct ExternalInsertDescData
 	Datum*			ext_values;
 	bool*			ext_nulls;
 	
-	FormatterData*  ext_formatter_data;
+	FormatterData*	ext_formatter_data;
+	int				ext_formatter_type;
+	char*			ext_formatter_name;
+
+	/* current insert information for pluggable storage */
+	PlugStorageInsertFuncs ext_ps_insert_funcs;   /* insert functions */
+	void *ext_ps_user_data;                       /* user data */
 
 	struct CopyStateData *ext_pstate; 	/* data parser control chars and state */
 
@@ -70,7 +77,7 @@ typedef ExternalInsertDescData *ExternalInsertDesc;
 typedef struct ExternalSelectDescData
 {
 	ProjectionInfo *projInfo;
-	// Information needed for aggregate pushdown
+	/* Information needed for aggregate pushdown */
 	int  agg_type;
 } ExternalSelectDescData;
 
@@ -82,17 +89,21 @@ typedef enum DataLineStatus
 	END_MARKER
 } DataLineStatus;
 
-extern FileScanDesc external_beginscan(Relation relation, Index scanrelid,
-								   uint32 scancounter, List *uriList,
-								   List *fmtOpts, char fmtType, bool isMasterOnly,
-								   int rejLimit, bool rejLimitInRows,
-								   Oid fmterrtbl, ResultRelSegFileInfo *segfileinfo, int encoding,
-								   List *scanquals);
+extern FileScanDesc external_beginscan(ExternalScan *extScan,
+                                       Relation currentRelation,
+                                       ResultRelSegFileInfo *segFileInfo,
+                                       int formatterType,
+                                       char *formatterName);
 extern void external_rescan(FileScanDesc scan);
 extern void external_endscan(FileScanDesc scan);
 extern void external_stopscan(FileScanDesc scan);
 extern ExternalSelectDesc external_getnext_init(PlanState *state, ExternalScanState *es_state);
-extern HeapTuple external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc desc);
+extern bool external_getnext(FileScanDesc scan,
+                             ScanDirection direction,
+                             ExternalSelectDesc desc,
+                             ScanState *ss,
+                             TupleTableSlot *slot);
+
 extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno);
 extern Oid external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup);
 extern void external_insert_finish(ExternalInsertDesc extInsertDesc);
@@ -102,5 +113,8 @@ char*	linenumber_atoi(char buffer[20],int64 linenumber);
 
 extern char *getExtTblFormatterTypeInFmtOptsStr(char *fmtStr);
 extern char *getExtTblFormatterTypeInFmtOptsList(List *fmtOpts);
+
+extern void external_populate_formatter_actionmask(struct CopyStateData *pstate,
+                                                   FormatterData *formatter);
 
 #endif   /* FILEAM_H */
