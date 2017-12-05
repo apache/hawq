@@ -4219,6 +4219,7 @@ _copyFileSplitNode(FileSplitNode *from)
   COPY_SCALAR_FIELD(logiceof);
   COPY_SCALAR_FIELD(offsets);
   COPY_SCALAR_FIELD(lengths);
+  COPY_STRING_FIELD(ext_file_uri_string);
 
   return newnode;
 }

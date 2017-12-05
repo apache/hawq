@@ -2201,6 +2201,7 @@ _outFileSplitNode(StringInfo str, FileSplitNode *node)
 	WRITE_INT64_FIELD(logiceof);
 	WRITE_INT64_FIELD(offsets);
 	WRITE_INT64_FIELD(lengths);
+	WRITE_STRING_FIELD(ext_file_uri_string);
 }
 
 static void
