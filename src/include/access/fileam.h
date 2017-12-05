@@ -104,8 +104,12 @@ extern bool external_getnext(FileScanDesc scan,
                              ScanState *ss,
                              TupleTableSlot *slot);
 
-extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno);
-extern Oid external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup);
+extern ExternalInsertDesc external_insert_init(Relation rel,
+                                               int errAosegno,
+                                               int formatterType,
+                                               char *formatterName);
+extern Oid external_insert(ExternalInsertDesc extInsertDesc,
+                           TupleTableSlot *tupTableSlot);
 extern void external_insert_finish(ExternalInsertDesc extInsertDesc);
 extern void external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char* quote, bool header, uint32 scancounter);
 extern void AtAbort_ExtTables(void);
