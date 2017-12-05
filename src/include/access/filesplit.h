@@ -40,6 +40,7 @@ typedef struct FileSplitNode
 	int64 logiceof;
 	int64 offsets;
 	int64 lengths;
+	char *ext_file_uri_string;
 } FileSplitNode;
 
 typedef FileSplitNode *FileSplit;
