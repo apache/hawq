@@ -79,7 +79,7 @@
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
 
-static HeapTuple externalgettup(FileScanDesc scan, ScanDirection dir, ExternalSelectDesc desc);
+static HeapTuple externalgettup(FileScanDesc scan, ScanDirection dir, ExternalSelectDesc desc, ScanState *ss);
 static void InitParseState(CopyState pstate, Relation relation,
 						   Datum* values, bool* nulls, bool writable,
 						   List *fmtOpts, char fmtType,
@@ -97,7 +97,7 @@ static void FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 
 static void open_external_readable_source(FileScanDesc scan);
 static void open_external_writable_source(ExternalInsertDesc extInsertDesc);
-static int	external_getdata(URL_FILE *extfile, CopyState pstate, int maxread, ExternalSelectDesc desc);
+static int	external_getdata(URL_FILE *extfile, CopyState pstate, int maxread, ExternalSelectDesc desc, ScanState *ss);
 static void external_senddata(URL_FILE *extfile, CopyState pstate);
 static void external_scan_error_callback(void *arg);
 void readHeaderLine(CopyState pstate);
@@ -487,6 +487,7 @@ HeapTuple
 external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc desc)
 {
 	HeapTuple	tuple;
+	ScanState *ss = NULL; /* a temporary dummy for the following steps */
 
 	if (scan->fs_noop)
 		return NULL;
@@ -508,7 +509,7 @@ external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc 
 	/* Note: no locking manipulations needed */
 	FILEDEBUG_1;
 
-	tuple = externalgettup(scan, direction, desc);
+	tuple = externalgettup(scan, direction, desc, ss);
 
 
 	if (tuple == NULL)
@@ -991,7 +992,7 @@ static DataLineStatus parse_next_line(FileScanDesc scan)
 }
 
 static HeapTuple
-externalgettup_defined(FileScanDesc scan, ExternalSelectDesc desc)
+externalgettup_defined(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss)
 {
 		HeapTuple	tuple = NULL;
 		CopyState	pstate = scan->fs_pstate;
@@ -1003,7 +1004,7 @@ externalgettup_defined(FileScanDesc scan, ExternalSelectDesc desc)
 			/* need to fill our buffer with data? */
 			if (pstate->raw_buf_done)
 			{
-			    pstate->bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc);
+			    pstate->bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
 				pstate->begloc = pstate->raw_buf;
 				pstate->raw_buf_done = (pstate->bytesread==0);
 				pstate->raw_buf_index = 0;
@@ -1094,7 +1095,7 @@ externalgettup_defined(FileScanDesc scan, ExternalSelectDesc desc)
 }
 
 static HeapTuple
-externalgettup_custom(FileScanDesc scan, ExternalSelectDesc desc)
+externalgettup_custom(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss)
 {
 		HeapTuple   	tuple;
 		CopyState		pstate = scan->fs_pstate;
@@ -1110,7 +1111,7 @@ externalgettup_custom(FileScanDesc scan, ExternalSelectDesc desc)
 			/* need to fill our buffer with data? */
 			if (pstate->raw_buf_done)
 			{
-				int	 bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc);
+				int	 bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
 				if ( bytesread > 0 )
 					appendBinaryStringInfo(&formatter->fmt_databuf, pstate->raw_buf, bytesread);
 				pstate->raw_buf_done = false;
@@ -1252,7 +1253,7 @@ externalgettup_custom(FileScanDesc scan, ExternalSelectDesc desc)
 */
 static HeapTuple
 externalgettup(FileScanDesc scan,
-		    ScanDirection dir __attribute__((unused)), ExternalSelectDesc desc)
+		    ScanDirection dir __attribute__((unused)), ExternalSelectDesc desc, ScanState *ss)
 {
 
 	CopyState	pstate = scan->fs_pstate;
@@ -1274,9 +1275,9 @@ externalgettup(FileScanDesc scan,
 	}
 
 	if (!custom)
-		return externalgettup_defined(scan, desc); /* text/csv */
+		return externalgettup_defined(scan, desc, ss); /* text/csv */
 	else
-		return externalgettup_custom(scan, desc);  /* custom   */
+		return externalgettup_custom(scan, desc, ss);  /* custom   */
 
 }
 /*
@@ -1769,7 +1770,7 @@ close_external_source(FILE *dataSource, bool failOnError, const char *relname)
  * get a chunk of data from the external data file.
  */
 static int
-external_getdata(URL_FILE *extfile, CopyState pstate, int maxread, ExternalSelectDesc desc)
+external_getdata(URL_FILE *extfile, CopyState pstate, int maxread, ExternalSelectDesc desc, ScanState *ss)
 {
 	int			bytesread = 0;
 
@@ -1781,7 +1782,8 @@ external_getdata(URL_FILE *extfile, CopyState pstate, int maxread, ExternalSelec
  	*/
 
 
-	bytesread = url_fread((void *) pstate->raw_buf, 1, maxread, extfile, pstate, desc);
+	bytesread = url_fread((void *) pstate->raw_buf, 1, maxread, extfile, pstate, desc,
+						  (ss == NULL ? NULL : &(ss->splits)));
 
 	if (url_feof(extfile, bytesread))
  	{

@@ -2294,6 +2294,7 @@ _readFileSplitNode(const char **str)
 	READ_INT64_FIELD(logiceof);
 	READ_INT64_FIELD(offsets);
 	READ_INT64_FIELD(lengths);
+	READ_STRING_FIELD(ext_file_uri_string);
 	READ_DONE();
 }
 

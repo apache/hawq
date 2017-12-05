@@ -48,7 +48,7 @@ typedef enum FmtNotification
 typedef struct FormatterData
 {
 	NodeTag			type;                 /* see T_FormatterData */
-	
+
 	/* metadata */
 	Relation    	fmt_relation;
 	TupleDesc   	fmt_tupDesc;
@@ -74,6 +74,11 @@ typedef struct FormatterData
 	bool			fmt_needs_transcoding;
 	FmgrInfo*		fmt_conversion_proc;
 	int				fmt_external_encoding;
+
+	/* external url */
+	char		   *fmt_url;
+	/* splits */
+	List		   *fmt_splits;
 		
 } FormatterData;
 
