@@ -34,9 +34,12 @@
  *		ExecExternalReScan				rescans the relation
  */
 #include "postgres.h"
+#include "fmgr.h"
 
 #include "access/fileam.h"
+#include "access/filesplit.h"
 #include "access/heapam.h"
+#include "access/plugstorage.h"
 #include "cdb/cdbvars.h"
 #include "executor/execdebug.h"
 #include "executor/nodeExternalscan.h"
@@ -60,13 +63,13 @@ static TupleTableSlot *ExternalNext(ExternalScanState *node);
 static TupleTableSlot *
 ExternalNext(ExternalScanState *node)
 {
-	HeapTuple	tuple;
 	FileScanDesc scandesc;
-	Index		scanrelid;
-	EState	   *estate;
+	Index scanrelid;
+	EState *estate = NULL;
 	ScanDirection direction;
-	TupleTableSlot *slot;
-	ExternalSelectDesc externalSelectDesc;
+	TupleTableSlot *slot = NULL;
+	ExternalSelectDesc externalSelectDesc = NULL;
+	bool returnTuple = false;
 
 	/*
 	 * get information from the estate and scan state
@@ -80,8 +83,61 @@ ExternalNext(ExternalScanState *node)
 	/*
 	 * get the next tuple from the file access methods
 	 */
-	externalSelectDesc = external_getnext_init(&(node->ss.ps), node);
-	tuple = external_getnext(scandesc, direction, externalSelectDesc);
+	if (scandesc->fs_formatter_type == ExternalTableType_Invalid)
+	{
+		elog(ERROR, "invalid formatter type for external table: %s", __func__);
+	}
+	else if (scandesc->fs_formatter_type != ExternalTableType_PLUG)
+	{
+		externalSelectDesc = external_getnext_init(&(node->ss.ps), node);
+
+		returnTuple = external_getnext(scandesc, direction, externalSelectDesc,
+		                               &(node->ss), slot);
+	}
+	else
+	{
+		Assert(scandesc->fs_formatter_name);
+
+		FmgrInfo *getnextInitFunc = scandesc->fs_ps_scan_funcs.getnext_init;
+
+		if (getnextInitFunc)
+		{
+			/*
+			 * pg_strncasecmp(scandesc->fs_formatter_name, "orc", strlen("orc"))
+			 * Performance improvement for string comparison.
+			 */
+			const char *formatter_name = "orc";
+			if (*(int *)(scandesc->fs_formatter_name) != *(int *)formatter_name)
+			{
+				externalSelectDesc =
+					InvokePlugStorageFormatGetNextInit(getnextInitFunc,
+					                                   &(node->ss.ps),
+					                                   node);
+			}
+		}
+		else
+		{
+			elog(ERROR, "%s_getnext_init function was not found",
+			            scandesc->fs_formatter_name);
+		}
+
+		FmgrInfo *getnextFunc = scandesc->fs_ps_scan_funcs.getnext;
+
+		if (getnextFunc)
+		{
+			returnTuple = InvokePlugStorageFormatGetNext(getnextFunc,
+			                                             scandesc,
+			                                             direction,
+			                                             externalSelectDesc,
+			                                             &(node->ss),
+			                                             slot);
+		}
+		else
+		{
+			elog(ERROR, "%s_getnext function was not found",
+			            scandesc->fs_formatter_name);
+		}
+	}
 
 	/*
 	 * save the tuple and the buffer returned to us by the access methods in
@@ -91,11 +147,14 @@ ExternalNext(ExternalScanState *node)
 	 * that ExecStoreTuple will increment the refcount of the buffer; the
 	 * refcount will not be dropped until the tuple table slot is cleared.
 	 */
-	if (tuple)
+	if (returnTuple)
 	{
-		Gpmon_M_Incr_Rows_Out(GpmonPktFromExtScanState(node));
-		CheckSendPlanStateGpmonPkt(&node->ss.ps);
-		ExecStoreGenericTuple(tuple, slot, true);
+		/*
+		 * Perfmon is not supported any more.
+		 *
+		 * Gpmon_M_Incr_Rows_Out(GpmonPktFromExtScanState(node));
+		 * CheckSendPlanStateGpmonPkt(&node->ss.ps);
+		 */
 
 	    /*
 	     * CDB: Label each row with a synthetic ctid if needed for subquery dedup.
@@ -115,7 +174,10 @@ ExternalNext(ExternalScanState *node)
 			ExecEagerFreeExternalScan(node);
 		}
 	}
-	pfree(externalSelectDesc);
+	if (externalSelectDesc)
+	{
+		pfree(externalSelectDesc);
+	}
 
 	return slot;
 }
@@ -141,16 +203,16 @@ ExecExternalScan(ExternalScanState *node)
 
 
 /* ----------------------------------------------------------------
-*		ExecInitExternalScan
-* ----------------------------------------------------------------
-*/
+ *		ExecInitExternalScan
+ * ----------------------------------------------------------------
+ */
 ExternalScanState *
 ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 {
 	ResultRelSegFileInfo *segfileinfo = NULL;
-	ExternalScanState *externalstate;
-	Relation	currentRelation;
-	FileScanDesc currentScanDesc;
+	ExternalScanState *externalstate = NULL;
+	Relation currentRelation = NULL;
+	FileScanDesc currentScanDesc = NULL;
 
 	Assert(outerPlan(node) == NULL);
 	Assert(innerPlan(node) == NULL);
@@ -205,19 +267,49 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 	{
 		segfileinfo = NULL;
 	}
-	currentScanDesc = external_beginscan(currentRelation,
-									 node->scan.scanrelid,
-									 node->scancounter,
-									 node->uriList,
-									 node->fmtOpts,
-									 node->fmtType,
-									 node->isMasterOnly,
-									 node->rejLimit,
-									 node->rejLimitInRows,
-									 node->fmterrtbl,
-									 segfileinfo,
-									 node->encoding,
-									 node->scan.plan.qual);
+
+	externalstate->ss.splits = GetFileSplitsOfSegment(estate->es_plannedstmt->scantable_splits,
+	                                                  currentRelation->rd_id,
+	                                                  GetQEIndex());
+
+	int   formatterType = ExternalTableType_Invalid;
+	char *formatterName = NULL;
+	getExternalTableTypeInList(node->fmtType, node->fmtOpts,
+	                         &formatterType, &formatterName);
+
+	if (formatterType == ExternalTableType_Invalid)
+	{
+		elog(ERROR, "invalid formatter type for external table: %s", __func__);
+	}
+	else if (formatterType != ExternalTableType_PLUG)
+	{
+		currentScanDesc = external_beginscan(node, currentRelation, segfileinfo,
+		                                     formatterType, formatterName);
+	}
+	else
+	{
+		Assert(formatterName);
+
+		Oid	procOid = LookupPlugStorageValidatorFunc(formatterName,
+		                                             "beginscan");
+
+		if (OidIsValid(procOid))
+		{
+			FmgrInfo beginScanFunc;
+			fmgr_info(procOid, &beginScanFunc);
+
+			currentScanDesc = InvokePlugStorageFormatBeginScan(&beginScanFunc,
+			                                                   node,
+			                                                   &(externalstate->ss),
+			                                                   currentRelation,
+			                                                   formatterType,
+			                                                   formatterName);
+		}
+		else
+		{
+			elog(ERROR, "%s_beginscan function was not found", formatterName);
+		}
+	}
 
 	externalstate->ss.ss_currentRelation = currentRelation;
 	externalstate->ess_ScanDesc = currentScanDesc;
@@ -317,7 +409,28 @@ ExecStopExternalScan(ExternalScanState *node)
 	/*
 	 * stop the file scan
 	 */
-	external_stopscan(fileScanDesc);
+	if (fileScanDesc->fs_formatter_type == ExternalTableType_Invalid)
+	{
+		elog(ERROR, "invalid formatter type for external table: %s", __func__);
+	}
+	else if (fileScanDesc->fs_formatter_type != ExternalTableType_PLUG)
+	{
+		external_stopscan(fileScanDesc);
+	}
+	else
+	{
+		FmgrInfo *stopScanFunc = fileScanDesc->fs_ps_scan_funcs.stopscan;
+
+		if (stopScanFunc)
+		{
+			InvokePlugStorageFormatStopScan(stopScanFunc, fileScanDesc);
+		}
+		else
+		{
+			elog(ERROR, "%s_stopscan function was not found",
+			            fileScanDesc->fs_formatter_name);
+		}
+	}
 }
 
 
@@ -355,7 +468,30 @@ ExecExternalReScan(ExternalScanState *node, ExprContext *exprCtxt)
 
 	ItemPointerSet(&node->cdb_fake_ctid, 0, 0);
 
-	external_rescan(fileScan);
+	if (fileScan->fs_formatter_type == ExternalTableType_Invalid)
+	{
+		elog(ERROR, "invalid formatter type for external table: %s", __func__);
+	}
+	else if (fileScan->fs_formatter_type != ExternalTableType_PLUG)
+	{
+		external_rescan(fileScan);
+	}
+	else
+	{
+		Assert(fileScan->fs_formatter_name);
+
+		FmgrInfo *rescanFunc = fileScan->fs_ps_scan_funcs.rescan;
+
+		if (rescanFunc)
+		{
+			InvokePlugStorageFormatReScan(rescanFunc, fileScan);
+		}
+		else
+		{
+			elog(ERROR, "%s_rescan function was not found",
+			            fileScan->fs_formatter_name);
+		}
+	}
 }
 
 void
@@ -379,5 +515,29 @@ void
 ExecEagerFreeExternalScan(ExternalScanState *node)
 {
 	Assert(node->ess_ScanDesc != NULL);
-	external_endscan(node->ess_ScanDesc);
+
+	FileScanDesc fileScanDesc = node->ess_ScanDesc;
+
+	if (fileScanDesc->fs_formatter_type == ExternalTableType_Invalid)
+	{
+		elog(ERROR, "invalid formatter type for external table: %s", __func__);
+	}
+	else if (fileScanDesc->fs_formatter_type != ExternalTableType_PLUG)
+	{
+		external_endscan(fileScanDesc);
+	}
+	else
+	{
+		FmgrInfo *endScanFunc = fileScanDesc->fs_ps_scan_funcs.endscan;
+
+		if (endScanFunc)
+		{
+			InvokePlugStorageFormatEndScan(endScanFunc, fileScanDesc);
+		}
+		else
+		{
+			elog(ERROR, "%s_endscan function was not found",
+			            fileScanDesc->fs_formatter_name);
+		}
+	}
 }
