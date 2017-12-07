@@ -137,11 +137,24 @@ static FILE *g_dataSource = NULL;
 * ----------------
 */
 FileScanDesc
-external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
-			   List *uriList, List *fmtOpts, char fmtType, bool isMasterOnly,
-			   int rejLimit, bool rejLimitInRows, Oid fmterrtbl, ResultRelSegFileInfo *segfileinfo, int encoding,
-			   List *scanquals)
+external_beginscan(ExternalScan *extScan,
+                   Relation relation,
+                   ResultRelSegFileInfo *segFileInfo,
+                   int formatterType,
+                   char *formatterName)
 {
+	Index scanrelid = extScan->scan.scanrelid;
+	uint32 scancounter = extScan->scancounter;
+	List *uriList = extScan->uriList;
+	List *fmtOpts = extScan->fmtOpts;
+	char fmtType = extScan->fmtType;
+	bool isMasterOnly = extScan->isMasterOnly;
+	int rejLimit = extScan->rejLimit;
+	bool rejLimitInRows = extScan->rejLimitInRows;
+	Oid fmterrtbl = extScan->fmterrtbl;
+	int encoding = extScan->encoding;
+	List *scanquals = extScan->scan.plan.qual;
+
 	FileScanDesc scan;
 	TupleDesc	tupDesc = NULL;
 	int			attnum;
@@ -173,6 +186,9 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 	scan->fs_noop = false;
 	scan->fs_file = NULL;
 	scan->fs_formatter = NULL;
+
+	scan->fs_formatter_type = formatterType;
+	scan->fs_formatter_name = formatterName;
 
 	/*
 	 * get the external URI assigned to us.
@@ -229,6 +245,7 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 		/* set external source (uri) */
 		scan->fs_uri = uri;
 
+		elog(LOG, "fs_uri (%d) is set as %s", segindex, uri);
 		/* NOTE: we delay actually opening the data source until external_getnext() */
 	}
 	else
@@ -272,14 +289,15 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 
 	/* Initialize all the parsing and state variables */
 	InitParseState(scan->fs_pstate, relation, NULL, NULL, false, fmtOpts, fmtType,
-				   scan->fs_uri, rejLimit, rejLimitInRows, fmterrtbl, segfileinfo, encoding);
+	               scan->fs_uri, rejLimit, rejLimitInRows, fmterrtbl, segFileInfo, encoding);
 
-	if(fmttype_is_custom(fmtType))
-	{
-		scan->fs_formatter = (FormatterData *) palloc0 (sizeof(FormatterData));
-		initStringInfo(&scan->fs_formatter->fmt_databuf);
-		scan->fs_formatter->fmt_perrow_ctx = scan->fs_pstate->rowcontext;
-	}
+	/*
+	 * We always have custom formatter
+	 */
+	scan->fs_formatter = (FormatterData *) palloc0 (sizeof(FormatterData));
+	initStringInfo(&scan->fs_formatter->fmt_databuf);
+	scan->fs_formatter->fmt_perrow_ctx = scan->fs_pstate->rowcontext;
+	scan->fs_formatter->fmt_user_ctx = NULL;
 
 	/* Set up callback to identify error line number */
 	scan->errcontext.callback = external_scan_error_callback;
@@ -391,6 +409,15 @@ external_endscan(FileScanDesc scan)
 	}
 
 	/*
+	 * free formatter name
+	 */
+	if (scan->fs_formatter_name)
+	{
+		pfree(scan->fs_formatter_name);
+		scan->fs_formatter_name = NULL;
+	}
+
+	/*
 	 * free parse state memory
 	 */
 	if (scan->fs_pstate != NULL)
@@ -483,14 +510,17 @@ external_getnext_init(PlanState *state, ExternalScanState *es_state) {
 *		Parse a data file and return its rows in heap tuple form
 * ----------------------------------------------------------------
 */
-HeapTuple
-external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc desc)
+bool
+external_getnext(FileScanDesc scan,
+                 ScanDirection direction,
+                 ExternalSelectDesc desc,
+                 ScanState *ss,
+                 TupleTableSlot *slot)
 {
 	HeapTuple	tuple;
-	ScanState *ss = NULL; /* a temporary dummy for the following steps */
 
 	if (scan->fs_noop)
-		return NULL;
+		return false;
 
 	/*
 	 * open the external source (local file or http).
@@ -503,7 +533,13 @@ external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc 
 	 * they are not expected (see MPP-1261). Therefore we instead do it here on the
 	 * first time around only.
 	 */
-	if (!scan->fs_file)
+
+	/*
+	 * if the formatters do not need external protocol, the framework will not
+	 * load external protocol.
+	 */
+
+	if (scan->fs_file == NULL)
 		open_external_readable_source(scan);
 
 	/* Note: no locking manipulations needed */
@@ -516,7 +552,7 @@ external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc 
 	{
 		FILEDEBUG_2;			/* external_getnext returning EOS */
 
-		return NULL;
+		return false;
 	}
 
 	/*
@@ -526,7 +562,9 @@ external_getnext(FileScanDesc scan, ScanDirection direction, ExternalSelectDesc 
 
 	pgstat_count_heap_getnext(scan->fs_rd);
 
-	return tuple;
+	ExecStoreGenericTuple(tuple, slot, true);
+
+	return true;
 }
 
 /*
@@ -2591,9 +2629,12 @@ static void parseFormatString(CopyState pstate, char *fmtstr, bool iscustom)
 		}
 
 		if (!formatter_found)
-			ereport(ERROR, (errcode(ERRCODE_GP_INTERNAL_ERROR),
-							errmsg("external table internal parse error: "
-									"no formatter function name found")));
+		{
+			/*
+			 * If there is no formatter option specified, use format name. So
+			 * we don't report error here.
+			 */
+		}
 
 		pstate->custom_formatter_params = l;
 	}
