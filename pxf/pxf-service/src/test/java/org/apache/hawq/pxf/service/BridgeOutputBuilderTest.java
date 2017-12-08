@@ -469,6 +469,7 @@ public class BridgeOutputBuilderTest {
         parameters.put("X-GP-DATA-DIR", "i'm/ready/to/go");
         parameters.put("X-GP-FRAGMENT-METADATA", "U29tZXRoaW5nIGluIHRoZSB3YXk=");
         parameters.put("X-GP-OPTIONS-I'M-STANDING-HERE", "outside-your-door");
+        parameters.put("X-GP-USER", "alex");
 
         ProtocolData protocolData = new ProtocolData(parameters);
         BridgeOutputBuilder builder = new BridgeOutputBuilder(protocolData);

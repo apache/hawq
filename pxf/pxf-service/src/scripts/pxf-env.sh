@@ -54,3 +54,6 @@ export HADOOP_DISTRO=${HADOOP_DISTRO}
 # Parent directory of Hadoop client installation (optional)
 # used in case of tarball-based installation when all clients are under a common parent directory
 export HADOOP_ROOT=${HADOOP_ROOT}
+
+# End-user identity impersonation, set to true to enable
+export PXF_USER_IMPERSONATION=@pxfDefaultUserImpersonation@
