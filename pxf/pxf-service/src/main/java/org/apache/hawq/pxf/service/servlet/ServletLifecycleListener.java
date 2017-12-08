@@ -1,4 +1,4 @@
-package org.apache.hawq.pxf.service.rest;
+package org.apache.hawq.pxf.service.servlet;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one

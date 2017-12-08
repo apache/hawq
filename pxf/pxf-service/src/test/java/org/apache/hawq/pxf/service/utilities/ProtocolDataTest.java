@@ -45,7 +45,7 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({ UserGroupInformation.class, ProfilesConf.class })
+@PrepareForTest({ UserGroupInformation.class, ProfilesConf.class, SecureLogin.class })
 public class ProtocolDataTest {
     Map<String, String> parameters;
 
@@ -67,8 +67,8 @@ public class ProtocolDataTest {
         assertEquals(protocolData.getAccessor(), "are");
         assertEquals(protocolData.getResolver(), "packed");
         assertEquals(protocolData.getDataSource(), "i'm/ready/to/go");
-        assertEquals(protocolData.getUserProperty("i'm-standing-here"),
-                "outside-your-door");
+        assertEquals(protocolData.getUserProperty("i'm-standing-here"), "outside-your-door");
+        assertEquals(protocolData.getUser(), "alex");
         assertEquals(protocolData.getParametersMap(), parameters);
         assertNull(protocolData.getLogin());
         assertNull(protocolData.getSecret());
@@ -205,11 +205,31 @@ public class ProtocolDataTest {
 
         try {
             new ProtocolData(parameters);
-            fail("null X-GP-TOKEN should throw");
+            fail("null X-GP-TOKEN should throw exception");
         } catch (IllegalArgumentException e) {
             assertEquals(e.getMessage(),
                     "Internal server error. Property \"TOKEN\" has no value in current request");
         }
+    }
+
+    @Test
+    public void nullUserThrowsWhenImpersonationEnabled() throws Exception {
+        when(SecureLogin.isUserImpersonationEnabled()).thenReturn(true);
+        parameters.remove("X-GP-USER");
+        try {
+            new ProtocolData(parameters);
+            fail("null X-GP-USER should throw exception");
+        } catch (IllegalArgumentException e) {
+            assertEquals(e.getMessage(),
+                    "Internal server error. Property \"USER\" has no value in current request");
+        }
+    }
+
+    @Test
+    public void nullUserDoesNotThrowWhenImpersonationDisabled() throws Exception {
+        parameters.remove("X-GP-USER");
+        ProtocolData protocolData = new ProtocolData(parameters);
+        assertNull(protocolData.getUser());
     }
 
     @Test
@@ -430,8 +450,11 @@ public class ProtocolDataTest {
         parameters.put("X-GP-DATA-DIR", "i'm/ready/to/go");
         parameters.put("X-GP-FRAGMENT-METADATA", "U29tZXRoaW5nIGluIHRoZSB3YXk=");
         parameters.put("X-GP-OPTIONS-I'M-STANDING-HERE", "outside-your-door");
+        parameters.put("X-GP-USER", "alex");
 
         PowerMockito.mockStatic(UserGroupInformation.class);
+        PowerMockito.mockStatic(SecureLogin.class);
+
     }
 
     /*
