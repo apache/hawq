@@ -73,7 +73,8 @@ public class HiveUtilities {
         COLUMNAR_SERDE("org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe"),
         LAZY_BINARY_COLUMNAR_SERDE("org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe"),
         LAZY_SIMPLE_SERDE("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"),
-        ORC_SERDE("org.apache.hadoop.hive.ql.io.orc.OrcSerde");
+        ORC_SERDE("org.apache.hadoop.hive.ql.io.orc.OrcSerde"),
+        CSV_SERDE("org.apache.hadoop.hive.serde2.OpenCSVSerde");
 
         private String serdeClassName;
 
