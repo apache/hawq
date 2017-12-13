@@ -196,12 +196,14 @@ project('pxf-service') {
     apply plugin: 'war'
     tasks.war {
         archiveName = 'pxf.war'
+        filter(ReplaceTokens, tokens: ['pxfProtocolVersion': project.pxfProtocolVersion])
         processResources {
             filesMatching('**/pxf-*') {
                 details ->
                     details.exclude()
             }
         }
+
     }
     dependencies {
         compile(project(':pxf-api'))
