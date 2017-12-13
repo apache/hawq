@@ -63,7 +63,7 @@ public class SecurityServletFilter implements Filter {
      * @param chain
      */
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+    public void doFilter(final ServletRequest request, final ServletResponse response, final FilterChain chain) throws IOException, ServletException {
 
         if (SecureLogin.isUserImpersonationEnabled()) {
 
@@ -71,7 +71,7 @@ public class SecurityServletFilter implements Filter {
             HttpServletResponse httpResponse = (HttpServletResponse) response;
 
             // retrieve user header and make sure header is present and is not empty
-            String user = httpRequest.getHeader(USER_HEADER);
+            final String user = httpRequest.getHeader(USER_HEADER);
             if (user == null) {
                 reportError(httpResponse, HttpServletResponse.SC_BAD_REQUEST, MISSING_HEADER_ERROR);
                 return;
