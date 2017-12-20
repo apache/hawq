@@ -67,17 +67,12 @@ public class SecurityServletFilter implements Filter {
 
         if (SecureLogin.isUserImpersonationEnabled()) {
 
-            HttpServletRequest httpRequest = (HttpServletRequest) request;
-            HttpServletResponse httpResponse = (HttpServletResponse) response;
-
             // retrieve user header and make sure header is present and is not empty
-            final String user = httpRequest.getHeader(USER_HEADER);
+            final String user = ((HttpServletRequest) request).getHeader(USER_HEADER);
             if (user == null) {
-                reportError(httpResponse, HttpServletResponse.SC_BAD_REQUEST, MISSING_HEADER_ERROR);
-                return;
+                throw new IllegalArgumentException(MISSING_HEADER_ERROR);
             } else if (user.trim().isEmpty()) {
-                reportError(httpResponse, HttpServletResponse.SC_BAD_REQUEST, EMPTY_HEADER_ERROR);
-                return;
+                throw new IllegalArgumentException(EMPTY_HEADER_ERROR);
             }
 
             // TODO refresh Kerberos token when security is enabled
@@ -94,19 +89,15 @@ public class SecurityServletFilter implements Filter {
 
             // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
             try {
-
                 LOG.debug("Creating proxy user for " + user);
                 UserGroupInformation proxyUGI = UserGroupInformation.createProxyUser(user, UserGroupInformation.getLoginUser());;
                 proxyUGI.doAs(action);
-
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
-                reportError(httpResponse, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ute.getCause());
-
-            } catch (Throwable t) {
-                reportError(httpResponse, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, t);
+                throw new ServletException(ute.getCause());
+            } catch (InterruptedException ie) {
+                throw new ServletException(ie);
             }
-
         } else {
             // no user impersonation is configured
             chain.doFilter(request, response);
@@ -120,44 +111,4 @@ public class SecurityServletFilter implements Filter {
     public void destroy() {
     }
 
-    /**
-     * Logs the message and sends it in the HttpServletResponse with a given error code
-     *
-     * @param httpResponse response
-     * @param httpStatus status to set
-     * @param message message to log
-     */
-    private void reportError(HttpServletResponse httpResponse, int httpStatus, String message) {
-        LOG.error(message);
-        writeErrorToResponse(httpResponse, httpStatus, message);
-    }
-
-    /**
-     * Logs the throwable and sends its message in the HttpServletResponse with a given error code
-     *
-     * @param httpResponse response
-     * @param httpStatus status to set
-     * @param t throwable to log
-     */
-    private void reportError(HttpServletResponse httpResponse, int httpStatus, Throwable t) {
-        LOG.error(t.getMessage(), t);
-        writeErrorToResponse(httpResponse, httpStatus, t.getMessage());
-    }
-
-    /**
-     * Sets HttpServletResponse to the given error code and writes a given message in the body
-     *
-     * @param httpResponse response
-     * @param httpStatus status to set
-     * @param message message to write
-     */
-    private void writeErrorToResponse(HttpServletResponse httpResponse, int httpStatus, String message) {
-        httpResponse.setContentType("text/plain");
-        try {
-            httpResponse.sendError(httpStatus, message);
-        } catch (Throwable t) {
-            // failed to write response, just log the failure
-            LOG.error(t.getMessage(), t);
-        }
-    }
 }
