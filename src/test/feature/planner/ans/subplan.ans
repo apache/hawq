@@ -31,11 +31,6 @@ insert into i4 values(null,null);
 INSERT 0 1
 insert into i4 select i, i-10 from generate_series(-5,0)i;
 INSERT 0 6
-DROP LANGUAGE IF EXISTS plpythonu CASCADE;
-psql:/tmp/TestSubplan_TestSubplanAll.sql:27: NOTICE:  language "plpythonu" does not exist, skipping
-DROP LANGUAGE
-CREATE LANGUAGE plpythonu;
-CREATE LANGUAGE
 create or replace function twice(int) returns int as $$
        select 2 * $1;
 $$ language sql;
