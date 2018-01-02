@@ -32,6 +32,7 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "fmgr.h"
 
 #include <ctype.h>
 #include <unistd.h>
@@ -46,10 +47,12 @@
 #include "access/aosegfiles.h"
 #include "access/appendonlywriter.h"
 #include "access/xact.h"
+#include "access/plugstorage.h"
 #include "catalog/gp_policy.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_type.h"
 #include "catalog/catalog.h"
+#include "catalog/pg_exttable.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbparquetam.h"
 #include "cdb/cdbpartition.h"
@@ -3884,6 +3887,7 @@ CopyFrom(CopyState cstate)
 {
 	void		*tuple;
 	TupleDesc	tupDesc;
+	ExternalInsertDesc extInsertDesc;
 	Form_pg_attribute *attr;
 	AttrNumber	num_phys_attrs,
 				attr_count,
@@ -4290,8 +4294,48 @@ CopyFrom(CopyState cstate)
 				else if (relstorage == RELSTORAGE_EXTERNAL &&
 						 resultRelInfo->ri_extInsertDesc == NULL)
 				{
-					resultRelInfo->ri_extInsertDesc =
-						external_insert_init(resultRelInfo->ri_RelationDesc, 0);
+					Relation relation = resultRelInfo->ri_RelationDesc;
+					ExtTableEntry *extEntry = GetExtTableEntry(RelationGetRelid(relation));
+					ExternalTableType formatterType = ExternalTableType_Invalid;
+					char *formatterName = NULL;
+					getExternalTableTypeInStr(extEntry->fmtcode, extEntry->fmtopts,
+					                        &formatterType, &formatterName);
+
+					if (formatterType == ExternalTableType_Invalid)
+					{
+						elog(ERROR, "invalid formatter type for external table: %s", __func__);
+					}
+					else if (formatterType != ExternalTableType_PLUG)
+					{
+						resultRelInfo->ri_extInsertDesc =
+								external_insert_init(resultRelInfo->ri_RelationDesc,
+							                         0, formatterType, formatterName);
+					}
+					else
+					{
+						Assert(formatterName);
+
+						Oid	procOid = LookupPlugStorageValidatorFunc(formatterName,
+						                                             "insert_init");
+
+						if (OidIsValid(procOid))
+						{
+							FmgrInfo *insertInitFunc = (FmgrInfo *)palloc(sizeof(FmgrInfo));
+							fmgr_info(procOid, insertInitFunc);
+
+							resultRelInfo->ri_extInsertDesc =
+							        InvokePlugStorageFormatInsertInit(insertInitFunc,
+							                                          resultRelInfo->ri_RelationDesc,
+							                                          formatterType,
+							                                          formatterName);
+
+							pfree(insertInitFunc);
+						}
+						else
+						{
+							elog(ERROR, "%s_insert function was not found", formatterName);
+						}
+					}
 				}
 
 				MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
@@ -4310,7 +4354,10 @@ CopyFrom(CopyState cstate)
 					if (cstate->oids && file_has_oids)
 						MemTupleSetOid(tuple, resultRelInfo->ri_aoInsertDesc->mt_bind, loaded_oid);
 				}
-				else if (relstorage == RELSTORAGE_PARQUET)
+				else if ((relstorage == RELSTORAGE_PARQUET) ||
+				         ((relstorage == RELSTORAGE_EXTERNAL) &&
+				          (resultRelInfo->ri_extInsertDesc->ext_formatter_type ==
+				           ExternalTableType_PLUG)))
 				{
                     tuple = NULL;
 				}
@@ -4362,21 +4409,22 @@ CopyFrom(CopyState cstate)
 				if (!skip_tuple)
 				{
 					char relstorage = RelinfoGetStorage(resultRelInfo);
-					
-					if ((relstorage != RELSTORAGE_PARQUET))
-					{
-						/* Place tuple in tuple slot */
-						ExecStoreGenericTuple(tuple, slot, false);
-					}
 
-					else
+					if ((relstorage == RELSTORAGE_PARQUET) ||
+					    ((relstorage == RELSTORAGE_EXTERNAL) &&
+		                  (resultRelInfo->ri_extInsertDesc->ext_formatter_type ==
+					      ExternalTableType_PLUG)))
 					{
 						ExecClearTuple(slot);
 						slot->PRIVATE_tts_values = values;
 						slot->PRIVATE_tts_isnull = nulls;
 						ExecStoreVirtualTuple(slot);
 					}
-
+					else
+					{
+						/* Place tuple in tuple slot */
+						ExecStoreGenericTuple(tuple, slot, false);
+					}
 					/*
 					 * Check the constraints of the tuple
 					 */
@@ -4408,7 +4456,36 @@ CopyFrom(CopyState cstate)
 					}
 					else if (relstorage == RELSTORAGE_EXTERNAL)
 					{
-						external_insert(resultRelInfo->ri_extInsertDesc, tuple);
+						extInsertDesc = resultRelInfo->ri_extInsertDesc;
+
+						if (extInsertDesc->ext_formatter_type == ExternalTableType_Invalid)
+						{
+							elog(ERROR, "invalid formatter type for external table: %s", __func__);
+						}
+						else if (extInsertDesc->ext_formatter_type != ExternalTableType_PLUG)
+						{
+							external_insert(extInsertDesc, slot);
+
+						}
+						else
+						{
+							Assert(extInsertDesc->ext_formatter_name);
+
+							FmgrInfo *insertFunc =
+									extInsertDesc->ext_ps_insert_funcs.insert;
+
+							if (insertFunc)
+							{
+								InvokePlugStorageFormatInsert(insertFunc,
+								                              extInsertDesc,
+								                              slot);
+							}
+							else
+							{
+								elog(ERROR, "%s_insert function was not found",
+								            extInsertDesc->ext_formatter_name);
+							}
+						}
 					}
 					else
 					{
@@ -4531,7 +4608,34 @@ CopyFrom(CopyState cstate)
 		}
 
 		if (resultRelInfo->ri_extInsertDesc)
-				external_insert_finish(resultRelInfo->ri_extInsertDesc);
+		{
+			ExternalInsertDesc extInsertDesc = resultRelInfo->ri_extInsertDesc;
+
+			if (extInsertDesc->ext_formatter_type == ExternalTableType_Invalid)
+			{
+				elog(ERROR, "invalid formatter type for external table: %s", __func__);
+			}
+			else if (extInsertDesc->ext_formatter_type != ExternalTableType_PLUG)
+			{
+				external_insert_finish(extInsertDesc);
+			}
+			else
+			{
+				FmgrInfo *insertFinishFunc =
+						extInsertDesc->ext_ps_insert_funcs.insert_finish;
+
+				if (insertFinishFunc)
+				{
+					InvokePlugStorageFormatInsertFinish(insertFinishFunc,
+								                        extInsertDesc);
+				}
+				else
+				{
+					elog(ERROR, "%s_insert_finish function was not found",
+					            extInsertDesc->ext_formatter_name);
+				}
+			}
+		}
 			
 		if (sendback && relstorage_is_ao(RelinfoGetStorage(resultRelInfo)) && Gp_role == GP_ROLE_EXECUTE)
 			AddSendbackChangedCatalogContent(buf, sendback);

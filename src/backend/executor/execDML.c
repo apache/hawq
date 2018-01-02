@@ -25,8 +25,11 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "fmgr.h"
 
 #include "access/fileam.h"
+#include "access/plugstorage.h"
+#include "catalog/pg_exttable.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbparquetam.h"
 #include "cdb/cdbpartition.h"
@@ -304,7 +307,7 @@ ExecInsert(TupleTableSlot *slot,
 	}
 
 	partslot = reconstructMatchingTupleSlot(slot, resultRelInfo);
-	if (rel_is_heap || rel_is_external)
+	if (rel_is_heap)
 	{
 		tuple = ExecFetchSlotHeapTuple(partslot);
 	}
@@ -312,13 +315,13 @@ ExecInsert(TupleTableSlot *slot,
 	{
 		tuple = ExecFetchSlotMemTuple(partslot, false);
 	}
-	else if (rel_is_parquet)
+	else if (rel_is_parquet || rel_is_external)
 	{
 		tuple = NULL;
 	}
 
 	Assert( partslot != NULL );
-	Assert( rel_is_parquet || (tuple != NULL));
+	Assert( rel_is_parquet || rel_is_external || (tuple != NULL));
 
 	/* Execute triggers in Planner-generated plans */
 	if (planGen == PLANGEN_PLANNER)
@@ -393,12 +396,89 @@ ExecInsert(TupleTableSlot *slot,
 	}
 	else if (rel_is_external)
 	{
-		/* Writable external table */
-		if (resultRelInfo->ri_extInsertDesc == NULL)
-			resultRelInfo->ri_extInsertDesc = external_insert_init(
-					resultRelationDesc, 0);
+		ExternalInsertDesc extInsertDesc = resultRelInfo->ri_extInsertDesc;
 
-		newId = external_insert(resultRelInfo->ri_extInsertDesc, tuple);
+		/* Writable external table */
+		if (extInsertDesc == NULL)
+		{
+			/* Get pg_exttable information for the external table */
+			ExtTableEntry *extEntry =
+					GetExtTableEntry(RelationGetRelid(resultRelationDesc));
+
+			/* Get formatter type and name for the external table */
+			ExternalTableType formatterType = ExternalTableType_Invalid;
+			char *formatterName = NULL;
+
+			getExternalTableTypeInStr(extEntry->fmtcode, extEntry->fmtopts,
+			                        &formatterType, &formatterName);
+
+			pfree(extEntry);
+
+			if (formatterType == ExternalTableType_Invalid)
+			{
+				elog(ERROR, "invalid formatter type for external table: %s", __func__);
+			}
+			else if (formatterType != ExternalTableType_PLUG)
+			{
+				resultRelInfo->ri_extInsertDesc = external_insert_init(
+						resultRelationDesc, 0, formatterType, formatterName);
+			}
+			else
+			{
+				Assert(formatterName);
+
+				Oid	procOid = LookupPlugStorageValidatorFunc(formatterName,
+				                                             "insert_init");
+
+				if (OidIsValid(procOid))
+				{
+					FmgrInfo insertInitFunc;
+					fmgr_info(procOid, &insertInitFunc);
+
+					resultRelInfo->ri_extInsertDesc =
+					        InvokePlugStorageFormatInsertInit(&insertInitFunc,
+					                                          resultRelationDesc,
+					                                          formatterType,
+					                                          formatterName);
+				}
+				else
+				{
+					elog(ERROR, "%s_insert_init function was not found", formatterName);
+				}
+			}
+		}
+
+		extInsertDesc = resultRelInfo->ri_extInsertDesc;
+
+		if (extInsertDesc->ext_formatter_type == ExternalTableType_Invalid)
+		{
+			elog(ERROR, "invalid formatter type for external table: %s", __func__);
+		}
+		else if (extInsertDesc->ext_formatter_type != ExternalTableType_PLUG)
+		{
+			newId = external_insert(resultRelInfo->ri_extInsertDesc, partslot);
+		}
+		else
+		{
+			Assert(extInsertDesc->ext_formatter_name);
+
+			/* Form virtual tuple */
+			slot_getallattrs(partslot);
+
+			FmgrInfo *insertFunc = extInsertDesc->ext_ps_insert_funcs.insert;
+
+			if (insertFunc)
+			{
+				newId = InvokePlugStorageFormatInsert(insertFunc,
+				                                      extInsertDesc,
+				                                      partslot);
+			}
+			else
+			{
+				elog(ERROR, "%s_insert function was not found",
+				            extInsertDesc->ext_formatter_name);
+			}
+		}
 	}
     else if(rel_is_parquet)
 	{
@@ -437,7 +517,7 @@ ExecInsert(TupleTableSlot *slot,
 
 	partslot->tts_tableOid = RelationGetRelid(resultRelationDesc);
 
-	if (rel_is_aorows || rel_is_parquet)
+	if (rel_is_aorows || rel_is_parquet || rel_is_external)
 	{
 
 		/* NOTE: Current version does not support index upon parquet table. */

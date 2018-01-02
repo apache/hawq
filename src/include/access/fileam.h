@@ -37,6 +37,7 @@
 #include "utils/rel.h"
 #include "utils/tqual.h"
 #include "access/url.h"
+#include "access/plugstorage_utils.h"
 
 
 
@@ -55,7 +56,13 @@ typedef struct ExternalInsertDescData
 	Datum*			ext_values;
 	bool*			ext_nulls;
 	
-	FormatterData*  ext_formatter_data;
+	FormatterData* ext_formatter_data;
+	ExternalTableType ext_formatter_type;
+	char* ext_formatter_name;
+
+	/* current insert information for pluggable storage */
+	PlugStorageInsertFuncs ext_ps_insert_funcs;   /* insert functions */
+	void *ext_ps_user_data;                       /* user data */
 
 	struct CopyStateData *ext_pstate; 	/* data parser control chars and state */
 
@@ -97,8 +104,12 @@ extern bool external_getnext(FileScanDesc scan,
                              ScanState *ss,
                              TupleTableSlot *slot);
 
-extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno);
-extern Oid external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup);
+extern ExternalInsertDesc external_insert_init(Relation rel,
+                                               int errAosegno,
+                                               ExternalTableType formatterType,
+                                               char *formatterName);
+extern Oid external_insert(ExternalInsertDesc extInsertDesc,
+                           TupleTableSlot *tupTableSlot);
 extern void external_insert_finish(ExternalInsertDesc extInsertDesc);
 extern void external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char* quote, bool header, uint32 scancounter);
 extern void AtAbort_ExtTables(void);

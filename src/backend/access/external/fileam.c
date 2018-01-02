@@ -574,7 +574,8 @@ external_getnext(FileScanDesc scan,
  * this function to initialize our various structures and state..
  */
 ExternalInsertDesc
-external_insert_init(Relation rel, int errAosegno)
+external_insert_init(Relation rel, int errAosegno,
+                     ExternalTableType formatterType, char *formatterName)
 {
 	ExternalInsertDesc	extInsertDesc;
 	ExtTableEntry*		extentry;
@@ -592,6 +593,8 @@ external_insert_init(Relation rel, int errAosegno)
 	extInsertDesc->ext_rel = rel;
 	extInsertDesc->ext_noop = (Gp_role == GP_ROLE_DISPATCH);
 	extInsertDesc->ext_formatter_data = NULL;
+	extInsertDesc->ext_formatter_type = formatterType;
+	extInsertDesc->ext_formatter_name = formatterName;
 
 	if(extentry->command)
 	{
@@ -682,9 +685,10 @@ external_insert_init(Relation rel, int errAosegno)
  *
  */
 Oid
-external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup)
+external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 {
 
+	HeapTuple		instup = ExecFetchSlotHeapTuple(tupTableSlot);
 	TupleDesc 		tupDesc = extInsertDesc->ext_tupDesc;
 	Datum*			values = extInsertDesc->ext_values;
 	bool*			nulls = extInsertDesc->ext_nulls;
@@ -755,12 +759,15 @@ external_insert(ExternalInsertDesc extInsertDesc, HeapTuple instup)
 		CopyOneCustomRowTo(pstate, b);
 	}
 
-	/* Write the data into the external source */
-	external_senddata((URL_FILE*)extInsertDesc->ext_file, pstate);
+	if (extInsertDesc->ext_formatter_data == NULL)
+	{
+		/* Write the data into the external source */
+		external_senddata((URL_FILE*)extInsertDesc->ext_file, pstate);
 
-	/* Reset our buffer to start clean next round */
-	pstate->fe_msgbuf->len = 0;
-	pstate->fe_msgbuf->data[0] = '\0';
+		/* Reset our buffer to start clean next round */
+		pstate->fe_msgbuf->len = 0;
+		pstate->fe_msgbuf->data[0] = '\0';
+	}
 	pstate->processed++;
 
 	return HeapTupleGetOid(instup);
@@ -791,6 +798,9 @@ external_insert_finish(ExternalInsertDesc extInsertDesc)
 
 	if(extInsertDesc->ext_formatter_data)
 		pfree(extInsertDesc->ext_formatter_data);
+
+	if(extInsertDesc->ext_formatter_name)
+		pfree(extInsertDesc->ext_formatter_name);
 
 	pfree(extInsertDesc);
 }
