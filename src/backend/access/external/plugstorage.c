@@ -59,6 +59,11 @@ void getExternalTableTypeInList(const char formatType,
 	}
 	else if (fmttype_is_custom(formatType))
 	{
+		*formatterType = ExternalTableType_CUSTOM;
+		*formatterName = NULL;
+	}
+	else if (fmttype_is_custom(formatType))
+	{
 		Assert(formatOptions);
 
 		*formatterName = getExtTblFormatterTypeInFmtOptsList(formatOptions);
@@ -86,6 +91,11 @@ void getExternalTableTypeInStr(const char formatType,
 	else if (fmttype_is_csv(formatType))
 	{
 		*formatterType = ExternalTableType_CSV;
+		*formatterName = NULL;
+	}
+	else if (fmttype_is_custom(formatType))
+	{
+		*formatterType = ExternalTableType_CUSTOM;
 		*formatterName = NULL;
 	}
 	else if (fmttype_is_custom(formatType))

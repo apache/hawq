@@ -85,6 +85,7 @@ typedef enum
 	ExternalTableType_GENERIC,     /* GENERIC external table format and protocol */
 	ExternalTableType_TEXT,        /* TEXT format with gpfdist(s), http, command protocol */
 	ExternalTableType_CSV,         /* CSV format with gpfdist(s), http, command protocol */
+	ExternalTableType_CUSTOM,      /* Temporary workaround to support the old framework */
 	ExternalTableType_PLUG,        /* Pluggable format with hdfs protocol, i.e., ORC */
 	ExternalTableType_Invalid
 } ExternalTableType;
