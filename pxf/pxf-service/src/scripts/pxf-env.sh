@@ -39,7 +39,7 @@ if [ ! -z '@pxfDefaultUser@' ]; then
 fi
 
 # Port
-export PXF_PORT=${PXF_PORT:-5888}
+export PXF_PORT=${PXF_PORT:-@pxfPortNum@}
 
 # Memory
 export PXF_JVM_OPTS="-Xmx2g -Xms1g"

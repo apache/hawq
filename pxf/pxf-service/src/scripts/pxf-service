@@ -36,7 +36,7 @@ else
 fi
 
 pxf_user=${PXF_USER}
-instance_port=${PXF_PORT:-51200}
+instance_port=${PXF_PORT:-@pxfPortNum@}
 instance_name=pxf-service
 
 if [ -z ${PXF_HOME} ]; then
