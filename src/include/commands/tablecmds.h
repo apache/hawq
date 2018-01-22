@@ -63,7 +63,7 @@ extern void	DefinePartitionedRelation(CreateStmt *stmt, Oid reloid);
 extern void EvaluateDeferredStatements(List *deferredStmts);
 
 extern void RemoveRelation(const RangeVar *relation, DropBehavior behavior,
-						   DropStmt *stmt /* MPP */);
+						   DropStmt *stmt /* MPP */, char relkind);
 
 extern bool RelationToRemoveIsTemp(const RangeVar *relation, DropBehavior behavior);
 

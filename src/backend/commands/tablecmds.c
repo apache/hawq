@@ -1500,7 +1500,7 @@ MetaTrackValidKindNsp(Form_pg_class rd_rel)
  */
 void
 RemoveRelation(const RangeVar *relation, DropBehavior behavior,
-			   DropStmt *stmt)
+			   DropStmt *stmt, char relkind)
 {
 	Oid			relOid;
 	ObjectAddress object;
@@ -1509,16 +1509,24 @@ RemoveRelation(const RangeVar *relation, DropBehavior behavior,
 
 	AcceptInvalidationMessages();
 
-	relOid = RangeVarGetRelid(relation, false, false /*allowHcatalog*/);
+	relOid = RangeVarGetRelid(relation, true, false /*allowHcatalog*/);
+
+	/* Not there? */
+	if (!OidIsValid(relOid))
+	{
+		DropErrorMsgNonExistent(relation, relkind, stmt->missing_ok);
+		return;
+	}
 
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		LockRelationOid(RelationRelationId, RowExclusiveLock);
 		LockRelationOid(TypeRelationId, RowExclusiveLock);
 		LockRelationOid(DependRelationId, RowExclusiveLock);
-	}
 
-	LockRelationOid(relOid, AccessExclusiveLock);
+		/* Get the lock before trying to fetch the pg_class entry */
+		LockRelationOid(relOid, AccessExclusiveLock);
+	}
 
 	pcqCtx = caql_beginscan(
 			NULL,
@@ -1530,7 +1538,28 @@ RemoveRelation(const RangeVar *relation, DropBehavior behavior,
 	tuple = caql_getnext(pcqCtx);
 
 	if (!HeapTupleIsValid(tuple))
+	{
+		if (Gp_role == GP_ROLE_DISPATCH)
+		{
+			Oid again = RangeVarGetRelid(relation, true, false /*allowHcatalog*/);
+
+			/* Not there? */
+			if (!OidIsValid(again))
+			{
+				DropErrorMsgNonExistent(relation, relkind, stmt->missing_ok);
+
+				UnlockRelationOid(DependRelationId, RowExclusiveLock);
+				UnlockRelationOid(TypeRelationId, RowExclusiveLock);
+				UnlockRelationOid(RelationRelationId, RowExclusiveLock);
+
+				UnlockRelationOid(relOid, AccessExclusiveLock);
+
+				caql_endscan(pcqCtx);
+				return;
+			}
+		}
 		elog(ERROR, "relation \"%s\" does not exist", relation->relname);
+	}
 
 	/* MPP-3260: disallow direct DROP TABLE of a partition */
 	if (stmt && rel_is_child_partition(relOid) && !stmt->bAllowPartn)
