@@ -151,8 +151,8 @@ DropErrorMsgWrongType(char *relname, char wrongkind, char rightkind)
  * Emit the right error message for a "DROP" command issued on a
  * non-existent relation
  */
-static void
-DropErrorMsgNonExistent(RangeVar *rel, char rightkind, bool missing_ok)
+void
+DropErrorMsgNonExistent(const RangeVar *rel, char rightkind, bool missing_ok)
 {
 	const struct msgstrings *rentry;
 
@@ -582,7 +582,7 @@ ProcessDropStatement(DropStmt *stmt)
 				if (CheckDropPermissions(rel, RELKIND_RELATION,
 										 stmt->missing_ok) &&
 					CheckDropRelStorage(rel, stmt->removeType))
-					RemoveRelation(rel, stmt->behavior, stmt);
+					RemoveRelation(rel, stmt->behavior, stmt, RELKIND_RELATION);
 
 				break;
 
@@ -590,7 +590,7 @@ ProcessDropStatement(DropStmt *stmt)
 				rel = makeRangeVarFromNameList(names);
 				if (CheckDropPermissions(rel, RELKIND_SEQUENCE,
 										 stmt->missing_ok))
-					RemoveRelation(rel, stmt->behavior, stmt);
+					RemoveRelation(rel, stmt->behavior, stmt, RELKIND_SEQUENCE);
 
 				break;
 
