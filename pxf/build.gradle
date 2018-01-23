@@ -267,6 +267,7 @@ project('pxf-service') {
             filter(ReplaceTokens,
                     tokens: ['pxfLogDir'     :  databaseProperties.pxfLogDir,
                              'pxfRunDir'     :  databaseProperties.pxfRunDir,
+                             'pxfPortNum'    :  databaseProperties.pxfPortNum,
                              'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
             into "/etc/pxf-${project.version}/conf"
         }
@@ -296,6 +297,7 @@ project('pxf-service') {
             into "/opt/pxf-${project.version}"
             filter(ReplaceTokens,
                     tokens: [
+                            'pxfPortNum'    :  databaseProperties.pxfPortNum,
                             'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
         }
 
@@ -629,6 +631,7 @@ task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
         rename('pxf-service', 'pxf')
         filter(ReplaceTokens,
                 tokens: [
+                        'pxfPortNum'    : databaseProperties.pxfPortNum,
                         'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
     }
 
@@ -639,6 +642,7 @@ task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
         filter(ReplaceTokens,
                 tokens: ['pxfLogDir'     : databaseProperties.pxfLogDir,
                          'pxfRunDir'     : databaseProperties.pxfRunDir,
+                         'pxfPortNum'    : databaseProperties.pxfPortNum,
                          'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)]) into 'conf'
     }
     from("pxf-service/src/configs/tomcat") { into 'tomcat-templates' }
