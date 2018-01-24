@@ -58,8 +58,8 @@ public class JdbcPlugin extends Plugin {
         super(input);
         jdbcDriver = input.getUserProperty("JDBC_DRIVER");
         dbUrl = input.getUserProperty("DB_URL");
-        user = input.getUserProperty("USER");
-        pass = input.getUserProperty("PASS");
+        user = input.getUserProperty("DB_USER");
+        pass = input.getUserProperty("DB_PASS");
         String strBatch = input.getUserProperty("BATCH_SIZE");
         if (strBatch != null) {
             batchSize = Integer.parseInt(strBatch);

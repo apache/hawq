@@ -94,7 +94,7 @@ public class ProtocolDataTest {
         when(ProfilesConf.getProfilePluginsMap("a profile")).thenReturn(
                 mockedProfiles);
 
-        parameters.put("x-gp-profile", "a profile");
+        parameters.put("x-gp-options-profile", "a profile");
         parameters.put("when you try your best", "and you do succeed");
         parameters.put("WHEN you GET what YOU want", "and what you need");
 
@@ -110,9 +110,9 @@ public class ProtocolDataTest {
 
     @Test
     public void definedProfile() throws Exception {
-        parameters.put("X-GP-PROFILE", "HIVE");
-        parameters.remove("X-GP-ACCESSOR");
-        parameters.remove("X-GP-RESOLVER");
+        parameters.put("X-GP-OPTIONS-PROFILE", "HIVE");
+        parameters.remove("X-GP-OPTIONS-ACCESSOR");
+        parameters.remove("X-GP-OPTIONS-RESOLVER");
         ProtocolData protocolData = new ProtocolData(parameters);
         assertEquals(protocolData.getFragmenter(), "org.apache.hawq.pxf.plugins.hive.HiveDataFragmenter");
         assertEquals(protocolData.getAccessor(), "org.apache.hawq.pxf.plugins.hive.HiveAccessor");
@@ -121,7 +121,7 @@ public class ProtocolDataTest {
 
     @Test
     public void undefinedProfile() throws Exception {
-        parameters.put("X-GP-PROFILE", "THIS_PROFILE_NEVER_EXISTED!");
+        parameters.put("X-GP-OPTIONS-PROFILE", "THIS_PROFILE_NEVER_EXISTED!");
         try {
             new ProtocolData(parameters);
             fail("Undefined profile should throw ProfileConfException");
@@ -132,29 +132,29 @@ public class ProtocolDataTest {
 
     @Test
     public void threadSafeTrue() throws Exception {
-        parameters.put("X-GP-THREAD-SAFE", "TRUE");
+        parameters.put("X-GP-OPTIONS-THREAD-SAFE", "TRUE");
         ProtocolData protocolData = new ProtocolData(parameters);
         assertEquals(protocolData.isThreadSafe(), true);
 
-        parameters.put("X-GP-THREAD-SAFE", "true");
+        parameters.put("X-GP-OPTIONS-THREAD-SAFE", "true");
         protocolData = new ProtocolData(parameters);
         assertEquals(protocolData.isThreadSafe(), true);
     }
 
     @Test
     public void threadSafeFalse() throws Exception {
-        parameters.put("X-GP-THREAD-SAFE", "False");
+        parameters.put("X-GP-OPTIONS-THREAD-SAFE", "False");
         ProtocolData protocolData = new ProtocolData(parameters);
         assertEquals(protocolData.isThreadSafe(), false);
 
-        parameters.put("X-GP-THREAD-SAFE", "falSE");
+        parameters.put("X-GP-OPTIONS-THREAD-SAFE", "falSE");
         protocolData = new ProtocolData(parameters);
         assertEquals(protocolData.isThreadSafe(), false);
     }
 
     @Test
     public void threadSafeMaybe() throws Exception {
-        parameters.put("X-GP-THREAD-SAFE", "maybe");
+        parameters.put("X-GP-OPTIONS-THREAD-SAFE", "maybe");
         try {
             new ProtocolData(parameters);
             fail("illegal THREAD-SAFE value should throw IllegalArgumentException");
@@ -166,7 +166,7 @@ public class ProtocolDataTest {
 
     @Test
     public void threadSafeDefault() throws Exception {
-        parameters.remove("X-GP-THREAD-SAFE");
+        parameters.remove("X-GP-OPTIONS-THREAD-SAFE");
         ProtocolData protocolData = new ProtocolData(parameters);
         assertEquals(protocolData.isThreadSafe(), true);
     }
@@ -232,8 +232,8 @@ public class ProtocolDataTest {
 
     @Test
     public void statsParams() {
-        parameters.put("X-GP-STATS-MAX-FRAGMENTS", "10101");
-        parameters.put("X-GP-STATS-SAMPLE-RATIO", "0.039");
+        parameters.put("X-GP-OPTIONS-STATS-MAX-FRAGMENTS", "10101");
+        parameters.put("X-GP-OPTIONS-STATS-SAMPLE-RATIO", "0.039");
 
         ProtocolData protData = new ProtocolData(parameters);
 
@@ -243,21 +243,21 @@ public class ProtocolDataTest {
 
     @Test
     public void statsMissingParams() {
-        parameters.put("X-GP-STATS-MAX-FRAGMENTS", "13");
+        parameters.put("X-GP-OPTIONS-STATS-MAX-FRAGMENTS", "13");
         try {
             new ProtocolData(parameters);
-            fail("missing X-GP-STATS-SAMPLE-RATIO parameter");
+            fail("missing X-GP-OPTIONS-STATS-SAMPLE-RATIO parameter");
         } catch (IllegalArgumentException e) {
             assertEquals(
                     e.getMessage(),
                     "Missing parameter: STATS-SAMPLE-RATIO and STATS-MAX-FRAGMENTS must be set together");
         }
 
-        parameters.remove("X-GP-STATS-MAX-FRAGMENTS");
-        parameters.put("X-GP-STATS-SAMPLE-RATIO", "1");
+        parameters.remove("X-GP-OPTIONS-STATS-MAX-FRAGMENTS");
+        parameters.put("X-GP-OPTIONS-STATS-SAMPLE-RATIO", "1");
         try {
             new ProtocolData(parameters);
-            fail("missing X-GP-STATS-MAX-FRAGMENTS parameter");
+            fail("missing X-GP-OPTIONS-STATS-MAX-FRAGMENTS parameter");
         } catch (IllegalArgumentException e) {
             assertEquals(
                     e.getMessage(),
@@ -267,11 +267,11 @@ public class ProtocolDataTest {
 
     @Test
     public void statsSampleRatioNegative() {
-        parameters.put("X-GP-STATS-SAMPLE-RATIO", "101");
+        parameters.put("X-GP-OPTIONS-STATS-SAMPLE-RATIO", "101");
 
         try {
             new ProtocolData(parameters);
-            fail("wrong X-GP-STATS-SAMPLE-RATIO value");
+            fail("wrong X-GP-OPTIONS-STATS-SAMPLE-RATIO value");
         } catch (IllegalArgumentException e) {
             assertEquals(
                     e.getMessage(),
@@ -279,10 +279,10 @@ public class ProtocolDataTest {
                             + "STATS-SAMPLE-RATIO must be a value between 0.0001 and 1.0");
         }
 
-        parameters.put("X-GP-STATS-SAMPLE-RATIO", "0");
+        parameters.put("X-GP-OPTIONS-STATS-SAMPLE-RATIO", "0");
         try {
             new ProtocolData(parameters);
-            fail("wrong X-GP-STATS-SAMPLE-RATIO value");
+            fail("wrong X-GP-OPTIONS-STATS-SAMPLE-RATIO value");
         } catch (IllegalArgumentException e) {
             assertEquals(
                     e.getMessage(),
@@ -290,10 +290,10 @@ public class ProtocolDataTest {
                             + "STATS-SAMPLE-RATIO must be a value between 0.0001 and 1.0");
         }
 
-        parameters.put("X-GP-STATS-SAMPLE-RATIO", "0.00005");
+        parameters.put("X-GP-OPTIONS-STATS-SAMPLE-RATIO", "0.00005");
         try {
             new ProtocolData(parameters);
-            fail("wrong X-GP-STATS-SAMPLE-RATIO value");
+            fail("wrong X-GP-OPTIONS-STATS-SAMPLE-RATIO value");
         } catch (IllegalArgumentException e) {
             assertEquals(
                     e.getMessage(),
@@ -301,10 +301,10 @@ public class ProtocolDataTest {
                             + "STATS-SAMPLE-RATIO must be a value between 0.0001 and 1.0");
         }
 
-        parameters.put("X-GP-STATS-SAMPLE-RATIO", "a");
+        parameters.put("X-GP-OPTIONS-STATS-SAMPLE-RATIO", "a");
         try {
             new ProtocolData(parameters);
-            fail("wrong X-GP-STATS-SAMPLE-RATIO value");
+            fail("wrong X-GP-OPTIONS-STATS-SAMPLE-RATIO value");
         } catch (NumberFormatException e) {
             assertEquals(e.getMessage(), "For input string: \"a\"");
         }
@@ -312,20 +312,20 @@ public class ProtocolDataTest {
 
     @Test
     public void statsMaxFragmentsNegative() {
-        parameters.put("X-GP-STATS-MAX-FRAGMENTS", "10.101");
+        parameters.put("X-GP-OPTIONS-STATS-MAX-FRAGMENTS", "10.101");
 
         try {
             new ProtocolData(parameters);
-            fail("wrong X-GP-STATS-MAX-FRAGMENTS value");
+            fail("wrong X-GP-OPTIONS-STATS-MAX-FRAGMENTS value");
         } catch (NumberFormatException e) {
             assertEquals(e.getMessage(), "For input string: \"10.101\"");
         }
 
-        parameters.put("X-GP-STATS-MAX-FRAGMENTS", "0");
+        parameters.put("X-GP-OPTIONS-STATS-MAX-FRAGMENTS", "0");
 
         try {
             new ProtocolData(parameters);
-            fail("wrong X-GP-STATS-MAX-FRAGMENTS value");
+            fail("wrong X-GP-OPTIONS-STATS-MAX-FRAGMENTS value");
         } catch (IllegalArgumentException e) {
             assertEquals(e.getMessage(), "Wrong value '0'. "
                     + "STATS-MAX-FRAGMENTS must be a positive integer");
@@ -425,11 +425,11 @@ public class ProtocolDataTest {
         parameters.put("X-GP-URL-HOST", "my://bags");
         parameters.put("X-GP-URL-PORT", "-8020");
         parameters.put("X-GP-ATTRS", "-1");
-        parameters.put("X-GP-ACCESSOR", "are");
-        parameters.put("X-GP-RESOLVER", "packed");
+        parameters.put("X-GP-OPTIONS-ACCESSOR", "are");
+        parameters.put("X-GP-OPTIONS-RESOLVER", "packed");
         parameters.put("X-GP-DATA-DIR", "i'm/ready/to/go");
         parameters.put("X-GP-FRAGMENT-METADATA", "U29tZXRoaW5nIGluIHRoZSB3YXk=");
-        parameters.put("X-GP-I'M-STANDING-HERE", "outside-your-door");
+        parameters.put("X-GP-OPTIONS-I'M-STANDING-HERE", "outside-your-door");
 
         PowerMockito.mockStatic(UserGroupInformation.class);
     }
