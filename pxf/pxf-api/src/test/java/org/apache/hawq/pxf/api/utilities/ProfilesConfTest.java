@@ -96,8 +96,6 @@ class ProfilesConfTestDefinedProfile extends ProfilesConfTest {
                 optionalFile.toURI().toURL());
 
         Map<String, String> hbaseProfile = ProfilesConf.getProfilePluginsMap("HBase");
-        System.out.println(hbaseProfile);
-        System.out.println(hbaseProfile.get("X-GP-OPTIONS-PLUGIN1"));
         assertEquals(2, hbaseProfile.keySet().size());
         assertEquals(hbaseProfile.get("X-GP-OPTIONS-PLUGIN1"), "X");
         assertEquals(hbaseProfile.get("X-GP-OPTIONS-PLUGIN2"), "XX");
