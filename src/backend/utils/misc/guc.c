@@ -4092,6 +4092,15 @@ static struct config_bool ConfigureNamesBool[] =
 		true, NULL, NULL
 	},
 
+	{
+			{"vectorized_executor_enable", PGC_USERSET, QUERY_TUNING_METHOD,
+			 gettext_noop("enable vectorized executor"),
+			 NULL
+			},
+			&vectorized_executor_enable,
+			false, NULL, NULL
+	},
+
     {
 		{"get_tmpdir_from_rm", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Get temporary directory from resource manager"),

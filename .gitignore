@@ -66,3 +66,6 @@ autom4te.cache/
 *.gcda
 *.gcno
 CodeCoverage*
+
+.vscode
+cmake-build-debug

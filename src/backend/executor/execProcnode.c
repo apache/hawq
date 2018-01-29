@@ -147,6 +147,7 @@
 #include "utils/debugbreak.h"
 #include "pg_trace.h"
 
+VectorExecMthd vmthd = {};
 #ifdef CDB_TRACE_EXECUTOR
 #include "nodes/print.h"
 static void ExecCdbTraceNode(PlanState *node, bool entry, TupleTableSlot *result);
@@ -204,6 +205,55 @@ setSubplanSliceId(SubPlan *subplan, EState *estate)
 	}
 }
 
+static bool isValidVectorizedPlan(Plan *node)
+{
+	if (!vectorized_executor_enable)
+	{
+		return false;
+	}
+
+	if (nodeTag(node) != T_Agg)
+	{
+		return false;
+	}
+	Plan *outerPlan = outerPlan(node);
+	if (nodeTag(outerPlan) != T_ParquetScan)
+	{
+		return false;
+	}
+	/*
+	TableScan *ts = (TableScan *)outerPlan;
+	if (ts->ss.tableType != TableTypeParquet)
+	{
+		return false;
+	}
+	*/
+	return true;
+}
+
+static bool isValidVectorizedPlanState(PlanState *node)
+{
+	if (!vectorized_executor_enable)
+	{
+		return false;
+	}
+
+	if (nodeTag(node) != T_AggState)
+	{
+		return false;
+	}
+	PlanState *outerPlan = outerPlanState(node);
+	if (nodeTag(outerPlan) != T_TableScanState)
+	{
+		return false;
+	}
+	TableScanState *ts = (TableScanState *)outerPlan;
+	if (ts->ss.tableType != TableTypeParquet)
+	{
+		return false;
+	}
+	return true;
+}
 
 /* ------------------------------------------------------------------------
  *		ExecInitNode
@@ -225,6 +275,9 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	PlanState  *result;
 	List	   *subps;
 	ListCell   *l;
+    if(ISVECTORIZED(node) && vmthd.ExecInitNode_H
+			&& (result = vmthd.ExecInitNode_H(node,estate,eflags)))
+		return result;
 
 	/*
 	 * do nothing when we get to the end of a leaf on tree.
@@ -797,7 +850,7 @@ ExecSliceDependencyNode(PlanState *node)
 	ExecSliceDependencyNode(outerPlanState(node));
 	ExecSliceDependencyNode(innerPlanState(node));
 }
-    
+
 /* ----------------------------------------------------------------
  *		ExecProcNode
  *
@@ -808,6 +861,10 @@ TupleTableSlot *
 ExecProcNode(PlanState *node)
 {
 	TupleTableSlot *result = NULL;
+    if(ISVECTORIZED(node) && vmthd.ExecProcNode_H
+	   && (result = vmthd.ExecProcNode_H(node)))
+		return result;
+
 
 	START_MEMORY_ACCOUNT(node->plan->memoryAccount);
 	{
@@ -1509,7 +1566,6 @@ ExecUpdateTransportState(PlanState *node, ChunkTransportState *state)
 	planstate_walk_node(node, transportUpdateNodeWalker, state);
 }	                            /* ExecUpdateTransportState */
 
-
 /* ----------------------------------------------------------------
  *		ExecEndNode
  *
@@ -1524,6 +1580,10 @@ ExecUpdateTransportState(PlanState *node, ChunkTransportState *state)
 void
 ExecEndNode(PlanState *node)
 {
+	if(ISVECTORIZED(node) && vmthd.ExecEndNode_H
+	   && vmthd.ExecEndNode_H(node))
+		return ;
+
 	ListCell   *subp;
 
 	/*

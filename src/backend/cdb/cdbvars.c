@@ -268,6 +268,9 @@ int min_cost_for_each_query;
 bool metadata_cache_enable;
 int metadata_cache_block_capacity;
 
+/* GUCs for vectorized executor */
+bool vectorized_executor_enable;
+
 /* The 5 gucs below related to metadatacache_test . */
 int metadata_cache_check_interval;
 int metadata_cache_refresh_interval;

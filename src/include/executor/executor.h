@@ -41,6 +41,17 @@
 
 #include "cdb/cdbdef.h"                 /* CdbVisitOpt */
 
+#define ISVECTORIZED(note) false
+
+typedef struct vectorexe_t {
+    PlanState* (*ExecInitNode_H)(Plan *node,EState *eState,int eflags);
+	TupleTableSlot* (*ExecProcNode_H)(PlanState *node);
+	bool (*ExecEndNode_H)(PlanState *node);
+} VectorExecMthd;
+
+extern PGDLLIMPORT VectorExecMthd vmthd;
+
+
 struct ChunkTransportState;             /* #include "cdb/cdbinterconnect.h" */
 
 /*
