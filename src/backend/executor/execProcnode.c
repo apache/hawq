@@ -147,6 +147,7 @@
 #include "utils/debugbreak.h"
 #include "pg_trace.h"
 
+VectorExecMthd vmthd = {};
 #ifdef CDB_TRACE_EXECUTOR
 #include "nodes/print.h"
 static void ExecCdbTraceNode(PlanState *node, bool entry, TupleTableSlot *result);
@@ -225,6 +226,9 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	PlanState  *result;
 	List	   *subps;
 	ListCell   *l;
+    if(vmthd.vectorized_executor_enable && vmthd.ExecInitNode_Hook
+			&& (result = vmthd.ExecInitNode_Hook(node,estate,eflags)))
+		return result;
 
 	/*
 	 * do nothing when we get to the end of a leaf on tree.
@@ -797,7 +801,7 @@ ExecSliceDependencyNode(PlanState *node)
 	ExecSliceDependencyNode(outerPlanState(node));
 	ExecSliceDependencyNode(innerPlanState(node));
 }
-    
+
 /* ----------------------------------------------------------------
  *		ExecProcNode
  *
@@ -808,6 +812,10 @@ TupleTableSlot *
 ExecProcNode(PlanState *node)
 {
 	TupleTableSlot *result = NULL;
+    if(vmthd.vectorized_executor_enable && vmthd.ExecProcNode_Hook
+	   && (result = vmthd.ExecProcNode_Hook(node)))
+		return result;
+
 
 	START_MEMORY_ACCOUNT(node->plan->memoryAccount);
 	{
@@ -1524,6 +1532,10 @@ ExecUpdateTransportState(PlanState *node, ChunkTransportState *state)
 void
 ExecEndNode(PlanState *node)
 {
+	if(vmthd.vectorized_executor_enable && vmthd.ExecEndNode_Hook
+	   && vmthd.ExecEndNode_Hook(node))
+		return ;
+
 	ListCell   *subp;
 
 	/*
