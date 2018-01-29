@@ -267,6 +267,11 @@ function check_hadoop_install()
             fi
             ;;
         cdh|CDH)
+            if [ -d "/opt/cloudera/parcels/CDH/lib/hadoop" ]; then
+                DISTRO="cdh"
+                CDHMANAGER="manager"
+                return 0;
+            fi
             if [ -d "/usr/lib/hadoop/client" ]; then
                 DISTRO="cdh"
                 return 0;
@@ -294,6 +299,7 @@ function check_hadoop_install()
 function determineHadoopDistro()
 {
     DISTRO=""
+    CDHMANAGER=""
     # check if the distro is explicitly specified
     if [ -z "${HADOOP_DISTRO}" ]; then
         # if distro is not specified, try checking for HDP and then CDH
@@ -334,6 +340,13 @@ function generatePrivateClasspath()
     # substitute HADOOP_ROOT value if defined
     if [ -n "${HADOOP_ROOT}" ]; then
         sed -i -e "s|HADOOP_ROOT|${HADOOP_ROOT}|g" ${PXF_HOME}/conf/pxf-private.classpath
+    fi
+   
+    # from clouderamanager
+    if ["${DISTRO}" -eq "cdh" ]  && [ "${CDHMANAGER}" -eq "manager" ] ; then
+        sed -i -e "s|CDHJAR|'/opt/cloudera/parcels/CDH/lib/hadoop/'|g" ${PXF_HOME}/conf/pxf-private.classpath
+    else
+        sed -i -e "s|CDHJAR|'/usr/lib/hadoop/'|g" ${PXF_HOME}/conf/pxf-private.classpath        
     fi
 }
 
