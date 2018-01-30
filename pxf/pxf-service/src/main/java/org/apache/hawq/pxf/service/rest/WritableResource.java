@@ -126,8 +126,10 @@ public class WritableResource extends RestResource{
 
         // THREAD-SAFE parameter has precedence
         boolean isThreadSafe = protData.isThreadSafe() && bridge.isThreadSafe();
-        LOG.debug("Request for " + path + " handled " +
-                (isThreadSafe ? "without" : "with") + " synchronization");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Request for " + path + " handled " +
+                    (isThreadSafe ? "without" : "with") + " synchronization");
+        }
 
         return isThreadSafe ?
                 writeResponse(bridge, path, inputStream) :
@@ -145,8 +147,6 @@ public class WritableResource extends RestResource{
                                           String path,
                                           InputStream inputStream) throws Exception {
 
-        String returnMsg;
-
         // Open the output file
         bridge.beginIteration();
 
@@ -159,20 +159,16 @@ public class WritableResource extends RestResource{
                 ++totalWritten;
             }
         } catch (ClientAbortException e) {
-            LOG.debug("Remote connection closed by HAWQ", e);
+            LOG.error("Remote connection closed by HAWQ", e);
         } catch (Exception ex) {
-            LOG.debug("totalWritten so far " + totalWritten + " to " + path);
+            LOG.error("Exception: totalWritten so far " + totalWritten + " to " + path, ex);
             throw ex;
         } finally {
-            try {
-                bridge.endIteration();
-            } catch (Exception e) {
-                // ignore ... any significant errors should already have been handled
-            }
+            bridge.endIteration();
         }
 
         String censuredPath = Utilities.maskNonPrintables(path);
-        returnMsg = "wrote " + totalWritten + " bulks to " + censuredPath;
+        String returnMsg = "wrote " + totalWritten + " bulks to " + censuredPath;
         LOG.debug(returnMsg);
 
         return Response.ok(returnMsg).build();
