@@ -344,18 +344,18 @@ function generatePrivateClasspath()
    
     # from clouderamanager
     if [ "${DISTRO}" = "cdh" ] && [ "${CDHMANAGER}" = "manager" ]; then
-        sed -i -e "s|CDH_HADOOP_JAR|/opt/cloudera/parcels/CDH/lib/hadoop|g" ${PXF_HOME}/conf/pxf-private.classpath
-        sed -i -e "s|CDH_YARN_JAR|/opt/cloudera/parcels/CDH/jars|g" ${PXF_HOME}/conf/pxf-private.classpath
-        sed -i -e "s|CDH_JETTY_JAR|/opt/cloudera/parcels/CDH/jars|g" ${PXF_HOME}/conf/pxf-private.classpath
-        sed -i -e "s|CDH_HIVE_JAR|/opt/cloudera/parcels/CDH/lib/hive|g" ${PXF_HOME}/conf/pxf-private.classpath
-        sed -i -e "s|CDH_HBASE_JAR|/opt/cloudera/parcels/CDH/lib/hbase|g" ${PXF_HOME}/conf/pxf-private.classpath
-        sed -i -e "s|CDH_ZOO_JAR|/opt/cloudera/parcels/CDH/lib/zookeeper|g" ${PXF_HOME}/conf/pxf-private.classpath
+        sed -i -e "s|CDH_HADOOP_JAR|/opt/cloudera/parcels/CDH/lib/hadoop|g" ${PXF_HOME}/conf/pxf-private.classpath \
+               -e "s|CDH_YARN_JAR|/opt/cloudera/parcels/CDH/jars|g" ${PXF_HOME}/conf/pxf-private.classpath \
+               -e "s|CDH_JETTY_JAR|/opt/cloudera/parcels/CDH/jars|g" ${PXF_HOME}/conf/pxf-private.classpath \
+               -e "s|CDH_HIVE_JAR|/opt/cloudera/parcels/CDH/lib/hive|g" ${PXF_HOME}/conf/pxf-private.classpath \
+               -e "s|CDH_HBASE_JAR|/opt/cloudera/parcels/CDH/lib/hbase|g" ${PXF_HOME}/conf/pxf-private.classpath \
+               -e "s|CDH_ZOO_JAR|/opt/cloudera/parcels/CDH/lib/zookeeper|g" ${PXF_HOME}/conf/pxf-private.classpath 
     else
-        sed -i -e "s|CDH_HADOOP_JAR|/usr/lib/hadoop|g" ${PXF_HOME}/conf/pxf-private.classpath        
-        sed -i -e "s|CDH_YARN_JAR|/usr/lib/hadoop-yarn|g" ${PXF_HOME}/conf/pxf-private.classpath
-        sed -i -e "s|CDH_HIVE_JAR|/usr/lib/hive|g" ${PXF_HOME}/conf/pxf-private.classpath
-        sed -i -e "s|CDH_HBASE_JAR|/usr/lib/hbase|g" ${PXF_HOME}/conf/pxf-private.classpath
-        sed -i -e "s|CDH_ZOO_JAR|/usr/lib/zookeeper|g" ${PXF_HOME}/conf/pxf-private.classpath
+        sed -i -e "s|CDH_HADOOP_JAR|/usr/lib/hadoop|g" ${PXF_HOME}/conf/pxf-private.classpath \       
+               -e "s|CDH_YARN_JAR|/usr/lib/hadoop-yarn|g" ${PXF_HOME}/conf/pxf-private.classpath \
+               -e "s|CDH_HIVE_JAR|/usr/lib/hive|g" ${PXF_HOME}/conf/pxf-private.classpath \
+               -e "s|CDH_HBASE_JAR|/usr/lib/hbase|g" ${PXF_HOME}/conf/pxf-private.classpath \
+               -e "s|CDH_ZOO_JAR|/usr/lib/zookeeper|g" ${PXF_HOME}/conf/pxf-private.classpath 
     fi
 }
 
