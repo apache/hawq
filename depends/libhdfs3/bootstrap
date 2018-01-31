@@ -32,7 +32,7 @@ binary_dir=`pwd`
 default_prefix=${source_dir}/dist
 
 # Choose the default dependency install prefix
-default_dependency=${DEPENDENCY_INSTALL_PREFIX}
+default_dependency=${HDFS_DEPENDENCY_INSTALL_PREFIX}
 
 if [ x"${default_dependency}" = x"" ]; then
     default_dependency="/opt/dependency"

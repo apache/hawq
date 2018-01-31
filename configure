@@ -9457,6 +9457,60 @@ fi
   fi
 fi
 
+#Check specific openssl for libhdfs used --wwang
+#Choose the default hdfs dependency prefix
+hdfs_default_dependency=${HDFS_DEPENDENCY_INSTALL_PREFIX}
+
+if [ x"${hdfs_default_dependency}" = x"" ]; then
+    hdfs_default_dependency="/opt/dependency"
+fi
+
+ac_check_lib_save_LIBS=$LIBS
+ac_check_save_cppflag=$CPPFLAGS
+ac_check_save_ldflag=$LDFLAGS
+
+CPPFLAGS="-I$hdfs_default_dependency/include $CPPFLAGS"
+LDFLAGS="-L$hdfs_default_dependency/lib $LDFLAGS"
+LIBS="-lcrypto $LIBS"
+
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+  /* end confdefs.h.  */
+
+  /* Override any GCC internal prototype to avoid an error.
+     Use char because int might match the return type of a GCC
+     builtin and then its argument prototype would still apply.  */
+  #ifdef __cplusplus
+  extern "C"
+  #endif
+  char EVP_aes_256_ctr();
+  int
+  main ()
+  {
+  return EVP_aes_256_ctr();
+    ;
+    return 0;
+  }
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  has_evp=yes
+else
+  has_evp=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+
+if test "x$has_evp" = xno; then :
+	as_fn_error $? "function 'EVP_aes_256_ctr' in library 'crypto' is required for OpenSSL. 
+Check config.log for details. It is possible the compiler isn't looking in the proper directory. 
+export HDFS_DEPENDENCY_INSTALL_PREFIX environment variable to indicate hdfs dependent openssl path" "$LINENO" 5
+fi
+
+
+LIBS=$ac_check_lib_save_LIBS
+CPPFLAGS=$ac_check_save_cppflag
+LDFLAGS=$ac_check_save_ldflag
+#Check libhdfs end
+
 if test "$with_openssl" = yes ; then
     if test "$PORTNAME" == "darwin"; then
 	LDFLAGS = "$LDFLAGS -L/usr/local/opt/openssl/lib"
