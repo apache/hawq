@@ -11234,7 +11234,7 @@ if test "$PORTNAME" == "darwin"; then
     LDFLAGS="-L/usr/local/opt/openssl/lib $LDFLAGS"
 fi
 
-if test x"${DEPENDENCY_INSTALL_PREFIX}" == x""; then
+if test ! x"${DEPENDENCY_INSTALL_PREFIX}" == x""; then
     CPPFLAGS="-I${DEPENDENCY_INSTALL_PREFIX}/include $CPPFLAGS"
     LDFLAGS="-L${DEPENDENCY_INSTALL_PREFIX}/lib $LDFLAGS"
 fi
@@ -11294,7 +11294,7 @@ if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
 
 else
-  as_fn_error $? "function 'EVP_aes_256_ctr' in library 'openssl' is required by libhdfs3.You can export HDFS_DEPENDENCY_INSTALL_PREFIX as custom path.
+  as_fn_error $? "function 'EVP_aes_256_ctr' in library 'openssl' is required by libhdfs3.You can export DEPENDENCY_INSTALL_PREFIX as custom path.
 Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 

@@ -1333,12 +1333,12 @@ if test "$PORTNAME" == "darwin"; then
     LDFLAGS="-L/usr/local/opt/openssl/lib $LDFLAGS"
 fi
 
-if test x"${DEPENDENCY_INSTALL_PREFIX}" == x""; then
+if test ! x"${DEPENDENCY_INSTALL_PREFIX}" == x""; then
     CPPFLAGS="-I${DEPENDENCY_INSTALL_PREFIX}/include $CPPFLAGS"
     LDFLAGS="-L${DEPENDENCY_INSTALL_PREFIX}/lib $LDFLAGS"
 fi
 
-AC_SEARCH_LIBS(EVP_aes_256_ctr,crypto, [], [AC_MSG_ERROR([function 'EVP_aes_256_ctr' in library 'openssl' is required by libhdfs3.You can export HDFS_DEPENDENCY_INSTALL_PREFIX as custom path.
+AC_SEARCH_LIBS(EVP_aes_256_ctr,crypto, [], [AC_MSG_ERROR([function 'EVP_aes_256_ctr' in library 'openssl' is required by libhdfs3.You can export DEPENDENCY_INSTALL_PREFIX as custom path.
 Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
 
 CPPFLAGS=${BACKUPCPPFLAG}
