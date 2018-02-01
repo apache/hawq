@@ -19,7 +19,6 @@ package org.apache.hawq.pxf.service.rest;
  * under the License.
  */
 
-
 import java.io.DataInputStream;
 import java.io.InputStream;
 import java.util.Map;
@@ -80,10 +79,8 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
 
  */
 
-
 /**
- * This class handles the subpath /&lt;version&gt;/Writable/ of this
- * REST component
+ * This class handles the subpath /&lt;version&gt;/Writable/ of this REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Writable/")
 public class WritableResource extends RestResource{
@@ -145,12 +142,12 @@ public class WritableResource extends RestResource{
 
     private static Response writeResponse(Bridge bridge,
                                           String path,
-                                          InputStream inputStream) throws Exception {
-
+                                          InputStream inputStream)
+            throws Exception {
         // Open the output file
         bridge.beginIteration();
-
         long totalWritten = 0;
+        Exception ex = null;
 
         // dataStream will close automatically in the end of the try.
         // inputStream is closed by dataStream.close().
@@ -158,13 +155,21 @@ public class WritableResource extends RestResource{
             while (bridge.setNext(dataStream)) {
                 ++totalWritten;
             }
-        } catch (ClientAbortException e) {
-            LOG.error("Remote connection closed by HAWQ", e);
-        } catch (Exception ex) {
-            LOG.error("Exception: totalWritten so far " + totalWritten + " to " + path, ex);
-            throw ex;
+        } catch (ClientAbortException cae) {
+            LOG.error("Remote connection closed by HAWQ", cae);
+        } catch (Exception e) {
+            LOG.error("Exception: totalWritten so far " + totalWritten + " to " + path, e);
+            ex = e;
         } finally {
-            bridge.endIteration();
+            try {
+                bridge.endIteration();
+            } catch (Exception e) {
+                if (ex == null)
+                    ex = e;
+            }
+            // propagate any exceptions
+            if (ex != null)
+                throw ex;
         }
 
         String censuredPath = Utilities.maskNonPrintables(path);
