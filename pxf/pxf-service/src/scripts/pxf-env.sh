@@ -19,7 +19,7 @@
 PARENT_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 
 # Default PXF_HOME
-export PXF_HOME=${PXF_HOME:=$PARENT_SCRIPT_DIR}
+export PXF_HOME=${PXF_HOME:=${PARENT_SCRIPT_DIR}}
 
 # Path to HDFS native libraries
 export LD_LIBRARY_PATH=/usr/lib/hadoop/lib/native:${LD_LIBRARY_PATH}
@@ -39,7 +39,7 @@ if [ ! -z '@pxfDefaultUser@' ]; then
 fi
 
 # Port
-export PXF_PORT=${PXF_PORT:-51200}
+export PXF_PORT=${PXF_PORT:-@pxfPortNum@}
 
 # Memory
 export PXF_JVM_OPTS="-Xmx2g -Xms1g"

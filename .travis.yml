@@ -36,16 +36,20 @@ install:
       openssl
       python
       snappy
+      apr
   - brew reinstall
       protobuf
       protobuf-c
       thrift
   - brew outdated libyaml || brew upgrade libyaml
   - brew outdated json-c  || brew upgrade json-c
-  - brew outdated boost   || brew upgrade boost
+  - brew uninstall boost --ignore-dependencies
+  - brew install homebrew/core/boost@1.60
+  - brew link boost@1.60 --force
   - brew outdated maven   || brew upgrade maven
   - brew install iproute2mac
   - brew list --versions
+  - brew link apr --force
   - sudo easy_install pip
   - sudo pip install pycrypto
   - sudo cpanm install JSON

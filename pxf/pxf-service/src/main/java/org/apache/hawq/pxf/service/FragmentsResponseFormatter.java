@@ -143,8 +143,10 @@ public class FragmentsResponseFormatter {
                 result.append(" ").append(host);
             }
 
-            result.append(", Metadata: ").append(
+            if (fragment.getMetadata() != null) {
+                result.append(", Metadata: ").append(
                     new String(fragment.getMetadata()));
+            }
 
             if (fragment.getUserData() != null) {
                 result.append(", User Data: ").append(

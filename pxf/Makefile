@@ -95,10 +95,10 @@ tomcat:
 install:
 	./gradlew install $(BUILD_PARAMS)
 	@if [ -d "$(PXF_HOME)/lib" ] ; then \
-		pushd $(PXF_HOME)/lib && \
+		cd $(PXF_HOME)/lib && \
 		for X in pxf-*-[0-9]*.jar; do \
 			ln -sf $$X `echo $$X | sed -e 's/-[a-zA-Z0-9.]*.jar/.jar/'`; \
-		done && popd; \
+		done; \
 	fi
 
 bundle:

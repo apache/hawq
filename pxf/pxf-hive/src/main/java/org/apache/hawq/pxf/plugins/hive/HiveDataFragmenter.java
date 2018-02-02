@@ -60,6 +60,7 @@ import org.apache.hawq.pxf.api.utilities.ProfilesConf;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.ProfileFactory;
+import org.apache.hadoop.hive.conf.HiveConf;
 
 /**
  * Fragmenter class for HIVE tables. <br>
@@ -100,6 +101,7 @@ public class HiveDataFragmenter extends Fragmenter {
     private Set<String> setPartitions = new TreeSet<String>(
             String.CASE_INSENSITIVE_ORDER);
     private Map<String, String> partitionkeyTypes = new HashMap<>();
+    private boolean canPushDownIntegral;
 
     /**
      * Constructs a HiveDataFragmenter object.
@@ -120,6 +122,9 @@ public class HiveDataFragmenter extends Fragmenter {
         super(inputData);
         jobConf = new JobConf(new Configuration(), clazz);
         client = HiveUtilities.initHiveClient();
+        // canPushDownIntegral represents hive.metastore.integral.jdo.pushdown property in hive-site.xml
+        canPushDownIntegral =
+                HiveConf.getBoolVar(new HiveConf(), HiveConf.ConfVars.METASTORE_INTEGER_JDO_PUSHDOWN);
     }
 
     @Override
@@ -409,7 +414,11 @@ public class HiveDataFragmenter extends Fragmenter {
         String filterValue = bFilter.getConstant()!= null ? bFilter.getConstant().constant().toString() : "";
         ColumnDescriptor filterColumn = inputData.getColumn(filterColumnIndex);
         String filterColumnName = filterColumn.columnName();
-
+        FilterParser.Operation operation = ((BasicFilter) filter).getOperation();
+        String colType = partitionkeyTypes.get(filterColumnName);
+        boolean isIntegralSupported =
+                canPushDownIntegral &&
+                        (operation == FilterParser.Operation.HDOP_EQ || operation == FilterParser.Operation.HDOP_NE);
         // In case this filter is not a partition, we ignore this filter (no add
         // to filter list)
         if (!setPartitions.contains(filterColumnName)) {
@@ -418,8 +427,15 @@ public class HiveDataFragmenter extends Fragmenter {
             return false;
         }
 
-		if (!partitionkeyTypes.get(filterColumnName).equalsIgnoreCase(serdeConstants.STRING_TYPE_NAME)) {
-            LOG.debug("Filter type is not string type , ignore this filter for hive: "
+        /* 
+         * HAWQ-1527 - Filtering only supported for partition columns of type string or 
+         * intgeral datatype. Integral datatypes include - TINYINT, SMALLINT, INT, BIGINT. 
+         * Note that with integral data types only equals("=") and not equals("!=") operators
+         * are supported. There are no operator restrictions with String.
+         */
+        if (!colType.equalsIgnoreCase(serdeConstants.STRING_TYPE_NAME)
+                && (!isIntegralSupported || !serdeConstants.IntegralTypes.contains(colType))) {
+            LOG.debug("Column type is neither string nor an integral data type, ignore this filter for hive: "
                     + filter);
             return false;
         }
@@ -428,7 +444,7 @@ public class HiveDataFragmenter extends Fragmenter {
             filtersString.append(prefix);
         filtersString.append(filterColumnName);
 
-        switch(((BasicFilter) filter).getOperation()) {
+        switch(operation) {
             case HDOP_EQ:
                 filtersString.append(HIVE_API_EQ);
                 break;

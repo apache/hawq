@@ -27,7 +27,17 @@ class TestSubplan : public ::testing::Test {
 };
 
 TEST_F(TestSubplan, TestSubplanAll) {
- hawq::test::SQLUtility util;
- util.execSQLFile("planner/sql/subplan.sql",
-                  "planner/ans/subplan.ans");
+    hawq::test::SQLUtility util;
+    // enable plpythonu language if it is absent
+    if (util.getQueryResult("SELECT lanname FROM pg_language WHERE lanname = 'plpythonu'") != "plpythonu")
+    {
+        util.execute("CREATE LANGUAGE plpythonu", false);
+    }
+
+    // run test if plpythonu language is enabled
+    if (util.getQueryResult("SELECT lanname FROM pg_language WHERE lanname = 'plpythonu'") == "plpythonu")
+    {
+        util.execSQLFile("planner/sql/subplan.sql",
+                         "planner/ans/subplan.ans");
+    }
 }

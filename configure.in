@@ -1325,6 +1325,25 @@ Don't use --with-openssl if you don't want to the OpenSSL support.])])
   AC_CHECK_FUNCS([ERR_set_mark])
 fi
 
+BACKUPCPPFLAG=${CPPFLAGS}
+BACKUPLDFLAG=${LDFLAGS}
+
+if test "$PORTNAME" == "darwin"; then
+    CPPFLAGS="-I/usr/local/opt/openssl/include $CPPFLAGS"
+    LDFLAGS="-L/usr/local/opt/openssl/lib $LDFLAGS"
+fi
+
+if test ! x"${DEPENDENCY_INSTALL_PREFIX}" == x""; then
+    CPPFLAGS="-I${DEPENDENCY_INSTALL_PREFIX}/include $CPPFLAGS"
+    LDFLAGS="-L${DEPENDENCY_INSTALL_PREFIX}/lib $LDFLAGS"
+fi
+
+AC_SEARCH_LIBS(EVP_aes_256_ctr,crypto, [], [AC_MSG_ERROR([function 'EVP_aes_256_ctr' in library 'openssl' is required by libhdfs3.You can export DEPENDENCY_INSTALL_PREFIX as custom path.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
+
+CPPFLAGS=${BACKUPCPPFLAG}
+LDFLAGS=${BACKUPLDFLAG}
+
 if test "$with_pam" = yes ; then
   AC_CHECK_HEADERS(security/pam_appl.h, [],
                    [AC_CHECK_HEADERS(pam/pam_appl.h, [],

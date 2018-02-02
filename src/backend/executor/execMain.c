@@ -61,6 +61,7 @@
 #include "access/reloptions.h"
 #include "access/transam.h"
 #include "access/xact.h"
+#include "access/plugstorage.h"
 #include "catalog/heap.h"
 #include "catalog/namespace.h"
 #include "catalog/toasting.h"
@@ -68,6 +69,7 @@
 #include "catalog/catalog.h"
 #include "catalog/pg_attribute_encoding.h"
 #include "catalog/pg_type.h"
+#include "catalog/pg_exttable.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbmirroredfilesysobj.h"
 #include "commands/dbcommands.h"
@@ -2973,7 +2975,36 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 		}
 
 		if (resultRelInfo->ri_extInsertDesc)
-			external_insert_finish(resultRelInfo->ri_extInsertDesc);
+		{
+			ExternalInsertDesc extInsertDesc = resultRelInfo->ri_extInsertDesc;
+
+			if (extInsertDesc->ext_formatter_type == ExternalTableType_Invalid)
+			{
+				elog(
+						ERROR, "invalid formatter type for external table: %s", __func__);
+			}
+			else if (extInsertDesc->ext_formatter_type
+					!= ExternalTableType_PLUG)
+			{
+				external_insert_finish(extInsertDesc);
+			}
+			else
+			{
+				FmgrInfo *insertFinishFunc =
+						extInsertDesc->ext_ps_insert_funcs.insert_finish;
+
+				if (insertFinishFunc)
+				{
+					InvokePlugStorageFormatInsertFinish(insertFinishFunc,
+							extInsertDesc);
+				}
+				else
+				{
+					elog(ERROR, "%s_insert_finish function was not found",
+					extInsertDesc->ext_formatter_name);
+				}
+			}
+		}
 
 		if (resultRelInfo->ri_resultSlot)
 		{

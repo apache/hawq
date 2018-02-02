@@ -3370,7 +3370,7 @@ static void print_datalocality_overall_log_information(SplitAllocResult *result,
 	}
 	/* print data locality result*/
 	elog(
-			LOG, "data locality ratio: %.3f; virtual segment number: %d; "
+			DEBUG1, "data locality ratio: %.3f; virtual segment number: %d; "
 			"different host number: %d; virtual segment number per host(avg/min/max): (%d/%d/%d); "
 			"segment size(avg/min/max): (%.3f B/"INT64_FORMAT" B/"INT64_FORMAT" B); "
 			"segment size with penalty(avg/min/max): (%.3f B/"INT64_FORMAT" B/"INT64_FORMAT" B); continuity(avg/min/max): (%.3f/%.3f/%.3f)."
