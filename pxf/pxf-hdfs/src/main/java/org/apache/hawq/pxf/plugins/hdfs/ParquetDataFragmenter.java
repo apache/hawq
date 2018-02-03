@@ -58,7 +58,7 @@ public class ParquetDataFragmenter extends Fragmenter {
     @Override
     public List<Fragment> getFragments() throws Exception {
         String absoluteDataPath = HdfsUtilities.absoluteDataPath(inputData.getDataSource());
-        ArrayList<InputSplit> splits = getSplits(new Path(absoluteDataPath));
+        List<InputSplit> splits = getSplits(new Path(absoluteDataPath));
 
         for (InputSplit split : splits) {
             FileSplit fsp = (FileSplit) split;
@@ -80,7 +80,7 @@ public class ParquetDataFragmenter extends Fragmenter {
         return fragments;
     }
 
-        private ArrayList<InputSplit> getSplits (Path path) throws IOException {
+        private List<InputSplit> getSplits (Path path) throws IOException {
             ParquetInputFormat<Group> parquetInputFormat = new ParquetInputFormat<Group>();
             ParquetInputFormat.setInputPaths(job, path);
             List<InputSplit> splits = parquetInputFormat.getSplits(job);

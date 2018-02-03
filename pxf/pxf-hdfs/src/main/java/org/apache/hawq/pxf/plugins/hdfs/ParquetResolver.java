@@ -97,15 +97,15 @@ public class ParquetResolver extends Plugin implements ReadResolver {
                 break;
             }
             case INT32: {
-                if (originalType == OriginalType.INT_8) {
+                if (originalType == OriginalType.INT_8 || originalType == OriginalType.INT_16) {
                     field.type = DataType.SMALLINT.getOID();
-                } else if (originalType == OriginalType.INT_16) {
-                    field.type = DataType.SMALLINT.getOID();
+                    field.val = g.getFieldRepetitionCount(columnIndex) == 0 ?
+                            null : (short) g.getInteger(columnIndex, 0);
                 } else {
                     field.type = DataType.INTEGER.getOID();
+                    field.val = g.getFieldRepetitionCount(columnIndex) == 0 ?
+                            null : g.getInteger(columnIndex, 0);
                 }
-                field.val = g.getFieldRepetitionCount(columnIndex) == 0 ?
-                        null : g.getInteger(columnIndex, 0);
                 break;
             }
             case INT64: {
