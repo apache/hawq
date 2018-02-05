@@ -883,7 +883,7 @@ test__normalize_key_name_Positive(void **state)
 {
 	char *input_key = strdup("mIxEdCaSeVaLuE");
 	char *normalized_key = normalize_key_name(input_key);
-	assert_string_equal(normalized_key, "X-GP-MIXEDCASEVALUE");
+	assert_string_equal(normalized_key, "X-GP-OPTIONS-MIXEDCASEVALUE");
 
 	pfree(input_key);
 	pfree(normalized_key);
@@ -894,7 +894,7 @@ test__normalize_key_name_PositiveUpperCase(void **state)
 {
 	char *input_key = strdup("ALREADY_UPPER_CASE");
 	char *normalized_key = normalize_key_name(input_key);
-	assert_string_equal(normalized_key, "X-GP-ALREADY_UPPER_CASE");
+	assert_string_equal(normalized_key, "X-GP-OPTIONS-ALREADY_UPPER_CASE");
 
 	pfree(input_key);
 	pfree(normalized_key);
