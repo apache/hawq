@@ -215,7 +215,7 @@ public class ProtocolData extends InputData {
         if (!duplicates.isEmpty()) {
             throw new IllegalArgumentException("Profile '" + profile
                     + "' already defines: "
-                    + String.valueOf(duplicates).replace("X-GP-", ""));
+                    + String.valueOf(duplicates).replace("X-GP-OPTIONS-", ""));
         }
     }
 
