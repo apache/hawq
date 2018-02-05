@@ -160,16 +160,13 @@ public class WritableResource extends RestResource{
         } catch (Exception e) {
             LOG.error("Exception: totalWritten so far " + totalWritten + " to " + path, e);
             ex = e;
+            throw ex;
         } finally {
             try {
                 bridge.endIteration();
             } catch (Exception e) {
-                if (ex == null)
-                    ex = e;
+                throw (ex == null) ? e: ex;
             }
-            // propagate any exceptions
-            if (ex != null)
-                throw ex;
         }
 
         String censuredPath = Utilities.maskNonPrintables(path);
