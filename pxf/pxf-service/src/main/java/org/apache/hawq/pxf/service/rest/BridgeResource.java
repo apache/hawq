@@ -92,7 +92,9 @@ public class BridgeResource extends RestResource {
         // Convert headers into a regular map
         Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
 
-        LOG.debug("started with parameters: " + params);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("started with parameters: " + params);
+        }
 
         ProtocolData protData = new ProtocolData(params);
         SecuredHDFS.verifyToken(protData, servletContext);
@@ -110,8 +112,10 @@ public class BridgeResource extends RestResource {
         String dataDir = protData.getDataSource();
         // THREAD-SAFE parameter has precedence
         boolean isThreadSafe = protData.isThreadSafe() && bridge.isThreadSafe();
-        LOG.debug("Request for " + dataDir + " will be handled "
-                + (isThreadSafe ? "without" : "with") + " synchronization");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Request for " + dataDir + " will be handled " +
+                    (isThreadSafe ? "without" : "with") + " synchronization");
+        }
 
         return readResponse(bridge, protData, isThreadSafe);
     }
@@ -121,9 +125,8 @@ public class BridgeResource extends RestResource {
         final int fragment = protData.getDataFragment();
         final String dataDir = protData.getDataSource();
 
-        // Creating an internal streaming class
-        // which will iterate the records and put them on the
-        // output stream
+        // Creating an internal streaming class which will iterate
+        // the records and put them on the output stream
         final StreamingOutput streaming = new StreamingOutput() {
             @Override
             public void write(final OutputStream out) throws IOException,
@@ -141,26 +144,28 @@ public class BridgeResource extends RestResource {
 
                     Writable record;
                     DataOutputStream dos = new DataOutputStream(out);
-                    LOG.debug("Starting streaming fragment " + fragment
-                            + " of resource " + dataDir);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Starting streaming fragment " + fragment + " of resource " + dataDir);
+                    }
                     while ((record = bridge.getNext()) != null) {
                         record.write(dos);
                         ++recordCount;
                     }
-                    LOG.debug("Finished streaming fragment " + fragment
-                            + " of resource " + dataDir + ", " + recordCount
-                            + " records.");
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Finished streaming fragment " + fragment + " of resource "
+                                + dataDir + ", " + recordCount + " records.");
+                    }
                 } catch (ClientAbortException e) {
-                    // Occurs whenever client (HAWQ) decides the end the
-                    // connection
+                    // Occurs whenever client (HAWQ) decides the end the connection
                     LOG.error("Remote connection closed by HAWQ", e);
                 } catch (Exception e) {
                     LOG.error("Exception thrown when streaming", e);
                     throw new IOException(e.getMessage());
                 } finally {
-                    LOG.debug("Stopped streaming fragment " + fragment
-                            + " of resource " + dataDir + ", " + recordCount
-                            + " records.");
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Stopped streaming fragment " + fragment + " of resource "
+                                + dataDir + ", " + recordCount + " records.");
+                    }
                     try {
                         bridge.endIteration();
                     } catch (Exception e) {

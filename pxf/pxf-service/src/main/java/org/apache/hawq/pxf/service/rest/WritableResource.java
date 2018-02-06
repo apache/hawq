@@ -19,7 +19,6 @@ package org.apache.hawq.pxf.service.rest;
  * under the License.
  */
 
-
 import java.io.DataInputStream;
 import java.io.InputStream;
 import java.util.Map;
@@ -80,10 +79,8 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
 
  */
 
-
 /**
- * This class handles the subpath /&lt;version&gt;/Writable/ of this
- * REST component
+ * This class handles the subpath /&lt;version&gt;/Writable/ of this REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Writable/")
 public class WritableResource extends RestResource{
@@ -126,8 +123,10 @@ public class WritableResource extends RestResource{
 
         // THREAD-SAFE parameter has precedence
         boolean isThreadSafe = protData.isThreadSafe() && bridge.isThreadSafe();
-        LOG.debug("Request for " + path + " handled " +
-                (isThreadSafe ? "without" : "with") + " synchronization");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Request for " + path + " handled " +
+                    (isThreadSafe ? "without" : "with") + " synchronization");
+        }
 
         return isThreadSafe ?
                 writeResponse(bridge, path, inputStream) :
@@ -143,14 +142,12 @@ public class WritableResource extends RestResource{
 
     private static Response writeResponse(Bridge bridge,
                                           String path,
-                                          InputStream inputStream) throws Exception {
-
-        String returnMsg;
-
+                                          InputStream inputStream)
+            throws Exception {
         // Open the output file
         bridge.beginIteration();
-
         long totalWritten = 0;
+        Exception ex = null;
 
         // dataStream will close automatically in the end of the try.
         // inputStream is closed by dataStream.close().
@@ -158,21 +155,22 @@ public class WritableResource extends RestResource{
             while (bridge.setNext(dataStream)) {
                 ++totalWritten;
             }
-        } catch (ClientAbortException e) {
-            LOG.debug("Remote connection closed by HAWQ", e);
-        } catch (Exception ex) {
-            LOG.debug("totalWritten so far " + totalWritten + " to " + path);
+        } catch (ClientAbortException cae) {
+            LOG.error("Remote connection closed by HAWQ", cae);
+        } catch (Exception e) {
+            LOG.error("Exception: totalWritten so far " + totalWritten + " to " + path, e);
+            ex = e;
             throw ex;
         } finally {
             try {
                 bridge.endIteration();
             } catch (Exception e) {
-                // ignore ... any significant errors should already have been handled
+                throw (ex == null) ? e: ex;
             }
         }
 
         String censuredPath = Utilities.maskNonPrintables(path);
-        returnMsg = "wrote " + totalWritten + " bulks to " + censuredPath;
+        String returnMsg = "wrote " + totalWritten + " bulks to " + censuredPath;
         LOG.debug(returnMsg);
 
         return Response.ok(returnMsg).build();
