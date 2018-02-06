@@ -216,6 +216,7 @@ project('pxf-service') {
             exclude module: 'calcite-core'
             exclude module: 'calcite-avatica'
         }
+        runtime "org.apache.parquet:parquet-hadoop-bundle:$parquetVersion"
     }
 
     ospackage {
@@ -360,6 +361,7 @@ project('pxf-hdfs') {
         compile "org.apache.hadoop:hadoop-mapreduce-client-core:$hadoopVersion"
         compile "org.apache.hadoop:hadoop-common:$hadoopVersion"
         compile "org.apache.hadoop:hadoop-hdfs:$hadoopVersion"
+        compile "org.apache.parquet:parquet-hadoop-bundle:$parquetVersion"
     }
 
     ospackage {
