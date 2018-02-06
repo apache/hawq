@@ -94,11 +94,11 @@ public class ProtocolData extends InputData {
         }
         accessor = getUserProperty("ACCESSOR");
         if(accessor == null) {
-            protocolViolation(accessor);
+            protocolViolation("ACCESSOR");
         }
         resolver = getUserProperty("RESOLVER");
         if(resolver == null) {
-            protocolViolation(resolver);
+            protocolViolation("RESOLVER"));
         }
 
         fragmenter = getUserProperty("FRAGMENTER");
