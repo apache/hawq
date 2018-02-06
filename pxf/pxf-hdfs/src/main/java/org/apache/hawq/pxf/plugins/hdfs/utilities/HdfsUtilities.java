@@ -180,17 +180,6 @@ public class HdfsUtilities {
         return byteArrayStream;
     }
 
-    public static byte[] prepareFragmentMetadata(long start,
-                                                 long length,
-                                                 String[] locations,
-                                                 Object additionalMetadata)
-            throws IOException {
-        ByteArrayOutputStream baos = writeBaseFragmentInfo(start, length, locations);
-        ObjectOutputStream objectStream = new ObjectOutputStream(baos);
-        objectStream.writeObject(additionalMetadata);
-        return baos.toByteArray();
-    }
-
     /**
      * Parses fragment metadata and return matching {@link FileSplit}.
      *

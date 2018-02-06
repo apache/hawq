@@ -43,6 +43,7 @@ import java.util.Iterator;
 
 /**
  * Parquet file accessor.
+ * Unit of operation is record.
  */
 public class ParquetFileAccessor extends Plugin implements ReadAccessor {
     private ParquetFileReader reader;

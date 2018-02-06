@@ -41,6 +41,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Fragmenter for Parquet on HDFS.
+ * Returns list of splits for a given HDFS path.
+ */
 public class ParquetDataFragmenter extends Fragmenter {
     private Job job;
 
