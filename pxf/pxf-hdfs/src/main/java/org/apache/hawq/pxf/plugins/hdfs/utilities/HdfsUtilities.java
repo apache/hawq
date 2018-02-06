@@ -61,7 +61,7 @@ public class HdfsUtilities {
      * begins with '/'.
      *
      * @param dataSource The HDFS path to a file or directory of interest.
-     *            Retrieved from the client request.
+     *                   Retrieved from the client request.
      * @return an absolute data path
      */
     public static String absoluteDataPath(String dataSource) {
@@ -134,7 +134,7 @@ public class HdfsUtilities {
     /**
      * Checks if requests should be handle in a single thread or not.
      *
-     * @param dataDir hdfs path to the data source
+     * @param dataDir   hdfs path to the data source
      * @param compCodec the fully qualified name of the compression codec
      * @return if the request can be run in multi-threaded mode.
      */
@@ -205,7 +205,7 @@ public class HdfsUtilities {
      * schema. The splittable API (AvroInputFormat) which is the one we will be
      * using to fetch the records, does not support getting the Avro schema yet.
      *
-     * @param conf Hadoop configuration
+     * @param conf       Hadoop configuration
      * @param dataSource Avro file (i.e fileName.avro) path
      * @return the Avro schema
      * @throws IOException if I/O error occurred while accessing Avro schema file
@@ -227,7 +227,7 @@ public class HdfsUtilities {
      * relayed properly to the DB.
      *
      * @param complexRecord list of fields to be stringified
-     * @param delimiter delimiter between fields
+     * @param delimiter     delimiter between fields
      * @return string of serialized fields using delimiter
      */
     public static String toString(List<OneField> complexRecord, String delimiter) {
