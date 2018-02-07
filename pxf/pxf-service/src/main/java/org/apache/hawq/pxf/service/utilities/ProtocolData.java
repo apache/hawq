@@ -57,8 +57,9 @@ public class ProtocolData extends InputData {
     protected float statsSampleRatio;
 
     /**
-     * Constructs a ProtocolData. Parses X-GP-* configuration variables.
-     *
+     * Constructs a ProtocolData.
+     * Parses X-GP-* system configuration variables and
+     * X-GP-OPTIONS-* user configuration variables
      * @param paramsMap contains all query-specific parameters from Hawq
      */
     public ProtocolData(Map<String, String> paramsMap) {
@@ -82,19 +83,26 @@ public class ProtocolData extends InputData {
         parseTupleDescription();
 
         /*
-         * accessor - will throw exception from getPropery() if outputFormat is
+         * accessor - will throw exception if outputFormat is
          * BINARY and the user did not supply accessor=... or profile=...
-         * resolver - will throw exception from getPropery() if outputFormat is
+         * resolver - will throw exception if outputFormat is
          * BINARY and the user did not supply resolver=... or profile=...
          */
-        profile = getOptionalProperty("PROFILE");
+        profile = getUserProperty("PROFILE");
         if (profile != null) {
             setProfilePlugins();
         }
-        accessor = getProperty("ACCESSOR");
-        resolver = getProperty("RESOLVER");
-        fragmenter = getOptionalProperty("FRAGMENTER");
-        metadata = getOptionalProperty("METADATA");
+        accessor = getUserProperty("ACCESSOR");
+        if(accessor == null) {
+            protocolViolation("ACCESSOR");
+        }
+        resolver = getUserProperty("RESOLVER");
+        if(resolver == null) {
+            protocolViolation("RESOLVER");
+        }
+
+        fragmenter = getUserProperty("FRAGMENTER");
+        metadata = getUserProperty("METADATA");
         dataSource = getProperty("DATA-DIR");
 
         /* Kerberos token information */
@@ -207,7 +215,7 @@ public class ProtocolData extends InputData {
         if (!duplicates.isEmpty()) {
             throw new IllegalArgumentException("Profile '" + profile
                     + "' already defines: "
-                    + String.valueOf(duplicates).replace("X-GP-", ""));
+                    + String.valueOf(duplicates).replace("X-GP-OPTIONS-", ""));
         }
     }
 
@@ -354,7 +362,7 @@ public class ProtocolData extends InputData {
     private void parseThreadSafe() {
 
         threadSafe = true;
-        String threadSafeStr = getOptionalProperty("THREAD-SAFE");
+        String threadSafeStr = getUserProperty("THREAD-SAFE");
         if (threadSafeStr != null) {
             threadSafe = parseBooleanValue(threadSafeStr);
         }
@@ -491,7 +499,7 @@ public class ProtocolData extends InputData {
 
     private void parseStatsParameters() {
 
-        String maxFrags = getOptionalProperty("STATS-MAX-FRAGMENTS");
+        String maxFrags = getUserProperty("STATS-MAX-FRAGMENTS");
         if (!StringUtils.isEmpty(maxFrags)) {
             statsMaxFragments = Integer.parseInt(maxFrags);
             if (statsMaxFragments <= 0) {

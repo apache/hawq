@@ -23,15 +23,18 @@ package org.apache.hawq.pxf.api.utilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
-import java.util.*;
+import java.util.Map;
+import java.util.ArrayList;
+
 
 /**
  * Common configuration available to all PXF plugins. Represents input data
- * coming from client applications, such as Hawq.
+ * coming from client applications, such as Hawq or GPDB.
  */
 public class InputData {
 
     public static final String DELIMITER_KEY = "DELIMITER";
+    public static final String USER_PROP_PREFIX = "X-GP-OPTIONS-";
     public static final int INVALID_SPLIT_IDX = -1;
     private static final Log LOG = LogFactory.getLog(InputData.class);
 
@@ -125,7 +128,7 @@ public class InputData {
      * @return property value as a String
      */
     public String getUserProperty(String userProp) {
-        return requestParametersMap.get("X-GP-" + userProp.toUpperCase());
+        return requestParametersMap.get(USER_PROP_PREFIX + userProp.toUpperCase());
     }
 
     /**

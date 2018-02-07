@@ -324,8 +324,8 @@ public class BridgeOutputBuilderTest {
         parameters.put("X-GP-ATTRS", "1");
         addColumn(parameters, 0, DataType.TEXT, "col0");
         // activate sampling code
-        parameters.put("X-GP-STATS-MAX-FRAGMENTS", "100");
-        parameters.put("X-GP-STATS-SAMPLE-RATIO", "1.00");
+        parameters.put("X-GP-OPTIONS-STATS-MAX-FRAGMENTS", "100");
+        parameters.put("X-GP-OPTIONS-STATS-SAMPLE-RATIO", "1.00");
 
         BridgeOutputBuilder builder = makeBuilder(parameters);
         LinkedList<Writable> outputQueue = builder.makeOutput(fields);
@@ -352,8 +352,8 @@ public class BridgeOutputBuilderTest {
         parameters.put("X-GP-ATTRS", "1");
         addColumn(parameters, 0, DataType.TEXT, "col0");
         // activate sampling code
-        parameters.put("X-GP-STATS-MAX-FRAGMENTS", "100");
-        parameters.put("X-GP-STATS-SAMPLE-RATIO", "1.00");
+        parameters.put("X-GP-OPTIONS-STATS-MAX-FRAGMENTS", "100");
+        parameters.put("X-GP-OPTIONS-STATS-SAMPLE-RATIO", "1.00");
 
         BridgeOutputBuilder builder = makeBuilder(parameters);
         LinkedList<Writable> outputQueue = builder.makeOutput(fields);
@@ -464,11 +464,11 @@ public class BridgeOutputBuilderTest {
         parameters.put("X-GP-FORMAT", "TEXT");
         parameters.put("X-GP-URL-HOST", "my://bags");
         parameters.put("X-GP-URL-PORT", "-8020");
-        parameters.put("X-GP-ACCESSOR", "are");
-        parameters.put("X-GP-RESOLVER", "packed");
+        parameters.put("X-GP-OPTIONS-ACCESSOR", "are");
+        parameters.put("X-GP-OPTIONS-RESOLVER", "packed");
         parameters.put("X-GP-DATA-DIR", "i'm/ready/to/go");
         parameters.put("X-GP-FRAGMENT-METADATA", "U29tZXRoaW5nIGluIHRoZSB3YXk=");
-        parameters.put("X-GP-I'M-STANDING-HERE", "outside-your-door");
+        parameters.put("X-GP-OPTIONS-I'M-STANDING-HERE", "outside-your-door");
 
         ProtocolData protocolData = new ProtocolData(parameters);
         BridgeOutputBuilder builder = new BridgeOutputBuilder(protocolData);

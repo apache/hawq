@@ -246,7 +246,7 @@ public abstract class PxfUnit {
 	}
 
 	/**
-	 * Get any extra parameters that are meant to be specified for the "pxf" protocol. Note that "X-GP-" is prepended to
+	 * Get any extra parameters that are meant to be specified for the "pxf" protocol. Note that "X-GP-OPTIONS-" is prepended to
 	 * each parameter name.
 	 * 
 	 * @return Any extra parameters or null if none.
@@ -301,12 +301,12 @@ public abstract class PxfUnit {
 			paramsMap.put("X-GP-ATTR-TYPECODE" + i, Integer.toString(params.get(i).second.getOID()));
 		}
 
-		paramsMap.put("X-GP-ACCESSOR", getWriteAccessorClass().getName());
-		paramsMap.put("X-GP-RESOLVER", getWriteResolverClass().getName());
+		paramsMap.put("X-GP-OPTIONS-ACCESSOR", getWriteAccessorClass().getName());
+		paramsMap.put("X-GP-OPTIONS-RESOLVER", getWriteResolverClass().getName());
 
 		if (getExtraParams() != null) {
 			for (Pair<String, String> param : getExtraParams()) {
-				paramsMap.put("X-GP-" + param.first, param.second);
+				paramsMap.put("X-GP-OPTIONS-" + param.first, param.second);
 			}
 		}
 
@@ -342,7 +342,6 @@ public abstract class PxfUnit {
 		paramsMap.put("X-GP-SEGMENT-ID", "1");
 		paramsMap.put("X-GP-HAS-FILTER", "0");
 		paramsMap.put("X-GP-SEGMENT-COUNT", "1");
-		paramsMap.put("X-GP-FRAGMENTER", getFragmenterClass().getName());
 		paramsMap.put("X-GP-FORMAT", "GPDBWritable");
 		paramsMap.put("X-GP-URL-HOST", "localhost");
 		paramsMap.put("X-GP-URL-PORT", "50070");
@@ -358,12 +357,13 @@ public abstract class PxfUnit {
 		}
 
 		// HDFSMetaData properties
-		paramsMap.put("X-GP-ACCESSOR", getReadAccessorClass().getName());
-		paramsMap.put("X-GP-RESOLVER", getReadResolverClass().getName());
+		paramsMap.put("X-GP-OPTIONS-FRAGMENTER", getFragmenterClass().getName());
+		paramsMap.put("X-GP-OPTIONS-ACCESSOR", getReadAccessorClass().getName());
+		paramsMap.put("X-GP-OPTIONS-RESOLVER", getReadResolverClass().getName());
 
 		if (getExtraParams() != null) {
 			for (Pair<String, String> param : getExtraParams()) {
-				paramsMap.put("X-GP-" + param.first, param.second);
+				paramsMap.put("X-GP-OPTIONS-" + param.first, param.second);
 			}
 		}
 

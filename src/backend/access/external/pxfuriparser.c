@@ -530,7 +530,7 @@ GPHDUri_parse_option(char* pair, GPHDUri *uri)
 	option_data->value = pnstrdup(sep + 1, value_len);
 
 	char *x_gp_key = normalize_key_name(option_data->key);
-	if (strcmp(x_gp_key, "X-GP-PROFILE") == 0)
+	if (strcmp(x_gp_key, "X-GP-OPTIONS-PROFILE") == 0)
 	{
 		uri->profile = pstrdup(option_data->value);
 	}
@@ -899,7 +899,7 @@ bool RelationIsExternalPxfReadOnly(Relation rel, StringInfo location)
 
 /*
  * Full name of the HEADER KEY expected by the PXF service
- * Converts input string to upper case and prepends "X-GP-" string
+ * Converts input string to upper case and prepends "X-GP-OPTIONS" string
  *
  */
 char* normalize_key_name(const char* key)
@@ -914,7 +914,7 @@ char* normalize_key_name(const char* key)
 	StringInfoData formatter;
 	initStringInfo(&formatter);
 	char* upperCasedKey = str_toupper(pstrdup(key), strlen(key));
-	appendStringInfo(&formatter, "X-GP-%s", upperCasedKey);
+	appendStringInfo(&formatter, "X-GP-OPTIONS-%s", upperCasedKey);
 	pfree(upperCasedKey);
 
 	return formatter.data;

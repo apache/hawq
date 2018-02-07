@@ -97,15 +97,15 @@ class ProfilesConfTestDefinedProfile extends ProfilesConfTest {
 
         Map<String, String> hbaseProfile = ProfilesConf.getProfilePluginsMap("HBase");
         assertEquals(2, hbaseProfile.keySet().size());
-        assertEquals(hbaseProfile.get("X-GP-PLUGIN1"), "X");
-        assertEquals(hbaseProfile.get("X-GP-PLUGIN2"), "XX");
+        assertEquals(hbaseProfile.get("X-GP-OPTIONS-PLUGIN1"), "X");
+        assertEquals(hbaseProfile.get("X-GP-OPTIONS-PLUGIN2"), "XX");
 
         Map<String, String> hiveProfile = ProfilesConf.getProfilePluginsMap("hIVe");// case
                                                                                     // insensitive
                                                                                     // profile
                                                                                     // name
         assertEquals(1, hiveProfile.keySet().size());
-        assertEquals(hiveProfile.get("X-GP-PLUGIN1"), "Y");
+        assertEquals(hiveProfile.get("X-GP-OPTIONS-PLUGIN1"), "Y");
 
         Mockito.verify(LOG).info("PXF profiles loaded: [HBase, Hive]");
     }
@@ -170,8 +170,8 @@ class ProfilesConfTestOverrideProfile extends ProfilesConfTest {
                 optionalFile.toURI().toURL());
         Map profile = ProfilesConf.getProfilePluginsMap("HBase");
         assertEquals(2, profile.keySet().size());
-        assertEquals(profile.get("X-GP-PLUGIN1"), "Y");
-        assertEquals(profile.get("X-GP-PLUGIN2"), "YY");
+        assertEquals(profile.get("X-GP-OPTIONS-PLUGIN1"), "Y");
+        assertEquals(profile.get("X-GP-OPTIONS-PLUGIN2"), "YY");
     }
 }
 
@@ -242,7 +242,7 @@ class ProfilesConfTestMissingOptionalProfileFile extends ProfilesConfTest {
                 mandatoryFile.toURI().toURL());
         when(classLoader.getResource("pxf-profiles.xml")).thenReturn(null);
         Map<String, String> hbaseProfile = ProfilesConf.getProfilePluginsMap("HBase");
-        assertEquals("Y", hbaseProfile.get("X-GP-PLUGIN1"));
+        assertEquals("Y", hbaseProfile.get("X-GP-OPTIONS-PLUGIN1"));
         Mockito.verify(LOG).warn("pxf-profiles.xml not found in the classpath");
     }
 }

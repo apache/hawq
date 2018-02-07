@@ -299,7 +299,7 @@ public class HiveDataFragmenter extends Fragmenter {
         }
         String fragmenterForProfile = null;
         if (profile != null) {
-            fragmenterForProfile = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-FRAGMENTER");
+            fragmenterForProfile = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OPTIONS-FRAGMENTER");
         } else {
             fragmenterForProfile = inputData.getFragmenter();
         }

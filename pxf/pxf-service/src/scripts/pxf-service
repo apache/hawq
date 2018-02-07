@@ -20,7 +20,6 @@
 # pxf-service	start/stop/initialize/status the PXF instance
 #
 
-
 if [ -z ${PXF_HOME} ]; then
     parent_script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
     env_script=${parent_script_dir}/conf/pxf-env.sh
@@ -197,26 +196,26 @@ function configureWebapp()
     popd > /dev/null
 
     context_file=${instance_root}/${instance_name}/webapps/pxf/META-INF/context.xml
-    sed -i -e "s:classpathFiles=\"[a-zA-Z0-9\/\;.-]*\":classpathFiles=\"${PXF_HOME}\/conf\/pxf-private.classpath\":" \
-           -e "s:secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\":secondaryClasspathFiles=\"${PXF_HOME}\/conf\/pxf-public.classpath\":" ${context_file}
+    sed -i -e "s:classpathFiles=\"[a-zA-Z0-9\/\;.-]*\":classpathFiles=\"${PXF_HOME}\/conf\/pxf-private.classpath\":" ${context_file} 
+    sed -i -e "s:secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\":secondaryClasspathFiles=\"${PXF_HOME}\/conf\/pxf-public.classpath\":" ${context_file}
 
     web_file=${instance_root}/${instance_name}/webapps/pxf/WEB-INF/web.xml
-    sed -i "s:<param-value>.*pxf-log4j.properties<\/param-value>:<param-value>$PXF_HOME\/conf\/pxf-log4j.properties<\/param-value>:" ${web_file}
+    sed -i -e "s:<param-value>.*pxf-log4j.properties<\/param-value>:<param-value>$PXF_HOME\/conf\/pxf-log4j.properties<\/param-value>:" ${web_file}
 
     # set port
     catalinaProperties=${instance_root}/${instance_name}/conf/catalina.properties
-    sed -i "s|^[[:blank:]]*connector.http.port=.*$|connector.http.port=$instance_port|g" ${catalinaProperties}
+    sed -i -e "s|^[[:blank:]]*connector.http.port=.*$|connector.http.port=$instance_port|g" ${catalinaProperties}
 
     # set container configs
     catalinaEnv=${instance_root}/${instance_name}/bin/setenv.sh
-    sed -i -e "s|JVM_OPTS=.*$|JVM_OPTS=\"${PXF_JVM_OPTS}\"|g" \
-           -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=${PXF_LOGDIR} |g" \
-           -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=${PXF_RUNDIR}/catalina.pid|g" \
-           -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=${PXF_LOGDIR}/catalina.out|g" ${catalinaEnv}
+    sed -i -e "s|JVM_OPTS=.*$|JVM_OPTS=\"${PXF_JVM_OPTS}\"|g" ${catalinaEnv}
+    sed -i -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=${PXF_LOGDIR} |g" ${catalinaEnv}
+    sed -i -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=${PXF_RUNDIR}/catalina.pid|g" ${catalinaEnv}
+    sed -i -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=${PXF_LOGDIR}/catalina.out|g" ${catalinaEnv}
 
     # set log directories
     catalinaLog=${instance_root}/$instance_name/conf/logging.properties
-    sed -i "s|juli.FileHandler.directory\s*=.*$|juli.FileHandler.directory = ${PXF_LOGDIR}|g" ${catalinaLog}
+    sed -i -e "s|juli.FileHandler.directory\s*=.*$|juli.FileHandler.directory = ${PXF_LOGDIR}|g" ${catalinaLog}
 }
 
 function commandWebapp()

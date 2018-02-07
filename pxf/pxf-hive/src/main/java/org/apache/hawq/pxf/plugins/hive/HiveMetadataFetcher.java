@@ -137,7 +137,7 @@ public class HiveMetadataFetcher extends MetadataFetcher {
         OutputFormat outputFormat = null;
         InputFormat<?, ?> fformat = HiveDataFragmenter.makeInputFormat(inputFormat, jobConf);
         String profile = ProfileFactory.get(fformat, hasComplexTypes);
-        String outputFormatClassName = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OUTPUTFORMAT");
+        String outputFormatClassName = ProfilesConf.getProfilePluginsMap(profile).get("X-GP-OPTIONS-OUTPUTFORMAT");
         outputFormat = OutputFormat.getOutputFormat(outputFormatClassName);
         return outputFormat;
     }

@@ -129,7 +129,7 @@ public enum ProfilesConf {
         for (String plugin : plugins) {
             String pluginValue = profileSubset.getString(plugin);
             if (!StringUtils.isEmpty(StringUtils.trim(pluginValue))) {
-                pluginsMap.put("X-GP-" + plugin.toUpperCase(), pluginValue);
+                pluginsMap.put(InputData.USER_PROP_PREFIX + plugin.toUpperCase(), pluginValue);
             }
         }
         return pluginsMap;
