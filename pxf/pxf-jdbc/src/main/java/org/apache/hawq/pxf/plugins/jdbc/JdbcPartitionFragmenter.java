@@ -292,7 +292,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
             case DATE: {
                 SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
                 //parse metadata of this fragment
-                //validate：the length of metadata == 16 (long)
+                //validate: the length of metadata == 16 (long)
                 byte[][] newb = ByteUtil.splitBytes(meta, 8);
                 Date fragStart = new Date(ByteUtil.toLong(newb[0]));
                 Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
@@ -304,7 +304,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 break;
             }
             case INT: {
-                //validate：the length of metadata ==8 （int)
+                //validate: the length of metadata == 8 (int)
                 byte[][] newb = ByteUtil.splitBytes(meta, 4);
                 int fragStart = ByteUtil.toInt(newb[0]);
                 int fragEnd = ByteUtil.toInt(newb[1]);

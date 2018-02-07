@@ -50,7 +50,7 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
  * Class enhances the API of the WEBHDFS REST server. Returns the metadata of a
  * given hcatalog table. <br>
  * Example for querying API FRAGMENTER from a web client:<br>
- * <code>curl -i "http://localhost:51200/pxf/{version}/Metadata/getMetadata?profile=PROFILE_NAME&pattern=OBJECT_PATTERN"</code>
+ * <code>curl -i "http://localhost:51200/pxf/{version}/Metadata/getMetadata?profile=PROFILE_NAME&amp;pattern=OBJECT_PATTERN"</code>
  * <br>
  * /pxf/ is made part of the path when there is a webapp by that name in tomcat.
  */
