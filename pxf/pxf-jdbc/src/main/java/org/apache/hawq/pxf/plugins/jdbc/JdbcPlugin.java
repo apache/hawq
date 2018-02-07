@@ -45,7 +45,7 @@ public class JdbcPlugin extends Plugin {
 
     //jdbc connection
     protected Connection dbConn = null;
-    //database type，from DatabaseMetaData.getDatabaseProductName()
+    //database type, from DatabaseMetaData.getDatabaseProductName()
     protected String dbProduct = null;
 
     /**
