@@ -19,38 +19,38 @@ package org.apache.hawq.pxf.plugins.ignite;
  * under the License.
  */
 
-import org.apache.hawq.pxf.api.*;
+import org.apache.hawq.pxf.api.OneRow;
+import org.apache.hawq.pxf.api.OneField;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.hawq.pxf.api.utilities.Plugin;
+import org.apache.hawq.pxf.api.ReadResolver;
+import org.apache.hawq.pxf.api.WriteResolver;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.text.SimpleDateFormat;
-import java.io.IOException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.binary.Hex;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonArray;
 
 
 
 /**
- * Resolver class for Ignite tables result.
- * Transforms a JsonArray object stored in {@link OneRow} into a List {@link OneField}
+ * PXF-Ignite resolver class
  */
-public class IgniteReadResolver extends Plugin implements ReadResolver {
-    private static final Log LOG = LogFactory.getLog(IgniteReadResolver.class);
+public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteResolver {
+    private static final Log LOG = LogFactory.getLog(IgniteResolver.class);
     
     // HAWQ column descriptors
     private ArrayList<ColumnDescriptor> columns = null;
 
-    public IgniteReadResolver(InputData input) {
+    public IgniteResolver(InputData input) throws Exception {
         super(input);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Constructor started");
@@ -63,19 +63,17 @@ public class IgniteReadResolver extends Plugin implements ReadResolver {
         }
     }
 
+    /**
+     * Transform a JsonArray object stored in {@link OneRow} into a List {@link OneField}
+     */
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
-
         JsonArray result = (JsonArray)row.getData();
         LinkedList<OneField> fields = new LinkedList<OneField>();
 
         for (int i = 0; i < columns.size(); i++) {
-            ColumnDescriptor column = columns.get(i);
-            String colName = column.columnName();
             Object value = null;
-
-            OneField oneField = new OneField();
-            oneField.type = column.columnTypeCode();
+            OneField oneField = new OneField(columns.get(i).columnTypeCode(), null);
 
             // Handle null values
             if (result.get(i).isJsonNull()) {
@@ -83,7 +81,6 @@ public class IgniteReadResolver extends Plugin implements ReadResolver {
                 fields.add(oneField);
                 continue;
             }
-
             switch (DataType.get(oneField.type)) {
                 case INTEGER:
                     value = result.get(i).getAsInt();
@@ -120,8 +117,9 @@ public class IgniteReadResolver extends Plugin implements ReadResolver {
                     break;
                 default:
                     throw new UnsupportedOperationException("Field type not supported: " + DataType.get(oneField.type).toString()
-                            + ", Column : " + column.toString());
+                            + ", Column : " + columns.get(i).columnName());
             }
+
             oneField.val = value;
             fields.add(oneField);
         }
@@ -129,4 +127,48 @@ public class IgniteReadResolver extends Plugin implements ReadResolver {
         return fields;
     }
 
+    /**
+     * Create a query string from a List<OneField> for Ignite database REST API containing INSERT query
+     */
+    @Override
+    public OneRow setFields(List<OneField> record) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        String fieldDivisor = "";
+        
+        sb.append("(");
+        for (OneField oneField : record) {
+            sb.append(fieldDivisor);
+            fieldDivisor = ", ";
+            switch (DataType.get(oneField.type)) {
+                case INTEGER:
+                case FLOAT8:
+                case REAL:
+                case BIGINT:
+                case SMALLINT:
+                case BOOLEAN:
+                    sb.append(String.valueOf(oneField.val));
+                    break;
+                case VARCHAR:
+                case BPCHAR:
+                case TEXT:
+                case NUMERIC:
+                    sb.append("'" + String.valueOf(oneField.val) + "'");
+                    break;
+                case BYTEA:
+                    // TODO: Check this code actually works
+                    sb.append("'" + Hex.encodeHexString((byte[])(oneField.val)) + "'");
+                    break;
+                case TIMESTAMP:
+                    sb.append(new SimpleDateFormat("'yyyy-MM-dd hh:mm:ss.SSS'").format(oneField.val));
+                    break;
+                case DATE:
+                    sb.append(new SimpleDateFormat("'yyyy-MM-dd'").format(oneField.val));
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Field type not supported: " + DataType.get(oneField.type).toString());
+            }
+        }
+        sb.append(")");
+        return new OneRow(sb.toString());
+    }
 }

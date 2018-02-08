@@ -30,6 +30,7 @@ PXF_HOME/lib/pxf-hdfs.jar
 PXF_HOME/lib/pxf-hive.jar
 PXF_HOME/lib/pxf-json.jar
 PXF_HOME/lib/pxf-jdbc.jar
+PXF_HOME/lib/pxf-ignite.jar
 
 # Hadoop/Hive/HBase configurations
 /etc/hadoop/conf
@@ -62,6 +63,7 @@ PXF_HOME/lib/pxf-jdbc.jar
 /usr/lib/hadoop/client/snappy-java.jar
 /usr/lib/hadoop/lib/asm-*[0-9].jar
 /usr/lib/hadoop/lib/jersey-server-*[0-9].jar
+/usr/lib/hadoop/client/gson.jar
 
 # Hive Libraries
 /usr/lib/hive/lib/antlr-runtime-*[0-9].jar

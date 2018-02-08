@@ -25,8 +25,6 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 
-import java.sql.*;
-
 /**
  * This class resolves the jdbc connection parameter and manages the opening and closing of the jdbc connection.
  * Implemented subclasses: {@link IgniteReadAccessor}.
@@ -34,10 +32,14 @@ import java.sql.*;
 public class IgnitePlugin extends Plugin {
     private static final Log LOG = LogFactory.getLog(IgnitePlugin.class);
 
-    // Ignite connection parameters
+    // Ignite cache
+    protected static final String igniteHostDefault = "127.0.0.1:8080";
     protected String igniteHost = null;
+    // PXF buffer for Ignite data. '0' is allowed for INSERT queries
+    protected static final int bufferSizeDefault = 128;
+    protected int bufferSize = bufferSizeDefault;
+    // Ignite cache name
     protected String cacheName = null;
-    protected int bufferSize = 128;  // The hardcoded default value
 
     /**
      * Parse and check the InputData
@@ -52,24 +54,30 @@ public class IgnitePlugin extends Plugin {
         
         igniteHost = inputData.getUserProperty("IGNITE_HOST");
         if (igniteHost == null) {
-            // Use the hardcoded value
-            igniteHost = "127.0.0.1:8080";
+            igniteHost = igniteHostDefault;
         }
 
         cacheName = inputData.getUserProperty("IGNITE_CACHE");
         if (cacheName == null) {
-            // pass; The default cache will be used
+            // pass; Ignite will use the default cache
         }
 
         String bufferSize_str = inputData.getUserProperty("BUFFER_SIZE");
         if (bufferSize_str != null) {
             try {
                 bufferSize = Integer.parseInt(bufferSize_str);
+                // Zero value is allowed for INSERT queries
+                if (bufferSize < 0) {
+                    bufferSize = bufferSizeDefault;
+                    LOG.warn("Buffer size is incorrect; set to the default value (" + bufferSizeDefault + ")");
+                }
             }
             catch (NumberFormatException e) {
-                // Use the hardcoded value
+                bufferSize = bufferSizeDefault;
+                LOG.warn("Buffer size is incorrect; set to the default value (" + bufferSizeDefault + ")");
             }
         }
+        // else: bufferSize is already set to bufferSizeDefault
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Constructor successful");
