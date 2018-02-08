@@ -193,4 +193,13 @@ under the License.
             <resolver>org.apache.hawq.pxf.plugins.hdfs.ParquetResolver</resolver>
         </plugins>
     </profile>
+    <profile>
+        <name>Apache Ignite</name>
+        <description>A profile to read and write data from/to Apache Ignite database</description>
+        <plugins>
+            <fragmenter>org.apache.hawq.pxf.plugins.ignite.IgnitePartitionFragmenter</fragmenter>
+            <accessor>org.apache.hawq.pxf.plugins.ignite.IgniteAccessor</accessor>
+            <resolver>org.apache.hawq.pxf.plugins.ignite.IgniteResolver</resolver>
+        </plugins>
+    </profile>
 </profiles>

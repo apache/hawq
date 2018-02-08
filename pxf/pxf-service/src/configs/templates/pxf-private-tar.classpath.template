@@ -29,6 +29,7 @@ PXF_HOME/lib/pxf-hdfs.jar
 PXF_HOME/lib/pxf-hive.jar
 PXF_HOME/lib/pxf-json.jar
 PXF_HOME/lib/pxf-jdbc.jar
+PXF_HOME/lib/pxf-ignite.jar
 
 # Hadoop/Hive/HBase configurations
 HADOOP_ROOT/hadoop/etc/hadoop
@@ -47,6 +48,7 @@ HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-configuration-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-io-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-lang-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-logging-*[0-9].jar
+HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-compress-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/guava-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/htrace-core*.jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/jetty-*.jar
@@ -59,6 +61,7 @@ HADOOP_ROOT/hadoop/share/hadoop/common/lib/snappy-java-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/hdfs/hadoop-hdfs-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-client-core-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-client-common-*[0-9].jar
+HADOOP_ROOT/hadoop/share/hadoop/common/lib/gson-*[0-9].jar
 
 # Pick Jackson 1.9 jars from hdfs dir for HDP tar and from mapreduce1 for CDH tar
 HADOOP_ROOT/hadoop/share/hadoop/[hdfs|madreduce1]/lib/jackson-core-asl-1.9*[0-9].jar
