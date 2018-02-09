@@ -43,19 +43,36 @@ import org.apache.hadoop.security.SecurityUtil;
  */
 public class SecureLogin {
     private static final Log LOG = LogFactory.getLog(SecureLogin.class);
+
+    private static final String PROPERTY_KEY_USER_IMPERSONATION = "pxf.service.user.impersonation.enabled";
+
     private static final String CONFIG_KEY_SERVICE_KEYTAB = "pxf.service.kerberos.keytab";
     private static final String CONFIG_KEY_SERVICE_PRINCIPAL = "pxf.service.kerberos.principal";
 
+    /**
+     * Establishes Login Context for the PXF service principal using Kerberos keytab.
+     */
     public static void login() {
         try {
             Configuration config = new Configuration();
             config.addResource("pxf-site.xml");
 
-            SecurityUtil.login(config, CONFIG_KEY_SERVICE_KEYTAB,
-                    CONFIG_KEY_SERVICE_PRINCIPAL);
+            SecurityUtil.login(config, CONFIG_KEY_SERVICE_KEYTAB, CONFIG_KEY_SERVICE_PRINCIPAL);
+
+            LOG.info("User impersonation is " + (isUserImpersonationEnabled() ? "enabled" : "disabled"));
+
         } catch (Exception e) {
             LOG.error("PXF service login failed");
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Returns whether user impersonation has been configured as enabled.
+     *
+     * @return true if user impersonation is enabled, false otherwise
+     */
+    public static boolean isUserImpersonationEnabled() {
+        return System.getProperty(PROPERTY_KEY_USER_IMPERSONATION, "").equalsIgnoreCase("true") ? true : false;
     }
 }

@@ -59,8 +59,16 @@ under the License.
         <url-pattern>/*</url-pattern>
     </servlet-mapping>
     <listener>
-	   <listener-class>org.apache.hawq.pxf.service.rest.ServletLifecycleListener</listener-class>
+       <listener-class>org.apache.hawq.pxf.service.servlet.ServletLifecycleListener</listener-class>
     </listener>
+    <filter>
+        <filter-name>PXF Security Filter</filter-name>
+        <filter-class>org.apache.hawq.pxf.service.servlet.SecurityServletFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>PXF Security Filter</filter-name>
+        <url-pattern>/@pxfProtocolVersion@/*</url-pattern>
+    </filter-mapping>
 
     <!-- log4j configuration 
          Log4jConfigListener looks for a file under log4jConfigLocation.

@@ -52,6 +52,7 @@ public class ProtocolData extends InputData {
     protected int port;
     protected String host;
     protected String token;
+    protected String user;
     // statistics parameters
     protected int statsMaxFragments;
     protected float statsSampleRatio;
@@ -105,10 +106,7 @@ public class ProtocolData extends InputData {
         metadata = getUserProperty("METADATA");
         dataSource = getProperty("DATA-DIR");
 
-        /* Kerberos token information */
-        if (UserGroupInformation.isSecurityEnabled()) {
-            token = getProperty("TOKEN");
-        }
+        parseSecurityProperties();
 
         parseFragmentMetadata();
         parseUserData();
@@ -165,6 +163,7 @@ public class ProtocolData extends InputData {
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
         this.token = copy.token;
+        this.user = copy.user;
         this.statsMaxFragments = copy.statsMaxFragments;
         this.statsSampleRatio = copy.statsSampleRatio;
     }
@@ -181,10 +180,7 @@ public class ProtocolData extends InputData {
         setProfilePlugins();
         metadata = getProperty("METADATA");
 
-        /* Kerberos token information */
-        if (UserGroupInformation.isSecurityEnabled()) {
-            token = getProperty("TOKEN");
-        }
+        parseSecurityProperties();
     }
 
     /**
@@ -325,6 +321,15 @@ public class ProtocolData extends InputData {
     }
 
     /**
+     * Returns identity of the end-user making the request.
+     *
+     * @return userid
+     */
+    public String getUser() {
+        return user;
+    }
+
+    /**
      * Returns Kerberos token information.
      *
      * @return token
@@ -354,6 +359,20 @@ public class ProtocolData extends InputData {
      */
     public float getStatsSampleRatio() {
         return statsSampleRatio;
+    }
+
+    private void parseSecurityProperties() {
+        // obtain identity of the end-user -- mandatory only when impersonation is enabled
+        if (SecureLogin.isUserImpersonationEnabled()) {
+            this.user = getProperty("USER");
+        } else {
+            this.user = getOptionalProperty("USER");
+        }
+
+        /* Kerberos token information */
+        if (UserGroupInformation.isSecurityEnabled()) {
+            this.token = getProperty("TOKEN");
+        }
     }
 
     /**
