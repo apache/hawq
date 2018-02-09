@@ -20,18 +20,16 @@ package org.apache.hawq.pxf.service.servlet;
  */
 
 
+import java.io.IOException;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.security.PrivilegedExceptionAction;
+import javax.servlet.http.HttpServletRequest;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.pxf.service.utilities.SecureLogin;
 
-import javax.servlet.*;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
-import java.lang.reflect.UndeclaredThrowableException;
 
 /**
  * Listener on lifecycle events of our webapp
@@ -43,11 +41,10 @@ public class SecurityServletFilter implements Filter {
     private static final String MISSING_HEADER_ERROR = String.format("Header %s is missing in the request", USER_HEADER);
     private static final String EMPTY_HEADER_ERROR = String.format("Header %s is empty in the request", USER_HEADER);
 
-
     /**
      * Initializes the filter.
      *
-     * @param filterConfig
+     * @param filterConfig filter configuration
      */
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
@@ -58,9 +55,9 @@ public class SecurityServletFilter implements Filter {
      * and create a proxy user to execute further request chain. Responds with an HTTP error if the header is missing
      * or the chain processing throws an exception.
      *
-     * @param request
-     * @param response
-     * @param chain
+     * @param request http request
+     * @param response http response
+     * @param chain filter chain
      */
     @Override
     public void doFilter(final ServletRequest request, final ServletResponse response, final FilterChain chain) throws IOException, ServletException {
