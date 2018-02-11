@@ -214,6 +214,7 @@
               <exclude>src/timezone/**/*</exclude>
               <exclude>doc/src/sgml/fixrtf</exclude>
               <exclude>doc/**/*.sgml</exclude>
+	      <exclude>contrib/vexecutor/*</exclude>
               <exclude>contrib/pgcrypto/*</exclude>
 
               <!-- Files which are not easy to have license headers. -->
