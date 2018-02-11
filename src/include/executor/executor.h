@@ -41,12 +41,11 @@
 
 #include "cdb/cdbdef.h"                 /* CdbVisitOpt */
 
-#define ISVECTORIZED(note) false
-
 typedef struct vectorexe_t {
-    PlanState* (*ExecInitNode_H)(Plan *node,EState *eState,int eflags);
-	TupleTableSlot* (*ExecProcNode_H)(PlanState *node);
-	bool (*ExecEndNode_H)(PlanState *node);
+	bool vectorized_executor_enable;
+	PlanState* (*ExecInitNode_Hook)(Plan *node,EState *eState,int eflags);
+	TupleTableSlot* (*ExecProcNode_Hook)(PlanState *node);
+	bool (*ExecEndNode_Hook)(PlanState *node);
 } VectorExecMthd;
 
 extern PGDLLIMPORT VectorExecMthd vmthd;

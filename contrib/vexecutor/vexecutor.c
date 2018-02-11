@@ -1,8 +1,25 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+
 #include "vexecutor.h"
-#include "c.h"
-#include "executor/executor.h"
-//#include "executor/execHHashagg.h"
-//#include "executor/nodeAgg.h"
+#include "utils/guc.h"
 
 PG_MODULE_MAGIC;
 
@@ -22,9 +39,15 @@ void
 _PG_init(void)
 {
 	elog(DEBUG3, "PG INIT VEXECTOR");
-    vmthd.ExecInitNode_H = VExecInitNode;
-	vmthd.ExecProcNode_H = VExecProcNode;
-	vmthd.ExecEndNode_H = VExecEndNode;
+	vmthd.ExecInitNode_Hook = VExecInitNode;
+	vmthd.ExecProcNode_Hook = VExecProcNode;
+	vmthd.ExecEndNode_Hook = VExecEndNode;
+	DefineCustomBoolVariable("vectorized_executor_enable",
+	                         gettext_noop("enable vectorized executor"),
+	                         NULL,
+	                         &vmthd.vectorized_executor_enable,
+	                         PGC_USERSET,
+	                         NULL,NULL);
 }
 
 /*
@@ -35,10 +58,9 @@ void
 _PG_fini(void)
 {
 	elog(DEBUG3, "PG FINI VEXECTOR");
-	vmthd.ExecInitNode_H = NULL;
-	vmthd.ExecProcNode_H = NULL;
-	vmthd.ExecEndNode_H = NULL;
-
+	vmthd.ExecInitNode_Hook = NULL;
+	vmthd.ExecProcNode_Hook = NULL;
+	vmthd.ExecEndNode_Hook = NULL;
 }
 
 static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags)

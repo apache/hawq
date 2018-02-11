@@ -1223,7 +1223,6 @@ PostmasterMain(int argc, char *argv[])
 	/*
 	 * process any libraries that should be preloaded at postmaster start
 	 */
-
 	process_shared_preload_libraries();
 
 	/*

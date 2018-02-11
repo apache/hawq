@@ -205,55 +205,6 @@ setSubplanSliceId(SubPlan *subplan, EState *estate)
 	}
 }
 
-static bool isValidVectorizedPlan(Plan *node)
-{
-	if (!vectorized_executor_enable)
-	{
-		return false;
-	}
-
-	if (nodeTag(node) != T_Agg)
-	{
-		return false;
-	}
-	Plan *outerPlan = outerPlan(node);
-	if (nodeTag(outerPlan) != T_ParquetScan)
-	{
-		return false;
-	}
-	/*
-	TableScan *ts = (TableScan *)outerPlan;
-	if (ts->ss.tableType != TableTypeParquet)
-	{
-		return false;
-	}
-	*/
-	return true;
-}
-
-static bool isValidVectorizedPlanState(PlanState *node)
-{
-	if (!vectorized_executor_enable)
-	{
-		return false;
-	}
-
-	if (nodeTag(node) != T_AggState)
-	{
-		return false;
-	}
-	PlanState *outerPlan = outerPlanState(node);
-	if (nodeTag(outerPlan) != T_TableScanState)
-	{
-		return false;
-	}
-	TableScanState *ts = (TableScanState *)outerPlan;
-	if (ts->ss.tableType != TableTypeParquet)
-	{
-		return false;
-	}
-	return true;
-}
 
 /* ------------------------------------------------------------------------
  *		ExecInitNode
@@ -275,8 +226,8 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	PlanState  *result;
 	List	   *subps;
 	ListCell   *l;
-    if(ISVECTORIZED(node) && vmthd.ExecInitNode_H
-			&& (result = vmthd.ExecInitNode_H(node,estate,eflags)))
+    if(vmthd.vectorized_executor_enable && vmthd.ExecInitNode_Hook
+			&& (result = vmthd.ExecInitNode_Hook(node,estate,eflags)))
 		return result;
 
 	/*
@@ -861,8 +812,8 @@ TupleTableSlot *
 ExecProcNode(PlanState *node)
 {
 	TupleTableSlot *result = NULL;
-    if(ISVECTORIZED(node) && vmthd.ExecProcNode_H
-	   && (result = vmthd.ExecProcNode_H(node)))
+    if(vmthd.vectorized_executor_enable && vmthd.ExecProcNode_Hook
+	   && (result = vmthd.ExecProcNode_Hook(node)))
 		return result;
 
 
@@ -1566,6 +1517,7 @@ ExecUpdateTransportState(PlanState *node, ChunkTransportState *state)
 	planstate_walk_node(node, transportUpdateNodeWalker, state);
 }	                            /* ExecUpdateTransportState */
 
+
 /* ----------------------------------------------------------------
  *		ExecEndNode
  *
@@ -1580,8 +1532,8 @@ ExecUpdateTransportState(PlanState *node, ChunkTransportState *state)
 void
 ExecEndNode(PlanState *node)
 {
-	if(ISVECTORIZED(node) && vmthd.ExecEndNode_H
-	   && vmthd.ExecEndNode_H(node))
+	if(vmthd.vectorized_executor_enable && vmthd.ExecEndNode_Hook
+	   && vmthd.ExecEndNode_Hook(node))
 		return ;
 
 	ListCell   *subp;

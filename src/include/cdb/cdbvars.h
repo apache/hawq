@@ -1129,9 +1129,6 @@ extern int metadata_cache_refresh_max_num;
 extern double metadata_cache_free_block_max_ratio;
 extern double metadata_cache_free_block_normal_ratio;
 
-/* vectorized executor GUCs */
-extern bool vectorized_executor_enable;
-
 extern int metadata_cache_max_hdfs_file_num;
 extern double metadata_cache_flush_ratio;
 extern double metadata_cache_reduce_ratio;
