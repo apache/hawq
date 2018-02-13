@@ -178,7 +178,7 @@ public class ProtocolData extends InputData {
         requestParametersMap = paramsMap;
         profile = profileString;
         setProfilePlugins();
-        metadata = getProperty("METADATA");
+        metadata = getUserProperty("METADATA");
 
         parseSecurityProperties();
     }
