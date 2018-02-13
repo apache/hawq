@@ -196,7 +196,7 @@ function configureWebapp()
     popd > /dev/null
 
     context_file=${instance_root}/${instance_name}/webapps/pxf/META-INF/context.xml
-    sed -i -e "s:classpathFiles=\"[a-zA-Z0-9\/\;.-]*\":classpathFiles=\"${PXF_HOME}\/conf\/pxf-private.classpath\":" ${context_file} 
+    sed -i -e "s:classpathFiles=\"[a-zA-Z0-9\/\;.-]*\":classpathFiles=\"${PXF_HOME}\/conf\/pxf-private.classpath\":" ${context_file}
     sed -i -e "s:secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\":secondaryClasspathFiles=\"${PXF_HOME}\/conf\/pxf-public.classpath\":" ${context_file}
 
     web_file=${instance_root}/${instance_name}/webapps/pxf/WEB-INF/web.xml
@@ -210,6 +210,7 @@ function configureWebapp()
     catalinaEnv=${instance_root}/${instance_name}/bin/setenv.sh
     sed -i -e "s|JVM_OPTS=.*$|JVM_OPTS=\"${PXF_JVM_OPTS}\"|g" ${catalinaEnv}
     sed -i -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=${PXF_LOGDIR} |g" ${catalinaEnv}
+    sed -i -e "s|^[[:blank:]]*PXF_USER_IMPERSONATION=.*$|PXF_USER_IMPERSONATION=\"${PXF_USER_IMPERSONATION}\"|g" ${catalinaEnv}
     sed -i -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=${PXF_RUNDIR}/catalina.pid|g" ${catalinaEnv}
     sed -i -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=${PXF_LOGDIR}/catalina.out|g" ${catalinaEnv}
 
