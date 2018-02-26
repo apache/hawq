@@ -340,9 +340,9 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                 Date fragStart = new Date(ByteUtil.toLong(newb[0]));
                 Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
 
-                sb.append(partitionColumn).append(">=").append("date'" + df.format(fragStart) + "'");
+                sb.append(partitionColumn).append(">=").append("'" + df.format(fragStart) + "'");
                 sb.append(" AND ");
-                sb.append(partitionColumn).append("<").append("date'" + df.format(fragEnd) + "'");
+                sb.append(partitionColumn).append("<").append("'" + df.format(fragEnd) + "'");
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("DATE partition constraints added");
                 }

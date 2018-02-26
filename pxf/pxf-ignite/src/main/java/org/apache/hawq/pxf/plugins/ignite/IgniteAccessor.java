@@ -34,11 +34,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
-import java.net.URL;
-import java.net.URLEncoder;
-
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 
@@ -85,10 +84,8 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
      */
     @Override
     public boolean openForRead() throws Exception {
-        // bufferSize == 0 is allowed for Write queries, so this check is necessary
-        if (bufferSize <= 0) {
-            bufferSize = bufferSizeDefault;
-            LOG.warn("Buffer size is incorrect; set to the default value (" + bufferSizeDefault + ")");
+        if (bufferSize == 0) {
+            bufferSize = 1;
         }
 
         StringBuilder sb = new StringBuilder();
@@ -116,7 +113,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         sb.append(tableName);
 
         // Insert query constraints
-        // TODO: Filter constants should be provided separately from the query itself for optimizations done by Ignite
+        // Note: Filter constants may be provided separately from the query itself, mostly for the safety of the SQL queries; at the moment, however, they are passed in the query itself.
         ArrayList<String> filterConstants = null;
         if (inputData.hasFilter()) {
             WhereSQLBuilder filterBuilder = new WhereSQLBuilder(inputData);
@@ -270,6 +267,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
             }
             LOG.info("Ignite write request. Query: '" + queryWrite + "'");
             sendInsertRestRequest(queryWrite);
+            bufferWrite.removeFirst();
             isWriteActive = true;
             return true;
         }

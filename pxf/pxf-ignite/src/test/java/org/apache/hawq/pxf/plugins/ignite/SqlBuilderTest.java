@@ -75,7 +75,7 @@ public class SqlBuilderTest {
         when(inputData.getFilterString()).thenReturn("a1c25s10d2008-02-01o2a1c25s10d2008-12-01o1l0a2c20s4d1200o2l0");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        assertEquals("1=1 AND cdate>date'2008-02-01' AND cdate<date'2008-12-01' AND amt>1200"
+        assertEquals("1=1 AND cdate>'2008-02-01' AND cdate<'2008-12-01' AND amt>1200"
                 , builder.buildWhereSQL());
     }
 
@@ -115,7 +115,7 @@ public class SqlBuilderTest {
         //partition-1 : cdate>=2008-01-01 and cdate<2008-03-01
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
         String fragmentSql = fragment.buildFragmenterSql(new StringBuilder(ORIGINAL_SQL)).toString();
-        assertEquals(ORIGINAL_SQL + " WHERE 1=1  AND cdate>=date'2008-01-01' AND cdate<date'2008-03-01'", fragmentSql);
+        assertEquals(ORIGINAL_SQL + " WHERE 1=1  AND cdate>='2008-01-01' AND cdate<'2008-03-01'", fragmentSql);
     }
 
     @Test

@@ -47,6 +47,7 @@
 /usr/hdp/current/hadoop-client/lib/protobuf-java-*[0-9].jar
 /usr/hdp/current/hadoop-client/lib/slf4j-api-*[0-9].jar
 /usr/hdp/current/hadoop-client/lib/snappy-java-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/gson-*[0-9].jar
 /usr/hdp/current/hbase-client/lib/hbase-client.jar
 /usr/hdp/current/hbase-client/lib/hbase-common.jar
 /usr/hdp/current/hbase-client/lib/hbase-protocol.jar
@@ -66,3 +67,4 @@
 /usr/lib/pxf/pxf-hive-*[0-9].jar
 /usr/lib/pxf/pxf-json-*[0-9].jar
 /usr/lib/pxf/pxf-jdbc-*[0-9].jar
+/usr/lib/pxf/pxf-ignite-*[0-9].jar

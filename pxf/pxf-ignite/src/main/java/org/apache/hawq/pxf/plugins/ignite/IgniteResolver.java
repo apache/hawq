@@ -155,7 +155,6 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
                     sb.append("'" + String.valueOf(oneField.val) + "'");
                     break;
                 case BYTEA:
-                    // TODO: Check this code actually works
                     sb.append("'" + Hex.encodeHexString((byte[])(oneField.val)) + "'");
                     break;
                 case TIMESTAMP:

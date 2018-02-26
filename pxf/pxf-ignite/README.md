@@ -1,47 +1,48 @@
 # Accessing Ignite database using PXF
 
-The PXF Ignite plug-in allows to read data from Ignite database.
+The PXF Ignite plug-in enables to access the [Ignite database](https://ignite.apache.org/) (both read and write operations are supported) via REST API.
 
 
 # Prerequisites
 
-Check the following before using the PXF Ignite plug-in:
-* The Ignite client is installed on the machine used as `IGNITE_HOST`, and it accepts REST queries from every PXF node;
+Check the following before using the plug-in:
+
 * The Ignite plug-in is installed on all PXF nodes;
-* `pxf-public.classpath` and `pxf-profiles.xml` located in `/etc/pxf/conf` support the Ignite plug-in. Note that `pxf-service` must be restarted if these files were changed;
+
+* The Ignite client is installed and running at the `IGNITE_HOST` (`localhost` by default; see below), and it accepts http queries from the PXF (note that *enabling Ignite REST API does not require changes in Ignite configuration*; see the instruction on how to do that at https://apacheignite.readme.io/docs/rest-api#section-getting-started).
 
 
 # Syntax
 
 ```
-CREATE [READABLE] EXTERNAL TABLE table_name (
-    column_name data_type [, ...] | LIKE other_table 
+CREATE [READABLE] EXTERNAL TABLE <table_name> (
+    <column_name> <data_type>[, <column_name> <data_type>, ...] | LIKE <other_table>
 )
-LOCATION ('pxf://namenode[:port]?PROFILE=Ignite[&<extra-parameter>&<extra-parameter>&...]')
+LOCATION ('pxf://<ignite_table_name>?PROFILE=Ignite[&<extra-parameter>&<extra-parameter>&...]')
 FORMAT 'CUSTOM' (formatter='pxfwritable_import');
 ```
 where each `<extra-parameter>` is one of the following:
 * `IGNITE_HOST=<ignite_host_address_with_port>`. The location of Ignite client node. If not given, `127.0.0.1:8080` is used by default;
-* `IGNITE_CACHE=<ignite_cache_name>`. The name of Ignite cache to use. If not given, this parameter is not included in queries from PXF to Ignite, thus the Ignite defaults will be used (at the moment, Ignite uses `Default` cache in this case). **Note** that this option is case-sensitive;
-* `BUFFER_SIZE=<int >= 1>`. The number of tuples stored in cache used by PXF; the same number of tuples is send by Ignite per a response. If not given, `128` is used by default;
+* `IGNITE_CACHE=<ignite_cache_name>`. The name of Ignite cache to use. If not given, this parameter is not included in queries from PXF to Ignite, thus Ignite default values will be used (at the moment, this is `Default` cache). This option is **case-sensitive**;
+* `BUFFER_SIZE=<unsigned_int>`. The number of tuples send to (from) Ignite per a response. The same number of tuples is stored in in-plug-in cache. The values `0` and `1` are equal (cache is not used, each tuple is passed in it's own query to Ignite). If not given, `128` is used by default;
 * `PARTITION_BY=<column>:<column_type>`. See below;
 * `RANGE=<start_value>:<end_value>`. See below;
 * `INTERVAL=<value>[:<unit>]`. See below.
 
 
-# Jdbc Table Fragments
+# Partitioning
 ## Introduction
 
 PXF Ignite plugin supports simultaneous access to Ignite database from multiple PXF segments. *Partitioning* should be used in order to perform such operation.
 
 Partitioning in PXF Ignite plug-in works just like in PXF JDBC plug-in.
 
-Partitioning is optional. However, a bug in the `pxf-service` which makes partitioning a required parameter was fixed only in [this commit](https://github.com/apache/incubator-hawq/commit/0d620e431026834dd70c9e0d63edf8bb28b38227) (17th Jan 2018), so the older versions of PXF may return an exception if a query does not contain a meaningful `PARTITION_BY` parameter.
+This feature is optional. However, a bug in the `pxf-service` which makes partitioning necessary for any query was fixed only on 17th Jan 2018 in [this commit](https://github.com/apache/incubator-hawq/commit/0d620e431026834dd70c9e0d63edf8bb28b38227), so the older versions of PXF may return an exception if a query does not contain a meaningful `PARTITION_BY` parameter.
 
 
 ## Syntax
 
-To use partitions, add a set of `<ignite-parameter>`:
+To use partitions, add a set of `<ignite-parameter>`s:
 ```
 &PARTITION_BY=<column>:<column_type>&RANGE=<start_value>:<end_value>[&INTERVAL=<value>[:<unit>]]
 ```
@@ -62,5 +63,3 @@ Example partitions:
 * `&PARTITION_BY=id:int&RANGE=42:142&INTERVAL=1`
 * `&PARTITION_BY=createdate:date&RANGE=2008-01-01:2010-01-01&INTERVAL=1:month`
 * `&PARTITION_BY=grade:enum&RANGE=excellent:good:general:bad`
-
-

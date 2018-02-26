@@ -515,6 +515,7 @@ project('pxf-ignite') {
         compile(project(':pxf-api'))
         compile(project(':pxf-service'))
         compile 'com.google.code.gson:gson:2.8.2'
+        testCompile 'com.google.code.gson:gson:2.8.2'
     }
 
     ospackage {
