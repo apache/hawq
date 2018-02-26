@@ -19,19 +19,11 @@ package org.apache.hawq.pxf.plugins.ignite;
  * under the License.
  */
 
-
-import org.apache.commons.lang.ArrayUtils;
-
 /**
- * A tool class, used to deal with byte array merging, split and other methods.
- * IgnitePartitionFragmenter requires this class in order to work.
+ * A tool class, used to deal with byte array split and conversions.
+ * IgnitePartitionFragmenter requires this class in order to work with 'fragmentMetadata' field
  */
 public class ByteUtil {
-
-    public static byte[] mergeBytes(byte[] b1, byte[] b2) {
-        return ArrayUtils.addAll(b1,b2);
-    }
-
     public static byte[][] splitBytes(byte[] bytes, int n) {
         int len = bytes.length / n;
         byte[][] newBytes = new byte[len][];

@@ -24,8 +24,6 @@ import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.FragmentsStats;
 import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -34,6 +32,10 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang.ArrayUtils;
 
 /**
  * Fragmenter class for Ignite data resources.
@@ -257,7 +259,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                     // Build Fragment.metadata: convert the date to a millisecond, then get bytes.
                     byte[] msStart = ByteUtil.getBytes(fragStart.getTimeInMillis());
                     byte[] msEnd = ByteUtil.getBytes(fragEnd.getTimeInMillis());
-                    fragmentMetadata = ByteUtil.mergeBytes(msStart, msEnd);
+                    fragmentMetadata = ArrayUtils.addAll(msStart, msEnd);
 
                     Fragment fragment = new Fragment(inputData.getDataSource(), replicaHostAddressWrapped, fragmentMetadata, fragmentUserdata);
                     fragments.add(fragment);
@@ -283,7 +285,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
 
                     byte[] bStart = ByteUtil.getBytes(fragStart);
                     byte[] bEnd = ByteUtil.getBytes(fragEnd);
-                    fragmentMetadata = ByteUtil.mergeBytes(bStart, bEnd);
+                    fragmentMetadata = ArrayUtils.addAll(bStart, bEnd);
 
                     Fragment fragment = new Fragment(inputData.getDataSource(), replicaHostAddressWrapped, fragmentMetadata, fragmentUserdata);
                     fragments.add(fragment);

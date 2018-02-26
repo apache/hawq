@@ -35,6 +35,8 @@ where each `<extra-parameter>` is one of the following:
 
 PXF Ignite plugin supports simultaneous access to Ignite database from multiple PXF segments. *Partitioning* should be used in order to perform such operation.
 
+If the partitioning is not used, all the data will be retrieved by a single PXF segment.
+
 Partitioning in PXF Ignite plug-in works just like in PXF JDBC plug-in.
 
 This feature is optional. However, a bug in the `pxf-service` which makes partitioning necessary for any query was fixed only on 17th Jan 2018 in [this commit](https://github.com/apache/incubator-hawq/commit/0d620e431026834dd70c9e0d63edf8bb28b38227), so the older versions of PXF may return an exception if a query does not contain a meaningful `PARTITION_BY` parameter.
