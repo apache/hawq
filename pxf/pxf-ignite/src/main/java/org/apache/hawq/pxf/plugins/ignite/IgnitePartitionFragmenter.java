@@ -37,87 +37,25 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.lang.ArrayUtils;
 
+
 /**
- * Fragmenter class for Ignite data resources.
- * @note At the moment this fragmenter works just like the JDBC's one
- *
- * Aside from implementing PXF {@link Fragmenter},
- * this class also transforms input data path (given by user) by adding the
- * information on splitting the request into a few requests for different regions.
- * <br>
- * The parameter Patterns
- * <br>
- * There are three  parameters, the format is as follows:
- * <br>
- * <pre>
- * <code>PARTITION_BY=column_name:column_type&amp;RANGE=start_value[:end_value]&amp;INTERVAL=interval_num[:interval_unit]</code>
- * </pre>
- * The <code>PARTITION_BY</code> parameter can be split by colon(':'),the <code>column_type</code> current supported : <code>date,int,enum</code> .
- * The Date format is 'yyyy-MM-dd'. <br>
- * The <code>RANGE</code> parameter can be split by colon(':') ,used to identify the starting range of each fragment.
- * The range is left-closed, ie:<code> '&gt;= start_value AND &lt; end_value' </code>.If the <code>column_type</code> is <code>int</code>,
- * the <code>end_value</code> can be empty. If the <code>column_type</code>is <code>enum</code>,the parameter <code>RANGE</code> can be empty. <br>
- * The <code>INTERVAL</code> parameter can be split by colon(':'), indicate the interval value of one fragment.
- * When <code>column_type</code> is <code>date</code>,this parameter must be split by colon, and <code>interval_unit</code> can be <code>year,month,day</code>.
- * When <code>column_type</code> is <code>int</code>, the <code>interval_unit</code> can be empty.
- * When <code>column_type</code> is <code>enum</code>,the <code>INTERVAL</code> parameter can be empty.
- * <br>
- * <p>
- * The syntax examples is:
- * <br>
- * <code>PARTITION_BY=createdate:date&amp;RANGE=2008-01-01:2010-01-01&amp;INTERVAL=1:month'</code>
- * <br>
- * <code>PARTITION_BY=year:int&amp;RANGE=2008:2010&amp;INTERVAL=1</code>
- * <br>
- * <code>PARTITION_BY=grade:enum&amp;RANGE=excellent:good:general:bad</code>
- * </p>
+ * PXF-Ignite fragmenter class
+ * 
+ * This fragmenter works just like the one in PXF JDBC plugin
  */
 public class IgnitePartitionFragmenter extends Fragmenter {
-    Log LOG = LogFactory.getLog(IgnitePartitionFragmenter.class);
-
-    String[] partitionBy = null;
-    String[] range = null;
-    String[] interval = null;
-    PartitionType partitionType = null;
-    String partitionColumn = null;
-    IntervalType intervalType = null;
-    int intervalNum = 1;
-
-    //when partitionType is DATE,it is valid
-    Calendar rangeStart = null;
-    Calendar rangeEnd = null;
-
-
-    enum PartitionType {
-        DATE,
-        INT,
-        ENUM;
-
-        public static PartitionType getType(String str) {
-            return valueOf(str.toUpperCase());
-        }
-    }
-
-    enum IntervalType {
-        DAY,
-        MONTH,
-        YEAR;
-
-        public static IntervalType type(String str) {
-            return valueOf(str.toUpperCase());
-        }
-    }
-
     /**
+     * Class constructor
+     * 
      * @throws UserDataException if the request parameter is malformed
      */
-    public IgnitePartitionFragmenter(InputData inConf) throws UserDataException {
-        super(inConf);
+    public IgnitePartitionFragmenter(InputData inputData) throws UserDataException {
+        super(inputData);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Constructor started");
         }
 
-        if (inConf.getUserProperty("PARTITION_BY") == null) {
+        if (inputData.getUserProperty("PARTITION_BY") == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Constructor successful; partition was not used");
             }
@@ -125,17 +63,16 @@ public class IgnitePartitionFragmenter extends Fragmenter {
         }
 
         try {
-            partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
-            partitionColumn = partitionBy[0];
-            partitionType = PartitionType.getType(partitionBy[1]);
+            partitionBy = inputData.getUserProperty("PARTITION_BY").split(":");
+            partitionType = PartitionType.typeOf(partitionBy[1]);
         }
         catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e1) {
-            throw new UserDataException("The parameter 'PARTITION_BY' invalid, the pattern is 'column_name:date|int|enum'");
+            throw new UserDataException("The parameter 'PARTITION_BY' is invalid. The pattern is 'column_name:DATE|INT|ENUM'");
         }
 
         //parse and validate parameter-RANGE
         try {
-            String rangeStr = inConf.getUserProperty("RANGE");
+            String rangeStr = inputData.getUserProperty("RANGE");
             if (rangeStr != null) {
                 range = rangeStr.split(":");
                 if (range.length == 1 && partitionType != PartitionType.ENUM) {
@@ -147,17 +84,17 @@ public class IgnitePartitionFragmenter extends Fragmenter {
             }
         }
         catch (IllegalArgumentException e) {
-            throw new UserDataException("The parameter 'RANGE' invalid, the pattern is 'start_value[:end_value]'");
+            throw new UserDataException("The parameter 'RANGE' is invalid, the pattern is 'start_value[:end_value]'");
         }
 
         //parse and validate parameter-INTERVAL
         try {
-            String intervalStr = inConf.getUserProperty("INTERVAL");
+            String intervalStr = inputData.getUserProperty("INTERVAL");
             if (intervalStr != null) {
                 interval = intervalStr.split(":");
                 intervalNum = Integer.parseInt(interval[0]);
                 if (interval.length > 1) {
-                    intervalType = IntervalType.type(interval[1]);
+                    intervalType = IntervalType.typeOf(interval[1]);
                 }
                 if (interval.length == 1 && partitionType == PartitionType.DATE) {
                     throw new UserDataException("The parameter 'INTERVAL' does not specify unit [:year|month|day]");
@@ -167,14 +104,14 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                 throw new UserDataException("The parameter 'INTERVAL' must be specified along with 'PARTITION_BY'");
             }
             if (intervalNum < 1) {
-                throw new UserDataException("The parameter 'INTERVAL' must > 1, but actual is '" + intervalNum + "'");
+                throw new UserDataException("The parameter 'INTERVAL' must be at least 1. The actual is '" + intervalNum + "'");
             }
         } 
         catch (IllegalArgumentException e) {
-            throw new UserDataException("The parameter 'INTERVAL' invalid, the pattern is 'interval_num[:interval_unit]'");
+            throw new UserDataException("The parameter 'INTERVAL' invalid. The pattern is 'interval_num[:interval_unit]'");
         }
 
-        //parse any date values
+        //parse date values
         try {
             if (partitionType == PartitionType.DATE) {
                 SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
@@ -184,7 +121,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                 rangeEnd.setTime(df.parse(range[1]));
             }
         } catch (ParseException e) {
-            throw new UserDataException("The parameter 'RANGE' has invalid date format. Expected format is 'YYYY-MM-DD'");
+            throw new UserDataException("The parameter 'RANGE' has invalid date format. Expected format is 'yyyy-MM-dd'");
         }
 
         if (LOG.isDebugEnabled()) {
@@ -193,7 +130,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
     }
 
     /**
-     * Returns statistics for  Ignite table. Currently it's not implemented.
+     * Returns statistics for the Ignite table. This is not implemented in the current version
      * @throws UnsupportedOperationException
      */
     @Override
@@ -204,19 +141,16 @@ public class IgnitePartitionFragmenter extends Fragmenter {
     /**
      * Returns list of fragments for Ignite table queries
      *
+     * @throws UnsupportedOperationException if a partition of unknown type was found
+     * 
      * @return a list of fragments
-     * @throws UnknownHostException from java.net.InetAddress.getLocalHost().getHostAddress()
      */
     @Override
-    public List<Fragment> getFragments() throws UnknownHostException {
+    public List<Fragment> getFragments() throws UnsupportedOperationException {
         if (LOG.isDebugEnabled()) {
             LOG.debug("getFragments() called; dataSource is '" + inputData.getDataSource() + "'");
         }
 
-        // Always use 'localhost' as a replica holder
-        // The replica holder is a *PXF* host which can process the requested query
-        // Note that this is not an Ignite host
-        String[] replicaHostAddressWrapped = new String[]{InetAddress.getLocalHost().getHostAddress()};
         byte[] fragmentMetadata = null;
         byte[] fragmentUserdata = null;
 
@@ -227,7 +161,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
             Fragment fragment = new Fragment(inputData.getDataSource(), replicaHostAddressWrapped, fragmentMetadata, fragmentUserdata);
             fragments.add(fragment);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("getFragments() successful. Total fragments: " + fragments.size());
+                LOG.debug("getFragments() successful");
             }
             return fragments;
         }
@@ -256,7 +190,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                     if (fragEnd.after(rangeEnd))
                         fragEnd = (Calendar) rangeEnd.clone();
 
-                    // Build Fragment.metadata: convert the date to a millisecond, then get bytes.
+                    // Note that the date is stored in milliseconds
                     byte[] msStart = ByteUtil.getBytes(fragStart.getTimeInMillis());
                     byte[] msEnd = ByteUtil.getBytes(fragEnd.getTimeInMillis());
                     fragmentMetadata = ArrayUtils.addAll(msStart, msEnd);
@@ -277,11 +211,12 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                 int rangeEnd = Integer.parseInt(range[1]);
                 int currInterval = intervalNum;
 
-                // Validate : curr_interval > 0
                 int fragStart = rangeStart;
                 while (fragStart < rangeEnd) {
                     int fragEnd = fragStart + currInterval;
-                    if (fragEnd > rangeEnd) fragEnd = rangeEnd;
+                    if (fragEnd > rangeEnd) {
+                        fragEnd = rangeEnd;
+                    }
 
                     byte[] bStart = ByteUtil.getBytes(fragStart);
                     byte[] bEnd = ByteUtil.getBytes(fragEnd);
@@ -291,11 +226,11 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                     fragments.add(fragment);
 
                     // Continue the previous fragment
-                    fragStart = fragEnd;// + 1;
+                    fragStart = fragEnd;
                 }
                 break;
             }
-            case ENUM:
+            case ENUM: {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("getFragments() found ENUM partition");
                 }
@@ -305,17 +240,34 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                     fragments.add(fragment);
                 }
                 break;
+            }
+            default: {
+                throw new UnsupportedOperationException("getFragments() found a partition of unknown type and failed");
+            }
         }
 
         if (LOG.isDebugEnabled()) {
-            LOG.debug("getFragments() successful. Total fragments: " + fragments.size());
+            LOG.debug("getFragments() successful");
         }
         return fragments;
     }
 
-    public StringBuilder buildFragmenterSql(StringBuilder sb) {
+    /**
+     * Insert partition constraints into the prepared SQL query.
+     * 
+     * @param inputData pre-validated PXF InputData
+     * @param sb the SQL query that is prepared for appending WHERE constraints.
+     * Other SQL statements may be present, but they must be complete. Note that no check is performed to check their "completeness"
+     */
+    public static StringBuilder buildFragmenterSql(InputData inputData, StringBuilder sb) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("buildFragmenterSql() called");
+        }
+
+        if (inputData.getUserProperty("PARTITION_BY") == null) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("buildFragmenterSql() successful, partition was not used");
+            }
         }
 
         byte[] meta = inputData.getFragmentMetadata();
@@ -326,25 +278,35 @@ public class IgnitePartitionFragmenter extends Fragmenter {
             return sb;
         }
 
+        // Note that these parameters have already been validated when constructing fragment.
+        String[] partitionBy = inputData.getUserProperty("PARTITION_BY").split(":");
+        String partitionColumn = partitionBy[0];
+        PartitionType partitionType = PartitionType.typeOf(partitionBy[1]);
+
         if (!sb.toString().contains("WHERE")) {
-            sb.append(" WHERE 1=1 ");
+            sb.append(" WHERE ");
         }
-        sb.append(" AND ");
+        else {
+            sb.append(" AND ");
+        }
 
         switch (partitionType) {
             case DATE: {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("DATE partition found");
                 }
-                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-                //parse metadata of this fragment
+
+                // Get fragment metadata
                 byte[][] newb = ByteUtil.splitBytes(meta, 8);
                 Date fragStart = new Date(ByteUtil.toLong(newb[0]));
                 Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
 
+                // Add constraints
+                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
                 sb.append(partitionColumn).append(">=").append("'" + df.format(fragStart) + "'");
                 sb.append(" AND ");
                 sb.append(partitionColumn).append("<").append("'" + df.format(fragEnd) + "'");
+
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("DATE partition constraints added");
                 }
@@ -354,26 +316,35 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("INT partition found");
                 }
+
+                // Get fragment metadata
                 byte[][] newb = ByteUtil.splitBytes(meta, 4);
                 int fragStart = ByteUtil.toInt(newb[0]);
                 int fragEnd = ByteUtil.toInt(newb[1]);
+                
+                // Add constraints
                 sb.append(partitionColumn).append(">=").append(fragStart);
                 sb.append(" AND ");
                 sb.append(partitionColumn).append("<").append(fragEnd);
+
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("INT partition constraints added");
                 }
                 break;
             }
-            case ENUM:
+            case ENUM: {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("ENUM partition found");
                 }
+
+                // Add constraints. Fragment metadata should not be parsed.
                 sb.append(partitionColumn).append("='").append(new String(meta)).append("'");
+
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("ENUM partition constraints added");
                 }
                 break;
+            }
         }
 
         if (LOG.isDebugEnabled()) {
@@ -381,4 +352,60 @@ public class IgnitePartitionFragmenter extends Fragmenter {
         }
         return sb;
     }
+
+
+    /**
+     * Partition type
+     */
+    private static enum PartitionType {
+        DATE,
+        INT,
+        ENUM;
+
+        public static PartitionType typeOf(String str) {
+            return valueOf(str.toUpperCase());
+        }
+    }
+    /**
+     * Partition interval, for 'partitionType == DATE'
+     */
+    private static enum IntervalType {
+        DAY,
+        MONTH,
+        YEAR;
+
+        public static IntervalType typeOf(String str) {
+            return valueOf(str.toUpperCase());
+        }
+    }
+
+    private static final Log LOG = LogFactory.getLog(IgnitePartitionFragmenter.class);
+
+    /**
+     * The replica holder. This is an address of a *PXF* host that processes fragments.
+     * It is always 'localhost'
+     */
+    private static final String[] replicaHostAddressWrapped;
+    static {
+        String[] temp;
+        try {
+            temp = new String[]{InetAddress.getLocalHost().getHostAddress()};
+        }
+        catch (UnknownHostException e) {
+            // In fact, 'localhost' can always be obtained
+            temp = new String[]{"localhost"};
+        }
+        replicaHostAddressWrapped = temp;
+    }
+
+    private String[] partitionBy = null;
+    private String[] range = null;
+    private String[] interval = null;
+    private PartitionType partitionType = null;
+    private IntervalType intervalType = null;
+    private int intervalNum = 1;
+
+    // Used only if 'partitionType' is 'DATE'
+    private Calendar rangeStart = null;
+    private Calendar rangeEnd = null;
 }

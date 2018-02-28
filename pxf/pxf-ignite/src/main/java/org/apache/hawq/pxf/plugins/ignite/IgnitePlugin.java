@@ -25,13 +25,13 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 
+
 /**
- * This class resolves the jdbc connection parameter and manages the opening and closing of the jdbc connection.
- * Implemented subclasses: {@link IgniteReadAccessor}.
+ * PXF-Ignite base class.
+ * This class manages the user-defined parameters provided in the query from PXF.
+ * Implemented subclasses: {@link IgniteAccessor}, {@link IgniteResolver}.
  */
 public class IgnitePlugin extends Plugin {
-    private static final Log LOG = LogFactory.getLog(IgnitePlugin.class);
-
     // Ignite cache
     protected static final String igniteHostDefault = "127.0.0.1:8080";
     protected String igniteHost = null;
@@ -42,7 +42,7 @@ public class IgnitePlugin extends Plugin {
     protected String cacheName = null;
 
     /**
-     * Parse and check the InputData
+     * Class constructor. Parses and checks 'InputData'
      * @param inputData
      * @throws UserDataException if the request parameter is malformed
      */
@@ -58,9 +58,7 @@ public class IgnitePlugin extends Plugin {
         }
 
         cacheName = inputData.getUserProperty("IGNITE_CACHE");
-        if (cacheName == null) {
-            // pass; Ignite will use the default cache
-        }
+        // If this value is null, Ignite will use the default cache
 
         String bufferSize_str = inputData.getUserProperty("BUFFER_SIZE");
         if (bufferSize_str != null) {
@@ -87,4 +85,6 @@ public class IgnitePlugin extends Plugin {
     public boolean isThreadSafe() {
         return true;
     }
+
+    private static final Log LOG = LogFactory.getLog(IgnitePlugin.class);
 }

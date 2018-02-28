@@ -19,13 +19,13 @@ package org.apache.hawq.pxf.plugins.ignite;
  * under the License.
  */
 
-import java.util.Calendar;
-import java.util.List;
-
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.ignite.ByteUtil;
+
+import java.util.Calendar;
+import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -34,17 +34,16 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-public class IgnitePartitionFragmenterTest {
-    InputData inputData;
 
+public class IgnitePartitionFragmenterTest {
     @Before
-    public void setUp() throws Exception {
-        prepareConstruction();
+    public void preparePartitionFragmenterTest() throws Exception {
+        inputData = mock(InputData.class);
         when(inputData.getDataSource()).thenReturn("sales");
     }
 
     @Test
-    public void testPartionByDateOfMonth() throws Exception {
+    public void testPartitionByDateOfMonth() throws Exception {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
         when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2009-01-01");
         when(inputData.getUserProperty("INTERVAL")).thenReturn("1:month");
@@ -77,7 +76,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test
-    public void testPartionByDateOfYear() throws Exception {
+    public void testPartitionByDateOfYear() throws Exception {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
         when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2011-01-01");
         when(inputData.getUserProperty("INTERVAL")).thenReturn("1:year");
@@ -88,7 +87,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test
-    public void testPartionByInt() throws Exception {
+    public void testPartitionByInt() throws Exception {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("year:int");
         when(inputData.getUserProperty("RANGE")).thenReturn("2001:2012");
         when(inputData.getUserProperty("INTERVAL")).thenReturn("2");
@@ -120,7 +119,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test
-    public void testPartionByEnum() throws Exception {
+    public void testPartitionByEnum() throws Exception {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("level:enum");
         when(inputData.getUserProperty("RANGE")).thenReturn("excellent:good:general:bad");
 
@@ -138,7 +137,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test(expected = UserDataException.class)
-    public void testInValidPartitiontype() throws Exception {
+    public void testInvalidPartitiontype() throws Exception {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("level:float");
         when(inputData.getUserProperty("RANGE")).thenReturn("100:200");
 
@@ -146,7 +145,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test(expected = UserDataException.class)
-    public void testInValidParameterFormat() throws Exception {
+    public void testInvalidParameterFormat() throws Exception {
         //PARTITION_BY must be comma-delimited string
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("level-enum");
         when(inputData.getUserProperty("RANGE")).thenReturn("100:200");
@@ -155,7 +154,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test(expected = UserDataException.class)
-    public void testInValidDateFormat() throws Exception {
+    public void testInvalidDateFormat() throws Exception {
         //date string must be yyyy-MM-dd
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
         when(inputData.getUserProperty("RANGE")).thenReturn("2008/01/01:2009-01-01");
@@ -165,7 +164,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test(expected = UserDataException.class)
-    public void testInValidParameterValue() throws Exception {
+    public void testInvalidParameterValue() throws Exception {
         //INTERVAL must be greater than 0
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
         when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2009-01-01");
@@ -175,8 +174,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test(expected = UserDataException.class)
-    public void testInValidIntervaltype() throws Exception {
-
+    public void testInvalidIntervalType() throws Exception {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
         when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2011-01-01");
         when(inputData.getUserProperty("INTERVAL")).thenReturn("6:hour");
@@ -185,8 +183,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test(expected = UserDataException.class)
-    public void testIntervaltypeMissing() throws Exception {
-
+    public void testIntervalTypeMissing() throws Exception {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("cdate:date");
         when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2011-01-01");
         when(inputData.getUserProperty("INTERVAL")).thenReturn("6");
@@ -195,8 +192,7 @@ public class IgnitePartitionFragmenterTest {
     }
 
     @Test
-    public void testIntervaltypeMissingValid() throws Exception {
-
+    public void testIntervalTypeMissingValid() throws Exception {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("year:int");
         when(inputData.getUserProperty("RANGE")).thenReturn("2001:2012");
         when(inputData.getUserProperty("INTERVAL")).thenReturn("1");
@@ -208,7 +204,6 @@ public class IgnitePartitionFragmenterTest {
 
     @Test
     public void testIntervalMissingEnum() throws Exception {
-
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("level:enum");
         when(inputData.getUserProperty("RANGE")).thenReturn("100:200:300");
 
@@ -228,7 +223,6 @@ public class IgnitePartitionFragmenterTest {
 
     @Test(expected = UserDataException.class)
     public void testRangeMissing() throws Exception {
-
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("year:int");
         when(inputData.getUserProperty("INTERVAL")).thenReturn("1");
 
@@ -237,7 +231,6 @@ public class IgnitePartitionFragmenterTest {
 
     @Test
     public void testRangeSingleValueEnum() throws Exception {
-
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("level:enum");
         when(inputData.getUserProperty("RANGE")).thenReturn("100");
 
@@ -248,21 +241,22 @@ public class IgnitePartitionFragmenterTest {
 
     @Test
     public void testNoPartition() throws Exception {
-
         IgnitePartitionFragmenter fragment = new IgnitePartitionFragmenter(inputData);
         List<Fragment> fragments = fragment.getFragments();
         assertEquals(1, fragments.size());
     }
 
+
+    private InputData inputData = null;
+
+    /**
+     * Check if two dates are equal and throw an exception if they are not
+     */
     private void assertDateEquals(long date, int year, int month, int day) {
         Calendar calendar = Calendar.getInstance();
         calendar.setTimeInMillis(date);
         assertEquals(calendar.get(Calendar.YEAR), year);
         assertEquals(calendar.get(Calendar.MONTH), month - 1);
         assertEquals(calendar.get(Calendar.DAY_OF_MONTH), day);
-    }
-
-    private void prepareConstruction() throws Exception {
-        inputData = mock(InputData.class);
     }
 }

@@ -28,6 +28,7 @@ import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.ignite.IgnitePlugin;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.regex.Matcher;
@@ -50,30 +51,11 @@ import com.google.gson.JsonArray;
 
 
 /**
- * Ignite database read and write accessor
+ * PXF-Ignite accessor class
  */
 public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteAccessor {
-    private static final Log LOG = LogFactory.getLog(IgniteAccessor.class);
-
-    // Prepared URLs to send to Ignite when reading data
-    private String urlReadStart = null;
-    private String urlReadFetch = null;
-    private String urlReadClose = null;
-    // Set to true when Ignite reported all the data for the SELECT query was retreived
-    private boolean isLastReadFinished = false;
-    // A buffer to store the SELECT query results (without Ignite metadata)
-    private LinkedList<JsonArray> bufferRead = new LinkedList<JsonArray>();
-
-    // A template for the INSERT 
-    private String queryWrite = null;
-    // Set to true when the INSERT operation is in progress
-    private boolean isWriteActive = false;
-    // A buffer to store prepared values for the INSERT query
-    private LinkedList<OneRow> bufferWrite = new LinkedList<OneRow>();
-    
-
     /**
-     * Class constructor.
+     * Class constructor
      */
     public IgniteAccessor(InputData inputData) throws UserDataException {
         super(inputData);
@@ -99,7 +81,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         for (int i = 0; i < columns.size(); i++) {
             ColumnDescriptor column = columns.get(i);
             if (i > 0) {
-                sb.append(",");
+                sb.append(", ");
             }
             sb.append(column.columnName());
         }
@@ -124,8 +106,8 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
             }
         }
 
-        // Insert partition constaints
-        sb = new IgnitePartitionFragmenter(inputData).buildFragmenterSql(sb);
+        // Insert partition constraints
+        sb = IgnitePartitionFragmenter.buildFragmenterSql(inputData, sb);
 
         // Format URL
         urlReadStart = buildQueryFldexe(sb.toString(), filterConstants);
@@ -138,7 +120,9 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         urlReadFetch = buildQueryFetch(response.getAsJsonObject().get("queryId").getAsInt());
         urlReadClose = buildQueryCls(response.getAsJsonObject().get("queryId").getAsInt());
 
-        LOG.info("Ignite read request. URL: '" + urlReadStart + "'");
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Ignite read request. URL: '" + urlReadStart + "'");
+        }
         return true;
     }
 
@@ -168,8 +152,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
             Iterator<JsonElement> itemsIterator = response.getAsJsonObject().get("items").getAsJsonArray().iterator();
             while (itemsIterator.hasNext()) {
                 if (!bufferRead.add(itemsIterator.next().getAsJsonArray())) {
-                    LOG.error("readNextObject(): Buffer refill failed (not enough memory in 'bufferRead')");
-                    throw new OutOfMemoryError("readNextObject(): not enough memory in 'bufferRead'");
+                    throw new IOException("readNextObject(): not enough memory in 'bufferRead'");
                 }
             }
 
@@ -217,8 +200,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         // This is a temporary solution. At the moment there is no other way (except for the usage of user-defined parameters) to get the correct name of Ignite table: GPDB inserts extra data into the address, as required by Hadoop.
         // Note that if no extra data is present, the 'definedSource' will be left unchanged
         String definedSource = inputData.getDataSource();
-        Pattern pattern = Pattern.compile("/(.*)/[0-9]*-[0-9]*_[0-9]*");
-        Matcher matcher = pattern.matcher(definedSource);
+        Matcher matcher = writeAddressPattern.matcher(definedSource);
         if (matcher.find()) {
             inputData.setDataSource(matcher.group(1));
         }
@@ -263,7 +245,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         if (!isWriteActive) {
             if (!currentRowInBuffer) {
                 LOG.error("writeNextObject(): Failed (not enough memory in 'bufferWrite')");
-                throw new OutOfMemoryError("writeNextObject(): not enough memory in 'bufferWrite'");
+                throw new IOException("writeNextObject(): not enough memory in 'bufferWrite'");
             }
             LOG.info("Ignite write request. Query: '" + queryWrite + "'");
             sendInsertRestRequest(queryWrite);
@@ -279,10 +261,10 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         if (!currentRowInBuffer) {
             if (!bufferWrite.add(currentRow)) {
                 LOG.error("writeNextObject(): Failed (not enough memory in 'bufferSend')");
-                throw new OutOfMemoryError("writeNextObject(): not enough memory in 'bufferSend'");
+                throw new IOException("writeNextObject(): not enough memory in 'bufferSend'");
             }
         }
-        
+
         return true;
     }
 
@@ -291,27 +273,49 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
      */
     @Override
     public void closeForWrite() throws Exception {
+        isWriteActive = false;
         if (!bufferWrite.isEmpty()) {
             sendInsertRestRequest(queryWrite);
         }
         if (isWriteActive) {
-            // At this point, the request must have finished successfully; otherwise an exception would be thrown before
+            // At this point, the request must have finished successfully
             LOG.info("Ignite write request finished successfully. Query: '" + queryWrite + "'");
         }
-        isWriteActive = false;
     }
+
+
+    private static final Log LOG = LogFactory.getLog(IgniteAccessor.class);
+
+    // A pattern to cut extra parameters from 'InputData.dataSource' when write operation is performed. See {@link openForWrite()} for the details
+    private static final Pattern writeAddressPattern = Pattern.compile("/(.*)/[0-9]*-[0-9]*_[0-9]*");
+
+    // Prepared URLs to send to Ignite when reading data
+    private String urlReadStart = null;
+    private String urlReadFetch = null;
+    private String urlReadClose = null;
+    // Set to true when Ignite reported all the data for the SELECT query was retreived
+    private boolean isLastReadFinished = false;
+    // A buffer to store the SELECT query results (without Ignite metadata)
+    private LinkedList<JsonArray> bufferRead = new LinkedList<JsonArray>();
+
+    // A template for the INSERT 
+    private String queryWrite = null;
+    // Set to true when the INSERT operation is in progress
+    private boolean isWriteActive = false;
+    // A buffer to store prepared values for the INSERT query
+    private LinkedList<OneRow> bufferWrite = new LinkedList<OneRow>();
 
     /**
      * Build HTTP GET query for Ignite REST API with command 'qryfldexe'
      * 
-     * @param querySql SQL query with filter constants. The constants must replaced by "?" if 'filterConstants' is not given
-     * @param filterConstants
+     * @param querySql SQL query
+     * @param filterConstants A list of Constraints' constants. Must be null in this version.
      * 
      * @return Prepared HTTP query. The query will be properly encoded with {@link java.net.URLEncoder}
      * 
      * @throws UnsupportedEncodingException from {@link java.net.URLEncoder.encode()}
      */
-    private String buildQueryFldexe(String querySql, ArrayList<String> filterConstants) throws UnsupportedEncodingException {
+    private String buildQueryFldexe(String querySql, List<String> filterConstants) throws UnsupportedEncodingException {
         StringBuilder sb = new StringBuilder();
         sb.append("http://");
         sb.append(igniteHost);
@@ -323,10 +327,15 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         sb.append("&");
         if (cacheName != null) {
             sb.append("cacheName=");
-            // Note that Ignite supports only "good" cache names (those that should be left unchanged by the URLEncoder.encode())
+            // Note that Ignite supports only "good" cache names (those that will be left unchanged by the URLEncoder.encode())
             sb.append(URLEncoder.encode(cacheName, "UTF-8"));
             sb.append("&");
         }
+        /* 
+        'filterConstants' must always be null in the current version.
+        This code allows to pass filters' constants separately from the filters' expressions. This feature is supported by Ignite database; however, it is not implemented in PXF Ignite plugin at the moment.
+        To implement this, changes should be made in {@link WhereSQLBuilder} (form SQL query without filter constants) and {@link IgnitePartitionFragmenter} (form partition constraints the similar way).
+        */
         int counter = 1;
         if (filterConstants != null) {
             for (String constant : filterConstants) {
@@ -404,26 +413,19 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
      * @throws IOException in case of connection failure
      */
     private JsonElement sendRestRequest(String query) throws ProtocolException, MalformedURLException, IOException {
-        // Create URL object
-        URL url;
-        try {
-            url = new URL(query);
-        }
-        catch (MalformedURLException e) {
-            LOG.error("sendRestRequest(): Failed (malformed URL). URL is '" + query + "'");
-            throw e;
-        }
+        // Create URL object. This operation may throw 'MalformedURLException'
+        URL url = new URL(query);
 
         // Connect to the Ignite server, send query and get raw response
+        BufferedReader reader = null;
         String responseRaw = null;
         try {
             StringBuilder sb = new StringBuilder();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream()));
+            reader = new BufferedReader(new InputStreamReader(url.openStream()));
             String responseLine;
             while ((responseLine = reader.readLine()) != null) {
                 sb.append(responseLine);
             }
-            reader.close();
             responseRaw = sb.toString();
             if (LOG.isDebugEnabled()) {
                 LOG.debug("sendRestRequest(): URL: '" + query + "'; Result: '" + responseRaw + "'");
@@ -432,6 +434,9 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         catch (Exception e) {
             LOG.error("sendRestRequest(): Failed (connection failure). URL is '" + query + "'");
             throw e;
+        }
+        finally {
+            reader.close();
         }
         
         // Parse raw Ignite server response

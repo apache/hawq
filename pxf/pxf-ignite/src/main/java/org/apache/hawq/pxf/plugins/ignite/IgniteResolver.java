@@ -30,6 +30,7 @@ import org.apache.hawq.pxf.api.WriteResolver;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
 import org.apache.commons.logging.Log;
@@ -40,16 +41,13 @@ import org.apache.commons.codec.binary.Hex;
 import com.google.gson.JsonArray;
 
 
-
 /**
  * PXF-Ignite resolver class
  */
 public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteResolver {
-    private static final Log LOG = LogFactory.getLog(IgniteResolver.class);
-    
-    // HAWQ column descriptors
-    private ArrayList<ColumnDescriptor> columns = null;
-
+    /**
+     * Class constructor
+     */
     public IgniteResolver(InputData input) throws Exception {
         super(input);
         if (LOG.isDebugEnabled()) {
@@ -64,12 +62,19 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
     }
 
     /**
-     * Transform a JsonArray object stored in {@link OneRow} into a List {@link OneField}
+     * Transform a {@link JsonArray} stored in {@link OneRow} into a list of {@link OneField}
+     * 
+     * @throws ParseException if the response could not be correctly parsed
+     * @throws UnsupportedOperationException if the type of some field is not supported
      */
     @Override
-    public List<OneField> getFields(OneRow row) throws Exception {
-        JsonArray result = (JsonArray)row.getData();
+    public List<OneField> getFields(OneRow row) throws ParseException, UnsupportedOperationException {
+        JsonArray result = JsonArray.class.cast(row.getData());
         LinkedList<OneField> fields = new LinkedList<OneField>();
+
+        if (result.size() != columns.size()) {
+            throw new ParseException("getFields(): Failed (a tuple received from Ignite contains more or less fields than requested). Raw tuple: '" + result.toString() + "'", 0);
+        }
 
         for (int i = 0; i < columns.size(); i++) {
             Object value = null;
@@ -77,7 +82,6 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
 
             // Handle null values
             if (result.get(i).isJsonNull()) {
-                oneField.val = null;
                 fields.add(oneField);
                 continue;
             }
@@ -117,7 +121,7 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
                     break;
                 default:
                     throw new UnsupportedOperationException("Field type not supported: " + DataType.get(oneField.type).toString()
-                            + ", Column : " + columns.get(i).columnName());
+                            + ", Column: " + columns.get(i).columnName());
             }
 
             oneField.val = value;
@@ -128,10 +132,12 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
     }
 
     /**
-     * Create a query string from a List<OneField> for Ignite database REST API containing INSERT query
+     * Transforms a list of {@link OneField} from PXF into a {@link OneRow} with a string inside, containing a tuple from SQL INSERT query
+     * 
+     * @throws UnsupportedOperationException if the type of some field is not supported
      */
     @Override
-    public OneRow setFields(List<OneField> record) throws Exception {
+    public OneRow setFields(List<OneField> record) throws UnsupportedOperationException {
         StringBuilder sb = new StringBuilder();
         String fieldDivisor = "";
         
@@ -140,18 +146,18 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
             sb.append(fieldDivisor);
             fieldDivisor = ", ";
             switch (DataType.get(oneField.type)) {
+                case BOOLEAN:
                 case INTEGER:
                 case FLOAT8:
                 case REAL:
                 case BIGINT:
+                case NUMERIC:
                 case SMALLINT:
-                case BOOLEAN:
                     sb.append(String.valueOf(oneField.val));
                     break;
                 case VARCHAR:
                 case BPCHAR:
                 case TEXT:
-                case NUMERIC:
                     sb.append("'" + String.valueOf(oneField.val) + "'");
                     break;
                 case BYTEA:
@@ -170,4 +176,9 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
         sb.append(")");
         return new OneRow(sb.toString());
     }
+
+    private static final Log LOG = LogFactory.getLog(IgniteResolver.class);
+    
+    // HAWQ column descriptors
+    private ArrayList<ColumnDescriptor> columns = null;
 }

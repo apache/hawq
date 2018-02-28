@@ -92,7 +92,7 @@ public class IgniteAccessorTest {
 
         List<String> allParams = captor.getAllValues();
 
-        assertEquals(allParams.get(0), "http://127.0.0.1:8080/ignite?cmd=qryfldexe&pageSize=0&qry=SELECT+id%2Cname%2Cbirthday%2Ckey+FROM+TableTest");
+        assertEquals(allParams.get(0), "http://127.0.0.1:8080/ignite?cmd=qryfldexe&pageSize=0&qry=SELECT+id%2C+name%2C+birthday%2C+key+FROM+TableTest");
         assertEquals(allParams.get(1), "http://127.0.0.1:8080/ignite?cmd=qryfetch&pageSize=128&qryId=1");
         assertEquals(allParams.get(2), "http://127.0.0.1:8080/ignite?cmd=qrycls&qryId=1");
     }

@@ -29,6 +29,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
+
 public class IgniteFilterBuilderTest {
     @Test
     public void parseFilterWithThreeOperations() throws Exception {
@@ -80,7 +81,7 @@ public class IgniteFilterBuilderTest {
     }
 
     @Test
-    public void parseISNULLExpression() throws Exception {
+    public void parseIsNullExpression() throws Exception {
         WhereSQLBuilder builder = new WhereSQLBuilder(null);
         BasicFilter filter = (BasicFilter) builder.getFilterObject("a1o8");
         assertEquals(FilterParser.Operation.HDOP_IS_NULL, filter.getOperation());
@@ -89,7 +90,7 @@ public class IgniteFilterBuilderTest {
     }
 
     @Test
-    public void parseISNOTNULLExpression() throws Exception {
+    public void parseIsNotNullExpression() throws Exception {
         WhereSQLBuilder builder = new WhereSQLBuilder(null);
         BasicFilter filter = (BasicFilter) builder.getFilterObject("a1o9");
         assertEquals(FilterParser.Operation.HDOP_IS_NOT_NULL, filter.getOperation());

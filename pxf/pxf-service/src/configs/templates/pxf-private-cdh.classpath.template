@@ -63,7 +63,7 @@ PXF_HOME/lib/pxf-ignite.jar
 /usr/lib/hadoop/client/snappy-java.jar
 /usr/lib/hadoop/lib/asm-*[0-9].jar
 /usr/lib/hadoop/lib/jersey-server-*[0-9].jar
-/usr/lib/hadoop/client/gson.jar
+/usr/lib/hadoop/client/gson-*[0-9].jar
 
 # Hive Libraries
 /usr/lib/hive/lib/antlr-runtime-*[0-9].jar
