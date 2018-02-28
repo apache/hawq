@@ -249,7 +249,6 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
             }
             LOG.info("Ignite write request. Query: '" + queryWrite + "'");
             sendInsertRestRequest(queryWrite);
-            bufferWrite.removeFirst();
             isWriteActive = true;
             return true;
         }
@@ -436,7 +435,10 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
             throw e;
         }
         finally {
-            reader.close();
+            if (reader != null) {
+                reader.close();
+            }
+            // if 'reader' is null, an exception must have been thrown
         }
         
         // Parse raw Ignite server response
@@ -498,6 +500,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
             fieldDivisor = ", ";
             sb.append((String)row.getData());
         }
+        bufferWrite.clear();
 
         // Send REST request 'qryfldexe' to Ignite
         JsonElement response = sendRestRequest(buildQueryFldexe(sb.toString(), null));
