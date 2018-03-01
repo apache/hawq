@@ -72,7 +72,6 @@ public class IgniteFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Object build(FilterParser.Operation opId, Object leftOperand,
                         Object rightOperand) throws Exception {
         // Assume column is on the left
@@ -102,8 +101,7 @@ public class IgniteFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     /**
-     * Handles AND of already calculated expressions. Currently only AND, in the
-     * future OR can be added
+     * Handles AND of already calculated expressions. Currently only AND can be handled
      *
      * Four cases here:
      * <ol>

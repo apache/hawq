@@ -22,10 +22,11 @@ package org.apache.hawq.pxf.plugins.ignite;
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.hawq.pxf.plugins.ignite.ByteUtil;
 
 import java.util.Calendar;
 import java.util.List;
+
+import org.apache.commons.compress.utils.ByteUtils;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -52,23 +53,21 @@ public class IgnitePartitionFragmenterTest {
         List<Fragment> fragments = fragment.getFragments();
         assertEquals(12, fragments.size());
 
-        //fragment - 1
+        // Fragment 1
         byte[] fragMeta = fragments.get(0).getMetadata();
-        byte[][] newBytes = ByteUtil.splitBytes(fragMeta, 8);
-        long fragStart = ByteUtil.toLong(newBytes[0]);
-        long fragEnd = ByteUtil.toLong(newBytes[1]);
+        long fragStart = ByteUtils.fromLittleEndian(fragMeta, 0, 8);
+        long fragEnd = ByteUtils.fromLittleEndian(fragMeta, 8, 8);
         assertDateEquals(fragStart, 2008, 1, 1);
         assertDateEquals(fragEnd, 2008, 2, 1);
 
-        //fragment - 12
+        // Fragment 12
         fragMeta = fragments.get(11).getMetadata();
-        newBytes = ByteUtil.splitBytes(fragMeta, 8);
-        fragStart = ByteUtil.toLong(newBytes[0]);
-        fragEnd = ByteUtil.toLong(newBytes[1]);
+        fragStart = ByteUtils.fromLittleEndian(fragMeta, 0, 8);
+        fragEnd = ByteUtils.fromLittleEndian(fragMeta, 8, 8);
         assertDateEquals(fragStart, 2008, 12, 1);
         assertDateEquals(fragEnd, 2009, 1, 1);
 
-        //when end_date > start_date
+        // End date > Start date
         when(inputData.getUserProperty("RANGE")).thenReturn("2008-01-01:2001-01-01");
         fragment = new IgnitePartitionFragmenter(inputData);
         fragments = fragment.getFragments();
@@ -96,23 +95,21 @@ public class IgnitePartitionFragmenterTest {
         List<Fragment> fragments = fragment.getFragments();
         assertEquals(6, fragments.size());
 
-        //fragment - 1
+        // Fragment 1
         byte[] fragMeta = fragments.get(0).getMetadata();
-        byte[][] newBytes = ByteUtil.splitBytes(fragMeta, 4);
-        int fragStart = ByteUtil.toInt(newBytes[0]);
-        int fragEnd = ByteUtil.toInt(newBytes[1]);
+        int fragStart = (int)ByteUtils.fromLittleEndian(fragMeta, 0, 4);
+        int fragEnd = (int)ByteUtils.fromLittleEndian(fragMeta, 4, 4);
         assertEquals(2001, fragStart);
         assertEquals(2003, fragEnd);
 
-        //fragment - 6
+        // Fragment 6
         fragMeta = fragments.get(5).getMetadata();
-        newBytes = ByteUtil.splitBytes(fragMeta, 4);
-        fragStart = ByteUtil.toInt(newBytes[0]);
-        fragEnd = ByteUtil.toInt(newBytes[1]);
+        fragStart = (int)ByteUtils.fromLittleEndian(fragMeta, 0, 4);
+        fragEnd = (int)ByteUtils.fromLittleEndian(fragMeta, 4, 4);
         assertEquals(2011, fragStart);
         assertEquals(2012, fragEnd);
 
-        //when end > start
+        // End > Start
         when(inputData.getUserProperty("RANGE")).thenReturn("2013:2012");
         fragment = new IgnitePartitionFragmenter(inputData);
         assertEquals(0, fragment.getFragments().size());

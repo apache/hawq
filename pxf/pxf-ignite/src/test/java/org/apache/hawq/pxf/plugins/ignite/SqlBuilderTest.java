@@ -94,10 +94,11 @@ public class SqlBuilderTest {
         List<Fragment> fragments = fragment.getFragments();
         assertEquals(6, fragments.size());
 
-        //partition-1 : cdate>=2008-01-01 and cdate<2008-03-01
+        // Partition 1: cdate>=2008-01-01 and cdate<2008-03-01
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
-        String fragmentSql = IgnitePartitionFragmenter.buildFragmenterSql(inputData, new StringBuilder(ORIGINAL_SQL)).toString();
-        assertEquals(ORIGINAL_SQL + " WHERE cdate>='2008-01-01' AND cdate<'2008-03-01'", fragmentSql);
+        StringBuilder sb = new StringBuilder(ORIGINAL_SQL);
+        IgnitePartitionFragmenter.buildFragmenterSql(inputData, sb);
+        assertEquals(ORIGINAL_SQL + " WHERE cdate>='2008-01-01' AND cdate<'2008-03-01'", sb.toString());
     }
 
     @Test
@@ -115,12 +116,13 @@ public class SqlBuilderTest {
         IgnitePartitionFragmenter fragment = new IgnitePartitionFragmenter(inputData);
         List<Fragment> fragments = fragment.getFragments();
 
-        //partition-1 : id>5 and grade='excellent'
+        // Partition 1: id>5 and grade='excellent'
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
 
         String filterSql = ORIGINAL_SQL + " WHERE " + whereSql;
-        String fragmentSql = IgnitePartitionFragmenter.buildFragmenterSql(inputData, new StringBuilder(filterSql)).toString();
-        assertEquals(filterSql + " AND grade='excellent'", fragmentSql);
+        StringBuilder sb = new StringBuilder(filterSql);
+        IgnitePartitionFragmenter.buildFragmenterSql(inputData, sb);
+        assertEquals(filterSql + " AND grade='excellent'", sb.toString());
     }
 
     @Test
@@ -133,8 +135,9 @@ public class SqlBuilderTest {
 
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
 
-        String fragmentSql = IgnitePartitionFragmenter.buildFragmenterSql(inputData, new StringBuilder(ORIGINAL_SQL)).toString();
-        assertEquals(ORIGINAL_SQL, fragmentSql);
+        StringBuilder sb = new StringBuilder(ORIGINAL_SQL);
+        IgnitePartitionFragmenter.buildFragmenterSql(inputData, sb);
+        assertEquals(ORIGINAL_SQL, sb.toString());
     }
 
     private void prepareConstruction() throws Exception {

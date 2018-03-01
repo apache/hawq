@@ -95,7 +95,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         sb.append(tableName);
 
         // Insert query constraints
-        // Note: Filter constants may be provided separately from the query itself, mostly for the safety of the SQL queries; at the moment, however, they are passed in the query itself.
+        // Note: Filter constants may be passed to Ignite separately from the WHERE expression, primarily for the safety of the SQL queries. However, at the moment they are passed in the query.
         ArrayList<String> filterConstants = null;
         if (inputData.hasFilter()) {
             WhereSQLBuilder filterBuilder = new WhereSQLBuilder(inputData);
@@ -107,7 +107,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
         }
 
         // Insert partition constraints
-        sb = IgnitePartitionFragmenter.buildFragmenterSql(inputData, sb);
+        IgnitePartitionFragmenter.buildFragmenterSql(inputData, sb);
 
         // Format URL
         urlReadStart = buildQueryFldexe(sb.toString(), filterConstants);

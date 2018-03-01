@@ -48,6 +48,7 @@ HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-configuration-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-io-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-lang-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-logging-*[0-9].jar
+HADOOP_ROOT/hadoop/share/hadoop/common/lib/commons-compress-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/guava-*[0-9].jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/htrace-core*.jar
 HADOOP_ROOT/hadoop/share/hadoop/common/lib/jetty-*.jar

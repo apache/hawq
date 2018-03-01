@@ -515,13 +515,15 @@ project('pxf-ignite') {
         compile(project(':pxf-api'))
         compile(project(':pxf-service'))
         compile 'com.google.code.gson:gson:2.8.2'
+        compile 'org.apache.commons:commons-compress:1.16.1'
         testCompile 'com.google.code.gson:gson:2.8.2'
+        testCompile 'org.apache.commons:commons-compress:1.16.1'
     }
 
     ospackage {
         packageName = versionedPackageName("${project.name}")
-        summary = 'HAWQ Extension Framework (PXF), Ignite plugin'
-        description = 'Querying external data stored in Ignite database.'
+        summary = 'HAWQ Extension Framework (PXF), Apache Ignite plugin'
+        description = 'Querying external data stored in the Apache Ignite database.'
         packager = ' '
         packageGroup = 'Development/Libraries'
         release = buildNumber() + '.' + project.osFamily

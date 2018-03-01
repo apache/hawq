@@ -35,7 +35,7 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.compress.utils.ByteUtils;
 
 
 /**
@@ -44,6 +44,100 @@ import org.apache.commons.lang.ArrayUtils;
  * This fragmenter works just like the one in PXF JDBC plugin
  */
 public class IgnitePartitionFragmenter extends Fragmenter {
+    /**
+     * Insert partition constraints into the prepared SQL query.
+     * 
+     * @param inputData pre-validated PXF InputData
+     * @param sb the SQL query that is prepared for appending extra WHERE constraints.
+     */
+    public static void buildFragmenterSql(InputData inputData, StringBuilder sb) {
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("buildFragmenterSql() called");
+        }
+
+        if (inputData.getUserProperty("PARTITION_BY") == null) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("buildFragmenterSql(): Partition is not used");
+            }
+            return;
+        }
+
+        byte[] meta = inputData.getFragmentMetadata();
+        if (meta == null) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("buildFragmenterSql(): Fragment metadata is null, no partition constraints added");
+            }
+            return;
+        }
+
+        // Note that these parameters have already been validated when constructing fragment.
+        String[] partitionBy = inputData.getUserProperty("PARTITION_BY").split(":");
+        String partitionColumn = partitionBy[0];
+        PartitionType partitionType = PartitionType.typeOf(partitionBy[1]);
+
+        if (!sb.toString().contains("WHERE")) {
+            sb.append(" WHERE ");
+        }
+        else {
+            sb.append(" AND ");
+        }
+
+        switch (partitionType) {
+            case DATE: {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("buildFragmenterSql(): DATE partition found");
+                }
+
+                // Get fragment metadata
+                Date fragStart = new Date(ByteUtils.fromLittleEndian(meta, 0, 8));
+                Date fragEnd = new Date(ByteUtils.fromLittleEndian(meta, 8, 8));
+
+                // Add constraints
+                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+                sb.append(partitionColumn).append(">=").append("'" + df.format(fragStart) + "'");
+                sb.append(" AND ");
+                sb.append(partitionColumn).append("<").append("'" + df.format(fragEnd) + "'");
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("buildFragmenterSql(): DATE partition constraints added");
+                }
+                break;
+            }
+            case INT: {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("buildFragmenterSql(): INT partition found");
+                }
+
+                // Get fragment metadata
+                int fragStart = (int)ByteUtils.fromLittleEndian(meta, 0, 4);
+                int fragEnd = (int)ByteUtils.fromLittleEndian(meta, 4, 4);
+                
+                // Add constraints
+                sb.append(partitionColumn).append(">=").append(fragStart);
+                sb.append(" AND ");
+                sb.append(partitionColumn).append("<").append(fragEnd);
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("buildFragmenterSql(): INT partition constraints added");
+                }
+                break;
+            }
+            case ENUM: {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("buildFragmenterSql(): ENUM partition found");
+                }
+
+                // Add constraints. Fragment metadata should not be parsed.
+                sb.append(partitionColumn).append("='").append(new String(meta)).append("'");
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("buildFragmenterSql(): ENUM partition constraints added");
+                }
+                break;
+            }
+        }
+    }
+
     /**
      * Class constructor
      * 
@@ -70,7 +164,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
             throw new UserDataException("The parameter 'PARTITION_BY' is invalid. The pattern is 'column_name:DATE|INT|ENUM'");
         }
 
-        //parse and validate parameter-RANGE
+        // Parse and validate parameter-RANGE
         try {
             String rangeStr = inputData.getUserProperty("RANGE");
             if (rangeStr != null) {
@@ -87,7 +181,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
             throw new UserDataException("The parameter 'RANGE' is invalid, the pattern is 'start_value[:end_value]'");
         }
 
-        //parse and validate parameter-INTERVAL
+        // Parse and validate parameter-INTERVAL
         try {
             String intervalStr = inputData.getUserProperty("INTERVAL");
             if (intervalStr != null) {
@@ -111,7 +205,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
             throw new UserDataException("The parameter 'INTERVAL' invalid. The pattern is 'interval_num[:interval_unit]'");
         }
 
-        //parse date values
+        // Parse date partition
         try {
             if (partitionType == PartitionType.DATE) {
                 SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
@@ -190,12 +284,11 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                     if (fragEnd.after(rangeEnd))
                         fragEnd = (Calendar) rangeEnd.clone();
 
-                    // Note that the date is stored in milliseconds
-                    byte[] msStart = ByteUtil.getBytes(fragStart.getTimeInMillis());
-                    byte[] msEnd = ByteUtil.getBytes(fragEnd.getTimeInMillis());
-                    fragmentMetadata = ArrayUtils.addAll(msStart, msEnd);
-
+                    fragmentMetadata = new byte[16];
+                    ByteUtils.toLittleEndian(fragmentMetadata, fragStart.getTimeInMillis(), 0, 8);
+                    ByteUtils.toLittleEndian(fragmentMetadata, fragEnd.getTimeInMillis(), 8, 8);
                     Fragment fragment = new Fragment(inputData.getDataSource(), replicaHostAddressWrapped, fragmentMetadata, fragmentUserdata);
+
                     fragments.add(fragment);
 
                     // Continue the previous fragment
@@ -218,11 +311,11 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                         fragEnd = rangeEnd;
                     }
 
-                    byte[] bStart = ByteUtil.getBytes(fragStart);
-                    byte[] bEnd = ByteUtil.getBytes(fragEnd);
-                    fragmentMetadata = ArrayUtils.addAll(bStart, bEnd);
-
+                    fragmentMetadata = new byte[8];
+                    ByteUtils.toLittleEndian(fragmentMetadata, fragStart, 0, 4);
+                    ByteUtils.toLittleEndian(fragmentMetadata, fragEnd, 4, 4);
                     Fragment fragment = new Fragment(inputData.getDataSource(), replicaHostAddressWrapped, fragmentMetadata, fragmentUserdata);
+
                     fragments.add(fragment);
 
                     // Continue the previous fragment
@@ -250,107 +343,6 @@ public class IgnitePartitionFragmenter extends Fragmenter {
             LOG.debug("getFragments() successful");
         }
         return fragments;
-    }
-
-    /**
-     * Insert partition constraints into the prepared SQL query.
-     * 
-     * @param inputData pre-validated PXF InputData
-     * @param sb the SQL query that is prepared for appending WHERE constraints.
-     * Other SQL statements may be present, but they must be complete. Note that no check is performed to check their "completeness"
-     */
-    public static StringBuilder buildFragmenterSql(InputData inputData, StringBuilder sb) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("buildFragmenterSql() called");
-        }
-
-        if (inputData.getUserProperty("PARTITION_BY") == null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("buildFragmenterSql() successful, partition was not used");
-            }
-        }
-
-        byte[] meta = inputData.getFragmentMetadata();
-        if (meta == null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Fragment metadata is null; No partition constraints added");
-            }
-            return sb;
-        }
-
-        // Note that these parameters have already been validated when constructing fragment.
-        String[] partitionBy = inputData.getUserProperty("PARTITION_BY").split(":");
-        String partitionColumn = partitionBy[0];
-        PartitionType partitionType = PartitionType.typeOf(partitionBy[1]);
-
-        if (!sb.toString().contains("WHERE")) {
-            sb.append(" WHERE ");
-        }
-        else {
-            sb.append(" AND ");
-        }
-
-        switch (partitionType) {
-            case DATE: {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("DATE partition found");
-                }
-
-                // Get fragment metadata
-                byte[][] newb = ByteUtil.splitBytes(meta, 8);
-                Date fragStart = new Date(ByteUtil.toLong(newb[0]));
-                Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
-
-                // Add constraints
-                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-                sb.append(partitionColumn).append(">=").append("'" + df.format(fragStart) + "'");
-                sb.append(" AND ");
-                sb.append(partitionColumn).append("<").append("'" + df.format(fragEnd) + "'");
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("DATE partition constraints added");
-                }
-                break;
-            }
-            case INT: {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("INT partition found");
-                }
-
-                // Get fragment metadata
-                byte[][] newb = ByteUtil.splitBytes(meta, 4);
-                int fragStart = ByteUtil.toInt(newb[0]);
-                int fragEnd = ByteUtil.toInt(newb[1]);
-                
-                // Add constraints
-                sb.append(partitionColumn).append(">=").append(fragStart);
-                sb.append(" AND ");
-                sb.append(partitionColumn).append("<").append(fragEnd);
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("INT partition constraints added");
-                }
-                break;
-            }
-            case ENUM: {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("ENUM partition found");
-                }
-
-                // Add constraints. Fragment metadata should not be parsed.
-                sb.append(partitionColumn).append("='").append(new String(meta)).append("'");
-
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("ENUM partition constraints added");
-                }
-                break;
-            }
-        }
-
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("buildFragmenterSql() successful");
-        }
-        return sb;
     }
 
 

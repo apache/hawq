@@ -16,7 +16,7 @@
 # This file contains the internal classpaths required to run PXF.
 # WARNING: DO NOT EDIT!
 # Any change in this file can result in PXF failing to run.
-# Adding resources should be done using pxf-public.classpath file. 
+# Adding resources should be done using pxf-public.classpath file.
 ##################################################################
 /etc/pxf/conf
 /etc/hadoop/conf
@@ -35,6 +35,7 @@
 /usr/hdp/current/hadoop-client/lib/commons-io-*[0-9].jar
 /usr/hdp/current/hadoop-client/lib/commons-lang-*[0-9].jar
 /usr/hdp/current/hadoop-client/lib/commons-logging-*[0-9].jar
+/usr/hdp/current/hadoop-client/lib/commons-compress-*[0-9].jar
 /usr/hdp/current/hadoop-client/lib/guava-*[0-9].jar
 /usr/hdp/current/hadoop-client/lib/htrace-core-*[0-9]*.jar
 /usr/hdp/current/hadoop-client/lib/hadoop-lzo-*[0-9].jar
