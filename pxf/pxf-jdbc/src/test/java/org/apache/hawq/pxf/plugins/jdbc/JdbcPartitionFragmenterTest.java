@@ -56,7 +56,7 @@ public class JdbcPartitionFragmenterTest {
 
         //fragment - 1
         byte[] fragMeta = fragments.get(0).getMetadata();
-        byte[][] newBytes = ByteUtil.splitBytes(fragMeta, 8);
+        byte[][] newBytes = ByteUtil.splitBytes(fragMeta);
         long fragStart = ByteUtil.toLong(newBytes[0]);
         long fragEnd = ByteUtil.toLong(newBytes[1]);
         assertDateEquals(fragStart, 2008, 1, 1);
@@ -64,7 +64,7 @@ public class JdbcPartitionFragmenterTest {
 
         //fragment - 12
         fragMeta = fragments.get(11).getMetadata();
-        newBytes = ByteUtil.splitBytes(fragMeta, 8);
+        newBytes = ByteUtil.splitBytes(fragMeta);
         fragStart = ByteUtil.toLong(newBytes[0]);
         fragEnd = ByteUtil.toLong(newBytes[1]);
         assertDateEquals(fragStart, 2008, 12, 1);
@@ -102,17 +102,17 @@ public class JdbcPartitionFragmenterTest {
 
         //fragment - 1
         byte[] fragMeta = fragments.get(0).getMetadata();
-        byte[][] newBytes = ByteUtil.splitBytes(fragMeta, 4);
-        int fragStart = ByteUtil.toInt(newBytes[0]);
-        int fragEnd = ByteUtil.toInt(newBytes[1]);
+        byte[][] newBytes = ByteUtil.splitBytes(fragMeta);
+        long fragStart = ByteUtil.toLong(newBytes[0]);
+        long fragEnd = ByteUtil.toLong(newBytes[1]);
         assertEquals(2001, fragStart);
         assertEquals(2003, fragEnd);
 
         //fragment - 6
         fragMeta = fragments.get(5).getMetadata();
-        newBytes = ByteUtil.splitBytes(fragMeta, 4);
-        fragStart = ByteUtil.toInt(newBytes[0]);
-        fragEnd = ByteUtil.toInt(newBytes[1]);
+        newBytes = ByteUtil.splitBytes(fragMeta);
+        fragStart = ByteUtil.toLong(newBytes[0]);
+        fragEnd = ByteUtil.toLong(newBytes[1]);
         assertEquals(2011, fragStart);
         assertEquals(2012, fragEnd);
 
