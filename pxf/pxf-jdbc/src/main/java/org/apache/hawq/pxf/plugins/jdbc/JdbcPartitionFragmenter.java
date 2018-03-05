@@ -143,7 +143,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
             } else if (partitionType != PartitionType.ENUM)
                 throw new UserDataException("The parameter 'INTERVAL' must be specified along with 'PARTITION_BY'");
             if (intervalNum < 1)
-                throw new UserDataException("The parameter 'INTERVAL' must > 1, but actual is '" + intervalNum + "'");
+                throw new UserDataException("The parameter 'INTERVAL' must be at least '1', but actual is '" + intervalNum + "'");
         } catch (IllegalArgumentException e1) {
             throw new UserDataException("The parameter 'INTERVAL' invalid, the pattern is 'interval_num[:interval_unit]'");
         }

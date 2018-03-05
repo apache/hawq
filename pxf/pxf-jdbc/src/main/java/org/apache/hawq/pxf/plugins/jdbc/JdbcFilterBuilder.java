@@ -72,7 +72,6 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Object build(FilterParser.Operation opId, Object leftOperand,
                         Object rightOperand) throws Exception {
         // Assume column is on the left
@@ -84,7 +83,7 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
     @Override
     public Object build(FilterParser.Operation operation, Object operand) throws Exception {
         if (operation == FilterParser.Operation.HDOP_IS_NULL || operation == FilterParser.Operation.HDOP_IS_NOT_NULL) {
-            // use null for the constant value of null comparison
+            // Use null for the constant value of null comparison
             return handleSimpleOperations(operation, (FilterParser.ColumnIndex) operand, null);
         } else {
             throw new Exception("Unsupported unary operation " + operation);

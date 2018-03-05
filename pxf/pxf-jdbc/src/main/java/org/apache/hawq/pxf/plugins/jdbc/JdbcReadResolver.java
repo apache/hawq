@@ -33,11 +33,11 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * Class JdbcReadResolver Read the Jdbc ResultSet, and generates the data type - List {@link OneField}.
+ * Class JdbcReadResolver.
+ * Reads the Jdbc ResultSet and generates a list of {@link OneField}.
  */
 public class JdbcReadResolver extends Plugin implements ReadResolver {
-    private static final Log LOG = LogFactory.getLog(JdbcReadResolver.class);
-    //HAWQ Table column definitions
+    // HAWQ Table column definitions
     private ArrayList<ColumnDescriptor> columns = null;
 
     public JdbcReadResolver(InputData input) {
@@ -50,8 +50,7 @@ public class JdbcReadResolver extends Plugin implements ReadResolver {
         ResultSet result = (ResultSet) row.getData();
         LinkedList<OneField> fields = new LinkedList<>();
 
-        for (int i = 0; i < columns.size(); i++) {
-            ColumnDescriptor column = columns.get(i);
+        for (ColumnDescriptor column : columns) {
             String colName = column.columnName();
             Object value = null;
 
@@ -86,18 +85,20 @@ public class JdbcReadResolver extends Plugin implements ReadResolver {
                 case NUMERIC:
                     value = result.getString(colName);
                     break;
-                case TIMESTAMP:
                 case DATE:
                     value = result.getDate(colName);
                     break;
+                case TIMESTAMP:
+                    value = result.getTimestamp(colName);
+                    break;
                 default:
-                    throw new UnsupportedOperationException("Unknwon Field Type : " + DataType.get(oneField.type).toString()
-                            + ", Column : " + column.toString());
+                    throw new UnsupportedOperationException("Unknown Field Type: " + DataType.get(oneField.type).toString()
+                            + ", Column: " + column.toString());
             }
+
             oneField.val = value;
             fields.add(oneField);
         }
         return fields;
     }
-
 }
