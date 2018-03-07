@@ -26,6 +26,7 @@ import org.apache.hawq.pxf.api.LogicalFilter;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.text.ParseException;
 
 /**
  * Uses the filter parser code to build a filter object, either simple - a
@@ -47,17 +48,21 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
      * @throws Exception if parsing the filter failed or filter is not a basic
      *             filter or list of basic filters
      */
-    public Object getFilterObject(String filterString) throws Exception {
-        FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
+    public Object getFilterObject(String filterString) throws ParseException {
+        try {
+            FilterParser parser = new FilterParser(this);
+            Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
 
-        if (!(result instanceof LogicalFilter) && !(result instanceof BasicFilter)
-                && !(result instanceof List)) {
-            throw new Exception("String " + filterString
-                    + " resolved to no filter");
+            if (!(result instanceof LogicalFilter) && !(result instanceof BasicFilter)
+                    && !(result instanceof List)) {
+                throw new Exception("String " + filterString
+                        + " resolved to no filter");
+            }
+            return result;
         }
-
-        return result;
+        catch (Exception e) {
+            throw new ParseException(e.getMessage(), 0);
+        }
     }
 
 

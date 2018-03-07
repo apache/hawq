@@ -1,6 +1,6 @@
-# Accessing Jdbc Table Data
+# Accessing external data sources via JDBC
 
-The PXF JDBC plug-in reads data stored in Traditional relational database,ie : mysql,ORACLE,postgresql.
+The PXF JDBC plugin reads data from and writes data into databases that support JDBC and whose driver is present on PXF segment.
 
 PXF-JDBC plug-in is the client of the database, the host running the database engine does not need to
 deploy PXF.
@@ -37,9 +37,23 @@ where `<pxf-parameters>` is:
     | PROFILE=Jdbc
 
 where `<custom-parameters>` is:
+```
+JDBC_DRIVER=<jdbc-driver-class-name>
+&DB_URL=<jdbc-url>
+&USER=<database-user>
+&PASS=<password>
+&BATCH_SIZE=<int>
+```
 
-    JDBC_DRIVER=<jdbc-driver-class-name>
-     &DB_URL=<jdbc-url>&USER=<database-user>&PASS=<password>
+The `BATCH_SIZE` parameter must be an integer. It describes the size of a batch
+used when processing INSERT queries. By default, each tuple is INSERTed with
+its own SQL query. This is a slow process that can be fastened with batching
+(in some cases). Batching must be supported by the JDBC driver used. The valid
+values for this parameter are:
+    * `0` (default), `1`: the batching is not used;
+    * `integer > 1`: the batch will be of the size provided;
+    * `integer < 0`: the batch will be of infinite size.
+
 
 ## Jdbc Table to HAWQ Data Type Mapping
 Jdbc-table and hawq-table data type system is similar to, does not require
@@ -97,26 +111,36 @@ you can also use multiple pxf-instance to access the JDBC table by fragments.
 ## Syntax
 where `<custom-parameters>` can use following partition parameters:
 
-    PARTITION_BY=column_name:column_type&RANGE=start_value[:end_value]&INTERVAL=interval_num[:interval_unit]
+```
+PARTITION_BY=column_name:column_type
+&RANGE=start_value[:end_value]
+&INTERVAL=interval_num[:interval_unit]
+```
+
 The `PARTITION_BY` parameter indicates which  column to use as the partition column.
 It can be split by colon(':'),the `column_type` current supported : `date|int|enum` .
 The Date format is `yyyy-MM-dd`.
 The `PARTITION_BY` parameter can be null, and there will be only one fragment.
 
 The `RANGE` parameter indicates the range of data to be queried , it can be split by colon(':').
- The range is left-closed, ie: `>= start_value AND < end_value` .
+The range is left-closed, ie: `>= start_value AND < end_value` .
 
 The `INTERVAL` parameter can be split by colon(':'), indicate the interval
- value of one fragment. When `column_type` is `date`,this parameter must
- be split by colon, and `interval_unit` can be `year|month|day`. When
- `column_type` is int, the `interval_unit` can be empty. When `column_type`
- is enum,the `INTERVAL` parameter can be empty.
+value of one fragment. When `column_type` is `date`,this parameter must
+be split by colon, and `interval_unit` can be `year|month|day`. When
+`column_type` is int, the `interval_unit` can be empty. When `column_type`
+is enum,the `INTERVAL` parameter can be empty.
 
-The syntax examples is :
+Note that batching is not safe if the database does not support transactions.
+In this case, there is no way to know how many tuples were actually INSERTed
+into the target database.
+
+The syntax examples are:
 
     * PARTITION_BY=createdate:date&RANGE=2008-01-01:2010-01-01&INTERVAL=1:month'
     * PARTITION_BY=year:int&RANGE=2008:2010&INTERVAL=1
     * PARTITION_BY=grade:enum&RANGE=excellent:good:general:bad
+
 
 ## Usage
 MySQL Table:

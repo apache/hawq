@@ -22,92 +22,146 @@ package org.apache.hawq.pxf.plugins.jdbc;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.pxf.api.UserDataException;
+import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 
-import java.sql.*;
+import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.SQLTimeoutException;
 
 /**
- * This class resolves the jdbc connection parameter and manages the opening and closing of the jdbc connection.
- * Implemented subclasses: {@link JdbcReadAccessor}.
+ * JDBC tables plugin
  *
+ * Implemented subclasses: {@link JdbcAccessor}, {@link JdbcResolver}.
  */
 public class JdbcPlugin extends Plugin {
-    private static final Log LOG = LogFactory.getLog(JdbcPlugin.class);
+    /**
+     * Class constructor. Parses and checks InputData
+     *
+     * @param input PXF InputData
+     *
+     * @throws UserDataException if one of the required request parameters is not set
+     */
+    public JdbcPlugin(InputData input) throws UserDataException {
+        super(input);
 
-    //jdbc connection parameters
+        jdbcDriver = input.getUserProperty("JDBC_DRIVER");
+        if (jdbcDriver == null) {
+            throw new UserDataException("JDBC_DRIVER must be set");
+        }
+
+        dbUrl = input.getUserProperty("DB_URL");
+        if (dbUrl == null) {
+            throw new UserDataException("DB_URL must be set");
+        }
+
+        // This parameter may be null
+        user = input.getUserProperty("USER");
+        if (user != null) {
+            pass = input.getUserProperty("PASS");
+        }
+
+        // If this parameter is not set, the default value (0) is used instead
+        String batchSizeRaw = input.getUserProperty("BATCH_SIZE");
+        if (batchSizeRaw != null) {
+            try {
+                batchSize = Integer.parseInt(batchSizeRaw);
+            }
+            catch (NumberFormatException e) {
+                throw new UserDataException("BATCH_SIZE is incorrect: must be an integer");
+            }
+        }
+
+        tblName = input.getDataSource();
+        if (tblName == null) {
+            throw new UserDataException("TABLE_NAME must be set as DataSource");
+        }
+        // At the moment, when writing into some table, the table name is concatenated with a special string that is necessary to write into HDFS. However, a raw table name is necessary in case of JDBC. The correct table name is extracted here. This code should be removed in later versions (when the table name becomes correct)
+        Matcher matcher = tableNamePattern.matcher(tblName);
+        if (matcher.matches()) {
+            inputData.setDataSource(matcher.group(1));
+            tblName = input.getDataSource();
+        }
+
+        // This variable is used in Accessor and Resolver, thus if it is not present, no other actions can be performed. This parameter is not under user's control
+        columns = inputData.getTupleDescription();
+        if (columns == null) {
+            throw new UserDataException("Tuple description is not provided");
+        }
+    }
+
+
+    // JDBC connection parameters
     protected String jdbcDriver = null;
     protected String dbUrl = null;
     protected String user = null;
     protected String pass = null;
     protected String tblName = null;
-    protected int batchSize = 100;
 
-    //jdbc connection
+    // JDBC connection object
     protected Connection dbConn = null;
-    //database type, from DatabaseMetaData.getDatabaseProductName()
-    protected String dbProduct = null;
+    // Database metadata
+    protected DatabaseMetaData dbMeta = null;
+    // Batch size for INSERTs into the database
+    protected int batchSize = 0;
+    // Columns description
+    protected ArrayList<ColumnDescriptor> columns = null;
 
     /**
-     * parse input data
+     * Open a JDBC connection
      *
-     * @param input the input data
-     * @throws UserDataException if the request parameter is malformed
+     * @throws ClassNotFoundException if the JDBC driver was not found
+     * @throws SQLException if a database access error occurs
+     * @throws SQLTimeoutException if a problem with the connection occurs
      */
-    public JdbcPlugin(InputData input) throws UserDataException {
-        super(input);
-        jdbcDriver = input.getUserProperty("JDBC_DRIVER");
-        dbUrl = input.getUserProperty("DB_URL");
-        user = input.getUserProperty("USER");
-        pass = input.getUserProperty("PASS");
-        String strBatch = input.getUserProperty("BATCH_SIZE");
-        if (strBatch != null) {
-            batchSize = Integer.parseInt(strBatch);
-        }
-
-        if (jdbcDriver == null) {
-            throw new UserDataException("JDBC_DRIVER must be set");
-        }
-        if (dbUrl == null) {
-            throw new UserDataException("DB_URL must be set(read)");
-        }
-
-        tblName = input.getDataSource();
-        if (tblName == null) {
-            throw new UserDataException("TABLE_NAME must be set as DataSource.");
-        }
-    }
-
-    public String getTableName() {
-        return tblName;
-    }
-
-    protected Connection openConnection() throws ClassNotFoundException, SQLException {
+    protected Connection openConnection() throws ClassNotFoundException, SQLException, SQLTimeoutException {
         if (LOG.isDebugEnabled()) {
-            LOG.debug(String.format("Open JDBC: driver=%s,url=%s,user=%s,pass=%s,table=%s",
+            if (user != null) {
+                LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, user=%s, pass=%s, table=%s",
                     jdbcDriver, dbUrl, user, pass, tblName));
+            }
+            else {
+                LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, table=%s",
+                    jdbcDriver, dbUrl, tblName));
+            }
         }
         if (dbConn == null || dbConn.isClosed()) {
             Class.forName(jdbcDriver);
             if (user != null) {
                 dbConn = DriverManager.getConnection(dbUrl, user, pass);
-            } else {
+            }
+            else {
                 dbConn = DriverManager.getConnection(dbUrl);
             }
-            DatabaseMetaData meta = dbConn.getMetaData();
-            dbProduct = meta.getDatabaseProductName();
+            dbMeta = dbConn.getMetaData();
         }
         return dbConn;
     }
 
+    /**
+     * Close a JDBC connection
+     */
     protected void closeConnection() {
         try {
             if (dbConn != null) {
                 dbConn.close();
                 dbConn = null;
             }
-        } catch (SQLException e) {
-            LOG.error("Close db connection error . ", e);
+        }
+        catch (SQLException e) {
+            LOG.error("JDBC connection close error. ", e);
         }
     }
+
+
+    private static final Log LOG = LogFactory.getLog(JdbcPlugin.class);
+    // At the moment, when writing into some table, the table name is concatenated with a special string that is necessary to write into HDFS. However, a raw table name is necessary in case of JDBC. This Pattern allows to extract the correct table name from the given InputData.dataSource
+    private static final Pattern tableNamePattern = Pattern.compile("/(.*)/[0-9]*-[0-9]*_[0-9]*");
 }

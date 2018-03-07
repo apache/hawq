@@ -27,13 +27,13 @@ import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
 import org.apache.hawq.pxf.plugins.jdbc.utils.DbProduct;
 
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
 
 /**
  * Fragmenter class for JDBC data resources.
@@ -66,36 +66,61 @@ import java.util.List;
  *
  */
 public class JdbcPartitionFragmenter extends Fragmenter {
-    String[] partitionBy = null;
-    String[] range = null;
-    String[] interval = null;
-    PartitionType partitionType = null;
-    String partitionColumn = null;
-    IntervalType intervalType = null;
-    int intervalNum = 1;
-
-    //when partitionType is DATE,it is valid
-    Calendar rangeStart = null;
-    Calendar rangeEnd = null;
-
-
-    enum PartitionType {
-        DATE,
-        INT,
-        ENUM;
-
-        public static PartitionType getType(String str) {
-            return valueOf(str.toUpperCase());
+    /**
+     * Insert fragment constraints into the SQL query
+     *
+     * @param inputData InputData of the fragment
+     * @param dbName Database name (affects the behaviour for DATE partitions)
+     * @param query SQL query to insert constraints to. The query may may contain other WHERE statements
+     */
+    public static void buildFragmenterSql(InputData inputData, String dbName, StringBuilder query) {
+        if (inputData.getUserProperty("PARTITION_BY") == null) {
+            return;
         }
-    }
 
-    enum IntervalType {
-        DAY,
-        MONTH,
-        YEAR;
+        byte[] meta = inputData.getFragmentMetadata();
+        if (meta == null) {
+            return;
+        }
+        String[] partitionBy = inputData.getUserProperty("PARTITION_BY").split(":");
+        String partitionColumn = partitionBy[0];
+        PartitionType partitionType = PartitionType.typeOf(partitionBy[1]);
+        DbProduct dbProduct = DbProduct.getDbProduct(dbName);
 
-        public static IntervalType type(String str) {
-            return valueOf(str.toUpperCase());
+        if (!query.toString().contains("WHERE")) {
+            query.append(" WHERE ");
+        }
+        else {
+            query.append(" AND ");
+        }
+
+        switch (partitionType) {
+            case DATE: {
+                byte[][] newb = ByteUtil.splitBytes(meta, 8);
+                Date fragStart = new Date(ByteUtil.toLong(newb[0]));
+                Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
+
+                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+                query.append(partitionColumn).append(" >= ").append(dbProduct.wrapDate(df.format(fragStart)));
+                query.append(" AND ");
+                query.append(partitionColumn).append(" < ").append(dbProduct.wrapDate(df.format(fragEnd)));
+
+                break;
+            }
+            case INT: {
+                byte[][] newb = ByteUtil.splitBytes(meta, 4);
+                int fragStart = ByteUtil.toInt(newb[0]);
+                int fragEnd = ByteUtil.toInt(newb[1]);
+
+                query.append(partitionColumn).append(" >= ").append(fragStart);
+                query.append(" AND ");
+                query.append(partitionColumn).append(" < ").append(fragEnd);
+                break;
+            }
+            case ENUM: {
+                query.append(partitionColumn).append(" = '").append(new String(meta)).append("'");
+                break;
+            }
         }
     }
 
@@ -112,7 +137,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
         try {
             partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
             partitionColumn = partitionBy[0];
-            partitionType = PartitionType.getType(partitionBy[1]);
+            partitionType = PartitionType.typeOf(partitionBy[1]);
         } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e1) {
             throw new UserDataException("The parameter 'PARTITION_BY' invalid, the pattern is 'column_name:date|int|enum'");
         }
@@ -137,7 +162,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 interval = intervalStr.split(":");
                 intervalNum = Integer.parseInt(interval[0]);
                 if (interval.length > 1)
-                    intervalType = IntervalType.type(interval[1]);
+                    intervalType = IntervalType.typeOf(interval[1]);
                 if (interval.length == 1 && partitionType == PartitionType.DATE)
                     throw new UserDataException("The parameter 'INTERVAL' does not specify unit [:year|month|day]");
             } else if (partitionType != PartitionType.ENUM)
@@ -168,7 +193,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
      */
     @Override
     public FragmentsStats getFragmentsStats() throws UnsupportedOperationException {
-        throw new UnsupportedOperationException("ANALYZE for Jdbc plugin is not supported");
+        throw new UnsupportedOperationException("ANALYZE for JDBC plugin is not supported");
     }
 
     /**
@@ -276,47 +301,36 @@ public class JdbcPartitionFragmenter extends Fragmenter {
         return fragments;
     }
 
-    public String buildFragmenterSql(String dbName, String originSql) {
-        byte[] meta = inputData.getFragmentMetadata();
-        if (meta == null)
-            return originSql;
+    String[] partitionBy = null;
+    String[] range = null;
+    String[] interval = null;
+    PartitionType partitionType = null;
+    String partitionColumn = null;
+    IntervalType intervalType = null;
+    int intervalNum = 1;
 
-        DbProduct dbProduct = DbProduct.getDbProduct(dbName);
+    //when partitionType is DATE,it is valid
+    Calendar rangeStart = null;
+    Calendar rangeEnd = null;
 
-        StringBuilder sb = new StringBuilder(originSql);
-        if (!originSql.contains("WHERE"))
-            sb.append(" WHERE 1=1 ");
 
-        sb.append(" AND ");
-        switch (partitionType) {
-            case DATE: {
-                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-                //parse metadata of this fragment
-                //validate: the length of metadata == 16 (long)
-                byte[][] newb = ByteUtil.splitBytes(meta, 8);
-                Date fragStart = new Date(ByteUtil.toLong(newb[0]));
-                Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
+    enum PartitionType {
+        DATE,
+        INT,
+        ENUM;
 
-                sb.append(partitionColumn).append(" >= ").append(dbProduct.wrapDate(df.format(fragStart)));
-                sb.append(" AND ");
-                sb.append(partitionColumn).append(" < ").append(dbProduct.wrapDate(df.format(fragEnd)));
-
-                break;
-            }
-            case INT: {
-                //validate: the length of metadata == 8 (int)
-                byte[][] newb = ByteUtil.splitBytes(meta, 4);
-                int fragStart = ByteUtil.toInt(newb[0]);
-                int fragEnd = ByteUtil.toInt(newb[1]);
-                sb.append(partitionColumn).append(" >= ").append(fragStart);
-                sb.append(" AND ");
-                sb.append(partitionColumn).append(" < ").append(fragEnd);
-                break;
-            }
-            case ENUM:
-                sb.append(partitionColumn).append("='").append(new String(meta)).append("'");
-                break;
+        public static PartitionType typeOf(String str) {
+            return valueOf(str.toUpperCase());
         }
-        return sb.toString();
+    }
+
+    enum IntervalType {
+        DAY,
+        MONTH,
+        YEAR;
+
+        public static IntervalType typeOf(String str) {
+            return valueOf(str.toUpperCase());
+        }
     }
 }
