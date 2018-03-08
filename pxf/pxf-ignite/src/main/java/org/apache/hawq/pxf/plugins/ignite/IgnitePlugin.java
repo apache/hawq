@@ -25,7 +25,6 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Plugin;
 
-
 /**
  * PXF-Ignite base class.
  * This class manages the user-defined parameters provided in the query from PXF.
@@ -51,7 +50,7 @@ public class IgnitePlugin extends Plugin {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Constructor started");
         }
-        
+
         igniteHost = inputData.getUserProperty("IGNITE_HOST");
         if (igniteHost == null) {
             igniteHost = igniteHostDefault;

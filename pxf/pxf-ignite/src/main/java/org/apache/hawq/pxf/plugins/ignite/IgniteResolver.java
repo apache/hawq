@@ -40,7 +40,6 @@ import org.apache.commons.codec.binary.Hex;
 
 import com.google.gson.JsonArray;
 
-
 /**
  * PXF-Ignite resolver class
  */
@@ -55,7 +54,7 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
         }
 
         columns = input.getTupleDescription();
-        
+
         if (LOG.isDebugEnabled()) {
             LOG.debug("Constructor successful");
         }
@@ -63,7 +62,7 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
 
     /**
      * Transform a {@link JsonArray} stored in {@link OneRow} into a list of {@link OneField}
-     * 
+     *
      * @throws ParseException if the response could not be correctly parsed
      * @throws UnsupportedOperationException if the type of some field is not supported
      */
@@ -133,14 +132,14 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
 
     /**
      * Transforms a list of {@link OneField} from PXF into a {@link OneRow} with a string inside, containing a tuple from SQL INSERT query
-     * 
+     *
      * @throws UnsupportedOperationException if the type of some field is not supported
      */
     @Override
     public OneRow setFields(List<OneField> record) throws UnsupportedOperationException {
         StringBuilder sb = new StringBuilder();
         String fieldDivisor = "";
-        
+
         sb.append("(");
         for (OneField oneField : record) {
             sb.append(fieldDivisor);
@@ -178,7 +177,7 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
     }
 
     private static final Log LOG = LogFactory.getLog(IgniteResolver.class);
-    
+
     // HAWQ column descriptors
     private ArrayList<ColumnDescriptor> columns = null;
 }

@@ -49,7 +49,6 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonArray;
 
-
 /**
  * PXF-Ignite accessor class
  */
@@ -297,7 +296,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
     // A buffer to store the SELECT query results (without Ignite metadata)
     private LinkedList<JsonArray> bufferRead = new LinkedList<JsonArray>();
 
-    // A template for the INSERT 
+    // A template for the INSERT
     private String queryWrite = null;
     // Set to true when the INSERT operation is in progress
     private boolean isWriteActive = false;
@@ -306,12 +305,12 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
 
     /**
      * Build HTTP GET query for Ignite REST API with command 'qryfldexe'
-     * 
+     *
      * @param querySql SQL query
      * @param filterConstants A list of Constraints' constants. Must be null in this version.
-     * 
+     *
      * @return Prepared HTTP query. The query will be properly encoded with {@link java.net.URLEncoder}
-     * 
+     *
      * @throws UnsupportedEncodingException from {@link java.net.URLEncoder.encode()}
      */
     private String buildQueryFldexe(String querySql, List<String> filterConstants) throws UnsupportedEncodingException {
@@ -330,7 +329,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
             sb.append(URLEncoder.encode(cacheName, "UTF-8"));
             sb.append("&");
         }
-        /* 
+        /*
         'filterConstants' must always be null in the current version.
         This code allows to pass filters' constants separately from the filters' expressions. This feature is supported by Ignite database; however, it is not implemented in PXF Ignite plugin at the moment.
         To implement this, changes should be made in {@link WhereSQLBuilder} (form SQL query without filter constants) and {@link IgnitePartitionFragmenter} (form partition constraints the similar way).
@@ -355,7 +354,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
     /**
      * Build HTTP GET query for Ignite REST API with command 'qryfetch'
      * This query is used to retrieve data after the 'qryfldexe' command started
-     * 
+     *
      * @param queryId ID of the query assigned by Ignite when the query started
      *
      * @return Prepared HTTP query
@@ -380,7 +379,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
     /**
      * Build HTTP GET query for Ignite REST API with command 'qrycls'
      * This query is used to close query resources on Ignite side
-     * 
+     *
      * @param queryId ID of the query assigned by Ignite when the query started
      *
      * @return Prepared HTTP query
@@ -401,12 +400,12 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
 
     /**
      * Send a REST request to the Ignite server
-     * 
+     *
      * @param query A prepared and properly encoded HTTP GET request
-     * 
+     *
      * @return "response" field from the received JSON object
      * (See Ignite REST API documentation for details)
-     * 
+     *
      * @throws ProtocolException if Ignite reports error in it's JSON response
      * @throws MalformedURLException if URL is malformed
      * @throws IOException in case of connection failure
@@ -440,7 +439,7 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
             }
             // if 'reader' is null, an exception must have been thrown
         }
-        
+
         // Parse raw Ignite server response
         JsonElement response = null;
         String error = null;
@@ -476,9 +475,9 @@ public class IgniteAccessor extends IgnitePlugin implements ReadAccessor, WriteA
 
     /**
      * Send an INSERT REST request to the Ignite server.
-     * 
-     * Note that 
-     * 
+     *
+     * Note that
+     *
      * The {@link sendRestRequest()} is used to handle network operations, thus all its exceptions may be thrown. They are:
      * @throws ProtocolException if Ignite reports error in it's JSON response
      * @throws MalformedURLException if URL is malformed

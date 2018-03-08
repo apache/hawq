@@ -37,16 +37,15 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.compress.utils.ByteUtils;
 
-
 /**
  * PXF-Ignite fragmenter class
- * 
+ *
  * This fragmenter works just like the one in PXF JDBC plugin
  */
 public class IgnitePartitionFragmenter extends Fragmenter {
     /**
      * Insert partition constraints into the prepared SQL query.
-     * 
+     *
      * @param inputData pre-validated PXF InputData
      * @param sb the SQL query that is prepared for appending extra WHERE constraints.
      */
@@ -111,7 +110,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                 // Get fragment metadata
                 int fragStart = (int)ByteUtils.fromLittleEndian(meta, 0, 4);
                 int fragEnd = (int)ByteUtils.fromLittleEndian(meta, 4, 4);
-                
+
                 // Add constraints
                 sb.append(partitionColumn).append(">=").append(fragStart);
                 sb.append(" AND ");
@@ -140,7 +139,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
 
     /**
      * Class constructor
-     * 
+     *
      * @throws UserDataException if the request parameter is malformed
      */
     public IgnitePartitionFragmenter(InputData inputData) throws UserDataException {
@@ -172,7 +171,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                 if (range.length == 1 && partitionType != PartitionType.ENUM) {
                     throw new UserDataException("The parameter 'RANGE' does not specify '[:end_value]'");
                 }
-            } 
+            }
             else {
                 throw new UserDataException("The parameter 'RANGE' must be specified along with 'PARTITION_BY'");
             }
@@ -193,14 +192,14 @@ public class IgnitePartitionFragmenter extends Fragmenter {
                 if (interval.length == 1 && partitionType == PartitionType.DATE) {
                     throw new UserDataException("The parameter 'INTERVAL' does not specify unit [:year|month|day]");
                 }
-            } 
+            }
             else if (partitionType != PartitionType.ENUM) {
                 throw new UserDataException("The parameter 'INTERVAL' must be specified along with 'PARTITION_BY'");
             }
             if (intervalNum < 1) {
                 throw new UserDataException("The parameter 'INTERVAL' must be at least 1. The actual is '" + intervalNum + "'");
             }
-        } 
+        }
         catch (IllegalArgumentException e) {
             throw new UserDataException("The parameter 'INTERVAL' invalid. The pattern is 'interval_num[:interval_unit]'");
         }
@@ -236,7 +235,7 @@ public class IgnitePartitionFragmenter extends Fragmenter {
      * Returns list of fragments for Ignite table queries
      *
      * @throws UnsupportedOperationException if a partition of unknown type was found
-     * 
+     *
      * @return a list of fragments
      */
     @Override
