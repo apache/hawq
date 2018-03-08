@@ -3,7 +3,7 @@
 The PXF Ignite plug-in enables to access the [Apache Ignite database](https://ignite.apache.org/) (both read and write operations are supported) via REST API.
 
 
-# Prerequisites
+## Prerequisites
 
 Check the following before using the plug-in:
 
@@ -12,10 +12,10 @@ Check the following before using the plug-in:
 * The Apache Ignite client is installed and running at the `IGNITE_HOST` (`localhost` by default; this can be changed, see syntax below), and it accepts http queries from the PXF (note that *enabling Ignite REST API does not require changes in Ignite configuration*; see the instruction on how to do that at https://apacheignite.readme.io/docs/rest-api#section-getting-started).
 
 
-# Syntax
+## Syntax
 
 ```
-CREATE [READABLE] EXTERNAL TABLE <table_name> (
+CREATE [READABLE | WRITABLE] EXTERNAL TABLE <table_name> (
     <column_name> <data_type>[, <column_name> <data_type>, ...] | LIKE <other_table>
 )
 LOCATION ('pxf://<ignite_table_name>?PROFILE=Ignite[&<extra-parameter>&<extra-parameter>&...]')
@@ -30,15 +30,22 @@ where each `<extra-parameter>` is one of the following:
 * `INTERVAL=<value>[:<unit>]`. See below.
 
 
-# Partitioning
-## Introduction
+## Write access
+
+PXF Ignite plugin supports `INSERT` queries. However, due to the usage of REST API, this function has a technical limit: URL can not be longer than approx. 2000 characters. This makes the `INSERT` of very long tuples of data impossible.
+
+Due to this limitation, the recommended value of `BUFFER_SIZE` for `INSERT` queries is `1`. Note that this slightly decreases the perfomance.
+
+
+## Partitioning
+### Introduction
 
 PXF Ignite plugin supports simultaneous **read** access to the Apache Ignite database from multiple PXF segments. *Partitioning* should be used in order to perform such operation.
 
 This feature is optional. If partitioning is not used, all the data will be retrieved by a single PXF segment.
 
 
-## Mechanism
+### Mechanism
 
 Partitioning in PXF Ignite plug-in works just like in PXF JDBC plug-in.
 
@@ -47,7 +54,7 @@ If partitioning is activated (a valid set of the required parameters is present 
 Extra constraints (`WHERE` expressions) are automatically added to each fragment to guarantee that every tuple of data is retrieved from the Apache Ignite database exactly once.
 
 
-## Syntax
+### Syntax
 
 To use partitions, add a set of `<ignite-parameter>`s:
 ```
