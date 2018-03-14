@@ -15,14 +15,87 @@
 # specific language governing permissions and limitations
 # under the License.
 
-Build HAWQ Vectorized Executor steps:
+
+Build HAWQ Vectorized Executor steps
+-------------------------------------
 
 1. Make sure HAWQ compilation and installation success.
 
 2. execute "make ;make install" in vexecutor directory
 
-3. add library name "vexector" to "shared_preload_libraries" in postgresql.conf which has to copies allocated in master and segment data directories respectively. Make sure both of them is assigned.
-
+3. add library name "vexector" to "shared_preload_libraries"
+   in postgresql.conf which has to copies allocated in master 
+   and segment data directories respectively. Make sure both 
+   of them is assigned.
+   
 4. restart HAWQ cluster
 
-5. execute "set vectorized_executor_enable to on" in psql to activate vectorized execution
+5. execute "set vectorized_executor_enable to on" in psql 
+   to activate vectorized execution
+
+
+How to add the default vectorized data types
+---------------------------------------------
+
+1. Follow "Build HAWQ Vectorized Executor steps" to start HAWQ.
+
+2. execute "create_type.sql" in psql. then some vectorized 
+   data types will be add to HAWQ.
+
+3. If the default vectorized is no use, you can delete then by
+   executing "drop_types.sql" in psql.
+
+
+How to add an new vectorized data types and operators
+------------------------------------------------------
+
+Vectorized data types is an new type like an array to storage a
+series data, it must have a BASE types, For example, the base 
+type of vint2 is int2. If you want to create an new vectorized 
+data type, you can follow these steps:
+
+1. Define the new struct and implement the IN/OUT functions 
+   for the vectorized datatypes.
+   
+2. Create data types by SQL:
+    a) Create an shell data types by CREATE TYPE;
+    b) Register the IN/OUT functions to the PG_PROC by CREATE 
+       FUNCTION;
+    c) Create the actrual vectorized data types by CREATE TYPE,
+       NOTE: Now we use typelem and typstorage of PG_TYPE to 
+       mark the vectorized types.
+       
+3. Create the new operators for the new vectorized data types.
+
+For example, If the base type is 'XXX', we want to create the 
+vectorized data types for it:
+    1) You can add the vectorized data types struct
+       (e.g. Add to vadt.h)
+            typedef struct vXXX
+            {
+                vheader header;
+                XXX values[0];
+            }vXXX;
+        
+       Implement the new IN/OUT functions for this data type:
+     
+            Datum vXXXin(PG_FUNCTION_ARGS);
+            Datum vXXXout(PG_FUNCTION_ARGS);
+       
+    2) Create data types by SQL:
+    
+            CREATE TYPE vXXX;
+            CREATE FUNCTION vXXXin(cstring)......;
+            CREATE FUNCTION vXXXout(vXXX)......;
+            CREATE TYPE vXXX ( INPUT = vXXXin, 
+                               OUTPUT = vXXXout, 
+                               element = XXX, 
+                               storage=external );
+        
+    3) Add new operators for the vectorized data types:
+    
+        CREATE FUNCTION vXXXvXXXgt(vXXX, vXXX) ......;
+        CREATE OPERATOR > ( leftarg = vXXX, 
+                            rightarg = vXXX, 
+                            procedure = vXXXvXXXgt, 
+                            commutator = <= );

@@ -23,6 +23,7 @@
 #include "postgres.h"
 #include "fmgr.h"
 #include "executor/executor.h"
+#include "vadt.h"
 
 /* Function declarations for extension loading and unloading */
 extern void _PG_init(void);
