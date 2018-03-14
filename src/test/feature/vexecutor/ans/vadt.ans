@@ -1,0 +1,1795 @@
+-- start_ignore
+SET SEARCH_PATH=TestVexecutor_vadt;
+SET
+-- end_ignore
+-- in/out functions
+SELECT '1 1 1'::vint2;
+ vint2 
+-------
+ 1 1 1
+(1 row)
+
+SELECT '1 1 1'::vint4;
+ vint4 
+-------
+ 1 1 1
+(1 row)
+
+SELECT '1 1 1'::vint8;
+ vint8 
+-------
+ 1 1 1
+(1 row)
+
+SELECT '1 1 1'::vfloat4;
+ vfloat4 
+---------
+ 1 1 1
+(1 row)
+
+SELECT '1 1 1'::vfloat8;
+ vfloat8 
+---------
+ 1 1 1
+(1 row)
+
+SELECT 'false true false'::vbool;
+ vbool 
+-------
+ f t f
+(1 row)
+
+-- operators +-*/ : v op v
+select '1 1 1'::vint2 + '2 2 2'::vint2;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vint2 - '2 2 2'::vint2;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vint2 * '2 2 2'::vint2;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vint2 / '2 2 2'::vint2;
+ ?column? 
+----------
+ 0 0 0
+(1 row)
+
+select '1 1 1'::vint4 + '2 2 2'::vint4;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vint4 - '2 2 2'::vint4;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vint4 * '2 2 2'::vint4;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vint4 / '2 2 2'::vint4;
+ ?column? 
+----------
+ 0 0 0
+(1 row)
+
+select '1 1 1'::vint8 + '2 2 2'::vint8;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vint8 - '2 2 2'::vint8;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vint8 * '2 2 2'::vint8;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vint8 / '2 2 2'::vint8;
+ ?column? 
+----------
+ 0 0 0
+(1 row)
+
+select '1 1 1'::vfloat4 + '2 2 2'::vfloat4;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vfloat4 - '2 2 2'::vfloat4;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vfloat4 * '2 2 2'::vfloat4;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vfloat4 / '2 2 2'::vfloat4;
+  ?column?   
+-------------
+ 0.5 0.5 0.5
+(1 row)
+
+select '1 1 1'::vfloat8 + '2 2 2'::vfloat8;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vfloat8 - '2 2 2'::vfloat8;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vfloat8 * '2 2 2'::vfloat8;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vfloat8 / '2 2 2'::vfloat8;
+  ?column?   
+-------------
+ 0.5 0.5 0.5
+(1 row)
+
+--operator +-*/ "v op c
+select '1 1 1'::vint2 + 2;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vint2 - 2;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vint2 * 2;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vint2 / 2;
+ ?column? 
+----------
+ 0 0 0
+(1 row)
+
+select '1 1 1'::vint4 + 2;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vint4 - 2;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vint4 * 2;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vint4 / 2;
+ ?column? 
+----------
+ 0 0 0
+(1 row)
+
+select '1 1 1'::vint8 + 2;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vint8 - 2;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vint8 * 2;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vint8 / 2;
+ ?column? 
+----------
+ 0 0 0
+(1 row)
+
+select '1 1 1'::vfloat4 + 2;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vfloat4 - 2;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vfloat4 * 2;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vfloat4 / 2;
+  ?column?   
+-------------
+ 0.5 0.5 0.5
+(1 row)
+
+select '1 1 1'::vfloat8 + 2;
+ ?column? 
+----------
+ 3 3 3
+(1 row)
+
+select '1 1 1'::vfloat8 - 2;
+ ?column? 
+----------
+ -1 -1 -1
+(1 row)
+
+select '1 1 1'::vfloat8 * 2;
+ ?column? 
+----------
+ 2 2 2
+(1 row)
+
+select '1 1 1'::vfloat8 / 2;
+  ?column?   
+-------------
+ 0.5 0.5 0.5
+(1 row)
+
+--operator cmp : v op v
+--left vint2
+select '1 1 1'::vint2 >  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 >  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 >  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 >  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 >  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--left vint4
+select '1 1 1'::vint4 >  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 >  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 >  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 >  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 >  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--left vint8
+select '1 1 1'::vint8 >  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 >  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 >  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 >  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 >  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--left vfloat4
+select '1 1 1'::vfloat4 >  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 >  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 >  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 >  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 >  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--left vfloat8
+select '1 1 1'::vfloat8 >  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  '2 2 2'::vint2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= '2 2 2'::vint2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 >  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  '2 2 2'::vint4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= '2 2 2'::vint4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 >  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  '2 2 2'::vint8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= '2 2 2'::vint8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 >  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= '2 2 2'::vfloat4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 >  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= '2 2 2'::vfloat8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--operator cmp : v op c
+--left vint2
+select '1 1 1'::vint2 >  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= 2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= 2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 >  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= 2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= 2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 >  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= 2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= 2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 >  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= 2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= 2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 >  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 >= 2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 =  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint2 <  2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint2 <= 2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--left vint4
+select '1 1 1'::vint4 >  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= 2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= 2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 >  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= 2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= 2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 >  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= 2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= 2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 >  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= 2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= 2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 >  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 >= 2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 =  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint4 <  2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint4 <= 2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--left vint8
+select '1 1 1'::vint8 >  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= 2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= 2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 >  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= 2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= 2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 >  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= 2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= 2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 >  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= 2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= 2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 >  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 >= 2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 =  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vint8 <  2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vint8 <= 2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--left vfloat4
+select '1 1 1'::vfloat4 >  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= 2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= 2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 >  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= 2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= 2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 >  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= 2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= 2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 >  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= 2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= 2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 >  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 >= 2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 =  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat4 <  2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat4 <= 2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+--left vfloat8
+select '1 1 1'::vfloat8 >  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= 2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  2::int2;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= 2::int2;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 >  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= 2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  2::int4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= 2::int4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 >  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= 2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  2::int8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= 2::int8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 >  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= 2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  2::float4;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= 2::float4;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 >  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 >= 2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 =  2::float8;
+ ?column? 
+----------
+ f f f
+(1 row)
+
+select '1 1 1'::vfloat8 <  2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
+select '1 1 1'::vfloat8 <= 2::float8;
+ ?column? 
+----------
+ t t t
+(1 row)
+
