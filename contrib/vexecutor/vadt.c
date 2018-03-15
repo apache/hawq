@@ -22,6 +22,10 @@
 #include "utils/builtins.h"
 #include "vadt.h"
 
+
+/* the maximum length of numeric */
+#define MAX_NUM_LEN 32
+
 /* Get the size of vectorized data */
 #define FUNCTION_VTYPESIZE(type) \
 size_t v##type##Size(vheader *vh) \
@@ -106,7 +110,7 @@ v##type##in(PG_FUNCTION_ARGS) \
 { \
     char *intString = PG_GETARG_CSTRING(0); \
     v##type *res = NULL; \
-    char tempstr[MAX_VECTOR_SIZE] = {0}; \
+    char tempstr[MAX_NUM_LEN] = {0}; \
     int n = 0; \
     res = palloc0(offsetof(v##type, values) + (MAX_VECTOR_SIZE) * sizeof(type)); \
     for (n = 0; *intString && n < MAX_VECTOR_SIZE; n++) \
@@ -119,7 +123,7 @@ v##type##in(PG_FUNCTION_ARGS) \
         start = intString; \
         while ((*intString && !isspace((unsigned char) *intString)) && *intString != '\0') \
             intString++; \
-        Assert(intString - start < MAX_VECTOR_SIZE); \
+        Assert(intString - start < MAX_NUM_LEN); \
         strncpy(tempstr, start, intString - start); \
         tempstr[intString - start] = 0; \
         res->values[n] =  MACRO_DATUM(DirectFunctionCall1(type##in, CStringGetDatum(tempstr))); \
@@ -152,7 +156,7 @@ v##type##out(PG_FUNCTION_ARGS) \
     int i = 0; \
 	char *rp; \
 	char *result; \
-	rp = result = (char *) palloc0(len * 16 + 1); \
+	rp = result = (char *) palloc0(len * MAX_NUM_LEN + 1); \
 	for (i = 0; i < len; i++) \
 	{ \
 		if (i != 0) \
