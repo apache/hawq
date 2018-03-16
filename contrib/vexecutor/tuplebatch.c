@@ -44,7 +44,7 @@ TupleBatch tbGenerate(int colnum,int batchsize)
     return tb;
 }
 
-void tbDestory(TupleBatch* tb){
+void tbDestroy(TupleBatch* tb){
     free((*tb)->skip);
     for(int i = 0 ;i < (*tb)->ncols; ++i)
     {
