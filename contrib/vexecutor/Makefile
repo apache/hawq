@@ -17,7 +17,7 @@
 
 
 MODULE_big = vexecutor
-OBJS    = vexecutor.o vadt.o
+OBJS    = vexecutor.o vadt.o vcheck.o tuplebatch.o
 
 PG_CXXFLAGS = -Wall -O0 -g -std=c++11
 PG_LIBS = $(libpq_pgport) 
