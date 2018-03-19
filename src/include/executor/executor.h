@@ -43,6 +43,7 @@
 
 typedef struct vectorexe_t {
 	bool vectorized_executor_enable;
+	Plan* (*CheckPlanVectorized_Hook)(PlannerInfo *root, Plan *plan);
 	PlanState* (*ExecInitNode_Hook)(Plan *node,EState *eState,int eflags);
 	TupleTableSlot* (*ExecProcNode_Hook)(PlanState *node);
 	bool (*ExecEndNode_Hook)(PlanState *node);

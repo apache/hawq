@@ -1255,6 +1255,7 @@ typedef struct PlanState
         List           *qual;                        /* implicitly-ANDed qual conditions */
         struct PlanState *lefttree; /* input plan tree(s) */
         struct PlanState *righttree;
+        struct PlanState *parent;
         List           *initPlan;                /* Init SubPlanState nodes (un-correlated expr
                                                                  * subselects) */
         List           *subPlan;                /* SubPlanState nodes in my expressions */
@@ -1293,6 +1294,9 @@ typedef struct PlanState
          */
         int gpmon_plan_tick;
         gpmon_packet_t gpmon_pkt;
+
+        /* If the executor operator is vectorized */
+        bool vectorized;
 } PlanState;
 
 typedef struct Gpmon_NameUnit_MaxVal
@@ -1357,6 +1361,7 @@ static inline void Gpmon_M_Reset(gpmon_packet_t *pkt, int nth)
  */
 #define innerPlanState(node)                (((PlanState *)(node))->righttree)
 #define outerPlanState(node)                (((PlanState *)(node))->lefttree)
+#define parentPlanState(node)               (((PlanState *)(node))->parent)
 
 
 /* ----------------

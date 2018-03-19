@@ -226,9 +226,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	PlanState  *result;
 	List	   *subps;
 	ListCell   *l;
-    if(vmthd.vectorized_executor_enable && vmthd.ExecInitNode_Hook
-			&& (result = vmthd.ExecInitNode_Hook(node,estate,eflags)))
-		return result;
 
 	/*
 	 * do nothing when we get to the end of a leaf on tree.
@@ -236,6 +233,24 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	if (node == NULL)
 	{
 		return NULL;
+	}
+
+	/*
+	* If the plan node can be vectorized and vectorized is enable, enter the
+	* vectorized execution operators.
+	*/
+	if(vmthd.vectorized_executor_enable
+		&& node->vectorized
+		&& vmthd.ExecInitNode_Hook
+		&& (result = vmthd.ExecInitNode_Hook(node,estate,eflags)))
+	{
+		/* New vectorized Plan node is got. */
+		return result;
+	}
+	else
+	{
+		/* Plan node can be vectorized, but there is no vectorized operator. */
+		node->vectorized = false;
 	}
 
 	Assert(estate != NULL);
@@ -757,6 +772,21 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	{
 		SAVE_EXECUTOR_MEMORY_ACCOUNT(result, curMemoryAccount);
 	}
+
+
+	/* set the parent plan state */
+	if(result != NULL)
+	{
+		if(innerPlanState(result))
+		{
+			innerPlanState(result)->parent =  result;
+		}
+		if(outerPlanState(result))
+		{
+			outerPlanState(result)->parent =  result;
+		}
+	}
+
 	return result;
 }
 

@@ -30,5 +30,10 @@ typedef struct vFuncMap
     size_t (*serialization)(vheader* vh, unsigned char* buf);
     Datum (*deserialization)(unsigned char* buf,size_t* len);
 }vFuncMap;
+
 extern const vFuncMap* GetVFunc(Oid vtype);
+extern Plan* CheckPlanVectorzied(PlannerInfo *root, Plan *plan);
+extern Plan* ReplacePlanVectorzied(PlannerInfo *root, Plan *plan);
+extern Oid GetVtype(Oid ntype);
+
 #endif

@@ -376,6 +376,7 @@ _outPlanInfo(StringInfo str, Plan *node)
 	{
 		WRITE_UINT64_FIELD(operatorMemKB);
 	}
+	WRITE_BOOL_FIELD(vectorized);
 }
 
 /*

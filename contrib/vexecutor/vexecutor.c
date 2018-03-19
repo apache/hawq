@@ -39,6 +39,7 @@ void
 _PG_init(void)
 {
 	elog(DEBUG3, "PG INIT VEXECTOR");
+	vmthd.CheckPlanVectorized_Hook = CheckPlanVectorzied;
 	vmthd.ExecInitNode_Hook = VExecInitNode;
 	vmthd.ExecProcNode_Hook = VExecProcNode;
 	vmthd.ExecEndNode_Hook = VExecEndNode;
@@ -58,6 +59,7 @@ void
 _PG_fini(void)
 {
 	elog(DEBUG3, "PG FINI VEXECTOR");
+	vmthd.CheckPlanVectorized_Hook = NULL;
 	vmthd.ExecInitNode_Hook = NULL;
 	vmthd.ExecProcNode_Hook = NULL;
 	vmthd.ExecEndNode_Hook = NULL;

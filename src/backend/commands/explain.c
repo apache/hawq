@@ -1332,6 +1332,9 @@ explain_outNode(StringInfo str,
 			break;
 	}
 
+	if(plan->vectorized)
+		appendStringInfoString(str, "vectorized ");
+
 	appendStringInfoString(str, pname);
 	switch (nodeTag(plan))
 	{
