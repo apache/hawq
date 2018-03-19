@@ -20,13 +20,14 @@
 
 #include "vexecutor.h"
 #include "utils/guc.h"
+#include "vcheck.h"
 
 PG_MODULE_MAGIC;
 
 /*
  * hook function
  */
-static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags);
+static PlanState* VExecInitNode(PlanState *node,EState *eState,int eflags);
 static TupleTableSlot* VExecProcNode(PlanState *node);
 static bool VExecEndNode(PlanState *node);
 
@@ -39,6 +40,7 @@ void
 _PG_init(void)
 {
 	elog(DEBUG3, "PG INIT VEXECTOR");
+	vmthd.CheckPlanVectorized_Hook = CheckAndReplacePlanVectorized;
 	vmthd.ExecInitNode_Hook = VExecInitNode;
 	vmthd.ExecProcNode_Hook = VExecProcNode;
 	vmthd.ExecEndNode_Hook = VExecEndNode;
@@ -58,15 +60,46 @@ void
 _PG_fini(void)
 {
 	elog(DEBUG3, "PG FINI VEXECTOR");
+	vmthd.CheckPlanVectorized_Hook = NULL;
 	vmthd.ExecInitNode_Hook = NULL;
 	vmthd.ExecProcNode_Hook = NULL;
 	vmthd.ExecEndNode_Hook = NULL;
 }
 
-static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags)
+static PlanState* VExecInitNode(PlanState *node,EState *eState,int eflags)
 {
+	Plan *plan = node->plan;
+	PlanState *subState = NULL;
+	VectorizedState *vstate = (VectorizedState*)palloc0(sizeof(VectorizedState));
+
+	if(NULL == node)
+		return node;
+
+	/* set state */
+	node->vectorized = (void*)vstate;
+
+	vstate->vectorized = plan->vectorized;
+
+	/* set the parent state of son */
+	if(innerPlanState(node))
+	{
+		subState = innerPlanState(node);
+		Assert(NULL != subState);
+
+		((VectorizedState*)(subState->vectorized))->parent = node;
+	}
+	if(outerPlanState(node))
+	{
+		subState = outerPlanState(node);
+		Assert(NULL != subState);
+
+		((VectorizedState*)(subState->vectorized))->parent = node;
+	}
+
+	//***TODO:process the vectorized execution operators here
+
 	elog(DEBUG3, "PG VEXEC INIT NODE");
-	return NULL;
+	return node;
 }
 static TupleTableSlot* VExecProcNode(PlanState *node)
 {
@@ -77,4 +110,24 @@ static bool VExecEndNode(PlanState *node)
 {
 	elog(DEBUG3, "PG VEXEC END NODE");
 	return false;
+}
+
+/* check if there is an vectorized execution operator */
+bool
+HasVecExecOprator(NodeTag tag)
+{
+	bool result = false;
+
+	switch(tag)
+	{
+	case T_AppendOnlyScan:
+	case T_ParquetScan:
+		result = true;
+		break;
+	default:
+		result = false;
+		break;
+	}
+
+	return result;
 }

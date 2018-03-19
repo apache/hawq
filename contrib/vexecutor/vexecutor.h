@@ -29,4 +29,6 @@
 extern void _PG_init(void);
 extern void _PG_fini(void);
 
+extern bool HasVecExecOprator(NodeTag tag);
+
 #endif

@@ -820,6 +820,11 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 
 	top_plan = zap_trivial_result(root, top_plan);
 
+	/* check if the plan tree can be vectorized */
+	if(vmthd.vectorized_executor_enable && vmthd.CheckPlanVectorized_Hook)
+		top_plan =  vmthd.CheckPlanVectorized_Hook(root, top_plan);
+
+
 	
 	/* build the PlannedStmt result */
 	result = makeNode(PlannedStmt);
