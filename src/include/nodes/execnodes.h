@@ -1295,8 +1295,8 @@ typedef struct PlanState
         int gpmon_plan_tick;
         gpmon_packet_t gpmon_pkt;
 
-        /* If the executor operator is vectorized */
-        bool vectorized;
+        /* state of executor operator  */
+        void* vectorized;
 } PlanState;
 
 typedef struct Gpmon_NameUnit_MaxVal

@@ -21,6 +21,7 @@
 #define VCHECK_H
 
 #include "vadt.h"
+#include "nodes/execnodes.h"
 typedef struct vFuncMap
 {
     Oid ntype;
@@ -31,9 +32,16 @@ typedef struct vFuncMap
     Datum (*deserialization)(unsigned char* buf,size_t* len);
 }vFuncMap;
 
+/* vectorized executor state */
+typedef struct VectorizedState
+{
+	bool vectorized;
+	PlanState *parent;
+}VectorizedState;
+
+
 extern const vFuncMap* GetVFunc(Oid vtype);
-extern Plan* CheckPlanVectorzied(PlannerInfo *root, Plan *plan);
-extern Plan* ReplacePlanVectorzied(PlannerInfo *root, Plan *plan);
+extern Plan* CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan);
 extern Oid GetVtype(Oid ntype);
 
 #endif

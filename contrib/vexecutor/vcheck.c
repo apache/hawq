@@ -32,6 +32,7 @@
 #include "utils/lsyscache.h"
 #include "vcheck.h"
 #include "vadt.h"
+#include "vexecutor.h"
 
 
 static const vFuncMap funcMap[] = {
@@ -193,13 +194,14 @@ CheckPlanNodeWalker(PlannerInfo *root, Plan *plan)
     							 CheckVectorizedExpression,
 							 &ctx);
 
+
     return false;
 }
 
 /*
  * check the plan tree
  */
-Plan*
+static Plan*
 CheckPlanVectorzied(PlannerInfo *root, Plan *plan)
 {
     if(NULL == plan)
@@ -216,10 +218,18 @@ CheckPlanVectorzied(PlannerInfo *root, Plan *plan)
  * Replace the non-vectorirzed type to vectorized type
  */
 static bool
-ReplacePlanNodeWalker(Plan *plan)
+ReplacePlanNodeWalker(PlannerInfo *root, Plan *plan)
 {
 	VectorizedContext ctx;
-	bool beVec = false;
+
+    if(!plan->vectorized)
+    		return false;
+
+    if(!HasVecExecOprator(nodeTag(plan)))
+    {
+    		plan->vectorized = false;
+    		return false;
+    }
 
     ctx.replace =true;
 
@@ -235,18 +245,24 @@ ReplacePlanNodeWalker(Plan *plan)
 /*
  * check the plan tree
  */
-Plan*
-ReplacePlanVectorzied(Plan *plan)
+static Plan*
+ReplacePlanVectorzied(PlannerInfo *root, Plan *plan)
 {
     if(NULL == plan)
         return plan;
 
-    if(!plan->vectorized)
-    		return plan;
-
+    ReplacePlanVectorzied(root, plan->lefttree);
+    ReplacePlanVectorzied(root, plan->righttree);
     ReplacePlanNodeWalker(root, plan);
 
     return plan;
+}
+
+Plan*
+CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan)
+{
+	plan = CheckPlanVectorzied(root, plan);
+	return ReplacePlanVectorzied(root, plan);
 }
 
 /*
@@ -263,7 +279,7 @@ Oid GetVtype(Oid ntype)
 	bool found = false;
 
 	//construct the hash table
-	if(NULL == hashMapV2N)
+	if(NULL == hashMapN2V)
 	{
 		HASHCTL	hash_ctl;
 		MemSet(&hash_ctl, 0, sizeof(hash_ctl));
@@ -272,12 +288,12 @@ Oid GetVtype(Oid ntype)
 		hash_ctl.entrysize = sizeof(VecTypeHashEntry);
 		hash_ctl.hash = oid_hash;
 
-		hashMapV2N = hash_create("vectorized_v2n", 64/*enough?*/,
+		hashMapN2V = hash_create("vectorized_v2n", 64/*enough?*/,
 								&hash_ctl, HASH_ELEM | HASH_FUNCTION);
 	}
 
 	//first, find the vectorized type in hash table
-	entry = hash_search(hashMapV2N, &ntype, HASH_ENTER, &found);
+	entry = hash_search(hashMapN2V, &ntype, HASH_ENTER, &found);
 	if(found)
 		return entry->dest;
 
@@ -351,7 +367,7 @@ const vFuncMap* GetVFunc(Oid vtype){
 	if(!HeapTupleIsValid(tuple))
 	{
 		caql_endscan(pcqCtx);
-		return InvalidOid;
+		return NULL;
 	}
 
 	ntype = caql_getattr(pcqCtx,

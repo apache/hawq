@@ -235,24 +235,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		return NULL;
 	}
 
-	/*
-	* If the plan node can be vectorized and vectorized is enable, enter the
-	* vectorized execution operators.
-	*/
-	if(vmthd.vectorized_executor_enable
-		&& node->vectorized
-		&& vmthd.ExecInitNode_Hook
-		&& (result = vmthd.ExecInitNode_Hook(node,estate,eflags)))
-	{
-		/* New vectorized Plan node is got. */
-		return result;
-	}
-	else
-	{
-		/* Plan node can be vectorized, but there is no vectorized operator. */
-		node->vectorized = false;
-	}
-
 	Assert(estate != NULL);
 	int origSliceIdInPlan = estate->currentSliceIdInPlan;
 	int origExecutingSliceId = estate->currentExecutingSliceId;
@@ -773,18 +755,16 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		SAVE_EXECUTOR_MEMORY_ACCOUNT(result, curMemoryAccount);
 	}
 
-
-	/* set the parent plan state */
-	if(result != NULL)
+	/*
+	* If the plan node can be vectorized and vectorized is enable, enter the
+	* vectorized execution operators.
+	*/
+	if(vmthd.vectorized_executor_enable
+		&& vmthd.ExecInitNode_Hook
+		&& (result = vmthd.ExecInitNode_Hook(result,estate,eflags)))
 	{
-		if(innerPlanState(result))
-		{
-			innerPlanState(result)->parent =  result;
-		}
-		if(outerPlanState(result))
-		{
-			outerPlanState(result)->parent =  result;
-		}
+		/* New vectorized Plan node is got. */
+		return result;
 	}
 
 	return result;
