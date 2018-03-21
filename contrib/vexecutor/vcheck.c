@@ -57,8 +57,8 @@ static HTAB *hashMapVFunc = NULL;
 
 typedef struct VecFuncHashEntry
 {
-    Oid src;
-    vFuncMap *vFunc;
+	Oid src;
+	vFuncMap *vFunc;
 } VecFuncHashEntry;
 
 typedef struct VecTypeHashEntry
@@ -92,87 +92,87 @@ typedef struct VectorizedContext
 static bool
 CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 {
-    if(NULL == node)
-        return false;
+	if(NULL == node)
+		return false;
 
-    if(is_plan_node(node))
-        return false;
+	if(is_plan_node(node))
+		return false;
 
-    //check the type of Var if it can be vectorized
-    if(IsA(node, Var))
-    {
-        Var *var = (Var*)node;
-        Oid vtype = GetVtype(var->vartype);
-        if(InvalidOid == vtype)
-        	    return true;
-        ctx->retType = vtype;
-        if(ctx->replace)
-        	    var->vartype = vtype;
-        return false;
-    }
+	//check the type of Var if it can be vectorized
+	if(IsA(node, Var))
+	{
+		Var *var = (Var*)node;
+		Oid vtype = GetVtype(var->vartype);
+		if(InvalidOid == vtype)
+			return true;
+		ctx->retType = vtype;
+		if(ctx->replace)
+			var->vartype = vtype;
+		return false;
+	}
 
-    //Const treat as can be vectorzied, its return type is non-vectorized type
-    //because we support the function like this: vtype op(vtype, const);
-    if(IsA(node, Const))
-    {
-    	    Const *c = (Const*)node;
-    	    ctx->retType = c->consttype;
-    	    return false;
-    }
+	//Const treat as can be vectorzied, its return type is non-vectorized type
+	//because we support the function like this: vtype op(vtype, const);
+	if(IsA(node, Const))
+	{
+		Const *c = (Const*)node;
+		ctx->retType = c->consttype;
+		return false;
+	}
 
-    //OpExpr:args, return types should can be vectorized,
-    //and there must exists an vectorized function to implement the operator
-    if(IsA(node, OpExpr))
-    {
-        OpExpr *op = (OpExpr*)node;
-        Node *argnode = NULL;
-        Oid ltype, rtype, rettype;
-        Form_pg_operator voper;
-        HeapTuple tuple;
+	//OpExpr:args, return types should can be vectorized,
+	//and there must exists an vectorized function to implement the operator
+	if(IsA(node, OpExpr))
+	{
+		OpExpr *op = (OpExpr*)node;
+		Node *argnode = NULL;
+		Oid ltype, rtype, rettype;
+		Form_pg_operator voper;
+		HeapTuple tuple;
 
-        //OpExpr mostly have two args, check the first one
-        argnode = linitial(op->args);
-        if(CheckVectorizedExpression(argnode, ctx))
-        	    return true;
+		//OpExpr mostly have two args, check the first one
+		argnode = linitial(op->args);
+		if(CheckVectorizedExpression(argnode, ctx))
+			return true;
 
-        ltype = ctx->retType;
+		ltype = ctx->retType;
 
-        //check the second one
-        argnode = lsecond(op->args);
-        if(CheckVectorizedExpression(argnode, ctx))
-        	    return true;
+		//check the second one
+		argnode = lsecond(op->args);
+		if(CheckVectorizedExpression(argnode, ctx))
+			return true;
 
-        rtype = ctx->retType;
+		rtype = ctx->retType;
 
-        //check the return type
-        rettype = GetVtype(op->opresulttype);
-        if(InvalidOid == rettype)
-        	    return true;
+		//check the return type
+		rettype = GetVtype(op->opresulttype);
+		if(InvalidOid == rettype)
+			return true;
 
 
-        //get the vectorized operator functions
-        //NOTE:we have no ParseState now, Give the NULL value is OK but not good...
-        tuple = oper(NULL, list_make1(makeString(get_opname(op->opno))),
-        				ltype, rtype, false, -1);
-        if(NULL == tuple)
-        	    return true;
+		//get the vectorized operator functions
+		//NOTE:we have no ParseState now, Give the NULL value is OK but not good...
+		tuple = oper(NULL, list_make1(makeString(get_opname(op->opno))),
+			ltype, rtype, false, -1);
+		if(NULL == tuple)
+			return true;
 
-        voper = (Form_pg_operator)GETSTRUCT(tuple);
-        if(voper->oprresult != rettype)
-        	    return true;
+		voper = (Form_pg_operator)GETSTRUCT(tuple);
+		if(voper->oprresult != rettype)
+			return true;
 
-        if(ctx->replace)
-        {
-        	    op->opresulttype = rettype;
-        	    op->opfuncid = voper->oprcode;
-        }
+		if(ctx->replace)
+		{
+			op->opresulttype = rettype;
+			op->opfuncid = voper->oprcode;
+		}
 
-        ctx->retType = rettype;
-        return false;
-    }
+		ctx->retType = rettype;
+		return false;
+	}
 
-    //now, other nodes treat as can not be vectorized
-    return plan_tree_walker(node, CheckVectorizedExpression, ctx);;
+	//now, other nodes treat as can not be vectorized
+	return plan_tree_walker(node, CheckVectorizedExpression, ctx);;
 }
 
 /*
@@ -184,18 +184,26 @@ CheckPlanNodeWalker(PlannerInfo *root, Plan *plan)
 {
 	VectorizedContext ctx;
 
-    if(plan->vectorized)
-    	    return true;
+	if(plan->vectorized)
+		return true;
 
-    ctx.replace =false;
+	/* skip to check if there are no corresponding vec-exec-operators*/
+	if(!HasVecExecOprator(nodeTag(plan)))
+	{
+		plan->vectorized = false;
+		return true;
+	}
 
-    ctx.retType = InvalidOid;
-    plan->vectorized = !plan_tree_walker((Node*)plan,
-    							 CheckVectorizedExpression,
+	planner_init_plan_tree_base(&ctx.base, root);
+
+	ctx.replace =false;
+
+	ctx.retType = InvalidOid;
+	plan->vectorized = !plan_tree_walker((Node*)plan,
+							CheckVectorizedExpression,
 							 &ctx);
 
-
-    return false;
+	return true;
 }
 
 /*
@@ -204,14 +212,14 @@ CheckPlanNodeWalker(PlannerInfo *root, Plan *plan)
 static Plan*
 CheckPlanVectorzied(PlannerInfo *root, Plan *plan)
 {
-    if(NULL == plan)
-        return plan;
+	if(NULL == plan)
+		return plan;
 
-    CheckPlanVectorzied(root, plan->lefttree);
-    CheckPlanVectorzied(root, plan->righttree);
-    CheckPlanNodeWalker(root, plan);
+	CheckPlanVectorzied(root, plan->lefttree);
+	CheckPlanVectorzied(root, plan->righttree);
+	CheckPlanNodeWalker(root, plan);
 
-    return plan;
+	return plan;
 }
 
 /*
@@ -222,24 +230,27 @@ ReplacePlanNodeWalker(PlannerInfo *root, Plan *plan)
 {
 	VectorizedContext ctx;
 
-    if(!plan->vectorized)
-    		return false;
+	if(!plan->vectorized)
+		return true;
 
-    if(!HasVecExecOprator(nodeTag(plan)))
-    {
-    		plan->vectorized = false;
-    		return false;
-    }
+	/* skip to replace if there are no corresponding vec-exec-operators*/
+	if(!HasVecExecOprator(nodeTag(plan)))
+	{
+		plan->vectorized = false;
+		return true;
+	}
 
-    ctx.replace =true;
+	planner_init_plan_tree_base(&ctx.base, root);
 
-    ctx.retType = InvalidOid;
-    plan_tree_walker((Node*)plan,
-    					CheckVectorizedExpression,
+	ctx.replace = true;
+
+	ctx.retType = InvalidOid;
+	plan_tree_walker((Node*)plan,
+					CheckVectorizedExpression,
 					&ctx);
 
 
-    return false;
+	return true;
 }
 
 /*
@@ -248,14 +259,14 @@ ReplacePlanNodeWalker(PlannerInfo *root, Plan *plan)
 static Plan*
 ReplacePlanVectorzied(PlannerInfo *root, Plan *plan)
 {
-    if(NULL == plan)
-        return plan;
+	if(NULL == plan)
+		return plan;
 
-    ReplacePlanVectorzied(root, plan->lefttree);
-    ReplacePlanVectorzied(root, plan->righttree);
-    ReplacePlanNodeWalker(root, plan);
+	ReplacePlanVectorzied(root, plan->lefttree);
+	ReplacePlanVectorzied(root, plan->righttree);
+	ReplacePlanNodeWalker(root, plan);
 
-    return plan;
+	return plan;
 }
 
 Plan*
@@ -272,7 +283,7 @@ CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan)
  */
 Oid GetVtype(Oid ntype)
 {
-    HeapTuple tuple;
+	HeapTuple tuple;
 	cqContext *pcqCtx;
 	Oid vtype;
 	VecTypeHashEntry *entry = NULL;
@@ -316,10 +327,10 @@ Oid GetVtype(Oid ntype)
 		return InvalidOid;
 	}
 
-    vtype = HeapTupleGetOid(tuple);
+	vtype = HeapTupleGetOid(tuple);
 
-    //storage in the hash table
-    entry->dest = vtype;
+	//storage in the hash table
+	entry->dest = vtype;
 
 	caql_endscan(pcqCtx);
 
@@ -359,7 +370,7 @@ const vFuncMap* GetVFunc(Oid vtype){
 
 	pcqCtx = caql_beginscan(NULL,
 							cql("SELECT * FROM pg_type "
-										" WHERE oid = :1 ",
+								" WHERE oid = :1 ",
 								ObjectIdGetDatum(vtype)));
 
 	tuple = caql_getnext(pcqCtx);
