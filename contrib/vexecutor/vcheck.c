@@ -159,13 +159,18 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 
 		voper = (Form_pg_operator)GETSTRUCT(tuple);
 		if(voper->oprresult != rettype)
+		{
+			ReleaseOperator(tuple);
 			return true;
+		}
 
 		if(ctx->replace)
 		{
 			op->opresulttype = rettype;
 			op->opfuncid = voper->oprcode;
 		}
+
+		ReleaseOperator(tuple);
 
 		ctx->retType = rettype;
 		return false;
