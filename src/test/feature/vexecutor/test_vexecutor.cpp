@@ -22,11 +22,11 @@
 
 using std::string;
 
-class TestVexecutor: public ::testing::Test
+class TestVexecutor : public ::testing::Test
 {
-	public:
-		TestVexecutor() {};
-		~TestVexecutor() {};
+  public:
+	TestVexecutor(){};
+	~TestVexecutor(){};
 };
 
 //#define TEST_F_FILE(TestName, basePath, testcase)	\
@@ -45,7 +45,6 @@ class TestVexecutor: public ::testing::Test
 //TEST_F_FILE_TYPE(vadt)
 //TEST_F_FILE_TYPE(drop_type)
 
-
 TEST_F(TestVexecutor, vadt)
 {
 	// preprocess source files to get sql/ans files
@@ -60,11 +59,47 @@ TEST_F(TestVexecutor, vadt)
 
 	// run sql file to get ans file and then diff it with out file
 	util.execSQLFile("vexecutor/sql/create_type.sql",
-	                 "vexecutor/ans/create_type.ans");
+					 "vexecutor/ans/create_type.ans");
 
 	util.execSQLFile("vexecutor/sql/vadt.sql",
-	                 "vexecutor/ans/vadt.ans");
+					 "vexecutor/ans/vadt.ans");
 
 	util.execSQLFile("vexecutor/sql/drop_type.sql",
-	                 "vexecutor/ans/drop_type.ans");
+					 "vexecutor/ans/drop_type.ans");
+}
+
+TEST_F(TestVexecutor, scanframework)
+{
+	hawq::test::SQLUtility util;
+
+	util.execute("drop table if exists test1");
+	util.execute("create table test1 ("
+				 "	unique1		int4,"
+				 "	unique2		int4,"
+				 "	two			int4,"
+				 "	four		int4,"
+				 "	ten			int4,"
+				 "	twenty		int4,"
+				 "	hundred		int4,"
+				 "	thousand	int4,"
+				 "	twothousand	int4,"
+				 "	fivethous	int4,"
+				 "	tenthous	int4,"
+				 "	odd			int4,"
+				 "	even		int4,"
+				 "	stringu1	name,"
+				 "	stringu2	name,"
+				 "	string4		name) WITH (appendonly = true, orientation = PARQUET, pagesize = 1048576, rowgroupsize = 8388608, compresstype = SNAPPY) DISTRIBUTED RANDOMLY;");
+
+  std::string pwd = util.getTestRootPath();
+  std::string cmd = "COPY test1 FROM '" + pwd + "/vexecutor/data/tenk.data'";
+  std::cout << cmd << std::endl;
+  util.execute(cmd);
+  util.execute("select unique1 from test1");
+  util.execute("SET vectorized_executor_enable to on");
+
+  util.execSQLFile("vexecutor/sql/scan1.sql",
+					"vexecutor/ans/scan1.ans");
+
+  util.execute("drop table test1");
 }

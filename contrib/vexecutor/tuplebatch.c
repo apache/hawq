@@ -22,9 +22,6 @@
 static size_t vtypeSize(vheader *vh);
 static size_t tbSerializationSize(TupleBatch tb);
 
-#define TBGETVALUEPTR(tb,type,colid,rowid) (&(((type *)tb->datagroup[colid])->data[rowid]))
-#define TBGETISNULLPTR(tb,colid,rowid) (&((tb->datagroup[colid])->isnull[rowid]))
-
 TupleBatch tbGenerate(int colnum,int batchsize)
 {
     Assert(colnum > 0 && batchsize > 0);

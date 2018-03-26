@@ -39,10 +39,11 @@ size_t v##type##Size(vheader *vh) \
 vheader* buildv##type(int n) \
 { \
 	vheader* result; \
-	result = (vheader*) palloc0(offsetof(v##type,values) + n * sizeof(type)); \
+	result = (vheader*) malloc(offsetof(v##type,values) + n * sizeof(type)); \
+	memset(result,0,offsetof(v##type,values) + n * sizeof(type)); \
 	result->dim = n; \
 	result->elemtype = typeoid; \
-	result->isnull = palloc(sizeof(bool) * n); \
+	result->isnull = malloc(sizeof(bool) * n); \
 	SET_VARSIZE(result,v##type##Size(result)); \
 	return result; \
 }
@@ -183,7 +184,6 @@ v##type1##v##type2##opstr(PG_FUNCTION_ARGS) \
     v##type1 *arg1 = PG_GETARG_POINTER(0); \
     v##type2 *arg2 = PG_GETARG_POINTER(1); \
     v##type1 *res = NULL; \
-    Assert((arg1)->header._vl_len == (arg2)->header._vl_len); \
     Assert((arg1)->header.dim == (arg2)->header.dim); \
     size = (arg1)->header.dim; \
     if(sizeof(type1) > sizeof(type2)) \
@@ -251,7 +251,6 @@ v##type1##v##type2##cmpstr(PG_FUNCTION_ARGS) \
     v##type1 *arg1 = PG_GETARG_POINTER(0); \
     v##type2 *arg2 = PG_GETARG_POINTER(1); \
     vbool *res = NULL; \
-    Assert((arg1)->header._vl_len == (arg2)->header._vl_len); \
     size = (arg1)->header.dim; \
     res = palloc0(offsetof(vbool, values) + (size) * sizeof(bool)); \
     SET_VARSIZE(res, (offsetof(vbool, values) + (size) * sizeof(bool)));  \
