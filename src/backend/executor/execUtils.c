@@ -755,7 +755,10 @@ ExecBuildProjectionInfo(List *targetList,
 			break;
 		}
 		attr = inputDesc->attrs[variable->varattno - 1];
-		if (attr->attisdropped || variable->vartype != attr->atttypid)
+		bool cond = vmthd.GetNType == NULL ?
+					variable->vartype != attr->atttypid :
+					(variable->vartype != attr->atttypid && vmthd.GetNType(variable->vartype) != attr->atttypid);
+		if (attr->attisdropped || cond)
 		{
 			isVarList = false;
 			break;

@@ -1,0 +1,1 @@
+select unique1 from test1;

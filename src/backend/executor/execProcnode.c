@@ -750,22 +750,20 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	if (estate->es_instrument && result != NULL) {
 		result->instrument = InstrAlloc(1);
 	}
+
 	if (result != NULL)
 	{
+		/*
+        * If the plan node can be vectorized and vectorized is enable, enter the
+        * vectorized execution operators.
+        */
+		if(vmthd.vectorized_executor_enable
+		   && vmthd.ExecInitNode_Hook)
+			result = vmthd.ExecInitNode_Hook(result,estate,eflags,curMemoryAccount);
+
 		SAVE_EXECUTOR_MEMORY_ACCOUNT(result, curMemoryAccount);
 	}
 
-	/*
-	* If the plan node can be vectorized and vectorized is enable, enter the
-	* vectorized execution operators.
-	*/
-	if(vmthd.vectorized_executor_enable
-		&& vmthd.ExecInitNode_Hook
-		&& (result = vmthd.ExecInitNode_Hook(result,estate,eflags)))
-	{
-		/* New vectorized Plan node is got. */
-		return result;
-	}
 
 	return result;
 }
@@ -822,10 +820,6 @@ TupleTableSlot *
 ExecProcNode(PlanState *node)
 {
 	TupleTableSlot *result = NULL;
-    if(vmthd.vectorized_executor_enable && vmthd.ExecProcNode_Hook
-	   && (result = vmthd.ExecProcNode_Hook(node)))
-		return result;
-
 
 	START_MEMORY_ACCOUNT(node->plan->memoryAccount);
 	{
@@ -903,6 +897,13 @@ ExecProcNode(PlanState *node)
 		CheckSendPlanStateGpmonPkt(node);
 
 	Assert(nodeTag(node) >= T_PlanState_Start && nodeTag(node) < T_PlanState_End);
+
+	if(vmthd.vectorized_executor_enable
+	   && node->vectorized
+	   && vmthd.ExecProcNode_Hook
+	   && (result = vmthd.ExecProcNode_Hook(node)))
+		goto Exec_Jmp_Done;
+
 	goto *ExecJmpTbl[nodeTag(node) - T_PlanState_Start];
 
 Exec_Jmp_Result:
@@ -1587,6 +1588,17 @@ ExecEndNode(PlanState *node)
         pfree(node->cdbexplainbuf);
         node->cdbexplainbuf = NULL;
     }
+
+	if(vmthd.vectorized_executor_enable
+	   && node->vectorized
+	   && vmthd.ExecEndNode_Hook
+	   && vmthd.ExecEndNode_Hook(node))
+	{
+		estate->currentSliceIdInPlan = origSliceIdInPlan;
+		estate->currentExecutingSliceId = origExecutingSliceId;
+
+		return ;
+	}
 
     switch (nodeTag(node))
 	{

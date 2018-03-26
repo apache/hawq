@@ -1,0 +1,5 @@
+#PARALLEL=* are the parallel tests to run, optional but should not be empty
+#SERIAL=* are the serial tests to run, optional but should not be empty
+#you can have several PARALLEL or SRRIAL
+
+SERIAL=TestVexecutor.*

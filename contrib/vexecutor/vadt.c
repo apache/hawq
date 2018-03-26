@@ -31,7 +31,7 @@
 size_t v##type##Size(vheader *vh) \
 {\
 	size_t len = offsetof(vheader,isnull);\
-	return  len + vh->dim * sizeof(bool) + vh->dim * sizeof(type);\
+	return  len + vh->dim * sizeof(bool) + vh->dim * sizeof(type) + sizeof(Datum);\
 }
 
 /* Build the vectorized data */
@@ -39,10 +39,10 @@ size_t v##type##Size(vheader *vh) \
 vheader* buildv##type(int n) \
 { \
 	vheader* result; \
-	result = (vheader*) palloc0(offsetof(v##type,values) + n * sizeof(type)); \
+	result = (vheader*) palloc0(offsetof(v##type,values) + n * sizeof(type)) + sizeof(Datum); \
 	result->dim = n; \
 	result->elemtype = typeoid; \
-	result->isnull = palloc(sizeof(bool) * n); \
+	result->isnull = palloc0(sizeof(bool) * n); \
 	SET_VARSIZE(result,v##type##Size(result)); \
 	return result; \
 }
@@ -52,9 +52,8 @@ vheader* buildv##type(int n) \
 void destoryv##type(v##header **header) \
 { \
 	v##type** ptr = (v##type**) header; \
-	free((*header)->isnull); \
-	free((*ptr)->values); \
-	free(*ptr); \
+	pfree((*header)->isnull); \
+	pfree(*ptr); \
 	*ptr = NULL; \
 }
 
@@ -183,7 +182,6 @@ v##type1##v##type2##opstr(PG_FUNCTION_ARGS) \
     v##type1 *arg1 = PG_GETARG_POINTER(0); \
     v##type2 *arg2 = PG_GETARG_POINTER(1); \
     v##type1 *res = NULL; \
-    Assert((arg1)->header._vl_len == (arg2)->header._vl_len); \
     Assert((arg1)->header.dim == (arg2)->header.dim); \
     size = (arg1)->header.dim; \
     if(sizeof(type1) > sizeof(type2)) \
@@ -251,7 +249,6 @@ v##type1##v##type2##cmpstr(PG_FUNCTION_ARGS) \
     v##type1 *arg1 = PG_GETARG_POINTER(0); \
     v##type2 *arg2 = PG_GETARG_POINTER(1); \
     vbool *res = NULL; \
-    Assert((arg1)->header._vl_len == (arg2)->header._vl_len); \
     size = (arg1)->header.dim; \
     res = palloc0(offsetof(vbool, values) + (size) * sizeof(bool)); \
     SET_VARSIZE(res, (offsetof(vbool, values) + (size) * sizeof(bool)));  \
