@@ -31,7 +31,7 @@
 size_t v##type##Size(vheader *vh) \
 {\
 	size_t len = offsetof(vheader,isnull);\
-	return  len + vh->dim * sizeof(bool) + vh->dim * sizeof(type);\
+	return  len + vh->dim * sizeof(bool) + vh->dim * sizeof(type) + sizeof(Datum);\
 }
 
 /* Build the vectorized data */
@@ -39,11 +39,10 @@ size_t v##type##Size(vheader *vh) \
 vheader* buildv##type(int n) \
 { \
 	vheader* result; \
-	result = (vheader*) malloc(offsetof(v##type,values) + n * sizeof(type)); \
-	memset(result,0,offsetof(v##type,values) + n * sizeof(type)); \
+	result = (vheader*) palloc0(offsetof(v##type,values) + n * sizeof(type)) + sizeof(Datum); \
 	result->dim = n; \
 	result->elemtype = typeoid; \
-	result->isnull = malloc(sizeof(bool) * n); \
+	result->isnull = palloc0(sizeof(bool) * n); \
 	SET_VARSIZE(result,v##type##Size(result)); \
 	return result; \
 }
@@ -53,9 +52,8 @@ vheader* buildv##type(int n) \
 void destoryv##type(v##header **header) \
 { \
 	v##type** ptr = (v##type**) header; \
-	free((*header)->isnull); \
-	free((*ptr)->values); \
-	free(*ptr); \
+	pfree((*header)->isnull); \
+	pfree(*ptr); \
 	*ptr = NULL; \
 }
 
