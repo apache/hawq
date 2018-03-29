@@ -29,7 +29,9 @@
 #include "execVScan.h"
 
 PG_MODULE_MAGIC;
-#define BATCHSIZE 1024
+int BATCHSIZE = 1024;
+static int MINBATCHSIZE = 1;
+static int MAXBATCHSIZE = 4096;
 /*
  * hook function
  */
@@ -59,6 +61,14 @@ _PG_init(void)
 	                         &vmthd.vectorized_executor_enable,
 	                         PGC_USERSET,
 	                         NULL,NULL);
+
+    DefineCustomIntVariable("vectorized_batch_size",
+							gettext_noop("set vectorized execution batch size"),
+                            NULL,
+                            &BATCHSIZE,
+                            MINBATCHSIZE,MAXBATCHSIZE,
+							PGC_USERSET,
+							NULL,NULL);
 }
 
 /*
@@ -75,6 +85,12 @@ _PG_fini(void)
 	vmthd.ExecEndNode_Hook = NULL;
 }
 
+/*
+ *
+ * backportTupleDescriptor
+ *			Backport the TupleDesc information to normal type. Due to Vectorized type unrecognizable in normal execution node,
+ *			the TupleDesc structure should backport metadata to normal type before we do V->N result pop up.
+ */
 static void backportTupleDescriptor(PlanState* ps,TupleDesc td)
 {
 	cqContext *pcqCtx;
