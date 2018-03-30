@@ -24,21 +24,27 @@
 #include "nodes/execnodes.h"
 typedef struct vFuncMap
 {
-    Oid ntype;
-    vheader* (* vtbuild)(int n);
-    void (* vtfree)(vheader **vh);
+	Oid ntype;
+	vheader* (* vtbuild)(int n);
+	void (* vtfree)(vheader **vh);
 	Datum (* gettypeptr)(vheader *vh,int n);
 	void (* gettypevalue)(vheader *vh,int n,Datum *ptr);
-    size_t (* vtsize)(vheader *vh);
-    size_t (*serialization)(vheader* vh, unsigned char* buf);
-    Datum (*deserialization)(unsigned char* buf,size_t* len);
+	size_t (* vtsize)(vheader *vh);
+	size_t (*serialization)(vheader* vh, unsigned char* buf);
+	Datum (*deserialization)(unsigned char* buf,size_t* len);
 }vFuncMap;
+
+typedef struct aoinfo {
+	bool* proj;
+	bool isDone;
+} aoinfo;
 
 /* vectorized executor state */
 typedef struct VectorizedState
 {
 	bool vectorized;
 	PlanState *parent;
+	aoinfo *ao;
 }VectorizedState;
 
 

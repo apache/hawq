@@ -90,7 +90,7 @@ parquet_vgetnext(ParquetScanDesc scan, ScanDirection direction, TupleTableSlot *
 /*
  * Get next tuple batch from current row group into slot.
  *
- * Return false if current row group has no tuple left, true otherwise.
+ * Return the number of tuples fetch out.
  */
 static int
 ParquetRowGroupReader_ScanNextTupleBatch(
@@ -105,14 +105,14 @@ ParquetRowGroupReader_ScanNextTupleBatch(
 	if (rowGroupReader->rowRead >= rowGroupReader->rowCount)
 	{
 		ParquetRowGroupReader_FinishedScanRowGroup(rowGroupReader);
-		return false;
+		return 0;
 	}
 
 	/*
 	 * get the next item (tuple) from the row group
 	 */
 	int ncol = slot->tts_tupleDescriptor->natts;
-    TupleBatch tb = (TupleBatch )slot->PRIVATE_tb;
+	TupleBatch tb = (TupleBatch )slot->PRIVATE_tb;
 
 	tb->nrows = 0;
 	if (rowGroupReader->rowRead + tb->batchsize > rowGroupReader->rowCount) {
@@ -131,12 +131,12 @@ ParquetRowGroupReader_ScanNextTupleBatch(
 			continue;
 
 		Oid hawqTypeID = tupDesc->attrs[i]->atttypid;
-        Oid hawqVTypeID = GetVtype(hawqTypeID);
+		Oid hawqVTypeID = GetVtype(hawqTypeID);
 		if(!tb->datagroup[i])
 			tbCreateColumn(tb,i,hawqVTypeID);
 
 		vheader* header = tb->datagroup[i];
-        header->dim = tb->nrows;
+		header->dim = tb->nrows;
 
 		ParquetColumnReader *nextReader =
 			&rowGroupReader->columnReaders[colReaderIndex];

@@ -103,3 +103,39 @@ TEST_F(TestVexecutor, scanframework)
 
   util.execute("drop table test1");
 }
+
+TEST_F(TestVexecutor, scanAO)
+{
+	hawq::test::SQLUtility util;
+
+	util.execute("drop table if exists test1");
+	util.execute("create table test1 ("
+				 "	unique1		int4,"
+				 "	unique2		int4,"
+				 "	two			int4,"
+				 "	four		int4,"
+				 "	ten			int4,"
+				 "	twenty		int4,"
+				 "	hundred		int4,"
+				 "	thousand	int4,"
+				 "	twothousand	int4,"
+				 "	fivethous	int4,"
+				 "	tenthous	int4,"
+				 "	odd			int4,"
+				 "	even		int4,"
+				 "	stringu1	name,"
+				 "	stringu2	name,"
+				 "	string4		name) WITH (appendonly = true, compresstype = SNAPPY) DISTRIBUTED RANDOMLY;");
+
+  std::string pwd = util.getTestRootPath();
+  std::string cmd = "COPY test1 FROM '" + pwd + "/vexecutor/data/tenk.data'";
+  std::cout << cmd << std::endl;
+  util.execute(cmd);
+  util.execute("select unique1 from test1");
+  util.execute("SET vectorized_executor_enable to on");
+
+  util.execSQLFile("vexecutor/sql/scan1.sql",
+					"vexecutor/ans/scan1.ans");
+
+  util.execute("drop table test1");
+}

@@ -21,6 +21,7 @@
 #include "miscadmin.h"
 #include "execVQual.h"
 #include "parquet_reader.h"
+#include "ao_reader.h"
 
 static TupleTableSlot*
 ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd);
@@ -35,8 +36,8 @@ getVScanMethod(int tableType)
                     },
                     //APPENDONLYSCAN
                     {
-                            &AppendOnlyScanNext, &BeginScanAppendOnlyRelation, &EndScanAppendOnlyRelation,
-                            &ReScanAppendOnlyRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
+                            &AppendOnlyVScanNext, &BeginVScanAppendOnlyRelation, &EndVScanAppendOnlyRelation,
+                                                                                 NULL,NULL,NULL
                     },
                     //PARQUETSCAN
                     {
@@ -130,6 +131,7 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
      * storage allocated in the previous tuple cycle.
      */
     econtext = node->ps.ps_ExprContext;
+
     ResetExprContext(econtext);
 
     /*
@@ -182,8 +184,7 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
                  * and return it.
                  */
                 ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->nrows = ((TupleBatch)slot->PRIVATE_tb)->nrows;
-                memcpy(((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip,
-                       ((TupleBatch)slot->PRIVATE_tb)->skip,sizeof(bool) * ((TupleBatch)slot->PRIVATE_tb)->nrows);
+                ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = ((TupleBatch)slot->PRIVATE_tb)->skip;
                 return ExecVProject(projInfo, NULL);
             }
             else
