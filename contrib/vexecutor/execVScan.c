@@ -19,6 +19,8 @@
 
 #include "execVScan.h"
 #include "miscadmin.h"
+#include "execVQual.h"
+#include "parquet_reader.h"
 
 static TupleTableSlot*
 ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd);
@@ -38,8 +40,8 @@ getVScanMethod(int tableType)
                     },
                     //PARQUETSCAN
                     {
-                            &ParquetScanNext, &BeginScanParquetRelation, &EndScanParquetRelation,
-                            &ReScanParquetRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
+                            &ParquetVScanNext, &BeginScanParquetRelation, &EndScanParquetRelation,
+                            NULL,NULL,NULL
                     }
             };
 
@@ -53,6 +55,35 @@ getVScanMethod(int tableType)
     return &scanMethods[tableType];
 }
 
+/*
+ * ExecTableVScanVirtualLayer
+ *          translate a batch of tuple to single one if scan parent is normal execution node
+ *
+ * VirtualNodeProc may not fill tuple data in slot success, due to qualification tag.
+ * invoke scan table functoin if no tuple can pop up in TupleBatch
+ */
+TupleTableSlot *ExecTableVScanVirtualLayer(ScanState *scanState)
+{
+    VectorizedState* vs = (VectorizedState*)scanState->ps.vectorized;
+    VectorizedState* pvs = vs->parent->vectorized;
+
+    if(pvs->vectorized)
+        return ExecVScan(scanState,getVScanMethod(scanState->tableType)->accessMethod);
+    else
+    {
+        TupleTableSlot* slot = scanState->ps.ps_ProjInfo ? scanState->ps.ps_ResultTupleSlot : scanState->ss_ScanTupleSlot;
+        bool succ = VirtualNodeProc(scanState,slot);
+
+        if(!succ)
+        {
+            slot = ExecTableVScan(scanState);
+            VirtualNodeProc(scanState,slot);
+        }
+
+        return slot;
+    }
+}
+
 TupleTableSlot *ExecTableVScan(ScanState *scanState)
 {
     if (scanState->scan_state == SCAN_INIT ||
@@ -61,6 +92,8 @@ TupleTableSlot *ExecTableVScan(ScanState *scanState)
         getVScanMethod(scanState->tableType)->beginScanMethod(scanState);
     }
 
+    tbReset(scanState->ss_ScanTupleSlot->PRIVATE_tb);
+    tbReset(scanState->ps.ps_ResultTupleSlot->PRIVATE_tb);
     TupleTableSlot *slot = ExecVScan(scanState,getVScanMethod(scanState->tableType)->accessMethod);
 
     if (TupIsNull(slot) && !scanState->ps.delayEagerFree)
@@ -148,7 +181,10 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
                  * Form a projection tuple, store it in the result tuple slot
                  * and return it.
                  */
-                return ExecProject(projInfo, NULL);
+                ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->nrows = ((TupleBatch)slot->PRIVATE_tb)->nrows;
+                memcpy(((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip,
+                       ((TupleBatch)slot->PRIVATE_tb)->skip,sizeof(bool) * ((TupleBatch)slot->PRIVATE_tb)->nrows);
+                return ExecVProject(projInfo, NULL);
             }
             else
             {
@@ -163,5 +199,7 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
          * Tuple fails qual, so free per-tuple memory and try again.
          */
         ResetExprContext(econtext);
+        tbReset(node->ss_ScanTupleSlot->PRIVATE_tb);
+        tbReset(node->ps.ps_ResultTupleSlot->PRIVATE_tb);
     }
 }

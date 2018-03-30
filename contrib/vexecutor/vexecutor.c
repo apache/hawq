@@ -189,7 +189,7 @@ static TupleTableSlot* VExecProcNode(PlanState *node)
         case T_ParquetScanState:
         case T_AppendOnlyScanState:
         case T_TableScanState:
-            result = ExecTableVScan((TableScanState*)node);
+			result = ExecTableVScanVirtualLayer((TableScanState*)node);
             break;
         default:
             break;
@@ -208,10 +208,6 @@ static bool VExecEndNode(PlanState *node)
 	{
 		case T_AppendOnlyScanState:
 		case T_ParquetScanState:
-            tbDestroy((TupleBatch *) (&node->ps_ResultTupleSlot->PRIVATE_tb));
-            tbDestroy((TupleBatch *) (&((TableScanState *) node)->ss.ss_ScanTupleSlot->PRIVATE_tb));
-			ret = true;
-			break;
 		case T_TableScanState:
 			ExecEndTableScan((TableScanState *)node);
 			ret = true;

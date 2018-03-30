@@ -39,7 +39,7 @@ size_t v##type##Size(vheader *vh) \
 vheader* buildv##type(int n) \
 { \
 	vheader* result; \
-	result = (vheader*) palloc0(offsetof(v##type,values) + n * sizeof(type)) + sizeof(Datum); \
+	result = (vheader*) palloc0(offsetof(v##type,values) + n * sizeof(type) + sizeof(Datum)) ; \
 	result->dim = n; \
 	result->elemtype = typeoid; \
 	result->isnull = palloc0(sizeof(bool) * n); \
@@ -49,7 +49,7 @@ vheader* buildv##type(int n) \
 
 /* Destroy the vectorized data */
 #define FUNCTION_DESTORY(type, typeoid) \
-void destoryv##type(v##header **header) \
+void destroyv##type(vheader **header) \
 { \
 	v##type** ptr = (v##type**) header; \
 	pfree((*header)->isnull); \
@@ -357,13 +357,28 @@ v##type##const_type##cmpstr(PG_FUNCTION_ARGS) \
     FUNCTION_CMP(type) \
     FUNCTION_CMP_RCONST(type) 
 
+#define FUNCTION_GETPTR(type) \
+type* getptrv##type(vheader *header,int n) \
+{\
+	if(n < 0 || n > header->dim) return NULL; \
+	v##type* ptr = (v##type *) header; \
+	return ptr->values + n; \
+}
 
+#define FUNCTION_GETVALUE(type) \
+void getvaluev##type(vheader *header,int n,Datum *ptr) \
+{ \
+	if(n < 0 || n > header->dim) return;\
+	*ptr = ((v##type*)header)->values[n];\
+}
 
 #define TYPE_DEFINE(type, typeoid) \
     FUNCTION_VTYPESIZE(type) \
     FUNCTION_OP_ALL(type) \
     FUNCTION_BUILD(type, typeoid) \
     FUNCTION_DESTORY(type, typeoid) \
+    FUNCTION_GETPTR(type) \
+    FUNCTION_GETVALUE(type) \
     FUNCTION_SERIALIZATION(type,typeoid) \
 
 /* These MACRO will be expanded when the code is compiled. */

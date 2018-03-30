@@ -16,34 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+#ifndef __EXEC_VQUAL_H___
+#define __EXEC_VQUAL_H___
+#include "postgres.h"
 
-#ifndef VCHECK_H
-#define VCHECK_H
-
+#include "access/heapam.h"
+#include "cdb/cdbvars.h"
+#include "cdb/partitionselection.h"
+#include "executor/execdebug.h"
+#include "executor/nodeAgg.h"
+#include "tuplebatch.h"
 #include "vadt.h"
-#include "nodes/execnodes.h"
-typedef struct vFuncMap
-{
-    Oid ntype;
-    vheader* (* vtbuild)(int n);
-    void (* vtfree)(vheader **vh);
-	Datum (* gettypeptr)(vheader *vh,int n);
-	void (* gettypevalue)(vheader *vh,int n,Datum *ptr);
-    size_t (* vtsize)(vheader *vh);
-    size_t (*serialization)(vheader* vh, unsigned char* buf);
-    Datum (*deserialization)(unsigned char* buf,size_t* len);
-}vFuncMap;
 
-/* vectorized executor state */
-typedef struct VectorizedState
-{
-	bool vectorized;
-	PlanState *parent;
-}VectorizedState;
+extern TupleTableSlot *
+ExecVProject(ProjectionInfo *projInfo, ExprDoneCond *isDone);
 
+extern bool
+ExecVQual(List *qual, ExprContext *econtext);
 
-extern const vFuncMap* GetVFunc(Oid vtype);
-extern Plan* CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan);
-extern Oid GetVtype(Oid ntype);
+extern bool
+VirtualNodeProc(ScanState* state,TupleTableSlot *slot);
 
 #endif

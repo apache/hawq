@@ -23,5 +23,8 @@
 #include "postgres.h"
 #include "executor/executor.h"
 
+
+TupleTableSlot *ExecTableVScanVirtualLayer(ScanState *scanState);
+
 TupleTableSlot *ExecTableVScan(ScanState *scanState);
 #endif

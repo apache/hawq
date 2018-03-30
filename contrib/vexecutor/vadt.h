@@ -58,8 +58,15 @@ extern vheader* buildv##type(int n);
 
 /* Destroy the vectorized data */
 #define FUNCTION_DESTORY_HEADER(type, typeoid) \
-extern void destoryv##type(vheader **header);
+extern void destroyv##type(vheader **header);
 
+/* Get a column data pointer */
+#define FUNCTION_GETPTR_HEADER(type) \
+extern type* getptrv##type(vheader *header,int n);
+
+/* Get a column data */
+#define FUNCTION_GETVALUE_HEADER(type) \
+extern void getvaluev##type(vheader *header,int n,Datum *ptr);
 /*
  * IN function for the abstract data types
  * e.g. Datum vint2in(PG_FUNCTION_ARGS)
@@ -186,6 +193,8 @@ extern Datum v##type##deserialization(unsigned char* buf,size_t* len); \
 
 #define TYPE_HEADER(type, typeoid) \
     VADT_BUILD(type) \
+    FUNCTION_GETPTR_HEADER(type)\
+    FUNCTION_GETVALUE_HEADER(type) \
     FUNCTION_OP_ALL_HEADER(type) \
     FUNCTION_IN_HEADER(type, typeoid) \
     FUNCTION_OUT_HEADER(type, typeoid) \

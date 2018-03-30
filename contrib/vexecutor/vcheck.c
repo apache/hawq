@@ -36,12 +36,12 @@
 
 
 static const vFuncMap funcMap[] = {
-		{INT2OID, &buildvint2, &destoryvint2, &vint2Size,&vint2serialization,&vint2deserialization},
-		{INT4OID, &buildvint4, &destoryvint4, &vint4Size,&vint4serialization,&vint4deserialization},
-		{INT8OID, &buildvint8, &destoryvint8, &vint8Size,&vint8serialization,&vint8deserialization},
-		{FLOAT4OID, &buildvfloat4, &destoryvfloat4, &vfloat4Size,&vfloat4serialization,&vfloat4deserialization},
-		{FLOAT8OID, &buildvfloat8, &destoryvfloat8, &vfloat8Size,&vfloat8serialization,&vfloat8deserialization},
-		{BOOLOID, &buildvbool, &destoryvbool, &vboolSize,&vboolserialization,&vbooldeserialization}
+		{INT2OID, &buildvint2, &destroyvint2, &getptrvint2,&getvaluevint2,&vint2Size,&vint2serialization,&vint2deserialization},
+		{INT4OID, &buildvint4, &destroyvint4, &getptrvint4,&getvaluevint4,&vint4Size,&vint4serialization,&vint4deserialization},
+		{INT8OID, &buildvint8, &destroyvint8, &getptrvint8,&getvaluevint8,&vint8Size,&vint8serialization,&vint8deserialization},
+		{FLOAT4OID, &buildvfloat4, &destroyvfloat4, &getptrvfloat4,&getvaluevfloat4,&vfloat4Size,&vfloat4serialization,&vfloat4deserialization},
+		{FLOAT8OID, &buildvfloat8, &destroyvfloat8, &getptrvfloat8,&getvaluevfloat8,&vfloat8Size,&vfloat8serialization,&vfloat8deserialization},
+		{BOOLOID, &buildvbool, &destroyvbool, &getptrvbool,&getvaluevbool,&vboolSize,&vboolserialization,&vbooldeserialization}
 };
 static const int funcMapLen = sizeof(funcMap) /sizeof(vFuncMap);
 

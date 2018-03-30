@@ -68,17 +68,17 @@ void tbCreateColumn(TupleBatch tb,int colid,Oid type)
         return;
     int bs = tb->batchsize;
 
-    GetVFunc(type)->vtbuild((bs));
+    tb->datagroup[colid] = GetVFunc(type)->vtbuild((bs));
 }
 
 void tbfreeColumn(vheader** vh,int colid)
 {
-    GetVFunc(vh[colid]->elemtype)->vtfree(&vh[colid]);
+    GetVFunc(GetVtype(vh[colid]->elemtype))->vtfree(&vh[colid]);
 }
 
 static size_t vtypeSize(vheader *vh)
 {
-    return GetVFunc(vh->elemtype)->vtsize(vh);
+    return GetVFunc(GetVtype(vh->elemtype))->vtsize(vh);
 }
 
 static size_t

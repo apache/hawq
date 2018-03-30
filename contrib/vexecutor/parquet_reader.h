@@ -16,34 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+#ifndef __PARQUET_READER__
+#define __PARQUET_READER__
 
-#ifndef VCHECK_H
-#define VCHECK_H
+#include "postgres.h"
+#include "fmgr.h"
+#include "funcapi.h"
+#include "cdb/cdbparquetfooterprocessor.h"
+#include "cdb/cdbparquetfooterserializer.h"
+#include "access/parquetmetadata_c++/MetadataInterface.h"
+#include "cdb/cdbparquetrowgroup.h"
+#include "utils/memutils.h"
+#include "utils/palloc.h"
+#include "snappy-c.h"
+#include "zlib.h"
+#include "executor/spi.h"
+#include "cdb/cdbparquetam.h"
+#include "nodes/print.h"
 
-#include "vadt.h"
-#include "nodes/execnodes.h"
-typedef struct vFuncMap
-{
-    Oid ntype;
-    vheader* (* vtbuild)(int n);
-    void (* vtfree)(vheader **vh);
-	Datum (* gettypeptr)(vheader *vh,int n);
-	void (* gettypevalue)(vheader *vh,int n,Datum *ptr);
-    size_t (* vtsize)(vheader *vh);
-    size_t (*serialization)(vheader* vh, unsigned char* buf);
-    Datum (*deserialization)(unsigned char* buf,size_t* len);
-}vFuncMap;
-
-/* vectorized executor state */
-typedef struct VectorizedState
-{
-	bool vectorized;
-	PlanState *parent;
-}VectorizedState;
-
-
-extern const vFuncMap* GetVFunc(Oid vtype);
-extern Plan* CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan);
-extern Oid GetVtype(Oid ntype);
+TupleTableSlot *ParquetVScanNext(ScanState *node);
 
 #endif
