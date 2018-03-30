@@ -39,6 +39,7 @@ typedef struct VectorizedState
 {
 	bool vectorized;
 	PlanState *parent;
+    bool* proj;
 }VectorizedState;
 
 

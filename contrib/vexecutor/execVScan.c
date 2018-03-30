@@ -21,6 +21,7 @@
 #include "miscadmin.h"
 #include "execVQual.h"
 #include "parquet_reader.h"
+#include "ao_reader.h"
 
 static TupleTableSlot*
 ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd);
@@ -35,8 +36,8 @@ getVScanMethod(int tableType)
                     },
                     //APPENDONLYSCAN
                     {
-                            &AppendOnlyScanNext, &BeginScanAppendOnlyRelation, &EndScanAppendOnlyRelation,
-                            &ReScanAppendOnlyRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
+                            &AppendOnlyVScanNext, &BeginVScanAppendOnlyRelation, &EndVScanAppendOnlyRelation,
+                                                                                 NULL,NULL,NULL
                     },
                     //PARQUETSCAN
                     {
