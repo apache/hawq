@@ -34,12 +34,17 @@ typedef struct vFuncMap
 	Datum (*deserialization)(unsigned char* buf,size_t* len);
 }vFuncMap;
 
+typedef struct aoinfo {
+	bool* proj;
+	bool isDone;
+} aoinfo;
+
 /* vectorized executor state */
 typedef struct VectorizedState
 {
 	bool vectorized;
 	PlanState *parent;
-	bool* proj;
+	aoinfo *ao;
 }VectorizedState;
 
 
