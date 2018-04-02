@@ -52,6 +52,11 @@ public class JdbcResolver extends JdbcPlugin implements ReadResolver, WriteResol
         super(input);
     }
 
+    /**
+     * getFields() implementation
+     *
+     * @throws SQLException if the provided {@link OneRow} object is invalid
+     */
     @Override
     public List<OneField> getFields(OneRow row) throws SQLException {
         ResultSet result = (ResultSet) row.getData();
@@ -111,21 +116,22 @@ public class JdbcResolver extends JdbcPlugin implements ReadResolver, WriteResol
     /**
      * setFields() implementation
      *
-     * @return OneRow with the data field containing an ArrayList<OneField>
-     * OneFields are not reordered before being passed to Accessor; at the moment, there is no way to correct the order of the fields if it is incorrect
+     * @return OneRow with the data field containing a List<OneField>
+     * OneFields are not reordered before being passed to Accessor; at the
+     * moment, there is no way to correct the order of the fields if it is not.
      * In practice, the 'record' provided is always ordered the right way.
-     *
-     * Note that TIMESTAMP with milliseconds is not supported
      *
      * @throws UnsupportedOperationException if field of some type is not supported
      */
     @Override
     public OneRow setFields(List<OneField> record) throws UnsupportedOperationException, ParseException {
-        int i = 0;
+        int column_index = 0;
         for (OneField oneField : record) {
-            ColumnDescriptor column = columns.get(i);
+            ColumnDescriptor column = columns.get(column_index);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Column #" + (i + 1) + ". Name: '" + column.columnName() + "'. Type: '" + DataType.get(column.columnTypeCode()).toString() + "'");
+                LOG.debug("Column #" + (column_index + 1) +
+                ". Name: '" + column.columnName() +
+                "'. Type: '" + DataType.get(column.columnTypeCode()).toString() + "'");
             }
             if (
                 LOG.isDebugEnabled() &&
@@ -219,7 +225,7 @@ public class JdbcResolver extends JdbcPlugin implements ReadResolver, WriteResol
                 oneField.type = column.columnTypeCode();
             }
 
-            i += 1;
+            column_index += 1;
         }
         return new OneRow(new LinkedList<OneField>(record));
     }
@@ -227,13 +233,13 @@ public class JdbcResolver extends JdbcPlugin implements ReadResolver, WriteResol
 
     private static final Log LOG = LogFactory.getLog(JdbcResolver.class);
 
-    // SimpleDateFormat to parse DATE provided as TEXT
+    // SimpleDateFormat to parse TEXT into DATE
     private static ThreadLocal<SimpleDateFormat> dateSDF = new ThreadLocal<SimpleDateFormat>() {
         @Override protected SimpleDateFormat initialValue() {
             return new SimpleDateFormat("yyyy-MM-dd");
         }
     };
-    // SimpleDateFormat to parse TIMESTAMP provided as TEXT
+    // SimpleDateFormat to parse TEXT into TIMESTAMP (with microseconds)
     private static ThreadLocal<SimpleDateFormat[]> timestampSDFs = new ThreadLocal<SimpleDateFormat[]>() {
         @Override protected SimpleDateFormat[] initialValue() {
             SimpleDateFormat[] retRes = {

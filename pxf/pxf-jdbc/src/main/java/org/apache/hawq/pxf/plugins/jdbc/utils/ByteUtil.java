@@ -19,14 +19,12 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  * under the License.
  */
 
-
 import org.apache.commons.lang.ArrayUtils;
 
 /**
- * A tool class, used to deal with byte array merging, split and other methods.
+ * A tool class for byte array merging, splitting and conversion
  */
 public class ByteUtil {
-
     public static byte[] mergeBytes(byte[] b1, byte[] b2) {
         return ArrayUtils.addAll(b1,b2);
     }

@@ -47,13 +47,10 @@ import org.apache.commons.logging.LogFactory;
 /**
  * JDBC tables accessor
  *
- * The accessor will make a SQL query,
- * then open a JDBC connection and either read or write data via JDBC
+ * The SELECT queries are processed by {@link java.sql.Statement}
  *
- * If the SELECT query is processed, all the data is first retreived from the database, and only then it is passed to the Resolver class (one tuple a time). This also means that openForRead() call takes long time, but the readNextObject() calls are very fast.
- *
- * If the INSERT query is processed,
- *
+ * The INSERT queries are processed by {@link java.sql.PreparedStatement} and
+ * built-in JDBC batches of arbitrary size
  */
 public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAccessor {
     /**
@@ -139,7 +136,11 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         statementWrite = dbConn.prepareStatement(queryWrite);
 
         if ((batchSize != 0) && (!dbMeta.supportsBatchUpdates())) {
-            LOG.info("The database '" + dbMeta.getDatabaseProductName() + "' does not support batch updates. The current request will be handled without batching");
+            LOG.info(
+                "The database '" +
+                dbMeta.getDatabaseProductName() +
+                "' does not support batch updates. The current request will be handled without batching"
+            );
             batchSize = 0;
         }
 
@@ -148,7 +149,11 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
 
 	/**
      * writeNextObject() implementation
-     * INSERTs one tuple using the PreparedStatement 'statementWrite'
+     *
+     * If batchSize is not 0 or 1, add a tuple to the batch of statementWrite
+     * Otherwise, execute an INSERT query immediately
+     *
+     * In both cases, a {@link java.sql.PreparedStatement} is used
      *
      * @throws SQLException if a database access error occurs
      * @throws IOException if the data provided by {@link JdbcResolver} is corrupted
@@ -315,22 +320,26 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
      */
     @Override
     public void closeForWrite() throws SQLException {
-        if ((dbConn != null) && (statementWrite != null) && (!statementWrite.isClosed())) {
-            // If batching was used, execute the batch
-            if ((batchSize < 0) || ((batchSize > 1) && (batchSizeCurrent > 0))) {
-                try {
-                    statementWrite.executeBatch();
+        try {
+            if ((dbConn != null) && (statementWrite != null) && (!statementWrite.isClosed())) {
+                // If batching was used, execute the batch
+                if ((batchSize < 0) || ((batchSize > 1) && (batchSizeCurrent > 0))) {
+                    try {
+                        statementWrite.executeBatch();
+                    }
+                    catch (SQLException e) {
+                        e = tryRollback(e);
+                        throw e;
+                    }
                 }
-                catch (SQLException e) {
-                    e = tryRollback(e);
-                    throw e;
+                if (dbMeta.supportsTransactions()) {
+                    dbConn.commit();
                 }
-            }
-            if (dbMeta.supportsTransactions()) {
-                dbConn.commit();
             }
         }
-        super.closeConnection();
+        finally {
+            super.closeConnection();
+        }
     }
 
 
@@ -355,11 +364,10 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         }
 
         // Insert the table name
-        sb.append(" FROM ").append(tblName);
+        sb.append(" FROM ").append(tableName);
 
         // Insert regular WHERE constraints
-        WhereSQLBuilder sqlBuilder = new WhereSQLBuilder(inputData);
-        sqlBuilder.buildWhereSQL(dbMeta.getDatabaseProductName(), sb);
+        (new WhereSQLBuilder(inputData)).buildWhereSQL(dbMeta.getDatabaseProductName(), sb);
 
         // Insert partition constraints
         JdbcPartitionFragmenter.buildFragmenterSql(inputData, dbMeta.getDatabaseProductName(), sb);
@@ -378,7 +386,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         sb.append("INSERT INTO ");
 
         // Insert the table name
-        sb.append(tblName);
+        sb.append(tableName);
 
         // Insert columns' names
         sb.append("(");
@@ -413,8 +421,6 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
      * @return The resulting SQLException (it may differ from 'rollbackException')
      */
     private SQLException tryRollback(SQLException rollbackException) {
-        final String failedInsertMessage = "Insert failed due to an SQLException. The target database does not support transactions and SOME DATA MAY HAVE BEEN INSERTED. ";
-
         // Get transactions support status
         boolean areTransactionsSupported = false;
         try {
@@ -448,6 +454,8 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
 
 
     private static final Log LOG = LogFactory.getLog(JdbcAccessor.class);
+
+    private static final String failedInsertMessage = "Insert failed due to an SQLException. The target database does not support transactions and SOME DATA MAY HAVE BEEN INSERTED. ";
 
     // Read variables
     private String queryRead = null;

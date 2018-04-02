@@ -20,7 +20,7 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  */
 
 /**
- * Implements methods for Postgres Database.
+ * Implements methods for the PostgreSQL.
  */
 public class PostgresProduct extends DbProduct {
     @Override

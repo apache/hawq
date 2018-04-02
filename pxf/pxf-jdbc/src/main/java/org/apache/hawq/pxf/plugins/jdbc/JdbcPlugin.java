@@ -19,8 +19,6 @@ package org.apache.hawq.pxf.plugins.jdbc;
  * under the License.
  */
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
@@ -29,23 +27,25 @@ import org.apache.hawq.pxf.api.utilities.Plugin;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
- * JDBC tables plugin
+ * JDBC tables plugin (base class)
  *
  * Implemented subclasses: {@link JdbcAccessor}, {@link JdbcResolver}.
  */
 public class JdbcPlugin extends Plugin {
     /**
-     * Class constructor. Parses and checks InputData
+     * Class constructor
      *
-     * @param input PXF InputData
+     * @param input {@link InputData} provided by PXF
      *
      * @throws UserDataException if one of the required request parameters is not set
      */
@@ -54,21 +54,42 @@ public class JdbcPlugin extends Plugin {
 
         jdbcDriver = input.getUserProperty("JDBC_DRIVER");
         if (jdbcDriver == null) {
-            throw new UserDataException("JDBC_DRIVER must be set");
+            throw new UserDataException("JDBC_DRIVER is a required parameter");
         }
 
         dbUrl = input.getUserProperty("DB_URL");
         if (dbUrl == null) {
-            throw new UserDataException("DB_URL must be set");
+            throw new UserDataException("DB_URL is a required parameter");
         }
 
-        // This parameter may be null
+        tableName = input.getDataSource();
+        if (tableName == null) {
+            throw new UserDataException("Data source must be provided");
+        }
+        /*
+        At the moment, when writing into some table, the table name is
+        concatenated with a special string that is necessary to write into HDFS.
+        However, a raw table name is necessary in case of JDBC.
+        The correct table name is extracted here.
+        */
+        Matcher matcher = tableNamePattern.matcher(tableName);
+        if (matcher.matches()) {
+            inputData.setDataSource(matcher.group(1));
+            tableName = input.getDataSource();
+        }
+
+        columns = inputData.getTupleDescription();
+        if (columns == null) {
+            throw new UserDataException("Tuple description must be provided");
+        }
+
+        // This parameter is not required. The default value is null
         user = input.getUserProperty("USER");
         if (user != null) {
             pass = input.getUserProperty("PASS");
         }
 
-        // If this parameter is not set, the default value (0) is used instead
+        // This parameter is not required. The default value is 0
         String batchSizeRaw = input.getUserProperty("BATCH_SIZE");
         if (batchSizeRaw != null) {
             try {
@@ -78,32 +99,15 @@ public class JdbcPlugin extends Plugin {
                 throw new UserDataException("BATCH_SIZE is incorrect: must be an integer");
             }
         }
-
-        tblName = input.getDataSource();
-        if (tblName == null) {
-            throw new UserDataException("TABLE_NAME must be set as DataSource");
-        }
-        // At the moment, when writing into some table, the table name is concatenated with a special string that is necessary to write into HDFS. However, a raw table name is necessary in case of JDBC. The correct table name is extracted here. This code should be removed in later versions (when the table name becomes correct)
-        Matcher matcher = tableNamePattern.matcher(tblName);
-        if (matcher.matches()) {
-            inputData.setDataSource(matcher.group(1));
-            tblName = input.getDataSource();
-        }
-
-        // This variable is used in Accessor and Resolver, thus if it is not present, no other actions can be performed. This parameter is not under user's control
-        columns = inputData.getTupleDescription();
-        if (columns == null) {
-            throw new UserDataException("Tuple description is not provided");
-        }
     }
 
 
-    // JDBC connection parameters
+    // User-defined JDBC parameters
     protected String jdbcDriver = null;
     protected String dbUrl = null;
     protected String user = null;
     protected String pass = null;
-    protected String tblName = null;
+    protected String tableName = null;
 
     // JDBC connection object
     protected Connection dbConn = null;
@@ -122,17 +126,17 @@ public class JdbcPlugin extends Plugin {
      * @throws SQLTimeoutException if a problem with the connection occurs
      */
     protected Connection openConnection() throws ClassNotFoundException, SQLException, SQLTimeoutException {
-        if (LOG.isDebugEnabled()) {
-            if (user != null) {
-                LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, user=%s, pass=%s, table=%s",
-                    jdbcDriver, dbUrl, user, pass, tblName));
-            }
-            else {
-                LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, table=%s",
-                    jdbcDriver, dbUrl, tblName));
-            }
-        }
         if (dbConn == null || dbConn.isClosed()) {
+            if (LOG.isDebugEnabled()) {
+                if (user != null) {
+                    LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, user=%s, pass=%s, table=%s",
+                        jdbcDriver, dbUrl, user, pass, tableName));
+                }
+                else {
+                    LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, table=%s",
+                        jdbcDriver, dbUrl, tableName));
+                }
+            }
             Class.forName(jdbcDriver);
             if (user != null) {
                 dbConn = DriverManager.getConnection(dbUrl, user, pass);
@@ -156,7 +160,7 @@ public class JdbcPlugin extends Plugin {
             }
         }
         catch (SQLException e) {
-            LOG.error("JDBC connection close error. ", e);
+            LOG.error("JDBC connection close error", e);
         }
     }
 

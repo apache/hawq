@@ -36,38 +36,13 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
 /**
- * Fragmenter class for JDBC data resources.
+ * JDBC fragmenter
  *
- * Extends the {@link Fragmenter} abstract class, with the purpose of transforming
- * an input data path  (an JDBC Database table name  and user request parameters)  into a list of regions
- * that belong to this table.
- * <br>
- * The parameter Patterns<br>
- * There are three  parameters,  the format is as follows:<br>
- * <pre>
- * <code>PARTITION_BY=column_name:column_type&amp;RANGE=start_value[:end_value]&amp;INTERVAL=interval_num[:interval_unit]</code>
- * </pre>
- * The <code>PARTITION_BY</code> parameter can be split by colon(':'),the <code>column_type</code> current supported : <code>date,int,enum</code> .
- * The Date format is 'yyyy-MM-dd'. <br>
- * The <code>RANGE</code> parameter can be split by colon(':') ,used to identify the starting range of each fragment.
- * The range is left-closed, ie:<code> '&gt;= start_value AND &lt; end_value' </code>.If the <code>column_type</code> is <code>int</code>,
- * the <code>end_value</code> can be empty. If the <code>column_type</code>is <code>enum</code>,the parameter <code>RANGE</code> can be empty. <br>
- * The <code>INTERVAL</code> parameter can be split by colon(':'), indicate the interval value of one fragment.
- * When <code>column_type</code> is <code>date</code>,this parameter must be split by colon, and <code>interval_unit</code> can be <code>year,month,day</code>.
- * When <code>column_type</code> is <code>int</code>, the <code>interval_unit</code> can be empty.
- * When <code>column_type</code> is <code>enum</code>,the <code>INTERVAL</code> parameter can be empty.
- * <br>
- * <p>
- * The syntax examples is :<br>
- * <code>PARTITION_BY=createdate:date&amp;RANGE=2008-01-01:2010-01-01&amp;INTERVAL=1:month'</code> <br>
- * <code>PARTITION_BY=year:int&amp;RANGE=2008:2010&amp;INTERVAL=1</code> <br>
- * <code>PARTITION_BY=grade:enum&amp;RANGE=excellent:good:general:bad</code>
- * </p>
- *
+ * Splits the query to allow multiple simultaneous SELECTs
  */
 public class JdbcPartitionFragmenter extends Fragmenter {
     /**
-     * Insert fragment constraints into the SQL query
+     * Insert fragment constraints into the SQL query.
      *
      * @param inputData InputData of the fragment
      * @param dbName Database name (affects the behaviour for DATE partitions)
@@ -125,70 +100,88 @@ public class JdbcPartitionFragmenter extends Fragmenter {
     }
 
     /**
-     * Constructor for JdbcPartitionFragmenter.
+     * Class constructor.
      *
-     * @param inConf input data such as which Jdbc table to scan
-     * @throws UserDataException  if the request parameter is malformed
+     * @param inputData PXF InputData
+     * @throws UserDataException if the request parameter is malformed
      */
-    public JdbcPartitionFragmenter(InputData inConf) throws UserDataException {
-        super(inConf);
-        if (inConf.getUserProperty("PARTITION_BY") == null)
+    public JdbcPartitionFragmenter(InputData inputData) throws UserDataException {
+        super(inputData);
+        if (inputData.getUserProperty("PARTITION_BY") == null) {
             return;
-        try {
-            partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
-            partitionColumn = partitionBy[0];
-            partitionType = PartitionType.typeOf(partitionBy[1]);
-        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e1) {
-            throw new UserDataException("The parameter 'PARTITION_BY' invalid, the pattern is 'column_name:date|int|enum'");
         }
 
-        //parse and validate parameter-RANGE
+        // PARTITION_BY
         try {
-            String rangeStr = inConf.getUserProperty("RANGE");
+            partitionType = PartitionType.typeOf(
+                inputData.getUserProperty("PARTITION_BY").split(":")[1]
+            );
+        }
+        catch (IllegalArgumentException | ArrayIndexOutOfBoundsException ex) {
+            throw new UserDataException("The parameter 'PARTITION_BY' is invalid. The pattern is '<column_name>:date|int|enum'");
+        }
+
+        // RANGE
+        try {
+            String rangeStr = inputData.getUserProperty("RANGE");
             if (rangeStr != null) {
                 range = rangeStr.split(":");
-                if (range.length == 1 && partitionType != PartitionType.ENUM)
-                    throw new UserDataException("The parameter 'RANGE' does not specify '[:end_value]'");
-            } else
-                throw new UserDataException("The parameter 'RANGE' must be specified along with 'PARTITION_BY'");
-        } catch (IllegalArgumentException e1) {
-            throw new UserDataException("The parameter 'RANGE' invalid, the pattern is 'start_value[:end_value]'");
-        }
-
-        //parse and validate parameter-INTERVAL
-        try {
-            String intervalStr = inConf.getUserProperty("INTERVAL");
-            if (intervalStr != null) {
-                interval = intervalStr.split(":");
-                intervalNum = Integer.parseInt(interval[0]);
-                if (interval.length > 1)
-                    intervalType = IntervalType.typeOf(interval[1]);
-                if (interval.length == 1 && partitionType == PartitionType.DATE)
-                    throw new UserDataException("The parameter 'INTERVAL' does not specify unit [:year|month|day]");
-            } else if (partitionType != PartitionType.ENUM)
-                throw new UserDataException("The parameter 'INTERVAL' must be specified along with 'PARTITION_BY'");
-            if (intervalNum < 1)
-                throw new UserDataException("The parameter 'INTERVAL' must be at least '1', but actual is '" + intervalNum + "'");
-        } catch (IllegalArgumentException e1) {
-            throw new UserDataException("The parameter 'INTERVAL' invalid, the pattern is 'interval_num[:interval_unit]'");
-        }
-
-        //parse any date values
-        try {
-            if (partitionType == PartitionType.DATE) {
-                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-                rangeStart = Calendar.getInstance();
-                rangeStart.setTime(df.parse(range[0]));
-                rangeEnd = Calendar.getInstance();
-                rangeEnd.setTime(df.parse(range[1]));
+                if (range.length == 1 && partitionType != PartitionType.ENUM) {
+                    throw new UserDataException("The parameter 'RANGE' must specify ':<end_value>' for this PARTITION_TYPE");
+                }
             }
-        } catch (ParseException e) {
-            throw new UserDataException("The parameter 'RANGE' has invalid date format. Expected format is 'YYYY-MM-DD'");
+            else {
+                throw new UserDataException("The parameter 'RANGE' must be specified along with 'PARTITION_BY'");
+            }
+
+            // Parse DATE partition type values
+            if (partitionType == PartitionType.DATE) {
+                try {
+                    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+                    rangeStart = Calendar.getInstance();
+                    rangeStart.setTime(df.parse(range[0]));
+                    rangeEnd = Calendar.getInstance();
+                    rangeEnd.setTime(df.parse(range[1]));
+                } catch (ParseException e) {
+                    throw new UserDataException("The parameter 'RANGE' has invalid date format. The correct format is 'yyyy-MM-dd'");
+                }
+            }
+        }
+        catch (IllegalArgumentException ex) {
+            throw new UserDataException("The parameter 'RANGE' is invalid. The pattern is '<start_value>[:<end_value>]'");
+        }
+
+        // INTERVAL
+        try {
+            String intervalStr = inputData.getUserProperty("INTERVAL");
+            if (intervalStr != null) {
+                String[] interval = intervalStr.split(":");
+                try {
+                    intervalNum = Integer.parseInt(interval[0]);
+                    if (intervalNum < 1) {
+                        throw new UserDataException("The '<interval_num>' in parameter 'INTERVAL' must be at least 1, but actual is " + intervalNum);
+                    }
+                }
+                catch (NumberFormatException ex) {
+                    throw new UserDataException("The '<interval_num>' in parameter 'INTERVAL' must be an integer");
+                }
+                if (interval.length > 1) {
+                    intervalType = IntervalType.typeOf(interval[1]);
+                }
+                if (interval.length == 1 && partitionType == PartitionType.DATE) {
+                    throw new UserDataException("The parameter 'INTERVAL' must specify unit (':year|month|day') for the PARTITION_TYPE = 'DATE'");
+                }
+            }
+            else if (partitionType != PartitionType.ENUM) {
+                throw new UserDataException("The parameter 'INTERVAL' must be specified along with 'PARTITION_BY' for this PARTITION_TYPE");
+            }
+        }
+        catch (IllegalArgumentException ex) {
+            throw new UserDataException("The parameter 'INTERVAL' is invalid. The pattern is '<interval_num>[:<interval_unit>]'");
         }
     }
 
     /**
-     * Returns statistics for Jdbc table. Currently it's not implemented.
      * @throws UnsupportedOperationException ANALYZE for Jdbc plugin is not supported
      */
     @Override
@@ -197,28 +190,26 @@ public class JdbcPartitionFragmenter extends Fragmenter {
     }
 
     /**
-     * Returns list of fragments containing all of the
-     * Jdbc table data.
+     * getFragments() implementation
      *
-     * @return a list of fragments
-     * @throws Exception if assign host error
+     * @return a list of fragments to be passed to PXF segments
      */
     @Override
-    public List<Fragment> getFragments() throws Exception {
+    public List<Fragment> getFragments() {
         if (partitionType == null) {
-            byte[] fragmentMetadata = null;
-            byte[] userData = null;
-            Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
+            Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, null);
             fragments.add(fragment);
-            return prepareHosts(fragments);
+            return fragments;
         }
+
         switch (partitionType) {
             case DATE: {
                 int currInterval = intervalNum;
-
                 Calendar fragStart = rangeStart;
+
+                // Create fragment
                 while (fragStart.before(rangeEnd)) {
-                    Calendar fragEnd = (Calendar) fragStart.clone();
+                    Calendar fragEnd = (Calendar)fragStart.clone();
                     switch (intervalType) {
                         case DAY:
                             fragEnd.add(Calendar.DAY_OF_MONTH, currInterval);
@@ -231,18 +222,18 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                             break;
                     }
                     if (fragEnd.after(rangeEnd))
-                        fragEnd = (Calendar) rangeEnd.clone();
+                        fragEnd = (Calendar)rangeEnd.clone();
 
-                    //make metadata of this fragment , converts the date to a millisecond,then get bytes.
+                    // Convert DATE into milliseconds
                     byte[] msStart = ByteUtil.getBytes(fragStart.getTimeInMillis());
                     byte[] msEnd = ByteUtil.getBytes(fragEnd.getTimeInMillis());
                     byte[] fragmentMetadata = ByteUtil.mergeBytes(msStart, msEnd);
 
-                    byte[] userData = new byte[0];
-                    Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
+                    // Write fragmetnt
+                    Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, fragmentMetadata);
                     fragments.add(fragment);
 
-                    //continue next fragment.
+                    // Prepare for the next fragment
                     fragStart = fragEnd;
                 }
                 break;
@@ -252,69 +243,50 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 int rangeEnd = Integer.parseInt(range[1]);
                 int currInterval = intervalNum;
 
-                //validate : curr_interval > 0
+                // Create fragment
                 int fragStart = rangeStart;
                 while (fragStart < rangeEnd) {
                     int fragEnd = fragStart + currInterval;
-                    if (fragEnd > rangeEnd) fragEnd = rangeEnd;
+                    if (fragEnd > rangeEnd) {
+                        fragEnd = rangeEnd;
+                    }
 
                     byte[] bStart = ByteUtil.getBytes(fragStart);
                     byte[] bEnd = ByteUtil.getBytes(fragEnd);
                     byte[] fragmentMetadata = ByteUtil.mergeBytes(bStart, bEnd);
 
-                    byte[] userData = new byte[0];
-                    Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
+                    Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, fragmentMetadata);
                     fragments.add(fragment);
 
-                    //continue next fragment.
-                    fragStart = fragEnd;// + 1;
+                    // Prepare for the next fragment
+                    fragStart = fragEnd;
                 }
                 break;
             }
-            case ENUM:
+            case ENUM: {
                 for (String frag : range) {
                     byte[] fragmentMetadata = frag.getBytes();
-                    Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, new byte[0]);
+                    Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, fragmentMetadata);
                     fragments.add(fragment);
                 }
                 break;
-        }
-
-        return prepareHosts(fragments);
-    }
-
-    /**
-     * For each fragment , assigned a host address.
-     * In Jdbc Plugin, 'replicas' is the host address of the PXF engine that is running, not the database engine.
-     * Since the other PXF host addresses can not be probed, only the host name of the current PXF engine is returned.
-     * @param fragments a list of fragments
-     * @return a list of fragments that assigned hosts.
-     * @throws UnknownHostException if InetAddress.getLocalHost error.
-     */
-    public static List<Fragment> prepareHosts(List<Fragment> fragments) throws UnknownHostException {
-        for (Fragment fragment : fragments) {
-            String pxfHost = InetAddress.getLocalHost().getHostAddress();
-            String[] hosts = new String[]{pxfHost};
-            fragment.setReplicas(hosts);
+            }
         }
 
         return fragments;
     }
 
-    String[] partitionBy = null;
-    String[] range = null;
-    String[] interval = null;
-    PartitionType partitionType = null;
-    String partitionColumn = null;
-    IntervalType intervalType = null;
-    int intervalNum = 1;
+    // Partition parameters (filled by class constructor)
+    private String[] range = null;
+    private PartitionType partitionType = null;
+    private int intervalNum = 1;
 
-    //when partitionType is DATE,it is valid
-    Calendar rangeStart = null;
-    Calendar rangeEnd = null;
+    // Partition parameters for DATE partitions (filled by class constructor)
+    private IntervalType intervalType = null;
+    private Calendar rangeStart = null;
+    private Calendar rangeEnd = null;
 
-
-    enum PartitionType {
+    private static enum PartitionType {
         DATE,
         INT,
         ENUM;
@@ -324,7 +296,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
         }
     }
 
-    enum IntervalType {
+    private static enum IntervalType {
         DAY,
         MONTH,
         YEAR;
@@ -332,5 +304,18 @@ public class JdbcPartitionFragmenter extends Fragmenter {
         public static IntervalType typeOf(String str) {
             return valueOf(str.toUpperCase());
         }
+    }
+
+    // A PXF engine to use as a host for fragments
+    private static final String[] pxfHosts;
+    static {
+        String[] localhost = {"localhost"};
+        try {
+            localhost[0] = InetAddress.getLocalHost().getHostAddress();
+        }
+        catch (UnknownHostException ex) {
+            // It is always possible to get 'localhost' address
+        }
+        pxfHosts = localhost;
     }
 }
