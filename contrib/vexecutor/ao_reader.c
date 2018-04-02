@@ -42,7 +42,6 @@ AppendOnlyVScanNext(ScanState *scanState)
 
         for(int i = 0;i < tb->ncols ; i ++)
         {
-
            if(vs->proj[i])
             {
                 Oid hawqTypeID = slot->tts_tupleDescriptor->attrs[i]->atttypid;
@@ -62,8 +61,6 @@ AppendOnlyVScanNext(ScanState *scanState)
         AppendOnlyScanDesc scanDesc = ((AppendOnlyScanState*)scanState)->aos_ScanDesc;
         VarBlockHeader *header = scanDesc->executorReadBlock.varBlockReader.header;
 
-        //if(row + 1 == VarBlockGet_itemCount(header))
-        //    break;
         if (scanDesc->aos_splits_processed == list_length(scanDesc->splits) &&
             scanDesc->executorReadBlock.currentItemCount == scanDesc->executorReadBlock.readerItemCount)
         {
@@ -72,7 +69,7 @@ AppendOnlyVScanNext(ScanState *scanState)
         }
     }
     tb->nrows = row == tb->batchsize ? row : row + 1;
-    //TupSetVirtualTupleNValid(slot, opaque->ncol);
+    TupSetVirtualTupleNValid(slot, tb->ncols);
     return slot;
 }
 
