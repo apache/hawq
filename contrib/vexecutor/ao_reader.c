@@ -19,7 +19,6 @@ BeginVScanAppendOnlyRelation(ScanState *scanState)
     vs->ao->proj = palloc0(sizeof(bool) * tb->ncols);
     GetNeededColumnsForScan((Node* )scanState->ps.plan->targetlist,vs->ao->proj,tb->ncols);
     GetNeededColumnsForScan((Node* )scanState->ps.plan->qual,vs->ao->proj,tb->ncols);
-
 }
 
 void
@@ -64,6 +63,7 @@ AOScanNext(ScanState *scanState)
     return slot;
 }
 
+
 TupleTableSlot *
 AppendOnlyVScanNext(ScanState *scanState)
 {
@@ -106,7 +106,10 @@ AppendOnlyVScanNext(ScanState *scanState)
     if(!slot)
         slot = scanState->ss_ScanTupleSlot;
 
-    TupSetVirtualTupleNValid(slot, tb->ncols);
+    if (tb->nrows == 0)
+        ExecClearTuple(slot);
+    else
+        TupSetVirtualTupleNValid(slot, tb->ncols);
     return slot;
 }
 
