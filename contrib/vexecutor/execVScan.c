@@ -69,7 +69,7 @@ TupleTableSlot *ExecTableVScanVirtualLayer(ScanState *scanState)
     VectorizedState* pvs = vs->parent->vectorized;
 
     if(pvs->vectorized)
-        return ExecVScan(scanState,getVScanMethod(scanState->tableType)->accessMethod);
+        return ExecTableVScan(scanState);
     else
     {
         TupleTableSlot* slot = scanState->ps.ps_ProjInfo ? scanState->ps.ps_ResultTupleSlot : scanState->ss_ScanTupleSlot;

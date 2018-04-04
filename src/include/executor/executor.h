@@ -44,7 +44,9 @@
 typedef struct vectorexe_t {
 	bool vectorized_executor_enable;
 	Plan* (*CheckPlanVectorized_Hook)(PlannerInfo *node, Plan *plan);
-	PlanState* (*ExecInitNode_Hook)(PlanState *node,EState *eState,int eflags,MemoryAccount* ptr);
+	ExprState* (*ExecInitExpr_Hook)(Expr *node, PlanState *parent);
+	PlanState* (*ExecInitNode_Hook)(Plan *node, EState *eState,int eflags);
+	PlanState* (*ExecVecNode_Hook)(PlanState *Node, PlanState *parentNode, EState *eState,int eflags);
 	TupleTableSlot* (*ExecProcNode_Hook)(PlanState *node);
 	bool (*ExecEndNode_Hook)(PlanState *node);
 	Oid (*GetNType)(Oid vtype);

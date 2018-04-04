@@ -2047,6 +2047,10 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 	 */
 	planstate = ExecInitNode(plannedstmt->planTree, estate, eflags);
 
+	/* to process the planstate */
+	if(vmthd.vectorized_executor_enable)
+		planstate = vmthd.ExecVecNode_Hook(planstate, NULL, estate, eflags);
+
 	queryDesc->planstate = planstate;
 
 	Assert(queryDesc->planstate);
