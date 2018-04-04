@@ -30,6 +30,7 @@ import org.apache.hawq.pxf.api.WriteResolver;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
@@ -113,10 +114,23 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
                     value = Base64.decodeBase64(result.get(i).getAsString());
                     break;
                 case TIMESTAMP:
-                    value = new SimpleDateFormat("MMM d, yyyy hh:mm:ss a").parse(result.get(i).getAsString());
+                    boolean isConversionSuccessful = false;
+                    for (SimpleDateFormat sdf : getTimestampSDFs.get()) {
+                        try {
+                            value = sdf.parse(result.get(i).getAsString());
+                            isConversionSuccessful = true;
+                            break;
+                        }
+                        catch (ParseException e) {
+                            // pass
+                        }
+                    }
+                    if (!isConversionSuccessful) {
+                        throw new ParseException(result.get(i).getAsString(), 0);
+                    }
                     break;
                 case DATE:
-                    value = new SimpleDateFormat("yyyy-MM-dd").parse(result.get(i).getAsString());
+                    value = getDateSDF.parse(result.get(i).getAsString());
                     break;
                 default:
                     throw new UnsupportedOperationException("Field type not supported: " + DataType.get(oneField.type).toString()
@@ -163,10 +177,10 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
                     sb.append("'" + Hex.encodeHexString((byte[])(oneField.val)) + "'");
                     break;
                 case TIMESTAMP:
-                    sb.append(new SimpleDateFormat("'yyyy-MM-dd hh:mm:ss.SSS'").format(oneField.val));
+                    sb.append(setTimestampSDF.get().format(oneField.val));
                     break;
                 case DATE:
-                    sb.append(new SimpleDateFormat("'yyyy-MM-dd'").format(oneField.val));
+                    sb.append(setDateSDF.format(oneField.val));
                     break;
                 default:
                     throw new UnsupportedOperationException("Field type not supported: " + DataType.get(oneField.type).toString());
@@ -177,6 +191,32 @@ public class IgniteResolver extends IgnitePlugin implements ReadResolver, WriteR
     }
 
     private static final Log LOG = LogFactory.getLog(IgniteResolver.class);
+
+    private static final SimpleDateFormat getDateSDF = new SimpleDateFormat("yyyy-MM-dd");
+    private static final SimpleDateFormat setDateSDF = new SimpleDateFormat("'yyyy-MM-dd'");
+
+    // SimpleDateFormats to parse Ignite TIMESTAMP format
+    private static ThreadLocal<SimpleDateFormat[]> getTimestampSDFs = new ThreadLocal<SimpleDateFormat[]>() {
+        @Override protected SimpleDateFormat[] initialValue() {
+            SimpleDateFormat[] retRes = {
+                new SimpleDateFormat("MMM d, yyyy hh:mm:ss.SSSSSS a"),
+                new SimpleDateFormat("MMM d, yyyy hh:mm:ss.SSSSS a"),
+                new SimpleDateFormat("MMM d, yyyy hh:mm:ss.SSSS a"),
+                new SimpleDateFormat("MMM d, yyyy hh:mm:ss.SSS a"),
+                new SimpleDateFormat("MMM d, yyyy hh:mm:ss.SS a"),
+                new SimpleDateFormat("MMM d, yyyy hh:mm:ss.S a"),
+                new SimpleDateFormat("MMM d, yyyy hh:mm:ss a")
+            };
+            return retRes;
+        }
+    };
+
+    // SimpleDateFormat to properly encode TIMESTAMP for INSERT queries
+    private static ThreadLocal<SimpleDateFormat> setTimestampSDF = new ThreadLocal<SimpleDateFormat>() {
+        @Override protected SimpleDateFormat initialValue() {
+            return new SimpleDateFormat("'yyyy-MM-dd hh:mm:ss.SSSSSS'");
+        }
+    };
 
     // HAWQ column descriptors
     private ArrayList<ColumnDescriptor> columns = null;
