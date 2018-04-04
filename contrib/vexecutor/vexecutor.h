@@ -30,5 +30,6 @@ extern void _PG_init(void);
 extern void _PG_fini(void);
 
 extern bool HasVecExecOprator(NodeTag tag);
+Oid GetNType(Oid vtype);
 
 #endif

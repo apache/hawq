@@ -138,6 +138,7 @@ v##type##in(PG_FUNCTION_ARGS) \
     SET_VARSIZE(res, (offsetof(v##type, values) + n * sizeof(type))); \
     res->header.elemtype = typeoid; \
     res->header.dim = n; \
+    res->header.isnull = palloc0(sizeof(bool) * n); \
     PG_RETURN_POINTER(res); \
 }
 
@@ -181,29 +182,36 @@ v##type1##v##type2##opstr(PG_FUNCTION_ARGS) \
     int i = 0; \
     v##type1 *arg1 = PG_GETARG_POINTER(0); \
     v##type2 *arg2 = PG_GETARG_POINTER(1); \
-    v##type1 *res = NULL; \
     Assert((arg1)->header.dim == (arg2)->header.dim); \
     size = (arg1)->header.dim; \
     if(sizeof(type1) > sizeof(type2)) \
     { \
-        res = palloc0(offsetof(v##type1, values) + (size) * sizeof(type1)); \
-        SET_VARSIZE(res, (offsetof(v##type1, values) + (size) * sizeof(type1))); \
-        res->header.dim = size;  \
-        res->header.elemtype = arg1->header.elemtype; \
+        v##type1 *res = NULL; \
+        res = (v##type1 *)buildv##type1(size); \
+        while(i < size) \
+        { \
+            res->header.isnull[i] = \
+                arg1->header.isnull[i] || arg2->header.isnull[i]; \
+            if(!res->header.isnull[i]) \
+                res->values[i] = arg1->values[i] opsym arg2->values[i]; \
+            i++; \
+        } \
+        PG_RETURN_POINTER(res); \
     } \
     else \
     { \
-        res = palloc0(offsetof(v##type2, values) + (size) * sizeof(type2)); \
-        SET_VARSIZE(res, (offsetof(v##type2, values) + (size) * sizeof(type2))); \
-        res->header.dim = size;  \
-        res->header.elemtype = arg2->header.elemtype; \
+        v##type2 *res = NULL; \
+        res = (v##type2 *)buildv##type2(size); \
+        while(i < size) \
+        { \
+            res->header.isnull[i] = \
+                arg1->header.isnull[i] || arg2->header.isnull[i]; \
+            if(!res->header.isnull[i]) \
+                res->values[i] = arg1->values[i] opsym arg2->values[i]; \
+            i++; \
+        } \
+        PG_RETURN_POINTER(res); \
     } \
-    while(i < size) \
-    { \
-        res->values[i] = arg1->values[i] opsym arg2->values[i]; \
-        i++; \
-    } \
-    PG_RETURN_POINTER(res); \
 }
 
 /*
@@ -222,13 +230,12 @@ v##type##const_type##opstr(PG_FUNCTION_ARGS) \
     const_type arg2 = CONST_ARG_MACRO(1); \
     v##type *res = NULL; \
     size = (arg1)->header.dim; \
-    res = palloc0(offsetof(v##type, values) + (size) * sizeof(type)); \
-    SET_VARSIZE(res, (offsetof(v##type, values) + (size) * sizeof(type)));  \
-    res->header.elemtype = arg1->header.elemtype; \
-    res->header.dim = arg1->header.dim; \
+    res = (v##type *)buildv##type(size); \
     while(i < size) \
     { \
-        res->values[i] = arg1->values[i] opsym arg2; \
+        res->header.isnull[i] = (arg1)->header.isnull[i]; \
+        if(!res->header.isnull[i]) \
+            res->values[i] = arg1->values[i] opsym arg2; \
         i ++ ;\
     } \
     PG_RETURN_POINTER(res); \
@@ -250,13 +257,13 @@ v##type1##v##type2##cmpstr(PG_FUNCTION_ARGS) \
     v##type2 *arg2 = PG_GETARG_POINTER(1); \
     vbool *res = NULL; \
     size = (arg1)->header.dim; \
-    res = palloc0(offsetof(vbool, values) + (size) * sizeof(bool)); \
-    SET_VARSIZE(res, (offsetof(vbool, values) + (size) * sizeof(bool)));  \
-    res->header.elemtype = BOOLOID; \
-    res->header.dim = arg1->header.dim; \
+    res = (vbool*)buildvbool(size); \
     while(i < size) \
     { \
-        res->values[i] = arg1->values[i] cmpsym arg2->values[i]; \
+         res->header.isnull[i] =  \
+            arg1->header.isnull[i] || arg2->header.isnull[i]; \
+        if(!res->header.isnull[i]) \
+            res->values[i] = arg1->values[i] cmpsym arg2->values[i]; \
         i++; \
     } \
     PG_RETURN_POINTER(res); \
@@ -278,13 +285,12 @@ v##type##const_type##cmpstr(PG_FUNCTION_ARGS) \
     const_type arg2 = CONST_ARG_MACRO(1); \
     vbool *res = NULL; \
     size = (arg1)->header.dim; \
-    res = palloc0(offsetof(vbool, values) + (size) * sizeof(bool)); \
-    SET_VARSIZE(res, (offsetof(vbool, values) + (size) * sizeof(bool)));  \
-    res->header.elemtype = BOOLOID; \
-    res->header.dim = size; \
+    res = (vbool*)buildvbool(size); \
     while(i < size) \
     { \
-        res->values[i] = arg1->values[i] cmpsym arg2; \
+        res->header.isnull[i] = (arg1)->header.isnull[i]; \
+        if(!res->header.isnull[i]) \
+            res->values[i] = arg1->values[i] cmpsym arg2; \
         i++; \
     } \
     PG_RETURN_POINTER(res); \

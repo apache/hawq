@@ -31,10 +31,13 @@
 extern TupleTableSlot *
 ExecVProject(ProjectionInfo *projInfo, ExprDoneCond *isDone);
 
-extern bool
-ExecVQual(List *qual, ExprContext *econtext);
+extern vbool*
+ExecVQual(List *qual, ExprContext *econtext, bool resultForNull);
 
 extern bool
 VirtualNodeProc(ScanState* state,TupleTableSlot *slot);
+
+extern ExprState *
+VExecInitExpr(Expr *node, PlanState *parent);
 
 #endif

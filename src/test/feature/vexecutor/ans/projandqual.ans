@@ -1,0 +1,40 @@
+-- start_ignore
+SET SEARCH_PATH=TestVexecutor_ProjAndQual;
+SET
+-- end_ignore
+select a + b from test1 where a + b > 1020 and b + c > 1;
+ ?column? 
+----------
+     1021
+     1022
+     1023
+     1024
+     1025
+(5 rows)
+
+select a - b from test1 where a - b > 1020 and b - c >= 0;
+ ?column? 
+----------
+     1021
+     1022
+     1023
+(3 rows)
+
+select a * b from test1 where a * b > 1020 and b * c < 10;
+ ?column? 
+----------
+     1021
+     1022
+     1023
+     1024
+(4 rows)
+
+select a / b from test1 where a / b > 1020 and b * c = 1;
+ ?column? 
+----------
+     1021
+     1022
+     1023
+     1024
+(4 rows)
+
