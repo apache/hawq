@@ -5834,13 +5834,13 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"gp_hashjoin_bloomfilter", PGC_USERSET, GP_ARRAY_TUNING,
+		{"hawq_hashjoin_bloomfilter", PGC_USERSET, GP_ARRAY_TUNING,
 		 gettext_noop("Use bloomfilter in hash join"),
-		 gettext_noop("Use bloomfilter may speed up hashtable probing"),
+		 gettext_noop("Use bloomfilter may speed up hash join performance"),
 		 GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL | GUC_GPDB_ADDOPT
 		},
-		&gp_hashjoin_bloomfilter,
-		1, 0, 1, NULL, NULL
+		&hawq_hashjoin_bloomfilter,
+		0, 0, 1, NULL, NULL
 	},
 
 	{
