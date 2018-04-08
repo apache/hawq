@@ -167,7 +167,7 @@ typedef struct HashJoinTableData
 	int			nbuckets;		/* # buckets in the in-memory hash table */
 	/* buckets[i] is head of list of tuples in i'th in-memory bucket */
 	struct HashJoinTupleData **buckets;
-	uint64     				  *bloom; /* bloom[i] is bloomfilter for buckets[i] */
+
 	/* buckets array is per-batch storage, as are all the tuples */
 
 	int			nbatch;			/* number of batches */

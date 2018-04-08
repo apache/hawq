@@ -13929,10 +13929,6 @@
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h"
         }, 
-        "gp_hashjoin_bloomfilter": {
-            "filename": "src/backend/cdb/cdbvars.c", 
-            "header filename": "src/include/cdb/cdbvars.h"
-        }, 
         "gp_hashjoin_tuples_per_bucket": {
             "filename": "src/backend/cdb/cdbvars.c", 
             "header filename": "src/include/cdb/cdbvars.h"

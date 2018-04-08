@@ -937,7 +937,7 @@ extern int gp_hashagg_spillbatch_min;
 extern int gp_hashagg_spillbatch_max;
 
 /* Hashjoin use bloom filter */
-extern int gp_hashjoin_bloomfilter;
+extern int hawq_hashjoin_bloomfilter;
 
 /* Get statistics for partitioned parent from a child */
 extern bool 	gp_statistics_pullup_from_child_partition;
