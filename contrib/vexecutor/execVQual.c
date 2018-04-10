@@ -173,7 +173,10 @@ VExecEvalScalarVar(ExprState *exprstate, ExprContext *econtext,
 	*isNull = false;
 
 	/* Fetch the value from the slot */
-	tb = (TupleBatch )econtext->ecxt_scantuple->PRIVATE_tb;
+	tb = (TupleBatch )slot->PRIVATE_tb;
+
+	Assert(NULL != tb);
+
 	return PointerGetDatum(tb->datagroup[attnum]);
 }
 
@@ -275,7 +278,9 @@ VExecEvalVar(ExprState *exprstate, ExprContext *econtext,
 		*isNull = false;
 
 		/* Fetch the value from the slot */
-		tb = (TupleBatch )econtext->ecxt_scantuple->PRIVATE_tb;
+		tb = (TupleBatch )slot->PRIVATE_tb;
+
+		Assert(NULL != tb);
 		return PointerGetDatum(tb->datagroup[attnum]);
 	}
 	else
@@ -322,7 +327,8 @@ VExecEvalNot(BoolExprState *notclause, ExprContext *econtext,
 	ret = (vbool*)DatumGetPointer(expr_value);
 	for(i = 0; i < ret->header.dim; i++)
 	{
-		ret->values[i] = !ret->values[i];
+		if(!ret->header.isnull[i])
+			ret->values[i] = !ret->values[i];
 	}
 
 	/*
@@ -382,24 +388,26 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 		if(NULL == res)
 		{
 			res = DatumGetPointer(clause_value);
+			for(i = 0; i < res->header.dim; i++)
+			{
+				if(res->header.isnull[i] || !res->values[i])
+				{
+					skip = false;
+					break;
+				}
+			}
 		}
 		else
 		{
 			next = DatumGetPointer(clause_value);
 			for(i = 0; i < res->header.dim; i++)
 			{
-				//TODO: process null values
-				res->values[i] |= next->values[i];
+				res->header.isnull[i] = (res->header.isnull[i] || next->header.isnull[i]);
+				res->values[i] = (res->values[i] || next->values[i]);
+				if(skip && (res->header.isnull[i] || !res->values[i]))
+					skip = false;
 			}
 		}
-
-		for(i = 0; i < res->header.dim; i++)
-		{
-			//TODO: process null values
-			if(!res->values[i])
-				skip = false;
-		}
-
 
 		if(skip)
 		{
@@ -408,7 +416,6 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 		}
 	}
 
-	/* AnyNull is true if at least one clause evaluated to NULL */
 	*isNull = false;
 	return PointerGetDatum(res);
 }
@@ -448,9 +455,8 @@ VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
 		ExprState  *clausestate = (ExprState *) lfirst(clause);
 		Datum		clause_value;
 
-		clause_value = ExecEvalExpr(clausestate, econtext, isNull, NULL);
 		/*
-		 * to check if all the values is true, then skip to evaluate some
+		 * to check if all the values is false, then skip to evaluate some
 		 * expressions
 		 */
 		skip = true;
@@ -460,24 +466,26 @@ VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
 		if(NULL == res)
 		{
 			res = DatumGetPointer(clause_value);
+			for(i = 0; i < res->header.dim; i++)
+			{
+				if(res->header.isnull[i] || res->values[i])
+				{
+					skip = false;
+					break;
+				}
+			}
 		}
 		else
 		{
 			next = DatumGetPointer(clause_value);
 			for(i = 0; i < res->header.dim; i++)
 			{
-				//TODO: process null values
-				res->values[i] |= next->values[i];
+				res->header.isnull[i] = (res->header.isnull[i] ||next->header.isnull[i]);
+				res->values[i] = (res->values[i] || next->values[i]);
+				if(skip && (res->header.isnull[i] || res->values[i]))
+					skip = false;
 			}
 		}
-
-		for(i = 0; i < res->header.dim; i++)
-		{
-			//TODO: process null values
-			if(res->values[i])
-				skip = false;
-		}
-
 
 		if(skip)
 		{
@@ -486,7 +494,6 @@ VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
 		}
 	}
 
-	/* AnyNull is true if at least one clause evaluated to NULL */
 	*isNull = false;
 	return PointerGetDatum(res);
 }
@@ -497,7 +504,7 @@ VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
 ExprState *
 VExecInitExpr(Expr *node, PlanState *parent)
 {
-	ExprState *state;
+	ExprState *state = NULL;
 	if(NULL == parent->vectorized)
 		return NULL;
 
@@ -542,5 +549,5 @@ VExecInitExpr(Expr *node, PlanState *parent)
 			break;
 	}
 
-	return NULL;
+	return state;
 }

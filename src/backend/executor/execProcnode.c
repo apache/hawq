@@ -278,6 +278,7 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
     */
 	if(vmthd.vectorized_executor_enable
 	   && vmthd.ExecInitNode_Hook
+	   && node->vectorized
 	   && (result = vmthd.ExecInitNode_Hook(node,estate,eflags)))
 		return result;
 
