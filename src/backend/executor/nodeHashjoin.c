@@ -552,6 +552,8 @@ ExecInitHashJoin(HashJoin *node, EState *estate, int eflags)
 	hjstate = makeNode(HashJoinState);
 	hjstate->js.ps.plan = (Plan *) node;
 	hjstate->js.ps.state = estate;
+	hjstate->useRuntimeFilter = node->useRuntimeFilter;
+	hjstate->estimatedInnerNum = node->estimatedInnerNum;
 
 	/*
 	 * Miscellaneous initialization

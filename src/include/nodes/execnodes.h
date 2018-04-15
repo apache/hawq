@@ -45,7 +45,7 @@
 #include "utils/relcache.h"
 #include "gpmon/gpmon.h"                /* gpmon_packet_t */
 #include "utils/memaccounting.h"
-
+#include "utils/bloomfilter.h"
 
 /*
  * Currently, since grouping is defined as uint64 internally, it limits the
@@ -2117,6 +2117,8 @@ typedef struct HashJoinState
         bool workfiles_created;
         /* number of batches when we loaded from the state. -1 means not loaded yet */
         int nbatch_loaded_state;
+        bool useRuntimeFilter;
+        int  estimatedInnerNum;
 
 } HashJoinState;
 

@@ -1878,6 +1878,9 @@ cost_hashjoin(HashPath *path, PlannerInfo *root)
 
 	/* approx # tuples passing the hash quals */
 	hashjointuples = clamp_row_est(hash_selec * outer_path_rows * inner_path_rows);
+	/* For deciding if use bloomfilter on hash join */
+	path->hashjoin_ratio = (hashjointuples/outer_path_rows > 1.0) ? 1.0 : hashjointuples/outer_path_rows;
+	path->estimatedNumInner = inner_path_rows;
 
 	/* cost of source data */
 	startup_cost += outer_path->startup_cost;
