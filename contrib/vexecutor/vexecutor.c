@@ -28,6 +28,7 @@
 #include "cdb/cdbvars.h"
 #include "execVScan.h"
 #include "execVQual.h"
+#include "vexecutor.h"
 
 PG_MODULE_MAGIC;
 int BATCHSIZE = 1024;
@@ -40,7 +41,6 @@ static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags);
 static PlanState* VExecVecNode(PlanState *Node, PlanState *parentNode, EState *eState,int eflags);
 static TupleTableSlot* VExecProcNode(PlanState *node);
 static bool VExecEndNode(PlanState *node);
-static Oid GetNType(Oid vtype);
 extern int currentSliceId;
 
 /*
@@ -144,7 +144,6 @@ static PlanState*
 VExecVecNode(PlanState *node, PlanState *parentNode, EState *eState,int eflags)
 {
 	Plan *plan = node->plan;
-	PlanState *subState = NULL;
 	VectorizedState *vstate = (VectorizedState*)palloc0(sizeof(VectorizedState));
 
 	elog(DEBUG3, "PG VEXECINIT NODE");
@@ -202,7 +201,7 @@ static TupleTableSlot* VExecProcNode(PlanState *node)
         case T_ParquetScanState:
         case T_AppendOnlyScanState:
         case T_TableScanState:
-			result = ExecTableVScanVirtualLayer((TableScanState*)node);
+            result = ExecTableVScanVirtualLayer((TableScanState*)node);
             break;
         default:
             break;
@@ -251,7 +250,7 @@ HasVecExecOprator(NodeTag tag)
 	return result;
 }
 
-static Oid GetNType(Oid vtype)
+Oid GetNType(Oid vtype)
 {
 	const vFuncMap* vf = GetVFunc(vtype);
 	return vf == NULL ? InvalidOid : vf->ntype;

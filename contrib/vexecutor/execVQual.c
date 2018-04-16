@@ -16,8 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+#include "postgres.h"
+#include "utils/builtins.h"
 #include "execVQual.h"
-
+static bool
+ExecVTargetList(List *targetlist,
+			   ExprContext *econtext,
+			   TupleTableSlot *slot,
+			   ExprDoneCond *itemIsDone,
+			   ExprDoneCond *isDone);
 /*
  * ExecVariableList
  *		Evaluates a simple-Variable-list projection.
@@ -26,12 +33,12 @@
  */
 static void
 ExecVecVariableList(ProjectionInfo *projInfo,
-                 Datum *values)
+                 Datum values)
 {
     ExprContext *econtext = projInfo->pi_exprContext;
     int		   *varSlotOffsets = projInfo->pi_varSlotOffsets;
     int		   *varNumbers = projInfo->pi_varNumbers;
-    TupleBatch  tb = (TupleBatch) values;
+    TupleBatch  tb = (TupleBatch) DatumGetPointer(values);
     int			i;
     tb->ncols = list_length(projInfo->pi_targetlist);
 
@@ -81,14 +88,12 @@ ExecVProject(ProjectionInfo *projInfo, ExprDoneCond *isDone)
     }
     else
     {
-        elog(FATAL,"does not support expression in projection stmt");
-       // if (ExecTargetList(projInfo->pi_targetlist,
-       //                    projInfo->pi_exprContext,
-       //                    slot_get_values(slot),
-       //                    slot_get_isnull(slot),
-       //                    (ExprDoneCond *) projInfo->pi_itemIsDone,
-       //                    isDone))
-       //     ExecStoreVirtualTuple(slot);
+       if (ExecVTargetList(projInfo->pi_targetlist,
+                           projInfo->pi_exprContext,
+                           slot,
+                           (ExprDoneCond *) projInfo->pi_itemIsDone,
+                           isDone))
+            ExecStoreVirtualTuple(slot);
     }
 
     return slot;
@@ -104,7 +109,7 @@ VirtualNodeProc(ScanState* state,TupleTableSlot *slot){
     if(TupIsNull(slot) )
         return false;
 
-    TupleBatch tb = slot->PRIVATE_tb;
+    TupleBatch tb = (TupleBatch)DatumGetPointer(slot->PRIVATE_tb);
     ExecClearTuple(slot);
 
     while (tb->skip[tb->iter] && tb->iter < tb->nrows)
@@ -173,11 +178,12 @@ VExecEvalScalarVar(ExprState *exprstate, ExprContext *econtext,
 	*isNull = false;
 
 	/* Fetch the value from the slot */
+	Assert(NULL != slot);
 	tb = (TupleBatch )slot->PRIVATE_tb;
 
 	Assert(NULL != tb);
 
-	return PointerGetDatum(tb->datagroup[attnum]);
+	return PointerGetDatum(tb->datagroup[attnum - 1]);
 }
 
 
@@ -225,6 +231,8 @@ VExecEvalVar(ExprState *exprstate, ExprContext *econtext,
 			break;
 	}
 
+	Assert(NULL != slot);
+
 	if (attnum != InvalidAttrNumber)
 	{
 		TupleBatch tb;
@@ -262,7 +270,8 @@ VExecEvalVar(ExprState *exprstate, ExprContext *econtext,
 			/* can't check type if dropped, since atttypid is probably 0 */
 			if (!attr->attisdropped)
 			{
-				if (variable->vartype != attr->atttypid)
+				if (variable->vartype != attr->atttypid &&
+					GetNType(variable->vartype) != attr->atttypid)
 					ereport(ERROR,
 							(errmsg("attribute %d has wrong type", attnum),
 							 errdetail("Table has type %s, but query expects %s.",
@@ -281,7 +290,7 @@ VExecEvalVar(ExprState *exprstate, ExprContext *econtext,
 		tb = (TupleBatch )slot->PRIVATE_tb;
 
 		Assert(NULL != tb);
-		return PointerGetDatum(tb->datagroup[attnum]);
+		return PointerGetDatum(tb->datagroup[attnum - 1]);
 	}
 	else
 	{
@@ -348,7 +357,6 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 {
 	List	   *clauses = orExpr->args;
 	ListCell   *clause;
-	bool		AnyNull;
 	vbool	*res = NULL;
 	vbool	*next = 	NULL;
 	bool		skip = true;
@@ -356,8 +364,6 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 
 	if (isDone)
 		*isDone = ExprSingleResult;
-
-	AnyNull = false;
 
 	/*
 	 * If any of the clauses is TRUE, the OR result is TRUE regardless of the
@@ -388,9 +394,11 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 		if(NULL == res)
 		{
 			res = DatumGetPointer(clause_value);
+			Assert(NULL != res->header.isnull);
 			for(i = 0; i < res->header.dim; i++)
 			{
-				if(res->header.isnull[i] || !res->values[i])
+				if(res->header.isnull[i] ||
+					!res->values[i])
 				{
 					skip = false;
 					break;
@@ -400,9 +408,11 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 		else
 		{
 			next = DatumGetPointer(clause_value);
+			Assert(NULL != res->header.isnull && NULL != next->header.isnull);
 			for(i = 0; i < res->header.dim; i++)
 			{
-				res->header.isnull[i] = (res->header.isnull[i] || next->header.isnull[i]);
+				res->header.isnull[i] =
+						(res->header.isnull[i] || next->header.isnull[i]);
 				res->values[i] = (res->values[i] || next->values[i]);
 				if(skip && (res->header.isnull[i] || !res->values[i]))
 					skip = false;
@@ -420,17 +430,11 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 	return PointerGetDatum(res);
 }
 
-/* ----------------------------------------------------------------
- *		ExecEvalAnd
- * ----------------------------------------------------------------
- */
 static Datum
-VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
+VExecEvalAndInternal(List* clauses, ExprContext *econtext,
 			bool *isNull, ExprDoneCond *isDone)
 {
-	List	   *clauses = andExpr->args;
 	ListCell   *clause;
-	bool		AnyNull;
 	vbool	*res = NULL;
 	vbool	*next = 	NULL;
 	bool		skip = true;
@@ -438,8 +442,6 @@ VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
 
 	if (isDone)
 		*isDone = ExprSingleResult;
-
-	AnyNull = false;
 
 	/*
 	 * If any of the clauses is FALSE, the AND result is FALSE regardless of
@@ -466,6 +468,7 @@ VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
 		if(NULL == res)
 		{
 			res = DatumGetPointer(clause_value);
+			Assert(NULL != res->header.isnull);
 			for(i = 0; i < res->header.dim; i++)
 			{
 				if(res->header.isnull[i] || res->values[i])
@@ -478,10 +481,12 @@ VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
 		else
 		{
 			next = DatumGetPointer(clause_value);
+			Assert(NULL != res->header.isnull && NULL != next->header.isnull);
 			for(i = 0; i < res->header.dim; i++)
 			{
-				res->header.isnull[i] = (res->header.isnull[i] ||next->header.isnull[i]);
-				res->values[i] = (res->values[i] || next->values[i]);
+				res->header.isnull[i] =
+						(res->header.isnull[i] || next->header.isnull[i]);
+				res->values[i] = (res->values[i] && next->values[i]);
 				if(skip && (res->header.isnull[i] || res->values[i]))
 					skip = false;
 			}
@@ -498,6 +503,17 @@ VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
 	return PointerGetDatum(res);
 }
 
+/* ----------------------------------------------------------------
+ *		ExecEvalAnd
+ * ----------------------------------------------------------------
+ */
+static Datum
+VExecEvalAnd(BoolExprState *andExpr, ExprContext *econtext,
+			bool *isNull, ExprDoneCond *isDone)
+{
+	return VExecEvalAndInternal(andExpr->args, econtext, isNull, isDone);
+}
+
 /*
  * Init the vectorized expressions
  */
@@ -505,8 +521,6 @@ ExprState *
 VExecInitExpr(Expr *node, PlanState *parent)
 {
 	ExprState *state = NULL;
-	if(NULL == parent->vectorized)
-		return NULL;
 
 	/*
 	 * Because Var is the leaf node of the expression tree, it have to be
@@ -544,10 +558,118 @@ VExecInitExpr(Expr *node, PlanState *parent)
 				state = (ExprState *) bstate;
 			}
 			break;
+
 		/*TODO: More and more expressions should be vectorized */
 		default:
 			break;
 	}
 
+	/* Common code for all state-node types */
+	if(NULL != state)
+		state->expr = node;
+
 	return state;
+}
+
+/* ----------------------------------------------------------------
+ *	copy from src/backend/executor/execQual.c
+ *
+ * NOTE:resultForNull do not used now, we can process it when call the
+ * ExecVQual.
+ * ----------------------------------------------------------------
+ */
+vbool*
+ExecVQual(List *qual, ExprContext *econtext, bool resultForNull)
+{
+	vbool *result;
+	MemoryContext oldContext;
+	bool	 isNull;
+
+	/*
+	 * debugging stuff
+	 */
+	EV_printf("ExecQual: qual is ");
+	EV_nodeDisplay(qual);
+	EV_printf("\n");
+
+	/*
+	 * Run in short-lived per-tuple context while computing expressions.
+	 */
+	oldContext = MemoryContextSwitchTo(econtext->ecxt_per_tuple_memory);
+
+	result = (vbool*)DatumGetPointer(VExecEvalAndInternal(qual, econtext, &isNull, NULL));
+
+	MemoryContextSwitchTo(oldContext);
+
+	return result;
+}
+
+/*
+ * copy from src/backend/executor/ExecQual.c
+ * ExecTargetList
+ *		Evaluates a targetlist with respect to the given
+ *		expression context.  Returns TRUE if we were able to create
+ *		a result, FALSE if we have exhausted a set-valued expression.
+ *
+ * Results are stored into the passed values and isnull arrays.
+ * The caller must provide an itemIsDone array that persists across calls.
+ *
+ * As with ExecEvalExpr, the caller should pass isDone = NULL if not
+ * prepared to deal with sets of result tuples.  Otherwise, a return
+ * of *isDone = ExprMultipleResult signifies a set element, and a return
+ * of *isDone = ExprEndResult signifies end of the set of tuple.
+ */
+static bool
+ExecVTargetList(List *targetlist,
+			   ExprContext *econtext,
+			   TupleTableSlot *slot,
+			   ExprDoneCond *itemIsDone,
+			   ExprDoneCond *isDone)
+{
+	MemoryContext oldContext;
+	ListCell   *tl;
+	TupleBatch tb;
+	bool isnull;
+
+	Assert(NULL != slot);
+
+	tb = (TupleBatch)DatumGetPointer(slot->PRIVATE_tb);
+
+	Assert(NULL != tb);
+
+	tb->ncols = list_length(targetlist);
+
+	/*
+	 * Run in short-lived per-tuple context while computing expressions.
+	 */
+	oldContext = MemoryContextSwitchTo(econtext->ecxt_per_tuple_memory);
+
+	/*
+	 * evaluate all the expressions in the target list
+	 */
+	if (isDone)
+		*isDone = ExprSingleResult;		/* until proven otherwise */
+
+	foreach(tl, targetlist)
+	{
+		GenericExprState *gstate = (GenericExprState *) lfirst(tl);
+		TargetEntry *tle = (TargetEntry *) gstate->xprstate.expr;
+		AttrNumber	resind = tle->resno - 1;
+
+		tb->datagroup[resind] = ExecEvalExpr(gstate->arg,
+									  econtext,
+									  &isnull,
+									  &itemIsDone[resind]);
+
+		if (itemIsDone[resind] != ExprSingleResult)
+		{
+			/*TODO: DO NOT SUPPORT SO FAR*/
+			elog(ERROR, "Only support single result so far.");
+		}
+	}
+
+	/* Report success */
+	MemoryContextSwitchTo(oldContext);
+
+	return true;
 }

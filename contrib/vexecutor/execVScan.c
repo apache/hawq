@@ -73,12 +73,20 @@ TupleTableSlot *ExecTableVScanVirtualLayer(ScanState *scanState)
     else
     {
         TupleTableSlot* slot = scanState->ps.ps_ProjInfo ? scanState->ps.ps_ResultTupleSlot : scanState->ss_ScanTupleSlot;
-        bool succ = VirtualNodeProc(scanState,slot);
-
-        if(!succ)
+        while(1)
         {
-            slot = ExecTableVScan(scanState);
-            VirtualNodeProc(scanState,slot);
+            bool succ = VirtualNodeProc(scanState,slot);
+
+            if(!succ)
+            {
+                slot = ExecTableVScan(scanState);
+                if(TupIsNull(slot))
+                    break;
+                else
+                    continue;
+            }
+
+            break;
         }
 
         return slot;
@@ -112,6 +120,7 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
     ExprContext *econtext;
     List	   *qual;
     ProjectionInfo *projInfo;
+    vbool *skip = NULL;
 
     /*
      * Fetch data from node
@@ -172,19 +181,29 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
          * when the qual is nil ... saves only a few cycles, but they add up
          * ...
          */
-        if (!qual || ExecQual(qual, econtext, false))
+        if (!qual || (NULL != (skip = ExecVQual(qual, econtext, false))))
         {
             /*
              * Found a satisfactory scan tuple.
              */
             if (projInfo)
             {
+                int i;
+
+                /* first construct the skip array */
+                for(i = 0; i < skip->header.dim; i++)
+                {
+                    skip->values[i] = ((!(skip->values[i])) ||
+                                      (skip->header.isnull[i]) ||
+                                      ((TupleBatch)slot->PRIVATE_tb)->skip[i]);
+                }
+
                 /*
                  * Form a projection tuple, store it in the result tuple slot
                  * and return it.
                  */
                 ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->nrows = ((TupleBatch)slot->PRIVATE_tb)->nrows;
-                ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = ((TupleBatch)slot->PRIVATE_tb)->skip;
+                ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = skip->values;
                 return ExecVProject(projInfo, NULL);
             }
             else

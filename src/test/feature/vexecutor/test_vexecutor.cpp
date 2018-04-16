@@ -139,3 +139,22 @@ TEST_F(TestVexecutor, scanAO)
 
   util.execute("drop table test1");
 }
+
+TEST_F(TestVexecutor, ProjAndQual)
+{
+	hawq::test::SQLUtility util;
+
+	util.execute("drop table if exists test1");
+	util.execute("create table test1 (a int, b int, c int, d int);");
+	util.execute("insert into test1 select generate_series(1,1024), 1, 1, 1;");
+
+	util.execSQLFile("vexecutor/sql/projandqual.sql",
+					"vexecutor/ans/projandqual.ans");
+
+	util.execute("SET vectorized_executor_enable to on");
+
+	util.execSQLFile("vexecutor/sql/projandqual.sql",
+					"vexecutor/ans/projandqual.ans");
+
+	util.execute("drop table test1");
+}
