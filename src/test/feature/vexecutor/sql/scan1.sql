@@ -1,1 +1,1 @@
-select unique1 from test1;
+select unique1 from test1 order by unique1;

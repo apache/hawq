@@ -191,11 +191,14 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
                 int i;
 
                 /* first construct the skip array */
-                for(i = 0; i < skip->header.dim; i++)
+                if(NULL != skip)
                 {
-                    skip->values[i] = ((!(skip->values[i])) ||
-                                      (skip->header.isnull[i]) ||
-                                      ((TupleBatch)slot->PRIVATE_tb)->skip[i]);
+                    for(i = 0; i < skip->header.dim; i++)
+                    {
+                        skip->values[i] = ((!(skip->values[i])) ||
+                                          (skip->header.isnull[i]) ||
+                                          ((TupleBatch)slot->PRIVATE_tb)->skip[i]);
+                    }
                 }
 
                 /*
@@ -203,7 +206,10 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
                  * and return it.
                  */
                 ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->nrows = ((TupleBatch)slot->PRIVATE_tb)->nrows;
-                ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = skip->values;
+                if(NULL != skip)
+                    ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = skip->values;
+                else
+                    ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = ((TupleBatch)slot->PRIVATE_tb)->skip;
                 return ExecVProject(projInfo, NULL);
             }
             else

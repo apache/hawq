@@ -26,6 +26,7 @@
 #include "executor/nodeTableScan.h"
 #include "catalog/catquery.h"
 #include "cdb/cdbvars.h"
+#include "utils/memaccounting.h"
 #include "execVScan.h"
 #include "execVQual.h"
 #include "vexecutor.h"
@@ -137,6 +138,10 @@ static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags)
 	return NULL;
 }
 
+#define HAS_EXECUTOR_MEMORY_ACCOUNT(planNode, NodeType) \
+	(NULL != planNode->memoryAccount && \
+	MEMORY_OWNER_TYPE_Exec_##NodeType == planNode->memoryAccount->ownerType)
+
 /*
  * when vectorized_executor_enable is ON, we have to process the plan.
  */
@@ -164,19 +169,21 @@ VExecVecNode(PlanState *node, PlanState *parentNode, EState *eState,int eflags)
 			case T_AppendOnlyScan:
 			case T_ParquetScan:
 			case T_TableScanState:
-				//START_MEMORY_ACCOUNT(curMemoryAccount);
-					{
-						TupleDesc td = ((TableScanState *)node)->ss.ss_ScanTupleSlot->tts_tupleDescriptor;
-						((TableScanState *)node)->ss.ss_ScanTupleSlot->PRIVATE_tb = PointerGetDatum(tbGenerate(td->natts,BATCHSIZE));
-						node->ps_ResultTupleSlot->PRIVATE_tb = PointerGetDatum(tbGenerate(td->natts,BATCHSIZE));
+				if(HAS_EXECUTOR_MEMORY_ACCOUNT(plan, TableScan))
+					START_MEMORY_ACCOUNT(plan->memoryAccount);
 
-						/* if V->N */
-						if( NULL == parentNode ||
-							NULL == parentNode->vectorized ||
-							!((VectorizedState *)parentNode->vectorized)->vectorized)
-							backportTupleDescriptor(node,node->ps_ResultTupleSlot->tts_tupleDescriptor);
-					}
-				//		END_MEMORY_ACCOUNT();
+				TupleDesc td = ((TableScanState *)node)->ss.ss_ScanTupleSlot->tts_tupleDescriptor;
+				((TableScanState *)node)->ss.ss_ScanTupleSlot->PRIVATE_tb = PointerGetDatum(tbGenerate(td->natts,BATCHSIZE));
+				node->ps_ResultTupleSlot->PRIVATE_tb = PointerGetDatum(tbGenerate(td->natts,BATCHSIZE));
+
+				/* if V->N */
+				if( NULL == parentNode ||
+					NULL == parentNode->vectorized ||
+					!((VectorizedState *)parentNode->vectorized)->vectorized)
+					backportTupleDescriptor(node,node->ps_ResultTupleSlot->tts_tupleDescriptor);
+
+				if(HAS_EXECUTOR_MEMORY_ACCOUNT(plan, TableScan))
+					END_MEMORY_ACCOUNT();
 				break;
 			default:
 				((VectorizedState *)node->vectorized)->vectorized = false;
