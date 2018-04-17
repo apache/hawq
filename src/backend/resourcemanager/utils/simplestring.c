@@ -200,7 +200,7 @@ int  SimpleStringToStorageSizeMB(SimpStringPtr str, uint32_t *value)
 	return FUNC_RETURN_OK;
 }
 
-int  SimpleStringToBytes(SimpStringPtr str, uint32_t *value)
+int  SimpleStringToBytes(SimpStringPtr str, uint64_t *value)
 {
 	int 	tail 	= strlen(str->Str) - 1;
 	int 	scanres = -1;
@@ -228,10 +228,6 @@ int  SimpleStringToBytes(SimpStringPtr str, uint32_t *value)
 	else if ( (str->Str[tail]   == 'b' || str->Str[tail] == 'B' ) &&
 			  (str->Str[tail-1] == 'g' || str->Str[tail-1] == 'G') ) {
 		*value = val * 1024 * 1024 *1024;
-	}
-	else if ( (str->Str[tail]   == 'b' || str->Str[tail] == 'B' ) &&
-			  (str->Str[tail-1] == 't' || str->Str[tail-1] == 'T') ) {
-		*value = val * 1024 * 1024 *1024 * 1024;
 	}
 	else {
 		return UTIL_SIMPSTRING_WRONG_FORMAT;

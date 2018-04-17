@@ -158,7 +158,7 @@ MultiExecHash(HashState *node)
 			/* Insert hash values into Bloom filter */
 			if (node->hashtable->bloomfilter != NULL && node->hashtable->bloomfilter->isCreated)
 			{
-			    InsertBloomFilter(node->hashtable->bloomfilter, hashvalue);
+				InsertBloomFilter(node->hashtable->bloomfilter, hashvalue);
 				node->hashtable->bloomfilter->nInserted++;
 			}
 		}
@@ -484,7 +484,7 @@ ExecHashTableCreate(HashState *hashState, HashJoinState *hjstate, List *hashOper
 		SimpString valuestr;
 		setSimpleStringRef(&valuestr,
 				hawq_hashjoin_bloomfilter_max_memory_size, strlen(hawq_hashjoin_bloomfilter_max_memory_size));
-		int max_size = 0;
+		uint64_t max_size = 0;
 		SimpleStringToBytes(&valuestr, &max_size);
 		max_size = UpperPowerTwo(max_size);
 

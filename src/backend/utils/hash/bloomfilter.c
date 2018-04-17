@@ -63,8 +63,8 @@ BloomFilter InitBloomFilter(int memory_size)
     bf->data_mask = bf->nBuckets - 1;
     bf->data_size = size;
     bf->isCreated = true;
-    elog(LOG, "Create a Bloom filter with number of buckets:%d, size:%d",
-              bf->nBuckets, size);
+    elog(DEBUG3, "Create a Bloom filter with number of buckets:%d, size:%d",
+                 bf->nBuckets, size);
     return bf;
 }
 
@@ -108,13 +108,14 @@ void PrintBloomFilter(BloomFilter bf)
 {
     StringInfo bfinfo = makeStringInfo();
     appendStringInfo(bfinfo, "##### Print Bloom filter #####\n");
-    appendStringInfo(bfinfo, "data_mask: %x, ", bf->data_mask);
-    appendStringInfo(bfinfo, "number of buckets: %d\n s", bf->nBuckets);
-    appendStringInfo(bfinfo, "number of inserted: %d\n s", bf->nInserted);
-    appendStringInfo(bfinfo, "number of tested: %d\n s", bf->nTested);
-    appendStringInfo(bfinfo, "number of matched: %d\n s", bf->nMatched);
-    appendStringInfo(bfinfo, "size: %d\n s", bf->data_size);
+    appendStringInfo(bfinfo, "data_mask: %x\n ", bf->data_mask);
+    appendStringInfo(bfinfo, "number of buckets: %d\n ", bf->nBuckets);
+    appendStringInfo(bfinfo, "number of inserted: %d\n ", bf->nInserted);
+    appendStringInfo(bfinfo, "number of tested: %d\n ", bf->nTested);
+    appendStringInfo(bfinfo, "number of matched: %d\n ", bf->nMatched);
+    appendStringInfo(bfinfo, "size: %d\n ", bf->data_size);
     appendStringInfo(bfinfo, "##### END Print Bloom filter #####\n");
+    elog(LOG, "%s", bfinfo->data);
     if(bfinfo->data != NULL)
     {
         pfree(bfinfo->data);
@@ -130,5 +131,5 @@ void DestroyBloomFilter(BloomFilter bf)
     {
         pfree(bf);
     }
-    elog(LOG, "Destroy a Bloom filter");
+    elog(DEBUG3, "Destroy a Bloom filter");
 }
