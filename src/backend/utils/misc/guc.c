@@ -738,6 +738,7 @@ double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
 double  net_disk_ratio;
+double hawq_hashjoin_bloomfilter_ratio;
 bool		optimizer_cte_inlining;
 int		optimizer_cte_inlining_bound;
 double 	optimizer_damping_factor_filter;
@@ -7124,6 +7125,16 @@ static struct config_real ConfigureNamesReal[] =
 		0.5, 0.0, 1.0, NULL, NULL
 	},
 
+	{
+		{"hawq_hashjoin_bloomfilter_ratio", PGC_USERSET, PRESET_OPTIONS,
+			gettext_noop("Sets the ratio for hash join Bloom filter."),
+			NULL,
+			GUC_NO_SHOW_ALL
+		},
+		&hawq_hashjoin_bloomfilter_ratio,
+		0.4, 0.0, 1.0, NULL, NULL
+	},
+
 /* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, 0.0, 0.0, 0.0, NULL, NULL
@@ -8252,14 +8263,14 @@ static struct config_string ConfigureNamesString[] =
 		"64GB", NULL, NULL
 	},
 
-    {
+	{
 		{"hawq_global_rm_type", PGC_POSTMASTER, RESOURCES_MGM,
 				gettext_noop("set resource management server type"),
 				NULL
 		},
 		&rm_global_rm_type,
 		"none", NULL, NULL
-    },
+	},
 
 	{
 		{"hawq_rm_yarn_address", PGC_POSTMASTER, RESOURCES_MGM,
@@ -8306,14 +8317,23 @@ static struct config_string ConfigureNamesString[] =
 		"", NULL, NULL
 	},
 
-    {
-        {"hawq_rm_stmt_vseg_memory", PGC_USERSET, RESOURCES_MGM,
-            gettext_noop("the memory quota of one virtual segment for one statement."),
-            NULL
-        },
-        &rm_stmt_vseg_mem_str,
-        "128mb", assign_hawq_rm_stmt_vseg_memory, NULL
-    },
+	{
+		{"hawq_rm_stmt_vseg_memory", PGC_USERSET, RESOURCES_MGM,
+			gettext_noop("the memory quota of one virtual segment for one statement."),
+			NULL
+		},
+		&rm_stmt_vseg_mem_str,
+		"128mb", assign_hawq_rm_stmt_vseg_memory, NULL
+	},
+
+	{
+		{"hawq_hashjoin_bloomfilter_max_memory_size", PGC_USERSET, PRESET_OPTIONS,
+			gettext_noop("The maximum memory size for bloom filter in hash join, with KB or MB"),
+			GUC_NO_SHOW_ALL
+		},
+		&hawq_hashjoin_bloomfilter_max_memory_size,
+		"2MB", NULL, NULL
+	},
 
 	{
 		{"hawq_re_cgroup_mount_point", PGC_POSTMASTER, RESOURCES_MGM,

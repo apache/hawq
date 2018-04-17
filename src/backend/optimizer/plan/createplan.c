@@ -2912,6 +2912,29 @@ create_mergejoin_plan(CreatePlanContext *ctx,
 	return join_plan;
 }
 
+/*
+ * Decide if use runtime filter for this hash join.
+ * If use, three conditions must be satisfied:
+ * 	1. GUC hawq_hashjoin_bloomfilter is enable;
+ * 	2. This hash join is not left outer join or full outer join or anti-join;
+ * 	3. The ratio of (the estimated number of hash join tuples)/(number of tuples of outer table)
+ *		is lower than the GUC hawq_hashjoin_bloomfilter_ratio;
+ */
+static bool
+decide_use_runtime_filter(HashPath* path, JoinType type)
+{
+	if (!hawq_hashjoin_bloomfilter || type == JOIN_LEFT || type == JOIN_FULL
+			|| type == JOIN_LASJ || type == JOIN_LASJ_NOTIN ||
+			path->hashjoin_ratio > hawq_hashjoin_bloomfilter_ratio)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
 static HashJoin *
 create_hashjoin_plan(CreatePlanContext *ctx,
 					 HashPath *best_path,
@@ -2979,6 +3002,20 @@ create_hashjoin_plan(CreatePlanContext *ctx,
 							  outer_plan,
 							  (Plan *) hash_plan,
 							  jointype);
+
+	/*
+	 * decide if use runtime filter for this hash join.
+	 */
+	join_plan->useRuntimeFilter = decide_use_runtime_filter(best_path, jointype);
+
+	/*
+	 * recored the estimated number of rows from inner table,
+	 * this number is used for the memory size of Bloom filter
+	 */
+	if (join_plan->useRuntimeFilter)
+	{
+		join_plan->estimatedInnerNum = best_path->estimatedNumInner;
+	}
 
 	/* 
 	 * MPP-4635.  best_path->jpath.outerjoinpath may be NULL.  

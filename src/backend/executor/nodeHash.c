@@ -56,7 +56,7 @@
 #include "utils/lsyscache.h"
 #include "utils/debugbreak.h"
 #include "utils/faultinjector.h"
-
+#include "resourcemanager/utils/simplestring.h"
 #include "cdb/cdbexplain.h"
 #include "cdb/cdbvars.h"
 
@@ -155,6 +155,12 @@ MultiExecHash(HashState *node)
 		if (ExecHashGetHashValue(node, hashtable, econtext, hashkeys, node->hs_keepnull, &hashvalue, &hashkeys_null))
 		{
 			ExecHashTableInsert(node, hashtable, slot, hashvalue);
+			/* Insert hash values into Bloom filter */
+			if (node->hashtable->bloomfilter != NULL && node->hashtable->bloomfilter->isCreated)
+			{
+				InsertBloomFilter(node->hashtable->bloomfilter, hashvalue);
+				node->hashtable->bloomfilter->nInserted++;
+			}
 		}
 
 		if (hashkeys_null)
@@ -321,6 +327,7 @@ ExecHashTableCreate(HashState *hashState, HashJoinState *hjstate, List *hashOper
 	 */
 	hashtable = (HashJoinTable)palloc0(sizeof(HashJoinTableData));
 	hashtable->buckets = NULL;
+	hashtable->bloomfilter = NULL;
 	hashtable->curbatch = 0;
 	hashtable->growEnabled = true;
 	hashtable->totalTuples = 0;
@@ -347,6 +354,15 @@ ExecHashTableCreate(HashState *hashState, HashJoinState *hjstate, List *hashOper
 												ALLOCSET_DEFAULT_MINSIZE,
 												ALLOCSET_DEFAULT_INITSIZE,
 												ALLOCSET_DEFAULT_MAXSIZE);
+
+	if (hjstate->useRuntimeFilter)
+	{
+		hashtable->bloomfilterCtx = AllocSetContextCreate(hashtable->hashCxt,
+													"HashTableBloomFilterContext",
+													ALLOCSET_DEFAULT_MINSIZE,
+													ALLOCSET_DEFAULT_INITSIZE,
+													ALLOCSET_DEFAULT_MAXSIZE);
+	}
 
 	/* CDB */ /* track temp buf file allocations in separate context */
 	hashtable->bfCxt = AllocSetContextCreate(CurrentMemoryContext,
@@ -453,6 +469,30 @@ ExecHashTableCreate(HashState *hashState, HashJoinState *hjstate, List *hashOper
 		palloc0(nbuckets * sizeof(HashJoinTuple));
 
 	MemoryContextSwitchTo(oldcxt);
+
+
+	/*
+	 * Initialize Bloom filter
+	 */
+	if (hjstate->useRuntimeFilter)
+	{
+		/*
+		 * The size of Bloom filter is decided by the estimated number of
+		 * tuples from inner table, but won't exceed the GUC value
+		 */
+		MemoryContextSwitchTo(hashtable->bloomfilterCtx);
+		SimpString valuestr;
+		setSimpleStringRef(&valuestr,
+				hawq_hashjoin_bloomfilter_max_memory_size, strlen(hawq_hashjoin_bloomfilter_max_memory_size));
+		uint64_t max_size = 0;
+		SimpleStringToBytes(&valuestr, &max_size);
+		max_size = UpperPowerTwo(max_size);
+
+		int size = UpperPowerTwo(hjstate->estimatedInnerNum);
+		hashtable->bloomfilter = InitBloomFilter(min(size, max_size));
+		MemoryContextSwitchTo(oldcxt);
+	}
+
 	}
 	END_MEMORY_ACCOUNT();
 	return hashtable;
@@ -716,7 +756,10 @@ ExecHashTableDestroy(HashState *hashState, HashJoinTable hashtable)
 		hashtable->work_set = NULL;
 	}
 
-	/* Release working memory (batchCxt is a child, so it goes away too) */
+	/*
+	 * Release working memory (batchCxt and bloomfilterCxt are children,
+	 * so they go away too)
+	 */
 	MemoryContextDelete(hashtable->hashCxt);
 	hashtable->batches = NULL;
 	}

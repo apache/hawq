@@ -823,6 +823,8 @@ typedef struct HashJoin
 	Join		join;
 	List	   *hashclauses;
 	List	   *hashqualclauses;
+	bool		useRuntimeFilter;
+	int 		estimatedInnerNum;
 } HashJoin;
 
 /*

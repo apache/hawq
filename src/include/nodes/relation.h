@@ -1067,6 +1067,8 @@ typedef struct HashPath
 {
 	JoinPath	jpath;
 	List	   *path_hashclauses;		/* join clauses used for hashing */
+	double		hashjoin_ratio;
+	double		estimatedNumInner;
 } HashPath;
 
 /*

@@ -87,6 +87,7 @@ bool SimpleStringIsPercentage(SimpStringPtr str);
 int  SimpleStringToPercentage(SimpStringPtr str, int8_t *value);
 /* <integer>mb, <integer>gb, <integer>tb */
 int  SimpleStringToStorageSizeMB(SimpStringPtr str, uint32_t *value);
+int  SimpleStringToBytes(SimpStringPtr str, uint64_t *value);
 
 int  SimpleStringToMapIndexInt8(SimpStringPtr 	str,
 								char 		   *strlist,

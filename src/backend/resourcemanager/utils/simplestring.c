@@ -200,6 +200,41 @@ int  SimpleStringToStorageSizeMB(SimpStringPtr str, uint32_t *value)
 	return FUNC_RETURN_OK;
 }
 
+int  SimpleStringToBytes(SimpStringPtr str, uint64_t *value)
+{
+	int 	tail 	= strlen(str->Str) - 1;
+	int 	scanres = -1;
+	int32_t val;
+	char	buff[256];
+
+	if ( tail < 2 || tail > sizeof(buff)-1 )
+		return UTIL_SIMPSTRING_WRONG_FORMAT;
+
+	strncpy(buff, str->Str, tail-1);
+	buff[tail-1] = '\0';
+
+	scanres = sscanf(buff, "%d", &val);
+	if ( scanres != 1 )
+		return UTIL_SIMPSTRING_WRONG_FORMAT;
+
+	if ( (str->Str[tail]   == 'b' || str->Str[tail] == 'B' ) &&
+		 (str->Str[tail-1] == 'k' || str->Str[tail-1] == 'K') ) {
+		*value = val * 1024;
+	}
+	else if ( (str->Str[tail]   == 'b' || str->Str[tail] == 'B' ) &&
+		 (str->Str[tail-1] == 'm' || str->Str[tail-1] == 'M') ) {
+		*value = val * 1024 *1024;
+	}
+	else if ( (str->Str[tail]   == 'b' || str->Str[tail] == 'B' ) &&
+			  (str->Str[tail-1] == 'g' || str->Str[tail-1] == 'G') ) {
+		*value = val * 1024 * 1024 *1024;
+	}
+	else {
+		return UTIL_SIMPSTRING_WRONG_FORMAT;
+	}
+	return FUNC_RETURN_OK;
+}
+
 int SimpleStringToMapIndexInt8(SimpStringPtr 	str,
 							   char 		   *strlist,
 							   int 				listsize,
