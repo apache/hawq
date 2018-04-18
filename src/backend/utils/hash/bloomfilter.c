@@ -22,9 +22,8 @@
 #include "utils/palloc.h"
 #include "lib/stringinfo.h"
 #include <assert.h>
-#include <math.h>
 
-uint32_t HASH_SEEDS[8] __attribute__((aligned(32))) = { 0x14EBCDFFU,
+const static uint32_t HASH_SEEDS[8] = { 0x14EBCDFFU,
         0x2A1C1A99U, 0x85CB78FBU, 0x6E8F82DDU, 0xF8464DFFU, 0x1028FEADU,
         0x74F04A4DU, 0x1832DB75U };
 

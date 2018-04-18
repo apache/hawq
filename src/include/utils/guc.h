@@ -412,6 +412,7 @@ extern double optimizer_nestloop_factor;
 extern double locality_upper_bound;
 extern bool optimizer_cte_inlining;
 extern double net_disk_ratio;
+extern double hawq_hashjoin_bloomfilter_ratio;
 extern int optimizer_cte_inlining_bound;
 extern double optimizer_damping_factor_filter;
 extern double optimizer_damping_factor_join;

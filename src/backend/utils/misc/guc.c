@@ -7126,7 +7126,7 @@ static struct config_real ConfigureNamesReal[] =
 	},
 
 	{
-		{"hawq_hashjoin_bloomfilter_ratio", PGC_USERSET, PRESET_OPTIONS,
+		{"hawq_hashjoin_bloomfilter_ratio", PGC_USERSET, GP_ARRAY_TUNING,
 			gettext_noop("Sets the ratio for hash join Bloom filter."),
 			NULL,
 			GUC_NO_SHOW_ALL
@@ -8327,12 +8327,13 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"hawq_hashjoin_bloomfilter_max_memory_size", PGC_USERSET, PRESET_OPTIONS,
+		{"hawq_hashjoin_bloomfilter_max_memory_size", PGC_USERSET, GP_ARRAY_TUNING,
 			gettext_noop("The maximum memory size for bloom filter in hash join, with KB or MB"),
+			NULL,
 			GUC_NO_SHOW_ALL
 		},
 		&hawq_hashjoin_bloomfilter_max_memory_size,
-		"2MB", NULL, NULL
+		"2mb", NULL, NULL
 	},
 
 	{
