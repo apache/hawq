@@ -37,6 +37,8 @@ public abstract class DbProduct {
             return new OracleProduct();
         else if (dbName.toUpperCase().contains("POSTGRES"))
             return new PostgresProduct();
+        else if (dbName.toUpperCase().contains("MICROSOFT"))
+            return new MicrosoftProduct();
         else
             return new CommonProduct();
     }
