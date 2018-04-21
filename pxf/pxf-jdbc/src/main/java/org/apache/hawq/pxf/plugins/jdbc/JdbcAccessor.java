@@ -67,7 +67,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
      * @throws SQLException if a database access error occurs
      * @throws SQLTimeoutException if a problem with the connection occurs
      * @throws ParseException if th SQL statement provided in PXF InputData is incorrect
-     * @throws ClassNotFoundException if the superclass implementation disappeared
+     * @throws ClassNotFoundException if the JDBC driver was not found
      */
     @Override
     public boolean openForRead() throws SQLException, SQLTimeoutException, ParseException, ClassNotFoundException {
@@ -119,7 +119,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
      * @throws SQLException if a database access error occurs
      * @throws SQLTimeoutException if a problem with the connection occurs
      * @throws ParseException if the SQL statement provided in PXF InputData is incorrect
-     * @throws ClassNotFoundException if the superclass implementation has disappeared
+     * @throws ClassNotFoundException if the JDBC driver was not found
      */
     @Override
     public boolean openForWrite() throws SQLException, SQLTimeoutException, ParseException, ClassNotFoundException {
@@ -136,7 +136,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         statementWrite = dbConn.prepareStatement(queryWrite);
 
         if ((batchSize != 0) && (!dbMeta.supportsBatchUpdates())) {
-            LOG.info(
+            LOG.warn(
                 "The database '" +
                 dbMeta.getDatabaseProductName() +
                 "' does not support batch updates. The current request will be handled without batching"
@@ -435,10 +435,10 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
             // The bad case: transactions are NOT supported
             if ((batchSize < 0) || (batchSize > 1)) {
                 // The worst case: batching was used
-                return new SQLException(failedInsertMessage + "The exact number of tuples inserted is unknown.", rollbackException);
+                return new SQLException(FAILED_INSERT_MESSAGE + "The exact number of tuples inserted is unknown.", rollbackException);
             }
             // Batching was NOT used
-            return new SQLException(failedInsertMessage + "The exact number of tuples inserted can be found in PXF logs.", rollbackException);
+            return new SQLException(FAILED_INSERT_MESSAGE + "The exact number of tuples inserted can be found in PXF logs.", rollbackException);
         }
 
         // The best case: transactions are supported
@@ -455,7 +455,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
 
     private static final Log LOG = LogFactory.getLog(JdbcAccessor.class);
 
-    private static final String failedInsertMessage = "Insert failed due to an SQLException. The target database does not support transactions and SOME DATA MAY HAVE BEEN INSERTED. ";
+    private static final String FAILED_INSERT_MESSAGE = "Insert failed due to an SQLException. The target database does not support transactions and SOME DATA MAY HAVE BEEN INSERTED. ";
 
     // Read variables
     private String queryRead = null;

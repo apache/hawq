@@ -153,8 +153,6 @@ Example partitions:
 
 ### Mechanism
 
-Note that **by default PXF does not support more than 100 fragments**.
-
 If partitioning is activated, the SELECT query is split into a set of small queries, each of which is called a *fragment*. All the fragments are processed by separate PXF instances simultaneously. If there are more fragments than PXF instances, some instances will process more than one fragment; if only one PXF instance is available, it will process all the fragments.
 
 Extra query constraints (`WHERE` expressions) are automatically added to each fragment to guarantee that every tuple of data is retrieved from the external database exactly once.
