@@ -150,19 +150,26 @@ tbSerialization(TupleBatch tb )
     return ret;
 }
 
-TupleBatch tbDeserialization(unsigned char *buffer)
+bool tbDeserialization(unsigned char *buffer,TupleBatch* pTB )
 {
     size_t buflen;
     size_t len = 0;
     size_t tmplen = 0;
     tmplen = sizeof(size_t);
+    TupleBatch tb;
     memcpy(&buflen,buffer,tmplen);
     len += tmplen;
 
     if(buflen < sizeof(TupleBatchData))
-        return NULL;
+        return false;
 
-    TupleBatch tb = palloc0(sizeof(TupleBatchData));
+    if(!*pTB)
+        tb = palloc0(sizeof(TupleBatchData));
+    else
+    {
+        tb = *pTB;
+        tbReset(tb);
+    }
 
     //deserial tb main data
     tmplen = offsetof(TupleBatchData,skip);
@@ -173,7 +180,8 @@ TupleBatch tbDeserialization(unsigned char *buffer)
     if(tb->nrows != 0)
     {
         tmplen = sizeof(bool) * tb->nrows;
-        tb->skip = palloc(tmplen);
+        if(!tb->skip)
+            tb->skip = palloc(tmplen);
         memcpy(tb->skip,buffer+len,tmplen);
         len += tmplen;
     }
@@ -183,26 +191,29 @@ TupleBatch tbDeserialization(unsigned char *buffer)
     {
         int colid;
         tmplen = sizeof(vtype*) * tb->ncols;
-        tb->datagroup = palloc0(tmplen);
         //the buffer length is 8-bytes alignment, 
         //so we need align the current length before comparing.
+        if(!tb->datagroup)
+            tb->datagroup = palloc0(tmplen);
         while (((len + 0x8) & (~0x7)) < buflen)
         {
             memcpy(&colid,buffer + len,sizeof(int));
             len += sizeof(int);
 
             vtype* src = (vtype*)(buffer + len);
-            tb->datagroup[colid] = buildvtype(src->elemtype,tb->batchsize,tb->skip);
 
-            tmplen = VDATUMSZ(tb->batchsize);
+            if(!tb->datagroup[colid])
+                tb->datagroup[colid] = buildvtype(src->elemtype,tb->batchsize,tb->skip);
+
+            tmplen = VDATUMSZ(tb->nrows);
             //in vtype pointer isnull and skipref are't serialized
             memcpy(tb->datagroup[colid]->values,src->values - 2,tmplen);
 
-            memcpy(tb->datagroup[colid]->isnull,ISNULLOFFSET(src) - 2,tb->nrows * sizeof(bool));
+            memcpy(tb->datagroup[colid]->isnull,(unsigned char *)(src->values - 2) + tmplen,tb->nrows * sizeof(bool));
 
             len += VTYPESIZE(tb->nrows);
         }
     }
-
-    return tb;
+    *pTB = tb;
+    return true;
 }

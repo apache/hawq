@@ -77,6 +77,6 @@ void tbfreeColumn(vtype** vh,int colid);
 /* TupleBatch serialization function */
 MemTuple tbSerialization(TupleBatch tb);
 /* TupleBatch deserialization function */
-TupleBatch tbDeserialization(unsigned char *buffer);
+bool tbDeserialization(unsigned char *buffer,TupleBatch* pTB);
 
 #endif
