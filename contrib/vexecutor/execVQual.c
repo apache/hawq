@@ -19,6 +19,7 @@
 #include "postgres.h"
 #include "utils/builtins.h"
 #include "execVQual.h"
+#include "cdb/cdbhash.h"
 static bool
 ExecVTargetList(List *targetlist,
 			   ExprContext *econtext,
@@ -105,7 +106,7 @@ ExecVProject(ProjectionInfo *projInfo, ExprDoneCond *isDone)
  *      This function will be invoked in V->N process.
  */
 bool
-VirtualNodeProc(ScanState* state,TupleTableSlot *slot){
+VirtualNodeProc(TupleTableSlot *slot){
     if(TupIsNull(slot) )
         return false;
 

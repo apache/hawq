@@ -80,7 +80,6 @@ static void processIncomingChunks(MotionLayerState *mlStates,
 static inline void reconstructTuple(MotionNodeEntry * pMNEntry, ChunkSorterEntry * pCSEntry);
 
 /* Stats-function declarations. */
-static void statSendTuple(MotionLayerState *mlStates, MotionNodeEntry * pMNEntry, TupleChunkList tcList);
 static void statSendEOS(MotionLayerState *mlStates, MotionNodeEntry * pMNEntry);
 static void statChunksProcessed(MotionLayerState *mlStates, MotionNodeEntry * pMNEntry, int chunksProcessed, int chunkBytes, int tupleBytes);
 static void statNewTupleArrived(MotionNodeEntry * pMNEntry, ChunkSorterEntry * pCSEntry);
@@ -1169,7 +1168,7 @@ addChunkToSorter(MotionLayerState *mlStates,
  * tcList->num_chunks and tcList->serialized_data_length, and
  * SerializeTupleDirect() only fills those fields out.
  */
-static void
+void
 statSendTuple(MotionLayerState *mlStates, MotionNodeEntry * pMNEntry, TupleChunkList tcList)
 {
 	int			headerOverhead;

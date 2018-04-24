@@ -4519,6 +4519,7 @@ ExecInitExpr(Expr *node, PlanState *parent)
 	/* Initialize the vectorzied expressions */
 	if( vmthd.vectorized_executor_enable
 		&& vmthd.ExecInitExpr_Hook
+		&& parent
 		&& parent->plan->vectorized)
 	{
 		state = vmthd.ExecInitExpr_Hook(node, parent);

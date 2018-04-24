@@ -75,7 +75,7 @@ TupleTableSlot *ExecTableVScanVirtualLayer(ScanState *scanState)
         TupleTableSlot* slot = scanState->ps.ps_ProjInfo ? scanState->ps.ps_ResultTupleSlot : scanState->ss_ScanTupleSlot;
         while(1)
         {
-            bool succ = VirtualNodeProc(scanState,slot);
+            bool succ = VirtualNodeProc(slot);
 
             if(!succ)
             {

@@ -17,7 +17,7 @@
 
 
 MODULE_big = vexecutor
-OBJS    = vexecutor.o vtype.o vcheck.o tuplebatch.o execVScan.o execVQual.o parquet_reader.o ao_reader.o
+OBJS    = vexecutor.o vtype.o vcheck.o tuplebatch.o execVScan.o execVQual.o parquet_reader.o ao_reader.o nodeVMotion.o
 
 PG_CXXFLAGS = -Wall -O0 -g -std=c++11
 PG_LIBS = $(libpq_pgport) 

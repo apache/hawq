@@ -30,6 +30,7 @@
 #include "execVScan.h"
 #include "execVQual.h"
 #include "vexecutor.h"
+#include "nodeVMotion.h"
 
 PG_MODULE_MAGIC;
 int BATCHSIZE = 1024;
@@ -40,7 +41,7 @@ static int MAXBATCHSIZE = 4096;
  */
 static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags);
 static PlanState* VExecVecNode(PlanState *Node, PlanState *parentNode, EState *eState,int eflags);
-static TupleTableSlot* VExecProcNode(PlanState *node);
+static TupleTableSlot* VExecProcNode(PlanState *node,TupleTableSlot** pRtr);
 static bool VExecEndNode(PlanState *node);
 extern int currentSliceId;
 
@@ -185,6 +186,16 @@ VExecVecNode(PlanState *node, PlanState *parentNode, EState *eState,int eflags)
 				if(HAS_EXECUTOR_MEMORY_ACCOUNT(plan, TableScan))
 					END_MEMORY_ACCOUNT();
 				break;
+			case T_MotionState:
+				if( NULL == parentNode ||
+					NULL == parentNode->vectorized ||
+					((Motion*)plan)->sendSorted ||
+					((Motion*)plan)->motionType == MOTIONTYPE_HASH ||
+					!((VectorizedState *)parentNode->vectorized)->vectorized)
+					((VectorizedState *)node->vectorized)->vectorized = false;
+				else
+					((VectorizedState *)node->vectorized)->vectorized = true;
+				break;
 			default:
 				((VectorizedState *)node->vectorized)->vectorized = false;
 				break;
@@ -200,8 +211,12 @@ VExecVecNode(PlanState *node, PlanState *parentNode, EState *eState,int eflags)
 	return node;
 }
 
-static TupleTableSlot* VExecProcNode(PlanState *node)
+static TupleTableSlot* VExecProcNode(PlanState *node,TupleTableSlot** pRtr)
 {
+	if(!((VectorizedState*)node->vectorized)->vectorized)
+		return false;
+
+	bool ret = true;
     TupleTableSlot* result = NULL;
     switch(nodeTag(node))
     {
@@ -210,10 +225,15 @@ static TupleTableSlot* VExecProcNode(PlanState *node)
         case T_TableScanState:
             result = ExecTableVScanVirtualLayer((TableScanState*)node);
             break;
+		case T_MotionState:
+			result = ExecVMotionVirtualLayer((MotionState*)node);
+			break;
         default:
+			ret = false;
             break;
     }
-    return result;
+	*pRtr = result;
+    return ret;
 }
 
 static bool VExecEndNode(PlanState *node)

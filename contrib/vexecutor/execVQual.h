@@ -34,7 +34,7 @@ extern vbool*
 ExecVQual(List *qual, ExprContext *econtext, bool resultForNull);
 
 extern bool
-VirtualNodeProc(ScanState* state,TupleTableSlot *slot);
+VirtualNodeProc(TupleTableSlot *slot);
 
 extern ExprState *
 VExecInitExpr(Expr *node, PlanState *parent);

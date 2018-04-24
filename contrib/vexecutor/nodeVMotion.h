@@ -17,29 +17,24 @@
  * under the License.
  */
 
-#ifndef VCHECK_H
-#define VCHECK_H
+#ifndef NODEVMOTION_H
+#define NODEVMOTION_H
 
-#include "vtype.h"
-#include "tuplebatch.h"
-#include "nodes/execnodes.h"
+#include "postgres.h"
+#include "executor/nodeMotion.h"
 
-typedef struct aoinfo {
-	bool* proj;
-	bool isDone;
-} aoinfo;
+#include "access/heapam.h"
+#include "nodes/execnodes.h" /* Slice, SliceTable */
+#include "cdb/cdbheap.h"
+#include "cdb/cdbmotion.h"
+#include "cdb/cdbhash.h"
+#include "executor/executor.h"
+#include "executor/execdebug.h"
+#include "executor/nodeMotion.h"
+#include "utils/tuplesort.h"
+#include "utils/tuplesort_mk.h"
+#include "utils/memutils.h"
 
-/* vectorized executor state */
-typedef struct VectorizedState
-{
-	bool vectorized;
-	PlanState *parent;
-	aoinfo *ao;
-}VectorizedState;
-
-
-extern Plan* CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan);
-extern Oid GetVtype(Oid ntype);
-extern Oid GetNtype(Oid vtype);
-
+extern TupleTableSlot *ExecVMotionVirtualLayer(MotionState *node);
 #endif
+
