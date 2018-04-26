@@ -56,13 +56,12 @@
 
 typedef struct TupleBatchData
 {
-    int     _tb_len;
     int     batchsize;  //indicate maximum number of batch
     int     ncols;      //the number of target table column
     int     nrows;      //the number of tuples scaned out
     int     iter;       //used for data
     bool*   skip;       //used for qualification
-    vheader** datagroup;
+    vtype** datagroup;
 }TupleBatchData,*TupleBatch;
 
 /* TupleBatch ctor */
@@ -74,9 +73,9 @@ void tbReset(TupleBatch tb);
 /* TupleBatch dtor */
 void tbDestroy(TupleBatch* tb);
 /* free one column */
-void tbfreeColumn(vheader** vh,int colid);
+void tbfreeColumn(vtype** vh,int colid);
 /* TupleBatch serialization function */
-unsigned char * tbSerialization(TupleBatch tb);
+MemTuple tbSerialization(TupleBatch tb);
 /* TupleBatch deserialization function */
 TupleBatch tbDeserialization(unsigned char *buffer);
 

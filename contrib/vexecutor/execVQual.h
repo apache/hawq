@@ -26,7 +26,6 @@
 #include "executor/execdebug.h"
 #include "executor/nodeAgg.h"
 #include "tuplebatch.h"
-#include "vadt.h"
 
 extern TupleTableSlot *
 ExecVProject(ProjectionInfo *projInfo, ExprDoneCond *isDone);

@@ -20,19 +20,8 @@
 #ifndef VCHECK_H
 #define VCHECK_H
 
-#include "vadt.h"
+#include "vtype.h"
 #include "nodes/execnodes.h"
-typedef struct vFuncMap
-{
-	Oid ntype;
-	vheader* (* vtbuild)(int n);
-	void (* vtfree)(vheader **vh);
-	Datum (* gettypeptr)(vheader *vh,int n);
-	void (* gettypevalue)(vheader *vh,int n,Datum *ptr);
-	size_t (* vtsize)(vheader *vh);
-	size_t (*serialization)(vheader* vh, unsigned char* buf);
-	Datum (*deserialization)(unsigned char* buf,size_t* len);
-}vFuncMap;
 
 typedef struct aoinfo {
 	bool* proj;
@@ -48,8 +37,8 @@ typedef struct VectorizedState
 }VectorizedState;
 
 
-extern const vFuncMap* GetVFunc(Oid vtype);
 extern Plan* CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan);
 extern Oid GetVtype(Oid ntype);
+extern Oid GetNtype(Oid vtype);
 
 #endif

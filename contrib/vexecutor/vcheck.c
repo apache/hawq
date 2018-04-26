@@ -30,36 +30,10 @@
 #include "nodes/relation.h"
 #include "optimizer/walkers.h"
 #include "utils/lsyscache.h"
+#include "utils/syscache.h"
 #include "vcheck.h"
-#include "vadt.h"
 #include "vexecutor.h"
 
-
-static const vFuncMap funcMap[] = {
-		{INT2OID, &buildvint2, &destroyvint2, &getptrvint2,&getvaluevint2,&vint2Size,&vint2serialization,&vint2deserialization},
-		{INT4OID, &buildvint4, &destroyvint4, &getptrvint4,&getvaluevint4,&vint4Size,&vint4serialization,&vint4deserialization},
-		{INT8OID, &buildvint8, &destroyvint8, &getptrvint8,&getvaluevint8,&vint8Size,&vint8serialization,&vint8deserialization},
-		{FLOAT4OID, &buildvfloat4, &destroyvfloat4, &getptrvfloat4,&getvaluevfloat4,&vfloat4Size,&vfloat4serialization,&vfloat4deserialization},
-		{FLOAT8OID, &buildvfloat8, &destroyvfloat8, &getptrvfloat8,&getvaluevfloat8,&vfloat8Size,&vfloat8serialization,&vfloat8deserialization},
-		{BOOLOID, &buildvbool, &destroyvbool, &getptrvbool,&getvaluevbool,&vboolSize,&vboolserialization,&vbooldeserialization}
-};
-static const int funcMapLen = sizeof(funcMap) /sizeof(vFuncMap);
-
-static const vFuncMap* vFuncWalker(Oid type)
-{
-	for(int i = 0;i < funcMapLen; i ++)
-		if(funcMap[i].ntype == type) return &funcMap[i];
-
-	return NULL;
-}
-
-static HTAB *hashMapVFunc = NULL;
-
-typedef struct VecFuncHashEntry
-{
-	Oid src;
-	vFuncMap *vFunc;
-} VecFuncHashEntry;
 
 typedef struct VecTypeHashEntry
 {
@@ -69,6 +43,8 @@ typedef struct VecTypeHashEntry
 
 /* Map between the vectorized types and non-vectorized types */
 static HTAB *hashMapN2V = NULL;
+/* Map between the vectorized types and non-vectorized types */
+static HTAB *hashMapV2N = NULL;
 
 /*
  * We check the expressions tree recursively becuase the args can be a sub expression,
@@ -345,31 +321,31 @@ Oid GetVtype(Oid ntype)
 /*
  * Get the functions for the vectorized types
  */
-const vFuncMap* GetVFunc(Oid vtype){
+Oid GetNtype(Oid vtype){
 	HeapTuple tuple;
 	bool isNull = true;
 	cqContext *pcqCtx;
-	VecFuncHashEntry *entry = NULL;
+	VecTypeHashEntry *entry = NULL;
 	Oid ntype;
 	bool found = false;
 
 	//construct the hash table
-	if(NULL == hashMapVFunc)
+	if(NULL == hashMapV2N)
 	{
 		HASHCTL	hash_ctl;
 		MemSet(&hash_ctl, 0, sizeof(hash_ctl));
 
 		hash_ctl.keysize = sizeof(Oid);
-		hash_ctl.entrysize = sizeof(VecFuncHashEntry);
+		hash_ctl.entrysize = sizeof(VecTypeHashEntry);
 		hash_ctl.hash = oid_hash;
 
-		hashMapVFunc = hash_create("hashvfunc", 64/*enough?*/, &hash_ctl, HASH_ELEM | HASH_FUNCTION);
+		hashMapV2N = hash_create("hashvfunc", 64/*enough?*/, &hash_ctl, HASH_ELEM | HASH_FUNCTION);
 	}
 
 	//first, find the vectorized type in hash table
-	entry = hash_search(hashMapVFunc, &vtype, HASH_ENTER, &found);
+	entry = hash_search(hashMapV2N, &vtype, HASH_ENTER, &found);
 	if(found)
-		return entry->vFunc;
+		return entry->dest;
 
 	Assert(!found);
 
@@ -383,7 +359,7 @@ const vFuncMap* GetVFunc(Oid vtype){
 	if(!HeapTupleIsValid(tuple))
 	{
 		caql_endscan(pcqCtx);
-		return NULL;
+		return InvalidOid;
 	}
 
 	ntype = caql_getattr(pcqCtx,
@@ -392,10 +368,10 @@ const vFuncMap* GetVFunc(Oid vtype){
 	Assert(!isNull);
 
 	/* storage in hash table*/
-	entry->vFunc = vFuncWalker(ntype);
+	entry->dest = ntype;
 
 	caql_endscan(pcqCtx);
 
-	return entry->vFunc ;
+	return entry->dest;
 }
 

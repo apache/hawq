@@ -70,7 +70,7 @@ data type, you can follow these steps:
 For example, If the base type is 'XXX', we want to create the 
 vectorized data types for it:
     1) You can add the vectorized data types struct
-       (e.g. Add to vadt.h)
+       (e.g. Add to vtype.h)
             typedef struct vXXX
             {
                 vheader header;

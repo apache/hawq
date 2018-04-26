@@ -193,12 +193,22 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
                 /* first construct the skip array */
                 if(NULL != skip)
                 {
-                    for(i = 0; i < skip->header.dim; i++)
+                    for(i = 0; i < skip->dim; i++)
                     {
-                        skip->values[i] = ((!(skip->values[i])) ||
-                                          (skip->header.isnull[i]) ||
+                        ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip[i] =
+                                          ((!DatumGetBool(skip->values[i])) ||
+                                          (skip->isnull[i]) ||
                                           ((TupleBatch)slot->PRIVATE_tb)->skip[i]);
                     }
+                }
+                else
+                {
+                    Assert(((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->batchsize ==
+                           ((TupleBatch)slot->PRIVATE_tb)->batchsize);
+
+                    memcpy(((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip,
+                            ((TupleBatch)slot->PRIVATE_tb)->skip,
+                            ((TupleBatch)slot->PRIVATE_tb)->batchsize * sizeof(bool));
                 }
 
                 /*
@@ -206,10 +216,6 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
                  * and return it.
                  */
                 ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->nrows = ((TupleBatch)slot->PRIVATE_tb)->nrows;
-                if(NULL != skip)
-                    ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = skip->values;
-                else
-                    ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = ((TupleBatch)slot->PRIVATE_tb)->skip;
                 return ExecVProject(projInfo, NULL);
             }
             else
