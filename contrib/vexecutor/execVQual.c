@@ -120,9 +120,9 @@ VirtualNodeProc(ScanState* state,TupleTableSlot *slot){
 
     for(int i = 0;i < tb->ncols;i ++)
     {
-        vheader *header = tb->datagroup[i];
-        GetVFunc(GetVtype(header->elemtype))->gettypevalue(header,tb->iter,slot->PRIVATE_tts_values + i);
-        slot->PRIVATE_tts_isnull[i] = header->isnull[tb->iter];
+        vtype *vt = tb->datagroup[i];
+        slot->PRIVATE_tts_values[i] = vt->values[tb->iter];
+        slot->PRIVATE_tts_isnull[i] = vt->isnull[tb->iter];
     }
     tb->iter ++;
     ExecStoreVirtualTuple(slot);
@@ -271,7 +271,7 @@ VExecEvalVar(ExprState *exprstate, ExprContext *econtext,
 			if (!attr->attisdropped)
 			{
 				if (variable->vartype != attr->atttypid &&
-					GetNType(variable->vartype) != attr->atttypid)
+					GetNtype(variable->vartype) != attr->atttypid)
 					ereport(ERROR,
 							(errmsg("attribute %d has wrong type", attnum),
 							 errdetail("Table has type %s, but query expects %s.",
@@ -334,9 +334,9 @@ VExecEvalNot(BoolExprState *notclause, ExprContext *econtext,
 	expr_value = ExecEvalExpr(clause, econtext, isNull, NULL);
 
 	ret = (vbool*)DatumGetPointer(expr_value);
-	for(i = 0; i < ret->header.dim; i++)
+	for(i = 0; i < ret->dim; i++)
 	{
-		if(!ret->header.isnull[i])
+		if(!ret->isnull[i])
 			ret->values[i] = !ret->values[i];
 	}
 
@@ -394,10 +394,10 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 		if(NULL == res)
 		{
 			res = DatumGetPointer(clause_value);
-			Assert(NULL != res->header.isnull);
-			for(i = 0; i < res->header.dim; i++)
+			Assert(NULL != res->isnull);
+			for(i = 0; i < res->dim; i++)
 			{
-				if(res->header.isnull[i] ||
+				if(res->isnull[i] ||
 					!res->values[i])
 				{
 					skip = false;
@@ -408,13 +408,13 @@ VExecEvalOr(BoolExprState *orExpr, ExprContext *econtext,
 		else
 		{
 			next = DatumGetPointer(clause_value);
-			Assert(NULL != res->header.isnull && NULL != next->header.isnull);
-			for(i = 0; i < res->header.dim; i++)
+			Assert(NULL != res->isnull && NULL != next->isnull);
+			for(i = 0; i < res->dim; i++)
 			{
-				res->header.isnull[i] =
-						(res->header.isnull[i] || next->header.isnull[i]);
+				res->isnull[i] =
+						(res->isnull[i] || next->isnull[i]);
 				res->values[i] = (res->values[i] || next->values[i]);
-				if(skip && (res->header.isnull[i] || !res->values[i]))
+				if(skip && (res->isnull[i] || !res->values[i]))
 					skip = false;
 			}
 		}
@@ -468,10 +468,10 @@ VExecEvalAndInternal(List* clauses, ExprContext *econtext,
 		if(NULL == res)
 		{
 			res = DatumGetPointer(clause_value);
-			Assert(NULL != res->header.isnull);
-			for(i = 0; i < res->header.dim; i++)
+			Assert(NULL != res->isnull);
+			for(i = 0; i < res->dim; i++)
 			{
-				if(res->header.isnull[i] || res->values[i])
+				if(res->isnull[i] || res->values[i])
 				{
 					skip = false;
 					break;
@@ -481,13 +481,13 @@ VExecEvalAndInternal(List* clauses, ExprContext *econtext,
 		else
 		{
 			next = DatumGetPointer(clause_value);
-			Assert(NULL != res->header.isnull && NULL != next->header.isnull);
-			for(i = 0; i < res->header.dim; i++)
+			Assert(NULL != res->isnull && NULL != next->isnull);
+			for(i = 0; i < res->dim; i++)
 			{
-				res->header.isnull[i] =
-						(res->header.isnull[i] || next->header.isnull[i]);
+				res->isnull[i] =
+						(res->isnull[i] || next->isnull[i]);
 				res->values[i] = (res->values[i] && next->values[i]);
-				if(skip && (res->header.isnull[i] || res->values[i]))
+				if(skip && (res->isnull[i] || res->values[i]))
 					skip = false;
 			}
 		}
@@ -656,7 +656,7 @@ ExecVTargetList(List *targetlist,
 		TargetEntry *tle = (TargetEntry *) gstate->xprstate.expr;
 		AttrNumber	resind = tle->resno - 1;
 
-		tb->datagroup[resind] = ExecEvalExpr(gstate->arg,
+		tb->datagroup[resind] = (vtype*)ExecEvalExpr(gstate->arg,
 									  econtext,
 									  &isnull,
 									  &itemIsDone[resind]);
