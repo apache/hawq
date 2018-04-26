@@ -19,9 +19,6 @@
 #include "postgres.h"
 #include "tuplebatch.h"
 
-static size_t vtypeSize(vheader *vh);
-static size_t tbSerializationSize(TupleBatch tb);
-
 TupleBatch tbGenerate(int colnum,int batchsize)
 {
     Assert(colnum > 0 && batchsize > 0);
@@ -42,16 +39,16 @@ TupleBatch tbGenerate(int colnum,int batchsize)
 }
 
 void tbDestroy(TupleBatch* tb){
-    free((*tb)->skip);
+    pfree((*tb)->skip);
     for(int i = 0 ;i < (*tb)->ncols; ++i)
     {
         if((*tb)->datagroup[i])
             tbfreeColumn((*tb)->datagroup,i);
     }
 
-    free((*tb)->datagroup);
+    pfree((*tb)->datagroup);
 
-    free((*tb));
+    pfree((*tb));
     *tb = NULL;
 }
 
@@ -68,17 +65,12 @@ void tbCreateColumn(TupleBatch tb,int colid,Oid type)
         return;
     int bs = tb->batchsize;
 
-    tb->datagroup[colid] = GetVFunc(type)->vtbuild((bs));
+    tb->datagroup[colid] = buildvtype(type,bs,tb->skip);
 }
 
-void tbfreeColumn(vheader** vh,int colid)
+void tbfreeColumn(vtype** vh,int colid)
 {
-    GetVFunc(GetVtype(vh[colid]->elemtype))->vtfree(&vh[colid]);
-}
-
-static size_t vtypeSize(vheader *vh)
-{
-    return GetVFunc(GetVtype(vh->elemtype))->vtsize(vh);
+    destroyvtype(&vh[colid]);
 }
 
 static size_t
@@ -93,76 +85,95 @@ tbSerializationSize(TupleBatch tb)
     //get skip tag size
     len += sizeof( bool ) * tb->nrows;
 
+    int vtypeSz = VTYPESIZE(tb->nrows);
     //get all un-null columns data size
     for(int i = 0;i < tb->ncols; i++ )
     {
         if(tb->datagroup[i])
         {
             len += sizeof(int);
-            len += vtypeSize(tb->datagroup[i]);
+            len += vtypeSz;
         }
     }
     return len;
 }
 
-unsigned char *
+MemTuple
 tbSerialization(TupleBatch tb )
 {
+    MemTuple ret;
     size_t len = 0;
     size_t tmplen = 0;
     //calculate total size for TupleBatch
     size_t size = tbSerializationSize(tb);
+    //makes buffer length about 8-bytes alignment for motion
+    size = (size + 0x8) & (~0x7);
 
-    unsigned char *buffer = palloc(size);
+    ret = palloc0(size);
+    unsigned char *buffer = ret->PRIVATE_mt_bits;
 
     //copy TupleBatch header
     memcpy(buffer,&size,sizeof(size_t));
+    buffer += sizeof(size_t);
 
     tmplen = offsetof(TupleBatchData ,skip);
-    memcpy(buffer+len,tb,tmplen);
-    len += tmplen;
+    memcpy(buffer,tb,tmplen);
+    buffer +=tmplen;
 
     tmplen = sizeof(bool) * tb->nrows;
-    memcpy(buffer+len,tb->skip,tmplen);
-    len += tmplen;
+    memcpy(buffer,tb->skip,tmplen);
+    buffer += tmplen;
 
 
     for(int i = 0;i < tb->ncols; i++ )
     {
         if(tb->datagroup[i])
         {
-            memcpy(buffer+len,&i,sizeof(int));
-            len += sizeof(int);
+            memcpy(buffer,&i,sizeof(int));
+            buffer += sizeof(int);
 
-            tmplen = GetVFunc(tb->datagroup[i]->elemtype)->serialization(tb->datagroup[i],buffer + len);
-            len += tmplen;
+            unsigned char* ptr = buffer;
+            memcpy(ptr,tb->datagroup[i],offsetof(vtype,isnull));
+            ptr+= offsetof(vtype,isnull);
+
+            tmplen = VDATUMSZ(tb->nrows);
+            memcpy(ptr,tb->datagroup[i]->values, tmplen);
+            ptr += tmplen;
+
+            tmplen = ISNULLSZ(tb->nrows);
+            memcpy(ptr,tb->datagroup[i]->isnull,tmplen);
+            buffer += VTYPESIZE(tb->nrows);
         }
     }
 
-    return buffer;
+    memtuple_set_size(ret,NULL,size);
+    return ret;
 }
 
 TupleBatch tbDeserialization(unsigned char *buffer)
 {
     size_t buflen;
-    memcpy(&buflen,buffer,sizeof(size_t));
+    size_t len = 0;
+    size_t tmplen = 0;
+    tmplen = sizeof(size_t);
+    memcpy(&buflen,buffer,tmplen);
+    len += tmplen;
 
     if(buflen < sizeof(TupleBatchData))
         return NULL;
 
-    size_t len = 0;
-    size_t tmplen = 0;
     TupleBatch tb = palloc0(sizeof(TupleBatchData));
 
     //deserial tb main data
     tmplen = offsetof(TupleBatchData,skip);
-    memcpy(tb,buffer+len,tmplen);
+    memcpy(tb,buffer + len,tmplen);
     len += tmplen;
 
     //deserial member value -- skip
     if(tb->nrows != 0)
     {
-        tb->skip = palloc(sizeof(bool) * tb->nrows);
+        tmplen = sizeof(bool) * tb->nrows;
+        tb->skip = palloc(tmplen);
         memcpy(tb->skip,buffer+len,tmplen);
         len += tmplen;
     }
@@ -170,14 +181,26 @@ TupleBatch tbDeserialization(unsigned char *buffer)
     //deserial member value -- datagroup
     if(tb->ncols != 0)
     {
-        tb->datagroup = palloc0(sizeof(vheader*) * tb->ncols);
         int colid;
-        while (len < buflen)
+        tmplen = sizeof(vtype*) * tb->ncols;
+        tb->datagroup = palloc0(tmplen);
+        //the buffer length is 8-bytes alignment, 
+        //so we need align the current length before comparing.
+        while (((len + 0x8) & (~0x7)) < buflen)
         {
             memcpy(&colid,buffer + len,sizeof(int));
             len += sizeof(int);
-            tb->datagroup[colid] = (vheader* ) GetVFunc(((vheader *) (buffer + len))->elemtype)->deserialization(buffer + len,&tmplen);
-            len += tmplen;
+
+            vtype* src = (vtype*)(buffer + len);
+            tb->datagroup[colid] = buildvtype(src->elemtype,tb->batchsize,tb->skip);
+
+            tmplen = VDATUMSZ(tb->batchsize);
+            //in vtype pointer isnull and skipref are't serialized
+            memcpy(tb->datagroup[colid]->values,src->values - 2,tmplen);
+
+            memcpy(tb->datagroup[colid]->isnull,ISNULLOFFSET(src) - 2,tb->nrows * sizeof(bool));
+
+            len += VTYPESIZE(tb->nrows);
         }
     }
 

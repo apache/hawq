@@ -23,13 +23,12 @@
 #include "postgres.h"
 #include "fmgr.h"
 #include "executor/executor.h"
-#include "vadt.h"
+#include "vtype.h"
 
 /* Function declarations for extension loading and unloading */
 extern void _PG_init(void);
 extern void _PG_fini(void);
 
 extern bool HasVecExecOprator(NodeTag tag);
-Oid GetNType(Oid vtype);
 
 #endif
