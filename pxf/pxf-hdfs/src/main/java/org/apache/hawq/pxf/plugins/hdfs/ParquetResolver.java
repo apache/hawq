@@ -29,6 +29,7 @@ import org.apache.hawq.pxf.api.utilities.Plugin;
 
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.parquet.example.data.Group;
+import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
@@ -55,6 +56,16 @@ public class ParquetResolver extends Plugin implements ReadResolver {
         super(metaData);
     }
 
+    // This method facilitates passing in the MessageType instance, which is
+    // found in the Parquet file footer
+    public List<OneField> getFields(OneRow row, MessageType schema) throws Exception
+    {
+      ParquetUserData parquetUserData = new ParquetUserData(schema);
+      Group g = (Group) row.getData();
+      List<OneField> output = resolveRecord(parquetUserData, g);
+      return output;
+    }
+    
 
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
