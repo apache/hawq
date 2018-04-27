@@ -106,6 +106,7 @@ tbSerialization(TupleBatch tb )
     size_t tmplen = 0;
     //calculate total size for TupleBatch
     size_t size = tbSerializationSize(tb);
+    //makes buffer length about 8-bytes alignment for motion
     size = (size + 0x8) & (~0x7);
 
     ret = palloc0(size);
@@ -183,6 +184,8 @@ TupleBatch tbDeserialization(unsigned char *buffer)
         int colid;
         tmplen = sizeof(vtype*) * tb->ncols;
         tb->datagroup = palloc0(tmplen);
+        //the buffer length is 8-bytes alignment, 
+        //so we need align the current length before comparing.
         while (((len + 0x8) & (~0x7)) < buflen)
         {
             memcpy(&colid,buffer + len,sizeof(int));
