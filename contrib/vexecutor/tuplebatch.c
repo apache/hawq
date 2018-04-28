@@ -150,7 +150,7 @@ tbSerialization(TupleBatch tb )
     return ret;
 }
 
-void tbDeserialization(unsigned char *buffer,TupleBatch* pTB )
+bool tbDeserialization(unsigned char *buffer,TupleBatch* pTB )
 {
     size_t buflen;
     size_t len = 0;
@@ -161,7 +161,7 @@ void tbDeserialization(unsigned char *buffer,TupleBatch* pTB )
     len += tmplen;
 
     if(buflen < sizeof(TupleBatchData))
-        return ;
+        return false;
 
     if(!*pTB)
         tb = palloc0(sizeof(TupleBatchData));
@@ -215,4 +215,5 @@ void tbDeserialization(unsigned char *buffer,TupleBatch* pTB )
         }
     }
     *pTB = tb;
+    return true;
 }

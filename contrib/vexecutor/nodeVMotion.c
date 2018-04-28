@@ -319,7 +319,10 @@ TupleTableSlot *execVMotionUnsortedReceiver(MotionState * node)
 
     /* store it in our result slot and return this. */
     slot = node->ps.ps_ResultTupleSlot;
-    tbDeserialization(((MemTuple)tuple)->PRIVATE_mt_bits,&slot->PRIVATE_tb);
+    bool succ = tbDeserialization(((MemTuple)tuple)->PRIVATE_mt_bits,&slot->PRIVATE_tb);
+
+    if(!succ)
+        elog(ERROR,"Deserialization process Failed");
 
     TupSetVirtualTupleNValid(slot, ((TupleBatch)slot->PRIVATE_tb)->ncols);
     return slot;
