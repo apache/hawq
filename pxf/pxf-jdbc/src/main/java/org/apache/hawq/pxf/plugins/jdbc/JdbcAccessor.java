@@ -455,7 +455,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
 
     private static final Log LOG = LogFactory.getLog(JdbcAccessor.class);
 
-    private static final String FAILED_INSERT_MESSAGE = "Insert failed due to an SQLException. The target database does not support transactions and SOME DATA MAY HAVE BEEN INSERTED. ";
+    private static final String FAILED_INSERT_MESSAGE = "Insert failed due to an SQLException. SOME DATA MAY HAVE BEEN INSERTED. ";
 
     // Read variables
     private String queryRead = null;

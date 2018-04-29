@@ -95,18 +95,16 @@ The `BATCH_SIZE` parameter is *not used* in such tables. *However*, if this para
 
 ## INSERT queries
 
-The PXF JDBC plugin allows to perform INSERT queries to external tables.
+The PXF JDBC plugin allows to perform INSERT queries to external tables. Note that **the plugin does not guarantee consistency for INSERT queries**. Use a staging table in external database to deal with this.
 
 To perform INSERT queries, create an `EXTERNAL WRITABLE TABLE` with `FORMAT 'CUSTOM' (FORMATTER='pxfwritable_export')` in PXF.
 
-The `PARTITION_BY`, `RANGE` and `INTERVAL` is ignored in such tables.
+The `PARTITION_BY`, `RANGE` and `INTERVAL` parameters in such tables are ignored.
 
 
 ### Batching
 
 The INSERT queries can be batched. This may significantly increase perfomance if batching is supported by the external database.
-
-If an **external database does not support transactions** and the INSERTion of one of the tuples failed, some tuples still may be inserted into the external database. The actual result depends on the external database.
 
 To enable batching, create an external table with the parameter `BATCH_SIZE` set to:
 * `integer > 1`. Batches of the given size will be used;
@@ -120,7 +118,7 @@ By default (`BATCH_SIZE` is absent), batching is not used.
 
 ## Partitioning
 
-PXF JDBC plugin supports simultaneous *read* access to an external table from multiple PXF segments. This function is called partitioning.
+PXF JDBC plugin supports simultaneous *read* access to an external table from multiple PXF segments. This feature is called partitioning.
 
 
 ### Syntax
