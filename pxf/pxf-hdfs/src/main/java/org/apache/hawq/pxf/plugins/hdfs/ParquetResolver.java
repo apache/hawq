@@ -56,8 +56,10 @@ public class ParquetResolver extends Plugin implements ReadResolver {
         super(metaData);
     }
 
-    // This method facilitates passing in the MessageType instance, which is
-    // found in the Parquet file footer
+    /**
+     * @inheritDoc
+     * @param schema the MessageType instance, which is obtained from the Parquet file footer
+     */
     public List<OneField> getFields(OneRow row, MessageType schema) throws Exception
     {
       ParquetUserData parquetUserData = new ParquetUserData(schema);
@@ -65,7 +67,6 @@ public class ParquetResolver extends Plugin implements ReadResolver {
       List<OneField> output = resolveRecord(parquetUserData, g);
       return output;
     }
-    
 
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
