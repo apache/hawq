@@ -101,6 +101,12 @@ public class ParquetResolver extends Plugin implements ReadResolver {
                     field.type = DataType.BYTEA.getOID();
                     field.val = g.getFieldRepetitionCount(columnIndex) == 0 ?
                             null : g.getBinary(columnIndex, 0).getBytes();
+                } else if (originalType == OriginalType.DATE) { // DATE type
+                    field.type = DataType.DATE.getOID();
+                    field.val = g.getFieldRepetitionCount(columnIndex) == 0 ? null : g.getString(columnIndex, 0);
+                } else if (originalType == OriginalType.TIMESTAMP_MILLIS) { // TIMESTAMP type
+                    field.type = DataType.TIMESTAMP.getOID();
+                    field.val = g.getFieldRepetitionCount(columnIndex) == 0 ? null : g.getString(columnIndex, 0);
                 } else {
                     field.type = DataType.TEXT.getOID();
                     field.val = g.getFieldRepetitionCount(columnIndex) == 0 ?
