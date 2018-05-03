@@ -24,7 +24,12 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  */
 public class MicrosoftProduct extends DbProduct {
     @Override
-    public String wrapDate(Object dateVal){
-        return "'" + dateVal + "'";
+    public String wrapDate(Object val){
+        return "'" + val + "'";
+    }
+
+    @Override
+    public String wrapTimestamp(Object val) {
+        return "'" + val + "'";
     }
 }

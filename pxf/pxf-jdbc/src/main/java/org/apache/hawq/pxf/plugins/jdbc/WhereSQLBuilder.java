@@ -26,6 +26,9 @@ import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.text.ParseException;
@@ -98,6 +101,18 @@ public class WhereSQLBuilder extends JdbcFilterBuilder {
                     case HDOP_EQ:
                         prepared.append(" = ");
                         break;
+                    case HDOP_LIKE:
+                        prepared.append(" LIKE ");
+                        break;
+                    case HDOP_NE:
+                        prepared.append(" <> ");
+                        break;
+                    case HDOP_IS_NULL:
+                        prepared.append(" IS NULL");
+                        continue;
+                    case HDOP_IS_NOT_NULL:
+                        prepared.append(" IS NOT NULL");
+                        continue;
                     default:
                         throw new UnsupportedFilterException("Unsupported Filter operation: " + op);
                 }
@@ -118,8 +133,12 @@ public class WhereSQLBuilder extends JdbcFilterBuilder {
                         prepared.append("'").append(val.toString()).append("'");
                         break;
                     case DATE:
-                        // Date field is formatted according to the given dbName
+                        // Date field has different format in different databases
                         prepared.append(dbProduct.wrapDate(val));
+                        break;
+                    case TIMESTAMP:
+                        // Timestamp field has different format in different databases
+                        prepared.append(dbProduct.wrapTimestamp(val));
                         break;
                     default:
                         throw new UnsupportedFilterException("Unsupported column type for filtering: " + column.columnTypeCode());
@@ -130,6 +149,7 @@ public class WhereSQLBuilder extends JdbcFilterBuilder {
             query.append(prepared);
         }
         catch (UnsupportedFilterException e) {
+            LOG.debug("WHERE clause is omitted: " + e.toString());
             // Silence the exception and do not insert constraints
         }
     }
@@ -166,6 +186,8 @@ public class WhereSQLBuilder extends JdbcFilterBuilder {
             super(message);
         }
     }
+
+    private static final Log LOG = LogFactory.getLog(WhereSQLBuilder.class);
 
     // {@link InputData} from PXF
     private InputData inputData;

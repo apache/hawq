@@ -86,8 +86,8 @@ public class SqlBuilderTest {
     public void testUnsupportedOperationFilter() throws Exception {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
-        // grade like 'bad'
-        when(inputData.getFilterString()).thenReturn("a3c25s3dbado7");
+        // IN 'bad'
+        when(inputData.getFilterString()).thenReturn("a3c25s3dbado10");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
         StringBuilder sb = new StringBuilder();

@@ -46,10 +46,18 @@ public abstract class DbProduct {
     /**
      * Wraps a given date value the way required by a target database
      *
-     * @param dateVal {@link java.sql.Date} object to wrap
+     * @param val {@link java.sql.Date} object to wrap
      * @return a string with a properly wrapped date object
      */
-    public abstract String wrapDate(Object dateVal);
+    public abstract String wrapDate(Object val);
+
+    /**
+     * Wraps a given timestamp value the way required by a target database
+     *
+     * @param val {@link java.sql.Timestamp} object to wrap
+     * @return a string with a properly wrapped timestamp object
+     */
+    public abstract String wrapTimestamp(Object val);
 }
 
 /**
@@ -57,7 +65,12 @@ public abstract class DbProduct {
  */
 class CommonProduct extends DbProduct {
     @Override
-    public String wrapDate(Object dateVal) {
-        return "date'" + dateVal + "'";
+    public String wrapDate(Object val) {
+        return "date'" + val + "'";
+    }
+
+    @Override
+    public String wrapTimestamp(Object val) {
+        return "'" + val + "'";
     }
 }
