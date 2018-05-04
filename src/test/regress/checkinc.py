@@ -100,6 +100,8 @@ fileset = {
     'quicklz1.h':	 [],
     'quicklz3.h':	 [],
     'json-c/json.h':     [],
+    'emmintrin.h':       [],
+    'cdb/cdbhash.h':     [],
 }
 
 
