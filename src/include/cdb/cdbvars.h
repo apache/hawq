@@ -943,10 +943,16 @@ extern int hawq_hashjoin_bloomfilter;
 extern char* hawq_hashjoin_bloomfilter_max_memory_size;
 /*
  * This guc value controls the ratio of (number of hash join tuples)/(number of tuples of outer table),
- * since the bloomfilter creation/check has cost, it is meaningless to use bloomfilter if most of tuples of outer table
- * can't be filtered. So, if the estimated value is lower than this guc, then we can apply bloomfilter on hash join.
+ * since the Bloom filter creation/check has cost, it is meaningless to use Bloom filter if most of tuples of outer table
+ * can't be filtered. So, if the estimated value is lower than this guc, then we can apply Bloom filter on hash join.
  */
 extern double hawq_hashjoin_bloomfilter_ratio;
+/*
+ * This guc value controls the Bloom filter sampling number, while scanning outer table, f
+ * or first N tuples of the outer table, if the ratio is larger than
+ * hawq_hashjoin_bloomfilter_ratio, the remain tuples will not be checked by Bloom filter.
+ */
+extern int hawq_hashjoin_bloomfilter_sampling_number;
 
 /* Get statistics for partitioned parent from a child */
 extern bool 	gp_statistics_pullup_from_child_partition;

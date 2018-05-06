@@ -33,6 +33,7 @@
 #include "access/filesplit.h"
 #include "access/htup.h"
 #include "executor/tuptable.h"
+#include "nodes/execnodes.h"
 
 typedef struct ParquetRowGroupReader
 {
@@ -71,6 +72,7 @@ ParquetRowGroupReader_ScanNextTuple(
 	ParquetRowGroupReader 	*rowGroupReader,
 	int						*hawqAttrToParquetColNum,
 	bool 					*projs,
+	RuntimeFilterState		*rfState,
 	TupleTableSlot 			*slot);
 
 /* Finish scanning current row group*/
