@@ -1541,7 +1541,7 @@ typedef struct ScanState
 	TableType tableType;
 
 	/* Runtime filter */
-	struct RuntimeFilterState runtimeFilter;
+	struct RuntimeFilterState *runtimeFilter;
 
 } ScanState;
 

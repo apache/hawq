@@ -806,12 +806,14 @@ ExecEndHashJoin(HashJoinState *node)
  * Create runtime filter state for scan node.
  * TODO: how to pass it across motion
  */
-static void
-CreateRuntimeFilterState(RuntimeFilterState* rf, HashJoinState *hjstate)
+static RuntimeFilterState*
+CreateRuntimeFilterState(HashJoinState *hjstate)
 {
 	/* record projection info */
 	ListCell *hk;
 	int i = 0;
+	RuntimeFilterState* rf = (RuntimeFilterState*)palloc0(sizeof(RuntimeFilterState));
+
 	foreach(hk, hjstate->hj_OuterHashKeys)
 	{
 		ExprState  *keyexpr = (ExprState *) lfirst(hk);
@@ -819,14 +821,13 @@ CreateRuntimeFilterState(RuntimeFilterState* rf, HashJoinState *hjstate)
 		rf->joinkeys = lappend_int(rf->joinkeys, variable->varattno);
 		i++;
 	}
-	rf->hashfunctions = (FmgrInfo *) palloc(i * sizeof(FmgrInfo));
-	memcpy(rf->hashfunctions, hjstate->hj_HashTable->hashfunctions, i*sizeof(FmgrInfo));
-	size_t size = offsetof(BloomFilterData, data) + hjstate->hj_HashTable->bloomfilter->data_size;
-	rf->bloomfilter = palloc0(size);
-	memcpy(rf->bloomfilter, hjstate->hj_HashTable->bloomfilter, size);
+	rf->hashfunctions = hjstate->hj_HashTable->hashfunctions;
+	rf->bloomfilter = hjstate->hj_HashTable->bloomfilter;
 	rf->hasRuntimeFilter = true;
 	rf->stopRuntimeFilter = false;
 	rf->checkedSamples = false;
+
+	return rf;
 }
 
 /*
@@ -852,21 +853,21 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 
 	HashState *hashState = (HashState *) innerPlanState(hjstate);
 
-	RuntimeFilterState* rf = &((ScanState*)outerNode)->runtimeFilter;
 	/* initialize bloom filter for scan node */
 	if (hashtable->bloomfilter != NULL &&
 		outerNode->type == T_TableScanState && /* only support scan node for left tree. */
-		rf->hasRuntimeFilter == false)
+		((ScanState*)outerNode)->runtimeFilter == NULL)
 	{
 		Assert(hashtable->bloomfilter->isCreated);
-		CreateRuntimeFilterState(rf, hjstate);
+		((ScanState*)outerNode)->runtimeFilter = CreateRuntimeFilterState(hjstate);
 	}
+	RuntimeFilterState* rf = ((ScanState*)outerNode)->runtimeFilter;
 
-	/* Adaptive runtime filter check.
-	 *
+	/*
+	 * Adaptive runtime filter check.
 	 */
 	HashJoin *hj = (HashJoin*)hjstate->js.ps.plan;
-	if (rf->hasRuntimeFilter && !rf->stopRuntimeFilter && !rf->checkedSamples &&
+	if (rf != NULL && rf->hasRuntimeFilter && !rf->stopRuntimeFilter && !rf->checkedSamples &&
 			rf->bloomfilter->nTested >= hawq_hashjoin_bloomfilter_sampling_number)
 	{
 		double real_ratio = (rf->bloomfilter->nMatched) / (rf->bloomfilter->nTested);

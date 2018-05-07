@@ -226,7 +226,7 @@ ParquetRowGroupReader_ScanNextTuple(
 		bool *nulls = slot_get_isnull(slot);
 
 		int colReaderIndex = 0;
-		int16 proj[128];
+		int16 proj[natts];
 		for (int i = 0, j = 0; i < natts; i++)
 		{
 			if (projs[i] == false)

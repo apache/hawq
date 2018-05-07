@@ -85,21 +85,21 @@ FreeScanRuntimefilterState(RuntimeFilterState* rfstate)
 			 bf->nInserted, bf->nTested, bf->nMatched, bf->nTested - bf->nMatched,
 			 bf->nTested == 0 ? 0 : (float)((float)(bf->nTested - bf->nMatched)/(float)(bf->nTested)));
 	}
-	DestroyBloomFilter(bf);
 	rfstate->bloomfilter = NULL;
 	if(rfstate->joinkeys)
 	{
 		list_free(rfstate->joinkeys);
 		rfstate->joinkeys = NIL;
 	}
+	pfree(rfstate);
 }
 
 void
 ExecEndTableScan(TableScanState *node)
 {
-	if (node->ss.runtimeFilter.hasRuntimeFilter)
+	if (node->ss.runtimeFilter != NULL)
 	{
-		FreeScanRuntimefilterState(&(node->ss.runtimeFilter));
+		FreeScanRuntimefilterState(node->ss.runtimeFilter);
 	}
 
 	if ((node->ss.scan_state & SCAN_SCAN) != 0)

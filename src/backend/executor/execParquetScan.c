@@ -109,7 +109,7 @@ BeginScanParquetRelation(ScanState *scanState)
 			node->opaque->proj);
 
 	/* push down Bloom filter */
-	node->opaque->scandesc->rfState = &scanState->runtimeFilter;
+	node->opaque->scandesc->rfState = scanState->runtimeFilter;
 
 	node->opaque->scandesc->splits = scanState->splits;
 	node->ss.scan_state = SCAN_SCAN;
