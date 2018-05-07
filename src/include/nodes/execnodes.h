@@ -1497,11 +1497,11 @@ typedef enum
 
 /*
  * Runtime filter information passed down to scan.
- * 	hasRuntimeFilter:
- * 	stopRuntimeFilter:
- * 	joinkeys
- *	hashfunctions
- *	bloomfilter
+ * 	hasRuntimeFilter: if this runtime filter has a created Bloom filter
+ * 	stopRuntimeFilter: if stop using runtime filter
+ * 	joinkeys: column position of join keys
+ *	hashfunctions: hash functions to hash join key
+ *	bloomfilter: BloomFilter instance
  */
 typedef struct RuntimeFilterState
 {
