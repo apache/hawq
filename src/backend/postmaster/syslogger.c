@@ -24,12 +24,15 @@
  */
 #include "postgres.h"
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <string.h>
 
 #include "lib/stringinfo.h"
 #include "libpq/pqsignal.h"
@@ -59,6 +62,9 @@
  */
 bool		Redirect_stderr = false;
 int			Log_RotationAge = HOURS_PER_DAY * MINS_PER_HOUR;
+int			Log_MaxAge = 0;  /* E.g., DAYS_PER_MONTH * HOURS_PER_DAY * MINS_PER_HOUR */
+int			Log_MaxSize = 0; /* E.g., 10 * 1024 * 1024, 10GB */
+
 int			Log_RotationSize = 10 * 1024;
 char	   *Log_directory = NULL;
 char	   *Log_filename = NULL;
@@ -163,6 +169,8 @@ static void set_next_rotation_time(void);
 static void sigHupHandler(SIGNAL_ARGS);
 static void sigUsr1Handler(SIGNAL_ARGS);
 
+static int logfileinfocmp(const void *d1, const void *d2);
+static void constrain_max_logfile();
 
 /*
  * Main entry point for syslogger process
@@ -174,6 +182,8 @@ SysLoggerMain(int argc, char *argv[])
     char	   *currentLogDir;
     char	   *currentLogFilename;
     int			currentLogRotationAge;
+    int			currentLogMaxAge;
+    int			currentLogMaxSize;
 
     IsUnderPostmaster = true;	/* we are a postmaster subprocess now */
 
@@ -329,6 +339,16 @@ SysLoggerMain(int argc, char *argv[])
             {
                 pfree(currentLogFilename);
                 currentLogFilename = pstrdup(Log_filename);
+                rotation_requested = true;
+            }
+            if (currentLogMaxAge != Log_MaxAge)
+            {
+                currentLogMaxAge = Log_MaxAge;
+                rotation_requested = true;
+            }
+            if (currentLogMaxSize != Log_MaxSize)
+            {
+                currentLogMaxSize = Log_MaxSize;
                 rotation_requested = true;
             }
 
@@ -1738,6 +1758,12 @@ logfile_rotate(bool time_based_rotation)
     LeaveCriticalSection(&sysfileSection);
 #endif
 
+    /*
+     * remove oldest log files when total size exceeds the Log_MaxSize,
+     * or last modification time is earlier than Log_MaxAge.
+     */
+    constrain_max_logfile();
+
     set_next_rotation_time();
 
     /* instead of pfree'ing filename, remember it for next time */
@@ -1746,6 +1772,215 @@ logfile_rotate(bool time_based_rotation)
     last_file_name = filename;
 }
 
+/*
+ * Used by qsort() to sort log files by modification time in descending order
+ */
+int logfileinfocmp(const void *d1, const void *d2)
+{
+    time_t diff = (*(LogFileInfo * const *)d1)->mtime -
+                  (*(LogFileInfo * const *)d2)->mtime;
+    return (diff > 0) ? -1 : (diff < 0 ? 1 : 0);
+}
+
+/*
+ * Constrain the log files with maximum size or duration
+ */
+static void
+constrain_max_logfile()
+{
+    /* file name/path string */
+    char *dirpath = NULL;
+    char *filepath = NULL;
+    char *filename;
+    char *suffix;
+
+    /* dir/file infomation */
+    DIR *dir;
+    struct dirent *file = NULL;
+    struct stat statbuf;
+
+    /* log file list */
+    size_t arraysz;
+    size_t nitems = 0;
+    size_t logsize = 0;
+    unsigned int i = 0, fileidx =0;
+    LogFileInfo **filelist, *copyfile = NULL;
+
+    /* upbound of constraints */
+    size_t largest = 0;
+    pg_time_t earliest, now, modifytime;
+
+#define CSV_SUFFIX ".csv"
+#define TXT_SUFFIX ".txt"
+
+    /* nothing to do if log files are immortal */
+    if (Log_MaxSize <= 0 && Log_MaxAge <= 0)
+        return;
+
+    /* calculate the earliest time to clean */
+    if(Log_MaxAge > 0)
+    {
+        now = (pg_time_t) time(NULL);
+        earliest = now - Log_MaxAge * SECS_PER_MINUTE;
+    }
+
+    /* calculate the largest total size to clean */
+    if(Log_MaxSize > 0)
+    {
+        largest = Log_MaxSize * 1024L;
+    }
+
+    /* open the log directory */
+    dirpath = palloc(MAXPGPATH);
+    snprintf(dirpath, MAXPGPATH, "%s/", Log_directory);
+
+    if ((dir = opendir(dirpath)) == NULL)
+    {
+        ereport(WARNING, (errmsg("could not open directory \"%s\": %m", dirpath)));
+        goto error_out;
+    }
+
+    if (fstat(dirfd(dir), &statbuf) < 0)
+    {
+        ereport(WARNING, (errmsg("could not obtain information about directory \"%s\": %m", dirpath)));
+        goto error_out;
+    }
+
+    /* estimate size of file array, 24 is the minimum size entry */
+    arraysz = (statbuf.st_size / 24);
+    filelist = (LogFileInfo **)palloc(arraysz * sizeof(LogFileInfo *));
+
+    /* get file lists, filter out illegal files */
+    filepath = palloc(MAXPGPATH);
+    while ((file = readdir(dir)) != NULL)
+    {
+        filename = file->d_name;
+
+        /* ignore '.' and '..' */
+        if (strcmp(filename, ".") == 0 || strcmp(filename, "..") == 0)
+            continue;
+
+        /* ignore '/'. On snow leopard, we get back "/" as a subdir */
+        if (filename[0] == '/' && filename[1] == '\0')
+            continue;
+
+        /* file name shorter than log extensions (.log, .csv) will be ignored */
+        if (strlen(filename) < sizeof(CSV_SUFFIX) + 1)
+           continue;
+
+        suffix = filename + (strlen(filename) - sizeof(CSV_SUFFIX) + 1);
+
+        /* is *.log ? */
+        if (gp_log_format == 0 && pg_strcasecmp(suffix, TXT_SUFFIX) != 0)
+            continue;
+
+        /* is *.csv ? */
+        if (gp_log_format == 1 && pg_strcasecmp(suffix, CSV_SUFFIX) != 0)
+            continue;
+
+        /* get file status, include symlink */
+        snprintf(filepath, MAXPGPATH, "%s/%s", Log_directory, filename);
+        if (lstat(filepath, &statbuf) != 0)
+        {
+            if (errno != ENOENT)
+                ereport(WARNING, (errmsg("could not stat file or directory \"%s\": %m", filepath)));
+
+            continue;
+        }
+
+        /* is a normal file? don't touch subdir, pipe, link and other types */
+        if (S_ISREG(statbuf.st_mode))
+        {
+            /* store its name into list */
+            copyfile = (LogFileInfo *)palloc(sizeof(LogFileInfo));
+            copyfile->filepath = pstrdup(filepath);
+            copyfile->mtime = statbuf.st_mtime;
+            copyfile->filesize= statbuf.st_size;
+
+            /* make sure space left is enough, in case that logs are growning */
+            if ((nitems+1) >= arraysz)
+            {
+                arraysz *= 2;
+                filelist = (LogFileInfo **)repalloc(filelist, arraysz * sizeof(LogFileInfo *));
+            }
+
+            filelist[nitems++] = copyfile;
+        }
+
+
+        /* clear it for next readdir() */
+        errno = 0;
+    }
+
+    if (errno)
+    {
+        ereport(WARNING, (errmsg("could not read directory \"%s\": %m", dirpath)));
+        goto error_out;
+    }
+
+    /* empty file list, why not leave directly? */
+    if(nitems == 0)
+        goto quick_out;
+
+    /* sort by log file modification time in descending order */
+    if (nitems)
+        qsort(filelist, nitems, sizeof(struct fileinfo *), logfileinfocmp);
+
+    /* filter out with size and age constraints*/
+    logsize = 0;
+    for(i = 0; i < nitems; i++)
+    {
+        /* maxsize constraint */
+        if(Log_MaxSize > 0)
+        {
+            logsize += filelist[i]->filesize;
+            if (logsize >= largest)
+               break;
+        }
+
+        /* maxage constraint */
+        if(Log_MaxAge > 0)
+        {
+            modifytime = filelist[i]->mtime;
+            if(modifytime < earliest)
+                break;
+        }
+
+    }
+    fileidx = i;
+
+    /* remove old files */
+    for(i = fileidx; i < nitems; i++)
+    {
+        filename = filelist[i]->filepath;
+        if (unlink(filename) != 0)
+        {
+            if (errno != ENOENT)
+            {
+                ereport(WARNING, (errmsg("could not remove file \"%s\": %m", filename)));
+                goto error_out;
+            }
+        }
+    }
+
+quick_out:
+error_out:
+    if (filelist)
+    {
+        for (i = 0; i < nitems; i++)
+        {
+            pfree(filelist[i]->filepath);
+            pfree(filelist[i]);
+        }
+        pfree(filelist);
+    }
+    if (dir)
+        closedir(dir);
+    if (dirpath)
+        pfree(dirpath);
+    if (filepath)
+        pfree(filepath);
+}
 
 /*
  * construct logfile name using timestamp information

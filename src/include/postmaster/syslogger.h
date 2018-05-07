@@ -168,6 +168,15 @@ typedef struct
 extern bool Redirect_stderr;
 extern int	Log_RotationAge;
 extern int	Log_RotationSize;
+
+extern int	Log_MaxAge;
+extern int	Log_MaxSize;
+typedef struct {
+	time_t  mtime;
+	char   *filepath;
+	size_t  filesize;
+} LogFileInfo;
+
 extern PGDLLIMPORT char *Log_directory;
 extern PGDLLIMPORT char *Log_filename;
 extern bool Log_truncate_on_rotation;

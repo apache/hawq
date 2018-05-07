@@ -203,6 +203,12 @@ max_prepared_transactions = 250		# can be 0 or more
 #log_rotation_size = 10MB		# Automatic rotation of logfiles will 
 					# happen after that much log output.
 					# 0 disables.
+#log_max_age = 30d	# Maximum duration of log files we keep.
+					# 0 means unlimited.
+#log_max_size = 10GB	# Maximum storage size of log files will
+					# be allowed. Oldest log files exeed the
+					# size will be removed.
+					# 0 means unlimited.
 
 # - When to Log -
 
