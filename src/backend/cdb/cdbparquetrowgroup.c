@@ -243,7 +243,9 @@ ParquetRowGroupReader_ScanNextTuple(
 			if (hawqAttrToParquetColNum[i] == 1) {
 				ParquetColumnReader_readValue(nextReader, &values[i], &nulls[i],
 						hawqTypeID);
-			} else {
+			}
+			else
+			{
 				/*
 				 * Because there are some memory reused inside the whole column reader, so need
 				 * to switch the context from PerTupleContext to rowgroup->context
@@ -253,28 +255,22 @@ ParquetRowGroupReader_ScanNextTuple(
 
 				switch (hawqTypeID) {
 				case HAWQ_TYPE_POINT:
-					ParquetColumnReader_readPoint(nextReader, &values[i],
-							&nulls[i]);
+					ParquetColumnReader_readPoint(nextReader, &values[i], &nulls[i]);
 					break;
 				case HAWQ_TYPE_PATH:
-					ParquetColumnReader_readPATH(nextReader, &values[i],
-							&nulls[i]);
+					ParquetColumnReader_readPATH(nextReader, &values[i], &nulls[i]);
 					break;
 				case HAWQ_TYPE_LSEG:
-					ParquetColumnReader_readLSEG(nextReader, &values[i],
-							&nulls[i]);
+					ParquetColumnReader_readLSEG(nextReader, &values[i], &nulls[i]);
 					break;
 				case HAWQ_TYPE_BOX:
-					ParquetColumnReader_readBOX(nextReader, &values[i],
-							&nulls[i]);
+					ParquetColumnReader_readBOX(nextReader, &values[i], &nulls[i]);
 					break;
 				case HAWQ_TYPE_CIRCLE:
-					ParquetColumnReader_readCIRCLE(nextReader, &values[i],
-							&nulls[i]);
+					ParquetColumnReader_readCIRCLE(nextReader, &values[i], &nulls[i]);
 					break;
 				case HAWQ_TYPE_POLYGON:
-					ParquetColumnReader_readPOLYGON(nextReader, &values[i],
-							&nulls[i]);
+					ParquetColumnReader_readPOLYGON(nextReader, &values[i], &nulls[i]);
 					break;
 				default:
 					/* TODO array type */
