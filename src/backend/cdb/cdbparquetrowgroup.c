@@ -240,7 +240,8 @@ ParquetRowGroupReader_ScanNextTuple(
 					&rowGroupReader->columnReaders[colReaderIndex];
 			int hawqTypeID = tupDesc->attrs[i]->atttypid;
 
-			if (hawqAttrToParquetColNum[i] == 1) {
+			if (hawqAttrToParquetColNum[i] == 1)
+			{
 				ParquetColumnReader_readValue(nextReader, &values[i], &nulls[i],
 						hawqTypeID);
 			}
@@ -310,7 +311,8 @@ ParquetRowGroupReader_ScanNextTuple(
 				i++;
 			}
 
-			if (!FindBloomFilter(rfState->bloomfilter, hashkey)) {
+			if (!FindBloomFilter(rfState->bloomfilter, hashkey))
+			{
 				continue;
 			}
 			rfState->bloomfilter->nMatched++;
