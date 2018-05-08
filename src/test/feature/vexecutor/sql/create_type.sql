@@ -5,6 +5,8 @@ drop type vint8 cascade;
 drop type vfloat8 cascade;
 drop type vfloat4 cascade;
 drop type vbool cascade;
+drop type vdateadt cascade;
+drop type vtimeadt cascade;
 
 -- create vectorized types
 
@@ -41,6 +43,17 @@ CREATE TYPE vbool;
 CREATE FUNCTION vboolin(cstring) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION vboolout(vbool) RETURNS cstring AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
 CREATE TYPE vbool ( INPUT = vboolin, OUTPUT = vboolout, element = bool, storage=external );
+
+CREATE TYPE vtimeadt;
+CREATE FUNCTION vtimeadtin(cstring) RETURNS vtimeadt as 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION vtimeadtout(vtimeadt) RETURNS cstring AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE TYPE vtimeadt ( input = vtimeadtin, output = vtimeadtout, element = time , storage=external);
+
+
+CREATE TYPE vdateadt;
+CREATE FUNCTION vdateadtin(cstring) RETURNS vdateadt as 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE FUNCTION vdateadtout(vdateadt) RETURNS cstring AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE TYPE vdateadt ( INPUT = vdateadtin, OUTPUT = vdateadtout, element = date , storage=external);
 
 
 -- create operators for the vectorized types
@@ -914,4 +927,37 @@ CREATE FUNCTION vfloat8float8div(vfloat8, float8) RETURNS vfloat8 AS 'vexecutor.
 CREATE OPERATOR / ( leftarg = vfloat8, rightarg = float8, procedure = vfloat8float8div, commutator = * );
 
 
+CREATE FUNCTION vdateadt_eq(vdateadt, vdateadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR = ( leftarg = vdateadt, rightarg = vdateadt, procedure = vdateadt_eq, commutator = = );
+CREATE FUNCTION vdateadt_ne(vdateadt, vdateadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR <> ( leftarg = vdateadt, rightarg = vdateadt, procedure = vdateadt_ne, commutator = <> );
+CREATE FUNCTION vdateadt_lt(vdateadt, vdateadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR < ( leftarg = vdateadt, rightarg = vdateadt, procedure = vdateadt_lt, commutator = < );
+CREATE FUNCTION vdateadt_le(vdateadt, vdateadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR <= ( leftarg = vdateadt, rightarg = vdateadt, procedure = vdateadt_le, commutator = <= );
+CREATE FUNCTION vdateadt_gt(vdateadt, vdateadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR > ( leftarg = vdateadt, rightarg = vdateadt, procedure = vdateadt_gt, commutator = > );
+CREATE FUNCTION vdateadt_ge(vdateadt, vdateadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR >= ( leftarg = vdateadt, rightarg = vdateadt, procedure = vdateadt_ge, commutator = >= );
+CREATE FUNCTION vdateadt_mi(vdateadt, vdateadt) RETURNS vint4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR - ( leftarg = vdateadt, rightarg = vdateadt, procedure = vdateadt_mi, commutator = - );
+CREATE FUNCTION vdateadt_pli(vdateadt, vint4) RETURNS vdateadt AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR + ( leftarg = vdateadt, rightarg = vint4, procedure = vdateadt_pli, commutator = + );
+CREATE FUNCTION vdateadt_mii(vdateadt, vint4) RETURNS vdateadt AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR - ( leftarg = vdateadt, rightarg = vint4, procedure = vdateadt_mii, commutator = - );
+
+
+
+CREATE FUNCTION vtimeadt_eq(vtimeadt, vtimeadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR = ( leftarg = vtimeadt, rightarg = vtimeadt, procedure = vtimeadt_eq, commutator = = );
+CREATE FUNCTION vtimeadt_ne(vtimeadt, vtimeadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR <> ( leftarg = vtimeadt, rightarg = vtimeadt, procedure = vtimeadt_ne, commutator = <> );
+CREATE FUNCTION vtimeadt_lt(vtimeadt, vtimeadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR < ( leftarg = vtimeadt, rightarg = vtimeadt, procedure = vtimeadt_lt, commutator = < );
+CREATE FUNCTION vtimeadt_le(vtimeadt, vtimeadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR <= ( leftarg = vtimeadt, rightarg = vtimeadt, procedure = vtimeadt_le, commutator = <= );
+CREATE FUNCTION vtimeadt_gt(vtimeadt, vtimeadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR > ( leftarg = vtimeadt, rightarg = vtimeadt, procedure = vtimeadt_gt, commutator = > );
+CREATE FUNCTION vtimeadt_ge(vtimeadt, vtimeadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR >= ( leftarg = vtimeadt, rightarg = vtimeadt, procedure = vtimeadt_ge, commutator = >= );
 
