@@ -24,11 +24,13 @@
 #include "fmgr.h"
 #include "executor/executor.h"
 #include "vtype.h"
+#include "vagg.h"
 
 /* Function declarations for extension loading and unloading */
 extern void _PG_init(void);
 extern void _PG_fini(void);
 
 extern bool HasVecExecOprator(NodeTag tag);
+extern void BackportTupleDescriptor(PlanState* ps,TupleDesc td);
 
 #endif

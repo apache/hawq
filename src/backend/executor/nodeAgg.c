@@ -152,11 +152,7 @@ typedef struct AggHashEntryData
 	AggStatePerGroupData pergroup[1];	/* VARIABLE LENGTH ARRAY */
 } AggHashEntryData;				/* VARIABLE LENGTH STRUCT */
 
-static void advance_transition_function(AggState *aggstate,
-										AggStatePerAgg peraggstate,
-										AggStatePerGroup pergroupstate,
-										FunctionCallInfoData *fcinfo,
-										MemoryManagerContainer *mem_manager);
+
 static void process_ordered_aggregate_single(AggState *aggstate,
 											 AggStatePerAgg peraggstate,
 											 AggStatePerGroup pergroupstate);
@@ -168,12 +164,9 @@ static void finalize_aggregate(AggState *aggstate,
 				   AggStatePerGroup pergroupstate,
 				   Datum *resultVal, bool *resultIsNull);
 
-static void finalize_aggregates(AggState *aggstate, AggStatePerGroup pergroup);
-
 static Bitmapset *find_unaggregated_cols(AggState *aggstate);
 static bool find_unaggregated_cols_walker(Node *node, Bitmapset **colnos);
 static TupleTableSlot *agg_retrieve_direct(AggState *aggstate);
-static TupleTableSlot *agg_retrieve_hash_table(AggState *aggstate);
 static void ExecAggExplainEnd(PlanState *planstate, struct StringInfoData *buf);
 static int count_extra_agg_slots(Node *node);
 static bool count_extra_agg_slots_walker(Node *node, int *count);
@@ -381,7 +374,7 @@ initialize_aggregates(AggState *aggstate,
  *
  * It doesn't matter which memory context this is called in.
  */
-static void
+void
 advance_transition_function(AggState *aggstate,
 							AggStatePerAgg peraggstate,
 							AggStatePerGroup pergroupstate,
@@ -819,7 +812,7 @@ process_ordered_aggregate_multi(AggState *aggstate,
  * finalize_aggregates
  *   Compute the final value for all aggregate functions.
  */
-static void
+void
 finalize_aggregates(AggState *aggstate, AggStatePerGroup pergroup)
 {
         AggStatePerAgg peragg = aggstate->peragg;
@@ -1708,7 +1701,7 @@ agg_retrieve_direct(AggState *aggstate)
 /*
  * ExecAgg for hashed case: retrieve groups from hash table
  */
-static TupleTableSlot *
+TupleTableSlot *
 agg_retrieve_hash_table(AggState *aggstate)
 {
 	ExprContext *econtext;
