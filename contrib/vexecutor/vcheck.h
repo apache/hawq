@@ -21,6 +21,7 @@
 #define VCHECK_H
 
 #include "vtype.h"
+#include "vtype_ext.h"
 #include "tuplebatch.h"
 #include "nodes/execnodes.h"
 

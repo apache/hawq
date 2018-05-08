@@ -24,6 +24,7 @@
 #include "fmgr.h"
 #include "executor/executor.h"
 #include "vtype.h"
+#include "vtype_ext.h"
 
 /* Function declarations for extension loading and unloading */
 extern void _PG_init(void);
