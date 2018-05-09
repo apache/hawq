@@ -100,6 +100,7 @@ ExecEndTableScan(TableScanState *node)
 	if (node->ss.runtimeFilter != NULL)
 	{
 		FreeScanRuntimefilterState(node->ss.runtimeFilter);
+		node->ss.runtimeFilter = NULL;
 	}
 
 	if ((node->ss.scan_state & SCAN_SCAN) != 0)

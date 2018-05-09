@@ -867,8 +867,9 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 	 * Adaptive runtime filter check.
 	 */
 	HashJoin *hj = (HashJoin*)hjstate->js.ps.plan;
-	if (rf != NULL && rf->hasRuntimeFilter && !rf->stopRuntimeFilter && !rf->checkedSamples &&
-			rf->bloomfilter->nTested >= hawq_hashjoin_bloomfilter_sampling_number)
+	if (outerNode->type == T_TableScanState && rf != NULL && rf->hasRuntimeFilter
+			&& !rf->stopRuntimeFilter && !rf->checkedSamples
+			&& rf->bloomfilter->nTested >= hawq_hashjoin_bloomfilter_sampling_number)
 	{
 		double real_ratio = (rf->bloomfilter->nMatched) / (rf->bloomfilter->nTested);
 		if(real_ratio > hawq_hashjoin_bloomfilter_ratio)
