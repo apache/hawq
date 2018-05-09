@@ -739,6 +739,7 @@ double  optimizer_nestloop_factor;
 double  locality_upper_bound;
 double  net_disk_ratio;
 double hawq_hashjoin_bloomfilter_ratio;
+int hawq_hashjoin_bloomfilter_sampling_number;
 bool		optimizer_cte_inlining;
 int		optimizer_cte_inlining_bound;
 double 	optimizer_damping_factor_filter;
@@ -6697,6 +6698,15 @@ static struct config_int ConfigureNamesInt[] =
 		300000, 1, INT_MAX, NULL, NULL
 	},
 
+	{
+		{"hawq_hashjoin_bloomfilter_sampling_number", PGC_USERSET, PRESET_OPTIONS,
+			gettext_noop("Sets the sampling number for hash join bloomfilter when scan the outer table."),
+			NULL,
+			GUC_NO_SHOW_ALL
+		},
+		&hawq_hashjoin_bloomfilter_sampling_number,
+		10000, 100, INT_MAX, NULL, NULL
+	},
 
 	/* End-of-list marker */
 	{

@@ -73,8 +73,36 @@ ExecTableScan(TableScanState *node)
 }
 
 void
+FreeScanRuntimefilterState(RuntimeFilterState* rfstate)
+{
+	BloomFilter bf = rfstate->bloomfilter;
+	if (bf != NULL && bf->isCreated)
+	{
+		elog(DEBUG3, "Hash Join, inner table row number:%d, "
+					 "outer table total row number:%d, "
+					 "outer table matched row number:%d, "
+					 "outer table filtered row number:%d, filtered rate:%.3f",
+			 bf->nInserted, bf->nTested, bf->nMatched, bf->nTested - bf->nMatched,
+			 bf->nTested == 0 ? 0 : (float)((float)(bf->nTested - bf->nMatched)/(float)(bf->nTested)));
+	}
+	rfstate->bloomfilter = NULL;
+	if(rfstate->joinkeys)
+	{
+		list_free(rfstate->joinkeys);
+		rfstate->joinkeys = NIL;
+	}
+	pfree(rfstate);
+}
+
+void
 ExecEndTableScan(TableScanState *node)
 {
+	if (node->ss.runtimeFilter != NULL)
+	{
+		FreeScanRuntimefilterState(node->ss.runtimeFilter);
+		node->ss.runtimeFilter = NULL;
+	}
+
 	if ((node->ss.scan_state & SCAN_SCAN) != 0)
 	{
 		EndTableScanRelation(&(node->ss));

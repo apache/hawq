@@ -26,6 +26,7 @@
 
 #include "cdb/cdbparquetrowgroup.h"
 #include "cdb/cdbparquetfooterserializer.h"
+#include "utils/bloomfilter.h"
 
 static bool ParquetRowGroupReader_Select(FileSplit split,
                                          ParquetMetadata parquetMetadata,
@@ -206,54 +207,54 @@ ParquetRowGroupReader_ScanNextTuple(
 	ParquetRowGroupReader	*rowGroupReader,
 	int						*hawqAttrToParquetColNum,
 	bool 					*projs,
+	RuntimeFilterState		*rfState,
 	TupleTableSlot 			*slot)
 {
 	Assert(slot);
-
-	if (rowGroupReader->rowRead >= rowGroupReader->rowCount)
+	while (rowGroupReader->rowRead < rowGroupReader->rowCount)
 	{
-		ParquetRowGroupReader_FinishedScanRowGroup(rowGroupReader);
-		return false;
-	}
 
-	/*
-	 * get the next item (tuple) from the row group
-	 */
-	rowGroupReader->rowRead++;
+		/*
+		 * get the next item (tuple) from the row group
+		 */
+		rowGroupReader->rowRead++;
 
-	int natts = slot->tts_tupleDescriptor->natts;
-	Assert(natts <=	tupDesc->natts);
+		int natts = slot->tts_tupleDescriptor->natts;
+		Assert(natts <= tupDesc->natts);
 
-	Datum *values = slot_get_values(slot);
-	bool *nulls = slot_get_isnull(slot);
+		Datum *values = slot_get_values(slot);
+		bool *nulls = slot_get_isnull(slot);
 
-	int colReaderIndex = 0;
-	for(int i = 0; i < natts; i++)
-	{
-		if(projs[i] == false)
+		int colReaderIndex = 0;
+		int16 proj[natts];
+		for (int i = 0, j = 0; i < natts; i++)
 		{
-			nulls[i] = true;
-			continue;
-		}
-
-		ParquetColumnReader *nextReader =
-			&rowGroupReader->columnReaders[colReaderIndex];
-		int hawqTypeID = tupDesc->attrs[i]->atttypid;
-
-		if(hawqAttrToParquetColNum[i] == 1)
-		{
-			ParquetColumnReader_readValue(nextReader, &values[i], &nulls[i], hawqTypeID);
-		}
-		else
-		{
-			/*
-			 * Because there are some memory reused inside the whole column reader, so need
-			 * to switch the context from PerTupleContext to rowgroup->context
-			 */
-			MemoryContext oldContext = MemoryContextSwitchTo(rowGroupReader->memoryContext);
-
-			switch(hawqTypeID)
+			if (projs[i] == false)
 			{
+				nulls[i] = true;
+				continue;
+			}
+			proj[j] = i;
+			j++;
+			ParquetColumnReader *nextReader =
+					&rowGroupReader->columnReaders[colReaderIndex];
+			int hawqTypeID = tupDesc->attrs[i]->atttypid;
+
+			if (hawqAttrToParquetColNum[i] == 1)
+			{
+				ParquetColumnReader_readValue(nextReader, &values[i], &nulls[i],
+						hawqTypeID);
+			}
+			else
+			{
+				/*
+				 * Because there are some memory reused inside the whole column reader, so need
+				 * to switch the context from PerTupleContext to rowgroup->context
+				 */
+				MemoryContext oldContext = MemoryContextSwitchTo(
+						rowGroupReader->memoryContext);
+
+				switch (hawqTypeID) {
 				case HAWQ_TYPE_POINT:
 					ParquetColumnReader_readPoint(nextReader, &values[i], &nulls[i]);
 					break;
@@ -277,17 +278,53 @@ ParquetRowGroupReader_ScanNextTuple(
 					/* TODO UDT */
 					Insist(false);
 					break;
+				}
+
+				MemoryContextSwitchTo(oldContext);
 			}
 
-			MemoryContextSwitchTo(oldContext);
+			colReaderIndex += hawqAttrToParquetColNum[i];
 		}
 
-		colReaderIndex += hawqAttrToParquetColNum[i];
+		if (rfState != NULL && rfState->hasRuntimeFilter
+				&& !rfState->stopRuntimeFilter)
+		{
+			Assert(rfState->bloomfilter != NULL);
+			rfState->bloomfilter->nTested++;
+			uint32_t hashkey = 0;
+			ListCell *hk;
+			int i = 0;
+			foreach(hk, rfState->joinkeys)
+			{
+				AttrNumber attrno = (AttrNumber) lfirst(hk);
+				Datum keyval;
+				uint32 hkey;
+
+				/* rotate hashkey left 1 bit at each step */
+				hashkey = (hashkey << 1) | ((hashkey & 0x80000000) ? 1 : 0);
+				keyval = values[proj[attrno - 1]];
+
+				/* Evaluate expression */
+				hkey = DatumGetUInt32(
+						FunctionCall1(&rfState->hashfunctions[i], keyval));
+				hashkey ^= hkey;
+				i++;
+			}
+
+			if (!FindBloomFilter(rfState->bloomfilter, hashkey))
+			{
+				continue;
+			}
+			rfState->bloomfilter->nMatched++;
+		}
+
+		/*construct tuple, and return back*/
+		TupSetVirtualTupleNValid(slot, natts);
+		return true;
 	}
 
-	/*construct tuple, and return back*/
-	TupSetVirtualTupleNValid(slot, natts);
-	return true;
+	ParquetRowGroupReader_FinishedScanRowGroup(rowGroupReader);
+	return false;
 }
 
 /**

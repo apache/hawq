@@ -1495,6 +1495,24 @@ typedef enum
 	TableTypeInvalid,
 } TableType;
 
+/*
+ * Runtime filter information passed down to scan.
+ * 	hasRuntimeFilter: if this runtime filter has a created Bloom filter
+ * 	stopRuntimeFilter: if stop using runtime filter
+ * 	joinkeys: column position of join keys
+ *	hashfunctions: hash functions to hash join key
+ *	bloomfilter: BloomFilter instance
+ */
+typedef struct RuntimeFilterState
+{
+	bool hasRuntimeFilter;
+	bool stopRuntimeFilter;
+	bool checkedSamples;
+	List* joinkeys;
+	FmgrInfo *hashfunctions;
+	BloomFilter bloomfilter;
+} RuntimeFilterState;
+
 /* ----------------
  *         ScanState information
  *
@@ -1521,6 +1539,9 @@ typedef struct ScanState
 
 	/* The type of the table that is being scanned */
 	TableType tableType;
+
+	/* Runtime filter */
+	struct RuntimeFilterState *runtimeFilter;
 
 } ScanState;
 
