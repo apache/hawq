@@ -35,6 +35,7 @@ typedef struct VectorizedState
 	bool vectorized;
 	PlanState *parent;
 	aoinfo *ao;
+	void *transdata;
 }VectorizedState;
 
 

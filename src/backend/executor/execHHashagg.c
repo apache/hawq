@@ -83,15 +83,6 @@ struct BatchFileInfo
 /* Used for padding */
 static char padding_dummy[MAXIMUM_ALIGNOF];
 
-/*
- * Represent different types for input records to be inserted
- * into the hash table.
- */
-typedef enum InputRecordType
-{
-	INPUT_RECORD_TUPLE = 0,
-	INPUT_RECORD_GROUP_AND_AGGS,
-} InputRecordType;
 
 #define GET_BUFFER_SIZE(hashtable) \
 	((hashtable)->entry_buf.nfull_total * (hashtable)->entry_buf.cellbytes + \
@@ -116,10 +107,8 @@ typedef enum InputRecordType
 
 /* Methods that handle batch files */
 static SpillSet *createSpillSet(unsigned branching_factor, unsigned parent_hash_bit);
-static SpillSet *read_spill_set(AggState *aggstate);
 static int closeSpillFile(AggState *aggstate, SpillSet *spill_set, int file_no);
 static int closeSpillFiles(AggState *aggstate, SpillSet *spill_set);
-static int suspendSpillFiles(SpillSet *spill_set);
 static int32 writeHashEntry(AggState *aggstate,
 							BatchFileInfo *file_info,
 							HashAggEntry *entry);
@@ -130,13 +119,8 @@ static void *readHashEntry(AggState *aggstate,
 
 /* Methods for hash table */
 static uint32 calc_hash_value(AggState* aggstate, TupleTableSlot *inputslot);
-static void spill_hash_table(AggState *aggstate);
 static void init_agg_hash_iter(HashAggTable* ht);
-static HashAggEntry *lookup_agg_hash_entry(AggState *aggstate, void *input_record,
-										   InputRecordType input_type, int32 input_size,
-										   uint32 hashkey, unsigned parent_hash_bit, bool *p_isnew);
 static void agg_hash_table_stat_upd(HashAggTable *ht);
-static void reset_agg_hash_table(AggState *aggstate);
 static bool agg_hash_reload(AggState *aggstate);
 static inline void *mpool_cxt_alloc(void *manager, Size len);
 
@@ -413,7 +397,7 @@ setGroupAggs(HashAggTable *hashtable, MemTupleBinding *mt_bind, HashAggEntry *en
  * or false depending on whether the returned entry is new.  Note that
  * a new entry will have *initialized* per-group data (Aggref states).
  */
-static HashAggEntry *
+HashAggEntry *
 lookup_agg_hash_entry(AggState *aggstate,
 					  void *input_record,
 					  InputRecordType input_type, int32 input_size,
@@ -1117,7 +1101,7 @@ getSpillFile(workfile_set *work_set, SpillSet *set, int file_no, int *p_alloc_si
  * suspendSpillFiles -- temporary suspend all spill files so that we
  * can have more space for the hash table.
  */
-static int
+int
 suspendSpillFiles(SpillSet *spill_set)
 {
 	int file_no;
@@ -1284,7 +1268,7 @@ obtain_spill_set(HashAggTable *hashtable)
  *
  * The statistics in the hashtable is also updated.
  */
-static SpillSet *
+SpillSet *
 read_spill_set(AggState *aggstate)
 {
 	Assert(aggstate != NULL);
@@ -1394,7 +1378,7 @@ read_spill_set(AggState *aggstate)
  * write bucket 1, (#batches + 1), (2 * #batches + 1), ... to the batch 1;
  * and etc.
  */
-static void
+void
 spill_hash_table(AggState *aggstate)
 {
 	HashAggTable *hashtable = aggstate->hhashtable;
