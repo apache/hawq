@@ -4,6 +4,9 @@
 #define MAX_NUM_LEN 64
 extern int BATCHSIZE;
 
+/* vdateadtin()
+ * Given text string, convert to internal format date.
+ */
 PG_FUNCTION_INFO_V1(vdateadtin);
 Datum
 vdateadtin(PG_FUNCTION_ARGS)
@@ -42,7 +45,7 @@ vdateadtin(PG_FUNCTION_ARGS)
     PG_RETURN_POINTER(res);
 }
 
-/* date_out()
+/* vdateadtout()
  * Given internal format date, convert to text string.
  */
 PG_FUNCTION_INFO_V1(vdateadtout);
@@ -144,6 +147,9 @@ Datum vdateadt_mi_dateadt(PG_FUNCTION_ARGS)
     PG_RETURN_POINTER(res);
 }
 
+/* vdateadt_mii_int4
+ * vdateadt - int4
+ * */
 PG_FUNCTION_INFO_V1(vdateadt_mii_int4);
 Datum vdateadt_mii_int4(PG_FUNCTION_ARGS)
 {
@@ -164,6 +170,10 @@ Datum vdateadt_mii_int4(PG_FUNCTION_ARGS)
     res->dim = arg1->dim;
     PG_RETURN_POINTER(res);
 }
+
+/* vdateadt_pli_int4
+ * vdateadt + int4
+ * */
 PG_FUNCTION_INFO_V1(vdateadt_pli_int4);
 Datum vdateadt_pli_int4(PG_FUNCTION_ARGS)
 {
@@ -184,6 +194,9 @@ Datum vdateadt_pli_int4(PG_FUNCTION_ARGS)
     PG_RETURN_POINTER(res);
 }
 
+/* vdateadt_mi
+ * vdateadt - vdateadt
+ * */
 PG_FUNCTION_INFO_V1(vdateadt_mi);
 Datum vdateadt_mi(PG_FUNCTION_ARGS)
 {
@@ -205,6 +218,9 @@ Datum vdateadt_mi(PG_FUNCTION_ARGS)
     PG_RETURN_POINTER(res); 
 }
 
+/* vdateadt_mii
+ * vdateadt - vint4
+ * */
 PG_FUNCTION_INFO_V1(vdateadt_mii);
 Datum vdateadt_mii(PG_FUNCTION_ARGS)
 {
@@ -226,6 +242,9 @@ Datum vdateadt_mii(PG_FUNCTION_ARGS)
     PG_RETURN_POINTER(res); 
 }
 
+/* vdateadt_pli
+ * vdateadt + vint4
+ * */
 PG_FUNCTION_INFO_V1(vdateadt_pli);
 Datum vdateadt_pli(PG_FUNCTION_ARGS)
 {

@@ -6,7 +6,6 @@ drop type vfloat8 cascade;
 drop type vfloat4 cascade;
 drop type vbool cascade;
 drop type vdateadt cascade;
-drop type vtimeadt cascade;
 
 -- create vectorized types
 
