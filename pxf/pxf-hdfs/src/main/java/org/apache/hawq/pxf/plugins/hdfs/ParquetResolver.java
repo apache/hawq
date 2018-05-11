@@ -29,6 +29,7 @@ import org.apache.hawq.pxf.api.utilities.Plugin;
 
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.parquet.example.data.Group;
+import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.OriginalType;
 import org.apache.parquet.schema.PrimitiveType;
 import org.apache.parquet.schema.Type;
@@ -55,6 +56,17 @@ public class ParquetResolver extends Plugin implements ReadResolver {
         super(metaData);
     }
 
+    /**
+     * @inheritDoc
+     * @param schema the MessageType instance, which is obtained from the Parquet file footer
+     */
+    public List<OneField> getFields(OneRow row, MessageType schema) throws Exception
+    {
+      ParquetUserData parquetUserData = new ParquetUserData(schema);
+      Group g = (Group) row.getData();
+      List<OneField> output = resolveRecord(parquetUserData, g);
+      return output;
+    }
 
     @Override
     public List<OneField> getFields(OneRow row) throws Exception {
@@ -89,6 +101,12 @@ public class ParquetResolver extends Plugin implements ReadResolver {
                     field.type = DataType.BYTEA.getOID();
                     field.val = g.getFieldRepetitionCount(columnIndex) == 0 ?
                             null : g.getBinary(columnIndex, 0).getBytes();
+                } else if (originalType == OriginalType.DATE) { // DATE type
+                    field.type = DataType.DATE.getOID();
+                    field.val = g.getFieldRepetitionCount(columnIndex) == 0 ? null : g.getString(columnIndex, 0);
+                } else if (originalType == OriginalType.TIMESTAMP_MILLIS) { // TIMESTAMP type
+                    field.type = DataType.TIMESTAMP.getOID();
+                    field.val = g.getFieldRepetitionCount(columnIndex) == 0 ? null : g.getString(columnIndex, 0);
                 } else {
                     field.type = DataType.TEXT.getOID();
                     field.val = g.getFieldRepetitionCount(columnIndex) == 0 ?

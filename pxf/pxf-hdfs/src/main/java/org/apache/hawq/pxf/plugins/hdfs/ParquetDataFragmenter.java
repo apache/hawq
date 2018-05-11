@@ -104,4 +104,5 @@ public class ParquetDataFragmenter extends Fragmenter {
 
             return result;
         }
-    }
+}
+

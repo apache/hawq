@@ -46,11 +46,11 @@ import java.util.Iterator;
  * Unit of operation is record.
  */
 public class ParquetFileAccessor extends Plugin implements ReadAccessor {
+
     private ParquetFileReader reader;
     private MessageColumnIO columnIO;
     private RecordIterator recordIterator;
     private MessageType schema;
-
 
     private class RecordIterator implements Iterator<OneRow> {
 
@@ -130,8 +130,28 @@ public class ParquetFileAccessor extends Plugin implements ReadAccessor {
      */
     public ParquetFileAccessor(InputData input) {
         super(input);
-        ParquetUserData parquetUserData = HdfsUtilities.parseParquetUserData(input);
-        schema = parquetUserData.getSchema();
+    }
+
+    public MessageType getSchema() {
+      return schema;
+    }
+
+    public void setSchema(MessageType schema) {
+      this.schema = schema;
+      columnIO = new ColumnIOFactory().getColumnIO(schema);
+    }
+
+    // Enable sub-classes of ParquetFileAccessor to set up recordIterator
+    public void setRecordIterator() {
+        recordIterator = new RecordIterator(reader);
+    }
+
+    public void setReader (ParquetFileReader reader) {
+      this.reader = reader;
+    }
+
+    public boolean iteratorHasNext() {
+      return recordIterator.hasNext();
     }
 
     @Override
@@ -139,12 +159,11 @@ public class ParquetFileAccessor extends Plugin implements ReadAccessor {
         Configuration conf = new Configuration();
         Path file = new Path(inputData.getDataSource());
         FileSplit fileSplit = HdfsUtilities.parseFileSplit(inputData);
+        setSchema(HdfsUtilities.parseParquetUserData(inputData).getSchema());
         // Create reader for a given split, read a range in file
-        reader = new ParquetFileReader(conf, file, ParquetMetadataConverter.range(
-                fileSplit.getStart(), fileSplit.getStart() + fileSplit.getLength()));
-        ParquetUserData parquetUserData = HdfsUtilities.parseParquetUserData(inputData);
-        columnIO = new ColumnIOFactory().getColumnIO(schema);
-        recordIterator = new RecordIterator(reader);
+        setReader(new ParquetFileReader(conf, file, ParquetMetadataConverter.range(
+                fileSplit.getStart(), fileSplit.getStart() + fileSplit.getLength())));
+        setRecordIterator();
         return recordIterator.hasNext();
     }
 

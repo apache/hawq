@@ -69,3 +69,4 @@ CodeCoverage*
 
 .vscode
 cmake-build-debug
+.*.swp
