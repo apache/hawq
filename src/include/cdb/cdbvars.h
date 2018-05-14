@@ -937,7 +937,7 @@ extern int gp_hashagg_spillbatch_min;
 extern int gp_hashagg_spillbatch_max;
 
 /* Hashjoin use bloom filter */
-extern int hawq_hashjoin_bloomfilter;
+extern bool hawq_hashjoin_bloomfilter;
 
 /* Maximum memory size for one Bloom filter */
 extern char* hawq_hashjoin_bloomfilter_max_memory_size;

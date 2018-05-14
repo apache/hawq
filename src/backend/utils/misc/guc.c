@@ -4421,6 +4421,15 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
+	{
+		{"hawq_hashjoin_bloomfilter", PGC_USERSET, GP_ARRAY_TUNING,
+			gettext_noop("Use bloomfilter in hash join"),
+			gettext_noop("Use bloomfilter may speed up hash join performance"),
+			GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL | GUC_GPDB_ADDOPT
+		},
+		&hawq_hashjoin_bloomfilter,
+		false, NULL, NULL
+	},
 
 	/* End-of-list marker */
 	{
@@ -5833,16 +5842,6 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&gp_hashagg_spillbatch_max,
 		0, 0, 1000000, NULL, NULL
-	},
-
-	{
-		{"hawq_hashjoin_bloomfilter", PGC_USERSET, GP_ARRAY_TUNING,
-		 gettext_noop("Use bloomfilter in hash join"),
-		 gettext_noop("Use bloomfilter may speed up hash join performance"),
-		 GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL | GUC_GPDB_ADDOPT
-		},
-		&hawq_hashjoin_bloomfilter,
-		0, 0, 1, NULL, NULL
 	},
 
 	{

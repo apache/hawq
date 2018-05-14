@@ -79,7 +79,7 @@ FreeScanRuntimefilterState(RuntimeFilterState* rfstate)
 	if (bf != NULL && bf->isCreated)
 	{
 		elog(DEBUG3, "Hash Join, inner table row number:%d, "
-					 "outer table total row number:%d, "
+					 "outer table checked row number:%d, "
 					 "outer table matched row number:%d, "
 					 "outer table filtered row number:%d, filtered rate:%.3f",
 			 bf->nInserted, bf->nTested, bf->nMatched, bf->nTested - bf->nMatched,
