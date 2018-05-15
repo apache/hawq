@@ -1053,8 +1053,6 @@ agg_hash_initial_1pass(AggState *aggstate)
 			/* set the correct value */
 			i = tb->iter - 1;
 
-			getnextvslot = true;
-
 			Gpmon_M_Incr(GpmonPktFromAggState(aggstate), GPMON_QEXEC_M_ROWSIN);
 
 			if (aggstate->hashslot->tts_tupleDescriptor == NULL)
