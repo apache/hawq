@@ -35,7 +35,16 @@ typedef struct VectorizedState
 {
 	bool vectorized;
 	PlanState *parent;
+
+	/* for table scan */
 	aoinfo *ao;
+
+	/* for aggregate */
+	void *transdata;
+	TupleTableSlot **aggslot;
+	BatchAggGroupData *batchGroupData;
+	GroupData *groupData;
+	int *indexList;
 }VectorizedState;
 
 

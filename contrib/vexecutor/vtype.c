@@ -181,6 +181,34 @@ v##type##const_type##opstr(PG_FUNCTION_ARGS) \
 }
 
 /*
+ * Operator function for the abstract data types, this MACRO is used for the
+ * Consts OP V-types.
+ * e.g. extern Datum int2vint2pl(PG_FUNCTION_ARGS);
+ */
+#define __FUNCTION_OP_LCONST(type, XTYPE, const_type, CONST_ARG_MACRO, opsym, opstr) \
+PG_FUNCTION_INFO_V1(const_type##v##type##opstr); \
+Datum \
+const_type##v##type##opstr(PG_FUNCTION_ARGS) \
+{ \
+    int size = 0; \
+    int i = 0; \
+    const_type arg1 = CONST_ARG_MACRO(0); \
+    v##type *arg2 = PG_GETARG_POINTER(1); \
+    v##type *res = buildv##type(BATCHSIZE, NULL); \
+    size = arg2->dim;\
+    while(i < size) \
+    { \
+        res->isnull[i] = arg2->isnull[i]; \
+        if(!res->isnull[i]) \
+            res->values[i] = XTYPE##GetDatum(((type)arg1) opsym (DatumGet##XTYPE(arg2->values[i]))); \
+        i ++ ;\
+    } \
+    res->dim = arg2->dim; \
+    PG_RETURN_POINTER(res); \
+}
+
+
+/*
  * Comparision function for the abstract data types, this MACRO is used for the 
  * V-types OP V-types.
  * e.g. extern Datum vint2vint2eq(PG_FUNCTION_ARGS);
@@ -243,11 +271,15 @@ v##type##const_type##cmpstr(PG_FUNCTION_ARGS) \
     __FUNCTION_OP(type1, XTYPE1, type2, XTYPE2, *, mul) \
     __FUNCTION_OP(type1, XTYPE1, type2, XTYPE2, /, div)
 
-#define _FUNCTION_OP_RCONST(type, XTYPE, const_type, CONST_ARG_MACRO) \
+#define _FUNCTION_OP_CONST(type, XTYPE, const_type, CONST_ARG_MACRO) \
     __FUNCTION_OP_RCONST(type, XTYPE, const_type, CONST_ARG_MACRO, +, pl)  \
     __FUNCTION_OP_RCONST(type, XTYPE, const_type, CONST_ARG_MACRO, -, mi)  \
     __FUNCTION_OP_RCONST(type, XTYPE, const_type, CONST_ARG_MACRO, *, mul) \
-    __FUNCTION_OP_RCONST(type, XTYPE, const_type, CONST_ARG_MACRO, /, div)
+    __FUNCTION_OP_RCONST(type, XTYPE, const_type, CONST_ARG_MACRO, /, div) \
+    __FUNCTION_OP_LCONST(type, XTYPE, const_type, CONST_ARG_MACRO, +, pl)  \
+    __FUNCTION_OP_LCONST(type, XTYPE, const_type, CONST_ARG_MACRO, -, mi)  \
+    __FUNCTION_OP_LCONST(type, XTYPE, const_type, CONST_ARG_MACRO, *, mul) \
+    __FUNCTION_OP_LCONST(type, XTYPE, const_type, CONST_ARG_MACRO, /, div)
 
 #define _FUNCTION_CMP(type1, XTYPE1, type2, XTYPE2) \
     __FUNCTION_CMP(type1, XTYPE1, type2, XTYPE2, ==, eq) \
@@ -274,11 +306,11 @@ v##type##const_type##cmpstr(PG_FUNCTION_ARGS) \
     _FUNCTION_OP(type, XTYPE1, float8, Float8)
 
 #define FUNCTION_OP_RCONST(type, XTYPE) \
-    _FUNCTION_OP_RCONST(type, XTYPE, int2, PG_GETARG_INT16) \
-    _FUNCTION_OP_RCONST(type, XTYPE, int4, PG_GETARG_INT32) \
-    _FUNCTION_OP_RCONST(type, XTYPE, int8, PG_GETARG_INT64) \
-    _FUNCTION_OP_RCONST(type, XTYPE, float4, PG_GETARG_FLOAT4) \
-    _FUNCTION_OP_RCONST(type, XTYPE, float8, PG_GETARG_FLOAT8)
+    _FUNCTION_OP_CONST(type, XTYPE, int2, PG_GETARG_INT16) \
+    _FUNCTION_OP_CONST(type, XTYPE, int4, PG_GETARG_INT32) \
+    _FUNCTION_OP_CONST(type, XTYPE, int8, PG_GETARG_INT64) \
+    _FUNCTION_OP_CONST(type, XTYPE, float4, PG_GETARG_FLOAT4) \
+    _FUNCTION_OP_CONST(type, XTYPE, float8, PG_GETARG_FLOAT8)
 
 #define FUNCTION_CMP(type1, XTYPE1) \
     _FUNCTION_CMP(type1, XTYPE1, int2, Int16) \

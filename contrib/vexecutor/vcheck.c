@@ -21,6 +21,7 @@
 #include "access/htup.h"
 #include "catalog/catquery.h"
 #include "catalog/pg_operator.h"
+#include "catalog/pg_proc.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbllize.h"
 #include "parser/parse_oper.h"
@@ -58,6 +59,86 @@ typedef struct VectorizedContext
 	Oid retType;
 	bool	 replace;
 }VectorizedContext;
+
+static Oid get_aggregate_oid(const char *aggname, Oid oidType);
+static char *getProcNameOnlyFromOid(Oid object_oid);
+
+// copyed from src/backend/utils/cache/lsyscache.c
+// Get oid of aggregate with given name and argument type
+static Oid
+get_aggregate_oid(const char *aggname, Oid oidType)
+{
+	HeapTuple htup = NULL;
+
+	// lookup pg_proc for functions with the given name and arg type
+	cqContext *pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE proname = :1",
+				PointerGetDatum((char *) aggname)));
+
+	Oid oidResult = InvalidOid;
+	while (HeapTupleIsValid(htup = caql_getnext(pcqCtx)))
+	{
+		Oid oidProc = HeapTupleGetOid(htup);
+
+		Form_pg_proc proctuple = (Form_pg_proc) GETSTRUCT(htup);
+
+		// skip functions with the wrong number of type of arguments
+		if (0 != proctuple->pronargs && InvalidOid != oidType)
+		{
+			if (1 != proctuple->pronargs || oidType != proctuple->proargtypes.values[0])
+			{
+				continue;
+			}
+		}
+		else if((0 != proctuple->pronargs && InvalidOid == oidType) ||
+				(0 == proctuple->pronargs && InvalidOid != oidType))
+			continue;
+
+		if (caql_getcount(
+					NULL,
+					cql("SELECT COUNT(*) FROM pg_aggregate "
+						" WHERE aggfnoid = :1 ",
+						ObjectIdGetDatum(oidProc))) > 0)
+		{
+			oidResult = oidProc;
+			break;
+		}
+	}
+
+	caql_endscan(pcqCtx);
+
+	return oidResult;
+}
+
+//copied from src/backend/catalog/aclchk.c and we refactor it.
+static char *
+getProcNameOnlyFromOid(Oid object_oid)
+{
+	StringInfoData tname;
+	initStringInfo(&tname);
+	HeapTuple tup;
+	cqContext *pCtx;
+
+	Assert(OidIsValid(object_oid));
+
+	pCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_proc "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(object_oid)));
+
+	tup = caql_getnext(pCtx);
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
+
+	appendStringInfo(&tname, "%s", NameStr(((Form_pg_proc)GETSTRUCT(tup))->proname));
+
+	caql_endscan(pCtx);
+	return tname.data;
+}
+
 
 /*
  * Check all the expressions if they can be vectorized
@@ -129,7 +210,7 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 		//get the vectorized operator functions
 		//NOTE:we have no ParseState now, Give the NULL value is OK but not good...
 		tuple = oper(NULL, list_make1(makeString(get_opname(op->opno))),
-			ltype, rtype, false, -1);
+			ltype, rtype, true, -1);
 		if(NULL == tuple)
 			return true;
 
@@ -149,6 +230,72 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 		ReleaseOperator(tuple);
 
 		ctx->retType = rettype;
+		return false;
+	}
+
+	/* support aggregate functions */
+	if(IsA(node, Aggref))
+	{
+		Aggref *ref = (Aggref*)node;
+		char *aggname = NULL;
+		Oid retType;
+		Oid vaggoid;
+
+		if(ref->aggdistinct || NULL != ref->aggorder)
+			return true;
+
+		/* Make sure there is less than one arguments */
+		if(1 < list_length(ref->args))
+			return true;
+
+		/* check arguments */
+		if(NULL != ref->args)
+		{
+			if(CheckVectorizedExpression(linitial(ref->args), ctx))
+				return true;
+			retType = ctx->retType;
+		}
+		else
+			retType = InvalidOid;
+
+		/* check the vectorized aggregate functions */
+		aggname = getProcNameOnlyFromOid(ref->aggfnoid);
+
+		if(0 == strcmp(aggname, "count") &&
+			0 == list_length(ref->args))
+			aggname = "veccount";
+
+		Assert(NUll != aggname);
+
+		vaggoid = get_aggregate_oid(aggname, retType);
+		if(InvalidOid == vaggoid)
+			return true;
+
+		if(ctx->replace)
+			ref->aggfnoid = vaggoid;
+
+		return false;
+	}
+
+	/*
+	 * if there are const in expressions, it may need to convert
+	 * type implicitly by FuncExpr, we only check if the arguments
+	 * of the FuncExpr is constant.
+	 */
+	if(IsA(node, FuncExpr))
+	{
+		FuncExpr *f = (FuncExpr*)node;
+		ListCell *l = NULL;
+		Node* expr = NULL;
+
+		if(1 < list_length(f->args))
+			return true;
+
+		expr = (Node*)linitial(f->args);
+		if(!IsA(expr, Const))
+			return true;
+
+		ctx->retType = f->funcresulttype;
 		return false;
 	}
 
@@ -174,6 +321,25 @@ CheckPlanNodeWalker(PlannerInfo *root, Plan *plan)
 		plan->vectorized = false;
 		return true;
 	}
+
+	/* if sub node can not vectorized, set the parent cannot vectorized too */
+	if( (NULL != plan->lefttree && !plan->lefttree->vectorized) ||
+		(NULL != plan->righttree && !plan->righttree->vectorized))
+	{
+		plan->vectorized = false;
+		return true;
+	}
+
+	/* the result of aggregate functions is scalar */
+	if(IsA(plan, Motion) && IsA((plan->lefttree), Agg))
+	{
+		plan->vectorized = false;
+		return true;
+	}
+
+	/* Don't support SORT Aggregate so far */
+	if(IsA(plan, Agg) && ((Agg*)plan)->aggstrategy == AGG_SORTED)
+		return true;
 
 	planner_init_plan_tree_base(&ctx.base, root);
 
@@ -253,7 +419,11 @@ ReplacePlanVectorzied(PlannerInfo *root, Plan *plan)
 Plan*
 CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan)
 {
+	/* the top plan node can not be vectorized so far */
+	plan->vectorized = false;
 	plan = CheckPlanVectorzied(root, plan);
+	Assert(!plan->vectorized);
+	plan->vectorized = false;
 	return ReplacePlanVectorzied(root, plan);
 }
 

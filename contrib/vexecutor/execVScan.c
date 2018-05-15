@@ -66,9 +66,10 @@ getVScanMethod(int tableType)
 TupleTableSlot *ExecTableVScanVirtualLayer(ScanState *scanState)
 {
     VectorizedState* vs = (VectorizedState*)scanState->ps.vectorized;
-    VectorizedState* pvs = vs->parent->vectorized;
 
-    if(pvs->vectorized)
+    /* if vs->parent is NULL, it represent that the parent is non-vectorized */
+    if(vs->parent && vs->parent->vectorized &&
+       ((VectorizedState*)vs->parent->vectorized)->vectorized)
         return ExecTableVScan(scanState);
     else
     {

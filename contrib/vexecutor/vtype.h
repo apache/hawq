@@ -58,7 +58,9 @@ extern Datum v##type1##v##type2##opstr(PG_FUNCTION_ARGS);
  */
 #define __FUNCTION_OP_RCONST_HEADER(type, const_type, CONST_ARG_MACRO, opsym, opstr) \
 extern Datum v##type##const_type##opstr(PG_FUNCTION_ARGS);
-
+#define __FUNCTION_OP_LCONST_HEADER(type, const_type, CONST_ARG_MACRO, opsym, opstr) \
+extern Datum \
+const_type##v##type##opstr(PG_FUNCTION_ARGS);
 /*
  * Comparision function for the abstract data types, this MACRO is used for the 
  * V-types OP V-types.
@@ -81,12 +83,15 @@ extern Datum v##type##const_type##cmpstr(PG_FUNCTION_ARGS);
     __FUNCTION_OP_HEADER(type1, type2, *, mul) \
     __FUNCTION_OP_HEADER(type1, type2, /, div)
 
-#define _FUNCTION_OP_RCONST_HEADER(type, const_type, CONST_ARG_MACRO) \
+#define _FUNCTION_OP_CONST_HEADER(type, const_type, CONST_ARG_MACRO) \
     __FUNCTION_OP_RCONST_HEADER(type, const_type, CONST_ARG_MACRO, +, pl)  \
     __FUNCTION_OP_RCONST_HEADER(type, const_type, CONST_ARG_MACRO, -, mi)  \
     __FUNCTION_OP_RCONST_HEADER(type, const_type, CONST_ARG_MACRO, *, mul) \
-    __FUNCTION_OP_RCONST_HEADER(type, const_type, CONST_ARG_MACRO, /, div)
-
+    __FUNCTION_OP_RCONST_HEADER(type, const_type, CONST_ARG_MACRO, /, div) \
+    __FUNCTION_OP_LCONST_HEADER(type, const_type, CONST_ARG_MACRO, +, pl)  \
+    __FUNCTION_OP_LCONST_HEADER(type, const_type, CONST_ARG_MACRO, -, mi)  \
+    __FUNCTION_OP_LCONST_HEADER(type, const_type, CONST_ARG_MACRO, *, mul) \
+    __FUNCTION_OP_LCONST_HEADER(type, const_type, CONST_ARG_MACRO, /, div)
 
 #define _FUNCTION_CMP_HEADER(type1, type2) \
     __FUNCTION_CMP_HEADER(type1, type2, ==, eq) \
@@ -125,12 +130,12 @@ extern Datum v##type##out(PG_FUNCTION_ARGS);
     _FUNCTION_OP_HEADER(type, float4) \
     _FUNCTION_OP_HEADER(type, float8)
 
-#define FUNCTION_OP_RCONST_HEADER(type) \
-    _FUNCTION_OP_RCONST_HEADER(type, int2, PG_GETARG_INT16) \
-    _FUNCTION_OP_RCONST_HEADER(type, int4, PG_GETARG_INT32) \
-    _FUNCTION_OP_RCONST_HEADER(type, int8, PG_GETARG_INT64) \
-    _FUNCTION_OP_RCONST_HEADER(type, float4, PG_GETARG_FLOAT4) \
-    _FUNCTION_OP_RCONST_HEADER(type, float8, PG_GETARG_FLOAT8)
+#define FUNCTION_OP_CONST_HEADER(type) \
+    _FUNCTION_OP_CONST_HEADER(type, int2, PG_GETARG_INT16) \
+    _FUNCTION_OP_CONST_HEADER(type, int4, PG_GETARG_INT32) \
+    _FUNCTION_OP_CONST_HEADER(type, int8, PG_GETARG_INT64) \
+    _FUNCTION_OP_CONST_HEADER(type, float4, PG_GETARG_FLOAT4) \
+    _FUNCTION_OP_CONST_HEADER(type, float8, PG_GETARG_FLOAT8)
 
 #define FUNCTION_CMP_HEADER(type1) \
     _FUNCTION_CMP_HEADER(type1, int2) \
@@ -148,7 +153,7 @@ extern Datum v##type##out(PG_FUNCTION_ARGS);
 
 #define FUNCTION_OP_ALL_HEADER(type) \
     FUNCTION_OP_HEADER(type) \
-    FUNCTION_OP_RCONST_HEADER(type) \
+    FUNCTION_OP_CONST_HEADER(type) \
     FUNCTION_CMP_HEADER(type) \
     FUNCTION_CMP_RCONST_HEADER(type) \
 

@@ -34,16 +34,18 @@ Build HAWQ Vectorized Executor steps
    to activate vectorized execution
 
 
-How to add the default vectorized data types
----------------------------------------------
+How to add the default vectorized data types and aggregate 
+functions
+----------------------------------------------------------
 
 1. Follow "Build HAWQ Vectorized Executor steps" to start HAWQ.
 
-2. execute "create_type.sql" in psql. then some vectorized 
-   data types will be add to HAWQ.
+2. execute "create_udv.sql" in psql. then some vectorized 
+   data types and vectorized aggregate functions will be
+   add to HAWQ.
 
-3. If the default vectorized is no use, you can delete then by
-   executing "drop_types.sql" in psql.
+3. If the default vectorized is no use, you can delete them by
+   executing "clean_udv.sql" in psql.
 
 
 How to add an new vectorized data types and operators
@@ -71,12 +73,17 @@ For example, If the base type is 'XXX', we want to create the
 vectorized data types for it:
     1) You can add the vectorized data types struct
        (e.g. Add to vtype.h)
-            typedef struct vXXX
-            {
-                vheader header;
-                XXX values[0];
-            }vXXX;
-        
+            typedef struct vtype {
+                int     _vl_len;
+                Oid     elemtype;
+                int     dim;
+                bool    *isnull;
+                bool    *skipref;
+                Datum   values[0];
+            }vtype;        
+
+            typedef struct vtype vXXX;
+
        Implement the new IN/OUT functions for this data type:
      
             Datum vXXXin(PG_FUNCTION_ARGS);

@@ -43,6 +43,17 @@
 typedef uint32 HashKey;
 typedef struct BatchFileInfo BatchFileInfo;
 
+/*
+ * Represent different types for input records to be inserted
+ * into the hash table.
+ */
+typedef enum InputRecordType
+{
+	INPUT_RECORD_TUPLE = 0,
+	INPUT_RECORD_GROUP_AND_AGGS,
+} InputRecordType;
+
+
 /* An entry in an Agg hash table.
  * 
  * Each such entry corresponds to a single group and includes the grouping
@@ -256,4 +267,12 @@ calcHashAggTableSizes(double memquota,	/* Memory quota in bytes. */
 					   int transpace,	/* Est per entry size of by-ref values. */
                        bool force,      /* true => succeed even if work_mem too small */
                        HashAggTableSizes   *out_hats);
+extern int suspendSpillFiles(SpillSet *spill_set);
+extern SpillSet *read_spill_set(AggState *aggstate);
+extern HashAggEntry *lookup_agg_hash_entry(AggState *aggstate, void *input_record,
+										   InputRecordType input_type, int32 input_size,
+										   uint32 hashkey, unsigned parent_hash_bit, bool *p_isnew);
+extern void spill_hash_table(AggState *aggstate);
+extern void reset_agg_hash_table(AggState *aggstate);
+
 #endif

@@ -12,7 +12,6 @@
 #ifndef NODEMOTION_H
 #define NODEMOTION_H
 
-#include "cdb/cdbhash.h"
 #include "nodes/execnodes.h"
 
 extern int	ExecCountSlotsMotion(Motion *node);
