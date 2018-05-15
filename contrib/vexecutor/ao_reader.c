@@ -108,6 +108,15 @@ AppendOnlyVScanNext(ScanState *scanState)
     if(!slot)
         slot = scanState->ss_ScanTupleSlot;
 
+    for(int i = 0;i < tb->ncols ; i ++)
+    {
+        if(vs->ao->proj[i])
+        {
+            if(tb->datagroup[i])
+                tb->datagroup[i]->dim = tb->nrows;
+        }
+    }
+
     if (tb->nrows == 0)
         ExecClearTuple(slot);
     else

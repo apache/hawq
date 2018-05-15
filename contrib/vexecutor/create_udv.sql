@@ -1,3 +1,45 @@
+--drop agg functions
+--drop the previous funcitons
+DROP AGGREGATE IF EXISTS sum(vint2);
+DROP AGGREGATE IF EXISTS sum(vint4);
+DROP AGGREGATE IF EXISTS sum(vint8);
+DROP AGGREGATE IF EXISTS sum(vfloat4);
+DROP AGGREGATE IF EXISTS sum(vfloat8);
+
+DROP AGGREGATE IF EXISTS avg(vint2);
+DROP AGGREGATE IF EXISTS avg(vint4);
+DROP AGGREGATE IF EXISTS avg(vint8);
+DROP AGGREGATE IF EXISTS avg(vfloat4);
+DROP AGGREGATE IF EXISTS avg(vfloat8);
+
+DROP AGGREGATE IF EXISTS count(vint2);
+DROP AGGREGATE IF EXISTS count(vint4);
+DROP AGGREGATE IF EXISTS count(vint8);
+DROP AGGREGATE IF EXISTS count(vfloat4);
+DROP AGGREGATE IF EXISTS count(vfloat8);
+
+DROP AGGREGATE IF EXISTS veccount(*);
+
+DROP FUNCTION IF EXISTS vint2_accum(int8, vint2);
+DROP FUNCTION IF EXISTS vint4_accum(int8, vint4);
+DROP FUNCTION IF EXISTS vint8_accum(numeric, vint8);
+DROP FUNCTION IF EXISTS vfloat4_accum(float4, vfloat4);
+DROP FUNCTION IF EXISTS vfloat8_accum(float8, vfloat8);
+
+DROP FUNCTION IF EXISTS vint2_avg_accum(bytea, vint2);
+DROP FUNCTION IF EXISTS vint4_avg_accum(bytea, vint4);
+DROP FUNCTION IF EXISTS vint8_avg_accum(bytea, vint8);
+DROP FUNCTION IF EXISTS vfloat4_avg_accum(bytea, vfloat4);
+DROP FUNCTION IF EXISTS vfloat8_avg_accum(bytea, vfloat8);
+
+DROP FUNCTION IF EXISTS vint2_inc(int8, vint2);
+DROP FUNCTION IF EXISTS vint4_inc(int8, vint4);
+DROP FUNCTION IF EXISTS vint8_inc(int8, vint8);
+DROP FUNCTION IF EXISTS vfloat4_inc(int8, vfloat4);
+DROP FUNCTION IF EXISTS vfloat8_inc(int8, vfloat8);
+
+DROP FUNCTION IF EXISTS vec_inc_any(int8);
+
 -- drop types first
 drop type vint2 cascade;
 drop type vint4 cascade;
@@ -6,6 +48,8 @@ drop type vfloat8 cascade;
 drop type vfloat4 cascade;
 drop type vbool cascade;
 drop type vdateadt cascade;
+
+
 
 -- create vectorized types
 
@@ -47,7 +91,6 @@ CREATE TYPE vdateadt;
 CREATE FUNCTION vdateadtin(cstring) RETURNS vdateadt as 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
 CREATE FUNCTION vdateadtout(vdateadt) RETURNS cstring AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
 CREATE TYPE vdateadt ( INPUT = vdateadtin, OUTPUT = vdateadtout, element = date , storage=external);
-
 
 -- create operators for the vectorized types
 
@@ -919,6 +962,51 @@ CREATE OPERATOR * ( leftarg = vfloat8, rightarg = float8, procedure = vfloat8flo
 CREATE FUNCTION vfloat8float8div(vfloat8, float8) RETURNS vfloat8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
 CREATE OPERATOR / ( leftarg = vfloat8, rightarg = float8, procedure = vfloat8float8div, commutator = * );
 
+CREATE FUNCTION int2vint2pl(int2, vint2) RETURNS vint2 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR + ( leftarg = int2, rightarg = vint2, procedure = int2vint2pl, commutator = - );
+CREATE FUNCTION int2vint2mi(int2, vint2) RETURNS vint2 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR - ( leftarg = int2, rightarg = vint2, procedure = int2vint2mi, commutator = + );
+CREATE FUNCTION int2vint2mul(int2, vint2) RETURNS vint2 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR * ( leftarg = int2, rightarg = vint2, procedure = int2vint2mul, commutator = / );
+CREATE FUNCTION int2vint2div(int2, vint2) RETURNS vint2 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR / ( leftarg = int2, rightarg = vint2, procedure = int2vint2div, commutator = * );
+
+CREATE FUNCTION int4vint4pl(int4, vint4) RETURNS vint4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR + ( leftarg = int4, rightarg = vint4, procedure = int4vint4pl, commutator = - );
+CREATE FUNCTION int4vint4mi(int4, vint4) RETURNS vint4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR - ( leftarg = int4, rightarg = vint4, procedure = int4vint4mi, commutator = + );
+CREATE FUNCTION int4vint4mul(int4, vint4) RETURNS vint4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR * ( leftarg = int4, rightarg = vint4, procedure = int4vint4mul, commutator = / );
+CREATE FUNCTION int4vint4div(int4, vint4) RETURNS vint4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR / ( leftarg = int4, rightarg = vint4, procedure = int4vint4div, commutator = * );
+
+CREATE FUNCTION int8vint8pl(int8, vint8) RETURNS vint8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR + ( leftarg = int8, rightarg = vint8, procedure = int8vint8pl, commutator = - );
+CREATE FUNCTION int8vint8mi(int8, vint8) RETURNS vint8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR - ( leftarg = int8, rightarg = vint8, procedure = int8vint8mi, commutator = + );
+CREATE FUNCTION int8vint8mul(int8, vint8) RETURNS vint8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR * ( leftarg = int8, rightarg = vint8, procedure = int8vint8mul, commutator = / );
+CREATE FUNCTION int8vint8div(int8, vint8) RETURNS vint8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR / ( leftarg = int8, rightarg = vint8, procedure = int8vint8div, commutator = * );
+
+CREATE FUNCTION float4vfloat4pl(float4, vfloat4) RETURNS vfloat4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR + ( leftarg = float4, rightarg = vfloat4, procedure = float4vfloat4pl, commutator = - );
+CREATE FUNCTION float4vfloat4mi(float4, vfloat4) RETURNS vfloat4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR - ( leftarg = float4, rightarg = vfloat4, procedure = float4vfloat4mi, commutator = + );
+CREATE FUNCTION float4vfloat4mul(float4, vfloat4) RETURNS vfloat4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR * ( leftarg = float4, rightarg = vfloat4, procedure = float4vfloat4mul, commutator = / );
+CREATE FUNCTION float4vfloat4div(float4, vfloat4) RETURNS vfloat4 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR / ( leftarg = float4, rightarg = vfloat4, procedure = float4vfloat4div, commutator = * );
+
+
+CREATE FUNCTION float8vfloat8pl(float8, vfloat8) RETURNS vfloat8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR + ( leftarg = float8, rightarg = vfloat8, procedure = float8vfloat8pl, commutator = - );
+CREATE FUNCTION float8vfloat8mi(float8, vfloat8) RETURNS vfloat8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR - ( leftarg = float8, rightarg = vfloat8, procedure = float8vfloat8mi, commutator = + );
+CREATE FUNCTION float8vfloat8mul(float8, vfloat8) RETURNS vfloat8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR * ( leftarg = float8, rightarg = vfloat8, procedure = float8vfloat8mul, commutator = / );
+CREATE FUNCTION float8vfloat8div(float8, vfloat8) RETURNS vfloat8 AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
+CREATE OPERATOR / ( leftarg = float8, rightarg = vfloat8, procedure = float8vfloat8div, commutator = * );
 
 CREATE FUNCTION vdateadt_eq(vdateadt, vdateadt) RETURNS vbool AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
 CREATE OPERATOR = ( leftarg = vdateadt, rightarg = vdateadt, procedure = vdateadt_eq, commutator = = );
@@ -958,3 +1046,94 @@ CREATE FUNCTION vdateadt_pli_int4(vdateadt, int4) RETURNS vdateadt AS 'vexecutor
 CREATE OPERATOR + ( leftarg = vdateadt, rightarg = int4, procedure = vdateadt_pli_int4, commutator = + );
 CREATE FUNCTION vdateadt_mii_int4(vdateadt, int4) RETURNS vdateadt AS 'vexecutor.so' LANGUAGE C IMMUTABLE STRICT;
 CREATE OPERATOR - ( leftarg = vdateadt, rightarg = int4, procedure = vdateadt_mii_int4, commutator = - );
+
+
+--create sum aggregate functions
+
+CREATE FUNCTION vint2_accum(int8, vint2) returns int8 as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE sum(vint2) ( 
+    sfunc = vint2_accum, 
+    stype = int8);
+
+CREATE FUNCTION vint4_accum(int8, vint4) returns int8 as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE sum(vint4) ( 
+    sfunc = vint4_accum, 
+    stype = int8);
+    
+CREATE FUNCTION vint8_accum(numeric, vint8) returns numeric as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE sum(vint8) ( 
+    sfunc = vint8_accum, 
+    stype = numeric);
+    
+CREATE FUNCTION vfloat4_accum(float4, vfloat4) returns float4 as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE sum(vfloat4) ( 
+    sfunc = vfloat4_accum, 
+    stype = float4);
+    
+CREATE FUNCTION vfloat8_accum(float8, vfloat8) returns float8 as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE sum(vfloat8) ( 
+    sfunc = vfloat8_accum, 
+    stype = float8);
+
+
+
+--create avg aggregate functions
+
+CREATE FUNCTION vint2_avg_accum(bytea, vint2) returns bytea as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE avg(vint2) ( 
+    sfunc = vint2_avg_accum,
+    stype = bytea);
+    
+CREATE FUNCTION vint4_avg_accum(bytea, vint4) returns bytea as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE avg(vint4) ( 
+    sfunc = vint4_avg_accum,
+    stype = bytea);
+
+CREATE FUNCTION vint8_avg_accum(bytea, vint8) returns bytea as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE avg(vint8) ( 
+    sfunc = vint8_avg_accum,
+    stype = bytea);
+
+CREATE FUNCTION vfloat4_avg_accum(bytea, vfloat4) returns bytea as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE avg(vfloat4) ( 
+    sfunc = vfloat4_avg_accum,
+    stype = bytea);
+
+CREATE FUNCTION vfloat8_avg_accum(bytea, vfloat8) returns bytea as 'vexecutor.so' language c immutable;
+CREATE AGGREGATE avg(vfloat8) ( 
+    sfunc = vfloat8_avg_accum,
+    stype = bytea);
+
+
+--create count aggregate functions
+
+CREATE FUNCTION vint2_inc(int8, vint2) returns int8 as 'vexecutor.so' language c immutable;
+create AGGREGATE count(vint2) ( 
+    sfunc = vint2_inc, 
+    stype = int8);
+
+CREATE FUNCTION vint4_inc(int8, vint4) returns int8 as 'vexecutor.so' language c immutable;
+create AGGREGATE count(vint4) ( 
+    sfunc = vint4_inc, 
+    stype = int8);
+
+CREATE FUNCTION vint8_inc(int8, vint8) returns int8 as 'vexecutor.so' language c immutable;
+create AGGREGATE count(vint8) ( 
+    sfunc = vint8_inc, 
+    stype = int8);
+    
+CREATE FUNCTION vfloat4_inc(int8, vfloat4) returns int8 as 'vexecutor.so' language c immutable;
+create AGGREGATE count(vfloat4) ( 
+    sfunc = vfloat4_inc, 
+    stype = int8);
+    
+CREATE FUNCTION vfloat8_inc(int8, vfloat8) returns int8 as 'vexecutor.so' language c immutable;
+create AGGREGATE count(vfloat8) ( 
+    sfunc = vfloat8_inc, 
+    stype = int8);
+
+--change the name to veccount, urgly...we will use this function to replace this count(*) functions in vcheck.c
+CREATE FUNCTION vec_inc_any(int8) returns int8 as 'vexecutor.so' language c immutable;
+create AGGREGATE veccount(*) ( 
+    sfunc = vec_inc_any, 
+    stype = int8);

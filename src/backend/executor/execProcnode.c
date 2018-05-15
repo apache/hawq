@@ -903,6 +903,7 @@ ExecProcNode(PlanState *node)
 	Assert(nodeTag(node) >= T_PlanState_Start && nodeTag(node) < T_PlanState_End);
 
 	if(vmthd.vectorized_executor_enable
+	   && node->plan->vectorized
 	   && vmthd.ExecProcNode_Hook
 	   && vmthd.ExecProcNode_Hook(node,&result))
 		goto Exec_Jmp_Done;

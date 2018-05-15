@@ -26,7 +26,8 @@ OBJS    = vexecutor.o \
 	  parquet_reader.o \
 	  ao_reader.o \
 	  nodeVMotion.o \
-	  vtype_ext.o
+	  vtype_ext.o \
+	  vagg.o
 
 PG_CXXFLAGS = -Wall -O0 -g -std=c++11
 PG_LIBS = $(libpq_pgport) 
