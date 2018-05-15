@@ -200,7 +200,7 @@ const_type##v##type##opstr(PG_FUNCTION_ARGS) \
     { \
         res->isnull[i] = arg2->isnull[i]; \
         if(!res->isnull[i]) \
-            res->values[i] = XTYPE##GetDatum((DatumGet##XTYPE(arg2->values[i])) opsym ((type)arg1)); \
+            res->values[i] = XTYPE##GetDatum(((type)arg1) opsym (DatumGet##XTYPE(arg2->values[i]))); \
         i ++ ;\
     } \
     res->dim = arg2->dim; \

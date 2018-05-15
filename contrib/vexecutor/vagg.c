@@ -1036,11 +1036,24 @@ agg_hash_initial_1pass(AggState *aggstate)
 			break;
 		}
 
-		/* we have to convert the vectorized tuple to non-vectorized tuple, and process it one by one */
-		for (i = 0; i < tb->nrows; i++)
+		/*
+		 * we have to convert the vectorized tuple to non-vectorized tuple,
+		 * and process it one by one.
+		 * the initialize value of i is -1, because outerslot may have no
+		 * valid tuple(all tuple can not pass the qualification), then -1
+		 * indicate that no valid tuple. if there have valid tuple, we will
+		 * reset the i to correct value.
+		 */
+
+		for (i = -1; i < tb->nrows; i++)
 		{
 			if(!VirtualNodeProc(outerslot))
 				break;
+
+			/* set the correct value */
+			i = tb->iter - 1;
+
+			getnextvslot = true;
 
 			Gpmon_M_Incr(GpmonPktFromAggState(aggstate), GPMON_QEXEC_M_ROWSIN);
 
@@ -1135,44 +1148,51 @@ agg_hash_initial_1pass(AggState *aggstate)
 			}
 		}
 
-		tmpcontext->ecxt_scantuple = outerslot;
-
-		/* To avoid wasteful duplication of work, we do the projection here */
-		int aggno;
-		for (aggno = 0; aggno < aggstate->numaggs; aggno++)
+		/*
+		 * if i == -1, it indicate that all tuple in outerslot is invalid,
+		 * we need not to process it.
+		 */
+		if(-1 != i)
 		{
-			AggStatePerAgg peraggstate = &aggstate->peragg[aggno];
+			tmpcontext->ecxt_scantuple = outerslot;
 
-			/* Evaluate the current input expressions for this aggregate */
-			vstate->aggslot[aggno] = ExecVProject(peraggstate->evalproj, NULL);
-		}
+			/* To avoid wasteful duplication of work, we do the projection here */
+			int aggno;
+			for (aggno = 0; aggno < aggstate->numaggs; aggno++)
+			{
+				AggStatePerAgg peraggstate = &aggstate->peragg[aggno];
 
-		/* we have known the group counts, so we process it one by one. */
-		for (int i = 0; i < agg_groupdata->group_cnt; i++) {
-			GroupData *cur_header = &(agg_groupdata->group_header[i]);
-			agg_groupdata->group_idx = i;
+				/* Evaluate the current input expressions for this aggregate */
+				vstate->aggslot[aggno] = ExecVProject(peraggstate->evalproj, NULL);
+			}
 
-			//set hashtable->groupaggs to the agg_hash_entry
-			setGroupAggs(hashtable, aggstate->hashslot->tts_mt_bind, cur_header->entry);
+			/* we have known the group counts, so we process it one by one. */
+			for (int i = 0; i < agg_groupdata->group_cnt; i++) {
+				GroupData *cur_header = &(agg_groupdata->group_header[i]);
+				agg_groupdata->group_idx = i;
 
-			/* HACK... */
-			AddAggVectorizedData(aggstate, hashtable->groupaggs->aggs, trans, agg_groupdata, tb->skip, tb->nrows);
-			advance_vaggregates(aggstate, hashtable->groupaggs->aggs, &(aggstate->mem_manager));
-			RemoveAggVectorizedData(aggstate, hashtable->groupaggs->aggs);
+				//set hashtable->groupaggs to the agg_hash_entry
+				setGroupAggs(hashtable, aggstate->hashslot->tts_mt_bind, cur_header->entry);
 
-		}
+				/* HACK... */
+				AddAggVectorizedData(aggstate, hashtable->groupaggs->aggs, trans, agg_groupdata, tb->skip, tb->nrows);
+				advance_vaggregates(aggstate, hashtable->groupaggs->aggs, &(aggstate->mem_manager));
+				RemoveAggVectorizedData(aggstate, hashtable->groupaggs->aggs);
 
-		/* it is batch count now */
-		hashtable->num_tuples++;
+			}
 
-		/* Reset per-input-tuple context after each tuple */
-		ResetExprContext(tmpcontext);
+			/* it is batch count now */
+			hashtable->num_tuples++;
 
-		if (streaming && !HAVE_FREESPACE(hashtable))
-		{
-			Assert(tuple_remaining);
-			ExecClearTuple(aggstate->hashslot);
-			break;
+			/* Reset per-input-tuple context after each tuple */
+			ResetExprContext(tmpcontext);
+
+			if (streaming && !HAVE_FREESPACE(hashtable))
+			{
+				Assert(tuple_remaining);
+				ExecClearTuple(aggstate->hashslot);
+				break;
+			}
 		}
 
 		/* Read the next tuple */
