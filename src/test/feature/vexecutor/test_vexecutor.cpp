@@ -29,41 +29,19 @@ class TestVexecutor : public ::testing::Test
 	~TestVexecutor(){};
 };
 
-//#define TEST_F_FILE(TestName, basePath, testcase)	\
-//TEST_F(TestName, testcase)							\
-//{													\
-//	hawq::test::SQLUtility util;					\
-//	string SqlFile(basePath);						\
-//	string AnsFile(basePath);						\
-//	SqlFile += "/sql/" #testcase ".sql";			\
-//	AnsFile += "/ans/" #testcase ".ans";			\
-//	util.execSQLFile(SqlFile, AnsFile);				\
-//}
-//
-//#define TEST_F_FILE_TYPE(testcase) TEST_F_FILE(TestVexecutor, "vexecutor", testcase)
-//TEST_F_FILE_TYPE(create_type)
-//TEST_F_FILE_TYPE(vadt)
-//TEST_F_FILE_TYPE(drop_type)
 
 TEST_F(TestVexecutor, vadt)
 {
 	// preprocess source files to get sql/ans files
 	hawq::test::SQLUtility util;
 
-	util.execute("drop type vint2 cascade", false);
-	util.execute("drop type vint4 cascade", false);
-	util.execute("drop type vint8 cascade", false);
-	util.execute("drop type vfloat4 cascade", false);
-	util.execute("drop type vfloat8 cascade", false);
-	util.execute("drop type vbool cascade", false);
-
-	// run sql file to get ans file and then diff it with out file
 	util.execSQLFile("vexecutor/sql/create_type.sql",
-					 "vexecutor/ans/create_type.ans");
+					 "vexecutor/ans/create_type_vadt.ans");
 
 	util.execSQLFile("vexecutor/sql/vadt.sql",
 					 "vexecutor/ans/vadt.ans");
 
+	// run sql file to get ans file and then diff it with out file
 	util.execSQLFile("vexecutor/sql/drop_type.sql",
 					 "vexecutor/ans/drop_type.ans");
 }
@@ -91,18 +69,25 @@ TEST_F(TestVexecutor, scanframework)
 				 "	stringu2	name,"
 				 "	string4		name) WITH (appendonly = true, orientation = PARQUET, pagesize = 1048576, rowgroupsize = 8388608, compresstype = SNAPPY) DISTRIBUTED RANDOMLY;");
 
-  std::string pwd = util.getTestRootPath();
-  std::string cmd = "COPY test1 FROM '" + pwd + "/vexecutor/data/tenk.data'";
-  std::cout << cmd << std::endl;
-  util.execute(cmd);
-  util.execute("select unique1 from test1");
-  util.execute("SET vectorized_executor_enable to on");
+	std::string pwd = util.getTestRootPath();
+	std::string cmd = "COPY test1 FROM '" + pwd + "/vexecutor/data/tenk.data'";
+	std::cout << cmd << std::endl;
+	util.execute(cmd);
 
-  util.execSQLFile("vexecutor/sql/scan1.sql",
+	util.execSQLFile("vexecutor/sql/create_type.sql");
+
+	util.execute("select unique1 from test1");
+	util.execute("SET vectorized_executor_enable to on");
+
+	util.execSQLFile("vexecutor/sql/scan1.sql",
 					"vexecutor/ans/scan1.ans");
 
-  util.execute("drop table test1");
-}
+	// run sql file to get ans file and then diff it with out file
+	util.execSQLFile("vexecutor/sql/drop_type.sql");
+
+	util.execute("drop table test1");
+};
+
 
 TEST_F(TestVexecutor, scanAO)
 {
@@ -127,18 +112,23 @@ TEST_F(TestVexecutor, scanAO)
 				 "	stringu2	name,"
 				 "	string4		name) WITH (appendonly = true, compresstype = SNAPPY) DISTRIBUTED RANDOMLY;");
 
-  std::string pwd = util.getTestRootPath();
-  std::string cmd = "COPY test1 FROM '" + pwd + "/vexecutor/data/tenk.data'";
-  std::cout << cmd << std::endl;
-  util.execute(cmd);
-  util.execute("select unique1 from test1");
-  util.execute("SET vectorized_executor_enable to on");
+	std::string pwd = util.getTestRootPath();
+	std::string cmd = "COPY test1 FROM '" + pwd + "/vexecutor/data/tenk.data'";
+	std::cout << cmd << std::endl;
+	util.execute(cmd);
+	util.execSQLFile("vexecutor/sql/create_type.sql");
 
-  util.execSQLFile("vexecutor/sql/scan1.sql",
+	util.execute("select unique1 from test1");
+	util.execute("SET vectorized_executor_enable to on");
+
+	util.execSQLFile("vexecutor/sql/scan1.sql",
 					"vexecutor/ans/scan1.ans");
 
-  util.execute("drop table test1");
-}
+	// run sql file to get ans file and then diff it with out file
+	util.execSQLFile("vexecutor/sql/drop_type.sql");
+
+	util.execute("drop table test1");
+};
 
 TEST_F(TestVexecutor, ProjAndQual)
 {
@@ -148,6 +138,8 @@ TEST_F(TestVexecutor, ProjAndQual)
 	util.execute("create table test1 (a int, b int, c int, d int);");
 	util.execute("insert into test1 select generate_series(1,1024), 1, 1, 1;");
 
+	util.execSQLFile("vexecutor/sql/create_type.sql");
+
 	util.execSQLFile("vexecutor/sql/projandqual.sql",
 					"vexecutor/ans/projandqual.ans");
 
@@ -156,22 +148,76 @@ TEST_F(TestVexecutor, ProjAndQual)
 	util.execSQLFile("vexecutor/sql/projandqual.sql",
 					"vexecutor/ans/projandqual.ans");
 
-	util.execute("drop table test1");
-}
+	// run sql file to get ans file and then diff it with out file
+	util.execSQLFile("vexecutor/sql/drop_type.sql");
 
+	util.execute("drop table test1");
+};
 
 TEST_F(TestVexecutor, date)
+ {
+ 	hawq::test::SQLUtility util;
+ 	util.execute("drop table if exists test1");
+ 	util.execute("create table test1 (a date,i int) WITH (appendonly = true, compresstype = SNAPPY) DISTRIBUTED RANDOMLY;");
+ 	util.execute("insert into test1 select '1998-03-28'::date + generate_series(1,2000), 1;");
+ 	util.execute("select a + i from test1;");
+
+ 	util.execSQLFile("vexecutor/sql/create_type.sql");
+ 
+ 	util.execute("SET vectorized_executor_enable to on");
+ 
+ 	util.execSQLFile("vexecutor/sql/vdate.sql",
+ 					"vexecutor/ans/vdate.ans");
+ 
+	// run sql file to get ans file and then diff it with out file
+	util.execSQLFile("vexecutor/sql/drop_type.sql");
+
+ 	util.execute("drop table test1");
+ }
+
+TEST_F(TestVexecutor, vagg)
 {
 	hawq::test::SQLUtility util;
-	util.execute("drop table if exists test1");
-	util.execute("create table test1 (a date,i int) WITH (appendonly = true, compresstype = SNAPPY) DISTRIBUTED RANDOMLY;");
-	util.execute("insert into test1 select '1998-03-28'::date + generate_series(1,2000), 1;");
-	util.execute("select a + i from test1;");
+
+	util.execute("create table test_int2(a int2, b int2, c int2)");
+	util.execute("create table test_int4(a int4, b int4, c int4)");
+	util.execute("create table test_int8(a int8, b int8, c int8)");
+	util.execute("create table test_float4(a float4, b float4, c float4)");
+	util.execute("create table test_float8(a float8, b float8, c float8)");
+
+	util.execute("insert into test_int2 select generate_series(1,16),1,2");
+	util.execute("insert into test_int4 select generate_series(1,16),1,2");
+	util.execute("insert into test_int8 select generate_series(1,16),1,2");
+	util.execute("insert into test_float4 select generate_series(1,16),1,2");
+	util.execute("insert into test_float8 select generate_series(1,16),1,2");
+
+	util.execute("insert into test_int2 select null, null, null");
+	util.execute("insert into test_int4 select null, null, null");
+	util.execute("insert into test_int8 select null, null, null");
+	util.execute("insert into test_float4 select null, null, null");
+	util.execute("insert into test_float8 select null, null, null");
+
+
+	// run sql file to get ans file and then diff it with out file
+	util.execSQLFile("vexecutor/sql/create_type.sql");
+
+	util.execSQLFile("vexecutor/sql/vagg.sql",
+					"vexecutor/ans/vagg.ans");
 
 	util.execute("SET vectorized_executor_enable to on");
+	util.execute("SET vectorized_batch_size = 4");
 
-	util.execSQLFile("vexecutor/sql/vdate.sql",
-					"vexecutor/ans/vdate.ans");
+	util.execSQLFile("vexecutor/sql/vagg.sql",
+					"vexecutor/ans/vagg.ans");
 
-	util.execute("drop table test1");
-}
+	// run sql file to get ans file and then diff it with out file
+	util.execSQLFile("vexecutor/sql/drop_type.sql");
+
+	util.execute("drop table if exists test_int2");
+	util.execute("drop table if exists test_int4");
+	util.execute("drop table if exists test_int8");
+	util.execute("drop table if exists test_float4");	
+	util.execute("drop table if exists test_float8");
+};
+
+
