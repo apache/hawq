@@ -1,7 +1,5 @@
 package org.apache.hawq.pxf.api;
 
-import java.util.Arrays;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,50 +40,7 @@ public class Fragment {
      */
     private String[] replicas;
 
-    @Override
-	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + index;
-		result = prime * result + Arrays.hashCode(metadata);
-		result = prime * result + ((profile == null) ? 0 : profile.hashCode());
-		result = prime * result + Arrays.hashCode(replicas);
-		result = prime * result + ((sourceName == null) ? 0 : sourceName.hashCode());
-		result = prime * result + Arrays.hashCode(userData);
-		return result;
-	}
-
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-		if (obj == null)
-			return false;
-		if (getClass() != obj.getClass())
-			return false;
-		Fragment other = (Fragment) obj;
-		if (index != other.index)
-			return false;
-		if (!Arrays.equals(metadata, other.metadata))
-			return false;
-		if (profile == null) {
-			if (other.profile != null)
-				return false;
-		} else if (!profile.equals(other.profile))
-			return false;
-		if (!Arrays.equals(replicas, other.replicas))
-			return false;
-		if (sourceName == null) {
-			if (other.sourceName != null)
-				return false;
-		} else if (!sourceName.equals(other.sourceName))
-			return false;
-		if (!Arrays.equals(userData, other.userData))
-			return false;
-		return true;
-	}
-
-	/**
+    /**
      * Fragment metadata information (starting point + length, region location, etc.).
      */
     private byte[] metadata;
