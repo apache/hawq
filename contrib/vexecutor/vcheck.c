@@ -210,7 +210,7 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 		//get the vectorized operator functions
 		//NOTE:we have no ParseState now, Give the NULL value is OK but not good...
 		tuple = oper(NULL, list_make1(makeString(get_opname(op->opno))),
-			ltype, rtype, false, -1);
+			ltype, rtype, true, -1);
 		if(NULL == tuple)
 			return true;
 
