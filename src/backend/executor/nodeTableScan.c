@@ -84,12 +84,15 @@ FreeScanRuntimefilterState(RuntimeFilterState* rfstate)
 					 "outer table filtered row number:%d, filtered rate:%.3f",
 			 bf->nInserted, bf->nTested, bf->nMatched, bf->nTested - bf->nMatched,
 			 bf->nTested == 0 ? 0 : (float)((float)(bf->nTested - bf->nMatched)/(float)(bf->nTested)));
+		DestroyBloomFilter(rfstate->bloomfilter);
 	}
-	rfstate->bloomfilter = NULL;
-	if(rfstate->joinkeys)
+	if (rfstate->joinkeys != NIL)
 	{
 		list_free(rfstate->joinkeys);
-		rfstate->joinkeys = NIL;
+	}
+	if (rfstate->hashfunctions != NULL)
+	{
+		pfree(rfstate->hashfunctions);
 	}
 	pfree(rfstate);
 }

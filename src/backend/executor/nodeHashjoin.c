@@ -821,8 +821,11 @@ CreateRuntimeFilterState(HashJoinState *hjstate)
 		rf->joinkeys = lappend_int(rf->joinkeys, variable->varattno);
 		i++;
 	}
-	rf->hashfunctions = hjstate->hj_HashTable->hashfunctions;
-	rf->bloomfilter = hjstate->hj_HashTable->bloomfilter;
+	rf->hashfunctions = (FmgrInfo *) palloc(i * sizeof(FmgrInfo));
+	memcpy(rf->hashfunctions, hjstate->hj_HashTable->hashfunctions, i*sizeof(FmgrInfo));
+	size_t size = offsetof(BloomFilterData, data) + hjstate->hj_HashTable->bloomfilter->data_size;
+	rf->bloomfilter = palloc0(size);
+	memcpy(rf->bloomfilter, hjstate->hj_HashTable->bloomfilter, size);
 	rf->hasRuntimeFilter = true;
 	rf->stopRuntimeFilter = false;
 	rf->checkedSamples = false;
@@ -875,13 +878,15 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 		if(real_ratio > hawq_hashjoin_bloomfilter_ratio)
 		{
 			rf->stopRuntimeFilter = true;
-			elog(DEBUG3, "Stop using bloomfilter on scan, since for first %d tuples, the ratio is %.3f, which exceeds the %.3f",
-					rf->bloomfilter->nTested, real_ratio, hawq_hashjoin_bloomfilter_ratio);
+			elog(DEBUG3, "Stop using Bloom filter on scan, since for first %d tuples, "
+						 "the pass ratio is %.3f, which exceeds the %.3f",
+						 hawq_hashjoin_bloomfilter_sampling_number, real_ratio, hawq_hashjoin_bloomfilter_ratio);
 		}
 		else
 		{
-			elog(DEBUG3, "Continue using bloomfilter on scan, for first %d tuples, the ratio is %.3f, which is lower than the %.3f",
-					rf->bloomfilter->nMatched, real_ratio, hawq_hashjoin_bloomfilter_ratio);
+			elog(DEBUG3, "Continue using Bloom filter on scan, since for first %d tuples, "
+						 "the pass ratio is %.3f, which is lower than the %.3f",
+						 hawq_hashjoin_bloomfilter_sampling_number, real_ratio, hawq_hashjoin_bloomfilter_ratio);
 		}
 		rf->checkedSamples = true;
 	}
