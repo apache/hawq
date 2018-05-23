@@ -123,7 +123,7 @@ subprojects { subProject ->
             force 'commons-codec:commons-codec:1.4'
             force 'commons-collections:commons-collections:3.2.1'
             force 'commons-logging:commons-logging:1.1.3'
-            force 'org.apache.avro:avro:1.7.4'
+            //force 'org.apache.avro:avro:1.7.4'
             force 'org.apache.zookeeper:zookeeper:3.4.6'
             force 'org.codehaus.jackson:jackson-mapper-asl:1.9.13'
             force 'junit:junit:4.11'
@@ -501,6 +501,39 @@ project('pxf-jdbc') {
         buildHost = ' '
 
         requires(versionedPackageName('pxf-service'), project.version, GREATER | EQUAL)
+
+        from(jar.outputs.files) {
+            into "/usr/lib/pxf-${project.version}"
+        }
+
+        link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+    }
+}
+
+project('pxf-s3') {
+    dependencies {
+        compile(project(':pxf-api'))
+        compile(project(':pxf-hdfs'))
+        compile "com.amazonaws:aws-java-sdk-s3:1.11.313"
+        compile "org.apache.parquet:parquet-hadoop:$parquetVersion"
+        compile "org.apache.parquet:parquet-tools:$parquetVersion"
+        compile "org.apache.hadoop:hadoop-common:2.8.2"
+        compile "org.apache.hadoop:hadoop-aws:2.8.2"
+        compile "org.apache.avro:avro:1.8.2"
+        compile "org.apache.parquet:parquet-avro:1.8.2"
+        testCompile "io.findify:s3mock_2.12:0.2.5"
+    }
+
+    ospackage {
+        packageName = versionedPackageName("${project.name}")
+        summary = 'HAWQ Extension Framework (PXF), S3 plugin'
+        description = 'Querying external data stored in S3'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
+
+        requires(versionedPackageName('pxf-hdfs'), project.version, GREATER | EQUAL)
 
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
