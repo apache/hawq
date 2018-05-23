@@ -26,27 +26,27 @@
     <name>S3ParquetWrite</name>
     <description>A profile for writing Parquet data to S3</description>
     <plugins>
-      <fragmenter>org.greenplum.pxf.s3.S3Fragmenter</fragmenter>
-      <accessor>org.greenplum.pxf.s3.S3ParquetWriteAccessor</accessor>
-      <resolver>org.greenplum.pxf.s3.S3ParquetWriteResolver</resolver>
+      <fragmenter>org.apache.hawq.pxf.plugins.s3.S3Fragmenter</fragmenter>
+      <accessor>org.apache.hawq.pxf.plugins.s3.S3ParquetWriteAccessor</accessor>
+      <resolver>org.apache.hawq.pxf.plugins.s3.S3ParquetWriteResolver</resolver>
     </plugins>
   </profile>
   <profile>
     <name>S3ParquetRead</name>
     <description>A profile for reading Parquet data from S3; does not support nested data</description>
     <plugins>
-      <fragmenter>org.greenplum.pxf.s3.S3Fragmenter</fragmenter>
-      <accessor>org.greenplum.pxf.s3.S3ParquetAccessor</accessor>
-      <resolver>org.greenplum.pxf.s3.S3ParquetResolver</resolver>
+      <fragmenter>org.apache.hawq.pxf.plugins.s3.S3Fragmenter</fragmenter>
+      <accessor>org.apache.hawq.pxf.plugins.s3.S3ParquetAccessor</accessor>
+      <resolver>org.apache.hawq.pxf.plugins.s3.S3ParquetResolver</resolver>
     </plugins>
   </profile>
   <profile>
     <name>S3ParquetJsonRead</name>
     <description>A profile for reading Parquet data from S3, as JSON; useful with nested data</description>
     <plugins>
-      <fragmenter>org.greenplum.pxf.s3.S3Fragmenter</fragmenter>
-      <accessor>org.greenplum.pxf.s3.S3ParquetJsonAccessor</accessor>
-      <resolver>org.greenplum.pxf.s3.S3ParquetJsonResolver</resolver>
+      <fragmenter>org.apache.hawq.pxf.plugins.s3.S3Fragmenter</fragmenter>
+      <accessor>org.apache.hawq.pxf.plugins.s3.S3ParquetJsonAccessor</accessor>
+      <resolver>org.apache.hawq.pxf.plugins.s3.S3ParquetJsonResolver</resolver>
     </plugins>
   </profile>
 </profiles>
