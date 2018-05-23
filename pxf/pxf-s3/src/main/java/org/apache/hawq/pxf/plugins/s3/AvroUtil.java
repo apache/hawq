@@ -1,4 +1,4 @@
-package org.greenplum.pxf.s3;
+package org.apache.hawq.pxf.plugins.s3;
 
 import java.util.ArrayList;
 import java.util.List;

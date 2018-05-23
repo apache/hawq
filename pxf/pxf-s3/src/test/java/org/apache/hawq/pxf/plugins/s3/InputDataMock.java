@@ -1,8 +1,9 @@
-package org.greenplum.pxf.s3;
+package org.apache.hawq.pxf.plugins.s3;
 
 import java.util.HashMap;
 
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.plugins.s3.PxfS3;
 
 /**
  * This exists so the various userProperty values can be set

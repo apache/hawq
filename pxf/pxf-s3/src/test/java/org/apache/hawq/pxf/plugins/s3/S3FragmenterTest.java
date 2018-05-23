@@ -1,4 +1,4 @@
-package org.greenplum.pxf.s3;
+package org.apache.hawq.pxf.plugins.s3;
 
 import static org.junit.Assert.*;
 
@@ -10,6 +10,8 @@ import java.util.List;
 
 import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.plugins.s3.PxfS3;
+import org.apache.hawq.pxf.plugins.s3.S3Fragmenter;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;

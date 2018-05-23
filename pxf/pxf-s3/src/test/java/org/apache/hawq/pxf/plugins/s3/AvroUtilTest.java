@@ -1,4 +1,4 @@
-package org.greenplum.pxf.s3;
+package org.apache.hawq.pxf.plugins.s3;
 
 import static org.junit.Assert.*;
 
@@ -9,6 +9,7 @@ import org.apache.avro.SchemaBuilder;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.plugins.s3.AvroUtil;
 import org.junit.Test;
 
 public class AvroUtilTest {

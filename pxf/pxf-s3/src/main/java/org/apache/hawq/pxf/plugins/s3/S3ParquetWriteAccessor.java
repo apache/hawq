@@ -1,4 +1,4 @@
-package org.greenplum.pxf.s3;
+package org.apache.hawq.pxf.plugins.s3;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;

@@ -1,4 +1,4 @@
-package org.greenplum.pxf.s3;
+package org.apache.hawq.pxf.plugins.s3;
 
 import java.text.SimpleDateFormat;
 import java.time.LocalTime;

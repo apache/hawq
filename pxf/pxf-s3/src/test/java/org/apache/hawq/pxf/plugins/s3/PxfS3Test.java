@@ -1,10 +1,11 @@
-package org.greenplum.pxf.s3;
+package org.apache.hawq.pxf.plugins.s3;
 
 import static org.junit.Assert.*;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.plugins.s3.PxfS3;
 import org.junit.Test;
 
 public class PxfS3Test {
