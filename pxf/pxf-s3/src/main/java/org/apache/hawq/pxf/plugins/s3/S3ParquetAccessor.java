@@ -1,5 +1,6 @@
 package org.apache.hawq.pxf.plugins.s3;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -56,7 +57,11 @@ public class S3ParquetAccessor extends ParquetFileAccessor implements ReadAccess
 		OneRow next = super.readNextObject();
 		if (null != next) {
 			try {
-				List<OneField> oneFieldList = resolver.getFields(next, schema);
+				List<OneField> oneFieldList = new ArrayList<OneField>();
+				for (OneField of: resolver.getFields(next, schema)) {
+					NullableOneField nof = new NullableOneField(of.type, of.val);
+					oneFieldList.add(nof);
+				}
 				rv = new OneRow(null, oneFieldList);
 			} catch (Exception e) {
 				throw new RuntimeException(e);

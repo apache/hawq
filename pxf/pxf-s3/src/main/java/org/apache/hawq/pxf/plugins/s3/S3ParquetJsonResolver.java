@@ -19,7 +19,7 @@ public class S3ParquetJsonResolver extends Plugin implements ReadResolver {
 	@Override
 	public List<OneField> getFields(OneRow row) throws Exception {
 		List<OneField> record = new ArrayList<>();
-		record.add(new OneField(DataType.VARCHAR.getOID(), row.getData()));
+		record.add(new NullableOneField(DataType.VARCHAR.getOID(), row.getData()));
 		return record;
 	}
 
