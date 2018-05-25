@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -21,7 +21,7 @@
  * pxffilters.c
  *
  * Functions for handling push down of supported scan level filters to PXF.
- * 
+ *
  */
 #include "access/pxffilters.h"
 #include "catalog/pg_operator.h"
@@ -43,7 +43,7 @@ static bool supported_operator_type_scalar_array_op_expr(Oid type, PxfFilterDesc
 static void scalar_const_to_str(Const *constval, StringInfo buf);
 static void list_const_to_str(Const *constval, StringInfo buf);
 static List* append_attr_from_var(Var* var, List* attrs);
-static void enrich_trivial_expression(List *expressionItems);
+static void add_extra_and_expression_items(List *expressionItems, int extraAndOperatorsNum, BoolExpr **extraNodePointer);
 static List* get_attrs_from_expr(Expr *expr, bool* expressionIsSupported);
 
 /*
@@ -264,22 +264,21 @@ Oid pxf_supported_types[] =
 };
 
 static void
-pxf_free_expression_items_list(List *expressionItems, bool freeBoolExprNodes)
+pxf_free_expression_items_list(List *expressionItems)
 {
-	ExpressionItem 	*expressionItem = NULL;
-	int previousLength;
+	ExpressionItem *expressionItem = NULL;
 
 	while (list_length(expressionItems) > 0)
 	{
-		expressionItem = (ExpressionItem *) lfirst(list_head(expressionItems));
-		if (freeBoolExprNodes && nodeTag(expressionItem->node) == T_BoolExpr)
-		{
-			pfree((BoolExpr *)expressionItem->node);
-		}
+		expressionItem = (ExpressionItem *) linitial(expressionItems);
 		pfree(expressionItem);
 
-		/* to avoid freeing already freed items - delete all occurrences of current expression*/
-		previousLength = expressionItems->length + 1;
+		/*
+		 * to avoid freeing already freed items - delete all occurrences of
+		 * current expression
+		 */
+		int			previousLength = expressionItems->length + 1;
+
 		while (expressionItems != NULL && previousLength > expressionItems->length)
 		{
 			previousLength = expressionItems->length;
@@ -297,7 +296,6 @@ pxf_free_expression_items_list(List *expressionItems, bool freeBoolExprNodes)
  *
  * Basically this function just transforms expression tree to Reversed Polish Notation list.
  *
- *
  */
 static List *
 pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
@@ -306,7 +304,7 @@ pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 	List			*result = NIL;
 	ListCell		*lc = NULL;
 	ListCell		*ilc = NULL;
-	
+
 	if (list_length(quals) == 0)
 		return NIL;
 
@@ -377,7 +375,7 @@ pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 				break;
 		}
 	}
-	
+
 	return result;
 }
 
@@ -872,7 +870,7 @@ append_attr_from_func_args(FuncExpr *expr, List* attrs, bool* expressionIsSuppor
 		} else if (IsA(node, Var)) {
 			attrs = append_attr_from_var((Var *) node, attrs);
 		} else if (IsA(node, OpExpr)) {
-			attrs = get_attrs_from_expr((OpExpr *) node, expressionIsSupported);
+			attrs = get_attrs_from_expr((Expr *) node, expressionIsSupported);
 		} else {
 			*expressionIsSupported = false;
 			return NIL;
@@ -1238,34 +1236,44 @@ list_const_to_str(Const *constval, StringInfo buf)
  * serializePxfFilterQuals
  *
  * Wrapper around pxf_make_filter_list -> pxf_serialize_filter_list.
- * Currently the only function exposed to the outside, however
- * we could expose the others in the future if needed.
  *
  * The function accepts the scan qual list and produces a serialized
  * string that represents the push down filters (See called functions
  * headers for more information).
  */
-char *serializePxfFilterQuals(List *quals)
+char *
+serializePxfFilterQuals(List *quals)
 {
 	char	*result = NULL;
 
 	if (pxf_enable_filter_pushdown)
 	{
 
-		int logicalOpsNum = 0;
-		List *expressionItems = pxf_make_expression_items_list(quals, NULL, &logicalOpsNum);
+		BoolExpr   *extraBoolExprNodePointer = NULL;
+		int			logicalOpsNum = 0;
+		List	   *expressionItems = pxf_make_expression_items_list(quals, NULL, &logicalOpsNum);
 
-		//Trivial expression means list of OpExpr implicitly ANDed
-		bool isTrivialExpression = logicalOpsNum == 0 && expressionItems && expressionItems->length > 1;
-
-		if (isTrivialExpression)
+		/*
+		* The 'expressionItems' are always explicitly AND'ed. If there are extra
+		* logical operations present, they are the items in the same list. We
+		* need to add AND items only for "meaningful" expression items (not
+		* including these logical operations)
+		*/
+		if (expressionItems)
 		{
-			enrich_trivial_expression(expressionItems);
-		}
-		result  = pxf_serialize_filter_list(expressionItems);
-		pxf_free_expression_items_list(expressionItems, isTrivialExpression);
-	}
+			int			extraAndOperatorsNum = expressionItems->length - 1 - logicalOpsNum;
 
+			add_extra_and_expression_items(expressionItems, extraAndOperatorsNum, &extraBoolExprNodePointer);
+		}
+
+		result = pxf_serialize_filter_list(expressionItems);
+
+		if (extraBoolExprNodePointer)
+		{
+			pfree(extraBoolExprNodePointer);
+		}
+		pxf_free_expression_items_list(expressionItems);
+	}
 
 	elog(DEBUG1, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
 
@@ -1273,29 +1281,32 @@ char *serializePxfFilterQuals(List *quals)
 }
 
 /*
- * Takes list of expression items which supposed to be just a list of OpExpr
- * and adds needed number of AND items
- *
+ * Adds a given number of AND expression items to an existing list of expression items
+ * Note that this will not work if OR operators are introduced
  */
-void enrich_trivial_expression(List *expressionItems) {
-
-
-	int logicalOpsNumNeeded = expressionItems->length - 1;
-
-	if (logicalOpsNumNeeded > 0)
+void
+add_extra_and_expression_items(List *expressionItems, int extraAndOperatorsNum, BoolExpr **extraNodePointer)
+{
+	if ((!expressionItems) || (extraAndOperatorsNum < 1))
 	{
-		ExpressionItem *andExpressionItem = (ExpressionItem *) palloc0(sizeof(ExpressionItem));
-		BoolExpr *andExpr = makeNode(BoolExpr);
+		*extraNodePointer = NULL;
+		return;
+	}
 
-		andExpr->boolop = AND_EXPR;
+	ExpressionItem *andExpressionItem = (ExpressionItem *) palloc0(sizeof(ExpressionItem));
 
-		andExpressionItem->node = (Node *) andExpr;
-		andExpressionItem->parent = NULL;
-		andExpressionItem->processed = false;
+	BoolExpr   *andExpr = makeNode(BoolExpr);
 
-		for (int i = 0; i < logicalOpsNumNeeded; i++) {
-			expressionItems = lappend(expressionItems, andExpressionItem);
-		}
+	andExpr->boolop = AND_EXPR;
+	*extraNodePointer = andExpr;
+
+	andExpressionItem->node = (Node *) andExpr;
+	andExpressionItem->parent = NULL;
+	andExpressionItem->processed = false;
+
+	for (int i = 0; i < extraAndOperatorsNum; i++)
+	{
+		expressionItems = lappend(expressionItems, andExpressionItem);
 	}
 }
 
