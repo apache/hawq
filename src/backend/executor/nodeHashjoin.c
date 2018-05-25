@@ -807,18 +807,24 @@ ExecEndHashJoin(HashJoinState *node)
  * TODO: how to pass it across motion
  */
 static RuntimeFilterState*
-CreateRuntimeFilterState(HashJoinState *hjstate)
+CreateRuntimeFilterState(HashJoinState *hjstate, int* pi_varNumbers, int len)
 {
 	/* record projection info */
 	ListCell *hk;
 	int i = 0;
-	RuntimeFilterState* rf = (RuntimeFilterState*)palloc0(sizeof(RuntimeFilterState));
+	Assert(hjstate != NULL);
+	if (pi_varNumbers == NULL)
+	{
+		return NULL;
+	}
 
+	RuntimeFilterState* rf = (RuntimeFilterState*)palloc0(sizeof(RuntimeFilterState));
 	foreach(hk, hjstate->hj_OuterHashKeys)
 	{
 		ExprState  *keyexpr = (ExprState *) lfirst(hk);
 		Var *variable = (Var *) keyexpr->expr;
-		rf->joinkeys = lappend_int(rf->joinkeys, variable->varattno);
+		Assert(variable->varattno <= len);
+		rf->joinkeys = lappend_int(rf->joinkeys, pi_varNumbers[variable->varattno-1]);
 		i++;
 	}
 	rf->hashfunctions = (FmgrInfo *) palloc(i * sizeof(FmgrInfo));
@@ -862,7 +868,9 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 		((ScanState*)outerNode)->runtimeFilter == NULL)
 	{
 		Assert(hashtable->bloomfilter->isCreated);
-		((ScanState*)outerNode)->runtimeFilter = CreateRuntimeFilterState(hjstate);
+		((ScanState*) outerNode)->runtimeFilter = CreateRuntimeFilterState(hjstate,
+													((ScanState*) outerNode)->ps.ps_ProjInfo->pi_varNumbers,
+													list_length(((ScanState*) outerNode)->ps.ps_ProjInfo->pi_targetlist));
 	}
 	RuntimeFilterState* rf = ((ScanState*)outerNode)->runtimeFilter;
 

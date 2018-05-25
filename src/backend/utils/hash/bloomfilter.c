@@ -90,6 +90,7 @@ void InsertBloomFilter(BloomFilter bf, uint32_t value)
  */
 bool FindBloomFilter(BloomFilter bf, uint32_t value)
 {
+    bf->nTested++;
     uint32_t bucket_idx = getBucketIdx(value, bf->data_mask);
     for (int i = 0; i < NUM_BUCKET_WORDS; ++i)
     {
@@ -100,6 +101,7 @@ bool FindBloomFilter(BloomFilter bf, uint32_t value)
             return false;
         }
     }
+    bf->nMatched++;
     return true;
 }
 

@@ -226,16 +226,13 @@ ParquetRowGroupReader_ScanNextTuple(
 		bool *nulls = slot_get_isnull(slot);
 
 		int colReaderIndex = 0;
-		int16 proj[natts];
-		for (int i = 0, j = 0; i < natts; i++)
+		for (int i = 0; i < natts; i++)
 		{
 			if (projs[i] == false)
 			{
 				nulls[i] = true;
 				continue;
 			}
-			proj[j] = i;
-			j++;
 			ParquetColumnReader *nextReader =
 					&rowGroupReader->columnReaders[colReaderIndex];
 			int hawqTypeID = tupDesc->attrs[i]->atttypid;
@@ -290,7 +287,6 @@ ParquetRowGroupReader_ScanNextTuple(
 				&& !rfState->stopRuntimeFilter)
 		{
 			Assert(rfState->bloomfilter != NULL);
-			rfState->bloomfilter->nTested++;
 			uint32_t hashkey = 0;
 			ListCell *hk;
 			int i = 0;
@@ -302,7 +298,7 @@ ParquetRowGroupReader_ScanNextTuple(
 
 				/* rotate hashkey left 1 bit at each step */
 				hashkey = (hashkey << 1) | ((hashkey & 0x80000000) ? 1 : 0);
-				keyval = values[proj[attrno - 1]];
+				keyval = values[attrno - 1];
 
 				/* Evaluate expression */
 				hkey = DatumGetUInt32(
@@ -315,7 +311,6 @@ ParquetRowGroupReader_ScanNextTuple(
 			{
 				continue;
 			}
-			rfState->bloomfilter->nMatched++;
 		}
 
 		/*construct tuple, and return back*/
