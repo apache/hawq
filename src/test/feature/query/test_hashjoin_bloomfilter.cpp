@@ -45,6 +45,10 @@ TEST_F(TestHashJoinBloomFilter, BasicTest)
     util.query("select * from dim;", 10);
     util.query("select * from fact, dim where fact.c1 = dim.c1 and dim.c2<4", 7);
     util.query("set hawq_hashjoin_bloomfilter=true; select * from fact, dim where fact.c1 = dim.c1 and dim.c2<4", 7);
+    util.query("set hawq_hashjoin_bloomfilter=true; select fact.c1 from fact, dim where fact.c1 = dim.c1 and dim.c2<4", 7);
+    util.query("set hawq_hashjoin_bloomfilter=true; select fact.c1, dim.c1 from fact, dim where fact.c1 = dim.c1 and dim.c2<4", 7);
+    util.query("set hawq_hashjoin_bloomfilter=true; select fact.c1, dim.c1, dim.c2 from fact, dim where fact.c1 = dim.c1 and dim.c2<4", 7);
+    util.query("set hawq_hashjoin_bloomfilter=true; select dim.c1, dim.c2 from fact, dim where fact.c1 = dim.c1 and dim.c2<4", 7);
     util.execute("set hawq_hashjoin_bloomfilter=true; explain analyze select * from fact, dim where fact.c1 = dim.c1 and dim.c2<4");
     util.execute("drop table dim;");
     util.execute("drop table fact;");
