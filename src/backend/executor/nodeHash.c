@@ -1482,10 +1482,12 @@ ExecHashTableExplainEnd(PlanState *planstate, struct StringInfoData *buf)
     }
 
     /* Report Bloom filter statistics. */
-    if (hashtable->bloomfilter != NULL)
+    if (hjstate->js.ps.lefttree->type ==  T_TableScanState &&
+            ((ScanState*)hjstate->js.ps.lefttree)->runtimeFilter != NULL &&
+            ((ScanState*)hjstate->js.ps.lefttree)->runtimeFilter->bloomfilter != NULL)
     {
-        BloomFilter bf = hashtable->bloomfilter;
-        appendStringInfo(buf,"Bloom filter, inner table row number:%d, "
+        BloomFilter bf = ((ScanState*)hjstate->js.ps.lefttree)->runtimeFilter->bloomfilter;
+        appendStringInfo(buf, "Bloom filter, inner table row number:%d, "
                         "outer table checked row number:%d, "
                         "outer table matched row number:%d, "
                         "outer table filtered row number:%d, filtered rate:%.3f",

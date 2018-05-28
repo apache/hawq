@@ -807,18 +807,35 @@ ExecEndHashJoin(HashJoinState *node)
  * TODO: how to pass it across motion
  */
 static RuntimeFilterState*
-CreateRuntimeFilterState(HashJoinState *hjstate)
+CreateRuntimeFilterState(HashJoinState *hjstate, ProjectionInfo* projInfo)
 {
 	/* record projection info */
 	ListCell *hk;
 	int i = 0;
-	RuntimeFilterState* rf = (RuntimeFilterState*)palloc0(sizeof(RuntimeFilterState));
+	Assert(hjstate != NULL);
 
+	if (projInfo != NULL && !projInfo->pi_isVarList)
+	{
+		/* Create bloom filter for simple-Var-list case */
+		return NULL;
+	}
+
+	/* push down join key projection information */
+	RuntimeFilterState* rf = (RuntimeFilterState*)palloc0(sizeof(RuntimeFilterState));
 	foreach(hk, hjstate->hj_OuterHashKeys)
 	{
 		ExprState  *keyexpr = (ExprState *) lfirst(hk);
 		Var *variable = (Var *) keyexpr->expr;
-		rf->joinkeys = lappend_int(rf->joinkeys, variable->varattno);
+		if (projInfo != NULL)
+		{
+			Assert(projInfo->pi_varNumbers != NULL);
+			rf->joinkeys = lappend_int(rf->joinkeys, projInfo->pi_varNumbers[variable->varattno-1]);
+		}
+		else
+		{
+			/* select * from ... */
+			rf->joinkeys = lappend_int(rf->joinkeys, variable->varattno);
+		}
 		i++;
 	}
 	rf->hashfunctions = (FmgrInfo *) palloc(i * sizeof(FmgrInfo));
@@ -862,7 +879,7 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 		((ScanState*)outerNode)->runtimeFilter == NULL)
 	{
 		Assert(hashtable->bloomfilter->isCreated);
-		((ScanState*)outerNode)->runtimeFilter = CreateRuntimeFilterState(hjstate);
+		((ScanState*) outerNode)->runtimeFilter = CreateRuntimeFilterState(hjstate, ((ScanState*) outerNode)->ps.ps_ProjInfo);
 	}
 	RuntimeFilterState* rf = ((ScanState*)outerNode)->runtimeFilter;
 
