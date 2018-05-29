@@ -29,7 +29,8 @@ typedef enum UserAuth
 	uaPAM,
 	uaLDAP,
 	uaCert,
-	uaRADIUS
+	uaRADIUS,
+	uaCloud
 } UserAuth;
 
 typedef enum IPCompareMethod
@@ -77,6 +78,7 @@ typedef struct
 	char	   *radiussecret;
 	char	   *radiusidentifier;
 	int			radiusport;
+	char	   *cloudserver;
 } HbaLine;
 
 /* kluge to avoid including libpq/libpq-be.h here */

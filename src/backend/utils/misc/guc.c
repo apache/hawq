@@ -790,6 +790,21 @@ char   *acl_type;
 int    rps_addr_port;
 int    rps_check_local_interval;
 
+char   *rps_addr_host;
+char   *rps_addr_suffix;
+int     rps_addr_port;
+
+char	   *pg_cloud_clustername = NULL;
+
+/*auto-switch service*/
+bool enable_master_auto_ha = false;
+
+/* 
+ * zookeeper_server hostlist
+ * "host1:port1,host2:port2,...,hostx:postx"
+ */
+char *ha_zookeeper_quorum = "localhost:2181";
+
 /*
  * Displayable names for context types (enum GucContext)
  *
@@ -8225,6 +8240,15 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&acl_type,
 		"standalone", NULL, NULL
+	},
+
+	{
+		{"clusterName", PGC_POSTMASTER, PRESET_OPTIONS,
+			gettext_noop("Corresponding identifier for this hawq cluster in oushu cloud system."),
+			NULL
+		},
+		&pg_cloud_clustername,
+		"", NULL, NULL
 	},
 
 	{

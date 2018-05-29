@@ -137,6 +137,7 @@ extern char *savedSeqServerHost;
 extern int savedSeqServerPort;
 
 struct curl_context_t curl_context_ranger;
+struct curl_context_t curl_context_cloud;
 /* ----------------
  *		global variables
  * ----------------

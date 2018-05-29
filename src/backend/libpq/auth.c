@@ -40,6 +40,7 @@
 #include "pgtime.h"
 #include "postmaster/postmaster.h"
 #include "utils/builtins.h"
+#include "utils/cloudrest.h"
 #include "utils/datetime.h"
 #include "utils/guc.h"
 #include "utils/timestamp.h"
@@ -213,6 +214,12 @@ static int pg_SSPI_recvauth(Port *port);
 #endif
 static int	CheckRADIUSAuth(Port *port);
 
+/*----------------------------------------------------------------
+ * Cloud Authentication
+ *----------------------------------------------------------------
+ */
+static int CheckCloudAuth(Port *port);
+
 /*
  * Maximum accepted size of GSS and SSPI authentication tokens.
  *
@@ -312,6 +319,9 @@ auth_failed(Port *port, int status)
 				break;
 			case uaRADIUS:
 				errstr = gettext_noop("RADIUS authentication failed for user \"%s\"");
+				break;
+			case uaCloud:
+				errstr = gettext_noop("Cloud authentication failed for user \"%s\"");
 				break;
 			default:
 				errstr = gettext_noop("authentication failed for user \"%s\": invalid authentication method");
@@ -710,6 +720,9 @@ ClientAuthentication(Port *port)
 			break;
 		case uaRADIUS:
 			status = CheckRADIUSAuth(port);
+			break;
+		case uaCloud:
+			status = CheckCloudAuth(port);
 			break;
 		case uaTrust:
 			status = STATUS_OK;
@@ -2695,6 +2708,62 @@ CheckCertAuth(Port *port)
 	return check_usermap(port->hba->usermap, port->user_name, port->peer_cn, false);
 }
 #endif
+
+/*
+ * Called when we have sent an authorization request for a password.
+ * Get the response and check it.
+ */
+static int
+CheckCloudAuth(Port *port)
+{
+	char	   *passwd;
+	int			result;
+
+	pg_cloud_auth = true;
+
+	elog(LOG, "in CheckCloudAuth, port->hba->cloudserver=%s, pg_cloud_clustername=%s", port->hba->cloudserver, pg_cloud_clustername);
+	if (!port->hba->cloudserver || port->hba->cloudserver[0] == '\0')
+	{
+		ereport(LOG,
+				(errmsg("cloud server not specified")));
+		return STATUS_ERROR;
+	}
+
+	sendAuthRequest(port, AUTH_REQ_PASSWORD);
+
+	passwd = recv_password_packet(port);
+	if (passwd == NULL)
+		return STATUS_EOF;		/* client wouldn't send password */
+
+	if (strlen(passwd) == 0)
+	{
+		ereport(LOG,
+				(errmsg("empty password returned by client")));
+		return STATUS_ERROR;
+	}
+
+	elog(LOG, "in CheckCloudAuth, before init_cloud_curl");
+	init_cloud_curl();
+
+	char *errormsg;
+	elog(LOG, "in CheckCloudAuth, before check_authentication_from_cloud");
+	result = check_authentication_from_cloud(port->user_name, passwd, NULL,
+			AUTHENTICATION_CHECK, "", &errormsg);
+	if (result)
+	{
+		ereport(LOG,
+				(errmsg("%s", errormsg)));
+		if (errormsg) {
+			pfree(errormsg);
+			errormsg = NULL;
+		}
+	}
+
+	pfree(passwd);
+
+	return result;
+
+}
 
 
 /*----------------------------------------------------------------

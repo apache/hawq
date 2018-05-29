@@ -25,12 +25,14 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+#include "libpq/auth.h"
 #include "libpq/ip.h"
 #include "libpq/libpq.h"
 #include "regex/regex.h"
 #include "storage/fd.h"
 #include "utils/flatfiles.h"
 #include "utils/acl.h"
+#include "utils/cloudrest.h"
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
@@ -1087,6 +1089,8 @@ parse_hba_line(List *line, int line_num, HbaLine *parsedline)
 #endif
 	else if (strcmp(token, "radius") == 0)
 		parsedline->auth_method = uaRADIUS;
+	else if (strcmp(token, "cloud") == 0)
+		parsedline->auth_method = uaCloud;
 	else
 	{
 		ereport(LOG,
@@ -1372,6 +1376,17 @@ parse_hba_line(List *line, int line_num, HbaLine *parsedline)
 			{
 				REQUIRE_AUTH_OPTION(uaRADIUS, "radiusidentifier", "radius");
 				parsedline->radiusidentifier = pstrdup(c);
+			}
+			else if (strcmp(token, "cloudserver") == 0)
+			{
+				REQUIRE_AUTH_OPTION(uaCloud, "cloudserver", "cloud");
+				parsedline->cloudserver = pstrdup(c);
+				size_t len = strlen(parsedline->cloudserver);
+				MemoryContext old;
+				old = MemoryContextSwitchTo(TopMemoryContext);
+				pg_cloud_server = (char *)palloc0(len + 1);
+				memcpy(pg_cloud_server, parsedline->cloudserver, len);
+				MemoryContextSwitchTo(old);
 			}
 			else
 			{
