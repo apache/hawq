@@ -2721,7 +2721,8 @@ CheckCloudAuth(Port *port)
 
 	pg_cloud_auth = true;
 
-	elog(LOG, "in CheckCloudAuth, port->hba->cloudserver=%s, pg_cloud_clustername=%s", port->hba->cloudserver, pg_cloud_clustername);
+	elog(
+			DEBUG3, "in CheckCloudAuth, port->hba->cloudserver=%s, pg_cloud_clustername=%s", port->hba->cloudserver, pg_cloud_clustername);
 	if (!port->hba->cloudserver || port->hba->cloudserver[0] == '\0')
 	{
 		ereport(LOG,
@@ -2742,11 +2743,9 @@ CheckCloudAuth(Port *port)
 		return STATUS_ERROR;
 	}
 
-	elog(LOG, "in CheckCloudAuth, before init_cloud_curl");
 	init_cloud_curl();
 
 	char *errormsg;
-	elog(LOG, "in CheckCloudAuth, before check_authentication_from_cloud");
 	result = check_authentication_from_cloud(port->user_name, passwd, NULL,
 			AUTHENTICATION_CHECK, "", &errormsg);
 	if (result)

@@ -559,7 +559,7 @@ CreateRole(CreateRoleStmt *stmt)
 		char *errormsg;
 		int ret = check_authentication_from_cloud(stmt->role, password,
 				&createrole, USER_SYNC, "create", &errormsg);
-		elog(INFO, "in CreateRole, ret=%d", ret);
+		elog(DEBUG3, "in CreateRole, ret=%d", ret);
 		if (ret)
 		{
 			/*
@@ -1158,7 +1158,7 @@ AlterRole(AlterRoleStmt *stmt)
 			ret = check_authentication_from_cloud(stmt->role, NULL,
 					&new_record[Anum_pg_authid_rolcreaterole - 1], USER_SYNC,
 					"alter", &errormsg);
-			elog(INFO, "in AlterRole, ret=%d", ret);
+			elog(DEBUG3, "in AlterRole, ret=%d", ret);
 			if (ret)
 			{
 				elog(ERROR, "%s", errormsg);
@@ -1212,7 +1212,7 @@ AlterRole(AlterRoleStmt *stmt)
 			int ret;
 			ret = check_authentication_from_cloud(stmt->role, password, NULL,
 					USER_SYNC, "alter", &errormsg);
-			elog(INFO, "in AlterRole, ret=%d", ret);
+			elog(DEBUG3, "in AlterRole, ret=%d", ret);
 			if (ret)
 			{
 				elog(ERROR, "%s", errormsg);
@@ -1644,6 +1644,7 @@ DropRole(DropRoleStmt *stmt)
 			char *errormsg;
 			int ret = check_authentication_from_cloud(role, NULL, NULL,
 					USER_SYNC, "drop", &errormsg);
+			elog(DEBUG3, "in DropRole, ret=%d", ret);
 			if (ret)
 			{
 				elog(ERROR, "%s", errormsg);
