@@ -776,12 +776,12 @@ assign_session_authorization(const char *value, bool doit, GucSource source)
 					PointerGetDatum((char *) value)));
 
 		roleTup = caql_getnext(pcqCtx);
-		if (!HeapTupleIsValid(roleTup))
+		if (!HeapTupleIsValid(roleTup)
+				&& !CheckUserExistOnCloud(pcqCtx, NULL, value, &roleTup, false))
 		{
 			if (source >= PGC_S_INTERACTIVE)
 				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
-						 errmsg("role \"%s\" does not exist", value)));
+						(errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("role \"%s\" does not exist", value)));
 			return NULL;
 		}
 
@@ -922,12 +922,12 @@ assign_role(const char *value, bool doit, GucSource source)
 					PointerGetDatum((char *) value)));
 
 		roleTup = caql_getnext(pcqCtx);
-		if (!HeapTupleIsValid(roleTup))
+		if (!HeapTupleIsValid(roleTup)
+				&& !CheckUserExistOnCloud(pcqCtx, NULL, value, &roleTup, false))
 		{
 			if (source >= PGC_S_INTERACTIVE)
 				ereport(ERROR,
-						(errcode(ERRCODE_UNDEFINED_OBJECT),
-						 errmsg("role \"%s\" does not exist", value)));
+						(errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("role \"%s\" does not exist", value)));
 			return NULL;
 		}
 

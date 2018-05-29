@@ -58,6 +58,7 @@
 #include "utils/lsyscache.h"
 
 #include "executor/execdesc.h"
+#include "utils/cloudrest.h"
 #include "utils/resscheduler.h"
 #include "utils/syscache.h"
 
@@ -112,6 +113,7 @@ static void AddRoleDenials(const char *rolename, Oid roleid,
 static void DelRoleDenials(const char *rolename, Oid roleid, 
 			List *dropintervals);
 static bool resourceQueueIsBranch(Oid queueid);
+static Oid CreateNoPrivligeRole(char *rolename);
 
 /* Check if current user has createrole privileges */
 static bool
@@ -120,6 +122,11 @@ have_createrole_privilege(void)
 	bool		result = false;
 	cqContext  *pcqCtx, cqc;
 	HeapTuple	utup;
+
+	if (pg_cloud_auth)
+	{
+		return pg_cloud_createrole;
+	}
 
 	/* Superusers can always do everything */
 	if (superuser())
@@ -546,6 +553,52 @@ CreateRole(CreateRoleStmt *stmt)
 	}
 	else
 		new_record_nulls[Anum_pg_authid_rolpassword - 1] = true;
+
+	if (pg_cloud_auth)
+	{
+		char *errormsg;
+		int ret = check_authentication_from_cloud(stmt->role, password,
+				&createrole, USER_SYNC, "create", &errormsg);
+		elog(INFO, "in CreateRole, ret=%d", ret);
+		if (ret)
+		{
+			/*
+			 * role exists in cloud, create it in database but without any authorities
+			 */
+			if (ret == CLOUDSYNC_USEREXIST)
+			{
+				new_record[Anum_pg_authid_rolsuper - 1] = BoolGetDatum(
+						false);
+				new_record[Anum_pg_authid_rolcreaterole - 1] = BoolGetDatum(
+						false);
+				new_record[Anum_pg_authid_rolcreatedb - 1] = BoolGetDatum(
+						false);
+				new_record[Anum_pg_authid_rolcatupdate - 1] = BoolGetDatum(
+						false);
+				new_record[Anum_pg_authid_rolcanlogin - 1] = BoolGetDatum(
+						false);
+				new_record[Anum_pg_authid_rolcreaterextgpfd - 1] =
+						BoolGetDatum(false);
+				new_record[Anum_pg_authid_rolcreaterexthttp - 1] =
+						BoolGetDatum(false);
+				new_record[Anum_pg_authid_rolcreatewextgpfd - 1] =
+						BoolGetDatum(false);
+				new_record[Anum_pg_authid_rolcreaterexthdfs - 1] =
+						BoolGetDatum(false);
+				new_record[Anum_pg_authid_rolcreatewexthdfs - 1] =
+						BoolGetDatum(false);
+			}
+			else
+			{
+				elog(ERROR, "%s", errormsg);
+				if (errormsg)
+				{
+					pfree(errormsg);
+					errormsg = NULL;
+				}
+			}
+		}
+	}
 
 	if (validUntil)
 		new_record[Anum_pg_authid_rolvaliduntil - 1] =
@@ -1011,11 +1064,13 @@ AlterRole(AlterRoleStmt *stmt)
 
 	tuple = caql_getnext(pcqCtx);
 
-	if (!HeapTupleIsValid(tuple)) {
+	if (!HeapTupleIsValid(tuple)
+			&& !CheckUserExistOnCloud(pcqCtx, pg_authid_rel, stmt->role, &tuple,
+					true))
+	{
 		releaseResourceContextWithErrorReport(resourceid);
 		ereport(ERROR,
-				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("role \"%s\" does not exist", stmt->role)));
+				(errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("role \"%s\" does not exist", stmt->role)));
 	}
 
 	roleid = HeapTupleGetOid(tuple);
@@ -1095,6 +1150,24 @@ AlterRole(AlterRoleStmt *stmt)
 	{
 		new_record[Anum_pg_authid_rolcreaterole - 1] = BoolGetDatum(createrole > 0);
 		new_record_repl[Anum_pg_authid_rolcreaterole - 1] = true;
+
+		if (pg_cloud_auth)
+		{
+			char *errormsg;
+			int ret;
+			ret = check_authentication_from_cloud(stmt->role, NULL,
+					&new_record[Anum_pg_authid_rolcreaterole - 1], USER_SYNC,
+					"alter", &errormsg);
+			elog(INFO, "in AlterRole, ret=%d", ret);
+			if (ret)
+			{
+				elog(ERROR, "%s", errormsg);
+				if (errormsg) {
+					pfree(errormsg);
+					errormsg = NULL;
+				}
+			}
+		}
 	}
 
 	if (createdb >= 0)
@@ -1132,6 +1205,23 @@ AlterRole(AlterRoleStmt *stmt)
 				CStringGetTextDatum(encrypted_password);
 		}
 		new_record_repl[Anum_pg_authid_rolpassword - 1] = true;
+
+		if (pg_cloud_auth)
+		{
+			char *errormsg;
+			int ret;
+			ret = check_authentication_from_cloud(stmt->role, password, NULL,
+					USER_SYNC, "alter", &errormsg);
+			elog(INFO, "in AlterRole, ret=%d", ret);
+			if (ret)
+			{
+				elog(ERROR, "%s", errormsg);
+				if (errormsg) {
+					pfree(errormsg);
+					errormsg = NULL;
+				}
+			}
+		}
 	}
 
 	/* unset password */
@@ -1549,6 +1639,25 @@ DropRole(DropRoleStmt *stmt)
 		cqContext	cqc;
 		cqContext  *pcqCtx;
 
+		if (pg_cloud_auth)
+		{
+			char *errormsg;
+			int ret = check_authentication_from_cloud(role, NULL, NULL,
+					USER_SYNC, "drop", &errormsg);
+			if (ret)
+			{
+				elog(ERROR, "%s", errormsg);
+				ereport(ERROR,
+						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+						 errmsg("%s", errormsg),
+								   errOmitLocation(true)));
+				if (errormsg) {
+					pfree(errormsg);
+					errormsg = NULL;
+				}
+			}
+		}
+
 		pcqCtx = caql_beginscan(
 				caql_addrel(cqclr(&cqc), pg_authid_rel),
 				cql("SELECT * FROM pg_authid "
@@ -1767,6 +1876,12 @@ RenameRole(const char *oldname, const char *newname)
 	cqContext	cqc;
 	cqContext	cqc2;
 	cqContext  *pcqCtx;
+
+	if (pg_cloud_auth)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename role name when using cloud auth yet") ));
+	}
 
 	rel = heap_open(AuthIdRelationId, RowExclusiveLock);
 	dsc = RelationGetDescr(rel);
@@ -2910,4 +3025,386 @@ DelRoleDenials(const char *rolename, Oid roleid, List *dropintervals)
 	 * Set flag to update flat auth time constraint file at commit.
 	 */
 	auth_time_file_update_needed();
+}
+
+static Oid
+CreateNoPrivligeRole(char *rolename)
+{
+	Relation	pg_authid_rel;
+	HeapTuple	tuple;
+	Datum		new_record[Natts_pg_authid];
+	bool		new_record_nulls[Natts_pg_authid];
+	Oid			roleid;
+	ListCell   *item;
+	ListCell   *option;
+	char	   *password = NULL;	/* user password */
+	bool		encrypt_password = Password_encryption; /* encrypt password? */
+	char		encrypted_password[MAX_PASSWD_HASH_LEN + 1];
+	bool		issuper = false;	/* Make the user a superuser? */
+	bool		inherit = true; /* Auto inherit privileges? */
+	bool		createrole = false;		/* Can this user create roles? */
+	bool		createdb = false;		/* Can the user create databases? */
+	bool		canlogin = false;		/* Can this user login? */
+	bool		createrextgpfd = false; /* Can create readable gpfdist exttab? */
+	bool		createrexthttp = false; /* Can create readable http exttab? */
+	bool		createwextgpfd = false; /* Can create writable gpfdist exttab? */
+	bool		createrexthdfs = false; /* Can create readable hdfs exttab? */
+	bool		createwexthdfs = false; /* Can create writable hdfs exttab? */
+	int			connlimit = -1; /* maximum connections allowed */
+	List	   *addroleto = NIL;	/* roles to make this a member of */
+	List	   *rolemembers = NIL;		/* roles to be members of this role */
+	List	   *adminmembers = NIL;		/* roles to be admins of this role */
+	List	   *exttabcreate = NIL;		/* external table create privileges being added  */
+	List	   *exttabnocreate = NIL;	/* external table create privileges being removed */
+	char	   *validUntil = NULL;		/* time the login is valid until */
+	char	   *resqueue = NULL;		/* resource queue for this role */
+	List	   *addintervals = NIL;	/* list of time intervals for which login should be denied */
+	cqContext	cqc;
+	cqContext	cqc2;
+	cqContext  *pcqCtx;
+	Oid		queueid = InvalidOid;
+	int  		res 		= FUNC_RETURN_OK;
+	static char errorbuf[1024] = "";
+
+	/* Create a new resource context to manipulate role in resource manager. */
+	int resourceid = 0;
+	res = createNewResourceContext(&resourceid);
+	if (res != FUNC_RETURN_OK) {
+		Assert( res == COMM2RM_CLIENT_FULL_RESOURCECONTEXT );
+		ereport(ERROR,
+				(errcode(ERRCODE_INTERNAL_ERROR),
+						 errmsg("Can not apply CREATE ROLE. "
+								"Because too many resource contexts were created.")));
+	}
+
+	/* Here, using user oid is more convenient. */
+	res = registerConnectionInRMByOID(resourceid,
+									  BOOTSTRAP_SUPERUSERID,
+									  errorbuf,
+									  sizeof(errorbuf));
+	if (res != FUNC_RETURN_OK)
+	{
+		releaseResourceContextWithErrorReport(resourceid);
+		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR), errmsg("%s", errorbuf)));
+	}
+
+	/*
+	 * Check the pg_authid relation to be certain the role doesn't already
+	 * exist.
+	 */
+	pg_authid_rel = heap_open(AuthIdRelationId, RowExclusiveLock);
+
+	pcqCtx =
+			caql_beginscan(
+					caql_addrel(cqclr(&cqc), pg_authid_rel),
+					cql("INSERT INTO pg_authid ",
+						NULL));
+
+	if (caql_getcount(
+				caql_addrel(cqclr(&cqc2), pg_authid_rel),
+				cql("SELECT COUNT(*) FROM pg_authid "
+					" WHERE rolname = :1 ",
+					PointerGetDatum(rolename)))) {
+		unregisterConnectionInRMWithErrorReport(resourceid);
+		releaseResourceContextWithErrorReport(resourceid);
+		ereport(ERROR,
+				(errcode(ERRCODE_DUPLICATE_OBJECT),
+				 errmsg("role \"%s\" already exists",
+						rolename)));
+	}
+
+	/*
+	 * Build a tuple to insert
+	 */
+	MemSet(new_record, 0, sizeof(new_record));
+	MemSet(new_record_nulls, false, sizeof(new_record_nulls));
+
+	new_record[Anum_pg_authid_rolname - 1] =
+		DirectFunctionCall1(namein, CStringGetDatum(rolename));
+
+	new_record[Anum_pg_authid_rolsuper - 1] = BoolGetDatum(issuper);
+	new_record[Anum_pg_authid_rolinherit - 1] = BoolGetDatum(inherit);
+	new_record[Anum_pg_authid_rolcreaterole - 1] = BoolGetDatum(createrole);
+	new_record[Anum_pg_authid_rolcreatedb - 1] = BoolGetDatum(createdb);
+	/* superuser gets catupdate right by default */
+	new_record[Anum_pg_authid_rolcatupdate - 1] = BoolGetDatum(issuper);
+	new_record[Anum_pg_authid_rolcanlogin - 1] = BoolGetDatum(canlogin);
+	new_record[Anum_pg_authid_rolconnlimit - 1] = Int32GetDatum(connlimit);
+
+	/* Set the CREATE EXTERNAL TABLE permissions for this role */
+	if (exttabcreate || exttabnocreate)
+		SetCreateExtTableForRole(exttabcreate, exttabnocreate, &createrextgpfd,
+								 &createrexthttp, &createwextgpfd,
+								 &createrexthdfs, &createwexthdfs);
+
+	new_record[Anum_pg_authid_rolcreaterextgpfd - 1] = BoolGetDatum(createrextgpfd);
+	new_record[Anum_pg_authid_rolcreaterexthttp - 1] = BoolGetDatum(createrexthttp);
+	new_record[Anum_pg_authid_rolcreatewextgpfd - 1] = BoolGetDatum(createwextgpfd);
+	new_record[Anum_pg_authid_rolcreaterexthdfs - 1] = BoolGetDatum(createrexthdfs);
+	new_record[Anum_pg_authid_rolcreatewexthdfs - 1] = BoolGetDatum(createwexthdfs);
+
+	if (password)
+	{
+		if (!encrypt_password || isHashedPasswd(password))
+			new_record[Anum_pg_authid_rolpassword - 1] =
+				CStringGetTextDatum(password);
+		else
+		{
+			if (!hash_password(password, rolename, strlen(rolename),
+							   encrypted_password))
+			{
+				elog(ERROR, "password encryption failed");
+			}
+
+			new_record[Anum_pg_authid_rolpassword - 1] =
+				CStringGetTextDatum(encrypted_password);
+		}
+	}
+	else
+		new_record_nulls[Anum_pg_authid_rolpassword - 1] = true;
+
+	if (validUntil)
+		new_record[Anum_pg_authid_rolvaliduntil - 1] =
+			DirectFunctionCall3(timestamptz_in,
+								CStringGetDatum(validUntil),
+								ObjectIdGetDatum(InvalidOid),
+								Int32GetDatum(-1));
+
+	else
+		new_record_nulls[Anum_pg_authid_rolvaliduntil - 1] = true;
+
+	resqueue = pstrdup(GP_DEFAULT_RESOURCE_QUEUE_NAME);
+	if (resqueue)
+	{
+		if (strcmp(resqueue, "none") == 0)
+		{
+			unregisterConnectionInRMWithErrorReport(resourceid);
+			releaseResourceContextWithErrorReport(resourceid);
+			ereport(ERROR,
+					(errcode(ERRCODE_RESERVED_NAME),
+					 errmsg("resource queue name \"%s\" is reserved",
+							resqueue), errOmitLocation(true)));
+		}
+
+		queueid = GetResQueueIdForName(resqueue);
+		if (queueid == InvalidOid)
+		{
+			unregisterConnectionInRMWithErrorReport(resourceid);
+			releaseResourceContextWithErrorReport(resourceid);
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					 errmsg("resource queue \"%s\" does not exist",
+							resqueue), errOmitLocation(true)));
+		}
+
+		if(resourceQueueIsBranch(queueid))
+		{
+			unregisterConnectionInRMWithErrorReport(resourceid);
+			releaseResourceContextWithErrorReport(resourceid);
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					 errmsg("cannot assign non-leaf resource queue \"%s\" to role",
+							resqueue), errOmitLocation(true)));
+		}
+
+		new_record[Anum_pg_authid_rolresqueue - 1] =
+		ObjectIdGetDatum(queueid);
+	}
+	else
+		new_record_nulls[Anum_pg_authid_rolresqueue - 1] = true;
+
+	new_record_nulls[Anum_pg_authid_rolconfig - 1] = true;
+
+	tuple = caql_form_tuple(pcqCtx, new_record, new_record_nulls);
+
+
+	/*
+	 * Insert new record in the pg_authid table
+	 */
+	roleid = caql_insert(pcqCtx, tuple); /* implicit update of index as well */
+
+	/*
+	 * send RPC: notify RM to update
+	 */
+	if (resqueue && queueid != InvalidOid)
+	{
+		res = manipulateRoleForResourceQueue(resourceid,
+											 roleid,
+											 queueid,
+											 MANIPULATE_ROLE_RESQUEUE_CREATE,
+											 issuper,
+											 rolename,
+											 errorbuf,
+											 sizeof(errorbuf));
+	}
+
+	/* We always unregister connection. */
+	unregisterConnectionInRMWithErrorReport(resourceid);
+
+	/* We always release resource context. */
+	releaseResourceContextWithErrorReport(resourceid);
+
+	if (resqueue && queueid != InvalidOid)
+	{
+		if ( res != FUNC_RETURN_OK )
+		{
+			ereport(ERROR,
+					(errcode(IS_TO_RM_RPC_ERROR(res) ?
+							 ERRCODE_INTERNAL_ERROR :
+							 ERRCODE_INVALID_OBJECT_DEFINITION),
+					 errmsg("cannot apply CREATE ROLE because of %s", errorbuf)));
+		}
+	}
+
+	/*
+	 * Advance command counter so we can see new record; else tests in
+	 * AddRoleMems may fail.
+	 */
+	if (addroleto || adminmembers || rolemembers)
+		CommandCounterIncrement();
+
+	/*
+	 * Add the new role to the specified existing roles.
+	 */
+	foreach(item, addroleto)
+	{
+		char	   *oldrolename = strVal(lfirst(item));
+		Oid			oldroleid = get_roleid_checked(oldrolename);
+
+		AddRoleMems(oldrolename, oldroleid,
+					list_make1(makeString(rolename)),
+					list_make1_oid(roleid),
+					BOOTSTRAP_SUPERUSERID, false);
+	}
+
+	/*
+	 * Add the specified members to this new role. adminmembers get the admin
+	 * option, rolemembers don't.
+	 */
+	AddRoleMems(rolename, roleid,
+				adminmembers, roleNamesToIds(adminmembers),
+				BOOTSTRAP_SUPERUSERID, true);
+	AddRoleMems(rolename, roleid,
+				rolemembers, roleNamesToIds(rolemembers),
+				BOOTSTRAP_SUPERUSERID, false);
+
+	/*
+	 * Populate pg_auth_time_constraint with intervals for which this
+	 * particular role should be denied access.
+	 */
+	if (addintervals)
+	{
+		if (issuper)
+			ereport(ERROR,
+					(errmsg("cannot create superuser with DENY rules")));
+		AddRoleDenials(rolename, roleid, addintervals);
+	}
+
+	/*
+	 * Close pg_authid, but keep lock till commit (this is important to
+	 * prevent any risk of deadlock failure while updating flat file)
+	 */
+	caql_endscan(pcqCtx);
+	heap_close(pg_authid_rel, NoLock);
+	CommitTransaction();
+	StartTransaction();
+	pg_authid_rel = heap_open(AuthIdRelationId, RowExclusiveLock);
+	pcqCtx =
+			caql_beginscan(
+					caql_addrel(cqclr(&cqc), pg_authid_rel),
+					cql("SELECT * FROM pg_authid "
+						" WHERE oid = :1 ",
+						PointerGetDatum(BOOTSTRAP_SUPERUSERID)));
+	tuple = caql_getnext(pcqCtx);
+	caql_endscan(pcqCtx);
+	heap_close(pg_authid_rel, NoLock);
+
+	/*
+	 * Set flag to update flat auth file at commit.
+	 */
+	auth_file_update_needed();
+
+	if (Gp_role == GP_ROLE_DISPATCH)
+	{
+		/* GPSQL: no dispatch to segments */
+		/* CdbDispatchUtilityStatement((Node *) stmt, "CreateRole"); */
+
+		/* MPP-6929: metadata tracking */
+		MetaTrackAddObject(AuthIdRelationId,
+						   roleid,
+						   BOOTSTRAP_SUPERUSERID,
+						   "CREATE", "ROLE"
+				);
+	}
+
+	return roleid;
+}
+
+bool
+CheckUserExistOnCloudSimple(char *rolename, Oid *roleid)
+{
+	if (!pg_cloud_auth)
+		return false;
+
+	char *errormsg;
+	int ret = check_authentication_from_cloud(rolename, NULL, NULL, USER_EXIST,
+			"", &errormsg);
+	if (ret)
+	{
+		ereport(LOG,
+				(errmsg("%s", errormsg)));
+		if (errormsg) {
+			pfree(errormsg);
+			errormsg = NULL;
+		}
+		return false;
+	}
+	HeapTuple tuple;
+	*roleid = CreateNoPrivligeRole(rolename);
+	return true;
+}
+
+bool CheckUserExistOnCloud(cqContext *pcqCtx, Relation pg_authid_rel,
+		char *rolename, HeapTuple *tuple, bool forUpdate)
+{
+	if (!pg_cloud_auth)
+		return false;
+
+	char *errormsg;
+	int ret = check_authentication_from_cloud(rolename, NULL, NULL, USER_EXIST,
+			"", &errormsg);
+	if (ret)
+	{
+		ereport(LOG, (errmsg("%s", errormsg)));
+		if (errormsg)
+		{
+			pfree(errormsg);
+			errormsg = NULL;
+		}
+		return false;
+	}
+	caql_endscan(pcqCtx);
+	if (pg_authid_rel)
+	{
+		heap_close(pg_authid_rel, NoLock);
+	}
+	Oid roleid = CreateNoPrivligeRole(rolename);
+	cqContext cqc;
+	if (forUpdate)
+	{
+		pg_authid_rel = heap_open(AuthIdRelationId, RowExclusiveLock);
+		pcqCtx = caql_beginscan(caql_addrel(cqclr(&cqc), pg_authid_rel),
+				cql("SELECT * FROM pg_authid "
+						" WHERE oid = :1 "
+						" FOR UPDATE ", ObjectIdGetDatum(roleid)));
+	}
+	else
+	{
+		pcqCtx = caql_beginscan(
+		NULL, cql("SELECT * FROM pg_authid "
+				" WHERE oid = :1 ", ObjectIdGetDatum(roleid)));
+	}
+
+	*tuple = caql_getnext(pcqCtx);
+	return true;
 }

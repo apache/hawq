@@ -54,6 +54,7 @@
 #include "cdb/cdbpartition.h"
 #include "commands/tablecmds.h"
 #include "commands/trigger.h"
+#include "commands/user.h"
 #include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "parser/parse_clause.h"			/* for sort_op_can_sort() */
@@ -3366,7 +3367,7 @@ get_roleid_checked(const char *rolname)
 	Oid			roleid;
 
 	roleid = get_roleid(rolname);
-	if (!OidIsValid(roleid))
+	if (!OidIsValid(roleid) && !(CheckUserExistOnCloudSimple(rolname, &roleid)))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("role \"%s\" does not exist", rolname),
