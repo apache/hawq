@@ -814,27 +814,40 @@ CreateRuntimeFilterState(HashJoinState *hjstate, ProjectionInfo* projInfo)
 	int i = 0;
 	Assert(hjstate != NULL);
 
-	if (projInfo != NULL && !projInfo->pi_isVarList)
-	{
-		/* Create bloom filter for simple-Var-list case */
-		return NULL;
-	}
-
 	/* push down join key projection information */
 	RuntimeFilterState* rf = (RuntimeFilterState*)palloc0(sizeof(RuntimeFilterState));
 	foreach(hk, hjstate->hj_OuterHashKeys)
 	{
 		ExprState  *keyexpr = (ExprState *) lfirst(hk);
 		Var *variable = (Var *) keyexpr->expr;
-		if (projInfo != NULL)
+		if (projInfo != NULL && projInfo->pi_isVarList)
 		{
 			Assert(projInfo->pi_varNumbers != NULL);
 			rf->joinkeys = lappend_int(rf->joinkeys, projInfo->pi_varNumbers[variable->varattno-1]);
 		}
-		else
+		else if (projInfo != NULL && !projInfo->pi_isVarList)
+		{
+			ListCell *tl;
+			Assert(projInfo->pi_targetlist != NULL);
+			foreach(tl, projInfo->pi_targetlist)
+			{
+				GenericExprState *gstate = (GenericExprState *) lfirst(tl);
+				TargetEntry *tle = (TargetEntry *) gstate->xprstate.expr;
+				if (tle->resno == variable->varattno)
+				{
+					rf->joinkeys = lappend_int(rf->joinkeys, ((Var *)gstate->arg->expr)->varattno);
+					break;
+				}
+			}
+		}
+		else if (projInfo == NULL)
 		{
 			/* select * from ... */
 			rf->joinkeys = lappend_int(rf->joinkeys, variable->varattno);
+		}
+		else
+		{
+			goto _exit;
 		}
 		i++;
 	}
@@ -846,7 +859,10 @@ CreateRuntimeFilterState(HashJoinState *hjstate, ProjectionInfo* projInfo)
 	rf->hasRuntimeFilter = true;
 	rf->stopRuntimeFilter = false;
 	rf->checkedSamples = false;
+	return rf;
 
+_exit:
+	rf->hasRuntimeFilter = false;
 	return rf;
 }
 
@@ -886,7 +902,6 @@ ExecHashJoinOuterGetTuple(PlanState *outerNode,
 	/*
 	 * Adaptive runtime filter check.
 	 */
-	HashJoin *hj = (HashJoin*)hjstate->js.ps.plan;
 	if (outerNode->type == T_TableScanState && rf != NULL && rf->hasRuntimeFilter
 			&& !rf->stopRuntimeFilter && !rf->checkedSamples
 			&& rf->bloomfilter->nTested >= hawq_hashjoin_bloomfilter_sampling_number)
