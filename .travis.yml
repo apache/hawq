@@ -42,7 +42,15 @@ install:
       protobuf-c
       thrift
   - brew outdated libyaml || brew upgrade libyaml
-  - brew outdated json-c  || brew upgrade json-c
+  - git clone https://github.com/json-c/json-c.git
+  - pushd json-c
+  - git reset --hard json-c-0.12.1-20160607
+  - sh autogen.sh
+  - ./configure
+  - make
+  - make install
+  - popd
+  - rm -rf ./json-c
   - brew uninstall boost --ignore-dependencies
   - brew install homebrew/core/boost@1.60
   - brew link boost@1.60 --force
