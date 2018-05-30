@@ -60,8 +60,8 @@ ExecWorkFile_Create(const char *fileName,
 					bool delOnClose,
 					int compressType)
 {
-	ExecWorkFile *workfile = NULL;
-	void *file = NULL;
+	ExecWorkFile *workfile;
+	void	   *file;
 
 	/* Before creating a new file, let's check the limit on number of workfile created */
 	if (!WorkfileQueryspace_AddWorkfile())
@@ -69,14 +69,6 @@ ExecWorkFile_Create(const char *fileName,
 		/* Failed to reserve additional disk space, notify caller */
 		workfile_mgr_report_error();
 	}
-
-	/*
-	 * Create ExecWorkFile in the TopMemoryContext since this memory context
-	 * is still available when calling the transaction callback at the
-	 * time when the transaction aborts.
-	 */
-	 MemoryContext oldContext = MemoryContextSwitchTo(TopMemoryContext);
-
 
 	switch(fileType)
 	{
@@ -88,10 +80,10 @@ ExecWorkFile_Create(const char *fileName,
 			file = (void *)bfz_create(fileName, delOnClose, compressType);
 			break;
 		default:
-			ereport(LOG,
+			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("invalid work file type: %d", fileType)));
-			Assert(false);
+			return NULL;		/* keep compiler quiet */
 	}
 
 	workfile = palloc0(sizeof(ExecWorkFile));
@@ -101,8 +93,6 @@ ExecWorkFile_Create(const char *fileName,
 	workfile->fileName = pstrdup(fileName);
 	workfile->size = 0;
 	ExecWorkFile_SetFlags(workfile, delOnClose, true /* created */);
-
-	MemoryContextSwitchTo(oldContext);
 
 	return workfile;
 }
@@ -158,9 +148,9 @@ ExecWorkFile_Open(const char *fileName,
 					bool delOnClose,
 					int compressType)
 {
-	ExecWorkFile *workfile = NULL;
-	void *file = NULL;
-	int64 file_size = 0;
+	ExecWorkFile *workfile;
+	void	   *file;
+	int64		file_size;
 
 	switch(fileType)
 	{
@@ -170,32 +160,30 @@ ExecWorkFile_Open(const char *fileName,
 					delOnClose,
 					true  /* interXact */ );
 			if (!file)
-			{
-				elog(ERROR, "could not open temporary file \"%s\": %m", fileName);
-			}
+				ereport(ERROR,
+						(errcode_for_file_access(),
+						 errmsg("could not open temporary file \"%s\": %m",
+								fileName)));
+
 			BufFileSetWorkfile(file);
 			file_size = BufFileGetSize(file);
-
 			break;
+
 		case BFZ:
 			file = (void *)bfz_open(fileName, delOnClose, compressType);
 			if (!file)
-			{
-				elog(ERROR, "could not open temporary file \"%s\": %m", fileName);
-			}
+				ereport(ERROR,
+						(errcode_for_file_access(),
+						 errmsg("could not open temporary file \"%s\": %m",
+								fileName)));
 			file_size = bfz_totalbytes((bfz_t *)file);
 			break;
+
 		default:
-			ereport(LOG,
+			ereport(ERROR,
 					(errcode(ERRCODE_INTERNAL_ERROR),
 					 errmsg("invalid work file type: %d", fileType)));
-			Assert(false);
-	}
-
-	/* Failed opening existing workfile. Inform the caller */
-	if (NULL == file)
-	{
-		return NULL;
+			return NULL;		/* keep compiler quiet */
 	}
 
 	workfile = palloc0(sizeof(ExecWorkFile));
@@ -219,6 +207,7 @@ ExecWorkFile_Open(const char *fileName,
  */
 bool
 ExecWorkFile_Write(ExecWorkFile *workfile,
+
 				   void *data,
 				   uint64 size)
 {

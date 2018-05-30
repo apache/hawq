@@ -18,7 +18,7 @@
 subdir=src/backend/executor
 top_builddir=../../../..
 
-TARGETS=nodeSubplan nodeShareInputScan execAmi execWorkfile execHHashagg
+TARGETS=nodeSubplan nodeShareInputScan execAmi execHHashagg
 
 # Objects from backend, which don't need to be mocked but need to be linked.
 nodeSubplan_REAL_OBJS=\
