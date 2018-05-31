@@ -30,6 +30,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.pxf.service.utilities.SecureLogin;
 
@@ -88,15 +89,25 @@ public class SecurityServletFilter implements Filter {
             };
 
             // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
+            UserGroupInformation proxyUGI = null;
             try {
-                LOG.debug("Creating proxy user for " + user);
-                UserGroupInformation proxyUGI = UserGroupInformation.createProxyUser(user, UserGroupInformation.getLoginUser());;
+                LOG.debug("Creating proxy user = " + user);
+                proxyUGI = UserGroupInformation.createProxyUser(user, UserGroupInformation.getLoginUser());
                 proxyUGI.doAs(action);
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
                 throw new ServletException(ute.getCause());
             } catch (InterruptedException ie) {
                 throw new ServletException(ie);
+            } finally {
+                try {
+                    if (proxyUGI != null) {
+                        LOG.debug("Closing FileSystem for proxy user = " + proxyUGI.getUserName());
+                        FileSystem.closeAllForUGI(proxyUGI);
+                    }
+                } catch (Throwable t) {
+                    LOG.warn("Error closing FileSystem for proxy user = " + proxyUGI.getUserName());
+                }
             }
         } else {
             // no user impersonation is configured
