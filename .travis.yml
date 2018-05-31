@@ -43,16 +43,13 @@ install:
       thrift
   - brew outdated libyaml || brew upgrade libyaml
   - git clone https://github.com/json-c/json-c.git
-  - cd json-c
-  - sh autogen.sh
+  - pushd json-c
   - git reset --hard json-c-0.12.1-20160607
-  - git log
-  - git reset json-c-0.12.1-20160607 --hard
   - sh autogen.sh
   - ./configure
   - make
   - make install
-  - cd ../
+  - popd
   - rm -rf ./json-c
   - brew uninstall boost --ignore-dependencies
   - brew install homebrew/core/boost@1.60
