@@ -334,6 +334,7 @@ project('pxf') {
         requires(versionedPackageName('pxf-hbase'), project.version, GREATER | EQUAL)
         requires(versionedPackageName('pxf-json'), project.version, GREATER | EQUAL)
         requires(versionedPackageName('pxf-jdbc'), project.version, GREATER | EQUAL)
+        requires(versionedPackageName('pxf-ignite'), project.version, GREATER | EQUAL)
 
         preInstall file('src/scripts/pre-install.sh')
         postInstall file('src/scripts/post-install.sh')
@@ -478,7 +479,6 @@ project('pxf-hbase') {
     }
 }
 
-
 project('pxf-jdbc') {
     dependencies {
         compile(project(':pxf-api'))
@@ -509,6 +509,36 @@ project('pxf-jdbc') {
         link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
     }
 }
+
+project('pxf-ignite') {
+    dependencies {
+        compile(project(':pxf-api'))
+        compile(project(':pxf-service'))
+        compile 'com.google.code.gson:gson:2.8.2'
+        compile 'org.apache.commons:commons-compress:1.16.1'
+        testCompile 'com.google.code.gson:gson:2.8.2'
+        testCompile 'org.apache.commons:commons-compress:1.16.1'
+    }
+
+    ospackage {
+        packageName = versionedPackageName("${project.name}")
+        summary = 'HAWQ Extension Framework (PXF), Apache Ignite plugin'
+        description = 'Querying external data stored in the Apache Ignite database.'
+        packager = ' '
+        packageGroup = 'Development/Libraries'
+        release = buildNumber() + '.' + project.osFamily
+        buildHost = ' '
+
+        requires(versionedPackageName('pxf-service'), project.version, GREATER | EQUAL)
+
+        from(jar.outputs.files) {
+            into "/usr/lib/pxf-${project.version}"
+        }
+
+        link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
+    }
+}
+
 
 def buildNumber() {
     System.getenv('BUILD_NUMBER') ?: System.getProperty('user.name')

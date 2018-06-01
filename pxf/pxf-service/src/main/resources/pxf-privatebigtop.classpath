@@ -17,7 +17,7 @@
 # This file contains the internal classpaths required to run PXF.
 # WARNING: DO NOT EDIT!
 # Any change in this file can result in PXF failing to run.
-# Adding resources should be done using pxf-public.classpath file. 
+# Adding resources should be done using pxf-public.classpath file.
 ##################################################################
 /etc/pxf/conf
 /etc/hadoop/conf
@@ -39,6 +39,7 @@
 /usr/lib/hadoop/client/commons-io-*[0-9].jar
 /usr/lib/hadoop/client/commons-lang-*[0-9].jar
 /usr/lib/hadoop/client/commons-logging-*[0-9].jar
+/usr/lib/hadoop/client/commons-compress-*[0-9].jar
 /usr/lib/hadoop/client/guava-*[0-9].jar
 /usr/lib/hadoop/client/htrace-core-*[0-9]*.jar
 /usr/lib/hadoop/client/hadoop-lzo-*[0-9].jar
@@ -49,6 +50,7 @@
 /usr/lib/hadoop/client/protobuf-java-*[0-9].jar
 /usr/lib/hadoop/client/slf4j-api-*[0-9].jar
 /usr/lib/hadoop/client/snappy-java-*[0-9].jar
+/usr/lib/hadoop/client/gson-*[0-9].jar
 /usr/lib/hive/lib/antlr-runtime-*[0-9].jar
 /usr/lib/hive/lib/datanucleus-api-jdo-*[0-9].jar
 /usr/lib/hive/lib/datanucleus-core-*[0-9].jar
@@ -61,3 +63,4 @@
 /usr/lib/pxf/pxf-hive-*[0-9].jar
 /usr/lib/pxf/pxf-json-*[0-9].jar
 /usr/lib/pxf/pxf-jdbc-*[0-9].jar
+/usr/lib/pxf/pxf-ignite-*[0-9].jar

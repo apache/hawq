@@ -18,7 +18,7 @@
 # with RPM-based installation of hadoop clients from CDH distribution.
 # WARNING: DO NOT EDIT!
 # Any change in this file can result in PXF failing to run.
-# Adding resources should be done using pxf-public.classpath file. 
+# Adding resources should be done using pxf-public.classpath file.
 ##################################################################
 
 # PXF Configuration
@@ -30,6 +30,7 @@ PXF_HOME/lib/pxf-hdfs.jar
 PXF_HOME/lib/pxf-hive.jar
 PXF_HOME/lib/pxf-json.jar
 PXF_HOME/lib/pxf-jdbc.jar
+PXF_HOME/lib/pxf-ignite.jar
 
 # Hadoop/Hive/HBase configurations
 /etc/hadoop/conf
@@ -50,6 +51,7 @@ PXF_HOME/lib/pxf-jdbc.jar
 /usr/lib/hadoop/client/commons-io.jar
 /usr/lib/hadoop/client/commons-lang.jar
 /usr/lib/hadoop/client/commons-logging.jar
+/usr/lib/hadoop/client/commons-compress.jar
 /usr/lib/hadoop/client/guava.jar
 /usr/lib/hadoop/client/htrace-core4.jar
 /usr/lib/hadoop/client/jackson-core.jar
@@ -62,6 +64,7 @@ PXF_HOME/lib/pxf-jdbc.jar
 /usr/lib/hadoop/client/snappy-java.jar
 /usr/lib/hadoop/lib/asm-*[0-9].jar
 /usr/lib/hadoop/lib/jersey-server-*[0-9].jar
+/usr/lib/hadoop/client/gson-*[0-9].jar
 
 # Hive Libraries
 /usr/lib/hive/lib/antlr-runtime-*[0-9].jar
