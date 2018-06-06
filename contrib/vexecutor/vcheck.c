@@ -265,7 +265,7 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 			0 == list_length(ref->args))
 			aggname = "veccount";
 
-		Assert(NUll != aggname);
+		Assert(NULL != aggname);
 
 		vaggoid = get_aggregate_oid(aggname, retType);
 		if(InvalidOid == vaggoid)
@@ -288,7 +288,7 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 		ListCell *l = NULL;
 		Node* expr = NULL;
 
-		if(1 < list_length(f->args))
+		if(1 != list_length(f->args))
 			return true;
 
 		expr = (Node*)linitial(f->args);
@@ -298,6 +298,12 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 		ctx->retType = f->funcresulttype;
 		return false;
 	}
+	
+	if(IsA(node,NullTest))
+		return true;
+
+	if(IsA(node, RowCompareExpr))
+		return true;
 
 	//now, other nodes treat as can not be vectorized
 	return plan_tree_walker(node, CheckVectorizedExpression, ctx);;
@@ -316,7 +322,7 @@ CheckPlanNodeWalker(PlannerInfo *root, Plan *plan)
 		return true;
 
 	/* skip to check if there are no corresponding vec-exec-operators*/
-	if(!HasVecExecOprator(nodeTag(plan)))
+	if(!HasVecExecOprator(plan))
 	{
 		plan->vectorized = false;
 		return true;
@@ -340,6 +346,23 @@ CheckPlanNodeWalker(PlannerInfo *root, Plan *plan)
 	/* Don't support SORT Aggregate so far */
 	if(IsA(plan, Agg) && ((Agg*)plan)->aggstrategy == AGG_SORTED)
 		return true;
+
+	/*
+	 * if there is an const in the projection, it is not supported so far,ugly...
+	 * I suppose that we have to carefully discriminate all the expressions,
+	 * then we can know that which const is in the projection, and which one
+	 * is in the qualification, we can process them differently.
+	 */
+	{
+		List *targetlist = plan->targetlist;
+		ListCell *c = NULL;
+		foreach(c, targetlist)
+		{
+			TargetEntry *entry = (TargetEntry*)lfirst(c);
+			if(!IsA(entry->expr,Aggref) && !contain_var_clause((Node*)entry))
+				return true;
+		}
+	}
 
 	planner_init_plan_tree_base(&ctx.base, root);
 
@@ -381,7 +404,7 @@ ReplacePlanNodeWalker(PlannerInfo *root, Plan *plan)
 		return true;
 
 	/* skip to replace if there are no corresponding vec-exec-operators*/
-	if(!HasVecExecOprator(nodeTag(plan)))
+	if(!HasVecExecOprator(plan))
 	{
 		plan->vectorized = false;
 		return true;
@@ -422,7 +445,6 @@ CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan)
 	/* the top plan node can not be vectorized so far */
 	plan->vectorized = false;
 	plan = CheckPlanVectorzied(root, plan);
-	Assert(!plan->vectorized);
 	plan->vectorized = false;
 	return ReplacePlanVectorzied(root, plan);
 }
@@ -521,8 +543,10 @@ Oid GetNtype(Oid vtype){
 
 	pcqCtx = caql_beginscan(NULL,
 							cql("SELECT * FROM pg_type "
-								" WHERE oid = :1 ",
-								ObjectIdGetDatum(vtype)));
+								" WHERE oid = :1 "
+								" AND typstorage = :2 ",
+								ObjectIdGetDatum(vtype),
+								CharGetDatum('e')));
 
 	tuple = caql_getnext(pcqCtx);
 

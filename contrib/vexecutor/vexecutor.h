@@ -31,7 +31,7 @@
 extern void _PG_init(void);
 extern void _PG_fini(void);
 
-extern bool HasVecExecOprator(NodeTag tag);
+extern bool HasVecExecOprator(Plan *plan);
 extern void BackportTupleDescriptor(PlanState* ps,TupleDesc td);
 
 #endif

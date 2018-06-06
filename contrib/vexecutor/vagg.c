@@ -563,7 +563,7 @@ advance_vaggregates(AggState *aggstate, AggStatePerGroup pergroup,
 		}
 
 		/* Evaluate the current input expressions for this aggregate */
-		Assert(NULL != vastate->aggslot);
+		Assert(NULL != vstate->aggslot);
 		slot = vstate->aggslot[aggno];
 
 		Assert(NULL != slot);

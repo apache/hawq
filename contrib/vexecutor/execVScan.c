@@ -37,12 +37,12 @@ getVScanMethod(int tableType)
                     //APPENDONLYSCAN
                     {
                             &AppendOnlyVScanNext, &BeginVScanAppendOnlyRelation, &EndVScanAppendOnlyRelation,
-                                                                                 NULL,NULL,NULL
+                            &ReScanAppendOnlyRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
                     },
                     //PARQUETSCAN
                     {
                             &ParquetVScanNext, &BeginScanParquetRelation, &EndScanParquetRelation,
-                            NULL,NULL,NULL
+                            &ReScanParquetRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
                     }
             };
 
@@ -55,6 +55,7 @@ getVScanMethod(int tableType)
 
     return &scanMethods[tableType];
 }
+
 
 /*
  * ExecTableVScanVirtualLayer

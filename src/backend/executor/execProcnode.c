@@ -279,8 +279,12 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	if(vmthd.vectorized_executor_enable
 	   && vmthd.ExecInitNode_Hook
 	   && node->vectorized
-	   && (result = vmthd.ExecInitNode_Hook(node,estate,eflags)))
+	   && (result = vmthd.ExecInitNode_Hook(node,estate,eflags,isAlienPlanNode,&curMemoryAccount)))
+	{
+
+		SAVE_EXECUTOR_MEMORY_ACCOUNT(result, curMemoryAccount);
 		return result;
+	}
 
 
 	switch (nodeTag(node))
@@ -1547,10 +1551,6 @@ ExecUpdateTransportState(PlanState *node, ChunkTransportState *state)
 void
 ExecEndNode(PlanState *node)
 {
-	if(vmthd.vectorized_executor_enable && vmthd.ExecEndNode_Hook
-	   && vmthd.ExecEndNode_Hook(node))
-		return ;
-
 	ListCell   *subp;
 
 	/*

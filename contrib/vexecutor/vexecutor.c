@@ -42,7 +42,7 @@ static int MAXBATCHSIZE = 4096;
 /*
  * hook function
  */
-static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags);
+static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags,bool isAlienPlanNode,MemoryAccount** pcurMemoryAccount);
 static PlanState* VExecVecNode(PlanState *Node, PlanState *parentNode, EState *eState,int eflags);
 static bool VExecProcNode(PlanState *node,TupleTableSlot** pRtr);
 static bool VExecEndNode(PlanState *node);
@@ -64,6 +64,8 @@ _PG_init(void)
 	vmthd.ExecProcNode_Hook = VExecProcNode;
 	vmthd.ExecEndNode_Hook = VExecEndNode;
 	vmthd.GetNType = GetNtype;
+
+	vmthd.vectorized_executor_enable = true;
 	DefineCustomBoolVariable("vectorized_executor_enable",
 	                         gettext_noop("enable vectorized executor"),
 	                         NULL,
@@ -112,7 +114,8 @@ void BackportTupleDescriptor(PlanState* ps,TupleDesc td)
 	{
 		oidtypeid = GetNtype(td->attrs[i]->atttypid);
 
-		Assert(InvalidOid != oidtypeid);
+		if(InvalidOid == oidtypeid)
+			continue;
 
 		pcqCtx = caql_beginscan(
 				NULL,
@@ -126,7 +129,8 @@ void BackportTupleDescriptor(PlanState* ps,TupleDesc td)
 		 * we should convert the vtype to ntype and skip the ntype which alreay exists.
 		 */
 		if (!HeapTupleIsValid(tuple))
-			continue;
+            goto endscan;
+
 		typeForm = (Form_pg_type) GETSTRUCT(tuple);
 
 		td->attrs[i]->atttypid = oidtypeid;
@@ -135,11 +139,12 @@ void BackportTupleDescriptor(PlanState* ps,TupleDesc td)
 		td->attrs[i]->attalign = typeForm->typalign;
 		td->attrs[i]->attstorage = typeForm->typstorage;
 
+endscan:
 		caql_endscan(pcqCtx);
 	}
 }
 
-static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags)
+static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags,bool isAlienPlanNode,MemoryAccount** pcurMemoryAccount)
 {
 	elog(DEBUG3, "PG VEXECINIT NODE");
 
@@ -151,7 +156,13 @@ static PlanState* VExecInitNode(Plan *node,EState *eState,int eflags)
 	switch (nodeTag(node) )
 	{
 	case T_Agg:
-		state = VExecInitAgg(node, eState, eflags);
+		*pcurMemoryAccount = CREATE_EXECUTOR_MEMORY_ACCOUNT(isAlienPlanNode, node, Agg);
+
+		START_MEMORY_ACCOUNT(*pcurMemoryAccount);
+		{
+			state = VExecInitAgg(node, eState, eflags);
+		}
+		END_MEMORY_ACCOUNT();
 		break;
 	default:
 		break;
@@ -223,6 +234,8 @@ VExecVecMotion(PlanState *node, PlanState *parentNode, EState *eState,int eflags
 	{
 		((VectorizedState *)node->vectorized)->vectorized = false;
 		plan->vectorized = false;
+		BackportTupleDescriptor(node,node->ps_ResultTupleSlot->tts_tupleDescriptor);
+		ExecAssignResultType(node, node->ps_ResultTupleSlot->tts_tupleDescriptor);
 	}
 	else
 	{
@@ -252,12 +265,12 @@ VExecVecNode(PlanState *node, PlanState *parentNode, EState *eState,int eflags)
 
 	switch (nodeTag(node) )
 	{
-		case T_AppendOnlyScan:
-		case T_ParquetScan:
+		case T_AppendOnlyScanState:
+		case T_ParquetScanState:
 		case T_TableScanState:
-			if(Gp_role != GP_ROLE_DISPATCH)
+			if(Gp_role != GP_ROLE_DISPATCH && vstate->vectorized)
 			{
-				if(HAS_EXECUTOR_MEMORY_ACCOUNT(plan, Agg))
+				if(HAS_EXECUTOR_MEMORY_ACCOUNT(plan, TableScan))
 				{
 					START_MEMORY_ACCOUNT(plan->memoryAccount);
 					VExecVecTableScan(node, parentNode, eState, eflags);
@@ -268,7 +281,7 @@ VExecVecNode(PlanState *node, PlanState *parentNode, EState *eState,int eflags)
 			}
 			break;
 		case T_AggState:
-			if(Gp_role != GP_ROLE_DISPATCH)
+			if(Gp_role != GP_ROLE_DISPATCH && vstate->vectorized)
 			{
 				if(HAS_EXECUTOR_MEMORY_ACCOUNT(plan, Agg))
 				{
@@ -281,14 +294,17 @@ VExecVecNode(PlanState *node, PlanState *parentNode, EState *eState,int eflags)
 			}
 			break;
 		case T_MotionState:
-			if(HAS_EXECUTOR_MEMORY_ACCOUNT(plan, Agg))
+			if(Gp_role != GP_ROLE_DISPATCH && vstate->vectorized)
 			{
-				START_MEMORY_ACCOUNT(plan->memoryAccount);
-				VExecVecMotion(node, parentNode, eState, eflags);
-				END_MEMORY_ACCOUNT();
+				if(HAS_EXECUTOR_MEMORY_ACCOUNT(plan, Motion))
+				{
+					START_MEMORY_ACCOUNT(plan->memoryAccount);
+					VExecVecMotion(node, parentNode, eState, eflags);
+					END_MEMORY_ACCOUNT();
+				}
+				else
+					VExecVecMotion(node, parentNode, eState, eflags);
 			}
-			else
-				VExecVecMotion(node, parentNode, eState, eflags);
 			break;
 		default:
 			((VectorizedState *)node->vectorized)->vectorized = false;
@@ -321,7 +337,7 @@ static bool VExecProcNode(PlanState *node,TupleTableSlot** pRtr)
         case T_AggState:
             result = ExecVAgg((AggState*)node);
             break;
-		case T_MotionState:
+	case T_MotionState:
 			result = ExecVMotionVirtualLayer((MotionState*)node);
 			break;
         default:
@@ -355,8 +371,9 @@ static bool VExecEndNode(PlanState *node)
 
 /* check if there is an vectorized execution operator */
 bool
-HasVecExecOprator(NodeTag tag)
+HasVecExecOprator(Plan* plan)
 {
+	NodeTag tag = nodeTag(plan);
 	bool result = false;
 
 	switch(tag)
@@ -364,8 +381,10 @@ HasVecExecOprator(NodeTag tag)
 	case T_AppendOnlyScan:
 	case T_ParquetScan:
 	case T_Agg:
-	case T_Motion:
 		result = true;
+		break;
+	case T_Motion:
+		result = (((Motion*)plan)->motionType != MOTIONTYPE_HASH) ? true : false;
 		break;
 	default:
 		result = false;
