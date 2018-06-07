@@ -124,7 +124,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
     @Override
     public boolean openForWrite() throws SQLException, SQLTimeoutException, ParseException, ClassNotFoundException {
         if (statementWrite != null && !statementWrite.isClosed()) {
-            return true;
+            throw new SQLException("The connection to an external database is already open.");
         }
 
         super.openConnection();
