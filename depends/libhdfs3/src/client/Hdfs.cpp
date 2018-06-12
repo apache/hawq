@@ -35,6 +35,7 @@
 #include "Thread.h"
 #include "XmlConfig.h"
 
+#include <boost/scope_exit.hpp>
 #include <vector>
 #include <string>
 #include <libxml/uri.h>
@@ -780,6 +781,30 @@ tSize hdfsRead(hdfsFS fs, hdfsFile file, void * buffer, tSize length) {
         return file->getInputStream().read(static_cast<char *>(buffer), length);
     } catch (const Hdfs::HdfsEndOfStream & e) {
         return 0;
+    } catch (const std::bad_alloc & e) {
+        SetErrorMessage("Out of memory");
+        errno = ENOMEM;
+    } catch (...) {
+        SetLastException(Hdfs::current_exception());
+        handleException(Hdfs::current_exception());
+    }
+
+    return -1;
+}
+
+tSize hdfsPread(hdfsFS fs, hdfsFile file, tOffset position,
+                void * buffer, tSize length) {
+    PARAMETER_ASSERT(fs && file && position >= 0 && buffer && length > 0, -1, EINVAL);
+    PARAMETER_ASSERT(file->isInput(), -1, EINVAL);
+
+    InputStream & is = file->getInputStream();
+    try {
+        tOffset oldPosition = is.tell();
+        is.seek(position);
+        BOOST_SCOPE_EXIT(is, oldPosition) {
+            is.seek(oldPosition);
+        } BOOST_SCOPE_EXIT_END
+        return is.read(static_cast<char *>(buffer), length);
     } catch (const std::bad_alloc & e) {
         SetErrorMessage("Out of memory");
         errno = ENOMEM;
