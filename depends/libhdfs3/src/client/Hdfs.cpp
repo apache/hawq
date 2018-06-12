@@ -836,12 +836,12 @@ tSize hdfsWrite(hdfsFS fs, hdfsFile file, const void * buffer, tSize length) {
 }
 
 int hdfsFlush(hdfsFS fs, hdfsFile file) {
-    PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
+    PARAMETER_ASSERT(fs && file, -1, EINVAL);
     return hdfsHFlush(fs, file);
 }
 
 int hdfsHFlush(hdfsFS fs, hdfsFile file) {
-    PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
+    PARAMETER_ASSERT(fs && file, -1, EINVAL);
     PARAMETER_ASSERT(!file->isInput(), -1, EINVAL);
 
     try {
@@ -863,7 +863,7 @@ int hdfsSync(hdfsFS fs, hdfsFile file) {
 }
 
 int hdfsHSync(hdfsFS fs, hdfsFile file) {
-    PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
+    PARAMETER_ASSERT(fs && file, -1, EINVAL);
     PARAMETER_ASSERT(!file->isInput(), -1, EINVAL);
 
     try {
@@ -881,7 +881,7 @@ int hdfsHSync(hdfsFS fs, hdfsFile file) {
 }
 
 int hdfsAvailable(hdfsFS fs, hdfsFile file) {
-    PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
+    PARAMETER_ASSERT(fs && file, -1, EINVAL);
     PARAMETER_ASSERT(file->isInput(), -1, EINVAL);
 
     try {
