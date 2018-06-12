@@ -1678,11 +1678,11 @@ TEST_F(TestCInterface, TestSync_InvalidInput) {
     in = hdfsOpenFile(fs, BASE_DIR"/testFlush1", O_RDONLY, 0, 0, 0);
     ASSERT_TRUE(in != NULL);
     //test invalid input
-    err = hdfsSync(NULL, out);
+    err = hdfsHSync(NULL, out);
     EXPECT_TRUE(err != 0 && EINVAL == errno);
-    err = hdfsSync(fs, NULL);
+    err = hdfsHSync(fs, NULL);
     EXPECT_TRUE(err != 0 && EINVAL == errno);
-    err = hdfsSync(fs, in);
+    err = hdfsHSync(fs, in);
     EXPECT_TRUE(err != 0 && EINVAL == errno);
     EXPECT_EQ(0, hdfsCloseFile(fs, out));
     EXPECT_EQ(0, hdfsCloseFile(fs, in));

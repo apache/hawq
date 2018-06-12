@@ -39,6 +39,15 @@
 #define EINTERNAL 255
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define DEPRECATED __attribute__((deprecated))
+#elif defined(_MSC_VER)
+#define DEPRECATED __declspec(deprecated)
+#else
+#pragma message("WARNING: DEPRECATED is not supported by the compiler.")
+#define DEPRECATED
+#endif
+
 /** All APIs set errno to meaningful values */
 
 #ifdef __cplusplus
@@ -387,13 +396,24 @@ int hdfsFlush(hdfsFS fs, hdfsFile file);
 int hdfsHFlush(hdfsFS fs, hdfsFile file);
 
 /**
+ * This function is deprecated. Please use hdfsHSync instead.
+ *
  * hdfsSync - Flush out and sync the data in client's user buffer. After the
  * return of this call, new readers will see the data.
  * @param fs configured filesystem handle
  * @param file file handle
  * @return 0 on success, -1 on error and sets errno
  */
-int hdfsSync(hdfsFS fs, hdfsFile file);
+DEPRECATED int hdfsSync(hdfsFS fs, hdfsFile file);
+
+/**
+ * hdfsHSync - Flush out and sync the data in client's user buffer. After the
+ * return of this call, new readers will see the data.
+ * @param fs configured filesystem handle
+ * @param file file handle
+ * @return 0 on success, -1 on error and sets errno
+ */
+int hdfsHSync(hdfsFS fs, hdfsFile file);
 
 /**
  * hdfsAvailable - Number of bytes that can be read from this

@@ -834,6 +834,10 @@ int hdfsHFlush(hdfsFS fs, hdfsFile file) {
 }
 
 int hdfsSync(hdfsFS fs, hdfsFile file) {
+    return hdfsHSync(fs, file);
+}
+
+int hdfsHSync(hdfsFS fs, hdfsFile file) {
     PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
     PARAMETER_ASSERT(!file->isInput(), -1, EINVAL);
 
