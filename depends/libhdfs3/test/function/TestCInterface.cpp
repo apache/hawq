@@ -1761,7 +1761,7 @@ static void TestHFlushAndSync(hdfsFS fs, hdfsFile file, const char * path, int64
         EXPECT_EQ(batch, hdfsWrite(fs, file, &buffer[0], batch));
 
         if (sync) {
-            EXPECT_EQ(0, hdfsSync(fs, file));
+            EXPECT_EQ(0, hdfsHSync(fs, file));
         } else {
             EXPECT_EQ(0, hdfsHFlush(fs, file));
         }
@@ -2057,7 +2057,7 @@ TEST_F(TestCInterface, TestGetBlockFileLocations_Success) {
     out = hdfsOpenFile(fs, BASE_DIR"/TestGetBlockFileLocations_Failure", O_WRONLY, 0, 0, 1024);
     ASSERT_TRUE(NULL != out);
     ASSERT_TRUE(buffer.size() == hdfsWrite(fs, out, &buffer[0], buffer.size()));
-    ASSERT_TRUE(0 == hdfsSync(fs, out));
+    ASSERT_TRUE(0 == hdfsHSync(fs, out));
     EXPECT_TRUE(NULL != (bl = hdfsGetFileBlockLocations(fs, BASE_DIR"/TestGetBlockFileLocations_Failure", 0, buffer.size(), &size)));
     EXPECT_EQ(2, size);
     EXPECT_FALSE(bl[0].corrupt);
@@ -2103,7 +2103,7 @@ TEST_F(TestCInterface, TestGetHosts_Success) {
                        1024);
     ASSERT_TRUE(NULL != out);
     ASSERT_TRUE(buffer.size() == hdfsWrite(fs, out, &buffer[0], buffer.size()));
-    ASSERT_TRUE(0 == hdfsSync(fs, out));
+    ASSERT_TRUE(0 == hdfsHSync(fs, out));
     hosts =
         hdfsGetHosts(fs, BASE_DIR "/TestGetHosts_Success", 0, buffer.size());
     EXPECT_TRUE(NULL != hosts);
