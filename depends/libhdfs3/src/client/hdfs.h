@@ -372,12 +372,12 @@ tSize hdfsRead(hdfsFS fs, hdfsFile file, void * buffer, tSize length);
   * hdfsPread - Positional read of data from an open file.
   * @param fs The configured filesystem handle.
   * @param file The file handle.
-  * @param position Position from which to read
+  * @param offset Position from which to read
   * @param buffer The buffer to copy read bytes into.
   * @param length The length of the buffer.
   * @return      See hdfsRead
   */
-tSize hdfsPread(hdfsFS fs, hdfsFile file, tOffset position,
+tSize hdfsPread(hdfsFS fs, hdfsFile file, tOffset offset,
                 void * buffer, tSize length);
 
 /**

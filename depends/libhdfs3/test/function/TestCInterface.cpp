@@ -29,6 +29,7 @@
 #include "TestUtil.h"
 #include "XmlConfig.h"
 
+#include <algorithm>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -1569,6 +1570,34 @@ static void TestRead(hdfsFS fs, int readSize, int64_t blockSize,
 TEST_F(TestCInterface, TestRead_Success) {
     TestRead(fs, 1024, 1024, 21 * 1024);
     TestRead(fs, 8 * 1024, 1024 * 1024, 21 * 1024 * 1024);
+}
+
+static void TestPread(hdfsFS fs, int readSize, int64_t blockSize,
+                     int64_t fileSize, int64_t offset) {
+    std::vector<char> buf(readSize);
+    hdfsFile in = NULL;
+    ASSERT_TRUE(CreateFile(fs, BASE_DIR"/testPread", blockSize, fileSize));
+    in = hdfsOpenFile(fs, BASE_DIR"/testPread", O_RDONLY, 0, 0, 0);
+    ASSERT_TRUE(in != NULL);
+
+    int64_t todo = fileSize - offset;
+    while (todo > 0) {
+        int64_t done = hdfsPread(fs, in, offset, &buf[0], std::min((int64_t) readSize, todo));
+        ASSERT_GT(done, 0);
+        ASSERT_EQ(hdfsTell(fs, in), 0);
+        EXPECT_TRUE(Hdfs::CheckBuffer(&buf[0], done, offset));
+        offset += done;
+        todo -= done;
+    }
+
+    EXPECT_EQ(0, hdfsPread(fs, in, offset, &buf[0], 1));
+    EXPECT_EQ(0, hdfsPread(fs, in, offset, &buf[0], 1));
+    hdfsCloseFile(fs, in);
+}
+
+TEST_F(TestCInterface, TestPread_Success) {
+    TestPread(fs, 1024, 1024, 21 * 1024, 0);
+    TestPread(fs, 1024, 1024, 21 * 1024, 13);
 }
 
 TEST_F(TestCInterface, TestWrite_InvalidInput) {
