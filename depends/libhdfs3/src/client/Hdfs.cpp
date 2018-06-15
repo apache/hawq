@@ -791,42 +791,21 @@ tSize hdfsRead(hdfsFS fs, hdfsFile file, void * buffer, tSize length) {
     return -1;
 }
 
-tSize hdfsPread(hdfsFS fs, hdfsFile file, tOffset offset,
+tSize hdfsPread(hdfsFS fs, hdfsFile file, tOffset pos,
                 void * buffer, tSize length) {
-    PARAMETER_ASSERT(fs && file && offset >= 0 && buffer && length > 0, -1, EINVAL);
+    PARAMETER_ASSERT(fs && file && pos >= 0 && buffer && length > 0, -1, EINVAL);
     PARAMETER_ASSERT(file->isInput(), -1, EINVAL);
 
-    tOffset oldPosition = -1;
-    tSize result = -1;
-    InputStream & is = file->getInputStream();
-    try {
-        oldPosition = is.tell();
-        is.seek(offset);
-        result = is.read(static_cast<char *>(buffer), length);
-    } catch (const Hdfs::HdfsEndOfStream & e) {
-        result = 0;
-    } catch (const std::bad_alloc & e) {
-        SetErrorMessage("Out of memory");
-        errno = ENOMEM;
-    } catch (...) {
-        SetLastException(Hdfs::current_exception());
-        handleException(Hdfs::current_exception());
+    tOffset oldPos = hdfsTell(fs, file);
+    if (oldPos < 0 || hdfsSeek(fs, file, pos) < 0) {
+        return -1;
     }
 
-    if (oldPosition >= 0) {
-        try {
-            is.seek(oldPosition);
-        } catch (...) {
-            // Do not mask the exception which has already been thrown.
-            if (result >= 0) {
-                SetLastException(Hdfs::current_exception());
-                handleException(Hdfs::current_exception());
-                result = -1;
-            }
-        }
-    }
-
-    return result;
+    tSize done = hdfsRead(fs, file, buffer, length);
+    // hdfsRead failure followed by hdfsSeek failure would cause
+    // hdfsGetLastError to only report the latter one, since there is
+    // no exception chaining.
+    return hdfsSeek(fs, file, oldPos) == 0 ? done : -1;
 }
 
 tSize hdfsWrite(hdfsFS fs, hdfsFile file, const void * buffer, tSize length) {
