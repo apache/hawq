@@ -41,6 +41,7 @@ public:
         tcpNoDelay = conf.isRpcTcpNoDelay();
         lingerTimeout = conf.getRpcSocketLingerTimeout();
         rpcTimeout = conf.getRpcTimeout();
+        rpcMaxLength = conf.getRpcMaxDataLength();
     }
 
     size_t hash_value() const;
@@ -117,6 +118,14 @@ public:
         this->rpcTimeout = rpcTimeout;
     }
 
+    int getRpcMaxLength() const {
+        return rpcMaxLength;
+    }
+
+    void setRpcMaxLength(int rpcTimeout) {
+        this->rpcMaxLength = rpcTimeout;
+    }
+
     bool operator ==(const RpcConfig & other) const {
         return this->maxIdleTime == other.maxIdleTime
                && this->pingTimeout == other.pingTimeout
@@ -126,7 +135,8 @@ public:
                && this->maxRetryOnConnect == other.maxRetryOnConnect
                && this->tcpNoDelay == other.tcpNoDelay
                && this->lingerTimeout == other.lingerTimeout
-               && this->rpcTimeout == other.rpcTimeout;
+               && this->rpcTimeout == other.rpcTimeout
+               && this->rpcMaxLength == other.rpcMaxLength;
     }
 
 private:
@@ -138,6 +148,7 @@ private:
     int maxRetryOnConnect;
     int lingerTimeout;
     int rpcTimeout;
+    int rpcMaxLength;
     bool tcpNoDelay;
 };
 

@@ -337,4 +337,13 @@ HA -->
 		</description>
 	</property>
 
+	<property>
+		<name>ipc.maximum.data.length</name>
+		<value>67108864</value>
+		<description>
+		The max protobuf message size when talking with HDFS.
+		Increase the value if encounter "Requested data length XXX is longer
+		than maximum configured RPC length XXX" error.
+		</description>
+	</property>
 </configuration>

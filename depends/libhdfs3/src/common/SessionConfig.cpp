@@ -83,6 +83,8 @@ SessionConfig::SessionConfig(const Config & conf) {
         }, {
             &rpcTimeout, "rpc.client.timeout", 3600 * 1000
         }, {
+            &rpcMaxDataLength, "ipc.maximum.data.length", 64 * 1024 * 1024
+        }, {
             &defaultReplica, "dfs.default.replica", 3, bind(CheckRangeGE<int32_t>, _1, _2, 1)
         }, {
             &inputConnTimeout, "input.connect.timeout", 600 * 1000
