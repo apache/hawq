@@ -130,7 +130,7 @@ static int call_cloud_rest(CURL_HANDLE curl_handle, const char* request, char *a
 	appendStringInfo(&tname, "/");
 	appendStringInfo(&tname, "%s", action);
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_URL, tname.data);
-	elog(INFO, "in call_cloud_rest: %s", tname.data);
+	elog(DEBUG3, "in call_cloud_rest: %s", tname.data);
 	pfree(tname.data);
 
 	struct curl_slist *headers = NULL;
@@ -139,7 +139,7 @@ static int call_cloud_rest(CURL_HANDLE curl_handle, const char* request, char *a
 		char buf[512];
 		memset(buf, 0, sizeof(buf));
 		sprintf(buf, "token:%s", pg_cloud_token);
-		elog(INFO, "in call_cloud_rest: %s", buf);
+		elog(DEBUG3, "in call_cloud_rest: %s", buf);
 		headers = curl_slist_append(headers, buf);
 	}
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_HTTPHEADER, headers);
@@ -195,7 +195,7 @@ static int parse_cloud_auth_response(char* buffer, int *result, char **errormsg)
 	pg_cloud_token = (char *)palloc0(len + 1);
 	memcpy(pg_cloud_token, token, len);
 	MemoryContextSwitchTo(old);
-	elog(INFO, "in parse_cloud_auth_response, token(%p): %s", pg_cloud_token, pg_cloud_token);
+	elog(DEBUG3, "in parse_cloud_auth_response, token(%p): %s", pg_cloud_token, pg_cloud_token);
 
 	struct json_object *jcreaterole = NULL;
 	if (!json_object_object_get_ex(response, "cancreateuser", &jcreaterole))
@@ -204,7 +204,7 @@ static int parse_cloud_auth_response(char* buffer, int *result, char **errormsg)
 		return -1;
 	}
 	pg_cloud_createrole = json_object_get_boolean(jcreaterole);
-	elog(INFO, "pg_cloud_createrole=%d", pg_cloud_createrole);
+	elog(DEBUG3, "pg_cloud_createrole=%d", pg_cloud_createrole);
 
 	struct json_object *jresult = NULL;
 	if (!json_object_object_get_ex(response, "result", &jresult))
@@ -260,7 +260,7 @@ static int parse_cloud_sync_response(char* buffer, int *result, char **errormsg)
 	}
 
 	int ok = json_object_get_boolean(jresult);
-	elog(INFO, "in parse_cloud_sync_response, ret=%d", ok);
+	elog(DEBUG3, "in parse_cloud_sync_response, ret=%d", ok);
 	if (ok == 0)
 	{
 		*result = CLOUDSYNC_OK;
@@ -441,6 +441,6 @@ int check_authentication_from_cloud(char *username, char *password,
 		curl_context_cloud.response.response_size = 0;
 	}
 
-	elog(INFO, "in check_authentication_from_cloud: ret=%d", result);
+	elog(DEBUG3, "in check_authentication_from_cloud: ret=%d", result);
 	return result;
 }
