@@ -128,11 +128,6 @@ public class JdbcResolver extends JdbcPlugin implements ReadResolver, WriteResol
         int column_index = 0;
         for (OneField oneField : record) {
             ColumnDescriptor column = columns.get(column_index);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Column #" + (column_index + 1) +
-                ". Name: '" + column.columnName() +
-                "'. Type: '" + DataType.get(column.columnTypeCode()).toString() + "'");
-            }
             if (
                 LOG.isDebugEnabled() &&
                 DataType.get(column.columnTypeCode()) != DataType.get(oneField.type)
@@ -229,7 +224,6 @@ public class JdbcResolver extends JdbcPlugin implements ReadResolver, WriteResol
         }
         return new OneRow(new LinkedList<OneField>(record));
     }
-
 
     private static final Log LOG = LogFactory.getLog(JdbcResolver.class);
 

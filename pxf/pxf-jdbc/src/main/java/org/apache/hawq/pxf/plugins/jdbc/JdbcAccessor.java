@@ -33,13 +33,14 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.math.BigDecimal;
 import java.sql.Types;
+import java.sql.Timestamp;
 import java.sql.Date;
+import java.sql.Statement;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.BatchUpdateException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -170,9 +171,6 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
 
         for (int i = 1; i <= tuple.size(); i++) {
             OneField field = tuple.get(i - 1);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Field " + i + ": " + DataType.get(field.type).toString());
-            }
             switch (DataType.get(field.type)) {
                 case INTEGER:
                     if (field.val == null) {
@@ -273,6 +271,9 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         SQLException rollbackException = null;
         if (batchSize < 0) {
             // Batch has an infinite size
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Trying to add a tuple to the batch (batch size is infinite)");
+            }
             statementWrite.addBatch();
         }
         else if ((batchSize == 0) || (batchSize == 1)) {
@@ -290,10 +291,18 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         }
         else {
             // Batch has a finite size
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(
+                    "Trying to add a tuple to the batch (batch size is now " + Integer.toString(batchSizeCurrent) + ")"
+                );
+            }
             statementWrite.addBatch();
             batchSizeCurrent += 1;
             if (batchSizeCurrent >= batchSize) {
                 batchSizeCurrent = 0;
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Trying to execute and clear the batch (batch size is now equal to the required one)");
+                }
                 try {
                     statementWrite.executeBatch();
                     statementWrite.clearBatch();
@@ -306,6 +315,9 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         }
 
         if (rollbackRequired) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Rollback is now required");
+            }
             rollbackException = tryRollback(rollbackException);
             throw rollbackException;
         }
@@ -324,6 +336,9 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
             if ((dbConn != null) && (statementWrite != null) && (!statementWrite.isClosed())) {
                 // If batching was used, execute the batch
                 if ((batchSize < 0) || ((batchSize > 1) && (batchSizeCurrent > 0))) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Trying to execute and clear the batch (closeForWrite() was called)");
+                    }
                     try {
                         statementWrite.executeBatch();
                     }
@@ -429,6 +444,11 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         catch (SQLException e) {
             // This error is unexpected; the dbMeta is probably corrupted
             return rollbackException;
+        }
+
+        if (rollbackException instanceof BatchUpdateException) {
+            // If we examine the BatchUpdateException, it must have the 'next' SQLException
+            rollbackException = ((BatchUpdateException)rollbackException).getNextException();
         }
 
         if (!areTransactionsSupported) {
