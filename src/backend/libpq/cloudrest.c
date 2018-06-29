@@ -142,6 +142,7 @@ static int call_cloud_rest(CURL_HANDLE curl_handle, const char* request, char *a
 		elog(DEBUG3, "in call_cloud_rest: %s", buf);
 		headers = curl_slist_append(headers, buf);
 	}
+	headers = curl_slist_append(headers, "connection:close");
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_HTTPHEADER, headers);
 
 	curl_easy_setopt(curl_handle->curl_handle, CURLOPT_POSTFIELDS, request);
