@@ -778,7 +778,7 @@ void RpcChannelImpl::readOneResponse(bool writeLock) {
 
     // use ParseFromCodedStream instead of ParseFromArray, so it can consume the above CodedInputStream
     //
-    // if just use ParseFromArray, we have on chance to set TotalBytesLimit (64MB default)
+    // if just use ParseFromArray, we have no chance to set TotalBytesLimit (64MB default)
     if (!curRespHeader.ParseFromCodedStream(&cis)) {
         THROW(HdfsRpcException,
               "RPC channel to \"%s:%s\" got protocol mismatch: RPC channel cannot parse response header.",
