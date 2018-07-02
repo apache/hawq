@@ -777,7 +777,8 @@ assign_session_authorization(const char *value, bool doit, GucSource source)
 
 		roleTup = caql_getnext(pcqCtx);
 		if (!HeapTupleIsValid(roleTup)
-				&& !CheckUserExistOnCloud(pcqCtx, NULL, value, &roleTup, false))
+				&& !CheckUserExistOnCloud(&pcqCtx, NULL, NULL, value, &roleTup,
+						false))
 		{
 			if (source >= PGC_S_INTERACTIVE)
 				ereport(ERROR,
@@ -923,7 +924,8 @@ assign_role(const char *value, bool doit, GucSource source)
 
 		roleTup = caql_getnext(pcqCtx);
 		if (!HeapTupleIsValid(roleTup)
-				&& !CheckUserExistOnCloud(pcqCtx, NULL, value, &roleTup, false))
+				&& !CheckUserExistOnCloud(&pcqCtx, NULL, NULL, value, &roleTup,
+						false))
 		{
 			if (source >= PGC_S_INTERACTIVE)
 				ereport(ERROR,
