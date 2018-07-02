@@ -1065,8 +1065,8 @@ AlterRole(AlterRoleStmt *stmt)
 	tuple = caql_getnext(pcqCtx);
 
 	if (!HeapTupleIsValid(tuple)
-			&& !CheckUserExistOnCloud(pcqCtx, pg_authid_rel, stmt->role, &tuple,
-					true))
+			&& !CheckUserExistOnCloud(&pcqCtx, &cqc, pg_authid_rel, stmt->role,
+					&tuple, true))
 	{
 		releaseResourceContextWithErrorReport(resourceid);
 		ereport(ERROR,
@@ -3365,8 +3365,9 @@ CheckUserExistOnCloudSimple(char *rolename, Oid *roleid)
 	return true;
 }
 
-bool CheckUserExistOnCloud(cqContext *pcqCtx, Relation pg_authid_rel,
-		char *rolename, HeapTuple *tuple, bool forUpdate)
+bool CheckUserExistOnCloud(cqContext **pcqCtx, cqContext *cqc,
+		Relation pg_authid_rel, char *rolename, HeapTuple *tuple,
+		bool forUpdate)
 {
 	if (!pg_cloud_auth)
 		return false;
@@ -3384,28 +3385,27 @@ bool CheckUserExistOnCloud(cqContext *pcqCtx, Relation pg_authid_rel,
 		}
 		return false;
 	}
-	caql_endscan(pcqCtx);
+	caql_endscan(*pcqCtx);
 	if (pg_authid_rel)
 	{
 		heap_close(pg_authid_rel, NoLock);
 	}
 	Oid roleid = CreateNoPrivligeRole(rolename);
-	cqContext cqc;
 	if (forUpdate)
 	{
 		pg_authid_rel = heap_open(AuthIdRelationId, RowExclusiveLock);
-		pcqCtx = caql_beginscan(caql_addrel(cqclr(&cqc), pg_authid_rel),
+		*pcqCtx = caql_beginscan(caql_addrel(cqclr(cqc), pg_authid_rel),
 				cql("SELECT * FROM pg_authid "
 						" WHERE oid = :1 "
 						" FOR UPDATE ", ObjectIdGetDatum(roleid)));
 	}
 	else
 	{
-		pcqCtx = caql_beginscan(
+		*pcqCtx = caql_beginscan(
 		NULL, cql("SELECT * FROM pg_authid "
 				" WHERE oid = :1 ", ObjectIdGetDatum(roleid)));
 	}
 
-	*tuple = caql_getnext(pcqCtx);
+	*tuple = caql_getnext(*pcqCtx);
 	return true;
 }

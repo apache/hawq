@@ -24,6 +24,6 @@ extern void RenameRole(const char *oldname, const char *newname);
 extern void DropOwnedObjects(DropOwnedStmt *stmt);
 extern void ReassignOwnedObjects(ReassignOwnedStmt *stmt);
 extern bool CheckUserExistOnCloudSimple(char *rolename, Oid *roleid);
-extern bool CheckUserExistOnCloud(cqContext *pcqCtx, Relation pg_authid_rel, char *rolename, HeapTuple *tuple, bool forUpdate);
+extern bool CheckUserExistOnCloud(cqContext **pcqCtx, cqContext *cqc, Relation pg_authid_rel, char *rolename, HeapTuple *tuple, bool forUpdate);
 
 #endif   /* USER_H */
