@@ -33,6 +33,7 @@
 #include "WriteBuffer.h"
 
 #include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 
 #define RPC_HEADER_MAGIC "hrpc"
 #define RPC_HEADER_VERSION 9
@@ -756,6 +757,8 @@ static exception_ptr HandlerRpcResponseException(exception_ptr e) {
 
 void RpcChannelImpl::readOneResponse(bool writeLock) {
     int readTimeout = key.getConf().getReadTimeout();
+    int maxLength = key.getConf().getRpcMaxLength();
+
     std::vector<char> buffer(128);
     RpcResponseHeaderProto curRespHeader;
     RpcResponseHeaderProto::RpcStatusProto status;
@@ -768,7 +771,15 @@ void RpcChannelImpl::readOneResponse(bool writeLock) {
     buffer.resize(headerSize);
     in->readFully(&buffer[0], headerSize, readTimeout);
 
-    if (!curRespHeader.ParseFromArray(&buffer[0], headerSize)) {
+    // use CodedInputStream around the buffer, so we can set TotalBytesLimit on it
+    ArrayInputStream ais(&buffer[0], headerSize);
+    CodedInputStream cis(&ais);
+    cis.SetTotalBytesLimit(maxLength, maxLength/2);
+
+    // use ParseFromCodedStream instead of ParseFromArray, so it can consume the above CodedInputStream
+    //
+    // if just use ParseFromArray, we have no chance to set TotalBytesLimit (64MB default)
+    if (!curRespHeader.ParseFromCodedStream(&cis)) {
         THROW(HdfsRpcException,
               "RPC channel to \"%s:%s\" got protocol mismatch: RPC channel cannot parse response header.",
               key.getServer().getHost().c_str(), key.getServer().getPort().c_str())
