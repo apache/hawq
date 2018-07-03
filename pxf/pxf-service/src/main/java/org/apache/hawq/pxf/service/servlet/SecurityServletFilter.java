@@ -78,9 +78,16 @@ public class SecurityServletFilter implements Filter {
             inProgress.incrementAndGet();
         }
 
+        public void incrementCounter() {
+            inProgress.incrementAndGet();
+        }
+
+        public void decrementCounter() {
+            inProgress.decrementAndGet();
+        }
+
         public void resetTime() {
             startTime = System.currentTimeMillis();
-            inProgress.decrementAndGet();
         }
 
         @Override
@@ -164,8 +171,7 @@ public class SecurityServletFilter implements Filter {
             SegmentTransactionId session = new SegmentTransactionId(segmentId, transactionId);
             if (fragmentCount != null) {
                 StringBuilder sb = new StringBuilder(session.toString());
-                sb.append(" (Fragment = ").append(fragmentIndex)
-                        .append(" of ").append(fragmentCount).append(")");
+                sb.append(" Fragment = ").append(fragmentIndex).append(" of ").append(fragmentCount);
                 LOG.info(sb.toString());
             }
 
@@ -212,7 +218,7 @@ public class SecurityServletFilter implements Filter {
                 delayQueue.offer(timedProxyUGI);
                 cache.put(session, timedProxyUGI);
             } else {
-                timedProxyUGI.inProgress.incrementAndGet();
+                timedProxyUGI.incrementCounter();
             }
             return timedProxyUGI;
         }
@@ -221,6 +227,7 @@ public class SecurityServletFilter implements Filter {
     private void release(TimedProxyUGI timedProxyUGI, Integer fragmentIndex, Integer fragmentCount) {
         synchronized (timedProxyUGI.session.segmentTransactionId.intern()) {
             timedProxyUGI.resetTime();
+            timedProxyUGI.decrementCounter();
             if (fragmentIndex != null && fragmentCount.equals(fragmentIndex))
                 closeUGI(timedProxyUGI);
         }
@@ -230,6 +237,7 @@ public class SecurityServletFilter implements Filter {
         TimedProxyUGI timedProxyUGI = delayQueue.poll();
         while (timedProxyUGI != null) {
             closeUGI(timedProxyUGI);
+            LOG.info(timedProxyUGI.session.toString() + " Delay Queue Size = " + delayQueue.size());
             timedProxyUGI = delayQueue.poll();
         }
     }
@@ -240,12 +248,15 @@ public class SecurityServletFilter implements Filter {
             try {
                 if (timedProxyUGI.inProgress.get() != 0) {
                     LOG.info(timedProxyUGI.session.toString() + " Skipping close of " + fsMsg);
+                    timedProxyUGI.resetTime();
+                    delayQueue.offer(timedProxyUGI);
                     return;
                 }
-                cache.remove(timedProxyUGI.session);
-                LOG.info(timedProxyUGI.session.toString() + " Closing " + fsMsg +
-                        " (Cache Size = " + cache.size() + ")");
-                FileSystem.closeAllForUGI(timedProxyUGI.proxyUGI);
+                if (cache.remove(timedProxyUGI.session) != null) {
+                    LOG.info(timedProxyUGI.session.toString() + " Closing " + fsMsg +
+                            " (Cache Size = " + cache.size() + ")");
+                    FileSystem.closeAllForUGI(timedProxyUGI.proxyUGI);
+                }
             } catch (Throwable t) {
                 LOG.warn(timedProxyUGI.session.toString() + " Error closing " + fsMsg);
             }
