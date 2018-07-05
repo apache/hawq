@@ -73,10 +73,10 @@ ApplicationClient::ApplicationClient(string &user, string &host, string &port) {
     rmConfInfos = RMInfo::getHARMInfo(*conf, YARN_RESOURCEMANAGER_HA);
 
     /* build a list of candidate RMs without duplicate */
-    for (vector<RMInfo>::iterator it = rmConfInfos.begin();
+    for (std::vector<RMInfo>::iterator it = rmConfInfos.begin();
             it != rmConfInfos.end(); it++) {
         bool found = false;
-        for (vector<RMInfo>::iterator it2 = rmInfos.begin();
+        for (std::vector<RMInfo>::iterator it2 = rmInfos.begin();
                 it2 != rmInfos.end(); it2++) {
             if (it2->getHost() == it->getHost()
                     && it2->getPort() == it->getPort()) {
