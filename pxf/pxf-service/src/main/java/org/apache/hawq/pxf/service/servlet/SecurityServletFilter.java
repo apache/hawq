@@ -23,12 +23,6 @@ package org.apache.hawq.pxf.service.servlet;
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedExceptionAction;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.DelayQueue;
-import java.util.concurrent.Delayed;
-import java.util.concurrent.TimeUnit;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -40,9 +34,9 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
+import org.apache.hawq.pxf.service.SegmentTransactionId;
+import org.apache.hawq.pxf.service.TimedProxyUGI;
+import org.apache.hawq.pxf.service.UGICache;
 import org.apache.hawq.pxf.service.utilities.SecureLogin;
 
 
@@ -60,82 +54,7 @@ public class SecurityServletFilter implements Filter {
     private static final String FRAGMENT_COUNT_HEADER = "X-GP-FRAGMENT-COUNT";
     private static final String MISSING_HEADER_ERROR = "Header %s is missing in the request";
     private static final String EMPTY_HEADER_ERROR = "Header %s is empty in the request";
-    private static Map<SegmentTransactionId, TimedProxyUGI> cache = new ConcurrentHashMap<>();
-    private static DelayQueue<TimedProxyUGI> delayQueue = new DelayQueue<>();
-    private static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
-
-
-    private class TimedProxyUGI implements Delayed {
-        long startTime;
-        UserGroupInformation proxyUGI;
-        SegmentTransactionId session;
-        AtomicInteger inProgress = new AtomicInteger();
-
-        public TimedProxyUGI(UserGroupInformation proxyUGI, SegmentTransactionId session) {
-            this.startTime = System.currentTimeMillis();
-            this.proxyUGI = proxyUGI;
-            this.session = session;
-            inProgress.incrementAndGet();
-        }
-
-        public void incrementCounter() {
-            inProgress.incrementAndGet();
-        }
-
-        public void decrementCounter() {
-            inProgress.decrementAndGet();
-        }
-
-        public void resetTime() {
-            startTime = System.currentTimeMillis();
-        }
-
-        @Override
-        public long getDelay(TimeUnit unit) {
-            return unit.convert(getDelayMillis(), TimeUnit.MILLISECONDS);
-        }
-
-        @Override
-        public int compareTo(Delayed other) {
-            TimedProxyUGI that = (TimedProxyUGI) other;
-            return Long.compare(this.getDelayMillis(), that.getDelayMillis());
-        }
-
-        private long getDelayMillis() {
-            return (startTime + UGI_CACHE_EXPIRY) - System.currentTimeMillis();
-        }
-    }
-
-    private class SegmentTransactionId {
-        String segmentId;
-        String transactionId;
-        String segmentTransactionId;
-
-        public SegmentTransactionId(String segmentId, String transactionId) {
-            this.segmentId = segmentId;
-            this.transactionId = transactionId;
-            this.segmentTransactionId = segmentId + ":" + transactionId;
-        }
-
-        @Override
-        public int hashCode() {
-            return segmentTransactionId.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (!(other instanceof SegmentTransactionId)) {
-                return false;
-            }
-            SegmentTransactionId that = (SegmentTransactionId) other;
-            return this.segmentTransactionId.equals(that.segmentTransactionId);
-        }
-
-        @Override
-        public String toString() {
-            return "Session = " + segmentTransactionId;
-        }
-    }
+    private static UGICache cache = new UGICache();
 
     /**
      * Initializes the filter.
@@ -163,8 +82,8 @@ public class SecurityServletFilter implements Filter {
 
             // retrieve user header and make sure header is present and is not empty
             final String user = getHeaderValue(request, USER_HEADER);
-            String segmentId = getHeaderValue(request, SEGMENT_ID_HEADER);
             String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER);
+            Integer segmentId = getHeaderValueInt(request, SEGMENT_ID_HEADER, true);
             Integer fragmentCount = getHeaderValueInt(request, FRAGMENT_COUNT_HEADER, false);
             Integer fragmentIndex = getHeaderValueInt(request, FRAGMENT_INDEX_HEADER, false);
 
@@ -188,9 +107,9 @@ public class SecurityServletFilter implements Filter {
             };
 
             // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
-            TimedProxyUGI timedProxyUGI = getTimedProxyUGI(user, session);
+            TimedProxyUGI timedProxyUGI = cache.getTimedProxyUGI(user, session);
             try {
-                timedProxyUGI.proxyUGI.doAs(action);
+                timedProxyUGI.getProxyUGI().doAs(action);
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
                 throw new ServletException(ute.getCause());
@@ -198,7 +117,7 @@ public class SecurityServletFilter implements Filter {
                 throw new ServletException(ie);
             }
             finally {
-                release(timedProxyUGI, fragmentIndex, fragmentCount);
+                cache.release(timedProxyUGI, fragmentIndex, fragmentCount);
             }
         } else {
             // no user impersonation is configured
@@ -206,62 +125,6 @@ public class SecurityServletFilter implements Filter {
         }
     }
 
-   private TimedProxyUGI getTimedProxyUGI(String user, SegmentTransactionId session) throws IOException {
-        synchronized (session.segmentTransactionId.intern()) {
-            TimedProxyUGI timedProxyUGI = cache.get(session);
-            if (timedProxyUGI == null || timedProxyUGI.getDelayMillis() < 0) {
-                cleanup();
-                LOG.info(session.toString() + " Creating proxy user = " + user);
-                UserGroupInformation proxyUGI =
-                        UserGroupInformation.createProxyUser(user, UserGroupInformation.getLoginUser());
-                timedProxyUGI = new TimedProxyUGI(proxyUGI, session);
-                delayQueue.offer(timedProxyUGI);
-                cache.put(session, timedProxyUGI);
-            } else {
-                timedProxyUGI.incrementCounter();
-            }
-            return timedProxyUGI;
-        }
-    }
-
-    private void release(TimedProxyUGI timedProxyUGI, Integer fragmentIndex, Integer fragmentCount) {
-        synchronized (timedProxyUGI.session.segmentTransactionId.intern()) {
-            timedProxyUGI.resetTime();
-            timedProxyUGI.decrementCounter();
-            if (fragmentIndex != null && fragmentCount.equals(fragmentIndex))
-                closeUGI(timedProxyUGI);
-        }
-    }
-
-    private void cleanup() {
-        TimedProxyUGI timedProxyUGI = delayQueue.poll();
-        while (timedProxyUGI != null) {
-            closeUGI(timedProxyUGI);
-            LOG.info(timedProxyUGI.session.toString() + " Delay Queue Size = " + delayQueue.size());
-            timedProxyUGI = delayQueue.poll();
-        }
-    }
-
-    private void closeUGI(TimedProxyUGI timedProxyUGI) {
-        synchronized (timedProxyUGI.session.segmentTransactionId.intern()) {
-            String fsMsg = "FileSystem for proxy user = " + timedProxyUGI.proxyUGI.getUserName();
-            try {
-                if (timedProxyUGI.inProgress.get() != 0) {
-                    LOG.info(timedProxyUGI.session.toString() + " Skipping close of " + fsMsg);
-                    timedProxyUGI.resetTime();
-                    delayQueue.offer(timedProxyUGI);
-                    return;
-                }
-                if (cache.remove(timedProxyUGI.session) != null) {
-                    LOG.info(timedProxyUGI.session.toString() + " Closing " + fsMsg +
-                            " (Cache Size = " + cache.size() + ")");
-                    FileSystem.closeAllForUGI(timedProxyUGI.proxyUGI);
-                }
-            } catch (Throwable t) {
-                LOG.warn(timedProxyUGI.session.toString() + " Error closing " + fsMsg);
-            }
-        }
-    }
 
     private Integer getHeaderValueInt(ServletRequest request, String headerKey, boolean required)
             throws IllegalArgumentException {
