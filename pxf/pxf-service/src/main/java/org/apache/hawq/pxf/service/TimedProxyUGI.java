@@ -27,16 +27,16 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 public class TimedProxyUGI implements Delayed {
 
-    private long startTime;
+    private volatile long startTime;
     private UserGroupInformation proxyUGI;
     private SegmentTransactionId session;
+    private boolean cleaned = false;
     AtomicInteger inProgress = new AtomicInteger();
 
     public TimedProxyUGI(UserGroupInformation proxyUGI, SegmentTransactionId session) {
         this.startTime = System.currentTimeMillis();
         this.proxyUGI = proxyUGI;
         this.session = session;
-        inProgress.incrementAndGet();
     }
 
     public UserGroupInformation getProxyUGI() {
@@ -45,6 +45,14 @@ public class TimedProxyUGI implements Delayed {
 
     public SegmentTransactionId getSession() {
         return session;
+    }
+
+    public boolean isCleaned() {
+        return cleaned;
+    }
+
+    public void setCleaned() {
+        cleaned = true;
     }
 
     public int getCounter() {
@@ -61,6 +69,10 @@ public class TimedProxyUGI implements Delayed {
 
     public void resetTime() {
         startTime = System.currentTimeMillis();
+    }
+
+    public void setExpired() {
+        startTime = -1L;
     }
 
     @Override

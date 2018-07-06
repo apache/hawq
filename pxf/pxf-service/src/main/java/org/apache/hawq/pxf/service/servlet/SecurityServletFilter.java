@@ -117,7 +117,8 @@ public class SecurityServletFilter implements Filter {
                 throw new ServletException(ie);
             }
             finally {
-                cache.release(timedProxyUGI, fragmentIndex, fragmentCount);
+                boolean forceClean = (fragmentIndex != null && fragmentCount.equals(fragmentIndex));
+                cache.release(timedProxyUGI, forceClean);
             }
         } else {
             // no user impersonation is configured

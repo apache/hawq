@@ -33,91 +33,97 @@ public class UGICache {
 
     private static final Log LOG = LogFactory.getLog(UGICache.class);
     private static Map<SegmentTransactionId, TimedProxyUGI> cache = new ConcurrentHashMap<>();
-    private static DelayQueue<TimedProxyUGI> delayQueue = new DelayQueue<>();
-    private static Object[] segmentLocks = new Object[100];
+    //private static DelayQueue<TimedProxyUGI> delayQueue = new DelayQueue<>();
+    private static DelayQueue<TimedProxyUGI>[] delayQueues = new DelayQueue<>[64];
     public static long UGI_CACHE_EXPIRY = 15 * 1 * 1000L; // 15 Minutes
 
-    static {
-        Thread t = new Thread(new Runnable() {
-
-            public void run() {
-                while (true) {
-                    try {
-                        Thread.sleep(UGI_CACHE_EXPIRY);
-                        TimedProxyUGI timedProxyUGI = delayQueue.poll();
-                        while (timedProxyUGI != null) {
-                            closeUGI(timedProxyUGI);
-                            LOG.info("Delay Queue Size = " + delayQueue.size());
-                            timedProxyUGI = delayQueue.poll();
-                        }
-                    } catch (InterruptedException ie) {
-                        LOG.warn("Terminating reaper thread");
-                        return;
-                    }
-                }
-            }
-        });
-
-        t.setName("UGI Reaper Thread");
-        t.start();
-        for (int i = 0; i < segmentLocks.length; i++) {
-            segmentLocks[i] = new Object();
+    public UGICache() {
+        for (int i = 0; i < delayQueues.length; i++) {
+            delayQueues[i] = new DelayQueue<>();
         }
     }
 
     public TimedProxyUGI getTimedProxyUGI(String user, SegmentTransactionId session) throws IOException {
 
         Integer segmentId = session.getSegmentId();
-        synchronized (segmentLocks[segmentId]) {
+        synchronized (delayQueues[segmentId]) {
+            // use the opportunity to cleanup any expired entries
+            cleanup(segmentId);
             TimedProxyUGI timedProxyUGI = cache.get(session);
             if (timedProxyUGI == null) {
                 LOG.info(session.toString() + " Creating proxy user = " + user);
                 UserGroupInformation proxyUGI =
                         UserGroupInformation.createProxyUser(user, UserGroupInformation.getLoginUser());
                 timedProxyUGI = new TimedProxyUGI(proxyUGI, session);
-                delayQueue.offer(timedProxyUGI);
+                delayQueues[segmentId].offer(timedProxyUGI);
                 cache.put(session, timedProxyUGI);
-            } else if (timedProxyUGI.getDelayMillis() < 0) {
-                closeUGI(timedProxyUGI);
-            } else {
-                timedProxyUGI.incrementCounter();
             }
+            timedProxyUGI.incrementCounter();
             return timedProxyUGI;
         }
     }
 
-    public void release(TimedProxyUGI timedProxyUGI, Integer fragmentIndex, Integer fragmentCount) {
+    private cleanup(Integer segmentId) {
+        // poll segment expiration queue for all expired entries and clean them if possible   
+        TimedProxyUGI ugi = null;
+        while ((ugi = delayQueues[segmentId].poll()) != null) {
+            // place it back in the queue if still in use and was not closed
+            if (!closeUGI(ugi)) {
+                delayQueues[segmentId].offer(ugi);
+            }
+            LOG.info("Delay Queue Size for segment " +
+                    segmentId + " = " + delayQueues[segmentId].size());
+        }
+    }
+    
+    public void release(TimedProxyUGI timedProxyUGI, boolean forceClean) {
 
         Integer segmentId = timedProxyUGI.getSession().getSegmentId();
-        synchronized (segmentLocks[segmentId]) {
-            timedProxyUGI.resetTime();
-            timedProxyUGI.decrementCounter();
-            if (fragmentIndex != null && fragmentCount.equals(fragmentIndex))
+        
+        timedProxyUGI.resetTime();
+        timedProxyUGI.decrementCounter();
+        
+        if (forceClean) {
+            synchronized (delayQueues[segmentId]) {
+                timedProxyUGI.setExpired();
                 closeUGI(timedProxyUGI);
+            }
         }
     }
 
-    private static void closeUGI(TimedProxyUGI timedProxyUGI) {
+    private static boolean closeUGI(TimedProxyUGI expiredProxyUGI) {
 
-        Integer segmentId = timedProxyUGI.getSession().getSegmentId();
-        synchronized (segmentLocks[segmentId]) {
-            String fsMsg = "FileSystem for proxy user = " + timedProxyUGI.getProxyUGI().getUserName();
+        SegmentTransactionId session = expiredProxyUGI.getSession();
+        Integer segmentId = session.getSegmentId();
+        //synchronized (delayQueues[segmentId]) {
+            String fsMsg = "FileSystem for proxy user = " + expiredProxyUGI.getProxyUGI().getUserName();
             try {
-                if (timedProxyUGI.inProgress.get() != 0) {
-                    LOG.info(timedProxyUGI.getSession().toString() + " Skipping close of " + fsMsg);
-                    timedProxyUGI.resetTime();
-                    delayQueue.offer(timedProxyUGI);
-                    return;
+                // The UGI object is still being used by another thread
+                if (expiredProxyUGI.inProgress.get() != 0) {
+                    LOG.info(session.toString() + " Skipping close of " + fsMsg);
+                    expiredProxyUGI.resetTime(); // update time so that it doesn't expire until release updates time again
+                    return false;
                 }
-                if (cache.remove(timedProxyUGI.getSession()) != null) {
-                    LOG.info(timedProxyUGI.getSession().toString() + " Closing " + fsMsg +
+                // expired UGI can be cleaned, as it is not used
+                // determine if it can be removed from cache also
+                TimedProxyUGI cachedUGI = cache.get(session);
+
+                if (expiredProxyUGI == cachedUGI) {
+                    // remove it from cache, as cache now has expired entry which is not in progress
+                    cache.remove(session);
+                }
+                
+                if (!expiredProxyUGI.isCleaned()) {
+                    LOG.info(session.toString() + " Closing " + fsMsg +
                             " (Cache Size = " + cache.size() + ")");
-                    FileSystem.closeAllForUGI(timedProxyUGI.getProxyUGI());
+                    FileSystem.closeAllForUGI(expiredProxyUGI.getProxyUGI());
+                    expiredProxyUGI.setCleaned();
                 }
+                
             } catch (Throwable t) {
-                LOG.warn(timedProxyUGI.getSession().toString() + " Error closing " + fsMsg);
+                LOG.warn(session.toString() + " Error closing " + fsMsg);
             }
-        }
+        //}
     }
 
 }
