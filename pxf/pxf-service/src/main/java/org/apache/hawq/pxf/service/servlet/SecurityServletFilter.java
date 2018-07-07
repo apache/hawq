@@ -88,10 +88,10 @@ public class SecurityServletFilter implements Filter {
             Integer fragmentIndex = getHeaderValueInt(request, FRAGMENT_INDEX_HEADER, false);
 
             SegmentTransactionId session = new SegmentTransactionId(segmentId, transactionId);
-            if (fragmentCount != null) {
+            if (LOG.isDebugEnabled() && fragmentCount != null) {
                 StringBuilder sb = new StringBuilder(session.toString());
                 sb.append(" Fragment = ").append(fragmentIndex).append(" of ").append(fragmentCount);
-                LOG.info(sb.toString());
+                LOG.debug(sb.toString());
             }
 
             // TODO refresh Kerberos token when security is enabled
@@ -117,6 +117,7 @@ public class SecurityServletFilter implements Filter {
                 throw new ServletException(ie);
             }
             finally {
+                // Optimization to cleanup the cache if it is the last fragment
                 boolean forceClean = (fragmentIndex != null && fragmentCount.equals(fragmentIndex));
                 cache.release(timedProxyUGI, forceClean);
             }
