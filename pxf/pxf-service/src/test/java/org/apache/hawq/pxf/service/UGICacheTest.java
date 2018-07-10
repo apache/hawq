@@ -3,6 +3,7 @@ package org.apache.hawq.pxf.service;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
 import static org.junit.Assert.assertEquals;
@@ -20,11 +21,14 @@ public class UGICacheTest {
     @Before
     public void setUp() throws Exception {
         provider = mock(UGIProvider.class);
-
-        when(provider.createProxyUGI(any(String.class))).thenAnswer((Answer<UserGroupInformation>) invocation -> mock(UserGroupInformation.class));
+        when(provider.createProxyUGI(any(String.class))).thenAnswer(new Answer<UserGroupInformation>() {
+            @Override
+            public UserGroupInformation answer(InvocationOnMock invocation) throws Throwable {
+                return mock(UserGroupInformation.class);
+            }
+        });
 
         session = new SessionId(0, "txn-id", "the-user");
-
         cache = new UGICache(provider);
     }
 
