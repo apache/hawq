@@ -10,7 +10,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.powermock.api.mockito.PowerMockito.when;
 
 public class UGICacheTest {
@@ -23,7 +26,7 @@ public class UGICacheTest {
         provider = mock(UGIProvider.class);
         when(provider.createProxyUGI(any(String.class))).thenAnswer(new Answer<UserGroupInformation>() {
             @Override
-            public UserGroupInformation answer(InvocationOnMock invocation) throws Throwable {
+            public UserGroupInformation answer(InvocationOnMock invocation) {
                 return mock(UserGroupInformation.class);
             }
         });

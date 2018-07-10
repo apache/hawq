@@ -34,7 +34,7 @@ public class UGICacheEntry implements Delayed {
     private AtomicInteger inProgress = new AtomicInteger();
     private static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
 
-    public UGICacheEntry(UserGroupInformation proxyUGI, SessionId session) {
+    UGICacheEntry(UserGroupInformation proxyUGI, SessionId session) {
         this.startTime = System.currentTimeMillis();
         this.proxyUGI = proxyUGI;
         this.session = session;
@@ -44,35 +44,35 @@ public class UGICacheEntry implements Delayed {
         return proxyUGI;
     }
 
-    public SessionId getSession() {
+    SessionId getSession() {
         return session;
     }
 
-    public boolean isCleaned() {
+    boolean isCleaned() {
         return cleaned;
     }
 
-    public void setCleaned() {
+    void setCleaned() {
         cleaned = true;
     }
 
-    public int getCounter() {
+    int getCounter() {
         return inProgress.get();
     }
 
-    public void incrementCounter() {
+    void incrementCounter() {
         inProgress.incrementAndGet();
     }
 
-    public void decrementCounter() {
+    void decrementCounter() {
         inProgress.decrementAndGet();
     }
 
-    public void resetTime() {
+    void resetTime() {
         startTime = System.currentTimeMillis();
     }
 
-    public void setExpired() {
+    void setExpired() {
         startTime = -1L;
     }
 
@@ -87,7 +87,7 @@ public class UGICacheEntry implements Delayed {
         return Long.compare(this.getDelayMillis(), that.getDelayMillis());
     }
 
-    public long getDelayMillis() {
+    private long getDelayMillis() {
         return (startTime + UGI_CACHE_EXPIRY) - System.currentTimeMillis();
     }
 }

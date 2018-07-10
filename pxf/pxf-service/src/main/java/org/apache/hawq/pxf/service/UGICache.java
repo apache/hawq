@@ -37,7 +37,7 @@ public class UGICache {
     private final Map<Integer, DelayQueue<UGICacheEntry>> queueMap = new HashMap<>();
     private final UGIProvider ugiProvider;
 
-    public UGICache(UGIProvider provider) {
+    UGICache(UGIProvider provider) {
         this.ugiProvider = provider;
     }
 
@@ -85,7 +85,7 @@ public class UGICache {
     // and clean them if possible
     private void cleanup(Integer segmentId) {
 
-        UGICacheEntry ugi = null;
+        UGICacheEntry ugi;
         DelayQueue<UGICacheEntry> delayQueue = getDelayQueue(segmentId);
         while ((ugi = delayQueue.poll()) != null) {
             // Place it back in the queue if still in use and was not closed

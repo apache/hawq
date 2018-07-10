@@ -24,14 +24,14 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 
-public class UGIProvider {
-    
-    public UserGroupInformation createProxyUGI(String effectiveUser) throws IOException {
+class UGIProvider {
+
+    UserGroupInformation createProxyUGI(String effectiveUser) throws IOException {
         return UserGroupInformation.createProxyUser(
                 effectiveUser, UserGroupInformation.getLoginUser());
     }
-    
-    public void destroy(UserGroupInformation ugi) throws IOException {
+
+    void destroy(UserGroupInformation ugi) throws IOException {
         FileSystem.closeAllForUGI(ugi);
     }
 }

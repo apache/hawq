@@ -88,9 +88,7 @@ public class SecurityServletFilter implements Filter {
 
             SessionId session = new SessionId(segmentId, transactionId, user);
             if (LOG.isDebugEnabled() && fragmentCount != null) {
-                StringBuilder sb = new StringBuilder(session.toString());
-                sb.append(" Fragment = ").append(fragmentIndex).append(" of ").append(fragmentCount);
-                LOG.debug(sb.toString());
+                LOG.debug(session.toString() + " Fragment = " + fragmentIndex + " of " + fragmentCount);
             }
 
             // TODO refresh Kerberos token when security is enabled
@@ -117,7 +115,7 @@ public class SecurityServletFilter implements Filter {
             }
             finally {
                 // Optimization to cleanup the cache if it is the last fragment
-                boolean forceClean = (fragmentIndex != null && fragmentCount.equals(fragmentIndex));
+                boolean forceClean = (fragmentIndex != null && fragmentIndex.equals(fragmentCount));
                 cache.release(timedProxyUGI, forceClean);
             }
         } else {
