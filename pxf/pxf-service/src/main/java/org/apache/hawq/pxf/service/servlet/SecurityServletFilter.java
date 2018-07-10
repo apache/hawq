@@ -53,7 +53,7 @@ public class SecurityServletFilter implements Filter {
     private static final String FRAGMENT_COUNT_HEADER = "X-GP-FRAGMENT-COUNT";
     private static final String MISSING_HEADER_ERROR = "Header %s is missing in the request";
     private static final String EMPTY_HEADER_ERROR = "Header %s is empty in the request";
-    private static UGICache cache = new UGICache();
+    private static final UGICache cache = new UGICache();
 
     /**
      * Initializes the filter.
