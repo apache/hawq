@@ -34,8 +34,8 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hawq.pxf.service.SegmentTransactionId;
-import org.apache.hawq.pxf.service.TimedProxyUGI;
+import org.apache.hawq.pxf.service.SessionId;
+import org.apache.hawq.pxf.service.UGICacheEntry;
 import org.apache.hawq.pxf.service.UGICache;
 import org.apache.hawq.pxf.service.utilities.SecureLogin;
 
@@ -47,7 +47,6 @@ public class SecurityServletFilter implements Filter {
 
     private static final Log LOG = LogFactory.getLog(SecurityServletFilter.class);
     private static final String USER_HEADER = "X-GP-USER";
-    private static final String SEGMENT_COUNT_HEADER = "X-GP-SEGMENT-COUNT";
     private static final String SEGMENT_ID_HEADER = "X-GP-SEGMENT-ID";
     private static final String TRANSACTION_ID_HEADER = "X-GP-XID";
     private static final String FRAGMENT_INDEX_HEADER = "X-GP-FRAGMENT-INDEX";
@@ -87,7 +86,7 @@ public class SecurityServletFilter implements Filter {
             Integer fragmentCount = getHeaderValueInt(request, FRAGMENT_COUNT_HEADER, false);
             Integer fragmentIndex = getHeaderValueInt(request, FRAGMENT_INDEX_HEADER, false);
 
-            SegmentTransactionId session = new SegmentTransactionId(segmentId, transactionId);
+            SessionId session = new SessionId(segmentId, transactionId, user);
             if (LOG.isDebugEnabled() && fragmentCount != null) {
                 StringBuilder sb = new StringBuilder(session.toString());
                 sb.append(" Fragment = ").append(fragmentIndex).append(" of ").append(fragmentCount);
@@ -107,9 +106,9 @@ public class SecurityServletFilter implements Filter {
             };
 
             // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
-            TimedProxyUGI timedProxyUGI = cache.getTimedProxyUGI(user, session);
+            UGICacheEntry timedProxyUGI = cache.getTimedProxyUGI(session);
             try {
-                timedProxyUGI.getProxyUGI().doAs(action);
+                timedProxyUGI.getUGI().doAs(action);
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
                 throw new ServletException(ute.getCause());

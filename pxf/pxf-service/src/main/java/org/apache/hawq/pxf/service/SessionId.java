@@ -19,42 +19,42 @@ package org.apache.hawq.pxf.service;
  * under the License.
  */
 
-public class SegmentTransactionId {
+public class SessionId {
 
+    private final String user;
     private Integer segmentId;
-    private String transactionId;
-    private String segmentTransactionId;
+    private String sessionId;
 
-    public SegmentTransactionId(Integer segmentId, String transactionId) {
+    public SessionId(Integer segmentId, String transactionId, String gpdbUser) {
         this.segmentId = segmentId;
-        this.transactionId = transactionId;
-        this.segmentTransactionId = segmentId + ":" + transactionId;
+        this.user = gpdbUser;
+        this.sessionId = segmentId + ":" + transactionId + ":" + gpdbUser;
     }
 
     public Integer getSegmentId() {
         return segmentId;
     }
 
-    public String getSegmentTransactionId() {
-        return segmentTransactionId;
-    }
-
     @Override
     public int hashCode() {
-        return segmentTransactionId.hashCode();
+        return sessionId.hashCode();
     }
 
     @Override
     public boolean equals(Object other) {
-        if (!(other instanceof SegmentTransactionId)) {
+        if (!(other instanceof SessionId)) {
             return false;
         }
-        SegmentTransactionId that = (SegmentTransactionId) other;
-        return this.segmentTransactionId.equals(that.segmentTransactionId);
+        SessionId that = (SessionId) other;
+        return this.sessionId.equals(that.sessionId);
     }
 
     @Override
     public String toString() {
-        return "Session = " + segmentTransactionId;
+        return "Session = " + sessionId;
+    }
+
+    public String getUser() {
+        return user;
     }
 }

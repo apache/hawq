@@ -25,25 +25,26 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.security.UserGroupInformation;
 
-public class TimedProxyUGI implements Delayed {
+public class UGICacheEntry implements Delayed {
 
     private volatile long startTime;
     private UserGroupInformation proxyUGI;
-    private SegmentTransactionId session;
+    private SessionId session;
     private boolean cleaned = false;
-    AtomicInteger inProgress = new AtomicInteger();
+    private AtomicInteger inProgress = new AtomicInteger();
+    private static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
 
-    public TimedProxyUGI(UserGroupInformation proxyUGI, SegmentTransactionId session) {
+    public UGICacheEntry(UserGroupInformation proxyUGI, SessionId session) {
         this.startTime = System.currentTimeMillis();
         this.proxyUGI = proxyUGI;
         this.session = session;
     }
 
-    public UserGroupInformation getProxyUGI() {
+    public UserGroupInformation getUGI() {
         return proxyUGI;
     }
 
-    public SegmentTransactionId getSession() {
+    public SessionId getSession() {
         return session;
     }
 
@@ -82,12 +83,12 @@ public class TimedProxyUGI implements Delayed {
 
     @Override
     public int compareTo(Delayed other) {
-        TimedProxyUGI that = (TimedProxyUGI) other;
+        UGICacheEntry that = (UGICacheEntry) other;
         return Long.compare(this.getDelayMillis(), that.getDelayMillis());
     }
 
     public long getDelayMillis() {
-        return (startTime + UGICache.UGI_CACHE_EXPIRY) - System.currentTimeMillis();
+        return (startTime + UGI_CACHE_EXPIRY) - System.currentTimeMillis();
     }
 }
 
