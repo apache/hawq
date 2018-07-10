@@ -86,6 +86,13 @@ public class UGICacheTest {
     }
 
     @Test
+    public void anySegmentIdIsValid() throws Exception {
+        session = new SessionId(65, "txn-id", "the-user");
+        UGICacheEntry proxyUGI1 = cache.getTimedProxyUGI(session);
+        assertNotNull(proxyUGI1.getUGI());
+    }
+
+    @Test
     public void releaseWithoutForceClean() throws Exception {
         UGICacheEntry proxyUGI1 = cache.getTimedProxyUGI(session);
 

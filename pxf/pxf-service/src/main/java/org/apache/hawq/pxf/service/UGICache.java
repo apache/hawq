@@ -20,14 +20,13 @@ package org.apache.hawq.pxf.service;
  */
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.DelayQueue;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.security.UserGroupInformation;
 
 public class UGICache {
 
@@ -35,18 +34,29 @@ public class UGICache {
     private Map<SessionId, UGICacheEntry> cache = new ConcurrentHashMap<>();
     @SuppressWarnings("unchecked")
     // There is a separate DelayQueue for each segment (also being used for locking)
-    private DelayQueue<UGICacheEntry>[] delayQueues = (DelayQueue<UGICacheEntry>[])new DelayQueue[64];
+    private final Map<Integer, DelayQueue<UGICacheEntry>> queueMap = new HashMap<>();
     private final UGIProvider ugiProvider;
 
     public UGICache(UGIProvider provider) {
         this.ugiProvider = provider;
-        for (int i = 0; i < delayQueues.length; i++) {
-            delayQueues[i] = new DelayQueue<>();
-        }
     }
 
     public UGICache() {
         this(new UGIProvider());
+    }
+
+    private DelayQueue<UGICacheEntry> getDelayQueue(Integer segmentId) {
+        DelayQueue<UGICacheEntry> queue = queueMap.get(segmentId);
+        if (queue == null) {
+            synchronized (queueMap) {
+                queue = queueMap.get(segmentId);
+                if (queue == null) {
+                    queue = new DelayQueue<>();
+                    queueMap.put(segmentId, queue);
+                }
+            }
+        }
+        return queue;
     }
 
     // Create new proxy UGI if not found in cache and increment reference count
@@ -55,15 +65,15 @@ public class UGICache {
 
         Integer segmentId = session.getSegmentId();
         String user = session.getUser();
-        synchronized (delayQueues[segmentId]) {
+        DelayQueue<UGICacheEntry> delayQueue = getDelayQueue(segmentId);
+        synchronized (delayQueue) {
             // Use the opportunity to cleanup any expired entries
             cleanup(segmentId);
             UGICacheEntry timedProxyUGI = cache.get(session);
             if (timedProxyUGI == null) {
                 LOG.info(session.toString() + " Creating proxy user = " + user);
-                UserGroupInformation proxyUGI = ugiProvider.createProxyUGI(user);
-                timedProxyUGI = new UGICacheEntry(proxyUGI, session);
-                delayQueues[segmentId].offer(timedProxyUGI);
+                timedProxyUGI = new UGICacheEntry(ugiProvider.createProxyUGI(user), session);
+                delayQueue.offer(timedProxyUGI);
                 cache.put(session, timedProxyUGI);
             }
             timedProxyUGI.incrementCounter();
@@ -76,13 +86,14 @@ public class UGICache {
     private void cleanup(Integer segmentId) {
 
         UGICacheEntry ugi = null;
-        while ((ugi = delayQueues[segmentId].poll()) != null) {
+        DelayQueue<UGICacheEntry> delayQueue = getDelayQueue(segmentId);
+        while ((ugi = delayQueue.poll()) != null) {
             // Place it back in the queue if still in use and was not closed
             if (!closeUGI(ugi)) {
-                delayQueues[segmentId].offer(ugi);
+                delayQueue.offer(ugi);
             }
             LOG.debug("Delay Queue Size for segment " +
-                    segmentId + " = " + delayQueues[segmentId].size());
+                    segmentId + " = " + delayQueue.size());
         }
     }
 
@@ -93,7 +104,7 @@ public class UGICache {
         timedProxyUGI.resetTime();
         timedProxyUGI.decrementCounter();
         if (forceClean) {
-            synchronized (delayQueues[segmentId]) {
+            synchronized (getDelayQueue(segmentId)) {
                 timedProxyUGI.setExpired();
                 closeUGI(timedProxyUGI);
             }
