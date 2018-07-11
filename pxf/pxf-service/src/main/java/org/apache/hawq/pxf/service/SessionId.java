@@ -19,19 +19,21 @@ package org.apache.hawq.pxf.service;
  * under the License.
  */
 
+import org.apache.commons.lang3.builder.EqualsBuilder;
+
 /**
  * For the purposes of pxf-server, a session is the set of requests processed on a specific segment
  * on behalf of a particular user and transaction. Grouping requests together into a session allows
  * us to re-use the UserGroupInformation object (which is expensive to destroy) for each session.
- *
+ * <p>
  * SessionId is used as the cache key to look up the UserGroupInformation for a request. See {@link
  * UGICache}.
  */
 public class SessionId {
 
     private final String user;
-    private Integer segmentId;
-    private String sessionId;
+    private final Integer segmentId;
+    private final String sessionId;
 
     /**
      * Create a sessionId
@@ -43,7 +45,7 @@ public class SessionId {
     public SessionId(Integer segmentId, String transactionId, String gpdbUser) {
         this.segmentId = segmentId;
         this.user = gpdbUser;
-        this.sessionId = segmentId + ":" + transactionId + ":" + gpdbUser;
+        this.sessionId = gpdbUser + ":" + transactionId + ":" + segmentId;
     }
 
     /**
@@ -51,6 +53,13 @@ public class SessionId {
      */
     public Integer getSegmentId() {
         return segmentId;
+    }
+
+    /**
+     * @return the gpdb user name
+     */
+    public String getUser() {
+        return user;
     }
 
     /**
@@ -65,12 +74,15 @@ public class SessionId {
      * {@inheritDoc}
      */
     @Override
-    public boolean equals(Object other) {
-        if (!(other instanceof SessionId)) {
-            return false;
-        }
-        SessionId that = (SessionId) other;
-        return this.sessionId.equals(that.sessionId);
+    public boolean equals(Object obj) {
+        if (obj == null) return false;
+        if (obj == this) return true;
+        if (obj.getClass() != getClass()) return false;
+
+        SessionId that = (SessionId) obj;
+        return new EqualsBuilder()
+                .append(sessionId, that.sessionId)
+                .isEquals();
     }
 
     /**
@@ -79,12 +91,5 @@ public class SessionId {
     @Override
     public String toString() {
         return "Session = " + sessionId;
-    }
-
-    /**
-     * @return the gpdb user name
-     */
-    public String getUser() {
-        return user;
     }
 }

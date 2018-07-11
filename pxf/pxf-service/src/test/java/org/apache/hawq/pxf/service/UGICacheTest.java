@@ -19,16 +19,19 @@ package org.apache.hawq.pxf.service;
  * under the License.
  */
 
+import com.google.common.base.Ticker;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -37,9 +40,24 @@ import static org.mockito.Mockito.verify;
 import static org.powermock.api.mockito.PowerMockito.when;
 
 public class UGICacheTest {
+    private static final long MINUTES = 60 * 1000L;
     private UGIProvider provider = null;
     private SessionId session = null;
     private UGICache cache = null;
+    private FakeTicker fakeTicker;
+
+    private static class FakeTicker extends Ticker {
+        private final AtomicLong nanos = new AtomicLong();
+
+        @Override
+        public long read() {
+            return nanos.get();
+        }
+
+        public long advanceTime(long milliseconds) {
+            return nanos.addAndGet(milliseconds * 1000) / 1000;
+        }
+    }
 
     @Before
     public void setUp() throws Exception {
@@ -52,30 +70,30 @@ public class UGICacheTest {
         });
 
         session = new SessionId(0, "txn-id", "the-user");
-        cache = new UGICache(provider);
+        fakeTicker = new FakeTicker();
+        cache = new UGICache(provider, fakeTicker);
     }
 
     @Test
     public void getUGIFromEmptyCache() throws Exception {
-        UGICache.Entry entry = cache.getTimedProxyUGI(session);
-        assertNotNull(entry.getUGI());
+        UserGroupInformation ugi = cache.getUserGroupInformation(session);
+        assertNotNull(ugi);
         verify(provider).createProxyUGI("the-user");
     }
 
     @Test
     public void getSameUGITwiceUsesCache() throws Exception {
-        UGICache.Entry entry1 = cache.getTimedProxyUGI(session);
-        UGICache.Entry entry2 = cache.getTimedProxyUGI(session);
-        assertEquals(entry1, entry2);
-        assertNotNull(entry1.getUGI());
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
+        assertEquals(ugi1, ugi2);
         verify(provider, times(1)).createProxyUGI("the-user");
     }
 
     @Test
     public void getTwoUGIsWithDifferentSessionsForSameUser() throws Exception {
         SessionId otherSession = new SessionId(0, "txn-id-2", "the-user");
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(otherSession);
+        UserGroupInformation proxyUGI1 = cache.getUserGroupInformation(session);
+        UserGroupInformation proxyUGI2 = cache.getUserGroupInformation(otherSession);
         assertNotEquals(proxyUGI1, proxyUGI2);
         verify(provider, times(2)).createProxyUGI("the-user");
         // TODO: this seems weird. We're creating two UGIs with the same params,
@@ -85,20 +103,20 @@ public class UGICacheTest {
     @Test
     public void getTwoUGIsWithDifferentUsers() throws Exception {
         SessionId otherSession = new SessionId(0, "txn-id", "different-user");
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(otherSession);
+        UserGroupInformation proxyUGI1 = cache.getUserGroupInformation(session);
+        UserGroupInformation proxyUGI2 = cache.getUserGroupInformation(otherSession);
         assertNotEquals(proxyUGI1, proxyUGI2);
         verify(provider, times(1)).createProxyUGI("the-user");
         verify(provider, times(1)).createProxyUGI("different-user");
     }
 
     @Test
-    public void getTwoUGIsWithDifferentUsersCachesBoth() throws Exception {
+    public void gettingTwoUGIsWithDifferentUsersCachesBoth() throws Exception {
         SessionId otherSession = new SessionId(0, "txn-id", "different-user");
-        UGICache.Entry proxyUGI1a = cache.getTimedProxyUGI(session);
-        UGICache.Entry proxyUGI1b = cache.getTimedProxyUGI(session);
-        UGICache.Entry proxyUGI2a = cache.getTimedProxyUGI(otherSession);
-        UGICache.Entry proxyUGI2b = cache.getTimedProxyUGI(otherSession);
+        UserGroupInformation proxyUGI1a = cache.getUserGroupInformation(session);
+        UserGroupInformation proxyUGI1b = cache.getUserGroupInformation(session);
+        UserGroupInformation proxyUGI2a = cache.getUserGroupInformation(otherSession);
+        UserGroupInformation proxyUGI2b = cache.getUserGroupInformation(otherSession);
         assertEquals(proxyUGI1a, proxyUGI1b);
         assertEquals(proxyUGI2a, proxyUGI2b);
         assertNotEquals(proxyUGI1a, proxyUGI2a);
@@ -107,131 +125,131 @@ public class UGICacheTest {
     }
 
     @Test
+    @Ignore
     public void getUGIWhenRequestedUserDoesNotExist() throws Exception {
-        // what does UserGroupInformation.createProxyUser() do in this scenario?
+        // TODO: what does UserGroupInformation.createProxyUser() do in this scenario?
         // how about getLoginUser()?
     }
 
     @Test
     public void anySegmentIdIsValid() throws Exception {
         session = new SessionId(65, "txn-id", "the-user");
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
-        assertNotNull(proxyUGI1.getUGI());
+        UserGroupInformation proxyUGI1 = cache.getUserGroupInformation(session);
+        assertNotNull(proxyUGI1);
     }
 
     @Test
     public void releaseWithoutForceClean() throws Exception {
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
 
-        cache.release(proxyUGI1, false);
+        cache.release(session, false);
         // UGI wasn't cleaned up, so we can still get it
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(session);
-        assertEquals(proxyUGI1, proxyUGI2);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
+        assertEquals(ugi1, ugi2);
         verify(provider, times(1)).createProxyUGI("the-user");
     }
 
     @Test
     public void releaseWithForceClean() throws Exception {
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
 
-        cache.release(proxyUGI1, true);
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(session);
-        assertNotEquals(proxyUGI1, proxyUGI2);
+        cache.release(session, true);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
+        assertNotEquals(ugi1, ugi2);
         verify(provider, times(2)).createProxyUGI("the-user");
     }
 
     @Test
-    public void releaseWithForceCleanResetsTheExpirationTimeIfUGIIsReferenced() throws Exception {
-        UGICache.Entry reference1 = cache.getTimedProxyUGI(session);
-        UGICache.Entry reference2 = cache.getTimedProxyUGI(session);
+    public void releaseResetsTheExpirationTime() throws Exception {
+        UserGroupInformation reference1 = cache.getUserGroupInformation(session);
+        UserGroupInformation reference2 = cache.getUserGroupInformation(session);
 
-        cache.release(reference1, true);
-        cache.release(reference2, false);
+        cache.release(session, true);
+        fakeTicker.advanceTime(15 * MINUTES);
+        cache.release(session, false);
+        fakeTicker.advanceTime(10 * MINUTES);
 
-        UGICache.Entry reference3 = cache.getTimedProxyUGI(session);
+        UserGroupInformation reference3 = cache.getUserGroupInformation(session);
 
+        assertEquals(reference1, reference2);
         assertEquals(reference1, reference3);
+        verify(provider, never()).destroy(any(UserGroupInformation.class));
     }
 
     @Test
     public void releaseAndReacquireDoesNotFreeResources() throws Exception {
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
-
-        cache.release(proxyUGI1, false);
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(session);
-        proxyUGI2.setExpired();
-        UGICache.Entry proxyUGI3 = cache.getTimedProxyUGI(session);
-        // this does not clean up any UGIs because our proxyUGI is still in use.
-        assertEquals(proxyUGI3, proxyUGI2);
+        cache.getUserGroupInformation(session);
+        cache.release(session, false);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
+        fakeTicker.advanceTime(50 * MINUTES);
+        UserGroupInformation ugi3 = cache.getUserGroupInformation(session);
+        // this does not clean up any UGIs because our ugi is still in use.
+        assertEquals(ugi3, ugi2);
         verify(provider, times(1)).createProxyUGI("the-user");
         verify(provider, never()).destroy(any(UserGroupInformation.class));
     }
 
     @Test
     public void releaseAndAcquireAfterTimeoutFreesResources() throws Exception {
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
 
-        cache.release(proxyUGI1, false);
-        proxyUGI1.setExpired();
+        cache.release(session, false);
+        fakeTicker.advanceTime(20 * MINUTES);
         verify(provider, never()).destroy(any(UserGroupInformation.class));
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(session);
-        verify(provider).destroy(proxyUGI1.getUGI());
-        assertNotEquals(proxyUGI2, proxyUGI1);
-        assertNotEquals(proxyUGI2.getUGI(), proxyUGI1.getUGI());
-        verify(provider, never()).destroy(proxyUGI2.getUGI());
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
+        verify(provider).destroy(ugi1);
+        assertNotEquals(ugi2, ugi1);
+        verify(provider, never()).destroy(ugi2);
         // this does not clean up any UGIs because our proxyUGI is still in use.
-        assertNotEquals(proxyUGI2, proxyUGI1);
         verify(provider, times(2)).createProxyUGI("the-user");
     }
 
     @Test
     public void releaseAnExpiredUGIResetsTheTimer() throws Exception {
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
-        proxyUGI1.setExpired();
-        cache.release(proxyUGI1, false);
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(session);
-        assertEquals(proxyUGI2, proxyUGI1);
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
+        fakeTicker.advanceTime(20 * MINUTES);
+        cache.release(session, false);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
+        assertEquals(ugi2, ugi1);
         verify(provider, never()).destroy(any(UserGroupInformation.class));
     }
 
     @Test
     public void releaseDoesNotFreeResourcesIfUGIIsUsedElsewhere() throws Exception {
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(session);
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
 
-        cache.release(proxyUGI1, true);
+        cache.release(session, true);
+        fakeTicker.advanceTime(60 * MINUTES);
         // UGI was not cleaned up because proxyUGI2 is referencing it
-        UGICache.Entry proxyUGI3 = cache.getTimedProxyUGI(session);
-        assertEquals(proxyUGI1, proxyUGI2);
-        assertEquals(proxyUGI1, proxyUGI3);
+        UserGroupInformation ugi3 = cache.getUserGroupInformation(session);
+        assertEquals(ugi1, ugi2);
+        assertEquals(ugi1, ugi3);
         verify(provider, times(1)).createProxyUGI("the-user");
     }
 
     @Test
     public void releasingAllReferencesFreesResources() throws Exception {
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(session);
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
 
-        cache.release(proxyUGI1, true);
-        cache.release(proxyUGI2, true);
+        cache.release(session, true);
+        verify(provider, never()).destroy(any(UserGroupInformation.class));
+        cache.release(session, true);
+        verify(provider, times(1)).destroy(any(UserGroupInformation.class));
+
         // at this point, the initial UGI has been freed. Calling
-        // getTimedProxyUGI again creates a new UGI.
-        UGICache.Entry proxyUGI3 = cache.getTimedProxyUGI(session);
-        assertEquals(proxyUGI1, proxyUGI2);
-        assertNotEquals(proxyUGI1, proxyUGI3);
+        // getUserGroupInformation again creates a new UGI.
+        UserGroupInformation proxyUGI3 = cache.getUserGroupInformation(session);
+        assertEquals(ugi1, ugi2);
+        assertNotEquals(ugi1, proxyUGI3);
         verify(provider, times(2)).createProxyUGI("the-user");
     }
 
     @Test
-    public void releaseAnEntryNotInTheCache() throws Exception {
-        // this could happen if some caller of the cache
-        // retains a reference to a cache entry after releasing it.
-        UGICache.Entry proxyUGI1 = cache.getTimedProxyUGI(session);
+    public void releaseAnEntryNotInTheCache() {
+        // this could happen if some caller of the cache calls release twice.
 
-        cache.release(proxyUGI1, true);
-        cache.release(proxyUGI1, true);
-        UGICache.Entry proxyUGI2 = cache.getTimedProxyUGI(session);
-        assertNotEquals(proxyUGI1, proxyUGI2);
-        verify(provider, times(2)).createProxyUGI("the-user");
+        cache.release(session, false); // does not throw
     }
 }

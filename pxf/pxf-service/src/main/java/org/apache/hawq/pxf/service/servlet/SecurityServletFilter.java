@@ -70,9 +70,9 @@ public class SecurityServletFilter implements Filter {
      * and create a proxy user to execute further request chain. Responds with an HTTP error if the header is missing
      * or the chain processing throws an exception.
      *
-     * @param request http request
+     * @param request  http request
      * @param response http response
-     * @param chain filter chain
+     * @param chain    filter chain
      */
     @Override
     public void doFilter(final ServletRequest request, final ServletResponse response, final FilterChain chain)
@@ -105,9 +105,9 @@ public class SecurityServletFilter implements Filter {
             };
 
             // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
-            UGICache.Entry timedProxyUGI = cache.getTimedProxyUGI(session);
+            UserGroupInformation ugi = cache.getUserGroupInformation(session);
             try {
-                timedProxyUGI.getUGI().doAs(action);
+                ugi.doAs(action);
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
                 throw new ServletException(ute.getCause());
@@ -116,14 +116,13 @@ public class SecurityServletFilter implements Filter {
             } finally {
                 // Optimization to cleanup the cache if it is the last fragment
                 boolean forceClean = (fragmentIndex != null && fragmentIndex.equals(fragmentCount));
-                cache.release(timedProxyUGI, forceClean);
+                cache.release(session, forceClean);
             }
         } else {
             // no user impersonation is configured
             chain.doFilter(request, response);
         }
     }
-
 
     private Integer getHeaderValueInt(ServletRequest request, String headerKey, boolean required)
             throws IllegalArgumentException {
