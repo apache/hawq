@@ -34,8 +34,8 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.pxf.service.SessionId;
-import org.apache.hawq.pxf.service.UGICacheEntry;
 import org.apache.hawq.pxf.service.UGICache;
 import org.apache.hawq.pxf.service.utilities.SecureLogin;
 
@@ -62,6 +62,7 @@ public class SecurityServletFilter implements Filter {
      */
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
+        //TODO: initialize cache here
     }
 
     /**
@@ -80,13 +81,13 @@ public class SecurityServletFilter implements Filter {
         if (SecureLogin.isUserImpersonationEnabled()) {
 
             // retrieve user header and make sure header is present and is not empty
-            final String user = getHeaderValue(request, USER_HEADER);
+            final String gpdbUser = getHeaderValue(request, USER_HEADER);
             String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER);
             Integer segmentId = getHeaderValueInt(request, SEGMENT_ID_HEADER, true);
             Integer fragmentCount = getHeaderValueInt(request, FRAGMENT_COUNT_HEADER, false);
             Integer fragmentIndex = getHeaderValueInt(request, FRAGMENT_INDEX_HEADER, false);
 
-            SessionId session = new SessionId(segmentId, transactionId, user);
+            SessionId session = new SessionId(segmentId, transactionId, gpdbUser);
             if (LOG.isDebugEnabled() && fragmentCount != null) {
                 LOG.debug(session.toString() + " Fragment = " + fragmentIndex + " of " + fragmentCount);
             }
@@ -97,14 +98,14 @@ public class SecurityServletFilter implements Filter {
             PrivilegedExceptionAction<Boolean> action = new PrivilegedExceptionAction<Boolean>() {
                 @Override
                 public Boolean run() throws IOException, ServletException {
-                    LOG.debug("Performing request chain call for proxy user = " + user);
+                    LOG.debug("Performing request chain call for proxy user = " + gpdbUser);
                     chain.doFilter(request, response);
                     return true;
                 }
             };
 
             // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
-            UGICacheEntry timedProxyUGI = cache.getTimedProxyUGI(session);
+            UGICache.Entry timedProxyUGI = cache.getTimedProxyUGI(session);
             try {
                 timedProxyUGI.getUGI().doAs(action);
             } catch (UndeclaredThrowableException ute) {
@@ -112,8 +113,7 @@ public class SecurityServletFilter implements Filter {
                 throw new ServletException(ute.getCause());
             } catch (InterruptedException ie) {
                 throw new ServletException(ie);
-            }
-            finally {
+            } finally {
                 // Optimization to cleanup the cache if it is the last fragment
                 boolean forceClean = (fragmentIndex != null && fragmentIndex.equals(fragmentCount));
                 cache.release(timedProxyUGI, forceClean);

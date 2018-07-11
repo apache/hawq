@@ -24,13 +24,30 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
 
+/**
+ * Thin wrapper around {@link UserGroupInformation} create and destroy methods. We mock this class
+ * in tests to be able to detect when a UGI is created/destroyed, and to isolate our tests from
+ * creating/destroying real UGI instances.
+ */
 class UGIProvider {
 
+    /**
+     * Wrapper for {@link UserGroupInformation} creation
+     *
+     * @param effectiveUser the name of the user that we want to impersonate
+     * @return a {@link UserGroupInformation} for impersonation.
+     * @throws IOException
+     */
     UserGroupInformation createProxyUGI(String effectiveUser) throws IOException {
         return UserGroupInformation.createProxyUser(
                 effectiveUser, UserGroupInformation.getLoginUser());
     }
 
+    /**
+     * Wrapper for {@link FileSystem}.closeAllForUGI method.
+     * @param ugi the {@link UserGroupInformation} whose filesystem resources we want to free.
+     * @throws IOException
+     */
     void destroy(UserGroupInformation ugi) throws IOException {
         FileSystem.closeAllForUGI(ugi);
     }
