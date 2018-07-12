@@ -35,7 +35,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * Stores UserGroupInformation instances for each active session. The UGIs are cleaned up if they
- * have not been accessed for 15 minutes.
+ * have not been accessed for UGI_CACHE_EXPIRY milliseconds.
  * <p>
  * The motivation for caching is that destroying UGIs is slow. The alternative, creating and
  * destroying a UGI per-request, is wasteful.
@@ -49,7 +49,7 @@ public class UGICache {
     private final Map<Integer, DelayQueue<Entry>> queueMap = new HashMap<>();
     private final UGIProvider ugiProvider;
     private Ticker ticker;
-    private final static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
+    final static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
 
     /**
      * Create a UGICache with the given {@link UGIProvider}. Intended for use by tests which need
@@ -92,7 +92,7 @@ public class UGICache {
 
     /**
      * Decrement reference count for the given session's UGI. Resets the time at which the UGI will
-     * expire to 15 minutes in the future.
+     * expire to UGI_CACHE_EXPIRY milliseconds in the future.
      *
      * @param session                  the session for which we want to release the UGI.
      * @param cleanImmediatelyIfNoRefs if true, destroys the UGI for the given session (only if it is
@@ -102,7 +102,7 @@ public class UGICache {
 
         Entry timedProxyUGI = cache.get(session);
 
-        if (timedProxyUGI == null) return;
+        assert timedProxyUGI != null : "Cannot release UGI for this session; it is not cached: " + session;
 
         timedProxyUGI.resetTime();
         timedProxyUGI.releaseReference();
@@ -170,7 +170,7 @@ public class UGICache {
     private boolean closeUGI(SessionId session, Entry toDelete) {
         // There is no need to synchronize this method because it should be called
         // from within a synchronized block
-        String fsMsg = "FileSystem for proxy user = " + toDelete.getUGI().getUserName();
+        String fsMsg = "FileSystem for proxy user = " + session.getUser();
         try {
             // The UGI object is still being used by another thread
             if (toDelete.isInUse()) {

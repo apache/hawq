@@ -22,11 +22,11 @@ package org.apache.hawq.pxf.service;
 import com.google.common.base.Ticker;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
+import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
@@ -35,6 +35,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -48,7 +49,7 @@ public class UGICacheTest {
     private UGICache cache = null;
     private FakeTicker fakeTicker;
 
-    private static class FakeTicker extends Ticker {
+    static class FakeTicker extends Ticker {
         private final AtomicLong nanos = new AtomicLong();
 
         @Override
@@ -168,7 +169,7 @@ public class UGICacheTest {
         cache.getUserGroupInformation(session);
 
         cache.release(session, true);
-        fakeTicker.advanceTime(15 * MINUTES);
+        fakeTicker.advanceTime(UGICache.UGI_CACHE_EXPIRY);
         cache.release(session, false);
         fakeTicker.advanceTime(10 * MINUTES);
 
@@ -241,11 +242,23 @@ public class UGICacheTest {
         assertNotInCache(session, ugi1);
     }
 
+    @Test(expected = IOException.class)
+    public void errorsThrownByCreatingAUgiAreNotCaught() throws Exception {
+        when(provider.createProxyUGI("the-user")).thenThrow(new IOException("test exception"));
+        cache.getUserGroupInformation(session);
+    }
+
     @Test
+    public void errorsThrownByDestroyingAUgiAreCaught() throws Exception {
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
+        doThrow(new IOException("test exception")).when(provider).destroy(ugi1);
+        cache.release(session, true); // does not throw
+    }
+
+    @Test(expected = AssertionError.class)
     public void releaseAnEntryNotInTheCache() {
         // this could happen if some caller of the cache calls release twice.
-
-        cache.release(session, false); // does not throw
+        cache.release(session, false);
     }
 
     private void assertStillInCache(SessionId session, UserGroupInformation ugi) throws Exception {
