@@ -49,6 +49,7 @@ public class UGICache {
     private final Map<Integer, DelayQueue<Entry>> queueMap = new HashMap<>();
     private final UGIProvider ugiProvider;
     private Ticker ticker;
+    private final static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
 
     /**
      * Create a UGICache with the given {@link UGIProvider}. Intended for use by tests which need
@@ -209,9 +210,8 @@ public class UGICache {
         private volatile long startTime;
         private UserGroupInformation proxyUGI;
         private boolean cleaned = false;
-        private AtomicInteger referenceCount = new AtomicInteger();
+        private final AtomicInteger referenceCount = new AtomicInteger();
         private final Ticker ticker;
-        private static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
 
         /**
          * Creates a new UGICache Entry.
