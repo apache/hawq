@@ -123,5 +123,9 @@ public class UGICacheMultiThreadTest {
 
         assertEquals(threadCount, finishedCount.intValue());
         assertEquals(0, provider.countUgisInUse());
+        // after the test has completed, the internal cache
+        // should be 0
+        assertEquals(0, cache.size());
+        assertEquals(0, cache.allQueuesSize());
     }
 }

@@ -76,11 +76,11 @@ public class UGICache {
         DelayQueue<Entry> delayQueue = getExpirationQueue(segmentId);
         synchronized (delayQueue) {
             // Use the opportunity to cleanup any expired entries
-            cleanup(delayQueue, session);
+            cleanup(delayQueue);
             Entry entry = cache.get(session);
             if (entry == null) {
                 LOG.debug(session.toString() + " Creating proxy user = " + user);
-                entry = new Entry(ticker, ugiProvider.createProxyUGI(user));
+                entry = new Entry(ticker, ugiProvider.createProxyUGI(user), session);
                 delayQueue.offer(entry);
                 cache.put(session, entry);
             }
@@ -111,7 +111,7 @@ public class UGICache {
             entry.decrementRefCount();
             expirationQueue.remove(entry);
             if (cleanImmediatelyIfNoRefs && entry.isNotInUse()) {
-                closeUGI(session, entry);
+                closeUGI(entry);
             } else {
                 // Reset expiration time and put it back in the queue
                 // only when we don't close the UGI
@@ -119,6 +119,35 @@ public class UGICache {
                 expirationQueue.offer(entry);
             }
         }
+    }
+
+    /**
+     * @return the size of the cache
+     */
+    int size() {
+        return cache.size();
+    }
+
+    /**
+     * This method is not thread-safe
+     *
+     * @return the sum of the sizes of the internal queues
+     */
+    int allQueuesSize() {
+        int count = 0;
+        for (DelayQueue queue : expirationQueueMap.values()) {
+            count += queue.size();
+        }
+        return count;
+    }
+
+    /**
+     * @param session
+     * @return determine whether the session is in the internal cache
+     */
+    boolean contains(SessionId session) {
+        DelayQueue<Entry> expirationQueue = getExpirationQueue(session.getSegmentId());
+        return cache.containsKey(session) && expirationQueue.contains(cache.get(session));
     }
 
     /**
@@ -148,25 +177,24 @@ public class UGICache {
      * every non-expired entry.
      *
      * @param expirationQueue
-     * @param session
      */
-    private void cleanup(DelayQueue<Entry> expirationQueue, SessionId session) {
+    private void cleanup(DelayQueue<Entry> expirationQueue) {
 
         Entry expiredUGI;
         while ((expiredUGI = expirationQueue.poll()) != null) {
             if (expiredUGI.isNotInUse()) {
-                closeUGI(session, expiredUGI);
+                closeUGI(expiredUGI);
             } else {
                 // The UGI object is still being used by another thread
-                String fsMsg = "FileSystem for proxy user = " + session.getUser();
-                LOG.debug(session.toString() + " Skipping close of " + fsMsg);
+                String fsMsg = "FileSystem for proxy user = " + expiredUGI.getSession().getUser();
+                LOG.debug(expiredUGI.getSession().toString() + " Skipping close of " + fsMsg);
                 // Place it back in the queue if still in use and was not closed
                 expiredUGI.resetTime();
                 expirationQueue.offer(expiredUGI);
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Delay Queue Size for segment " +
-                        session.getSegmentId() + " = " + expirationQueue.size());
+                        expiredUGI.getSession().getSegmentId() + " = " + expirationQueue.size());
             }
         }
     }
@@ -176,20 +204,24 @@ public class UGICache {
      * session.getSegmentId(). When the reference count is 0, the Entry is removed from the
      * cache where it will then be processed to be destroyed by the UGIProvider.
      *
-     * @param session
      * @param expiredUGI
      * @return true if the UGI entry was cleaned, false when the UGI entry was still in use
      * and cleaning up was skipped
      */
-    private void closeUGI(SessionId session, Entry expiredUGI) {
+    private void closeUGI(Entry expiredUGI) {
         // There is no need to synchronize this method because it should be called
         // from within a synchronized block
+        SessionId session = expiredUGI.getSession();
         String fsMsg = "FileSystem for proxy user = " + session.getUser();
         try {
             // Expired UGI object can be cleaned since it is not used
-            // Remove it from cache, as cache now has an
-            // expired entry which is not in progress
-            cache.remove(session);
+            // Determine if it can be removed from cache also
+            Entry cachedUGI = cache.get(session);
+            if (expiredUGI == cachedUGI) {
+                // Remove it from cache, as cache now has an
+                // expired entry which is not in progress
+                cache.remove(session);
+            }
 
             // Optimization to call close only if it has not been
             // called for that UGI
@@ -213,20 +245,23 @@ public class UGICache {
     private static class Entry implements Delayed {
 
         private volatile long startTime;
-        private UserGroupInformation proxyUGI;
-        private boolean cleaned = false;
+        private final SessionId session;
+        private final UserGroupInformation proxyUGI;
         private final AtomicInteger referenceCount = new AtomicInteger();
         private final Ticker ticker;
+        private boolean cleaned = false;
 
         /**
          * Creates a new UGICache Entry.
          *
          * @param ticker
          * @param proxyUGI
+         * @param session
          */
-        Entry(Ticker ticker, UserGroupInformation proxyUGI) {
+        Entry(Ticker ticker, UserGroupInformation proxyUGI, SessionId session) {
             this.ticker = ticker;
             this.proxyUGI = proxyUGI;
+            this.session = session;
         }
 
         /**
@@ -234,6 +269,14 @@ public class UGICache {
          */
         public UserGroupInformation getUGI() {
             return proxyUGI;
+        }
+
+
+        /**
+         * @return the session associated to the {@link UserGroupInformation}.
+         */
+        public SessionId getSession() {
+            return session;
         }
 
         /**

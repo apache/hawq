@@ -29,10 +29,11 @@ import org.mockito.stubbing.Answer;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static junit.framework.TestCase.assertTrue;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertSame;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -90,6 +91,8 @@ public class UGICacheTest {
         UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
         assertEquals(ugi1, ugi2);
         verify(provider, times(1)).createProxyUGI("the-user");
+        assertEquals(1, cache.size());
+        assertEquals(1, cache.allQueuesSize());
     }
 
     @Test
@@ -99,8 +102,12 @@ public class UGICacheTest {
         UserGroupInformation proxyUGI2 = cache.getUserGroupInformation(otherSession);
         assertNotEquals(proxyUGI1, proxyUGI2);
         verify(provider, times(2)).createProxyUGI("the-user");
-        // TODO: this seems weird. We're creating two UGIs with the same params,
-        // even though we have two different sessions. Why?
+        assertEquals(2, cache.size());
+        assertEquals(2, cache.allQueuesSize());
+        // getting a new UGI instance for each transaction ID is not strictly necessary, but allows
+        // us to expire UGIs for transactions that have finished. If we reused one UGI per user,
+        // it might never get to expire from the cache, and eventually Kerberos might invalidate
+        // the UGI on its end.
     }
 
     @Test
@@ -111,6 +118,7 @@ public class UGICacheTest {
         assertNotEquals(proxyUGI1, proxyUGI2);
         verify(provider, times(1)).createProxyUGI("the-user");
         verify(provider, times(1)).createProxyUGI("different-user");
+        assertEquals(2, cache.size());
     }
 
     @Test
@@ -138,11 +146,16 @@ public class UGICacheTest {
     @Test
     public void ensureCleanUpAfterExpiration() throws Exception {
         UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
-
         fakeTicker.advanceTime(10 * MINUTES);
         cache.release(session, false);
-        fakeTicker.advanceTime(16 * MINUTES);
+        fakeTicker.advanceTime(UGICache.UGI_CACHE_EXPIRY + 1000);
+
+        SessionId session2 = new SessionId(0, "txn-id", "the-user-2");
+        cache.getUserGroupInformation(session2);
         assertNotInCache(session, ugi1);
+        cache.release(session2, true);
+        assertEquals(0, cache.size());
+        assertEquals(0, cache.allQueuesSize());
     }
 
     @Test
@@ -166,7 +179,7 @@ public class UGICacheTest {
         SessionId session2 = new SessionId(0, "txn-id", "the-user-2");
         SessionId session3 = new SessionId(0, "txn-id", "the-user-3");
 
-        cache.getUserGroupInformation(session);
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
         fakeTicker.advanceTime(10 * MINUTES);
         UserGroupInformation ugi2 = cache.getUserGroupInformation(session2);
         cache.release(session2, false);
@@ -175,7 +188,8 @@ public class UGICacheTest {
         fakeTicker.advanceTime(2 * MINUTES);
         cache.getUserGroupInformation(session3);
 
-        verify(provider, times(1)).destroy(ugi2);
+        assertStillInCache(session, ugi1);
+        assertNotInCache(session2, ugi2);
     }
 
     @Test
@@ -194,6 +208,21 @@ public class UGICacheTest {
 
         cache.release(session, true);
         assertNotInCache(session, ugi1);
+    }
+
+    @Test
+    public void releaseWithForceCleanOnlyCleansUGIsForThatSegment() throws Exception {
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
+
+        SessionId session2 = new SessionId(999, "txn-id", "user");
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session2);
+
+        cache.release(session2, false); // ugi2 is now unreferenced
+        cache.release(session, true);
+        assertNotInCache(session, ugi1);
+        assertStillInCache(session2, ugi2);
+        assertEquals(1, cache.size());
+        assertEquals(1, cache.allQueuesSize());
     }
 
     @Test
@@ -220,6 +249,7 @@ public class UGICacheTest {
         assertEquals(ugi3, ugi2);
         verify(provider, times(1)).createProxyUGI("the-user");
         verify(provider, never()).destroy(any(UserGroupInformation.class));
+        assertStillInCache(session, ugi2);
     }
 
     @Test
@@ -228,11 +258,11 @@ public class UGICacheTest {
 
         cache.release(session, false);
         fakeTicker.advanceTime(20 * MINUTES);
-        verify(provider, never()).destroy(any(UserGroupInformation.class));
+        assertStillInCache(session, ugi1);
         UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
         verify(provider).destroy(ugi1);
         assertNotEquals(ugi2, ugi1);
-        verify(provider, never()).destroy(ugi2);
+        assertStillInCache(session, ugi2);
         // this does not clean up any UGIs because our proxyUGI is still in use.
         verify(provider, times(2)).createProxyUGI("the-user");
     }
@@ -242,16 +272,19 @@ public class UGICacheTest {
         UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
         fakeTicker.advanceTime(20 * MINUTES);
         cache.release(session, false);
-        UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
-        assertEquals(ugi2, ugi1);
-        verify(provider, never()).destroy(any(UserGroupInformation.class));
-        // TODO: can we assert that the timer was reset
+
+        assertStillInCache(session, ugi1);
+
+        fakeTicker.advanceTime(14 * MINUTES);
+        SessionId session2 = new SessionId(0, "txn-id", "the-user-2");
+        cache.getUserGroupInformation(session2); // triggers cleanup
+        assertStillInCache(session, ugi1);
     }
 
     @Test
     public void releaseDoesNotFreeResourcesIfUGIIsUsedElsewhere() throws Exception {
         UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
-        cache.getUserGroupInformation(session);
+        cache.getUserGroupInformation(session); // increments ref count to 2
 
         cache.release(session, true);
         fakeTicker.advanceTime(60 * MINUTES);
@@ -267,12 +300,9 @@ public class UGICacheTest {
         assertEquals(ugi1, ugi2);
 
         cache.release(session, true);
-        verify(provider, never()).destroy(any(UserGroupInformation.class));
+        assertStillInCache(session, ugi1);
         cache.release(session, true);
-        verify(provider, times(1)).destroy(any(UserGroupInformation.class));
-
-        // at this point, the initial UGI has been freed. Calling
-        // getUserGroupInformation again creates a new UGI.
+        // at this point, the initial UGI has been freed.
         assertNotInCache(session, ugi1);
     }
 
@@ -296,16 +326,12 @@ public class UGICacheTest {
     }
 
     private void assertStillInCache(SessionId session, UserGroupInformation ugi) throws Exception {
-        UserGroupInformation fromCache = cache.getUserGroupInformation(session);
-        assertSame(ugi, fromCache);
-        cache.release(session, false);
+        assertTrue(cache.contains(session));
         verify(provider, never()).destroy(ugi);
     }
 
     private void assertNotInCache(SessionId session, UserGroupInformation ugi) throws Exception {
-        UserGroupInformation fromCache = cache.getUserGroupInformation(session);
-        assertNotSame(ugi, fromCache);
-        cache.release(session, false);
+        assertFalse(cache.contains(session));
         verify(provider, times(1)).destroy(ugi);
     }
 }
