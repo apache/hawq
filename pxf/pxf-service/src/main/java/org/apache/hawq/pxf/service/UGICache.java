@@ -79,7 +79,9 @@ public class UGICache {
             cleanup(delayQueue);
             Entry entry = cache.get(session);
             if (entry == null) {
-                LOG.debug(session.toString() + " Creating proxy user = " + user);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(session + " Creating proxy user = " + user);
+                }
                 entry = new Entry(ticker, ugiProvider.createProxyUGI(user), session);
                 delayQueue.offer(entry);
                 cache.put(session, entry);
@@ -129,7 +131,7 @@ public class UGICache {
     }
 
     /**
-     * This method is not thread-safe
+     * This method is not thread-safe, and is intended to be called in tests.
      *
      * @return the sum of the sizes of the internal queues
      */
@@ -142,12 +144,17 @@ public class UGICache {
     }
 
     /**
+     * This method is O(n) in the number of cache entries and should only be called in tests.
+     *
      * @param session
      * @return determine whether the session is in the internal cache
      */
     boolean contains(SessionId session) {
         DelayQueue<Entry> expirationQueue = getExpirationQueue(session.getSegmentId());
-        return cache.containsKey(session) && expirationQueue.contains(cache.get(session));
+        synchronized (expirationQueue) {
+            Entry entry = cache.get(session);
+            return entry != null && expirationQueue.contains(entry);
+        }
     }
 
     /**
@@ -187,7 +194,9 @@ public class UGICache {
             } else {
                 // The UGI object is still being used by another thread
                 String fsMsg = "FileSystem for proxy user = " + expiredUGI.getSession().getUser();
-                LOG.debug(expiredUGI.getSession().toString() + " Skipping close of " + fsMsg);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(expiredUGI.getSession().toString() + " Skipping close of " + fsMsg);
+                }
                 // Place it back in the queue if still in use and was not closed
                 expiredUGI.resetTime();
                 expirationQueue.offer(expiredUGI);
