@@ -44,9 +44,8 @@ public class UGICache {
 
     private static final Log LOG = LogFactory.getLog(UGICache.class);
     private Map<SessionId, Entry> cache = new ConcurrentHashMap<>();
-    @SuppressWarnings("unchecked")
     // There is a separate DelayQueue for each segment (also being used for locking)
-    private final Map<Integer, DelayQueue<Entry>> queueMap = new HashMap<>();
+    private final Map<Integer, DelayQueue<Entry>> expirationQueueMap = new HashMap<>();
     private final UGIProvider ugiProvider;
     private Ticker ticker;
     final static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
@@ -80,12 +79,12 @@ public class UGICache {
             cleanup(session);
             Entry entry = cache.get(session);
             if (entry == null) {
-                LOG.info(session.toString() + " Creating proxy user = " + user);
+                LOG.debug(session.toString() + " Creating proxy user = " + user);
                 entry = new Entry(ticker, ugiProvider.createProxyUGI(user));
                 delayQueue.offer(entry);
                 cache.put(session, entry);
             }
-            entry.acquireReference();
+            entry.incrementRefCount();
             return entry.getUGI();
         }
     }
@@ -100,35 +99,40 @@ public class UGICache {
      */
     public void release(SessionId session, boolean cleanImmediatelyIfNoRefs) {
 
-        Entry timedProxyUGI = cache.get(session);
+        Entry entry = cache.get(session);
 
-        assert timedProxyUGI != null : "Cannot release UGI for this session; it is not cached: " + session;
+        if (entry == null) {
+            throw new IllegalStateException("Cannot release UGI for this session; it is not cached: " + session);
+        }
 
-        timedProxyUGI.resetTime();
-        timedProxyUGI.releaseReference();
-        if (cleanImmediatelyIfNoRefs) {
-            synchronized (getExpirationQueue(session.getSegmentId())) {
-                timedProxyUGI.setExpired();
-                closeUGI(session, timedProxyUGI);
+        DelayQueue<Entry> expirationQueue = getExpirationQueue(session.getSegmentId());
+
+        synchronized (expirationQueue) {
+            expirationQueue.remove(entry);
+            entry.resetTime();
+            expirationQueue.offer(entry);
+            entry.decrementRefCount();
+            if (cleanImmediatelyIfNoRefs && entry.isNotInUse()) {
+                closeUGI(session, entry);
             }
         }
     }
 
     /**
      * Get the queue of cache entries associated with a segment, creating it if it doesn't
-     * yet exist. This lets us lazily populate the queueMap.
+     * yet exist. This lets us lazily populate the expirationQueueMap.
      *
      * @param segmentId
      * @return the {@link DelayQueue} associated to the segment.
      */
     private DelayQueue<Entry> getExpirationQueue(Integer segmentId) {
-        DelayQueue<Entry> queue = queueMap.get(segmentId);
+        DelayQueue<Entry> queue = expirationQueueMap.get(segmentId);
         if (queue == null) {
-            synchronized (queueMap) {
-                queue = queueMap.get(segmentId);
+            synchronized (expirationQueueMap) {
+                queue = expirationQueueMap.get(segmentId);
                 if (queue == null) {
                     queue = new DelayQueue<>();
-                    queueMap.put(segmentId, queue);
+                    expirationQueueMap.put(segmentId, queue);
                 }
             }
         }
@@ -144,16 +148,21 @@ public class UGICache {
      */
     private void cleanup(SessionId session) {
 
-        Entry ugi;
-        DelayQueue<Entry> delayQueue = getExpirationQueue(session.getSegmentId());
-        while ((ugi = delayQueue.poll()) != null) {
-            // Place it back in the queue if still in use and was not closed
-            if (!closeUGI(session, ugi)) {
-                ugi.resetTime();
-                delayQueue.offer(ugi);
+        Entry expiredUgi;
+        DelayQueue<Entry> expirationQueue = getExpirationQueue(session.getSegmentId());
+        while ((expiredUgi = expirationQueue.poll()) != null) {
+            if (expiredUgi.isNotInUse()) {
+                closeUGI(session, expiredUgi);
+            } else {
+                // The UGI object is still being used by another thread
+                String fsMsg = "FileSystem for proxy user = " + session.getUser();
+                LOG.debug(session.toString() + " Skipping close of " + fsMsg);
+                // Place it back in the queue if still in use and was not closed
+                expiredUgi.resetTime();
+                expirationQueue.offer(expiredUgi);
             }
             LOG.debug("Delay Queue Size for segment " +
-                    session.getSegmentId() + " = " + delayQueue.size());
+                    session.getSegmentId() + " = " + expirationQueue.size());
         }
     }
 
@@ -167,30 +176,20 @@ public class UGICache {
      * @return true if the UGI entry was cleaned, false when the UGI entry was still in use
      * and cleaning up was skipped
      */
-    private boolean closeUGI(SessionId session, Entry toDelete) {
+    private void closeUGI(SessionId session, Entry toDelete) {
         // There is no need to synchronize this method because it should be called
         // from within a synchronized block
         String fsMsg = "FileSystem for proxy user = " + session.getUser();
         try {
-            // The UGI object is still being used by another thread
-            if (toDelete.isInUse()) {
-                LOG.info(session.toString() + " Skipping close of " + fsMsg);
-                return false;
-            }
-
             // Expired UGI object can be cleaned since it is not used
-            // Determine if it can be removed from cache also
-            Entry cachedUGI = cache.get(session);
-            if (toDelete == cachedUGI) {
-                // Remove it from cache, as cache now has an
-                // expired entry which is not in progress
-                cache.remove(session);
-            }
+            // Remove it from cache, as cache now has an
+            // expired entry which is not in progress
+            cache.remove(session);
 
             // Optimization to call close only if it has not been
             // called for that UGI
             if (!toDelete.isCleaned()) {
-                LOG.info(session.toString() + " Closing " + fsMsg +
+                LOG.debug(session.toString() + " Closing " + fsMsg +
                         " (Cache Size = " + cache.size() + ")");
                 ugiProvider.destroy(toDelete.getUGI());
                 toDelete.setCleaned();
@@ -199,7 +198,6 @@ public class UGICache {
         } catch (Throwable t) {
             LOG.warn(session.toString() + " Error closing " + fsMsg, t);
         }
-        return true;
     }
 
     /**
@@ -248,23 +246,25 @@ public class UGICache {
         /**
          * @return true if the UGI is being referenced by a session, false otherwise
          */
-        private boolean isInUse() {
-            return referenceCount.get() > 0;
+        private boolean isNotInUse() {
+            return referenceCount.get() <= 0;
         }
 
         /**
          * Increments the number of references accessing the {@link UserGroupInformation}.
          */
-        void acquireReference() {
+        void incrementRefCount() {
             referenceCount.incrementAndGet();
         }
 
         /**
          * Decrements the number of references accessing the {@link UserGroupInformation}.
          */
-        void releaseReference() {
+        void decrementRefCount() {
             int count = referenceCount.decrementAndGet();
-            assert count >= 0;
+            if (count < 0) {
+                throw new IllegalStateException("UGICache.Entry referenceCount may not be decremented past 0.");
+            }
         }
 
         /**
@@ -272,13 +272,6 @@ public class UGICache {
          */
         void resetTime() {
             startTime = currentTimeMillis();
-        }
-
-        /**
-         * Expire the UGICache Entry
-         */
-        void setExpired() {
-            startTime = -1L;
         }
 
         /**
@@ -297,6 +290,8 @@ public class UGICache {
          */
         @Override
         public int compareTo(Delayed other) {
+            if (!(other instanceof Entry)) return 1;
+
             Entry that = (Entry) other;
             return Long.compare(this.getDelayMillis(), that.getDelayMillis());
         }

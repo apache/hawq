@@ -146,6 +146,39 @@ public class UGICacheTest {
     }
 
     @Test
+    public void anUnusedUGIIsFreedAfterDelayWhenAnotherUGIForTheSameSegmentIsAccessed() throws Exception {
+        SessionId session2 = new SessionId(0, "txn-id", "the-user-2");
+        UserGroupInformation notInUse = cache.getUserGroupInformation(session);
+        fakeTicker.advanceTime(UGICache.UGI_CACHE_EXPIRY + 1000);
+
+        // at this point, notInUse is expired but still in use
+        cache.getUserGroupInformation(session2);
+        cache.release(session, false);
+        fakeTicker.advanceTime(UGICache.UGI_CACHE_EXPIRY + 1000);
+
+        cache.getUserGroupInformation(session2);
+
+        verify(provider, times(1)).destroy(notInUse);
+    }
+
+    @Test
+    public void putsItemsBackInTheQueueWhenResettingExpirationDate() throws Exception {
+        SessionId session2 = new SessionId(0, "txn-id", "the-user-2");
+        SessionId session3 = new SessionId(0, "txn-id", "the-user-3");
+
+        cache.getUserGroupInformation(session);
+        fakeTicker.advanceTime(10 * MINUTES);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session2);
+        cache.release(session2, false);
+        fakeTicker.advanceTime(14 * MINUTES);
+        cache.release(session, false);
+        fakeTicker.advanceTime(2 * MINUTES);
+        cache.getUserGroupInformation(session3);
+
+        verify(provider, times(1)).destroy(ugi2);
+    }
+
+    @Test
     public void releaseWithoutForceClean() throws Exception {
         UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
 
@@ -255,7 +288,7 @@ public class UGICacheTest {
         cache.release(session, true); // does not throw
     }
 
-    @Test(expected = AssertionError.class)
+    @Test(expected = IllegalStateException.class)
     public void releaseAnEntryNotInTheCache() {
         // this could happen if some caller of the cache calls release twice.
         cache.release(session, false);

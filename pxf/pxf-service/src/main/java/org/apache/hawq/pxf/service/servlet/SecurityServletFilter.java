@@ -53,7 +53,7 @@ public class SecurityServletFilter implements Filter {
     private static final String FRAGMENT_COUNT_HEADER = "X-GP-FRAGMENT-COUNT";
     private static final String MISSING_HEADER_ERROR = "Header %s is missing in the request";
     private static final String EMPTY_HEADER_ERROR = "Header %s is empty in the request";
-    private static final UGICache cache = new UGICache();
+    private static UGICache proxyUGICache;
 
     /**
      * Initializes the filter.
@@ -62,7 +62,7 @@ public class SecurityServletFilter implements Filter {
      */
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
-        //TODO: initialize cache here
+        proxyUGICache = new UGICache();
     }
 
     /**
@@ -105,9 +105,9 @@ public class SecurityServletFilter implements Filter {
             };
 
             // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
-            UserGroupInformation ugi = cache.getUserGroupInformation(session);
+            UserGroupInformation proxyUGI = proxyUGICache.getUserGroupInformation(session);
             try {
-                ugi.doAs(action);
+                proxyUGI.doAs(action);
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
                 throw new ServletException(ute.getCause());
@@ -115,8 +115,13 @@ public class SecurityServletFilter implements Filter {
                 throw new ServletException(ie);
             } finally {
                 // Optimization to cleanup the cache if it is the last fragment
-                boolean forceClean = (fragmentIndex != null && fragmentIndex.equals(fragmentCount));
-                cache.release(session, forceClean);
+                boolean cleanImmediately = (fragmentIndex != null && fragmentIndex.equals(fragmentCount));
+                try {
+                    proxyUGICache.release(session, cleanImmediately);
+                } catch (Throwable t) {
+                    LOG.error("Error releasing UGICache for session: " + session, t);
+                }
+
             }
         } else {
             // no user impersonation is configured

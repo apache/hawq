@@ -19,8 +19,6 @@ package org.apache.hawq.pxf.service;
  * under the License.
  */
 
-import org.apache.commons.lang3.builder.EqualsBuilder;
-
 /**
  * For the purposes of pxf-server, a session is the set of requests processed on a specific segment
  * on behalf of a particular user and transaction. Grouping requests together into a session allows
@@ -80,9 +78,7 @@ public class SessionId {
         if (obj.getClass() != getClass()) return false;
 
         SessionId that = (SessionId) obj;
-        return new EqualsBuilder()
-                .append(sessionId, that.sessionId)
-                .isEquals();
+        return this.sessionId.equals(that.sessionId);
     }
 
     /**
