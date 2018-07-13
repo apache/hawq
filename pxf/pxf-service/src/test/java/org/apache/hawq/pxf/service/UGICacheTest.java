@@ -245,6 +245,7 @@ public class UGICacheTest {
         UserGroupInformation ugi2 = cache.getUserGroupInformation(session);
         assertEquals(ugi2, ugi1);
         verify(provider, never()).destroy(any(UserGroupInformation.class));
+        // TODO: can we assert that the timer was reset
     }
 
     @Test

@@ -19,7 +19,6 @@ package org.apache.hawq.pxf.service.servlet;
  * under the License.
  */
 
-
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedExceptionAction;
@@ -34,11 +33,9 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.pxf.service.SessionId;
 import org.apache.hawq.pxf.service.UGICache;
 import org.apache.hawq.pxf.service.utilities.SecureLogin;
-
 
 /**
  * Listener on lifecycle events of our webapp
@@ -61,7 +58,7 @@ public class SecurityServletFilter implements Filter {
      * @param filterConfig filter configuration
      */
     @Override
-    public void init(FilterConfig filterConfig) throws ServletException {
+    public void init(FilterConfig filterConfig) {
         proxyUGICache = new UGICache();
     }
 
@@ -104,10 +101,13 @@ public class SecurityServletFilter implements Filter {
                 }
             };
 
-            // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
-            UserGroupInformation proxyUGI = proxyUGICache.getUserGroupInformation(session);
+            LOG.debug("Creating proxy user for session: " + session);
             try {
-                proxyUGI.doAs(action);
+                // create proxy user UGI from the UGI of the logged in user
+                // and execute the servlet chain as that user
+                proxyUGICache
+                        .getUserGroupInformation(session)
+                        .doAs(action);
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
                 throw new ServletException(ute.getCause());
@@ -116,12 +116,12 @@ public class SecurityServletFilter implements Filter {
             } finally {
                 // Optimization to cleanup the cache if it is the last fragment
                 boolean cleanImmediately = (fragmentIndex != null && fragmentIndex.equals(fragmentCount));
+                LOG.debug("Releasing proxy user for session: " + session);
                 try {
                     proxyUGICache.release(session, cleanImmediately);
                 } catch (Throwable t) {
                     LOG.error("Error releasing UGICache for session: " + session, t);
                 }
-
             }
         } else {
             // no user impersonation is configured

@@ -36,9 +36,9 @@ public class SessionId {
     /**
      * Create a sessionId
      *
-     * @param segmentId
-     * @param transactionId
-     * @param gpdbUser
+     * @param segmentId     the calling segment
+     * @param transactionId the identifier for the transaction
+     * @param gpdbUser      the GPDB username
      */
     public SessionId(Integer segmentId, String transactionId, String gpdbUser) {
         this.segmentId = segmentId;

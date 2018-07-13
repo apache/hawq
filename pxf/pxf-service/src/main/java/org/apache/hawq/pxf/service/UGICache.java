@@ -43,11 +43,11 @@ import org.apache.hadoop.security.UserGroupInformation;
 public class UGICache {
 
     private static final Log LOG = LogFactory.getLog(UGICache.class);
-    private Map<SessionId, Entry> cache = new ConcurrentHashMap<>();
+    private final Map<SessionId, Entry> cache = new ConcurrentHashMap<>();
     // There is a separate DelayQueue for each segment (also being used for locking)
     private final Map<Integer, DelayQueue<Entry>> expirationQueueMap = new HashMap<>();
     private final UGIProvider ugiProvider;
-    private Ticker ticker;
+    private final Ticker ticker;
     final static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
 
     /**
@@ -76,7 +76,7 @@ public class UGICache {
         DelayQueue<Entry> delayQueue = getExpirationQueue(segmentId);
         synchronized (delayQueue) {
             // Use the opportunity to cleanup any expired entries
-            cleanup(session);
+            cleanup(delayQueue, session);
             Entry entry = cache.get(session);
             if (entry == null) {
                 LOG.debug(session.toString() + " Creating proxy user = " + user);
@@ -108,12 +108,15 @@ public class UGICache {
         DelayQueue<Entry> expirationQueue = getExpirationQueue(session.getSegmentId());
 
         synchronized (expirationQueue) {
-            expirationQueue.remove(entry);
-            entry.resetTime();
-            expirationQueue.offer(entry);
             entry.decrementRefCount();
+            expirationQueue.remove(entry);
             if (cleanImmediatelyIfNoRefs && entry.isNotInUse()) {
                 closeUGI(session, entry);
+            } else {
+                // Reset expiration time and put it back in the queue
+                // only when we don't close the UGI
+                entry.resetTime();
+                expirationQueue.offer(entry);
             }
         }
     }
@@ -140,29 +143,31 @@ public class UGICache {
     }
 
     /**
-     * Iterate through all the entries in the queue for the given session's segment
-     * and close expired {@link UserGroupInformation}, otherwise it resets
-     * the timer for every non-expired entry.
+     * Iterate through all the entries in the queue and close expired
+     * {@link UserGroupInformation}, otherwise it resets the timer for
+     * every non-expired entry.
      *
+     * @param expirationQueue
      * @param session
      */
-    private void cleanup(SessionId session) {
+    private void cleanup(DelayQueue<Entry> expirationQueue, SessionId session) {
 
-        Entry expiredUgi;
-        DelayQueue<Entry> expirationQueue = getExpirationQueue(session.getSegmentId());
-        while ((expiredUgi = expirationQueue.poll()) != null) {
-            if (expiredUgi.isNotInUse()) {
-                closeUGI(session, expiredUgi);
+        Entry expiredUGI;
+        while ((expiredUGI = expirationQueue.poll()) != null) {
+            if (expiredUGI.isNotInUse()) {
+                closeUGI(session, expiredUGI);
             } else {
                 // The UGI object is still being used by another thread
                 String fsMsg = "FileSystem for proxy user = " + session.getUser();
                 LOG.debug(session.toString() + " Skipping close of " + fsMsg);
                 // Place it back in the queue if still in use and was not closed
-                expiredUgi.resetTime();
-                expirationQueue.offer(expiredUgi);
+                expiredUGI.resetTime();
+                expirationQueue.offer(expiredUGI);
             }
-            LOG.debug("Delay Queue Size for segment " +
-                    session.getSegmentId() + " = " + expirationQueue.size());
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Delay Queue Size for segment " +
+                        session.getSegmentId() + " = " + expirationQueue.size());
+            }
         }
     }
 
@@ -172,11 +177,11 @@ public class UGICache {
      * cache where it will then be processed to be destroyed by the UGIProvider.
      *
      * @param session
-     * @param toDelete
+     * @param expiredUGI
      * @return true if the UGI entry was cleaned, false when the UGI entry was still in use
      * and cleaning up was skipped
      */
-    private void closeUGI(SessionId session, Entry toDelete) {
+    private void closeUGI(SessionId session, Entry expiredUGI) {
         // There is no need to synchronize this method because it should be called
         // from within a synchronized block
         String fsMsg = "FileSystem for proxy user = " + session.getUser();
@@ -188,11 +193,13 @@ public class UGICache {
 
             // Optimization to call close only if it has not been
             // called for that UGI
-            if (!toDelete.isCleaned()) {
-                LOG.debug(session.toString() + " Closing " + fsMsg +
-                        " (Cache Size = " + cache.size() + ")");
-                ugiProvider.destroy(toDelete.getUGI());
-                toDelete.setCleaned();
+            if (!expiredUGI.isCleaned()) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(session.toString() + " Closing " + fsMsg +
+                            " (Cache Size = " + cache.size() + ")");
+                }
+                ugiProvider.destroy(expiredUGI.getUGI());
+                expiredUGI.setCleaned();
             }
 
         } catch (Throwable t) {
