@@ -95,13 +95,17 @@ public class SecurityServletFilter implements Filter {
             PrivilegedExceptionAction<Boolean> action = new PrivilegedExceptionAction<Boolean>() {
                 @Override
                 public Boolean run() throws IOException, ServletException {
-                    LOG.debug("Performing request chain call for proxy user = " + gpdbUser);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Performing request chain call for proxy user = " + gpdbUser);
+                    }
                     chain.doFilter(request, response);
                     return true;
                 }
             };
 
-            LOG.debug("Creating proxy user for session: " + session);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Creating proxy user for session: " + session);
+            }
             try {
                 // create proxy user UGI from the UGI of the logged in user
                 // and execute the servlet chain as that user
@@ -116,7 +120,9 @@ public class SecurityServletFilter implements Filter {
             } finally {
                 // Optimization to cleanup the cache if it is the last fragment
                 boolean cleanImmediately = (fragmentIndex != null && fragmentIndex.equals(fragmentCount));
-                LOG.debug("Releasing proxy user for session: " + session);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Releasing proxy user for session: " + session);
+                }
                 try {
                     proxyUGICache.release(session, cleanImmediately);
                 } catch (Throwable t) {
