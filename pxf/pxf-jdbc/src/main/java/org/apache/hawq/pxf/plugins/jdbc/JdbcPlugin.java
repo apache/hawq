@@ -99,6 +99,17 @@ public class JdbcPlugin extends Plugin {
                 throw new UserDataException("BATCH_SIZE is incorrect: must be an integer");
             }
         }
+
+        // This parameter is not required. The default value is 1
+        String poolSizeRaw = input.getUserProperty("POOL_SIZE");
+        if (poolSizeRaw != null) {
+            try {
+                poolSize = Integer.parseInt(poolSizeRaw);
+            }
+            catch (NumberFormatException e) {
+                throw new UserDataException("POOL_SIZE is incorrect: must be an integer");
+            }
+        }
     }
 
 
@@ -110,53 +121,57 @@ public class JdbcPlugin extends Plugin {
     protected String tableName = null;
 
     // JDBC connection object
-    protected Connection dbConn = null;
+    protected Connection dbCurrentConn = null;
     // Database metadata
     protected DatabaseMetaData dbMeta = null;
     // Batch size for INSERTs into the database
     protected int batchSize = 0;
+    // Thread pool size
+    protected int poolSize = 1;
     // Columns description
     protected ArrayList<ColumnDescriptor> columns = null;
 
     /**
-     * Open a JDBC connection
+     * Open a new JDBC connection. WARNING:
+     * this procedure does not initialize dbCurrentConn
      *
      * @throws ClassNotFoundException if the JDBC driver was not found
      * @throws SQLException if a database access error occurs
      * @throws SQLTimeoutException if a problem with the connection occurs
      */
     protected Connection openConnection() throws ClassNotFoundException, SQLException, SQLTimeoutException {
-        if (dbConn == null || dbConn.isClosed()) {
-            if (LOG.isDebugEnabled()) {
-                if (user != null) {
-                    LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, user=%s, pass=%s, table=%s",
-                        jdbcDriver, dbUrl, user, pass, tableName));
-                }
-                else {
-                    LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, table=%s",
-                        jdbcDriver, dbUrl, tableName));
-                }
-            }
-            Class.forName(jdbcDriver);
+        Connection dbConn;
+        if (LOG.isDebugEnabled()) {
             if (user != null) {
-                dbConn = DriverManager.getConnection(dbUrl, user, pass);
+                LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, user=%s, pass=%s, table=%s",
+                    jdbcDriver, dbUrl, user, pass, tableName));
             }
             else {
-                dbConn = DriverManager.getConnection(dbUrl);
+                LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, table=%s",
+                    jdbcDriver, dbUrl, tableName));
             }
-            dbMeta = dbConn.getMetaData();
         }
+        Class.forName(jdbcDriver);
+        if (user != null) {
+            dbConn = DriverManager.getConnection(dbUrl, user, pass);
+        }
+        else {
+            dbConn = DriverManager.getConnection(dbUrl);
+        }
+        dbMeta = dbConn.getMetaData();
         return dbConn;
     }
 
     /**
      * Close a JDBC connection
      */
-    protected void closeConnection() {
+    protected static void closeConnection(Connection dbConn) {
         try {
-            if (dbConn != null) {
+            if ((dbConn != null) && (!dbConn.isClosed())) {
+                if ((dbConn.getMetaData().supportsTransactions()) && (!dbConn.getAutoCommit())) {
+                    dbConn.commit();
+                }
                 dbConn.close();
-                dbConn = null;
             }
         }
         catch (SQLException e) {

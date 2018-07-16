@@ -29,6 +29,11 @@ import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
 
 import java.util.List;
+import java.util.LinkedList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.io.IOException;
 import java.text.ParseException;
 import java.math.BigDecimal;
@@ -41,6 +46,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
 import java.sql.BatchUpdateException;
+import java.sql.Connection;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -76,10 +82,10 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
             return true;
         }
 
-        super.openConnection();
+        dbCurrentConn = super.openConnection();
 
         queryRead = buildSelectQuery();
-        statementRead = dbConn.createStatement();
+        statementRead = dbCurrentConn.createStatement();
         resultSetRead = statementRead.executeQuery(queryRead);
 
         return true;
@@ -110,7 +116,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
             statementRead.close();
             statementRead = null;
         }
-        super.closeConnection();
+        JdbcPlugin.closeConnection(dbCurrentConn);
     }
 
     /**
@@ -124,17 +130,11 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
      */
     @Override
     public boolean openForWrite() throws SQLException, SQLTimeoutException, ParseException, ClassNotFoundException {
-        if (statementWrite != null && !statementWrite.isClosed()) {
+        if (statementWriteCurrent != null && !statementWriteCurrent.isClosed()) {
             throw new SQLException("The connection to an external database is already open.");
         }
-
-        super.openConnection();
-        if (dbMeta.supportsTransactions()) {
-            dbConn.setAutoCommit(false);
-        }
-
         queryWrite = buildInsertQuery();
-        statementWrite = dbConn.prepareStatement(queryWrite);
+        prepareVariablesForWrite();
 
         if ((batchSize != 0) && (!dbMeta.supportsBatchUpdates())) {
             LOG.warn(
@@ -143,6 +143,19 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
                 "' does not support batch updates. The current request will be handled without batching"
             );
             batchSize = 0;
+        }
+
+        if (poolSize < 1) {
+            // Set the poolSize equal to the number of CPUs available
+            poolSize = Runtime.getRuntime().availableProcessors();
+            LOG.info(
+                "The POOL_SIZE is set to the number of CPUs available (" + Integer.toString(poolSize) + ")"
+            );
+        }
+        // Now the poolSize is >= 1
+        if (poolSize > 1) {
+            executorServiceWrite = Executors.newFixedThreadPool(poolSize);
+            poolTasks = new LinkedList<>();
         }
 
         return true;
@@ -158,10 +171,11 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
      *
      * @throws SQLException if a database access error occurs
      * @throws IOException if the data provided by {@link JdbcResolver} is corrupted
+     * @throws ClassNotFoundException if pooling is used and the JDBC driver was not found
      */
     @Override
     @SuppressWarnings("unchecked")
-    public boolean writeNextObject(OneRow row) throws SQLException, IOException {
+    public boolean writeNextObject(OneRow row) throws SQLException, IOException, ClassNotFoundException {
         // This cast is safe because the data in the row is formed by JdbcPlugin
         List<OneField> tuple = (List<OneField>) row.getData();
 
@@ -174,92 +188,92 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
             switch (DataType.get(field.type)) {
                 case INTEGER:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.INTEGER);
+                        statementWriteCurrent.setNull(i, Types.INTEGER);
                     }
                     else {
-                        statementWrite.setInt(i, (int)field.val);
+                        statementWriteCurrent.setInt(i, (int)field.val);
                     }
                     break;
                 case BIGINT:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.INTEGER);
+                        statementWriteCurrent.setNull(i, Types.INTEGER);
                     }
                     else {
-                        statementWrite.setLong(i, (long)field.val);
+                        statementWriteCurrent.setLong(i, (long)field.val);
                     }
                     break;
                 case SMALLINT:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.INTEGER);
+                        statementWriteCurrent.setNull(i, Types.INTEGER);
                     }
                     else {
-                        statementWrite.setShort(i, (short)field.val);
+                        statementWriteCurrent.setShort(i, (short)field.val);
                     }
                     break;
                 case REAL:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.FLOAT);
+                        statementWriteCurrent.setNull(i, Types.FLOAT);
                     }
                     else {
-                        statementWrite.setFloat(i, (float)field.val);
+                        statementWriteCurrent.setFloat(i, (float)field.val);
                     }
                     break;
                 case FLOAT8:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.DOUBLE);
+                        statementWriteCurrent.setNull(i, Types.DOUBLE);
                     }
                     else {
-                        statementWrite.setDouble(i, (double)field.val);
+                        statementWriteCurrent.setDouble(i, (double)field.val);
                     }
                     break;
                 case BOOLEAN:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.BOOLEAN);
+                        statementWriteCurrent.setNull(i, Types.BOOLEAN);
                     }
                     else {
-                        statementWrite.setBoolean(i, (boolean)field.val);
+                        statementWriteCurrent.setBoolean(i, (boolean)field.val);
                     }
                     break;
                 case NUMERIC:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.NUMERIC);
+                        statementWriteCurrent.setNull(i, Types.NUMERIC);
                     }
                     else {
-                        statementWrite.setBigDecimal(i, (BigDecimal)field.val);
+                        statementWriteCurrent.setBigDecimal(i, (BigDecimal)field.val);
                     }
                     break;
                 case VARCHAR:
                 case BPCHAR:
                 case TEXT:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.VARCHAR);
+                        statementWriteCurrent.setNull(i, Types.VARCHAR);
                     }
                     else {
-                        statementWrite.setString(i, (String)field.val);
+                        statementWriteCurrent.setString(i, (String)field.val);
                     }
                     break;
                 case BYTEA:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.BINARY);
+                        statementWriteCurrent.setNull(i, Types.BINARY);
                     }
                     else {
-                        statementWrite.setBytes(i, (byte[])field.val);
+                        statementWriteCurrent.setBytes(i, (byte[])field.val);
                     }
                     break;
                 case TIMESTAMP:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.TIMESTAMP);
+                        statementWriteCurrent.setNull(i, Types.TIMESTAMP);
                     }
                     else {
-                        statementWrite.setTimestamp(i, (Timestamp)field.val);
+                        statementWriteCurrent.setTimestamp(i, (Timestamp)field.val);
                     }
                     break;
                 case DATE:
                     if (field.val == null) {
-                        statementWrite.setNull(i, Types.DATE);
+                        statementWriteCurrent.setNull(i, Types.DATE);
                     }
                     else {
-                        statementWrite.setDate(i, (Date)field.val);
+                        statementWriteCurrent.setDate(i, (Date)field.val);
                     }
                     break;
                 default:
@@ -267,26 +281,30 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
             }
         }
 
-        boolean rollbackRequired = false;
         SQLException rollbackException = null;
         if (batchSize < 0) {
             // Batch has an infinite size
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Trying to add a tuple to the batch (batch size is infinite)");
             }
-            statementWrite.addBatch();
+            try {
+                statementWriteCurrent.addBatch();
+            }
+            catch (SQLException e) {
+                rollbackException = e;
+            }
         }
         else if ((batchSize == 0) || (batchSize == 1)) {
             // Batching is not used
-            try {
-                rollbackRequired = (statementWrite.executeUpdate() != 1);
-                if (rollbackRequired) {
-                    rollbackException = new SQLException("The number of rows affected by INSERT query is incorrect");
-                }
+            StatementCallable statementCallable = new StatementCallable(false, statementWriteCurrent);
+            // Check whether pooling is used and act accordingly
+            if (poolSize == 1) {
+                rollbackException = statementCallable.call();
             }
-            catch (SQLException e) {
-                rollbackRequired = true;
-                rollbackException = e;
+            else {
+                statementCallable.setSelfDestructible();
+                poolTasks.add(executorServiceWrite.submit(statementCallable));
+                prepareVariablesForWrite();
             }
         }
         else {
@@ -296,25 +314,27 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
                     "Trying to add a tuple to the batch (batch size is now " + Integer.toString(batchSizeCurrent) + ")"
                 );
             }
-            statementWrite.addBatch();
+            statementWriteCurrent.addBatch();
             batchSizeCurrent += 1;
             if (batchSizeCurrent >= batchSize) {
                 batchSizeCurrent = 0;
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Trying to execute and clear the batch (batch size is now equal to the required one)");
+                    LOG.debug("Trying to execute the batch (batch size is now equal to the required one)");
                 }
-                try {
-                    statementWrite.executeBatch();
-                    statementWrite.clearBatch();
+                StatementCallable statementCallable = new StatementCallable(true, statementWriteCurrent);
+                // Check if pooling is used and act accordingly
+                if (poolSize == 1) {
+                    rollbackException = statementCallable.call();
                 }
-                catch (SQLException e) {
-                    rollbackRequired = true;
-                    rollbackException = e;
+                else {
+                    statementCallable.setSelfDestructible();
+                    poolTasks.add(executorServiceWrite.submit(statementCallable));
+                    prepareVariablesForWrite();
                 }
             }
         }
 
-        if (rollbackRequired) {
+        if (rollbackException != null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Rollback is now required");
             }
@@ -329,31 +349,71 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
      * closeForWrite() implementation
      *
      * @throws SQLException if a database access error occurs
+     * @throws Exception if pooling is used and any pool thread encounter runtime problems
      */
     @Override
-    public void closeForWrite() throws SQLException {
-        try {
-            if ((dbConn != null) && (statementWrite != null) && (!statementWrite.isClosed())) {
-                // If batching was used, execute the batch
-                if ((batchSize < 0) || ((batchSize > 1) && (batchSizeCurrent > 0))) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Trying to execute and clear the batch (closeForWrite() was called)");
+    public void closeForWrite() throws Exception {
+        // We make a manual check here because if something is wrong with the statement or the connection, we should not throw an exception; instead, we only throw exception from the first unsuccessful update operation
+        if ((dbCurrentConn != null) && (statementWriteCurrent != null) && (!statementWriteCurrent.isClosed())) {
+            try {
+                // Collect the results of pool threads
+                if (poolSize > 1) {
+                    Exception firstException = null;
+                    for (Future<SQLException> task : poolTasks) {
+                        // We need this construction to ensure that we try to close *all* connections opened by pool threads
+                        try {
+                            SQLException currentSqlException = task.get();
+                            if (currentSqlException != null) {
+                                if (firstException == null) {
+                                    firstException = currentSqlException;
+                                }
+                                LOG.error(
+                                    "A SQLException in a pool thread occured: " + currentSqlException.getClass() + " " + currentSqlException.getMessage()
+                                );
+                            }
+                        }
+                        catch (Exception e) {
+                            // This exception could be caused by connection and statement cleanup problems or by thread execution errors
+                            /*
+                            if (firstException == null) {
+                                firstException = e;
+                            }
+                            */
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug(
+                                    "A runtime exception in a pool thread occured: " + e.getClass() + " " + e.getMessage()
+                                );
+                            }
+                        }
                     }
                     try {
-                        statementWrite.executeBatch();
+                        executorServiceWrite.shutdown();
                     }
-                    catch (SQLException e) {
+                    catch (Exception e) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("executorServiceWrite.shutdown() threw an exception: " + e.getClass().toString());
+                        }
+                    }
+                    if (firstException != null) {
+                        // Rollback is not possible: each pool thread commits its own part of the query
+                        throw firstException;
+                    }
+                }
+                // If batching was used, execute the last batch
+                if ((batchSize < 0) || ((batchSize > 1) && (batchSizeCurrent > 0))) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Trying to execute the batch (closeForWrite() was called)");
+                    }
+                    SQLException e = new StatementCallable(true, statementWriteCurrent).call();
+                    if (e != null) {
                         e = tryRollback(e);
                         throw e;
                     }
                 }
-                if (dbMeta.supportsTransactions()) {
-                    dbConn.commit();
-                }
             }
-        }
-        finally {
-            super.closeConnection();
+            finally {
+                cleanVariablesForWrite(statementWriteCurrent);
+            }
         }
     }
 
@@ -463,7 +523,7 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
 
         // The best case: transactions are supported
         try {
-            dbConn.rollback();
+            dbCurrentConn.rollback();
         }
         catch (SQLException e) {
             // log exception as error, but do not throw it (the actual cause of rollback will be thrown instead)
@@ -472,6 +532,117 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         return rollbackException;
     }
 
+    /**
+     * Open the Connection, set autocommit mode if possible and prepare statement
+     */
+    private void prepareVariablesForWrite() throws SQLException, SQLTimeoutException, ClassNotFoundException {
+        dbCurrentConn = super.openConnection();
+        if (dbMeta.supportsTransactions()) {
+            dbCurrentConn.setAutoCommit(false);
+        }
+        statementWriteCurrent = dbCurrentConn.prepareStatement(queryWrite);
+    }
+
+    /**
+     * Close the given statement and a connection that it uses
+     */
+    private static void cleanVariablesForWrite(PreparedStatement statement) throws SQLException {
+        if ((statement == null) || (statement.isClosed())) {
+            return;
+        }
+        Connection conn = null;
+        try {
+            conn = statement.getConnection();
+        }
+        catch (Exception e) {}
+        statement.close();
+        JdbcPlugin.closeConnection(conn);
+    }
+
+    private static class StatementCallable implements Callable<SQLException> {
+        /**
+         * Wrap a PreparedStatement to implement Callable interface
+         */
+        public StatementCallable(boolean withBatch, PreparedStatement statement) throws SQLException {
+            selfDestructible = false;
+            this.withBatch = withBatch;
+            if ((statement == null) || (statement.isClosed())) {
+                throw new SQLException("The provided statement is null or closed");
+            }
+            this.statement = statement;
+        }
+
+        @Override
+        public SQLException call() throws SQLException {
+            SQLException result;
+            try {
+                if (withBatch) {
+                    result = executeUpdateWithBatch(statement);
+                }
+                else {
+                    result = executeUpdateWithoutBatch(statement);
+                }
+            }
+            finally {
+                if (isSelfDestructible()) {
+                    JdbcAccessor.cleanVariablesForWrite(statement);
+                }
+            }
+            return result;
+        }
+
+        /**
+         * Make this StatementCallable close the connection after execution
+         */
+        public void setSelfDestructible() {
+            selfDestructible = true;
+        }
+
+        /**
+         * Check if this StatementCallable will close its connections automatically after execution
+         */
+        public boolean isSelfDestructible() {
+            return selfDestructible;
+        }
+
+        /**
+         * Execute INSERT query without batching.
+         *
+         * @param statement A PreparedStatement containing the query
+         * @return null or a SQLException that occured during update
+         */
+        private SQLException executeUpdateWithoutBatch(PreparedStatement statement) {
+            try {
+                if (statement.executeUpdate() != 1) {
+                    throw new SQLException("The number of rows affected by INSERT query is incorrect");
+                }
+            }
+            catch (SQLException e) {
+                return e;
+            }
+            return null;
+        }
+
+        /**
+         * Execute INSERT query with batching.
+         *
+         * @param statement A PreparedStatement containing the batch of queries
+         * @return null or a SQLException that occured during update
+         */
+        private SQLException executeUpdateWithBatch(PreparedStatement statement) {
+            try {
+                statement.executeBatch();
+            }
+            catch (SQLException e) {
+                return e;
+            }
+            return null;
+        }
+
+        private final boolean withBatch;
+        private boolean selfDestructible;
+        private PreparedStatement statement;
+    }
 
     private static final Log LOG = LogFactory.getLog(JdbcAccessor.class);
 
@@ -484,6 +655,9 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
 
     // Write variables
     private String queryWrite = null;
-    private PreparedStatement statementWrite = null;
+    private PreparedStatement statementWriteCurrent = null;
     private int batchSizeCurrent = 0;
+
+    private ExecutorService executorServiceWrite = null;
+    private List<Future<SQLException> > poolTasks = null;
 }
