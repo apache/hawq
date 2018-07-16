@@ -111,6 +111,12 @@ public class UGICache {
 
         synchronized (expirationQueue) {
             entry.decrementRefCount();
+            // expirationQueue.remove is an expensive operation.
+            // We envision that the number of elements in these queues
+            // will be at most in the hundreds of elements, which is
+            // why we went ahead with removing elements from the queue.
+            // If the use case changes, we should reconsider making the
+            // call below.
             expirationQueue.remove(entry);
             if (cleanImmediatelyIfNoRefs && entry.isNotInUse()) {
                 closeUGI(entry);
