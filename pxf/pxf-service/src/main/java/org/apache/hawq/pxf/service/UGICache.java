@@ -51,8 +51,8 @@ public class UGICache {
     final static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
 
     /**
-     * Create a UGICache with the given {@link UGIProvider}. Intended for use by tests which need
-     * to substitute a mock UGIProvider.
+     * Create a UGICache with the given {@link Ticker} and {@link UGIProvider}. Intended for use by
+     * tests which need to mock UGI creation/destruction and the current time.
      */
     UGICache(UGIProvider provider, Ticker ticker) {
         this.ticker = ticker;
@@ -68,7 +68,12 @@ public class UGICache {
     }
 
     /**
-     * Create new proxy UGI if not found in cache and increment reference count
+     * If a UGI for the given session exists in the cache, returns it. Otherwise, creates a new
+     * proxy UGI. In either case this method increments the reference count of the UGI. This method
+     * also destroys expired, unreferenced UGIs for the same segmentId as the given session.
+     *
+     * @param session The user from the session is impersonated by the proxy UGI.
+     * @return the proxy UGI for the given session.
      */
     public UserGroupInformation getUserGroupInformation(SessionId session) throws IOException {
         Integer segmentId = session.getSegmentId();
@@ -96,8 +101,8 @@ public class UGICache {
      * expire to UGI_CACHE_EXPIRY milliseconds in the future.
      *
      * @param session                  the session for which we want to release the UGI.
-     * @param cleanImmediatelyIfNoRefs if true, destroys the UGI for the given session (only if it is
-     *                                 now unreferenced).
+     * @param cleanImmediatelyIfNoRefs if true, destroys the UGI for the given session (only if it
+     *                                 is now unreferenced).
      */
     public void release(SessionId session, boolean cleanImmediatelyIfNoRefs) {
 
@@ -164,8 +169,8 @@ public class UGICache {
     }
 
     /**
-     * Get the queue of cache entries associated with a segment, creating it if it doesn't
-     * yet exist. This lets us lazily populate the expirationQueueMap.
+     * Get the queue of cache entries associated with a segment, creating it if it doesn't yet
+     * exist. This lets us lazily populate the expirationQueueMap.
      *
      * @param segmentId
      * @return the {@link DelayQueue} associated to the segment.
@@ -185,9 +190,8 @@ public class UGICache {
     }
 
     /**
-     * Iterate through all the entries in the queue and close expired
-     * {@link UserGroupInformation}, otherwise it resets the timer for
-     * every non-expired entry.
+     * Iterate through all the entries in the queue and close expired {@link UserGroupInformation},
+     * otherwise it resets the timer for every non-expired entry.
      *
      * @param expirationQueue
      */
@@ -216,12 +220,10 @@ public class UGICache {
 
     /**
      * This method must be called from a synchronized block for the delayQueue for the given
-     * session.getSegmentId(). When the reference count is 0, the Entry is removed from the
-     * cache where it will then be processed to be destroyed by the UGIProvider.
+     * session.getSegmentId(). Removes the cachedUGI from the internal cache and then passes it to
+     * {@link UGIProvider} to destroy the UGI.
      *
      * @param expiredUGI
-     * @return true if the UGI entry was cleaned, false when the UGI entry was still in use
-     * and cleaning up was skipped
      */
     private void closeUGI(Entry expiredUGI) {
         // There is no need to synchronize this method because it should be called
@@ -369,7 +371,8 @@ public class UGICache {
         }
 
         /**
-         * @return the current Unix timestamp in milliseconds (equivalent to {@link System}.currentTimeMillis)
+         * @return the current Unix timestamp in milliseconds (equivalent to {@link
+         * System}.currentTimeMillis)
          */
         private long currentTimeMillis() {
             return ticker.read() / 1000;
