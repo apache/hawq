@@ -116,12 +116,6 @@ public class UGICache {
 
         synchronized (expirationQueue) {
             entry.decrementRefCount();
-            // expirationQueue.remove is an expensive operation.
-            // We envision that the number of elements in these queues
-            // will be at most in the hundreds of elements, which is
-            // why we went ahead with removing elements from the queue.
-            // If the use case changes, we should reconsider making the
-            // call below.
             expirationQueue.remove(entry);
             if (cleanImmediatelyIfNoRefs && entry.isNotInUse()) {
                 closeUGI(entry);
@@ -226,30 +220,19 @@ public class UGICache {
      * @param expiredUGI
      */
     private void closeUGI(Entry expiredUGI) {
-        // There is no need to synchronize this method because it should be called
-        // from within a synchronized block
         SessionId session = expiredUGI.getSession();
         String fsMsg = "FileSystem for proxy user = " + session.getUser();
-        try {
-            // Expired UGI object can be cleaned since it is not used
-            // Determine if it can be removed from cache also
-            Entry cachedUGI = cache.get(session);
-            if (expiredUGI == cachedUGI) {
-                // Remove it from cache, as cache now has an
-                // expired entry which is not in progress
-                cache.remove(session);
-            }
 
-            // Optimization to call close only if it has not been
-            // called for that UGI
-            if (!expiredUGI.isCleaned()) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug(session.toString() + " Closing " + fsMsg +
-                            " (Cache Size = " + cache.size() + ")");
-                }
-                ugiProvider.destroy(expiredUGI.getUGI());
-                expiredUGI.setCleaned();
-            }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug(session.toString() + " Closing " + fsMsg +
+                    " (Cache Size = " + cache.size() + ")");
+        }
+
+        try {
+            // Remove it from cache, as cache now has an
+            // expired entry which is not in progress
+            cache.remove(session);
+            ugiProvider.destroy(expiredUGI.getUGI());
 
         } catch (Throwable t) {
             LOG.warn(session.toString() + " Error closing " + fsMsg, t);
@@ -266,7 +249,6 @@ public class UGICache {
         private final UserGroupInformation proxyUGI;
         private final AtomicInteger referenceCount = new AtomicInteger();
         private final Ticker ticker;
-        private boolean cleaned = false;
 
         /**
          * Creates a new UGICache Entry.
@@ -294,20 +276,6 @@ public class UGICache {
          */
         public SessionId getSession() {
             return session;
-        }
-
-        /**
-         * @return true if the setCleaned has been invoked, false otherwise.
-         */
-        boolean isCleaned() {
-            return cleaned;
-        }
-
-        /**
-         * mark that the {@link UserGroupInformation} in this Entry has been destroyed.
-         */
-        void setCleaned() {
-            cleaned = true;
         }
 
         /**

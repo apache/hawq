@@ -34,7 +34,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertSame;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -92,6 +91,14 @@ public class UGICacheTest {
         assertEquals(ugi1, ugi2);
         verify(provider, times(1)).createProxyUGI("the-user");
         assertCacheSize(1);
+    }
+
+    @Test
+    public void getUGIWithEquivalentSessionsReturnsTheSameInstance() throws Exception {
+        SessionId session2 = new SessionId(0, "txn-id", "the-user");
+        UserGroupInformation ugi1 = cache.getUserGroupInformation(session);
+        UserGroupInformation ugi2 = cache.getUserGroupInformation(session2);
+        assertEquals(ugi1, ugi2);
     }
 
     @Test

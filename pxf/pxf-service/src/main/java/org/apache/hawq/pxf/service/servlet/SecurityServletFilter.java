@@ -50,7 +50,7 @@ public class SecurityServletFilter implements Filter {
     private static final String FRAGMENT_COUNT_HEADER = "X-GP-FRAGMENT-COUNT";
     private static final String MISSING_HEADER_ERROR = "Header %s is missing in the request";
     private static final String EMPTY_HEADER_ERROR = "Header %s is empty in the request";
-    private static UGICache proxyUGICache;
+    private UGICache proxyUGICache;
 
     /**
      * Initializes the filter.
@@ -78,8 +78,8 @@ public class SecurityServletFilter implements Filter {
         if (SecureLogin.isUserImpersonationEnabled()) {
 
             // retrieve user header and make sure header is present and is not empty
-            final String gpdbUser = getHeaderValue(request, USER_HEADER);
-            String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER);
+            final String gpdbUser = getHeaderValue(request, USER_HEADER, true);
+            String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER, true);
             Integer segmentId = getHeaderValueInt(request, SEGMENT_ID_HEADER, true);
             Integer fragmentCount = getHeaderValueInt(request, FRAGMENT_COUNT_HEADER, false);
             Integer fragmentIndex = getHeaderValueInt(request, FRAGMENT_INDEX_HEADER, false);
@@ -104,10 +104,10 @@ public class SecurityServletFilter implements Filter {
             };
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Creating proxy user for session: " + session);
+                LOG.debug("Retrieving proxy user for session: " + session);
             }
             try {
-                // create proxy user UGI from the UGI of the logged in user
+                // Retrieve proxy user UGI from the UGI of the logged in user
                 // and execute the servlet chain as that user
                 proxyUGICache
                         .getUserGroupInformation(session)
@@ -135,15 +135,17 @@ public class SecurityServletFilter implements Filter {
         }
     }
 
+    /**
+     * Destroys the filter.
+     */
+    @Override
+    public void destroy() {
+    }
+
     private Integer getHeaderValueInt(ServletRequest request, String headerKey, boolean required)
             throws IllegalArgumentException {
         String value = getHeaderValue(request, headerKey, required);
         return value != null ? Integer.valueOf(value) : null;
-    }
-
-    private String getHeaderValue(ServletRequest request, String headerKey)
-            throws IllegalArgumentException {
-        return getHeaderValue(request, headerKey, true);
     }
 
     private String getHeaderValue(ServletRequest request, String headerKey, boolean required)
@@ -155,13 +157,6 @@ public class SecurityServletFilter implements Filter {
             throw new IllegalArgumentException(String.format(EMPTY_HEADER_ERROR, headerKey));
         }
         return value;
-    }
-
-    /**
-     * Destroys the filter.
-     */
-    @Override
-    public void destroy() {
     }
 
 }
