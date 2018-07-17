@@ -30,11 +30,14 @@ import org.apache.hawq.pxf.api.WriteResolver;
 
 import java.util.List;
 import java.util.LinkedList;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
@@ -223,6 +226,115 @@ public class JdbcResolver extends JdbcPlugin implements ReadResolver, WriteResol
             column_index += 1;
         }
         return new OneRow(new LinkedList<OneField>(record));
+    }
+
+    /**
+     * Decode OneRow object and pass all its contents to a PreparedStatement
+     *
+     * @throws IOException if data in a OneRow is corrupted
+     * @throws SQLException if the given statement is broken
+     */
+    @SuppressWarnings("unchecked")
+    public static void decodeOneRowToPreparedStatement(OneRow row, PreparedStatement statement) throws IOException, SQLException {
+        // This is safe: OneRow comes from JdbcResolver
+        List<OneField> tuple = (List<OneField>)row.getData();
+        for (int i = 1; i <= tuple.size(); i++) {
+            OneField field = tuple.get(i - 1);
+            switch (DataType.get(field.type)) {
+                case INTEGER:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.INTEGER);
+                    }
+                    else {
+                        statement.setInt(i, (int)field.val);
+                    }
+                    break;
+                case BIGINT:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.INTEGER);
+                    }
+                    else {
+                        statement.setLong(i, (long)field.val);
+                    }
+                    break;
+                case SMALLINT:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.INTEGER);
+                    }
+                    else {
+                        statement.setShort(i, (short)field.val);
+                    }
+                    break;
+                case REAL:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.FLOAT);
+                    }
+                    else {
+                        statement.setFloat(i, (float)field.val);
+                    }
+                    break;
+                case FLOAT8:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.DOUBLE);
+                    }
+                    else {
+                        statement.setDouble(i, (double)field.val);
+                    }
+                    break;
+                case BOOLEAN:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.BOOLEAN);
+                    }
+                    else {
+                        statement.setBoolean(i, (boolean)field.val);
+                    }
+                    break;
+                case NUMERIC:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.NUMERIC);
+                    }
+                    else {
+                        statement.setBigDecimal(i, (BigDecimal)field.val);
+                    }
+                    break;
+                case VARCHAR:
+                case BPCHAR:
+                case TEXT:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.VARCHAR);
+                    }
+                    else {
+                        statement.setString(i, (String)field.val);
+                    }
+                    break;
+                case BYTEA:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.BINARY);
+                    }
+                    else {
+                        statement.setBytes(i, (byte[])field.val);
+                    }
+                    break;
+                case TIMESTAMP:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.TIMESTAMP);
+                    }
+                    else {
+                        statement.setTimestamp(i, (Timestamp)field.val);
+                    }
+                    break;
+                case DATE:
+                    if (field.val == null) {
+                        statement.setNull(i, Types.DATE);
+                    }
+                    else {
+                        statement.setDate(i, (Date)field.val);
+                    }
+                    break;
+                default:
+                    throw new IOException("The data tuple from JdbcResolver is corrupted");
+            }
+        }
     }
 
     private static final Log LOG = LogFactory.getLog(JdbcResolver.class);

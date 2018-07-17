@@ -28,10 +28,11 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
+import java.sql.Statement;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -112,35 +113,15 @@ public class JdbcPlugin extends Plugin {
         }
     }
 
-
-    // User-defined JDBC parameters
-    protected String jdbcDriver = null;
-    protected String dbUrl = null;
-    protected String user = null;
-    protected String pass = null;
-    protected String tableName = null;
-
-    // JDBC connection object
-    protected Connection dbCurrentConn = null;
-    // Database metadata
-    protected DatabaseMetaData dbMeta = null;
-    // Batch size for INSERTs into the database
-    protected int batchSize = 0;
-    // Thread pool size
-    protected int poolSize = 1;
-    // Columns description
-    protected ArrayList<ColumnDescriptor> columns = null;
-
     /**
-     * Open a new JDBC connection. WARNING:
-     * this procedure does not initialize dbCurrentConn
+     * Open a new JDBC connection
      *
      * @throws ClassNotFoundException if the JDBC driver was not found
      * @throws SQLException if a database access error occurs
-     * @throws SQLTimeoutException if a problem with the connection occurs
+     * @throws SQLTimeoutException if a connection problem occurs
      */
-    protected Connection openConnection() throws ClassNotFoundException, SQLException, SQLTimeoutException {
-        Connection dbConn;
+    public Connection getConnection() throws ClassNotFoundException, SQLException, SQLTimeoutException {
+        Connection connection;
         if (LOG.isDebugEnabled()) {
             if (user != null) {
                 LOG.debug(String.format("Open JDBC connection: driver=%s, url=%s, user=%s, pass=%s, table=%s",
@@ -153,25 +134,24 @@ public class JdbcPlugin extends Plugin {
         }
         Class.forName(jdbcDriver);
         if (user != null) {
-            dbConn = DriverManager.getConnection(dbUrl, user, pass);
+            connection = DriverManager.getConnection(dbUrl, user, pass);
         }
         else {
-            dbConn = DriverManager.getConnection(dbUrl);
+            connection = DriverManager.getConnection(dbUrl);
         }
-        dbMeta = dbConn.getMetaData();
-        return dbConn;
+        return connection;
     }
 
     /**
      * Close a JDBC connection
      */
-    protected static void closeConnection(Connection dbConn) {
+    public static void closeConnection(Connection connection) {
         try {
-            if ((dbConn != null) && (!dbConn.isClosed())) {
-                if ((dbConn.getMetaData().supportsTransactions()) && (!dbConn.getAutoCommit())) {
-                    dbConn.commit();
+            if ((connection != null) && (!connection.isClosed())) {
+                if ((connection.getMetaData().supportsTransactions()) && (!connection.getAutoCommit())) {
+                    connection.commit();
                 }
-                dbConn.close();
+                connection.close();
             }
         }
         catch (SQLException e) {
@@ -179,8 +159,59 @@ public class JdbcPlugin extends Plugin {
         }
     }
 
+    /**
+     * Prepare a JDBC PreparedStatement
+     *
+     * @throws ClassNotFoundException if the JDBC driver was not found
+     * @throws SQLException if a database access error occurs
+     * @throws SQLTimeoutException if a connection problem occurs
+     */
+    public PreparedStatement getPreparedStatement(Connection connection, String query) throws SQLException, SQLTimeoutException, ClassNotFoundException {
+        if ((connection == null) || (query == null)) {
+            throw new IllegalArgumentException("The provided query or connection is null");
+        }
+        if (connection.getMetaData().supportsTransactions()) {
+            connection.setAutoCommit(false);
+        }
+        return connection.prepareStatement(query);
+    }
+
+    /**
+     * Close a JDBC Statement (and the connection it is based on)
+     */
+    public static void closeStatement(Statement statement) {
+        if (statement == null) {
+            return;
+        }
+        Connection connection = null;
+        try {
+            if (!statement.isClosed()) {
+                connection = statement.getConnection();
+                statement.close();
+            }
+        }
+        catch (Exception e) {}
+        closeConnection(connection);
+    }
+
+
+    // User-defined JDBC parameters
+    protected String jdbcDriver = null;
+    protected String dbUrl = null;
+    protected String user = null;
+    protected String pass = null;
+    protected String tableName = null;
+
+    // User-defined parameters for INSERT queries
+    protected int batchSize = 0;
+    protected int poolSize = 1;
+
+    // Columns description
+    protected ArrayList<ColumnDescriptor> columns = null;
+
 
     private static final Log LOG = LogFactory.getLog(JdbcPlugin.class);
+
     // At the moment, when writing into some table, the table name is concatenated with a special string that is necessary to write into HDFS. However, a raw table name is necessary in case of JDBC. This Pattern allows to extract the correct table name from the given InputData.dataSource
     private static final Pattern tableNamePattern = Pattern.compile("/(.*)/[0-9]*-[0-9]*_[0-9]*");
 }

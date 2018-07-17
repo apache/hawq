@@ -72,15 +72,21 @@ The **`<plugin_parameters>`** are **optional**.
 
 The meaning of `BATCH_SIZE` is given in section [batching of INSERT queries](#Batching).
 
+The meaning of `POOL_SIZE` is given in section [using thread pool for INSERT queries](#Thread_pool)
+
 The meaning of other parameters is given in section [partitioning](#Partitioning).
 ```
-{
+[
 &BATCH_SIZE=<batch_size>
-|
+]
+[
+&POOL_SIZE=<pool_size>
+]
+[
 &PARTITION_BY=<column>:<column_type>
 &RANGE=<start_value>:<end_value>
 [&INTERVAL=<value>[:<unit>]]
-}
+]
 ```
 
 
@@ -114,6 +120,22 @@ To enable batching, create an external table with the parameter `BATCH_SIZE` set
 Batching must be supported by the JDBC driver of an external database. If the driver does not support batching, it will not be used, but PXF plugin will try to INSERT values anyway, and an information message will be added to PXF logs.
 
 By default (`BATCH_SIZE` is absent), batching is not used.
+
+
+## Thread pool
+
+The INSERT queries can be processed by multiple threads. This may significantly increase perfomance if the external database can work with multiple connections simultaneously.
+
+It is recommended to use batching together with a thread pool. In this case, each thread receives data from one (whole) batch and processes it. If a thread pool is used without batching, each thread in a pool will receive exactly one tuple; as a rule, this takes much more time than usual one-thread INSERT.
+
+If any of the threads from pool fails, the user will get the error message. However, if INSERT fails, some data still may be INSERTed into the external database.
+
+To enable thread pool, create an external table with the paramete `POOL_SIZE` set to:
+* `integer > 1`. Thread pool will consist of the given number of threads.
+* `integer < 1`. The number of threads in a pool will be equal to the number of CPUs in the system
+* `integer = 1`. Thread pool will be disabled
+
+By default (`POOL_SIZE` is absent), thread pool is not used.
 
 
 ## Partitioning
