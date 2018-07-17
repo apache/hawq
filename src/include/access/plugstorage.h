@@ -45,6 +45,7 @@
 #include "executor/tuptable.h"
 
 /* From src/include/access/fileam.h */
+extern char *getExtTblCategoryInFmtOptsStr(char *fmtStr);
 extern char *getExtTblFormatterTypeInFmtOptsStr(char *fmtStr);
 extern char *getExtTblFormatterTypeInFmtOptsList(List *fmtOpts);
 
@@ -98,6 +99,7 @@ typedef struct PlugStorageData
 	bool                   ps_has_tuple;
 	Oid                    ps_tuple_oid;
 	TupleTableSlot        *ps_tuple_table_slot;
+	int                     ps_segno;
 
 } PlugStorageData;
 
@@ -179,7 +181,9 @@ void InvokePlugStorageFormatStopScan(FmgrInfo *func,
 ExternalInsertDesc InvokePlugStorageFormatInsertInit(FmgrInfo *func,
                                                      Relation relation,
                                                      int formatterType,
-                                                     char *formatterName);
+                                                     char *formatterName,
+													PlannedStmt* plannedstmt,
+													int segno);
 
 Oid InvokePlugStorageFormatInsert(FmgrInfo *func,
                                   ExternalInsertDesc extInsertDesc,

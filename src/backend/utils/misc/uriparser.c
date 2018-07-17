@@ -78,6 +78,11 @@ ParseExternalTableUri(const char *uri_str)
 		uri->protocol = URI_GPFDISTS;
 		protocol_len = strlen(PROTOCOL_GPFDISTS);
 	}
+	else if (IS_HDFS_URI(uri_str))
+	{
+			uri->protocol = URI_HDFS;
+			protocol_len = strlen(PROTOCOL_HDFS);
+	}
 
 	else /* not recognized. treat it as a custom protocol */
 	{
@@ -200,7 +205,10 @@ ParseExternalTableUri(const char *uri_str)
 			}
 			else
 			{
-				uri->port = -1; /* no port was indicated. will use default if needed */
+				if (IS_HDFS_URI(uri_str)) /* means nameservice format */
+					uri->port = 0;
+				else
+					uri->port = -1; /* no port was indicated. will use default if needed */
 			}
 		}
 	}

@@ -42,6 +42,7 @@
 #include "catalog/pg_compression.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_depend.h"
+#include "catalog/pg_exttable.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_type_encoding.h"
@@ -1294,19 +1295,19 @@ DefineCompositeType(const RangeVar *typevar, List *coldeflist, Oid relOid, Oid c
 	 * now set the parameters for keys/inheritance etc. All of these are
 	 * uninteresting for composite types...
 	 */
-	createStmt->relation = (RangeVar *) typevar;
-	createStmt->tableElts = coldeflist;
-	createStmt->inhRelations = NIL;
-	createStmt->constraints = NIL;
-	createStmt->options = list_make1(defWithOids(false));
-	createStmt->oncommit = ONCOMMIT_NOOP;
-	createStmt->tablespacename = NULL;
+	createStmt->base.relation = (RangeVar *) typevar;
+	createStmt->base.tableElts = coldeflist;
+	createStmt->base.inhRelations = NIL;
+	createStmt->base.constraints = NIL;
+	createStmt->base.options = list_make1(defWithOids(false));
+	createStmt->base.oncommit = ONCOMMIT_NOOP;
+	createStmt->base.tablespacename = NULL;
 
 	/*
 	 * finally create the relation...
 	 */
-	return  DefineRelation(createStmt, RELKIND_COMPOSITE_TYPE, RELSTORAGE_VIRTUAL);
-
+	return  DefineRelation(createStmt, RELKIND_COMPOSITE_TYPE,
+		                       RELSTORAGE_VIRTUAL, NonCustomFormatType);
 	/*
 	 * DefineRelation already dispatches this.
 	 *

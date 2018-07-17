@@ -29,14 +29,17 @@
 
 #include "access/genam.h"
 #include "access/aomd.h"
+#include "access/extprotocol.h"
 #include "access/heapam.h"
 #include "access/filesplit.h"
 #include "access/parquetsegfiles.h"
+#include "access/xact.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
 #include "catalog/pg_exttable.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_proc.h"
+#include "catalog/pg_extprotocol.h"
 #include "cdb/cdbdatalocality.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
@@ -52,6 +55,7 @@
 #include "optimizer/planmain.h"
 #include "parser/parsetree.h"
 #include "storage/fd.h"
+#include "parser/parse_func.h"
 #include "postmaster/identity.h"
 #include "cdb/cdbmetadatacache.h"
 #include "resourcemanager/utils/network_utils.h"
@@ -87,6 +91,11 @@ typedef struct range_table_collector_context {
 	List *full_range_tables; /* every table include result relation  */
 } range_table_collector_context;
 
+typedef struct collect_scan_rangetable_context {
+	plan_tree_base_prefix base;
+	List *range_tables; // range table for scan only
+	List *full_range_tables;  // full range table
+} collect_scan_rangetable_context;
 /*
  * structure containing information about how much a
  * host holds.
@@ -123,10 +132,14 @@ typedef struct File_Split {
 	int64 logiceof;
 	int host;
 	bool is_local_read;
+	char *ext_file_uri;
 } File_Split;
 
 typedef enum DATALOCALITY_RELATION_TYPE {
-	DATALOCALITY_APPENDONLY, DATALOCALITY_PARQUET, DATALOCALITY_UNKNOWN
+	DATALOCALITY_APPENDONLY,
+	DATALOCALITY_PARQUET,
+	DATALOCALITY_HDFS,
+	DATALOCALITY_UNKNOWN
 } DATALOCALITY_RELATION_TYPE;
 
 /*
@@ -290,6 +303,7 @@ typedef struct hostname_volume_stat_context {
  */
 typedef struct split_to_segment_mapping_context {
 	range_table_collector_context rtc_context;
+	collect_scan_rangetable_context srtc_context;
 	data_dist_stat_context dds_context;
 	collect_hdfs_split_location_context chsl_context;
 	hostname_volume_stat_context host_context;
@@ -315,9 +329,9 @@ typedef struct split_to_segment_mapping_context {
 
 	int64 total_metadata_logic_len;
 
-    int metadata_cache_time_us;
-    int alloc_resource_time_us;
-    int cal_datalocality_time_us;
+	int metadata_cache_time_us;
+	int alloc_resource_time_us;
+	int cal_datalocality_time_us;
 } split_to_segment_mapping_context;
 
 typedef struct vseg_list{
@@ -331,13 +345,18 @@ static void init_datalocality_memory_context(void);
 static void init_split_assignment_result(Split_Assignment_Result *result,
 		int host_num);
 
-static void init_datalocality_context(split_to_segment_mapping_context *context);
+static void init_datalocality_context(PlannedStmt *plannedstmt,
+		split_to_segment_mapping_context *context);
 
 static bool range_table_collector_walker(Node *node,
 		range_table_collector_context *context);
 
-static void collect_range_tables(Query *query, List* full_range_table,
+static void collect_range_tables(Query *query,
 		range_table_collector_context *context);
+
+static bool collect_scan_rangetable(Node *node,
+		collect_scan_rangetable_context *cxt);
+
 
 static void convert_range_tables_to_oids_and_check_table_functions(List **range_tables, bool* isUDFExists,
 		MemoryContext my_memorycontext);
@@ -348,6 +367,8 @@ static void check_keep_hash_and_external_table(
 
 static int64 get_block_locations_and_claculte_table_size(
 		split_to_segment_mapping_context *collector_context);
+
+static bool dataStoredInHdfs(Relation rel);
 
 static List *get_virtual_segments(QueryResource *resource);
 
@@ -367,6 +388,12 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 		split_to_segment_mapping_context *context, int64 splitsize,
 		Relation_Data *rel_data, int* hitblocks,
 		int* allblocks, GpPolicy *targetPolicy);
+
+static void ExternalGetHdfsFileDataLocation(Relation relation,
+		split_to_segment_mapping_context *context, int64 splitsize,
+		Relation_Data *rel_data, int* allblocks);
+
+Oid LookupCustomProtocolBlockLocationFunc(char *protoname);
 
 static BlockLocation *fetch_hdfs_data_block_location(char *filepath, int64 len,
 		int *block_num, RelFileNode rnode, uint32_t segno, double* hit_ratio);
@@ -464,6 +491,9 @@ static Relation_File** change_file_order_based_on_continuity(
 static int64 set_maximum_segment_volume_parameter(Relation_Data *rel_data,
 		int host_num, double* maxSizePerSegment);
 
+static void InvokeHDFSProtocolBlockLocation(Oid    procOid,
+                                            List  *locs,
+                                            List **blockLocations);
 /*
  * Setup /cleanup the memory context for this run
  * of data locality algorithm.
@@ -500,13 +530,17 @@ static void init_split_assignment_result(Split_Assignment_Result *result,
 	return;
 }
 
-static void init_datalocality_context(split_to_segment_mapping_context *context) {
+static void init_datalocality_context(PlannedStmt *plannedstmt,
+		split_to_segment_mapping_context *context) {
 	context->old_memorycontext = CurrentMemoryContext;
 	context->datalocality_memorycontext = DataLocalityMemoryContext;
 
 	context->chsl_context.relations = NIL;
 	context->rtc_context.range_tables = NIL;
-	context->rtc_context.full_range_tables = NIL;
+	context->rtc_context.full_range_tables = plannedstmt->rtable;
+	context->srtc_context.range_tables = NIL;
+	context->srtc_context.full_range_tables = plannedstmt->rtable;
+	context->srtc_context.base.node = (Node *)plannedstmt;
 
 	context->externTableForceSegNum = 0;
 	context->externTableLocationSegNum = 0;
@@ -592,7 +626,7 @@ static bool range_table_collector_walker(Node *node,
  * collect_range_tables: collect all range table relations, and store
  * them into the range_table_collector_context.
  */
-static void collect_range_tables(Query *query, List* full_range_table,
+static void collect_range_tables(Query *query,
 		range_table_collector_context *context) {
 
 	query_tree_walker(query, range_table_collector_walker, (void *) context,
@@ -613,8 +647,26 @@ static void collect_range_tables(Query *query, List* full_range_table,
 		}
 		context->range_tables = new_range_tables;
 	}
-	context->full_range_tables = full_range_table;
 	return;
+}
+
+bool collect_scan_rangetable(Node *node,
+		collect_scan_rangetable_context *cxt) {
+	if (NULL == node) return false;
+
+	switch (nodeTag(node)) {
+	case T_ExternalScan:
+	case T_AppendOnlyScan:
+	case T_ParquetScan: {
+		RangeTblEntry  *rte = rt_fetch(((Scan *)node)->scanrelid,
+											   cxt->full_range_tables);
+		cxt->range_tables = lappend(cxt->range_tables, rte);
+	}
+	default:
+		break;
+	}
+
+	return plan_tree_walker(node, collect_scan_rangetable, cxt);
 }
 /*
  *
@@ -750,6 +802,19 @@ static void check_keep_hash_and_external_table(
 					if (uri && uri->protocol == URI_CUSTOM && is_pxf_protocol(uri)) {
 						isPxf = true;
 					}
+					else if (uri && (is_hdfs_protocol(uri))) {
+						relation_close(rel, AccessShareLock);
+						if (targetPolicy->nattrs > 0)
+						{
+							/*select the maximum hash bucket number as hashSegNum of query*/
+							if (context->hashSegNum < targetPolicy->bucketnum)
+							{
+								context->hashSegNum = targetPolicy->bucketnum;
+								context->keep_hash = true;
+							}
+						}
+						continue;
+					}
 				}
 			}
 			if (extEnrty->command || isPxf) {
@@ -844,37 +909,14 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 		/*
 		 * We only consider the data stored in HDFS.
 		 */
-		if (RelationIsAoRows(rel) || RelationIsParquet(rel)) {
-			Relation_Data *rel_data = NULL;
-			/*
-			 * Get pg_appendonly information for this table.
-			 */
-			AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, SnapshotNow);
-
-			rel_data = (Relation_Data *) palloc(sizeof(Relation_Data));
+		bool isDataStoredInHdfs = dataStoredInHdfs(rel);
+		if (isDataStoredInHdfs ) {
+			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext, rel_oid);
+			Relation_Data *rel_data = (Relation_Data *) palloc(sizeof(Relation_Data));
 			rel_data->relid = rel_oid;
 			rel_data->files = NIL;
 			rel_data->partition_parent_relid = 0;
 			rel_data->block_count = 0;
-
-			GpPolicy *targetPolicy = NULL;
-			targetPolicy = GpPolicyFetch(CurrentMemoryContext, rel_oid);
-			/*
-			 * Based on the pg_appendonly information, calculate the data
-			 * location information associated with this relation.
-			 */
-			if (RelationIsAoRows(rel)) {
-				rel_data->type = DATALOCALITY_APPENDONLY;
-				AOGetSegFileDataLocation(rel, aoEntry, ActiveSnapshot, context,
-						aoEntry->splitsize, rel_data, &hitblocks,
-						&allblocks, targetPolicy);
-			} else {
-				rel_data->type = DATALOCALITY_PARQUET;
-				ParquetGetSegFileDataLocation(rel, aoEntry, ActiveSnapshot, context,
-						context->split_size, rel_data, &hitblocks,
-						&allblocks, targetPolicy);
-			}
-
 			bool isResultRelation = true;
 			ListCell *nonResultlc;
 			foreach(nonResultlc, context->rtc_context.range_tables)
@@ -884,6 +926,54 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 					isResultRelation = false;
 				}
 			}
+
+			if (!isResultRelation) {
+				// skip the relation not in scan nodes
+				// for partition table scan optimization;
+				ListCell *rtc;
+				bool found = false;
+				foreach(rtc, context->srtc_context.range_tables) {
+					RangeTblEntry *rte = lfirst(rtc);
+					if (rel_oid == rte->relid) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					relation_close(rel, AccessShareLock);
+					continue;
+				}
+			}
+
+			if (RelationIsAoRows(rel) || RelationIsParquet(rel)) {
+				/*
+				 * Get pg_appendonly information for this table.
+				 */
+				AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, SnapshotNow);
+				/*
+				 * Based on the pg_appendonly information, calculate the data
+				 * location information associated with this relation.
+				 */
+				if (RelationIsAoRows(rel)) {
+					rel_data->type = DATALOCALITY_APPENDONLY;
+					AOGetSegFileDataLocation(rel, aoEntry, ActiveSnapshot, context,
+							aoEntry->splitsize, rel_data, &hitblocks,
+							&allblocks, targetPolicy);
+				} else {
+					rel_data->type = DATALOCALITY_PARQUET;
+					ParquetGetSegFileDataLocation(rel, aoEntry, ActiveSnapshot, context,
+							context->split_size, rel_data, &hitblocks,
+							&allblocks, targetPolicy);
+				}
+			} else if (RelationIsExternal(rel)) {
+				if (isDataStoredInHdfs) {
+					// we can't use metadata cache, so hitblocks will always be 0
+					rel_data->type = DATALOCALITY_HDFS;
+					ExternalGetHdfsFileDataLocation(rel, context, context->split_size,
+					                                rel_data, &allblocks);
+				}
+			}
+
 			if (!isResultRelation) {
 				total_size += rel_data->total_size;
 				totalFileCount += list_length(rel_data->files);
@@ -915,8 +1005,7 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 	}
 	context->total_file_count = totalFileCount;
 	context->total_size = total_size;
-    
-    context->metadata_cache_time_us = eclaspeTime;
+	context->metadata_cache_time_us = eclaspeTime;
 
 	if(debug_datalocality_time){
 		elog(LOG, "metadata overall execution time: %d us. \n", eclaspeTime);
@@ -924,6 +1013,25 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 	return total_size;
 }
 
+bool dataStoredInHdfs(Relation rel) {
+	if (RelationIsAoRows(rel) || RelationIsParquet(rel)) {
+		return true;
+	} else if (RelationIsExternal(rel)) {
+		ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
+		bool isHdfsProtocol = false;
+		if (!extEnrty->command && extEnrty->locations) {
+			char* first_uri_str = (char *) strVal(lfirst(list_head(extEnrty->locations)));
+			if (first_uri_str) {
+				Uri* uri = ParseExternalTableUri(first_uri_str);
+				if (uri && is_hdfs_protocol(uri)) {
+					isHdfsProtocol = true;
+				}
+			}
+		}
+		return isHdfsProtocol;
+	}
+	return false;
+}
 /*
  * search_host_in_stat_context: search a host name in the statistic
  * context; if not found, create a new one.
@@ -1579,7 +1687,237 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 	return;
 }
 
+static void InvokeHDFSProtocolBlockLocation(Oid    procOid,
+                                            List  *locs,
+                                            List **blockLocations)
+{
+	ExtProtocolValidatorData   *validator_data;
+	FmgrInfo				   *validator_udf;
+	FunctionCallInfoData		fcinfo;
 
+	validator_data = (ExtProtocolValidatorData *)
+					 palloc0 (sizeof(ExtProtocolValidatorData));
+	validator_udf = palloc(sizeof(FmgrInfo));
+	fmgr_info(procOid, validator_udf);
+
+	validator_data->type 		= T_ExtProtocolValidatorData;
+	validator_data->url_list 	= locs;
+	validator_data->format_opts = NULL;
+	validator_data->errmsg		= NULL;
+	validator_data->direction 	= EXT_VALIDATE_READ;
+	validator_data->action		= EXT_VALID_ACT_GETBLKLOC;
+
+	InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,
+							 /* FmgrInfo */ validator_udf,
+							 /* nArgs */ 0,
+							 /* Call Context */ (Node *) validator_data,
+							 /* ResultSetInfo */ NULL);
+
+	/* invoke validator. if this function returns - validation passed */
+	FunctionCallInvoke(&fcinfo);
+
+	ExtProtocolBlockLocationData *bls =
+		(ExtProtocolBlockLocationData *)(fcinfo.resultinfo);
+	/* debug output block location. */
+	if (bls != NULL)
+	{
+		ListCell *c;
+		int i = 0 ,j = 0;
+		foreach(c, bls->files)
+		{
+			blocklocation_file *blf = (blocklocation_file *)(lfirst(c));
+			elog(DEBUG3, "DEBUG LOCATION for %s with %d blocks",
+					     blf->file_uri, blf->block_num);
+			for ( i = 0 ; i < blf->block_num ; ++i )
+			{
+				BlockLocation *pbl = &(blf->locations[i]);
+				elog(DEBUG3, "DEBUG LOCATION for block %d : %d, "
+						     INT64_FORMAT ", " INT64_FORMAT ", %d",
+						     i,
+						     pbl->corrupt, pbl->length, pbl->offset,
+							 pbl->numOfNodes);
+				for ( j = 0 ; j < pbl->numOfNodes ; ++j )
+				{
+					elog(DEBUG3, "DEBUG LOCATION for block %d : %s, %s, %s",
+							     i,
+							     pbl->hosts[j], pbl->names[j],
+								 pbl->topologyPaths[j]);
+				}
+			}
+		}
+	}
+
+	elog(DEBUG3, "after invoking get block location API");
+
+	/* get location data from fcinfo.resultinfo. */
+	if (bls != NULL)
+	{
+		Assert(bls->type == T_ExtProtocolBlockLocationData);
+		while(list_length(bls->files) > 0)
+		{
+			void *v = lfirst(list_head(bls->files));
+			bls->files = list_delete_first(bls->files);
+			*blockLocations = lappend(*blockLocations, v);
+		}
+	}
+	pfree(validator_data);
+	pfree(validator_udf);
+}
+
+Oid
+LookupCustomProtocolBlockLocationFunc(char *protoname)
+{
+	List*	funcname 	= NIL;
+	Oid		procOid		= InvalidOid;
+	Oid		argList[1];
+	Oid		returnOid;
+
+	char*   new_func_name = (char *)palloc0(strlen(protoname) + 16);
+	sprintf(new_func_name, "%s_blocklocation", protoname);
+	funcname = lappend(funcname, makeString(new_func_name));
+	returnOid = VOIDOID;
+	procOid = LookupFuncName(funcname, 0, argList, true);
+
+	if (!OidIsValid(procOid))
+		ereport(ERROR, (errcode(ERRCODE_UNDEFINED_FUNCTION),
+						errmsg("protocol function %s was not found.",
+								new_func_name),
+						errhint("Create it with CREATE FUNCTION."),
+						errOmitLocation(true)));
+
+	/* check return type matches */
+	if (get_func_rettype(procOid) != returnOid)
+		ereport(ERROR, (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+						errmsg("protocol function %s has an incorrect return type",
+								new_func_name),
+						errOmitLocation(true)));
+
+	/* check allowed volatility */
+	if (func_volatile(procOid) != PROVOLATILE_STABLE)
+		ereport(ERROR, (errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
+				 	 	errmsg("protocol function %s is not declared STABLE.",
+						new_func_name),
+						errOmitLocation(true)));
+	pfree(new_func_name);
+
+	return procOid;
+}
+
+static void ExternalGetHdfsFileDataLocation(
+				Relation relation,
+				split_to_segment_mapping_context *context,
+				int64 splitsize,
+				Relation_Data *rel_data,
+				int* allblocks) {
+	ExtTableEntry *ext_entry = GetExtTableEntry(rel_data->relid);
+	Assert(ext_entry->locations != NIL);
+	int64 total_size = 0;
+	int segno = 1;
+
+	/*
+	 * Step 1. get external HDFS location from URI.
+	 */
+	char* first_uri_str = (char *) strVal(lfirst(list_head(ext_entry->locations)));
+	/* We must have at least one location. */
+	Assert(first_uri_str != NULL);
+	Uri* uri = ParseExternalTableUri(first_uri_str);
+	bool isHdfs = false;
+	if (uri != NULL && is_hdfs_protocol(uri)) {
+		isHdfs = true;
+	}
+	Assert(isHdfs);  /* Currently, we accept HDFS only. */
+
+    /*
+     * Step 2. Get function to call for getting location information. This work
+     * is done by validator function registered for this external protocol.
+     */
+	Oid procOid = InvalidOid;
+	if (isHdfs) {
+		procOid = LookupCustomProtocolBlockLocationFunc("hdfs");
+	}
+	else
+	{
+		Assert(false);
+	}
+
+	/*
+	 * Step 3. Call validator to get location data.
+	 */
+
+	/* Prepare function call parameter by passing into location string. This is
+	 * only called at dispatcher side. */
+	List *bls = NULL; /* Block locations */
+	if (OidIsValid(procOid) && Gp_role == GP_ROLE_DISPATCH)
+	{
+		InvokeHDFSProtocolBlockLocation(procOid, ext_entry->locations, &bls);
+	}
+
+	/*
+	 * Step 4. Build data location info for optimization after this call.
+	 */
+
+	/* Go through each files */
+	ListCell *cbl = NULL;
+	foreach(cbl, bls)
+	{
+		blocklocation_file *f = (blocklocation_file *)lfirst(cbl);
+		BlockLocation *locations = f->locations;
+		int block_num = f->block_num;
+		int64 logic_len = 0;
+		*allblocks += block_num;
+		if ((locations != NULL) && (block_num > 0)) {
+			// calculate length for one specific file
+			for (int j = 0; j < block_num; ++j) {
+				logic_len += locations[j].length;
+		//		locations[j].lowerBoundInc = NULL;
+		//		locations[j].upperBoundExc = NULL;
+			}
+			total_size += logic_len;
+
+			Block_Host_Index * host_index = update_data_dist_stat(context,
+					locations, block_num);
+
+			Relation_File *file = (Relation_File *) palloc(sizeof(Relation_File));
+			if (atoi(strrchr(f->file_uri, '/') + 1) > 0)
+			  file->segno = atoi(strrchr(f->file_uri, '/') + 1);
+			else
+			  file->segno = segno++;
+			file->block_num = block_num;
+			file->locations = locations;
+			file->hostIDs = host_index;
+			file->logic_len = logic_len;
+
+			// do the split logic
+			int realSplitNum = 0;
+			int split_num = file->block_num;
+			int64 offset = 0;
+			File_Split *splits = (File_Split *) palloc(sizeof(File_Split) * split_num);
+			while (realSplitNum < split_num) {
+					splits[realSplitNum].host = -1;
+					splits[realSplitNum].is_local_read = true;
+					splits[realSplitNum].offset = offset;
+					splits[realSplitNum].length = file->locations[realSplitNum].length;
+					splits[realSplitNum].logiceof = logic_len;
+					splits[realSplitNum].ext_file_uri = pstrdup(f->file_uri);
+
+					if (logic_len - offset <= splits[realSplitNum].length) {
+							splits[realSplitNum].length = logic_len - offset;
+							++realSplitNum;
+							break;
+					}
+					offset += splits[realSplitNum].length;
+					++realSplitNum;
+			}
+			file->split_num = realSplitNum;
+			file->splits = splits;
+			context->total_split_count += realSplitNum;
+
+			rel_data->files = lappend(rel_data->files, file);
+		}
+	}
+	context->total_metadata_logic_len += total_size;
+	rel_data->total_size = total_size;
+}
 /*
  * step 1 search segments with local read and segment is not full after being assigned the block
  * step 2 search segments with local read and segment is not full before being assigned the block
@@ -4021,14 +4359,17 @@ void find_udf(Query *query, udf_collector_context *context) {
  * fixedVsegNum is used by PBE, since all the execute should use the same number of vsegs.
  */
 SplitAllocResult *
-calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
-		List *fullRangeTable, GpPolicy *intoPolicy, int sliceNum, int fixedVsegNum) {
+calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
+		QueryResourceLife resourceLife, int fixedVsegNum) {
 	SplitAllocResult *result = NULL;
 	QueryResource *resource = NULL;
-
 	List *virtual_segments = NIL;
 	List *alloc_result = NIL;
+	Node *planTree = plannedstmt->planTree;
+	GpPolicy *intoPolicy = plannedstmt->intoPolicy;
+	int sliceNum = plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1;
 	split_to_segment_mapping_context context;
+	context.chsl_context.relations = NIL;
 
 	int planner_segments = 0; /*virtual segments number for explain statement */
 
@@ -4061,9 +4402,11 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 	{
 		init_datalocality_memory_context();
 
-		init_datalocality_context(&context);
+		init_datalocality_context(plannedstmt, &context);
 
-		collect_range_tables(query, fullRangeTable, &(context.rtc_context));
+		collect_range_tables(query, &(context.rtc_context));
+
+		collect_scan_rangetable(planTree, &(context.srtc_context));
 
 		bool isTableFunctionExists = false;
 
@@ -4104,6 +4447,9 @@ calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
 
 		/* get block location and calculate relation size*/
 		get_block_locations_and_claculte_table_size(&context);
+		if(context.chsl_context.relations){
+			Relation_Data* tmp = (Relation_Data*) lfirst(context.chsl_context.relations->tail);
+		}
 
 		/*use inherit resource*/
 		if (resourceLife == QRL_INHERIT) {

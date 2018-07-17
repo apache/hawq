@@ -104,10 +104,9 @@ extern bool external_getnext(FileScanDesc scan,
                              ScanState *ss,
                              TupleTableSlot *slot);
 
-extern ExternalInsertDesc external_insert_init(Relation rel,
-                                               int errAosegno,
-                                               ExternalTableType formatterType,
-                                               char *formatterName);
+extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno,
+        int formatterType, char *formatterName, PlannedStmt* plannedstmt);
+
 extern Oid external_insert(ExternalInsertDesc extInsertDesc,
                            TupleTableSlot *tupTableSlot);
 extern void external_insert_finish(ExternalInsertDesc extInsertDesc);
@@ -115,6 +114,12 @@ extern void external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* e
 extern void AtAbort_ExtTables(void);
 char*	linenumber_atoi(char buffer[20],int64 linenumber);
 
+extern bool hasErrTblInFmtOpts(List *fmtOpts);
+extern char getExtTblFormatterTypeInFmtOpts(List *fmtOpts);
+extern void external_populate_formatter_actionmask(struct CopyStateData *pstate,
+												   FormatterData *formatter);
+
+extern char *getExtTblCategoryInFmtOptsStr(char *fmtStr);
 extern char *getExtTblFormatterTypeInFmtOptsStr(char *fmtStr);
 extern char *getExtTblFormatterTypeInFmtOptsList(List *fmtOpts);
 

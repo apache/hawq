@@ -242,10 +242,10 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <dbehavior>	opt_drop_behavior
 
 %type <list>	createdb_opt_list alterdb_opt_list copy_opt_list
-				ext_on_clause_list format_opt format_opt_list format_def_list transaction_mode_list
+				ext_on_clause_list format_opt format_opt_list transaction_mode_list
 				ext_opt_encoding_list
 %type <defelt>	createdb_opt_item alterdb_opt_item copy_opt_item
-				ext_on_clause_item format_opt_item format_def_item transaction_mode_item
+				ext_on_clause_item format_opt_item transaction_mode_item
 				ext_opt_encoding_item
 
 %type <ival>	opt_lock lock_type cast_context
@@ -301,7 +301,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 				aggr_args aggr_args_list old_aggr_definition old_aggr_list
 				oper_argtypes RuleActionList RuleActionMulti
 				cdb_string_list
-				opt_column_list columnList opt_name_list exttab_auth_list keyvalue_list
+				opt_column_list columnList columnListPlus opt_name_list exttab_auth_list keyvalue_list
 				opt_inherited_column_list
 				sort_clause opt_sort_clause sortby_list index_params
 				name_list from_clause from_list opt_array_bounds
@@ -431,7 +431,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <node>	var_value zone_value
 
 %type <keyword> unreserved_keyword func_name_keyword
-%type <keyword> col_name_keyword reserved_keyword
+%type <keyword> col_name_keyword reserved_keyword format_opt_keyword
 %type <keyword> keywords_ok_in_alias_no_as
 
 %type <node>	TableConstraint TableLikeClause 
@@ -3310,24 +3310,25 @@ CreateStmt:	CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
 			OptTabPartitionBy
 				{
 					CreateStmt *n = makeNode(CreateStmt);
+					
 					$4->istemp = $2;
-					n->relation = $4;
-					n->tableElts = $6;
-					n->inhRelations = $8;
-					n->constraints = NIL;
-					n->options = $9;
-					n->oncommit = $10;
-					n->tablespacename = $11;
-					n->distributedBy = $12;
-					n->partitionBy = $13;
+					n->base.relation = $4;
+					n->base.tableElts = $6;
+					n->base.inhRelations = $8;
+					n->base.constraints = NIL;
+					n->base.options = $9;
+					n->base.oncommit = $10;
+					n->base.tablespacename = $11;
+					n->base.distributedBy = $12;
+					n->base.partitionBy = $13;
 					n->oidInfo.relOid = 0;
 					n->oidInfo.comptypeOid = 0;
 					n->oidInfo.toastOid = 0;
 					n->oidInfo.toastIndexOid = 0;
 					n->oidInfo.toastComptypeOid = 0;
-					n->relKind = RELKIND_RELATION;
+					n->base.relKind = RELKIND_RELATION;
 					n->policy = 0;
-					n->postCreate = NULL;
+					n->base.postCreate = NULL;
 					
 					$$ = (Node *)n;
 				}
@@ -3339,23 +3340,23 @@ CreateStmt:	CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
 					 */
 					CreateStmt *n = makeNode(CreateStmt);
 					$4->istemp = $2;
-					n->relation = $4;
-					n->tableElts = $8;
-					n->inhRelations = list_make1($6);
-					n->constraints = NIL;
-					n->options = $10;
-					n->oncommit = $11;
-					n->tablespacename = $12;
-					n->distributedBy = $13;
-					n->partitionBy = $14;
+					n->base.relation = $4;
+					n->base.tableElts = $8;
+					n->base.inhRelations = list_make1($6);
+					n->base.constraints = NIL;
+					n->base.options = $10;
+					n->base.oncommit = $11;
+					n->base.tablespacename = $12;
+					n->base.distributedBy = $13;
+					n->base.partitionBy = $14;
 					n->oidInfo.relOid = 0;
 					n->oidInfo.comptypeOid = 0;
 					n->oidInfo.toastOid = 0;
 					n->oidInfo.toastIndexOid = 0;
 					n->oidInfo.toastComptypeOid = 0;
-					n->relKind = RELKIND_RELATION;
+					n->base.relKind = RELKIND_RELATION;
 					n->policy = 0;
-                    n->postCreate = NULL;
+                    n->base.postCreate = NULL;
 					
 					$$ = (Node *)n;
 				}
@@ -3753,6 +3754,17 @@ opt_inherited_column_list:
 columnList:
 			columnElem								{ $$ = list_make1($1); }
 			| columnList ',' columnElem				{ $$ = lappend($1, $3); }
+		;
+columnListPlus:
+			columnElem ',' columnElem	
+			{
+				$$ = list_make1($1);
+				$$ = lappend($$, $3);
+			}
+			| columnListPlus ',' columnElem
+			{
+				$$ = lappend($1, $3);
+			}
 		;
 
 columnElem: ColId
@@ -4584,16 +4596,17 @@ CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_n
 						{
 							CreateExternalStmt *n = makeNode(CreateExternalStmt);
 							n->iswritable = $2;
+							n->isexternal = TRUE;
 							n->isweb = $4;
 							$7->istemp = $5;
-							n->relation = $7;
-							n->tableElts = $9;
+							n->base.relation = $7;
+							n->base.tableElts = $9;
 							n->exttypedesc = $11;
 							n->format = $13;
-							n->formatOpts = $14;
+							n->base.options = $14;
 							n->encoding = $15;
 							n->sreh = $16;
-							n->distributedBy = $17;
+							n->base.distributedBy = $17;
 							n->policy = 0;
 							
 							/* various syntax checks for EXECUTE external table */
@@ -4694,13 +4707,12 @@ ext_on_clause_item:
 
 format_opt: 
 			  '(' format_opt_list ')'			{ $$ = $2; }
-			| '(' format_def_list ')'			{ $$ = $2; }
 			| '(' ')'							{ $$ = NIL; }
 			| /*EMPTY*/							{ $$ = NIL; }
 			;
 
 format_opt_list:
-			format_opt_item		
+			format_opt_item	
 			{ 
 				$$ = list_make1($1);
 			}
@@ -4710,67 +4722,43 @@ format_opt_list:
 			}
 			;
 
-format_def_list:
-			format_def_item		
-			{ 
-				$$ = list_make1($1);
-			} 
-			| format_def_list ',' format_def_item
-			{
-				$$ = lappend($1, $3);
-			}
-
-format_def_item:
-    		ColLabel '=' def_arg
-			{
-				$$ = makeDefElem($1, $3);
-			}
-			| ColLabel '=' '(' columnList ')'
-			{
-				$$ = makeDefElem($1, (Node *) $4);
-			}
+format_opt_keyword:
+			  AS
+			| DELIMITER
+			| NULL_P
+			| CSV
+			| HEADER_P
+			| QUOTE
+			| ESCAPE
+			| FORCE
+			| NOT
+			| FILL
+			| MISSING
+			| FIELDS
+			| NEWLINE
+			;
 
 
 format_opt_item:
-			DELIMITER opt_as Sconst
+			IDENT
 			{
-				$$ = makeDefElem("delimiter", (Node *)makeString($3));
+				$$ = makeDefElem("#ident", (Node *)makeString($1));
 			}
-			| NULL_P opt_as Sconst
+			| Sconst
 			{
-				$$ = makeDefElem("null", (Node *)makeString($3));
+				$$ = makeDefElem("#string", (Node *)makeString($1));
 			}
-			| CSV
+			| SignedIconst
 			{
-				$$ = makeDefElem("csv", (Node *)makeInteger(TRUE));
+				$$ = makeDefElem("#int", (Node *)makeInteger($1));
 			}
-			| HEADER_P
+			| format_opt_keyword
 			{
-				$$ = makeDefElem("header", (Node *)makeInteger(TRUE));
+				$$ = makeDefElem("#ident", (Node *)makeString($1));
 			}
-			| QUOTE opt_as Sconst
+			| columnListPlus
 			{
-				$$ = makeDefElem("quote", (Node *)makeString($3));
-			}
-			| ESCAPE opt_as Sconst
-			{
-				$$ = makeDefElem("escape", (Node *)makeString($3));
-			}
-			| FORCE NOT NULL_P columnList
-			{
-				$$ = makeDefElem("force_notnull", (Node *)$4);
-			}
-			| FORCE QUOTE columnList
-			{
-				$$ = makeDefElem("force_quote", (Node *)$3);
-			}
-			| FILL MISSING FIELDS
-			{
-				$$ = makeDefElem("fill_missing_fields", (Node *)makeInteger(TRUE));
-			}
-			| NEWLINE opt_as Sconst
-			{
-				$$ = makeDefElem("newline", (Node *)makeString($3));
+				$$ = makeDefElem("#collist", (Node *)$1);
 			}
 			;
 
@@ -13258,28 +13246,28 @@ makeAddPartitionCreateStmt(Node *n, Node *subSpec)
 	CreateStmt        *ct        = makeNode(CreateStmt);
     PartitionBy       *pBy       = NULL;
 
-    ct->relation = makeRangeVar(NULL /*catalogname*/, NULL, "fake_partition_name", -1);
+    ct->base.relation = makeRangeVar(NULL /*catalogname*/, NULL, "fake_partition_name", -1);
 
     /* in analyze.c, fill in tableelts with a list of inhrelation of
        the partition parent table, and fill in inhrelations with copy
        of rangevar for parent table */
 
-    ct->tableElts    = NIL; /* fill in later */
-    ct->inhRelations = NIL; /* fill in later */
+    ct->base.tableElts    = NIL; /* fill in later */
+    ct->base.inhRelations = NIL; /* fill in later */
 
-    ct->constraints = NIL;
+    ct->base.constraints = NIL;
 
     if (pc_StAttr)
-        ct->options = (List *)pc_StAttr->arg1;
+        ct->base.options = (List *)pc_StAttr->arg1;
     else
-        ct->options = NIL;
+        ct->base.options = NIL;
 
-    ct->oncommit = ONCOMMIT_NOOP;
+    ct->base.oncommit = ONCOMMIT_NOOP;
         
     if (pc_StAttr && pc_StAttr->arg2)
-        ct->tablespacename = strVal(pc_StAttr->arg2);
+        ct->base.tablespacename = strVal(pc_StAttr->arg2);
     else
-        ct->tablespacename = NULL;
+        ct->base.tablespacename = NULL;
 
     if (subSpec) /* treat subspec as partition by... */
 	{
@@ -13290,19 +13278,19 @@ makeAddPartitionCreateStmt(Node *n, Node *subSpec)
 		pBy->partQuiet = PART_VERBO_NODISTRO;
         pBy->location  = -1;
         pBy->partDefault = NULL;
-        pBy->parentRel = copyObject(ct->relation);
+        pBy->parentRel = copyObject(ct->base.relation);
     }
 
-    ct->distributedBy = NULL;
-    ct->partitionBy = (Node *)pBy;
+    ct->base.distributedBy = NULL;
+    ct->base.partitionBy = (Node *)pBy;
     ct->oidInfo.relOid = 0;
     ct->oidInfo.comptypeOid = 0;
     ct->oidInfo.toastOid = 0;
     ct->oidInfo.toastIndexOid = 0;
     ct->oidInfo.toastComptypeOid = 0;
-    ct->relKind = RELKIND_RELATION;
+    ct->base.relKind = RELKIND_RELATION;
     ct->policy = 0;
-    ct->postCreate = NULL;
+    ct->base.postCreate = NULL;
 
     return (Node *)ct;
 }

@@ -59,6 +59,7 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbcat.h"
 
+#include "catalog/pg_exttable.h"
 
 static void checkViewTupleDesc(TupleDesc newdesc, TupleDesc olddesc);
 static bool isViewOnTempTable_walker(Node *node, void *context);
@@ -244,21 +245,21 @@ DefineVirtualRelation(const RangeVar *relation, List *tlist, bool replace, Oid v
 		 * now set the parameters for keys/inheritance etc. All of these are
 		 * uninteresting for views...
 		 */
-		createStmt->relation = (RangeVar *) relation;
-		createStmt->tableElts = attrList;
-		createStmt->inhRelations = NIL;
-		createStmt->constraints = NIL;
-		createStmt->options = list_make1(defWithOids(false));
-		createStmt->oncommit = ONCOMMIT_NOOP;
-		createStmt->tablespacename = NULL;
-		createStmt->relKind = RELKIND_VIEW;
+		createStmt->base.relation = (RangeVar *) relation;
+		createStmt->base.tableElts = attrList;
+		createStmt->base.inhRelations = NIL;
+		createStmt->base.constraints = NIL;
+		createStmt->base.options = list_make1(defWithOids(false));
+		createStmt->base.oncommit = ONCOMMIT_NOOP;
+		createStmt->base.tablespacename = NULL;
+		createStmt->base.relKind = RELKIND_VIEW;
 
 		/*
 		 * finally create the relation (this will error out if there's an
 		 * existing view, so we don't need more code to complain if "replace"
 		 * is false).
 		 */
-		newviewOid =  DefineRelation(createStmt, RELKIND_VIEW, RELSTORAGE_VIRTUAL);
+		newviewOid =  DefineRelation(createStmt, RELKIND_VIEW, RELSTORAGE_VIRTUAL, NonCustomFormatType);
 		if(comptypeOid)
 			*comptypeOid = createStmt->oidInfo.comptypeOid;
 		return newviewOid;

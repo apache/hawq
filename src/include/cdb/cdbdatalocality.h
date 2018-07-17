@@ -32,6 +32,7 @@
 #include "catalog/gp_policy.h"
 #include "nodes/parsenodes.h"
 #include "executor/execdesc.h"
+#include "catalog/pg_exttable.h"
 
 /*
  * structure containing information about data residence
@@ -71,12 +72,18 @@ typedef struct VirtualSegmentNode
 	char *hostname;
 } VirtualSegmentNode;
 
+typedef struct blocklocation_file{
+	BlockLocation *locations;
+	int block_num;
+	char *file_uri;
+}blocklocation_file;
+
 /*
  * calculate_planner_segment_num: based on the parse tree,
  * we calculate the appropriate planner segment_num.
  */
-SplitAllocResult * calculate_planner_segment_num(Query *query, QueryResourceLife resourceLife,
-                                                List *rtable, GpPolicy *intoPolicy, int sliceNum, int fixedVsegNum);
+SplitAllocResult * calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
+		QueryResourceLife resourceLife, int fixedVsegNum);
 
 /*
  * udf_collector_walker: the routine to file udfs.
