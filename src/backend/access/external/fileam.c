@@ -86,14 +86,17 @@ static void InitParseState(CopyState pstate, Relation relation,
 						   char *uri, int rejectlimit,
 						   bool islimitinrows, Oid fmterrtbl, ResultRelSegFileInfo *segfileinfo, int encoding);
 
-static void FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
-										 int					nArgs,
-										 CopyState 				pstate,
-										 FormatterData*			formatter,
-										 Relation 				rel,
-										 TupleDesc 				tupDesc,
-										 FmgrInfo			   *convFuncs,
-										 Oid                   *typioparams);
+static void
+FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
+							 int					nArgs,
+							 CopyState 				pstate,
+							 FormatterData		   *formatter,
+							 Relation 				rel,
+							 TupleDesc 				tupDesc,
+							 FmgrInfo			   *convFuncs,
+							 Oid                   *typioparams,
+							 char				   *url,
+							 ScanState			   *ss);
 
 static void open_external_readable_source(FileScanDesc scan);
 static void open_external_writable_source(ExternalInsertDesc extInsertDesc);
@@ -305,10 +308,52 @@ external_beginscan(ExternalScan *extScan,
 	scan->errcontext.previous = error_context_stack;
 
 	//pgstat_initstats(relation);
-
+	external_populate_formatter_actionmask(scan->fs_pstate, scan->fs_formatter);
 	return scan;
 }
 
+
+/* ----------------
+ * external_populate_formatter_actionmask
+ * ----------------
+ */
+void external_populate_formatter_actionmask(CopyState pstate,
+											FormatterData *formatter)
+{
+	/* We just call the formatter in function to populate the mask */
+	formatter->fmt_mask = FMT_UNSET;
+
+	if (pstate->custom_formatter_func == NULL)
+	{
+		formatter->fmt_mask |= FMT_NEEDEXTBUFF;
+		elog(LOG, "external scan needs an external protocol to cooperate");
+		return;
+	}
+
+	Datum d;
+	FunctionCallInfoData fcinfo;
+	/* per call formatter prep */
+	FunctionCallPrepareFormatter(&fcinfo,
+								 0,
+								 pstate,
+								 formatter,
+								 NULL,
+								 NULL,
+								 NULL,
+								 NULL,
+								 NULL,
+								 NULL);
+	d = FunctionCallInvoke(&fcinfo);
+
+	if (formatter->fmt_mask & FMT_NEEDEXTBUFF)
+	{
+		elog(LOG, "external scan needs an external protocol to cooperate");
+	}
+	else
+	{
+		elog(LOG, "external scan needs only formatter to manipulate data");
+	}
+}
 
 /* ----------------
 *		external_rescan  - (re)start a scan of an external file
@@ -525,13 +570,15 @@ external_getnext(FileScanDesc scan,
 	/*
 	 * open the external source (local file or http).
 	 *
-	 * NOTE: external_beginscan() seems like the natural place for this call. However,
-	 * in queries with more than one gang each gang will initialized all the nodes
-	 * of the plan (but actually executed only the nodes in it's local slice)
-	 * This means that external_beginscan() (and external_endscan() too) will get called
-	 * more than needed and we'll end up opening too many http connections when
-	 * they are not expected (see MPP-1261). Therefore we instead do it here on the
-	 * first time around only.
+	 * NOTE: external_beginscan() seems like the natural place for this call.
+	 * However, in queries with more than one gang each gang will initialized
+	 * all the nodes of the plan (but actually executed only the nodes in it's
+	 * local slice)
+	 *
+	 * This means that external_beginscan() (and external_endscan() too) will
+	 * get called more than needed and we'll end up opening too many http
+	 * connections when they are not expected (see MPP-1261). Therefore we
+	 * instead do it here on the first time around only.
 	 */
 
 	/*
@@ -539,7 +586,7 @@ external_getnext(FileScanDesc scan,
 	 * load external protocol.
 	 */
 
-	if (scan->fs_file == NULL)
+	if (scan->fs_file == NULL && (scan->fs_formatter->fmt_mask & FMT_NEEDEXTBUFF))
 		open_external_readable_source(scan);
 
 	/* Note: no locking manipulations needed */
@@ -567,6 +614,7 @@ external_getnext(FileScanDesc scan,
 	return true;
 }
 
+
 /*
  * external_insert_init
  *
@@ -575,7 +623,7 @@ external_getnext(FileScanDesc scan,
  */
 ExternalInsertDesc
 external_insert_init(Relation rel, int errAosegno,
-                     ExternalTableType formatterType, char *formatterName)
+                     int formatterType, char *formatterName, PlannedStmt* plannedstmt)
 {
 	ExternalInsertDesc	extInsertDesc;
 	ExtTableEntry*		extentry;
@@ -634,7 +682,11 @@ external_insert_init(Relation rel, int errAosegno,
 		/* get a url to use. we use seg number modulo total num of urls */
 		v = list_nth(extentry->locations, my_url);
 		uri_str = pstrdup(v->val.str);
+		Uri* uri = ParseExternalTableUri(uri_str);
+
 		extInsertDesc->ext_uri = uri_str;
+
+		FreeExternalTableUri(uri);
 
 		/*elog(NOTICE, "seg %d got url number %d: %s", segindex, my_url, uri_str);*/
 	}
@@ -668,6 +720,10 @@ external_insert_init(Relation rel, int errAosegno,
 	{
 		extInsertDesc->ext_formatter_data = (FormatterData *) palloc0 (sizeof(FormatterData));
 		extInsertDesc->ext_formatter_data->fmt_perrow_ctx = extInsertDesc->ext_pstate->rowcontext;
+
+		/* First call formatter in function to get action mask */
+		external_populate_formatter_actionmask(extInsertDesc->ext_pstate,
+											   extInsertDesc->ext_formatter_data);
 	}
 
 	return extInsertDesc;
@@ -687,7 +743,6 @@ external_insert_init(Relation rel, int errAosegno,
 Oid
 external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 {
-
 	HeapTuple		instup = ExecFetchSlotHeapTuple(tupTableSlot);
 	TupleDesc 		tupDesc = extInsertDesc->ext_tupDesc;
 	Datum*			values = extInsertDesc->ext_values;
@@ -695,14 +750,18 @@ external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 	CopyStateData*  pstate = extInsertDesc->ext_pstate;
 	bool			customFormat = extInsertDesc->ext_pstate->custom;
 
-
 	if(extInsertDesc->ext_noop)
 		return InvalidOid;
 
 
 	/* Open our output file or output stream if not yet open */
-	if(!extInsertDesc->ext_file && !extInsertDesc->ext_noop)
+	if(!extInsertDesc->ext_file &&
+	   !extInsertDesc->ext_noop &&
+	   (extInsertDesc->ext_formatter_data == NULL ||
+	   (extInsertDesc->ext_formatter_data->fmt_mask & FMT_NEEDEXTBUFF)))
+	{
 		open_external_writable_source(extInsertDesc);
+	}
 
 	/*
 	 * deconstruct the tuple and format it into text
@@ -730,15 +789,34 @@ external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 		/* must have been created during insert_init */
 		Assert(formatter);
 
-		/* per call formatter prep */
-		FunctionCallPrepareFormatter(&fcinfo,
-									 1,
-									 pstate,
-									 formatter,
-									 extInsertDesc->ext_rel,
-									 extInsertDesc->ext_tupDesc,
-									 pstate->out_functions,
-									 NULL);
+		if ((formatter->fmt_mask & FMT_NEEDEXTBUFF) == 0)
+		{
+			/* per call formatter prep */
+			FunctionCallPrepareFormatter(&fcinfo,
+										 0,
+										 pstate,
+										 formatter,
+										 extInsertDesc->ext_rel,
+										 extInsertDesc->ext_tupDesc,
+										 pstate->out_functions,
+										 NULL,
+										 extInsertDesc->ext_uri,
+										 NULL);
+		}
+		else
+		{
+			/* per call formatter prep */
+			FunctionCallPrepareFormatter(&fcinfo,
+										 1,
+										 pstate,
+										 formatter,
+										 extInsertDesc->ext_rel,
+										 extInsertDesc->ext_tupDesc,
+										 pstate->out_functions,
+										 NULL,
+										 NULL,
+										 NULL);
+		}
 
 		/* Mark the correct record type in the passed tuple */
 		HeapTupleHeaderSetTypeId(instup->t_data, tupDesc->tdtypeid);
@@ -748,18 +826,22 @@ external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 		fcinfo.argnull[0] = false;
 
 		d = FunctionCallInvoke(&fcinfo);
+
 		MemoryContextReset(formatter->fmt_perrow_ctx);
 
-		/* We do not expect a null result */
-		if (fcinfo.isnull)
-			elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+		if (formatter->fmt_mask & FMT_NEEDEXTBUFF)
+		{
+			/* We do not expect a null result */
+			if (fcinfo.isnull)
+				elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
 
-		b = DatumGetByteaP(d);
+			b = DatumGetByteaP(d);
 
-		CopyOneCustomRowTo(pstate, b);
+			CopyOneCustomRowTo(pstate, b);
+		}
 	}
 
-	if (extInsertDesc->ext_formatter_data == NULL)
+	if (extInsertDesc->ext_formatter_data == NULL || (extInsertDesc->ext_formatter_data->fmt_mask & FMT_NEEDEXTBUFF))
 	{
 		/* Write the data into the external source */
 		external_senddata((URL_FILE*)extInsertDesc->ext_file, pstate);
@@ -769,7 +851,6 @@ external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 		pstate->fe_msgbuf->data[0] = '\0';
 	}
 	pstate->processed++;
-
 	return HeapTupleGetOid(instup);
 }
 
@@ -782,6 +863,28 @@ external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 void
 external_insert_finish(ExternalInsertDesc extInsertDesc)
 {
+	/* Tell formatter to close */
+	if (extInsertDesc->ext_formatter_data != NULL &&
+		(extInsertDesc->ext_formatter_data->fmt_mask & FMT_NEEDEXTBUFF) == 0)
+	{
+		Datum d;
+		FunctionCallInfoData fcinfo;
+
+		extInsertDesc->ext_formatter_data->fmt_mask |= FMT_WRITE_END;
+
+		/* per call formatter prep */
+		FunctionCallPrepareFormatter(&fcinfo,
+									 0,
+									 extInsertDesc->ext_pstate,
+									 extInsertDesc->ext_formatter_data,
+									 NULL,
+									 NULL,
+									 NULL,
+									 NULL,
+									 NULL,
+									 NULL);
+		d = FunctionCallInvoke(&fcinfo);
+	}
 
 	/*
 	 * Close the external source
@@ -804,6 +907,7 @@ external_insert_finish(ExternalInsertDesc extInsertDesc)
 
 	pfree(extInsertDesc);
 }
+
 
 /* ==========================================================================
  * The follwing macros aid in major refactoring of data processing code (in
@@ -1042,102 +1146,102 @@ static DataLineStatus parse_next_line(FileScanDesc scan)
 static HeapTuple
 externalgettup_defined(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss)
 {
-		HeapTuple	tuple = NULL;
-		CopyState	pstate = scan->fs_pstate;
-		bool        needData = false;
+	HeapTuple	tuple = NULL;
+	CopyState	pstate = scan->fs_pstate;
+	bool        needData = false;
 
-		/* If we either got things to read or stuff to process */
-		while (!pstate->fe_eof || !pstate->raw_buf_done)
+	/* If we either got things to read or stuff to process */
+	while (!pstate->fe_eof || !pstate->raw_buf_done)
+	{
+		/* need to fill our buffer with data? */
+		if (pstate->raw_buf_done)
 		{
-			/* need to fill our buffer with data? */
-			if (pstate->raw_buf_done)
+		    pstate->bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
+			pstate->begloc = pstate->raw_buf;
+			pstate->raw_buf_done = (pstate->bytesread==0);
+			pstate->raw_buf_index = 0;
+
+			/* on first time around just throw the header line away */
+			if (pstate->header_line && pstate->bytesread > 0)
 			{
-			    pstate->bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
-				pstate->begloc = pstate->raw_buf;
-				pstate->raw_buf_done = (pstate->bytesread==0);
-				pstate->raw_buf_index = 0;
-
-				/* on first time around just throw the header line away */
-				if (pstate->header_line && pstate->bytesread > 0)
+				PG_TRY();
 				{
-					PG_TRY();
-					{
-						readHeaderLine(pstate);
-					}
-					PG_CATCH();
-					{
-						/*
-						 * got here? encoding conversion error occurred on the
-						 * header line (first row).
-						 */
-						if (pstate->errMode == ALL_OR_NOTHING)
-						{
-							PG_RE_THROW();
-						}
-						else
-						{
-							/* SREH - release error state */
-							if (!elog_dismiss(DEBUG5))
-								PG_RE_THROW(); /* hope to never get here! */
-
-							/*
-							 * note: we don't bother doing anything special here.
-							 * we are never interested in logging a header line
-							 * error. just continue the workflow.
-							 */
-						}
-					}
-					PG_END_TRY();
-
-					EXT_RESET_LINEBUF;
-					pstate->header_line = false;
+					readHeaderLine(pstate);
 				}
-			}
-
-			/* while there is still data in our buffer */
-			while (!pstate->raw_buf_done || needData)
-			{
-				DataLineStatus ret_mode = parse_next_line(scan);
-
-				if(ret_mode == LINE_OK)
+				PG_CATCH();
 				{
-					/* convert to heap tuple */
-					/* XXX This is bad code.  Planner should be able to
-					 * decide whether we need heaptuple or memtuple upstream,
-					 * so make the right decision here.
+					/*
+					 * got here? encoding conversion error occurred on the
+					 * header line (first row).
 					 */
-					tuple = heap_form_tuple(scan->fs_tupDesc, scan->values, scan->nulls);
-					pstate->processed++;
-					MemoryContextReset(pstate->rowcontext);
-					return tuple;
+					if (pstate->errMode == ALL_OR_NOTHING)
+					{
+						PG_RE_THROW();
+					}
+					else
+					{
+						/* SREH - release error state */
+						if (!elog_dismiss(DEBUG5))
+							PG_RE_THROW(); /* hope to never get here! */
+
+						/*
+						 * note: we don't bother doing anything special here.
+						 * we are never interested in logging a header line
+						 * error. just continue the workflow.
+						 */
+					}
 				}
-				else if(ret_mode == LINE_ERROR && !pstate->raw_buf_done)
-				{
-					/* error was handled in parse_next_line. move to the next */
-					continue;
-				}
-				else if(ret_mode == END_MARKER)
-				{
-					scan->fs_inited = false;
-					return NULL;
-				}
-				else
-				{
-					/* try to get more data if possible */
-					Assert((ret_mode == NEED_MORE_DATA) ||
-						   (ret_mode == LINE_ERROR && pstate->raw_buf_done));
-					needData = true;
-					break;
-				}
+				PG_END_TRY();
+
+				EXT_RESET_LINEBUF;
+				pstate->header_line = false;
 			}
 		}
 
-		/*
-		 * if we got here we finished reading all the data.
-		 */
-		scan->fs_inited = false;
+		/* while there is still data in our buffer */
+		while (!pstate->raw_buf_done || needData)
+		{
+			DataLineStatus ret_mode = parse_next_line(scan);
 
-		return NULL;
+			if(ret_mode == LINE_OK)
+			{
+				/* convert to heap tuple */
+				/* XXX This is bad code.  Planner should be able to
+				 * decide whether we need heaptuple or memtuple upstream,
+				 * so make the right decision here.
+				 */
+				tuple = heap_form_tuple(scan->fs_tupDesc, scan->values, scan->nulls);
+				pstate->processed++;
+				MemoryContextReset(pstate->rowcontext);
+				return tuple;
+			}
+			else if(ret_mode == LINE_ERROR && !pstate->raw_buf_done)
+			{
+				/* error was handled in parse_next_line. move to the next */
+				continue;
+			}
+			else if(ret_mode == END_MARKER)
+			{
+				scan->fs_inited = false;
+				return NULL;
+			}
+			else
+			{
+				/* try to get more data if possible */
+				Assert((ret_mode == NEED_MORE_DATA) ||
+					   (ret_mode == LINE_ERROR && pstate->raw_buf_done));
+				needData = true;
+				break;
+			}
+		}
+	}
+
+	/*
+	 * if we got here we finished reading all the data.
+	 */
+	scan->fs_inited = false;
+
+	return NULL;
 
 
 }
@@ -1145,149 +1249,241 @@ externalgettup_defined(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss
 static HeapTuple
 externalgettup_custom(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss)
 {
-		HeapTuple   	tuple;
-		CopyState		pstate = scan->fs_pstate;
-		FormatterData*	formatter = scan->fs_formatter;
-		bool			no_more_data = false;
-		MemoryContext 	oldctxt = CurrentMemoryContext;
+	HeapTuple   	tuple;
+	CopyState		pstate = scan->fs_pstate;
+	FormatterData*	formatter = scan->fs_formatter;
+	bool			no_more_data = false;
+	MemoryContext 	oldctxt = CurrentMemoryContext;
 
-		Assert(formatter);
+	Assert(formatter);
 
-		/* while didn't finish processing the entire file */
-		while (!no_more_data)
+	/* while didn't finish processing the entire file */
+	while (!no_more_data)
+	{
+		/* need to fill our buffer with data? */
+		if (pstate->raw_buf_done)
 		{
-			/* need to fill our buffer with data? */
-			if (pstate->raw_buf_done)
-			{
-				int	 bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
-				if ( bytesread > 0 )
-					appendBinaryStringInfo(&formatter->fmt_databuf, pstate->raw_buf, bytesread);
-				pstate->raw_buf_done = false;
+			int	 bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
+			if ( bytesread > 0 )
+				appendBinaryStringInfo(&formatter->fmt_databuf, pstate->raw_buf, bytesread);
+			pstate->raw_buf_done = false;
 
-				/* HEADER not yet supported ... */
-				if(pstate->header_line)
-					elog(ERROR, "header line in custom format is not yet supported");
-			}
-
-			if (formatter->fmt_databuf.len > 0 || !pstate->fe_eof)
-			{
-				/* while there is still data in our buffer */
-				while (!pstate->raw_buf_done)
-				{
-					bool	error_caught = false;
-
-					/*
-					 * Invoke the custom formatter function.
-					 */
-					PG_TRY();
-					{
-						Datum					d;
-						FunctionCallInfoData	fcinfo;
-
-						/* per call formatter prep */
-						FunctionCallPrepareFormatter(&fcinfo,
-													 0,
-													 pstate,
-													 formatter,
-													 scan->fs_rd,
-													 scan->fs_tupDesc,
-													 scan->in_functions,
-													 scan->typioparams);
-						d = FunctionCallInvoke(&fcinfo);
-
-					}
-					PG_CATCH();
-					{
-						error_caught = true;
-
-						MemoryContextSwitchTo(formatter->fmt_perrow_ctx);
-
-						/*
-						 * Save any bad row information that was set
-						 * by the user in the formatter UDF (if any).
-						 * Then handle the error in FILEAM_HANDLE_ERROR.
-						 */
-						pstate->cur_lineno = formatter->fmt_badrow_num;
-						pstate->cur_byteno = formatter->fmt_bytesread;
-						resetStringInfo(&pstate->line_buf);
-
-						if (formatter->fmt_badrow_len > 0)
-						{
-							if (formatter->fmt_badrow_data)
-								appendBinaryStringInfo(&pstate->line_buf,
-													   formatter->fmt_badrow_data,
-													   formatter->fmt_badrow_len);
-
-							formatter->fmt_databuf.cursor += formatter->fmt_badrow_len;
-							if (formatter->fmt_databuf.cursor > formatter->fmt_databuf.len ||
-								formatter->fmt_databuf.cursor < 0 )
-							{
-								formatter->fmt_databuf.cursor = formatter->fmt_databuf.len;
-							}
-						}
-
-						FILEAM_HANDLE_ERROR;
-
-						MemoryContextSwitchTo(oldctxt);
-					}
-					PG_END_TRY();
-
-					/*
-					 * Examine the function results. If an error was caught
-					 * we already handled it, so after checking the reject
-					 * limit, loop again and call the UDF for the next tuple.
-					 */
-					if (!error_caught)
-					{
-						switch (formatter->fmt_notification)
-						{
-							case FMT_NONE:
-
-								/* got a tuple back */
-
-								tuple = formatter->fmt_tuple;
-								pstate->processed++;
-								MemoryContextReset(formatter->fmt_perrow_ctx);
-
-								return tuple;
-
-							case FMT_NEED_MORE_DATA:
-
-								/*
-								 * Callee consumed all data in the buffer.
-								 * Prepare to read more data into it.
-								 */
-								pstate->raw_buf_done = true;
-								justifyDatabuf(&formatter->fmt_databuf);
-
-								continue;
-
-							default:
-								elog(ERROR, "unsupported formatter notification (%d)",
-											formatter->fmt_notification);
-								break;
-						}
-					}
-					else
-					{
-						FILEAM_IF_REJECT_LIMIT_REACHED_ABORT
-					}
-
-				}
-			}
-			else
-			{
-				no_more_data = true;
-			}
+			/* HEADER not yet supported ... */
+			if(pstate->header_line)
+				elog(ERROR, "header line in custom format is not yet supported");
 		}
 
-		/*
-		 * if we got here we finished reading all the data.
-		 */
-		Assert(no_more_data);
-		scan->fs_inited = false;
+		if (formatter->fmt_databuf.len > 0 || !pstate->fe_eof)
+		{
+			/* while there is still data in our buffer */
+			while (!pstate->raw_buf_done)
+			{
+				bool	error_caught = false;
 
-		return NULL;
+				/*
+				 * Invoke the custom formatter function.
+				 */
+				PG_TRY();
+				{
+					Datum					d;
+					FunctionCallInfoData	fcinfo;
+
+					/* per call formatter prep */
+					FunctionCallPrepareFormatter(&fcinfo,
+												 0,
+												 pstate,
+												 formatter,
+												 scan->fs_rd,
+												 scan->fs_tupDesc,
+												 scan->in_functions,
+												 scan->typioparams,
+												 ((URL_FILE *)(scan->fs_file))->url,
+												 ss);
+					d = FunctionCallInvoke(&fcinfo);
+
+				}
+				PG_CATCH();
+				{
+					error_caught = true;
+
+					MemoryContextSwitchTo(formatter->fmt_perrow_ctx);
+
+					/*
+					 * Save any bad row information that was set
+					 * by the user in the formatter UDF (if any).
+					 * Then handle the error in FILEAM_HANDLE_ERROR.
+					 */
+					pstate->cur_lineno = formatter->fmt_badrow_num;
+					pstate->cur_byteno = formatter->fmt_bytesread;
+					resetStringInfo(&pstate->line_buf);
+
+					if (formatter->fmt_badrow_len > 0)
+					{
+						if (formatter->fmt_badrow_data)
+							appendBinaryStringInfo(&pstate->line_buf,
+												   formatter->fmt_badrow_data,
+												   formatter->fmt_badrow_len);
+
+						formatter->fmt_databuf.cursor += formatter->fmt_badrow_len;
+						if (formatter->fmt_databuf.cursor > formatter->fmt_databuf.len ||
+							formatter->fmt_databuf.cursor < 0 )
+						{
+							formatter->fmt_databuf.cursor = formatter->fmt_databuf.len;
+						}
+					}
+
+					FILEAM_HANDLE_ERROR;
+
+					MemoryContextSwitchTo(oldctxt);
+				}
+				PG_END_TRY();
+
+				/*
+				 * Examine the function results. If an error was caught
+				 * we already handled it, so after checking the reject
+				 * limit, loop again and call the UDF for the next tuple.
+				 */
+				if (!error_caught)
+				{
+					switch (formatter->fmt_notification)
+					{
+						case FMT_NONE:
+
+							/* got a tuple back */
+
+							tuple = formatter->fmt_tuple;
+							pstate->processed++;
+							MemoryContextReset(formatter->fmt_perrow_ctx);
+
+							return tuple;
+
+						case FMT_NEED_MORE_DATA:
+
+							/*
+							 * Callee consumed all data in the buffer.
+							 * Prepare to read more data into it.
+							 */
+							pstate->raw_buf_done = true;
+							justifyDatabuf(&formatter->fmt_databuf);
+
+							continue;
+
+						default:
+							elog(ERROR, "unsupported formatter notification (%d)",
+										formatter->fmt_notification);
+							break;
+					}
+				}
+				else
+				{
+					FILEAM_IF_REJECT_LIMIT_REACHED_ABORT
+				}
+			}
+		}
+		else
+		{
+			no_more_data = true;
+		}
+	}
+
+	/*
+	 * if we got here we finished reading all the data.
+	 */
+	Assert(no_more_data);
+	scan->fs_inited = false;
+
+	return NULL;
+}
+
+static HeapTuple
+externalgettup_custom_noextprot(FileScanDesc scan,
+								ExternalSelectDesc desc,
+								ScanState *ss)
+{
+	HeapTuple   	tuple;
+	CopyState		pstate = scan->fs_pstate;
+	FormatterData*	formatter = scan->fs_formatter;
+	bool			no_more_data = false;
+	MemoryContext 	oldctxt = CurrentMemoryContext;
+
+	Assert(formatter);
+
+	/* while didn't finish processing the entire file */
+	while (!no_more_data)
+	{
+		bool error_caught = false;
+
+		/*
+		 * Invoke the custom formatter function.
+		 */
+		PG_TRY();
+		{
+			Datum					d;
+			FunctionCallInfoData	fcinfo;
+
+			/* per call formatter prep */
+			FunctionCallPrepareFormatter(&fcinfo,
+										 0,
+										 pstate,
+										 formatter,
+										 scan->fs_rd,
+										 scan->fs_tupDesc,
+										 scan->in_functions,
+										 scan->typioparams,
+										 scan->fs_uri,
+										 ss);
+			d = FunctionCallInvoke(&fcinfo);
+
+		}
+		PG_CATCH();
+		{
+			error_caught = true;
+			MemoryContextSwitchTo(formatter->fmt_perrow_ctx);
+			FILEAM_HANDLE_ERROR;
+			MemoryContextSwitchTo(oldctxt);
+		}
+		PG_END_TRY();
+
+		if (!error_caught)
+		{
+			switch (formatter->fmt_notification)
+			{
+				case FMT_NONE:
+				{
+					/* got a tuple back */
+					tuple = formatter->fmt_tuple;
+					pstate->processed++;
+					MemoryContextReset(formatter->fmt_perrow_ctx);
+					return tuple;
+				}
+				case FMT_DONE:
+				{
+					no_more_data = true;
+					break;
+				}
+				default:
+				{
+					elog(ERROR, "unsupported formatter notification (%d)",
+								formatter->fmt_notification);
+					break;
+				}
+			}
+		}
+		else
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_EXTERNAL_ROUTINE_INVOCATION_EXCEPTION),
+						(errmsg("formatter reported error")),
+						errOmitLocation(true)));
+		}
+	}
+
+	/*
+	 * if we got here we finished reading all the data.
+	 */
+	Assert(no_more_data);
+	scan->fs_inited = false;
+	return NULL;
 }
 
 /* ----------------
@@ -1322,11 +1518,19 @@ externalgettup(FileScanDesc scan,
 		/* (set current state...) */
 	}
 
+	/***********************************************************
+	 * This version has always custom formatter and fs defined.
+	 ***********************************************************/
 	if (!custom)
-		return externalgettup_defined(scan, desc, ss); /* text/csv */
+		return externalgettup_defined(scan, desc, ss); // text/csv
+	else if (scan->fs_formatter->fmt_mask & FMT_NEEDEXTBUFF)
+	{
+		return externalgettup_custom(scan, desc, ss);
+	}
 	else
-		return externalgettup_custom(scan, desc, ss);  /* custom   */
-
+	{
+		return externalgettup_custom_noextprot(scan, desc, ss);
+	}
 }
 /*
  * setCustomFormatter
@@ -1346,7 +1550,23 @@ lookupCustomFormatter(char *formatter_name, bool iswritable)
 		Oid		argList[1];
 		Oid		returnOid;
 
-		funcname = lappend(funcname, makeString(formatter_name));
+		char*   new_formatter_name = (char *)palloc0(strlen(formatter_name) + 5);
+		if (!iswritable)
+		{
+			sprintf(new_formatter_name, "%s_in", formatter_name);
+		}
+		else
+		{
+			sprintf(new_formatter_name, "%s_out", formatter_name);
+		}
+
+		/* update to all lowercase string */
+		for ( int i = 0 ; new_formatter_name[i] != '\0' ; ++i )
+		{
+			new_formatter_name[i] = tolower(new_formatter_name[i]);
+		}
+
+		funcname = lappend(funcname, makeString(new_formatter_name));
 
 		if(iswritable)
 		{
@@ -1363,7 +1583,7 @@ lookupCustomFormatter(char *formatter_name, bool iswritable)
 		if (!OidIsValid(procOid))
 			ereport(ERROR, (errcode(ERRCODE_UNDEFINED_FUNCTION),
 							errmsg("formatter function %s of type %s was not found.",
-									formatter_name,
+									new_formatter_name,
 									(iswritable ? "writable" : "readable")),
 							errhint("Create it with CREATE FUNCTION."),
 							errOmitLocation(true)));
@@ -1372,7 +1592,7 @@ lookupCustomFormatter(char *formatter_name, bool iswritable)
 		if (get_func_rettype(procOid) != returnOid)
 			ereport(ERROR, (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 							errmsg("formatter function %s of type %s has an incorrect return type",
-									formatter_name,
+									new_formatter_name,
 									(iswritable ? "writable" : "readable")),
 							errOmitLocation(true)));
 
@@ -1381,8 +1601,11 @@ lookupCustomFormatter(char *formatter_name, bool iswritable)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 					 errmsg("formatter function %s is not declared STABLE.",
-							 formatter_name),
+							 new_formatter_name),
 					 errOmitLocation(true)));
+
+		if(NULL != new_formatter_name)
+			pfree(new_formatter_name);
 
 		return procOid;
 }
@@ -1664,7 +1887,9 @@ FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 							 Relation 				rel,
 							 TupleDesc 				tupDesc,
 							 FmgrInfo			   *convFuncs,
-							 Oid                   *typioparams)
+							 Oid                   *typioparams,
+							 char				   *url,
+							 ScanState			   *ss)
 {
 	formatter->type = T_FormatterData;
 	formatter->fmt_relation = rel;
@@ -1680,6 +1905,8 @@ FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 	formatter->fmt_needs_transcoding = pstate->need_transcoding;
 	formatter->fmt_conversion_proc = pstate->enc_conversion_proc;
 	formatter->fmt_external_encoding = pstate->client_encoding;
+	formatter->fmt_url = url;
+	formatter->fmt_splits = ss == NULL ? NULL : ss->splits;
 
 	InitFunctionCallInfoData(/* FunctionCallInfoData */ *fcinfo,
 							 /* FmgrInfo */ pstate->custom_formatter_func,
@@ -1687,7 +1914,6 @@ FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 							 /* Call Context */ (Node *) formatter,
 							 /* ResultSetInfo */ NULL);
 }
-
 
 /*
  * open the external source for scanning (RET only)
@@ -2358,6 +2584,48 @@ strtokx2(const char *s,
 	}
 
 	return start;
+}
+
+bool hasErrTblInFmtOpts(List *fmtOpts) {
+	char	*format_str = pstrdup((char *) strVal(linitial(fmtOpts)));
+	const	char *whitespace = " \t\n\r";
+	int	encoding = GetDatabaseEncoding();
+	char *key = strtokx2(format_str, whitespace, NULL, NULL,
+												0, false, true, encoding);
+	while (key) {
+		if (pg_strcasecmp(key, "err_table") == 0)
+			return true;
+		key = strtokx2(NULL, whitespace, NULL, NULL,
+									   0, false, false, encoding);
+	}
+	return false;
+}
+
+char *getExtTblCategoryInFmtOptsStr(char *fmtStr)
+{
+	const char	*whitespace = " \t\n\r";
+	const char	*quote = "'";
+	int			encoding = GetDatabaseEncoding();
+
+	char *key = strtokx2(fmtStr, whitespace, NULL, NULL,
+	                     0, false, true, encoding);
+	char *val = strtokx2(NULL, whitespace, NULL, quote,
+	                     0, false, true, encoding);
+
+	while (key && val)
+	{
+		if (pg_strncasecmp(key, "category", strlen("category")) == 0)
+		{
+			return pstrdup(val);
+		}
+
+		key = strtokx2(NULL, whitespace, NULL, NULL,
+		               0, false, false, encoding);
+		val = strtokx2(NULL, whitespace, NULL, quote,
+		               0, false, true, encoding);
+	}
+
+	return NULL;
 }
 
 char *getExtTblFormatterTypeInFmtOptsStr(char *fmtStr)

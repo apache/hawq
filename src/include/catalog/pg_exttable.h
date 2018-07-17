@@ -164,9 +164,10 @@ GetExtTableEntry(Oid relid);
 extern void
 RemoveExtTableEntry(Oid relid);
 
-#define CustomFormatType 'b'
-#define TextFormatType 't'
-#define CsvFormatType 'c'
+#define CustomFormatType    'b'
+#define TextFormatType      't'
+#define CsvFormatType       'c'
+#define NonCustomFormatType 'n'
 
 /* PXF formats*/
 #define GpdbWritableFormatName "GPDBWritable"

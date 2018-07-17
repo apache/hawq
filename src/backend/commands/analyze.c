@@ -54,6 +54,7 @@
 #include "access/aosegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "access/hash.h"
+#include "access/xact.h"
 #include "catalog/index.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
@@ -64,6 +65,7 @@
 #include "cdb/cdbheap.h"
 #include "cdb/cdbhash.h"
 #include "commands/vacuum.h"
+#include "commands/dbcommands.h"
 #include "executor/executor.h"
 #include "lib/stringinfo.h"
 #include "libpq/pqformat.h"             /* pq_beginmessage() etc. */
@@ -80,12 +82,15 @@
 #include "utils/memutils.h"
 #include "utils/syscache.h"
 #include "utils/tuplesort.h"
+#include "utils/palloc.h"
 #include "utils/pg_locale.h"
 #include "utils/builtins.h"
 #include "utils/inval.h"
+#include "utils/uri.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbanalyze.h"
 #include "cdb/cdbrelsize.h"
+#include "cdb/cdbdatalocality.h"
 #include "utils/fmgroids.h"
 #include "storage/backendid.h"
 #include "executor/spi.h"
@@ -93,6 +98,8 @@
 #include "catalog/pg_namespace.h"
 #include "utils/debugbreak.h"
 #include "nodes/makefuncs.h"
+#include "nodes/nodes.h"
+#include "nodes/parsenodes.h"
 
 #include "commands/analyzeutils.h"
 
@@ -153,8 +160,14 @@ static List	*buildExplicitAttributeNames(Oid relationOid, VacuumStmt *stmt);
 static void gp_statistics_estimate_reltuples_relpages_heap(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, float4 *reltuples, float4 *relpages);
+static void gp_statistics_estimate_reltuples_relpages_external(Relation rel, float4 *relTuples, float4 *relPages);
 static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples, float4 *relPages, bool rootonly);
 static void analyzeEstimateIndexpages(Oid relationOid, Oid indexOid, float4 *indexPages);
+
+static void getExternalRelTuples(Oid relationOid, float4 *relTuples);
+static void getExternalRelPages(Oid relationOid, float4 *relPages , Relation rel);
+static float4 getExtrelPagesHDFS(Uri *uri);
+static bool isExternalHDFSProtocol(Oid relOid);
 
 /* Attribute-type related functions */
 static bool isOrderedAndHashable(Oid relationOid, const char *attributeName);
@@ -441,6 +454,17 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 					(errmsg("skipping \"%s\" --- cannot analyze a mid-level partition. "
 							"Please run ANALYZE on the root partition table.",
 							get_rel_name(relationOid))));
+		}
+		else if (!isExternalHDFSProtocol(relationOid))
+		{
+					/*
+					 * Support analyze for external table.
+					 * For now, HDFS protocol external table is supported.
+					 */
+			ereport(WARNING,
+					 (errmsg("skipping \"%s\" --- cannot analyze external table with non-HDFS or non-MAGMA protocol. "
+					         "Please run ANALYZE on external table with HDFS or MAGMA protocol.",
+					         get_rel_name(relationOid))));
 		}
 		else
 		{
@@ -989,8 +1013,10 @@ static List* analyzableRelations(bool rootonly, List **fullRelOids)
 	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
 	{
 		Oid candidateOid = HeapTupleGetOid(tuple);
-		if (analyzePermitted(candidateOid)
-						&& candidateOid != StatisticRelationId)
+		bool isExternalHDFS = isExternalHDFSProtocol(candidateOid);
+		if (analyzePermitted(candidateOid) &&
+				    candidateOid != StatisticRelationId &&
+				    isExternalHDFS)
 		{
 			*fullRelOids = lappend_oid(*fullRelOids, candidateOid);
 		}
@@ -998,8 +1024,9 @@ static List* analyzableRelations(bool rootonly, List **fullRelOids)
 		{
 			continue;
 		}
-		if (analyzePermitted(candidateOid)
-				&& candidateOid != StatisticRelationId)
+		if (analyzePermitted(candidateOid) &&
+				    candidateOid != StatisticRelationId &&
+				    isExternalHDFS)
 		{
 			lRelOids = lappend_oid(lRelOids, candidateOid);
 		}
@@ -1703,6 +1730,11 @@ static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples,
 			}
 			else if (RelationIsParquet(rel)){
 				gp_statistics_estimate_reltuples_relpages_parquet(rel, &partRelTuples,
+						&partRelPages);
+			}
+			else if( RelationIsExternal(rel))
+			{
+				gp_statistics_estimate_reltuples_relpages_external(rel, &partRelTuples,
 						&partRelPages);
 			}
 
@@ -3265,4 +3297,381 @@ static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, floa
 
 	pfree(fstotal);
 	return;
+}
+
+/**
+ * This method estimates the number of tuples and pages in an extern relation. We can not get accurate tuple counts
+ * and pages counts in the catalog. Therefore, we have to get reltuples and relpages manually.
+ *
+ * Input:
+ * 	rel - Relation. Must be an external table.
+ *
+ * Output:
+ * 	reltuples - exact number of tuples in relation.
+ * 	relpages  - exact number of pages.
+ */
+static void gp_statistics_estimate_reltuples_relpages_external(Relation rel, float4 *relTuples, float4 *relPages){
+	Oid extRelationOid = RelationGetRelid(rel);
+	getExternalRelTuples(extRelationOid, relTuples);
+	getExternalRelPages(extRelationOid, relPages, rel);
+}
+
+/**
+ * This method called by analyzeExternalEstimateReltuplesRelpages,
+ * to get External Relation reltuple counts, we run count(*) sql manually
+ *
+ * Input:
+ * 	extRelationOid - External Table Relation Oid
+ * Output:
+ * 	relTuples - exact number of tuples in relation.
+ */
+static void getExternalRelTuples(Oid extRelationOid, float4 *relTuples){
+	const char *schemaName = NULL;
+	const char *tableName = NULL;
+	schemaName = get_namespace_name(get_rel_namespace(extRelationOid)); /* must be pfreed */
+	tableName = get_rel_name(extRelationOid); /* must be pfreed */
+
+	StringInfoData str;
+	initStringInfo(&str);
+	appendStringInfo(&str, "select count(*)::float4 from %s.%s as Ta",
+			quote_identifier(schemaName),
+			quote_identifier(tableName));
+
+	spiExecuteWithCallback(str.data, false /*readonly*/, 0 /*tcount */,
+								spiCallback_getSingleResultRowColumnAsFloat4, relTuples);
+	pfree(tableName);
+	pfree(schemaName);
+	pfree(str.data);
+}
+
+/**
+ * This method called by analyzeExternalEstimateReltuplesRelpages,to get External Relation relpages counts.
+ * We call GetExtTableEntry method to get get List of external Table Locations.And then we go through every
+ * location url to sum the count of relpages.External Relation now support some different protocals, therefore
+ * we need to process them in different way.
+ *
+ * Input:
+ * 	extRelationOid - External Table Relation Oid
+ * Output:
+ * 	relTuples - exact number of pages in relation.
+ */
+static void getExternalRelPages(Oid extRelationOid, float4 *relPages , Relation rel){
+
+	ExtTableEntry* entry = GetExtTableEntry(extRelationOid);
+	List* extLocations = entry->locations;
+	int	num_urls = list_length(extLocations);
+	ListCell *cell = list_head(extLocations);
+	ListCell *cellTmp = NULL;
+	while(cell != NULL)
+	{
+		char *url = pstrdup(((Value*)lfirst(cell))->val.str);
+		Assert(url != NULL);
+		Uri *uri = ParseExternalTableUri(url);
+		Assert(uri != NULL);
+		switch (uri->protocol){
+			case URI_HDFS:
+				*relPages += getExtrelPagesHDFS(uri);
+				break;
+
+			/*
+			 * to be done
+			 */
+			case URI_GPFDIST:
+                *relPages = 1.0;
+                elog(NOTICE,"In external table ANALYZE command are not supported in GPFDIST location so far.");
+                break;
+            case URI_FILE:
+                *relPages = 1.0;
+                elog(NOTICE,"In external table ANALYZE command are not supported in FILE location so far.");
+                break;
+			case URI_FTP:
+				*relPages = 1.0;
+				elog(NOTICE,"In external table ANALYZE command are not supported in FTP location so far.");
+                break;
+			case URI_HTTP:
+				*relPages = 1.0;
+				elog(NOTICE,"In external table ANALYZE command are not supported in HTTP location so far.");
+                break;
+			case URI_CUSTOM:
+				*relPages = 1.0;
+				elog(NOTICE,"In external table ANALYZE command are not supported in CUSTOM location so far.");
+                break;
+			case URI_GPFDISTS:
+				*relPages = 1.0;
+				elog(NOTICE,"In external table ANALYZE command are not supported in GPFDISTS location so far.");
+                break;
+			default:
+				*relPages = 1.0;
+                elog(NOTICE,"should not go here");
+				break;
+		}
+
+		cell = cell->next;
+
+		/* free resourse */
+		pfree(url);
+		if(uri->customprotocol != NULL){ pfree(uri->customprotocol);}
+		pfree(uri->hostname);
+		if(uri->path!=NULL){pfree(uri->path);}
+		FreeExternalTableUri(uri);
+	}
+	/* pfree entry->location*/
+	list_free_deep(extLocations);
+	/* pfree entry */
+	if(entry->fmtopts != NULL){ pfree(entry->fmtopts);}
+	if(entry->command != NULL){ pfree(entry->command);}
+	pfree(entry);
+}
+
+/**
+ * This method get the number of pages external table which location uri protocol is HDFS. We hold that
+ * the concept of the page number in  external table is same as the concept of block number in hdfs.
+ * Therefore we get the number of pages for external table by get the number of blocks in hdfs
+ *
+ * Input:
+ * 	uri - hdfs uri which refers to external table storage location, uri can refer to a file or a folder
+ *
+ */
+static float4 getExtrelPagesHDFS(Uri *uri){
+	int numOfBlock = 0;
+	int nsize = 0;
+	float4 relpages = 0.0;
+	hdfsFS fs = hdfsConnect(uri->hostname, uri->port);
+
+	//hdfsFileInfo *fiarray = hdfsGetPathInfo(fs, uri->path);
+	hdfsFileInfo *fiarray = hdfsListDirectory(fs, uri->path,&nsize);
+	if (fs == NULL)
+	{
+		elog(ERROR, "hdfsprotocol_blocklocation : "
+					"failed to get files of path %s",
+					uri->path);
+	}
+
+	/* Call block location api to get data location for each file */
+	for (int i = 0 ; i < nsize ; i++)
+	{
+//		FscHdfsFileInfoC *fi = FscHdfsGetFileInfoFromArray(fiarray, i);
+		hdfsFileInfo *fi = &fiarray[i];
+		/* break condition of this for loop */
+		if (fi == NULL) {break;}
+
+		/* Build file name full path. */
+		const char *fname = fi->mName;
+		char *fullpath = palloc0(
+								 strlen(fname) +      /* name  */
+								 1);                  /* \0    */
+		sprintf(fullpath, "%s/%s", uri->path, fname);
+
+		/* Get file full length. */
+	//	int64_t len = FscHdfsGetFileInfoLength(fi);
+		int64_t len = fi->mSize;
+		if (len == 0) {
+			pfree(fullpath);
+			continue;
+		}
+
+		/* Get block location data for this file */
+		BlockLocation *bla = hdfsGetFileBlockLocations(fs, fullpath, 0, len,&numOfBlock);
+		if (bla == NULL)
+		{
+			elog(ERROR, "hdfsprotocol_blocklocation : "
+						"failed to get block location of path %s. "
+						"It is reported generally due to HDFS service errors or "
+						"another session's ongoing writing.",
+						fullpath);
+		}
+
+		relpages += numOfBlock;
+
+
+		/* We don't need it any longer */
+		pfree(fullpath);
+
+		/* Clean up block location instances created by the lib. */
+		hdfsFreeFileBlockLocations(&bla,numOfBlock);
+	}
+
+	/* Clean up file info array created by the lib for this location. */
+//	FscHdfsFreeFileInfoArrayC(&fiarray);
+	hdfsFreeFileInfo(fiarray,nsize);
+	hdfsDisconnect(fs);
+	return relpages;
+}
+
+
+/*
+ * Get total bytes of external table with HDFS protocol
+ */
+uint64 GetExternalTotalBytesHDFS(Uri *uri)
+{
+	uint64 totalBytes = 0;
+	int nsize = 0;
+
+	hdfsFS fs = hdfsConnect(uri->hostname, uri->port);
+
+	hdfsFileInfo *fiarray = hdfsListDirectory(fs, uri->path,&nsize);
+	if (fiarray == NULL)
+	{
+		elog(ERROR, "hdfsprotocol_blocklocation : "
+		            "failed to get files of path %s.",
+		            uri->path);
+	}
+
+	/* Call block location api to get data location for each file */
+	for (int i = 0 ; i < nsize ; i++)
+	{
+		hdfsFileInfo *fi = &fiarray[i];
+
+		/* Break condition of this for loop */
+		if (fi == NULL)
+		{
+			break;
+		}
+
+		/* Get file full length. */
+		totalBytes += fi->mSize;
+
+	}
+
+	/* Clean up file info array created by the lib for this location. */
+	hdfsFreeFileInfo(fiarray,nsize);
+		hdfsDisconnect(fs);
+
+	return totalBytes;
+}
+
+/*
+ * Get total bytes of external table
+ */
+uint64 GetExternalTotalBytes(Relation rel)
+{
+	Oid extRelOid = RelationGetRelid(rel);
+	ExtTableEntry *entry = GetExtTableEntry(extRelOid);
+	List *extLocations = entry->locations;
+	int num_urls = list_length(extLocations);
+	ListCell *cell = list_head(extLocations);
+	ListCell *cellTmp = NULL;
+	uint64 totalBytes = 0;
+
+	while(cell != NULL)
+	{
+		char *url = pstrdup(((Value*)lfirst(cell))->val.str);
+		Assert(url != NULL);
+
+		Uri *uri = ParseExternalTableUri(url);
+		Assert(uri != NULL);
+
+		switch (uri->protocol)
+		{
+		case URI_HDFS:
+			totalBytes += GetExternalTotalBytesHDFS(uri);
+			break;
+		/*
+		 * Support analyze for external table.
+		 * For now, HDFS protocol external table is supported.
+		 */
+		case URI_GPFDIST:
+			totalBytes += 0;
+			elog(ERROR,"In external table ANALYZE command are not supported in GPFDIST location so far.");
+			break;
+
+		case URI_FILE:
+			totalBytes += 0;
+			elog(ERROR,"In external table ANALYZE command are not supported in FILE location so far.");
+			break;
+
+		case URI_FTP:
+			totalBytes += 0;
+			elog(ERROR,"In external table ANALYZE command are not supported in FTP location so far.");
+			break;
+
+		case URI_HTTP:
+			totalBytes += 0;
+			elog(ERROR,"In external table ANALYZE command are not supported in HTTP location so far.");
+			break;
+
+		case URI_CUSTOM:
+			totalBytes += 0;
+			elog(ERROR,"In external table ANALYZE command are not supported in CUSTOM location so far.");
+			break;
+
+		case URI_GPFDISTS:
+			totalBytes += 0;
+			elog(ERROR,"In external table ANALYZE command are not supported in GPFDISTS location so far.");
+			break;
+
+		default:
+			totalBytes += 0;
+			elog(ERROR,"should not go here");
+			break;
+		}
+
+		cell = cell->next;
+
+		/* free resourse */
+		pfree(url);
+		if (uri->customprotocol != NULL)
+		{
+			pfree(uri->customprotocol);
+		}
+		pfree(uri->hostname);
+
+		if (uri->path != NULL)
+		{
+			pfree(uri->path);
+		}
+		FreeExternalTableUri(uri);
+
+	}
+	/* pfree entry->location*/
+	list_free_deep(extLocations);
+	/* pfree entry */
+	if (entry->fmtopts != NULL)
+	{
+		pfree(entry->fmtopts);
+	}
+	if (entry->command != NULL)
+	{
+		pfree(entry->command);
+	}
+	pfree(entry);
+
+	return totalBytes;
+}
+
+/*
+ * Check if a relation is external table with HDFS protocol
+ */
+static bool isExternalHDFSProtocol(Oid relOid)
+{
+	bool ret = true;
+
+	Relation rel = try_relation_open(relOid, AccessShareLock, false);
+	if (rel != NULL)
+	{
+		if ((rel->rd_rel->relkind == RELKIND_RELATION) &&
+		    RelationIsExternal(rel))
+		{
+			ExtTableEntry* entry = GetExtTableEntry(relOid);
+			List* extLocations = entry->locations;
+			ListCell *cell = list_head(extLocations);
+			while(cell != NULL)
+			{
+				char *url = ((Value*)lfirst(cell))->val.str;
+				Assert(url != NULL);
+			//	if (!IS_HDFS_URI(url))
+				if (!IS_HDFS_URI(url))
+				{
+					ret = false;
+					break;
+				}
+
+				cell = cell->next;
+			}
+		}
+
+		relation_close(rel, AccessShareLock);
+	}
+
+	return ret;
 }

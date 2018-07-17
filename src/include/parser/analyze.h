@@ -34,27 +34,33 @@ extern void applyLockingClause(Query *qry, Index rtindex,
 Datum partition_arg_get_val(Node *node, bool *isnull);
 
 /* State shared by transformCreateStmt and its subroutines */
-typedef struct
-{
-	const char *stmtType;		/* "CREATE TABLE" or "ALTER TABLE" */
-	RangeVar   *relation;		/* relation to create */
-	List	   *inhRelations;	/* relations to inherit from */
-	bool		hasoids;		/* does relation have an OID column? */
-	bool		isalter;		/* true if altering existing table */
-	bool		isaddpart;		/* true if create in service of adding a part */
-	List	   *columns;		/* ColumnDef items */
-	List	   *ckconstraints;	/* CHECK constraints */
-	List	   *fkconstraints;	/* FOREIGN KEY constraints */
-	List	   *ixconstraints;	/* index-creating constraints */
-	List	   *inh_indexes;	/* cloned indexes from INCLUDING INDEXES */
-	List	   *blist;			/* "before list" of things to do before
-								 * creating the table */
-	List	   *alist;			/* "after list" of things to do after creating
-								 * the table */
-	List	   *dlist;			/* "deferred list" of utility statements to 
-								 * transfer to the list CreateStmt->deferredStmts
-								 * for later parse_analyze and dispatch */
-	IndexStmt  *pkey;			/* PRIMARY KEY index, if any */
+typedef struct {
+  bool isExternalTable;
+  const char *stmtType; /* "CREATE TABLE" or "ALTER TABLE" */
+  RangeVar *relation;   /* relation to create */
+  List *inhRelations;   /* relations to inherit from */
+  bool hasoids;         /* does relation have an OID column? */
+  bool isalter;         /* true if altering existing table */
+  bool isaddpart;       /* true if create in service of adding a part */
+  List *columns;        /* ColumnDef items */
+  List *ckconstraints;  /* CHECK constraints */
+  List *fkconstraints;  /* FOREIGN KEY constraints */
+  List *ixconstraints;  /* index-creating constraints */
+  List *inh_indexes;    /* cloned indexes from INCLUDING INDEXES */
+  List *blist;          /* "before list" of things to do before
+                                         * creating the table */
+  List *alist;          /* "after list" of things to do after creating
+                                         * the table */
+  List *dlist;          /* "deferred list" of utility statements to
+                                         * transfer to the list CreateStmt->deferredStmts
+                                         * for later parse_analyze and dispatch */
+  IndexStmt *pkey;      /* PRIMARY KEY index, if any */
+
+  // for external table only
+  Node *exttypedesc;
+  char *format;
+  bool iswritable;
+  char *parentPath;
 } CreateStmtContext;
 
 Query *transformCreateStmt(ParseState *pstate, CreateStmt *stmt,
@@ -83,4 +89,6 @@ extern List * form_default_storage_directive(List *enc);
 
 extern struct GpPolicy *createRandomDistribution(int maxattrs);
 
+extern void recognizeExternalRelationFormatterOptions(
+    CreateExternalStmt *createExtStmt);
 #endif   /* ANALYZE_H */

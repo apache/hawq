@@ -1079,25 +1079,25 @@ _equalCopyStmt(CopyStmt *a, CopyStmt *b)
 static bool
 _equalCreateStmt(CreateStmt *a, CreateStmt *b)
 {
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_NODE_FIELD(tableElts);
-	COMPARE_NODE_FIELD(inhRelations);
-	COMPARE_NODE_FIELD(constraints);
-	COMPARE_NODE_FIELD(options);
-	COMPARE_SCALAR_FIELD(oncommit);
-	COMPARE_STRING_FIELD(tablespacename);
-	COMPARE_NODE_FIELD(distributedBy);
+	COMPARE_SCALAR_FIELD(base.relKind);
+	COMPARE_NODE_FIELD(base.relation);
+	COMPARE_NODE_FIELD(base.tableElts);
+	COMPARE_NODE_FIELD(base.inhRelations);
+	COMPARE_NODE_FIELD(base.constraints);
+	COMPARE_NODE_FIELD(base.options);
+	COMPARE_SCALAR_FIELD(base.oncommit);
+	COMPARE_STRING_FIELD(base.tablespacename);
+	COMPARE_NODE_FIELD(base.distributedBy);
+	COMPARE_SCALAR_FIELD(base.is_part_child);
+	COMPARE_SCALAR_FIELD(base.is_add_part);
 	COMPARE_SCALAR_FIELD(oidInfo.relOid);
 	COMPARE_SCALAR_FIELD(oidInfo.comptypeOid);
 	COMPARE_SCALAR_FIELD(oidInfo.toastOid);
 	COMPARE_SCALAR_FIELD(oidInfo.toastIndexOid);
-	COMPARE_SCALAR_FIELD(relKind);
 	COMPARE_SCALAR_FIELD(relStorage);
 	/* policy omitted */
 	/* postCreate omitted */
 	/* deferredStmts omitted */
-	COMPARE_SCALAR_FIELD(is_part_child);
-	COMPARE_SCALAR_FIELD(is_add_part);
 	COMPARE_SCALAR_FIELD(is_split_part);
 	COMPARE_SCALAR_FIELD(ownerid);
 	COMPARE_SCALAR_FIELD(buildAoBlkdir);
@@ -1141,16 +1141,25 @@ _equalExtTableTypeDesc(ExtTableTypeDesc *a, ExtTableTypeDesc *b)
 static bool
 _equalCreateExternalStmt(CreateExternalStmt *a, CreateExternalStmt *b)
 {
-	COMPARE_NODE_FIELD(relation);
-	COMPARE_NODE_FIELD(tableElts);
+	COMPARE_SCALAR_FIELD(base.relKind);
+	COMPARE_NODE_FIELD(base.relation);
+	COMPARE_NODE_FIELD(base.tableElts);
+	COMPARE_NODE_FIELD(base.inhRelations);
+	COMPARE_NODE_FIELD(base.constraints);
+	COMPARE_NODE_FIELD(base.options);
+	COMPARE_SCALAR_FIELD(base.oncommit);
+	COMPARE_STRING_FIELD(base.tablespacename);
+	COMPARE_NODE_FIELD(base.distributedBy);
+	COMPARE_SCALAR_FIELD(base.is_part_child);
+	COMPARE_SCALAR_FIELD(base.is_add_part);
 	COMPARE_NODE_FIELD(exttypedesc);
 	COMPARE_STRING_FIELD(format);
-	COMPARE_NODE_FIELD(formatOpts);
 	COMPARE_SCALAR_FIELD(isweb);
 	COMPARE_SCALAR_FIELD(iswritable);
+	COMPARE_SCALAR_FIELD(forceCreateDir);
+	COMPARE_STRING_FIELD(parentPath);
 	COMPARE_NODE_FIELD(sreh);
 	COMPARE_NODE_FIELD(encoding);
-	COMPARE_NODE_FIELD(distributedBy);
 
 	return true;
 }

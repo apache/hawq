@@ -4308,8 +4308,9 @@ CopyFrom(CopyState cstate)
 					else if (formatterType != ExternalTableType_PLUG)
 					{
 						resultRelInfo->ri_extInsertDesc =
-								external_insert_init(resultRelInfo->ri_RelationDesc,
-							                         0, formatterType, formatterName);
+								resultRelInfo->ri_extInsertDesc =
+										external_insert_init(resultRelInfo->ri_RelationDesc,
+											                      0, formatterType, formatterName, NULL);
 					}
 					else
 					{
@@ -4323,11 +4324,20 @@ CopyFrom(CopyState cstate)
 							FmgrInfo *insertInitFunc = (FmgrInfo *)palloc(sizeof(FmgrInfo));
 							fmgr_info(procOid, insertInitFunc);
 
+							ResultRelSegFileInfo *segfileinfo = NULL;
+							ResultRelInfoSetSegFileInfo(resultRelInfo,
+												cstate->ao_segfileinfos);
+							segfileinfo = (ResultRelSegFileInfo *) list_nth(
+												resultRelInfo->ri_aosegfileinfos,
+												GetQEIndex());
+
 							resultRelInfo->ri_extInsertDesc =
-							        InvokePlugStorageFormatInsertInit(insertInitFunc,
-							                                          resultRelInfo->ri_RelationDesc,
-							                                          formatterType,
-							                                          formatterName);
+									InvokePlugStorageFormatInsertInit(insertInitFunc,
+						                                      resultRelInfo->ri_RelationDesc,
+														                 formatterType,
+														                 formatterName,
+																		  NULL,
+														                  segfileinfo->segno);
 
 							pfree(insertInitFunc);
 						}

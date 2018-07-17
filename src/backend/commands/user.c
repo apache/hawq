@@ -2271,7 +2271,8 @@ static void CheckValueBelongsToKey(char *key, char *val, const char **keys, cons
 		if(strcasecmp(val, "gpfdist") != 0 && 
 		   strcasecmp(val, "gpfdists") != 0 &&
 		   strcasecmp(val, "http") != 0 &&
-		   strcasecmp(val, "gphdfs") != 0)
+		   strcasecmp(val, "gphdfs") != 0&&
+		   strcasecmp(val, "hdfs") != 0)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("invalid %s value \"%s\"", key, val)));
@@ -2303,7 +2304,7 @@ static void TransformExttabAuthClause(DefElem *defel, extAuthPair *extauth)
 	const int	numvals = 6;
 	const char *keys[] = { "type", "protocol"};	 /* order matters for validation. don't change! */
 	const char *vals[] = { /* types     */ "readable", "writable", 
-						   /* protocols */ "gpfdist", "gpfdists" , "http", "gphdfs"};
+						   /* protocols */ "gpfdist", "gpfdists" , "http", "gphdfs", "hdfs"};
 
 	if(list_length(l) > 2)
 		ereport(ERROR,
@@ -2450,6 +2451,19 @@ static void SetCreateExtTableForRole(List* allow,
 					createwexthdfs_specified = true;
 				}
 			}
+			else if(strcasecmp(extauth->protocol, "hdfs") == 0)
+			{
+				if(strcasecmp(extauth->type, "readable") == 0)
+				{
+					*createrexthdfs = true;
+					createrexthdfs_specified = true;
+				}
+				else
+				{
+					*createwexthdfs = true;
+					createwexthdfs_specified = true;
+				}
+			}
 			else /* http */
 			{
 				if(strcasecmp(extauth->type, "readable") == 0)
@@ -2502,6 +2516,23 @@ static void SetCreateExtTableForRole(List* allow,
 				}
 			}
 			else if(strcasecmp(extauth->protocol, "gphdfs") == 0)
+			{
+				if(strcasecmp(extauth->type, "readable") == 0)
+				{
+					if(createrexthdfs_specified)
+						conflict = true;
+
+					*createrexthdfs = false;
+				}
+				else
+				{
+					if(createwexthdfs_specified)
+						conflict = true;
+
+					*createwexthdfs = false;
+				}
+			}
+			else if(strcasecmp(extauth->protocol, "hdfs") == 0)
 			{
 				if(strcasecmp(extauth->type, "readable") == 0)
 				{

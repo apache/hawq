@@ -32,7 +32,8 @@ typedef enum UriProtocol
 	URI_HTTP,
 	URI_GPFDIST,
 	URI_CUSTOM,
-	URI_GPFDISTS
+	URI_GPFDISTS,
+	URI_HDFS
 }	UriProtocol;
 
 #define PROTOCOL_FILE		"file://"
@@ -41,6 +42,7 @@ typedef enum UriProtocol
 #define PROTOCOL_GPFDIST	"gpfdist://"
 #define PROTOCOL_GPFDISTS	"gpfdists://"
 #define PROTOCOL_PXF		"pxf://"
+#define PROTOCOL_HDFS		"hdfs://"
 
 /* 
  * sometimes we don't want to parse the whole URI but just take a peek at
@@ -52,6 +54,7 @@ typedef enum UriProtocol
 #define IS_GPFDISTS_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_GPFDISTS, strlen(PROTOCOL_GPFDISTS)) == 0) 
 #define IS_FTP_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_FTP, strlen(PROTOCOL_FTP)) == 0)
 #define IS_PXF_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_PXF, strlen(PROTOCOL_PXF)) == 0)
+#define IS_HDFS_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_HDFS, strlen(PROTOCOL_HDFS)) == 0)
 
 typedef struct Uri
 {

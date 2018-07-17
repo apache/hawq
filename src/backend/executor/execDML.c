@@ -421,7 +421,7 @@ ExecInsert(TupleTableSlot *slot,
 			else if (formatterType != ExternalTableType_PLUG)
 			{
 				resultRelInfo->ri_extInsertDesc = external_insert_init(
-						resultRelationDesc, 0, formatterType, formatterName);
+						resultRelationDesc, 0, formatterType, formatterName, estate->es_plannedstmt);
 			}
 			else
 			{
@@ -435,11 +435,21 @@ ExecInsert(TupleTableSlot *slot,
 					FmgrInfo insertInitFunc;
 					fmgr_info(procOid, &insertInitFunc);
 
+
+					ResultRelSegFileInfo *segfileinfo = NULL;
+					ResultRelInfoSetSegFileInfo(resultRelInfo,
+							estate->es_result_segfileinfos);
+					segfileinfo = (ResultRelSegFileInfo *) list_nth(
+							resultRelInfo->ri_aosegfileinfos, GetQEIndex());
+
 					resultRelInfo->ri_extInsertDesc =
-					        InvokePlugStorageFormatInsertInit(&insertInitFunc,
-					                                          resultRelationDesc,
-					                                          formatterType,
-					                                          formatterName);
+
+					InvokePlugStorageFormatInsertInit(&insertInitFunc,
+													 resultRelationDesc,
+													 formatterType,
+													 formatterName,
+													 estate->es_plannedstmt,
+													 segfileinfo->segno);
 				}
 				else
 				{

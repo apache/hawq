@@ -15,12 +15,15 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "port.h"
 
 #include "access/twophase.h"
 #include "access/xact.h"
+#include "access/fileam.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_exttable.h"
 #include "catalog/toasting.h"
 #include "catalog/aoseg.h"
 #include "commands/alter.h"
@@ -50,6 +53,7 @@
 #include "commands/vacuum.h"
 #include "commands/view.h"
 #include "miscadmin.h"
+#include "nodes/value.h"
 #include "postmaster/checkpoint.h"
 #include "rewrite/rewriteDefine.h"
 #include "rewrite/rewriteRemove.h"
@@ -61,6 +65,7 @@
 #include "utils/guc.h"
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
+#include "utils/uri.h"
 #include "lib/stringinfo.h"
 
 #include "cdb/cdbcat.h"
@@ -71,6 +76,7 @@
 #include "cdb/dispatcher.h"
 
 #include "resourcemanager/resqueuecommand.h"
+#include "catalog/pg_exttable.h"
 /*
  * Error-checking support for DROP commands
  */
@@ -270,10 +276,32 @@ CheckDropRelStorage(RangeVar *rel, ObjectType removeType)
 
 	classform = (Form_pg_class) GETSTRUCT(tuple);
 
-	if ((removeType == OBJECT_EXTTABLE && classform->relstorage != RELSTORAGE_EXTERNAL) ||
-		(removeType == OBJECT_FOREIGNTABLE && classform->relstorage != RELSTORAGE_FOREIGN) ||	
-		(removeType == OBJECT_TABLE && (classform->relstorage == RELSTORAGE_EXTERNAL || 
-										classform->relstorage == RELSTORAGE_FOREIGN)))
+	bool is_internal = false;
+	if (classform->relstorage == RELSTORAGE_EXTERNAL)
+	{
+		ExtTableEntry *entry = GetExtTableEntry(relOid);
+		List *entry_locations = entry->locations;
+		Assert(entry_locations);
+		ListCell *entry_location = list_head(entry_locations);
+		char *url = ((Value*)lfirst(entry_location))->val.str;
+		char *category = getExtTblCategoryInFmtOptsStr(entry->fmtopts);
+
+		if ((IS_HDFS_URI(url)) &&
+		    (category != NULL && pg_strncasecmp(category, "internal", strlen("internal")) == 0))
+		{
+			is_internal = true;
+		}
+
+		if (category)
+		{
+			pfree(category);
+		}
+	}
+
+	if ((removeType == OBJECT_EXTTABLE && (classform->relstorage != RELSTORAGE_EXTERNAL || is_internal)) ||
+		    (removeType == OBJECT_FOREIGNTABLE && classform->relstorage != RELSTORAGE_FOREIGN) ||
+		    (removeType == OBJECT_TABLE && (classform->relstorage == RELSTORAGE_EXTERNAL && (!is_internal) ||
+											classform->relstorage == RELSTORAGE_FOREIGN)))
 	{
 		/* we have a mismatch. format an error string and shoot */
 		
@@ -287,7 +315,7 @@ CheckDropRelStorage(RangeVar *rel, ObjectType removeType)
 		else
 			want_type = pstrdup("a base");
 
-		if (classform->relstorage == RELSTORAGE_EXTERNAL)
+		if (classform->relstorage == RELSTORAGE_EXTERNAL && !is_internal)
 			hint = pstrdup("Use DROP EXTERNAL TABLE to remove an external table");
 		else if (classform->relstorage == RELSTORAGE_FOREIGN)
 			hint = pstrdup("Use DROP FOREIGN TABLE to remove a foreign table");
@@ -447,7 +475,7 @@ check_xact_readonly(Node *parsetree)
 
 				createStmt = (CreateStmt *) parsetree;
 
-				if (createStmt->relation->istemp)
+				if (createStmt->base.relation->istemp)
 					return;		// Permit creation of TEMPORARY tables in read-only mode.
 
 				ereport(ERROR,
@@ -912,8 +940,8 @@ ProcessUtility(Node *parsetree,
 				Assert (gp_upgrade_mode || Gp_role != GP_ROLE_EXECUTE);
 
 
-				relOid = DefineRelation((CreateStmt *) parsetree,
-										relKind, relStorage);
+				relOid = DefineRelation((CreateStmt *) parsetree, relKind,
+								                        relStorage, NonCustomFormatType);
 
 				/*
 				 * Let AlterTableCreateToastTable decide if this one needs a
@@ -936,13 +964,13 @@ ProcessUtility(Node *parsetree,
 						((CreateStmt *) parsetree)->oidInfo.toastOid,
 						((CreateStmt *) parsetree)->oidInfo.toastIndexOid,
 					    &(((CreateStmt *) parsetree)->oidInfo.toastComptypeOid),
-						((CreateStmt *)parsetree)->is_part_child);
+						((CreateStmt *)parsetree)->base.is_part_child);
 
 					AlterTableCreateAoSegTableWithOid(relOid,
 							((CreateStmt *) parsetree)->oidInfo.aosegOid,
 							((CreateStmt *) parsetree)->oidInfo.aosegIndexOid,
 							&(((CreateStmt *) parsetree)->oidInfo.aosegComptypeOid),
-							((CreateStmt *) parsetree)->is_part_child);
+							((CreateStmt *) parsetree)->base.is_part_child);
 				}
 				CommandCounterIncrement();
 				/*

@@ -36,9 +36,18 @@
 typedef enum FmtNotification
 {
 	FMT_NONE,
+	FMT_DONE,
 	FMT_NEED_MORE_DATA
 
 } FmtNotification;
+
+typedef enum FmtActionMask
+{
+	FMT_UNSET = 0,
+	FMT_SET = 1,
+	FMT_NEEDEXTBUFF = 2,
+	FMT_WRITE_END = 4
+} FmtActionMask;
 
 /*
  * FormatterData is the node type that is passed as fmgr "context" info
@@ -49,6 +58,7 @@ typedef struct FormatterData
 {
 	NodeTag			type;                 /* see T_FormatterData */
 
+	FmtActionMask	fmt_mask;
 	/* metadata */
 	Relation    	fmt_relation;
 	TupleDesc   	fmt_tupDesc;
