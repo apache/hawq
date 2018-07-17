@@ -31,6 +31,7 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hawq.pxf.service.SessionId;
@@ -46,11 +47,10 @@ public class SecurityServletFilter implements Filter {
     private static final String USER_HEADER = "X-GP-USER";
     private static final String SEGMENT_ID_HEADER = "X-GP-SEGMENT-ID";
     private static final String TRANSACTION_ID_HEADER = "X-GP-XID";
-    private static final String FRAGMENT_INDEX_HEADER = "X-GP-FRAGMENT-INDEX";
-    private static final String FRAGMENT_COUNT_HEADER = "X-GP-FRAGMENT-COUNT";
+    private static final String LAST_FRAGMENT_HEADER = "X-GP-LAST-FRAGMENT";
     private static final String MISSING_HEADER_ERROR = "Header %s is missing in the request";
     private static final String EMPTY_HEADER_ERROR = "Header %s is empty in the request";
-    private UGICache proxyUGICache;
+    UGICache proxyUGICache;
 
     /**
      * Initializes the filter.
@@ -81,13 +81,9 @@ public class SecurityServletFilter implements Filter {
             final String gpdbUser = getHeaderValue(request, USER_HEADER, true);
             String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER, true);
             Integer segmentId = getHeaderValueInt(request, SEGMENT_ID_HEADER, true);
-            Integer fragmentCount = getHeaderValueInt(request, FRAGMENT_COUNT_HEADER, false);
-            Integer fragmentIndex = getHeaderValueInt(request, FRAGMENT_INDEX_HEADER, false);
+            boolean lastCallForSegment = getHeaderValueBoolean(request, LAST_FRAGMENT_HEADER, false);
 
             SessionId session = new SessionId(segmentId, transactionId, gpdbUser);
-            if (LOG.isDebugEnabled() && fragmentCount != null) {
-                LOG.debug(session.toString() + " Fragment = " + fragmentIndex + " of " + fragmentCount);
-            }
 
             // TODO refresh Kerberos token when security is enabled
 
@@ -119,12 +115,12 @@ public class SecurityServletFilter implements Filter {
                 throw new ServletException(ie);
             } finally {
                 // Optimization to cleanup the cache if it is the last fragment
-                boolean cleanImmediately = (fragmentIndex != null && fragmentIndex.equals(fragmentCount));
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Releasing proxy user for session: " + session);
+                    LOG.debug("Releasing proxy user for session: " + session +
+                            (lastCallForSegment ? " Last fragment call." : ""));
                 }
                 try {
-                    proxyUGICache.release(session, cleanImmediately);
+                    proxyUGICache.release(session, lastCallForSegment);
                 } catch (Throwable t) {
                     LOG.error("Error releasing UGICache for session: " + session, t);
                 }
@@ -157,6 +153,10 @@ public class SecurityServletFilter implements Filter {
             throw new IllegalArgumentException(String.format(EMPTY_HEADER_ERROR, headerKey));
         }
         return value;
+    }
+
+    private boolean getHeaderValueBoolean(ServletRequest request, String headerKey, boolean required) {
+        return StringUtils.equals("true", getHeaderValue(request, headerKey, required));
     }
 
 }
