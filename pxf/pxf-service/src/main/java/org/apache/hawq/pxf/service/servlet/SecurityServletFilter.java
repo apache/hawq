@@ -79,9 +79,9 @@ public class SecurityServletFilter implements Filter {
 
             // retrieve user header and make sure header is present and is not empty
             final String gpdbUser = getHeaderValue(request, USER_HEADER, true);
-            String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER, true);
-            Integer segmentId = getHeaderValueInt(request, SEGMENT_ID_HEADER, true);
-            boolean lastCallForSegment = getHeaderValueBoolean(request, LAST_FRAGMENT_HEADER, false);
+            final String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER, true);
+            final Integer segmentId = getHeaderValueInt(request, SEGMENT_ID_HEADER, true);
+            final boolean lastCallForSegment = getHeaderValueBoolean(request, LAST_FRAGMENT_HEADER, false);
 
             SessionId session = new SessionId(segmentId, transactionId, gpdbUser);
 
