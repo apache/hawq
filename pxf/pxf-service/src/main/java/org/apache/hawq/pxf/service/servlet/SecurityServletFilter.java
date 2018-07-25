@@ -88,6 +88,10 @@ public class SecurityServletFilter implements Filter {
                 }
             };
 
+            if (UserGroupInformation.isSecurityEnabled()) {
+                UserGroupInformation.getLoginUser().reloginFromKeytab();
+            }
+
             // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
             UserGroupInformation proxyUGI = null;
             try {
