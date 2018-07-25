@@ -71,7 +71,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
 
         switch (partitionType) {
             case DATE: {
-                byte[][] newb = ByteUtil.splitBytes(meta, 8);
+                byte[][] newb = ByteUtil.splitBytes(meta);
                 Date fragStart = new Date(ByteUtil.toLong(newb[0]));
                 Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
 
@@ -83,9 +83,9 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 break;
             }
             case INT: {
-                byte[][] newb = ByteUtil.splitBytes(meta, 4);
-                int fragStart = ByteUtil.toInt(newb[0]);
-                int fragEnd = ByteUtil.toInt(newb[1]);
+                byte[][] newb = ByteUtil.splitBytes(meta);
+                long fragStart = ByteUtil.toLong(newb[0]);
+                long fragEnd = ByteUtil.toLong(newb[1]);
 
                 query.append(partitionColumn).append(" >= ").append(fragStart);
                 query.append(" AND ");
@@ -134,16 +134,27 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 throw new UserDataException("The parameter 'RANGE' must be specified along with 'PARTITION_BY'");
             }
 
-            // Parse DATE partition type values
             if (partitionType == PartitionType.DATE) {
+                // Parse DATE partition type values
                 try {
                     SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-                    rangeStart = Calendar.getInstance();
-                    rangeStart.setTime(df.parse(range[0]));
-                    rangeEnd = Calendar.getInstance();
-                    rangeEnd.setTime(df.parse(range[1]));
-                } catch (ParseException e) {
+                    rangeDateStart = Calendar.getInstance();
+                    rangeDateStart.setTime(df.parse(range[0]));
+                    rangeDateEnd = Calendar.getInstance();
+                    rangeDateEnd.setTime(df.parse(range[1]));
+                }
+                catch (ParseException e) {
                     throw new UserDataException("The parameter 'RANGE' has invalid date format. The correct format is 'yyyy-MM-dd'");
+                }
+            }
+            else if (partitionType == PartitionType.INT) {
+                // Parse INT partition type values
+                try {
+                    rangeIntStart = Long.parseLong(range[0]);
+                    rangeIntEnd = Long.parseLong(range[1]);
+                }
+                catch (NumberFormatException e) {
+                    throw new UserDataException("The parameter 'RANGE' is invalid. Both range boundaries must be integers");
                 }
             }
         }
@@ -157,7 +168,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
             if (intervalStr != null) {
                 String[] interval = intervalStr.split(":");
                 try {
-                    intervalNum = Integer.parseInt(interval[0]);
+                    intervalNum = Long.parseLong(interval[0]);
                     if (intervalNum < 1) {
                         throw new UserDataException("The '<interval_num>' in parameter 'INTERVAL' must be at least 1, but actual is " + intervalNum);
                     }
@@ -165,6 +176,8 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 catch (NumberFormatException ex) {
                     throw new UserDataException("The '<interval_num>' in parameter 'INTERVAL' must be an integer");
                 }
+
+                // Intervals of type DATE
                 if (interval.length > 1) {
                     intervalType = IntervalType.typeOf(interval[1]);
                 }
@@ -197,6 +210,7 @@ public class JdbcPartitionFragmenter extends Fragmenter {
     @Override
     public List<Fragment> getFragments() {
         if (partitionType == null) {
+            // No partition case
             Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, null);
             fragments.add(fragment);
             return fragments;
@@ -204,32 +218,31 @@ public class JdbcPartitionFragmenter extends Fragmenter {
 
         switch (partitionType) {
             case DATE: {
-                int currInterval = intervalNum;
-                Calendar fragStart = rangeStart;
+                Calendar fragStart = rangeDateStart;
 
-                // Create fragment
-                while (fragStart.before(rangeEnd)) {
+                while (fragStart.before(rangeDateEnd)) {
+                    // Calculate a new fragment
                     Calendar fragEnd = (Calendar)fragStart.clone();
                     switch (intervalType) {
                         case DAY:
-                            fragEnd.add(Calendar.DAY_OF_MONTH, currInterval);
+                            fragEnd.add(Calendar.DAY_OF_MONTH, (int)intervalNum);
                             break;
                         case MONTH:
-                            fragEnd.add(Calendar.MONTH, currInterval);
+                            fragEnd.add(Calendar.MONTH, (int)intervalNum);
                             break;
                         case YEAR:
-                            fragEnd.add(Calendar.YEAR, currInterval);
+                            fragEnd.add(Calendar.YEAR, (int)intervalNum);
                             break;
                     }
-                    if (fragEnd.after(rangeEnd))
-                        fragEnd = (Calendar)rangeEnd.clone();
+                    if (fragEnd.after(rangeDateEnd))
+                        fragEnd = (Calendar)rangeDateEnd.clone();
 
-                    // Convert DATE into milliseconds
+                    // Convert to byte[]
                     byte[] msStart = ByteUtil.getBytes(fragStart.getTimeInMillis());
                     byte[] msEnd = ByteUtil.getBytes(fragEnd.getTimeInMillis());
                     byte[] fragmentMetadata = ByteUtil.mergeBytes(msStart, msEnd);
 
-                    // Write fragmetnt
+                    // Write fragment
                     Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, fragmentMetadata);
                     fragments.add(fragment);
 
@@ -239,22 +252,21 @@ public class JdbcPartitionFragmenter extends Fragmenter {
                 break;
             }
             case INT: {
-                int rangeStart = Integer.parseInt(range[0]);
-                int rangeEnd = Integer.parseInt(range[1]);
-                int currInterval = intervalNum;
+                long fragStart = rangeIntStart;
 
-                // Create fragment
-                int fragStart = rangeStart;
-                while (fragStart < rangeEnd) {
-                    int fragEnd = fragStart + currInterval;
-                    if (fragEnd > rangeEnd) {
-                        fragEnd = rangeEnd;
+                while (fragStart < rangeIntEnd) {
+                    // Calculate a new fragment
+                    long fragEnd = fragStart + intervalNum;
+                    if (fragEnd > rangeIntEnd) {
+                        fragEnd = rangeIntEnd;
                     }
 
+                    // Convert to byte[]
                     byte[] bStart = ByteUtil.getBytes(fragStart);
                     byte[] bEnd = ByteUtil.getBytes(fragEnd);
                     byte[] fragmentMetadata = ByteUtil.mergeBytes(bStart, bEnd);
 
+                    // Write fragment
                     Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, fragmentMetadata);
                     fragments.add(fragment);
 
@@ -279,12 +291,16 @@ public class JdbcPartitionFragmenter extends Fragmenter {
     // Partition parameters (filled by class constructor)
     private String[] range = null;
     private PartitionType partitionType = null;
-    private int intervalNum = 1;
+    private long intervalNum;
+
+    // Partition parameters for INT partitions (filled by class constructor)
+    private long rangeIntStart;
+    private long rangeIntEnd;
 
     // Partition parameters for DATE partitions (filled by class constructor)
-    private IntervalType intervalType = null;
-    private Calendar rangeStart = null;
-    private Calendar rangeEnd = null;
+    private IntervalType intervalType;
+    private Calendar rangeDateStart;
+    private Calendar rangeDateEnd;
 
     private static enum PartitionType {
         DATE,
