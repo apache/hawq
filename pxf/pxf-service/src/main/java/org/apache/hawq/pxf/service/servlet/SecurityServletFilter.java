@@ -19,21 +19,24 @@ package org.apache.hawq.pxf.service.servlet;
  * under the License.
  */
 
-
 import java.io.IOException;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedExceptionAction;
 
-import javax.servlet.*;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hawq.pxf.service.SessionId;
+import org.apache.hawq.pxf.service.UGICache;
 import org.apache.hawq.pxf.service.utilities.SecureLogin;
-
 
 /**
  * Listener on lifecycle events of our webapp
@@ -42,8 +45,12 @@ public class SecurityServletFilter implements Filter {
 
     private static final Log LOG = LogFactory.getLog(SecurityServletFilter.class);
     private static final String USER_HEADER = "X-GP-USER";
-    private static final String MISSING_HEADER_ERROR = String.format("Header %s is missing in the request", USER_HEADER);
-    private static final String EMPTY_HEADER_ERROR = String.format("Header %s is empty in the request", USER_HEADER);
+    private static final String SEGMENT_ID_HEADER = "X-GP-SEGMENT-ID";
+    private static final String TRANSACTION_ID_HEADER = "X-GP-XID";
+    private static final String LAST_FRAGMENT_HEADER = "X-GP-LAST-FRAGMENT";
+    private static final String MISSING_HEADER_ERROR = "Header %s is missing in the request";
+    private static final String EMPTY_HEADER_ERROR = "Header %s is empty in the request";
+    UGICache proxyUGICache;
 
     /**
      * Initializes the filter.
@@ -51,7 +58,8 @@ public class SecurityServletFilter implements Filter {
      * @param filterConfig filter configuration
      */
     @Override
-    public void init(FilterConfig filterConfig) throws ServletException {
+    public void init(FilterConfig filterConfig) {
+        proxyUGICache = new UGICache();
     }
 
     /**
@@ -59,54 +67,62 @@ public class SecurityServletFilter implements Filter {
      * and create a proxy user to execute further request chain. Responds with an HTTP error if the header is missing
      * or the chain processing throws an exception.
      *
-     * @param request http request
+     * @param request  http request
      * @param response http response
-     * @param chain filter chain
+     * @param chain    filter chain
      */
     @Override
-    public void doFilter(final ServletRequest request, final ServletResponse response, final FilterChain chain) throws IOException, ServletException {
+    public void doFilter(final ServletRequest request, final ServletResponse response, final FilterChain chain)
+            throws IOException, ServletException {
 
         if (SecureLogin.isUserImpersonationEnabled()) {
 
             // retrieve user header and make sure header is present and is not empty
-            final String user = ((HttpServletRequest) request).getHeader(USER_HEADER);
-            if (user == null) {
-                throw new IllegalArgumentException(MISSING_HEADER_ERROR);
-            } else if (user.trim().isEmpty()) {
-                throw new IllegalArgumentException(EMPTY_HEADER_ERROR);
-            }
+            final String gpdbUser = getHeaderValue(request, USER_HEADER, true);
+            final String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER, true);
+            final Integer segmentId = getHeaderValueInt(request, SEGMENT_ID_HEADER, true);
+            final boolean lastCallForSegment = getHeaderValueBoolean(request, LAST_FRAGMENT_HEADER, false);
+
+            SessionId session = new SessionId(segmentId, transactionId, gpdbUser);
 
             // TODO refresh Kerberos token when security is enabled
 
-            // prepare pivileged action to run on behalf of proxy user
+            // prepare privileged action to run on behalf of proxy user
             PrivilegedExceptionAction<Boolean> action = new PrivilegedExceptionAction<Boolean>() {
                 @Override
                 public Boolean run() throws IOException, ServletException {
-                    LOG.debug("Performing request chain call for proxy user = " + user);
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Performing request chain call for proxy user = " + gpdbUser);
+                    }
                     chain.doFilter(request, response);
                     return true;
                 }
             };
 
-            // create proxy user UGI from the UGI of the logged in user and execute the servlet chain as that user
-            UserGroupInformation proxyUGI = null;
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Retrieving proxy user for session: " + session);
+            }
             try {
-                LOG.debug("Creating proxy user = " + user);
-                proxyUGI = UserGroupInformation.createProxyUser(user, UserGroupInformation.getLoginUser());
-                proxyUGI.doAs(action);
+                // Retrieve proxy user UGI from the UGI of the logged in user
+                // and execute the servlet chain as that user
+                proxyUGICache
+                        .getUserGroupInformation(session)
+                        .doAs(action);
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
                 throw new ServletException(ute.getCause());
             } catch (InterruptedException ie) {
                 throw new ServletException(ie);
             } finally {
+                // Optimization to cleanup the cache if it is the last fragment
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Releasing proxy user for session: " + session +
+                            (lastCallForSegment ? " Last fragment call." : ""));
+                }
                 try {
-                    if (proxyUGI != null) {
-                        LOG.debug("Closing FileSystem for proxy user = " + proxyUGI.getUserName());
-                        FileSystem.closeAllForUGI(proxyUGI);
-                    }
+                    proxyUGICache.release(session, lastCallForSegment);
                 } catch (Throwable t) {
-                    LOG.warn("Error closing FileSystem for proxy user = " + proxyUGI.getUserName());
+                    LOG.error("Error releasing UGICache for session: " + session, t);
                 }
             }
         } else {
@@ -120,6 +136,27 @@ public class SecurityServletFilter implements Filter {
      */
     @Override
     public void destroy() {
+    }
+
+    private Integer getHeaderValueInt(ServletRequest request, String headerKey, boolean required)
+            throws IllegalArgumentException {
+        String value = getHeaderValue(request, headerKey, required);
+        return value != null ? Integer.valueOf(value) : null;
+    }
+
+    private String getHeaderValue(ServletRequest request, String headerKey, boolean required)
+            throws IllegalArgumentException {
+        String value = ((HttpServletRequest) request).getHeader(headerKey);
+        if (required && value == null) {
+            throw new IllegalArgumentException(String.format(MISSING_HEADER_ERROR, headerKey));
+        } else if (required && value.trim().isEmpty()) {
+            throw new IllegalArgumentException(String.format(EMPTY_HEADER_ERROR, headerKey));
+        }
+        return value;
+    }
+
+    private boolean getHeaderValueBoolean(ServletRequest request, String headerKey, boolean required) {
+        return StringUtils.equals("true", getHeaderValue(request, headerKey, required));
     }
 
 }
