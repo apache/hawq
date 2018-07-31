@@ -96,9 +96,8 @@ public class BridgeResource extends RestResource {
             LOG.debug("started with parameters: " + params);
         }
 
-        ProtocolData protData = new ProtocolData(params);
-        SecuredHDFS.verifyToken(protData, servletContext);
         Bridge bridge;
+        ProtocolData protData = new ProtocolData(params);
         float sampleRatio = protData.getStatsSampleRatio();
         if (sampleRatio > 0) {
             bridge = new ReadSamplingBridge(protData);

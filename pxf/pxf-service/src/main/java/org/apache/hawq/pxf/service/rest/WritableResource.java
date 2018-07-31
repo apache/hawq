@@ -117,8 +117,6 @@ public class WritableResource extends RestResource{
 
         ProtocolData protData = new ProtocolData(params);
         protData.setDataSource(path);
-
-        SecuredHDFS.verifyToken(protData, servletContext);
         Bridge bridge = new WriteBridge(protData);
 
         // THREAD-SAFE parameter has precedence

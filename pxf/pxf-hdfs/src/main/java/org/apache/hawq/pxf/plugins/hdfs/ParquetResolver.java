@@ -57,7 +57,7 @@ public class ParquetResolver extends Plugin implements ReadResolver {
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      * @param schema the MessageType instance, which is obtained from the Parquet file footer
      */
     public List<OneField> getFields(OneRow row, MessageType schema) throws Exception

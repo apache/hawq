@@ -5,9 +5,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -28,7 +28,7 @@ JVM_OPTS=""
 PXF_LOGDIR="$CATALINA_BASE/logs"
 PXF_USER_IMPERSONATION=""
 
-PXF_OPTS="-Dpxf.log.dir=$PXF_LOGDIR -Dpxf.service.user.impersonation.enabled=$PXF_USER_IMPERSONATION"
+PXF_OPTS="-Dpxf.log.dir=$PXF_LOGDIR -Dpxf.service.user.impersonation.enabled=$PXF_USER_IMPERSONATION -Dpxf.service.kerberos.keytab=$PXF_KEYTAB -Dpxf.service.kerberos.principal=$PXF_PRINCIPAL"
 JAVA_OPTS="$JVM_OPTS $AGENT_PATHS $JAVA_AGENTS $JAVA_LIBRARY_PATH $PXF_OPTS"
 
 CATALINA_PID="$CATALINA_BASE/logs/catalina.pid"

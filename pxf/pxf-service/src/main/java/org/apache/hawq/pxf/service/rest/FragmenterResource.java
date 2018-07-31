@@ -147,7 +147,6 @@ public class FragmenterResource extends RestResource {
         if (protData.getFragmenter() == null) {
             protData.protocolViolation("fragmenter");
         }
-        SecuredHDFS.verifyToken(protData, servletContext);
 
         return protData;
     }

@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.utilities;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -21,6 +21,7 @@ package org.apache.hawq.pxf.service.utilities;
 
 
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,10 +32,9 @@ import org.powermock.modules.junit4.PowerMockRunner;
 import javax.servlet.ServletContext;
 import java.io.IOException;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
+import static org.mockito.Mockito.*;
 
 
 @RunWith(PowerMockRunner.class)
@@ -44,6 +44,18 @@ public class SecuredHDFSTest {
     ServletContext mockContext;
 
     @Test
+    public void nullToken() throws IOException {
+        when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
+        UserGroupInformation ugi = mock(UserGroupInformation.class);
+        when(mockProtocolData.getToken()).thenReturn(null);
+        when(UserGroupInformation.getLoginUser()).thenReturn(ugi);
+
+        SecuredHDFS.verifyToken(null, mockContext);
+        verify(ugi).reloginFromKeytab();
+        verify(ugi, never()).addToken(any());
+    }
+
+    @Test
     public void invalidTokenThrows() throws IOException {
         when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
         UserGroupInformation ugi = mock(UserGroupInformation.class);
@@ -51,7 +63,7 @@ public class SecuredHDFSTest {
         when(mockProtocolData.getToken()).thenReturn("This is odd");
 
         try {
-            SecuredHDFS.verifyToken(mockProtocolData, mockContext);
+            SecuredHDFS.verifyToken("This is odd", mockContext);
             fail("invalid X-GP-TOKEN should throw");
         } catch (SecurityException e) {
             assertEquals("Failed to verify delegation token java.io.EOFException", e.getMessage());
@@ -66,7 +78,7 @@ public class SecuredHDFSTest {
         when(mockProtocolData.getToken()).thenReturn("This is odd");
 
         try {
-            SecuredHDFS.verifyToken(mockProtocolData, mockContext);
+            SecuredHDFS.verifyToken("This is odd", mockContext);
             fail("invalid X-GP-TOKEN should throw");
         } catch (SecurityException e) {
             verify(ugi).reloginFromKeytab();
