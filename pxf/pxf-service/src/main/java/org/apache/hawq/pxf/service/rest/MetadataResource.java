@@ -103,7 +103,6 @@ public class MetadataResource extends RestResource {
             ProtocolData protData = new ProtocolData(params, profile.toLowerCase());
 
             // 0. Verify token
-            SecuredHDFS.verifyToken(protData, servletContext);
 
             // 1. start MetadataFetcher
             MetadataFetcher metadataFetcher = MetadataFetcherFactory.create(protData);
