@@ -39,7 +39,7 @@ class Version {
      * actual value on build stage, using pxfProtocolVersion parameter from
      * gradle.properties
      */
-    final static String PXF_PROTOCOL_VERSION = "@pxfProtocolVersion@";
+    final static String PXF_PROTOCOL_VERSION = "v15";
 
     public Version() {
     }
