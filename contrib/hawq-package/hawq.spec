@@ -25,15 +25,15 @@
 %define    installdir             /usr/local/%{name}
 
 Name:       apache-hawq
-Summary:    Hadoop Native SQL powered by Apache HAWQ (incubating)
+Summary:    Hadoop Native SQL powered by Apache HAWQ
 Version:    %{hawq_version}
 Release:    %{rpm_os_version}
 License:    ASL 2.0
 Group:      Applications/Databases
-URL:        http://hawq.incubator.apache.org
+URL:        http://hawq.apache.org
 Prefix:     /usr/local
 BuildArch:  %{arch}
-SOURCE0 :   apache-hawq-src-%{hawq_version}-incubating.tar.gz
+SOURCE0 :   apache-hawq-src-%{hawq_version}.tar.gz
 Requires:   libgsasl, krb5-libs, libicu, protobuf >= 2.5.0, json-c >= 0.9, net-snmp-libs, thrift >= 0.9.1, boost >= 1.53.0
 %if %{rpm_os_version} == el6
 Requires: openssl
@@ -45,7 +45,7 @@ Requires(pre): shadow-utils
 AutoReqProv:    no
 
 %description
-Apache HAWQ (incubating) combines exceptional MPP-based analytics
+Apache HAWQ combines exceptional MPP-based analytics
 performance, robust ANSI SQL compliance, Hadoop ecosystem
 integration and manageability, and flexible data-store format
 support, all natively in Hadoop, no connectors required.
@@ -56,7 +56,7 @@ source Greenplum® Database and PostgreSQL, HAWQ enables you to
 swiftly and interactively query Hadoop data, natively via HDFS.
 
 %prep
-%setup -n %{name}-src-%{version}-incubating
+%setup -n %{name}-src-%{version}
 
 %build
 export CFLAGS="-O3 -g"

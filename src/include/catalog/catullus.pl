@@ -115,7 +115,7 @@ pg_window.  And operators and operator classes?  Access methods? Casts?
 
 Apache HAWQ
 
-Address bug reports and comments to: dev@hawq.incubator.apache.org
+Address bug reports and comments to: dev@hawq.apache.org
 
 =cut
 # SLZY_POD_HDR_END
