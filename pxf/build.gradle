@@ -19,34 +19,38 @@
 
 import org.apache.tools.ant.filters.ReplaceTokens
 
+buildscript {
+
+    dependencies {
+        classpath "com.netflix.nebula:gradle-ospackage-plugin:2.2.6"
+        classpath 'com.netflix.nebula:gradle-aggregate-javadocs-plugin:2.2.+'
+    }
+}
+
+plugins {
+    id "de.undercouch.download" version "3.4.3"
+}
+
+repositories {
+    // mavenCentral without https:
+    maven {
+        url 'http://repo1.maven.org/maven2'
+    }
+    mavenLocal()
+    jcenter {
+        url 'http://jcenter.bintray.com/'
+    }
+    maven {
+        url 'http://repository.jboss.org/nexus/content/groups/public'
+    }
+}
+
 // Get database property, use HAWQ as a default database
 def database = System.getProperty("database", "hawq");
 def databaseFileName = "gradle/profiles/" + database + ".properties";
 assert file(databaseFileName).exists()
 def databaseProperties = new Properties()
 file(databaseFileName).withInputStream { databaseProperties.load(it) }
-
-buildscript {
-    repositories {
-        // mavenCentral without https:
-        maven {
-            url 'http://repo1.maven.org/maven2'
-        }
-        mavenLocal()
-        jcenter {
-            url 'http://jcenter.bintray.com/'
-        }
-        maven {
-            url 'http://repository.jboss.org/nexus/content/groups/public'
-        }
-    }
-
-    dependencies {
-        classpath "com.netflix.nebula:gradle-ospackage-plugin:2.2.6"
-        classpath "de.undercouch:gradle-download-task:2.1.0"
-        classpath 'com.netflix.nebula:gradle-aggregate-javadocs-plugin:2.2.+'
-    }   
-}
 
 // Hadoop distribution (can be hdp or null which would default to apache) - needed to set correct classpaths
 // can be set with -Dhd=<value>
@@ -153,46 +157,6 @@ subprojects { subProject ->
 
 project('pxf-service') {
 
-// Copy existing sources and replace any occurrences of @tokenName@ with desired values
-    task generateSources {
-        doFirst {
-            copy {
-                from('src/main/java') {
-                    include '**/*.java'
-                    filter(ReplaceTokens,
-                        tokens:['pxfProtocolVersion': project.pxfProtocolVersion ])}
-                into "tmp/generatedSources"
-            }
-        }
-    }
-
-// Call cleanup taskAfter Java code compilation
-    compileJava.doLast {
-        tasks.cleanGeneratedSources.execute()
-    }
-
-// Delete "tmp" directory under current project directory
-// rm -r pxf-service/tmp
-    task cleanGeneratedSources() {
-        doFirst {
-            delete "tmp"
-        }
-    }
-
-// Call generateSources task before Java compilation
-    gradle.projectsEvaluated {
-        compileJava.dependsOn(generateSources)
-    }
-
-// Use custom sources directory with generated sources
-    sourceSets {
-        main {
-            java {
-                srcDirs = ["tmp/generatedSources"]
-            }
-        }
-    }
-
     apply plugin: 'war'
     tasks.war {
         archiveName = 'pxf.war'
@@ -256,7 +220,7 @@ project('pxf-service') {
 
         from("src/main/resources/pxf-private${hddist}.classpath") {
             into("/etc/pxf-${project.version}/conf")
-            rename("pxf-private${hddist}.classpath", "pxf-private.classpath") 
+            rename("pxf-private${hddist}.classpath", "pxf-private.classpath")
         }
 
         from('src/main/resources/pxf-public.classpath') {
@@ -275,7 +239,7 @@ project('pxf-service') {
                              'pxfDefaultUserImpersonation': (databaseProperties.pxfDefaultUserImpersonation == null ? "" : databaseProperties.pxfDefaultUserImpersonation)])
             into "/etc/pxf-${project.version}/conf"
         }
-        
+
         from('src/main/resources/pxf-log4j.properties') {
             fileType CONFIG | NOREPLACE
             into "/etc/pxf-${project.version}/conf"
@@ -288,7 +252,7 @@ project('pxf-service') {
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
         }
-        
+
         //tomcat configuration files
         from('src/configs/tomcat') {
             fileType CONFIG | NOREPLACE
@@ -449,7 +413,7 @@ project('pxf-json') {
     task create_tweets_tgz(type: Exec){
       commandLine 'tar', '-zcf', 'src/test/resources/tweets.tar.gz', '-C', 'src/test/resources', 'tweets-pp.json'
     }
-    
+
     tasks['test'].dependsOn('create_tweets_tgz')
 }
 
@@ -544,9 +508,10 @@ def buildNumber() {
     System.getenv('BUILD_NUMBER') ?: System.getProperty('user.name')
 }
 
-task wrapper(type: Wrapper) {
-    gradleVersion = '2.13'
+wrapper {
+    gradleVersion = '4.9'
 }
+
 
 def distSubprojects = subprojects - project(':pxf-api')
 
@@ -581,13 +546,11 @@ task rpm(type: Copy, dependsOn: [subprojects.build, distSubprojects.buildRpm]) {
     }
 }
 
-// tomcat 
+// tomcat
 def tomcatName = "apache-tomcat-${tomcatVersion}"
 def tomcatTargetDir = "tomcat/build"
 
 task tomcatGet << {
-
-    apply plugin: 'de.undercouch.download'
 
     def TarGzSuffix = ".tar.gz"
     def tomcatTar = "${tomcatName}${TarGzSuffix}"
