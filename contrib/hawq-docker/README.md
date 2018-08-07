@@ -14,8 +14,8 @@ https://docs.docker.com/
 # Setup build and test environment
 * clone hawq repository
 ```
-git clone https://github.com/apache/incubator-hawq.git .
-cd incubator-hawq/contrib/hawq-docker
+git clone https://github.com/apache/hawq.git .
+cd hawq/contrib/hawq-docker
 ```
 * Get the docker images
 ```
@@ -51,7 +51,7 @@ sudo -u hdfs hdfs dfsadmin -report
 ```
 * clone Apache HAWQ code to /data direcotry
 ```
-git clone https://github.com/apache/incubator-hawq.git /data/hawq
+git clone https://github.com/apache/hawq.git /data/hawq
 ```
 * build Apache HAWQ
 ```
