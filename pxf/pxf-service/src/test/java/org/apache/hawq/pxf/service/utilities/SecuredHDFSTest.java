@@ -44,6 +44,7 @@ public class SecuredHDFSTest {
     ServletContext mockContext;
 
     @Test
+    @SuppressWarnings("unchecked")
     public void nullToken() throws IOException {
         when(UserGroupInformation.isSecurityEnabled()).thenReturn(true);
         UserGroupInformation ugi = mock(UserGroupInformation.class);
@@ -52,7 +53,7 @@ public class SecuredHDFSTest {
 
         SecuredHDFS.verifyToken(null, mockContext);
         verify(ugi).reloginFromKeytab();
-        verify(ugi, never()).addToken(any());
+        verify(ugi, never()).addToken(any(Token.class));
     }
 
     @Test
