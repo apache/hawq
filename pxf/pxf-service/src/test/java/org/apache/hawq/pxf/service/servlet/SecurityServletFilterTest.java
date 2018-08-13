@@ -28,6 +28,7 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
 import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 
@@ -82,6 +83,7 @@ public class SecurityServletFilterTest {
         when(servletRequest.getHeader("X-GP-SEGMENT-ID")).thenReturn("1");
 
         SecurityServletFilter securityServletFilter = new SecurityServletFilter();
+        securityServletFilter.init(mock(FilterConfig.class));
         securityServletFilter.proxyUGICache = mock(UGICache.class);
 
         when(securityServletFilter.proxyUGICache.getUserGroupInformation(any(SessionId.class))).thenReturn(mock(UserGroupInformation.class));
@@ -103,6 +105,7 @@ public class SecurityServletFilterTest {
         when(servletRequest.getHeader("X-GP-LAST-FRAGMENT")).thenReturn("true");
 
         SecurityServletFilter securityServletFilter = new SecurityServletFilter();
+        securityServletFilter.init(mock(FilterConfig.class));
         securityServletFilter.proxyUGICache = mock(UGICache.class);
 
         when(securityServletFilter.proxyUGICache.getUserGroupInformation(any(SessionId.class))).thenReturn(mock(UserGroupInformation.class));

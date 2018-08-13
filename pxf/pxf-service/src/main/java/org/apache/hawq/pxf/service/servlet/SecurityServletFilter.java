@@ -34,9 +34,11 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.pxf.service.SessionId;
 import org.apache.hawq.pxf.service.UGICache;
 import org.apache.hawq.pxf.service.utilities.SecureLogin;
+import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
 
 /**
  * Listener on lifecycle events of our webapp
@@ -48,8 +50,10 @@ public class SecurityServletFilter implements Filter {
     private static final String SEGMENT_ID_HEADER = "X-GP-SEGMENT-ID";
     private static final String TRANSACTION_ID_HEADER = "X-GP-XID";
     private static final String LAST_FRAGMENT_HEADER = "X-GP-LAST-FRAGMENT";
+    private static final String DELEGATION_TOKEN_HEADER = "X-GP-TOKEN";
     private static final String MISSING_HEADER_ERROR = "Header %s is missing in the request";
     private static final String EMPTY_HEADER_ERROR = "Header %s is empty in the request";
+    private FilterConfig config;
     UGICache proxyUGICache;
 
     /**
@@ -59,6 +63,7 @@ public class SecurityServletFilter implements Filter {
      */
     @Override
     public void init(FilterConfig filterConfig) {
+        config = filterConfig;
         proxyUGICache = new UGICache();
     }
 
@@ -76,7 +81,6 @@ public class SecurityServletFilter implements Filter {
             throws IOException, ServletException {
 
         if (SecureLogin.isUserImpersonationEnabled()) {
-
             // retrieve user header and make sure header is present and is not empty
             final String gpdbUser = getHeaderValue(request, USER_HEADER, true);
             final String transactionId = getHeaderValue(request, TRANSACTION_ID_HEADER, true);
@@ -85,9 +89,7 @@ public class SecurityServletFilter implements Filter {
 
             SessionId session = new SessionId(segmentId, transactionId, gpdbUser);
 
-            // TODO refresh Kerberos token when security is enabled
-
-            // prepare privileged action to run on behalf of proxy user
+            // Prepare privileged action to run on behalf of proxy user
             PrivilegedExceptionAction<Boolean> action = new PrivilegedExceptionAction<Boolean>() {
                 @Override
                 public Boolean run() throws IOException, ServletException {
@@ -102,12 +104,18 @@ public class SecurityServletFilter implements Filter {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Retrieving proxy user for session: " + session);
             }
+
+            // Refresh Kerberos token when security is enabled
+            String tokenString = getHeaderValue(request, DELEGATION_TOKEN_HEADER, false);
+            SecuredHDFS.verifyToken(tokenString, config.getServletContext());
+
             try {
                 // Retrieve proxy user UGI from the UGI of the logged in user
-                // and execute the servlet chain as that user
-                proxyUGICache
-                        .getUserGroupInformation(session)
-                        .doAs(action);
+                UserGroupInformation proxyUserGroupInformation = proxyUGICache
+                        .getUserGroupInformation(session);
+
+                // Execute the servlet chain as that user
+                proxyUserGroupInformation.doAs(action);
             } catch (UndeclaredThrowableException ute) {
                 // unwrap the real exception thrown by the action
                 throw new ServletException(ute.getCause());
