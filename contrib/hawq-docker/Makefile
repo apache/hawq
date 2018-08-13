@@ -203,8 +203,10 @@ remove-data:
 
 pull:
 	@echo latest images
+	#For remote registry
 	#docker pull hawq/hawq-dev:$(OS_VERSION)
 	#docker pull hawq/hawq-test:$(OS_VERSION)
+	#For local registry
 	docker pull 127.0.0.1:5000/hawq-dev:$(OS_VERSION)
 	docker pull 127.0.0.1:5000/hawq-test:$(OS_VERSION)
 	docker tag 127.0.0.1:5000/hawq-dev:$(OS_VERSION) hawq/hawq-dev:$(OS_VERSION)
