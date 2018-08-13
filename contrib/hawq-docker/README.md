@@ -17,13 +17,11 @@ https://docs.docker.com/
 git clone https://github.com/apache/incubator-hawq.git .
 cd incubator-hawq/contrib/hawq-docker
 ```
-* Get the docker images
+* Build the docker images
 ```
-  make pull (recommended)
-OR
   make build
 ``` 
-(Command `make pull` is to pull docker images from Docker Hub, while command `make build` is to build docker images locally. In general, `make pull` is faster than `make build`.)
+(Command `make build` is to build docker images locally.)
 * setup a 5 nodes virtual cluster for Apache HAWQ build and test.
 ```
 make run
@@ -83,6 +81,38 @@ Type "help" for help.
 
 postgres=# 
 ```
+# Store docker images in local docker registry
+
+After your hawq environment is up and running, you could draft a local docker registry to store your hawq images locally for further usage.
+* pull and run a docker registry
+```
+docker pull registry
+docker run -d -p 127.0.0.1:5000:5000 registry
+```
+Make sure you could get the following output
+```
+curl http://localhost:5000/v2/_catalog
+{"repositories":[]}
+```
+You could push your local hawq images to local repository, let us use "centos7" as example
+```
+docker tag  hawq/hawq-test:centos7  localhost:5000/hawq-test:centos7
+docker tag  hawq/hawq-dev:centos7  localhost:5000/hawq-dev:centos7
+docker push localhost:5000/hawq-test
+docker push localhost:5000/hawq-dev
+```
+Now the local registry has images in it
+```
+curl http://localhost:5000/v2/_catalog
+{"repositories":["hawq-dev","hawq-test"]}
+```
+
+If we want to pull the images from local repo
+```
+make pull
+``` 
+
+
 # More command with this script
 ```
  Usage:
