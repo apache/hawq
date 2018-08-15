@@ -6,9 +6,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -110,9 +110,9 @@ function deployWebapp()
 function waitForTomcat()
 {
 	attempts=0
-	max_attempts=$1 # number of attempts to connect 
+	max_attempts=$1 # number of attempts to connect
 	sleep_time=1 # sleep 1 second between attempts
-	
+
 	# wait until tomcat is up:
 	echo Checking if tomcat is up and running...
 	until [[ "`curl --silent --connect-timeout 1 -I http://localhost:${instance_port} | grep 'Coyote'`" != "" ]];
@@ -136,16 +136,16 @@ function waitForTomcat()
 function checkWebapp()
 {
 	waitForTomcat $1 || return 1
-	
+
 	echo Checking if PXF webapp is up and running...
 	curlResponse=$(${curl} -s "http://localhost:${instance_port}/pxf/v0")
 	expectedResponse="Wrong version v0, supported version is v[0-9]+"
-	
+
 	if [[ ${curlResponse} =~ $expectedResponse ]]; then
 		echo PXF webapp is listening on port ${instance_port}
 		return 0
 	fi
-	
+
 	echo ERROR: PXF webapp is inaccessible but tomcat is up. Check logs for more information
 	return 1
 }
@@ -210,6 +210,8 @@ function configureWebapp()
     catalinaEnv=${instance_root}/${instance_name}/bin/setenv.sh
     sed -i -e "s|JVM_OPTS=.*$|JVM_OPTS=\"${PXF_JVM_OPTS}\"|g" ${catalinaEnv}
     sed -i -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=${PXF_LOGDIR} |g" ${catalinaEnv}
+    sed -i -e "s|-Dpxf.service.kerberos.keytab=[^[:space:]^\"]*|-Dpxf.service.kerberos.keytab=${PXF_KEYTAB} |g" ${catalinaEnv}
+    sed -i -e "s|-Dpxf.service.kerberos.principal=[^[:space:]^\"]*|-Dpxf.service.kerberos.principal=${PXF_PRINCIPAL} |g" ${catalinaEnv}
     sed -i -e "s|^[[:blank:]]*PXF_USER_IMPERSONATION=.*$|PXF_USER_IMPERSONATION=\"${PXF_USER_IMPERSONATION}\"|g" ${catalinaEnv}
     sed -i -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=${PXF_RUNDIR}/catalina.pid|g" ${catalinaEnv}
     sed -i -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=${PXF_LOGDIR}/catalina.out|g" ${catalinaEnv}
@@ -386,7 +388,7 @@ function validateParameters()
     return 0
 }
 
-# 
+#
 # doStart handles start command
 # command is executed as the user $pxf_user
 #

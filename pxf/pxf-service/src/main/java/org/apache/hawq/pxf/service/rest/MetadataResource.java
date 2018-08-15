@@ -99,11 +99,10 @@ public class MetadataResource extends RestResource {
             // Convert headers into a regular map
             Map<String, String> params = convertToCaseInsensitiveMap(headers.getRequestHeaders());
 
-            // Add profile and verify token
+            // Add profile
             ProtocolData protData = new ProtocolData(params, profile.toLowerCase());
 
-            // 0. Verify token
-            SecuredHDFS.verifyToken(protData, servletContext);
+            // Token verification happens at the SecurityServletFilter
 
             // 1. start MetadataFetcher
             MetadataFetcher metadataFetcher = MetadataFetcherFactory.create(protData);

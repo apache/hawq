@@ -45,28 +45,29 @@ public class SecuredHDFS {
      *
      * All token properties will be deserialized from string to a Token object
      *
-     * @param protData input parameters
+     * @param tokenString (optional) the delegation token
      * @param context servlet context which contains the NN address
      *
      * @throws SecurityException Thrown when authentication fails
      */
-    public static void verifyToken(ProtocolData protData, ServletContext context) {
+    public static void verifyToken(String tokenString, ServletContext context) {
         try {
             if (UserGroupInformation.isSecurityEnabled()) {
                 /*
-                 * HAWQ-1215: The verify token method validates that the token sent from
+                 * The verify token method validates that the token sent from
                  * Hawq to PXF is valid. However, this token is for a user other than
                  * 'pxf'. The following line ensures that before attempting any secure communication
                  * PXF tries to relogin in the case that its own ticket is about to expire
                  * #reloginFromKeytab is a no-op if the ticket is not near expiring
                  */
                 UserGroupInformation.getLoginUser().reloginFromKeytab();
-                Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>();
-                String tokenString = protData.getToken();
-                token.decodeFromUrlString(tokenString);
+                if (tokenString != null) {
+                    Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>();
+                    token.decodeFromUrlString(tokenString);
 
-                verifyToken(token.getIdentifier(), token.getPassword(),
-                        token.getKind(), token.getService(), context);
+                    verifyToken(token.getIdentifier(), token.getPassword(),
+                            token.getKind(), token.getService(), context);
+                }
             }
         } catch (IOException e) {
             throw new SecurityException("Failed to verify delegation token "

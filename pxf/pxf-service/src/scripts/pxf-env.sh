@@ -44,6 +44,12 @@ export PXF_PORT=${PXF_PORT:-@pxfPortNum@}
 # Memory
 export PXF_JVM_OPTS="-Xmx2g -Xms1g"
 
+# Kerberos
+# Path to keytab file owned by pxf service with permissions 0400
+export PXF_KEYTAB="/etc/security/keytab/pxf.service.keytab"
+# Kerberos principal pxf service should use. _HOST is replaced automatically with hostnames FQDN
+export PXF_PRINCIPAL="pxf/_HOST@EXAMPLE.COM"
+
 # Hadoop Distribution Type (optional), supported values:
 # <empty> - for auto discovery of HDP, CDH or tarball based client installation
 # HDP     - for HDP Hadoop client installation

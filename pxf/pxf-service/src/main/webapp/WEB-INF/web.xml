@@ -67,7 +67,7 @@ under the License.
     </filter>
     <filter-mapping>
         <filter-name>PXF Security Filter</filter-name>
-        <url-pattern>/@pxfProtocolVersion@/*</url-pattern>
+        <url-pattern>/v15/*</url-pattern>
     </filter-mapping>
 
     <!-- log4j configuration 
