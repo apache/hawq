@@ -2092,7 +2092,7 @@ transformCreateStmt(ParseState *pstate, CreateStmt *stmt,
 	*extras_after = list_concat(cxt.alist, *extras_after);
 	cxt.alist = NIL;
 
-	Assert(stmt->constraints == NIL);
+	Assert(stmt->base.constraints == NIL);
 
 	/*
 	 * Postprocess constraints that give rise to index definitions.

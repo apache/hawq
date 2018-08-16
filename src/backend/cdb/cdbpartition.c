@@ -8374,7 +8374,7 @@ fixCreateStmtForPartitionedTable(CreateStmt *stmt)
 	int i;
 	
 	/* Caller should check this! */
-	Assert(stmt->partitionBy && !stmt->is_part_child);
+	Assert(stmt->base.partitionBy && !stmt->base.is_part_child);
 	
 	foreach( lc_elt, stmt->base.tableElts )
 	{
