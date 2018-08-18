@@ -58,7 +58,7 @@ public class UGICacheTest {
         }
 
         long advanceTime(long milliseconds) {
-            return nanos.addAndGet(milliseconds * 1000) / 1000;
+            return nanos.addAndGet(milliseconds * UGICache.NANOS_PER_MILLIS) / UGICache.NANOS_PER_MILLIS;
         }
     }
 

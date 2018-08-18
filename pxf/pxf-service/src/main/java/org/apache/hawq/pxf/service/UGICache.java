@@ -48,7 +48,8 @@ public class UGICache {
     private final Map<Integer, DelayQueue<Entry>> expirationQueueMap = new HashMap<>();
     private final UGIProvider ugiProvider;
     private final Ticker ticker;
-    final static long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
+    static final int NANOS_PER_MILLIS = 1000000;
+    static final long UGI_CACHE_EXPIRY = 15 * 60 * 1000L; // 15 Minutes
 
     /**
      * Create a UGICache with the given {@link Ticker} and {@link UGIProvider}. Intended for use by
@@ -343,7 +344,7 @@ public class UGICache {
          * System}.currentTimeMillis)
          */
         private long currentTimeMillis() {
-            return ticker.read() / 1000;
+            return ticker.read() / NANOS_PER_MILLIS;
         }
     }
 }
