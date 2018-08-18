@@ -91,19 +91,19 @@ docker run -d -p 127.0.0.1:5000:5000 registry
 ```
 Make sure you could get the following output
 ```
-curl http://127.0.0.1:5000/v2/_catalog
+curl http://localhost:5000/v2/_catalog
 {"repositories":[]}
 ```
 You could push your local hawq images to local repository, let us use "centos7" as example
 ```
-docker tag  hawq/hawq-test:centos7  127.0.0.1:5000/hawq-test:centos7
-docker tag  hawq/hawq-dev:centos7  127.0.0.1:5000/hawq-dev:centos7
-docker push 127.0.0.1:5000/hawq-test
-docker push 127.0.0.1:5000/hawq-dev
+docker tag  hawq/hawq-test:centos7  localhost:5000/hawq-test:centos7
+docker tag  hawq/hawq-dev:centos7  localhost:5000/hawq-dev:centos7
+docker push localhost:5000/hawq-test
+docker push localhost:5000/hawq-dev
 ```
 Now the local registry has images in it
 ```
-curl http://127.0.0.1:5000/v2/_catalog
+curl http://localhost:5000/v2/_catalog
 {"repositories":["hawq-dev","hawq-test"]}
 ```
 
