@@ -203,14 +203,15 @@ remove-data:
 
 pull:
 	@echo latest images
-	#For remote registry
+	#There is no hawq repo in docker.io currently, we just build up a local repo to mimic the docker registry here.
+	#For remote registry.
 	#docker pull hawq/hawq-dev:$(OS_VERSION)
 	#docker pull hawq/hawq-test:$(OS_VERSION)
-	#For local registry
-	docker pull 127.0.0.1:5000/hawq-dev:$(OS_VERSION)
-	docker pull 127.0.0.1:5000/hawq-test:$(OS_VERSION)
-	docker tag 127.0.0.1:5000/hawq-dev:$(OS_VERSION) hawq/hawq-dev:$(OS_VERSION)
-	docker tag 127.0.0.1:5000/hawq-test:$(OS_VERSION) hawq/hawq-test:$(OS_VERSION)
+	#For local registry, user need to install local registry and push images before following steps.
+	docker pull localhost:5000/hawq-dev:$(OS_VERSION)
+	docker pull localhost:5000/hawq-test:$(OS_VERSION)
+	docker tag localhost:5000/hawq-dev:$(OS_VERSION) hawq/hawq-dev:$(OS_VERSION)
+	docker tag localhost:5000/hawq-test:$(OS_VERSION) hawq/hawq-test:$(OS_VERSION)
 
 clean:
 	@make -f $(THIS_MAKEFILE_PATH) stop 2>&1 >/dev/null || true
