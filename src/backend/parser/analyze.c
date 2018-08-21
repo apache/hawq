@@ -2195,7 +2195,7 @@ enum PreDefinedFormatterOptionVALTYPE {
   PREDEF_FMTOPT_VAL_COLNAMELIST
 };
 
-enum PreDefinedFormatterOptionID {
+typedef enum PreDefinedFormatterOptionID {
   PREDEF_FMT_OPT_ID_DELIMITER,
   PREDEF_FMT_OPT_ID_NULL,
   PREDEF_FMT_OPT_ID_HEADER,
@@ -2207,7 +2207,7 @@ enum PreDefinedFormatterOptionID {
   PREDEF_FMT_OPT_ID_NEWLINE,
   PREDEF_FMT_OPT_ID_UNPREDEFINED,
   PREDEF_FMT_OPT_ID_ILLEGAL
-};
+}PreDefinedFormatterOptionID;
 
 typedef struct PreDefinedFormatterOption {
   char keyword[3][32];
@@ -2253,7 +2253,7 @@ enum PreDefinedFormatterOptionID MatchExternalRelationFormatterOption(
                   (options[i].valueType == PREDEF_FMTOPT_VAL_COLNAMELIST))) {
         return options[i].optID; /* Got option having one value */
       } else {
-        return PREDEF_FMT_OPT_ID_ILLEGAL; /* no expected value type */
+        return PREDEF_FMT_OPT_ID_UNPREDEFINED; /* no expected value type */
       }
     } else if (pdOpt->nKeyword == 2 && de2 != NULL &&
                strcasecmp(pdOpt->keyword[0], ((Value *)(de1->arg))->val.str) ==
@@ -2274,7 +2274,7 @@ enum PreDefinedFormatterOptionID MatchExternalRelationFormatterOption(
                   (options[i].valueType == PREDEF_FMTOPT_VAL_COLNAMELIST))) {
         return options[i].optID; /* Got option having one value */
       } else {
-        return PREDEF_FMT_OPT_ID_ILLEGAL; /* no expected value type */
+        return PREDEF_FMT_OPT_ID_UNPREDEFINED; /* no expected value type */
       }
     } else if (pdOpt->nKeyword == 3 && de2 != NULL && de3 != NULL &&
                strcasecmp(pdOpt->keyword[0], ((Value *)(de1->arg))->val.str) ==
@@ -2297,7 +2297,7 @@ enum PreDefinedFormatterOptionID MatchExternalRelationFormatterOption(
                   (options[i].valueType == PREDEF_FMTOPT_VAL_COLNAMELIST))) {
         return options[i].optID; /* Got option having one value */
       } else {
-        return PREDEF_FMT_OPT_ID_ILLEGAL; /* no expected value type */
+        return PREDEF_FMT_OPT_ID_UNPREDEFINED; /* no expected value type */
       }
     }
   }

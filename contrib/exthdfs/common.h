@@ -24,7 +24,6 @@
 #include "fmgr.h"
 #include "funcapi.h"
 #include "access/extprotocol.h"
-#include "access/fileam.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_exttable.h"
 #include "utils/array.h"
