@@ -18380,7 +18380,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 		{
 			DefElem    *defel = (DefElem *)lfirst(option);
 
-			if (strcmp(defel->defname, "delimiter") == 0)
+			if (strcmp(defel->defname, "delimiter") == 0 || strcmp(defel->defname, "delimiter_as") == 0 )
 			{
 				if (delim)
 					ereport(ERROR,
@@ -18389,7 +18389,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				delim = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "null") == 0)
+			else if (strcmp(defel->defname, "null") == 0 || strcmp(defel->defname, "null_as") == 0)
 			{
 				if (null_print)
 					ereport(ERROR,
@@ -18398,7 +18398,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				null_print = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "header") == 0)
+			else if (strcmp(defel->defname, "header") == 0 || strcmp(defel->defname, "header_as") == 0)
 			{
 				if (header_line)
 					ereport(ERROR,
@@ -18407,7 +18407,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				header_line = intVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "quote") == 0)
+			else if (strcmp(defel->defname, "quote") == 0 || strcmp(defel->defname, "quote_as") == 0)
 			{
 				if (quote)
 					ereport(ERROR,
@@ -18416,7 +18416,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				quote = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "escape") == 0)
+			else if (strcmp(defel->defname, "escape") == 0 || strcmp(defel->defname, "escape_as") == 0)
 			{
 				if (escape)
 					ereport(ERROR,
@@ -18425,7 +18425,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				escape = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "force_notnull") == 0)
+			else if (strcmp(defel->defname, "force_notnull") == 0 || strcmp(defel->defname, "force_notnull_as") == 0)
 			{
 				if (force_notnull)
 					ereport(ERROR,
@@ -18435,7 +18435,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 					
 				force_notnull = (List *) defel->arg;
 			}
-			else if (strcmp(defel->defname, "force_quote") == 0)
+			else if (strcmp(defel->defname, "force_quote") == 0 || strcmp(defel->defname, "force_quote_as") == 0)
 			{
 				if (force_quote)
 					ereport(ERROR,
@@ -18445,7 +18445,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 					
 				force_quote = (List *) defel->arg;
 			}
-			else if (strcmp(defel->defname, "fill_missing_fields") == 0)
+			else if (strcmp(defel->defname, "fill_missing_fields") == 0 || strcmp(defel->defname, "fill_missing_fields_as") == 0)
 			{
 				if (fill_missing)
 					ereport(ERROR,
@@ -18454,7 +18454,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				fill_missing = intVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "newline") == 0)
+			else if (strcmp(defel->defname, "newline") == 0 || strcmp(defel->defname, "newline_as") == 0)
 			{
 				if (eol_str)
 					ereport(ERROR,
@@ -18463,7 +18463,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				eol_str = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "formatter") == 0)
+			else if (strcmp(defel->defname, "formatter") == 0 || strcmp(defel->defname, "formatter_as") == 0)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),

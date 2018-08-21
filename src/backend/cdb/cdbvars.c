@@ -169,12 +169,12 @@ bool gp_interconnect_cache_future_packets=true;
 
 int			Gp_udp_bufsize_k; /* UPD recv buf size, in KB */
 
-#ifdef USE_ASSERT_CHECKING
 /*
  * UDP-IC Test hooks (for fault injection).
  *
  * Dropseg: specifies which segment to apply the drop_percent to.
  */
+#ifdef USE_ASSERT_CHECKING
 int gp_udpic_dropseg = UNDEF_SEGMENT;
 int gp_udpic_dropxmit_percent = 0;
 int gp_udpic_dropacks_percent = 0;
