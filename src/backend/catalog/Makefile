@@ -30,6 +30,10 @@ include $(top_srcdir)/src/backend/common.mk
 cdb_init.sql: cdb_schema.sql filesystem.sql
 	cat $(call vpathsearch,cdb_schema.sql) $(call vpathsearch,cdb_external_extensions.sql) $(call vpathsearch,filesystem.sql) > cdb_init.sql
 
+ifeq ($(with_orc), yes)
+	cat $(srcdir)/../../../contrib/orc/orc_init.sql >> cdb_init.sql
+endif
+
 cdb_schema.sql: cdb_schema.in
 			sed -e 's,@pkglibdir@,$(pkglibdir),g' \
                 -e 's,@dlsuffix@,$(DLSUFFIX),g' \
@@ -139,6 +143,12 @@ install-data: $(BKIFILES) installdirs
 	$(INSTALL_DATA) $(call vpathsearch,cdb_init.sql) '$(DESTDIR)$(datadir)/cdb_init.sql'
 	$(INSTALL_DATA) $(call vpathsearch,cdb_external_extensions.sql) '$(DESTDIR)$(datadir)/cdb_external_extensions.sql'
 	$(INSTALL_DATA) $(call vpathsearch,filesystem.sql) '$(DESTDIR)$(datadir)/filesystem.sql'
+	
+ifeq ($(with_orc), yes)
+	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/orc_install.sql '$(DESTDIR)$(datadir)/orc_install.sql'
+	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/orc_uninstall.sql '$(DESTDIR)$(datadir)/orc_uninstall.sql'
+endif
+
 	$(INSTALL_DATA) $(srcdir)/sql_features.txt '$(DESTDIR)$(datadir)/sql_features.txt'
 	$(INSTALL_DATA) $(call vpathsearch,gp_toolkit.sql) '$(DESTDIR)$(datadir)/gp_toolkit.sql'
 

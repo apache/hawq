@@ -731,6 +731,7 @@ krb_srvtab
 with_krb5
 with_gssapi
 with_pgcrypto
+with_orc
 with_r
 with_java
 with_python
@@ -860,6 +861,7 @@ with_python
 with_java
 with_r
 with_pgcrypto
+with_orc
 with_gssapi
 with_krb5
 with_krb_srvnam
@@ -5832,6 +5834,40 @@ fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_pgcrypto" >&5
 $as_echo "$with_pgcrypto" >&6; }
+
+
+#
+# Optionally build with orc in pluggable storage framework.
+#
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build orc modules" >&5
+$as_echo_n "checking whether to build orc modules... " >&6; }
+
+pgac_args="$pgac_args with_orc"
+
+
+# Check whether --with-orc was given.
+if test "${with_orc+set}" = set; then :
+  withval=$with_orc;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-orc option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_orc=yes
+
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_orc" >&5
+$as_echo "$with_orc" >&6; }
 
 
 #
