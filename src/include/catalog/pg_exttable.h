@@ -167,6 +167,7 @@ RemoveExtTableEntry(Oid relid);
 #define CustomFormatType    'b'
 #define TextFormatType      't'
 #define CsvFormatType       'c'
+#define OrcFormatType       'o'
 #define NonCustomFormatType 'n'
 
 /* PXF formats*/
@@ -176,5 +177,6 @@ RemoveExtTableEntry(Oid relid);
 #define fmttype_is_custom(c) (c == CustomFormatType)
 #define fmttype_is_text(c)   (c == TextFormatType)
 #define fmttype_is_csv(c)    (c == CsvFormatType)
+#define fmttype_is_orc(c)     (c == OrcFormatType)
 
 #endif /* PG_EXTTABLE_H */

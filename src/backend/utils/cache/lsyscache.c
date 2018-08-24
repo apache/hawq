@@ -2553,6 +2553,18 @@ type_is_rowtype(Oid typid)
 }
 
 /*
+ * type_is_basetype
+ *
+ *		Convenience function to determine whether a type OID represents
+ *		a "rowtype" type --- neither invalid & a named base type.
+ */
+bool
+type_is_basetype(Oid typid)
+{
+	return (typid != InvalidOid && get_typtype(typid) == TYPTYPE_BASE);
+}
+
+/*
  * get_typ_typrelid
  *
  *		Given the type OID, get the typrelid (InvalidOid if not a complex
