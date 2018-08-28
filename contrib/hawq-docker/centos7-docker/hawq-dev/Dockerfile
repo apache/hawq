@@ -23,7 +23,7 @@ MAINTAINER Richard Guo <riguo@pivotal.io>
 RUN yum install -y epel-release && \
  yum makecache && \
  yum install -y man passwd sudo tar which git mlocate links make bzip2 net-tools \
- autoconf automake libtool m4 gcc gcc-c++ gdb bison flex cmake gperf maven indent \
+ autoconf automake libtool m4 gcc gcc-c++ gdb flex cmake gperf maven indent \
  libuuid-devel krb5-devel libgsasl-devel expat-devel libxml2-devel \
  perl-ExtUtils-Embed pam-devel python-devel libcurl-devel snappy-devel \
  thrift-devel libyaml-devel libevent-devel bzip2-devel openssl-devel \
@@ -32,6 +32,8 @@ RUN yum install -y epel-release && \
  java-1.7.0-openjdk-devel lcov cmake \
  openssh-clients openssh-server perl-JSON && \
  yum clean all
+
+RUN rpm -ivh --nodeps   https://rpmfind.net/linux/centos/6.10/os/x86_64/Packages/bison-2.4.1-5.el6.x86_64.rpm
 
 RUN pip --retries=50 --timeout=300 install pycrypto
 
