@@ -1214,6 +1214,7 @@ SPI_cursor_open(const char *name, SPIPlanPtr plan,
 		int option = CURSOR_OPT_NO_SCROLL;
 		
 		if ( new_stmt && new_stmt->planTree &&
+			queryTree->commandType != CMD_UTILITY &&
 			ExecSupportsBackwardScan(new_stmt->planTree) )
 			option = CURSOR_OPT_SCROLL;
 

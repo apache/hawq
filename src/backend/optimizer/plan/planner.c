@@ -313,7 +313,7 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
   Query *my_parse = copyObject(parse);
 
   /* If this is a parallel plan. request resource and allocate split again*/
-  if (plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
+  if (my_parse->commandType != CMD_UTILITY && plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
   {
     /*
      * Now, we want to allocate resource.
