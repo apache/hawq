@@ -158,7 +158,7 @@ If the expression is TRUE, gpexclude will continue
 
 Apache HAWQ
 
-Address bug reports and comments to: dev@hawq.incubator.apache.org
+Address bug reports and comments to: dev@hawq.apache.org
 
 =cut
 
