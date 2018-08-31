@@ -34,7 +34,7 @@ import java.sql.SQLException;
  */
 class SimpleWriterCallable implements WriterCallable {
     @Override
-    public void supply(OneRow row) throws IllegalStateException, IllegalArgumentException {
+    public void supply(OneRow row) throws IllegalStateException {
         if (this.row != null) {
             throw new IllegalStateException("Trying to supply() a OneRow object to a full WriterCallable");
         }
@@ -88,7 +88,7 @@ class SimpleWriterCallable implements WriterCallable {
     /**
      * Construct a new simple writer
      */
-    SimpleWriterCallable(JdbcPlugin plugin, String query, PreparedStatement statement) throws IllegalArgumentException {
+    SimpleWriterCallable(JdbcPlugin plugin, String query, PreparedStatement statement) {
         if ((plugin == null) || (query == null)) {
             throw new IllegalArgumentException("The provided JdbcPlugin or SQL query is null");
         }

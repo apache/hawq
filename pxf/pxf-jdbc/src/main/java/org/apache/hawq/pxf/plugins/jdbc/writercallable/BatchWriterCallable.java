@@ -91,7 +91,7 @@ class BatchWriterCallable implements WriterCallable {
     /**
      * Construct a new batch writer
      */
-    BatchWriterCallable(JdbcPlugin plugin, String query, PreparedStatement statement, int maxRowsCount) throws IllegalArgumentException {
+    BatchWriterCallable(JdbcPlugin plugin, String query, PreparedStatement statement, int maxRowsCount) {
         if ((plugin == null) || (query == null)) {
             throw new IllegalArgumentException("The provided JdbcPlugin or SQL query is null");
         }

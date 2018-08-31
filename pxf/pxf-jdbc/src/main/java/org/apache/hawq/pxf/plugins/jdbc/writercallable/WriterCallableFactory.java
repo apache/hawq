@@ -46,9 +46,8 @@ public class WriterCallableFactory {
      * Get an instance of WriterCallable
      *
      * @return an implementation of WriterCallable, chosen based on parameters that were set for this factory
-     * @throws IllegalArgumentException if a WriterCallable cannot be created with requested parameters
      */
-    public WriterCallable get() throws IllegalArgumentException {
+    public WriterCallable get() {
         if (batchSize == 1) {
             return new SimpleWriterCallable(plugin, query, statement);
         }

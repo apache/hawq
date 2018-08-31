@@ -32,9 +32,8 @@ public interface WriterCallable extends Callable<SQLException> {
      * Pass the next OneRow to this WriterCallable.
      *
      * @throws IllegalStateException if this WriterCallable must be call()ed before the next call to supply()
-     * @throws IllegalArgumentException if row is null
      */
-    void supply(OneRow row) throws IllegalStateException, IllegalArgumentException;
+    void supply(OneRow row) throws IllegalStateException;
 
     /**
      * Check whether this WriterCallable must be called

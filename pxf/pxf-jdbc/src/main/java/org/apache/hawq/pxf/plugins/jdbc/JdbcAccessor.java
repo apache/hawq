@@ -118,10 +118,9 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
      * @throws SQLTimeoutException if a problem with the connection occurs
      * @throws ParseException if the SQL statement provided in PXF InputData is incorrect
      * @throws ClassNotFoundException if the JDBC driver was not found
-     * @throws IllegalArgumentException if the provided or generated combination of user-defined parameters cannot be processed
      */
     @Override
-    public boolean openForWrite() throws SQLException, SQLTimeoutException, ParseException, ClassNotFoundException, IllegalArgumentException {
+    public boolean openForWrite() throws SQLException, SQLTimeoutException, ParseException, ClassNotFoundException {
         if (statementWrite != null && !statementWrite.isClosed()) {
             throw new SQLException("The connection to an external database is already open.");
         }
