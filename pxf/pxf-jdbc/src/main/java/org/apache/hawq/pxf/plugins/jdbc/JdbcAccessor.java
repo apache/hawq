@@ -41,7 +41,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
-import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 
@@ -186,8 +185,6 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
             throw new IllegalStateException("The JDBC connection was not properly initialized (writerCallable is null)");
         }
 
-        SQLException rollbackException = null;
-
         writerCallable.supply(row);
         if (writerCallable.isCallRequired()) {
             if (poolSize > 1) {
@@ -197,25 +194,8 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
             }
             else {
                 // Pooling is not used
-                try {
-                    rollbackException = writerCallable.call();
-                }
-                catch (SQLException e) {
-                    rollbackException = e;
-                }
-                catch (Exception e) {
-                    // This is not expected
-                    throw e;
-                }
+                writerCallable.call();
             }
-        }
-
-        if (rollbackException != null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Rollback is now required");
-            }
-            rollbackException = tryRollback(statementWrite.getConnection(), rollbackException);
-            throw rollbackException;
         }
 
         return true;
@@ -269,30 +249,12 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
                     }
                 }
                 if (firstException != null) {
-                    // Rollback is of no use: each pool thread commits a part of the query itself
                     throw firstException;
                 }
             }
 
-            // Send the data that is left
-            SQLException rollbackException;
-            try {
-                rollbackException = writerCallable.call();
-            }
-            catch (SQLException e) {
-                rollbackException = e;
-            }
-            catch (Exception e) {
-                throw e;
-            }
-
-            if (rollbackException != null) {
-                if (poolSize == 1) {
-                    rollbackException = tryRollback(statementWrite.getConnection(), rollbackException);
-                }
-                // Otherwise, rollback is of no use (again)
-                throw rollbackException;
-            }
+            // Send data that is left
+            writerCallable.call();
         }
         finally {
             JdbcPlugin.closeStatement(statementWrite);
@@ -373,50 +335,6 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         return sb.toString();
     }
 
-    /**
-     * Try to rollback the current transaction
-     *
-     * @param rollbackException the rollback cause
-     *
-     * @return The resulting SQLException (it may differ from 'rollbackException')
-     */
-    private SQLException tryRollback(Connection connection, SQLException rollbackException) {
-        // Get transactions support status
-        boolean areTransactionsSupported = false;
-        try {
-            areTransactionsSupported = connection.getMetaData().supportsTransactions();
-        }
-        catch (SQLException e) {
-            // This error is unexpected; the dbMeta is probably corrupted
-            return rollbackException;
-        }
-
-        if (rollbackException instanceof BatchUpdateException) {
-            // If we examine the BatchUpdateException, it must have the 'next' SQLException
-            rollbackException = ((BatchUpdateException)rollbackException).getNextException();
-        }
-
-        if (!areTransactionsSupported) {
-            // The bad case: transactions are NOT supported
-            if ((batchSize < 0) || (batchSize > 1)) {
-                // The worst case: batching was used
-                return new SQLException(FAILED_INSERT_MESSAGE + "The exact number of tuples inserted is unknown.", rollbackException);
-            }
-            // Batching was NOT used
-            return new SQLException(FAILED_INSERT_MESSAGE + "The exact number of tuples inserted can be found in PXF logs.", rollbackException);
-        }
-
-        // The best case: transactions are supported
-        try {
-            connection.rollback();
-        }
-        catch (SQLException e) {
-            // log exception as error, but do not throw it (the actual cause of rollback will be thrown instead)
-            LOG.error("An exception happened during the transaction rollback: '" + e.toString() + "'");
-        }
-        return rollbackException;
-    }
-
     // Read variables
     private String queryRead = null;
     private Statement statementRead = null;
@@ -432,5 +350,4 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
 
     // Static variables
     private static final Log LOG = LogFactory.getLog(JdbcAccessor.class);
-    private static final String FAILED_INSERT_MESSAGE = "Insert failed due to an SQLException. SOME DATA MAY HAVE BEEN INSERTED. ";
 }

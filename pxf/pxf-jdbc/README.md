@@ -68,13 +68,8 @@ The **`<jdbc_login_parameters>`** are **optional**, but if provided, both of the
 &PASS=<external_database_password>
 ```
 
-The **`<plugin_parameters>`** are **optional**.
+The **`<plugin_parameters>`** are **optional**:
 
-The meaning of `BATCH_SIZE` is given in section [batching of INSERT queries](#Batching).
-
-The meaning of `POOL_SIZE` is given in section [using thread pool for INSERT queries](#Thread_pool)
-
-The meaning of other parameters is given in section [partitioning](#Partitioning).
 ```
 [
 &BATCH_SIZE=<batch_size>
@@ -89,6 +84,12 @@ The meaning of other parameters is given in section [partitioning](#Partitioning
 ]
 ```
 
+The meaning of `BATCH_SIZE` is given in section [batching of INSERT queries](#Batching).
+
+The meaning of `POOL_SIZE` is given in section [using thread pool for INSERT queries](#Thread_pool)
+
+The meaning of other parameters is given in section [partitioning](#Partitioning).
+
 
 ## SELECT queries
 
@@ -96,7 +97,7 @@ The PXF JDBC plugin allows to perform SELECT queries to external tables.
 
 To perform SELECT queries, create an `EXTERNAL READABLE TABLE` or just an `EXTERNAL TABLE` with `FORMAT 'CUSTOM' (FORMATTER='pxfwritable_import')` in PXF.
 
-The `BATCH_SIZE` parameter is *not used* in such tables. *However*, if this parameter is present, its value will be checked for correctness (it must be an integer).
+The `BATCH_SIZE` parameter is not used in such tables. *However*, if this parameter is present, its value will be checked for correctness (it must be an integer).
 
 
 ## INSERT queries
@@ -110,14 +111,15 @@ The `PARTITION_BY`, `RANGE` and `INTERVAL` parameters in such tables are ignored
 
 ### Batching
 
-The INSERT queries can be batched. This may significantly increase perfomance if batching is supported by the external database.
+INSERT queries can be batched. This may significantly increase perfomance if batching is supported by an external database.
 
 To enable batching, create an external table with the parameter `BATCH_SIZE` set to:
+* `0`. Batch will be of [recommended](https://docs.oracle.com/cd/E11882_01/java.112/e16548/oraperf.htm#JJDBC28754) size (`100`);
+* `1`. Batching will not be used;
 * `integer > 1`. Batches of the given size will be used;
-* `integer < 0`. A batch of infinite size will be used (all tuples will be sent in one huge JDBC query). Note that this behaviour **may cause errors**, as each database has its own limit on the size of JDBC queries;
-* `0` or `1`. Batching will not be used.
+* `integer < 0`. A batch of infinite size will be used (all tuples will be sent in one huge JDBC query from each segment). Choosing this value **may cause errors**, as PXF will consume lots of memory; also, every database has a limit on the maximum size of JDBC queries.
 
-Batching must be supported by the JDBC driver of an external database. If the driver does not support batching, it will not be used, but PXF plugin will try to INSERT values anyway, and an information message will be added to PXF logs.
+Batching must be supported by the JDBC driver of an external database. If the driver does not support batching, it will not be used, and PXF plugin will try to INSERT values anyway, adding an information message to PXF logs.
 
 By default (`BATCH_SIZE` is absent), batching is not used.
 
@@ -126,7 +128,7 @@ By default (`BATCH_SIZE` is absent), batching is not used.
 
 The INSERT queries can be processed by multiple threads. This may significantly increase perfomance if the external database can work with multiple connections simultaneously.
 
-It is recommended to use batching together with a thread pool. In this case, each thread receives data from one (whole) batch and processes it. If a thread pool is used without batching, each thread in a pool will receive exactly one tuple; as a rule, this takes much more time than usual one-thread INSERT.
+It is recommended to use batching together with a thread pool. In this case, each thread receives data from one (whole) batch and processes it. If a thread pool is used without batching, each thread in a pool will receive exactly one tuple; as a rule, this takes much more time than an usual one-thread INSERT.
 
 If any of the threads from pool fails, the user will get the error message. However, if INSERT fails, some data still may be INSERTed into the external database.
 
@@ -140,10 +142,11 @@ By default (`POOL_SIZE` is absent), thread pool is not used.
 
 ## Partitioning
 
-PXF JDBC plugin supports simultaneous *read* access to an external table from multiple PXF segments. This feature is called partitioning.
+PXF JDBC plugin supports simultaneous read access to an external table from multiple PXF segments. This feature is called partitioning.
 
 
 ### Syntax
+
 Use the following `<plugin_parameters>` (mentioned above) to activate partitioning:
 
 ```

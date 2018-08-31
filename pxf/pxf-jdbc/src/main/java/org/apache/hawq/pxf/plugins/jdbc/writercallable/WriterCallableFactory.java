@@ -75,16 +75,15 @@ public class WriterCallableFactory {
     /**
      * Set batch size to use.
      *
-     * @param batchSize < 0: Use batches of infinite size
+     * @param batchSize = 0: Use batches of recommended size
      * @param batchSize = 1: Do not use batches
      * @param batchSize > 1: Use batches of the given size
+     * @param batchSize < 0: Use batches of infinite size
      */
     public void setBatchSize(int batchSize) {
-        if (batchSize < 0) {
-            batchSize = 0;
-        }
-        else if (batchSize == 0) {
-            batchSize = 1;
+        if (batchSize == 0) {
+            // Set the recommended value: https://docs.oracle.com/cd/E11882_01/java.112/e16548/oraperf.htm#JJDBC28754
+            batchSize = 100;
         }
         this.batchSize = batchSize;
     }

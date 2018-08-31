@@ -96,6 +96,7 @@ class BatchWriterCallable implements WriterCallable {
         this.query = query;
         this.statement = statement;
         if (maxRowsCount < 0) {
+            // From now, zero means "infinite". The processing of user-provided zero must have been done in {@link WriterCallableFactory}
             maxRowsCount = 0;
         }
         this.maxRowsCount = maxRowsCount;
