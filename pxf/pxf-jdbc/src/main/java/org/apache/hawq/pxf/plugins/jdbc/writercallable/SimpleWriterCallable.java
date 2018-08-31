@@ -46,10 +46,7 @@ class SimpleWriterCallable implements WriterCallable {
 
     @Override
     public boolean isCallRequired() {
-        if (this.row != null) {
-            return true;
-        }
-        return false;
+        return this.row != null;
     }
 
     @Override

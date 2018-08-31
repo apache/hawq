@@ -48,10 +48,7 @@ class BatchWriterCallable implements WriterCallable {
 
     @Override
     public boolean isCallRequired() {
-        if ((maxRowsCount > 0) && (rows.size() >= maxRowsCount)) {
-            return true;
-        }
-        return false;
+        return (maxRowsCount > 0) && (rows.size() >= maxRowsCount);
     }
 
     @Override
