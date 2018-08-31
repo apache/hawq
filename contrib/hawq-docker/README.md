@@ -121,7 +121,16 @@ make pull
     To stop all containers:                        make stop
     To remove hdfs containers:                     make clean
     To remove all containers:                      make distclean
-    To build images locally:                       make build
+    To build images locally:                       make build-image
     To pull latest images:                         make pull
+    To build Hawq runtime:                         make build-hawq
+    To initialize Hawq on Namenode:                make init-hawq
+    To start Hawq on Namenode:                     make start-hawq
+    To stop Hawq on Namenode:                      make stop-hawq
+    To check Hawq status on Namenode:              make status-hawq
+    To build PXF runtime:                          make build-pxf
+    To initialize PXF on Namenode/Datanodes:       make init-pxf
+    To start PXF on Namenode/Datanodes:            make start-pxf
+    To stop PXF on on Namenode/Datanodes:          make stop-hawq
+    To check PXF status on Namenode/Datanodes:     make status-hawq
 ```
-

@@ -25,11 +25,14 @@ OS_VERSION := centos7
 # Do not use underscore "_" in CLUSTER_ID
 CLUSTER_ID := $(OS_VERSION)
 # Monut this local directory to /data in data container and share with other containers
-LOCAL := 
+LOCAL :=
 # networks used in docker
 NETWORK := $(CLUSTER_ID)_hawq_network
+HAWQ_HOME := "/data/hawq-devel"
+PXF_CLASSPATH_TEMPLATE = "hdp"
+JAVA_TOOL_OPTIONS := -Dfile.encoding=UTF8
 
-all: 
+all:
 	@echo " Usage:"
 	@echo "    To setup a build and test environment:         make run"
 	@echo "    To start all containers:                       make start"
@@ -37,10 +40,21 @@ all:
 	@echo "    To remove hdfs containers:                     make clean"
 	@echo "    To remove all containers:                      make distclean"
 	@echo ""
-	@echo "    To build images locally:                       make build"
+	@echo "    To build images locally:                       make build-image"
 	@echo "    To pull latest images:                         make pull"
+	@echo ""
+	@echo "    To build Hawq runtime:                         make build-hawq"
+	@echo "    To initialize Hawq on Namenode:                make init-hawq"
+	@echo "    To start Hawq on Namenode:                     make start-hawq"
+	@echo "    To stop Hawq on Namenode:                      make stop-hawq"
+	@echo "    To check Hawq status on Namenode:              make status-hawq"
+	@echo "    To build PXF runtime:                          make build-pxf"
+	@echo "    To initialize PXF on Namenode/Datanodes:       make init-pxf"
+	@echo "    To start PXF on Namenode/Datanodes:            make start-pxf"
+	@echo "    To stop PXF on on Namenode/Datanodes:          make stop-hawq"
+	@echo "    To check PXF status on Namenode/Datanodes:     make status-pxf"
 
-build:
+build-image:
 	@make -f $(THIS_MAKEFILE_PATH) build-hawq-dev-$(OS_VERSION)
 	@make -f $(THIS_MAKEFILE_PATH) build-hawq-test-$(OS_VERSION)
 	@echo "Build Images Done!"
@@ -51,7 +65,10 @@ build-hawq-dev-$(OS_VERSION): $(TOP_DIR)/$(OS_VERSION)-docker/hawq-dev/Dockerfil
 
 build-hawq-test-$(OS_VERSION): $(TOP_DIR)/$(OS_VERSION)-docker/hawq-test/Dockerfile
 	@echo build hawq-test:$(OS_VERSION) image
-	docker build -t hawq/hawq-test:$(OS_VERSION) $(TOP_DIR)/$(OS_VERSION)-docker/hawq-test/
+	docker build \
+		--build-arg=PXF_CLASSPATH_TEMPLATE="`cat ../../pxf/pxf-service/src/configs/templates/pxf-private-${PXF_CLASSPATH_TEMPLATE}.classpath.template`" \
+		--build-arg=PXF_LOG4J_PROPERTIES="`cat ../../pxf/pxf-service/src/main/resources/pxf-log4j.properties`" \
+		-t hawq/hawq-test:$(OS_VERSION) $(TOP_DIR)/$(OS_VERSION)-docker/hawq-test/
 
 create-data-container:
 	@echo create ${CLUSTER_ID}-data container
@@ -227,3 +244,218 @@ distclean:
 		docker network rm $(NETWORK) 2>&1 >/dev/null || true; \
 	fi
 	@echo "Distclean Done!"
+
+build-hawq:
+	@echo "Make sure you have executed make build-image"
+	@echo "Make sure you have executed make run"
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "JAVA_TOOL_OPTIONS=$(JAVA_TOOL_OPTIONS)" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-hawq.sh --build"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!"; \
+	fi
+
+init-hawq:
+	@echo "Make sure you have executed make build-hawq"
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-hawq.sh --init"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!"; \
+	fi
+
+start-hawq:
+	@echo "Make sure you have executed make init-hawq"
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "JAVA_TOOL_OPTIONS=$(JAVA_TOOL_OPTIONS)" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-hawq.sh --start"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!"; \
+	fi
+
+stop-hawq:
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "JAVA_TOOL_OPTIONS=$(JAVA_TOOL_OPTIONS)" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-hawq.sh --stop"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!"; \
+	fi
+
+status-hawq:
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "JAVA_TOOL_OPTIONS=$(JAVA_TOOL_OPTIONS)" \
+			-e  "USER=gpadmin" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-hawq.sh --status"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!"; \
+	fi
+
+build-pxf:
+	@echo "Make sure you have executed make build-image"
+	@echo "Make sure you have executed make run"
+	@make -f $(THIS_MAKEFILE_PATH) pxf-namenode
+	@i=1; \
+	while [ $$i -le $(NDATANODES) ] ; do \
+		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i pxf-datanode; \
+		i=$$((i+1)); \
+	done
+
+pxf-namenode:
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "JAVA_TOOL_OPTIONS=$(JAVA_TOOL_OPTIONS)" \
+			-e "PXF_CLASSPATH_TEMPLATE=$(PXF_CLASSPATH_TEMPLATE)" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-pxf.sh --build"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!" && exit 1; \
+	fi
+
+pxf-datanode:
+	@echo "Logging into ${CLUSTER_ID}-datanode$(CUR_DATANODE) container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-datanode$(CUR_DATANODE)" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "JAVA_TOOL_OPTIONS=$(JAVA_TOOL_OPTIONS)" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-datanode$(CUR_DATANODE) /bin/bash -c "service-pxf.sh --build"; \
+	else \
+		echo "${CLUSTER_ID}-datanode$(CUR_DATANODE) container does not exist!" && exit 1; \
+	fi
+
+init-pxf:
+	@echo "Make sure you have executed make build-pxf"
+	@make -f $(THIS_MAKEFILE_PATH) init-pxf-namenode
+	@i=1; \
+	while [ $$i -le $(NDATANODES) ] ; do \
+		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i init-pxf-datanode; \
+		i=$$((i+1)); \
+	done
+
+init-pxf-namenode:
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-pxf.sh --init"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!" && exit 1; \
+	fi
+
+init-pxf-datanode:
+	@echo "Logging into ${CLUSTER_ID}-datanode$(CUR_DATANODE) container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-datanode$(CUR_DATANODE)" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-datanode$(CUR_DATANODE) /bin/bash -c "service-pxf.sh --init"; \
+	else \
+		echo "${CLUSTER_ID}-datanode$(CUR_DATANODE) container does not exist!" && exit 1; \
+	fi
+
+start-pxf:
+	@echo "Make sure you have executed make init-pxf"
+	@make -f $(THIS_MAKEFILE_PATH) start-pxf-namenode
+	@i=1; \
+	while [ $$i -le $(NDATANODES) ] ; do \
+		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i start-pxf-datanode; \
+		i=$$((i+1)); \
+	done
+
+start-pxf-namenode:
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-pxf.sh --start"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!" && exit 1; \
+	fi
+
+start-pxf-datanode:
+	@echo "Logging into ${CLUSTER_ID}-datanode$(CUR_DATANODE) container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-datanode$(CUR_DATANODE)" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-datanode$(CUR_DATANODE) /bin/bash -c "service-pxf.sh --start"; \
+	else \
+		echo "${CLUSTER_ID}-datanode$(CUR_DATANODE) container does not exist!" && exit 1; \
+	fi
+
+stop-pxf:
+	@make -f $(THIS_MAKEFILE_PATH) stop-pxf-namenode
+	@i=1; \
+	while [ $$i -le $(NDATANODES) ] ; do \
+		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i stop-pxf-datanode; \
+		i=$$((i+1)); \
+	done
+
+stop-pxf-namenode:
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-pxf.sh --stop"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!" && exit 1; \
+	fi
+
+stop-pxf-datanode:
+	@echo "Logging into ${CLUSTER_ID}-datanode$(CUR_DATANODE) container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-datanode$(CUR_DATANODE)" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-datanode$(CUR_DATANODE) /bin/bash -c "service-pxf.sh --stop"; \
+	else \
+		echo "${CLUSTER_ID}-datanode$(CUR_DATANODE) container does not exist!" && exit 1; \
+	fi
+
+status-pxf:
+	@make -f $(THIS_MAKEFILE_PATH) status-pxf-namenode
+	@i=1; \
+	while [ $$i -le $(NDATANODES) ] ; do \
+		make -f $(THIS_MAKEFILE_PATH) CUR_DATANODE=$$i status-pxf-datanode; \
+		i=$$((i+1)); \
+	done
+
+status-pxf-namenode:
+	@echo "Logging into ${CLUSTER_ID}-namenode container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-namenode" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-namenode /bin/bash -c "service-pxf.sh --status"; \
+	else \
+		echo "${CLUSTER_ID}-namenode container does not exist!" && exit 1; \
+	fi
+
+status-pxf-datanode:
+	@echo "Logging into ${CLUSTER_ID}-datanode$(CUR_DATANODE) container"
+	@if [ ! -z "`docker ps -a --filter="name=${CLUSTER_ID}-datanode$(CUR_DATANODE)" | grep -v CONTAINER`" ]; then \
+		docker exec \
+			-e "HAWQ_HOME=$(HAWQ_HOME)" \
+			-e "NAMENODE=${CLUSTER_ID}-namenode" \
+			-u gpadmin --privileged -it ${CLUSTER_ID}-datanode$(CUR_DATANODE) /bin/bash -c "service-pxf.sh --status"; \
+	else \
+		echo "${CLUSTER_ID}-datanode$(CUR_DATANODE) container does not exist!" && exit 1; \
+	fi

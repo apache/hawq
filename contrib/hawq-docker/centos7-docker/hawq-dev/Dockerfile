@@ -30,7 +30,7 @@ RUN yum install -y epel-release && \
  openldap-devel protobuf-devel readline-devel net-snmp-devel apr-devel \
  libesmtp-devel python-pip json-c-devel \
  java-1.7.0-openjdk-devel lcov cmake \
- openssh-clients openssh-server perl-JSON && \
+ openssh-clients openssh-server perl-JSON unzip && \
  yum clean all
 
 RUN rpm -ivh --nodeps   https://rpmfind.net/linux/centos/6.10/os/x86_64/Packages/bison-2.4.1-5.el6.x86_64.rpm
