@@ -37,7 +37,7 @@ import java.sql.SQLException;
 class BatchWriterCallable implements WriterCallable {
     @Override
     public void supply(OneRow row) throws IllegalStateException {
-        if ((maxRowsCount > 0) && (rows.size() >= maxRowsCount)) {
+        if ((batchSize > 0) && (rows.size() >= batchSize)) {
             throw new IllegalStateException("Trying to supply() a OneRow object to a full WriterCallable");
         }
         if (row == null) {
@@ -48,7 +48,7 @@ class BatchWriterCallable implements WriterCallable {
 
     @Override
     public boolean isCallRequired() {
-        return (maxRowsCount > 0) && (rows.size() >= maxRowsCount);
+        return (batchSize > 0) && (rows.size() >= batchSize);
     }
 
     @Override
@@ -88,18 +88,35 @@ class BatchWriterCallable implements WriterCallable {
     /**
      * Construct a new batch writer
      */
-    BatchWriterCallable(JdbcPlugin plugin, String query, PreparedStatement statement, int maxRowsCount) {
-        if ((plugin == null) || (query == null)) {
+    BatchWriterCallable(JdbcPlugin plugin, String query, PreparedStatement statement, int batchSize) {
+        if (plugin == null || query == null) {
             throw new IllegalArgumentException("The provided JdbcPlugin or SQL query is null");
         }
+
+        try {
+            if (!plugin.getConnection().getMetaData().supportsBatchUpdates()) {
+                throw new IllegalArgumentException("The external database does not support batch updates");
+            }
+        }
+        catch (SQLException | ClassNotFoundException | IllegalArgumentException e) {
+            // We catch all possible exceptions here so that in case supportBatchUpdates() throws an exception, we try not to use batch updates to avoid complete failure (at least on this stage)
+            throw new IllegalArgumentException(e);
+        }
+
         this.plugin = plugin;
         this.query = query;
         this.statement = statement;
-        if (maxRowsCount < 0) {
-            // From now, zero means "infinite". The processing of user-provided zero must have been done in {@link WriterCallableFactory}
-            maxRowsCount = 0;
+        if (batchSize < 1) {
+            // Use [recommended](https://docs.oracle.com/cd/E11882_01/java.112/e16548/oraperf.htm#JJDBC28754) value
+            this.batchSize = 100;
         }
-        this.maxRowsCount = maxRowsCount;
+        else if (batchSize > 1) {
+            this.batchSize = batchSize;
+        }
+        else {
+            throw new IllegalArgumentException("The provided batchSize is 1; BatchWriterCallable cannot be used with this batchSize");
+        }
+
         rows = new LinkedList<>();
     }
 
@@ -107,5 +124,5 @@ class BatchWriterCallable implements WriterCallable {
     private final String query;
     private PreparedStatement statement;
     private List<OneRow> rows;
-    private final int maxRowsCount;
+    private final int batchSize;
 }

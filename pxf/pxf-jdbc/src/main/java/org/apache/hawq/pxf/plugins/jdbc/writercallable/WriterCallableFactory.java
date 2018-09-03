@@ -24,6 +24,9 @@ import org.apache.hawq.pxf.plugins.jdbc.JdbcPlugin;
 
 import java.sql.PreparedStatement;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 /**
  * An object that processes INSERT operation on {@link OneRow} objects
  */
@@ -36,7 +39,7 @@ public class WriterCallableFactory {
      * By default, 'batchSize' is 1 and 'statement' is null
      */
     public WriterCallableFactory() {
-        batchSize = 1;
+        batchSize = 0;
         plugin = null;
         query = null;
         statement = null;
@@ -48,12 +51,20 @@ public class WriterCallableFactory {
      * @return an implementation of WriterCallable, chosen based on parameters that were set for this factory
      */
     public WriterCallable get() {
-        if (batchSize == 1) {
-            return new SimpleWriterCallable(plugin, query, statement);
+        if (batchSize != 1) {
+            try {
+                return new BatchWriterCallable(plugin, query, statement, batchSize);
+            }
+            catch (IllegalArgumentException e) {
+                LOG.warn(
+                    "Batching was requested for the query '" +
+                    query == null ? "" : query +
+                    "', but will not be used"
+                );
+                LOG.warn(e.toString());
+            }
         }
-        else {
-            return new BatchWriterCallable(plugin, query, statement, batchSize);
-        }
+        return new SimpleWriterCallable(plugin, query, statement);
     }
 
     /**
@@ -75,16 +86,11 @@ public class WriterCallableFactory {
     /**
      * Set batch size to use.
      *
-     * @param batchSize = 0: Use batches of recommended size
+     * @param batchSize < 1: Use batches of recommended size
      * @param batchSize = 1: Do not use batches
-     * @param batchSize > 1: Use batches of the given size
-     * @param batchSize < 0: Use batches of infinite size
+     * @param batchSize > 1: Use batches of given size
      */
     public void setBatchSize(int batchSize) {
-        if (batchSize == 0) {
-            // Set the recommended value: https://docs.oracle.com/cd/E11882_01/java.112/e16548/oraperf.htm#JJDBC28754
-            batchSize = 100;
-        }
         this.batchSize = batchSize;
     }
 
@@ -103,4 +109,6 @@ public class WriterCallableFactory {
     private JdbcPlugin plugin;
     private String query;
     private PreparedStatement statement;
+
+    private static final Log LOG = LogFactory.getLog(WriterCallableFactory.class);
 }
