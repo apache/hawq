@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -814,7 +814,7 @@ void test__pxf_serialize_filter_list__oneFilter(void **state)
 	char* result = pxf_serialize_filter_list(expressionItems);
 	assert_string_equal(result, "a0c25s4d1984o5");
 
-	pxf_free_expression_items_list(expressionItems, true);
+	pxf_free_expression_items_list(expressionItems);
 	expressionItems = NIL;
 	pfree(result);
 
@@ -832,7 +832,7 @@ void test__pxf_serialize_fillter_list__nullFilter(void **state)
 	char* result = pxf_serialize_filter_list(expressionItems);
 	assert_string_equal(result, "a0o8");
 
-	pxf_free_expression_items_list(expressionItems, true);
+	pxf_free_expression_items_list(expressionItems);
 	expressionItems = NIL;
 	pfree(result);
 
@@ -870,7 +870,7 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 
 	assert_int_equal(expressionItems->length, 2*trivialExpressionItems - 1);
 
-	pxf_free_expression_items_list(expressionItems, true);
+	pxf_free_expression_items_list(expressionItems);
 	expressionItems = NIL;
 }
 
@@ -931,8 +931,8 @@ test__extractPxfAttributes_supported_function_one_arg(void **state) {
 	}
 }
 
-int 
-main(int argc, char* argv[]) 
+int
+main(int argc, char* argv[])
 {
 	cmockery_parse_arguments(argc, argv);
 
