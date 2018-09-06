@@ -113,14 +113,13 @@ The `PARTITION_BY`, `RANGE` and `INTERVAL` parameters in such tables are ignored
 
 INSERT queries can be batched. This may significantly increase perfomance if batching is supported by an external database.
 
-To enable batching, create an external table with the parameter `BATCH_SIZE` set to:
-* `integer < 1`. Batch will be of [recommended](https://docs.oracle.com/cd/E11882_01/java.112/e16548/oraperf.htm#JJDBC28754) size (`100`);
-* `integer > 1`. Batch will be of given size;
-* `1`. Batching will be disabled.
+Batching is enabled by default, and the default batch size is `100` (this is a [recommended](https://docs.oracle.com/cd/E11882_01/java.112/e16548/oraperf.htm#JJDBC28754) value). To control this feature, create an external table with the parameter `BATCH_SIZE` set to:
+* `0` or `1`. Batching will be disabled;
+* `integer > 1`. Batch will be of given size.
 
-Batching must be supported by the JDBC driver of an external database. If the driver does not support batching, this feature will be disabled, but the PXF plugin will try to execute INSERT query, and a warning message will be added to PXF logs.
-
-The default value of `BATCH_SIZE` (if this parameter is absent) is `integer < 1`, thus a batch of recommended size will be used.
+Batching must be supported by the JDBC driver of an external database. If the driver does not support batching, behaviour depends on the `BATCH_SIZE` parameter:
+* `BATCH_SIZE` is not present; `BATCH_SIZE` is `0` or `1`. PXF will try to execute INSERT query without batching;
+* `BATCH_SIZE` is an `integer > 1`. INSERT query will fail with an appropriate error message.
 
 
 ## Thread pool

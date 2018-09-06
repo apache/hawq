@@ -130,13 +130,13 @@ public class JdbcAccessor extends JdbcPlugin implements ReadAccessor, WriteAcces
         statementWrite = super.getPreparedStatement(connection, queryWrite);
 
         // Process batchSize
-        if ((batchSize != 0) && (!connection.getMetaData().supportsBatchUpdates())) {
-            LOG.warn(
-                "The database '" +
-                connection.getMetaData().getDatabaseProductName() +
-                "' does not support batch updates. The current request will be handled without batching"
-            );
-            batchSize = 0;
+        if (!connection.getMetaData().supportsBatchUpdates()) {
+            if ((batchSizeIsSetByUser) && (batchSize > 1)) {
+                throw new SQLException("The external database does not support batch updates");
+            }
+            else {
+                batchSize = 1;
+            }
         }
 
         // Process poolSize

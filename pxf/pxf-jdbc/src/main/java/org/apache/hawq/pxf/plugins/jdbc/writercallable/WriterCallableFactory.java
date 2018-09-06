@@ -24,22 +24,19 @@ import org.apache.hawq.pxf.plugins.jdbc.JdbcPlugin;
 
 import java.sql.PreparedStatement;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-
 /**
  * An object that processes INSERT operation on {@link OneRow} objects
  */
 public class WriterCallableFactory {
     /**
-     * Create a new factory.
+     * Create a new {@link WriterCallable} factory.
      *
-     * Note that before constructing {@link WriterCallable}, 'setBatchSize' and 'setStatement' must be called.
+     * Note that 'setPlugin' and 'setQuery' must be called before construction of a {@link WriterCallable}.
      *
-     * By default, 'batchSize' is 1 and 'statement' is null
+     * By default, 'statement' is null
      */
     public WriterCallableFactory() {
-        batchSize = 0;
+        batchSize = JdbcPlugin.DEFAULT_BATCH_SIZE;
         plugin = null;
         query = null;
         statement = null;
@@ -51,18 +48,8 @@ public class WriterCallableFactory {
      * @return an implementation of WriterCallable, chosen based on parameters that were set for this factory
      */
     public WriterCallable get() {
-        if (batchSize != 1) {
-            try {
-                return new BatchWriterCallable(plugin, query, statement, batchSize);
-            }
-            catch (IllegalArgumentException e) {
-                LOG.warn(
-                    "Batching was requested for the query '" +
-                    query == null ? "" : query +
-                    "', but will not be used"
-                );
-                LOG.warn(e.toString());
-            }
+        if (batchSize > 1) {
+            return new BatchWriterCallable(plugin, query, statement, batchSize);
         }
         return new SimpleWriterCallable(plugin, query, statement);
     }
@@ -84,11 +71,10 @@ public class WriterCallableFactory {
     }
 
     /**
-     * Set batch size to use.
+     * Set batch size to use
      *
-     * @param batchSize < 1: Use batches of recommended size
-     * @param batchSize = 1: Do not use batches
-     * @param batchSize > 1: Use batches of given size
+     * @param batchSize > 1: Use batches of specified size
+     * @param batchSize < 1: Do not use batches
      */
     public void setBatchSize(int batchSize) {
         this.batchSize = batchSize;
@@ -104,11 +90,8 @@ public class WriterCallableFactory {
         this.statement = statement;
     }
 
-
     private int batchSize;
     private JdbcPlugin plugin;
     private String query;
     private PreparedStatement statement;
-
-    private static final Log LOG = LogFactory.getLog(WriterCallableFactory.class);
 }

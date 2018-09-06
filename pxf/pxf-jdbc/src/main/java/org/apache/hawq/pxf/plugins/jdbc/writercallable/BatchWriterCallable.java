@@ -93,29 +93,10 @@ class BatchWriterCallable implements WriterCallable {
             throw new IllegalArgumentException("The provided JdbcPlugin or SQL query is null");
         }
 
-        try {
-            if (!plugin.getConnection().getMetaData().supportsBatchUpdates()) {
-                throw new IllegalArgumentException("The external database does not support batch updates");
-            }
-        }
-        catch (SQLException | ClassNotFoundException | IllegalArgumentException e) {
-            // We catch all possible exceptions here so that in case supportBatchUpdates() throws an exception, we try not to use batch updates to avoid complete failure (at least on this stage)
-            throw new IllegalArgumentException(e);
-        }
-
         this.plugin = plugin;
         this.query = query;
         this.statement = statement;
-        if (batchSize < 1) {
-            // Use [recommended](https://docs.oracle.com/cd/E11882_01/java.112/e16548/oraperf.htm#JJDBC28754) value
-            this.batchSize = 100;
-        }
-        else if (batchSize > 1) {
-            this.batchSize = batchSize;
-        }
-        else {
-            throw new IllegalArgumentException("The provided batchSize is 1; BatchWriterCallable cannot be used with this batchSize");
-        }
+        this.batchSize = batchSize;
 
         rows = new LinkedList<>();
     }

@@ -94,10 +94,14 @@ public class JdbcPlugin extends Plugin {
         String batchSizeRaw = input.getUserProperty("BATCH_SIZE");
         if (batchSizeRaw != null) {
             try {
-                batchSize = Integer.parseInt(batchSizeRaw);
+                batchSize = Integer.parseUnsignedInt(batchSizeRaw);
+                if (batchSize == 0) {
+                    batchSize = 1;
+                }
+                batchSizeIsSetByUser = true;
             }
             catch (NumberFormatException e) {
-                throw new UserDataException("BATCH_SIZE is incorrect: must be an integer");
+                throw new UserDataException("BATCH_SIZE is incorrect: must be a non-negative integer");
             }
         }
 
@@ -194,16 +198,20 @@ public class JdbcPlugin extends Plugin {
         closeConnection(connection);
     }
 
-
-    // User-defined JDBC parameters
+    // JDBC parameters
     protected String jdbcDriver = null;
     protected String dbUrl = null;
     protected String user = null;
     protected String pass = null;
+
     protected String tableName = null;
 
-    // User-defined parameters for INSERT queries
-    protected int batchSize = 0;
+    // '100' is a recommended value: https://docs.oracle.com/cd/E11882_01/java.112/e16548/oraperf.htm#JJDBC28754
+    public static final int DEFAULT_BATCH_SIZE = 100;
+    // After argument parsing, this value is guaranteed to be >= 1
+    protected int batchSize = DEFAULT_BATCH_SIZE;
+    protected boolean batchSizeIsSetByUser = false;
+
     protected int poolSize = 1;
 
     // Columns description
