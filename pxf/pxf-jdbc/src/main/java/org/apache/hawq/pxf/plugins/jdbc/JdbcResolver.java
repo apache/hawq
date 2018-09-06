@@ -158,69 +158,72 @@ public class JdbcResolver extends JdbcPlugin implements ReadResolver, WriteResol
                     throw new UnsupportedOperationException("Field type '" + DataType.get(oneField.type).toString() + "' (column '" + column.toString() + "') is not supported");
             }
 
-            if (LOG.isDebugEnabled()) {
-                if (DataType.get(oneField.type) == DataType.BYTEA) {
-                    LOG.debug("OneField content (conversion from BYTEA): '" + new String((byte[])oneField.val) + "'");
-                }
+            if (
+                LOG.isDebugEnabled() &&
+                DataType.get(oneField.type) == DataType.BYTEA
+            ) {
+                LOG.debug("OneField content (conversion from BYTEA): '" + new String((byte[])oneField.val) + "'");
             }
 
             // Convert TEXT columns into native data types
-            if ((oneField.val != null) && (DataType.get(oneField.type) == DataType.TEXT) && (DataType.get(column.columnTypeCode()) != DataType.TEXT)) {
-                String rawVal = (String)oneField.val;
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("OneField content (conversion from TEXT): '" + rawVal + "'");
-                }
-                switch (DataType.get(column.columnTypeCode())) {
-                    case VARCHAR:
-                    case BPCHAR:
-                    case TEXT:
-                    case BYTEA:
-                        break;
-                    case BOOLEAN:
-                        oneField.val = (Object)Boolean.parseBoolean(rawVal);
-                        break;
-                    case INTEGER:
-                        oneField.val = (Object)Integer.parseInt(rawVal);
-                        break;
-                    case FLOAT8:
-                        oneField.val = (Object)Double.parseDouble(rawVal);
-                        break;
-                    case REAL:
-                        oneField.val = (Object)Float.parseFloat(rawVal);
-                        break;
-                    case BIGINT:
-                        oneField.val = (Object)Long.parseLong(rawVal);
-                        break;
-                    case SMALLINT:
-                        oneField.val = (Object)Short.parseShort(rawVal);
-                        break;
-                    case NUMERIC:
-                        oneField.val = (Object)new BigDecimal(rawVal);
-                        break;
-                    case TIMESTAMP:
-                        boolean isConversionSuccessful = false;
-                        for (SimpleDateFormat sdf : timestampSDFs.get()) {
-                            try {
-                                java.util.Date parsedTimestamp = sdf.parse(rawVal);
-                                oneField.val = (Object)new Timestamp(parsedTimestamp.getTime());
-                                isConversionSuccessful = true;
-                                break;
-                            }
-                            catch (ParseException e) {
-                                // pass
-                            }
-                        }
-                        if (!isConversionSuccessful) {
-                            throw new ParseException(rawVal, 0);
-                        }
-                        break;
-                    case DATE:
-                        oneField.val = (Object)new Date(dateSDF.get().parse(rawVal).getTime());
-                        break;
-                    default:
-                        throw new UnsupportedOperationException("Field type '" + DataType.get(oneField.type).toString() + "' (column '" + column.toString() + "') is not supported");
-                }
+            if ((DataType.get(oneField.type) == DataType.TEXT) && (DataType.get(column.columnTypeCode()) != DataType.TEXT)) {
                 oneField.type = column.columnTypeCode();
+                if (oneField.val != null) {
+                    String rawVal = (String)oneField.val;
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("OneField content (conversion from TEXT): '" + rawVal + "'");
+                    }
+                    switch (DataType.get(column.columnTypeCode())) {
+                        case VARCHAR:
+                        case BPCHAR:
+                        case TEXT:
+                        case BYTEA:
+                            break;
+                        case BOOLEAN:
+                            oneField.val = (Object)Boolean.parseBoolean(rawVal);
+                            break;
+                        case INTEGER:
+                            oneField.val = (Object)Integer.parseInt(rawVal);
+                            break;
+                        case FLOAT8:
+                            oneField.val = (Object)Double.parseDouble(rawVal);
+                            break;
+                        case REAL:
+                            oneField.val = (Object)Float.parseFloat(rawVal);
+                            break;
+                        case BIGINT:
+                            oneField.val = (Object)Long.parseLong(rawVal);
+                            break;
+                        case SMALLINT:
+                            oneField.val = (Object)Short.parseShort(rawVal);
+                            break;
+                        case NUMERIC:
+                            oneField.val = (Object)new BigDecimal(rawVal);
+                            break;
+                        case TIMESTAMP:
+                            boolean isConversionSuccessful = false;
+                            for (SimpleDateFormat sdf : timestampSDFs.get()) {
+                                try {
+                                    java.util.Date parsedTimestamp = sdf.parse(rawVal);
+                                    oneField.val = (Object)new Timestamp(parsedTimestamp.getTime());
+                                    isConversionSuccessful = true;
+                                    break;
+                                }
+                                catch (ParseException e) {
+                                    // pass
+                                }
+                            }
+                            if (!isConversionSuccessful) {
+                                throw new ParseException(rawVal, 0);
+                            }
+                            break;
+                        case DATE:
+                            oneField.val = (Object)new Date(dateSDF.get().parse(rawVal).getTime());
+                            break;
+                        default:
+                            throw new UnsupportedOperationException("Field type '" + DataType.get(oneField.type).toString() + "' (column '" + column.toString() + "') is not supported");
+                    }
+                }
             }
 
             column_index += 1;
