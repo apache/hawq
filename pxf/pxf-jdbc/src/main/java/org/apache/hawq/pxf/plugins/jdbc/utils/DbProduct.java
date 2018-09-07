@@ -20,14 +20,16 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  */
 
 /**
- * As the syntax of different database products are not the same, such as the date type  field for processing, ORACLE use to_date () function, and mysql use Date () function.
- So we create this class to abstract public methods, the specific database products can implementation of these  methods.
+ * A tool class to process data types that must have different form in different databases.
+ * Such processing is required to create correct constraints (WHERE statements).
  */
 public abstract class DbProduct {
-    //wrap date string
-    public abstract String wrapDate(Object date_val);
-
-
+    /**
+     * Get an instance of some class - the database product
+     *
+     * @param String dbName A full name of the database
+     * @return a DbProduct of the required class
+     */
     public static DbProduct getDbProduct(String dbName) {
         if (dbName.toUpperCase().contains("MYSQL"))
             return new MysqlProduct();
@@ -35,15 +37,40 @@ public abstract class DbProduct {
             return new OracleProduct();
         else if (dbName.toUpperCase().contains("POSTGRES"))
             return new PostgresProduct();
+        else if (dbName.toUpperCase().contains("MICROSOFT"))
+            return new MicrosoftProduct();
         else
-            //Unsupported databases may execute errors
             return new CommonProduct();
     }
+
+    /**
+     * Wraps a given date value the way required by a target database
+     *
+     * @param val {@link java.sql.Date} object to wrap
+     * @return a string with a properly wrapped date object
+     */
+    public abstract String wrapDate(Object val);
+
+    /**
+     * Wraps a given timestamp value the way required by a target database
+     *
+     * @param val {@link java.sql.Timestamp} object to wrap
+     * @return a string with a properly wrapped timestamp object
+     */
+    public abstract String wrapTimestamp(Object val);
 }
 
+/**
+ * Common product. Used when no other products are avalibale
+ */
 class CommonProduct extends DbProduct {
     @Override
-    public String wrapDate(Object dateVal) {
-        return "date'" + dateVal + "'";
+    public String wrapDate(Object val) {
+        return "date'" + val + "'";
+    }
+
+    @Override
+    public String wrapTimestamp(Object val) {
+        return "'" + val + "'";
     }
 }

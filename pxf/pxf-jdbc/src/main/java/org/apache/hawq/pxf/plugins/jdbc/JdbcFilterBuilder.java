@@ -26,14 +26,12 @@ import org.apache.hawq.pxf.api.LogicalFilter;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.text.ParseException;
 
 /**
- * Uses the filter parser code to build a filter object, either simple - a
- * single {@link BasicFilter} object or a
- * compound - a {@link List} of
- * {@link BasicFilter} objects.
- * The subclass {@link WhereSQLBuilder} will use the filter for
- * generate WHERE statement.
+ * A filter builder. Uses a single {@link BasicFilter} or a {@link List} of {@link BasicFilter} objects.
+ *
+ * The subclass {@link WhereSQLBuilder} will use the result to generate WHERE statement.
  */
 public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
     /**
@@ -41,25 +39,27 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
      * list of such filters.
      *
      * @param filterString the string representation of the filter
-     * @return a single {@link BasicFilter}
-     *         object or a {@link List} of
-     *         {@link BasicFilter} objects.
-     * @throws Exception if parsing the filter failed or filter is not a basic
-     *             filter or list of basic filters
+     * @return a {@link BasicFilter} or a {@link List} of {@link BasicFilter}.
+     * @throws ParseException if parsing the filter failed or filter is not a basic filter or list of basic filters
      */
-    public Object getFilterObject(String filterString) throws Exception {
-        FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
+    public Object getFilterObject(String filterString) throws ParseException {
+        try {
+            FilterParser parser = new FilterParser(this);
+            Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
 
-        if (!(result instanceof LogicalFilter) && !(result instanceof BasicFilter)
-                && !(result instanceof List)) {
-            throw new Exception("String " + filterString
-                    + " resolved to no filter");
+            if (
+                !(result instanceof LogicalFilter) &&
+                !(result instanceof BasicFilter) &&
+                !(result instanceof List)
+            ) {
+                throw new Exception("'" + filterString + "' could not be resolved to a filter");
+            }
+            return result;
         }
-
-        return result;
+        catch (Exception e) {
+            throw new ParseException(e.getMessage(), 0);
+        }
     }
-
 
     @Override
     public Object build(FilterParser.LogicalOperation op, Object leftOperand, Object rightOperand) {
@@ -72,28 +72,33 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public Object build(FilterParser.Operation opId, Object leftOperand,
                         Object rightOperand) throws Exception {
         // Assume column is on the left
-        return handleSimpleOperations(opId,
-                (FilterParser.ColumnIndex) leftOperand,
-                (FilterParser.Constant) rightOperand);
+        return handleSimpleOperations(
+            opId,
+            (FilterParser.ColumnIndex) leftOperand,
+            (FilterParser.Constant) rightOperand
+        );
     }
 
     @Override
-    public Object build(FilterParser.Operation operation, Object operand) throws Exception {
-        if (operation == FilterParser.Operation.HDOP_IS_NULL || operation == FilterParser.Operation.HDOP_IS_NOT_NULL) {
-            // use null for the constant value of null comparison
+    public Object build(FilterParser.Operation operation, Object operand) throws UnsupportedOperationException {
+        if (
+            operation == FilterParser.Operation.HDOP_IS_NULL ||
+            operation == FilterParser.Operation.HDOP_IS_NOT_NULL
+        ) {
+            // Use null for the constant value of null comparison
             return handleSimpleOperations(operation, (FilterParser.ColumnIndex) operand, null);
-        } else {
-            throw new Exception("Unsupported unary operation " + operation);
+        }
+        else {
+            throw new UnsupportedOperationException("Unsupported unary operation '" + operation + "'");
         }
     }
 
     /*
-     * Handles simple column-operator-constant expressions Creates a special
-     * filter in the case the column is the row key column
+     * Handles simple column-operator-constant expressions.
+     * Creates a special filter in the case the column is the row key column
      */
     private BasicFilter handleSimpleOperations(FilterParser.Operation opId,
                                                FilterParser.ColumnIndex column,
@@ -102,8 +107,7 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     /**
-     * Handles AND of already calculated expressions. Currently only AND, in the
-     * future OR can be added
+     * Handles AND of already calculated expressions.
      *
      * Four cases here:
      * <ol>
@@ -135,7 +139,6 @@ public class JdbcFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     private Object handleLogicalOperation(FilterParser.LogicalOperation operator, Object leftOperand, Object rightOperand) {
-
         List<Object> result = new LinkedList<>();
 
         result.add(leftOperand);
