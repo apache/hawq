@@ -866,9 +866,9 @@ test__pxf_serialize_filter_list__manyFilters(void **state)
 	pfree(result);
 
 	int trivialExpressionItems = expressionItems->length;
-	enrich_trivial_expression(expressionItems);
+	add_extra_and_expression_items(expressionItems, trivialExpressionItems - 1);
 
-	assert_int_equal(expressionItems->length, 2*trivialExpressionItems - 1);
+	assert_int_equal(expressionItems->length, 2 * trivialExpressionItems - 1);
 
 	pxf_free_expression_items_list(expressionItems);
 	expressionItems = NIL;
