@@ -75,15 +75,15 @@ ParquetRowGroupReader_ScanNextTuple(
 	RuntimeFilterState		*rfState,
 	TupleTableSlot 			*slot);
 
-/* Get one attribute of a tuple from current row group*/
+/* Get specified attributes of a tuple into slot*/
 void
-ParquetRowGroupReader_ScanOneAttribute(
-    ParquetRowGroupReader   *rowGroupReader,
-    int                     colChildNum,
-    ParquetColumnReader     *columnReader,
-    Datum                   *value,
-    bool                    *null,
-    int                     hawqTypeID);
+ParquetRowGroupReader_ScanNextTupleColumns(
+	TupleDesc 				pqs_tupDesc,
+	ParquetRowGroupReader 	*rowGroupReader,
+	int						*hawqAttrToParquetColNum,
+	bool 					*projs,
+	TupleTableSlot 			*slot,
+	List					*attsList);
 
 /* Finish scanning current row group*/
 void
