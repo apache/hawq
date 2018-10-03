@@ -33,7 +33,7 @@
 #include "parser/parse_func.h"
 
 /*
- * getExternalTableTypeIn(List/Str)
+ * getExternalTableTypeList
  *
  *    Return the table type for a given external table
  *
@@ -59,16 +59,22 @@ void getExternalTableTypeInList(const char formatType,
 	}
 	else if (fmttype_is_custom(formatType))
 	{
-		*formatterType = ExternalTableType_CUSTOM;
-		*formatterName = NULL;
-	}
-	else if (fmttype_is_custom(formatType))
-	{
 		Assert(formatOptions);
 
 		*formatterName = getExtTblFormatterTypeInFmtOptsList(formatOptions);
 
-		*formatterType = ExternalTableType_PLUG;
+		if (pg_strncasecmp(*formatterName, "text", strlen("text")) == 0)
+		{
+			*formatterType = ExternalTableType_TEXT_CUSTOM;
+		}
+		else if (pg_strncasecmp(*formatterName, "csv", strlen("csv")) == 0)
+		{
+			*formatterType = ExternalTableType_CSV_CUSTOM;
+		}
+		else
+		{
+			*formatterType = ExternalTableType_PLUG;
+		}
 	}
 	else
 	{
@@ -78,9 +84,13 @@ void getExternalTableTypeInList(const char formatType,
 	}
 }
 
+/*
+ * getExternalTableTypeStr
+ *
+ */
 void getExternalTableTypeInStr(const char formatType,
                              char *formatOptions,
-                             int *formatterType,
+							 int *formatterType,
                              char **formatterName)
 {
 	if (fmttype_is_text(formatType))
@@ -95,17 +105,23 @@ void getExternalTableTypeInStr(const char formatType,
 	}
 	else if (fmttype_is_custom(formatType))
 	{
-		*formatterType = ExternalTableType_CUSTOM;
-		*formatterName = NULL;
-	}
-	else if (fmttype_is_custom(formatType))
-	{
 		Assert(formatOptions);
 
 		*formatterName = getExtTblFormatterTypeInFmtOptsStr(formatOptions);
 		Assert(*formatterName);
 
-		*formatterType = ExternalTableType_PLUG;
+		if (pg_strncasecmp(*formatterName, "text", strlen("text")) == 0)
+		{
+			*formatterType = ExternalTableType_TEXT_CUSTOM;
+		}
+		else if (pg_strncasecmp(*formatterName, "csv", strlen("csv")) == 0)
+		{
+			*formatterType = ExternalTableType_CSV_CUSTOM;
+		}
+		else
+		{
+			*formatterType = ExternalTableType_PLUG;
+		}
 	}
 	else
 	{
@@ -479,24 +495,33 @@ void InvokePlugStorageFormatStopScan(FmgrInfo *func,
 ExternalInsertDesc InvokePlugStorageFormatInsertInit(FmgrInfo *func,
 		                                             Relation relation,
                                                      int formatterType,
-                                                     char *formatterName)
+                                                     char *formatterName,
+													PlannedStmt *plannedstmt,
+													int segno )
 {
 	PlugStorageData psdata;
 	FunctionCallInfoData fcinfo;
 
-	psdata.type               = T_PlugStorageData;
-	psdata.ps_relation        = relation;
-	psdata.ps_formatter_type  = formatterType;
-	psdata.ps_formatter_name  = formatterName;
+	psdata.type = T_PlugStorageData;
+	psdata.ps_relation = relation;
+	psdata.ps_formatter_type = formatterType;
+	psdata.ps_formatter_name = formatterName;
+	psdata.ps_segno = segno;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
 
+	psdata.ps_scan_state = palloc0(sizeof(ScanState));
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata),  // Call Context
+	                         NULL);              // ResultSetInfo
+
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",
@@ -505,6 +530,7 @@ ExternalInsertDesc InvokePlugStorageFormatInsertInit(FmgrInfo *func,
 
 	ExternalInsertDesc extInsertDesc = psdata.ps_ext_insert_desc;
 
+	pfree(psdata.ps_scan_state);
 	return extInsertDesc;
 }
 

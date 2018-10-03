@@ -91,7 +91,8 @@ SELECT p1.oid, p1.typname, p2.oid, p2.proname
 FROM pg_type AS p1, pg_proc AS p2
 WHERE p1.typinput = p2.oid AND p1.typtype in ('b', 'p') AND
     (p1.typelem != 0 AND p1.typlen < 0) AND NOT
-    (p2.oid = 'array_in'::regproc)
+    (p2.oid = 'array_in'::regproc) AND
+    (p1.typstorage = 'p')
 ORDER BY 1;
 
 -- Check for bogus typoutput routines

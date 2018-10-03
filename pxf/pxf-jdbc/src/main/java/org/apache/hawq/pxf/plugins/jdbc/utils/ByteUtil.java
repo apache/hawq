@@ -19,29 +19,34 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  * under the License.
  */
 
-
 import org.apache.commons.lang.ArrayUtils;
 
 /**
- * A tool class, used to deal with byte array merging, split and other methods.
+ * A tool class for byte array merging, splitting and conversion
  */
 public class ByteUtil {
-
     public static byte[] mergeBytes(byte[] b1, byte[] b2) {
         return ArrayUtils.addAll(b1,b2);
     }
 
-    public static byte[][] splitBytes(byte[] bytes, int n) {
-        int len = bytes.length / n;
+    /**
+     * Split a byte[] array into two arrays, each of which represents a value of type long
+     */
+    public static byte[][] splitBytes(byte[] bytes) {
+        final int N = 8;
+        int len = bytes.length / N;
         byte[][] newBytes = new byte[len][];
         int j = 0;
         for (int i = 0; i < len; i++) {
-            newBytes[i] = new byte[n];
-            for (int k = 0; k < n; k++) newBytes[i][k] = bytes[j++];
+            newBytes[i] = new byte[N];
+            for (int k = 0; k < N; k++) newBytes[i][k] = bytes[j++];
         }
         return newBytes;
     }
 
+    /**
+     * Convert a value of type long to a byte[] array
+     */
     public static byte[] getBytes(long value) {
         byte[] b = new byte[8];
         b[0] = (byte) ((value >> 56) & 0xFF);
@@ -55,22 +60,9 @@ public class ByteUtil {
         return b;
     }
 
-    public static byte[] getBytes(int value) {
-        byte[] b = new byte[4];
-        b[0] = (byte) ((value >> 24) & 0xFF);
-        b[1] = (byte) ((value >> 16) & 0xFF);
-        b[2] = (byte) ((value >> 8) & 0xFF);
-        b[3] = (byte) ((value >> 0) & 0xFF);
-        return b;
-    }
-
-    public static int toInt(byte[] b) {
-        return (((((int) b[3]) & 0xFF) << 32) +
-                ((((int) b[2]) & 0xFF) << 40) +
-                ((((int) b[1]) & 0xFF) << 48) +
-                ((((int) b[0]) & 0xFF) << 56));
-    }
-
+    /**
+     * Convert a byte[] array to a value of type long
+     */
     public static long toLong(byte[] b) {
         return ((((long) b[7]) & 0xFF) +
                 ((((long) b[6]) & 0xFF) << 8) +

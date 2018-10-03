@@ -93,18 +93,29 @@ AppendOnlyVScanNext(ScanState *scanState)
                 if(!tb->datagroup[i])
                     tbCreateColumn(tb,i,hawqVTypeID);
 
-                Datum *ptr = GetVFunc(hawqVTypeID)->gettypeptr(tb->datagroup[i],tb->nrows);
-                *ptr = slot_getattr(slot,i + 1, &(tb->datagroup[i]->isnull[tb->nrows]));
+                tb->datagroup[i]->values[tb->nrows] = slot_getattr(slot,i + 1, &(tb->datagroup[i]->isnull[tb->nrows]));
 
                 /* if attribute is a reference, deep copy the data out to prevent ao table buffer free before vectorized scan batch done */
                 if(!slot->tts_mt_bind->tupdesc->attrs[i]->attbyval)
-                    *ptr = datumCopy(*ptr,slot->tts_mt_bind->tupdesc->attrs[i]->attbyval,slot->tts_mt_bind->tupdesc->attrs[i]->attlen);
+                    tb->datagroup[i]->values[tb->nrows]= datumCopy(tb->datagroup[i]->values[tb->nrows],
+                                                                   slot->tts_mt_bind->tupdesc->attrs[i]->attbyval,
+                                                                   slot->tts_mt_bind->tupdesc->attrs[i]->attlen);
+
             }
         }
     }
 
     if(!slot)
         slot = scanState->ss_ScanTupleSlot;
+
+    for(int i = 0;i < tb->ncols ; i ++)
+    {
+        if(vs->ao->proj[i])
+        {
+            if(tb->datagroup[i])
+                tb->datagroup[i]->dim = tb->nrows;
+        }
+    }
 
     if (tb->nrows == 0)
         ExecClearTuple(slot);

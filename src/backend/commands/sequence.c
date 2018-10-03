@@ -65,6 +65,8 @@
 
 #include "postmaster/seqserver.h"
 
+#include "catalog/pg_exttable.h"
+
 
 /*
  * We don't want to log each fetching of a value from a sequence,
@@ -415,7 +417,7 @@ DefineSequence(CreateSeqStmt *seq)
 	stmt->oidInfo.aosegIndexOid = 0;
 	stmt->oidInfo.aoblkdirOid = 0;
 	stmt->oidInfo.aoblkdirIndexOid = 0;
-	stmt->tableElts = NIL;
+	stmt->base.tableElts = NIL;
 	for (i = SEQ_COL_FIRSTCOL; i <= SEQ_COL_LASTCOL; i++)
 	{
 		ColumnDef  *coldef = makeNode(ColumnDef);
@@ -478,20 +480,20 @@ DefineSequence(CreateSeqStmt *seq)
 				value[i - 1] = BoolGetDatum(false);
 				break;
 		}
-		stmt->tableElts = lappend(stmt->tableElts, coldef);
+		stmt->base.tableElts = lappend(stmt->base.tableElts, coldef);
 	}
 
-	stmt->relation = seq->sequence;
-	stmt->inhRelations = NIL;
-	stmt->constraints = NIL;
-	stmt->options = list_make1(defWithOids(false));
-	stmt->oncommit = ONCOMMIT_NOOP;
-	stmt->tablespacename = NULL;
-	stmt->relKind = RELKIND_SEQUENCE;
+	stmt->base.relation = seq->sequence;
+	stmt->base.inhRelations = NIL;
+	stmt->base.constraints = NIL;
+	stmt->base.options = list_make1(defWithOids(false));
+	stmt->base.oncommit = ONCOMMIT_NOOP;
+	stmt->base.tablespacename = NULL;
+	stmt->base.relKind = RELKIND_SEQUENCE;
 	stmt->oidInfo.comptypeOid = seq->comptypeOid;
 	stmt->ownerid = GetUserId();
 
-	seqoid = DefineRelation(stmt, RELKIND_SEQUENCE, RELSTORAGE_HEAP);
+	seqoid = DefineRelation(stmt, RELKIND_SEQUENCE, RELSTORAGE_HEAP, NonCustomFormatType);
 
     /*
      * Open and lock the new sequence.  (This lock is redundant; an

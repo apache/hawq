@@ -1127,6 +1127,11 @@ bool is_pxf_protocol(Uri *uri)
 	return false;
 }
 
+bool is_hdfs_protocol(Uri *uri)
+{
+	return uri->protocol == URI_HDFS;
+}
+
 /*
  * create plan for pxf
  */
@@ -1440,6 +1445,10 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	{
 		segdb_file_map = create_pxf_plan(segdb_file_map, rel, total_primaries, ctx, scan_relid);
 
+	}
+	else if (using_location && is_hdfs_protocol(uri))
+	{
+			// nothing to do
 	}
 	/* (2) */
 	else if(using_location && (uri->protocol == URI_GPFDIST || 
@@ -1839,17 +1848,30 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	/* data encoding */
 	encoding = rel->ext_encoding;
 
-	scan_plan = make_externalscan(tlist,
-								  scan_clauses,
-								  scan_relid,
-								  filenames,
-								  fmtopts,
-								  rel->fmttype,
-								  ismasteronly,
-								  rejectlimit,
-								  islimitinrows,
-								  fmtErrTblOid,
-								  encoding);
+	if (using_location && (is_hdfs_protocol(uri)))
+		scan_plan = make_externalscan(tlist,
+										  scan_clauses,
+										  scan_relid,
+										  rel->locationlist,
+										  fmtopts,
+										  rel->fmttype,
+										  ismasteronly,
+										  rejectlimit,
+										  islimitinrows,
+										  fmtErrTblOid,
+										  encoding);
+	else
+		scan_plan = make_externalscan(tlist,
+											scan_clauses,
+											scan_relid,
+											filenames,
+											fmtopts,
+											rel->fmttype,
+											ismasteronly,
+											rejectlimit,
+											islimitinrows,
+											fmtErrTblOid,
+											encoding);
 
 	copy_path_costsize(ctx->root, &scan_plan->scan.plan, best_path);
 

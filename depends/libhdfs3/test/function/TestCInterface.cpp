@@ -29,6 +29,7 @@
 #include "TestUtil.h"
 #include "XmlConfig.h"
 
+#include <algorithm>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -1571,6 +1572,34 @@ TEST_F(TestCInterface, TestRead_Success) {
     TestRead(fs, 8 * 1024, 1024 * 1024, 21 * 1024 * 1024);
 }
 
+static void TestPread(hdfsFS fs, int readSize, int64_t blockSize,
+                     int64_t fileSize, int64_t offset) {
+    std::vector<char> buf(readSize);
+    hdfsFile in = NULL;
+    ASSERT_TRUE(CreateFile(fs, BASE_DIR"/testPread", blockSize, fileSize));
+    in = hdfsOpenFile(fs, BASE_DIR"/testPread", O_RDONLY, 0, 0, 0);
+    ASSERT_TRUE(in != NULL);
+
+    int64_t todo = fileSize - offset;
+    while (todo > 0) {
+        int64_t done = hdfsPread(fs, in, offset, &buf[0], std::min((int64_t) readSize, todo));
+        ASSERT_GT(done, 0);
+        ASSERT_EQ(hdfsTell(fs, in), 0);
+        EXPECT_TRUE(Hdfs::CheckBuffer(&buf[0], done, offset));
+        offset += done;
+        todo -= done;
+    }
+
+    EXPECT_EQ(0, hdfsPread(fs, in, offset, &buf[0], 1));
+    EXPECT_EQ(0, hdfsPread(fs, in, offset, &buf[0], 1));
+    hdfsCloseFile(fs, in);
+}
+
+TEST_F(TestCInterface, TestPread_Success) {
+    TestPread(fs, 1024, 1024, 21 * 1024, 0);
+    TestPread(fs, 1024, 1024, 21 * 1024, 13);
+}
+
 TEST_F(TestCInterface, TestWrite_InvalidInput) {
     int err;
     char buf[10240];
@@ -1678,11 +1707,11 @@ TEST_F(TestCInterface, TestSync_InvalidInput) {
     in = hdfsOpenFile(fs, BASE_DIR"/testFlush1", O_RDONLY, 0, 0, 0);
     ASSERT_TRUE(in != NULL);
     //test invalid input
-    err = hdfsSync(NULL, out);
+    err = hdfsHSync(NULL, out);
     EXPECT_TRUE(err != 0 && EINVAL == errno);
-    err = hdfsSync(fs, NULL);
+    err = hdfsHSync(fs, NULL);
     EXPECT_TRUE(err != 0 && EINVAL == errno);
-    err = hdfsSync(fs, in);
+    err = hdfsHSync(fs, in);
     EXPECT_TRUE(err != 0 && EINVAL == errno);
     EXPECT_EQ(0, hdfsCloseFile(fs, out));
     EXPECT_EQ(0, hdfsCloseFile(fs, in));
@@ -1732,7 +1761,7 @@ static void TestHFlushAndSync(hdfsFS fs, hdfsFile file, const char * path, int64
         EXPECT_EQ(batch, hdfsWrite(fs, file, &buffer[0], batch));
 
         if (sync) {
-            EXPECT_EQ(0, hdfsSync(fs, file));
+            EXPECT_EQ(0, hdfsHSync(fs, file));
         } else {
             EXPECT_EQ(0, hdfsHFlush(fs, file));
         }
@@ -2028,7 +2057,7 @@ TEST_F(TestCInterface, TestGetBlockFileLocations_Success) {
     out = hdfsOpenFile(fs, BASE_DIR"/TestGetBlockFileLocations_Failure", O_WRONLY, 0, 0, 1024);
     ASSERT_TRUE(NULL != out);
     ASSERT_TRUE(buffer.size() == hdfsWrite(fs, out, &buffer[0], buffer.size()));
-    ASSERT_TRUE(0 == hdfsSync(fs, out));
+    ASSERT_TRUE(0 == hdfsHSync(fs, out));
     EXPECT_TRUE(NULL != (bl = hdfsGetFileBlockLocations(fs, BASE_DIR"/TestGetBlockFileLocations_Failure", 0, buffer.size(), &size)));
     EXPECT_EQ(2, size);
     EXPECT_FALSE(bl[0].corrupt);
@@ -2074,7 +2103,7 @@ TEST_F(TestCInterface, TestGetHosts_Success) {
                        1024);
     ASSERT_TRUE(NULL != out);
     ASSERT_TRUE(buffer.size() == hdfsWrite(fs, out, &buffer[0], buffer.size()));
-    ASSERT_TRUE(0 == hdfsSync(fs, out));
+    ASSERT_TRUE(0 == hdfsHSync(fs, out));
     hosts =
         hdfsGetHosts(fs, BASE_DIR "/TestGetHosts_Success", 0, buffer.size());
     EXPECT_TRUE(NULL != hosts);

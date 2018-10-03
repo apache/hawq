@@ -14,11 +14,21 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-
+DATA_built = create_udv.sql
 MODULE_big = vexecutor
-OBJS    = vexecutor.o vadt.o vcheck.o tuplebatch.o execVScan.o execVQual.o parquet_reader.o ao_reader.o
+OBJS    = vexecutor.o \
+	  vtype.o \
+	  vcheck.o \
+	  tuplebatch.o \
+	  execVScan.o \
+	  execVQual.o \
+	  parquet_reader.o \
+	  ao_reader.o \
+	  nodeVMotion.o \
+	  vtype_ext.o \
+	  vagg.o
 
+EXTRA_CLEAN = create_udv.sql
 PG_CXXFLAGS = -Wall -O0 -g -std=c++11
 PG_LIBS = $(libpq_pgport) 
 
@@ -35,3 +45,6 @@ include $(top_srcdir)/contrib/contrib-global.mk
 endif
 
 SHLIB_LINK += $(filter -lz -lsnappy, $(LIBS))
+
+$(srcdir)/create_udv.sql : create_udv.sql.in
+	cat $< > $@

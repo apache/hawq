@@ -2927,20 +2927,22 @@ _copyCreateStmt(CreateStmt *from)
 {
 	CreateStmt *newnode = makeNode(CreateStmt);
 
-	COPY_NODE_FIELD(relation);
-	COPY_NODE_FIELD(tableElts);
-	COPY_NODE_FIELD(inhRelations);
-	COPY_NODE_FIELD(constraints);
-	COPY_NODE_FIELD(options);
-	COPY_SCALAR_FIELD(oncommit);
-	COPY_STRING_FIELD(tablespacename);
-	COPY_NODE_FIELD(distributedBy);
+	COPY_SCALAR_FIELD(base.relKind);
+	COPY_NODE_FIELD(base.relation);
+	COPY_NODE_FIELD(base.tableElts);
+	COPY_NODE_FIELD(base.inhRelations);
+	COPY_NODE_FIELD(base.constraints);
+	COPY_NODE_FIELD(base.options);
+	COPY_SCALAR_FIELD(base.oncommit);
+	COPY_STRING_FIELD(base.tablespacename);
+	COPY_NODE_FIELD(base.distributedBy);
+	COPY_SCALAR_FIELD(base.is_part_child);
+	COPY_SCALAR_FIELD(base.is_add_part);
 	COPY_SCALAR_FIELD(oidInfo.relOid);
 	COPY_SCALAR_FIELD(oidInfo.comptypeOid);
 	COPY_SCALAR_FIELD(oidInfo.toastOid);
 	COPY_SCALAR_FIELD(oidInfo.toastIndexOid);
 	COPY_SCALAR_FIELD(oidInfo.toastComptypeOid);
-	COPY_SCALAR_FIELD(relKind);
 	COPY_SCALAR_FIELD(relStorage);
 	if (from->policy)
 	{
@@ -2950,8 +2952,6 @@ _copyCreateStmt(CreateStmt *from)
 		newnode->policy = NULL;
 	/* postCreate omitted (why?) */
 	COPY_NODE_FIELD(deferredStmts);
-	COPY_SCALAR_FIELD(is_part_child);
-	COPY_SCALAR_FIELD(is_add_part);
 	COPY_SCALAR_FIELD(ownerid);
 	COPY_SCALAR_FIELD(buildAoBlkdir);
 	COPY_NODE_FIELD(attr_encodings);
@@ -3133,16 +3133,26 @@ _copyCreateExternalStmt(CreateExternalStmt *from)
 {
 	CreateExternalStmt *newnode = makeNode(CreateExternalStmt);
 
-	COPY_NODE_FIELD(relation);
-	COPY_NODE_FIELD(tableElts);
+	COPY_SCALAR_FIELD(base.relKind);
+	COPY_NODE_FIELD(base.relation);
+	COPY_NODE_FIELD(base.tableElts);
+	COPY_NODE_FIELD(base.inhRelations);
+	COPY_NODE_FIELD(base.constraints);
+	COPY_NODE_FIELD(base.options);
+	COPY_SCALAR_FIELD(base.oncommit);
+	COPY_STRING_FIELD(base.tablespacename);
+	COPY_NODE_FIELD(base.distributedBy);
+	COPY_SCALAR_FIELD(base.is_part_child);
+	COPY_SCALAR_FIELD(base.is_add_part);
 	COPY_NODE_FIELD(exttypedesc);
 	COPY_STRING_FIELD(format);
-	COPY_NODE_FIELD(formatOpts);
 	COPY_SCALAR_FIELD(isweb);
 	COPY_SCALAR_FIELD(iswritable);
+	COPY_SCALAR_FIELD(isexternal);
+	COPY_SCALAR_FIELD(forceCreateDir);
+	COPY_STRING_FIELD(parentPath);
 	COPY_NODE_FIELD(sreh);
 	COPY_NODE_FIELD(encoding);
-	COPY_NODE_FIELD(distributedBy);	
 	if (from->policy)
 	{
 		COPY_POINTER_FIELD(policy,sizeof(GpPolicy) + from->policy->nattrs*sizeof(from->policy->attrs[0]));

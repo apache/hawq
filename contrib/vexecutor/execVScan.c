@@ -37,12 +37,12 @@ getVScanMethod(int tableType)
                     //APPENDONLYSCAN
                     {
                             &AppendOnlyVScanNext, &BeginVScanAppendOnlyRelation, &EndVScanAppendOnlyRelation,
-                                                                                 NULL,NULL,NULL
+                            &ReScanAppendOnlyRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
                     },
                     //PARQUETSCAN
                     {
                             &ParquetVScanNext, &BeginScanParquetRelation, &EndScanParquetRelation,
-                            NULL,NULL,NULL
+                            &ReScanParquetRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
                     }
             };
 
@@ -56,6 +56,7 @@ getVScanMethod(int tableType)
     return &scanMethods[tableType];
 }
 
+
 /*
  * ExecTableVScanVirtualLayer
  *          translate a batch of tuple to single one if scan parent is normal execution node
@@ -66,16 +67,17 @@ getVScanMethod(int tableType)
 TupleTableSlot *ExecTableVScanVirtualLayer(ScanState *scanState)
 {
     VectorizedState* vs = (VectorizedState*)scanState->ps.vectorized;
-    VectorizedState* pvs = vs->parent->vectorized;
 
-    if(pvs->vectorized)
+    /* if vs->parent is NULL, it represent that the parent is non-vectorized */
+    if(vs->parent && vs->parent->vectorized &&
+       ((VectorizedState*)vs->parent->vectorized)->vectorized)
         return ExecTableVScan(scanState);
     else
     {
         TupleTableSlot* slot = scanState->ps.ps_ProjInfo ? scanState->ps.ps_ResultTupleSlot : scanState->ss_ScanTupleSlot;
         while(1)
         {
-            bool succ = VirtualNodeProc(scanState,slot);
+            bool succ = VirtualNodeProc(slot);
 
             if(!succ)
             {
@@ -193,12 +195,22 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
                 /* first construct the skip array */
                 if(NULL != skip)
                 {
-                    for(i = 0; i < skip->header.dim; i++)
+                    for(i = 0; i < skip->dim; i++)
                     {
-                        skip->values[i] = ((!(skip->values[i])) ||
-                                          (skip->header.isnull[i]) ||
+                        ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip[i] =
+                                          ((!DatumGetBool(skip->values[i])) ||
+                                          (skip->isnull[i]) ||
                                           ((TupleBatch)slot->PRIVATE_tb)->skip[i]);
                     }
+                }
+                else
+                {
+                    Assert(((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->batchsize ==
+                           ((TupleBatch)slot->PRIVATE_tb)->batchsize);
+
+                    memcpy(((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip,
+                            ((TupleBatch)slot->PRIVATE_tb)->skip,
+                            ((TupleBatch)slot->PRIVATE_tb)->batchsize * sizeof(bool));
                 }
 
                 /*
@@ -206,10 +218,6 @@ ExecVScan(ScanState *node, ExecScanAccessMtd accessMtd)
                  * and return it.
                  */
                 ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->nrows = ((TupleBatch)slot->PRIVATE_tb)->nrows;
-                if(NULL != skip)
-                    ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = skip->values;
-                else
-                    ((TupleBatch)projInfo->pi_slot->PRIVATE_tb)->skip = ((TupleBatch)slot->PRIVATE_tb)->skip;
                 return ExecVProject(projInfo, NULL);
             }
             else

@@ -4,7 +4,7 @@
 # PGAC_PATH_BISON
 # ---------------
 # Look for Bison, set the output variable BISON to its path if found.
-# Reject versions before 1.875 (they have bugs or capacity limits).
+# Reject versions before 1.875 or after 2.9 (they have bugs or capacity limits).
 # Note we do not accept other implementations of yacc.
 
 AC_DEFUN([PGAC_PATH_BISON],
@@ -16,11 +16,11 @@ fi
 if test "$BISON"; then
   pgac_bison_version=`$BISON --version 2>/dev/null | sed q`
   AC_MSG_NOTICE([using $pgac_bison_version])
-  if echo "$pgac_bison_version" | $AWK '{ if ([$]4 < 1.875) exit 0; else exit 1;}'
+  if echo "$pgac_bison_version" | $AWK '{ if ([$]4 < 1.875 && [$]4 > 2.9) exit 0; else exit 1;}'
   then
     AC_MSG_WARN([
-*** The installed version of Bison, $BISON, is too old to use with PostgreSQL.
-*** Bison version 1.875 or later is required, but this is $pgac_bison_version.])
+*** The installed version of Bison, $BISON, is too old or too new to use with HAWQ.
+*** Bison version between 1.875 and 2.9 is required, but this is $pgac_bison_version.])
     BISON=""
   fi
 fi

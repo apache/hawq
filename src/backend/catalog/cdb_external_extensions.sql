@@ -47,3 +47,15 @@ LANGUAGE C STABLE;
 CREATE OR REPLACE FUNCTION fixedwidth_out(record) RETURNS bytea 
 AS '$libdir/fixedwidth.so', 'fixedwidth_out'
 LANGUAGE C STABLE;
+
+------------------------------------------------------------------
+-- external HDFS
+------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION hdfs_validate() RETURNS void
+AS '$libdir/exthdfs.so', 'hdfsprotocol_validate'
+LANGUAGE C STABLE;
+
+CREATE OR REPLACE FUNCTION hdfs_blocklocation() RETURNS void
+AS '$libdir/exthdfs.so', 'hdfsprotocol_blocklocation'
+LANGUAGE C STABLE;
+

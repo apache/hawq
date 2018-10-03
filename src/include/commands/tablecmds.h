@@ -52,7 +52,7 @@ typedef struct AttrMapContext{
 
 extern const char *synthetic_sql;
 
-extern Oid	DefineRelation(CreateStmt *stmt, char relkind, char relstorage);
+extern Oid DefineRelation(CreateStmt *stmt, char relkind, char relstorage, const char *formattername);
 
 extern void	DefineExternalRelation(CreateExternalStmt *stmt);
 
@@ -88,6 +88,8 @@ extern void ATAddColumn(Relation rel, ColumnDef *colDef);
 extern void CheckTableNotInUse(Relation rel, const char *stmt);
 
 extern void ExecuteTruncate(TruncateStmt *stmt);
+
+
 
 extern void renameatt(Oid myrelid,
 		  const char *oldattname,

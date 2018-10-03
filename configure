@@ -731,6 +731,7 @@ krb_srvtab
 with_krb5
 with_gssapi
 with_pgcrypto
+with_orc
 with_r
 with_java
 with_python
@@ -860,6 +861,7 @@ with_python
 with_java
 with_r
 with_pgcrypto
+with_orc
 with_gssapi
 with_krb5
 with_krb_srvnam
@@ -5835,6 +5837,40 @@ $as_echo "$with_pgcrypto" >&6; }
 
 
 #
+# Optionally build with orc in pluggable storage framework.
+#
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build orc modules" >&5
+$as_echo_n "checking whether to build orc modules... " >&6; }
+
+pgac_args="$pgac_args with_orc"
+
+
+# Check whether --with-orc was given.
+if test "${with_orc+set}" = set; then :
+  withval=$with_orc;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-orc option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_orc=yes
+
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_orc" >&5
+$as_echo "$with_orc" >&6; }
+
+
+#
 # GSSAPI
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with GSSAPI support" >&5
@@ -7435,14 +7471,14 @@ if test "$BISON"; then
   pgac_bison_version=`$BISON --version 2>/dev/null | sed q`
   { $as_echo "$as_me:${as_lineno-$LINENO}: using $pgac_bison_version" >&5
 $as_echo "$as_me: using $pgac_bison_version" >&6;}
-  if echo "$pgac_bison_version" | $AWK '{ if ($4 < 1.875) exit 0; else exit 1;}'
+  if echo "$pgac_bison_version" | $AWK '{ if ($4 < 1.875 && $4 > 2.9) exit 0; else exit 1;}'
   then
     { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:
-*** The installed version of Bison, $BISON, is too old to use with PostgreSQL.
-*** Bison version 1.875 or later is required, but this is $pgac_bison_version." >&5
+*** The installed version of Bison, $BISON, is too old or too new to use with HAWQ.
+*** Bison version between 1.875 and 2.9 is required, but this is $pgac_bison_version." >&5
 $as_echo "$as_me: WARNING:
-*** The installed version of Bison, $BISON, is too old to use with PostgreSQL.
-*** Bison version 1.875 or later is required, but this is $pgac_bison_version." >&2;}
+*** The installed version of Bison, $BISON, is too old or too new to use with HAWQ.
+*** Bison version between 1.875 and 2.9 is required, but this is $pgac_bison_version." >&2;}
     BISON=""
   fi
 fi

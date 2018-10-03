@@ -318,11 +318,7 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
     /*
      * Now, we want to allocate resource.
      */
-    allocResult = calculate_planner_segment_num(my_parse, plannedstmt->resource->life,
-                                        plannedstmt->rtable, plannedstmt->intoPolicy,
-                                        plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1,
-                                        -1);
-
+    allocResult = calculate_planner_segment_num(plannedstmt, my_parse, plannedstmt->resource->life, -1);
     Assert(allocResult);
 
     ppResult->saResult = *allocResult;
@@ -628,9 +624,7 @@ static void resource_negotiator(Query *parse, int cursorOptions,
             /*
              * Now, we want to allocate resource.
              */
-            allocResult = calculate_planner_segment_num(my_parse, resourceLife,
-                    plannedstmt->rtable, plannedstmt->intoPolicy,
-                    plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1, -1);
+            allocResult = calculate_planner_segment_num(plannedstmt, my_parse, resourceLife, -1);
 
             Assert(allocResult);
 

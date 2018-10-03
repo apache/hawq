@@ -169,6 +169,7 @@ with_python	= @with_python@
 with_tcl	= @with_tcl@
 with_r		= @with_r@
 with_pgcrypto = @with_pgcrypto@
+with_orc      = @with_orc@
 with_java   = @with_java@
 with_openssl	= @with_openssl@
 with_system_tzdata = @with_system_tzdata@

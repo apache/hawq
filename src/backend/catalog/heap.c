@@ -47,7 +47,11 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "fmgr.h"
+#include "miscadmin.h"
+#include "port.h"
 
+#include "access/fileam.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/sysattr.h"
@@ -78,38 +82,42 @@
 #include "catalog/pg_statistic.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
-#include "cdb/cdbappendonlyam.h"
-#include "cdb/cdbpartition.h"
+
 #include "cdb/cdbanalyze.h"
+#include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbmirroredfilesysobj.h"
 #include "cdb/cdbparquetfooterprocessor.h"
+#include "cdb/cdbparquetstoragewrite.h"
+#include "cdb/cdbpartition.h"
+#include "cdb/cdbpersistentfilesysobj.h"
+#include "cdb/cdbsharedstorageop.h"
+#include "cdb/cdbvars.h"
 #include "commands/dbcommands.h"
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
-#include "miscadmin.h"
+
 #include "nodes/makefuncs.h"
+#include "nodes/pg_list.h"
+#include "nodes/value.h"
 #include "optimizer/clauses.h"
 #include "optimizer/var.h"
 #include "parser/parse_coerce.h"
 #include "parser/parse_expr.h"
 #include "parser/parse_relation.h"
+#include "pg_config_manual.h"
+#include "storage/fd.h"
 #include "storage/smgr.h"
+#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
+#include "utils/guc.h"
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"             /* CDB: GetMemoryChunkContext */
+#include "utils/palloc.h"
 #include "utils/relcache.h"
 #include "utils/syscache.h"
-#include "utils/guc.h"
-#include "cdb/cdbvars.h"
-
-#include "cdb/cdbsharedstorageop.h"
-#include "cdb/cdbmirroredfilesysobj.h"
-#include "cdb/cdbpersistentfilesysobj.h"
-#include "cdb/cdbparquetstoragewrite.h"
-#include "catalog/gp_persistent.h"
-
-#include "utils/guc.h"
+#include "utils/uri.h"
 
 typedef struct pg_result PGresult;
 extern void PQclear(PGresult *res);
@@ -2544,7 +2552,52 @@ heap_drop_with_catalog(Oid relid)
 	 * External table? If so, delete the pg_exttable tuple.
 	 */
 	if (is_external_rel)
+	{
+		/* Step 1. remove uri on file system */
+		rel = relation_open(relid, AccessExclusiveLock);
+		ExtTableEntry *exttbl = GetExtTableEntry(rel->rd_id);
+		char *path = (char *) strVal(linitial(exttbl->locations));
+		char *searchKey = (char *) palloc0 (MAXPGPATH);
+		char *fileSpacePath = NULL;
+		GetFilespacePathForTablespace(get_database_dts(MyDatabaseId),
+			                          &fileSpacePath);
+		sprintf(searchKey, "%s/ExtErrTbl/",fileSpacePath);
+		char *match = strstr(path,searchKey);
+		if (match)
+		{
+			RemovePath(path, 1);
+		}
+
+		/* Get category for the external table */
+		List *entry_locations = exttbl->locations;
+		Assert(entry_locations);
+		ListCell *entry_location = list_head(entry_locations);
+		char *url = ((Value*)lfirst(entry_location))->val.str;
+		char *category = getExtTblCategoryInFmtOptsStr(exttbl->fmtopts);
+
+		/* Remove data for internal table */
+		if (category != NULL &&
+		    pg_strncasecmp(category, "internal", strlen("internal")) == 0)
+		{
+
+
+			if (IS_HDFS_URI(url))   /* ORC, TEXT, CSV */
+			{
+				// orc, text, csv only support one location.
+				Assert(list_length(entry_locations) == 1);
+				RemovePath(url, 1);
+			}
+		}
+
+		if (category)
+		{
+			pfree(category);
+		}
+		relation_close(rel, AccessExclusiveLock);
+
+		/* Step 2. remove pg_exttable entry */
 		RemoveExtTableEntry(relid);
+	}
 
 	if (is_foreign_rel)
 		RemoveForeignTableEntry(relid);

@@ -87,6 +87,12 @@ ParquetScanNext(ScanState *scanState)
 	Assert(node->opaque != NULL &&
 		   node->opaque->scandesc != NULL);
 
+	/* push down Bloom filter */
+	if (node->opaque->scandesc->rfState == NULL &&
+			scanState->runtimeFilter != NULL)
+	{
+		node->opaque->scandesc->rfState = scanState->runtimeFilter;
+	}
 	parquet_getnext(node->opaque->scandesc, node->ss.ps.state->es_direction, node->ss.ss_ScanTupleSlot);
 	return node->ss.ss_ScanTupleSlot;
 }
@@ -107,6 +113,9 @@ BeginScanParquetRelation(ScanState *scanState)
 			node->ss.ps.state->es_snapshot,
 			NULL /* relationTupleDesc */,
 			node->opaque->proj);
+
+	/* push down Bloom filter */
+	node->opaque->scandesc->rfState = scanState->runtimeFilter;
 
 	node->opaque->scandesc->splits = scanState->splits;
 	node->ss.scan_state = SCAN_SCAN;

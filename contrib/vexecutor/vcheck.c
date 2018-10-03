@@ -21,6 +21,7 @@
 #include "access/htup.h"
 #include "catalog/catquery.h"
 #include "catalog/pg_operator.h"
+#include "catalog/pg_proc.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbllize.h"
 #include "parser/parse_oper.h"
@@ -30,36 +31,10 @@
 #include "nodes/relation.h"
 #include "optimizer/walkers.h"
 #include "utils/lsyscache.h"
+#include "utils/syscache.h"
 #include "vcheck.h"
-#include "vadt.h"
 #include "vexecutor.h"
 
-
-static const vFuncMap funcMap[] = {
-		{INT2OID, &buildvint2, &destroyvint2, &getptrvint2,&getvaluevint2,&vint2Size,&vint2serialization,&vint2deserialization},
-		{INT4OID, &buildvint4, &destroyvint4, &getptrvint4,&getvaluevint4,&vint4Size,&vint4serialization,&vint4deserialization},
-		{INT8OID, &buildvint8, &destroyvint8, &getptrvint8,&getvaluevint8,&vint8Size,&vint8serialization,&vint8deserialization},
-		{FLOAT4OID, &buildvfloat4, &destroyvfloat4, &getptrvfloat4,&getvaluevfloat4,&vfloat4Size,&vfloat4serialization,&vfloat4deserialization},
-		{FLOAT8OID, &buildvfloat8, &destroyvfloat8, &getptrvfloat8,&getvaluevfloat8,&vfloat8Size,&vfloat8serialization,&vfloat8deserialization},
-		{BOOLOID, &buildvbool, &destroyvbool, &getptrvbool,&getvaluevbool,&vboolSize,&vboolserialization,&vbooldeserialization}
-};
-static const int funcMapLen = sizeof(funcMap) /sizeof(vFuncMap);
-
-static const vFuncMap* vFuncWalker(Oid type)
-{
-	for(int i = 0;i < funcMapLen; i ++)
-		if(funcMap[i].ntype == type) return &funcMap[i];
-
-	return NULL;
-}
-
-static HTAB *hashMapVFunc = NULL;
-
-typedef struct VecFuncHashEntry
-{
-	Oid src;
-	vFuncMap *vFunc;
-} VecFuncHashEntry;
 
 typedef struct VecTypeHashEntry
 {
@@ -69,6 +44,8 @@ typedef struct VecTypeHashEntry
 
 /* Map between the vectorized types and non-vectorized types */
 static HTAB *hashMapN2V = NULL;
+/* Map between the vectorized types and non-vectorized types */
+static HTAB *hashMapV2N = NULL;
 
 /*
  * We check the expressions tree recursively becuase the args can be a sub expression,
@@ -82,6 +59,86 @@ typedef struct VectorizedContext
 	Oid retType;
 	bool	 replace;
 }VectorizedContext;
+
+static Oid get_aggregate_oid(const char *aggname, Oid oidType);
+static char *getProcNameOnlyFromOid(Oid object_oid);
+
+// copyed from src/backend/utils/cache/lsyscache.c
+// Get oid of aggregate with given name and argument type
+static Oid
+get_aggregate_oid(const char *aggname, Oid oidType)
+{
+	HeapTuple htup = NULL;
+
+	// lookup pg_proc for functions with the given name and arg type
+	cqContext *pcqCtx = caql_beginscan(
+			NULL,
+			cql("SELECT * FROM pg_proc "
+				" WHERE proname = :1",
+				PointerGetDatum((char *) aggname)));
+
+	Oid oidResult = InvalidOid;
+	while (HeapTupleIsValid(htup = caql_getnext(pcqCtx)))
+	{
+		Oid oidProc = HeapTupleGetOid(htup);
+
+		Form_pg_proc proctuple = (Form_pg_proc) GETSTRUCT(htup);
+
+		// skip functions with the wrong number of type of arguments
+		if (0 != proctuple->pronargs && InvalidOid != oidType)
+		{
+			if (1 != proctuple->pronargs || oidType != proctuple->proargtypes.values[0])
+			{
+				continue;
+			}
+		}
+		else if((0 != proctuple->pronargs && InvalidOid == oidType) ||
+				(0 == proctuple->pronargs && InvalidOid != oidType))
+			continue;
+
+		if (caql_getcount(
+					NULL,
+					cql("SELECT COUNT(*) FROM pg_aggregate "
+						" WHERE aggfnoid = :1 ",
+						ObjectIdGetDatum(oidProc))) > 0)
+		{
+			oidResult = oidProc;
+			break;
+		}
+	}
+
+	caql_endscan(pcqCtx);
+
+	return oidResult;
+}
+
+//copied from src/backend/catalog/aclchk.c and we refactor it.
+static char *
+getProcNameOnlyFromOid(Oid object_oid)
+{
+	StringInfoData tname;
+	initStringInfo(&tname);
+	HeapTuple tup;
+	cqContext *pCtx;
+
+	Assert(OidIsValid(object_oid));
+
+	pCtx = caql_beginscan(
+				NULL,
+				cql("SELECT * FROM pg_proc "
+					" WHERE oid = :1 ",
+					ObjectIdGetDatum(object_oid)));
+
+	tup = caql_getnext(pCtx);
+	if (!HeapTupleIsValid(tup))
+		elog(ERROR, "oid [%u] not found in table pg_class", object_oid);
+
+	appendStringInfo(&tname, "%s", NameStr(((Form_pg_proc)GETSTRUCT(tup))->proname));
+
+	caql_endscan(pCtx);
+	return tname.data;
+}
+
 
 /*
  * Check all the expressions if they can be vectorized
@@ -153,7 +210,7 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 		//get the vectorized operator functions
 		//NOTE:we have no ParseState now, Give the NULL value is OK but not good...
 		tuple = oper(NULL, list_make1(makeString(get_opname(op->opno))),
-			ltype, rtype, false, -1);
+			ltype, rtype, true, -1);
 		if(NULL == tuple)
 			return true;
 
@@ -176,6 +233,78 @@ CheckVectorizedExpression(Node *node, VectorizedContext *ctx)
 		return false;
 	}
 
+	/* support aggregate functions */
+	if(IsA(node, Aggref))
+	{
+		Aggref *ref = (Aggref*)node;
+		char *aggname = NULL;
+		Oid retType;
+		Oid vaggoid;
+
+		if(ref->aggdistinct || NULL != ref->aggorder)
+			return true;
+
+		/* Make sure there is less than one arguments */
+		if(1 < list_length(ref->args))
+			return true;
+
+		/* check arguments */
+		if(NULL != ref->args)
+		{
+			if(CheckVectorizedExpression(linitial(ref->args), ctx))
+				return true;
+			retType = ctx->retType;
+		}
+		else
+			retType = InvalidOid;
+
+		/* check the vectorized aggregate functions */
+		aggname = getProcNameOnlyFromOid(ref->aggfnoid);
+
+		if(0 == strcmp(aggname, "count") &&
+			0 == list_length(ref->args))
+			aggname = "veccount";
+
+		Assert(NULL != aggname);
+
+		vaggoid = get_aggregate_oid(aggname, retType);
+		if(InvalidOid == vaggoid)
+			return true;
+
+		if(ctx->replace)
+			ref->aggfnoid = vaggoid;
+
+		return false;
+	}
+
+	/*
+	 * if there are const in expressions, it may need to convert
+	 * type implicitly by FuncExpr, we only check if the arguments
+	 * of the FuncExpr is constant.
+	 */
+	if(IsA(node, FuncExpr))
+	{
+		FuncExpr *f = (FuncExpr*)node;
+		ListCell *l = NULL;
+		Node* expr = NULL;
+
+		if(1 != list_length(f->args))
+			return true;
+
+		expr = (Node*)linitial(f->args);
+		if(!IsA(expr, Const))
+			return true;
+
+		ctx->retType = f->funcresulttype;
+		return false;
+	}
+	
+	if(IsA(node,NullTest))
+		return true;
+
+	if(IsA(node, RowCompareExpr))
+		return true;
+
 	//now, other nodes treat as can not be vectorized
 	return plan_tree_walker(node, CheckVectorizedExpression, ctx);;
 }
@@ -193,10 +322,46 @@ CheckPlanNodeWalker(PlannerInfo *root, Plan *plan)
 		return true;
 
 	/* skip to check if there are no corresponding vec-exec-operators*/
-	if(!HasVecExecOprator(nodeTag(plan)))
+	if(!HasVecExecOprator(plan))
 	{
 		plan->vectorized = false;
 		return true;
+	}
+
+	/* if sub node can not vectorized, set the parent cannot vectorized too */
+	if( (NULL != plan->lefttree && !plan->lefttree->vectorized) ||
+		(NULL != plan->righttree && !plan->righttree->vectorized))
+	{
+		plan->vectorized = false;
+		return true;
+	}
+
+	/* the result of aggregate functions is scalar */
+	if(IsA(plan, Motion) && IsA((plan->lefttree), Agg))
+	{
+		plan->vectorized = false;
+		return true;
+	}
+
+	/* Don't support SORT Aggregate so far */
+	if(IsA(plan, Agg) && ((Agg*)plan)->aggstrategy == AGG_SORTED)
+		return true;
+
+	/*
+	 * if there is an const in the projection, it is not supported so far,ugly...
+	 * I suppose that we have to carefully discriminate all the expressions,
+	 * then we can know that which const is in the projection, and which one
+	 * is in the qualification, we can process them differently.
+	 */
+	{
+		List *targetlist = plan->targetlist;
+		ListCell *c = NULL;
+		foreach(c, targetlist)
+		{
+			TargetEntry *entry = (TargetEntry*)lfirst(c);
+			if(!IsA(entry->expr,Aggref) && !contain_var_clause((Node*)entry))
+				return true;
+		}
 	}
 
 	planner_init_plan_tree_base(&ctx.base, root);
@@ -239,7 +404,7 @@ ReplacePlanNodeWalker(PlannerInfo *root, Plan *plan)
 		return true;
 
 	/* skip to replace if there are no corresponding vec-exec-operators*/
-	if(!HasVecExecOprator(nodeTag(plan)))
+	if(!HasVecExecOprator(plan))
 	{
 		plan->vectorized = false;
 		return true;
@@ -277,7 +442,10 @@ ReplacePlanVectorzied(PlannerInfo *root, Plan *plan)
 Plan*
 CheckAndReplacePlanVectorized(PlannerInfo *root, Plan *plan)
 {
+	/* the top plan node can not be vectorized so far */
+	plan->vectorized = false;
 	plan = CheckPlanVectorzied(root, plan);
+	plan->vectorized = false;
 	return ReplacePlanVectorzied(root, plan);
 }
 
@@ -345,45 +513,47 @@ Oid GetVtype(Oid ntype)
 /*
  * Get the functions for the vectorized types
  */
-const vFuncMap* GetVFunc(Oid vtype){
+Oid GetNtype(Oid vtype){
 	HeapTuple tuple;
 	bool isNull = true;
 	cqContext *pcqCtx;
-	VecFuncHashEntry *entry = NULL;
+	VecTypeHashEntry *entry = NULL;
 	Oid ntype;
 	bool found = false;
 
 	//construct the hash table
-	if(NULL == hashMapVFunc)
+	if(NULL == hashMapV2N)
 	{
 		HASHCTL	hash_ctl;
 		MemSet(&hash_ctl, 0, sizeof(hash_ctl));
 
 		hash_ctl.keysize = sizeof(Oid);
-		hash_ctl.entrysize = sizeof(VecFuncHashEntry);
+		hash_ctl.entrysize = sizeof(VecTypeHashEntry);
 		hash_ctl.hash = oid_hash;
 
-		hashMapVFunc = hash_create("hashvfunc", 64/*enough?*/, &hash_ctl, HASH_ELEM | HASH_FUNCTION);
+		hashMapV2N = hash_create("hashvfunc", 64/*enough?*/, &hash_ctl, HASH_ELEM | HASH_FUNCTION);
 	}
 
 	//first, find the vectorized type in hash table
-	entry = hash_search(hashMapVFunc, &vtype, HASH_ENTER, &found);
+	entry = hash_search(hashMapV2N, &vtype, HASH_ENTER, &found);
 	if(found)
-		return entry->vFunc;
+		return entry->dest;
 
 	Assert(!found);
 
 	pcqCtx = caql_beginscan(NULL,
 							cql("SELECT * FROM pg_type "
-								" WHERE oid = :1 ",
-								ObjectIdGetDatum(vtype)));
+								" WHERE oid = :1 "
+								" AND typstorage = :2 ",
+								ObjectIdGetDatum(vtype),
+								CharGetDatum('e')));
 
 	tuple = caql_getnext(pcqCtx);
 
 	if(!HeapTupleIsValid(tuple))
 	{
 		caql_endscan(pcqCtx);
-		return NULL;
+		return InvalidOid;
 	}
 
 	ntype = caql_getattr(pcqCtx,
@@ -392,10 +562,10 @@ const vFuncMap* GetVFunc(Oid vtype){
 	Assert(!isNull);
 
 	/* storage in hash table*/
-	entry->vFunc = vFuncWalker(ntype);
+	entry->dest = ntype;
 
 	caql_endscan(pcqCtx);
 
-	return entry->vFunc ;
+	return entry->dest;
 }
 

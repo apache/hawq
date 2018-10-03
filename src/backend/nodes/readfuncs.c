@@ -2154,16 +2154,18 @@ _readCreateStmt(void)
 {
 	READ_LOCALS(CreateStmt);
 
-	READ_NODE_FIELD(relation);
-	READ_NODE_FIELD(tableElts);
-	READ_NODE_FIELD(inhRelations);
-	READ_NODE_FIELD(constraints);
-
-	READ_NODE_FIELD(options);
-	READ_ENUM_FIELD(oncommit,OnCommitAction);
-	READ_STRING_FIELD(tablespacename);
-	READ_NODE_FIELD(distributedBy);
-	READ_NODE_FIELD(partitionBy);
+	READ_CHAR_FIELD(base.relKind);
+	READ_NODE_FIELD(base.relation);
+	READ_NODE_FIELD(base.tableElts);
+	READ_NODE_FIELD(base.inhRelations);
+	READ_NODE_FIELD(base.constraints);
+	READ_NODE_FIELD(base.options);
+	READ_ENUM_FIELD(base.oncommit,OnCommitAction);
+	READ_STRING_FIELD(base.tablespacename);
+	READ_NODE_FIELD(base.distributedBy);
+	READ_BOOL_FIELD(base.is_part_child);
+	READ_BOOL_FIELD(base.is_add_part);
+	READ_NODE_FIELD(base.partitionBy);
 	READ_OID_FIELD(oidInfo.relOid);
 	READ_OID_FIELD(oidInfo.comptypeOid);
 	READ_OID_FIELD(oidInfo.toastOid);
@@ -2175,13 +2177,10 @@ _readCreateStmt(void)
 	READ_OID_FIELD(oidInfo.aoblkdirOid);
 	READ_OID_FIELD(oidInfo.aoblkdirIndexOid);
 	READ_OID_FIELD(oidInfo.aoblkdirComptypeOid);
-	READ_CHAR_FIELD(relKind);
 	READ_CHAR_FIELD(relStorage);
 	/* policy omitted */
 	/* postCreate omitted */
 	READ_NODE_FIELD(deferredStmts);
-	READ_BOOL_FIELD(is_part_child);
-	READ_BOOL_FIELD(is_add_part);
 	READ_BOOL_FIELD(is_split_part);
 	READ_OID_FIELD(ownerid);
 	READ_BOOL_FIELD(buildAoBlkdir);
@@ -2300,16 +2299,27 @@ _readCreateExternalStmt(void)
 {
 	READ_LOCALS(CreateExternalStmt);
 
-	READ_NODE_FIELD(relation);
-	READ_NODE_FIELD(tableElts);
+	READ_CHAR_FIELD(base.relKind);
+	READ_NODE_FIELD(base.relation);
+	READ_NODE_FIELD(base.tableElts);
+	READ_NODE_FIELD(base.inhRelations);
+	READ_NODE_FIELD(base.constraints);
+	READ_NODE_FIELD(base.options);
+	READ_ENUM_FIELD(base.oncommit,OnCommitAction);
+	READ_STRING_FIELD(base.tablespacename);
+	READ_NODE_FIELD(base.distributedBy);
+	READ_BOOL_FIELD(base.is_part_child);
+	READ_BOOL_FIELD(base.is_add_part);
+	READ_NODE_FIELD(base.partitionBy);
 	READ_NODE_FIELD(exttypedesc);
 	READ_STRING_FIELD(format);
-	READ_NODE_FIELD(formatOpts);
 	READ_BOOL_FIELD(isweb);
 	READ_BOOL_FIELD(iswritable);
+	READ_BOOL_FIELD(isexternal);
+	READ_BOOL_FIELD(forceCreateDir);
+	READ_STRING_FIELD(parentPath);
 	READ_NODE_FIELD(sreh);
 	READ_NODE_FIELD(encoding);
-	READ_NODE_FIELD(distributedBy);
 	local_node->policy = NULL;
 	
 	READ_DONE();

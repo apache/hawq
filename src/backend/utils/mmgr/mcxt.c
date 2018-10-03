@@ -828,7 +828,6 @@ MemoryContextStats(MemoryContext context)
  *
  * This is just a debugging utility, so it's not fancy.
  */
-#ifdef MEMORY_CONTEXT_CHECKING
 void
 MemoryContextCheck(MemoryContext context)
 {
@@ -840,7 +839,6 @@ MemoryContextCheck(MemoryContext context)
 	for (child = context->firstchild; child != NULL; child = child->nextchild)
 		MemoryContextCheck(child);
 }
-#endif
 
 /*
  * MemoryContextContains

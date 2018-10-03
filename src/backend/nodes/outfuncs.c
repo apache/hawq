@@ -2111,15 +2111,18 @@ _outCreateStmt(StringInfo str, CreateStmt *node)
 {
 	WRITE_NODE_TYPE("CREATESTMT");
 
-	WRITE_NODE_FIELD(relation);
-	WRITE_NODE_FIELD(tableElts);
-	WRITE_NODE_FIELD(inhRelations);
-	WRITE_NODE_FIELD(constraints);
-	WRITE_NODE_FIELD(options);
-	WRITE_ENUM_FIELD(oncommit, OnCommitAction);
-	WRITE_STRING_FIELD(tablespacename);
-	WRITE_NODE_FIELD(distributedBy);
-	WRITE_NODE_FIELD(partitionBy);
+	WRITE_CHAR_FIELD(base.relKind);
+	WRITE_NODE_FIELD(base.relation);
+	WRITE_NODE_FIELD(base.tableElts);
+	WRITE_NODE_FIELD(base.inhRelations);
+	WRITE_NODE_FIELD(base.constraints);
+	WRITE_NODE_FIELD(base.options);
+	WRITE_ENUM_FIELD(base.oncommit, OnCommitAction);
+	WRITE_STRING_FIELD(base.tablespacename);
+	WRITE_NODE_FIELD(base.distributedBy);
+	WRITE_BOOL_FIELD(base.is_part_child);
+	WRITE_BOOL_FIELD(base.is_add_part);
+	WRITE_NODE_FIELD(base.partitionBy);
 	WRITE_OID_FIELD(oidInfo.relOid);
 	WRITE_OID_FIELD(oidInfo.comptypeOid);
 	WRITE_OID_FIELD(oidInfo.toastOid);
@@ -2131,13 +2134,10 @@ _outCreateStmt(StringInfo str, CreateStmt *node)
 	WRITE_OID_FIELD(oidInfo.aoblkdirOid);
 	WRITE_OID_FIELD(oidInfo.aoblkdirIndexOid);
 	WRITE_OID_FIELD(oidInfo.aoblkdirComptypeOid);
-	WRITE_CHAR_FIELD(relKind);
 	WRITE_CHAR_FIELD(relStorage);
 	/* policy omitted */
 	/* postCreate omitted */
 	WRITE_NODE_FIELD(deferredStmts);
-	WRITE_BOOL_FIELD(is_part_child);
-	WRITE_BOOL_FIELD(is_add_part);
 	WRITE_BOOL_FIELD(is_split_part);
 	WRITE_OID_FIELD(ownerid);
 	WRITE_BOOL_FIELD(buildAoBlkdir);
@@ -2170,16 +2170,27 @@ _outCreateExternalStmt(StringInfo str, CreateExternalStmt *node)
 {
 	WRITE_NODE_TYPE("CREATEEXTERNALSTMT");
 
-	WRITE_NODE_FIELD(relation);
-	WRITE_NODE_FIELD(tableElts);
+	WRITE_CHAR_FIELD(base.relKind);
+	WRITE_NODE_FIELD(base.relation);
+	WRITE_NODE_FIELD(base.tableElts);
+	WRITE_NODE_FIELD(base.inhRelations);
+	WRITE_NODE_FIELD(base.constraints);
+	WRITE_NODE_FIELD(base.options);
+	WRITE_ENUM_FIELD(base.oncommit, OnCommitAction);
+	WRITE_STRING_FIELD(base.tablespacename);
+	WRITE_NODE_FIELD(base.distributedBy);
+	WRITE_BOOL_FIELD(base.is_part_child);
+	WRITE_BOOL_FIELD(base.is_add_part);
+	WRITE_NODE_FIELD(base.partitionBy);
 	WRITE_NODE_FIELD(exttypedesc);
 	WRITE_STRING_FIELD(format);
-	WRITE_NODE_FIELD(formatOpts);
 	WRITE_BOOL_FIELD(isweb);
 	WRITE_BOOL_FIELD(iswritable);
+	WRITE_BOOL_FIELD(isexternal);
+	WRITE_BOOL_FIELD(forceCreateDir);
+	WRITE_STRING_FIELD(parentPath);
 	WRITE_NODE_FIELD(sreh);
 	WRITE_NODE_FIELD(encoding);
-	WRITE_NODE_FIELD(distributedBy);
 }
 
 static void

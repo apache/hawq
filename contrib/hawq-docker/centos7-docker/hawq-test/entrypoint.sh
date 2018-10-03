@@ -27,6 +27,9 @@ if [ ! -f /etc/profile.d/hadoop.sh ]; then
   sudo chmod a+x /etc/profile.d/hadoop.sh
 fi
 
+sudo chmod 777 /etc/hadoop/conf/core-site.xml
+sudo sed "s/@hdfs.namenode@/$NAMENODE/g" -i /etc/hadoop/conf/core-site.xml
+
 sudo start-hdfs.sh
 sudo sysctl -p
 

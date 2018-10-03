@@ -202,7 +202,7 @@
 
 =======================================================================
 
-Apache HAWQ (incubating) - contained works supporting PXF components:
+Apache HAWQ - contained works supporting PXF components:
 
 This product contains additional works that are distributed under
 Apache License, Version 2.0 (ALv2).
@@ -211,9 +211,9 @@ Apache License, Version 2.0 (ALv2).
 
 =======================================================================
 
-Apache HAWQ (incubating) PXF runtime dependent subcomponents:
+Apache HAWQ PXF runtime dependent subcomponents:
 
-  The Apache HAWQ (incubating) project contains PXF. It is an
+  The Apache HAWQ project contains PXF. It is an
   extensible framework that allows HAWQ to query external data files,
   whose metadata is not managed by HAWQ. PXF includes built-in
   connectors for accessing data that exists inside HDFS files, Hive

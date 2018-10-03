@@ -45,7 +45,7 @@ mkdir -p rpmbuild/BUILD rpmbuild/RPMS rpmbuild/SOURCES rpmbuild/SPECS rpmbuild/S
 # Copy HAWQ RPM configuration file for the build
 cp hawq.spec rpmbuild/SPECS/
 
-HAWQ_SOURCE_TARBALL_FILE=apache-hawq-src-${HAWQ_RELEASE_VERSION}-incubating.tar.gz
+HAWQ_SOURCE_TARBALL_FILE=apache-hawq-src-${HAWQ_RELEASE_VERSION}.tar.gz
 
 # Get PATH where to find HAWQ source code tarball
 if [ -z ${HAWQ_SOURCE_TARBALL_PATH} ]; then

@@ -791,6 +791,23 @@ tSize hdfsRead(hdfsFS fs, hdfsFile file, void * buffer, tSize length) {
     return -1;
 }
 
+tSize hdfsPread(hdfsFS fs, hdfsFile file, tOffset pos,
+                void * buffer, tSize length) {
+    PARAMETER_ASSERT(fs && file && pos >= 0 && buffer && length > 0, -1, EINVAL);
+    PARAMETER_ASSERT(file->isInput(), -1, EINVAL);
+
+    tOffset oldPos = hdfsTell(fs, file);
+    if (oldPos < 0 || hdfsSeek(fs, file, pos) < 0) {
+        return -1;
+    }
+
+    tSize done = hdfsRead(fs, file, buffer, length);
+    // hdfsRead failure followed by hdfsSeek failure would cause
+    // hdfsGetLastError to only report the latter one, since there is
+    // no exception chaining.
+    return hdfsSeek(fs, file, oldPos) == 0 ? done : -1;
+}
+
 tSize hdfsWrite(hdfsFS fs, hdfsFile file, const void * buffer, tSize length) {
     PARAMETER_ASSERT(fs && file && buffer && length > 0, -1, EINVAL);
     PARAMETER_ASSERT(!file->isInput(), -1, EINVAL);
@@ -811,12 +828,12 @@ tSize hdfsWrite(hdfsFS fs, hdfsFile file, const void * buffer, tSize length) {
 }
 
 int hdfsFlush(hdfsFS fs, hdfsFile file) {
-    PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
+    PARAMETER_ASSERT(fs && file, -1, EINVAL);
     return hdfsHFlush(fs, file);
 }
 
 int hdfsHFlush(hdfsFS fs, hdfsFile file) {
-    PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
+    PARAMETER_ASSERT(fs && file, -1, EINVAL);
     PARAMETER_ASSERT(!file->isInput(), -1, EINVAL);
 
     try {
@@ -834,7 +851,11 @@ int hdfsHFlush(hdfsFS fs, hdfsFile file) {
 }
 
 int hdfsSync(hdfsFS fs, hdfsFile file) {
-    PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
+    return hdfsHSync(fs, file);
+}
+
+int hdfsHSync(hdfsFS fs, hdfsFile file) {
+    PARAMETER_ASSERT(fs && file, -1, EINVAL);
     PARAMETER_ASSERT(!file->isInput(), -1, EINVAL);
 
     try {
@@ -852,7 +873,7 @@ int hdfsSync(hdfsFS fs, hdfsFile file) {
 }
 
 int hdfsAvailable(hdfsFS fs, hdfsFile file) {
-    PARAMETER_ASSERT(fs && file && file, -1, EINVAL);
+    PARAMETER_ASSERT(fs && file, -1, EINVAL);
     PARAMETER_ASSERT(file->isInput(), -1, EINVAL);
 
     try {

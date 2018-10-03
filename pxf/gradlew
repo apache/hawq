@@ -15,13 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+##############################################################################
 ##
-## Tries to recreate Gradle's gradlew command in pure bash.
-## This way you don't have to worry about binaries in your build.
+##  Gradle start up script for UN*X
 ##
-## Depdencies
-## unzip
-##
+##############################################################################
 
 set -e
 set -o pipefail
@@ -30,10 +28,10 @@ APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
 # Use the maximum available, or set MAX_FD != -1 to use that value.
-    MAX_FD="maximum"
+MAX_FD="maximum"
 
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
-DEFAULT_JVM_OPTS="-Dorg.gradle.appname=$APP_BASE_NAME"
+DEFAULT_JVM_OPTS=""
 
 bin=`dirname "$0"`
 bin=`cd "$bin">/dev/null; pwd`
@@ -51,11 +49,11 @@ else
   fi
 fi
 
-warn ( ) {
+warn () {
     echo "$*"
 }
 
-die ( ) {
+die () {
     echo
     echo "$*"
     echo
@@ -63,10 +61,22 @@ die ( ) {
 }
 
 # OS specific support (must be 'true' or 'false').
+cygwin=false
+msys=false
 darwin=false
+nonstop=false
 case "`uname`" in
+  CYGWIN* )
+    cygwin=true
+    ;;
   Darwin* )
     darwin=true
+    ;;
+  MINGW* )
+    msys=true
+    ;;
+  NONSTOP* )
+    nonstop=true
     ;;
 esac
 
@@ -84,9 +94,9 @@ while [ -h "$PRG" ] ; do
     fi
 done
 SAVED="`pwd`"
-cd "`dirname \"$PRG\"`/" >&-
+cd "`dirname \"$PRG\"`/" >/dev/null
 APP_HOME="`pwd -P`"
-cd "$SAVED" >&-
+cd "$SAVED" >/dev/null
 
 CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
@@ -113,7 +123,7 @@ location of your Java installation."
 fi
 
 # Increase the maximum file descriptors if we can.
-if [ "$darwin" = "false" ] ; then
+if [ "$cygwin" = "false" -a "$darwin" = "false" -a "$nonstop" = "false" ] ; then
     MAX_FD_LIMIT=`ulimit -H -n`
     if [ $? -eq 0 ] ; then
         if [ "$MAX_FD" = "maximum" -o "$MAX_FD" = "max" ] ; then
@@ -131,6 +141,51 @@ fi
 # For Darwin, add options to specify how the application appears in the dock
 if $darwin; then
     GRADLE_OPTS="$GRADLE_OPTS \"-Xdock:name=$APP_NAME\" \"-Xdock:icon=$APP_HOME/media/gradle.icns\""
+fi
+
+# For Cygwin, switch paths to Windows format before running java
+if $cygwin ; then
+    APP_HOME=`cygpath --path --mixed "$APP_HOME"`
+    CLASSPATH=`cygpath --path --mixed "$CLASSPATH"`
+    JAVACMD=`cygpath --unix "$JAVACMD"`
+
+    # We build the pattern for arguments to be converted via cygpath
+    ROOTDIRSRAW=`find -L / -maxdepth 1 -mindepth 1 -type d 2>/dev/null`
+    SEP=""
+    for dir in $ROOTDIRSRAW ; do
+        ROOTDIRS="$ROOTDIRS$SEP$dir"
+        SEP="|"
+    done
+    OURCYGPATTERN="(^($ROOTDIRS))"
+    # Add a user-defined pattern to the cygpath arguments
+    if [ "$GRADLE_CYGPATTERN" != "" ] ; then
+        OURCYGPATTERN="$OURCYGPATTERN|($GRADLE_CYGPATTERN)"
+    fi
+    # Now convert the arguments - kludge to limit ourselves to /bin/sh
+    i=0
+    for arg in "$@" ; do
+        CHECK=`echo "$arg"|egrep -c "$OURCYGPATTERN" -`
+        CHECK2=`echo "$arg"|egrep -c "^-"`                                 ### Determine if an option
+
+        if [ $CHECK -ne 0 ] && [ $CHECK2 -eq 0 ] ; then                    ### Added a condition
+            eval `echo args$i`=`cygpath --path --ignore --mixed "$arg"`
+        else
+            eval `echo args$i`="\"$arg\""
+        fi
+        i=$((i+1))
+    done
+    case $i in
+        (0) set -- ;;
+        (1) set -- "$args0" ;;
+        (2) set -- "$args0" "$args1" ;;
+        (3) set -- "$args0" "$args1" "$args2" ;;
+        (4) set -- "$args0" "$args1" "$args2" "$args3" ;;
+        (5) set -- "$args0" "$args1" "$args2" "$args3" "$args4" ;;
+        (6) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" ;;
+        (7) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" ;;
+        (8) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" "$args7" ;;
+        (9) set -- "$args0" "$args1" "$args2" "$args3" "$args4" "$args5" "$args6" "$args7" "$args8" ;;
+    esac
 fi
 
 # does not match gradle's hash
@@ -195,6 +250,12 @@ lib_path() {
   echo "$base_path/$file_name/lib"
 }
 
+# Escape application args
+save () {
+    for i do printf %s\\n "$i" | sed "s/'/'\\\\''/g;1s/^/'/;\$s/\$/' \\\\/" ; done
+    echo " "
+}
+
 classpath() {
   local dir=$(lib_path)
   local cp=$(ls -1 $dir/*.jar | tr '\n' ':')
@@ -211,10 +272,11 @@ main() {
     download
   fi
 
+  APP_ARGS=$(save "$@")
+
   eval splitJvmOpts $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS
   JVM_OPTS[${#JVM_OPTS[*]}]="-Dorg.gradle.appname=$APP_BASE_NAME"
-
-  $JAVACMD "${JVM_OPTS[@]}" -cp $(classpath) org.gradle.launcher.GradleMain "$@"
+  exec "$JAVACMD" "${JVM_OPTS[@]}" -cp $(classpath) org.gradle.launcher.GradleMain "$@"
 }
 
 main "$@"

@@ -37,6 +37,7 @@ pxf/pxf-hdfs-*[0-9].jar
 pxf/pxf-hive-*[0-9].jar
 pxf/pxf-json-*[0-9].jar
 pxf/pxf-jdbc-*[0-9].jar
+pxf/pxf-ignite-*[0-9].jar
 
 # Hadoop Libraries
 hadoop/share/hadoop/hdfs/hadoop-hdfs-*[0-9].jar
@@ -52,6 +53,7 @@ hadoop/share/hadoop/common/lib/commons-configuration-*[0-9].jar
 hadoop/share/hadoop/common/lib/commons-io-*[0-9].jar
 hadoop/share/hadoop/common/lib/commons-lang-*[0-9].jar
 hadoop/share/hadoop/common/lib/commons-logging-*[0-9].jar
+hadoop/share/hadoop/common/lib/commons-compress-*[0-9].jar
 hadoop/share/hadoop/common/lib/guava-*[0-9].jar
 hadoop/share/hadoop/common/lib/htrace-core*.jar
 hadoop/share/hadoop/common/lib/jetty-*.jar
@@ -62,6 +64,7 @@ hadoop/share/hadoop/common/lib/jersey-server-*[0-9].jar
 hadoop/share/hadoop/common/lib/log4j-*[0-9].jar
 hadoop/share/hadoop/common/lib/protobuf-java-*[0-9].jar
 hadoop/share/hadoop/common/lib/slf4j-api-*[0-9].jar
+hadoop/share/hadoop/common/lib/gson-*[0-9].jar
 
 # Hive Libraries
 hive/lib/antlr-runtime*.jar

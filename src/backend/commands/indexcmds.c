@@ -903,6 +903,7 @@ CheckPredicate(Expr *predicate)
 				   errOmitLocation(true)));
 }
 
+
 static void
 ComputeIndexAttrs(IndexInfo *indexInfo,
 				  Oid *classOidP,

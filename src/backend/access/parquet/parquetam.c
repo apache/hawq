@@ -301,6 +301,7 @@ void parquet_getnext(ParquetScanDesc scan, ScanDirection direction,
 												&scan->rowGroupReader,
 												scan->hawqAttrToParquetColChunks,
 												scan->proj,
+												scan->rfState,
 												slot);
 
 		if(tupleExist)

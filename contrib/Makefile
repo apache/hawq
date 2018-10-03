@@ -9,10 +9,15 @@ WANTED_DIRS = \
 		extprotocol \
 		gp_cancel_query \
 		formatter_fixedwidth \
-		hawq-hadoop
+		exthdfs\
+		hawq-hadoop\
 
 ifeq ($(with_pgcrypto), yes)
 WANTED_DIRS += pgcrypto
+endif
+
+ifeq ($(with_orc), yes)
+WANTED_DIRS += orc
 endif
 
 # Missing:

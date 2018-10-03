@@ -40,7 +40,11 @@ all: $(DEFAULTTARGET)
 
 $(DEFAULTTARGET):
 ifdef MAVEN
+ifeq ($(shell java -version 2>&1 | grep 1.7.0 > /dev/null; printf $$?),0)
+	$(MAVEN) package -DskipTests -Dhttps.protocols=TLSv1.2
+else
 	$(MAVEN) package -DskipTests
+endif
 else
 	@$(missing) mvn $< $@
 endif

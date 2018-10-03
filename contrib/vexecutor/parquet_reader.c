@@ -131,12 +131,13 @@ ParquetRowGroupReader_ScanNextTupleBatch(
 			continue;
 
 		Oid hawqTypeID = tupDesc->attrs[i]->atttypid;
-		Oid hawqVTypeID = GetVtype(hawqTypeID);
 		if(!tb->datagroup[i])
-			tbCreateColumn(tb,i,hawqVTypeID);
+			tbCreateColumn(tb,i,hawqTypeID);
 
-		vheader* header = tb->datagroup[i];
-		header->dim = tb->nrows;
+
+		vtype* vt = tb->datagroup[i];
+		vt->dim = tb->nrows;
+
 
 		ParquetColumnReader *nextReader =
 			&rowGroupReader->columnReaders[colReaderIndex];
@@ -146,7 +147,7 @@ ParquetRowGroupReader_ScanNextTupleBatch(
 
 			if(hawqAttrToParquetColNum[i] == 1)
 			{
-				ParquetColumnReader_readValue(nextReader, GetVFunc(hawqVTypeID)->gettypeptr(header,j), header->isnull + j, hawqTypeID);
+				ParquetColumnReader_readValue(nextReader, vt->values + j , vt->isnull + j, hawqTypeID);
 			}
 			else
 			{
@@ -159,22 +160,22 @@ ParquetRowGroupReader_ScanNextTupleBatch(
 				switch(hawqTypeID)
 				{
 					case HAWQ_TYPE_POINT:
-						ParquetColumnReader_readPoint(nextReader, GetVFunc(hawqVTypeID)->gettypeptr(header,j), header->isnull + j);
+						ParquetColumnReader_readPoint(nextReader, vt->values + j, vt->isnull + j);
 						break;
 					case HAWQ_TYPE_PATH:
-						ParquetColumnReader_readPATH(nextReader, GetVFunc(hawqVTypeID)->gettypeptr(header,j), header->isnull + j);
+						ParquetColumnReader_readPATH(nextReader, vt->values + j, vt->isnull + j);
 						break;
 					case HAWQ_TYPE_LSEG:
-						ParquetColumnReader_readLSEG(nextReader, GetVFunc(hawqVTypeID)->gettypeptr(header,j), header->isnull + j);
+						ParquetColumnReader_readLSEG(nextReader, vt->values + j, vt->isnull + j);
 						break;
 					case HAWQ_TYPE_BOX:
-						ParquetColumnReader_readBOX(nextReader, GetVFunc(hawqVTypeID)->gettypeptr(header,j), header->isnull + j);
+						ParquetColumnReader_readBOX(nextReader, vt->values + j, vt->isnull + j);
 						break;
 					case HAWQ_TYPE_CIRCLE:
-						ParquetColumnReader_readCIRCLE(nextReader,GetVFunc(hawqVTypeID)->gettypeptr(header,j),header->isnull + j);
+						ParquetColumnReader_readCIRCLE(nextReader, vt->values + j, vt->isnull + j);
 						break;
 					case HAWQ_TYPE_POLYGON:
-						ParquetColumnReader_readPOLYGON(nextReader,GetVFunc(hawqVTypeID)->gettypeptr(header,j),header->isnull + j);
+						ParquetColumnReader_readPOLYGON(nextReader, vt->values + j, vt->isnull + j);
 						break;
 					default:
 						Insist(false);

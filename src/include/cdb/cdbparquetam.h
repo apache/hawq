@@ -84,6 +84,8 @@ typedef struct ParquetScanDescData {
 
 	List *splits;
 	bool toCloseFile; // identify if it's ready to close segment file
+
+	RuntimeFilterState *rfState; /* Bloom filter */
 } ParquetScanDescData;
 
 typedef ParquetScanDescData *ParquetScanDesc;

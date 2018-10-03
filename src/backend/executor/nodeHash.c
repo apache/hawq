@@ -1480,6 +1480,22 @@ ExecHashTableExplainEnd(PlanState *planstate, struct StringInfoData *buf)
                              hashtable->nbatch - stats->nonemptybatches);
         appendStringInfoChar(buf, '\n');
     }
+
+    /* Report Bloom filter statistics. */
+    if (hjstate->js.ps.lefttree->type ==  T_TableScanState &&
+            ((ScanState*)hjstate->js.ps.lefttree)->runtimeFilter != NULL &&
+            ((ScanState*)hjstate->js.ps.lefttree)->runtimeFilter->bloomfilter != NULL)
+    {
+        BloomFilter bf = ((ScanState*)hjstate->js.ps.lefttree)->runtimeFilter->bloomfilter;
+        appendStringInfo(buf, "Bloom filter, inner table row number:%d, "
+                        "outer table checked row number:%d, "
+                        "outer table matched row number:%d, "
+                        "outer table filtered row number:%d, filtered rate:%.3f",
+                        bf->nInserted, bf->nTested, bf->nMatched, bf->nTested - bf->nMatched,
+                        bf->nTested == 0 ? 0 : (float)((float)(bf->nTested - bf->nMatched)/(float)(bf->nTested)));
+        appendStringInfoChar(buf, '\n');
+    }
+
 }                               /* ExecHashTableExplainEnd */
 
 

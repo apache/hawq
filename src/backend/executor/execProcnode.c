@@ -279,8 +279,12 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	if(vmthd.vectorized_executor_enable
 	   && vmthd.ExecInitNode_Hook
 	   && node->vectorized
-	   && (result = vmthd.ExecInitNode_Hook(node,estate,eflags)))
+	   && (result = vmthd.ExecInitNode_Hook(node,estate,eflags,isAlienPlanNode,&curMemoryAccount)))
+	{
+
+		SAVE_EXECUTOR_MEMORY_ACCOUNT(result, curMemoryAccount);
 		return result;
+	}
 
 
 	switch (nodeTag(node))
@@ -903,9 +907,9 @@ ExecProcNode(PlanState *node)
 	Assert(nodeTag(node) >= T_PlanState_Start && nodeTag(node) < T_PlanState_End);
 
 	if(vmthd.vectorized_executor_enable
-	   && node->vectorized
+	   && node->plan->vectorized
 	   && vmthd.ExecProcNode_Hook
-	   && (result = vmthd.ExecProcNode_Hook(node)))
+	   && vmthd.ExecProcNode_Hook(node,&result))
 		goto Exec_Jmp_Done;
 
 	goto *ExecJmpTbl[nodeTag(node) - T_PlanState_Start];
@@ -1547,10 +1551,6 @@ ExecUpdateTransportState(PlanState *node, ChunkTransportState *state)
 void
 ExecEndNode(PlanState *node)
 {
-	if(vmthd.vectorized_executor_enable && vmthd.ExecEndNode_Hook
-	   && vmthd.ExecEndNode_Hook(node))
-		return ;
-
 	ListCell   *subp;
 
 	/*

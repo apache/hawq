@@ -66,9 +66,7 @@ typedef struct MemoryContextMethods
 	void		(*stats) (MemoryContext context, uint64 *nBlocks, uint64 *nChunks, uint64 *currentAvailable, uint64 *allAllocated, uint64 *allFreed, uint64 *maxHeld);
 	void		(*release_accounting)(MemoryContext context);
 	void		(*update_generation)(MemoryContext context);
-#ifdef MEMORY_CONTEXT_CHECKING
 	void		(*check) (MemoryContext context);
-#endif
 } MemoryContextMethods;
 
 

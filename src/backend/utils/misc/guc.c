@@ -739,6 +739,7 @@ double  optimizer_nestloop_factor;
 double  locality_upper_bound;
 double  net_disk_ratio;
 double hawq_hashjoin_bloomfilter_ratio;
+int hawq_hashjoin_bloomfilter_sampling_number;
 bool		optimizer_cte_inlining;
 int		optimizer_cte_inlining_bound;
 double 	optimizer_damping_factor_filter;
@@ -4420,6 +4421,15 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
+	{
+		{"hawq_hashjoin_bloomfilter", PGC_USERSET, GP_ARRAY_TUNING,
+			gettext_noop("Use bloomfilter in hash join"),
+			gettext_noop("Use bloomfilter may speed up hash join performance"),
+			GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL | GUC_GPDB_ADDOPT
+		},
+		&hawq_hashjoin_bloomfilter,
+		false, NULL, NULL
+	},
 
 	/* End-of-list marker */
 	{
@@ -5835,16 +5845,6 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
-		{"hawq_hashjoin_bloomfilter", PGC_USERSET, GP_ARRAY_TUNING,
-		 gettext_noop("Use bloomfilter in hash join"),
-		 gettext_noop("Use bloomfilter may speed up hash join performance"),
-		 GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL | GUC_GPDB_ADDOPT
-		},
-		&hawq_hashjoin_bloomfilter,
-		0, 0, 1, NULL, NULL
-	},
-
-	{
 		{"gp_motion_slice_noop", PGC_USERSET, GP_ARRAY_TUNING,
 		 gettext_noop("Make motion nodes in certain slices noop"),
 		 gettext_noop("Make motion nodes noop, to help analyze performace"),
@@ -6697,6 +6697,15 @@ static struct config_int ConfigureNamesInt[] =
 		300000, 1, INT_MAX, NULL, NULL
 	},
 
+	{
+		{"hawq_hashjoin_bloomfilter_sampling_number", PGC_USERSET, PRESET_OPTIONS,
+			gettext_noop("Sets the sampling number for hash join bloomfilter when scan the outer table."),
+			NULL,
+			GUC_NO_SHOW_ALL
+		},
+		&hawq_hashjoin_bloomfilter_sampling_number,
+		10000, 100, INT_MAX, NULL, NULL
+	},
 
 	/* End-of-list marker */
 	{

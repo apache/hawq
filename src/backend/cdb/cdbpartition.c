@@ -4787,9 +4787,9 @@ get_part_rule(Relation rel,
 static void
 fixup_table_storage_options(CreateStmt *ct)
 {
-	if (!ct->options)
+	if (!ct->base.options)
 	{
-    	ct->options = list_make2(makeDefElem("appendonly",
+    	ct->base.options = list_make2(makeDefElem("appendonly",
 											 (Node *)makeString("true")),
 								 makeDefElem("orientation",
 											 (Node *)makeString("column")));
@@ -5243,11 +5243,11 @@ atpxPartAddList(Relation rel,
 	ct = (CreateStmt *)linitial((List *)pUtl);
 	Assert(IsA(ct, CreateStmt));
 	
-	ct->is_add_part = true; /* subroutines need to know this */
+	ct->base.is_add_part = true; /* subroutines need to know this */
 	ct->ownerid = ownerid;
 	
-	if (!ct->distributedBy)
-		ct->distributedBy = make_dist_clause(rel);
+	if (!ct->base.distributedBy)
+		ct->base.distributedBy = make_dist_clause(rel);
 	
 	if (bSetTemplate)
 	/* if creating a template, silence partition name messages */
@@ -6377,7 +6377,7 @@ atpxPartAddList(Relation rel,
 	 * name of the parent relation
 	 */
 	
-	ct->relation = makeRangeVar(
+	ct->base.relation = makeRangeVar(
 								NULL /*catalogname*/, 
 								get_namespace_name(RelationGetNamespace(par_rel)),
 								RelationGetRelationName(par_rel), -1);
@@ -6429,7 +6429,7 @@ atpxPartAddList(Relation rel,
 		Oid 			 skipTableRelid	 	 = InvalidOid; 
 		List			*attr_encodings		 = NIL;
 		
-		ct->partitionBy = (Node *)pBy;
+		ct->base.partitionBy = (Node *)pBy;
 
 		/* this parse_analyze expands the phony create of a partitioned table
 		 * that we just build into the constituent commands we need to create
@@ -6517,7 +6517,7 @@ atpxPartAddList(Relation rel,
 						gs->objtype = ACL_OBJECT_RELATION;
 						gs->cooked_privs = cp;
 						
-						gs->objects = list_make1(copyObject(t->relation));
+						gs->objects = list_make1(copyObject(t->base.relation));
 						
 						pt = parse_analyze((Node *)gs, NULL, NULL, 0);
 						l1 = list_concat(l1, pt);
@@ -6545,7 +6545,7 @@ atpxPartAddList(Relation rel,
 			{
 				CreateStmt *t = (CreateStmt *)((Query *)s)->utilityStmt;
 				
-				skipTableRelid = RangeVarGetRelid(t->relation, true, false /*allowHcatalog*/);
+				skipTableRelid = RangeVarGetRelid(t->base.relation, true, false /*allowHcatalog*/);
 			}
 		}
 
@@ -8374,9 +8374,9 @@ fixCreateStmtForPartitionedTable(CreateStmt *stmt)
 	int i;
 	
 	/* Caller should check this! */
-	Assert(stmt->partitionBy && !stmt->is_part_child);
+	Assert(stmt->base.partitionBy && !stmt->base.is_part_child);
 	
-	foreach( lc_elt, stmt->tableElts )
+	foreach( lc_elt, stmt->base.tableElts )
 	{
 		Node * elt = lfirst(lc_elt);
 		
@@ -8512,7 +8512,7 @@ fixCreateStmtForPartitionedTable(CreateStmt *stmt)
 				FkConstraint *fcon = list_nth(unnamed_cons, i);
 			
 				fcon->constr_name = 
-					ChooseConstraintNameForPartitionCreate(stmt->relation->relname,
+					ChooseConstraintNameForPartitionCreate(stmt->base.relation->relname,
 														   colname,
 														   label,
 														   used_names);
@@ -8528,7 +8528,7 @@ fixCreateStmtForPartitionedTable(CreateStmt *stmt)
 				if ( 0 != strcmp(label, "pkey") )
 					colname = list_nth(unnamed_cons_col, i);
 				
-				con->name = ChooseConstraintNameForPartitionCreate(stmt->relation->relname,
+				con->name = ChooseConstraintNameForPartitionCreate(stmt->base.relation->relname,
 																   colname,
 																   label,
 																   used_names);

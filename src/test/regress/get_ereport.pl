@@ -106,7 +106,7 @@ entries of level ERROR, WARNING, NOTICE, or FATAL.
 
 Apache HAWQ
 
-Address bug reports and comments to: dev@hawq.incubator.apache.org
+Address bug reports and comments to: dev@hawq.apache.org
 
 =cut
 

@@ -245,6 +245,14 @@ public:
         this->rpcTimeout = rpcTimeout;
     }
 
+    int32_t getRpcMaxDataLength() const {
+        return rpcMaxDataLength;
+    }
+
+    void setRpcMaxDataLength(int32_t rpcMaxLength) {
+        this->rpcMaxDataLength = rpcMaxLength;
+    }
+
     bool doesNotRetryAnotherNode() const {
         return notRetryAnotherNode;
     }
@@ -334,6 +342,7 @@ public:
     int32_t rpcMaxHARetry;
     int32_t rpcSocketLingerTimeout;
     int32_t rpcTimeout;
+    int32_t rpcMaxDataLength; //ipc.maximum.data.length
     bool rpcTcpNoDelay;
     std::string rpcAuthMethod;
 

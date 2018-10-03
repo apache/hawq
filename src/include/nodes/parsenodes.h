@@ -1354,14 +1354,15 @@ typedef struct GrantRoleStmt
  * Node that represents the single row error handling (SREH) clause.
  * used in COPY and External Tables.
  */
-typedef struct SingleRowErrorDesc
-{
-	NodeTag		type;
-	RangeVar	*errtable;			/* error table for data format errors */
-	int			rejectlimit;		/* per segment error reject limit */
-	bool		is_keep;			/* true if KEEP indicated (COPY only) */
-	bool		is_limit_in_rows;	/* true for ROWS false for PERCENT */
-	bool		reusing_existing_errtable;  /* var used later in trasform... */
+typedef struct SingleRowErrorDesc {
+  NodeTag type;
+  RangeVar *errtable;             /* error table for data format errors */
+  int rejectlimit;                /* per segment error reject limit */
+  bool is_keep;                   /* true if KEEP indicated (COPY only) */
+  bool is_limit_in_rows;          /* true for ROWS false for PERCENT */
+  bool reusing_existing_errtable; /* var used later in trasform... */
+  bool is_hdfs_protocol_text;     /* hdfs protocol text format table */
+  char *hdfsLoc; /* error table location for hdfs protocol text only */
 } SingleRowErrorDesc;
 
 /* ----------------------
@@ -1403,37 +1404,40 @@ typedef struct CopyStmt
  * implementation).
  * ----------------------
  */
+typedef struct CreateStmtBase {
+  char relKind;             // CDB: force relkind to this
+  RangeVar *relation;       // relation to create
+  List *tableElts;          // column definitions (list of ColumnDef)
+  List *inhRelations;       // relations to inherit from (list of inhRelation)
+  List *constraints;        // constraints (list of Constraint nodes)
+  List *options;            // options from WITH clause
+  OnCommitAction oncommit;  // what do we do at COMMIT?
+  char *tablespacename;     // table space to use, or NULL
+  List *distributedBy;      // what columns we distribute the data by
+  Node *postCreate;         // CDB: parse and process after the CREATE
+  // CDB: child table in a partition? Marked during analysis for
+  // interior or leaf parts of the new table.  Not marked for a
+  // a partition root or ordinary table.
+  bool is_part_child;
+  bool is_add_part;   // CDB: is create adding a part to a partition?
+  Node *partitionBy;  // what columns we partition the data by
+} CreateStmtBase;
 
-typedef struct CreateStmt
-{
-	NodeTag		type;
-	RangeVar   *relation;		/* relation to create */
-	List	   *tableElts;		/* column definitions (list of ColumnDef) */
-	List	   *inhRelations;	/* relations to inherit from (list of
-								 * inhRelation) */
-	List	   *constraints;	/* constraints (list of Constraint nodes) */
-	List	   *options;		/* options from WITH clause */
-	OnCommitAction oncommit;	/* what do we do at COMMIT? */
-	char	   *tablespacename; /* table space to use, or NULL */
-	List       *distributedBy;   /* what columns we distribute the data by */
-	Node       *partitionBy;     /* what columns we partition the data by */
-	TableOidInfo oidInfo;
-	char	    relKind;         /* CDB: force relkind to this */
-	char		relStorage;
-	struct GpPolicy  *policy;
-	Node       *postCreate;      /* CDB: parse and process after the CREATE */
-	List	   *deferredStmts;	/* CDB: Statements, e.g., partial indexes, that can't be 
-								 * analyzed until after CREATE (until the target table
-								 * is created and visible). */
-	bool		is_part_child;	/* CDB: child table in a partition? Marked during analysis for 
-								 * interior or leaf parts of the new table.  Not marked for a
-								 * a partition root or ordinary table.
-								 */
-	bool		is_add_part;	/* CDB: is create adding a part to a partition? */
-	bool		is_split_part;	/* CDB: is create spliting a part? */
-	Oid			ownerid;		/* OID of the role to own this. if InvalidOid, GetUserId() */
-	bool		buildAoBlkdir; /* whether to build the block directory for an AO table */
-	List	   *attr_encodings; /* attribute storage directives */
+
+typedef struct CreateStmt {
+  NodeTag type;
+  CreateStmtBase base;
+  TableOidInfo oidInfo;
+  char relStorage;
+  struct GpPolicy *policy;
+  List *deferredStmts; /* CDB: Statements, e.g., partial indexes, that can't be
+                                                * analyzed until after CREATE
+                        * (until the target table
+                                                * is created and visible). */
+  bool is_split_part;  /* CDB: is create spliting a part? */
+  Oid ownerid; /* OID of the role to own this. if InvalidOid, GetUserId() */
+  bool buildAoBlkdir; /* whether to build the block directory for an AO table */
+  List *attr_encodings; /* attribute storage directives */
 } CreateStmt;
 
 typedef enum SharedStorageOp
@@ -1459,8 +1463,9 @@ typedef struct SharedStorageOpStmt
  */
 typedef enum ExtTableType
 {
-	EXTTBL_TYPE_LOCATION,		/* table defined with LOCATION clause */
-	EXTTBL_TYPE_EXECUTE			/* table defined with EXECUTE clause */
+	 EXTTBL_TYPE_LOCATION, /* table defined with LOCATION clause */
+	 EXTTBL_TYPE_EXECUTE,  /* table defined with EXECUTE clause */
+	 EXTTBL_TYPE_UNKNOWN   /* table defined with unknown store */
 } ExtTableType;
 
 typedef struct ExtTableTypeDesc
@@ -1472,22 +1477,21 @@ typedef struct ExtTableTypeDesc
 	char			*command_string;
 } ExtTableTypeDesc;
 
-typedef struct CreateExternalStmt
-{
-	NodeTag		type;
-	RangeVar   *relation;		/* external relation to create */
-	List	   *tableElts;		/* column definitions (list of ColumnDef) */
-	Node	   *exttypedesc;    /* LOCATION or EXECUTE information */
-	char	   *format;			/* data format name */
-	List	   *formatOpts;		/* List of DefElem nodes for data format */
-	bool		isweb;
-	bool		iswritable;
-	Node	   *sreh;			/* Single row error handling info */
-	List	   *encoding;		/* List (size 1 max) of DefElem nodes for
-								   data encoding */
-	List       *distributedBy;   /* what columns we distribute the data by */
-	struct GpPolicy  *policy;	/* used for writable tables */
-	
+typedef struct CreateExternalStmt {
+  NodeTag type;
+  CreateStmtBase base;
+  Node *exttypedesc; /* LOCATION or EXECUTE information */
+  char *format;      /* data format name */
+  bool isweb;
+  bool iswritable;
+  bool isexternal;
+  Node *sreh;              /* Single row error handling info */
+  List *encoding;          /* List (size 1 max) of DefElem nodes for
+                                                      data encoding */
+  struct GpPolicy *policy; /* used for writable tables */
+  bool forceCreateDir;     /* true to create external dir */
+  char *parentPath;         // keep the parent relative path for partition
+  struct IndexStmt *pkey;  /* PRIMARY KEY index, if any */
 } CreateExternalStmt;
 
 /* ----------------------

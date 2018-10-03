@@ -217,5 +217,12 @@ static inline gpmon_packet_t * GpmonPktFromAggState(AggState *node)
 
 extern List *combineAggrefArgs(Aggref *aggref, List **sort_clauses);
 extern List *combinePercentileArgs(PercentileExpr *p);
+extern void finalize_aggregates(AggState *aggstate, AggStatePerGroup pergroup);
+extern TupleTableSlot *agg_retrieve_hash_table(AggState *aggstate);
+extern void advance_transition_function(AggState *aggstate,
+							AggStatePerAgg peraggstate,
+							AggStatePerGroup pergroupstate,
+							FunctionCallInfoData *fcinfo,
+							MemoryManagerContainer *mem_manager);
 
 #endif   /* NODEAGG_H */
