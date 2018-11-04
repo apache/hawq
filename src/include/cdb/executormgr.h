@@ -98,5 +98,8 @@ extern bool executormgr_connect(struct SegmentDatabaseDescriptor *desc,
 							bool is_writer, bool is_superuser);
 extern void executormgr_free_executor(struct SegmentDatabaseDescriptor *desc);
 
+extern bool executormgr_has_cached_executor();
+extern void executormgr_clean_cached_executor();
+
 #endif	/* EXECUTORMGR_H */
 

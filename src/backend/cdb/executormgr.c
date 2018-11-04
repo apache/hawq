@@ -1096,3 +1096,27 @@ executormgr_destory(SegmentDatabaseDescriptor *desc)
 	pfree(desc);
 }
 
+bool executormgr_has_cached_executor()
+{
+  return executor_cache.cached_num > 0;
+}
+
+bool executormgr_clean_cached_executor_filter(PoolItem item)
+{
+  SegmentDatabaseDescriptor *desc = (SegmentDatabaseDescriptor *)item;
+  return desc->conn->asyncStatus == PGASYNC_IDLE;
+}
+
+void executormgr_clean_cached_executor()
+{
+  /* go through each cached executor */
+  int cleaned = 0;
+  if (!executor_cache.init)
+  {
+    return;
+  }
+
+  cleaned = poolmgr_clean(executor_cache.pool, (PoolMgrIterateFilter) executormgr_clean_cached_executor_filter);
+  elog(DEBUG5, "cleaned %d idle executors", cleaned);
+}
+

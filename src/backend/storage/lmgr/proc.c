@@ -1399,9 +1399,9 @@ HandleClientWaitTimeout(void)
 	/*
 	 * Free gangs to free up resources on the segDBs.
 	 */
-	if (gangsExist())
+	if (executormgr_has_cached_executor())
 	{
-		cleanupAllIdleGangs();
+	  executormgr_clean_cached_executor();
 	}
 
 }

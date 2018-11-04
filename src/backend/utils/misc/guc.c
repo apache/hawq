@@ -5056,7 +5056,7 @@ static struct config_int ConfigureNamesInt[] =
 	{
 		{"gp_vmem_idle_resource_timeout", PGC_USERSET, CLIENT_CONN_OTHER,
 			gettext_noop("Sets the time a session can be idle (in milliseconds) before we release gangs on the segment DBs to free resources."),
-			gettext_noop("A value of 0 turns off the timeout."),
+			gettext_noop("A value of 0 means closing idle gangs at once"),
 			GUC_UNIT_MS | GUC_GPDB_ADDOPT
 		},
 		&IdleSessionGangTimeout,

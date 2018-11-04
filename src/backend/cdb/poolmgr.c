@@ -184,3 +184,45 @@ poolmgr_iterate(PoolMgrState *pool, PoolMgrIterateFilter filter, PoolMgrIterateC
 	return;
 }
 
+int poolmgr_clean(struct PoolMgrState *pool, PoolMgrIterateFilter filter)
+{
+  int res = 0;
+  HASH_SEQ_STATUS   hash_seq;
+  PoolItemEntry   *entry;
+
+  if (!pool)
+    return res;
+
+  hash_seq_init(&hash_seq, pool->hashtable);
+  while ((entry = hash_seq_search(&hash_seq)))
+  {
+    ListCell *curr = list_head(entry->list);
+    ListCell *prev = NULL;
+    while (curr != NULL)
+    {
+      PoolItem  item = lfirst(curr);
+      if (filter && !filter(item))
+      {
+        /* try next */
+        prev = curr;
+        curr = lnext(prev);
+        continue;
+      }
+      /* clean now */
+      res++;
+      pool->callback(item);
+      entry->list = list_delete_cell(entry->list, curr, prev);
+      if (prev != NULL)
+      {
+        curr = lnext(prev);
+      }
+      else
+      {
+        curr = list_head(entry->list);
+      }
+    }
+  }
+  return res;
+}
+
+
