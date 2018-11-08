@@ -16,7 +16,7 @@
 # under the License.
 #
 MODULE_big = orc
-OBJS       = orc.o
+OBJS       = cwrapper/cwrapper.o format/orc_format.o orc.o
 
 PG_CPPFLAGS = -I$(libpq_srcdir)
 PG_LIBS = $(libpq_pgport)
