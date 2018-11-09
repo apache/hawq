@@ -16,11 +16,10 @@
 # under the License.
 #
 MODULE_big = orc
-OBJS       = cwrapper/cwrapper.o format/orc_format.o orc.o
+OBJS       = cwrapper/cwrapper.o orc.o
 
 PG_CPPFLAGS = -I$(libpq_srcdir)
 PG_LIBS = $(libpq_pgport)
-
 
 ifdef USE_PGXS
 PGXS := $(shell pg_config --pgxs)
@@ -31,3 +30,10 @@ top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
 endif
+
+clean distclean:
+	$(MAKE) -C cwrapper $@ || true;
+	rm -f orc.o orc.so
+
+cwrapper/cwrapper.o:
+	$(MAKE) -C cwrapper cwrapper.o
