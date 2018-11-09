@@ -16,3 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+#ifndef STORAGE_SRC_STORAGE_CWRAPPER_ORC_FORMAT_C_H_
+#define STORAGE_SRC_STORAGE_CWRAPPER_ORC_FORMAT_C_H_
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#ifndef ERROR_MESSAGE_BUFFER_SIZE
+#define ERROR_MESSAGE_BUFFER_SIZE 4096
+#endif
+  void wrap_func_test();
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // STORAGE_SRC_STORAGE_CWRAPPER_ORC_FORMAT_C_H_
