@@ -21,6 +21,7 @@
 #include "lib/stringinfo.h"
 #include "utils/guc.h"
 #include "miscadmin.h"
+#include "access/pxfutils.h"
 
 /* include libcurl without typecheck.
  * This allows wrapping curl_easy_setopt to be wrapped
@@ -310,17 +311,6 @@ CHURL_HANDLE churl_init(const char* url, CHURL_HEADERS headers)
 	create_curl_handle(context);
 	clear_error_buffer(context);
 
-	/* needed to resolve localhost */
-	if (strstr(url, LocalhostIpV4) != NULL) {
-		struct curl_slist *resolve_hosts = NULL;
-		char *pxf_host_entry = (char *) palloc0(strlen(pxf_service_address) + strlen(LocalhostIpV4Entry) + 1);
-		strcat(pxf_host_entry, pxf_service_address);
-		strcat(pxf_host_entry, LocalhostIpV4Entry);
-		resolve_hosts = curl_slist_append(NULL, pxf_host_entry);
-		set_curl_option(context, CURLOPT_RESOLVE, resolve_hosts);
-		pfree(pxf_host_entry);
-	}
-
 	set_curl_option(context, CURLOPT_URL, url);
 	set_curl_option(context, CURLOPT_VERBOSE, (const void*)FALSE);
 	set_curl_option(context, CURLOPT_ERRORBUFFER, context->curl_error_buffer);
@@ -491,6 +481,29 @@ void create_curl_handle(churl_context* context)
 void set_curl_option(churl_context* context, CURLoption option, const void* data)
 {
 	int curl_error;
+
+	if (option == CURLOPT_URL)
+	{
+		const char* url = (char* )data;
+		/* needed to resolve localhost */
+		if (strstr(url, LocalhostIpV4) != NULL) {
+			//get loopback interface ip address
+			char* loopback_addr = get_loopback_ip_addr();
+			elog(DEBUG1, "Loopback interface IP address: %s", loopback_addr);
+			char* replaced_url = replace_string(url, LocalhostIpV4, loopback_addr);
+			elog(DEBUG1, "Replaced url: %s", replaced_url);
+			if (CURLE_OK != (curl_error = curl_easy_setopt(context->curl_handle, option, replaced_url)))
+				elog(ERROR, "internal error: curl_easy_setopt %d error (%d - %s)",
+					 option, curl_error, curl_easy_strerror(curl_error));
+
+			//release memory
+			pfree(replaced_url);
+			pfree(loopback_addr);
+			return;
+		}
+	}
+
+
 	if (CURLE_OK != (curl_error = curl_easy_setopt(context->curl_handle, option, data)))
 		elog(ERROR, "internal error: curl_easy_setopt %d error (%d - %s)",
 			 option, curl_error, curl_easy_strerror(curl_error));

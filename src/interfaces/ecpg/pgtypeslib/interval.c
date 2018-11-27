@@ -606,7 +606,7 @@ DecodeInterval(char **field, int *ftype, int nf,		/* int range, */
 						break;
 
 					case RESERV:
-						tmask = (DTK_DATE_M || DTK_TIME_M);
+						tmask = (DTK_DATE_M | DTK_TIME_M);
 						*dtype = val;
 						break;
 

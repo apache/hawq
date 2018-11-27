@@ -121,7 +121,7 @@ const RpcSaslProto_SaslAuth * RpcChannelImpl::createSaslClient(
             break;
         } else if (method.getMethod() == AuthMethod::SIMPLE) {
             return auth;
-        } else if (method.getMethod() == AuthMethod::UNKNOWN) {
+        } else if (method.getMethod() == AuthMethod::UNSURENESS) {
             return auth;
         } else {
             auth = NULL;
@@ -187,7 +187,7 @@ RpcAuth RpcChannelImpl::setupSaslConnection() {
 
             if (retval.getMethod() == AuthMethod::SIMPLE) {
                 done = true;
-            } else if (retval.getMethod() == AuthMethod::UNKNOWN) {
+            } else if (retval.getMethod() == AuthMethod::UNSURENESS) {
                 THROW(AccessControlException, "Unknown auth mechanism");
             } else {
                 std::string respToken;

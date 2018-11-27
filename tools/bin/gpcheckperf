@@ -351,6 +351,10 @@ def runSetup():
 	print '--------------------'
     okCount = 0
     try:
+        #check hostfile if have -f opt
+        if GV.opt['-f']:
+            if not os.path.exists(GV.opt['-f']):
+                sys.exit("[Error] unable to find hostfile: %s" % GV.opt['-f'])
 	#check python reachable
 	if GV.opt['-v']: print '[Info] verify python interpreter exists'
 	(ok, out) = gpssh('python -c print')

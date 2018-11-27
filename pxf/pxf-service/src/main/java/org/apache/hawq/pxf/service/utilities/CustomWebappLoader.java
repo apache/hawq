@@ -49,7 +49,7 @@ import org.apache.juli.logging.LogFactory;
 public class CustomWebappLoader extends WebappLoader {
 
 	/**
-	 * Because this class belongs in tcServer itself, logs go into tcServer's log facility that is separate
+	 * Because this class belongs in application container itself, logs go into tomcat's log facility that is separate
 	 * from the web app's log facility.
 	 *
 	 * Logs are directed to catalina.log file. By default only INFO or higher messages are logged.

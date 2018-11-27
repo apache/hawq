@@ -487,6 +487,7 @@ DESCR("network IP address/netmask, network address");
 
 /*  OIDS 1000 - 1099  */
 DATA(insert OID = 1000 (	_bool	   PGNSP PGUID -1 f b t \054 0	16 array_in array_out array_recv array_send - i x f 0 -1 0 _null_ _null_ ));
+#define BOOLARRAYOID 1000
 DATA(insert OID = 1001 (	_bytea	   PGNSP PGUID -1 f b t \054 0	17 array_in array_out array_recv array_send - i x f 0 -1 0 _null_ _null_ ));
 DATA(insert OID = 1002 (	_char	   PGNSP PGUID -1 f b t \054 0	18 array_in array_out array_recv array_send - i x f 0 -1 0 _null_ _null_ ));
 DATA(insert OID = 1003 (	_name	   PGNSP PGUID -1 f b t \054 0	19 array_in array_out array_recv array_send - i x f 0 -1 0 _null_ _null_ ));

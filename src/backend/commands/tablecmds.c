@@ -800,7 +800,7 @@ DefineRelation_int(CreateStmt *stmt,
  * Add Default page size and rowgroup size to relation options
  */
 static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
-	Datum result;
+	Datum result = 0;
 	ListCell   *cell = NULL;
 	bool pageSizeSet = false;
 	bool rowgroupSizeSet = false;
@@ -970,7 +970,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 									 isweb, iswritable,&isCustom);
 			if(!isCustom){
 				int locLength = list_length(exttypeDesc->location_list);
-				if (createStmt->policy && locLength > 0)
+				if (createStmt->policy && locLength > 0 && locLength > createStmt->policy->bucketnum)
 				{
 					createStmt->policy->bucketnum = locLength;
 				}
@@ -1570,8 +1570,6 @@ bool
 RelationToRemoveIsTemp(const RangeVar *relation, DropBehavior behavior)
 {
 	Oid			relOid;
-	Oid			recheckoid;
-	ObjectAddress object;
 	HeapTuple	relTup;
 	Form_pg_class relForm;
 	char	   *nspname;
@@ -1587,10 +1585,6 @@ RelationToRemoveIsTemp(const RangeVar *relation, DropBehavior behavior)
 	// UNDONE: Not sure how to interpret 'behavior'...
 
 	relOid = RangeVarGetRelid(relation, false, false /*allowHcatalog*/);
-
-	object.classId = RelationRelationId;
-	object.objectId = relOid;
-	object.objectSubId = 0;
 
 	/*
 	 * Lock down the object to stablize it before we examine its
@@ -1610,7 +1604,7 @@ RelationToRemoveIsTemp(const RangeVar *relation, DropBehavior behavior)
 	 * When we got the relOid lock, it is possible that the relation has gone away.
 	 * this will throw Error if the relation is already deleted.
 	 */
-	recheckoid = RangeVarGetRelid(relation, false, false /*allowHcatalog*/);
+	RangeVarGetRelid(relation, false, false /*allowHcatalog*/);
 
 	/* if we got here then we should proceed. */
 
@@ -1830,10 +1824,6 @@ ExecuteTruncate(TruncateStmt *stmt)
 		Oid			toast_relid;
 		Oid			aoseg_relid = InvalidOid;
 		Oid			aoblkdir_relid = InvalidOid;
-		Oid			new_heap_oid = InvalidOid;
-		Oid			new_toast_oid = InvalidOid;
-		Oid			new_aoseg_oid = InvalidOid;
-		Oid			new_aoblkdir_oid = InvalidOid;
 		List	   *indoids = NIL;
 
 		/*
@@ -1841,7 +1831,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 		 * as the relfilenode value. The old storage file is scheduled for
 		 * deletion at commit.
 		 */
-		new_heap_oid = setNewRelfilenode(rel);
+		setNewRelfilenode(rel);
 
 		heap_relid = RelationGetRelid(rel);
 		toast_relid = rel->rd_rel->reltoastrelid;
@@ -1865,7 +1855,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 		if (OidIsValid(toast_relid))
 		{
 			rel = relation_open(toast_relid, AccessExclusiveLock);
-			new_toast_oid = setNewRelfilenode(rel);
+			setNewRelfilenode(rel);
 			heap_close(rel, NoLock);
 		}
 
@@ -1875,14 +1865,14 @@ ExecuteTruncate(TruncateStmt *stmt)
 		if (OidIsValid(aoseg_relid))
 		{
 			rel = relation_open(aoseg_relid, AccessExclusiveLock);
-			new_aoseg_oid = setNewRelfilenode(rel);
+			setNewRelfilenode(rel);
 			heap_close(rel, NoLock);
 		}
 
 		if (OidIsValid(aoblkdir_relid))
 		{
 			rel = relation_open(aoblkdir_relid, AccessExclusiveLock);
-			new_aoblkdir_oid = setNewRelfilenode(rel);
+			setNewRelfilenode(rel);
 			heap_close(rel, NoLock);
 		}
 
@@ -3048,7 +3038,7 @@ renamerel(Oid myrelid, const char *newrelname, RenameStmt *stmt)
 	char			oldrelname[NAMEDATALEN];
 	bool			relhastriggers;
 	Form_pg_class	form;
-	bool			isSystemRelation;
+	bool __MAYBE_UNUSED	isSystemRelation;
 	cqContext		cqc;
 	cqContext	   *pcqCtx;
 
@@ -4726,7 +4716,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 				pc->arg1 = (Node *)NIL;
 				foreach(l, todo)
 				{
-					List *l1;
+					List *l1 = NIL;
 					ListCell *lc;
 					Node *t = lfirst(l);
 
@@ -6419,7 +6409,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 	  savedResource = GetActiveQueryResource();
 	  SetActiveQueryResource(resource);
 
-	  segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, false);
+	  segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, true, false);
 
     /*
      * We create seg files for the new relation here.
@@ -10744,18 +10734,16 @@ ATExecSetTableSpace_AppendOnly(
 	Relation		gp_relfile_node,
 	RelFileNode		*newRelFileNode)
 {
-	Oid			oldTablespace;
-
 	char *buffer;
 
 	GpRelfileNodeScan 	gpRelfileNodeScan;
 
 	HeapTuple tuple;
 
-	int32 segmentFileNum;
+	int32 segmentFileNum = 0;
 
 	ItemPointerData oldPersistentTid;
-	int64 oldPersistentSerialNum;
+	int64 oldPersistentSerialNum = 0;
 
 	ItemPointerData newPersistentTid;
 	int64 newPersistentSerialNum;
@@ -10770,8 +10758,6 @@ ATExecSetTableSpace_AppendOnly(
 				 */
 					
 	int segmentCount;
-
-	oldTablespace = rel->rd_rel->reltablespace ? rel->rd_rel->reltablespace : MyDatabaseTableSpace;
 
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 
@@ -11717,7 +11703,6 @@ MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel, List *inhAt
 	AttrNumber	parent_attno;
 	int			parent_natts;
 	TupleDesc	tupleDesc;
-	TupleConstr *constr;
 	HeapTuple	tuple;
 	ListCell	*attNameCell;
 	cqContext	cqc;
@@ -11729,7 +11714,6 @@ MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel, List *inhAt
 
 	tupleDesc = RelationGetDescr(parent_rel);
 	parent_natts = tupleDesc->natts;
-	constr = tupleDesc->constr;
 
 	/*
 	 * If we have an inherited column list, ensure all named columns exist in parent
@@ -12882,7 +12866,6 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 	bool		change_policy = false;
 	bool		is_ao = false;
     bool        is_aocs = false;
-    char        relstorage = RELSTORAGE_HEAP;
 	List	   *hidden_types = NIL; /* types we need to build for dropped columns */
 
 	/* Permissions checks */
@@ -12955,7 +12938,6 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
                 && pg_strcasecmp(strVal(def->arg), "true") == 0)
             {
               is_ao = true;
-              relstorage = RELSTORAGE_AOROWS;
             }
             else
             {
@@ -12978,7 +12960,6 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
                 && pg_strcasecmp(strVal(def->arg), "parquet") == 0)
             {
               is_aocs = true;
-              relstorage = RELSTORAGE_PARQUET;
             }
             else
             {
@@ -13690,7 +13671,6 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 	PgPartRule* 		 par_prule 	= NULL;	/* prule for parent if IDRule */
 	char 		 		 lRelNameBuf[(NAMEDATALEN*2)];
 	char 				*lrelname   = NULL;
-	Node 				*pSubSpec 	= NULL;
 	AlterPartitionCmd   *pc2		= NULL;
 	bool				 is_split = false;
 	bool				 bSetTemplate = (att == AT_PartSetTemplate);
@@ -13846,7 +13826,6 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 
 		if ('r' == pNode->part->parkind)
 		{
-			pSubSpec =
 			atpxPartAddList(rel, pc, pNode,
 							pc2->arg2, /* utl statement */
 							(locPid->idtype == AT_AP_IDName) ?
@@ -13861,7 +13840,6 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 		}
 		else if ('l' == pNode->part->parkind)
 		{
-			pSubSpec =
 			atpxPartAddList(rel, pc, pNode,
 							pc2->arg2, /* utl statement */
 							(locPid->idtype == AT_AP_IDName) ?
@@ -14536,7 +14514,7 @@ ATPExecPartExchange(AlteredTableInfo *tab, Relation rel, AlterPartitionCmd *pc)
 		AttrMap			*newmap;
 		AttrMap			*oldmap;
 		List			*newcons;
-		bool			 ok;
+		bool __MAYBE_UNUSED	 ok;
 		bool			 validate	= intVal(pc2->arg1) ? true : false;
 		Oid				 oldnspid	= InvalidOid;
 		Oid				 newnspid	= InvalidOid;
@@ -14863,16 +14841,14 @@ ATPExecPartModify(Relation rel,
 
 		if (bAdd || bDrop)
 		{
-			bool stat = atpxModifyListOverlap(rel, pid, prule,
-											  (PartitionElem *)pc3->arg2,
-											  bAdd);
-			stat = false;
+			atpxModifyListOverlap(rel, pid, prule,
+								  (PartitionElem *)pc3->arg2,
+								  bAdd);
 		}
 		if (bStart || bEnd)
 		{
-			bool stat = atpxModifyRangeOverlap(rel, pid, prule,
-											   (PartitionElem *)pc3->arg2);
-			stat = false;
+			atpxModifyRangeOverlap(rel, pid, prule,
+								   (PartitionElem *)pc3->arg2);
 		}
 
 
@@ -14910,7 +14886,6 @@ ATPExecPartRename(Relation rel,
 	AlterPartitionId 	*pid 	   = (AlterPartitionId *)pc->partid;
 	PgPartRule   		*prule 	   = NULL;
 	PartitionNode  		*pNode     = NULL;
-	AlterPartitionId 	*locPid    = pid;	/* local pid if IDRule */
 	PgPartRule* 		 par_prule = NULL;	/* prule for parent if IDRule */
 	char 		 		 lRelNameBuf[(NAMEDATALEN*2)];
 	char 				*lrelname=NULL;
@@ -14918,13 +14893,8 @@ ATPExecPartRename(Relation rel,
 	if (Gp_role != GP_ROLE_DISPATCH)
 		return;
 
-	locPid =
-			wack_pid_relname(pid,
-							 &pNode,
-							 rel,
-							 &par_prule,
-							 &lrelname,
-							 lRelNameBuf);
+	wack_pid_relname(pid, &pNode, rel, &par_prule,
+					 &lrelname, lRelNameBuf);
 
 	prule = get_part_rule(rel, pid, true, true, CurrentMemoryContext, NULL,
 						  false);
@@ -14932,7 +14902,6 @@ ATPExecPartRename(Relation rel,
 	if (prule)
 	{
 		AlterPartitionId		 newpid;
-		PgPartRule   		   	*prule2 	 = NULL;
 		Relation			 	 targetrelation;
 		char        		 	 targetrelname[NAMEDATALEN];
 		Relation			 	 parentrelation;
@@ -14957,11 +14926,11 @@ ATPExecPartRename(Relation rel,
 		newpid.location = -1;
 
 		/* ERROR if exists */
-		prule2 = get_part_rule1(rel, &newpid, true, false,
-								CurrentMemoryContext, NULL,
-								pNode,
-								lrelname,
-								NULL);
+		get_part_rule1(rel, &newpid, true, false,
+						CurrentMemoryContext, NULL,
+						pNode,
+						lrelname,
+						NULL);
 
 		targetrelation = relation_open(prule->topRule->parchildrelid,
 									   AccessExclusiveLock);
@@ -15331,6 +15300,10 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 	rrib->ri_partSlot = MakeSingleTupleTableSlot(RelationGetDescr(intob));
 	map_part_attrs(temprel, intoa, &rria->ri_partInsertMap, true);
 	map_part_attrs(temprel, intob, &rrib->ri_partInsertMap, true);
+	Assert(NULL != rria->ri_RelationDesc);
+	rria->ri_resultSlot = MakeSingleTupleTableSlot(rria->ri_RelationDesc->rd_att);
+	Assert(NULL != rrib->ri_RelationDesc);
+	rrib->ri_resultSlot = MakeSingleTupleTableSlot(rrib->ri_RelationDesc->rd_att);
 
 	/* constr might not be defined if this is a default partition */
 	if (intoa->rd_att->constr && intoa->rd_att->constr->num_check)
@@ -15602,21 +15575,18 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 	ExecDropSingleTupleTableSlot(rrib->ri_partSlot);
 
 	/*
-	 * We may have created "cached" version of our target result tuple table slot
-	 * inside reconstructMatchingTupleSlot. Drop any such slots.
+	 * We created our target result tuple table slots upfront.
+	 * We can drop them now.
 	 */
-	if (NULL != rria->ri_resultSlot)
-	{
-		Assert(NULL != rria->ri_resultSlot->tts_tupleDescriptor);
-		ExecDropSingleTupleTableSlot(rria->ri_resultSlot);
-		rria->ri_resultSlot = NULL;
-	}
-	if (NULL != rrib->ri_resultSlot)
-	{
-		Assert(NULL != rrib->ri_resultSlot->tts_tupleDescriptor);
-		ExecDropSingleTupleTableSlot(rrib->ri_resultSlot);
-		rrib->ri_resultSlot = NULL;
-	}
+	Assert(NULL != rria->ri_resultSlot);
+	Assert(NULL != rria->ri_resultSlot->tts_tupleDescriptor);
+	ExecDropSingleTupleTableSlot(rria->ri_resultSlot);
+	rria->ri_resultSlot = NULL;
+
+	Assert(NULL != rrib->ri_resultSlot);
+	Assert(NULL != rrib->ri_resultSlot->tts_tupleDescriptor);
+	ExecDropSingleTupleTableSlot(rrib->ri_resultSlot);
+	rrib->ri_resultSlot = NULL;
 
 	if (rria->ri_partInsertMap)
 		pfree(rria->ri_partInsertMap);
@@ -15815,7 +15785,6 @@ ATPExecPartSplit(Relation rel,
 		int i;
 		AlterPartitionId *intopid1 = NULL;
 		AlterPartitionId *intopid2 = NULL;
-		int default_pos = 0;
 		Oid rel_to_drop = InvalidOid;
 		AlterPartitionId *aapid = NULL; /* just for alter partition pids */
 		Relation existrel;
@@ -15928,7 +15897,6 @@ ATPExecPartSplit(Relation rel,
 
 			if (exists && isdef)
 			{
-				default_pos = 1;
 				intopid2 = (AlterPartitionId *)pc2->partid;
 				intopid1 = (AlterPartitionId *)pc2->arg1;
 				into_exists = 2;
@@ -16029,8 +15997,6 @@ ATPExecPartSplit(Relation rel,
 
 				if (isdef)
 				{
-					default_pos = 2;
-
 					if (intopid2->idtype == AT_AP_IDDefault)
 						 intopid2->partiddef = (Node *)makeString(parname);
 				}
@@ -16713,7 +16679,7 @@ ATPExecPartSplit(Relation rel,
     resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num, NULL, 0);
     savedResource = GetActiveQueryResource();
     SetActiveQueryResource(resource);
-    segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, false);
+    segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, true, false);
     scantable_splits = NIL;
 
 		/* create the segfiles for the new relations here */
@@ -17656,7 +17622,6 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, 
 
 	ListCell   *exec_location_opt;
 	char	   *exec_location_str = NULL;
-	char	   *value_str = NULL;
 	int			value_int;
 	Size		len;
 	text		*t;

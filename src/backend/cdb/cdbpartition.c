@@ -6381,7 +6381,7 @@ atpxPartAddList(Relation rel,
 								NULL /*catalogname*/, 
 								get_namespace_name(RelationGetNamespace(par_rel)),
 								RelationGetRelationName(par_rel), -1);
-	
+
 	if (bOpenGap) /* might need a gap to insert the new partition */
 	{
 		AlterPartitionId 	 	 pid;
@@ -6417,6 +6417,8 @@ atpxPartAddList(Relation rel,
 								CurrentMemoryContext);
 	}
 	
+	GpPolicy * parPolicy = GpPolicyFetch(CurrentMemoryContext,
+	    RelationGetRelid(par_rel));
 	{
 		List			*l1;
 		ListCell		*lc;
@@ -6546,8 +6548,7 @@ atpxPartAddList(Relation rel,
 				skipTableRelid = RangeVarGetRelid(t->relation, true, false /*allowHcatalog*/);
 			}
 		}
-		
-		
+
 		for_each_cell(lc, lnext(lc))
 		{
 			Query *q = lfirst(lc);
@@ -6621,6 +6622,13 @@ atpxPartAddList(Relation rel,
 			{
 				/* propagate owner */
 				((CreateStmt *)q->utilityStmt)->ownerid = ownerid;
+				/* child partition should have the same bucket number with parent partition */
+				if (parPolicy && ((CreateStmt *)q->utilityStmt)->policy
+				    && ((CreateStmt *)q->utilityStmt)->policy->nattrs > 0
+				    && ((CreateStmt *)q->utilityStmt)->policy->ptype ==
+				        POLICYTYPE_PARTITIONED) {
+				  ((CreateStmt *)q->utilityStmt)->policy->bucketnum = parPolicy->bucketnum;
+				}
 			}
 			
 			/* normal case - add partitions using CREATE statements
@@ -6698,6 +6706,8 @@ atpxPartAddList(Relation rel,
 		} /* end for each cell */
 		
 	}
+	if(parPolicy)
+	  pfree(parPolicy);
 	
 	if (par_prule && par_prule->topRule)
 		heap_close(par_rel, NoLock);

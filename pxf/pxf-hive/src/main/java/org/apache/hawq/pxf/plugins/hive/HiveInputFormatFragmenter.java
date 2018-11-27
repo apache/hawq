@@ -26,6 +26,7 @@ import org.apache.hawq.pxf.api.UserDataException;
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
 import org.apache.hawq.pxf.api.utilities.InputData;
+import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -33,6 +34,7 @@ import org.apache.hadoop.hive.metastore.api.Table;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Specialized Hive fragmenter for RC and Text files tables. Unlike the
@@ -53,28 +55,25 @@ import java.util.List;
  */
 public class HiveInputFormatFragmenter extends HiveDataFragmenter {
     private static final Log LOG = LogFactory.getLog(HiveInputFormatFragmenter.class);
-
-    static final String STR_RC_FILE_INPUT_FORMAT = "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
-    static final String STR_TEXT_FILE_INPUT_FORMAT = "org.apache.hadoop.mapred.TextInputFormat";
-    static final String STR_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe";
-    static final String STR_LAZY_BINARY_COLUMNAR_SERDE = "org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe";
-    static final String STR_LAZY_SIMPLE_SERDE = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe";
-    private static final int EXPECTED_NUM_OF_TOKS = 3;
+    private static final int EXPECTED_NUM_OF_TOKS = 4;
     public static final int TOK_SERDE = 0;
     public static final int TOK_KEYS = 1;
     public static final int TOK_FILTER_DONE = 2;
+    public static final int TOK_COL_TYPES = 3;
 
     /** Defines the Hive input formats currently supported in pxf */
     public enum PXF_HIVE_INPUT_FORMATS {
         RC_FILE_INPUT_FORMAT,
-        TEXT_FILE_INPUT_FORMAT
+        TEXT_FILE_INPUT_FORMAT,
+        ORC_FILE_INPUT_FORMAT
     }
 
     /** Defines the Hive serializers (serde classes) currently supported in pxf */
     public enum PXF_HIVE_SERDES {
         COLUMNAR_SERDE,
         LAZY_BINARY_COLUMNAR_SERDE,
-        LAZY_SIMPLE_SERDE
+        LAZY_SIMPLE_SERDE,
+        ORC_SERDE
     }
 
     /**
@@ -146,139 +145,16 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
         for (FieldSchema hiveCol : hiveColumns) {
             ColumnDescriptor colDesc = inputData.getColumn(index++);
             DataType colType = DataType.get(colDesc.columnTypeCode());
-            compareTypes(colType, hiveCol.getType(), colDesc.columnName());
+            HiveUtilities.validateTypeCompatible(colType, colDesc.columnTypeModifiers(), hiveCol.getType(), colDesc.columnName());
         }
         // check partition fields
         List<FieldSchema> hivePartitions = tbl.getPartitionKeys();
         for (FieldSchema hivePart : hivePartitions) {
             ColumnDescriptor colDesc = inputData.getColumn(index++);
             DataType colType = DataType.get(colDesc.columnTypeCode());
-            compareTypes(colType, hivePart.getType(), colDesc.columnName());
+            HiveUtilities.validateTypeCompatible(colType, colDesc.columnTypeModifiers(), hivePart.getType(), colDesc.columnName());
         }
 
-    }
-
-    private void compareTypes(DataType type, String hiveType, String fieldName) {
-        String convertedHive = toHiveType(type, fieldName);
-        if (!convertedHive.equals(hiveType)
-                && !(convertedHive.equals("smallint") && hiveType.equals("tinyint"))) {
-            throw new UnsupportedTypeException(
-                    "Schema mismatch definition: Field " + fieldName
-                            + " (Hive type " + hiveType + ", HAWQ type "
-                            + type.toString() + ")");
-        }
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Field " + fieldName + ": Hive type " + hiveType
-                    + ", HAWQ type " + type.toString());
-        }
-    }
-
-    /**
-     * Converts HAWQ type to hive type. The supported mappings are:<ul>
-     * <li>{@code BOOLEAN -> boolean}</li>
-     * <li>{@code SMALLINT -> smallint (tinyint is converted to smallint)}</li>
-     * <li>{@code BIGINT -> bigint}</li>
-     * <li>{@code TIMESTAMP, TIME -> timestamp}</li>
-     * <li>{@code NUMERIC -> decimal}</li>
-     * <li>{@code BYTEA -> binary}</li>
-     * <li>{@code INTERGER -> int}</li>
-     * <li>{@code TEXT -> string}</li>
-     * <li>{@code REAL -> float}</li>
-     * <li>{@code FLOAT8 -> double}</li>
-     * </ul>
-     * All other types (both in HAWQ and in HIVE) are not supported.
-     *
-     * @param type HAWQ data type
-     * @param name field name
-     * @return Hive type
-     * @throws UnsupportedTypeException if type is not supported
-     */
-    public static String toHiveType(DataType type, String name) {
-        switch (type) {
-            case BOOLEAN:
-            case SMALLINT:
-            case BIGINT:
-            case TIMESTAMP:
-                return type.toString().toLowerCase();
-            case NUMERIC:
-                return "decimal";
-            case BYTEA:
-                return "binary";
-            case INTEGER:
-                return "int";
-            case TEXT:
-                return "string";
-            case REAL:
-                return "float";
-            case FLOAT8:
-                return "double";
-            case TIME:
-                return "timestamp";
-            default:
-                throw new UnsupportedTypeException(
-                        type.toString()
-                                + " conversion is not supported by HiveInputFormatFragmenter (Field "
-                                + name + ")");
-        }
-    }
-
-    /*
-     * Validates that partition format corresponds to PXF supported formats and
-     * transforms the class name to an enumeration for writing it to the
-     * accessors on other PXF instances.
-     */
-    private String assertFileType(String className, HiveTablePartition partData)
-            throws Exception {
-        switch (className) {
-            case STR_RC_FILE_INPUT_FORMAT:
-                return PXF_HIVE_INPUT_FORMATS.RC_FILE_INPUT_FORMAT.name();
-            case STR_TEXT_FILE_INPUT_FORMAT:
-                return PXF_HIVE_INPUT_FORMATS.TEXT_FILE_INPUT_FORMAT.name();
-            default:
-                throw new IllegalArgumentException(
-                        "HiveInputFormatFragmenter does not yet support "
-                                + className
-                                + " for "
-                                + partData
-                                + ". Supported InputFormat are "
-                                + Arrays.toString(PXF_HIVE_INPUT_FORMATS.values()));
-        }
-    }
-
-    /*
-     * Validates that partition serde corresponds to PXF supported serdes and
-     * transforms the class name to an enumeration for writing it to the
-     * resolvers on other PXF instances.
-     */
-    private String assertSerde(String className, HiveTablePartition partData)
-            throws Exception {
-        switch (className) {
-            case STR_COLUMNAR_SERDE:
-                return PXF_HIVE_SERDES.COLUMNAR_SERDE.name();
-            case STR_LAZY_BINARY_COLUMNAR_SERDE:
-                return PXF_HIVE_SERDES.LAZY_BINARY_COLUMNAR_SERDE.name();
-            case STR_LAZY_SIMPLE_SERDE:
-                return PXF_HIVE_SERDES.LAZY_SIMPLE_SERDE.name();
-            default:
-                throw new UnsupportedTypeException(
-                        "HiveInputFormatFragmenter does not yet support  "
-                                + className + " for " + partData
-                                + ". Supported serializers are: "
-                                + Arrays.toString(PXF_HIVE_SERDES.values()));
-        }
-    }
-
-    @Override
-    byte[] makeUserData(HiveTablePartition partData) throws Exception {
-        String inputFormatName = partData.storageDesc.getInputFormat();
-        String serdeName = partData.storageDesc.getSerdeInfo().getSerializationLib();
-        String partitionKeys = serializePartitionKeys(partData);
-
-        assertFileType(inputFormatName, partData);
-        String userData = assertSerde(serdeName, partData) + HIVE_UD_DELIM
-                + partitionKeys + HIVE_UD_DELIM + filterInFragmenter;
-
-        return userData.getBytes();
     }
 
     /**
@@ -286,6 +162,6 @@ public class HiveInputFormatFragmenter extends HiveDataFragmenter {
      */
     @Override
     public FragmentsStats getFragmentsStats() throws Exception {
-        throw new UnsupportedOperationException("ANALYZE for HiveRc and HiveText plugins is not supported");
+        throw new UnsupportedOperationException("ANALYZE for HiveRc, HiveText, and HiveOrc plugins is not supported");
     }
 }

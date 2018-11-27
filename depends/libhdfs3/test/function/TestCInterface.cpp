@@ -30,6 +30,9 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <limits>
+#include <stdlib.h>
+#include <sstream>
+#include <iostream>
 
 using namespace Hdfs::Internal;
 
@@ -198,6 +201,45 @@ TEST(TestCInterfaceConnect, TestConnect_Success) {
     ASSERT_EQ(hdfsDisconnect(fs), 0);
 }
 
+TEST(TestCInterfaceTDE, DISABLED_TestCreateEnRPC_Success) {
+    hdfsFS fs = NULL;
+    hdfsEncryptionZoneInfo * enInfo = NULL;
+    char * uri = NULL;
+    setenv("LIBHDFS3_CONF", "function-test.xml", 1);
+    struct hdfsBuilder * bld = hdfsNewBuilder();
+    assert(bld != NULL);
+    hdfsBuilderSetNameNode(bld, "default");
+    fs = hdfsBuilderConnect(bld);
+    ASSERT_TRUE(fs != NULL);
+    system("hadoop fs -rmr /TDE");
+    system("hadoop key create keytde");
+    system("hadoop fs -mkdir /TDE");
+    ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, "/TDE", "keytde")); 
+    enInfo = hdfsGetEZForPath(fs, "/TDE");
+    ASSERT_TRUE(enInfo != NULL);
+    EXPECT_TRUE(enInfo->mKeyName != NULL);
+    std::cout << "----hdfsEncryptionZoneInfo----:" << " KeyName : " << enInfo->mKeyName << " Suite : " << enInfo->mSuite << " CryptoProtocolVersion : " << enInfo->mCryptoProtocolVersion << " Id : " << enInfo->mId << " Path : " << enInfo->mPath << std::endl;
+    hdfsFreeEncryptionZoneInfo(enInfo, 1);
+    for (int i = 0; i <= 201; i++){
+        std::stringstream newstr;
+        newstr << i;
+        std::string tde = "/TDE" + newstr.str();
+        std::string key = "keytde" + newstr.str();
+        std::string rmTde = "hadoop fs -rmr /TDE" + newstr.str();
+        std::string tdeKey = "hadoop key create keytde" + newstr.str();
+        std::string mkTde = "hadoop fs -mkdir /TDE" + newstr.str();
+        system(rmTde.c_str());
+        system(tdeKey.c_str());
+        system(mkTde.c_str());
+        ASSERT_EQ(0, hdfsCreateEncryptionZone(fs, tde.c_str(), key.c_str()));
+    } 
+    hdfsEncryptionZoneInfo * enZoneInfos = NULL;
+    int num = 0;
+    hdfsListEncryptionZones(fs, &num);
+    EXPECT_EQ(num, 203); 
+    ASSERT_EQ(hdfsDisconnect(fs), 0);
+    hdfsFreeBuilder(bld);
+}
 
 TEST(TestErrorMessage, TestErrorMessage) {
     EXPECT_NO_THROW(hdfsGetLastError());

@@ -43,7 +43,7 @@ public class HAWQPolygon
 	 */
 	public HAWQPolygon(String value) throws HAWQException
 	{
-		value.replaceAll(" ", "");
+		value = value.replaceAll(" ", "");
 		String[] pointStrs = value.substring(1, value.length() - 1).split(",");
 		if (pointStrs.length % 2 != 0)
 			throw new HAWQException("Cannot convert " + value

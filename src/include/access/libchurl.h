@@ -141,7 +141,6 @@ void churl_cleanup(CHURL_HANDLE handle, bool after_error);
  */
 void print_http_headers(CHURL_HEADERS headers);
 
-
 #endif
 
 #define LocalhostIpV4Entry ":127.0.0.1"

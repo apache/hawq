@@ -293,7 +293,7 @@ void RemoteBlockReader::verifyChecksum(int chunks) {
         uint32_t result = checksum->getValue();
         uint32_t target = ReadBigEndian32FromArray(pchecksum + (i * checksumSize));
 
-        if (result != target && size == chunkSize) {
+        if (result != target) {
             THROW(ChecksumException, "RemoteBlockReader: checksum not match for Block: %s, on Datanode: %s",
                   binfo.toString().c_str(), datanode.formatAddress().c_str());
         }

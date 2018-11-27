@@ -1,0 +1,40 @@
+{
+  "isEnabled": true,
+  "service": "hawq",
+  "name": "FunctionTest",
+  "policyType": 0,
+  "description": "Test policy for function resource",
+  "isAuditEnabled": true,
+  "resources": {
+    "schema": {
+      "values": ["*"],
+      "isExcludes": false,
+      "isRecursive": false
+    },
+    "database": {
+      "values": ["*"],
+      "isExcludes": false,
+      "isRecursive": false
+    },
+    "function": {
+      "values": ["atan"],
+      "isExcludes": false,
+      "isRecursive": false
+    }
+  },
+  "policyItems": [{
+    "accesses": [{
+      "type": "execute",
+      "isAllowed": true
+    }],
+    "users": ["maria_dev"],
+    "groups": [],
+    "conditions": [],
+    "delegateAdmin": true
+  }],
+  "denyPolicyItems": [],
+  "allowExceptions": [],
+  "denyExceptions": [],
+  "dataMaskPolicyItems": [],
+  "rowFilterPolicyItems": []
+}

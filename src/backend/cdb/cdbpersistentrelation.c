@@ -629,7 +629,7 @@ void PersistentRelation_MarkCreatePending(
 						relFileNode->spcNode,
 						relFileNode->dbNode,
 						relFileNode->relNode,
-						persistentTid, persistentSerialNum);
+						persistentTid, *persistentSerialNum);
 #endif
 
 	/*
@@ -648,14 +648,16 @@ void PersistentRelation_MarkCreatePending(
 void PersistentRelation_AddCreated(
 		RelFileNode *relFileNode,
 		ItemPointer persistentTid,
+		int64 *persistentSerialNum,
 		bool flushToXLog)
 {
 	WRITE_PERSISTENT_STATE_ORDERED_LOCK_DECLARE;
 
 	PersistentFileSysObjName fsObjName;
-	ItemPointerData previousFreeTid;
-	int64 persistentSerialNum;
+
 	RelationDirEntry relationDirEntry;
+
+	ItemPointerData previousFreeTid;
 	Datum values[Natts_gp_persistent_relation_node];
 
 	if (RelFileNode_IsEmpty(relFileNode))
@@ -711,8 +713,11 @@ void PersistentRelation_AddCreated(
 								PersistentFsObjType_RelationDir,
 								values,
 								flushToXLog,
-								persistentTid,
-								&persistentSerialNum);
+								&relationDirEntry->persistentTid,
+								&relationDirEntry->persistentSerialNum);
+
+	*persistentTid = relationDirEntry->persistentTid;
+	*persistentSerialNum = relationDirEntry->persistentSerialNum;
 
 	WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;
 
@@ -721,7 +726,7 @@ void PersistentRelation_AddCreated(
 		elog(Persistent_DebugPrintLevel(),
 			"Persistent relation: Add '%s', in state 'Created', serial number " INT64_FORMAT " at TID %s",
 			PersistentFileSysObjName_ObjectName(&fsObjName),
-			persistentSerialNum,
+			*persistentSerialNum,
 			ItemPointerToString(persistentTid));
 	}
 }

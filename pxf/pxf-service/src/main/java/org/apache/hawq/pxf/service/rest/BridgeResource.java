@@ -155,6 +155,11 @@ public class BridgeResource extends RestResource {
                     LOG.debug("Stopped streaming fragment " + fragment
                             + " of resource " + dataDir + ", " + recordCount
                             + " records.");
+                    try {
+                        bridge.endIteration();
+                    } catch (Exception e) {
+                        // ignore ... any significant errors should already have been handled
+                    }
                     if (!threadSafe) {
                         unlock(dataDir);
                     }

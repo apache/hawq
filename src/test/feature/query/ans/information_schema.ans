@@ -1,0 +1,105 @@
+drop table if exists r;
+psql:/tmp/TestInformationSchema_BasicTest.sql:5: NOTICE:  table "r" does not exist, skipping
+DROP TABLE
+create table r(a int, b int);
+CREATE TABLE
+ 
+SELECT attnum::information_schema.cardinal_number 
+from pg_attribute 
+where attnum > 0 and attrelid = 'r'::regclass;
+ attnum 
+--------
+      1
+      2
+(2 rows)
+
+-- this one should fail
+SELECT attnum::information_schema.cardinal_number 
+from pg_attribute 
+where attrelid = 'r'::regclass;
+psql:/tmp/TestInformationSchema_BasicTest.sql:15: ERROR:  value for domain information_schema.cardinal_number violates check constraint "cardinal_number_domain_check"
+SELECT *
+from (SELECT attnum::information_schema.cardinal_number 
+      from pg_attribute 
+      where attnum > 0 and attrelid = 'r'::regclass) q
+where attnum=2;
+ attnum 
+--------
+      2
+(1 row)
+
+select table_schema, table_name,column_name,ordinal_position
+from information_schema.columns
+where table_name ='r';
+ table_schema | table_name | column_name | ordinal_position 
+--------------+------------+-------------+------------------
+ public       | r          | b           |                2
+ public       | r          | a           |                1
+(2 rows)
+
+select table_schema, table_name,column_name,ordinal_position
+from information_schema.columns
+where table_name ='r'
+and ordinal_position =1;
+ table_schema | table_name | column_name | ordinal_position 
+--------------+------------+-------------+------------------
+ public       | r          | a           |                1
+(1 row)
+
+select table_schema, table_name,column_name,ordinal_position
+from information_schema.columns
+where ordinal_position = 20;
+    table_schema    |      table_name       |    column_name     | ordinal_position 
+--------------------+-----------------------+--------------------+------------------
+ pg_catalog         | pg_proc               | prodataaccess      |               20
+ pg_catalog         | pg_partitions         | parenttablespace   |               20
+ pg_catalog         | pg_class              | reltriggers        |               20
+ pg_catalog         | pg_type               | typtypmod          |               20
+ pg_catalog         | pg_am                 | ambuild            |               20
+ hawq_toolkit       | __hawq_log_master_ext | logdetail          |               20
+ pg_catalog         | pg_filesystem         | fsysacl            |               20
+ pg_catalog         | pg_statistic          | stavalues3         |               20
+ information_schema | parameters            | numeric_scale      |               20
+ information_schema | attributes            | datetime_precision |               20
+ information_schema | element_types         | interval_precision |               20
+ information_schema | routines              | collation_catalog  |               20
+ information_schema | domains               | udt_catalog        |               20
+ information_schema | columns               | collation_catalog  |               20
+(14 rows)
+
+-- MPP-25724
+select a.column_name
+from information_schema.columns a
+where a.table_name
+in
+(select b.table_name from information_schema.tables b where
+	a.column_name like 'b') and a.table_name = 'r';
+ column_name 
+-------------
+ b
+(1 row)
+
+select c.relname
+from pg_class c
+where c.relname
+in
+(select b.table_name from information_schema.tables b where
+	c.relname like 'r');
+ relname 
+---------
+ r
+(1 row)
+
+select a.table_name
+from information_schema.tables a
+where a.table_name
+in
+(select b.relname from pg_class b where
+	a.table_name like 'r');
+ table_name 
+------------
+ r
+(1 row)
+
+drop table r;
+DROP TABLE

@@ -156,7 +156,7 @@ LOAD_GP_TOOLKIT () {
     fi
 
     # We need SET SESSION AUTH here to load the toolkit
-    ${ECHO} "SET SESSION AUTHORIZATION $ROLNAME;"  >> ${TOOLKIT_FILE} 2>&1
+    ${ECHO} "SET SESSION AUTHORIZATION '$ROLNAME';"  >> ${TOOLKIT_FILE} 2>&1
     RETVAL=$?
     if [ $RETVAL -ne 0 ];then
         ${ECHO} "[FATAL]:-Failed to create the hawq_toolkit sql file." | tee -a ${MASTER_LOG_FILE}
@@ -170,17 +170,17 @@ LOAD_GP_TOOLKIT () {
         exit 1
     fi
 
-    $PSQL -q -p ${hawq_port} -f ${TOOLKIT_FILE} template1
+    $PSQL -q -v ON_ERROR_STOP=on -p ${hawq_port} -f ${TOOLKIT_FILE} template1
     RETVAL=$?
     if [ $RETVAL -ne 0 ];then
-        ${ECHO} "[FATAL]:-Failed to create the hawq_toolkit schema." | tee -a ${MASTER_LOG_FILE} 
+        ${ECHO} "[FATAL]:-Failed to create the hawq_toolkit schema in template1." | tee -a ${MASTER_LOG_FILE} 
         exit 1
     fi
 
-    $PSQL -q -p ${hawq_port} -f ${TOOLKIT_FILE} postgres
+    $PSQL -q -v ON_ERROR_STOP=on -p ${hawq_port} -f ${TOOLKIT_FILE} postgres
     RETVAL=$?
     if [ $RETVAL -ne 0 ];then
-        ${ECHO} "[FATAL]:-Failed to create the hawq_toolkit schema." | tee -a ${MASTER_LOG_FILE} 
+        ${ECHO} "[FATAL]:-Failed to create the hawq_toolkit schema in postgres." | tee -a ${MASTER_LOG_FILE} 
         exit 1
     fi
 

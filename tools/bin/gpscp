@@ -38,7 +38,7 @@ warnings.simplefilter('ignore', DeprecationWarning)
 import os
 import sys
 import getopt
-import popen2
+import subprocess
 from gppylib.util import ssh_utils
 from gppylib.gpparseopts import OptParser
 from gppylib.gpcoverage import GpCoverage
@@ -114,12 +114,10 @@ def parseCommandLine():
 #############
 def run(cmd, peer):
     if GV.opt['-v']: print '[INFO]', cmd
-    p = popen2.Popen4(cmd)
+    p = subprocess.Popen(cmd, shell=True)
     p.x_cmd = cmd
     p.x_peer = peer
-    p.tochild.close()    
     return p
-
 
 #############
 coverage = GpCoverage()
@@ -163,13 +161,10 @@ try:
 
     errmsg = None
     for p in proc:
-	for out in p.fromchild:
-	    print '[OUT %s] %s' % (p.x_peer, out)
-	status = p.wait()
-	if status:
-	    errmsg = '[ERROR %s] exit %d, cmd - %s' % (p.x_peer, status, p.x_cmd)
-	    print errmsg
-
+        p.communicate()
+        if p.returncode:
+            errmsg = '[ERROR %s] exit %d, cmd - %s' % (p.x_peer, p.returncode, p.x_cmd)
+            print errmsg
 
     if errmsg: sys.exit(1)
     if GV.opt['-v']: print '[INFO] completed successfully'

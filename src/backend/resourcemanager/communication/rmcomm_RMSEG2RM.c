@@ -107,8 +107,10 @@ int sendIMAlive(int  *errorcode,
 	if ( res != FUNC_RETURN_OK )
 	{
 		rm_pfree(AsyncCommContext, context);
-		elog(WARNING, "Fail to register asynchronous connection for sending "
-					  "IMAlive message. %d", res);
+		elog(LOG, "failed to register asynchronous connection for sending "
+			      "IMAlive message. %d", res);
+		/* Always switch if fail to register connection here. */
+		switchIMAliveSendingTarget();
 		return res;
 	}
 
@@ -140,7 +142,7 @@ void receivedIMAliveResponse(AsyncCommMessageHandlerContext  context,
 		 buffersize != sizeof(RPCResponseIMAliveData) ) {
 		elog(WARNING, "Segment's resource manager received wrong response for "
 					  "heart-beat request.");
-		DRMGlobalInstance->SendToStandby = !DRMGlobalInstance->SendToStandby;
+		switchIMAliveSendingTarget();
 	}
 	else
 	{
@@ -165,7 +167,7 @@ void sentIMAliveError(AsyncCommMessageHandlerContext context)
 	else
 		elog(WARNING, "Segment's resource manager sending IMAlive message "
 					  "switches from master to standby");
-	DRMGlobalInstance->SendToStandby = !DRMGlobalInstance->SendToStandby;
+	switchIMAliveSendingTarget();
 }
 
 void sentIMAliveCleanUp(AsyncCommMessageHandlerContext context)

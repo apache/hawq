@@ -53,6 +53,14 @@ public class SecuredHDFS {
     public static void verifyToken(ProtocolData protData, ServletContext context) {
         try {
             if (UserGroupInformation.isSecurityEnabled()) {
+                /*
+                 * HAWQ-1215: The verify token method validates that the token sent from
+                 * Hawq to PXF is valid. However, this token is for a user other than
+                 * 'pxf'. The following line ensures that before attempting any secure communication
+                 * PXF tries to relogin in the case that its own ticket is about to expire
+                 * #reloginFromKeytab is a no-op if the ticket is not near expiring
+                 */
+                UserGroupInformation.getLoginUser().reloginFromKeytab();
                 Token<DelegationTokenIdentifier> token = new Token<DelegationTokenIdentifier>();
                 String tokenString = protData.getToken();
                 token.decodeFromUrlString(tokenString);
@@ -103,9 +111,6 @@ public class SecuredHDFS {
             LOG.debug("user " + userGroupInformation.getUserName() + " ("
                     + userGroupInformation.getShortUserName()
                     + ") authenticated");
-
-            // re-login if necessary
-            userGroupInformation.checkTGTAndReloginFromKeytab();
         } catch (IOException e) {
             throw new SecurityException("Failed to verify delegation token "
                     + e, e);

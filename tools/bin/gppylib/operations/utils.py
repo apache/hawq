@@ -80,7 +80,9 @@ class ParallelOperation(Operation):
         self.parallelism = min(len(operations), max_parallelism)
     def execute(self):        
         """TODO: Make Command a subclass of Operation. Then, make WorkerPool work with Operation objects."""
-        OperationWorkerPool(numWorkers=self.parallelism, operations=self.operations).join()
+        pool = OperationWorkerPool(numWorkers=self.parallelism, operations=self.operations)
+        pool.join()
+        pool.haltWork()
         return None
     def __str__(self):
         return "Parallel(%d)" % len(self.operations)

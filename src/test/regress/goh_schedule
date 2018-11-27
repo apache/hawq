@@ -4,7 +4,6 @@ test: create_function_1
 test: create_type
 test: create_table
 test: copy
-test: create_aggregate
 test: vacuum
 test: subselect
 test: arrays

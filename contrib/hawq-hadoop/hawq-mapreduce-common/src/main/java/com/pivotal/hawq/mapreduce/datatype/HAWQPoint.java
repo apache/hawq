@@ -42,7 +42,7 @@ public class HAWQPoint
 	{
 		if (value.startsWith("(") && value.endsWith(")"))
 		{
-			value.replaceAll(" ", "");
+			value = value.replaceAll(" ", "");
 			int posOfComma = value.indexOf(',');
 			double x = Double.parseDouble(value.substring(1, posOfComma));
 			double y = Double.parseDouble(value.substring(posOfComma + 1,

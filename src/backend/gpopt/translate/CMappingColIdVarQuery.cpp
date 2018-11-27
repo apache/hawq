@@ -30,11 +30,6 @@
 //
 //---------------------------------------------------------------------------
 
-#define ALLOW_DatumGetPointer
-#define ALLOW_ntohl
-#define ALLOW_memset
-#define ALLOW_printf
-
 #include "postgres.h"
 #include "gpopt/translate/CMappingColIdVarQuery.h"
 

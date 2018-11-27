@@ -1,0 +1,79 @@
+AO_FileLocations:
+  Blocksize: 32768
+  Checksum: false
+  CompressionLevel: 0
+  CompressionType: null
+  Files:
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID@/1
+    size: 0
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID@/2
+    size: 0
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID@/3
+    size: 0
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID@/4
+    size: 0
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID@/5
+    size: 0
+  - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID@/6
+    size: 0
+  PartitionBy: PARTITION BY list (gender)
+  Partitions:
+  - Blocksize: 32768
+    Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION girls VALUES('F') WITH (appendonly=true)
+    Files:
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID1@/1
+      size: 432
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID1@/2
+      size: 408
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID1@/3
+      size: 464
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID1@/4
+      size: 408
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID1@/5
+      size: 464
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID1@/6
+      size: 536
+    Name: rank_1_prt_girls
+  - Blocksize: 32768
+    Checksum: false
+    CompressionLevel: 0
+    CompressionType: null
+    Constraint: PARTITION boys VALUES('M') WITH (appendonly=true)
+    Files:
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID2@/1
+      size: 0
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID2@/2
+      size: 0
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID2@/3
+      size: 0
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID2@/4
+      size: 0
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID2@/5
+      size: 0
+    - path: /hawq_default/16385/@DATABASE_OID@/@TABLE_OID2@/6
+      size: 0
+    Name: rank_1_prt_boys
+AO_Schema:
+- name: id
+  type: int4
+- name: rank
+  type: int4
+- name: year
+  type: int4
+- name: gender
+  type: bpchar
+- name: count
+  type: int4
+Bucketnum: 6
+DBVersion: PostgreSQL 8.2.15 (Greenplum Database 4.2.0 build 1) (HAWQ 2.0.1.0 build
+  dev) on x86_64-apple-darwin14.5.0, compiled by GCC Apple LLVM version 6.1.0 (clang-602.0.53)
+  (based on LLVM 3.6.0svn) compiled on Jul  6 2016 10:22:33
+DFS_URL: hdfs://@PORT@
+Distribution_Policy: DISTRIBUTED BY (id)
+Encoding: UTF8
+FileFormat: AO
+TableName: public.rank
+Version: 1.0.0

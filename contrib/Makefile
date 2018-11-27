@@ -13,35 +13,13 @@ WANTED_DIRS = \
 
 ifeq ($(with_pgcrypto), yes)
 WANTED_DIRS += pgcrypto
-
-pgcrypto_commit := $(shell cat $(abs_top_srcdir)/depends/thirdparty/postgres.commit)
-
-pgcrypto_prepare_timestamp: pgcrypto.patch $(abs_top_srcdir)/depends/thirdparty/postgres.commit
-	rm -f pgcrypto_prepare_timestamp
-
-# This includes an ugly hack which remove two added files after "git-reset".
-# I do this because "git apply" fails if the two files have existed.
-pgcrypto_prepare: pgcrypto_prepare_timestamp
-	if [ ! -f $(abs_top_builddir)/$(subdir)/pgcrypto_prepare_timestamp ]; then \
-		[ "x$(pgcrypto_commit)" != "x" ] || exit 1; \
-		cd $(abs_top_srcdir)/depends/thirdparty; mkdir -p postgres; cd postgres; \
-		[ ! -d .git ] && git clone https://github.com/postgres/postgres.git .; \
-		git reset --hard $(pgcrypto_commit) || (echo Now fetch from upstream and try again; git fetch origin master; git reset --hard $(pgcrypto_commit)) || exit 2; \
-		rm -f contrib/pgcrypto/pgcrypto.sql.in contrib/pgcrypto/uninstall_pgcrypto.sql; \
-		git apply $(abs_top_srcdir)/$(subdir)/pgcrypto.patch || exit 3; \
-		touch $(abs_top_builddir)/$(subdir)/pgcrypto_prepare_timestamp; \
-	fi
-else
-pgcrypto_prepare:
 endif
-
-.PHONY: pgcrypto_prepare
 
 # Missing:
 #		start-scripts	\ (does not have a makefile)
 #		xml2		\ (requires libxml installed)
 
-all install installdirs uninstall distprep: pgcrypto_prepare
+all install installdirs uninstall distprep:
 	@for dir in $(WANTED_DIRS); do \
 		$(MAKE) -C $$dir $@ || exit; \
 	done

@@ -60,7 +60,7 @@ date_in(PG_FUNCTION_ARGS)
 	struct pg_tm tt,
 			   *tm = &tt;
 	int			tzp;
-	int			dtype;
+	int			dtype = 0;
 	int			nf;
 	int			dterr;
 	char	   *field[MAXDATEFIELDS];
@@ -907,7 +907,7 @@ time_in(PG_FUNCTION_ARGS)
 #endif
 	int32		typmod = PG_GETARG_INT32(2);
 	TimeADT		result;
-	fsec_t		fsec;
+	fsec_t		fsec = 0;
 	struct pg_tm tt,
 			   *tm = &tt;
 	int			tz;
@@ -915,7 +915,7 @@ time_in(PG_FUNCTION_ARGS)
 	int			dterr;
 	char		workbuf[MAXDATELEN + 1];
 	char	   *field[MAXDATEFIELDS];
-	int			dtype;
+	int			dtype = 0;
 	int			ftype[MAXDATEFIELDS];
 
 	dterr = ParseDateTime(str, workbuf, sizeof(workbuf),
@@ -1773,15 +1773,15 @@ timetz_in(PG_FUNCTION_ARGS)
 #endif
 	int32		typmod = PG_GETARG_INT32(2);
 	TimeTzADT  *result;
-	fsec_t		fsec;
+	fsec_t		fsec = 0;
 	struct pg_tm tt,
 			   *tm = &tt;
-	int			tz;
+	int			tz = 0;
 	int			nf;
 	int			dterr;
 	char		workbuf[MAXDATELEN + 1];
 	char	   *field[MAXDATEFIELDS];
-	int			dtype;
+	int			dtype = 0;
 	int			ftype[MAXDATEFIELDS];
 
 	dterr = ParseDateTime(str, workbuf, sizeof(workbuf),

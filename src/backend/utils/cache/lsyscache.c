@@ -3248,6 +3248,30 @@ get_namespace_name(Oid nspid)
 	return result;
 }
 
+/*
+ * get_namespace_oid
+ *		Returns the oid of a namespace given its name
+ *
+ */
+Oid
+get_namespace_oid(const char* npname)
+{
+	Oid			result;
+	int			fetchCount;
+
+	result = caql_getoid_plus(
+			NULL,
+			&fetchCount,
+			NULL,
+			cql("SELECT oid FROM pg_namespace "
+				" WHERE nspname = :1 ",
+				PointerGetDatum((char *) npname)));
+
+	if (!fetchCount)
+		return InvalidOid;
+
+	return result;
+}
 /*				---------- PG_AUTHID CACHE ----------					 */
 
 /*

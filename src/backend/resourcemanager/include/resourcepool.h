@@ -715,6 +715,7 @@ SimpStringPtr build_segment_status_description(SegStat segstat);
 #define EPSILON 1e-7
 #define IS_DOUBLE_ZERO(d)       (fabs(d) < EPSILON)
 #define IS_DOUBLE_EQ(x, y)      ((fabs((x) - (y))) <= (EPSILON))
+#define IS_DOUBLE_GE(x, y)      (((x) + EPSILON) >= (y))
 
 void validateResourcePoolStatus(bool refquemgr);
 

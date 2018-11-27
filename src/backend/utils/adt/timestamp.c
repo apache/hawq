@@ -155,7 +155,7 @@ timestamp_in(PG_FUNCTION_ARGS)
 	struct pg_tm tt,
 			   *tm = &tt;
 	int			tz;
-	int			dtype;
+	int			dtype = 0;
 	int			nf;
 	int			dterr;
 	char	   *field[MAXDATEFIELDS];
@@ -419,7 +419,7 @@ timestamptz_in(PG_FUNCTION_ARGS)
 	struct pg_tm tt,
 			   *tm = &tt;
 	int			tz;
-	int			dtype;
+	int			dtype = 0;
 	int			nf;
 	int			dterr;
 	char	   *field[MAXDATEFIELDS];

@@ -246,7 +246,7 @@ void PersistentRelfile_AddCreatePending(
 						relFileNode->dbNode,
 						relFileNode->relNode,
 						segmentFileNum,
-						persistentTid, serialNum);
+						persistentTid, *serialNum);
 #endif
 
 	#ifdef FAULT_INJECTOR

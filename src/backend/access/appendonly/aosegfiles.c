@@ -1091,7 +1091,7 @@ static Datum
 gp_update_ao_master_stats_internal(Oid relid, Snapshot appendOnlyMetaDataSnapshot)
 {
 	Relation		parentrel;
-	Datum			returnDatum;
+	Datum			returnDatum = 0;
 
 	/* open the parent (main) relation */
 	parentrel = heap_open(relid, RowExclusiveLock);
@@ -1549,6 +1549,8 @@ get_ao_compression_ratio_name(PG_FUNCTION_ARGS)
 	Oid				relid;
 
 	/* Assert(Gp_role != GP_ROLE_EXECUTE); */
+	if (NULL == relname)
+		elog(ERROR, "failed to get relname for this function.");
 
 	parentrv = makeRangeVarFromNameList(textToQualifiedNameList(relname));
 	relid = RangeVarGetRelid(parentrv, false, true /*allowHcatalog*/);
@@ -1568,6 +1570,9 @@ get_ao_compression_ratio_oid(PG_FUNCTION_ARGS)
 	Oid			relid = PG_GETARG_OID(0);
 
 	/* Assert(Gp_role != GP_ROLE_EXECUTE); */
+
+	if (!OidIsValid(relid))
+		elog(ERROR, "failed to get valid relation id for this function.");
 
 	return ao_compression_ratio_internal(relid);
 }

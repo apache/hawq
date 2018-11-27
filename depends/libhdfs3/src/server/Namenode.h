@@ -23,6 +23,7 @@
 #define _HDFS_LIBHDFS3_SERVER_NAMENODE_H_
 
 #include "client/FileStatus.h"
+#include "client/EncryptionZoneInfo.h"
 #include "client/Permission.h"
 #include "DatanodeInfo.h"
 #include "Exception.h"
@@ -809,8 +810,40 @@ public:
      * close the namenode connection.
      */
     virtual void close() {};
-};
 
+    /**
+     * Create encryption zone for the directory with specific key name
+     * @param path the directory path which is to be created.
+     * @param keyname The key name of the encryption zone 
+     * @return return true if success.
+     * @throw HdfsIOException If an I/O error occurred
+     */
+    virtual bool createEncryptionZone(const std::string & src, const std::string & keyName) = 0;
+
+    /**
+     * To get encryption zone information.
+     * @param path the path which information is to be returned.
+     * @return the encryption zone information.
+     * @throw FileNotFoundException If file <code>src</code> does not exist
+     * @throw UnresolvedLinkException If <code>src</code> contains a symlink
+     * @throw HdfsIOException If an I/O error occurred
+     */
+    virtual EncryptionZoneInfo getEncryptionZoneInfo(const std::string & src, bool *exist) = 0; 
+
+    /**
+     * Get a partial listing of the indicated encryption zones
+     *
+     * @param id the index of encryption zone
+     * @param ezl append the returned encryption zones.
+     *
+     * @throw AccessControlException permission denied
+     * @throw UnresolvedLinkException If <code>src</code> contains a symlink
+     * @throw HdfsIOException If an I/O error occurred
+     */
+    virtual bool listEncryptionZones(const int64_t id, std::vector<EncryptionZoneInfo> & ezl) 
+              /* throw (AccessControlException, UnresolvedLinkException, HdfsIOException) */ = 0;
+
+};
 }
 }
 

@@ -1,0 +1,206 @@
+-- start_ignore
+SET SEARCH_PATH=TestParser_TestParserCaseGroupBy;
+SET
+-- end_ignore
+--
+-- CASE ... WHEN IS NOT DISTINCT FROM ...
+--
+INSERT INTO mytable values 	(1,2,'t'),
+							(2,3,'e'),
+							(3,4,'o'),
+							(4,5,'o'),
+							(4,4,'o'),
+							(5,5,'t'),
+							(6,6,'t'),
+							(7,6,'a'),
+							(8,7,'t'),
+							(9,8,'a');
+INSERT 0 10
+CREATE OR REPLACE FUNCTION negate(int) RETURNS int 
+AS 'SELECT $1 * (-1)'
+LANGUAGE sql
+IMMUTABLE
+RETURNS null ON null input;
+CREATE FUNCTION
+DROP VIEW IF EXISTS myview;
+psql:/tmp/TestParser_TestParserCaseGroupBy.sql:24: NOTICE:  view "myview" does not exist, skipping
+DROP VIEW
+CREATE VIEW myview AS 
+   SELECT a,b, CASE a WHEN IS NOT DISTINCT FROM b THEN b*10
+                      WHEN IS NOT DISTINCT FROM b+1 THEN b*100 
+                      WHEN b-1 THEN b*1000
+                      WHEN b*10 THEN b*10000
+                      WHEN negate(b) THEN b*(-1.0)
+                      ELSE b END AS newb
+     FROM mytable;
+CREATE VIEW
+SELECT * FROM myview ORDER BY a,b;
+ a | b | newb 
+---+---+------
+ 1 | 2 | 2000
+ 2 | 3 | 3000
+ 3 | 4 | 4000
+ 4 | 4 |   40
+ 4 | 5 | 5000
+ 5 | 5 |   50
+ 6 | 6 |   60
+ 7 | 6 |  600
+ 8 | 7 |  700
+ 9 | 8 |  800
+(10 rows)
+
+-- Test deparse
+select pg_get_viewdef('myview',true); 
+                                   pg_get_viewdef                                    
+-------------------------------------------------------------------------------------
+  SELECT mytable.a, mytable.b,                                                       
+         CASE mytable.a                                                              
+             WHEN IS NOT DISTINCT FROM mytable.b THEN (mytable.b * 10)::numeric      
+             WHEN IS NOT DISTINCT FROM mytable.b + 1 THEN (mytable.b * 100)::numeric 
+             WHEN mytable.b - 1 THEN (mytable.b * 1000)::numeric                     
+             WHEN mytable.b * 10 THEN (mytable.b * 10000)::numeric                   
+             WHEN negate(mytable.b) THEN mytable.b::numeric * (-1.0)                 
+             ELSE mytable.b::numeric                                                 
+         END AS newb                                                                 
+    FROM mytable;
+(1 row)
+
+-- User-defined DECODE function
+CREATE OR REPLACE FUNCTION "decode"(int, int, int) RETURNS int
+AS 'select $1 * $2 - $3;'
+LANGUAGE sql
+IMMUTABLE
+RETURNS null ON null input;
+CREATE FUNCTION
+SELECT decode(11,8,11);
+ case 
+------
+     
+(1 row)
+
+SELECT "decode"(11,8,11);
+ decode 
+--------
+     77
+(1 row)
+
+-- Test CASE x WHEN IS NOT DISTINCT FROM y with DECODE
+SELECT a,b,decode(a,1,1), 
+		CASE decode(a,1,1) WHEN IS NOT DISTINCT FROM 1 THEN b*100
+                  		   WHEN IS NOT DISTINCT FROM 4 THEN b*1000 ELSE b END as newb
+  FROM mytable ORDER BY a,b; 
+ a | b | case | newb 
+---+---+------+------
+ 1 | 2 |    1 |  200
+ 2 | 3 |      |    3
+ 3 | 4 |      |    4
+ 4 | 4 |      |    4
+ 4 | 5 |      |    5
+ 5 | 5 |      |    5
+ 6 | 6 |      |    6
+ 7 | 6 |      |    6
+ 8 | 7 |      |    7
+ 9 | 8 |      |    8
+(10 rows)
+
+-- Test CASE WHEN x IS NOT DISTINCT FROM y with DECODE
+SELECT a,b,decode(a,1,1), 
+		CASE WHEN decode(a,1,1) IS NOT DISTINCT FROM 1 THEN b*100
+			 WHEN decode(a,1,1) IS NOT DISTINCT FROM 4 THEN b*1000 ELSE b END as newb
+  FROM mytable ORDER BY a,b; 
+ a | b | case | newb 
+---+---+------+------
+ 1 | 2 |    1 |  200
+ 2 | 3 |      |    3
+ 3 | 4 |      |    4
+ 4 | 4 |      |    4
+ 4 | 5 |      |    5
+ 5 | 5 |      |    5
+ 6 | 6 |      |    6
+ 7 | 6 |      |    6
+ 8 | 7 |      |    7
+ 9 | 8 |      |    8
+(10 rows)
+
+SELECT a,b,"decode"(a,1,1), 
+			CASE WHEN "decode"(a,1,1) IS NOT DISTINCT FROM 1 THEN b*100
+                 WHEN "decode"(a,1,1) IS NOT DISTINCT FROM 4 THEN b*1000 ELSE b END as newb
+  FROM mytable ORDER BY a,b; 
+ a | b | decode | newb 
+---+---+--------+------
+ 1 | 2 |      0 |    2
+ 2 | 3 |      1 |  300
+ 3 | 4 |      2 |    4
+ 4 | 4 |      3 |    4
+ 4 | 5 |      3 |    5
+ 5 | 5 |      4 | 5000
+ 6 | 6 |      5 |    6
+ 7 | 6 |      6 |    6
+ 8 | 7 |      7 |    7
+ 9 | 8 |      8 |    8
+(10 rows)
+
+--
+-- Case expression in group by
+--
+SELECT
+        CASE t.field1
+        WHEN IS NOT DISTINCT FROM ''::text THEN 'Undefined'::character varying
+        ELSE t.field1
+        END AS field1
+        FROM ( SELECT 'test value'::text AS field1) t
+        GROUP BY
+        CASE t.field1
+                WHEN IS NOT DISTINCT FROM ''::text THEN 'Undefined'::character varying
+                ELSE t.field1
+        END;
+   field1   
+------------
+ test value
+(1 row)
+
+--
+-- Variant of case expression in group by
+--
+SELECT
+        CASE t.field1
+        WHEN IS NOT DISTINCT FROM ''::text THEN 'Undefined'::character varying
+        ELSE t.field1
+        END AS field1
+        FROM ( SELECT 'test value'::text AS field1) t
+        GROUP BY 1;
+   field1   
+------------
+ test value
+(1 row)
+
+--
+-- decode in group by
+--
+SELECT
+        decode(t.field1, ''::text, 'Undefined'::character varying, t.field1) as field1
+        FROM ( SELECT 'test value'::text AS field1) t
+        GROUP BY
+        decode(t.field1, ''::text, 'Undefined'::character varying, t.field1);
+   field1   
+------------
+ test value
+(1 row)
+
+--
+-- variant of decode in group by
+--
+        SELECT
+        decode(t.field1, ''::text, 'Undefined'::character varying, t.field1) as field1
+        FROM ( SELECT 'test value'::text AS field1) t
+        GROUP BY 1;
+   field1   
+------------
+ test value
+(1 row)
+
+--
+-- clean up
+--
+DROP FUNCTION "decode"(int, int, int);
+DROP FUNCTION

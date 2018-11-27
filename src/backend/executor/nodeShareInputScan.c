@@ -640,8 +640,13 @@ read_retry:
 	else if(sz == 0 || errno == EINTR)
 		goto read_retry;
 	else
+	{
+		if(fd >= 0)
+		{
+			gp_retry_close(fd);
+		}
 		elog(ERROR, "could not read from fifo: %m");
-
+	}
 	Assert(!"Never be here");
 	return 0;
 }
@@ -658,7 +663,13 @@ write_retry:
 	else if(sz == 0 || errno == EINTR)
 		goto write_retry;
 	else
+	{
+		if(fd >= 0)
+		{
+			gp_retry_close(fd);
+		}
 		elog(ERROR, "could not write to fifo: %m");
+	}
 
 	Assert(!"Never be here");
 	return 0;
@@ -914,6 +925,10 @@ writer_wait_for_acks(ShareInput_Lk_Context *pctxt, int share_id, int xslice)
 			int save_errno = errno;
 			elog(LOG, "SISC WRITER (shareid=%d, slice=%d): notify still wait for an answer, errno %d",
 					share_id, currentSliceId, save_errno);
+			/*if error(except EINTR) happens in select, we just return to avoid endless loop*/
+			if(errno != EINTR){
+				return;
+			}
 		}
 	}
 }

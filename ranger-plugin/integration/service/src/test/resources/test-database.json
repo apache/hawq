@@ -1,0 +1,46 @@
+{
+  "isEnabled": true,
+  "service": "hawq",
+  "name": "DatabaseTest",
+  "policyType": 0,
+  "description": "Test policy for database resource",
+  "isAuditEnabled": true,
+  "resources": {
+    "schema": {
+      "values": ["*"],
+      "isExcludes": false,
+      "isRecursive": false
+    },
+    "database": {
+      "values": ["sirotan"],
+      "isExcludes": false,
+      "isRecursive": false
+    },
+    "function": {
+      "values": ["*"],
+      "isExcludes": false,
+      "isRecursive": false
+    }
+  },
+  "policyItems": [{
+    "accesses": [{
+      "type": "create",
+      "isAllowed": true
+    }, {
+      "type": "connect",
+      "isAllowed": true
+    }, {
+      "type": "temp",
+      "isAllowed": true
+    }],
+    "users": ["maria_dev"],
+    "groups": [],
+    "conditions": [],
+    "delegateAdmin": true
+  }],
+  "denyPolicyItems": [],
+  "allowExceptions": [],
+  "denyExceptions": [],
+  "dataMaskPolicyItems": [],
+  "rowFilterPolicyItems": []
+}

@@ -18,12 +18,12 @@ class Command {
   Command& run();
   Command& setCommand(const std::string&);
   Command& setOutputFile(const std::string&);
-  const std::string& getCommand() const; 
-  const std::string& getResultOutput() const; 
+  const std::string& getCommand() const;
+  const std::string& getResultOutput() const;
   int getResultStatus() const;
 
-  static const std::string& getCommandOutput(const std::string& cmd);
-  static const std::string& getCommandOutput(const std::string& cmd, const std::string& out);
+  static const std::string getCommandOutput(const std::string& cmd);
+  static const std::string getCommandOutput(const std::string& cmd, const std::string& out);
   static int getCommandStatus(const std::string& cmd);
   static int getCommandStatus(const std::string& cmd, const std::string& out);
 

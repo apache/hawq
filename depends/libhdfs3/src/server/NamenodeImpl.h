@@ -218,6 +218,15 @@ public:
     void cancelDelegationToken(const Token & token)
     /*throws IOException*/;
 
+    bool createEncryptionZone(const std::string & src, const std::string & keyName);
+    /* throws HdfsIOException If an I/O error occurred */
+
+    EncryptionZoneInfo getEncryptionZoneInfo(const std::string & src, bool *exist);
+    /* throw (FileNotFoundException, UnresolvedLinkException, HdfsIOException) */     
+    bool listEncryptionZones(const int64_t id, std::vector<EncryptionZoneInfo> & ezl);
+    /* throw (AccessControlException, UnresolvedLinkException, HdfsIOException) */ 
+
+
 private:
     void invoke(const RpcCall & call);
 

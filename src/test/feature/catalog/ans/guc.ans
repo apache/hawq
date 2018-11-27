@@ -1,0 +1,38 @@
+CREATE TABLE DATE_TBL (f1 date);
+CREATE TABLE
+INSERT INTO DATE_TBL VALUES ('1957-04-09');
+INSERT 0 1
+SELECT f1 FROM DATE_TBL;
+     f1     
+------------
+ 04/09/1957
+(1 row)
+
+SET DATESTYLE TO 'POSTGRES, MDY';
+SET
+SELECT f1 FROM DATE_TBL;
+     f1     
+------------
+ 04-09-1957
+(1 row)
+
+SET DATESTYLE TO 'POSTGRES, DMY';
+SET
+SELECT f1 FROM DATE_TBL;
+     f1     
+------------
+ 09-04-1957
+(1 row)
+
+--- Partially test JIRA HAWQ-1092 lc_collate and lc_ctype do not work after setting through hawq init
+SELECT name, setting from pg_settings where name like 'lc%'
+    name     |  setting   
+-------------+------------
+ lc_collate  | en_US.utf8
+ lc_ctype    | en_US.utf8
+ lc_messages | en_US.utf8
+ lc_monetary | en_US.utf8
+ lc_numeric  | en_US.utf8
+ lc_time     | en_US.utf8
+(6 rows)
+

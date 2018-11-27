@@ -101,6 +101,11 @@ public:
   MOCK_METHOD3(getFileBlockLocations, std::vector<Hdfs::BlockLocation> (const char * path, int64_t start, int64_t len));
   MOCK_METHOD2(listAllDirectoryItems, std::vector<Hdfs::FileStatus> (const char * path, bool needLocation));
   MOCK_METHOD0(getPeerCache, Hdfs::Internal::PeerCache &());
+  MOCK_METHOD2(createEncryptionZone, bool(const char * path, const char * keyName));
+  MOCK_METHOD1(getEZForPath, Hdfs::EncryptionZoneInfo(const char * path));
+  MOCK_METHOD2(listEncryptionZones, bool(const int64_t id, std::vector<Hdfs::EncryptionZoneInfo> &));
+  MOCK_METHOD0(listEncryptionZone, Hdfs::EncryptionZoneIterator());
+  MOCK_METHOD0(listAllEncryptionZoneItems, std::vector<Hdfs::EncryptionZoneInfo>());
 };
 
 #endif /* _HDFS_LIBHDFS3_MOCK_MOCKSOCKET_H_ */

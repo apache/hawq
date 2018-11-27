@@ -1499,8 +1499,10 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
     prepareDispatchedCatalogAttribute(cxt, relid);
 
     /* collect pg_attrdef info */
-    prepareDispatchedCatalogAttributeDefault(cxt, relid);
-
+    /* Only INSERT statement will use column default value*/
+    if(forInsert){
+		prepareDispatchedCatalogAttributeDefault(cxt, relid);
+    }
     /* collect pg_attribute_encoding info */
     prepareDispatchedCatalogAttributeEncoding(cxt, relid);
 
@@ -1854,9 +1856,13 @@ static bool collect_func_walker(Node *node, QueryContextInfo *context)
 	if (IsA(node, FuncExpr))
 	{
 		FuncExpr *func = (FuncExpr *) node;
+		AclMode needAcl = ACL_NO_RIGHTS;
 		switch (func->funcid)
 		{
+		case SETVAL_FUNC_OID:
+			needAcl = ACL_UPDATE;
 		case NEXTVAL_FUNC_OID:
+			needAcl |= ACL_USAGE;
 		{
 			Const *arg;
 			Oid seqoid;
@@ -1872,7 +1878,7 @@ static bool collect_func_walker(Node *node, QueryContextInfo *context)
 				 * aclchecks on segments defeats the purpose.  Do the aclchecks
 				 * on the master, prior to dispatch
 				 */
-				if (pg_class_aclcheck(seqoid, GetUserId(), ACL_UPDATE) != ACLCHECK_OK)
+				if (pg_class_aclcheck(seqoid, GetUserId(), needAcl) != ACLCHECK_OK)
 					ereport(ERROR,
 							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 							 errmsg("permission denied for sequence %s",

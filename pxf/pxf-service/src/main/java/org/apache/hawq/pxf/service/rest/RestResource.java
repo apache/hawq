@@ -24,6 +24,7 @@ import javax.ws.rs.core.MultivaluedMap;
 import org.apache.commons.codec.CharEncoding;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.commons.lang.StringUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -56,7 +57,12 @@ public abstract class RestResource {
             String key = entry.getKey();
             List<String> values = entry.getValue();
             if (values != null) {
-                String value = values.get(0);
+                String value;
+                if(values.size() > 1) {
+                    value = StringUtils.join(values, ",");
+                } else {
+                    value = values.get(0);
+                }
                 if (value != null) {
                     // converting to value UTF-8 encoding
                     value = new String(value.getBytes(CharEncoding.ISO_8859_1),

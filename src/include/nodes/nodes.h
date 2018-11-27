@@ -524,7 +524,6 @@ typedef enum NodeTag
 
 	/* tags for describing the query resource should occupied in segment*/
 	T_QueryResource = 1050,
-	T_QueryResourceParameters,
 
 	/*
 	 * TAGS FOR CAQL PARSER

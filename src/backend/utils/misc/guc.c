@@ -450,6 +450,7 @@ char       *Debug_dtm_action_protocol_str;
 
 /* Enable check for compatibility of encoding and locale in createdb */
 bool		gp_encoding_check_locale_compatibility;
+bool  allow_file_count_bucket_num_mismatch;
 
 char	   *pgstat_temp_directory;
 
@@ -731,6 +732,7 @@ int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_limit;
+bool enable_ranger = false;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
@@ -744,6 +746,7 @@ int		optimizer_segments;
 int		optimizer_parts_to_force_sort_on_insert;
 int		optimizer_join_arity_for_associativity_commutativity;
 int		optimizer_array_expansion_threshold;
+int		optimizer_join_order_threshold;
 bool		optimizer_analyze_root_partition;
 bool		optimizer_analyze_midlevel_partition;
 bool		optimizer_enable_constant_expression_evaluation;
@@ -757,12 +760,16 @@ bool		optimizer_static_partition_selection;
 bool		optimizer_enable_partial_index;
 bool		optimizer_dml_triggers;
 bool		optimizer_dml_constraints;
-bool 		optimizer_enable_master_only_queries;
-bool sort_segments_enable;
-bool 		optimizer_multilevel_partitioning;
-bool        optimizer_enable_derive_stats_all_groups;
+bool		optimizer_enable_master_only_queries;
+bool		sort_segments_enable;
+bool		optimizer_multilevel_partitioning;
+bool		optimizer_enable_derive_stats_all_groups;
 bool		optimizer_explain_show_status;
 bool		optimizer_prefer_scalar_dqa_multistage_agg;
+bool		optimizer_parallel_union;
+bool		optimizer_array_constraints;
+
+int information_schema_namespcace_oid;
 
 /* Security */
 bool		gp_reject_internal_tcp_conn = true;
@@ -774,6 +781,9 @@ bool gp_plpgsql_clear_cache_always = false;
 /* indicate whether called by gpdump, if yes, processutility will open some limitations */
 bool gp_called_by_pgdump = false;
 
+char   *rps_addr_host;
+char   *rps_addr_suffix;
+int     rps_addr_port;
 
 /*
  * Displayable names for context types (enum GucContext)
@@ -3176,6 +3186,17 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+	    {"allow_file_count_bucket_num_mismatch", PGC_POSTMASTER, CLIENT_CONN_LOCALE,
+	          gettext_noop("allow hash table to be treated as random when file count and"
+	              " bucket number are mismatched"),
+	          NULL,
+	          GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+	    },
+	    &allow_file_count_bucket_num_mismatch,
+	    false, NULL, NULL
+	},
+
+	{
 		{"gp_temporary_files_filespace_repair", PGC_SUSET, DEVELOPER_OPTIONS,
                         gettext_noop("Change the filespace inconsistency to a warning"),
                         NULL,
@@ -4100,7 +4121,7 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
-		{"enable_prefer_list_to_rm;", PGC_USERSET, DEVELOPER_OPTIONS,
+		{"enable_prefer_list_to_rm", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Sets whether enable data locality prefer list passed to rm"),
 			NULL,
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
@@ -4311,6 +4332,16 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+    {"enable_ranger", PGC_POSTMASTER, CONN_AUTH_SETTINGS,
+     gettext_noop("Enable Apache Ranger for HAWQ privilege management."),
+     NULL,
+     GUC_SUPERUSER_ONLY
+    },
+    &enable_ranger,
+    false, NULL, NULL
+  },
+
+	{
 		{"filesystem_support_truncate", PGC_USERSET, APPENDONLY_TABLES,
 		 gettext_noop("the file system support truncate feature."),
 		 NULL,
@@ -4374,6 +4405,27 @@ static struct config_bool ConfigureNamesBool[] =
 		&optimizer_prefer_scalar_dqa_multistage_agg,
 		true, NULL, NULL
 	},
+
+	{
+		{"optimizer_parallel_union", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Enable parallel execution for UNION/UNION ALL queries."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_parallel_union,
+		false, NULL, NULL
+	},
+
+	{
+		{"optimizer_array_constraints", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("Allows the optimizer's constraint framework to derive array constraints."),
+			NULL,
+			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+		},
+		&optimizer_array_constraints,
+		false, NULL, NULL
+	},
+
 
 	/* End-of-list marker */
 	{
@@ -6124,6 +6176,7 @@ static struct config_int ConfigureNamesInt[] =
 		&server_ticket_renew_interval,
 		43200000, 0, INT_MAX, NULL, NULL
 	},
+
 	{
 		{"optimizer_array_expansion_threshold", PGC_USERSET, QUERY_TUNING_METHOD,
 			gettext_noop("Item limit for expansion of arrays in WHERE clause to disjunctive form."),
@@ -6133,6 +6186,25 @@ static struct config_int ConfigureNamesInt[] =
 		&optimizer_array_expansion_threshold,
 		25, 0, INT_MAX, NULL, NULL
 	},
+
+	{
+		{"optimizer_join_order_threshold", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Maximum number of join children to use dynamic programming based join ordering algorithm."),
+			NULL
+		},
+		&optimizer_join_order_threshold,
+		10, 0, INT_MAX, NULL, NULL
+	},
+
+	{
+		{"information_schema_namespcace_oid", PGC_USERSET, DEVELOPER_OPTIONS,
+			gettext_noop("the oid of information_schema namespace"),
+			NULL
+		},
+		&information_schema_namespcace_oid,
+		0, 0, INT_MAX, NULL, NULL
+	},
+
 	{
 		{"memory_profiler_dataset_size", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("Set the size in GB"),
@@ -6201,6 +6273,15 @@ static struct config_int ConfigureNamesInt[] =
 		&master_addr_port,
 		1, 1, 65535, NULL, NULL
 	},
+
+	{
+    {"hawq_rps_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("ranger plugin server address port number"),
+      NULL
+    },
+    &rps_addr_port,
+    8432, 1, 65535, NULL, NULL
+  },
 
 	{
 		{"hawq_segment_address_port", PGC_POSTMASTER, PRESET_OPTIONS,
@@ -8107,16 +8188,34 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
+    {"hawq_rps_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("ranger plugin server address hostname"),
+      NULL
+    },
+    &rps_addr_host,
+    "localhost", NULL, NULL
+  },
+
+  {
+    {"hawq_rps_address_suffix", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("ranger plugin server suffix of restful service address"),
+      NULL
+    },
+    &rps_addr_suffix,
+    "rps", NULL, NULL
+  },
+
+	{
+		{"hawq_standby_address_host", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("standby server address hostname"),
 			NULL
 		},
 		&standby_addr_host,
-		"localhost", NULL, NULL
+		"none", NULL, NULL
 	},
 
 	{
-		{"dfs_url", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_dfs_url", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("hdfs url"),
 			NULL
 		},
@@ -8125,7 +8224,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("master server data directory"),
 			NULL
 		},
@@ -8134,7 +8233,7 @@ static struct config_string ConfigureNamesString[] =
 	},
 
 	{
-		{"segment_directory", PGC_POSTMASTER, PRESET_OPTIONS,
+		{"hawq_segment_directory", PGC_POSTMASTER, PRESET_OPTIONS,
 			gettext_noop("segment data directory"),
 			NULL
 		},
@@ -12202,6 +12301,7 @@ ProcessGUCArray(ArrayType *array, GucSource source)
 					(errcode(ERRCODE_SYNTAX_ERROR),
 			  errmsg("could not parse setting for parameter \"%s\"", name)));
 			free(name);
+			pfree(s);
 			continue;
 		}
 
@@ -12216,12 +12316,49 @@ ProcessGUCArray(ArrayType *array, GucSource source)
 		 * GPSQL needs to dispatch the database/user config to segments.
 		 */
 		if (Gp_role == GP_ROLE_DISPATCH)
-			appendStringInfo(&MyProcPort->override_options, "-c %s=%s ", name, value);
-		elog(DEBUG1, "gpsql guc: %s = %s", name , value);
+		{
+			unsigned int	 j, start, size;
+			char			*temp, *new_temp;
+
+			size = 256;
+			temp = palloc(size + 8);
+			if (temp == NULL)
+				ereport(ERROR,
+						(errcode(ERRCODE_OUT_OF_MEMORY),
+						 errmsg("out of memory")));
+
+			j = 0;
+			for (start = 0; start < strlen(value); ++start)
+			{
+				if (j == size)
+				{
+					size *= 2;
+					new_temp = repalloc(temp, size + 8);
+					if (new_temp == NULL)
+						ereport(ERROR,
+								(errcode(ERRCODE_OUT_OF_MEMORY),
+								 errmsg("out of memory")));
+					temp = new_temp;
+				}
+
+				if (value[start] == ' ')
+				{
+					temp[j++] = '\\';
+					temp[j++] = '\\';
+				} else if (value[start] == '"' || value[start] == '\'')
+					temp[j++] = '\\';
+
+				temp[j++] = value[start];
+			}
+
+			temp[j] = '\0';
+			appendStringInfo(&MyProcPort->override_options, "-c %s=%s ", name, temp);
+			elog(DEBUG1, "gpsql guc: %s = %s", name, temp);
+			pfree(temp);
+		}
 
 		free(name);
-		if (value)
-			free(value);
+		free(value);
 		pfree(s);
 	}
 }
@@ -13598,7 +13735,7 @@ assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source)
 {
 	if (doit)
 	{
-		int32_t newvalmb = 0;
+		uint32_t newvalmb = 0;
 		int parseres = FUNC_RETURN_OK;
 		SimpString valuestr;
 		setSimpleStringRef(&valuestr, newval, strlen(newval));

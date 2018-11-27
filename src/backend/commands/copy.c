@@ -1602,7 +1602,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			{
 				Oid		relid = RelationGetRelid(cstate->cdbsreh->errtbl);
 				Assert(!rel_is_partitioned(relid));
-				err_segnos = SetSegnoForWrite(NIL, relid,  list_length(cstate->resource->segments), false, true);
+				err_segnos = SetSegnoForWrite(NIL, relid,  list_length(cstate->resource->segments), false, true, true);
 				if (Gp_role == GP_ROLE_DISPATCH)
 					CreateAppendOnlyParquetSegFileForRelationOnMaster(
 							cstate->cdbsreh->errtbl,
@@ -1642,7 +1642,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 				{
 					SegfileMapNode *n = makeNode(SegfileMapNode);
 					n->relid = RelationGetRelid(cstate->rel);
-					n->segnos = SetSegnoForWrite(NIL, n->relid, 1, false, true);
+					n->segnos = SetSegnoForWrite(NIL, n->relid, 1, false, true, true);
 					cstate->ao_segnos = lappend(cstate->ao_segnos, n);
 				}
 			}

@@ -72,23 +72,23 @@ public class WriteBridge implements Bridge {
 
         List<OneField> record = inputBuilder.makeInput(inputStream);
         if (record == null) {
-            close();
             return false;
         }
 
         OneRow onerow = fieldsResolver.setFields(record);
         if (onerow == null) {
-            close();
             return false;
         }
         if (!fileAccessor.writeNextObject(onerow)) {
-            close();
             throw new BadRecordException();
         }
         return true;
     }
 
-    private void close() throws Exception {
+    /*
+     * Close the underlying resource
+     */
+    public void endIteration() throws Exception {
         try {
             fileAccessor.closeForWrite();
         } catch (Exception e) {

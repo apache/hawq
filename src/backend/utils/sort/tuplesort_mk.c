@@ -984,6 +984,7 @@ tuplesort_end_mk(Tuplesortstate_mk *state)
         {
         	workfile_mgr_close_file(state->work_set, state->tapeset_state_file, true);
         }
+        state->tapeset_state_file = NULL;
     }
 
 

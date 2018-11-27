@@ -67,8 +67,8 @@ getBitmapTableScanMethod(TableType tableType)
 
 	/* COMPILE_ASSERT(ARRAY_SIZE(scanMethods) == TableTypeInvalid); */
 
-	if (tableType < 0 && tableType >= TableTypeInvalid)
-	{
+	if (tableType < TableTypeHeap || tableType >= TableTypeInvalid)
+    {
 		return NULL;
 	}
 

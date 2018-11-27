@@ -66,7 +66,7 @@ public class TPCHLocalTester extends TPCHTester {
 
 				// load TPCH data
 				Map<String, String> rs = HAWQJdbcUtils.executeSafeQueryForSingleRow(
-						conn, "SELECT COUNT(*) segnum FROM gp_segment_configuration WHERE content>=0;");
+						conn, "SELECT COUNT(*) segnum FROM gp_segment_configuration WHERE role='p';");
 				int segnum = Integer.parseInt(rs.get("segnum"));
 				MRFormatTestUtils.runShellCommand(tpchSpec.getLoadCmd(segnum));
 

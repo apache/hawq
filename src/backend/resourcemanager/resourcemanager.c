@@ -203,19 +203,19 @@ int ResManagerMain(int argc, char *argv[])
 
     res = createDRMInstance();
 	if ( res != FUNC_RETURN_OK ) {
-		elog(FATAL, "HAWQ RM Can not create resource manager global instance.");
+		elog(FATAL, "HAWQ RM cannot create resource manager global instance.");
 	}
 	elog(DEBUG5, "HAWQ RM :: created dynamic resource manager instance.");
 
     res = createDRMMemoryContext();
     if ( res != FUNC_RETURN_OK ) {
-    	elog(FATAL, "HAWQ RM Can not create resource manager global instance.");
+    	elog(FATAL, "HAWQ RM cannot create resource manager global instance.");
     }
 	elog(DEBUG5, "HAWQ RM :: created resource manager memory context.");
 
 	res = initializeDRMInstance(PCONTEXT);
 	if ( res != FUNC_RETURN_OK ) {
-	    	elog(FATAL, "HAWQ RM Can not initialize global instance.");
+	    	elog(FATAL, "HAWQ RM cannot initialize global instance.");
 	}
 
 	elog(DEBUG5, "HAWQ RM :: initialized resource manager instance.");
@@ -227,7 +227,7 @@ int ResManagerMain(int argc, char *argv[])
 	/* Command line parser. */
     res = parseCommandLine(argc, argv);
     if ( res != FUNC_RETURN_OK ) {
-    	elog(FATAL, "Wrong resource manager command line arguments.");
+    	elog(FATAL, "invalid resource manager command line arguments.");
     }
 
 	elog(DEBUG5, "HAWQ RM ::passed command line arguments.");
@@ -235,7 +235,7 @@ int ResManagerMain(int argc, char *argv[])
 	/* Recognize all loaded configure properties. */
 	res = loadDynamicResourceManagerConfigure();
 	if ( res != FUNC_RETURN_OK ) {
-		elog(FATAL, "Fail to load valid properties from configure files.");
+		elog(FATAL, "failed to load valid properties from configure files.");
 	}
 
 	elog(DEBUG5, "HAWQ RM :: passed loading configuration.");
@@ -327,7 +327,7 @@ int ResManagerMain(int argc, char *argv[])
 		RB_prepareImplementation(DRMGlobalInstance->ImpType);
 		res = RB_start(true);
 		if ( res != FUNC_RETURN_OK ) {
-			elog(FATAL, "Fail to create resource broker service.");
+			elog(FATAL, "failed to create resource broker service.");
 		}
 		res = ResManagerMainServer2ndPhase();
 		elog(LOG, "Master RM exits.\n");
@@ -463,7 +463,7 @@ int ResManagerMainServer2ndPhase(void)
 	/* New socket facility poll based server.*/
 	res = initializeSocketServer();
 	if ( res != FUNC_RETURN_OK ) {
-		elog(FATAL, "Fail to initialize socket server.");
+		elog(FATAL, "failed to initialize socket server.");
 	}
 
 	/*
@@ -493,7 +493,7 @@ int ResManagerMainServer2ndPhase(void)
 	/* Load queue and user definition as no DDL now. */
 	res = loadAllQueueAndUser();
 	if ( res != FUNC_RETURN_OK ) {
-		elog(FATAL, "Fail to load queue and user definition.");
+		elog(FATAL, "failed to load queue and user definition.");
 	}
 
 	elog(DEBUG5, "HAWQ RM :: passed loading queue and user definition.");
@@ -732,7 +732,7 @@ int parseCommandLine(int argc, char **argv)
 			res = getStringValue(argc, argv, i+1, &value);
 			if ( res != FUNC_RETURN_OK ) {
 				elog( WARNING,
-					  "Wrong command line argument %s behind %s.",
+					  "invalid command line argument %s behind %s.",
 					  value.Str,
 					  HAWQDRM_COMMANDLINE_ROLE);
 				goto exit;
@@ -747,7 +747,7 @@ int parseCommandLine(int argc, char **argv)
 				DRMGlobalInstance->Role = START_RM_ROLE_SEGMENT;
 			}
 			else {
-				elog(WARNING, "Wrong argument value '%s' for %s",
+				elog(WARNING, "invalid argument value '%s' for %s",
 							  value.Str, HAWQDRM_COMMANDLINE_ROLE);
 				res = MAIN_WRONG_COMMANDLINE;
 			}
@@ -853,7 +853,7 @@ int initializeDRMInstance(MCTYPE context)
 	initSimpleString(&(DRMGlobalInstance->SocketLocalHostName), 	   context);
 	res = getLocalHostName(&(DRMGlobalInstance->SocketLocalHostName));
 	if ( res != FUNC_RETURN_OK ) {
-		elog(WARNING, "Fail to get local host name.");
+		elog(WARNING, "failed to get local host name.");
 	}
 
 	/* Set resource manager server startup time to 0, i.e. not started yet. */
@@ -871,7 +871,7 @@ int initializeDRMInstanceForQD(void)
 			         DRMGlobalInstance->Context);
 	res = getLocalHostName(&(DRMGlobalInstance->SocketLocalHostName));
 	if ( res != FUNC_RETURN_OK ) {
-		elog(WARNING, "Fail to get local host name.");
+		elog(WARNING, "failed to get local host name.");
 	}
 	return res;
 }
@@ -891,7 +891,7 @@ void initializeDRMInstanceForQE(void)
     /* create dynamic resource manager instance to contain config data. */
     res = createDRMInstance();
     if ( res != FUNC_RETURN_OK ) {
-    	elog(ERROR, "Fail to initialize data structure for communicating with "
+    	elog(ERROR, "failed to initialize data structure for communicating with "
                 	"resource manager.");
     }
 
@@ -911,7 +911,7 @@ void initializeDRMInstanceForQE(void)
 			         DRMGlobalInstance->Context);
 	res = getLocalHostName(&(DRMGlobalInstance->SocketLocalHostName));
 	if ( res != FUNC_RETURN_OK ) {
-		elog(WARNING, "Fail to get local host name.");
+		elog(WARNING, "failed to get local host name.");
 	}
 
 	/****** Resource enforcement GUCs begins ******/
@@ -1016,7 +1016,7 @@ int  loadDynamicResourceManagerConfigure(void)
 	}
 	else
 	{
-		elog(WARNING, "Wrong global resource manager type set in %s.",
+		elog(WARNING, "invalid global resource manager type set in %s.",
 				  	  HAWQDRM_CONFFILE_SERVER_TYPE);
 		return MAIN_CONF_UNSET_ROLE;
 	}
@@ -1026,16 +1026,16 @@ int  loadDynamicResourceManagerConfigure(void)
 	SimpString segmem;
 	if ( rm_seg_memory_use[0] == '\0' )
 	{
-		elog(WARNING, "%s is not set", HAWQDRM_CONFFILE_LIMIT_MEMORY_USE);
+		elog(WARNING, "uninitialized parameter %s", HAWQDRM_CONFFILE_LIMIT_MEMORY_USE);
 		return MAIN_CONF_UNSET_SEGMENT_MEMORY_USE;
 	}
 
 	setSimpleStringRefNoLen(&segmem, rm_seg_memory_use);
 	int res = SimpleStringToStorageSizeMB(&segmem,
-										  &(DRMGlobalInstance->SegmentMemoryMB));
+										  (uint32_t *) &(DRMGlobalInstance->SegmentMemoryMB));
 	if ( res != FUNC_RETURN_OK)
 	{
-		elog(WARNING, "Can not understand the value '%s' of property %s.",
+		elog(WARNING, "invalid value '%s' for property %s.",
 				  	  rm_seg_memory_use,
 					  HAWQDRM_CONFFILE_LIMIT_MEMORY_USE);
 		return MAIN_CONF_UNSET_SEGMENT_MEMORY_USE;
@@ -1127,7 +1127,7 @@ exit:
 
 	if ( res != FUNC_RETURN_OK )
 	{
-		elog( LOG, "Fail to load queue and user definition.");
+		elog( LOG, "failed to load queue and user definition.");
 	}
 	return res;
 }
@@ -1825,7 +1825,7 @@ int addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 		if ( res != FUNC_RETURN_OK )
 		{
 			rm_pfree(PCONTEXT, newqueue);
-			elog(WARNING, "Resource manager can not create resource queue with its "
+			elog(WARNING, "Resource manager cannot create resource queue with its "
 						  "attributes because %s",
 						  errorbuf);
 			continue;
@@ -1935,19 +1935,19 @@ int addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 														 sizeof(errorbuf));
 		if ( res != FUNC_RETURN_OK )
 		{
-			elog(RMLOG, "res=%d error=%s, after check and complete queue %s.",
+			elog(RMLOG, "res=%d error=%s, after check and complete queue \'%s\'.",
 						res,
 						errorbuf,
 						partqueue->Name);
 
 			rm_pfree(PCONTEXT, partqueue);
-			elog(WARNING, "Resource manager can not complete resource queue's "
+			elog(WARNING, "Resource manager cannot complete resource queue's "
 						  "attributes because %s",
 						  errorbuf);
 			continue;
 		}
 
-		elog(RMLOG, "Checked and completed queue %s.", partqueue->Name);
+		elog(RMLOG, "Checked and completed queue \'%s\'.", partqueue->Name);
 
 		DynResourceQueueTrack newtrack = NULL;
 		res = createQueueAndTrack(partqueue, &newtrack, errorbuf, sizeof(errorbuf));
@@ -1960,14 +1960,14 @@ int addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 				rm_pfree(PCONTEXT, newtrack);
 			}
 
-			elog( WARNING, "Resource manager can not create resource queue %s "
+			elog( WARNING, "Resource manager cannot create resource queue \'%s\' "
 						   "because %s",
 						   partqueue->Name,
 						   errorbuf);
 			continue;
 		}
 
-		elog(RMLOG, "Created queue %s.", partqueue->Name);
+		elog(RMLOG, "Created queue \'%s\'.", partqueue->Name);
 
 		char buffer[1024];
 		generateQueueReport(partqueue->OID, buffer, sizeof(buffer));
@@ -1992,7 +1992,7 @@ int addResourceQueueAndUserFromProperties(List *queueprops, List *userprops)
 		res = parseUserAttributes(attrs,newuser, errorbuf, sizeof(errorbuf));
 		if ( res != FUNC_RETURN_OK )
 		{
-			elog(WARNING, "Can not create user with its attributes because %s",
+			elog(WARNING, "cannot create user with its attributes because %s",
 						  errorbuf);
 			rm_pfree(PCONTEXT, newuser);
 			continue;

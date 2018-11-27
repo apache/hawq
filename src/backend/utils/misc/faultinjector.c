@@ -324,7 +324,9 @@ FaultInjectorIdentifierEnumToString[] = {
 	_("opt_task_allocate_string_buffer"),
 		/* inject fault while allocating string buffer */
 	_("runaway_cleanup"),
-		/* inject fault before cleaning up a runaway query */		
+		/* inject fault before cleaning up a runaway query */	
+	_("interconnect_stop_ack_is_lost"),
+		/* inject fault in interconnect to skip sending the stop ack */	
 	_("not recognized"),
 };
 
@@ -785,7 +787,7 @@ FaultInjector_InjectFaultIfSet(
 
 		case FaultInjectorTypeSegv:
 		{
-			*(int *) 0 = 1234;
+			*(volatile int *) 0 = 1234;
 			break;
 		}
 		
@@ -985,6 +987,7 @@ FaultInjector_NewHashEntry(
 				
 			case FinishPreparedTransactionAbortPass1AbortingCreateNeeded:
 			case FinishPreparedTransactionAbortPass2AbortingCreateNeeded:
+			case InterconnectStopAckIsLost:
 
 			case SyncPersistentTable:
 			case XLOGInsert:

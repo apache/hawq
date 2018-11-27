@@ -8678,6 +8678,208 @@ SELECT  cc, sum(nn) over() FROM v1_mpp_20470;
 
 drop view v1_mpp_20470;
 drop table t_mpp_20470;
+
+-- Checking if ORCA correctly populates canSetTag in PlannedStmt for multiple statements because of rules
+drop table if exists can_set_tag_target;
+NOTICE:  table "can_set_tag_target" does not exist, skipping
+create table can_set_tag_target
+(
+	x int,
+	y int,
+	z char
+);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'x' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+drop table if exists can_set_tag_audit;
+NOTICE:  table "can_set_tag_audit" does not exist, skipping
+create table can_set_tag_audit
+(
+	t timestamp without time zone,
+	x int,
+	y int,
+	z char
+);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 't' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+create rule can_set_tag_audit_update AS
+    ON UPDATE TO can_set_tag_target DO  INSERT INTO can_set_tag_audit (t, x, y, z)
+  VALUES (now(), old.x, old.y, old.z);
+insert into can_set_tag_target select i, i + 1, i + 2 from generate_series(1,2) as i;
+create role unpriv;
+NOTICE:  resource queue required -- using default resource queue "pg_default"
+grant all on can_set_tag_target to unpriv;
+grant all on can_set_tag_audit to unpriv;
+set role unpriv;
+show optimizer;
+ optimizer 
+-----------
+ on
+(1 row)
+
+update can_set_tag_target set y = y + 1;
+select count(1) from can_set_tag_audit;
+ count 
+-------
+     2
+(1 row)
+
+reset role;
+revoke all on can_set_tag_target from unpriv;
+revoke all on can_set_tag_audit from unpriv;
+drop role unpriv;
+drop table can_set_tag_target;
+drop table can_set_tag_audit;
+-- start_ignore
+create language plpythonu;
+-- end_ignore
+-- Checking if ORCA uses parser's canSetTag for CREATE TABLE AS SELECT
+create or replace function canSetTag_Func(x int) returns int as $$
+    if (x is None):
+        return 0
+    else:
+        return x * 3
+$$ language plpythonu;
+create table canSetTag_input_data (domain integer, class integer, attr text, value integer)
+   distributed by (domain);
+insert into canSetTag_input_data values(1, 1, 'A', 1);
+insert into canSetTag_input_data values(2, 1, 'A', 0);
+insert into canSetTag_input_data values(3, 0, 'B', 1);
+create table canSetTag_bug_table as 
+SELECT attr, class, (select canSetTag_Func(count(distinct class)::int) from canSetTag_input_data)
+   as dclass FROM canSetTag_input_data GROUP BY attr, class distributed by (attr);
+drop function canSetTag_Func(x int);
+drop table canSetTag_bug_table;
+drop table canSetTag_input_data;
+-- Test B-Tree index scan with in list
+CREATE TABLE btree_test as SELECT * FROM generate_series(1,100) as a distributed randomly;
+CREATE INDEX btree_test_index ON btree_test(a);
+EXPLAIN SELECT * FROM btree_test WHERE a in (1, 47);
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..4.25 rows=2 width=4)
+   ->  Seq Scan on btree_test  (cost=0.00..4.25 rows=1 width=4)
+         Filter: a = ANY ('{1,47}'::integer[])
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: legacy query optimizer
+(5 rows)
+
+EXPLAIN SELECT * FROM btree_test WHERE a in ('2', 47);
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..4.25 rows=2 width=4)
+   ->  Seq Scan on btree_test  (cost=0.00..4.25 rows=1 width=4)
+         Filter: a = ANY ('{2,47}'::integer[])
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: legacy query optimizer
+(5 rows)
+
+EXPLAIN SELECT * FROM btree_test WHERE a in ('1', '2');
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..4.25 rows=2 width=4)
+   ->  Seq Scan on btree_test  (cost=0.00..4.25 rows=1 width=4)
+         Filter: a = ANY ('{1,2}'::integer[])
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: legacy query optimizer
+(5 rows)
+
+EXPLAIN SELECT * FROM btree_test WHERE a in ('1', '2', 47);
+                                 QUERY PLAN                                 
+----------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..4.38 rows=3 width=4)
+   ->  Seq Scan on btree_test  (cost=0.00..4.38 rows=1 width=4)
+         Filter: a = ANY ('{1,2,47}'::integer[])
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: legacy query optimizer
+(5 rows)
+
+-- Test Bitmap index scan with in list
+CREATE TABLE bitmap_test as SELECT * FROM generate_series(1,100) as a distributed randomly;
+CREATE INDEX bitmap_index ON bitmap_test USING BITMAP(a);
+EXPLAIN SELECT * FROM bitmap_test WHERE a in (select 1);
+                                      QUERY PLAN                                       
+---------------------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..0.05 rows=100 width=4)
+   ->  Nested Loop  (cost=0.00..0.04 rows=34 width=4)
+         Join Filter: true
+         ->  Result  (cost=0.00..0.00 rows=1 width=4)
+               ->  Result  (cost=0.00..0.00 rows=1 width=1)
+         ->  Bitmap Table Scan on bitmap_test  (cost=0.00..0.04 rows=1 width=4)
+               Recheck Cond: bitmap_test.a = (1)
+               ->  Bitmap Index Scan on bitmap_index  (cost=0.00..0.00 rows=0 width=0)
+                     Index Cond: bitmap_test.a = (1)
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: PQO version 1.658
+(11 rows)
+
+EXPLAIN SELECT * FROM bitmap_test WHERE a in (1, 47);
+                                   QUERY PLAN                                    
+---------------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..408.76 rows=3 width=4)
+   ->  Bitmap Table Scan on bitmap_test  (cost=0.00..408.76 rows=1 width=4)
+         Recheck Cond: a = ANY ('{1,47}'::integer[])
+         ->  Bitmap Index Scan on bitmap_index  (cost=0.00..0.00 rows=0 width=0)
+               Index Cond: a = ANY ('{1,47}'::integer[])
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: PQO version 1.647
+(7 rows)
+
+EXPLAIN SELECT * FROM bitmap_test WHERE a in ('2', 47);
+                                   QUERY PLAN                                    
+---------------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..408.76 rows=3 width=4)
+   ->  Bitmap Table Scan on bitmap_test  (cost=0.00..408.76 rows=1 width=4)
+         Recheck Cond: a = ANY ('{2,47}'::integer[])
+         ->  Bitmap Index Scan on bitmap_index  (cost=0.00..0.00 rows=0 width=0)
+               Index Cond: a = ANY ('{2,47}'::integer[])
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: PQO version 1.647
+(7 rows)
+
+EXPLAIN SELECT * FROM bitmap_test WHERE a in ('1', '2');
+                                   QUERY PLAN                                    
+---------------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..408.76 rows=3 width=4)
+   ->  Bitmap Table Scan on bitmap_test  (cost=0.00..408.76 rows=1 width=4)
+         Recheck Cond: a = ANY ('{1,2}'::integer[])
+         ->  Bitmap Index Scan on bitmap_index  (cost=0.00..0.00 rows=0 width=0)
+               Index Cond: a = ANY ('{1,2}'::integer[])
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: PQO version 1.647
+(7 rows)
+
+EXPLAIN SELECT * FROM bitmap_test WHERE a in ('1', '2', 47);
+                                  QUERY PLAN                                  
+------------------------------------------------------------------------------
+ Gather Motion 3:1  (slice1; segments: 3)  (cost=0.00..431.00 rows=4 width=4)
+   ->  Table Scan on bitmap_test  (cost=0.00..431.00 rows=2 width=4)
+         Filter: a = ANY ('{1,2,47}'::integer[])
+ Settings:  optimizer=on; optimizer_metadata_caching=on
+ Optimizer status: PQO version 1.647
+(5 rows)
+
+-- Test Logging for unsupported features in ORCA
+-- start_ignore
+drop table if exists foo;
+NOTICE:  table "foo" does not exist, skipping
+-- end_ignore
+create table foo(a int, b int);
+NOTICE:  Table doesn't have 'DISTRIBUTED BY' clause -- Using column named 'a' as the Greenplum Database data distribution key for this table.
+HINT:  The 'DISTRIBUTED BY' clause determines the distribution of data. Make sure column(s) chosen are the optimal data distribution key to minimize skew.
+set client_min_messages='log';
+select count(*) from foo group by cube(a,b);
+LOG:  statement: select count(*) from foo group by cube(a,b);
+LOG:  2016-08-19 10:46:53:360703 PDT,THD000,NOTICE,"Feature not supported by the Pivotal Query Optimizer: Cube",
+LOG:  Planner produced plan :0
+ count 
+-------
+(0 rows)
+
+reset client_min_messages;
+LOG:  statement: reset client_min_messages;
+-- start_ignore
+drop table foo;
+-- end_ignore
 -- clean up
 drop schema orca cascade;
 NOTICE:  drop cascades to table orca.bm_dyn_test_onepart_1_prt_part5

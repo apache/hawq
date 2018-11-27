@@ -318,7 +318,7 @@ rloop:
  * This function holds an interrupt before reporting this error to avoid
  * a self deadlock situation, see MPP-13718 for more info.
  */
-static void
+static void __MAYBE_UNUSED
 report_commerror(const char *err_msg)
 {
 	HOLD_INTERRUPTS();

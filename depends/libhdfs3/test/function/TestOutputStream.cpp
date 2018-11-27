@@ -517,6 +517,18 @@ TEST_F(TestOutputStream, TestOpenFileForWrite) {
 }
 
 
+TEST_F(TestOutputStream, DISABLE_TestOpenFileForWriteTDE){
+    conf.set("output.default.packetsize", 1024);
+    fs = new FileSystem(conf);
+    fs->connect();
+    fs->mkdirs("/testTDE", 0755);
+    system("hadoop key create amy");
+    system("hdfs crypto -createZone -keyName amy -path /testTDE");
+    OutputStream other;
+    ASSERT_NO_THROW(other.open(*fs, "/testTDE/amy", Create | Append));
+    other.close();
+    fs->disconnect();
+}
 
 TEST_F(TestOutputStream, TestWriteChunkPacket) {
     //test create a file and write a block

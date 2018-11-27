@@ -153,7 +153,7 @@ extern void ClosePager(FILE *pagerpipe);
 extern void html_escaped_print(const char *in, FILE *fout);
 
 extern void printTableInit(printTableContent *const content,
-			   const printTableOpt *opt, const char *title,
+			   printTableOpt *opt, const char *title,
 			   const int ncolumns, const int nrows);
 extern void printTableAddHeader(printTableContent *const content,
 				 const char *header, const bool translate, const char align);

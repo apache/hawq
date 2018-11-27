@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.apache.hawq</groupId>
+    <artifactId>ranger-plugin</artifactId>
+    <version>2.1.0.0</version>
+    <packaging>pom</packaging>
+    <name>HAWQ Ranger Plugin</name>
+    <description>HAWQ Ranger Plugin</description>
+
+    <modules>
+        <module>admin-plugin</module>
+        <module>service</module>
+    </modules>
+
+    <properties>
+        <jackson.version>1.9</jackson.version>
+        <release.version>1</release.version>
+        <postgresql.version>9.1-901-1.jdbc4</postgresql.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <build>
+        <testResources>
+            <testResource>
+                <directory>src/test/resources</directory>
+                <includes>
+                    <include>**/*</include>
+                </includes>
+                <filtering>true</filtering>
+            </testResource>
+        </testResources>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>rpm-maven-plugin</artifactId>
+                <version>2.0.1</version>
+                <inherited>false</inherited>
+                <executions>
+                    <execution>
+                        <inherited>false</inherited>
+                        <phase>install</phase>
+                        <goals>
+                            <goal>rpm</goal>
+                        </goals>
+                    </execution>
+                </executions>
+
+                <configuration>
+                    <copyright>ASL 2.0</copyright>
+                    <group>org.apache.hawq.ranger</group>
+                    <defaultUsername>gpadmin</defaultUsername>
+                    <defaultGroupname>gpadmin</defaultGroupname>
+                    <description>
+                        HAWQ Ranger plugin.
+                    </description>
+                    <release>${release.version}</release>
+                    <requires>
+                        <require>bigtop-tomcat</require>
+                        <require>hawq_${hawq.name.version} &gt;= ${project.version}</require>
+                    </requires>
+                    <mappings>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/bin</directory>
+                            <filemode>755</filemode>
+                            <sources>
+                                <source>
+                                    <location>scripts</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/lib</directory>
+                            <sources>
+                                <source>
+                                    <location>admin-plugin/target/ranger-plugin-admin-${project.version}.jar</location>
+                                </source>
+                                <source>
+                                    <location>admin-plugin/target/lib/postgresql-${postgresql.version}.jar</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/etc</directory>
+                            <sources>
+                                <source>
+                                    <location>conf/ranger-servicedef-hawq.json</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service</directory>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/bin</directory>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/logs</directory>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/temp</directory>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/work</directory>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/webapps</directory>
+                            <sources>
+                                <source>
+                                    <location>service/target/ranger-plugin-service-${project.version}.war</location>
+                                    <destination>rps.war</destination>
+                                </source>
+                            </sources>
+                        </mapping>
+                        <mapping>
+                            <directory>/usr/local/hawq_${hawq.name.version}/ranger/plugin-service/conf</directory>
+                            <sources>
+                                <source>
+                                    <location>conf/tomcat-server.xml</location>
+                                </source>
+                            </sources>
+                        </mapping>
+                    </mappings>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>1.7</version>
+                <executions>
+                    <execution>
+                        <id>regex-property</id>
+                        <goals>
+                            <goal>regex-property</goal>
+                        </goals>
+                        <configuration>
+                            <name>hawq.name.version</name>
+                            <value>${project.version}</value>
+                            <regex>^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)?$</regex>
+                            <replacement>$1_$2_$3_$4</replacement>
+                            <failIfNoMatch>true</failIfNoMatch>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.1</version>
+                <configuration>
+                    <source>1.7</source>
+                    <target>1.7</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.apache.ranger</groupId>
+                <artifactId>ranger-plugins-common</artifactId>
+                <version>0.6.0</version>
+            </dependency>
+            <dependency>
+                <groupId>log4j</groupId>
+                <artifactId>log4j</artifactId>
+                <version>1.2.17</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-logging</groupId>
+                <artifactId>commons-logging</artifactId>
+                <version>1.2</version>
+            </dependency>
+            <dependency>
+                <groupId>postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.codehaus.jackson</groupId>
+                <artifactId>jackson-xc</artifactId>
+                <version>1.9.13</version>
+            </dependency>
+            <dependency>
+              <groupId>com.google.guava</groupId>
+              <artifactId>guava</artifactId>
+              <version>11.0.2</version>
+            </dependency>
+            <dependency>
+                <groupId>javax.servlet</groupId>
+                <artifactId>servlet-api</artifactId>
+                <version>2.5</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>javax.servlet.jsp</groupId>
+                <artifactId>jsp-api</artifactId>
+                <version>2.1</version>
+                <scope>provided</scope>
+            </dependency>
+            <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.12</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>1.10.19</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.powermock</groupId>
+                <artifactId>powermock-module-junit4</artifactId>
+                <version>1.6.5</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.powermock</groupId>
+                <artifactId>powermock-api-mockito</artifactId>
+                <version>1.6.5</version>
+                <scope>test</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>

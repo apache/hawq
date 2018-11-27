@@ -1,0 +1,35 @@
+{
+  "isEnabled": true,
+  "service": "hawq",
+  "name": "LanguageTest",
+  "policyType": 0,
+  "description": "Test policy for language resource",
+  "isAuditEnabled": true,
+  "resources": {
+    "language": {
+      "values": ["sql"],
+      "isExcludes": false,
+      "isRecursive": false
+    },
+    "database": {
+      "values": ["*"],
+      "isExcludes": false,
+      "isRecursive": false
+    }
+  },
+  "policyItems": [{
+    "accesses": [{
+      "type": "usage",
+      "isAllowed": true
+    }],
+    "users": ["maria_dev"],
+    "groups": [],
+    "conditions": [],
+    "delegateAdmin": true
+  }],
+  "denyPolicyItems": [],
+  "allowExceptions": [],
+  "denyExceptions": [],
+  "dataMaskPolicyItems": [],
+  "rowFilterPolicyItems": []
+}

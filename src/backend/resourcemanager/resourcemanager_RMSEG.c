@@ -101,7 +101,7 @@ int  initializeSocketServer_RMSEG(void)
 	 * tasks. */
 	if ( netres != STATUS_OK ) {
 		res = REQUESTHANDLER_FAIL_START_SOCKET_SERVER;
-		elog( LOG,  "Can not create socket server. HostName=%s, Port=%d",
+		elog( LOG,  "cannot create socket server. HostName=%s, Port=%d",
 				    allip,
 					rm_segment_port);
 		return res;
@@ -274,4 +274,15 @@ void checkAndBuildFailedTmpDirList(void)
 	elog(LOG, "checkAndBuildFailedTmpDirList finished checking temporary "
 			  "directory, which costs " UINT64_FORMAT " us",
 			  endtime - starttime);
+}
+
+void switchIMAliveSendingTarget(void)
+{
+	/* We switch to standby server only when it is correctly set. */
+	if (pg_strcasecmp(standby_addr_host, "none") != 0)
+	{
+		DRMGlobalInstance->SendToStandby = !DRMGlobalInstance->SendToStandby;
+		elog(LOG, "segment will send heart-beat to %s from now on",
+				  DRMGlobalInstance->SendToStandby ? "standby" : "master");
+	}
 }

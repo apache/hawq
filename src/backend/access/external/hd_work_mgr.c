@@ -53,6 +53,7 @@ typedef struct sAllocatedDataFragment
 	char *source_name; /* source name */
 	char *fragment_md; /* fragment meta data */
 	char *user_data; /* additional user data */
+	char *profile; /* recommended profile to work with fragment */
 } AllocatedDataFragment;
 
 /*
@@ -713,6 +714,7 @@ create_allocated_fragment(DataFragment *fragment)
 	allocated->source_name = pstrdup(fragment->source_name);
 	allocated->fragment_md = (fragment->fragment_md) ? pstrdup(fragment->fragment_md) : NULL;
 	allocated->user_data = (fragment->user_data) ? pstrdup(fragment->user_data) : NULL;
+	allocated->profile = (fragment->profile) ? pstrdup(fragment->profile) : NULL;
 	return allocated;
 }
 
@@ -782,12 +784,22 @@ make_allocation_output_string(List *segment_fragments)
 		appendStringInfo(&fragment_str, "%d", frag->index);
 		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
 		if (frag->fragment_md)
+		{
 			appendStringInfo(&fragment_str, "%s", frag->fragment_md);
+		}
+
+		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
 		if (frag->user_data)
 		{
-			appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
 			appendStringInfo(&fragment_str, "%s", frag->user_data);
 		}
+		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
+		if (frag->profile)
+		{
+			appendStringInfo(&fragment_str, "%s", frag->profile);
+		}
+		appendStringInfoChar(&fragment_str, SEGWORK_IN_PAIR_DELIM);
+
 		fragment_size = strlen(fragment_str.data);
 
 		appendStringInfo(&segwork, "%d", fragment_size);
@@ -817,6 +829,8 @@ free_allocated_frags(List *segment_fragments)
 			pfree(frag->fragment_md);
 		if (frag->user_data)
 			pfree(frag->user_data);
+		if (frag->profile)
+			pfree(frag->profile);
 		pfree(frag);
 	}
 	list_free(segment_fragments);
@@ -855,6 +869,11 @@ print_fragment_list(List *fragments)
 		if (frag->user_data)
 		{
 			appendStringInfo(&log_str, "user data: %s\n", frag->user_data);
+		}
+
+		if (frag->profile)
+		{
+			appendStringInfo(&log_str, "profile: %s\n", frag->profile);
 		}
 	}
 

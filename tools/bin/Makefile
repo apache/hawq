@@ -36,7 +36,7 @@ PYLIB_SRC=$(SRC)/pythonSrc
 LIB_DIR=$(SRC)/lib
 PYLIB_DIR=$(SRC)/ext
 
-all: lockfile pygresql stream pychecker psi unittest2
+all: lockfile pygresql stream pychecker psi unittest2 pexpect
 
 #
 # Python Libraries
@@ -107,6 +107,18 @@ psi:
 	cp -r $(PYLIB_SRC)/$(PSI_DIR)/build/lib.*/psi $(PYLIB_DIR)
 
 #
+# PEXPECT
+#
+PEXPECT_VERSION=4.2
+PEXPECT_DIR=pexpect-$(PEXPECT_VERSION)
+
+pexpect:
+	@echo "--- pexpect"
+	cd $(PYLIB_SRC)/$(PEXPECT_DIR)/ && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" python setup.py build
+	cp -r $(PYLIB_SRC)/$(PEXPECT_DIR)/build/lib/pexpect $(PYLIB_DIR)
+	cp -r $(PYLIB_SRC)/ptyprocess-0.5.1/ptyprocess $(PYLIB_DIR)
+
+#
 # PYCHECKER
 #
 PYCHECKER_VERSION=0.8.18
@@ -123,18 +135,6 @@ unittest2:
 	@echo "--- unittest2"
 	cd $(PYLIB_SRC)/$(UNITTEST2_DIR)/ && python setup.py build
 	cp -r $(PYLIB_SRC)/$(UNITTEST2_DIR)/build/lib/unittest2  $(PYLIB_DIR)/
-
-#
-# PARAMIKO
-#
-PARAMIKO_VERSION=1.7.6-9
-PARAMIKO_DIR=paramiko-$(PARAMIKO_VERSION)
-paramiko:
-	@echo "--- paramiko"
-	cd $(PYLIB_SRC)/ && $(TAR) xzf $(PARAMIKO_DIR).tar.gz
-	cd $(PYLIB_SRC)/$(PARAMIKO_DIR)/ && python setup.py build
-	cp -r $(PYLIB_SRC)/$(PARAMIKO_DIR)/build/lib/paramiko  $(PYLIB_DIR)/
-
 
 PYTHON_FILES=`grep -l --exclude=Makefile --exclude=gplogfilter --exclude=gpcheckos --exclude=gpgenfsmap.py --exclude=throttlingD.py "/bin/env python" *`\
 			 `grep -l "/bin/env python" $(SRC)/../sbin/*`\

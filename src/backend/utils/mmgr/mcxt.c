@@ -459,7 +459,7 @@ MemoryContextError(int errorcode, MemoryContext context,
 		 *
 		 * XXX What is the right way of doing this?
 		 */
-		*(int *) NULL = errorcode;
+		((void(*)()) NULL)();
 	}
 
 	if(errorcode != ERRCODE_OUT_OF_MEMORY)

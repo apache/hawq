@@ -373,7 +373,6 @@ public class BridgeOutputBuilder {
                     break;
                 case VARCHAR:
                 case BPCHAR:
-                case CHAR:
                 case TEXT:
                 case NUMERIC:
                 case TIMESTAMP:

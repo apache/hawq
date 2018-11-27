@@ -5243,6 +5243,8 @@
 
  CREATE FUNCTION gp_persistent_set_relation_bufpool_kind_all() RETURNS int4 LANGUAGE internal VOLATILE AS 'gp_persistent_set_relation_bufpool_kind_all' WITH (OID=7182, DESCRIPTION="Populate the gp_persistent_relation_node table's relation_bufpool_kind column for the whole database instance for upgrade from 4.0 to 4.1");
 
+ CREATE FUNCTION gp_relfile_insert_for_register(Oid, Oid, Oid, Oid, Oid, cstring, char, char, Oid) RETURNS int4 LANGUAGE internal VOLATILE AS 'gp_persistent_relnode_insert' WITH (OID=7179, DESCRIPTION="insert record into gp_relfile_insert_for_register and gp_relfile_node");
+
 -- GIN array support
  CREATE FUNCTION ginarrayextract(anyarray, internal) RETURNS internal LANGUAGE internal IMMUTABLE STRICT AS 'ginarrayextract' WITH (OID=2743, DESCRIPTION="GIN array support");
 

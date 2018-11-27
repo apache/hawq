@@ -14,26 +14,42 @@ XmlConfig::XmlConfig(string p) :
   parse();
 }
 
-void XmlConfig::parse() {
-  // the result document tree
-  xmlDocPtr doc;
+bool XmlConfig::open() {
+  if (access(path.c_str(), R_OK)) {
+    return false;
+  }
+
+  doc = xmlReadFile(path.c_str(), nullptr, 0);
+  if (doc == nullptr) {
+    return false;
+  }
+
+  return true;
+}
+
+void XmlConfig::closeNotSave() {
+    xmlFreeDoc(doc);
+}
+
+void XmlConfig::closeAndSave() {
+    xmlSaveFormatFile(path.c_str(), doc, 0); 
+    xmlFreeDoc(doc);
+}
+
+bool XmlConfig::parse() {
   LIBXML_TEST_VERSION kv
   .clear();
 
-  if (access(path.c_str(), R_OK)) {
-    return;
-  }
-
-  // parse the file
-  doc = xmlReadFile(path.c_str(), nullptr, 0);
-  if (doc == nullptr) {
-    return;
+  if (!open()) {
+    return false;
   }
   try {
     readConfigItems(doc);
-    xmlFreeDoc(doc);
+    closeNotSave();
+    return true;
   } catch (...) {
-    xmlFreeDoc(doc);
+    closeNotSave();
+    return false;
   }
 }
 
@@ -89,6 +105,88 @@ void XmlConfig::readConfigItem(xmlNodePtr root) {
   } else if (hasName) {
     return;
   }
+}
+
+bool XmlConfig::setString(const string &key,
+                          const string &value,
+                          bool save) {
+  bool result = false;
+
+  if (save) {
+    if (!open()) {
+      return false;
+    }
+  }
+  try {
+    result = writeConfigItem(doc, key, value);
+    if (save) {
+      closeAndSave();
+    }
+  } catch (...) {
+    if (save) {
+      closeNotSave();
+    }
+  }
+  return result;
+}
+
+bool XmlConfig::setString(const string &key,
+                          const string &value) {
+  return setString(key, value, true);
+}
+
+bool XmlConfig::writeConfigItem(xmlDocPtr doc,
+                                const string &key,
+                                const string &value) {
+  xmlNodePtr root, curNode, curNodeChild, findNode;
+  root = xmlDocGetRootElement(doc);
+  bool findkey = false;
+  if (root == nullptr || strcmp((const char *) root->name, "configuration")) {
+    return false;
+  }
+  // for each property
+  for (curNode = root->children; curNode != nullptr; curNode = curNode->next) {
+    if (curNode->type != XML_ELEMENT_NODE) {
+      continue;
+    }
+    if (strcmp((const char *) curNode->name, "property")) {
+      return false;
+    }
+    curNodeChild = curNode->children;
+    for (curNodeChild = curNode->children; curNodeChild != nullptr; curNodeChild = curNodeChild->next) {
+      if (curNodeChild->type != XML_ELEMENT_NODE) {
+        continue;
+      }
+      if (!strcmp((const char *) curNodeChild->name, "name")) {
+        if (curNodeChild->children != nullptr
+            && XML_TEXT_NODE == curNodeChild->children->type
+            && !strcmp((const char *) curNodeChild->children->content, key.c_str())) {
+          findNode = curNode;
+          findkey = true;
+        } else {
+          if (findkey) {
+            xmlNewTextChild(findNode, NULL, BAD_CAST "value", BAD_CAST value.c_str());
+            return true;
+          }
+        }
+      } else if (!strcmp((const char *) curNodeChild->name, "value")) {
+        if (findkey
+            && curNodeChild->children != nullptr
+            && XML_TEXT_NODE == curNodeChild->children->type) {
+          xmlNodeSetContent(curNodeChild->children, (xmlChar*) const_cast<char*>(value.c_str()));
+          return true;
+        }
+      } else {
+        continue;
+      }
+    }
+  }
+
+  xmlNodePtr newNode = xmlNewNode(NULL, BAD_CAST "property");
+  xmlAddChild(root, newNode);
+  xmlNewTextChild(newNode, NULL, BAD_CAST "name", BAD_CAST key.c_str());
+  xmlNewTextChild(newNode, NULL, BAD_CAST "value", BAD_CAST value.c_str());
+  return true;
 }
 
 const string XmlConfig::getString(const char *key) {

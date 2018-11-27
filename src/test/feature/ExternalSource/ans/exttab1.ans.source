@@ -633,7 +633,7 @@ psql:/tmp/TestExternalTable_TestExternalTableAll.sql:411: ERROR:  the ON segment
 -- SELECT from WET (negative)
 --
 select * from wet_pos1;
-psql:/tmp/TestExternalTable_TestExternalTableAll.sql:416: ERROR:  External scan error: It is not possible to read from a WRITABLE external table. Create the table as READABLE instead. (COptTasks.cpp:1617)
+psql:/tmp/TestExternalTable_TestExternalTableAll.sql:416: ERROR:  External scan error: It is not possible to read from a WRITABLE external table. Create the table as READABLE instead. (CTranslatorDXLToPlStmt.cpp:1041)
 --
 -- WET: export some data with INSERT SELECT, INSERT and COPY.
 --

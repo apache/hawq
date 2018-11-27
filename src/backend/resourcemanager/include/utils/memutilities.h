@@ -115,7 +115,7 @@ void resetSelfMaintainBuffer(SelfMaintainBuffer buffer);
 void resetSelfMaintainBufferCursor(SelfMaintainBuffer buffer, int newcursor);
 
 void appendSelfMaintainBuffer(SelfMaintainBuffer buffer,
-							  char *source,
+							  const char *source,
 							  uint32_t size);
 
 #define appendSMBVar(buffer, val)                                     		   \

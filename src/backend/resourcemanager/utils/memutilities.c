@@ -173,7 +173,7 @@ void resetSelfMaintainBufferCursor(SelfMaintainBuffer buffer, int newcursor)
 }
 
 void appendSelfMaintainBuffer(SelfMaintainBuffer buffer,
-							 char *source,
+							 const char *source,
 							 uint32_t size)
 {
 	Assert( buffer != NULL );

@@ -236,6 +236,8 @@ public class HdfsUtilities {
     public static String toString(List<OneField> complexRecord, String delimiter) {
         StringBuilder buff = new StringBuilder();
         String delim = ""; // first iteration has no delimiter
+        if(complexRecord == null)
+            return "";
         for (OneField complex : complexRecord) {
             if (complex.type == DataType.BYTEA.getOID()) {
                 /** Serialize byte array as string */

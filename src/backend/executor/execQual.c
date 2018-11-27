@@ -1562,7 +1562,7 @@ restart:
 	{
 		fcinfo.resultinfo = (Node *) &rsinfo;
 	}
-	rsinfo.type = T_ReturnSetInfo;
+	rsinfo.type = (fmNodeTag) T_ReturnSetInfo;
 	rsinfo.econtext = econtext;
 	rsinfo.expectedDesc = fcache->funcResultDesc;
 	rsinfo.allowedModes = (int) (SFRM_ValuePerCall | SFRM_Materialize);
@@ -1878,7 +1878,7 @@ ExecMakeTableFunctionResult(ExprState *funcexpr,
 	 * our own state variables.
 	 */
 	InitFunctionCallInfoData(fcinfo, NULL, 0, NULL, (Node *) &rsinfo);
-	rsinfo.type = T_ReturnSetInfo;
+	rsinfo.type = (fmNodeTag) T_ReturnSetInfo;
 	rsinfo.econtext = econtext;
 	rsinfo.expectedDesc = expectedDesc;
 	rsinfo.allowedModes = (int) (SFRM_ValuePerCall | SFRM_Materialize);

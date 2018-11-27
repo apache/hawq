@@ -229,7 +229,7 @@ abstimein(PG_FUNCTION_ARGS)
 	int			dterr;
 	char	   *field[MAXDATEFIELDS];
 	char		workbuf[MAXDATELEN + 1];
-	int			dtype;
+	int			dtype = 0;
 	int			nf,
 				ftype[MAXDATEFIELDS];
 

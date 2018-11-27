@@ -22,8 +22,8 @@
 
 pxf_root=/usr/lib/pxf
 env_script=/etc/pxf/conf/pxf-env.sh
-tomcat_root=/opt/pivotal/apache-tomcat
-tomcat_templates=/opt/pivotal/pxf/tomcat-templates
+tomcat_root=/opt/apache-tomcat
+tomcat_templates=/opt/pxf/tomcat-templates
 instance_root=/var/pxf
 
 pxf_user=pxf

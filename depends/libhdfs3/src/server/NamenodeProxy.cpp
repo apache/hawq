@@ -524,5 +524,29 @@ void NamenodeProxy::close() {
     namenodes.clear();
 }
 
+bool NamenodeProxy::createEncryptionZone(const std::string & src, const std::string & keyName) {
+    NAMENODE_HA_RETRY_BEGIN();
+    return namenode->createEncryptionZone(src, keyName);
+    NAMENODE_HA_RETRY_END();
+    assert(!"should not reach here");
+    return false;
+}
+
+EncryptionZoneInfo NamenodeProxy::getEncryptionZoneInfo(const std::string & src, bool *exist) {
+    NAMENODE_HA_RETRY_BEGIN();
+    return namenode->getEncryptionZoneInfo(src, exist);
+    NAMENODE_HA_RETRY_END();
+    assert(!"should not reach here");
+    return EncryptionZoneInfo();
+}
+
+bool NamenodeProxy::listEncryptionZones(const int64_t id, std::vector<EncryptionZoneInfo> & ezl) {
+    NAMENODE_HA_RETRY_BEGIN();
+    return namenode->listEncryptionZones(id, ezl);
+    NAMENODE_HA_RETRY_END();
+    assert(!"should not reach here");
+    return false;
+}
+
 }
 }

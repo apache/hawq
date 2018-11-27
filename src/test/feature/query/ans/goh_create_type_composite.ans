@@ -1,0 +1,202 @@
+--
+-- CREATE_TYPE
+--
+--
+-- Note: widget_in/out were created in create_function_1, without any
+-- prior shell-type creation.  These commands therefore complete a test
+-- of the "old style" approach of making the functions first.
+--
+-- start_ignore
+drop database hdfs;
+DROP DATABASE
+-- end_ignore
+create database hdfs;
+CREATE DATABASE
+\c hdfs
+You are now connected to database "hdfs" as user "ivan".
+-- Test stand-alone composite type
+create type temp_type_1 as (a int, b int);
+CREATE TYPE
+create type temp_type_2 as (a int, b int);
+CREATE TYPE
+create table temp_table (id int, a temp_type_1, b temp_type_2) distributed randomly;
+CREATE TABLE
+insert into temp_table values (1, (1,2), (3,4));
+INSERT 0 1
+insert into temp_table values (2, (5,6), (7,8));
+INSERT 0 1
+insert into temp_table values (3, (9,10), (11,12));
+INSERT 0 1
+\d temp_table
+Append-Only Table "public.temp_table"
+ Column |    Type     | Modifiers 
+--------+-------------+-----------
+ id     | integer     | 
+ a      | temp_type_1 | 
+ b      | temp_type_2 | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+
+select * from temp_table order by 1;
+ id |   a    |    b    
+----+--------+---------
+  1 | (1,2)  | (3,4)
+  2 | (5,6)  | (7,8)
+  3 | (9,10) | (11,12)
+(3 rows)
+
+drop table temp_table;
+DROP TABLE
+create type temp_type_3 as (a temp_type_1, b temp_type_2);
+CREATE TYPE
+CREATE table temp_table (id int, a temp_type_1, b temp_type_3) distributed randomly;
+CREATE TABLE
+insert into temp_table values (1, (9,10), ((11,12),(7,8)));
+INSERT 0 1
+insert into temp_table values (2, (1,2), ((3,4),(5,6)));
+INSERT 0 1
+select * from temp_table order by 1;
+ id |   a    |          b          
+----+--------+---------------------
+  1 | (9,10) | ("(11,12)","(7,8)")
+  2 | (1,2)  | ("(3,4)","(5,6)")
+(2 rows)
+
+-- check catalog entries for types
+select count(typrelid) from pg_type where typname like 'temp_type_%';
+ count 
+-------
+     3
+(1 row)
+
+comment on type temp_type_1 is 'test composite type';
+COMMENT
+\dT temp_type_1
+             List of data types
+ Schema |    Name     |     Description     
+--------+-------------+---------------------
+ public | temp_type_1 | test composite type
+(1 row)
+
+select count(reltype) from pg_class where relname like 'temp_type%';
+ count 
+-------
+     3
+(1 row)
+
+create table test_func (foo temp_type_1);
+CREATE TABLE
+insert into test_func values((1,2));
+INSERT 0 1
+insert into test_func values((3,4));
+INSERT 0 1
+insert into test_func values((5,6));
+INSERT 0 1
+insert into test_func values((7,8));
+INSERT 0 1
+-- Functions with UDTs
+create function test_temp_func(temp_type_1, temp_type_2) RETURNS temp_type_1 AS '
+  select foo from test_func where (foo).a = 3;
+' LANGUAGE SQL; 
+CREATE FUNCTION
+SELECT * FROM test_temp_func((7,8), (5,6));
+ a | b 
+---+---
+ 3 | 4
+(1 row)
+
+drop function test_temp_func(temp_type_1, temp_type_2);
+DROP FUNCTION
+-- UDT and UDA
+create or replace function test_temp_func_2(temp_type_1, temp_type_1) RETURNS temp_type_1 AS '
+  select ($1.a + $2.a, $1.b + $2.b)::temp_type_1;
+' LANGUAGE SQL; 
+CREATE FUNCTION
+CREATE AGGREGATE agg_comp_type (temp_type_1) (
+   sfunc = test_temp_func_2, stype = temp_type_1,
+   initcond = '(0,0)'
+);
+CREATE AGGREGATE
+select agg_comp_type(foo) from test_func;
+ agg_comp_type 
+---------------
+ (16,20)
+(1 row)
+
+-- Check alter schema
+create schema type_test;
+CREATE SCHEMA
+alter type temp_type_1 set schema type_test;
+ALTER TYPE
+\dT temp_type_1
+     List of data types
+ Schema | Name | Description 
+--------+------+-------------
+(0 rows)
+
+\dT type_test.temp_type_1
+                   List of data types
+  Schema   |         Name          |     Description     
+-----------+-----------------------+---------------------
+ type_test | type_test.temp_type_1 | test composite type
+(1 row)
+
+\d test_func
+    Append-Only Table "public.test_func"
+ Column |         Type          | Modifiers 
+--------+-----------------------+-----------
+ foo    | type_test.temp_type_1 | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+
+select foo from test_func where (foo).a = 3;
+  foo  
+-------
+ (3,4)
+(1 row)
+
+-- type name with truncation
+create type abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890 as (a int, b int);
+psql:/tmp/TestCreateTypeComposite_BasicTest.sql:85: NOTICE:  identifier "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890" will be truncated to "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1"
+CREATE TYPE
+create table huge_type_table (a abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890);
+psql:/tmp/TestCreateTypeComposite_BasicTest.sql:87: NOTICE:  identifier "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890" will be truncated to "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1"
+CREATE TABLE
+insert into huge_type_table values ((1,2));
+INSERT 0 1
+insert into huge_type_table values ((3,4));
+INSERT 0 1
+select * from huge_type_table;
+   a   
+-------
+ (1,2)
+ (3,4)
+(2 rows)
+
+\d huge_type_table;
+                      Append-Only Table "public.huge_type_table"
+ Column |                              Type                               | Modifiers 
+--------+-----------------------------------------------------------------+-----------
+ a      | abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1 | 
+Compression Type: None
+Compression Level: 0
+Block Size: 32768
+Checksum: f
+Distributed randomly
+
+drop table huge_type_table;
+DROP TABLE
+drop type abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890;
+psql:/tmp/TestCreateTypeComposite_BasicTest.sql:95: NOTICE:  identifier "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1234567890" will be truncated to "abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz1"
+DROP TYPE
+-- composite type array tests ..negative test
+create table type_array_table (col_one type_test.temp_type_1[]);
+psql:/tmp/TestCreateTypeComposite_BasicTest.sql:98: ERROR:  type "type_test.temp_type_1[]" does not exist
+\c db_testcreatetypecomposite_basictest 
+You are now connected to database "db_testcreatetypecomposite_basictest" as user "ivan".

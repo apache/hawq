@@ -832,40 +832,10 @@ public class GPDBWritable implements Writable {
      * @return type name
      */
     public static String getTypeName(int oid) {
-        switch (DataType.get(oid)) {
-            case BOOLEAN:
-                return "BOOLEAN";
-            case BYTEA:
-                return "BYTEA";
-            case CHAR:
-                return "CHAR";
-            case BIGINT:
-                return "BIGINT";
-            case SMALLINT:
-                return "SMALLINT";
-            case INTEGER:
-                return "INTEGER";
-            case TEXT:
-                return "TEXT";
-            case REAL:
-                return "REAL";
-            case FLOAT8:
-                return "FLOAT8";
-            case BPCHAR:
-                return "BPCHAR";
-            case VARCHAR:
-                return "VARCHAR";
-            case DATE:
-                return "DATE";
-            case TIME:
-                return "TIME";
-            case TIMESTAMP:
-                return "TIMESTAMP";
-            case NUMERIC:
-                return "NUMERIC";
-            default:
-                return "TEXT";
-        }
+        DataType type = DataType.get(oid);
+        if (type == UNSUPPORTED_TYPE)
+            return DataType.TEXT.name();
+        return type.name();
     }
 
     /*

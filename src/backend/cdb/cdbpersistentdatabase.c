@@ -612,7 +612,7 @@ void PersistentDatabase_MarkCreatePending(
 	 */
 #ifdef MASTER_MIRROR_SYNC
 	mmxlog_log_create_database(dbDirNode->tablespace, dbDirNode->database,
-			persistentTid, persistentSerialNum);
+			persistentTid, *persistentSerialNum);
 #endif
 
 
@@ -1291,7 +1291,7 @@ void PersistentDatabase_MarkJustInTimeCreatePending(
 #ifdef MASTER_MIRROR_SYNC
 	mmxlog_log_create_database(dbDirNode->tablespace,
 							   dbDirNode->database,
-							   persistentTid, persistentSerialNum);
+							   persistentTid, *persistentSerialNum);
 #endif
 	
 	WRITE_PERSISTENT_STATE_ORDERED_UNLOCK;

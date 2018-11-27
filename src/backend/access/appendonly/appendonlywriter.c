@@ -977,7 +977,7 @@ addCandidateSegno(AOSegfileStatus **maxSegno4Seg, int segment_num, AOSegfileStat
  *
  */
 List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num,
-        bool forNewRel,
+        bool forNewRel, bool reuse_segfilenum_in_same_xid,
         bool keepHash)
 {
     /* these vars are used in GP_ROLE_DISPATCH only */
@@ -1082,7 +1082,7 @@ List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num,
             {
                 if (!segfilestatus->isfull)
                 {
-                    if (segfilestatus->xid == CurrentXid)
+                    if (segfilestatus->xid == CurrentXid && reuse_segfilenum_in_same_xid)
                     {
                         has_same_txn_status = true;
                         if(CheckSegFileForWriteIfNeeded(aoentry, segfilestatus)){
@@ -1209,7 +1209,7 @@ List *assignPerRelSegno(List *all_relids, int segment_num)
 			n = makeNode(SegfileMapNode);
 			n->relid = cur_relid;
 
-			n->segnos = SetSegnoForWrite(NIL, cur_relid, segment_num, false, true);
+			n->segnos = SetSegnoForWrite(NIL, cur_relid, segment_num, false, true, true);
 
 			Assert(n->relid != InvalidOid);
 			Assert(n->segnos != NIL);

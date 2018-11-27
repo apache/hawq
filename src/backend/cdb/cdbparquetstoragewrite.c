@@ -721,12 +721,11 @@ void estimateColumnWidth(int *columnWidths,
 
 		/* variable length type */
 		case HAWQ_TYPE_CHAR:
-		case HAWQ_TYPE_BPCHAR:
 			/* for char(n), atttypmod is n + 4 */
 			Assert(att->atttypmod > 4);
 			columnWidths[(*colidx)++] = att->atttypmod;
 			break;
-			break;
+		case HAWQ_TYPE_BPCHAR:
 		case HAWQ_TYPE_VARCHAR:
 		case HAWQ_TYPE_TEXT:
 		case HAWQ_TYPE_XML:

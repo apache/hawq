@@ -20,17 +20,20 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 
+import org.apache.hawq.pxf.api.BasicFilter;
 import org.apache.hawq.pxf.api.FilterParser;
+import org.apache.hawq.pxf.api.LogicalFilter;
 import org.apache.hawq.pxf.api.utilities.InputData;
 
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 /**
  * Uses the filter parser code to build a filter object, either simple - a
- * single {@link org.apache.hawq.pxf.api.FilterParser.BasicFilter} object or a
+ * single {@link BasicFilter} object or a
  * compound - a {@link java.util.List} of
- * {@link org.apache.hawq.pxf.api.FilterParser.BasicFilter} objects.
+ * {@link BasicFilter} objects.
  * {@link org.apache.hawq.pxf.plugins.hive.HiveAccessor} will use the filter for
  * partition filtering.
  */
@@ -47,21 +50,24 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     /**
-     * Translates a filterString into a {@link org.apache.hawq.pxf.api.FilterParser.BasicFilter} or a
+     * Translates a filterString into a {@link BasicFilter} or a
      * list of such filters.
      *
      * @param filterString the string representation of the filter
-     * @return a single {@link org.apache.hawq.pxf.api.FilterParser.BasicFilter}
+     * @return a single {@link BasicFilter}
      *         object or a {@link java.util.List} of
-     *         {@link org.apache.hawq.pxf.api.FilterParser.BasicFilter} objects.
+     *         {@link BasicFilter} objects.
      * @throws Exception if parsing the filter failed or filter is not a basic
      *             filter or list of basic filters
      */
     public Object getFilterObject(String filterString) throws Exception {
-        FilterParser parser = new FilterParser(this);
-        Object result = parser.parse(filterString);
+        if (filterString == null)
+            return null;
 
-        if (!(result instanceof FilterParser.BasicFilter)
+        FilterParser parser = new FilterParser(this);
+        Object result = parser.parse(filterString.getBytes(FilterParser.DEFAULT_CHARSET));
+
+        if (!(result instanceof LogicalFilter) && !(result instanceof BasicFilter)
                 && !(result instanceof List)) {
             throw new Exception("String " + filterString
                     + " resolved to no filter");
@@ -71,47 +77,43 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
     }
 
     @Override
+    public Object build(FilterParser.LogicalOperation op, Object leftOperand, Object rightOperand) {
+        return handleLogicalOperation(op, leftOperand, rightOperand);
+    }
+
+    @Override
+    public Object build(FilterParser.LogicalOperation op, Object filter) {
+        return handleLogicalOperation(op, filter);
+    }
+
+    @Override
     @SuppressWarnings("unchecked")
     public Object build(FilterParser.Operation opId, Object leftOperand,
                         Object rightOperand) throws Exception {
-        if (leftOperand instanceof FilterParser.BasicFilter
-                || leftOperand instanceof List) {
-            if (opId != FilterParser.Operation.HDOP_AND
-                    || !(rightOperand instanceof FilterParser.BasicFilter)) {
-                throw new Exception(
-                        "Only AND is allowed between compound expressions");
-            }
-
-            if (leftOperand instanceof List) {
-                return handleCompoundOperations(
-                        (List<FilterParser.BasicFilter>) leftOperand,
-                        (FilterParser.BasicFilter) rightOperand);
-            } else {
-                return handleCompoundOperations(
-                        (FilterParser.BasicFilter) leftOperand,
-                        (FilterParser.BasicFilter) rightOperand);
-            }
-        }
-
-        if (!(rightOperand instanceof FilterParser.Constant)) {
-            throw new Exception(
-                    "expressions of column-op-column are not supported");
-        }
-
         // Assume column is on the left
         return handleSimpleOperations(opId,
                 (FilterParser.ColumnIndex) leftOperand,
                 (FilterParser.Constant) rightOperand);
     }
 
+    @Override
+    public Object build(FilterParser.Operation operation, Object operand) throws Exception {
+        if (operation == FilterParser.Operation.HDOP_IS_NULL || operation == FilterParser.Operation.HDOP_IS_NOT_NULL) {
+            // use null for the constant value of null comparison
+            return handleSimpleOperations(operation, (FilterParser.ColumnIndex) operand, null);
+        } else {
+            throw new Exception("Unsupported unary operation " + operation);
+        }
+    }
+
     /*
      * Handles simple column-operator-constant expressions Creates a special
      * filter in the case the column is the row key column
      */
-    private FilterParser.BasicFilter handleSimpleOperations(FilterParser.Operation opId,
-                                                            FilterParser.ColumnIndex column,
-                                                            FilterParser.Constant constant) {
-        return new FilterParser.BasicFilter(opId, column, constant);
+    private BasicFilter handleSimpleOperations(FilterParser.Operation opId,
+                                               FilterParser.ColumnIndex column,
+                                               FilterParser.Constant constant) {
+        return new BasicFilter(opId, column, constant);
     }
 
     /**
@@ -131,19 +133,32 @@ public class HiveFilterBuilder implements FilterParser.FilterBuilder {
      * @param right right hand filter
      * @return list of filters constructing the filter tree
      */
-    private List<FilterParser.BasicFilter> handleCompoundOperations(List<FilterParser.BasicFilter> left,
-                                                                    FilterParser.BasicFilter right) {
+    private List<BasicFilter> handleCompoundOperations(List<BasicFilter> left,
+                                                       BasicFilter right) {
         left.add(right);
         return left;
     }
 
-    private List<FilterParser.BasicFilter> handleCompoundOperations(FilterParser.BasicFilter left,
-                                                                    FilterParser.BasicFilter right) {
-        List<FilterParser.BasicFilter> result = new LinkedList<FilterParser.BasicFilter>();
+    private List<BasicFilter> handleCompoundOperations(BasicFilter left,
+                                                       BasicFilter right) {
+        List<BasicFilter> result = new LinkedList<BasicFilter>();
 
         result.add(left);
         result.add(right);
 
         return result;
+    }
+
+    private Object handleLogicalOperation(FilterParser.LogicalOperation operator, Object leftOperand, Object rightOperand) {
+
+        List<Object> result = new LinkedList<>();
+
+        result.add(leftOperand);
+        result.add(rightOperand);
+        return new LogicalFilter(operator, result);
+    }
+
+    private Object handleLogicalOperation(FilterParser.LogicalOperation operator, Object filter) {
+        return new LogicalFilter(operator, Arrays.asList(filter));
     }
 }

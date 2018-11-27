@@ -12,7 +12,7 @@ class TestExternalTable : public ::testing::Test {
   ~TestExternalTable() {}
 };
 
-TEST_F(TestExternalTable, TestExternalTableAll) {
+TEST_F(TestExternalTable, DISABLED_TestExternalTableAll) {
   SQLUtility util;
   auto test_root = util.getTestRootPath();
   auto replace_lambda = [&] () {

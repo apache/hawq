@@ -45,14 +45,14 @@ void initSimpleStringWithContent( SimpStringPtr str,
 					  	  	  	  int 		    length);
 /* set string value. */
 void setSimpleStringWithContent( SimpStringPtr  str,
-					  	  	 	 char		   *content,
+					  	  	 	 const char		   *content,
 					  	  	 	 int		    length);
 
 /* free simple string with allocated content. */
 void freeSimpleStringContent(SimpStringPtr str);
 
 /* Reference one existing buffer without memory allocation. */
-void setSimpleStringRef(SimpStringPtr str, char *content, int length);
+void setSimpleStringRef(SimpStringPtr str, const char *content, int length);
 
 /* string operations. */
 int  SimpleStringFind(SimpStringPtr str, char *target);
@@ -63,7 +63,7 @@ bool SimpleStringEmpty(SimpStringPtr str);
 int  SimpleStringLocateChar(SimpStringPtr str, char target, int *location);
 /* string to the other number values. */
 int  SimpleStringToInt32(SimpStringPtr str, int32_t *value);
-int  SimpleStringToInt64(SimpStringPtr str, int64_t *value);
+int  SimpleStringToInt64(SimpStringPtr str, int64 *value);
 int  SimpleStringToDouble(SimpStringPtr str, double *value);
 int  SimpleStringToBool(SimpStringPtr str, bool *value);
 

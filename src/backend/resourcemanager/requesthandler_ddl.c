@@ -101,22 +101,22 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	RPCRequestHeadManipulateResQueue request = (RPCRequestHeadManipulateResQueue)
 											   ((*conntrack)->MessageBuff.Buffer);
 
-	elog(LOG, "Resource manager gets a request from ConnID %d to submit resource "
+	elog(LOG, "resource manager gets a request from ConnID %d to submit resource "
 			  "queue DDL statement.",
 			  request->ConnID);
 
-	elog(DEBUG3, "With attribute list size %d", request->WithAttrLength);
+	elog(DEBUG3, "with attribute list size %d", request->WithAttrLength);
 
 	if ( (*conntrack)->ConnID == INVALID_CONNID )
 	{
 		res = retrieveConnectionTrack((*conntrack), request->ConnID);
 		if ( res != FUNC_RETURN_OK )
 		{
-			elog(WARNING, "Not valid resource context with id %d.", request->ConnID);
+			elog(WARNING, "invalid resource context with id %d.", request->ConnID);
 			goto senderr;
 		}
 
-		elog(DEBUG5, "Resource manager fetched existing connection track "
+		elog(DEBUG5, "resource manager fetched existing connection track "
 					 "ID=%d, Progress=%d.",
 					 (*conntrack)->ConnID,
 					 (*conntrack)->Progress);
@@ -173,7 +173,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	foreach(cell, rsqattr)
 	{
 		KVProperty attribute = lfirst(cell);
-		elog(RMLOG, "Resource manager received DDL Request: %s=%s",
+		elog(RMLOG, "resource manager received DDL Request: %s=%s",
 				    attribute->Key.Str,
 					attribute->Val.Str);
 	}
@@ -186,7 +186,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 	if (res != FUNC_RETURN_OK)
 	{
 		ddlres = res;
-		elog(WARNING, "Cannot recognize DDL attribute, %s", errorbuf);
+		elog(WARNING, "cannot recognize DDL attribute, %s", errorbuf);
 		goto senderr;
 	}
 
@@ -210,7 +210,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				snprintf(errorbuf, sizeof(errorbuf),
 						"exceed maximum resource queue number %d",
 						rm_nresqueue_limit);
-				elog(WARNING, "Resource manager can not create resource queue "
+				elog(WARNING, "resource manager cannot create resource queue "
 							  "because %s",
 							  errorbuf);
 				goto senderr;
@@ -227,7 +227,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				rm_pfree(PCONTEXT, newqueue);
 				ddlres = res;
-				elog(WARNING, "Resource manager can not create resource queue "
+				elog(WARNING, "resource manager cannot create resource queue "
 							  "with its attributes because %s",
 							  errorbuf);
 				goto senderr;
@@ -240,7 +240,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				rm_pfree(PCONTEXT, newqueue);
 				ddlres = res;
-				elog(WARNING, "Resource manager can not complete resource queue's "
+				elog(WARNING, "resource manager cannot complete resource queue's "
 							  "attributes because %s",
 							  errorbuf);
 				goto senderr;
@@ -254,8 +254,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				if (newtrack != NULL)
 					rm_pfree(PCONTEXT, newtrack);
 				ddlres = res;
-				elog(WARNING, "Resource manager can not create resource queue %s "
-							  "because %s",
+				elog(WARNING, "resource manager cannot create resource queue \'%s\', %s",
 							  newqueue->Name,
 							  errorbuf);
 				goto senderr;
@@ -267,14 +266,13 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, "Cannot update resource queue changes in pg_resqueue.");
+				elog(WARNING, "cannot update resource queue changes in pg_resqueue.");
 
 				/* If fail in updating catalog table, revert previous operations in RM. */
 				res = dropQueueAndTrack(newtrack, errorbuf, sizeof(errorbuf));
 				if (res != FUNC_RETURN_OK)
 				{
-					elog(WARNING, "Resource manager cannot drop queue and track "
-								  "because %s",
+					elog(WARNING, "resource manager cannot drop queue and track, %s",
 								  errorbuf);
 				}
 				goto senderr;
@@ -332,7 +330,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				rm_pfree(PCONTEXT, newqueue);
 				ddlres = res;
-				elog(WARNING, "Resource manager cannot alter resource queue %s, %s",
+				elog(WARNING, "resource manager cannot alter resource queue \'%s\', %s",
 							  nameattr->Val.Str,
 							  errorbuf);
 				goto senderr;
@@ -346,7 +344,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				ddlres = RESQUEMGR_NO_QUENAME;
 				snprintf(errorbuf, sizeof(errorbuf), "the queue doesn't exist");
-				elog(WARNING, "Resource manager cannot alter resource queue %s, %s",
+				elog(WARNING, "resource manager cannot alter resource queue \'%s\', %s",
 							  nameattr->Val.Str,
 							  errorbuf);
 				goto senderr;
@@ -374,13 +372,13 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 					{
 						ddlres = RESQUEMGR_ALTERQUEUE_NOTALLOWED;
 						snprintf(errorbuf, sizeof(errorbuf),
-								 "user can only alter branch resource queue %s "
+								 "user can only alter branch resource queue \'%s\' "
 								 "attributes %s and %s",
 								 nameattr->Val.Str,
 								 RSQDDLAttrNames[RSQ_DDL_ATTR_MEMORY_LIMIT_CLUSTER],
 								 RSQDDLAttrNames[RSQ_DDL_ATTR_CORE_LIMIT_CLUSTER]);
-						elog(WARNING, "Resource manager cannot alter resource "
-									  "queue %s, %s",
+						elog(WARNING, "resource manager cannot alter resource "
+									  "queue \'%s\', %s",
 									  nameattr->Val.Str,
 									  errorbuf);
 						goto senderr;
@@ -399,7 +397,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, "Resource manager cannot update resource queue with "
+				elog(WARNING, "resource manager cannot update resource queue with "
 							  "its attributes, %s",
 							  errorbuf);
 				cleanupQueueTrackShadows(&qhavingshadow);
@@ -413,7 +411,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, "Resource manager cannot complete resource queue "
+				elog(WARNING, "resource manager cannot complete resource queue "
 							  "attributes, %s",
 							  errorbuf);
 				cleanupQueueTrackShadows(&qhavingshadow);
@@ -452,7 +450,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if ( res != FUNC_RETURN_OK )
 			{
 				ddlres = res;
-				elog(WARNING, "Can not apply alter resource queue changes, %s",
+				elog(WARNING, "cannot apply alter resource queue changes, %s",
 							  errorbuf);
 				cleanupQueueTrackShadows(&qhavingshadow);
 				goto senderr;
@@ -465,7 +463,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, "Cannot alter resource queue changes in pg_resqueue.");
+				elog(WARNING, "cannot alter resource queue changes in pg_resqueue.");
 				cleanupQueueTrackShadows(&qhavingshadow);
 				goto senderr;
 			}
@@ -485,9 +483,9 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				ddlres = RESQUEMGR_NO_QUENAME;
 				snprintf(errorbuf, sizeof(errorbuf),
-						 "resource queue %s doesn't exist",
+						 "resource queue \'%s\' doesn't exist",
 						 nameattr->Val.Str);
-				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+				elog(WARNING, "resource manager cannot drop resource queue \'%s\', %s",
 							  nameattr->Val.Str,
 							  errorbuf);
 				goto senderr;
@@ -497,9 +495,9 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			{
 				ddlres = RESQUEMGR_IN_USE;
 				snprintf(errorbuf, sizeof(errorbuf),
-						 "resource queue %s is a branch queue",
+						 "resource queue \'%s\' is a branch queue",
 						 todroptrack->QueueInfo->Name);
-				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+				elog(WARNING, "Resource manager cannot drop resource queue \'%s\', %s",
 							  nameattr->Val.Str,
 							  errorbuf);
 				goto senderr;
@@ -509,9 +507,9 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				 todroptrack->QueryResRequests.NodeCount > 0 )
 			{
 				ddlres = RESQUEMGR_IN_USE;
-				snprintf(errorbuf, sizeof(errorbuf), "resource queue %s is busy",
+				snprintf(errorbuf, sizeof(errorbuf), "resource queue \'%s\' is busy",
 						 todroptrack->QueueInfo->Name);
-				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+				elog(WARNING, "resource manager cannot drop resource queue \'%s\', %s",
 							  nameattr->Val.Str,
 							  errorbuf);
 				goto senderr;
@@ -525,7 +523,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 				ddlres = res;
 				snprintf(errorbuf, sizeof(errorbuf),
 						 "cannot update resource queue changes in pg_resqueue");
-				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+				elog(WARNING, "Resource manager cannot drop resource queue \'%s\', %s",
 							  nameattr->Val.Str,
 							  errorbuf);
 				goto senderr;
@@ -535,7 +533,7 @@ bool handleRMDDLRequestManipulateResourceQueue(void **arg)
 			if (res != FUNC_RETURN_OK)
 			{
 				ddlres = res;
-				elog(WARNING, "Resource manager cannot drop resource queue %s, %s",
+				elog(WARNING, "resource manager cannot drop resource queue \'%s\', %s",
 							  nameattr->Val.Str,
 						      errorbuf);
 				goto senderr;
@@ -632,7 +630,7 @@ bool handleRMDDLRequestManipulateRole(void **arg)
 			user->isSuperUser = request->isSuperUser;
 			strncpy(user->Name, request->Name, sizeof(user->Name)-1);
 			createUser(user);
-			elog(LOG, "Resource manager handles request CREATE ROLE oid:%d, "
+			elog(LOG, "resource manager handles request CREATE ROLE oid:%d, "
 					  "queueID:%d, isSuper:%d, roleName:%s",
 					  request->RoleOID,
 					  request->QueueOID,
@@ -657,7 +655,7 @@ bool handleRMDDLRequestManipulateRole(void **arg)
 			user->isSuperUser = request->isSuperUser;
 			strncpy(user->Name, request->Name, sizeof(user->Name)-1);
 			createUser(user);
-			elog(LOG, "Resource manager handles request ALTER ROLE oid:%d, "
+			elog(LOG, "resource manager handles request ALTER ROLE oid:%d, "
 					  "queueID:%d, isSuper:%d, roleName:%s",
 					  request->RoleOID,
 					  request->QueueOID,
@@ -671,7 +669,7 @@ bool handleRMDDLRequestManipulateRole(void **arg)
 			int64_t roleoid = request->RoleOID;
 			res = dropUser(roleoid, request->Name);
 			Assert(res == FUNC_RETURN_OK);
-			elog(LOG, "Resource manager handles request drop role oid:%d, "
+			elog(LOG, "resource manager handles request drop role oid:%d, "
 					  "roleName:%s",
 					  request->RoleOID,
 					  request->Name);
@@ -722,7 +720,7 @@ int updateResqueueCatalog(int					 action,
 		res = performInsertActionForPGResqueue(insertaction, &newoid);
 		if(res != FUNC_RETURN_OK)
 		{
-			elog(WARNING, "Resource manager performs insert operation on "
+			elog(WARNING, "resource manager performs insert operation on "
 						  "pg_resqueue failed : %d",
 						  res);
 
@@ -761,9 +759,9 @@ int updateResqueueCatalog(int					 action,
 			res = performUpdateActionForPGResqueue(updateaction, parentname);
 			if(res != FUNC_RETURN_OK)
 			{
-				elog(WARNING, "Resource manager updates the status of the parent "
-							  "resource queue %s failed when create resource "
-							  "queue %s",
+				elog(WARNING, "resource manager updates the status of the parent "
+							  "resource queue \'%s\' failed when create resource "
+							  "queue \'%s\'",
 							  parenttrack->QueueInfo->Name,
 							  queuetrack->QueueInfo->Name);
 				DRMGlobalInstance->ResManagerMainKeepRun = false;
@@ -786,8 +784,8 @@ int updateResqueueCatalog(int					 action,
 		res = performUpdateActionForPGResqueue(updateaction, queuename);
 		if(res != FUNC_RETURN_OK)
 		{
-			elog(WARNING, "Resource manager performs update operation on "
-						  "pg_resqueue failed when update resource queue %s",
+			elog(WARNING, "resource manager performs update operation on "
+						  "pg_resqueue failed when update resource queue \'%s\'",
 						  queuename);
 			DRMGlobalInstance->ResManagerMainKeepRun = false;
 		}
@@ -800,8 +798,8 @@ int updateResqueueCatalog(int					 action,
 		res = performDeleteActionForPGResqueue(queuename);
 		if(res != FUNC_RETURN_OK)
 		{
-			elog(WARNING, "Resource manager performs delete operation on "
-						  "pg_resqueue failed when drop resource queue %s.",
+			elog(WARNING, "resource manager performs delete operation on "
+						  "pg_resqueue failed when drop resource queue \'%s\'.",
 						  queuename);
 			DRMGlobalInstance->ResManagerMainKeepRun = false;
 			break;
@@ -833,8 +831,8 @@ int updateResqueueCatalog(int					 action,
 			res = performUpdateActionForPGResqueue(updateaction, parentname);
 			if(res != FUNC_RETURN_OK)
 			{
-				elog(WARNING, "Resource manager updates the status of the parent "
-							  "resource queue %s failed when drop resource queue %s",
+				elog(WARNING, "resource manager updates the status of the parent "
+							  "resource queue \'%s\' failed when drop resource queue \'%s\'",
 							  parenttrack->QueueInfo->Name,
 							  queuetrack->QueueInfo->Name);
 				DRMGlobalInstance->ResManagerMainKeepRun = false;
@@ -1136,7 +1134,7 @@ int performInsertActionForPGResqueue(List *colvalues, Oid *newoid)
 	conn = PQconnectdb(conninfo);
 	if ((libpqres = PQstatus(conn)) != CONNECTION_OK)
 	{
-		elog(WARNING, "Resource manager failed to connect database when insert "
+		elog(WARNING, "resource manager failed to connect database when insert "
 					  "row into pg_resqueue, error code: %d, reason: %s",
 				      libpqres,
 				      PQerrorMessage(conn));
@@ -1147,7 +1145,7 @@ int performInsertActionForPGResqueue(List *colvalues, Oid *newoid)
 	result = PQexec(conn, "BEGIN");
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
 	{
-		elog(WARNING, "Resource manager failed to run SQL: %s when insert row "
+		elog(WARNING, "resource manager failed to run SQL: %s when insert row "
 					  "into pg_resqueue, reason: %s",
 				      "BEGIN",
 				      PQresultErrorMessage(result));
@@ -1163,7 +1161,7 @@ int performInsertActionForPGResqueue(List *colvalues, Oid *newoid)
 	sql = createPQExpBuffer();
 	if ( sql == NULL )
 	{
-		elog(WARNING, "Resource manager failed to allocate buffer for building "
+		elog(WARNING, "resource manager failed to allocate buffer for building "
 					  "sql statement.");
 		goto cleanup;
 	}
@@ -1206,11 +1204,11 @@ int performInsertActionForPGResqueue(List *colvalues, Oid *newoid)
 	}
 	appendPQExpBuffer(sql,"%s",")");
 
-	elog(LOG, "Resource manager created a new queue: %s", sql->data);
+	elog(LOG, "resource manager created a new queue: %s", sql->data);
 	result = PQexec(conn, sql->data);
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
 	{
-		elog(WARNING, "Resource manager failed to run SQL: %s failed "
+		elog(WARNING, "resource manager failed to run SQL: %s failed "
 				      "when insert row into pg_resqueue, reason : %s",
 				      sql->data,
 				      PQresultErrorMessage(result));
@@ -1224,7 +1222,7 @@ int performInsertActionForPGResqueue(List *colvalues, Oid *newoid)
 	result = PQexec(conn, sql->data);
 	if (!result || PQresultStatus(result) != PGRES_TUPLES_OK)
 	{
-		elog(WARNING, "Resource manager failed to run SQL: %s failed, reason : %s",
+		elog(WARNING, "resource manager failed to run SQL: %s failed, reason : %s",
 				      sql->data,
 				      PQresultErrorMessage(result));
 		PQexec(conn, "ABORT");
@@ -1246,7 +1244,7 @@ int performInsertActionForPGResqueue(List *colvalues, Oid *newoid)
 	result = PQexec(conn, "COMMIT");
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
 	{
-		elog(WARNING, "Resource manager failed to run SQL: %s "
+		elog(WARNING, "resource manager failed to run SQL: %s "
 			      	  "when insert row into pg_resqueue, reason : %s",
 					  "COMMIT",
 					  PQresultErrorMessage(result));
@@ -1254,7 +1252,7 @@ int performInsertActionForPGResqueue(List *colvalues, Oid *newoid)
 		res = LIBPQ_FAIL_EXECUTE;
 		goto cleanup;
 	}
-	elog(LOG, "Resource manager created a new resource queue, oid is: %d", *newoid);
+	elog(LOG, "resource manager created a new resource queue, oid is: %d", *newoid);
 
 cleanup:
 	if(sql != NULL)
@@ -1290,7 +1288,7 @@ int performUpdateActionForPGResqueue(List *colvalues, char *queuename)
 	conn = PQconnectdb(conninfo);
 	if ((libpqres = PQstatus(conn)) != CONNECTION_OK)
 	{
-		elog(WARNING, "Resource manager failed to connect database when update "
+		elog(WARNING, "resource manager failed to connect database when update "
 					  "row of pg_resqueue, error code: %d, reason: %s",
 			      	  libpqres,
 			      	  PQerrorMessage(conn));
@@ -1301,7 +1299,7 @@ int performUpdateActionForPGResqueue(List *colvalues, char *queuename)
 	result = PQexec(conn, "BEGIN");
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
 	{
-		elog(WARNING, "Resource manager failed to run SQL: %s when update row "
+		elog(WARNING, "resource manager failed to run SQL: %s when update row "
 					  "of pg_resqueue, reason : %s",
 					  "BEGIN",
 					  PQresultErrorMessage(result));
@@ -1316,7 +1314,7 @@ int performUpdateActionForPGResqueue(List *colvalues, char *queuename)
 	sql = createPQExpBuffer();
 	if ( sql == NULL )
 	{
-		elog(WARNING, "Resource manager failed to allocate buffer for building "
+		elog(WARNING, "resource manager failed to allocate buffer for building "
 					  "sql statement.");
 		goto cleanup;
 	}
@@ -1341,7 +1339,7 @@ int performUpdateActionForPGResqueue(List *colvalues, char *queuename)
 	}
 	appendPQExpBuffer(sql, " WHERE rsqname='%s'", queuename);
 
-	elog(LOG, "Resource manager updates resource queue: %s",sql->data);
+	elog(LOG, "resource manager updates resource queue: %s",sql->data);
 	result = PQexec(conn, sql->data);
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
 	{
@@ -1357,7 +1355,7 @@ int performUpdateActionForPGResqueue(List *colvalues, char *queuename)
 	result = PQexec(conn, "COMMIT");
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
 	{
-		elog(WARNING, "Resource manager failed to run SQL: %s "
+		elog(WARNING, "resource manager failed to run SQL: %s "
 				  	  "when update row of pg_resqueue, reason : %s",
 					  "COMMIT",
 					  PQresultErrorMessage(result));
@@ -1365,7 +1363,7 @@ int performUpdateActionForPGResqueue(List *colvalues, char *queuename)
 		res = LIBPQ_FAIL_EXECUTE;
 		goto cleanup;
 	}
-	elog(LOG, "Resource queue %s is updated", queuename);
+	elog(LOG, "Resource queue \'%s\' is updated", queuename);
 
 cleanup:
 	if(sql != NULL)
@@ -1396,7 +1394,7 @@ int performDeleteActionForPGResqueue(char *queuename)
 			"dbname=template1 port=%d connect_timeout=%d", master_addr_port, LIBPQ_CONNECT_TIMEOUT);
 	conn = PQconnectdb(conninfo);
 	if ((libpqres = PQstatus(conn)) != CONNECTION_OK) {
-		elog(WARNING, "Resource manager failed to connect database when delete a row from pg_resqueue,"
+		elog(WARNING, "resource manager failed to connect database when delete a row from pg_resqueue,"
 		      	  	  "error code: %d, reason: %s",
 		      	  	  libpqres,
 		      	  	  PQerrorMessage(conn));
@@ -1407,7 +1405,7 @@ int performDeleteActionForPGResqueue(char *queuename)
 
 	result = PQexec(conn, "BEGIN");
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK) {
-		elog(WARNING, "Resource manager failed to run SQL: %s "
+		elog(WARNING, "resource manager failed to run SQL: %s "
 				  	  "when delete a row from pg_resqueue, reason : %s",
 	      	  	  	  "BEGIN",
 	      	  	  	  PQresultErrorMessage(result));
@@ -1422,14 +1420,14 @@ int performDeleteActionForPGResqueue(char *queuename)
 	sql = createPQExpBuffer();
 	if ( sql == NULL )
 	{
-		elog(WARNING, "Resource manager failed to allocate buffer for building "
+		elog(WARNING, "resource manager failed to allocate buffer for building "
 					  "sql statement.");
 		goto cleanup;
 	}
 	appendPQExpBuffer(sql, "SELECT oid FROM pg_resqueue WHERE rsqname = '%s'", queuename);
 	result = PQexec(conn, sql->data);
 	if (!result || PQresultStatus(result) != PGRES_TUPLES_OK) {
-		elog(WARNING, "Resource manager failed to run SQL: %s "
+		elog(WARNING, "resource manager failed to run SQL: %s "
 			  	  	  "when delete a row from pg_resqueue, reason : %s",
 					  sql->data,
 					  PQresultErrorMessage(result));
@@ -1438,7 +1436,7 @@ int performDeleteActionForPGResqueue(char *queuename)
 	}
 	queueid = (uint32) atoi(PQgetvalue(result, 0, 0));
 	if(queueid == InvalidOid) {
-		elog(WARNING, "Resource manager gets an invalid oid when delete a row from pg_resqueue");
+		elog(WARNING, "resource manager gets an invalid oid when delete a row from pg_resqueue");
 		res = PGRES_FATAL_ERROR;
 		goto cleanup;
 	}
@@ -1449,10 +1447,10 @@ int performDeleteActionForPGResqueue(char *queuename)
 	PQclear(result);
 	resetPQExpBuffer(sql);
 	appendPQExpBuffer(sql, "DELETE FROM pg_resqueue WHERE rsqname = '%s'", queuename);
-	elog(LOG, "Resource manager drops a resource queue: %s",sql->data);
+	elog(LOG, "resource manager drops a resource queue: %s",sql->data);
 	result = PQexec(conn, sql->data);
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK) {
-		elog(WARNING, "Resource manager failed to run SQL: %s "
+		elog(WARNING, "resource manager failed to run SQL: %s "
 		  	  	  	  "when delete a row from pg_resqueue, reason : %s",
 					  sql->data,
 					  PQresultErrorMessage(result));
@@ -1470,7 +1468,7 @@ int performDeleteActionForPGResqueue(char *queuename)
 					  queueid, ResQueueRelationId);
 	result = PQexec(conn, sql->data);
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
-		elog(WARNING, "Resource manager failed to run SQL: %s "
+		elog(WARNING, "resource manager failed to run SQL: %s "
 		  	  	  	  "when delete a row from pg_resqueue, reason : %s",
 					  sql->data,
 					  PQresultErrorMessage(result));
@@ -1483,7 +1481,7 @@ int performDeleteActionForPGResqueue(char *queuename)
 				      ResQueueRelationId, queueid);
 	result = PQexec(conn, sql->data);
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK)
-		elog(WARNING, "Resource manager failed to run SQL: %s "
+		elog(WARNING, "resource manager failed to run SQL: %s "
 		  	  	  	  "when delete a row from pg_resqueue, reason : %s",
 					  sql->data,
 					  PQresultErrorMessage(result));
@@ -1491,7 +1489,7 @@ int performDeleteActionForPGResqueue(char *queuename)
 	PQclear(result);
 	result = PQexec(conn, "COMMIT");
 	if (!result || PQresultStatus(result) != PGRES_COMMAND_OK) {
-		elog(WARNING, "Resource manager failed to run SQL: %s "
+		elog(WARNING, "resource manager failed to run SQL: %s "
 		  	  	  	  "when delete a row from pg_resqueue, reason : %s",
 					  "COMMIT",
 					  PQresultErrorMessage(result));
@@ -1500,7 +1498,7 @@ int performDeleteActionForPGResqueue(char *queuename)
 		goto cleanup;
 	}
 
-	elog(LOG, "Resource queue %s is dropped", queuename);
+	elog(LOG, "resource queue \'%s\' is dropped", queuename);
 
 cleanup:
 	if(sql != NULL)

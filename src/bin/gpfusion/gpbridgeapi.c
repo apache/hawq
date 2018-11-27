@@ -181,6 +181,7 @@ void add_querydata_to_http_header(gphadoop_context* context, PG_FUNCTION_ARGS)
 	inputData.headers = context->churl_headers;
 	inputData.gphduri = context->gphd_uri;
 	inputData.rel = EXTPROTOCOL_GET_RELATION(fcinfo);
+	inputData.quals = EXTPROTOCOL_GET_SCANQUALS(fcinfo);
 	inputData.filterstr = serializePxfFilterQuals(EXTPROTOCOL_GET_SCANQUALS(fcinfo));
 	if (EXTPROTOCOL_GET_SELECTDESC(fcinfo))
 		inputData.proj_info = EXTPROTOCOL_GET_PROJINFO(fcinfo);
@@ -224,6 +225,17 @@ void set_current_fragment_headers(gphadoop_context* context)
 	{
 		churl_headers_remove(context->churl_headers, "X-GP-FRAGMENT-USER-DATA", true);
 	}
+
+	/* if current fragment has optimal profile set it*/
+	if (frag_data->profile)
+	{
+		churl_headers_override(context->churl_headers, "X-GP-PROFILE", frag_data->profile);
+	} else if (context->gphd_uri->profile)
+	{
+		/* if current fragment doesn't have any optimal profile, set to use profile from url */
+		churl_headers_override(context->churl_headers, "X-GP-PROFILE", context->gphd_uri->profile);
+	}
+	/* if there is no profile passed in url, we expect to have accessor+fragmenter+resolver so no action needed by this point */
 
 }
 

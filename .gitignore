@@ -41,6 +41,12 @@ objfiles.txt
 .pydevproject
 .cproject
 .settings
+.classpath
+
+# IDEA Project
+*.iml
+.idea
+
 # Ctags
 **/tags
 
@@ -54,6 +60,7 @@ env.sh
 ext/
 plr.tgz
 autom4te.cache/
+**/target
 
 # coverage
 *.gcda

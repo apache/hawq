@@ -200,14 +200,19 @@ const string PSQL::_getPSQLFileCommand(const string& file) const {
 bool PSQL::checkDiff(const string& expect_file,
                      const string& result_file,
                      bool save_diff,
+                     const string& global_init_file,
                      const string& init_file) {
   string diff_file = result_file + ".diff";
   string command;
-  command.append("gpdiff.pl ")
+  command.append("gpdiff.pl -du ")
       .append(PSQL_BASIC_DIFF_OPTS);
+  if (!global_init_file.empty()) {
+      command.append(" -gpd_init ")
+          .append(global_init_file);
+  }
   if (!init_file.empty()) {
       command.append(" -gpd_init ")
-      .append(init_file);
+          .append(init_file);
   }
   command.append(" ")
       .append(expect_file)

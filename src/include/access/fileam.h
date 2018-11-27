@@ -72,8 +72,6 @@ typedef struct ExternalSelectDescData
 	ProjectionInfo *projInfo;
 } ExternalSelectDescData;
 
-typedef ExternalSelectDescData *ExternalSelectDesc;
-
 typedef enum DataLineStatus
 {
 	LINE_OK,

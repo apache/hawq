@@ -1,0 +1,30 @@
+{
+  "isEnabled": true,
+  "service": "hawq",
+  "name": "TablespaceTest",
+  "policyType": 0,
+  "description": "Test policy for tablespace resource",
+  "isAuditEnabled": true,
+  "resources": {
+    "tablespace": {
+      "values": ["pg_global"],
+      "isExcludes": false,
+      "isRecursive": false
+    }
+  },
+  "policyItems": [{
+    "accesses": [{
+      "type": "create",
+      "isAllowed": true
+    }],
+    "users": ["maria_dev"],
+    "groups": [],
+    "conditions": [],
+    "delegateAdmin": true
+  }],
+  "denyPolicyItems": [],
+  "allowExceptions": [],
+  "denyExceptions": [],
+  "dataMaskPolicyItems": [],
+  "rowFilterPolicyItems": []
+}

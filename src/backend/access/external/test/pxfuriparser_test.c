@@ -72,6 +72,7 @@ test__parseGPHDUri__ValidURI(void **state)
 	assert_string_equal(option->value, "SomeAnalyzer");
 
 	assert_true(parsed->fragments == NULL);
+	assert_true(parsed->profile == NULL);
 
 	freeGPHDUri(parsed);
 }
@@ -180,6 +181,7 @@ test__parseGPHDUri__NegativeTestNoProtocol(void **state)
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf:/1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter");
+		elog_dismiss(INFO);
 		return;
 	}
 	PG_END_TRY();
@@ -210,6 +212,7 @@ test__parseGPHDUri__NegativeTestNoOptions(void **state)
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl: missing options section");
+		elog_dismiss(INFO);
 		return;
 	}
 	PG_END_TRY();
@@ -240,6 +243,7 @@ test__parseGPHDUri__NegativeTestMissingEqual(void **state)
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER: option 'FRAGMENTER' missing '='");
+		elog_dismiss(INFO);
 		return;
 	}
 	PG_END_TRY();
@@ -270,6 +274,7 @@ test__parseGPHDUri__NegativeTestDuplicateEquals(void **state)
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=HdfsDataFragmenter=DuplicateFragmenter: option 'FRAGMENTER=HdfsDataFragmenter=DuplicateFragmenter' contains duplicate '='");
+		elog_dismiss(INFO);
 		return;
 	}
 	PG_END_TRY();
@@ -300,6 +305,7 @@ test__parseGPHDUri__NegativeTestMissingKey(void **state)
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?=HdfsDataFragmenter: option '=HdfsDataFragmenter' missing key before '='");
+		elog_dismiss(INFO);
 		return;
 	}
 	PG_END_TRY();
@@ -330,6 +336,7 @@ test__parseGPHDUri__NegativeTestMissingValue(void **state)
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=: option 'FRAGMENTER=' missing value after '='");
+		elog_dismiss(INFO);
 		return;
 	}
 	PG_END_TRY();
@@ -348,6 +355,7 @@ test__GPHDUri_verify_no_duplicate_options__ValidURI(void **state)
 	/* Setting the test -- code omitted -- */
 	GPHDUri* parsed = parseGPHDUri(valid_uri);
 	GPHDUri_verify_no_duplicate_options(parsed);
+	assert_string_equal(parsed->profile, "a");
 	freeGPHDUri(parsed);
 }
 
@@ -375,6 +383,7 @@ test__GPHDUri_verify_no_duplicate_options__NegativeTestDuplicateOpts(void **stat
 		assert_true(edata->sqlerrcode == ERRCODE_SYNTAX_ERROR);
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?Profile=a&Analyzer=b&PROFILE=c: Duplicate option(s): PROFILE");
+		elog_dismiss(INFO);
 		return;
 	}
 	PG_END_TRY();
@@ -424,6 +433,7 @@ test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts(void **stat
 		assert_true(edata->elevel == ERROR);
 		assert_string_equal(edata->message, "Invalid URI pxf://1.2.3.4:5678/some/path/and/table.tbl?FRAGMENTER=a: PROFILE or ACCESSOR and RESOLVER option(s) missing");
 		list_free(coreOptions);
+		elog_dismiss(INFO);
 		return;
 	}
 	PG_END_TRY();
@@ -431,9 +441,541 @@ test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts(void **stat
 	assert_true(false);
 }
 
+/*
+ * Test GPHDUri_parse_fragment when fragment string is valid and all parameters are passed
+ */
+void
+test__GPHDUri_parse_fragment__ValidFragment(void **state) {
+
+	char* fragment = "HOST@REST_PORT@TABLE_NAME@INDEX@FRAGMENT_METADATA@USER_DATA@PROFILE@";
+
+	List *fragments = NIL;
+
+	fragments = GPHDUri_parse_fragment(fragment, fragments);
+
+	ListCell *fragment_cell = list_head(fragments);
+	FragmentData *fragment_data = (FragmentData*) lfirst(fragment_cell);
+
+	assert_string_equal(fragment_data->authority, "HOST:REST_PORT");
+	assert_string_equal(fragment_data->fragment_md, "FRAGMENT_METADATA");
+	assert_string_equal(fragment_data->index, "INDEX");
+	assert_string_equal(fragment_data->profile, "PROFILE");
+	assert_string_equal(fragment_data->source_name, "TABLE_NAME");
+	assert_string_equal(fragment_data->user_data, "USER_DATA");
+
+	GPHDUri_free_fragment(fragment_data);
+	list_free(fragments);
+
+}
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string doesn't have profile
+ */
+void
+test__GPHDUri_parse_fragment__EmptyProfile(void **state) {
+	char* fragment = "HOST@REST_PORT@TABLE_NAME@INDEX@FRAGMENT_METADATA@USER_DATA@@";
+
+	List *fragments = NIL;
+
+	fragments = GPHDUri_parse_fragment(fragment, fragments);
+
+	ListCell *fragment_cell = list_head(fragments);
+	FragmentData *fragment_data = (FragmentData*) lfirst(fragment_cell);
+
+	assert_string_equal(fragment_data->authority, "HOST:REST_PORT");
+	assert_string_equal(fragment_data->fragment_md, "FRAGMENT_METADATA");
+	assert_string_equal(fragment_data->index, "INDEX");
+	assert_true(!fragment_data->profile);
+	assert_string_equal(fragment_data->source_name, "TABLE_NAME");
+	assert_string_equal(fragment_data->user_data, "USER_DATA");
+
+	GPHDUri_free_fragment(fragment_data);
+	list_free(fragments);
+
+}
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string is null
+ */
+void
+test__GPHDUri_parse_fragment__NullFragment(void **state) {
+
+	char* fragment = NULL;
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment.fragment string is null.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string is empty
+ */
+void
+test__GPHDUri_parse_fragment__EmptyString(void **state) {
+
+	char* fragment = "";
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string has less tokens then expected
+ */
+void
+test__GPHDUri_parse_fragment__MissingIpHost(void **state) {
+
+	char* fragment = "@";
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string has less tokens then expected
+ */
+void
+test__GPHDUri_parse_fragment__MissingPort(void **state) {
+
+	char* fragment = "@HOST@";
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string has less tokens then expected
+ */
+void
+test__GPHDUri_parse_fragment__MissingSourceName(void **state) {
+
+	char* fragment = "@HOST@PORT@";
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string has less tokens then expected
+ */
+void
+test__GPHDUri_parse_fragment__MissingIndex(void **state) {
+
+
+	char* fragment = "@HOST@PORT@SOURCE_NAME@";
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string has less tokens then expected
+ */
+void
+test__GPHDUri_parse_fragment__MissingFragmentMetadata(void **state) {
+
+	char* fragment = "@HOST@PORT@SOURCE_NAME@42@";
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string has less tokens then expected
+ */
+void
+test__GPHDUri_parse_fragment__MissingUserData(void **state) {
+
+	char* fragment = "HOST@REST_PORT@TABLE_NAME@INDEX@FRAGMENT_METADATA@";
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+
+/*
+ * Test GPHDUri_parse_fragment when fragment string has less tokens then expected
+ */
+void
+test__GPHDUri_parse_fragment__MissingProfile(void **state) {
+
+	char* fragment = "HOST@REST_PORT@TABLE_NAME@INDEX@FRAGMENT_METADATA@USER_METADATA@";
+
+	List *fragments = NIL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfuriparser.c:GPHDUri_parse_fragment. Fragment string is invalid.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		fragments = GPHDUri_parse_fragment(fragment, fragments);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		list_free(fragments);
+		pfree(err_msg->data);
+		pfree(err_msg);
+		elog_dismiss(INFO);
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+
+void
+test__normalize_key_name_Positive(void **state)
+{
+	char *input_key = strdup("mIxEdCaSeVaLuE");
+	char *normalized_key = normalize_key_name(input_key);
+	assert_string_equal(normalized_key, "X-GP-MIXEDCASEVALUE");
+
+	pfree(input_key);
+	pfree(normalized_key);
+}
+
+void
+test__normalize_key_name_PositiveUpperCase(void **state)
+{
+	char *input_key = strdup("ALREADY_UPPER_CASE");
+	char *normalized_key = normalize_key_name(input_key);
+	assert_string_equal(normalized_key, "X-GP-ALREADY_UPPER_CASE");
+
+	pfree(input_key);
+	pfree(normalized_key);
+}
+
+void
+test__normalize_key_name_Negative__key_is_null(void **state)
+{
+	char *input_key = NULL;
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfheaders.c:normalize_key_name. Parameter key is null or empty.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		char *normalized_key = normalize_key_name(input_key);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		pfree(err_msg->data);
+		pfree(err_msg);
+
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
+void
+test__normalize_key_name_Negative__key_is_empty(void **state)
+{
+	char *input_key = "";
+
+	StringInfo err_msg = makeStringInfo();
+	appendStringInfo(err_msg, "internal error in pxfheaders.c:normalize_key_name. Parameter key is null or empty.");
+
+	/* Expect error */
+	PG_TRY();
+	{
+		/* This will throw a ereport(ERROR).*/
+		char *normalized_key = normalize_key_name(input_key);
+	}
+	PG_CATCH();
+	{
+		CurrentMemoryContext = 1;
+		ErrorData *edata = CopyErrorData();
+
+		/* Validate the type of expected error */
+		assert_true(edata->sqlerrcode == ERRCODE_INTERNAL_ERROR);
+		assert_true(edata->elevel == ERROR);
+		assert_string_equal(edata->message, err_msg->data);
+
+		pfree(err_msg->data);
+		pfree(err_msg);
+
+		return;
+	}
+	PG_END_TRY();
+
+	/* should not reach here*/
+	assert_true(false);
+
+}
+
 int 
 main(int argc, char* argv[]) 
 {
+
 	cmockery_parse_arguments(argc, argv);
 
 	const UnitTest tests[] = {
@@ -449,7 +991,21 @@ main(int argc, char* argv[])
 			unit_test(test__GPHDUri_verify_no_duplicate_options__ValidURI),
 			unit_test(test__GPHDUri_verify_no_duplicate_options__NegativeTestDuplicateOpts),
 			unit_test(test__GPHDUri_verify_core_options_exist__ValidURI),
-			unit_test(test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts)
+			unit_test(test__GPHDUri_verify_core_options_exist__NegativeTestMissingCoreOpts),
+			unit_test(test__GPHDUri_parse_fragment__EmptyProfile),
+			unit_test(test__GPHDUri_parse_fragment__ValidFragment),
+			unit_test(test__GPHDUri_parse_fragment__EmptyString),
+			unit_test(test__GPHDUri_parse_fragment__MissingIpHost),
+			unit_test(test__GPHDUri_parse_fragment__MissingPort),
+			unit_test(test__GPHDUri_parse_fragment__MissingSourceName),
+			unit_test(test__GPHDUri_parse_fragment__MissingIndex),
+			unit_test(test__GPHDUri_parse_fragment__MissingFragmentMetadata),
+			unit_test(test__GPHDUri_parse_fragment__MissingUserData),
+			unit_test(test__GPHDUri_parse_fragment__MissingProfile),
+			unit_test(test__normalize_key_name_Positive),
+			unit_test(test__normalize_key_name_PositiveUpperCase),
+			unit_test(test__normalize_key_name_Negative__key_is_null),
+			unit_test(test__normalize_key_name_Negative__key_is_empty)
 	};
 	return run_tests(tests);
 }

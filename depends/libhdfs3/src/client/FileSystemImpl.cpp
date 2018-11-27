@@ -22,11 +22,13 @@
 #include "Atomic.h"
 #include "BlockLocation.h"
 #include "DirectoryIterator.h"
+#include "EncryptionZoneIterator.h"
 #include "Exception.h"
 #include "ExceptionInternal.h"
 #include "FileStatus.h"
 #include "FileSystemImpl.h"
 #include "FileSystemStats.h"
+#include "EncryptionZoneInfo.h"
 #include "InputStream.h"
 #include "LeaseRenewer.h"
 #include "Logger.h"
@@ -773,6 +775,92 @@ bool FileSystemImpl::unregisterOpenedOutputStream() {
     }
 
     return  openedOutputStream == 0;
+}
+
+/**
+ * Create encryption zone for the directory with specific key name
+ * @param path the directory path which is to be created.
+ * @param keyname The key name of the encryption zone 
+ * @return return true if success.
+ */
+
+bool FileSystemImpl::createEncryptionZone(const char * path, const char * keyName) {
+    if (!nn) {
+        THROW(HdfsIOException, "FileSystemImpl: not connected.");
+    }
+
+    if (NULL == path || !strlen(path)) {
+        THROW(InvalidParameter, "Invalid input: path should not be empty");
+    }
+
+    if (NULL == keyName || !strlen(keyName)) {
+        THROW(InvalidParameter, "Invalid input: key name should not be empty");
+    }
+
+    return nn->createEncryptionZone(getStandardPath(path), keyName);
+}
+
+
+/**
+ * To get encryption zone information.
+ * @param path the path which information is to be returned.
+ * @return the encryption zone information.
+ */
+
+EncryptionZoneInfo FileSystemImpl::getEZForPath(const char * path) {
+    if (!nn) {
+        THROW(HdfsIOException, "FileSystemImpl: not connected.");
+    }
+
+    if (NULL == path || !strlen(path)) {
+        THROW(InvalidParameter, "Invalid input: path should not be empty");
+    }
+
+    return nn->getEncryptionZoneInfo(getStandardPath(path), NULL);
+}
+
+bool FileSystemImpl::listEncryptionZones(const int64_t id,
+                                std::vector<EncryptionZoneInfo> & ezl) {
+    if (!nn) {
+        THROW(HdfsIOException, "FileSystemImpl: not connected.");
+    }
+
+    return nn->listEncryptionZones(id, ezl);
+}
+
+/**
+ * list the contents of an encryption zone.
+ * @return return the encryption zone information.
+ */
+EncryptionZoneIterator FileSystemImpl::listEncryptionZone() {
+    if (!nn) {
+        THROW(HdfsIOException, "FileSystemImpl: not connected.");
+    }
+
+    return EncryptionZoneIterator(this, 0);
+}
+/**
+ * list all the contents of encryption zones.
+ * @param id the index of the encyrption zones.
+ * @return Return a vector of encryption zones information.
+ */
+
+std::vector<EncryptionZoneInfo> FileSystemImpl::listAllEncryptionZoneItems() {
+    if (!nn) {
+        THROW(HdfsIOException, "FileSystemImpl: not connected.");
+    }
+
+    std::vector<EncryptionZoneInfo> retval;
+    retval.clear();
+    int64_t id = 0;
+
+    EncryptionZoneIterator it;
+    it = FileSystemImpl::listEncryptionZone();
+
+    while (it.hasNext()) {
+        retval.push_back(it.getNext());
+    }
+    return retval;
 }
 
 }

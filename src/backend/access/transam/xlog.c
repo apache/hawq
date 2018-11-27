@@ -5299,6 +5299,8 @@ XLOGShmemInit(void)
 void
 XLogStartupInit(void)
 {
+	if (!IsBootstrapProcessingMode())
+		ReadControlFile();
 }
 
 /*

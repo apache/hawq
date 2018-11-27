@@ -1211,9 +1211,11 @@ RelationBuildDesc(Oid targetRelId, bool insertIt)
 	/*
 	 * if no such tuple exists, return NULL
 	 */
-	if (!HeapTupleIsValid(pg_class_tuple))
+	if (!HeapTupleIsValid(pg_class_tuple)){
+		if(RelationIsValid(pg_class_relation))
+			heap_close(pg_class_relation, AccessShareLock);
 		return NULL;
-
+	}
 	/*
 	 * get information from the pg_class_tuple
 	 */
@@ -3265,7 +3267,7 @@ AttrDefaultFetch(Relation relation)
 	caql_endscan(pcqCtx);
 	heap_close(adrel, AccessShareLock);
 
-	if (found != ndef)
+	if (found != ndef && ( GP_ROLE_UTILITY==Gp_role || GP_ROLE_DISPATCH==Gp_role ))
 		elog(WARNING, "%d attrdef record(s) missing for rel %s",
 			 ndef - found, RelationGetRelationName(relation));
 }

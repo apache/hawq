@@ -147,6 +147,39 @@ TEST_F(TestFileSystem, listDirectory) {
     ASSERT_THROW(it.getNext(), HdfsIOException);
 }
 
+TEST_F(TestFileSystem, DISABLED_listEncryptionZone) {
+    fs->disconnect();
+    fs->connect();
+    const int dirs = 201;
+
+    for (int i = 0; i < dirs; i++){
+        std::stringstream newstr;
+        newstr << i;
+        std::string tde = "/TDE" + newstr.str();
+        std::string key = "keytde" + newstr.str();
+        std::string rmTde = "hadoop fs -rmr /TDE" + newstr.str();
+        std::string tdeKey = "hadoop key create keytde" + newstr.str();
+        std::string mkTde = "hadoop fs -mkdir /TDE" + newstr.str();
+        std::string tdeZone = "hdfs crypto -createZone -keyName " + key + "-path " + tde;
+        system(rmTde.c_str());
+        system(tdeKey.c_str());
+        system(mkTde.c_str());
+        system(tdeZone.c_str());
+    }
+
+    EncryptionZoneIterator it;
+    EXPECT_NO_THROW(it = fs->listEncryptionZone());
+    int count = 0;
+
+    while (it.hasNext()) {
+        count ++;
+        it.getNext();
+    }
+
+    ASSERT_EQ(dirs, count);
+    ASSERT_THROW(it.getNext(), HdfsIOException);
+}
+
 TEST_F(TestFileSystem, setOwner) {
     fs->disconnect();
     ASSERT_THROW(fs->setOwner(BASE_DIR, "setOwner", ""), HdfsIOException);

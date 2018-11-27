@@ -42,7 +42,13 @@ void port_to_str(char** port, int new_port);
 /* get hdfs location from current session's filespace entry */
 void get_hdfs_location_from_filespace(char** path);
 
-/* Parse the REST message and issue the libchurl call */
+/* parse the REST message and issue the libchurl call */
 void call_rest(GPHDUri *hadoop_uri, ClientContext *client_context, char* rest_msg);
+
+/* get ip address of loopback interface */
+char* get_loopback_ip_addr(void);
+
+/* replace first occurrence of replace in string with replacement*/
+char* replace_string(const char* string, const char* replace, const char* replacement);
 
 #endif	// _PXF_UTILS_H_

@@ -612,7 +612,7 @@ void PersistentFilespace_MarkCreatePending(
 	 * This XLOG must be generated under the persistent write-lock.
 	 */
 #ifdef MASTER_MIRROR_SYNC
-	mmxlog_log_create_filespace(filespaceOid,persistentTid, persistentSerialNum);
+	mmxlog_log_create_filespace(filespaceOid,persistentTid, *persistentSerialNum);
 #endif
 
 

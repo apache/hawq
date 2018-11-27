@@ -31,30 +31,50 @@ import java.util.Map;
 public enum DataType {
     BOOLEAN(16),
     BYTEA(17),
-    CHAR(18),
     BIGINT(20),
     SMALLINT(21),
     INTEGER(23),
     TEXT(25),
     REAL(700),
     FLOAT8(701),
+    /**
+     * char(length), blank-padded string, fixed storage length
+     */
     BPCHAR(1042),
+    /**
+     * varchar(length), non-blank-padded string, variable storage length
+     */
     VARCHAR(1043),
     DATE(1082),
     TIME(1083),
     TIMESTAMP(1114),
     NUMERIC(1700),
+
+    INT2ARRAY(1005),
+    INT4ARRAY(1007),
+    INT8ARRAY(1016),
+    BOOLARRAY(1000),
+    TEXTARRAY(1009),
+
     UNSUPPORTED_TYPE(-1);
 
     private static final Map<Integer, DataType> lookup = new HashMap<>();
 
     static {
+
+        INT2ARRAY.typeElem = SMALLINT;
+        INT4ARRAY.typeElem = INTEGER;
+        INT8ARRAY.typeElem = BIGINT;
+        BOOLARRAY.typeElem = BOOLEAN;
+        TEXTARRAY.typeElem = TEXT;
+
         for (DataType dt : EnumSet.allOf(DataType.class)) {
             lookup.put(dt.getOID(), dt);
         }
     }
 
     private final int OID;
+    private DataType typeElem;
 
     DataType(int OID) {
         this.OID = OID;
@@ -75,5 +95,9 @@ public enum DataType {
 
     public int getOID() {
         return OID;
+    }
+
+    public DataType getTypeElem() {
+        return typeElem;
     }
 }

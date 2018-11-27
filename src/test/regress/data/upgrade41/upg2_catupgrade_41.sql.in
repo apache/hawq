@@ -61,6 +61,24 @@ is 'Populate the gp_persistent_relation_node table''s relation_bufpool_kind colu
 select gp_persistent_set_relation_bufpool_kind_all();
 select gp_persistent_set_relation_bufpool_kind_all() from gp_dist_random('gp_version_at_initdb');
 
+create function @gpupgradeschemaname@.gp_relfile_insert_for_register(
+     @gpupgradeschemaname@.bool)
+returns @gpupgradeschemaname@.int4
+language internal AS 'gp_relfile_insert_for_register' volatile
+with (oid = 7183);
+select @gpupgradeschemaname@.addProcPIN(7183);
+comment on function @gpupgradeschemaname@.gp_relfile_insert_for_register(
+     @gpupgradeschemaname@.oid,
+     @gpupgradeschemaname@.oid,
+     @gpupgradeschemaname@.oid,
+     @gpupgradeschemaname@.oid,
+     @gpupgradeschemaname@.oid,
+     @gpupgradeschemaname@.cstring,
+     @gpupgradeschemaname@.char,
+     @gpupgradeschemaname@.char,
+     @gpupgradeschemaname@.oid)
+is 'insert record in gp_persistent_relfile_node and gp_relfile_node';
+
 update @gpupgradeschemaname@.pg_class set relhaspkey = true where oid = 5094;
 select catDML('update @gpupgradeschemaname@.pg_class set relhaspkey = true where oid = 5094') from gp_dist_random('gp_version_at_initdb');
 --

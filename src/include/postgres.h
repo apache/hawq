@@ -513,6 +513,14 @@ extern void gp_set_thread_sigmasks(void);
 
 extern void OnMoveOutCGroupForQE(void);
 
+#ifndef __MAYBE_UNUSED
+#define __MAYBE_UNUSED __attribute__((unused))
+#endif
+
+#ifndef UNUSED_ARG
+#define UNUSED_ARG(x)			((void)x)
+#endif
+
 #ifdef __cplusplus
 }   /* extern "C" */
 #endif

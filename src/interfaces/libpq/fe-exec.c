@@ -2386,7 +2386,7 @@ PQresultStatus(const PGresult *res)
 char *
 PQresStatus(ExecStatusType status)
 {
-	if (status < 0 || status >= sizeof pgresStatus / sizeof pgresStatus[0])
+	if (status < PGRES_EMPTY_QUERY || (unsigned int) status >= sizeof pgresStatus / sizeof pgresStatus[0])
 		return libpq_gettext("invalid ExecStatusType code");
 	return pgresStatus[status];
 }
@@ -2686,7 +2686,7 @@ PQoidStatus(const PGresult *res)
 
 	size_t		len;
 
-	if (!res || !res->cmdStatus || strncmp(res->cmdStatus, "INSERT ", 7) != 0)
+	if (!res || strncmp(res->cmdStatus, "INSERT ", 7) != 0)
 		return "";
 
 	len = strspn(res->cmdStatus + 7, "0123456789");
@@ -2710,7 +2710,6 @@ PQoidValue(const PGresult *res)
 	unsigned long result;
 
 	if (!res ||
-		!res->cmdStatus ||
 		strncmp(res->cmdStatus, "INSERT ", 7) != 0 ||
 		res->cmdStatus[7] < '0' ||
 		res->cmdStatus[7] > '9')
