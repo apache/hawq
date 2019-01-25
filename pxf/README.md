@@ -45,3 +45,15 @@ Configuration for target databases are stored in **gradle/profiles**.
 HAWQ is a default database. To build it for Greenplum:
 
     ./gradlew clean build [buildRpm] [distTar] -Ddatabase="gpdb"
+    
+
+Profiling
+=========
+
+If you wish to profile the PXF, you could use [Java profiler](https://www.ej-technologies.com/products/jprofiler/overview.html). You can download JProfiler agent and update pxf-env.sh to set port say 10001 for profiler access.
+
+    export PXF_JVM_OPTS="-Xmx2g -Xms1g -agentpath:jprofiler10/bin/linux-x64/libjprofilerti.so=port=10001"
+    
+
+
+
