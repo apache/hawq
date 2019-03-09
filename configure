@@ -5861,7 +5861,7 @@ if test "${with_orc+set}" = set; then :
   esac
 
 else
-  with_orc=yes
+  with_orc=no
 
 fi
 
