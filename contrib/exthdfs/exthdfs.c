@@ -251,13 +251,7 @@ Datum hdfsprotocol_validate(PG_FUNCTION_ARGS)
 			}
 		}
 	}
-	if(1)
-	{
-		ereport(ERROR,
-						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("hdfsprotocol_validate : "
-								"no formatter is supported for external hdfs")));
-	}
+
 	if (!isCsv && !isText && !isOrc)
 	{
 		ereport(ERROR,
