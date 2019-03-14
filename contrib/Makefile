@@ -9,8 +9,8 @@ WANTED_DIRS = \
 		extprotocol \
 		gp_cancel_query \
 		formatter_fixedwidth \
-		exthdfs\
-		hawq-hadoop\
+		exthdfs \
+		hawq-hadoop
 
 ifeq ($(with_pgcrypto), yes)
 WANTED_DIRS += pgcrypto
