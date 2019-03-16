@@ -19,6 +19,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 #include "rpc/RpcAuth.h"
 #include "common/XmlConfig.h"

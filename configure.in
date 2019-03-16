@@ -726,7 +726,7 @@ AC_SUBST(with_pgcrypto)
 # Optionally build with orc format in pluggable storage framework.
 #
 AC_MSG_CHECKING([whether to build orc modules])
-PGAC_ARG_BOOL(with, orc, yes, [  --with-orc         build with orc format])
+PGAC_ARG_BOOL(with, orc, no, [  --with-orc         build with orc format])
 AC_MSG_RESULT([$with_orc])
 AC_SUBST(with_orc)
 #

@@ -39,6 +39,7 @@ install:
       python
       snappy
       apr
+      apr-util
   - brew reinstall
       protobuf
       protobuf-c

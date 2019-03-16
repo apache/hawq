@@ -18,6 +18,7 @@
  */
 
 #include <pthread.h>
+#include <vector>
 
 #include "rpc/RpcAuth.h"
 #include "common/XmlConfig.h"

@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+
+=======
 All: orc_format.so
 liborc_format.so: orc_format.cpp
 	g++ --shared -o liborc_format.so orc_format.cpp

@@ -465,6 +465,12 @@ extern int     rps_addr_port;
 
 /* interval of checking local RPS */
 extern int     rps_check_local_interval;
+
+/*
+ * cloud authenticate
+ */
+extern char	   *pg_cloud_clustername;
+
 /*
  * During insertion in a table with parquet partitions,
  * require tuples to be sorted by partition key.
