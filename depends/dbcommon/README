@@ -1,0 +1,14 @@
+## How to build
+
+    cd dbcommon
+    mkdir build
+    cd build
+    ../bootstrap --prefix=/opt/dependency/package (default)
+
+## Build
+
+   make
+
+## Install
+
+   make install
