@@ -1,0 +1,216 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+ 
+syntax = "proto2";
+
+package univplan;
+
+option cc_generic_services = true;
+option java_generic_services = true;
+
+enum UNIVPLANEXPRTYPE {
+  UNIVPLAN_EXPR_AGGREF = 1;
+  UNIVPLAN_EXPR_BOOLEXPR = 2;
+  UNIVPLAN_EXPR_CONST = 3;
+  UNIVPLAN_EXPR_FUNCEXPR = 4;
+  UNIVPLAN_EXPR_NULLTEST = 5;
+  UNIVPLAN_EXPR_OPEXPR = 6;
+  UNIVPLAN_EXPR_TARGETENTRY = 7;
+  UNIVPLAN_EXPR_VAR = 8;
+  UNIVPLAN_EXPR_BOOLEANTEST = 9;
+  UNIVPLAN_EXPR_CASEEXPR = 10;
+  UNIVPLAN_EXPR_CASEWHEN = 11;
+  UNIVPLAN_EXPR_SUBPLAN = 12;
+  UNIVPLAN_EXPR_PARAM = 13;
+  UNIVPLAN_EXPR_SCALARARRAYOPEXPR = 14;
+  UNIVPLAN_EXPR_COALESCEEXPR = 15;
+  UNIVPLAN_EXPR_NULLIFEXPR = 16;
+  UNIVPLAN_EXPR_DISTINCTEXPR = 17;
+}
+
+message UnivPlanOpExpr {
+  required int32              funcId = 1;
+  required int32              retType = 2;
+  repeated UnivPlanExprPoly   args = 3;
+}
+
+message UnivPlanFuncExpr {
+  required int32              funcId = 1;
+  required int32              retType = 2;
+  repeated UnivPlanExprPoly   args = 3;
+}
+
+enum NULLTESTTYPE {
+  NULLTESTTYPE_IS_NULL = 0;
+  NULLTESTTYPE_IS_NOT_NULL = 1;
+}
+
+message UnivPlanNullTest {
+  required UnivPlanExprPoly   arg = 1;
+  required NULLTESTTYPE       type = 2;
+}
+
+enum BOOLTESTTYPE {
+  BOOLTESTTYPE_IS_TRUE = 0;
+  BOOLTESTTYPE_IS_NOT_TRUE = 1;
+  BOOLTESTTYPE_IS_FALSE = 2;
+  BOOLTESTTYPE_IS_NOT_FALSE = 3;
+  BOOLTESTTYPE_IS_UNKNOWN = 4;
+  BOOLTESTTYPE_IS_NOT_UNKNOWN = 5;
+}
+
+message UnivPlanBooleanTest {
+  required UnivPlanExprPoly   arg = 1;
+  required BOOLTESTTYPE       type = 2;
+}
+
+enum BOOLEXPRTYPE {
+  BOOLEXPRTYPE_AND_EXPR = 0;
+  BOOLEXPRTYPE_OR_EXPR = 1;
+  BOOLEXPRTYPE_NOT_EXPR = 2;
+}
+
+message UnivPlanBoolExpr {
+  repeated UnivPlanExprPoly   args = 1;
+  required BOOLEXPRTYPE       type = 2;
+}
+
+message UnivPlanConst {
+  required int32              type = 1;
+  required bool               isNull = 2;
+  optional string             value = 3;
+  optional int64              typeMod = 4 [default = -1];
+}
+
+message UnivPlanVar {
+  required uint32             varNo = 1;
+  required int32              varAttNo = 2;
+  required int32              typeId = 3;
+  optional int64              typeMod = 4 [default = -1];
+}
+
+message UnivPlanAggref {
+  required int32              transFuncId = 1;
+  required int32              retType = 2;
+  required bool               transInitVal = 3;
+  optional int32              finalFuncId = 4;
+  repeated UnivPlanExprPoly   args = 5;
+  required int32              funcId = 6;
+}
+
+message UnivPlanTargetEntry {
+  required UnivPlanExprPoly   expression = 1;
+  required bool               resJunk = 2;
+  optional string             resName = 3;
+}
+
+message UnivPlanCaseExpr {
+  required int32              casetype = 1;
+  repeated UnivPlanExprPoly   args = 2;
+  required UnivPlanExprPoly   defresult = 3;
+}
+
+message UnivPlanCaseWhen {
+  required UnivPlanExprPoly   expr = 1;
+  required UnivPlanExprPoly   result = 2;
+}
+
+enum SUBLINKTYPE {
+  EXISTS_SUBLINK = 0;
+  ALL_SUBLINK = 1;
+  ANY_SUBLINK = 2;
+  ROWCOMPARE_SUBLINK = 3;
+  EXPR_SUBLINK = 4;
+  ARRAY_SUBLINK = 5;
+  NOT_EXISTS_SUBLINK = 6;
+}
+
+message UnivPlanSubPlan {
+  required SUBLINKTYPE subLinkType = 1;
+  required int32 planId = 2;
+  required int32 typeId = 3;
+  optional int64 typeMod = 4 [default = -1];
+  required bool useHashTable = 5;
+  required bool initPlan = 6;
+  repeated int32 setParam = 7;                // input param for param_exec
+  repeated int32 parentParam = 8;             // input param for subplan
+  repeated UnivPlanExprPoly args = 9;         // inputs for subplan
+  repeated int32 testexprParam = 10;          // input param for test expr
+  optional UnivPlanExprPoly testexpr = 11;    // test expr for ALL/ANY
+}
+
+enum PARAMKIND {
+  PARAM_EXTERN = 0;
+  PARAM_EXEC = 1;
+}
+
+message UnivPlanParam {
+  required PARAMKIND paramKind = 1;
+  required int32 paramId = 2;
+  required int32 typeId = 3;
+  optional int64 typeMod = 4 [default = -1];
+}
+
+message UnivPlanScalarArrayOpExpr {
+  required int32              funcId = 1;
+  required bool               useOr = 2;
+  repeated UnivPlanExprPoly   args = 3;
+}
+
+message UnivPlanCoalesceExpr {
+  required int32              coalesceType = 1;
+  required int32              coalesceTypeMod = 2;
+  repeated UnivPlanExprPoly   args = 3;
+}
+
+message UnivPlanNullIfExpr {
+  required int32              funcId = 1;
+  required int32              retType = 2;
+  required int32              typeMod = 3;
+  repeated UnivPlanExprPoly   args = 4;
+}
+
+message UnivPlanDistinctExpr {
+  required int32				 funcId = 1;
+  required int32				 retType = 2;
+  repeated UnivPlanExprPoly   args = 3;
+}
+
+message UnivPlanExprPoly {
+  required UNIVPLANEXPRTYPE   type = 1;
+  oneof value {
+    UnivPlanAggref            aggref = 2;
+    UnivPlanBoolExpr          boolexpr = 3;
+    UnivPlanConst             val = 4;
+    UnivPlanFuncExpr          funcexpr = 5;
+    UnivPlanNullTest          nulltest = 6;
+    UnivPlanOpExpr            opexpr = 7;
+    UnivPlanTargetEntry       targetentry = 8;
+    UnivPlanVar               var = 9;
+    UnivPlanBooleanTest       booltest = 10;
+    UnivPlanCaseExpr          caseexpr = 11;
+    UnivPlanCaseWhen          casewhen = 12;
+    UnivPlanSubPlan           subplan = 13;
+    UnivPlanParam             param = 14;
+    UnivPlanScalarArrayOpExpr scalarArrayOpexpr = 15;
+    UnivPlanCoalesceExpr      coalesceExpr = 16;
+    UnivPlanNullIfExpr        nullIfExpr = 17;
+    UnivPlanDistinctExpr      distinctExpr = 18;
+  }
+}

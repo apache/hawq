@@ -1,0 +1,8 @@
+.DS_Store
+.cproject
+.project
+.settings
+.pydevproject
+*.pyc
+build/
+CodeCoverageReport/

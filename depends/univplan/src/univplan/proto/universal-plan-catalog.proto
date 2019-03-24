@@ -1,0 +1,62 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+ 
+syntax = "proto2";
+
+package univplan;
+
+option cc_generic_services = true;
+option java_generic_services = true;
+
+message UnivPlanColumn {
+	required string		columnName = 1;
+	required int32 		typeId = 2;
+	optional int32    scale1 = 3;
+	optional int32    scale2 = 4;
+	optional bool     isNullable = 5;
+	optional bytes    defaultVal = 6;
+	required int64    typeMod = 7 [default = -1];
+}
+
+enum UNIVPLANFORMATTYPE {
+  TEXT_FORMAT        = 1;
+  CSV_FORMAT         = 2;
+  ORC_FORMAT         = 3;
+  MAGMA_FORMAT       = 4;
+  MAGMA_LOCAL_FORMAT = 5;
+  INVALID_FORMAT     = 6;
+}
+
+//
+// Magma:
+//
+//  In case a Magma external table, location saves target table external
+//  name defined in Magma, in format :
+//      magma:///dbname/schemaname/tablename
+//  for the columns, MAGMA has its own catalog having complete column definition,
+//  thus, it is only required to fill basic column names and rough type content
+//
+
+message UnivPlanTable {
+	required int64					    tableId = 1;
+	required UNIVPLANFORMATTYPE	format = 2;
+	required string					    location = 3;
+	required bytes					    tableOptionsInJson = 4;
+	repeated UnivPlanColumn 		columns = 5;
+}
