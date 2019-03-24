@@ -1,0 +1,15 @@
+# How to build
+## Get source code and Bootstrapping
+
+    cd storage
+    mkdir build
+    cd build
+    ../bootstrap --prefix=/opt/dependency/package (default)
+
+## Build
+
+   make
+
+## Install
+
+   make install

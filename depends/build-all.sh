@@ -118,12 +118,15 @@ function build() {
 echo "Delete headers in ${PREFIX}/include ..."
 rm -rf $PREFIX/include/dbcommon
 rm -rf $PREFIX/include/univplan
+rm -rf $PREFIX/include/storage
 echo "Done."
 
 echo "Delete libs in ${PREFIX}/lib ..."
 rm -rf $PREFIX/lib/libdbcommon*
 rm -rf $PREFIX/lib/libunivplan*
+rm -rf $PREFIX/lib/libstorage*
 echo "Done."
 
 build dbcommon
 build univplan
+build storage
