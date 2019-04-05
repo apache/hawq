@@ -1,4 +1,3 @@
-#!/bin/bash -e
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,13 +14,27 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+#
+# -*-makefile-*-
+#------------------------------------------------------------------------------
+# A makefile that integrate building this module with hawq
+#------------------------------------------------------------------------------
 
-source_dir=`cd "\`dirname \"$0\"\`";pwd`
-if [ $source_dir = `pwd` ]; then
-	echo 'Error: Don''t bootstrap in the source folder'
-	exit
-fi
+prefix := @prefix@
+enable_debug    = @enable_debug@
+enable_coverage = @enable_coverage@
+with_univplan = @with_univplan@
 
-cp $source_dir/Makefile .
-cat $source_dir/build-all.sh| sed "s|../bootstrap|$source_dir/\$MODULE/bootstrap|g" > ./build-all.sh
-chmod +x ./build-all.sh
+# Support for VPATH builds
+vpath_build = @vpath_build@
+abs_top_srcdir = @abs_top_srcdir@
+abs_top_builddir = @abs_top_builddir@
+
+ifneq ($(vpath_build),yes)
+top_srcdir = $(top_builddir)
+srcdir = .
+else # vpath_build = yes
+top_srcdir = $(abs_top_srcdir)
+srcdir = $(top_srcdir)/$(subdir)
+VPATH = $(srcdir)
+endif

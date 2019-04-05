@@ -723,6 +723,9 @@ with_zlib
 with_system_tzdata
 with_libhdfs3
 with_libyarn
+with_dbcommon
+with_univplan
+with_storage
 with_openssl
 with_bonjour
 with_ldap
@@ -872,6 +875,9 @@ with_openssl
 with_readline
 with_libyarn
 with_libhdfs3
+with_dbcommon
+with_univplan
+with_storage
 with_libedit_preferred
 with_system_tzdata
 with_zlib
@@ -1563,6 +1569,9 @@ Optional Packages:
   --without-readline      do not use GNU Readline nor BSD Libedit for editing
   --without-libyarn       do not build libyarn
   --without-libhdfs3      do not build libhdfs3
+  --without-dbcommon      do not build dbcommon
+  --without-univplan      do not build univplan
+  --without-storage       do not build storage
   --without-libedit-preferred  Don't prefer BSD Libedit over GNU Readline
   --with-system-tzdata=DIR  use system time zone data in DIR
   --without-zlib          do not use Zlib
@@ -6230,6 +6239,95 @@ else
 
 fi
 
+
+
+
+#
+# dbcommon
+#
+
+pgac_args="$pgac_args with_dbcommon"
+
+
+# Check whether --with-dbcommon was given.
+if test "${with_dbcommon+set}" = set; then :
+  withval=$with_dbcommon;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-dbcommon option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_dbcommon=yes
+
+fi
+
+
+
+
+#
+# univplan
+#
+
+pgac_args="$pgac_args with_univplan"
+
+
+# Check whether --with-univplan was given.
+if test "${with_univplan+set}" = set; then :
+  withval=$with_univplan;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-univplan option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_univplan=yes
+
+fi
+
+
+
+
+#
+# storage
+#
+
+pgac_args="$pgac_args with_storage"
+
+
+# Check whether --with-storage was given.
+if test "${with_storage+set}" = set; then :
+  withval=$with_storage;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-storage option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_storage=yes
+
+fi
 
 
 
@@ -16837,7 +16935,7 @@ $as_echo "done" >&6; }
 fi
 
 
-ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global ranger-plugin/Makefile.global"
+ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global depends/dbcommon/Makefile.global depends/univplan/Makefile.global depends/storage/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global ranger-plugin/Makefile.global"
 
 
 ac_config_links="$ac_config_links src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION} src/backend/port/pg_shmem.c:${SHMEM_IMPLEMENTATION} src/include/dynloader.h:src/backend/port/dynloader/${template}.h src/include/pg_config_os.h:src/include/port/${template}.h src/Makefile.port:src/makefiles/Makefile.${template}"
@@ -16848,9 +16946,12 @@ ac_config_commands="$ac_config_commands check_win32_symlinks"
 
 fi
 
-# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn
+# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn & dbcommon & univplan & storage
 rm -f depends/libhdfs3/build/libhdfs3_build_timestamp
 rm -f depends/libyarn/build/libyarn_build_timestamp
+rm -f depends/dbcommon/build/dbcommon_build_timestamp
+rm -f depends/univplan/build/univplan_build_timestamp
+rm -f depends/storage/build/storage_build_timestamp
 rm -f depends/thirdparty/gporca_build_timestamp
 rm -f depends/thirdparty/gpos_build_timestamp
 rm -f depends/thirdparty/gp-xerces_build_timestamp
@@ -17568,6 +17669,9 @@ do
     "depends/thirdparty/googletest/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/thirdparty/googletest/Makefile.global" ;;
     "depends/libhdfs3/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libhdfs3/Makefile.global" ;;
     "depends/libyarn/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libyarn/Makefile.global" ;;
+    "depends/dbcommon/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/dbcommon/Makefile.global" ;;
+    "depends/univplan/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/univplan/Makefile.global" ;;
+    "depends/storage/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/storage/Makefile.global" ;;
     "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;
     "src/pl/pljava/src/java/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/pl/pljava/src/java/Makefile.global" ;;
     "ranger-plugin/Makefile.global") CONFIG_FILES="$CONFIG_FILES ranger-plugin/Makefile.global" ;;

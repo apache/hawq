@@ -3,7 +3,7 @@
     cd dbcommon
     mkdir build
     cd build
-    ../bootstrap --prefix=/opt/dependency/package (default)
+    ../bootstrap --prefix=/usr/local/hawq (default)
 
 ## Build
 

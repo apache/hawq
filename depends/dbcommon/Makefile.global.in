@@ -15,20 +15,26 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+# -*-makefile-*-
+#------------------------------------------------------------------------------
+# A makefile that integrate building this module with hawq
+#------------------------------------------------------------------------------
 
-.PHONY: release debug
+prefix := @prefix@
+enable_debug    = @enable_debug@
+enable_coverage = @enable_coverage@
+with_dbcommon = @with_dbcommon@
 
-incremental:
-	./build-all.sh incremental
+# Support for VPATH builds
+vpath_build = @vpath_build@
+abs_top_srcdir = @abs_top_srcdir@
+abs_top_builddir = @abs_top_builddir@
 
-release:
-	./build-all.sh release
-
-debug: 
-	./build-all.sh debug
-
-coverage:
-	./build-all.sh coverage
-
-noavx:
-	./build-all.sh noavx
+ifneq ($(vpath_build),yes)
+top_srcdir = $(top_builddir)
+srcdir = .
+else # vpath_build = yes
+top_srcdir = $(abs_top_srcdir)
+srcdir = $(top_srcdir)/$(subdir)
+VPATH = $(srcdir)
+endif

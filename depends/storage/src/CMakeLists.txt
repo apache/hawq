@@ -42,11 +42,16 @@ AUTO_SOURCES(orc_format_HEADER "*.h" "${storage_SRC_DIR}/format/orc")
 AUTO_SOURCES(testutil_HEADER "*.h" "${storage_SRC_DIR}/testutil")
 
 INCLUDE_DIRECTORIES(${storage_ROOT_DIR})
-INCLUDE_DIRECTORIES(${DEPENDENCY_INSTALL_PREFIX}/package/include)
+#INCLUDE_DIRECTORIES(${DEPENDENCY_INSTALL_PREFIX}/package/include)
+INCLUDE_DIRECTORIES(${DEPENDENCY_INSTALL_PREFIX}/include)
 INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/src)
 INCLUDE_DIRECTORIES(/usr/local/include)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../univplan/build/install/usr/local/hawq/include)
 LINK_DIRECTORIES(/usr/local/lib)
-LINK_DIRECTORIES(${DEPENDENCY_INSTALL_PREFIX}/package/lib)
+#LINK_DIRECTORIES(${DEPENDENCY_INSTALL_PREFIX}/package/lib)
+LINK_DIRECTORIES(${DEPENDENCY_INSTALL_PREFIX}/lib)
+LINK_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../libhdfs3/build/install/usr/local/hawq/lib)
+LINK_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../univplan/build/install/usr/local/hawq/lib)
 
 
 ADD_LIBRARY(storage-shared SHARED ${storage_SOURCES} ${storage_PROTO_SRCS} ${storage_PROTO_HDRS})

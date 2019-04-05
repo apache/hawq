@@ -843,6 +843,27 @@ PGAC_ARG_BOOL(with, libhdfs3, yes,
 AC_SUBST(with_libhdfs3)
 
 #
+# dbcommon
+#
+PGAC_ARG_BOOL(with, dbcommon, yes,
+              [  --without-dbcommon      do not build dbcommon])
+AC_SUBST(with_dbcommon)
+
+#
+# univplan
+#
+PGAC_ARG_BOOL(with, univplan, yes,
+              [  --without-univplan      do not build univplan])
+AC_SUBST(with_univplan)
+
+#
+# storage
+#
+PGAC_ARG_BOOL(with, storage, yes,
+              [  --without-storage      do not build storage])
+AC_SUBST(with_storage)
+
+#
 # Prefer libedit
 #
 # In GPDB we want the default to be yes, because we don't want to link with GPL code.
@@ -2185,7 +2206,7 @@ else
 fi
 AC_SUBST(vpath_build)
 
-AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global ranger-plugin/Makefile.global])
+AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global depends/dbcommon/Makefile.global depends/univplan/Makefile.global depends/storage/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global ranger-plugin/Makefile.global])
 
 AC_CONFIG_LINKS([
   src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c
@@ -2208,9 +2229,12 @@ for FILE in $CONFIG_LINKS
 ])
 fi
 
-# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn 
+# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn & dbcommon & univplan & storage
 rm -f depends/libhdfs3/build/libhdfs3_build_timestamp
 rm -f depends/libyarn/build/libyarn_build_timestamp
+rm -f depends/dbcommon/build/dbcommon_build_timestamp
+rm -f depends/univplan/build/univplan_build_timestamp
+rm -f depends/storage/build/storage_build_timestamp
 rm -f depends/thirdparty/gporca_build_timestamp
 rm -f depends/thirdparty/gpos_build_timestamp
 rm -f depends/thirdparty/gp-xerces_build_timestamp
