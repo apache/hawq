@@ -27,4 +27,4 @@ ADD_EXECUTABLE(unit EXCLUDE_FROM_ALL
     ${unit_SOURCES}
 )
 
-target_link_libraries(unit ${CLANG_LDFLAGS} dbcommon-shared gtest gmock)
+target_link_libraries(unit ${CLANG_LDFLAGS} hdfs3 dbcommon-shared gtest gmock)
