@@ -58,6 +58,11 @@ rpm:
 	$(MAKE) -C ranger-plugin $@
 	$(MAKE) -C contrib/hawq-package rpm-tarball
 
+unittest:
+	$(MAKE) -C depends/dbcommon $@
+	$(MAKE) -C depends/univplan $@
+	$(MAKE) -C depends/storage $@
+
 feature-test:
 	$(MAKE) -C src feature-test
 

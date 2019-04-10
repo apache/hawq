@@ -43,10 +43,12 @@ ifeq ($(with_storage), yes)
 all: build
 	cd $(top_builddir)/$(subdir)/build; mkdir -p install; \
 	$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/build/install install
-	cd $(top_builddir)/$(subdir)/build/test && $(MAKE) unittest
 
 install: build
 	cd $(top_builddir)/$(subdir)/build && $(MAKE) install
+
+unittest:
+	cd $(top_builddir)/$(subdir)/build/test && $(MAKE) unittest
 
 distclean:
 	rm -rf $(top_builddir)/$(subdir)/build
