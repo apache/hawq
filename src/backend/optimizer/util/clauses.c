@@ -93,6 +93,7 @@ static bool expression_returns_set_walker(Node *node, void *context);
 static bool contain_subplans_walker(Node *node, void *context);
 static bool contain_mutable_functions_walker(Node *node, void *context);
 static bool contain_volatile_functions_walker(Node *node, void *context);
+static bool contain_windowfuncs(Node *node);
 static bool contain_window_functions_walker(Node *node, void *context);
 static bool contain_nonstrict_functions_walker(Node *node, void *context);
 static Relids find_nonnullable_rels_walker(Node *node, bool top_level);
@@ -862,10 +863,25 @@ contain_volatile_functions_walker(Node *node, void *context)
  * window functions because if there are any, they pertain to a different
  * planning level.
  */
-bool
-contain_window_functions(Node *clause)
+bool contain_window_functions(Node *clause)
 {
-	return contain_window_functions_walker(clause, NULL);
+	return contain_windowfuncs(clause);
+}
+
+/*
+ * contain_windowfuncs -
+ *  Check if an expression contains a window function call of the
+ *  current query level.
+ */
+static bool contain_windowfuncs(Node *node)
+{
+	/*
+	 * Must be prepared to start with a Query or a bare expression tree; if
+	 * it's a Query, we don't want to increment sublevels_up.
+	 */
+	return query_or_expression_tree_walker(node,
+			contain_window_functions_walker,
+			NULL, 0);
 }
 
 static bool

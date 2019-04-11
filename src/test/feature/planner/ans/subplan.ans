@@ -351,6 +351,21 @@ select array(select nop(i) from toy order by i);
  {1,2,3,4,5,6,7,8,9,10}
 (1 row)
 
+-- This one contains one subquery and window function.
+create table aa(a int);
+CREATE TABLE
+insert into aa values (1);
+INSERT 0 1
+SELECT t1.sum
+FROM ( SELECT sum(a) OVER() AS sum FROM aa
+UNION ALL
+SELECT sum(a) OVER() AS sum FROM aa) t1 WHERE t1.sum = 1;
+ sum
+-----
+   1
+   1
+(2 rows)
+
 -- start_ignore
 drop schema subplan_tests cascade;
 psql:/tmp/TestSubplan_TestSubplanAll.sql:142: NOTICE:  drop cascades to append only table toy

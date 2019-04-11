@@ -132,6 +132,13 @@ create table toy as select generate_series(1, 10) i distributed by (i);
 select * from toy; -- only for debugging
 select array(select nop(i) from toy order by i);
 
+-- This one contains one subquery and window function.
+create table aa(a int);
+insert into aa values (1);
+SELECT t1.sum
+FROM ( SELECT sum(a) OVER() AS sum FROM aa
+UNION ALL
+SELECT sum(a) OVER() AS sum FROM aa) t1 WHERE t1.sum = 1;
 -- start_ignore
 drop schema subplan_tests cascade;
 -- end_ignore
