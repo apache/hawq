@@ -46,9 +46,10 @@ INCLUDE_DIRECTORIES(${univplan_ROOT_DIR})
 INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR}/src)
 INCLUDE_DIRECTORIES(${DEPENDENCY_INSTALL_PREFIX}/include)
 INCLUDE_DIRECTORIES(/usr/local/include)
+INCLUDE_DIRECTORIES(${univplan_ROOT_DIR}/../../dbcommon/build/install/usr/local/hawq/include)
 LINK_DIRECTORIES(/usr/local/lib)
 LINK_DIRECTORIES(${DEPENDENCY_INSTALL_PREFIX}/lib)
-
+LINK_DIRECTORIES(${univplan_ROOT_DIR}/../../dbcommon/build/install/usr/local/hawq/lib)
 
 ADD_LIBRARY(univplan-shared SHARED
             ${UNIVPLAN_PROTO_HDRS}
