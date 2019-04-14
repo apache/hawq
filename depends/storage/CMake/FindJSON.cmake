@@ -20,7 +20,7 @@
 #  License text for the above reference.)
 
 # Look for the header file.
-find_path(JSON_INCLUDE_DIR NAMES json-c/json.h)
+find_path(JSON_INCLUDE_DIR NAMES json/json.h)
 mark_as_advanced(JSON_INCLUDE_DIR)
 
 # Look for the library (sorted from most current/relevant entry to least).
