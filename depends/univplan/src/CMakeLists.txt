@@ -12,6 +12,7 @@ set(CMAKE_MACOSX_RPATH 1)
 SET(univplan_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 SET(univplan_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/univplan)
 SET(univplan_proto_DIR ${univplan_SRC_DIR}/proto)
+SET(Protobuf_PROTOC_EXECUTABLE /usr/local/bin/protoc)
 
 file(GLOB proto_files "${univplan_SRC_DIR}/proto/*.proto")
 set(proto_SRC_DIR ${CMAKE_BINARY_DIR}/src/univplan/proto)
