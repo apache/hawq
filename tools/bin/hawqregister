@@ -1205,7 +1205,7 @@ if __name__ == '__main__':
     if (options.yml_config or options.force) and options.filepath:
         parser.print_help(sys.stderr)
         sys.exit(1)
-    if local_ssh('hdfs'):
+    if local_ssh('hdfs') == 127:
         logger.error('Command "hdfs" is not available.')
         sys.exit(1)
     main(options, args)

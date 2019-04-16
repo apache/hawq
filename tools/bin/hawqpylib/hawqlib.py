@@ -259,6 +259,11 @@ def local_ssh(cmd, logger = None, warning = False):
                 logger.error(stderr.strip())
             else:
                 logger.warn(stderr.strip())
+
+    if result.returncode == 1 or result.returncode == 2:
+	# give some existing warning
+	print("warning: Command can be found but cannot be executed correctly ")
+
     return result.returncode
 
 
