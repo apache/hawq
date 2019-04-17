@@ -1,3 +1,7 @@
+-- start_ignore
+SET SEARCH_PATH=TestType_char;
+SET
+-- end_ignore
 --
 -- CHAR
 --
@@ -71,11 +75,12 @@ SELECT '' AS five, c.*
    WHERE c.f1 < 'a';
  five | f1 
 ------+----
+      | A
       | 1
       | 2
       | 3
       |  
-(4 rows)
+(5 rows)
 
 SELECT '' AS six, c.*
    FROM CHAR_TBL c
@@ -83,20 +88,20 @@ SELECT '' AS six, c.*
  six | f1 
 -----+----
      | a
+     | A
      | 1
      | 2
      | 3
      |  
-(5 rows)
+(6 rows)
 
 SELECT '' AS one, c.*
    FROM CHAR_TBL c
    WHERE c.f1 > 'a';
  one | f1 
 -----+----
-     | A
      | c
-(2 rows)
+(1 row)
 
 SELECT '' AS two, c.*
    FROM CHAR_TBL c
@@ -104,9 +109,8 @@ SELECT '' AS two, c.*
  two | f1 
 -----+----
      | a
-     | A
      | c
-(3 rows)
+(2 rows)
 
 DROP TABLE CHAR_TBL;
 DROP TABLE
