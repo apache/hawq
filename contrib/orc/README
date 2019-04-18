@@ -1,5 +1,0 @@
-1. Compile ORC format in pluggable storage framework
-   $ ./configure --with-orc; make -j8; make install
-
-2. Configure and initialize cluster
-   $ hawq init cluster -a
