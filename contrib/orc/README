@@ -1,0 +1,84 @@
+Fresh installation from 3.0.0.0 source code
+-------------------------------------------
+1. Compile ORC format in pluggable storage framework
+   $ ./configure --with-orc; make -j8; make install
+
+2. Configure and initialize cluster
+   $ hawq init cluster -a
+
+
+
+Fresh installation from 3.0.0.0 rpm package
+-------------------------------------------
+1. Setup 3.0.0.0 yum repository
+   $ cd /etc/yum.repos.d
+   $ sudo wget  http://yum.oushu.io/oushurepo/yumrepo/release/oushu-database/centos7/3.0.0.0/oushu-database.repo
+   $ sudo wget http://yum.oushu.io/oushurepo/yumrepo/oushu-database-utils/centos7/1.1.0.0/oushu-database-utils.repo
+
+2. Install rpm package
+   $ sudo yum install -y hawq
+
+3. Configure and initialize cluster
+   $ hawq init cluster -a
+
+
+
+Upgrade from 2.2.0.0 to 3.3.0.0
+-------------------------------
+1. Stop 2.2.0.0 cluster on master node
+   $ hawq stop cluster -a
+
+2. Backup 2.2.0.0 configuration on each node
+   $ cp -rf $GPHOME/etc ~/
+
+3. Backup 2.2.0.0 yum repository on each node
+   $ sudo mv /etc/yum.repos.d/oushu-hawq++.repo /etc/yum.repos.d/oushu-hawq++.repo.bak
+   $ sudo mv /etc/yum.repos.d/oushu-hawq++-utils.repo /etc/yum.repos.d/oushu-hawq++-utils.repo.bak
+
+4. Setup 3.0.0.0 yum repository on each node
+   $ sudo wget -O /etc/yum.repos.d/oushu-database.repo http://yum.oushu.io/oushurepo/yumrepo/test/oushu-database/centos7/3.0.0.0/oushu-database.repo
+   $ sudo wget -O /etc/yum.repos.d/oushu-database-utils.repo http://yum.oushu.io/oushurepo/yumrepo/oushu-database-utils/centos7/1.1.0.0/oushu-database-utils.repo
+   $ sudo yum makecache
+
+5. Install 3.0.0.0 rpm package on each node
+   $ sudo yum remove -y hawq
+   $ sudo yum install -y hawq
+
+6. Configure 3.0.0.0 on each node
+   $ cp -rf ~/etc/* $GPHOME/etc/
+
+7. Install ORC format
+
+   1) Configure the cluster to upgrade mode
+   $ hawq start cluster 
+   $ hawq config -c upgrade_mode -v on --skipvalidation
+   $ hawq restart cluster -a  
+
+   2) Install ORC format in pg_catalog.pg_proc table in template1 on master node
+      Please find $hawq_master_address_port in $GPHOME/etc/hawq-site.xml
+   $ PGOPTIONS='-c gp_session_role=utility' psql -a -p $hawq_master_address_port -d template1 -f $GPHOME/share/postgresql/orc_install.sql > orc_install.out 2>&1
+
+   3) Install ORC format in pg_catalog.pg_proc table in template1 on segment node
+      Please find $hawq_segment_address_port in $GPHOME/etc/hawq-site.xml
+   $ PGOPTIONS='-c gp_session_role=utility' psql -a -p $hawq_segment_address_port -d template1 -f $GPHOME/share/postgresql/orc_install.sql > orc_install.out 2>&1
+
+   4) Configure the cluster to normal mode
+   $ hawq config -c upgrade_mode -v off --skipvalidation
+   $ hawq restart cluster -a 
+
+   5) Get user database name on master node
+   $ psql -a -d template1 -c "select datname from pg_database where datname not in ('hcatalog', 'template0', 'template1') order by datname;"
+
+   6) Install ORC format in pg_catalog.pg_proc table in each user database on master node
+   $ psql -a -d $user_database_name -f $GPHOME/share/postgresql/orc_install.sql > orc_install.out 2>&1
+
+   7) Restart cluster on master node
+   $ hawq restart cluster -a
+
+8. Uninstall ORC format if necessary
+   Refer to installation of ORC format while use /user/local/hawq/share/postgresql/orc_uninstall.sql instead of /user/local/hawq/share/postgresql/orc_install.sql
+
+9. Install PostGIS if necessary
+
+10. Install MADlib if necessary
+
