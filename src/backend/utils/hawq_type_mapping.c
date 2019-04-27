@@ -23,8 +23,7 @@
 *-------------------------------------------------------------------------
 */
 
-#include "hawq_type_mapping.h"
-
+#include "utils/hawq_type_mapping.h"
 #include "miscadmin.h"
 
 int32_t map_hawq_type_to_common_plan(int32_t hawqTypeID) {

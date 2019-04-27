@@ -8,7 +8,7 @@ subdir = src/backend/utils
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
-OBJS        = fmgrtab.o session_state.o 
+OBJS        = fmgrtab.o session_state.o hawq_type_mapping.o
 SUBDIRS     = adt cache error fmgr hash init mb misc mmgr resowner \
 			   resscheduler sort time gpmon gp workfile_manager 
 
