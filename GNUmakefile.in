@@ -14,8 +14,11 @@ all:
 	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C depends/dbcommon $@
+	$(MAKE) -C depends/dbcommon install
 	$(MAKE) -C depends/univplan $@
+	$(MAKE) -C depends/univplan install
 	$(MAKE) -C depends/storage $@
+	$(MAKE) -C depends/storage install
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
@@ -28,9 +31,6 @@ install:
 	$(MAKE) -C depends/thirdparty/googletest $@ 
 	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C depends/libyarn $@
-	$(MAKE) -C depends/dbcommon $@
-	$(MAKE) -C depends/univplan $@
-	$(MAKE) -C depends/storage $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
