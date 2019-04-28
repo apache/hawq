@@ -47,20 +47,32 @@ PG_FUNCTION_INFO_V1(orc_validate_encodings);
 PG_FUNCTION_INFO_V1(orc_validate_datatypes);
 
 /* Accessors for pluggable storage format ORC */
+PG_FUNCTION_INFO_V1(orc_beginscan);
+PG_FUNCTION_INFO_V1(orc_getnext_init);
+PG_FUNCTION_INFO_V1(orc_getnext);
+PG_FUNCTION_INFO_V1(orc_rescan);
+PG_FUNCTION_INFO_V1(orc_endscan);
+PG_FUNCTION_INFO_V1(orc_stopscan);
 PG_FUNCTION_INFO_V1(orc_insert_init);
 PG_FUNCTION_INFO_V1(orc_insert);
 PG_FUNCTION_INFO_V1(orc_insert_finish);
 
-///* Definitions of validators for pluggable storage format ORC */
-//Datum orc_validate_interfaces(PG_FUNCTION_ARGS);
-//Datum orc_validate_options(PG_FUNCTION_ARGS);
-//Datum orc_validate_encodings(PG_FUNCTION_ARGS);
-//Datum orc_validate_datatypes(PG_FUNCTION_ARGS);
-//
-///* Definitions of accessors for pluggable storage format ORC */
-//Datum orc_insert_init(PG_FUNCTION_ARGS);
-//Datum orc_insert(PG_FUNCTION_ARGS);
-//Datum orc_insert_finish(PG_FUNCTION_ARGS);
+/* Definitions of validators for pluggable storage format ORC */
+Datum orc_validate_interfaces(PG_FUNCTION_ARGS);
+Datum orc_validate_options(PG_FUNCTION_ARGS);
+Datum orc_validate_encodings(PG_FUNCTION_ARGS);
+Datum orc_validate_datatypes(PG_FUNCTION_ARGS);
+
+/* Definitions of accessors for pluggable storage format ORC */
+Datum orc_beginscan(PG_FUNCTION_ARGS);
+Datum orc_getnext_init(PG_FUNCTION_ARGS);
+Datum orc_getnext(PG_FUNCTION_ARGS);
+Datum orc_rescan(PG_FUNCTION_ARGS);
+Datum orc_endscan(PG_FUNCTION_ARGS);
+Datum orc_stopscan(PG_FUNCTION_ARGS);
+Datum orc_insert_init(PG_FUNCTION_ARGS);
+Datum orc_insert(PG_FUNCTION_ARGS);
+Datum orc_insert_finish(PG_FUNCTION_ARGS);
 
 typedef struct
 {
