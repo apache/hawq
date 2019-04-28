@@ -21,7 +21,7 @@ LANGUAGE C STABLE;
 CREATE OR REPLACE FUNCTION pg_catalog.orc_validate_datatypes() RETURNS void
 AS '$libdir/orc.so', 'orc_validate_datatypes'
 LANGUAGE C STABLE;
-
+/*
 CREATE OR REPLACE FUNCTION pg_catalog.orc_beginscan() RETURNS bytea
 AS '$libdir/orc.so', 'orc_beginscan'
 LANGUAGE C STABLE;
@@ -45,6 +45,7 @@ LANGUAGE C STABLE;
 CREATE OR REPLACE FUNCTION pg_catalog.orc_stopscan() RETURNS void
 AS '$libdir/orc.so', 'orc_stopscan'
 LANGUAGE C STABLE;
+*/
 
 CREATE OR REPLACE FUNCTION pg_catalog.orc_insert_init() RETURNS bytea
 AS '$libdir/orc.so', 'orc_insert_init'

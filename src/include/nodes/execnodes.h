@@ -1539,6 +1539,9 @@ typedef struct ScanState
 
 	/* The type of the table that is being scanned */
 	TableType tableType;
+	char *hivehost;
+	int hiveport;
+	char *hivepath;
 
 	/* Runtime filter */
 	struct RuntimeFilterState *runtimeFilter;

@@ -33,7 +33,8 @@ typedef enum UriProtocol
 	URI_GPFDIST,
 	URI_CUSTOM,
 	URI_GPFDISTS,
-	URI_HDFS
+	URI_HDFS,
+	URI_HIVE
 }	UriProtocol;
 
 #define PROTOCOL_FILE		"file://"
@@ -43,6 +44,7 @@ typedef enum UriProtocol
 #define PROTOCOL_GPFDISTS	"gpfdists://"
 #define PROTOCOL_PXF		"pxf://"
 #define PROTOCOL_HDFS		"hdfs://"
+#define PROTOCOL_HIVE      	"hive://"
 
 /* 
  * sometimes we don't want to parse the whole URI but just take a peek at
