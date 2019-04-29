@@ -11,13 +11,19 @@ include $(top_builddir)/src/Makefile.global
 all:
 #	$(MAKE) -C doc $@
 	$(MAKE) -C depends/thirdparty/googletest $@
+	$(MAKE) -C depends/thirdparty/googletest install
 	$(MAKE) -C depends/libhdfs3 $@
+	$(MAKE) -C depends/libhdfs3 install
 	$(MAKE) -C depends/libyarn $@
+	$(MAKE) -C depends/libyarn install
 	$(MAKE) -C depends/dbcommon $@
+	$(MAKE) -C depends/dbcommon unittest
 	$(MAKE) -C depends/dbcommon install
 	$(MAKE) -C depends/univplan $@
+	$(MAKE) -C depends/univplan unittest
 	$(MAKE) -C depends/univplan install
 	$(MAKE) -C depends/storage $@
+	$(MAKE) -C depends/storage unittest
 	$(MAKE) -C depends/storage install
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
@@ -28,9 +34,6 @@ all:
 
 install:
 #	$(MAKE) -C doc $@
-	$(MAKE) -C depends/thirdparty/googletest $@ 
-	$(MAKE) -C depends/libhdfs3 $@
-	$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
