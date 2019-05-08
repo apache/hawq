@@ -433,12 +433,12 @@ struct DatumCreater<T, sizeof(MagmaTid)> {
 };
 
 // Declare DatumCreate template for std::string.
-template <typename T>
-struct DatumCreater<T, sizeof(std::string)> {
+template <>
+struct DatumCreater<std::string, sizeof(std::string)> {
   // Create a datum with given std::string.
   // @param value The initial value of the datum.
   // @return Return a new datum.
-  static inline Datum CreateDatum(const T &value) {
+  static inline Datum CreateDatum(const std::string &value) {
     return Datum(reinterpret_cast<int64_t>(value.c_str()));
   }
 };

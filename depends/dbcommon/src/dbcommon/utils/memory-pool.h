@@ -87,7 +87,6 @@ class MemoryPool {
     }
     space = newSize;
     void *ret = p;
-    std::align(align, size, ret, space);
     activeMem[ret] = MemAddr{p, space};
     return reinterpret_cast<T *>(ret);
   }
@@ -113,7 +112,6 @@ class MemoryPool {
       activeMem.erase(p);
       p = ret;
       ret = p;
-      std::align(align, size, ret, space);
       activeMem[ret] = MemAddr{p, space};
     }
 
