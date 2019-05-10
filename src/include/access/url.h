@@ -61,14 +61,6 @@ enum fcurl_type_e
 	CFTYPE_CUSTOM = 4 
 };
 
-#if BYTE_ORDER == BIG_ENDIAN
-#define local_htonll(n)  (n)
-#define local_ntohll(n)  (n)
-#else
-#define local_htonll(n)  ((((uint64) htonl(n)) << 32LL) | htonl((n) >> 32LL))
-#define local_ntohll(n)  ((((uint64) ntohl(n)) << 32LL) | (uint32) ntohl(((uint64)n) >> 32LL))
-#endif
-
 typedef struct curlctl_t {
 	
 	CURL *handle;
@@ -94,6 +86,7 @@ typedef struct curlctl_t {
 	int error, eof;				/* error & eof flags */
 	int gp_proto;
 	char *http_response;
+	int64 seq_number;
 	
 	struct 
 	{
@@ -165,5 +158,15 @@ extern void url_rewind(URL_FILE *file, const char *relname);
 extern void url_fflush(URL_FILE *file, CopyState pstate);
 
 extern URL_FILE *url_execute_fopen(char* url, char *cmd, bool forwrite, extvar_t *ev);
+
+// implementation-specific functions
+extern URL_FILE *url_curl_fopen(char *url, bool forwrite, extvar_t *ev, CopyState pstate);
+extern void url_curl_fclose(URL_FILE *file, bool failOnError, const char *relname);
+extern bool url_curl_feof(URL_FILE *file, int bytesread);
+extern bool url_curl_ferror(URL_FILE *file, int bytesread, char *ebuf, int ebuflen);
+extern size_t url_curl_fread(void *ptr, size_t size, URL_FILE *file, CopyState pstate);
+extern size_t url_curl_fwrite(void *ptr, size_t size, URL_FILE *file, CopyState pstate);
+extern void url_curl_fflush(URL_FILE *file, CopyState pstate);
+extern void url_curl_rewind(URL_FILE *file, const char *relname);
 
 #endif

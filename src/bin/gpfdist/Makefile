@@ -28,7 +28,7 @@ CFLAGS := -fprofile-arcs -ftest-coverage $(CFLAGS)
 endif
 
 code_dir     = $(CURDIR)/src/gpfdist/
-GPFDISTFILES = fstream.c gfile.c gpfdist.c transform.c
+GPFDISTFILES = fstream.c gfile.c gpfdist.c transform.c gpfdist_helper.c
 OBJS         = $(subst .c,.o,$(GPFDISTFILES))
 
 SHELL=bash

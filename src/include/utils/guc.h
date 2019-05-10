@@ -533,6 +533,9 @@ extern char   *pxf_remote_service_secret;
 /* Time based authentication GUC */
 extern char  *gp_auth_time_override_str;
 
+extern int readable_external_table_timeout;
+extern int writable_external_table_bufsize;
+
 extern void SetConfigOption(const char *name, const char *value,
 				GucContext context, GucSource source);
 

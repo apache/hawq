@@ -790,6 +790,10 @@ char   *acl_type;
 int    rps_addr_port;
 int    rps_check_local_interval;
 
+// curl url external table related guc
+int writable_external_table_bufsize = 64;
+int readable_external_table_timeout = 0;
+
 /*
  * Displayable names for context types (enum GucContext)
  *
@@ -5306,6 +5310,28 @@ static struct config_int ConfigureNamesInt[] =
 		&GpIdentity.numsegments,
 		UNINITIALIZED_GP_IDENTITY_VALUE, INT_MIN, INT_MAX, NULL, NULL
 	},
+
+  {
+    {"readable_external_table_timeout", PGC_USERSET, EXTERNAL_TABLES,
+      gettext_noop("Cancel the query if no data read within N seconds."),
+      gettext_noop("A value of 0 turns off the timeout."),
+      GUC_UNIT_S | GUC_NOT_IN_SAMPLE
+    },
+    &readable_external_table_timeout,
+    0, 0, INT_MAX,
+    NULL, NULL, NULL
+  },
+
+  {
+    {"writable_external_table_bufsize", PGC_USERSET, EXTERNAL_TABLES,
+      gettext_noop("Buffer size in kilobytes for writable external table before writing data to gpfdist."),
+      gettext_noop("Valid value is between 32K and 128M: [32, 131072]."),
+      GUC_UNIT_KB | GUC_NOT_IN_SAMPLE
+    },
+    &writable_external_table_bufsize,
+    64, 32, 131072,
+    NULL, NULL, NULL
+  },
 
 	{
 		{"gp_max_csv_line_length", PGC_USERSET, EXTERNAL_TABLES,
