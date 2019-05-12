@@ -1,0 +1,42 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestDatatypeDouble;
+SET
+-- end_ignore
+create table td (i int, f float, r real, dp double precision);
+CREATE TABLE
+insert into td values(1, 1.1, 1.11, 1.111);
+INSERT 0 1
+insert into td values(2, 2.2, 2.22, 2.222);
+INSERT 0 1
+insert into td values(3, 3.3, 3.33, 3.333);
+INSERT 0 1
+create writable external table twd_e (i int, f float, r real, dp double precision) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_double/twd_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trd_e (i int, f float, r real, dp double precision) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_double/twd_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into twd_e select * from td;
+INSERT 0 3
+select * from td order by i;
+ i |  f  |  r   |  dp   
+---+-----+------+-------
+ 1 | 1.1 | 1.11 | 1.111
+ 2 | 2.2 | 2.22 | 2.222
+ 3 | 3.3 | 3.33 | 3.333
+(3 rows)
+
+select * from twd_e order by i;
+ i |  f  |  r   |  dp   
+---+-----+------+-------
+ 1 | 1.1 | 1.11 | 1.111
+ 2 | 2.2 | 2.22 | 2.222
+ 3 | 3.3 | 3.33 | 3.333
+(3 rows)
+
+select * from trd_e order by i;
+ i |  f  |  r   |  dp   
+---+-----+------+-------
+ 1 | 1.1 | 1.11 | 1.111
+ 2 | 2.2 | 2.22 | 2.222
+ 3 | 3.3 | 3.33 | 3.333
+(3 rows)
+

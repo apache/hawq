@@ -1,0 +1,89 @@
+-- start_ignore
+drop table if exists neg_orc_table1, neg_orc_table2, neg_orc_table3, neg_orc_table4, neg_orc_table5, neg_orc_testdrop,
+	neg_orc_table6, neg_orc_table7, neg_orc_table8, neg_orc_table9, neg_orc_table10, neg_orc_table11, neg_orc_table12, neg_orc_table13, neg_orc_table14,
+	neg_orc_table15 ,neg_orc_table16 ,neg_orc_table17 ,neg_orc_table18, neg_orc_table19, neg_orc_table20;
+drop external table if exists  neg_orc_table1_e, neg_orc_table2_e, neg_orc_table3_e, neg_orc_table4_e, neg_orc_table5_e, neg_orc_table6_e, neg_orc_table7_e, 
+	neg_orc_table8_e, neg_orc_table9_e, neg_orc_table10_e, neg_orc_table11_e, neg_orc_table12_e, neg_orc_table13_e, neg_orc_table14_e, neg_orc_table15_e, neg_orc_table16_e, 
+	neg_orc_table17_e, neg_orc_table18_e, neg_orc_table19_e, neg_orc_table20_e, neg_orc_table21_e, neg_orc_table22_e, neg_orc_table23_e, neg_orc_table24_e, neg_orc_table25_e,
+	neg_orc_testdrop_e, neg_orc_table26_e, neg_orc_table27_e, neg_orc_table28_e;
+-- end_ignore
+-- internal table
+create writable table neg_orc_table1 (i int, j float) format 'orc';
+create readable table neg_orc_table2 (i int, j float) format 'orc';
+
+-- internal table can not location
+create table neg_orc_table3 (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table3') format 'orc';
+
+-- internal table can not execute
+create table neg_orc_table4(i int) execute() format 'orc';
+
+-- test can not support create index statement
+create table neg_orc_table5(i int ,j float, primary key(i)) format 'orc';
+create table neg_orc_table6(i int ,j float, check(i>5)) format 'orc';
+create table neg_orc_table7(i int not null, f float) format 'orc';
+
+
+-- test compresstype
+create table neg_orc_table8(i int, j float) format 'orc' (compresstype lz4);
+create table neg_orc_table9(i int, j float) format 'orc' (compresstype snappy);
+create table neg_orc_table10(i int, j float) format 'orc' (compresstype none);
+create table neg_orc_table11(i int, j float) format 'orc' (compresstype fndsngsjng);
+create table neg_orc_table12(i int, j float) format 'orc' (compresstype 'fndsngsjng');
+create table neg_orc_table13(i int, j float) format 'orc' (rlecoder 'v');
+create table neg_orc_table14(i int, j float) format 'orc' (rlecoder v);
+
+create table neg_orc_table15(i int, j float) format orc;
+create table neg_orc_table16(i int, j float) format 'orc' encoding utf8;
+
+-- test like
+create table neg_orc_table17(i int, j float) format 'orc';
+create table neg_orc_table18(i text, like neg_orc_table17) format 'orc';
+
+-- test distributed
+create table neg_orc_table19(i int, j float) format 'orc' distributed by i;
+
+create table neg_orc_table20(i int, j float) format 'orc' (escape #);
+
+
+-- writable external orc table
+--external table can not be web
+create writable external web table neg_orc_table1_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table1_e') format 'orc';
+create writable external table neg_orc_table2_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table2_e');
+create writable external table neg_orc_table3_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table3_e') format 'parquet';
+create writable external table neg_orc_table4_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table4_e') format 'orc' (compresstype 'zlib') encoding 'utf8';
+create writable external table neg_orc_table5_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table5_e') format 'orc' (rlecoder 'v') encoding 'utf8';
+create writable external table neg_orc_table6_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table6_e') format 'orc' (rlecoder 'v1') encoding 'utf8';
+create writable external table neg_orc_table7_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table7_e') format 'orc' (rlecoder 'v3') encoding 'utf8';
+create writable external table neg_orc_table8_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table8_e') format 'orc' encoding 'us-ascii';
+create writable external table neg_orc_table9_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table9_e') format 'orc' encoding 'gbk';
+create writable external table neg_orc_table10_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table10_e') format 'orc' (compresstype 'lz4' compresstype 'lz4') encoding 'utf8';
+create writable external table neg_orc_table11_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table11_e') format 'orc' (compresstype 'lz4' escape '#') encoding 'utf8';
+create writable external table neg_orc_table12_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table12_e') format 'orc' (compresstype 'lz4' delimiter ',') encoding 'utf8';
+create writable external table neg_orc_table13_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table13_e') format 'orc' (compresstype 'lz4' escape '#') encoding 'utf8';
+create writable external table neg_orc_table14_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table14_e') format 'magma';
+
+-- readable external orc table
+create readable external table neg_orc_table15_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn01_e');
+create readable external table neg_orc_table16_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn02_e') format 'parquet';
+create readable external table neg_orc_table17_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn03_e') format 'orc' encoding 'gbk';
+create readable external table neg_orc_table18_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn04_e') format 'orc' (compresstype 'none') encoding 'utf8';
+create readable external table neg_orc_table19_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn05_e') format 'orc' (compresstype 'lz4') encoding 'utf8';
+create readable external table neg_orc_table20_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn06_e') format 'orc' (compresstype 'zlib') encoding 'utf8';
+create readable external table neg_orc_table21_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn07_e') format 'orc' (rlecoder 'v') encoding 'utf8';
+create readable external table neg_orc_table22_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn08_e') format 'orc' (rlecoder 'v1') encoding 'utf8';
+create readable external table neg_orc_table23_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn09_e') format 'orc' (rlecoder 'v3') encoding 'utf8';
+create readable external table neg_orc_table24_e (i int) location ('magma://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table24_e') format 'orc';
+create readable external web table neg_orc_table25_e(i int)  location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table25_e') format 'orc';
+create readable external table neg_orc_table26_e(i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table26_e') format 'orc' (compresstype lz4);
+create readable external table neg_orc_table27_e(i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table27_e') format 'orc' (compresstype snappy);
+create readable external table neg_orc_table28_e(i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table28_e') format 'orc' (compresstype none);
+
+-- test drop
+create table neg_orc_testdrop(i int) format 'orc';
+create readable external table neg_orc_testdrop_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test/normalpath/neg_orc_testdrop_e') format 'orc';
+
+-- test can not insert for readable
+insert into neg_orc_testdrop_e values (1);
+
+drop external table neg_orc_testdrop;
+drop table neg_orc_testdrop_e;

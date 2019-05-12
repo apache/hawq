@@ -1,0 +1,17 @@
+-- start_ignore
+set new_executor=off;
+-- end_ignore
+create table td (i int, f float, r real, dp double precision);
+
+insert into td values(1, 1.1, 1.11, 1.111);
+insert into td values(2, 2.2, 2.22, 2.222);
+insert into td values(3, 3.3, 3.33, 3.333);
+
+create writable external table twd_e (i int, f float, r real, dp double precision) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_double/twd_e') format 'orc' (compresstype 'lz4');
+create readable external table trd_e (i int, f float, r real, dp double precision) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_double/twd_e') format 'orc';
+
+insert into twd_e select * from td;
+
+select * from td order by i;
+select * from twd_e order by i;
+select * from trd_e order by i;

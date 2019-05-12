@@ -1,0 +1,91 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestDatatypeBool;
+SET
+-- end_ignore
+--start_ignore
+set new_executor=auto;
+SET
+--end_ignore
+create table tb (i int, b boolean);
+CREATE TABLE
+insert into tb values(1, TRUE);
+INSERT 0 1
+insert into tb values(2, 't');
+INSERT 0 1
+insert into tb values(3, 'true');
+INSERT 0 1
+insert into tb values(4, 'y');
+INSERT 0 1
+insert into tb values(5, 'yes');
+INSERT 0 1
+insert into tb values(6, '1');
+INSERT 0 1
+insert into tb values(7, FALSE);
+INSERT 0 1
+insert into tb values(8, 'f');
+INSERT 0 1
+insert into tb values(9, 'false');
+INSERT 0 1
+insert into tb values(10, 'n');
+INSERT 0 1
+insert into tb values(11, 'no');
+INSERT 0 1
+insert into tb values(12, '0');
+INSERT 0 1
+create writable external table twb_e (i int, b boolean) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_bool/twb_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trb_e (i int, b boolean) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_bool/twb_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into twb_e select * from tb;
+INSERT 0 12
+select * from tb order by i;
+ i  | b 
+----+---
+  1 | t
+  2 | t
+  3 | t
+  4 | t
+  5 | t
+  6 | t
+  7 | f
+  8 | f
+  9 | f
+ 10 | f
+ 11 | f
+ 12 | f
+(12 rows)
+
+select * from twb_e order by i;
+ i  | b 
+----+---
+  1 | t
+  2 | t
+  3 | t
+  4 | t
+  5 | t
+  6 | t
+  7 | f
+  8 | f
+  9 | f
+ 10 | f
+ 11 | f
+ 12 | f
+(12 rows)
+
+select * from trb_e order by i;
+ i  | b 
+----+---
+  1 | t
+  2 | t
+  3 | t
+  4 | t
+  5 | t
+  6 | t
+  7 | f
+  8 | f
+  9 | f
+ 10 | f
+ 11 | f
+ 12 | f
+(12 rows)
+

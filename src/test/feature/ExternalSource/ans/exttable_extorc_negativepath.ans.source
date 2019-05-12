@@ -1,0 +1,225 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestNegativePath;
+SET
+-- end_ignore
+-- start_ignore
+drop table if exists neg_orc_table1, neg_orc_table2, neg_orc_table3, neg_orc_table4, neg_orc_table5, neg_orc_testdrop,
+	neg_orc_table6, neg_orc_table7, neg_orc_table8, neg_orc_table9, neg_orc_table10, neg_orc_table11, neg_orc_table12, neg_orc_table13, neg_orc_table14,
+	neg_orc_table15 ,neg_orc_table16 ,neg_orc_table17 ,neg_orc_table18, neg_orc_table19, neg_orc_table20;
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table1" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table2" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table3" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table4" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table5" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_testdrop" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table6" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table7" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table8" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table9" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table10" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table11" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table12" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table13" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table14" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table15" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table16" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table17" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table18" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table19" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:7: NOTICE:  table "neg_orc_table20" does not exist, skipping
+DROP TABLE
+drop external table if exists  neg_orc_table1_e, neg_orc_table2_e, neg_orc_table3_e, neg_orc_table4_e, neg_orc_table5_e, neg_orc_table6_e, neg_orc_table7_e, 
+	neg_orc_table8_e, neg_orc_table9_e, neg_orc_table10_e, neg_orc_table11_e, neg_orc_table12_e, neg_orc_table13_e, neg_orc_table14_e, neg_orc_table15_e, neg_orc_table16_e, 
+	neg_orc_table17_e, neg_orc_table18_e, neg_orc_table19_e, neg_orc_table20_e, neg_orc_table21_e, neg_orc_table22_e, neg_orc_table23_e, neg_orc_table24_e, neg_orc_table25_e,
+	neg_orc_testdrop_e, neg_orc_table26_e, neg_orc_table27_e, neg_orc_table28_e;
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table1_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table2_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table3_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table4_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table5_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table6_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table7_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table8_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table9_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table10_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table11_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table12_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table13_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table14_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table15_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table16_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table17_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table18_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table19_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table20_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table21_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table22_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table23_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table24_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table25_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_testdrop_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table26_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table27_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestNegativePath.sql:11: NOTICE:  table "neg_orc_table28_e" does not exist, skipping
+DROP EXTERNAL TABLE
+-- end_ignore
+-- internal table
+create writable table neg_orc_table1 (i int, j float) format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:14: ERROR:  syntax error at or near "table"
+LINE 1: create writable table neg_orc_table1 (i int, j float) format...
+                        ^
+create readable table neg_orc_table2 (i int, j float) format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:15: ERROR:  syntax error at or near "table"
+LINE 1: create readable table neg_orc_table2 (i int, j float) format...
+                        ^
+-- internal table can not location
+create table neg_orc_table3 (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table3') format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:18: ERROR:  LOCATION or EXECUTE may not be used for native table
+HINT:  Use CREATE TABLE FORMAT or CREATE EXTERNAL TABLE instead
+-- internal table can not execute
+create table neg_orc_table4(i int) execute() format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:21: ERROR:  syntax error at or near "("
+LINE 1: create table neg_orc_table4(i int) execute() format 'orc';
+                                                  ^
+-- test can not support create index statement
+create table neg_orc_table5(i int ,j float, primary key(i)) format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:24: ERROR:  Cannot support create index statement yet
+create table neg_orc_table6(i int ,j float, check(i>5)) format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:25: ERROR:  Do not support table constrait other than primary key
+create table neg_orc_table7(i int not null, f float) format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:26: ERROR:  Do not support column constrait
+-- test compresstype
+create table neg_orc_table8(i int, j float) format 'orc' (compresstype lz4);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:30: ERROR:  invalid value for option compresstype_lz4: "1"
+create table neg_orc_table9(i int, j float) format 'orc' (compresstype snappy);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:31: ERROR:  invalid value for option compresstype_snappy: "1"
+create table neg_orc_table10(i int, j float) format 'orc' (compresstype none);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:32: ERROR:  syntax error at or near ")"
+LINE 1: ...rc_table10(i int, j float) format 'orc' (compresstype none);
+                                                                     ^
+create table neg_orc_table11(i int, j float) format 'orc' (compresstype fndsngsjng);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:33: ERROR:  invalid value for option compresstype_fndsngsjng: "1"
+create table neg_orc_table12(i int, j float) format 'orc' (compresstype 'fndsngsjng');
+psql:/tmp/TestExtOrc_TestNegativePath.sql:34: ERROR:  invalid value for option compresstype: "fndsngsjng"
+create table neg_orc_table13(i int, j float) format 'orc' (rlecoder 'v');
+psql:/tmp/TestExtOrc_TestNegativePath.sql:35: ERROR:  Option "rlecoder" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create table neg_orc_table14(i int, j float) format 'orc' (rlecoder v);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:36: ERROR:  Option "rlecoder_v" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create table neg_orc_table15(i int, j float) format orc;
+psql:/tmp/TestExtOrc_TestNegativePath.sql:38: ERROR:  syntax error at or near "orc"
+LINE 1: create table neg_orc_table15(i int, j float) format orc;
+                                                            ^
+create table neg_orc_table16(i int, j float) format 'orc' encoding utf8;
+psql:/tmp/TestExtOrc_TestNegativePath.sql:39: ERROR:  syntax error at or near "utf8"
+LINE 1: ... neg_orc_table16(i int, j float) format 'orc' encoding utf8;
+                                                                  ^
+-- test like
+create table neg_orc_table17(i int, j float) format 'orc';
+CREATE TABLE
+create table neg_orc_table18(i text, like neg_orc_table17) format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:43: ERROR:  column "i" duplicated
+-- test distributed
+create table neg_orc_table19(i int, j float) format 'orc' distributed by i;
+psql:/tmp/TestExtOrc_TestNegativePath.sql:46: ERROR:  syntax error at or near "i"
+LINE 1: ...g_orc_table19(i int, j float) format 'orc' distributed by i;
+                                                                     ^
+create table neg_orc_table20(i int, j float) format 'orc' (escape #);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:48: ERROR:  syntax error at or near "#"
+LINE 1: ...ble neg_orc_table20(i int, j float) format 'orc' (escape #);
+                                                                    ^
+-- writable external orc table
+--external table can not be web
+create writable external web table neg_orc_table1_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table1_e') format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:53: ERROR:  an EXTERNAL WEB TABLE may only use http URI's, problem in: 'hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table1_e'
+HINT:  Use CREATE EXTERNAL TABLE instead.
+create writable external table neg_orc_table2_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table2_e');
+psql:/tmp/TestExtOrc_TestNegativePath.sql:54: ERROR:  syntax error at or near ";"
+LINE 1: ...efault/exttable_extorc_test_negativepath/neg_orc_table2_e');
+                                                                      ^
+create writable external table neg_orc_table3_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table3_e') format 'parquet';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:55: ERROR:  LOCATION using hdfs url 'hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table3_e' does not support 'parquet' format
+HINT:  Use "FORMAT 'orc', 'text', or 'csv'" instead
+create writable external table neg_orc_table4_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table4_e') format 'orc' (compresstype 'zlib') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:56: ERROR:  invalid value for option compresstype: "zlib"
+create writable external table neg_orc_table5_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table5_e') format 'orc' (rlecoder 'v') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:57: ERROR:  Option "rlecoder" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create writable external table neg_orc_table6_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table6_e') format 'orc' (rlecoder 'v1') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:58: ERROR:  Option "rlecoder" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create writable external table neg_orc_table7_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table7_e') format 'orc' (rlecoder 'v3') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:59: ERROR:  Option "rlecoder" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create writable external table neg_orc_table8_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table8_e') format 'orc' encoding 'us-ascii';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:60: ERROR:  "us-ascii" is not a valid encoding for ORC external table. Encoding for ORC external table must be UTF8.
+create writable external table neg_orc_table9_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table9_e') format 'orc' encoding 'gbk';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:61: ERROR:  "gbk" is not a valid encoding for ORC external table. Encoding for ORC external table must be UTF8.
+create writable external table neg_orc_table10_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table10_e') format 'orc' (compresstype 'lz4' compresstype 'lz4') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:62: ERROR:  conflicting or redundant options "compresstype"
+create writable external table neg_orc_table11_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table11_e') format 'orc' (compresstype 'lz4' escape '#') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:63: ERROR:  Option "escape" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create writable external table neg_orc_table12_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table12_e') format 'orc' (compresstype 'lz4' delimiter ',') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:64: ERROR:  Option "delimiter" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create writable external table neg_orc_table13_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table13_e') format 'orc' (compresstype 'lz4' escape '#') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:65: ERROR:  Option "escape" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create writable external table neg_orc_table14_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table14_e') format 'magma';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:66: ERROR:  LOCATION using hdfs url 'hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table14_e' does not support 'magma' format
+HINT:  Use "FORMAT 'orc', 'text', or 'csv'" instead
+-- readable external orc table
+create readable external table neg_orc_table15_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn01_e');
+psql:/tmp/TestExtOrc_TestNegativePath.sql:69: ERROR:  syntax error at or near ";"
+LINE 1: ...000@@path@@exttable_extorc_test_negativepath/rn01_e');
+                                                                      ^
+create readable external table neg_orc_table16_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn02_e') format 'parquet';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:70: ERROR:  LOCATION using hdfs url 'hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn02_e' does not support 'parquet' format
+HINT:  Use "FORMAT 'orc', 'text', or 'csv'" instead
+create readable external table neg_orc_table17_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn03_e') format 'orc' encoding 'gbk';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:71: ERROR:  "gbk" is not a valid encoding for ORC external table. Encoding for ORC external table must be UTF8.
+create readable external table neg_orc_table18_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn04_e') format 'orc' (compresstype 'none') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:72: ERROR:  redundant option compresstype
+create readable external table neg_orc_table19_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn05_e') format 'orc' (compresstype 'lz4') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:73: ERROR:  redundant option compresstype
+create readable external table neg_orc_table20_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn06_e') format 'orc' (compresstype 'zlib') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:74: ERROR:  redundant option compresstype
+create readable external table neg_orc_table21_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn07_e') format 'orc' (rlecoder 'v') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:75: ERROR:  Option "rlecoder" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create readable external table neg_orc_table22_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn08_e') format 'orc' (rlecoder 'v1') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:76: ERROR:  Option "rlecoder" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create readable external table neg_orc_table23_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/rn09_e') format 'orc' (rlecoder 'v3') encoding 'utf8';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:77: ERROR:  Option "rlecoder" for ORC table is invalid
+HINT:  Format options for ORC table must be either formatter, or compresstype
+create readable external table neg_orc_table24_e (i int) location ('magma://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table24_e') format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:78: ERROR:  LOCATION using magma url 'magma://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table24_e' does not support 'orc' format
+HINT:  Use "FORMAT 'magma'" instead
+create readable external web table neg_orc_table25_e(i int)  location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table25_e') format 'orc';
+psql:/tmp/TestExtOrc_TestNegativePath.sql:79: ERROR:  an EXTERNAL WEB TABLE may only use http URI's, problem in: 'hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table25_e'
+HINT:  Use CREATE EXTERNAL TABLE instead.
+create readable external table neg_orc_table26_e(i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table26_e') format 'orc' (compresstype lz4);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:80: ERROR:  redundant option compresstype_lz4
+create readable external table neg_orc_table27_e(i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table27_e') format 'orc' (compresstype snappy);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:81: ERROR:  redundant option compresstype_snappy
+create readable external table neg_orc_table28_e(i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test_negativepath/neg_orc_table28_e') format 'orc' (compresstype none);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:82: ERROR:  syntax error at or near ")"
+LINE 1: ...vepath/neg_orc_table28_e') format 'orc' (compresstype none);
+                                                                     ^
+-- test drop
+create table neg_orc_testdrop(i int) format 'orc';
+CREATE TABLE
+create readable external table neg_orc_testdrop_e (i int) location ('hdfs://@@host@@@@path@@exttable_extorc_test/normalpath/neg_orc_testdrop_e') format 'orc';
+CREATE EXTERNAL TABLE
+-- test can not insert for readable
+insert into neg_orc_testdrop_e values (1);
+psql:/tmp/TestExtOrc_TestNegativePath.sql:89: ERROR:  cannot change a readable external table "neg_orc_testdrop_e"
+drop external table neg_orc_testdrop;
+psql:/tmp/TestExtOrc_TestNegativePath.sql:91: ERROR:  "neg_orc_testdrop" is not an external table
+HINT:  Use DROP TABLE to remove a base table
+drop table neg_orc_testdrop_e;
+psql:/tmp/TestExtOrc_TestNegativePath.sql:92: ERROR:  "neg_orc_testdrop_e" is not a base table
+HINT:  Use DROP EXTERNAL TABLE to remove an external table

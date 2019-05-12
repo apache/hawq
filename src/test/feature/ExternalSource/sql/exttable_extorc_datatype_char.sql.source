@@ -1,0 +1,27 @@
+create table tc (i int, c character);
+create table tcn (i int, cn character(6));
+
+insert into tc values (1, 'a');
+insert into tc values (2, 'b');
+insert into tc values (3, 'c');
+
+insert into tcn values (1, 'a');
+insert into tcn values (2, 'bbb');
+insert into tcn values (3, 'cccccc');
+
+create writable external table twc_e (i int, c character) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_char/twc_e') format 'orc' (compresstype 'lz4');
+create readable external table trc_e (i int, c character) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_char/twc_e') format 'orc';
+
+create writable external table twcn_e (i int, cn character(6)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_char/twcn_e') format 'orc' (compresstype 'lz4');
+create readable external table trcn_e (i int, cn character(6)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_char/twcn_e') format 'orc';
+
+-- insert into twc_e select * from tc;
+-- insert into twcn_e select * from tcn;
+
+select * from tc order by i;
+-- select * from twc_e order by i;
+-- select * from trc_e order by i;
+
+select * from tcn order by i;
+-- select * from twcn_e order by i;
+-- select * from trcn_e order by i;

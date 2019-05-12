@@ -1,0 +1,188 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestDatatypeDateTime;
+SET
+-- end_ignore
+--start_ignore
+set new_executor=auto;
+SET
+--end_ignore
+-- date
+create table td (i int, d date);
+CREATE TABLE
+insert into td values (1, '2017-07-01'::date);
+INSERT 0 1
+insert into td values (2, 'Jul-02-17'::date);
+INSERT 0 1
+insert into td values (2, '2017.300'::date);
+INSERT 0 1
+create writable external table twd_e (i int, d date) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twd_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trd_e (i int, d date) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twd_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into twd_e select * from td;
+INSERT 0 3
+select * from td order by i;
+ i |     d      
+---+------------
+ 1 | 07-01-2017
+ 2 | 07-02-2017
+ 2 | 10-27-2017
+(3 rows)
+
+-- select * from twd_e order by i;
+-- select * from trd_e order by i;
+-- time
+create table tt (i int, t time);
+CREATE TABLE
+create table ttntz(i int, t time without time zone);
+CREATE TABLE
+create table tttz(i int, t time with time zone);
+CREATE TABLE
+insert into tt values (1, '19:18:17'::time);
+INSERT 0 1
+insert into ttntz values (1, '19:18:17'::time without time zone);
+INSERT 0 1
+insert into tttz values (1, '19:18:17-08:00'::time with time zone);
+INSERT 0 1
+create writable external table twt_e (i int, t time) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twt_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trt_e (i int, t time) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twt_e') format 'orc';
+CREATE EXTERNAL TABLE
+create writable external table twtntz_e (i int, t time without time zone) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twtntz_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trtntz_e (i int, t time without time zone) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twtntz_e') format 'orc';
+CREATE EXTERNAL TABLE
+create writable external table twttz_e (i int, t time with time zone) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twttz_e') format 'orc' (compresstype 'lz4');
+psql:/tmp/TestExtOrc_TestDatatypeDateTime.sql:38: ERROR:  unsupported data types 1266 for columns of external ORC table is specified.
+create readable external table trttz_e (i int, t time with time zone) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twttz_e') format 'orc';
+psql:/tmp/TestExtOrc_TestDatatypeDateTime.sql:39: ERROR:  unsupported data types 1266 for columns of external ORC table is specified.
+-- insert into twt_e select * from tt;
+select * from tt order by i;
+ i |    t     
+---+----------
+ 1 | 19:18:17
+(1 row)
+
+-- select * from twt_e order by i;
+-- select * from trt_e order by i;
+-- insert into twtntz_e select * from ttntz;
+select * from ttntz order by i;
+ i |    t     
+---+----------
+ 1 | 19:18:17
+(1 row)
+
+-- select * from twtntz_e order by i;
+-- select * from trtntz_e order by i;
+-- insert into twttz_e select * from tttz;
+select * from tttz order by i;
+ i |      t      
+---+-------------
+ 1 | 19:18:17-08
+(1 row)
+
+-- select * from twttz_e order by i;
+-- select * from trttz_e order by i;
+-- timestamp
+create table tts (i int, t timestamp);
+CREATE TABLE
+create table ttsntz(i int, t timestamp without time zone);
+CREATE TABLE
+create table ttstz(i int, t timestamp with time zone);
+CREATE TABLE
+insert into tts values (1, '2017-07-01 19:18:17'::timestamp);
+INSERT 0 1
+insert into ttsntz values (1, '2017-07-01 19:18:17'::timestamp without time zone);
+INSERT 0 1
+insert into ttstz values (1, '2017-07-01 19:18:17-08:00'::timestamp with time zone);
+INSERT 0 1
+create writable external table twts_e (i int, t timestamp) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twts_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trts_e (i int, t timestamp) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twts_e') format 'orc';
+CREATE EXTERNAL TABLE
+create writable external table twtsntz_e (i int, t timestamp without time zone) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twtsntz_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trtsntz_e (i int, t timestamp without time zone) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twtsntz_e') format 'orc';
+CREATE EXTERNAL TABLE
+create writable external table twtstz_e (i int, t timestamp with time zone) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twtstz_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trtstz_e (i int, t timestamp with time zone) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twtstz_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into twts_e select * from tts;
+INSERT 0 1
+select * from tts order by i;
+ i |            t             
+---+--------------------------
+ 1 | Sat Jul 01 19:18:17 2017
+(1 row)
+
+select * from twts_e order by i;
+ i |            t             
+---+--------------------------
+ 1 | Sat Jul 01 19:18:17 2017
+(1 row)
+
+select * from trts_e order by i;
+ i |            t             
+---+--------------------------
+ 1 | Sat Jul 01 19:18:17 2017
+(1 row)
+
+insert into twtsntz_e select * from ttsntz;
+INSERT 0 1
+select * from ttsntz order by i;
+ i |            t             
+---+--------------------------
+ 1 | Sat Jul 01 19:18:17 2017
+(1 row)
+
+select * from twtsntz_e order by i;
+ i |            t             
+---+--------------------------
+ 1 | Sat Jul 01 19:18:17 2017
+(1 row)
+ 
+select * from trtsntz_e order by i;
+ i |            t             
+---+--------------------------
+ 1 | Sat Jul 01 19:18:17 2017
+(1 row)
+ 
+insert into twtstz_e select * from ttstz;
+INSERT 0 1
+select * from ttstz order by i;
+ i |              t               
+---+------------------------------
+ 1 | Sat Jul 01 20:18:17 2017 PDT
+(1 row)
+
+select * from twtstz_e order by i;
+ i |              t               
+---+------------------------------
+ 1 | Sat Jul 01 20:18:17 2017 PDT
+(1 row)
+
+select * from trtstz_e order by i;
+ i |              t               
+---+------------------------------
+ 1 | Sat Jul 01 20:18:17 2017 PDT
+(1 row)
+
+-- interval
+create table tit (i int, it interval);
+CREATE TABLE
+insert into tit values (1, '1 year 2 months 3 days 4 hours 5 minutes 6 seconds'::interval);
+INSERT 0 1
+create writable external table twit_e (i int, it interval) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twit_e') format 'orc' (compresstype 'lz4');
+psql:/tmp/TestExtOrc_TestDatatypeDateTime.sql:94: ERROR:  unsupported data types 1186 for columns of external ORC table is specified.
+create readable external table trit_e (i int, it interval) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_datetime/twit_e') format 'orc';
+psql:/tmp/TestExtOrc_TestDatatypeDateTime.sql:95: ERROR:  unsupported data types 1186 for columns of external ORC table is specified.
+-- insert into twit_e select * from tit;
+select * from tit order by i;
+ i |              it               
+---+-------------------------------
+ 1 | 1 year 2 mons 3 days 04:05:06
+(1 row)
+
+-- select * from twit_e order by i;
+-- select * from trit_e order by i;

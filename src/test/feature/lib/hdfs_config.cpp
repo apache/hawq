@@ -33,134 +33,142 @@ namespace hawq {
 namespace test {
 
 HdfsConfig::HdfsConfig() {
-  std::string user = HAWQ_USER;
-  if(user.empty()) {
-    struct passwd *pw;
-    uid_t uid = geteuid();
-    pw = getpwuid(uid);
-    user.assign(pw->pw_name);
-  }
-  conn.reset(new hawq::test::PSQL(HAWQ_DB, HAWQ_HOST, HAWQ_PORT, user, HAWQ_PASSWORD));
-  isLoadFromHawqConfigFile = false;
-  isLoadFromHdfsConfigFile = false;
+    isLoadFromHawqConfigFile = false;
+    isLoadFromHdfsConfigFile = false;
+    isHACluster = this->__isHA();
+    this->getCluster();
 }
 
-void HdfsConfig::runCommand(const string &command, 
-                            bool ishdfsuser, 
-                            string &result) {
-  string cmd = "";
-  if (ishdfsuser) {
-    cmd = "/usr/bin/sudo -Eu ";
-    cmd.append(getHdfsUser());
-    cmd.append(" env \"PATH=$PATH\" ");
-    cmd.append(command);
-  } else {
-    cmd = command;
-  }
-  Command c(cmd);
-  result = c.run().getResultOutput();
-}
-
-bool HdfsConfig::runCommandAndFind(const string &command, 
-                                   bool ishdfsuser, 
-                                   const string &findstring) {
-  string result = "";
-  runCommand(command, ishdfsuser, result);
-  auto lines = hawq::test::split(result, '\n');
-  for (size_t i=0; i<lines.size(); i++) {
-    string valueLine = lines[i];
-    int find = valueLine.find(findstring);
-    if (find >= 0) {
-        return true;
-    }
-  }
-  return false;
-}
-
-void HdfsConfig::runCommandAndGetNodesPorts(const string &command, 
-                                            std::vector<string> &datanodelist,
-                                            std::vector<int> &port) {
-  string result = "";
-  runCommand(command, true, result);
-  auto lines = hawq::test::split(result, '\n');
-  for (size_t i = 0; i < lines.size(); i++) {
-    string valueLine = lines[i];
-    auto datanodeInfo = hawq::test::split(valueLine, ':');
-    if (datanodeInfo.size() == 3) {
-      int portStart = datanodeInfo[2].find_first_of('(');
-      int portEnd = datanodeInfo[2].find_first_of(')');
-      string datanodePort = datanodeInfo[2].substr(0, portStart);
-      string datanodeHost = datanodeInfo[2].substr(portStart+1, portEnd-portStart-1);
-      datanodelist.push_back(hawq::test::trim(datanodeHost));
-      port.push_back(std::stoi(hawq::test::trim(datanodePort)));
-    }
-  }
-}
-
-string HdfsConfig::getHdfsUser() {
-  string cmd = "ps aux|grep hdfs.server|grep -v grep";
-  Command c(cmd);
-  string result = c.run().getResultOutput();
-  auto lines = hawq::test::split(result, '\n');
-  if (lines.size() >= 1) {
-    return hawq::test::trim(hawq::test::split(lines[lines.size()-1], ' ')[0]);
-  } 
-  return "hdfs";
-}
-
-bool HdfsConfig::LoadFromHawqConfigFile() {
-  if (isLoadFromHawqConfigFile) {
-    return true;
-  }
-  const char *env = getenv("GPHOME");
-  string confPath = env ? env : "";
-  if (confPath != "") {
-    confPath.append("/etc/hdfs-client.xml");
-  } else {
-    return false;
-  }
-
-  hawqxmlconf.reset(new XmlConfig(confPath));
-  if (!hawqxmlconf->parse())
-    return false;
-
-  isLoadFromHawqConfigFile = true;
-  return true;
-}
-
-bool HdfsConfig::LoadFromHdfsConfigFile() {
-  if (isLoadFromHdfsConfigFile) {
-    return true;
-  }
-  string confPath=getHadoopHome();
-  if (confPath == "") {
-    return false;
-  }
-  confPath.append("/etc/hadoop/hdfs-site.xml");
-  hdfsxmlconf.reset(new XmlConfig(confPath));
-  if (!hdfsxmlconf->parse())
-    return false;
-  
-  isLoadFromHdfsConfigFile = true;
-  return true;
-}
-
-int HdfsConfig::isHA() {
-  const hawq::test::PSQLQueryResult &result = conn->getQueryResult(
+bool HdfsConfig::__isHA() {
+    const hawq::test::PSQLQueryResult &result = conn->getQueryResult(
        "SELECT substring(fselocation from length('hdfs:// ') for (position('/' in substring(fselocation from length('hdfs:// ')))-1)::int) "
        "FROM pg_filespace pgfs, pg_filespace_entry pgfse "
        "WHERE pgfs.fsname = 'dfs_system' AND pgfse.fsefsoid=pgfs.oid ;");
-  std::vector<std::vector<string>> table = result.getRows();
-  if (table.size() > 0) {
-    int find = table[0][0].find(":");
-    if (find < 0) {
-      return 1;
-    } else {
-      return 0;
+    std::vector<std::vector<string>> table = result.getRows();
+    if (table.size() > 0) {
+        int find = table[0][0].find(":");
+        if (find < 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
-  }
-  return -1;
+    return false;
 }
+
+// Return kubenet cluster information. It is only valid when iscloud is true
+bool HdfsConfig::getCluster()
+{
+    bool status;
+    if (masterPhysicalHosts.size() == 0 )
+    {
+        if (iscloud)
+        {
+            status = this->__fetchKubeCluster();
+            if (!status)
+                 return false;
+            this->getHadoopHome();
+            hdfsuser = this->getHdfsUser();
+            if (hdfsuser.size() == 0)
+                return false;
+        }
+        else
+        {
+            if (isHACluster)
+            {
+                string hostname = HAWQ_HOST;
+                masterPhysicalHosts.push_back(hostname);
+                this->getHadoopHome();
+                hdfsuser = this->getHdfsUser();
+                std::vector<string> masterhosts;
+                std::vector<int>  namenodePort;
+                this->getNamenodes(masterhosts, namenodePort);
+                masterPhysicalHosts.clear();
+                for (uint16_t i =0; i < masterhosts.size(); i++)
+                    masterPhysicalHosts.push_back(masterhosts[i]);
+            }
+            else
+            {
+                 string nameportstring;
+                 this->getNamenodeHost(nameportstring);
+                 int pos = nameportstring.find(":");
+                 masterPhysicalHosts.push_back(nameportstring.substr(0, pos));
+                 this->getHadoopHome();
+                 hdfsuser = this->getHdfsUser();
+             }
+             std::vector<int> datanodePort;
+             this->getDatanodelist(slavesPhysicalHosts, datanodePort);
+        }
+    }
+    return true;
+}
+
+
+string HdfsConfig::getHdfsUser() {
+    if (this->hdfsuser.size() == 0 )
+    {
+        string command = "ps aux|grep hdfs.server|grep -v grep";
+        string result;
+        // NOTE: It should be HDFS_COMMAND since we need to login the hdfs container to get user
+        bool status = this->runCommand(masterPhysicalHosts[MASTERPOS], command,
+                      "", result, HDFS_COMMAND);
+        if (!status)
+            return "";
+        auto lines = hawq::test::split(result, '\n');
+        if (lines.size() >= 1) {
+            return hawq::test::trim(hawq::test::split(lines[lines.size()-1], ' ')[0]);
+        }
+    }
+    return hdfsuser;
+}
+
+bool HdfsConfig::LoadFromHawqConfigFile() {
+    if (!isLoadFromHawqConfigFile)
+    {
+        string confPath = iscloud ? getenv("CLOUD_CLUSTER_ENV") : getenv("GPHOME") ;
+        if (confPath.empty() || isdemo)
+            return false;
+        if (iscloud)
+        {
+            confPath.append("/hawq/hdfs-client.xml");
+             }
+        else
+        {
+            confPath.append("/etc/hdfs-client.xml");
+        }
+
+        hawqxmlconf.reset(new XmlConfig(confPath));
+        if (!hawqxmlconf->parse())
+            return false;
+        isLoadFromHawqConfigFile = true;
+    }
+    return true;
+}
+
+bool HdfsConfig::LoadFromHdfsConfigFile() {
+    if (!isLoadFromHdfsConfigFile)
+    {
+        string confPath = iscloud ? getenv("CLOUD_CLUSTER_ENV") : this->getHadoopHome() ;
+        if (confPath.empty() || isdemo)
+            return false;
+        if (iscloud)
+        {
+            confPath.append("/hadoop/demo/hdfs-site.xml");
+        }
+        else
+        {
+            confPath.append("/etc/hadoop/hdfs-site.xml");
+        }
+
+         hdfsxmlconf.reset(new XmlConfig(confPath));
+         if (!hdfsxmlconf->parse())
+            return false;
+
+         isLoadFromHdfsConfigFile = true;
+    }
+    return true;
+}
+
 
 int HdfsConfig::isConfigKerberos() {
   bool ret = LoadFromHawqConfigFile();
@@ -176,7 +184,8 @@ int HdfsConfig::isConfigKerberos() {
 }
 
 int HdfsConfig::isTruncate() {
-  if (runCommandAndFind("hadoop fs -truncate", false, "-truncate: Unknown command")) {
+  if (this->runCommandAndFind("hadoop fs -truncate",
+          hdfsuser, "-truncate: Unknown command", HDFS_COMMAND)) {
     return 0;
   } else {
     return 1;
@@ -184,23 +193,27 @@ int HdfsConfig::isTruncate() {
 }
 
 string HdfsConfig::getHadoopHome() {
-  string result = "";
-  runCommand("ps -ef|grep hadoop", false, result);
-  string hadoopHome = "";
-  auto lines = hawq::test::split(result, '\n');
-  for (size_t i=0; i<lines.size()-1; i++) {
-    string valueLine = lines[i];
-    string findstring = "-Dhadoop.home.dir=";
-    int pos = valueLine.find(findstring);
-    if (pos >=0 ) {
-      string valueTmp = valueLine.substr(pos+findstring.size()); 
-      int valueEnd = valueTmp.find_first_of(" ");
-      string value = valueTmp.substr(0, valueEnd);
-      hadoopHome = hawq::test::trim(value);
-      return hadoopHome;
+    if (this->compentPath.size () == 0)
+    {
+        string result = "";
+        bool status = this->runCommand(masterPhysicalHosts[MASTERPOS], "ps -ef|grep hadoop",
+                "", result, OS_COMMAND );
+        if (!status)
+                return "";
+         auto lines = hawq::test::split(result, '\n');
+         for (size_t i=0; i<lines.size()-1; i++) {
+                string valueLine = lines[i];
+                string findstring = "-Dhadoop.home.dir=";
+                int pos = valueLine.find(findstring);
+                if (pos >=0 ) {
+                   string valueTmp = valueLine.substr(pos+findstring.size());
+                   int valueEnd = valueTmp.find_first_of(" ");
+                   string value = valueTmp.substr(0, valueEnd);
+                   compentPath = hawq::test::trim(value);
+             }
+         }
     }
-  }
-  return hadoopHome;
+    return this->compentPath;
 }
 
 bool HdfsConfig::getNamenodeHost(string &namenodehost) {
@@ -227,6 +240,32 @@ bool HdfsConfig::getStandbyNamenode(string &standbynamenode,
     return getHANamenode("standby", standbynamenode, port);
 }
 
+bool HdfsConfig::checkNamenodesHealth() {
+  if (isHA() <= 0) {
+    return false;
+  }
+  string namenodeService = "";
+  string nameServiceValue = getParameterValue("dfs.nameservices");
+  string haNamenodesName = "dfs.ha.namenodes.";
+  haNamenodesName.append(hawq::test::trim(nameServiceValue));
+  string haNamenodesValue = getParameterValue(haNamenodesName);
+  auto haNamenodes = hawq::test::split(haNamenodesValue, ',');
+  for (size_t i = 0; i < haNamenodes.size(); i++) {
+    string haNamenode = hawq::test::trim(haNamenodes[i]);
+    string cmd = "hdfs haadmin -checkHealth ";
+    cmd.append(haNamenode);
+    string checkResult;
+    bool status = this->runCommand(cmd,
+            hdfsuser, checkResult, HDFS_COMMAND );
+    if (!status)
+        return false;
+    if (checkResult.size() > 0)
+       return false;
+  }
+
+  return true;
+}
+
 bool HdfsConfig::getHANamenode(const string &namenodetype,
                                string &namenode,
                                int &port) {
@@ -234,23 +273,30 @@ bool HdfsConfig::getHANamenode(const string &namenodetype,
     return false;
   }
   string namenodeService = "";
-  string nameServiceValue = hawqxmlconf->getString("dfs.nameservices");
+  string nameServiceValue = getParameterValue("dfs.nameservices");
   string haNamenodesName = "dfs.ha.namenodes.";
   haNamenodesName.append(hawq::test::trim(nameServiceValue));
-  string haNamenodesValue = hawqxmlconf->getString(haNamenodesName);
+  string haNamenodesValue = getParameterValue(haNamenodesName);
   auto haNamenodes = hawq::test::split(haNamenodesValue, ',');
-  for (size_t i = 0; i < haNamenodes.size(); i++) {
+  size_t i;
+  string result;
+  for ( i = 0; i < haNamenodes.size(); i++) {
     string haNamenode = hawq::test::trim(haNamenodes[i]);
     string cmd = "hdfs haadmin -getServiceState ";
     cmd.append(haNamenode);
-    if (runCommandAndFind(cmd, true, namenodetype)) {
+    bool status = this->runCommandAndFind(cmd, hdfsuser, namenodetype, HDFS_COMMAND );
+    if (status) {
       namenodeService = haNamenode;
       break;
     }
   }
-  string rpcAddressName = "dfs.namenode.rpc-address.gphd-cluster.";
-  rpcAddressName.append(namenodeService);
-  string rpcAddressValue = hawqxmlconf->getString(rpcAddressName);
+
+  if (i == haNamenodes.size())
+      return false;
+
+  string rpcAddressName = "dfs.namenode.rpc-address.";
+  rpcAddressName.append(nameServiceValue).append(".").append(namenodeService);
+  string rpcAddressValue = getParameterValue(rpcAddressName);
   auto namenodeInfo = hawq::test::split(rpcAddressValue, ':');
   namenode = hawq::test::trim(namenodeInfo[0]);
   port = std::stoi(hawq::test::trim(namenodeInfo[1]));
@@ -258,38 +304,73 @@ bool HdfsConfig::getHANamenode(const string &namenodetype,
 }
 
 void HdfsConfig::getNamenodes(std::vector<string> &namenodes,
-                              std::vector<int> &port) {
-  string result = "";
-  runCommand("hdfs getconf -nnRpcAddresses", true, result);
-  auto lines = hawq::test::split(result, '\n');
-  for (size_t i = 0; i < lines.size(); i++) {
-    string valueLine = lines[i];
-    auto namenodeInfo = hawq::test::split(valueLine, ':');
-    if (namenodeInfo.size() == 2) {
-      namenodes.push_back(hawq::test::trim(namenodeInfo[0]));
-      port.push_back(std::stoi(hawq::test::trim(namenodeInfo[1])));
-    }
+                              std::vector<int> &port)
+{
+    namenodes.clear();
+    port.clear();
+    string result = "";
+    bool status = this->runCommand("hdfs getconf -nnRpcAddresses",
+          hdfsuser, result, HDFS_COMMAND );
+    if (!status)
+        return;
+    auto lines = hawq::test::split(result, '\n');
+    for (size_t i = 0; i < lines.size(); i++) {
+        string valueLine = lines[i];
+        auto namenodeInfo = hawq::test::split(valueLine, ':');
+        if (namenodeInfo.size() == 2) {
+            namenodes.push_back(hawq::test::trim(namenodeInfo[0]));
+            port.push_back(std::stoi(hawq::test::trim(namenodeInfo[1])));
+        }
   }
 }
 
 void HdfsConfig::getDatanodelist(std::vector<string> &datanodelist,
                                  std::vector<int> &port) {
-  runCommandAndGetNodesPorts("hdfs dfsadmin -report | grep Name", datanodelist, port);
+  this->runCommandAndGetNodesPorts("hdfs dfsadmin -report | grep Name",
+                                   hdfsuser, datanodelist, port,
+                                   HDFS_COMMAND);
 }
 
 void HdfsConfig::getActiveDatanodes(std::vector<string> &activedatanodes,
                                     std::vector<int> &port) {
-  runCommandAndGetNodesPorts("hdfs dfsadmin -report -live | grep Name", activedatanodes, port);
+     this->runCommandAndGetNodesPorts("hdfs dfsadmin -report -live | grep Name",
+                                      hdfsuser, activedatanodes, port,
+                                      HDFS_COMMAND);
+}
+
+
+int HdfsConfig::getActiveDatanodesNum() {
+    string resultnum;
+    bool status = this->runCommand(
+            "hdfs dfsadmin -report -live | grep Name | wc -l",
+            hdfsuser, resultnum, HDFS_COMMAND );
+    if (!status)
+        return -1;
+    auto lines = hawq::test::split(resultnum, '\n');
+    for (size_t i = 0; i < lines.size(); i++) {
+
+        int pos = lines[i].find(" WARN ");
+        if (pos > 0)
+            continue;
+        else
+            return std::atoi(lines[i].c_str());
+    }
+    return -1;
+
 }
 
 int HdfsConfig::isSafemode() {
-  if (runCommandAndFind("hadoop fs -mkdir /tmp_hawq_test", false, "Name node is in safe mode.")) {
-    return 1;
-  }
-  string cmd = "hadoop fs -rm -r /tmp_hawq_test";
-  Command c_teardown(cmd);
-  string result = c_teardown.run().getResultOutput();
-  return 0;
+    bool status = this->runCommandAndFind(
+            "hadoop fs -mkdir /tmp_hawq_test",
+            hdfsuser, "Name node is in safe mode.", HDFS_COMMAND );
+    if (status)
+        return 1;
+    string cmd = "hadoop fs -rm -r /tmp_hawq_test";
+    string result;
+    status = this->runCommand(cmd, hdfsuser, result, HDFS_COMMAND );
+    if (status)
+        return 0;
+    return -1;
 }
 
 string HdfsConfig::getParameterValue(const string &parameterName) {

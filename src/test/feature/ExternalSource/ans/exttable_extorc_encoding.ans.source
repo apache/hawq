@@ -1,0 +1,37 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestEncoding;
+SET
+-- end_ignore
+create table te (i int, t text);
+CREATE TABLE
+insert into te values(1, 'abc');
+INSERT 0 1
+insert into te values(2, E'中国');
+INSERT 0 1
+create writable external table twe_e (i int, t text) location ('hdfs://@@host@@@@path@@exttable_extorc_test/encoding/twe_e') format 'orc' (compresstype 'lz4') encoding 'utf8';
+CREATE EXTERNAL TABLE
+create readable external table tre_e (i int, t text) location ('hdfs://@@host@@@@path@@exttable_extorc_test/encoding/twe_e') format 'orc' encoding 'utf8';
+CREATE EXTERNAL TABLE
+insert into twe_e select * from te;
+INSERT 0 2
+select * from te order by i;
+ i |  t   
+---+------
+ 1 | abc
+ 2 | 中国
+(2 rows)
+
+select * from twe_e order by i;
+ i |  t   
+---+------
+ 1 | abc
+ 2 | 中国
+(2 rows)
+
+select * from tre_e order by i;
+ i |  t   
+---+------
+ 1 | abc
+ 2 | 中国
+(2 rows)
+

@@ -1,0 +1,42 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestDatatypeVarchar;
+SET
+-- end_ignore
+create table tv (i int, cv char varying, cvn char varying(6), v varchar, vn varchar(8), t text);
+CREATE TABLE
+insert into tv values (1, 'aa', 'aaa', 'aaaa', 'aaaaa', 'aaaaaaaa');
+INSERT 0 1
+insert into tv values (2, 'bb', 'bbb', 'bbbb', 'bbbbb', 'bbbbbbbb');
+INSERT 0 1
+insert into tv values (3, 'cc', 'ccc', 'cccc', 'ccccc', 'cccccccc');
+INSERT 0 1
+create writable external table twv_e (i int, cv char varying, cvn char varying(6), v varchar, vn varchar(8), t text) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_varchar/twv_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trv_e (i int, cv char varying, cvn char varying(6), v varchar, vn varchar(8), t text) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_varchar/twv_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into twv_e select * from tv;
+INSERT 0 3
+select * from tv order by i;
+ i | cv | cvn |  v   |  vn   |    t     
+---+----+-----+------+-------+----------
+ 1 | aa | aaa | aaaa | aaaaa | aaaaaaaa
+ 2 | bb | bbb | bbbb | bbbbb | bbbbbbbb
+ 3 | cc | ccc | cccc | ccccc | cccccccc
+(3 rows)
+
+select * from twv_e order by i;
+ i | cv | cvn |  v   |  vn   |    t     
+---+----+-----+------+-------+----------
+ 1 | aa | aaa | aaaa | aaaaa | aaaaaaaa
+ 2 | bb | bbb | bbbb | bbbbb | bbbbbbbb
+ 3 | cc | ccc | cccc | ccccc | cccccccc
+(3 rows)
+
+select * from trv_e order by i;
+ i | cv | cvn |  v   |  vn   |    t     
+---+----+-----+------+-------+----------
+ 1 | aa | aaa | aaaa | aaaaa | aaaaaaaa
+ 2 | bb | bbb | bbbb | bbbbb | bbbbbbbb
+ 3 | cc | ccc | cccc | ccccc | cccccccc
+(3 rows)
+

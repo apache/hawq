@@ -1,0 +1,270 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestDatatypeDecimal;
+SET
+-- end_ignore
+-- start_ignore
+set new_executor=off;
+SET
+-- end_ignore
+create table td (i int, d decimal(5, 1));
+CREATE TABLE
+create table tn (i int, n numeric(7, 2));
+CREATE TABLE
+insert into td values(1, 1111.1);
+INSERT 0 1
+insert into td values(2, 2222.2);
+INSERT 0 1
+insert into td values(3, 3333.3);
+INSERT 0 1
+insert into tn values(1, 11111.11);
+INSERT 0 1
+insert into tn values(2, 22222.22);
+INSERT 0 1
+insert into tn values(3, 33333.33);
+INSERT 0 1
+create writable external table twd_e (i int, d decimal(5, 1)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_decimal/twd_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trd_e (i int, d decimal(5, 1)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_decimal/twd_e') format 'orc';
+CREATE EXTERNAL TABLE
+create writable external table twn_e (i int, n numeric(7, 2)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_decimal/twn_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trn_e (i int, n numeric(7, 2)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_decimal/twn_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into twd_e select * from td;
+INSERT 0 3
+insert into twn_e select * from td;
+INSERT 0 3
+select * from td order by i;
+ i |   d    
+---+--------
+ 1 | 1111.1
+ 2 | 2222.2
+ 3 | 3333.3
+(3 rows)
+
+select * from twd_e order by i;
+ i |   d    
+---+--------
+ 1 | 1111.1
+ 2 | 2222.2
+ 3 | 3333.3
+(3 rows)
+
+select * from trd_e order by i;
+ i |   d    
+---+--------
+ 1 | 1111.1
+ 2 | 2222.2
+ 3 | 3333.3
+(3 rows)
+
+select * from tn order by i;
+ i |    n     
+---+----------
+ 1 | 11111.11
+ 2 | 22222.22
+ 3 | 33333.33
+(3 rows)
+
+select * from twn_e order by i;
+ i |    n    
+---+---------
+ 1 | 1111.10
+ 2 | 2222.20
+ 3 | 3333.30
+(3 rows)
+
+select * from trn_e order by i;
+ i |    n    
+---+---------
+ 1 | 1111.10
+ 2 | 2222.20
+ 3 | 3333.30
+(3 rows)
+
+create table numeric_table0(id int, salary decimal(18,9)) format 'orc';
+CREATE TABLE
+-- create table numeric_table1(id int, salary decimal(100,50)) format 'orc';
+create table numeric_table2(id int, salary decimal(2000,3)) format 'orc';
+psql:/tmp/TestExtOrc_TestDatatypeDecimal.sql:37: ERROR:  DECIMAL precision 2000 must be between 1 and 1000
+create table numeric_table3(id int, salary decimal(1000,3000)) format 'orc';
+psql:/tmp/TestExtOrc_TestDatatypeDecimal.sql:38: ERROR:  DECIMAL scale 3000 must be between 0 and precision 1000
+insert into numeric_table0 values(1, 1212.54);
+INSERT 0 1
+insert into numeric_table0 values(2, 12123.557);
+INSERT 0 1
+insert into numeric_table0 values(3, 12121.54);
+INSERT 0 1
+insert into numeric_table0 values(4, -121224343.5846544);
+INSERT 0 1
+insert into numeric_table0 values(4, 324332.582342);
+INSERT 0 1
+insert into numeric_table0 values(5, 'nan');
+INSERT 0 1
+insert into numeric_table0 values(6, 0);
+INSERT 0 1
+-- insert into numeric_table1 values(0, 0);
+-- insert into numeric_table1 values(1, 1234343543535435345436.3243543543524654243524353);
+-- insert into numeric_table1 values(5, -324343435332434.4324315435524541);
+select * from numeric_table0;
+ id |        salary        
+----+----------------------
+  1 |       1212.540000000
+  2 |      12123.557000000
+  3 |      12121.540000000
+  4 | -121224343.584654400
+  4 |     324332.582342000
+  5 |                 	 
+  6 |          0.000000000
+(7 rows)
+
+-- select * from numeric_table1;
+select * from numeric_table0 where id > 3 order by salary;
+ id |        salary        
+----+----------------------
+  4 | -121224343.584654400
+  6 |          0.000000000
+  4 |     324332.582342000
+  5 |                  	 
+(4 rows)
+
+-- select * from numeric_table1 where salary > 0;
+select salary + 1 from numeric_table0;
+       ?column?       
+----------------------
+       1213.540000000
+      12124.557000000
+      12122.540000000
+ -121224342.584654400
+     324333.582342000
+                     
+          1.000000000
+(7 rows)
+
+select salary - 2 from numeric_table0;
+       ?column?       
+----------------------
+       1210.540000000
+      12121.557000000
+      12119.540000000
+ -121224345.584654400
+     324330.582342000
+                     
+         -2.000000000
+(7 rows)
+
+select salary * 12 from numeric_table0;
+       ?column?        
+-----------------------
+       14550.480000000
+      145482.684000000
+      145458.480000000
+ -1454692123.015852800
+     3891990.988104000
+                      
+           0.000000000
+(7 rows)
+
+select salary / 2 from numeric_table0;
+        ?column?        
+------------------------
+   606.2700000000000000
+  6061.7785000000000000
+  6060.7700000000000000
+ -60612171.792327200000
+    162166.291171000000
+                       
+ 0.00000000000000000000
+(7 rows)
+
+select avg(salary) from numeric_table0;
+ avg 
+------------------------
+ -20145758.894218733333
+(1 row)
+
+select max(salary) from numeric_table0;
+ max 
+------------------
+ 324332.582342000
+(1 row)
+
+select min(salary) from numeric_table0;
+         min          
+----------------------
+ -121224343.584654400
+(1 row)
+
+select round(salary) from numeric_table0;
+   round    
+------------
+       1213
+      12124
+      12122
+ -121224344
+     324333
+           
+          0
+(7 rows)
+
+create table test_scale(d decimal(25,10)) format 'orc';
+CREATE TABLE
+insert into test_scale values
+(100000000000000),
+(10000000000000),
+(1000000000000),
+(100000000000),
+(10000000000),
+(1000000000),
+(100000000),
+(10000000),
+(1000000),
+(100000),
+(10000),
+(1000),
+(100),
+(10),
+(1),
+(0.1),
+(0.01),
+(0.001),
+(0.0001),
+(0.00001),
+(0.000001),
+(0.0000001),
+(0.00000001),
+(0.000000001),
+(0.0000000001),
+(0);
+INSERT 0 26
+select * from test_scale order by d;
+             d              
+----------------------------
+               0.0000000000
+               0.0000000001
+               0.0000000010
+               0.0000000100
+               0.0000001000
+               0.0000010000
+               0.0000100000
+               0.0001000000
+               0.0010000000
+               0.0100000000
+               0.1000000000
+               1.0000000000
+              10.0000000000
+             100.0000000000
+            1000.0000000000
+           10000.0000000000
+          100000.0000000000
+         1000000.0000000000
+        10000000.0000000000
+       100000000.0000000000
+      1000000000.0000000000
+     10000000000.0000000000
+    100000000000.0000000000
+   1000000000000.0000000000
+  10000000000000.0000000000
+ 100000000000000.0000000000
+(26 rows)
+

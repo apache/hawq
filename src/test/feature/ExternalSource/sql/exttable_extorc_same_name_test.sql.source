@@ -1,0 +1,33 @@
+-- start_ignore
+drop external table if exists test_same_name_orctable1_e, test_same_name_orctable2_e, test_same_name_orctable3_e, test_same_name_orctable4_e;
+drop table if exists test_same_orctable1_e;
+-- end_ignore
+
+-- test different external table using same name but have different columns
+create writable external table test_same_name_orctable1_e (i int, j float, k text) location ('hdfs://@@host@@@@path@@exttable_extorc_test/same_name_test/test_same_name_orctable1_e') format 'orc';
+insert into test_same_name_orctable1_e values(1,0.1,'aaa');
+
+create writable external table test_same_name_orctable2_e(i int, j float) location('hdfs://@@host@@@@path@@exttable_extorc_test/same_name_test/test_same_name_orctable1_e') format 'orc';
+
+insert into test_same_name_orctable2_e values(2,0.2);
+
+-- test different external table using same name and also same columns
+create writable external table test_same_name_orctable3_e(i int, j float) location('hdfs://@@host@@@@path@@exttable_extorc_test/same_name_test/test_same_name_orctable3_e') format 'orc';
+
+insert into test_same_name_orctable3_e values(3,0.3);
+
+create writable external table test_same_name_orctable4_e(i int, j float) location('hdfs://@@host@@@@path@@exttable_extorc_test/same_name_test/test_same_name_orctable3_e') format 'orc';
+
+insert into test_same_name_orctable4_e values(4,0.4);
+
+select * from test_same_name_orctable1_e;
+select * from test_same_name_orctable2_e;
+select * from test_same_name_orctable3_e;
+select * from test_same_name_orctable4_e;
+
+-- test the internal and external table using the same name
+create table test_same_name_orctable3_e(i int, j float) format 'orc';
+
+insert into test_same_name_orctable3_e values(5,0.5);
+
+select * from test_same_name_orctable3_e;

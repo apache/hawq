@@ -1,0 +1,17 @@
+--start_ignore
+set new_executor=auto;
+--end_ignore
+
+create table te (i int, t text);
+
+insert into te values(1, 'abc');
+insert into te values(2, E'中国');
+
+create writable external table twe_e (i int, t text) location ('hdfs://@@host@@@@path@@exttable_extorc_test/encoding/twe_e') format 'orc' (compresstype 'lz4') encoding 'utf8';
+create readable external table tre_e (i int, t text) location ('hdfs://@@host@@@@path@@exttable_extorc_test/encoding/twe_e') format 'orc' encoding 'utf8';
+
+insert into twe_e select * from te;
+
+select * from te order by i;
+select * from twe_e order by i;
+select * from tre_e order by i;

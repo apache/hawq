@@ -1,0 +1,17 @@
+--start_ignore
+set new_executor=auto;
+--end_ignore
+create table ti (i int, si smallint, ii int, bi bigint, s serial, bs bigserial);
+
+insert into ti values(1, -32768, -2147483648, -9223372036854775808);
+insert into ti values(2, 0, 0, 0);
+insert into ti values(3, 32767, 2147483647, 9223372036854775807);
+
+create writable external table twi_e (i int, si smallint, ii int, bi bigint, s serial, bs bigserial) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_integer/twi_e') format 'orc' (compresstype 'lz4');
+create readable external table tri_e (i int, si smallint, ii int, bi bigint, s serial, bs bigserial) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_integer/twi_e') format 'orc';
+
+insert into twi_e select * from ti;
+
+select * from ti order by i;
+select * from twi_e order by i;
+select * from tri_e order by i;

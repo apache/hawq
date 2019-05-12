@@ -1,0 +1,92 @@
+-- start_ignore
+set new_executor=off;
+-- end_ignore
+create table td (i int, d decimal(5, 1));
+create table tn (i int, n numeric(7, 2));
+
+insert into td values(1, 1111.1);
+insert into td values(2, 2222.2);
+insert into td values(3, 3333.3);
+
+insert into tn values(1, 11111.11);
+insert into tn values(2, 22222.22);
+insert into tn values(3, 33333.33);
+
+create writable external table twd_e (i int, d decimal(5, 1)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_decimal/twd_e') format 'orc' (compresstype 'lz4');
+create readable external table trd_e (i int, d decimal(5, 1)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_decimal/twd_e') format 'orc';
+
+create writable external table twn_e (i int, n numeric(7, 2)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_decimal/twn_e') format 'orc' (compresstype 'lz4');
+create readable external table trn_e (i int, n numeric(7, 2)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_decimal/twn_e') format 'orc';
+
+insert into twd_e select * from td;
+insert into twn_e select * from td;
+
+select * from td order by i;
+select * from twd_e order by i;
+select * from trd_e order by i;
+
+select * from tn order by i;
+select * from twn_e order by i;
+select * from trn_e order by i;
+
+create table numeric_table0(id int, salary decimal(18,9)) format 'orc';
+-- create table numeric_table1(id int, salary decimal(100,50)) format 'orc';
+create table numeric_table2(id int, salary decimal(2000,3)) format 'orc';
+create table numeric_table3(id int, salary decimal(1000,3000)) format 'orc';
+
+insert into numeric_table0 values(1, 1212.54);
+insert into numeric_table0 values(2, 12123.557);
+insert into numeric_table0 values(3, 12121.54);
+insert into numeric_table0 values(4, -121224343.5846544);
+insert into numeric_table0 values(4, 324332.582342);
+insert into numeric_table0 values(5, 'nan');
+insert into numeric_table0 values(6, 0);
+
+-- insert into numeric_table1 values(0, 0);
+-- insert into numeric_table1 values(1, 1234343543535435345436.3243543543524654243524353);
+-- insert into numeric_table1 values(5, -324343435332434.4324315435524541);
+
+select * from numeric_table0;
+-- select * from numeric_table1;
+
+select * from numeric_table0 where id > 3 order by salary;
+-- select * from numeric_table1 where salary > 0;
+
+select salary + 1 from numeric_table0;
+select salary - 2 from numeric_table0;
+select salary * 12 from numeric_table0;
+select salary / 2 from numeric_table0;
+select avg(salary) from numeric_table0;
+select max(salary) from numeric_table0;
+select min(salary) from numeric_table0;
+select round(salary) from numeric_table0;
+
+create table test_scale(d decimal(25,10)) format 'orc';
+insert into test_scale values
+(100000000000000),
+(10000000000000),
+(1000000000000),
+(100000000000),
+(10000000000),
+(1000000000),
+(100000000),
+(10000000),
+(1000000),
+(100000),
+(10000),
+(1000),
+(100),
+(10),
+(1),
+(0.1),
+(0.01),
+(0.001),
+(0.0001),
+(0.00001),
+(0.000001),
+(0.0000001),
+(0.00000001),
+(0.000000001),
+(0.0000000001),
+(0);
+select * from test_scale order by d;

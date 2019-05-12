@@ -1,0 +1,48 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestDatatypeInteger;
+SET
+-- end_ignore
+create table ti (i int, si smallint, ii int, bi bigint, s serial, bs bigserial);
+psql:/tmp/TestExtOrc_TestDatatypeInteger.sql:4: NOTICE:  CREATE TABLE will create implicit sequence "ti_s_seq" for serial column "ti.s"
+psql:/tmp/TestExtOrc_TestDatatypeInteger.sql:4: NOTICE:  CREATE TABLE will create implicit sequence "ti_bs_seq" for serial column "ti.bs"
+CREATE TABLE
+insert into ti values(1, -32768, -2147483648, -9223372036854775808);
+INSERT 0 1
+insert into ti values(2, 0, 0, 0);
+INSERT 0 1
+insert into ti values(3, 32767, 2147483647, 9223372036854775807);
+INSERT 0 1
+create writable external table twi_e (i int, si smallint, ii int, bi bigint, s serial, bs bigserial) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_integer/twi_e') format 'orc' (compresstype 'lz4');
+psql:/tmp/TestExtOrc_TestDatatypeInteger.sql:10: NOTICE:  CREATE EXTERNAL TABLE will create implicit sequence "twi_e_s_seq" for serial column "twi_e.s"
+psql:/tmp/TestExtOrc_TestDatatypeInteger.sql:10: NOTICE:  CREATE EXTERNAL TABLE will create implicit sequence "twi_e_bs_seq" for serial column "twi_e.bs"
+CREATE EXTERNAL TABLE
+create readable external table tri_e (i int, si smallint, ii int, bi bigint, s serial, bs bigserial) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_integer/twi_e') format 'orc';
+psql:/tmp/TestExtOrc_TestDatatypeInteger.sql:11: NOTICE:  CREATE EXTERNAL TABLE will create implicit sequence "tri_e_s_seq" for serial column "tri_e.s"
+psql:/tmp/TestExtOrc_TestDatatypeInteger.sql:11: NOTICE:  CREATE EXTERNAL TABLE will create implicit sequence "tri_e_bs_seq" for serial column "tri_e.bs"
+CREATE EXTERNAL TABLE
+insert into twi_e select * from ti;
+INSERT 0 3
+select * from ti order by i;
+ i |   si   |     ii      |          bi          | s | bs 
+---+--------+-------------+----------------------+---+----
+ 1 | -32768 | -2147483648 | -9223372036854775808 | 1 |  1
+ 2 |      0 |           0 |                    0 | 2 |  2
+ 3 |  32767 |  2147483647 |  9223372036854775807 | 3 |  3
+(3 rows)
+
+select * from twi_e order by i;
+ i |   si   |     ii      |          bi          | s | bs 
+---+--------+-------------+----------------------+---+----
+ 1 | -32768 | -2147483648 | -9223372036854775808 | 1 |  1
+ 2 |      0 |           0 |                    0 | 2 |  2
+ 3 |  32767 |  2147483647 |  9223372036854775807 | 3 |  3
+(3 rows)
+
+select * from tri_e order by i;
+ i |   si   |     ii      |          bi          | s | bs 
+---+--------+-------------+----------------------+---+----
+ 1 | -32768 | -2147483648 | -9223372036854775808 | 1 |  1
+ 2 |      0 |           0 |                    0 | 2 |  2
+ 3 |  32767 |  2147483647 |  9223372036854775807 | 3 |  3
+(3 rows)
+

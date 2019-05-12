@@ -1,0 +1,22 @@
+-- start_ignore
+SET SEARCH_PATH=TETExtorc_TestTruncate;
+SET
+-- end_ignore
+create external table exttable_extorc_testtruncate (a int) location('hdfs://@@host@@@@path@@exttable_extorc_testtruncate') format'orc';
+CREATE EXTERNAL TABLE
+insert into exttable_extorc_testtruncate select generate_series(1,1000);
+INSERT 0 1000
+select count(*) from exttable_extorc_testtruncate;
+ count 
+-------
+  1000
+(1 row)
+
+truncate table exttable_extorc_testtruncate;
+TRUNCATE TABLE
+select count(*) from exttable_extorc_testtruncate;
+ count 
+-------
+     0
+(1 row)
+

@@ -1,0 +1,14 @@
+create table tm (i int, m money);
+
+insert into tm values(1, '1'::money);
+insert into tm values(2, '2.2'::money);
+insert into tm values(3, '$3,333.33');
+
+create writable external table twm_e (i int, m money) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_money/twm_e') format 'orc' (compresstype 'lz4');
+create readable external table trm_e (i int, m money) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_money/twm_e') format 'orc';
+
+-- insert into twm_e select * from tm;
+
+select * from tm order by i;
+-- select * from twm_e order by i;
+-- select * from trm_e order by i;

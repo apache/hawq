@@ -25,6 +25,7 @@
 #include "psql.h"
 #include "sql_util.h"
 #include "xml_parser.h"
+#include "lib/compent_config.h"
 
 namespace hawq {
 namespace test {
@@ -34,7 +35,7 @@ namespace test {
  * including checking state of namenodes and datanodes, get parameter value
  * @author Chunling Wang
  */
-class HdfsConfig {
+class HdfsConfig : public CompentConfig {
   public:
     /**
      * HdfsConfig constructor
@@ -48,9 +49,9 @@ class HdfsConfig {
 
     /**
      * whether HDFS is in HA mode
-     * @return 1 if HDFS is HA, 0 if HDFS is not HA, -1 if there is an error
+     * @return true if HDFS is HA, false if HDFS is not HA
      */
-    int isHA();
+    bool isHA() { return isHACluster; }
 
     /**
      * whether HDFS is kerbos
@@ -70,6 +71,7 @@ class HdfsConfig {
      */
     std::string getHadoopHome();
 
+    bool getCluster();
     /**
      * get HDFS namenode's host ('hostname:port' for non-HA, 'servicename' for HA)
      * @ param namenodehost, namenode host reference which will be set
@@ -103,6 +105,7 @@ class HdfsConfig {
     void getNamenodes(std::vector<std::string> &namenodes,
                       std::vector<int> &port);
 
+    bool checkNamenodesHealth();
     /**
      * get HDFS datanodes information
      * @param datanodelist, datanodes' hostnames reference which will be set
@@ -157,18 +160,15 @@ class HdfsConfig {
      */
     bool setParameterValue(const std::string &parameterName, const std::string &parameterValue);
 
-  private:
-    void runCommand(const std::string &command, bool ishdfsuser, std::string &result);
-    
-    bool runCommandAndFind(const std::string &command, bool ishdfsuser, const std::string &findstring);
-    
-    void runCommandAndGetNodesPorts(const std::string &command, std::vector<std::string> &datanodelist, std::vector<int> &port);
-    
+    //return active data node number
+    int getActiveDatanodesNum();
+
     /**
      * @return hdfs user
      */
     std::string getHdfsUser();
 
+  protected:
     /**
      * load key-value parameters in ./etc/hdfs-client.xml
      * @return true if succeeded
@@ -190,12 +190,16 @@ class HdfsConfig {
      */
     bool getHANamenode(const std::string &namenodetype, std::string &namenode, int &port);
 
+    bool isHACluster;
+
+    std::string hdfsuser;
+  private:
+    bool __isHA();
   private:
     std::unique_ptr<XmlConfig> hawqxmlconf;
-    std::unique_ptr<XmlConfig> hdfsxmlconf;
     bool isLoadFromHawqConfigFile;
+    std::unique_ptr<XmlConfig> hdfsxmlconf;
     bool isLoadFromHdfsConfigFile;
-    std::unique_ptr<hawq::test::PSQL> conn;
 };
 
 } // namespace test

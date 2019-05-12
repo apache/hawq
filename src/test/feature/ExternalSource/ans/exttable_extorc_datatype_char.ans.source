@@ -1,0 +1,50 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestDatatypeChar;
+SET
+-- end_ignore
+create table tc (i int, c character);
+CREATE TABLE
+create table tcn (i int, cn character(6));
+CREATE TABLE
+insert into tc values (1, 'a');
+INSERT 0 1
+insert into tc values (2, 'b');
+INSERT 0 1
+insert into tc values (3, 'c');
+INSERT 0 1
+insert into tcn values (1, 'a');
+INSERT 0 1
+insert into tcn values (2, 'bbb');
+INSERT 0 1
+insert into tcn values (3, 'cccccc');
+INSERT 0 1
+create writable external table twc_e (i int, c character) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_char/twc_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trc_e (i int, c character) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_char/twc_e') format 'orc';
+CREATE EXTERNAL TABLE
+create writable external table twcn_e (i int, cn character(6)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_char/twcn_e') format 'orc' (compresstype 'lz4');
+CREATE EXTERNAL TABLE
+create readable external table trcn_e (i int, cn character(6)) location ('hdfs://@@host@@@@path@@exttable_extorc_test/datatype_char/twcn_e') format 'orc';
+CREATE EXTERNAL TABLE
+-- insert into twc_e select * from tc;
+-- insert into twcn_e select * from tcn;
+select * from tc order by i;
+ i | c 
+---+---
+ 1 | a
+ 2 | b
+ 3 | c
+(3 rows)
+
+-- select * from twc_e order by i;
+-- select * from trc_e order by i;
+select * from tcn order by i;
+ i |   cn   
+---+--------
+ 1 | a     
+ 2 | bbb   
+ 3 | cccccc
+(3 rows)
+
+-- select * from twcn_e order by i;
+-- select * from trcn_e order by i;

@@ -1,0 +1,69 @@
+-- start_ignore
+SET SEARCH_PATH=TestExtOrc_TestSameName;
+SET
+-- end_ignore
+-- start_ignore
+drop external table if exists test_same_name_orctable1_e, test_same_name_orctable2_e, test_same_name_orctable3_e, test_same_name_orctable4_e;
+psql:/tmp/TestExtOrc_TestSameName.sql:5: NOTICE:  table "test_same_name_orctable1_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestSameName.sql:5: NOTICE:  table "test_same_name_orctable2_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestSameName.sql:5: NOTICE:  table "test_same_name_orctable3_e" does not exist, skipping
+psql:/tmp/TestExtOrc_TestSameName.sql:5: NOTICE:  table "test_same_name_orctable4_e" does not exist, skipping
+DROP EXTERNAL TABLE
+drop table if exists test_same_orctable1_e;
+psql:/tmp/TestExtOrc_TestSameName.sql:6: NOTICE:  table "test_same_orctable1_e" does not exist, skipping
+DROP TABLE
+-- end_ignore
+-- test different external table using same name but have different columns
+create writable external table test_same_name_orctable1_e (i int, j float, k text) location ('hdfs://@@host@@@@path@@exttable_extorc_test/same_name_test/test_same_name_orctable1_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into test_same_name_orctable1_e values(1,0.1,'aaa');
+INSERT 0 1
+create writable external table test_same_name_orctable2_e(i int, j float) location('hdfs://@@host@@@@path@@exttable_extorc_test/same_name_test/test_same_name_orctable1_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into test_same_name_orctable2_e values(2,0.2);
+INSERT 0 1
+-- test different external table using same name and also same columns
+create writable external table test_same_name_orctable3_e(i int, j float) location('hdfs://@@host@@@@path@@exttable_extorc_test/same_name_test/test_same_name_orctable3_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into test_same_name_orctable3_e values(3,0.3);
+INSERT 0 1
+create writable external table test_same_name_orctable4_e(i int, j float) location('hdfs://@@host@@@@path@@exttable_extorc_test/same_name_test/test_same_name_orctable3_e') format 'orc';
+CREATE EXTERNAL TABLE
+insert into test_same_name_orctable4_e values(4,0.4);
+INSERT 0 1
+select * from test_same_name_orctable1_e;
+psql:/tmp/TestExtOrc_TestSameName.sql:26: ERROR:  NewExecutorRun: failed to do MyExecutorRun. Invalid column selected 2 out of 2  (2600) (newExecutor.c:69)  (seg0 127.0.0.1:40000 pid=80025)
+select * from test_same_name_orctable2_e;
+ i |  j  
+---+-----
+ 1 | 0.1
+ 2 | 0.2
+(2 rows)
+
+select * from test_same_name_orctable3_e;
+ i |  j  
+---+-----
+ 3 | 0.3
+ 4 | 0.4
+(2 rows)
+
+select * from test_same_name_orctable4_e;
+ i |  j  
+---+-----
+ 3 | 0.3
+ 4 | 0.4
+(2 rows)
+
+-- test the internal and external table using the same name
+create table test_same_name_orctable3_e(i int, j float) format 'orc';
+psql:/tmp/TestExtOrc_TestSameName.sql:32: ERROR:  relation "test_same_name_orctable3_e" already exists
+insert into test_same_name_orctable3_e values(5,0.5);
+INSERT 0 1
+select * from test_same_name_orctable3_e;
+ i |  j  
+---+-----
+ 3 | 0.3
+ 4 | 0.4
+ 5 | 0.5
+(3 rows)
+

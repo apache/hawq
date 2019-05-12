@@ -1,0 +1,5 @@
+create external table exttable_extorc_testtruncate (a int) location('hdfs://@@host@@@@path@@exttable_extorc_testtruncate') format'orc';
+insert into exttable_extorc_testtruncate select generate_series(1,1000);
+select count(*) from exttable_extorc_testtruncate;
+truncate table exttable_extorc_testtruncate;
+select count(*) from exttable_extorc_testtruncate;
