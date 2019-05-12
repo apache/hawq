@@ -44,7 +44,22 @@ TEST_F(TestName, testcase)							\
 
 TEST_F_FILE_TYPE(boolean)
 
-TEST_F_FILE_TYPE(char)
+TEST_F(TestType, char)
+{
+  hawq::test::SQLUtility util;
+  string SqlFile("catalog");
+  string AnsFile("catalog");
+  SqlFile += "/sql/char.sql";
+  #ifdef __linux__
+    AnsFile += "/ans/char_linux.ans";
+    util.execSQLFile(SqlFile, AnsFile);
+  #elif defined __APPLE__
+    AnsFile += "/ans/char.ans";
+    util.execSQLFile(SqlFile, AnsFile);
+  #else
+    EXPECT_TRUE(false) << "Unsupported platform";
+  #endif
+}
 
 TEST_F_FILE_TYPE(date)
 
@@ -75,4 +90,19 @@ TEST_F(TestType, type_sanity)
 	                 "catalog/ans/type_sanity.ans");
 }
 
-TEST_F_FILE_TYPE(varchar)
+TEST_F(TestType, varchar)
+{
+  hawq::test::SQLUtility util;
+  string SqlFile("catalog");
+  string AnsFile("catalog");
+  SqlFile += "/sql/varchar.sql";
+  #ifdef __linux__
+    AnsFile += "/ans/varchar_linux.ans";
+    util.execSQLFile(SqlFile, AnsFile);
+  #elif defined __APPLE__
+    AnsFile += "/ans/varchar.ans";
+    util.execSQLFile(SqlFile, AnsFile);
+  #else
+    EXPECT_TRUE(false) << "Unsupported platform";
+  #endif
+}
