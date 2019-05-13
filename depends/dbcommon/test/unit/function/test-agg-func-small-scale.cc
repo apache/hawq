@@ -640,7 +640,7 @@ void AggFuncTest::testMinMaxSmallScale<Timestamp, TIMESTAMPID>(
     }
   }
 }
-TEST_F(AggFuncTest, small_scale_MinMax) {
+TEST_F(AggFuncTest, DISABLED_small_scale_MinMax) {
   testMinMaxSmallScale<int8_t, TINYINTID>(min_int8_smaller, true);
   testMinMaxSmallScale<int16_t, SMALLINTID>(min_int16_smaller, true);
   testMinMaxSmallScale<int32_t, INTID>(min_int32_smaller, true);
