@@ -752,7 +752,7 @@ void AggFuncTest::testMinMaxHasNoGroupBy<Timestamp, TIMESTAMPID>(
     }
   }
 }
-TEST_F(AggFuncTest, has_no_group_by_MinMax) {
+TEST_F(AggFuncTest, DISABLED_has_no_group_by_MinMax) {
   testMinMaxHasNoGroupBy<int8_t, TINYINTID>(min_int8_smaller, true);
   testMinMaxHasNoGroupBy<int16_t, SMALLINTID>(min_int16_smaller, true);
   testMinMaxHasNoGroupBy<int32_t, INTID>(min_int32_smaller, true);

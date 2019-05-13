@@ -682,7 +682,7 @@ void AggFuncTest::testMinMax<Timestamp, TIMESTAMPID>(func_type testFunc,
     }
   }
 }
-TEST_F(AggFuncTest, MinMax) {
+TEST_F(AggFuncTest, DISABLED_MinMax) {
   testMinMax<int8_t, TINYINTID>(min_int8_smaller, true);
   testMinMax<int16_t, SMALLINTID>(min_int16_smaller, true);
   testMinMax<int32_t, INTID>(min_int32_smaller, true);
