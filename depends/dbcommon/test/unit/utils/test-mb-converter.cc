@@ -42,7 +42,7 @@ TEST(TestMbConverter, Basic) {
   EXPECT_EQ(utf8Str, res);
 }
 
-TEST(TestMbConverter, Canonical) {
+TEST(TestMbConverter, DISABLED_Canonical) {
   EXPECT_EQ("UTF-8", MbConverter::canonicalizeEncodingName("utf8"));
   EXPECT_EQ("UTF-8", MbConverter::canonicalizeEncodingName("UTF-8"));
   EXPECT_EQ("UTF-8", MbConverter::canonicalizeEncodingName("UTF8"));
