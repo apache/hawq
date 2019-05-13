@@ -17,13 +17,13 @@ all:
 	$(MAKE) -C depends/libyarn $@
 	$(MAKE) -C depends/libyarn install
 	$(MAKE) -C depends/dbcommon $@
-	# $(MAKE) -C depends/dbcommon unittest
+	$(MAKE) -C depends/dbcommon unittest
 	$(MAKE) -C depends/dbcommon install
 	$(MAKE) -C depends/univplan $@
-	# $(MAKE) -C depends/univplan unittest
+	$(MAKE) -C depends/univplan unittest
 	$(MAKE) -C depends/univplan install
 	$(MAKE) -C depends/storage $@
-	# $(MAKE) -C depends/storage unittest
+	$(MAKE) -C depends/storage unittest
 	$(MAKE) -C depends/storage install
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
