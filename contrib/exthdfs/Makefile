@@ -21,7 +21,7 @@ OBJS       = exthdfs.o
 PG_CPPFLAGS = -I$(libpq_srcdir)
 PG_LIBS = $(libpq_pgport)
 
-override CFLAGS += -lhdfs3
+override CFLAGS += -lhdfs3 -lstorage
 
 ifdef USE_PGXS
 PGXS := $(shell pg_config --pgxs)

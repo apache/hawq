@@ -3360,6 +3360,70 @@ CreateStmt:	CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
 					
 					$$ = (Node *)n;
 				}
+		| CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
+		  ExtTypedesc FORMAT Sconst format_opt ext_opt_encoding_list OptDistributedBy OptTabPartitionBy
+		  		{
+		  			CreateExternalStmt *n = makeNode(CreateExternalStmt);
+		  			n->iswritable = TRUE;
+		  			n->isexternal = FALSE;
+		  			n->isweb = FALSE;
+		  			$4->istemp = $2;
+		  			n->base.relation = $4;
+		  			n->base.tableElts = $6;
+		  			n->exttypedesc = $8;
+		  			n->format = $10;
+		  			n->base.options = $11;
+		  			n->encoding = $12;
+		  			n->sreh = NULL;
+		  			n->base.distributedBy = $13;
+		  			n->base.partitionBy = $14;
+		  			n->policy = 0;
+
+		  			/* various syntax checks for internal table implemented using pluggable storage */
+		  			if(((ExtTableTypeDesc *) n->exttypedesc)->exttabletype != EXTTBL_TYPE_UNKNOWN)
+		  			{
+		  				ereport(ERROR,
+		  				        (errcode(ERRCODE_SYNTAX_ERROR),
+		  				         errmsg("LOCATION or EXECUTE may not be used for native table"),
+		  				         errhint("Use CREATE TABLE FORMAT or CREATE EXTERNAL TABLE instead"),
+		  				         errOmitLocation(true)));
+		  			}
+
+		  			ListCell *cell;
+		  			foreach (cell, n->base.tableElts)
+		  			{
+		  				Node *node = (Node *)lfirst(cell);
+		  				switch (nodeTag(node))
+		  				{
+		  					case T_ColumnDef:
+		  					{
+		  						if (((ColumnDef *)node)->constraints != NIL)
+		  						{
+									ereport(ERROR,
+									  (errcode(ERRCODE_SYNTAX_ERROR),
+									  errmsg("Do not support column constraint")));
+		  						}
+		  					}
+		  					break;
+
+		  					case T_Constraint:
+		  					{
+		  						if (((Constraint *)node)->contype != CONSTR_PRIMARY)
+		  						{
+		  							ereport(ERROR,
+		  							        (errcode(ERRCODE_SYNTAX_ERROR),
+		  							         errmsg("Do not support table constraint other than primary key")));
+		  						}
+		  					}
+		  					break;
+
+		  					default:
+		  						break;
+		  				}
+		  			}
+
+					$$ = (Node *)n;
+				}
 		;
 
 /*
@@ -4643,7 +4707,7 @@ CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_n
 
 OptWritable:	WRITABLE				{ $$ = TRUE; }
 				| READABLE				{ $$ = FALSE; }
-				| /*EMPTY*/				{ $$ = FALSE; }
+				| /*EMPTY*/				{ $$ = TRUE; }
 				;
 
 OptWeb:		WEB						{ $$ = TRUE; }
@@ -4669,6 +4733,16 @@ ExtTypedesc:
 				n->command_string = $2;
 				n->on_clause = $3; /* default will get set later if needed */
 						
+				$$ = (Node *)n;
+			}
+			| /*EMPTY*/
+			{
+				ExtTableTypeDesc *n = makeNode(ExtTableTypeDesc);
+				n->exttabletype = EXTTBL_TYPE_UNKNOWN;
+				n->location_list = NIL;
+				n->command_string = NULL;
+				n->on_clause = NIL;
+
 				$$ = (Node *)n;
 			}
 			;
