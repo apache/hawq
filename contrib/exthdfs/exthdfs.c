@@ -22,12 +22,10 @@
 #include "common.h"
 #include "access/extprotocol.h"
 #include "cdb/cdbdatalocality.h"
-#include "storage/fd.h"
-#include "storage/filesystem.h"
+#include "cdb/cdbfilesystemcredential.h"
+#include "cdb/cdbvars.h"
+#include "storage/cwrapper/hdfs-file-system-c.h"
 #include "utils/uri.h"
-
-
-
 
 PG_MODULE_MAGIC;
 
@@ -421,30 +419,47 @@ Datum hdfsprotocol_validate(PG_FUNCTION_ARGS)
 		}
 
 		/* SHOULD ADD LOGIC HERE TO CREATE UNEXISTING PATH */
-		if (pvalidator_data->forceCreateDir) {
-
+		if (pvalidator_data->forceCreateDir)
+		{
 		  elog(LOG, "hdfs_validator() forced creating dir");
 
-		  /* Create file system instance */
-		  	hdfsFS fs = hdfsConnect(uri->hostname, uri->port);
+			/* Create file system instance */
+			FscHdfsFileSystemC *fs = FscHdfsNewFileSystem(uri->hostname,
+					uri->port);
 			if (fs == NULL)
 			{
 				elog(ERROR, "hdfsprotocol_validate : "
-							"failed to create HDFS instance to connect to %s:%d",
-							uri->hostname, uri->port);
+				"failed to create HDFS instance to connect to %s:%d",
+				uri->hostname, uri->port);
 			}
 
-			if (hdfsExists(fs, uri->path) == -1)
+			if (FscHdfsExistPath(fs, uri->path)
+					&& FscHdfsGetFileKind(fs, uri->path) == 'F')
 				elog(ERROR, "hdfsprotocol_validate : "
-						"Location \"%s\" is not exist",
-						uri->path);
+				"Location \"%s\" is a file, not supported yet. "
+				"Only support directory now",
+				uri->path);
+			if (pvalidator_data->direction == EXT_VALIDATE_WRITE
+					&& !FscHdfsExistInsertPath(fs, uri->path))
+			{
+				elog(LOG, "hdfs_validator() to create url %s", uri->path);
+				FscHdfsCreateInsertDir(fs, uri->path);
+				if (FscHdfsHasErrorRaised(fs))
+				{
+					CatchedError *ce = FscHdfsGetFileSystemError(fs);
+					elog(ERROR, "hdfsprotocol_validate : "
+					"failed to create directory %s : %s(%d)",
+					uri->path,
+					ce->errMessage, ce->errCode);
+				}
+			}
 
-		 /* destroy fs instance */
-			hdfsDisconnect(fs);
+			/* destroy fs instance */
+			FscHdfsFreeFileSystemC(&fs);
 		}
 
 		/* Clean up temporarily created instances */
-		FreeExternalTableUri(uri);
+		pfree(uri);
 		if (nnaddr != NULL)
 		{
 			pfree(nnaddr);

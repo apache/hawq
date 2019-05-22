@@ -179,7 +179,7 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%user_data_tables_readable TO public;
 --		External table that determines the local segment id
 --		
 --------------------------------------------------------------------------------
--- CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%localid
+-- CREATE READABLE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%localid
 -- (
 -- 	localid	int
 -- )
@@ -196,7 +196,7 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%user_data_tables_readable TO public;
 --		External table that determines the master's segment id
 --		
 --------------------------------------------------------------------------------
--- CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%masterid
+-- CREATE READABLE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%masterid
 -- (
 -- 	masterid	int
 -- )
@@ -238,7 +238,7 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%user_data_tables_readable TO public;
 --		External table to read segment log; requires superuser privilege
 --		
 --------------------------------------------------------------------------------
--- CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%log_segment_ext
+-- CREATE READABLE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%log_segment_ext
 -- (
 -- 	logtime timestamp with time zone,
 -- 	loguser text,
@@ -285,7 +285,7 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX_AUX%%user_data_tables_readable TO public;
 --		External table to read the master log; requires superuser privilege
 --		
 --------------------------------------------------------------------------------
-CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%log_master_ext
+CREATE READABLE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%log_master_ext
 (
 	logtime timestamp with time zone,
 	loguser text,
@@ -319,7 +319,7 @@ CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%log_master_ext
 	logstack text
 )
 EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv' ON MASTER
-FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+FORMAT 'CSV' (DELIMITER ',' NULL '' QUOTE '"');
 
 REVOKE ALL ON TABLE %%JETPACK_PREFIX_AUX%%log_master_ext FROM public;
 
@@ -994,7 +994,7 @@ GRANT SELECT ON TABLE %%JETPACK_PREFIX%%stats_missing TO public;
 --		External table to determine free space on disk on a per-segment basis
 --		
 --------------------------------------------------------------------------------
--- CREATE EXTERNAL WEB TABLE %%JETPACK_PREFIX%%disk_free
+-- CREATE READABLE EXTERNAL WEB TABLE %%JETPACK_PREFIX%%disk_free
 -- (
 --	dfsegment int,
 --	dfhostname text,
