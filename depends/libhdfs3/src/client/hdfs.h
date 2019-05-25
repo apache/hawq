@@ -552,6 +552,7 @@ typedef struct {
     short mPermissions; /* the permissions associated with the file */
     tTime mLastAccess; /* the last access time for the file in seconds */
     hdfsEncryptionFileInfo * mHdfsEncryptionFileInfo; /* the encryption info of the file/directory */
+    tOffset mFileid; /* Fileid associated with a file. Default value is 0*/
 } hdfsFileInfo;
 
 /**

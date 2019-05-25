@@ -1050,6 +1050,7 @@ static void ConstructHdfsFileInfo(hdfsFileInfo * infos,
         infos[i].mPermissions = status[i].getPermission().toShort();
         infos[i].mReplication = status[i].getReplication();
         infos[i].mSize = status[i].getLength();
+        infos[i].mFileid = status[i].getFileid();
         infos[i].mHdfsEncryptionFileInfo = NULL;
         if (status[i].isFileEncrypted()) {
              infos[i].mHdfsEncryptionFileInfo = new hdfsEncryptionFileInfo[1];
