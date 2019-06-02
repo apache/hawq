@@ -423,6 +423,8 @@ AORelCreateHashEntry(Oid relid)
 			{
 				pfree(allfsinfoParquet);
 
+				LWLockRelease(AOSegFileLock);
+
 				ereport(ERROR, (errmsg("cannot open more than %d "
 				      "append-only table segment "
 				      "files cocurrently",
@@ -457,6 +459,8 @@ AORelCreateHashEntry(Oid relid)
 			if (id == NEXT_END_OF_LIST)
 			{
 				pfree(allfsinfo);
+
+				LWLockRelease(AOSegFileLock);
 
 				ereport(ERROR, (errmsg("cannot open more than %d "
 				      "append-only table segment "
@@ -1147,6 +1151,7 @@ List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num,
 				if (new_status == NEXT_END_OF_LIST)
 				{
 					LWLockRelease(AOSegFileLock);
+
 					ereport(ERROR, (errmsg("cannot open more than %d append-only table segment files concurrently",
 									MaxAORelSegFileStatus)));
 				}
