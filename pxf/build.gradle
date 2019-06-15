@@ -591,7 +591,7 @@ task tomcatGet << {
 
     def TarGzSuffix = ".tar.gz"
     def tomcatTar = "${tomcatName}${TarGzSuffix}"
-    def tomcatUrl = "http://archive.apache.org/dist/tomcat/tomcat-7/v${tomcatVersion}/bin/${tomcatTar}"
+    def tomcatUrl = "https://www-us.apache.org/dist/tomcat/tomcat-7/v${tomcatVersion}/bin/${tomcatTar}"
 
     if (file("${tomcatTargetDir}/${tomcatName}").exists()) {
         println "${tomcatName} already exists, nothing to do"
