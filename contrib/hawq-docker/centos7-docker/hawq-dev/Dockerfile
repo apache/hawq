@@ -36,6 +36,7 @@ RUN yum install -y epel-release && \
 RUN rpm -ivh --nodeps   https://rpmfind.net/linux/centos/6.10/os/x86_64/Packages/bison-2.4.1-5.el6.x86_64.rpm
 
 RUN pip --retries=50 --timeout=300 install pycrypto
+RUN pip --retries=50 --timeout=300 install cogapp
 
 # OS requirement
 RUN echo "kernel.sem = 250 512000 100 2048" >> /etc/sysctl.conf
