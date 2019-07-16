@@ -96,6 +96,7 @@ RUN mkdir -p /tmp/build/ && \
 
 # install python module 
 RUN pip --retries=50 --timeout=300 install pycrypto
+RUN pip --retries=50 --timeout=300 install cogapp
 
 # create user gpadmin since HAWQ cannot run under root
 RUN groupadd -g 1000 gpadmin && \
