@@ -18,17 +18,18 @@
 MODULE_big = exthdfs
 OBJS       = exthdfs.o
 
+top_builddir = ../..
+include $(top_builddir)/src/Makefile.global
+
 PG_CPPFLAGS = -I$(libpq_srcdir)
 PG_LIBS = $(libpq_pgport)
 
-override CFLAGS += -lhdfs3 -lstorage
+override CFLAGS += -lhdfs3 -lstorage -L$(prefix)/lib
 
 ifdef USE_PGXS
 PGXS := $(shell pg_config --pgxs)
 include $(PGXS)
 else
 subdir = contrib/exthdfs
-top_builddir = ../..
-include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
 endif
