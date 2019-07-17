@@ -9,7 +9,5 @@ subdir = contrib/orc
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 include $(top_srcdir)/contrib/contrib-global.mk
-override CFLAGS += -lstorage -ljson-c -luuid -I${top_builddir}/src/backend/utils \
-				   -L${top_builddir}/depends/storage/build/install/usr/local/hawq/lib \
-				   -I${top_builddir}/depends/storage/build/install/usr/local/hawq/include 
+override CFLAGS += -lstorage -ljson-c -luuid -I${top_builddir}/src/backend/utils -L$(prefix)/lib -I$(prefix)/include
 endif
