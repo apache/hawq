@@ -27,8 +27,8 @@ with_dbcommon = yes
 
 # Support for VPATH builds
 vpath_build = no
-abs_top_srcdir = /Users/tuyu/hawq
-abs_top_builddir = /Users/tuyu/hawq
+abs_top_srcdir = /data/apache-hawq
+abs_top_builddir = /data/apache-hawq
 
 ifneq ($(vpath_build),yes)
 top_srcdir = $(top_builddir)
