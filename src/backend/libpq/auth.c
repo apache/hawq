@@ -383,12 +383,19 @@ internal_client_authentication(Port *port)
 			/* 
 			 * Internal connection via a domain socket -- use ident
 			 */
-			char *local_name;
+			char local_name[IDENT_USERNAME_MAX + 1];
 			char remote_name[IDENT_USERNAME_MAX + 1];
 			struct passwd *pw;
 
 			pw = getpwuid(geteuid());
-			local_name = pw->pw_name;
+
+			/*
+			 * copy local name out because another getpwuid call is performed in
+			 * ident_unix(), which causes memory freed referenced by pw
+			 */
+
+			local_name[IDENT_USERNAME_MAX] = '\0';
+			strncpy(local_name, pw->pw_name, IDENT_USERNAME_MAX);
 
 			remote_name[0] = '\0';
 
