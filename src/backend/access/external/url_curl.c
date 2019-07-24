@@ -1012,6 +1012,7 @@ static void gp_proto0_write(URL_FILE *file, CopyState pstate) {
   replace_httpheader(file, "X-GP-SEQ", seq);
 
   gp_curl_easy_perform_backoff_and_check_response(file);
+  file->u.curl.seq_number++;
 }
 
 static size_t curl_fwrite(char *buf, int nbytes, URL_FILE *file,
