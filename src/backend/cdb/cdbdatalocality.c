@@ -153,6 +153,7 @@ typedef struct Detailed_File_Split {
 	int64 logiceof;
 	int64 offset;
 	int64 length;
+	char *ext_file_uri_string;
 } Detailed_File_Split;
 
 /*
@@ -1289,6 +1290,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 						File_Split *split = (File_Split *) palloc(sizeof(File_Split));
 						split->offset = 0;
 						split->length = logic_len;
+						split->ext_file_uri = NULL;
 						file->split_num = 1;
 						file->splits = split;
 						context->total_split_count += file->split_num;
@@ -1304,6 +1306,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 							splits[realSplitNum].host = -1;
 							splits[realSplitNum].is_local_read = true;
 							splits[realSplitNum].offset = offset;
+							splits[realSplitNum].ext_file_uri = NULL;
 							splits[realSplitNum].length =
 									file->locations[realSplitNum].length;
 							if (logic_len - offset <= splits[realSplitNum].length) {
@@ -1342,6 +1345,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 				split->length = logic_len;
 				split->host = -1;
 				split->is_local_read = true;
+				split->ext_file_uri = NULL;
 				file->split_num = 1;
 				file->splits = split;
 				file->logic_len = logic_len;
@@ -1425,6 +1429,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 						File_Split *split = (File_Split *) palloc(sizeof(File_Split));
 						split->offset = 0;
 						split->length = logic_len;
+						split->ext_file_uri = NULL;
 						file->split_num = 1;
 						file->splits = split;
 						context->total_split_count += file->split_num;
@@ -1441,6 +1446,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 							splits[realSplitNum].host = -1;
 							splits[realSplitNum].is_local_read = true;
 							splits[realSplitNum].offset = offset;
+							splits[realSplitNum].ext_file_uri = NULL;
 							splits[realSplitNum].length =
 									file->locations[realSplitNum].length;
 							if (logic_len - offset <= splits[realSplitNum].length) {
@@ -1482,6 +1488,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 				split->length = logic_len;
 				split->host = -1;
 				split->is_local_read = true;
+				split->ext_file_uri = NULL;
 				file->split_num = 1;
 				file->splits = split;
 				file->logic_len = logic_len;
@@ -1621,6 +1628,7 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 					splits[realSplitNum].offset = offset;
 					splits[realSplitNum].length = file->locations[realSplitNum].length;
 					splits[realSplitNum].logiceof = logic_len;
+					splits[realSplitNum].ext_file_uri = NULL;
 					if (logic_len - offset <= splits[realSplitNum].length) {
 						splits[realSplitNum].length = logic_len - offset;
 						realSplitNum++;
@@ -1649,6 +1657,7 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 			split->logiceof = logic_len;
 			split->host = -1;
 			split->is_local_read = true;
+			split->ext_file_uri = NULL;
 			file->split_num = 1;
 			file->splits = split;
 			file->logic_len = logic_len;
@@ -2259,6 +2268,7 @@ post_process_assign_result(Split_Assignment_Result *assign_result) {
 			Detailed_File_Split *split = har->splits + j;
 			ListCell *per_seg_splits;
 			bool empty_seg = false;
+			char *p = NULL;
 			FileSplit fileSplit = makeNode(FileSplitNode);
 			if (split->rel_oid != last_oid) {
 				last_oid = split->rel_oid;
@@ -2274,10 +2284,15 @@ post_process_assign_result(Split_Assignment_Result *assign_result) {
 			}
 			fileSplit->offsets = split->offset;
 			fileSplit->lengths = split->length;
+			p = split->ext_file_uri_string;
+			fileSplit->ext_file_uri_string = p ? pstrdup(p) : (char *) NULL;
 
 			j += 1;
 
 			if (empty_seg) {
+        if (fileSplit->ext_file_uri_string) {
+          pfree(fileSplit->ext_file_uri_string);
+        }
 				pfree(fileSplit);
 			} else {
 				per_seg_splits = list_nth_cell((List *) (last_mapnode->splits), i);
@@ -3863,6 +3878,7 @@ static void combine_all_splits(Detailed_File_Split **splits,
 
 			for (int i = 0; i < rel_file->split_num; i++) {
 				/* fake data locality */
+			  char *p = NULL;
 				if (debug_fake_datalocality) {
 					bool isLocalRead = false;
 					int localCount = 0;
@@ -3934,6 +3950,8 @@ static void combine_all_splits(Detailed_File_Split **splits,
 				(*splits)[total_split_index].offset = rel_file->splits[i].offset;
 				(*splits)[total_split_index].length = rel_file->splits[i].length;
 				(*splits)[total_split_index].logiceof = rel_file->logic_len;
+        p = rel_file->splits[i].ext_file_uri;
+        (*splits)[total_split_index].ext_file_uri_string = p ? pstrdup(p) : (char *) NULL;
 				total_split_index++;
 				splitTotalLength += rel_file->splits[i].length;
 			}
