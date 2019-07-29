@@ -2050,7 +2050,11 @@ CreateCommandTag(Node *parsetree)
 			break;
 
 		case T_CreateExternalStmt:
-			tag = "CREATE EXTERNAL TABLE";
+		{
+			CreateExternalStmt *stmt = (CreateExternalStmt *) parsetree;
+
+			tag = (stmt->isexternal) ? "CREATE EXTERNAL TABLE" : "CREATE TABLE";
+		}
 			break;
 
 		case T_CreateForeignStmt:
