@@ -1714,6 +1714,7 @@ AOGetAllSegFileSplits(AppendOnlyEntry *aoEntry,
 			split->segno = segno;
 			split->offsets = 0;
 			split->lengths = file_size;
+			split->ext_file_uri_string = NULL;
 			splits = lappend(splits, split);
 		}
 		else
@@ -1727,6 +1728,7 @@ AOGetAllSegFileSplits(AppendOnlyEntry *aoEntry,
 				split->segno = segno;
 				split->offsets = offset;
 				split->lengths = aoEntry->splitsize;
+				split->ext_file_uri_string = NULL;
 				splits = lappend(splits, split);
 
 				offset += aoEntry->splitsize;
@@ -1738,6 +1740,7 @@ AOGetAllSegFileSplits(AppendOnlyEntry *aoEntry,
 				split->segno = segno;
 				split->offsets = offset;
 				split->lengths = remaining_size;
+				split->ext_file_uri_string = NULL;
 				splits = lappend(splits, split);
 			}
 		}

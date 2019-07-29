@@ -676,6 +676,7 @@ ParquetGetAllSegFileSplits(AppendOnlyEntry *aoEntry,
 		split->offsets = 0;
 		split->lengths = (int64)DatumGetFloat8(fastgetattr(tuple, Anum_pg_parquetseg_eof, pg_parquetseg_dsc, NULL));
 		split->logiceof = split->lengths;
+		split->ext_file_uri_string = NULL;
 		splits = lappend(splits, split);
 	}
 
