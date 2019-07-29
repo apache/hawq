@@ -1293,15 +1293,6 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		using_location = true;
 	}
 
-	/* various validations */
-
-	if(rel->writable && allocatedResource)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("it is not possible to read from a WRITABLE external table."),
-				errhint("Create the table as READABLE instead"),
-						 errOmitLocation(true)));
-
 	if(rel->rejectlimit != -1)
 	{
 		/* 
@@ -5142,3 +5133,5 @@ flatten_grouping_list(List *groupcls)
 
 	return result;
 }
+
+
