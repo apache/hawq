@@ -14,61 +14,18 @@
 # limitations under the License.
 language: c
 
-os:
-  - osx
+os: osx
 
-osx_image: xcode8.3
-
-compiler:
-  - clang
-
-before_install:
-  - brew --version
-  - "brew update 2>&1 > /tmp/brew-update.txt || (cat /tmp/brew-update.txt && false)"
-  - brew list --versions
+compiler: clang
 
 install:
-  - brew reinstall
-      Gsasl
-      bison
-      ccache
-      cpanm
-      libevent
-      maven
-      openssl
-      python
-      snappy
-      apr
-      apr-util
-  - brew reinstall
-      protobuf
-      protobuf-c
-      thrift
-  - brew outdated libyaml || brew upgrade libyaml
-  - git clone https://github.com/json-c/json-c.git
-  - pushd json-c
-  - git reset --hard json-c-0.12.1-20160607
-  - sh autogen.sh
-  - ./configure
-  - make
-  - make install
-  - popd
-  - rm -rf ./json-c
-  - brew uninstall boost --ignore-dependencies
-  - brew install homebrew/core/boost@1.60
-  - brew link boost@1.60 --force
-  - brew outdated maven   || brew upgrade maven
-  - brew install iproute2mac
-  - brew list --versions
-  - brew link apr --force
-  - sudo easy_install pip
-  - sudo pip install pycrypto
-  - sudo cpanm install JSON
+  - wget http://yum.oushu-tech.com/oushurepo/yumrepo/internal/linux/toolchain/dependency-Darwin.tar.xz
+  - tar -xf dependency-*.tar.gz -C /opt/
 
 before_script:
-  - mvn apache-rat:check
-  - export DEPENDENCY_INSTALL_PREFIX=/usr/local/opt/openssl
-  - cd $TRAVIS_BUILD_DIR
+  - export CC=clang
+  - export CXX=clang++
+  - source /opt/dependency-Darwin/package/env.sh
   - ./configure
 
 script:
