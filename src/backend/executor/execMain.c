@@ -875,8 +875,9 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                         result_segfileinfos = GetResultRelSegFileInfos(RelationGetRelid(relinfo->ri_RelationDesc),
                                                                        estate->es_result_aosegnos, result_segfileinfos);
                     }
+
                     plannedstmt->result_segfileinfos = result_segfileinfos;
-                    
+
                     if (plannedstmt->intoClause != NULL)
                     {
                         List *segment_segnos = SetSegnoForWrite(NIL, 0, GetQEGangNum(), true, true, false);
@@ -1791,7 +1792,6 @@ InitializeResultRelations(PlannedStmt *plannedstmt, EState *estate, CmdType oper
 		}
 
 	}
-
 	estate->es_partition_state = NULL;
 	if (estate->es_result_partitions)
 	{
@@ -2432,7 +2432,7 @@ CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping)
 	Relation rel = heap_open(relid, AccessShareLock);
 
 	/* only relevant for AO relations */
-	if(!RelationIsAoRows(rel)  && !RelationIsParquet(rel))
+	if(!RelationIsAoRows(rel)  && !RelationIsParquet(rel) && !RelationIsExternal(rel))
 	{
 		heap_close(rel, AccessShareLock);
 		return;
@@ -2464,6 +2464,45 @@ CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping)
 	heap_close(rel, AccessShareLock);
 
 	Assert(found);
+}
+
+static void CreateExternalSegFileForRelationOnMaster(Relation rel, List *segnos,
+		SharedStorageOpTasks *addTasks)
+{
+	ParquetFileSegInfo * fsinfo;
+	ListCell *cell;
+
+	Assert(RelationIsExternal(rel));
+
+	char * relname = RelationGetRelationName(rel);
+
+	foreach(cell, segnos)
+	{
+		int segno = lfirst_int(cell);
+
+		Assert(NULL != addTasks);
+		Assert(addTasks->sizeTasks >= addTasks->numTasks);
+
+		RelFileNode *n;
+
+		if (addTasks->sizeTasks == addTasks->numTasks)
+		{
+			addTasks->tasks = repalloc(addTasks->tasks,
+					addTasks->sizeTasks * sizeof(SharedStorageOpTask) * 2);
+			addTasks->sizeTasks *= 2;
+		}
+
+		n = &addTasks->tasks[addTasks->numTasks].node;
+		n->dbNode = rel->rd_node.dbNode;
+		n->relNode = rel->rd_node.relNode;
+		n->spcNode = rel->rd_node.spcNode;
+
+		addTasks->tasks[addTasks->numTasks].segno = segno;
+		addTasks->tasks[addTasks->numTasks].relname = palloc(strlen(relname) + 1);
+		strcpy(addTasks->tasks[addTasks->numTasks].relname, relname);
+
+		addTasks->numTasks++;
+	}
 }
 
 	static void
@@ -2647,13 +2686,20 @@ CreateAppendOnlyParquetSegFileForRelationOnMaster(Relation rel, List *segnos)
 			CreateParquetSegFileForRelationOnMaster(rel, aoEntry, segnos, addTasks, overwriteTasks);
 
 		pfree(aoEntry);
-	}
 
-	PerformSharedStorageOpTasks(addTasks, Op_CreateSegFile);
-	PostPerformSharedStorageOpTasks(addTasks);
-  PerformSharedStorageOpTasks(overwriteTasks, Op_OverWriteSegFile);
+		PerformSharedStorageOpTasks(addTasks, Op_CreateSegFile);
+		PostPerformSharedStorageOpTasks(addTasks);
+		PerformSharedStorageOpTasks(overwriteTasks, Op_OverWriteSegFile);
+	}
+	// TODO: Should we create empty files on orc hash distribution table?
+	// else if (RelationIsExternal(rel))
+	// {
+	// 	CreateExternalSegFileForRelationOnMaster(rel, segnos, addTasks);
+	// 	PerformSharedStorageOpTasks(addTasks, Op_CreateSegFile);
+	// }
+
 	DropSharedStorageOpTasks(addTasks);
-  DropSharedStorageOpTasks(overwriteTasks);
+	DropSharedStorageOpTasks(overwriteTasks);
 }
 
 /*
@@ -2712,10 +2758,10 @@ ResultRelInfoSetSegFileInfo(ResultRelInfo *resultRelInfo, List *mapping)
 	/*
 	 * Only relevant for AO relations.
 	 */
-	if (!relstorage_is_ao(RelinfoGetStorage(resultRelInfo)))
-	{
-		return;
-	}
+//	if (!relstorage_is_ao(RelinfoGetStorage(resultRelInfo)))
+//	{
+//		return;
+//	}
 
 	Assert(mapping);
 	Assert(resultRelInfo->ri_RelationDesc);

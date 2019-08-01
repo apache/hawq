@@ -4331,6 +4331,9 @@ CopyFrom(CopyState cstate)
 												resultRelInfo->ri_aosegfileinfos,
 												GetQEIndex());
 
+							PlannedStmt* plannedstmt = palloc(sizeof(PlannedStmt));
+							memset(plannedstmt,0,sizeof(PlannedStmt));
+							plannedstmt->scantable_splits = cstate->splits;
 							resultRelInfo->ri_extInsertDesc =
 									InvokePlugStorageFormatInsertInit(insertInitFunc,
 						                                      resultRelInfo->ri_RelationDesc,
@@ -4340,6 +4343,7 @@ CopyFrom(CopyState cstate)
 														                  segfileinfo->segno);
 
 							pfree(insertInitFunc);
+							pfree(plannedstmt);
 						}
 						else
 						{

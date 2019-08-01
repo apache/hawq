@@ -129,6 +129,7 @@ extern void InitAppendOnlyWriter(void);
 extern Size AppendOnlyWriterShmemSize(void);
 extern bool TestCurrentTspSupportTruncate(Oid tsp);
 extern List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num, bool forNewRel, bool reuse_segfilenum_in_same_xid, bool keepHash);
+extern List *SetSegnoForExternalWrite(List *existing_segnos, Oid relid, int segment_num, bool forNewRel, bool reuse_segfilenum_in_same_xid, bool keepHash);
 extern List *assignPerRelSegno(List *all_rels, int segment_num);
 extern void UpdateMasterAosegTotals(Relation parentrel,
 									int segno, 

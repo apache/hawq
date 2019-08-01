@@ -2955,10 +2955,6 @@ fetchSegFileInfos(Oid relid, List *segnos)
 		}
 
 		storageChar = get_relation_storage_type(relid);
-		/*
-		 * Get pg_appendonly information for this table.
-		 */
-		aoEntry = GetAppendOnlyEntry(relid, SnapshotNow);
 
 		/*
 		 * Based on the pg_appendonly information, fetch
@@ -2967,12 +2963,30 @@ fetchSegFileInfos(Oid relid, List *segnos)
 		 */
 		if (RELSTORAGE_AOROWS == storageChar)
 		{
+			/*
+			 * Get pg_appendonly information for this table.
+			 */
+			aoEntry = GetAppendOnlyEntry(relid, SnapshotNow);
 			AOFetchSegFileInfo(aoEntry, result, SnapshotNow);
+		}
+		else if (RELSTORAGE_PARQUET == storageChar)
+		{
+			/*
+			 * Get pg_appendonly information for this table.
+			 */
+			aoEntry = GetAppendOnlyEntry(relid, SnapshotNow);
+			ParquetFetchSegFileInfo(aoEntry, result, SnapshotNow);
 		}
 		else
 		{
-			Assert(RELSTORAGE_PARQUET == storageChar);
-			ParquetFetchSegFileInfo(aoEntry, result, SnapshotNow);
+			/*
+			 * Get range info for current magma hash table, which is already
+			 * available when get block location and do datalocality
+			 */
+			/*
+			 * TODO(Zongtian): vsegno -> rg list -> {range list1, ..., range list N}
+			 */
+			Assert(RELSTORAGE_EXTERNAL == storageChar);
 		}
 	}
 	return result;
