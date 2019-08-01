@@ -1185,6 +1185,72 @@ List *SetSegnoForWrite(List *existing_segnos, Oid relid, int segment_num,
 
 }
 
+List *SetSegnoForExternalWrite(List *existing_segnos, Oid relid, int segment_num,
+        bool forNewRel, bool reuse_segfilenum_in_same_xid,
+        bool keepHash)
+{
+    /* these vars are used in GP_ROLE_DISPATCH only */
+    AORelHashEntryData	*aoentry = NULL;
+    TransactionId 		CurrentXid = GetTopTransactionId();
+    int next;
+    AOSegfileStatus *segfilestatus = NULL;
+    int remaining_num = segment_num;
+    bool has_same_txn_status = false;
+    AOSegfileStatus **maxSegno4Segment = NULL;
+
+     switch(Gp_role)
+    {
+        case GP_ROLE_EXECUTE:
+
+             Assert(existing_segnos != NIL);
+            Assert(list_length(existing_segnos) == segment_num);
+            return existing_segnos;
+
+         case GP_ROLE_UTILITY:
+
+             Assert(existing_segnos == NIL);
+            Assert(segment_num == 1);
+            return list_make1_int(RESERVED_SEGNO);
+
+         case GP_ROLE_DISPATCH:
+
+             Assert(existing_segnos == NIL);
+            Assert(segment_num > 0);
+
+             if (forNewRel)
+            {
+                int i;
+                for (i = 1; i <= segment_num; i++)
+                {
+                    existing_segnos = lappend_int(existing_segnos, i);
+                }
+                return existing_segnos;
+            }
+
+             if (Debug_appendonly_print_segfile_choice)
+            {
+                ereport(LOG, (errmsg("SetSegnoForWrite: Choosing a segno for external "
+                                "relation \"%s\" (%d) ",
+                                get_rel_name(relid), relid)));
+            }
+
+             for (int i = 0; i < segment_num; i++)
+            {
+                existing_segnos = lappend_int(existing_segnos,  i);
+            }
+            Assert(list_length(existing_segnos) == segment_num);
+
+             return existing_segnos;
+
+             /* fix this for dispatch agent. for now it's broken anyway. */
+        default:
+            Assert(false);
+            return NIL;
+    }
+
+ }
+
+
 /*
  * assignPerRelSegno
  *
@@ -1230,6 +1296,21 @@ List *assignPerRelSegno(List *all_relids, int segment_num)
 				*/
 			}
 
+		}
+		else if (RelationIsExternal(rel))
+		{
+			SegfileMapNode *n;
+
+			n = makeNode(SegfileMapNode);
+			n->relid = cur_relid;
+
+			n->segnos = SetSegnoForExternalWrite(NIL, cur_relid, segment_num,
+					false, true, true);
+
+			Assert(n->relid != InvalidOid);
+			Assert(n->segnos != NIL);
+
+			mapping = lappend(mapping, n);
 		}
 
         /*

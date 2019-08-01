@@ -4125,15 +4125,34 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		int fileCountInRelation = list_length(rel_data->files);
 		bool FileCountBucketNumMismatch = false;
 		if (targetPolicy->bucketnum > 0) {
-		  FileCountBucketNumMismatch = fileCountInRelation %
-		    targetPolicy->bucketnum == 0 ? false : true;
+			Relation rel = heap_open(rel_data->relid, NoLock);
+			targetPolicy->bucketnum == 0 ? false : true;
+			if (!RelationIsExternal(rel))
+			{
+				FileCountBucketNumMismatch = fileCountInRelation %
+						targetPolicy->bucketnum == 0 ? false : true;
+			}
+			else
+			{
+				ListCell *lc_file;
+				int maxsegno = 0;
+				foreach(lc_file, rel_data->files)
+				{
+					Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
+					if (rel_file->segno > maxsegno)
+						maxsegno = rel_file->segno;
+				}
+				FileCountBucketNumMismatch =
+				maxsegno > targetPolicy->bucketnum ? true : false;
+			}
+			heap_close(rel, NoLock);
 		}
 		if (isRelationHash && FileCountBucketNumMismatch && !allow_file_count_bucket_num_mismatch) {
-		  elog(ERROR, "file count %d in catalog is not in proportion to the bucket "
-		      "number %d of hash table with oid=%u, some data may be lost, if you "
-		      "still want to continue the query by considering the table as random, set GUC "
-		      "allow_file_count_bucket_num_mismatch to on and try again.",
-		      fileCountInRelation, targetPolicy->bucketnum, myrelid);
+			elog(ERROR, "file count %d in catalog is not in proportion to the bucket "
+				"number %d of hash table with oid=%u, some data may be lost, if you "
+				"still want to continue the query by considering the table as random, set GUC "
+				"allow_file_count_bucket_num_mismatch to on and try again.",
+				fileCountInRelation, targetPolicy->bucketnum, myrelid);
 		}
 		/* change the virtual segment order when keep hash.
 		 * order of idMap should also be changed.
