@@ -691,7 +691,7 @@ TEST_F(TestExtOrc, TestDatatypeMoney) {
   ASSERT_TRUE(status);
 }
 
-TEST_F(TestExtOrc, TestTruncate) {
+TEST_F(TestExtOrc, DISABLED_TestTruncate) {
   SQLUtility util;
   HdfsConfig hc;
   std::string result;
@@ -760,17 +760,17 @@ TEST_F(TestExtOrc, BoolTypeTest) {
       "(\'" +
       url + "\') FORMAT 'orc'");
   util.execute("insert into t10 values('yes'),('n'),(null),('0'),(true)");
-  util.query("set new_executor=off; select * from t10 where p='f' or p is true",
+  util.query("select * from t10 where p='f' or p is true",
              "t|\nf|\nf|\nt|\n");
-  util.query("set new_executor=off; select * from t10 where not p is unknown",
+  util.query("select * from t10 where not p is unknown",
              "t|\nf|\nf|\nt|\n");
-  util.query("set new_executor=off; select * from t10 where 't' > p",
+  util.query("select * from t10 where 't' > p",
              "f|\nf|\n");
-  util.query("set new_executor=off; select * from t10 where p != 't'",
+  util.query("select * from t10 where p != 't'",
              "f|\nf|\n");
 }
 
-TEST_F(TestExtOrc, DateTypeTest) {
+TEST_F(TestExtOrc, DISABLED_DateTypeTest) {
   SQLUtility util;
   std::string url = generateUrl(util, "TestExtOrc_DateTypeTest");
   ASSERT_FALSE(url.empty());
@@ -785,67 +785,67 @@ TEST_F(TestExtOrc, DateTypeTest) {
       "03'),('1999-Jan-08'),('Jan-08-1999'),('08-Jan-1999'),('"
       "19990108'),('990108'),('1999.008'),('J2451187'),('0099-01-08 BC')");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, MDY'; select * from t11 "
+      "set datestyle to 'ISO, MDY'; select * from t11 "
       "where p != '2001-1-1'",
       "1999-01-08|\n1999-01-08|\n2003-01-02|\n1999-01-08|"
       "\n1999-01-08|\n1999-01-08|\n1999-01-08|\n1999-01-08|\n1999-01-08|"
       "\n1999-01-08|\n0099-01-08 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, MDY'; select * from t11 "
+      "set datestyle to 'ISO, MDY'; select * from t11 "
       "where p < '2000-1-1'",
       "1999-01-08|\n1999-01-08|\n1999-01-08|"
       "\n1999-01-08|\n1999-01-08|\n1999-01-08|\n1999-01-08|\n1999-01-08|"
       "\n1999-01-08|\n0099-01-08 BC|\n");
   util.query(
-      "set new_executor=off; select p - '2002-01-02' from t11 where p > "
+      "select p - '2002-01-02' from t11 where p > "
       "'2000-1-1'",
       "365|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, MDY'; select * from t11 "
+      "set datestyle to 'ISO, MDY'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "0099-01-08 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, DMY'; select * from t11 "
+      "set datestyle to 'ISO, DMY'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "0099-01-08 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, YMD'; select * from t11 "
+      "set datestyle to 'ISO, YMD'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "0099-01-08 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'Postgres, MDY'; select * from "
+      "set datestyle to 'Postgres, MDY'; select * from "
       "t11 where p = '0099-1-8 BC'",
       "01-08-0099 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'Postgres, DMY'; select * from "
+      "set datestyle to 'Postgres, DMY'; select * from "
       "t11 where p = '0099-1-8 BC'",
       "08-01-0099 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'Postgres, YMD'; select * from "
+      "set datestyle to 'Postgres, YMD'; select * from "
       "t11 where p = '0099-1-8 BC'",
       "01-08-0099 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'SQL, MDY'; select * from t11 "
+      "set datestyle to 'SQL, MDY'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "01/08/0099 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'SQL, DMY'; select * from t11 "
+      "set datestyle to 'SQL, DMY'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "08/01/0099 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'SQL, YMD'; select * from t11 "
+      "set datestyle to 'SQL, YMD'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "01/08/0099 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'German, MDY'; select * from t11 "
+      "set datestyle to 'German, MDY'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "08.01.0099 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'German, DMY'; select * from t11 "
+      "set datestyle to 'German, DMY'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "08.01.0099 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'German, YMD'; select * from t11 "
+      "set datestyle to 'German, YMD'; select * from t11 "
       "where p = '0099-1-8 BC'",
       "08.01.0099 BC|\n");
 }
@@ -866,19 +866,20 @@ TEST_F(TestExtOrc, TimeTypeTest) {
       "PM'),('04:05:06.789-8'),('04:05:06-08:00'),('04:05-08:00'),('040506-08')"
       ",('04:05:06 PST'),('2003-04-12 04:05:06 America/New_York')");
   util.query(
-      "set new_executor=off; select * from t12 where p = '04:05:06'",
+      "select * from t12 where p = '04:05:06'",
       "04:05:06|\n04:05:06|\n04:05:06|\n04:05:06|\n04:05:06|\n04:05:06|\n");
-  util.query("set new_executor=off; select * from t12 where p = '04:05:06.79'",
+  util.query("select * from t12 where p = '04:05:06.79'",
              "04:05:06.79|\n04:05:06.79|\n");
-  util.query("set new_executor=off; select * from t12 where p > '04:05:06'",
+  util.query("select * from t12 where p > '04:05:06'",
              "04:05:06.79|\n16:05:00|\n04:05:06.79|\n");
-  util.query("set new_executor=off; select * from t12 where p < '04:05:06'",
+  util.query("select * from t12 where p < '04:05:06'",
              "04:05:00|\n04:05:00|\n04:05:00|\n");
 }
 
 TEST_F(TestExtOrc, TimestampTypeTest) {
   SQLUtility util;
   std::string url = generateUrl(util, "TestExtOrc_TimestampTypeTest");
+  std::cout << url << std::endl;
   ASSERT_FALSE(url.empty());
   util.execute("drop external table if exists t13");
   util.execute(
@@ -889,60 +890,60 @@ TEST_F(TestExtOrc, TimestampTypeTest) {
       "insert into t13 values('1999-01-08 04:05:06'), ('January 8 04:05:06 "
       "1999 PST'), ('1999-01-08 04:05:06.01 BC')");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, YMD'; select * from t13 "
+      "set datestyle to 'ISO, YMD'; select * from t13 "
       "where p > '1999-01-08 04:05:06 BC'",
       "1999-01-08 04:05:06|\n1999-01-08 04:05:06|\n1999-01-08 04:05:06.01 "
       "BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, YMD'; select * from t13 "
+      "set datestyle to 'ISO, YMD'; select * from t13 "
       "where p < '1999-01-08 04:05:06'",
       "1999-01-08 04:05:06.01 BC|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, MDY'; select * from t13 "
+      "set datestyle to 'ISO, MDY'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "1999-01-08 04:05:06|\n1999-01-08 04:05:06|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, DMY'; select * from t13 "
+      "set datestyle to 'ISO, DMY'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "1999-01-08 04:05:06|\n1999-01-08 04:05:06|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'ISO, YMD'; select * from t13 "
+      "set datestyle to 'ISO, YMD'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "1999-01-08 04:05:06|\n1999-01-08 04:05:06|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'Postgres, MDY'; select * from "
+      "set datestyle to 'Postgres, MDY'; select * from "
       "t13 where p = '1999-01-08 04:05:06'",
       "Fri Jan 08 04:05:06 1999|\nFri Jan 08 04:05:06 1999|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'Postgres, DMY'; select * from "
+      "set datestyle to 'Postgres, DMY'; select * from "
       "t13 where p = '1999-01-08 04:05:06'",
       "Fri 08 Jan 04:05:06 1999|\nFri 08 Jan 04:05:06 1999|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'Postgres, YMD'; select * from "
+      "set datestyle to 'Postgres, YMD'; select * from "
       "t13 where p = '1999-01-08 04:05:06'",
       "Fri Jan 08 04:05:06 1999|\nFri Jan 08 04:05:06 1999|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'SQL, MDY'; select * from t13 "
+      "set datestyle to 'SQL, MDY'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "01/08/1999 04:05:06|\n01/08/1999 04:05:06|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'SQL, DMY'; select * from t13 "
+      "set datestyle to 'SQL, DMY'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "08/01/1999 04:05:06|\n08/01/1999 04:05:06|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'SQL, YMD'; select * from t13 "
+      "set datestyle to 'SQL, YMD'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "01/08/1999 04:05:06|\n01/08/1999 04:05:06|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'German, MDY'; select * from t13 "
+      "set datestyle to 'German, MDY'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "08.01.1999 04:05:06|\n08.01.1999 04:05:06|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'German, DMY'; select * from t13 "
+      "set datestyle to 'German, DMY'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "08.01.1999 04:05:06|\n08.01.1999 04:05:06|\n");
   util.query(
-      "set new_executor=off; set datestyle to 'German, YMD'; select * from t13 "
+      "set datestyle to 'German, YMD'; select * from t13 "
       "where p = '1999-01-08 04:05:06'",
       "08.01.1999 04:05:06|\n08.01.1999 04:05:06|\n");
 }
@@ -957,15 +958,15 @@ TEST_F(TestExtOrc, BinaryTypeTest) {
       "(\'" +
       url + "\') FORMAT 'orc'");
   util.execute("insert into t14 values('haha'), ('233'), ('666'), ('ok')");
-  util.query("set new_executor=off; select * from t14",
+  util.query("select * from t14",
              "haha|\n233|\n666|\nok|\n");
-  util.query("set new_executor=off; select octet_length(arr) from t14",
+  util.query("select octet_length(arr) from t14",
              "4|\n3|\n3|\n2|\n");
-  util.query("set new_executor=off; select * from t14 where arr > '233'",
+  util.query("select * from t14 where arr > '233'",
              "haha|\n666|\nok|\n");
-  util.query("set new_executor=off; select * from t14 where arr = '233'",
+  util.query("select * from t14 where arr = '233'",
              "233|\n");
-  util.query("set new_executor=off; select * from t14 where arr < '666'",
+  util.query("select * from t14 where arr < '666'",
              "233|\n");
 }
 
@@ -981,7 +982,7 @@ TEST_F(TestExtOrc, StringTypeTest) {
       "LOCATION (\'" +
       url + "\') FORMAT 'orc'");
   util.execute("insert into t15 values('0', 'a ', 'b      ', 'c', 'd', 'e');");
-  util.query("set new_executor=off; select * from t15", "0|a|b    |c|d|e|\n");
+  util.query("select * from t15", "0|a|b    |c|d|e|\n");
 }
 
 TEST_F(TestExtOrc, DISABLED_SmallIntArrayTypeTest) {
@@ -994,7 +995,7 @@ TEST_F(TestExtOrc, DISABLED_SmallIntArrayTypeTest) {
       "(\'" +
       url + "\') FORMAT 'orc'");
   util.execute("insert into t16 values('{1,2,3}'), ('{NULL, 2}'), (NULL);");
-  util.query("set new_executor=off; select * from t16",
+  util.query("select * from t16",
              "{1,2,3}|\n{NULL,2}|\n|\n");
 }
 
@@ -1008,7 +1009,7 @@ TEST_F(TestExtOrc, DISABLED_IntArrayTypeTest) {
       "(\'" +
       url + "\') FORMAT 'orc'");
   util.execute("insert into t17 values('{1,2,3}'), ('{NULL, 2}'), (NULL);");
-  util.query("set new_executor=off; select * from t17",
+  util.query("select * from t17",
              "{1,2,3}|\n{NULL,2}|\n|\n");
 }
 
@@ -1022,7 +1023,7 @@ TEST_F(TestExtOrc, DISABLED_BigIntArrayTypeTest) {
       "(\'" +
       url + "\') FORMAT 'orc'");
   util.execute("insert into t18 values('{1,2,3}'), ('{NULL, 2}'), (NULL);");
-  util.query("set new_executor=off; select * from t18",
+  util.query("select * from t18",
              "{1,2,3}|\n{NULL,2}|\n|\n");
 }
 
@@ -1036,7 +1037,7 @@ TEST_F(TestExtOrc, DISABLED_FloatArrayTypeTest) {
       "(\'" +
       url + "\') FORMAT 'orc'");
   util.execute("insert into t19 values('{1,2,3}'), ('{NULL, 2}'), (NULL);");
-  util.query("set new_executor=off; select * from t19",
+  util.query("select * from t19",
              "{1,2,3}|\n{NULL,2}|\n|\n");
 }
 
@@ -1050,7 +1051,7 @@ TEST_F(TestExtOrc, DISABLED_DoubleArrayTypeTest) {
       "(\'" +
       url + "\') FORMAT 'orc'");
   util.execute("insert into t20 values('{1,2,3}'), ('{NULL, 2}'), (NULL);");
-  util.query("set new_executor=off; select * from t20",
+  util.query("select * from t20",
              "{1,2,3}|\n{NULL,2}|\n|\n");
 }
 
@@ -1071,7 +1072,7 @@ TEST_F(TestExtOrc, DISABLED_SmallIntArrayTypeWithSortedAnsTest) {
   util.execute(
       "insert into t22 values(12, NULL),(13, "
       "'{NULL,1,2,3}');");
-  util.query("set new_executor=off; select * from t22 order by i",
+  util.query("select * from t22 order by i",
              "1||\n2||\n11|{1,2,NULL,4,5,NULL}|\n12||\n13|{NULL,1,2,3}|\n31|{1,"
              "2,3}|\n||\n");
 }
@@ -1092,7 +1093,7 @@ TEST_F(TestExtOrc, DISABLED_IntArrayTypeWithSortedAnsTest) {
   util.execute(
       "insert into t23 values(12, NULL),(13, "
       "'{NULL,1,2,3}');");
-  util.query("set new_executor=off; select * from t23 order by i",
+  util.query("select * from t23 order by i",
              "1||\n2||\n11|{1,2,NULL,4,5,NULL}|\n12||\n13|{NULL,1,2,3}|\n31|{1,"
              "2,3}|\n||\n");
 }
@@ -1114,7 +1115,7 @@ TEST_F(TestExtOrc, DISABLED_BigIntArrayTypeWithSortedAnsTest) {
   util.execute(
       "insert into t24 values(12, NULL),(13, "
       "'{NULL,1,2,3}');");
-  util.query("set new_executor=off; select * from t24 order by i",
+  util.query("select * from t24 order by i",
              "1||\n2||\n11|{1,2,NULL,4,5,NULL}|\n12||\n13|{NULL,1,2,3}|\n31|{1,"
              "2,3}|\n||\n");
 }
@@ -1135,7 +1136,7 @@ TEST_F(TestExtOrc, DISABLED_FloatArrayTypeWithSortedAnsTest) {
   util.execute(
       "insert into t25 values(12, NULL),(13, "
       "'{NULL,1,2,3}');");
-  util.query("set new_executor=off; select * from t25 order by i",
+  util.query("select * from t25 order by i",
              "1||\n2||\n11|{1,2,NULL,4,5,NULL}|\n12||\n13|{NULL,1,2,3}|\n31|{1,"
              "2,3}|\n||\n");
 }
@@ -1157,7 +1158,7 @@ TEST_F(TestExtOrc, DISABLED_DoubleArrayTypeWithSortedAnsTest) {
   util.execute(
       "insert into t26 values(12, NULL),(13, "
       "'{NULL,1,2,3}');");
-  util.query("set new_executor=off; select * from t26 order by i",
+  util.query("select * from t26 order by i",
              "1||\n2||\n11|{1,2,NULL,4,5,NULL}|\n12||\n13|{NULL,1,2,3}|\n31|{1,"
              "2,3}|\n||\n");
 }
@@ -1179,13 +1180,13 @@ TEST_F(TestExtOrc, DISABLED_MixedTypeWithArrayTypeTest) {
   util.execute(
       "insert into t27 values(NULL, 12, 'f', NULL),('{NULL,1,2,3}', 13, NULL, "
       "'2018-3-20 11:51:15'), ('{}', NULL, 'eee', '2018-3-20 11:51:14.233');");
-  util.query("set new_executor=off; select * from t27 order by i, s",
+  util.query("select * from t27 order by i, s",
              "{1,2,NULL,4,5,NULL}|11|abc|Tue Mar 20 11:51:14.233 "
              "2018|\n|12|f||\n{NULL,1,2,3}|13||Tue Mar 20 11:51:15 "
              "2018|\n{1,2,3}|31||Tue Mar 20 11:51:14 2018|\n{}||eee|Tue Mar 20 "
              "11:51:14.233 2018|\n||||\n");
   util.query(
-      "set new_executor=off; select * from t27 where s is not null "
+      "select * from t27 where s is not null "
       "order by t,i ",
       "{1,2,3}|31||Tue Mar 20 11:51:14 2018|\n{1,2,NULL,4,5,NULL}|11|abc|Tue "
       "Mar 20 11:51:14.233 2018|\n{}||eee|Tue Mar 20 11:51:14.233 "
@@ -1198,11 +1199,11 @@ TEST_F(TestExtOrc, DISABLED_EuclideanMetricFloat8Array) {
   util.execute("create table t28 (p float8[])  FORMAT 'orc'");
   util.execute("insert into t28 values('{1,2,3}'), ('{1,2}');");
   util.query(
-      "set new_executor=off; select euclidean_metric_float8array(p, "
+      "select euclidean_metric_float8array(p, "
       "array[1,2,3]) from t28;",
       "0|\n3|\n");
   util.query(
-      "set new_executor=off; select euclidean_metric_float8array(p, "
+      "select euclidean_metric_float8array(p, "
       "array[1,2]) from t28;",
       "3|\n0|\n");
 }
@@ -1213,11 +1214,11 @@ TEST_F(TestExtOrc, DISABLED_EuclideanMetricFloat4Array) {
   util.execute("create table t29 (p float4[])  FORMAT 'orc'");
   util.execute("insert into t29 values('{1,2,3}'), ('{1,2}');");
   util.query(
-      "set new_executor=off; select euclidean_metric_float4array(p, "
+      "select euclidean_metric_float4array(p, "
       "array[1,2,3]) from t29;",
       "0|\n3|\n");
   util.query(
-      "set new_executor=off; select euclidean_metric_float4array(p, "
+      "select euclidean_metric_float4array(p, "
       "array[1,2]) from t29;",
       "3|\n0|\n");
 }
@@ -1228,11 +1229,11 @@ TEST_F(TestExtOrc, DISABLED_CosineDistanceFloat8Array) {
   util.execute("create table t30 (p float8[])  FORMAT 'orc'");
   util.execute("insert into t30 values('{1,2,0}'), ('{1,2}');");
   util.query(
-      "set new_executor=off; select cosine_distance_float8array(p, "
+      "select cosine_distance_float8array(p, "
       "array[1,2,0]) from t30;",
       "1|\n1|\n");
   util.query(
-      "set new_executor=off; select cosine_distance_float8array(p, "
+      "select cosine_distance_float8array(p, "
       "array[1,2]) from t30;",
       "1|\n1|\n");
 }
@@ -1243,11 +1244,11 @@ TEST_F(TestExtOrc, DISABLED_CosineDistanceFloat4Array) {
   util.execute("create table t31 (p float4[])  FORMAT 'orc'");
   util.execute("insert into t31 values('{1,2,0}'), ('{1,2}');");
   util.query(
-      "set new_executor=off; select cosine_distance_float4array(p, "
+      "select cosine_distance_float4array(p, "
       "array[1,2,0]) from t31;",
       "1|\n1|\n");
   util.query(
-      "set new_executor=off; select cosine_distance_float4array(p, "
+      "select cosine_distance_float4array(p, "
       "array[1,2]) from t31;",
       "1|\n1|\n");
 }
