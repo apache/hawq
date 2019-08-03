@@ -27,7 +27,7 @@ RUN yum install -y epel-release && \
  libuuid-devel krb5-devel libgsasl-devel expat-devel libxml2-devel \
  perl-ExtUtils-Embed pam-devel python-devel libcurl-devel snappy-devel \
  thrift-devel libyaml-devel libevent-devel bzip2-devel openssl-devel \
- openldap-devel protobuf-devel readline-devel net-snmp-devel apr-devel \
+ openldap-devel readline-devel net-snmp-devel apr-devel \
  libesmtp-devel python-pip json-c-devel \
  java-1.7.0-openjdk-devel lcov cmake3 \
  wget rpm-build \
