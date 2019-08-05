@@ -1501,15 +1501,12 @@ void TimestampColumnReader::next(ColumnVectorBatch& rowBatch,
           nanoBuffer[i] *= 10;
         }
       }
-      int64_t writerTime = secsBuffer[i] + epochOffset;
+  //    int64_t writerTime = secsBuffer[i] + epochOffset;
       // For now only support timestamp without timezone
       // secsBuffer[i] =
       //    writerTime + writerTimezone.getVariant(writerTime).gmtOffset;
       secsBuffer[i] +=
           (ORC_TIMESTAMP_EPOCH_JDATE - UNIX_EPOCH_JDATE) * SECONDS_PER_DAY;
-      if (secsBuffer[i] < 0 && nanoBuffer[i] != 0) {
-        secsBuffer[i] -= 1;
-      }
     }
   }
 }
