@@ -770,7 +770,7 @@ TEST_F(TestExtOrc, BoolTypeTest) {
              "f|\nf|\n");
 }
 
-TEST_F(TestExtOrc, DISABLED_DateTypeTest) {
+TEST_F(TestExtOrc, DateTypeTest) {
   SQLUtility util;
   std::string url = generateUrl(util, "TestExtOrc_DateTypeTest");
   ASSERT_FALSE(url.empty());
