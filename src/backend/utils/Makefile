@@ -14,6 +14,8 @@ SUBDIRS     = adt cache error fmgr hash init mb misc mmgr resowner \
 
 include $(top_srcdir)/src/backend/common.mk
 
+override CPPFLAGS := -I$(prefix)/include $(CPPFLAGS)
+
 all: fmgroids.h probes.h
 
 

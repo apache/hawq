@@ -14,6 +14,8 @@ subdir = src/backend
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
+override CPPFLAGS := -I$(prefix)/include $(CPPFLAGS)
+
 SUBDIRS = access bootstrap catalog parser commands executor foreign \
 	lib libpq gp_libpq_fe main nodes optimizer port postmaster regex \
 	rewrite storage tcop utils resourcemanager $(top_builddir)/src/timezone cdb
