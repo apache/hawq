@@ -12,6 +12,7 @@ subdir = src/include
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
+override CPPFLAGS := -I$(prefix)/include $(CPPFLAGS)
 
 all: pg_config.h pg_config_os.h check_oids check_keywords
 
