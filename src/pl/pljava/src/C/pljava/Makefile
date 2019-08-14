@@ -118,12 +118,11 @@ else
 				$(JRE_LIB)/jrockit \
 				2> /dev/null))
 		endif
-
 		PLJAVA_CPPFLAGS += -I"$(JDK_HOME)/include" -I"$(JDK_HOME)/include/$(JRE_INCL)"
+		SHLIB_LINK += -L"$(JDK_HOME)/jre/lib/$(JRE_CPU)/server"
 		SHLIB_LINK += -L. -L"$(JVM_LIB)" -ljvm
 	endif
 endif
-
 
 override CPPFLAGS += $(PLJAVA_CPPFLAGS)
 override CFLAGS += $(PLJAVA_CFLAGS)
