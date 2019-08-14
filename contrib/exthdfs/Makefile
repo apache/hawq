@@ -24,7 +24,7 @@ include $(top_builddir)/src/Makefile.global
 PG_CPPFLAGS = -I$(libpq_srcdir)
 PG_LIBS = $(libpq_pgport)
 
-override CFLAGS += -lhdfs3 -lstorage -L$(prefix)/lib
+override CFLAGS += -lhdfs3 -lstorage -L$(prefix)/lib -I$(prefix)/include
 
 ifdef USE_PGXS
 PGXS := $(shell pg_config --pgxs)
