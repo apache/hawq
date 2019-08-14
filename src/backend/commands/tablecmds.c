@@ -1709,35 +1709,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 			Relation	rel;
 			PartitionNode *pNode;
 
-			PG_TRY();
-			{
-				rel = heap_openrv(rv, AccessExclusiveLock);
-			}
-			
-			PG_CATCH();
-			{
-				/* 
-				 * In the case of the table being dropped concurrently, 
-				 * throw a friendlier error than:
-				 * 
-				 * "could not open relation with relid 1234"
-				 */
-				if (rv->schemaname)
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_TABLE),
-							 errmsg("relation \"%s.%s\" does not exist",
-									rv->schemaname, rv->relname),
-							 errOmitLocation(true)));
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_TABLE),
-							 errmsg("relation \"%s\" does not exist",
-									rv->relname),
-							 errOmitLocation(true)));
-				PG_RE_THROW();
-			}
-			PG_END_TRY();
-			
+		  rel = heap_openrv(rv, AccessExclusiveLock);
 			truncate_check_rel(rel);
 
 			if (partcheck == 2)
