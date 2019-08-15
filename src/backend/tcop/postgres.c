@@ -4804,9 +4804,17 @@ PostgresMain(int argc, char *argv[], const char *username)
 			 * This means giving the end user enough time to type in the next SQL statement
 			 *
 			 */
-			if (IdleSessionGangTimeout > 0 && gangsExist())
+			if (IdleSessionGangTimeout > 0 && executormgr_has_cached_executor())
+            {
 				if (!enable_sig_alarm( IdleSessionGangTimeout /* ms */, false))
+                {
 					elog(FATAL, "could not set timer for client wait timeout");
+                }
+            }
+            else if (IdleSessionGangTimeout == 0)
+            {
+                executormgr_clean_cached_executor();
+            }
 		}
 
 		IdleTracker_DeactivateProcess();

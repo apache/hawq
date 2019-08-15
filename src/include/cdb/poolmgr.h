@@ -32,6 +32,8 @@ typedef bool (*PoolMgrIterateFilter) (PoolItem item);
 
 extern struct PoolMgrState *poolmgr_create_pool(MemoryContext ctx, PoolMgrCleanCallback callback);
 extern bool poolmgr_drop_pool(struct PoolMgrState *pool);
+extern int poolmgr_clean(struct PoolMgrState *pool, PoolMgrIterateFilter filter);
+
 extern PoolItem poolmgr_get_item_by_name(struct PoolMgrState *pool, const char *name);
 extern PoolItem poolmgr_get_random_item(struct PoolMgrState *pool);
 extern void poolmgr_put_item(struct PoolMgrState *pool, const char *name, PoolItem item);
