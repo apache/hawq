@@ -34,6 +34,12 @@ all:
 
 install:
 #	$(MAKE) -C doc $@
+	$(MAKE) -C depends/thirdparty/googletest install
+	$(MAKE) -C depends/libhdfs3 install
+	$(MAKE) -C depends/libyarn install
+	$(MAKE) -C depends/dbcommon install
+	$(MAKE) -C depends/univplan install
+	$(MAKE) -C depends/storage install
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
