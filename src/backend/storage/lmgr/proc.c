@@ -1174,12 +1174,14 @@ CheckDeadLock(void)
 		goto check_done;
 	}
 
+	Assert(MyProc->waitLock != NULL);
+	RemoveFromWaitQueue(MyProc, LockTagHashCode(&(MyProc->waitLock->tag)));
+
 	/*
 	 * Unlock my semaphore so that the interrupted ProcSleep() call can
 	 * finish.
 	 */
 	PGSemaphoreUnlock(&MyProc->sem);
-	MyProc->waitStatus = STATUS_FOUND;
 
 	/*
 	 * We're done here.  Transaction abort caused by the error that ProcSleep
