@@ -10,6 +10,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 -- start_matchignore
 s/LINE.*exttable_ext.*_test/exttable_ext_test/
 s/.*failed to begin insert: type not supported for orc.*/failed to begin insert: type not supported for orc/
