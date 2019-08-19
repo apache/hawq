@@ -58,6 +58,9 @@
 
               <exclude>depends/libhdfs3/CMake/**</exclude>
               <exclude>depends/libyarn/CMake/**</exclude>
+              <exclude>depends/dbcommon/CMake/**</exclude>
+              <exclude>depends/storage/CMake/**</exclude>>
+              <exclude>depends/univplan/CMake/**</exclude>
               
               <!-- Open-source Python modules with BSD license -->
               
@@ -65,6 +68,9 @@
               <exclude>tools/bin/pythonSrc/unittest2-0.5.1/**</exclude>
               <exclude>tools/bin/ext/figleaf/**</exclude>
               <exclude>tools/bin/ext/pg8000/**</exclude>
+              <exclude>depends/dbcommon/test/parallel/**</exclude>
+              <exclude>depends/storage/test/parallel/**</exclude>
+              <exclude>depends/univplan/test/parallel/**</exclude>
 
               <!-- BZIP2 license (4 clause BSD) -->
 
@@ -221,6 +227,9 @@
 
               <exclude>depends/libhdfs3/test/data/*</exclude>
               <exclude>depends/libhdfs3/debian/**</exclude>
+              <exclude>depends/dbcommon/test/data/*</exclude>
+              <exclude>depends/storage/test/data/*</exclude>
+              <exclude>depends/univplan/test/data/*</exclude>
 
               <!-- Following files are licensed to ASF via the initial HAWQ SGA,
                    however it is tricky to maintain headers in them -->
@@ -276,6 +285,7 @@
               <exclude>**/*.gdb</exclude>
               <exclude>**/*.patch</exclude>
               <exclude>**/*.commit</exclude>
+              <exclude>**/*.cfg</exclude>
               <exclude>**/__init__.py</exclude>
               <exclude>**/*README*</exclude>
             </excludes>

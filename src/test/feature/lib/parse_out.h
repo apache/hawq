@@ -15,6 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #ifndef HAWQ_SRC_TEST_FEATURE_PARSE_OUT_H_
 #define HAWQ_SRC_TEST_FEATURE_PARSE_OUT_H_
 
