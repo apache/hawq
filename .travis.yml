@@ -54,13 +54,15 @@ install:
   - make install
   - popd
   - rm -rf ./json-c
+  - ln -s /usr/local/opt/apr/libexec/lib/libapr-1.0.dylib /usr/local/lib/
+  - ln -s /usr/local/opt/apr/libexec/lib/libapr-1.dylib /usr/local/lib/
+  - ln -s /usr/local/opt/apr/libexec/bin/apr-1-config /usr/local/bin/apr-1-config
   - brew uninstall boost --ignore-dependencies
   - brew install homebrew/core/boost@1.60
   - brew link boost@1.60 --force
   - brew outdated maven   || brew upgrade maven
   - brew install iproute2mac
   - brew list --versions
-  - brew link apr --force
   - sudo curl https://bootstrap.pypa.io/get-pip.py |sudo python
   - sudo pip install pycrypto
   - sudo cpanm install JSON
