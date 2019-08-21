@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 
-#include "jsoncpp/json/json.h"
+#include "json/json.h"
 
 #include "dbcommon/utils/int-util.h"
 #include "storage/format/format.h"
