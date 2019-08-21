@@ -74,6 +74,7 @@ before_script:
   - ./configure
 
 script:
+  - sudo install -o $USER -d /usr/local/hawq
   - make -j$(sysctl -n hw.ncpu)
   - make feature-test
   - make feature-test-clean
