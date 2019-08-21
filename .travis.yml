@@ -30,6 +30,7 @@ before_install:
 install:
   - brew reinstall
       Gsasl
+      boost
       bison
       ccache
       cpanm
@@ -43,37 +44,49 @@ install:
   - brew reinstall
       protobuf
       protobuf-c
-      thrift
+      thrift@0.9
+      glog
+      lz4
+      libiconv
+      json-c
+      jsoncpp
+      hadoop
   - brew outdated libyaml || brew upgrade libyaml
-  - git clone https://github.com/json-c/json-c.git
-  - pushd json-c
-  - git reset --hard json-c-0.12.1-20160607
-  - sh autogen.sh
-  - ./configure
-  - make
-  - make install
-  - popd
-  - rm -rf ./json-c
-  - ln -s /usr/local/opt/apr/libexec/lib/libapr-1.0.dylib /usr/local/lib/
+  - brew link --force thrift@0.9
   - ln -s /usr/local/opt/apr/libexec/lib/libapr-1.dylib /usr/local/lib/
   - ln -s /usr/local/opt/apr/libexec/bin/apr-1-config /usr/local/bin/apr-1-config
-  - brew uninstall boost --ignore-dependencies
-  - brew install homebrew/core/boost@1.60
-  - brew link boost@1.60 --force
+  - ln -s /usr/local/opt/openssl/lib/libcrypto.dylib /usr/local/lib/
+  - ln -s /usr/local/opt/openssl/lib/libssl.dylib /usr/local/lib/
+  - ln -s /usr/local/opt/openssl/bin/openssl /usr/local/bin/openssl
+  - ln -s /usr/local/opt/libiconv/lib/libiconv.dylib /usr/local/lib/
+  - ln -s /usr/local/opt/libiconv/lib/libcharset.dylib /usr/local/lib/
+  - ln -s /usr/local/opt/libiconv/bin/iconv /usr/local/bin/iconv
+  - cp /usr/local/opt/libiconv/include/* /usr/local/include/
   - brew outdated maven   || brew upgrade maven
   - brew install iproute2mac
   - brew list --versions
   - sudo curl https://bootstrap.pypa.io/get-pip.py |sudo python
   - sudo pip install pycrypto
+  - sudo pip install cogapp
   - sudo cpanm install JSON
+  - sudo mkdir -p /usr/local/opt/hawq-dep
+  - sudo mkdir -p /usr/local/opt/hawq-dep/bin
+  - sudo mkdir -p /usr/local/opt/hawq-dep/lib
+  - sudo mkdir -p /usr/local/opt/hawq-dep/include
+  - sudo cp -rf /usr/local/opt/openssl/bin/* /usr/local/opt/hawq-dep/bin/
+  - sudo cp -rf /usr/local/opt/openssl/lib/* /usr/local/opt/hawq-dep/lib/
+  - sudo cp -rf /usr/local/opt/openssl/include/* /usr/local/opt/hawq-dep/include/
+  - sudo cp -rf /usr/local/opt/json-c/lib/* /usr/local/opt/hawq-dep/lib/
+  - sudo cp -rf /usr/local/opt/json-c/include/* /usr/local/opt/hawq-dep/include/
 
 before_script:
   - mvn apache-rat:check
-  - export DEPENDENCY_INSTALL_PREFIX=/usr/local/opt/openssl
+  - export DEPENDENCY_INSTALL_PREFIX=/usr/local/opt/hawq-dep
   - cd $TRAVIS_BUILD_DIR
   - ./configure
 
 script:
+  - sudo install -o $USER -d /usr/local/hawq
   - make -j$(sysctl -n hw.ncpu)
   - make feature-test
   - make feature-test-clean
