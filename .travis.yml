@@ -77,19 +77,10 @@ install:
   - sudo pip install pycrypto
   - sudo pip install cogapp
   - sudo cpanm install JSON
-  - sudo mkdir -p /usr/local/opt/hawq-dep
-  - sudo mkdir -p /usr/local/opt/hawq-dep/bin
-  - sudo mkdir -p /usr/local/opt/hawq-dep/lib
-  - sudo mkdir -p /usr/local/opt/hawq-dep/include
-  - sudo cp -rf /usr/local/opt/openssl/bin/* /usr/local/opt/hawq-dep/bin/
-  - sudo cp -rf /usr/local/opt/openssl/lib/* /usr/local/opt/hawq-dep/lib/
-  - sudo cp -rf /usr/local/opt/openssl/include/* /usr/local/opt/hawq-dep/include/
-  - sudo cp -rf /usr/local/opt/jsoncpp/lib/* /usr/local/opt/hawq-dep/lib/
-  - sudo cp -rf /usr/local/opt/jsoncpp/include/* /usr/local/opt/hawq-dep/include/
 
 before_script:
   - mvn apache-rat:check
-  - export DEPENDENCY_INSTALL_PREFIX=/usr/local/opt/hawq-dep
+  - export DEPENDENCY_INSTALL_PREFIX=/usr/local/opt/openssl
   - cd $TRAVIS_BUILD_DIR
   - ./configure
 
