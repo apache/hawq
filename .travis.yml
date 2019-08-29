@@ -92,5 +92,7 @@ script:
   - make feature-test-clean
 
 branches:
+  only:
+    - travis
   except:
     - legacy

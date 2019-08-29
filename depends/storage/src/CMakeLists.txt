@@ -15,7 +15,6 @@ set(CMAKE_MACOSX_RPATH 1)
 SET(storage_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 SET(storage_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/storage)
 SET(orcformat_proto_DIR ${storage_SRC_DIR}/format/orc)
-SET(Protobuf_PROTOC_EXECUTABLE /usr/local/bin/protoc)
 
 file(GLOB proto_files "${storage_SRC_DIR}/format/orc/*.proto")
 set(proto_SRC_DIR ${CMAKE_BINARY_DIR}/src/storage/format/orc)

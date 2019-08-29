@@ -1,0 +1,70 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Apache HAWQ
+
+on: [push]
+
+jobs:
+  build-on-macOS:
+
+    runs-on: macOS-10.15
+
+    steps:
+
+    - uses: actions/checkout@v2
+
+    - name: lint check
+      run: |
+        csrutil status
+        ulimit -a
+        mvn apache-rat:check
+
+    - name: install thirdparty
+      run: |
+        # download prebuilt libraries
+        curl -sL http://yum.oushu-tech.com/oushurepo/yumrepo/internal/linux/toolchain/dependency-Darwin.tar.xz | tar -xJ -C $GITHUB_WORKSPACE
+        for file in $(find $GITHUB_WORKSPACE/dependency-Darwin/package/bin -name '*' -type f) $(find $GITHUB_WORKSPACE/dependency-Darwin/package/lib -name '*.dylib' -type f); do
+          if [[ $(file $file | grep Mach-O) ]]; then
+            install_name_tool -add_rpath $GITHUB_WORKSPACE/dependency-Darwin/package/lib $file;
+          fi
+        done
+        install_name_tool -add_rpath $GITHUB_WORKSPACE/dependency-Darwin/package/lib/perl5/5.28.0/darwin-thread-multi-2level/CORE/ $GITHUB_WORKSPACE/dependency-Darwin/package/bin/perl
+
+    - name: configure
+      run: |
+        source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
+        export CFLAGS="$CFLAGS -w"
+        export LDFLAGS="$LDFLAGS -Wl,-rpath,$GITHUB_WORKSPACE/dependency-Darwin/package/lib"
+
+        ./configure --enable-debug --prefix=/tmp/hawq || cat config.log
+        test -f config.status
+
+    - name: build hawq
+      run: |
+        source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
+        make -j$(nproc)
+        make -j$(nproc) install
+
+    - name: build feature-test
+      run: |
+        source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
+        make -j$(nproc) feature-test
+
+    - name: test executable
+      run: |
+        source /tmp/hawq/greenplum_path.sh
+        postgres -V
+        src/test/feature/feature-test --gtest_list_tests
