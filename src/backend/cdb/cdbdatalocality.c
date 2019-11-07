@@ -4583,14 +4583,15 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 				if ((context.resultRelationHashSegNum < context.externTableForceSegNum
 						&& context.externTableForceSegNum != 0)
 						|| (context.resultRelationHashSegNum < context.externTableLocationSegNum)) {
-					elog(ERROR, "Could not allocate enough memory! "
-							"bucket number of result hash table and external table should match each other");
+					/* bucket number of result table must be equal to or larger than
+					 * location number of external table.*/
+					elog(ERROR, "bucket number of result hash table and external table should match each other");
 				}
 				maxTargetSegmentNumber = context.resultRelationHashSegNum;
 				minTargetSegmentNumber = context.resultRelationHashSegNum;
 			}
 			else if(context.externTableForceSegNum > 0){
-				/* bucket number of external table must be the same with the number of virtual segments*/
+				/* location number of external table must be less than the number of virtual segments*/
 				if(context.externTableForceSegNum < context.externTableLocationSegNum){
 					elog(ERROR, "external table bucket number should match each other");
 				}
