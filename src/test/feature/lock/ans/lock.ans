@@ -1,0 +1,129 @@
+-- start_ignore
+SET SEARCH_PATH=TestLock_LockBasics;
+SET
+-- end_ignore
+--
+-- Test the LOCK statement
+--
+-- Setup
+CREATE SCHEMA lock_schema1;
+CREATE SCHEMA
+SET search_path = lock_schema1;
+SET
+CREATE TABLE lock_tbl1 (a BIGINT);
+CREATE TABLE
+CREATE VIEW lock_view1 AS SELECT 1;
+CREATE VIEW
+CREATE ROLE regress_rol_lock1;
+psql:/tmp/TestLock_LockBasics.sql:13: NOTICE:  resource queue required -- using default resource queue "pg_default"
+CREATE ROLE
+ALTER ROLE regress_rol_lock1 SET search_path = lock_schema1;
+ALTER ROLE
+GRANT USAGE ON SCHEMA lock_schema1 TO regress_rol_lock1;
+GRANT
+-- Try all valid lock options; also try omitting the optional TABLE keyword.
+BEGIN TRANSACTION;
+BEGIN
+LOCK TABLE lock_tbl1 IN ACCESS SHARE MODE;
+LOCK TABLE
+LOCK lock_tbl1 IN ROW SHARE MODE;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN ROW EXCLUSIVE MODE;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN SHARE UPDATE EXCLUSIVE MODE;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN SHARE MODE;
+LOCK TABLE
+LOCK lock_tbl1 IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN EXCLUSIVE MODE;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN ACCESS EXCLUSIVE MODE;
+LOCK TABLE
+ROLLBACK;
+ROLLBACK
+-- Try using NOWAIT along with valid options.
+BEGIN TRANSACTION;
+BEGIN
+LOCK TABLE lock_tbl1 IN ACCESS SHARE MODE NOWAIT;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN ROW SHARE MODE NOWAIT;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN ROW EXCLUSIVE MODE NOWAIT;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN SHARE UPDATE EXCLUSIVE MODE NOWAIT;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN SHARE MODE NOWAIT;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN SHARE ROW EXCLUSIVE MODE NOWAIT;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN EXCLUSIVE MODE NOWAIT;
+LOCK TABLE
+LOCK TABLE lock_tbl1 IN ACCESS EXCLUSIVE MODE NOWAIT;
+LOCK TABLE
+LOCK TABLE lock_view1 IN EXCLUSIVE MODE;   -- Will fail; can't lock a non-table
+psql:/tmp/TestLock_LockBasics.sql:39: ERROR:  "lock_view1" is not a table
+ROLLBACK;
+ROLLBACK
+-- Verify that we can lock a table with inheritance children.
+CREATE TABLE lock_tbl2 (b BIGINT) INHERITS (lock_tbl1);
+psql:/tmp/TestLock_LockBasics.sql:43: NOTICE:  Table has parent, setting distribution columns to match parent table
+CREATE TABLE
+CREATE TABLE lock_tbl3 () INHERITS (lock_tbl2);
+psql:/tmp/TestLock_LockBasics.sql:44: NOTICE:  Table has parent, setting distribution columns to match parent table
+CREATE TABLE
+BEGIN TRANSACTION;
+BEGIN
+LOCK TABLE lock_tbl1 * IN ACCESS EXCLUSIVE MODE;
+psql:/tmp/TestLock_LockBasics.sql:46: ERROR:  syntax error at or near "*"
+LINE 1: LOCK TABLE lock_tbl1 * IN ACCESS EXCLUSIVE MODE;
+                             ^
+ROLLBACK;
+ROLLBACK
+-- Verify that we can't lock a child table just because we have permission
+-- on the parent, but that we can lock the parent only.
+GRANT UPDATE ON TABLE lock_tbl1 TO regress_rol_lock1;
+GRANT
+SET ROLE regress_rol_lock1;
+SET
+BEGIN;
+BEGIN
+LOCK TABLE lock_tbl1 * IN ACCESS EXCLUSIVE MODE;
+psql:/tmp/TestLock_LockBasics.sql:54: ERROR:  syntax error at or near "*"
+LINE 1: LOCK TABLE lock_tbl1 * IN ACCESS EXCLUSIVE MODE;
+                             ^
+ROLLBACK;
+ROLLBACK
+BEGIN;
+BEGIN
+LOCK TABLE ONLY lock_tbl1;
+psql:/tmp/TestLock_LockBasics.sql:57: ERROR:  syntax error at or near "ONLY"
+LINE 1: LOCK TABLE ONLY lock_tbl1;
+                   ^
+ROLLBACK;
+ROLLBACK
+RESET ROLE;
+RESET
+--
+-- Clean up
+--
+DROP VIEW lock_view1;
+DROP VIEW
+DROP TABLE lock_tbl3;
+DROP TABLE
+DROP TABLE lock_tbl2;
+DROP TABLE
+DROP TABLE lock_tbl1;
+DROP TABLE
+DROP SCHEMA lock_schema1 CASCADE;
+DROP SCHEMA
+DROP ROLE regress_rol_lock1;
+DROP ROLE
+-- atomic ops tests
+RESET search_path;
+RESET
+SELECT test_atomic_ops();
+psql:/tmp/TestLock_LockBasics.sql:74: ERROR:  function test_atomic_ops() does not exist
+LINE 1: SELECT test_atomic_ops();
+               ^
+HINT:  No function matches the given name and argument types. You may need to add explicit type casts.
