@@ -63,9 +63,11 @@ SQLUtility::SQLUtility(SQLUtilityMode mode)
     schemaName = HAWQ_DEFAULT_SCHEMA;
     databaseName = "db_" + string(test_info->test_case_name()) + "_" + test_info->name();
     std::transform(databaseName.begin(), databaseName.end(), databaseName.begin(), ::tolower);
-    exec("DROP DATABASE IF EXISTS " + databaseName);
-    exec("CREATE DATABASE " + databaseName);
-    sql_util_mode = MODE_DATABASE;
+	if (mode != MODE_DEFAULT) {
+		exec("DROP DATABASE IF EXISTS " + databaseName);
+		exec("CREATE DATABASE " + databaseName);
+		sql_util_mode = MODE_DATABASE;
+	}
   }
 }
 

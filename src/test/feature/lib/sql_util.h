@@ -45,7 +45,8 @@ struct FilePath {
 enum SQLUtilityMode {
     MODE_SCHEMA,
     MODE_DATABASE,
-    MODE_MAX_NUM
+    MODE_MAX_NUM,
+	MODE_DEFAULT
 };
 
 class SQLUtility {

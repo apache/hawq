@@ -1179,6 +1179,7 @@ CheckDeadLock(void)
 	 * finish.
 	 */
 	PGSemaphoreUnlock(&MyProc->sem);
+	MyProc->waitStatus = STATUS_FOUND;
 
 	/*
 	 * We're done here.  Transaction abort caused by the error that ProcSleep
