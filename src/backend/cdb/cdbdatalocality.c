@@ -4633,6 +4633,10 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 			} else {
 				maxTargetSegmentNumber = context.randomSegNum;
 				if(context.externTableLocationSegNum > 0 && maxTargetSegmentNumber < GetQueryVsegNum()){
+					/*
+					 * adjust max segment number for random table by rm_nvseg_perquery_perseg_limit
+					 * and rm_nvseg_perquery_limit.
+					 */
 					maxTargetSegmentNumber = GetQueryVsegNum();
 				}
 				minTargetSegmentNumber = context.minimum_segment_num;
