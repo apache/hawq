@@ -4643,6 +4643,10 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 			}
 
 			if (enforce_virtual_segment_number > 0) {
+			  /*
+			   * this is the last factor to determine the virtual segment number,
+			   * it has the highest priority in all conditions.
+			   */
 				maxTargetSegmentNumber = enforce_virtual_segment_number;
 				minTargetSegmentNumber = enforce_virtual_segment_number;
 			}
