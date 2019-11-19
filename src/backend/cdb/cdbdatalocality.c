@@ -260,9 +260,9 @@ typedef struct Assignment_Log_Context {
  * structure for target segment ID mapping.
  */
 typedef struct TargetSegmentIDMap {
-	int target_segment_num;
-	int *global_IDs;
-	char** hostname;
+	int target_segment_num;   // number of virtual segments
+	int *global_IDs;   // virtual segment number -> global hostIndex
+	char** hostname;   // hostname of each virtual segment
 } TargetSegmentIDMap;
 
 /*
