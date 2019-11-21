@@ -61,33 +61,12 @@
 #include "cdb/cdbpathlocus.h"
 #include "cdb/memquota.h"
 #include "miscadmin.h"
-#include "cdb/cdbgang.h"
 #include "cdb/dispatcher.h"
 
 #ifdef USE_ORCA
 extern char *SzDXLPlan(Query *parse);
 extern StringInfo OptVersion();
 #endif
-
-typedef struct ExplainState
-{
-	/* options */
-	bool		printTList;		/* print plan targetlists */
-	bool		printAnalyze;	/* print actual times */
-	/* other states */
-	PlannedStmt *pstmt;			/* top of plan */
-	List	   *rtable;			/* range table */
-
-    /* CDB */
-	int				segmentNum;
-    struct CdbExplain_ShowStatCtx  *showstatctx;    /* EXPLAIN ANALYZE info */
-    Slice          *currentSlice;   /* slice whose nodes we are visiting */
-    ErrorData      *deferredError;  /* caught error to be re-thrown */
-    MemoryContext   explaincxt;     /* mem pool for palloc()ing buffers etc. */
-    TupOutputState *tupOutputState; /* for sending output to client */
-	StringInfoData  outbuf;         /* the output buffer */
-    StringInfoData  workbuf;        /* a scratch buffer */
-} ExplainState;
 
 extern bool Test_print_direct_dispatch_info;
 
@@ -109,7 +88,7 @@ static void ExplainDXL(Query *query, ExplainStmt *stmt,
 
 static double elapsed_time(instr_time *starttime);
 static ErrorData *explain_defer_error(ExplainState *es);
-static void explain_outNode(StringInfo str,
+void explain_outNode(StringInfo str,
 				Plan *plan, PlanState *planstate,
 				Plan *outer_plan,
 				int indent, ExplainState *es, bool isSequential);
@@ -977,7 +956,7 @@ appendGangAndDirectDispatchInfo(StringInfo str, PlanState *planstate, int sliceI
  * side of a join with the current node.  This is only interesting for
  * deciphering runtime keys of an inner indexscan.
  */
-static void
+void
 explain_outNode(StringInfo str,
 				Plan *plan, PlanState *planstate,
 				Plan *outer_plan,

@@ -102,6 +102,7 @@ fileset = {
     'json-c/json.h':     [],
     'emmintrin.h':       [],
     'cdb/cdbhash.h':     [],
+    'cdb/cdbgang.h':     [],
 }
 
 
