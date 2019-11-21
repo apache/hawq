@@ -13,8 +13,28 @@
 #ifndef EXPLAIN_H
 #define EXPLAIN_H
 
+#include "cdb/cdbgang.h"
 #include "executor/executor.h"
 
+typedef struct ExplainState
+{
+	/* options */
+	bool		printTList;		/* print plan targetlists */
+	bool		printAnalyze;	/* print actual times */
+	/* other states */
+	PlannedStmt *pstmt;			/* top of plan */
+	List	   *rtable;			/* range table */
+
+    /* CDB */
+	int				segmentNum;
+    struct CdbExplain_ShowStatCtx  *showstatctx;    /* EXPLAIN ANALYZE info */
+    Slice          *currentSlice;   /* slice whose nodes we are visiting */
+    ErrorData      *deferredError;  /* caught error to be re-thrown */
+    MemoryContext   explaincxt;     /* mem pool for palloc()ing buffers etc. */
+    TupOutputState *tupOutputState; /* for sending output to client */
+	StringInfoData  outbuf;         /* the output buffer */
+    StringInfoData  workbuf;        /* a scratch buffer */
+} ExplainState;
 
 extern void ExplainQuery(ExplainStmt *stmt, const char *queryString,
 						 ParamListInfo params, DestReceiver *dest);
