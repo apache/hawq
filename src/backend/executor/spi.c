@@ -18,6 +18,7 @@
 #include "access/xact.h"
 #include "catalog/catquery.h"
 #include "catalog/heap.h"
+#include "commands/explain.h"
 #include "commands/trigger.h"
 #include "executor/spi_priv.h"
 #include "utils/lsyscache.h"
@@ -503,6 +504,10 @@ int
 SPI_execute_plan(SPIPlanPtr plan, Datum *Values, const char *Nulls,
 				 bool read_only, long tcount)
 {
+	clock_t start, finish;
+	double  duration;
+	start = clock();
+
 	int			res;
 
 	if (plan == NULL || tcount < 0)
@@ -530,6 +535,10 @@ SPI_execute_plan(SPIPlanPtr plan, Datum *Values, const char *Nulls,
 	PG_END_TRY();
 
 	_SPI_end_call(true);
+	finish = clock();
+	duration = (double)(finish - start) / CLOCKS_PER_SEC * 1000;
+	if (Debug_udf_plan)
+		elog(LOG, "query:%s; SPI_execute_plan time:%fms", plan->query, duration);
 	return res;
 }
 
@@ -592,6 +601,10 @@ SPI_execute_snapshot(SPIPlanPtr plan,
 SPIPlanPtr
 SPI_prepare(const char *src, int nargs, Oid *argtypes)
 {
+	clock_t start, finish;
+	double  duration;
+	start = clock();
+
 	_SPI_plan	plan;
 	_SPI_plan  *result;
 
@@ -636,6 +649,11 @@ SPI_prepare(const char *src, int nargs, Oid *argtypes)
 
 	_SPI_end_call(true);
 
+	finish = clock();
+	duration = (double)(finish - start) / CLOCKS_PER_SEC * 1000;
+	if (Debug_udf_plan)
+		elog(LOG, "query:%s; SPI_prepare time:%fms", src, duration);
+
 	return result;
 }
 
@@ -678,6 +696,107 @@ SPI_freeplan(SPIPlanPtr plan)
 
 	MemoryContextDelete(plan->plancxt);
 	return 0;
+}
+
+void Explain_udf_plan(QueryDesc *qdesc)
+{
+	ExplainState explainState;
+	ExplainState *es = &explainState;
+	MemoryContext oldcxt = CurrentMemoryContext;
+	MemoryContext explaincxt;
+	/* Create EXPLAIN memory context. */
+	explaincxt = AllocSetContextCreate(
+			CurrentMemoryContext, "EXPLAIN working storage",
+			ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE,
+			ALLOCSET_DEFAULT_MAXSIZE);
+
+	/* Initialize ExplainState structure. */
+	memset(es, 0, sizeof(*es));
+	es->explaincxt = explaincxt;
+	es->showstatctx = NULL;
+	es->deferredError = NULL;
+	es->pstmt = qdesc->plannedstmt;
+	es->segmentNum = qdesc->plannedstmt->planner_segments;
+
+	/* Allocate output buffer and a scratch buffer. */
+	MemoryContextSwitchTo(explaincxt);
+	initStringInfoOfSize(&es->workbuf, 1000);
+	initStringInfoOfSize(&es->outbuf, 16000);
+	MemoryContextSwitchTo(oldcxt);
+
+	StringInfo  buf = &es->outbuf;
+	es->currentSlice = getCurrentSlice(
+			qdesc->estate, LocallyExecutingSliceIndex(qdesc->estate));
+	es->rtable = qdesc->plannedstmt->rtable;
+
+	bool isSequential = false;
+	int indent = 0;
+	if (qdesc->plannedstmt->planTree->dispatch == DISPATCH_SEQUENTIAL) {
+		isSequential=true;
+	}
+
+	CmdType cmd = qdesc->plannedstmt->commandType;
+	Plan *childPlan = qdesc->plannedstmt->planTree;
+
+	if ((cmd == CMD_DELETE || cmd == CMD_INSERT || cmd == CMD_UPDATE) &&
+		qdesc->plannedstmt->planGen == PLANGEN_PLANNER)
+	{
+		/* Set sliceNum to the slice number of the outer-most query plan node */
+		int sliceNum = 0;
+		int numSegments = es->segmentNum;
+		char *cmdName = NULL;
+
+		switch (cmd)
+		{
+			case CMD_DELETE:
+				cmdName = "Delete";
+				break;
+			case CMD_INSERT:
+				cmdName = "Insert";
+				break;
+			case CMD_UPDATE:
+				cmdName = "Update";
+				break;
+			default:
+				/* This should never be reached */
+				Assert(!"Unexpected statement type");
+				break;
+		}
+		appendStringInfo(buf, "%s", cmdName);
+
+		if (IsA(childPlan, Motion))
+		{
+			Motion *pMotion = (Motion *)childPlan;
+			if (pMotion->motionType == MOTIONTYPE_FIXED && pMotion->numOutputSegs != 0)
+			{
+				numSegments = 1;
+			}
+			/* else: other motion nodes execute on all segments */
+		}
+		else if ((childPlan->directDispatch).isDirectDispatch)
+		{
+			numSegments = 1;
+		}
+		appendStringInfo(buf, " (slice%d; segments: %d)", sliceNum, numSegments);
+		appendStringInfo(buf, "  (rows=%.0f width=%d)\n", ceil(childPlan->plan_rows / numSegments), childPlan->plan_width);
+		appendStringInfo(buf, "  ->  ");
+		indent = 3;
+	}
+	explain_outNode(buf, childPlan, qdesc->planstate,
+	                NULL, indent, es, isSequential);
+
+	if (qdesc->estate->dispatch_data)
+		dispatcher_print_statistics(buf, qdesc->estate->dispatch_data);
+	appendStringInfo(buf, "Data locality statistics:\n");
+	if (qdesc->plannedstmt->datalocalityInfo ==NULL){
+		appendStringInfo(buf, "  no data locality information in this query\n");
+	} else {
+		appendStringInfo(buf, "  %s\n", qdesc->plannedstmt->datalocalityInfo->data);
+	}
+
+	elog(LOG, "UDF Plan:\n%s", buf->data);
+	// free memory
+	MemoryContextDelete(explaincxt);
 }
 
 HeapTuple
@@ -1853,6 +1972,14 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
 				}
 
 				PlannedStmt *stmt = copyObject(originalStmt);
+				if (Debug_udf_plan && originalStmt->datalocalityInfo)
+				{
+					stmt->datalocalityTime = originalStmt->datalocalityTime;
+					stmt->datalocalityInfo = makeStringInfo();
+					stmt->datalocalityInfo->cursor = originalStmt->datalocalityInfo->cursor;
+					appendStringInfoString(stmt->datalocalityInfo,
+					                       originalStmt->datalocalityInfo->data);
+				}
 
 				_SPI_current->processed = 0;
 				_SPI_current->lastoid = InvalidOid;
@@ -2212,7 +2339,13 @@ _SPI_pquery(QueryDesc * queryDesc, bool fire_triggers, long tcount)
 		ExecutorStart(queryDesc, 0);
 
 		ExecutorRun(queryDesc, ForwardScanDirection, tcount);
-		
+
+		// print udf plan to pglog
+		if (Debug_udf_plan)
+		{
+			Explain_udf_plan(queryDesc);
+		}
+
 		_SPI_current->processed = queryDesc->estate->es_processed;
 		_SPI_current->lastoid = queryDesc->estate->es_lastoid;
 		
@@ -2457,6 +2590,14 @@ _SPI_copy_plan(SPIPlanPtr plan, int location)
 			if (IsA(node, PlannedStmt))
 			{
 				PlannedStmt *ps = (PlannedStmt*) node;
+				if (Debug_udf_plan && ((PlannedStmt*)lfirst(lc))->datalocalityInfo)
+				{
+					ps->datalocalityTime = ((PlannedStmt*)lfirst(lc))->datalocalityTime;
+					ps->datalocalityInfo = makeStringInfo();
+					ps->datalocalityInfo->cursor = ((PlannedStmt*)lfirst(lc))->datalocalityInfo->cursor;
+					appendStringInfoString(ps->datalocalityInfo,
+					                       ((PlannedStmt*)lfirst(lc))->datalocalityInfo->data);
+				}
 				ps->qdContext = plancxt;
 			}
 			newplan->ptlist = lappend(newplan->ptlist, node);

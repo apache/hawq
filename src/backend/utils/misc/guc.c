@@ -279,6 +279,7 @@ bool		assert_enabled = false;
 #endif
 bool		log_duration = false;
 bool		Debug_print_plan = false;
+bool		Debug_udf_plan = false;
 bool		Debug_print_parse = false;
 bool		Debug_print_rewritten = false;
 bool		Debug_pretty_print = false;
@@ -1433,6 +1434,14 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&log_statement_stats,
 		false, assign_log_stats, NULL
+	},
+	{
+		{"debug_udf_plan", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Prints the execution plan of udf to server log."),
+			NULL
+		},
+		&Debug_udf_plan,
+		false, NULL, NULL
 	},
 	{
 		{"log_dispatch_stats", PGC_SUSET, STATS_MONITORING,
