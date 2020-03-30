@@ -126,7 +126,7 @@ namespace Hdfs {
 			return -1;
 		}
 
-		LOG(DEBUG3, "CryptoCodec init success, length of the decrypted key is : %llu, crypto method is : %d", AlgorithmBlockSize, crypto_method);
+		LOG(DEBUG3, "CryptoCodec init success, length of the decrypted key is : %lu, crypto method is : %d", AlgorithmBlockSize, crypto_method);
 		return 1;
 
 	}

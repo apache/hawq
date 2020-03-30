@@ -63,3 +63,12 @@ set(GoogleTest_LIBRARIES ${Gtest_LIBRARY} ${Gmock_LIBRARY})
 mark_as_advanced(
     GoogleTest_INCLUDE_DIR
     GoogleTest_LIBRARIES)
+
+if(GoogleTest_FOUND AND NOT TARGET GoogleTest::GoogleTest)
+    add_library(GoogleTest::GoogleTest INTERFACE IMPORTED)
+    set_target_properties(GoogleTest::GoogleTest
+		PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${GoogleTest_INCLUDE_DIR}"
+		INTERFACE_LINK_LIBRARIES "${GoogleTest_LIBRARIES}"
+    )
+endif()
