@@ -402,6 +402,7 @@ ExplainOnePlan(PlannedStmt *plannedstmt, ExplainStmt *stmt,
     es->deferredError = NULL;
     es->tupOutputState = tstate;
     es->pstmt = plannedstmt;
+    es->printUdfPlan = false;
     /* TODO: HAWQ2: Refactor the resource to empty set with segmentNum. */
     es->segmentNum = plannedstmt->planner_segments;
 
@@ -2042,8 +2043,20 @@ explain_outNode(StringInfo str,
     /* CDB: Empty the output buffer if it's more than half full. */
     if (str->len*2 > str->maxlen)
     {
+      /* the normal explain analyze */
+      if (!es->printUdfPlan)
+      {
         do_text_output_multiline(es->tupOutputState, str->data);
         truncateStringInfo(str, 0);
+      }
+      else
+      {
+        /*
+         * print udf plan
+         * we cant use sender/receiver as above
+         */
+        enlargeStringInfo(str, str->maxlen);
+      }
     }
 
     es->currentSlice = currentSlice;    /* restore */

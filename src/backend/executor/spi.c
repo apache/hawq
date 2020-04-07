@@ -504,10 +504,6 @@ int
 SPI_execute_plan(SPIPlanPtr plan, Datum *Values, const char *Nulls,
 				 bool read_only, long tcount)
 {
-	clock_t start, finish;
-	double  duration;
-	start = clock();
-
 	int			res;
 
 	if (plan == NULL || tcount < 0)
@@ -535,10 +531,7 @@ SPI_execute_plan(SPIPlanPtr plan, Datum *Values, const char *Nulls,
 	PG_END_TRY();
 
 	_SPI_end_call(true);
-	finish = clock();
-	duration = (double)(finish - start) / CLOCKS_PER_SEC * 1000;
-	if (Debug_udf_plan)
-		elog(LOG, "query:%s; SPI_execute_plan time:%fms", plan->query, duration);
+
 	return res;
 }
 
@@ -601,10 +594,6 @@ SPI_execute_snapshot(SPIPlanPtr plan,
 SPIPlanPtr
 SPI_prepare(const char *src, int nargs, Oid *argtypes)
 {
-	clock_t start, finish;
-	double  duration;
-	start = clock();
-
 	_SPI_plan	plan;
 	_SPI_plan  *result;
 
@@ -648,11 +637,6 @@ SPI_prepare(const char *src, int nargs, Oid *argtypes)
 	PG_END_TRY();
 
 	_SPI_end_call(true);
-
-	finish = clock();
-	duration = (double)(finish - start) / CLOCKS_PER_SEC * 1000;
-	if (Debug_udf_plan)
-		elog(LOG, "query:%s; SPI_prepare time:%fms", src, duration);
 
 	return result;
 }
@@ -715,6 +699,7 @@ void Explain_udf_plan(QueryDesc *qdesc)
 	es->explaincxt = explaincxt;
 	es->showstatctx = NULL;
 	es->deferredError = NULL;
+	es->printUdfPlan = true;
 	es->pstmt = qdesc->plannedstmt;
 	es->segmentNum = qdesc->plannedstmt->planner_segments;
 
@@ -1719,6 +1704,9 @@ spi_printtup(TupleTableSlot * slot, DestReceiver *self)
 static void
 _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
 {
+	struct timeval t_start, t_end;
+	gettimeofday(&t_start, NULL);
+
 	List	   *raw_parsetree_list;
 	List	   *query_list_list;
 	List	   *plan_list;
@@ -1846,6 +1834,13 @@ _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
 	 * Pop the error context stack
 	 */
 	error_context_stack = spierrcontext.previous;
+
+	if (Debug_udf_plan)
+	{
+		gettimeofday(&t_end, NULL);
+		double duration = (1000000 * (t_end.tv_sec - t_start.tv_sec) + t_end.tv_usec - t_start.tv_usec) / 1000;
+		elog(LOG, "UDF query:%s; _SPI_prepare_plan time:%lfms", plan->query, duration);
+	}
 }
 
 /*
@@ -1864,6 +1859,9 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
 				  Snapshot snapshot, Snapshot crosscheck_snapshot,
 				  bool read_only, bool fire_triggers, long tcount)
 {
+	struct timeval t_start, t_end;
+	gettimeofday(&t_start, NULL);
+
 	volatile int my_res = 0;
 	volatile uint64 my_processed = 0;
 	volatile Oid my_lastoid = InvalidOid;
@@ -2163,6 +2161,13 @@ fail:
 
 	/* plan execution is done */
 	plan->use_count--;
+
+	if (Debug_udf_plan)
+	{
+		gettimeofday(&t_end, NULL);
+		double duration = (1000000 * (t_end.tv_sec - t_start.tv_sec) + t_end.tv_usec - t_start.tv_usec) / 1000;
+		elog(LOG, "UDF query:%s; _SPI_execute_plan time:%lfms", plan->query, duration);
+	}
 
 	/*
 	 * If none of the queries had canSetTag, we return the last query's result

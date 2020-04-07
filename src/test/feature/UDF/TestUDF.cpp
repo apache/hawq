@@ -335,3 +335,12 @@ TEST_F(TestUDF, TestUDFPlperlu)
 		                 "UDF/ans/function_plperlu.ans");
 	}
 }
+
+TEST_F(TestUDF, TestUDFDebug)
+{
+	hawq::test::SQLUtility util;
+	std::string sqlfile="UDF/sql/test_udf_debug.sql";
+	std::string outfile="UDF/ans/test_udf_debug.out";
+	std::string ansfile="UDF/ans/test_udf_debug.ans";
+	util.execSpecificSQLFile(sqlfile, outfile, ansfile, "", "", "");
+}

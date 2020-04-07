@@ -21,6 +21,7 @@ typedef struct ExplainState
 	/* options */
 	bool		printTList;		/* print plan targetlists */
 	bool		printAnalyze;	/* print actual times */
+	bool		printUdfPlan;  /* print udf plan */
 	/* other states */
 	PlannedStmt *pstmt;			/* top of plan */
 	List	   *rtable;			/* range table */
