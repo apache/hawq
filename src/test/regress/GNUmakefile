@@ -115,7 +115,7 @@ endif
 
 # And finally some extra C modules...
 
-all: tablespace-setup includecheck
+all: tablespace-setup
 
 # Tablespace setup
 .PHONY: tablespace-setup
