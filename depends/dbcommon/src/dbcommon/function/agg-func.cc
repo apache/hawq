@@ -836,7 +836,8 @@ Datum avg_type_amalg_impl(Datum *params, uint64_t size) {
   Object *para = DatumGetValue<Object *>(params[4]);
 
   Vector *vec = reinterpret_cast<Vector *>(para);
-  assert(dynamic_cast<Vector *>(para)->getTypeKind() == TypeKind::STRUCTID);
+  assert(dynamic_cast<Vector *>(para)->getTypeKind() ==
+         TypeKind::AVG_DOUBLE_TRANS_DATA_ID);
 
   Accessor accessor = grpVals.getAccessor<Accessor>();
 
@@ -1144,7 +1145,8 @@ Datum avg_decimal_amalg_impl(Datum *params, uint64_t size) {
   Object *para = DatumGetValue<Object *>(params[4]);
 
   Vector *vec = reinterpret_cast<Vector *>(para);
-  assert(dynamic_cast<Vector *>(para)->getTypeKind() == TypeKind::STRUCTID);
+  assert(dynamic_cast<Vector *>(para)->getTypeKind() ==
+         TypeKind::AVG_DECIMAL_TRANS_DATA_ID);
 
   Accessor accessor = grpVals.getAccessor<Accessor>();
 

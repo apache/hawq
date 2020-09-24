@@ -181,8 +181,9 @@ class VectorUtility {
 
   static std::unique_ptr<Vector> generateSelectStructVector(
       std::vector<std::unique_ptr<Vector>> &vecs,  // NOLINT
-      const std::vector<bool> *nulls, SelectList *sel) {
+      const std::vector<bool> *nulls, SelectList *sel, TypeKind typekind) {
     std::unique_ptr<dbcommon::Vector> result(new dbcommon::StructVector(false));
+    result->setTypeKind(typekind);
     for (int i = 0; i < vecs.size(); i++) {
       result->addChildVector(std::move(vecs[i]));
     }

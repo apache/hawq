@@ -93,6 +93,8 @@ enum TypeKind {
   IOBASETYPEID = 2004,  // base type
   STRUCTEXID = 2005,    // struct extension
   MAGMATID = 2006,      // magma tid
+  AVG_DOUBLE_TRANS_DATA_ID = 2007,
+  AVG_DECIMAL_TRANS_DATA_ID = 2008,
 
   // 2100~2199 format(ps:xml not support yet)
 

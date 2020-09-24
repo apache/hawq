@@ -125,6 +125,14 @@ std::unique_ptr<Vector> Vector::BuildVector(TypeKind type, bool ownData,
     case MAGMATID:
       ret = std::unique_ptr<Vector>(new MagmaTidVector(ownData));
       break;
+    case AVG_DOUBLE_TRANS_DATA_ID:
+      ret = std::unique_ptr<Vector>(new StructVector(ownData));
+      ret->setTypeKind(AVG_DOUBLE_TRANS_DATA_ID);
+      break;
+    case AVG_DECIMAL_TRANS_DATA_ID:
+      ret = std::unique_ptr<Vector>(new StructVector(ownData));
+      ret->setTypeKind(AVG_DECIMAL_TRANS_DATA_ID);
+      break;
     default:
       LOG_ERROR(ERRCODE_INTERNAL_ERROR, "Not supported type %d", type);
   }

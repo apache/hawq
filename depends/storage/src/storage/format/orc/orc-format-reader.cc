@@ -263,6 +263,46 @@ dbcommon::TupleBatch::uptr ORCFormatReader::createTupleBatch(
         assert(lv->isValid());
         break;
       }
+      case orc::ORCTypeKind::STRUCT: {
+        // XXX(chiyang): support struct vector only for aggregate intermediate
+        // output, as a result of which ORC file serves as workfile
+        orc::StructVectorBatch *structBatch =
+            dynamic_cast<orc::StructVectorBatch *>(b);
+        assert(structBatch->fields.size() == 2);
+        assert(structBatch->fields[0]->getType() == orc::ORCTypeKind::DOUBLE ||
+               structBatch->fields[0]->getType() == orc::ORCTypeKind::DECIMAL);
+        assert(structBatch->fields[1]->getType() == orc::ORCTypeKind::LONG);
+
+        bool isDecimal =
+            structBatch->fields[0]->getType() == orc::ORCTypeKind::DECIMAL;
+        auto vecSum = dbcommon::Vector::BuildVector(
+            isDecimal ? dbcommon::TypeKind::DECIMALID
+                      : dbcommon::TypeKind::DOUBLEID,
+            false);
+        auto vecCount =
+            dbcommon::Vector::BuildVector(dbcommon::TypeKind::BIGINTID, false);
+        {
+          auto b0 = structBatch->fields[0];
+          vecSum->setValue(b0->getData(), b0->numElements * b0->getWidth());
+          vecSum->setHasNull(b0->hasNulls);
+          if (b0->hasNulls)
+            vecSum->setNotNulls(b0->getNotNull(), b0->numElements);
+        }
+        {
+          auto b1 = structBatch->fields[1];
+          vecCount->setValue(b1->getData(), b1->numElements * b1->getWidth());
+          vecCount->setHasNull(b1->hasNulls);
+          if (b1->hasNulls)
+            vecCount->setNotNulls(b1->getNotNull(), b1->numElements);
+        }
+
+        v->addChildVector(std::move(vecSum));
+        v->addChildVector(std::move(vecCount));
+        v->setTypeKind(isDecimal
+                           ? dbcommon::TypeKind::AVG_DECIMAL_TRANS_DATA_ID
+                           : dbcommon::TypeKind::AVG_DOUBLE_TRANS_DATA_ID);
+        break;
+      }
       default:
         LOG_ERROR(ERRCODE_FEATURE_NOT_SUPPORTED, "type %d not supported yet",
                   b->getType());

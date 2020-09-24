@@ -248,7 +248,10 @@ void AggFuncTest::testAvgAmalgSmallScale(func_type testFunc) {
       vecs.push_back(std::move(vecSum));
       vecs.push_back(std::move(vecCount));
       std::unique_ptr<dbcommon::Vector> vec =
-          VectorUtility::generateSelectStructVector(vecs, nullptr, nullptr);
+          VectorUtility::generateSelectStructVector(
+              vecs, nullptr, nullptr,
+              (TypeKind::DECIMALNEWID == TK ? AVG_DECIMAL_TRANS_DATA_ID
+                                            : AVG_DOUBLE_TRANS_DATA_ID));
 
       grpVals = generateAggGroupValues<T>(initGrpVals, true, true);
       std::vector<uint64_t> hashGroups = {0, 0, 1, 1, 1};
@@ -283,7 +286,10 @@ void AggFuncTest::testAvgAmalgSmallScale(func_type testFunc) {
       vecs.push_back(std::move(vecSum));
       vecs.push_back(std::move(vecCount));
       std::unique_ptr<dbcommon::Vector> vec =
-          VectorUtility::generateSelectStructVector(vecs, nullptr, nullptr);
+          VectorUtility::generateSelectStructVector(
+              vecs, nullptr, nullptr,
+              (TypeKind::DECIMALNEWID == TK ? AVG_DECIMAL_TRANS_DATA_ID
+                                            : AVG_DOUBLE_TRANS_DATA_ID));
 
       std::vector<uint64_t> hashGroups = {0, 1, 1};
       SelectList sel = {0, 3, 4};

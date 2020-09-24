@@ -340,8 +340,7 @@ struct StructVectorBatch : public ColumnVectorBatch {
   }
 
   std::unique_ptr<dbcommon::Vector> buildVector() override {
-    LOG_ERROR(ERRCODE_INTERNAL_ERROR,
-              "not implemented buildVector for StructVectorBatch");
+    return dbcommon::Vector::BuildVector(dbcommon::TypeKind::STRUCTID, false);
   }
 };
 

@@ -130,6 +130,7 @@ class StructVector : public Vector {
 
   std::unique_ptr<Vector> cloneSelected(const SelectList *sel) const override {
     std::unique_ptr<Vector> vec(new StructVector(false));
+    vec->setTypeKind(this->getTypeKind());
     for (int i = 0; i < childs.size(); i++) {
       vec->addChildVector(childs[i]->cloneSelected(sel));
     }

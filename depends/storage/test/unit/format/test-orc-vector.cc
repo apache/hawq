@@ -66,8 +66,6 @@ TEST(TestOrcVector, StructVectorBatch) {
   EXPECT_THROW(vec.getWidth(), dbcommon::TransactionAbortException);
   EXPECT_EQ(vec.getType(), ORCTypeKind::STRUCT);
   EXPECT_THROW(vec.getData(), dbcommon::TransactionAbortException);
-  EXPECT_THROW(vec.buildVector(), dbcommon::TransactionAbortException);
-
   EXPECT_EQ(vec.hasVariableLength(), false);
 
   EXPECT_EQ(vec.toString(),

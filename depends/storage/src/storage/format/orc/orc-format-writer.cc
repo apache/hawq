@@ -195,6 +195,22 @@ std::unique_ptr<orc::Type> ORCFormatWriter::buildSchema(
         child->addStructField(name, std::move(grandchild));
         ret->addStructField(name, std::move(child));
         break;
+      case dbcommon::TypeKind::AVG_DOUBLE_TRANS_DATA_ID:
+        child.reset(new orc::TypeImpl(orc::ORCTypeKind::STRUCT));
+        grandchild.reset(new orc::TypeImpl(orc::ORCTypeKind::DOUBLE));
+        child->addStructField(name, std::move(grandchild));
+        grandchild.reset(new orc::TypeImpl(orc::ORCTypeKind::LONG));
+        child->addStructField(name, std::move(grandchild));
+        ret->addStructField(name, std::move(child));
+        break;
+      case dbcommon::TypeKind::AVG_DECIMAL_TRANS_DATA_ID:
+        child.reset(new orc::TypeImpl(orc::ORCTypeKind::STRUCT));
+        grandchild.reset(new orc::TypeImpl(orc::ORCTypeKind::DECIMAL));
+        child->addStructField(name, std::move(grandchild));
+        grandchild.reset(new orc::TypeImpl(orc::ORCTypeKind::LONG));
+        child->addStructField(name, std::move(grandchild));
+        ret->addStructField(name, std::move(child));
+        break;
       default:
         LOG_ERROR(ERRCODE_FEATURE_NOT_SUPPORTED,
                   "type not supported for orc: %d", t);
