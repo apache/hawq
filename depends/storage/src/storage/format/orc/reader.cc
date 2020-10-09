@@ -2258,7 +2258,6 @@ void Decimal128ColumnReader::next(ColumnVectorBatch& rowBatch,
         readInt128(values[i], static_cast<int32_t>(scaleBuffer[i]));
         highbits[i] = values[i].getHighBits();
         lowbits[i] = values[i].getLowBits();
-        scaleBuffer[i] = scale;
       }
     }
   } else {
@@ -2266,7 +2265,6 @@ void Decimal128ColumnReader::next(ColumnVectorBatch& rowBatch,
       readInt128(values[i], static_cast<int32_t>(scaleBuffer[i]));
       highbits[i] = values[i].getHighBits();
       lowbits[i] = values[i].getLowBits();
-      scaleBuffer[i] = scale;
     }
   }
 }

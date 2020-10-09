@@ -19,7 +19,9 @@
 
 #include "storage/format/orc/writer.h"
 
+#include "dbcommon/common/vector-transformer.h"
 #include "dbcommon/common/vector/decimal-vector.h"
+
 namespace orc {
 Decimal64ColumnWriter::Decimal64ColumnWriter(const orc::Type *type,
                                              WriterOptions *options)
@@ -170,11 +172,20 @@ void Decimal128ColumnWriter::writeVector(dbcommon::Vector *vector) {
     buf = vector->getNullBuffer()->getReverseBools();
     notNull = const_cast<char *>(buf->data());
   }
-  // A work around to support "insert select" expression
+
   if (vector->getTypeKind() == dbcommon::DECIMALNEWID) {
-    dbcommon::DecimalVector *dvec =
-        dynamic_cast<dbcommon::DecimalVector *>(vector);
-    dvec->computeRawValueAndValPtrs();
+    ColumnWriter::writeVector(vector);
+    dbcommon::DecimalVectorRawData vec(vector);
+    auto writeValue = [&](uint64_t plainIdx) {
+      orc::Int128 value(vec.hightbits[plainIdx], vec.lowbits[plainIdx]);
+      if (writeStatsOn)
+        dynamic_cast<DecimalColumnStatisticsImpl *>(stripeColStats.get())
+            ->updateDecimal(Decimal(value, scale));
+      writeInt128(&value);
+    };
+    dbcommon::transformVector(vec.plainSize, vec.sel, vec.nulls, writeValue);
+    scaleRleCoder->write(vec.scales, vec.plainSize, notNull);
+    return;
   }
 
   uint64_t numValues = vector->getNumOfRows();
@@ -193,10 +204,6 @@ void Decimal128ColumnWriter::writeVector(dbcommon::Vector *vector) {
   }
 
   ColumnWriter::writeVector(vector);
-  if (vector->hasNullValue()) {
-    buf = vector->getNullBuffer()->getReverseBools();
-    notNull = const_cast<char *>(buf->data());
-  }
   std::vector<int64_t> scales(numValues, static_cast<int64_t>(scale));
 
   for (uint64_t i = 0; i < numValues; i++) {

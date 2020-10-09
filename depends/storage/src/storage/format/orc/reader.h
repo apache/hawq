@@ -637,7 +637,7 @@ class Decimal128ColumnReader : public Decimal64ColumnReader {
       }
     }
     unZigZagInt128(value);
-    scaleInt128(value, static_cast<uint32_t>(scale),
+    scaleInt128(value, static_cast<uint32_t>(currentScale),
                 static_cast<uint32_t>(currentScale));
   }
 };
