@@ -131,39 +131,39 @@ call_function_table(ARITH_OP, DECIMAL_TYPE, DECIMAL_TYPE)
 // [[[end]]]
 
   FuncEntryArray.push_back({AVG_TINYINT, "avg", DOUBLEID, {TINYINTID}});
-  FuncEntryArray.push_back({AVG_TINYINT_ACCU, "avg_tinyint_accu", AVG_DECIMAL_TRNANS_DATA_ID, {TINYINTID}, avg_int8_accu});
-  FuncEntryArray.push_back({AVG_TINYINT_AMALG, "avg_tinyint_amalg", AVG_DECIMAL_TRNANS_DATA_ID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_int8_amalg});
-  FuncEntryArray.push_back({AVG_TINYINT_AVG, "avg_tinyint_avg", DOUBLEID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_double_avg});
+  FuncEntryArray.push_back({AVG_TINYINT_ACCU, "avg_tinyint_accu", AVG_DECIMAL_TRANS_DATA_ID, {TINYINTID}, avg_int8_accu});
+  FuncEntryArray.push_back({AVG_TINYINT_AMALG, "avg_tinyint_amalg", AVG_DECIMAL_TRANS_DATA_ID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_int8_amalg});
+  FuncEntryArray.push_back({AVG_TINYINT_AVG, "avg_tinyint_avg", DOUBLEID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_double_avg});
 
   FuncEntryArray.push_back({AVG_SMALLINT, "avg", DOUBLEID, {SMALLINTID}});
-  FuncEntryArray.push_back({AVG_SMALLINT_ACCU, "avg_smallint_accu", AVG_DECIMAL_TRNANS_DATA_ID, {SMALLINTID}, avg_int16_accu});
-  FuncEntryArray.push_back({AVG_SMALLINT_AMALG, "avg_smallint_amalg", AVG_DECIMAL_TRNANS_DATA_ID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_int16_amalg});
-  FuncEntryArray.push_back({AVG_SMALLINT_AVG, "avg_smallint_avg", DOUBLEID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_double_avg});
+  FuncEntryArray.push_back({AVG_SMALLINT_ACCU, "avg_smallint_accu", AVG_DECIMAL_TRANS_DATA_ID, {SMALLINTID}, avg_int16_accu});
+  FuncEntryArray.push_back({AVG_SMALLINT_AMALG, "avg_smallint_amalg", AVG_DECIMAL_TRANS_DATA_ID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_int16_amalg});
+  FuncEntryArray.push_back({AVG_SMALLINT_AVG, "avg_smallint_avg", DOUBLEID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_double_avg});
 
   FuncEntryArray.push_back({AVG_INT, "avg", DOUBLEID, {INTID}});
-  FuncEntryArray.push_back({AVG_INT_ACCU, "avg_int_accu", AVG_DECIMAL_TRNANS_DATA_ID, {INTID}, avg_int32_accu});
-  FuncEntryArray.push_back({AVG_INT_AMALG, "avg_int_amalg", AVG_DECIMAL_TRNANS_DATA_ID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_int32_amalg});
-  FuncEntryArray.push_back({AVG_INT_AVG, "avg_int_avg", DOUBLEID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_double_avg});
+  FuncEntryArray.push_back({AVG_INT_ACCU, "avg_int_accu", AVG_DECIMAL_TRANS_DATA_ID, {INTID}, avg_int32_accu});
+  FuncEntryArray.push_back({AVG_INT_AMALG, "avg_int_amalg", AVG_DECIMAL_TRANS_DATA_ID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_int32_amalg});
+  FuncEntryArray.push_back({AVG_INT_AVG, "avg_int_avg", DOUBLEID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_double_avg});
 
   FuncEntryArray.push_back({AVG_BIGINT, "avg", DOUBLEID, {BIGINTID}});
-  FuncEntryArray.push_back({AVG_BIGINT_ACCU, "avg_bigint_accu", AVG_DECIMAL_TRNANS_DATA_ID, {BIGINTID}, avg_int64_accu});
-  FuncEntryArray.push_back({AVG_BIGINT_AMALG, "avg_bigint_amalg", AVG_DECIMAL_TRNANS_DATA_ID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_int64_amalg});
-  FuncEntryArray.push_back({AVG_BIGINT_AVG, "avg_bigint_avg", DOUBLEID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_double_avg});
+  FuncEntryArray.push_back({AVG_BIGINT_ACCU, "avg_bigint_accu", AVG_DECIMAL_TRANS_DATA_ID, {BIGINTID}, avg_int64_accu});
+  FuncEntryArray.push_back({AVG_BIGINT_AMALG, "avg_bigint_amalg", AVG_DECIMAL_TRANS_DATA_ID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_int64_amalg});
+  FuncEntryArray.push_back({AVG_BIGINT_AVG, "avg_bigint_avg", DOUBLEID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_double_avg});
 
   FuncEntryArray.push_back({AVG_FLOAT, "avg", DOUBLEID, {FLOATID}});
-  FuncEntryArray.push_back({AVG_FLOAT_ACCU, "avg_float_accu", AVG_DECIMAL_TRNANS_DATA_ID, {FLOATID}, avg_float_accu});
-  FuncEntryArray.push_back({AVG_FLOAT_AMALG, "avg_float_amalg", AVG_DECIMAL_TRNANS_DATA_ID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_float_amalg});
-  FuncEntryArray.push_back({AVG_FLOAT_AVG, "avg_float_avg", DOUBLEID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_double_avg});
+  FuncEntryArray.push_back({AVG_FLOAT_ACCU, "avg_float_accu", AVG_DECIMAL_TRANS_DATA_ID, {FLOATID}, avg_float_accu});
+  FuncEntryArray.push_back({AVG_FLOAT_AMALG, "avg_float_amalg", AVG_DECIMAL_TRANS_DATA_ID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_float_amalg});
+  FuncEntryArray.push_back({AVG_FLOAT_AVG, "avg_float_avg", DOUBLEID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_double_avg});
 
   FuncEntryArray.push_back({AVG_DOUBLE, "avg", DOUBLEID, {DOUBLEID}});
-  FuncEntryArray.push_back({AVG_DOUBLE_ACCU, "avg_double_accu", AVG_DECIMAL_TRNANS_DATA_ID, {DOUBLEID}, avg_double_accu});
-  FuncEntryArray.push_back({AVG_DOUBLE_AMALG, "avg_double_amalg", AVG_DECIMAL_TRNANS_DATA_ID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_double_amalg});
-  FuncEntryArray.push_back({AVG_DOUBLE_AVG, "avg_double_avg", DOUBLEID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_double_avg});
+  FuncEntryArray.push_back({AVG_DOUBLE_ACCU, "avg_double_accu", AVG_DECIMAL_TRANS_DATA_ID, {DOUBLEID}, avg_double_accu});
+  FuncEntryArray.push_back({AVG_DOUBLE_AMALG, "avg_double_amalg", AVG_DECIMAL_TRANS_DATA_ID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_double_amalg});
+  FuncEntryArray.push_back({AVG_DOUBLE_AVG, "avg_double_avg", DOUBLEID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_double_avg});
 
   FuncEntryArray.push_back({AVG_DECIMAL, "avg", DECIMALNEWID, {DECIMALNEWID}});
-  FuncEntryArray.push_back({AVG_DECIMAL_ACCU, "avg_decimal_accu", AVG_DECIMAL_TRNANS_DATA_ID, {DECIMALNEWID}, avg_decimal_accu});
-  FuncEntryArray.push_back({AVG_DECIMAL_AMALG, "avg_decimal_amalg", AVG_DECIMAL_TRNANS_DATA_ID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_decimal_amalg});
-  FuncEntryArray.push_back({AVG_DECIMAL_AVG, "avg_decimal_avg", DECIMALNEWID, {AVG_DECIMAL_TRNANS_DATA_ID}, avg_decimal_avg});
+  FuncEntryArray.push_back({AVG_DECIMAL_ACCU, "avg_decimal_accu", AVG_DECIMAL_TRANS_DATA_ID, {DECIMALNEWID}, avg_decimal_accu});
+  FuncEntryArray.push_back({AVG_DECIMAL_AMALG, "avg_decimal_amalg", AVG_DECIMAL_TRANS_DATA_ID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_decimal_amalg});
+  FuncEntryArray.push_back({AVG_DECIMAL_AVG, "avg_decimal_avg", DECIMALNEWID, {AVG_DECIMAL_TRANS_DATA_ID}, avg_decimal_avg});
 
   FuncEntryArray.push_back({SUM_TINYINT, "sum", BIGINTID, {TINYINTID}});
   FuncEntryArray.push_back({SUM_TINYINT_SUM, "sum_tinyint_sum", BIGINTID, {BIGINTID}, sum_int8_sum});
