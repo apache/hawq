@@ -276,14 +276,23 @@ dbcommon::TupleBatch::uptr ORCFormatReader::createTupleBatch(
         bool isDecimal =
             structBatch->fields[0]->getType() == orc::ORCTypeKind::DECIMAL;
         auto vecSum = dbcommon::Vector::BuildVector(
-            isDecimal ? dbcommon::TypeKind::DECIMALID
+            isDecimal ? dbcommon::TypeKind::DECIMALNEWID
                       : dbcommon::TypeKind::DOUBLEID,
             false);
         auto vecCount =
             dbcommon::Vector::BuildVector(dbcommon::TypeKind::BIGINTID, false);
         {
           auto b0 = structBatch->fields[0];
-          vecSum->setValue(b0->getData(), b0->numElements * b0->getWidth());
+          if (isDecimal) {
+            vecSum->setValue(b0->getData(),
+                             b0->numElements * b0->getWidth() / 3);
+            vecSum->setAuxiliaryValue(b0->getAuxiliaryData(),
+                                      b0->numElements * b0->getWidth() / 3);
+            vecSum->setScaleValue(b0->getScaleData(),
+                                  b0->numElements * b0->getWidth() / 3);
+          } else {
+            vecSum->setValue(b0->getData(), b0->numElements * b0->getWidth());
+          }
           vecSum->setHasNull(b0->hasNulls);
           if (b0->hasNulls)
             vecSum->setNotNulls(b0->getNotNull(), b0->numElements);

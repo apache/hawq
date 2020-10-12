@@ -63,7 +63,7 @@ class MagmaTidType : public FixedSizeTypeBase {
     return std::to_string(val.rowId);
   }
 
-  uint64_t getTypeWidth() const override { return kWidth; }
+  uint64_t getTypeWidth() const override { return sizeof(MagmaTid); }
 
   std::string DatumToString(const Datum &d) const override {
     LOG_ERROR(ERRCODE_FEATURE_NOT_SUPPORTED, "MagmaTid type not supported yet");

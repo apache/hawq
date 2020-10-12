@@ -170,8 +170,6 @@ Datum hdfsprotocol_blocklocation(PG_FUNCTION_ARGS)
 			      FscHdfsGetFileBlockLocationFromArray(bla, bidx);
 			  BlockLocation *bl = &(blf->locations[bidx]);
 			  bl->numOfNodes = FscHdfsGetFileBlockLocationNNodes(blo);
-			  bl->rangeId = -1;
-			  bl->replicaGroupId = -1;
 			  bl->hosts = (char **) palloc0(sizeof(char *) * bl->numOfNodes);
 			  bl->names = (char **) palloc0(sizeof(char *) * bl->numOfNodes);
 			  bl->topologyPaths = (char **) palloc0(

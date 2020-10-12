@@ -186,7 +186,9 @@ struct MagmaTid {
     return cmp(x, y) == 0;
   }
 
-  friend bool operator==(const MagmaTid &x, const int &y) { return false; }
+  friend bool operator==(const MagmaTid &x, const int &y) {
+    return false;
+  }
 
   friend bool operator!=(const MagmaTid &x, const MagmaTid &y) {
     return cmp(x, y) != 0;
@@ -213,7 +215,7 @@ struct MagmaTid {
       return x.rangeId < y.rangeId ? -1 : 1;
     }
   }
-};
+};  // namespace dbcommon
 
 /**
  * A structure to represent a scalar value

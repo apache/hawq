@@ -205,7 +205,7 @@ std::unique_ptr<orc::Type> ORCFormatWriter::buildSchema(
         break;
       case dbcommon::TypeKind::AVG_DECIMAL_TRANS_DATA_ID:
         child.reset(new orc::TypeImpl(orc::ORCTypeKind::STRUCT));
-        grandchild.reset(new orc::TypeImpl(orc::ORCTypeKind::DECIMAL));
+        grandchild.reset(new orc::TypeImpl(orc::ORCTypeKind::DECIMAL, 38, 2));
         child->addStructField(name, std::move(grandchild));
         grandchild.reset(new orc::TypeImpl(orc::ORCTypeKind::LONG));
         child->addStructField(name, std::move(grandchild));

@@ -157,6 +157,7 @@ class VariableSizeTypeVector : public Vector {
                            ? getValPtrPlain(end)
                            : getValPtrPlain(end - 1) + getLengths()[end - 1];
     uint64_t valSz = static_cast<uint64_t>(pEnd - pStart);
+
     if (values.data()) {
       ret->setValue(pStart, valSz);
     }
