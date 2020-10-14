@@ -425,6 +425,10 @@ static void decimalGetValueBuffer(dbcommon::DecimalVector *srcVector,
                                                DEC_DIGITS -
                                            1
                                      : -1;
+
+    // In particular, if the value is zero, there will be no digits at all
+    if (significantDigitCount == 0) totalDigitCount = 0;
+
     numeric.varlen =
         NUMERIC_HDRSZ +
         ((totalDigitCount + DEC_DIGITS - 1) / DEC_DIGITS) * sizeof(int16_t);
