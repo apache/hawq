@@ -18,6 +18,7 @@
  */
 
 #include <cmath>
+#include <fstream>
 
 //#include <boost/lexical_cast.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
@@ -317,6 +318,24 @@ Datum TypeCast::castDecimalToFloatType(Datum *params, uint64_t size) {
 }
 
 template <typename TP>
+inline DecimalVar floatToDecimal(TP in) {
+  int64_t scale = 0;
+  while (true) {
+    if (scale >= 13) {
+      break;
+    }
+    if (abs(in - static_cast<int64_t>(in)) > 1e-8) {
+      in *= 10.0;
+      ++scale;
+    } else {
+      break;
+    }
+  }
+  Int128 int128 = static_cast<int64_t>(in);
+  return DecimalVar(int128.getHighBits(), int128.getLowBits(), scale);
+}
+
+template <typename TP>
 Datum TypeCast::castFloatTypeToDecimal(Datum *params, uint64_t size) {
   assert(size == 2 && "invalid input");
   Object *para = DatumGetValue<Object *>(params[1]);
@@ -332,7 +351,7 @@ Datum TypeCast::castFloatTypeToDecimal(Datum *params, uint64_t size) {
       DecimalVar *ret = retScalar->allocateValue<DecimalVar>();
 
       TP val = DatumGetValue<TP>(srcScalar->value);
-      *ret = DecimalType::fromString(boost::lexical_cast<std::string>(val));
+      *ret = floatToDecimal(val);
     }
     return CreateDatum(retScalar);
   } else {
@@ -351,12 +370,57 @@ bool isDecimalOverflow(std::string val) {
   return false;
 }
 
+template <int64_t n>
+constexpr uint64_t res2() {
+  return 2 * res2<n - 1>();
+}
+
+template <>
+constexpr uint64_t res2<1>() {
+  return 2;
+}
+
+template <typename TR>
+inline TR decimalToFloat(int64_t highbits, uint64_t lowbits, int64_t scale) {
+  TR exp[] = {
+      1.0,
+      10.0,
+      100.0,
+      1000.0,
+      10000.0,
+      100000.0,
+      1000000.0,
+      10000000.0,
+      100000000.0,
+      1000000000.0,
+      10000000000.0,
+      100000000000.0,
+      1000000000000.0,
+      10000000000000.0,
+      100000000000000.0,
+      1000000000000000.0,
+      10000000000000000.0,
+      100000000000000000.0,
+      1000000000000000000.0,
+      10000000000000000000.0,
+      100000000000000000000.0,
+  };
+  Int128 int128(highbits, lowbits);
+  int128.abs();
+  TR fval =
+      static_cast<TR>(int128.getHighBits()) * static_cast<TR>(res2<64>()) +
+      static_cast<TR>(int128.getLowBits());
+  if (scale <= 20)
+    fval /= exp[scale];
+  else
+    for (int32_t i = 0; i < scale; ++i) fval /= 10.0;
+  return highbits < 0 ? -fval : fval;
+}
+
 template <typename TR>
 Datum TypeCast::valCastDecimalToFloatType(DecimalVar *param) {
-  std::string strVal = dbcommon::DecimalType::toString(
-      param->highbits, param->lowbits, param->scale);
-  double fval = stod(strVal);
-  return CreateDatum(static_cast<TR>(fval));
+  return CreateDatum(static_cast<TR>(
+      decimalToFloat<TR>(param->highbits, param->lowbits, param->scale)));
 }
 
 template <typename TR>
@@ -393,19 +457,15 @@ Datum TypeCast::vecCastDecimalToFloatType(Vector *rvec, Vector *vec) {
         if (rnull[index]) {
           rdata[index] = 0;
         } else {
-          std::string strVecVal =
-              DecimalType::toString(hval[index], lval[index], sval[index]);
-          double fval = stod(strVecVal);
-          rdata[index] = static_cast<TR>(fval);
+          rdata[index] =
+              decimalToFloat<TR>(hval[index], lval[index], sval[index]);
         }
       }
     } else {
       for (uint64_t i = 0; i < sz; ++i) {
         auto index = (*sel)[i];
-        std::string strVecVal =
-            DecimalType::toString(hval[index], lval[index], sval[index]);
-        double fval = stod(strVecVal);
-        rdata[index] = static_cast<TR>(fval);
+        rdata[index] =
+            decimalToFloat<TR>(hval[index], lval[index], sval[index]);
       }
     }
   } else {
@@ -416,18 +476,12 @@ Datum TypeCast::vecCastDecimalToFloatType(Vector *rvec, Vector *vec) {
         if (rnull[i]) {
           rdata[i] = 0;
         } else {
-          std::string strVecVal =
-              DecimalType::toString(hval[i], lval[i], sval[i]);
-          double fval = stod(strVecVal);
-          rdata[i] = static_cast<TR>(fval);
+          rdata[i] = decimalToFloat<TR>(hval[i], lval[i], sval[i]);
         }
       }
     } else {
       for (uint64_t i = 0; i < sz; ++i) {
-        std::string strVecVal =
-            DecimalType::toString(hval[i], lval[i], sval[i]);
-        double fval = stod(strVecVal);
-        rdata[i] = static_cast<TR>(fval);
+        rdata[i] = decimalToFloat<TR>(hval[i], lval[i], sval[i]);
       }
     }
   }
@@ -472,21 +526,19 @@ Datum TypeCast::vecCastFloatTypeToDecimal(Vector *rvec, Vector *vec) {
         auto index = (*sel)[i];
         rnull[index] = nulls[index];
         if (!rnull[index]) {
-          snprintf(buffer, sizeof(buffer), "%.*g", DBL_DIG, v[index]);
-          DecimalVar decVal = DecimalType::fromString(buffer);
-          rLowbit[index] = decVal.lowbits;
-          rHighbit[index] = decVal.highbits;
-          rScales[index] = decVal.scale;
+          DecimalVar decValtmp = floatToDecimal(v[index]);
+          rLowbit[index] = decValtmp.lowbits;
+          rHighbit[index] = decValtmp.highbits;
+          rScales[index] = decValtmp.scale;
         }
       }
     } else {
       for (uint64_t i = 0; i < sz; ++i) {
         auto index = (*sel)[i];
-        snprintf(buffer, sizeof(buffer), "%.*g", DBL_DIG, v[index]);
-        DecimalVar decVal = DecimalType::fromString(buffer);
-        rLowbit[index] = decVal.lowbits;
-        rHighbit[index] = decVal.highbits;
-        rScales[index] = decVal.scale;
+        DecimalVar decValtmp = floatToDecimal(v[index]);
+        rLowbit[index] = decValtmp.lowbits;
+        rHighbit[index] = decValtmp.highbits;
+        rScales[index] = decValtmp.scale;
       }
     }
   } else {
@@ -495,20 +547,18 @@ Datum TypeCast::vecCastFloatTypeToDecimal(Vector *rvec, Vector *vec) {
       for (uint64_t i = 0; i < sz; ++i) {
         rnull[i] = nulls[i];
         if (!rnull[i]) {
-          snprintf(buffer, sizeof(buffer), "%.*g", DBL_DIG, v[i]);
-          DecimalVar decVal = DecimalType::fromString(buffer);
-          rLowbit[i] = decVal.lowbits;
-          rHighbit[i] = decVal.highbits;
-          rScales[i] = decVal.scale;
+          DecimalVar decValtmp = floatToDecimal(v[i]);
+          rLowbit[i] = decValtmp.lowbits;
+          rHighbit[i] = decValtmp.highbits;
+          rScales[i] = decValtmp.scale;
         }
       }
     } else {
       for (uint64_t i = 0; i < sz; ++i) {
-        snprintf(buffer, sizeof(buffer), "%.*g", DBL_DIG, v[i]);
-        DecimalVar decVal = DecimalType::fromString(buffer);
-        rLowbit[i] = decVal.lowbits;
-        rHighbit[i] = decVal.highbits;
-        rScales[i] = decVal.scale;
+        DecimalVar decValtmp = floatToDecimal(v[i]);
+        rLowbit[i] = decValtmp.lowbits;
+        rHighbit[i] = decValtmp.highbits;
+        rScales[i] = decValtmp.scale;
       }
     }
   }
