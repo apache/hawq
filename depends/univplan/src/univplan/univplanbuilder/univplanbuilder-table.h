@@ -47,6 +47,10 @@ class UnivPlanBuilderTable {
     ref->set_location(location);
   }
 
+  void setTargetName(const std::string &targetName) {
+    ref->set_targetname(targetName);
+  }
+
   void setTableOptionsInJson(const std::string &optStr) {
     ref->set_tableoptionsinjson(optStr);
   }

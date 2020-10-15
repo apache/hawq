@@ -497,7 +497,7 @@ void UnivPlanProtoUtility::constructRangeTable() {
 
   univPlanRangeTblEntryAddTable(univplan, 2, UnivPlanOrcFormat, location,
                                 fmtOptsJson, columnNum, columnName.get(),
-                                columnDataType, columnDataTypeMod);
+                                columnDataType, columnDataTypeMod, nullptr);
 }
 
 void UnivPlanProtoUtility::constructReceiver() {

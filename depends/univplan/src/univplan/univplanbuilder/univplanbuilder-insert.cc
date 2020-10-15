@@ -47,4 +47,23 @@ void UnivPlanBuilderInsert::from(const UnivPlanPlanNodePoly &node) {
 
 void UnivPlanBuilderInsert::setInsertRelId(uint32_t id) { ref->set_relid(id); }
 
+void UnivPlanBuilderInsert::setInsertHasher(
+    int32_t nDistKeyIndex, int16_t *distKeyIndex, int32_t nRanges,
+    uint32_t *rangeToRgMap, int16_t nRg, uint16_t *rgIds, const char **rgUrls) {
+  for (int32_t i = 0; i < nDistKeyIndex; i++) {
+    if (distKeyIndex[i] > 0) {
+      ref->mutable_hasher()->mutable_hashkeys()->Add(distKeyIndex[i]);
+    }
+  }
+  if (ref->mutable_hasher()->mutable_hashkeys()->size() == 0) {
+    ref->mutable_hasher()->mutable_hashkeys()->Add(1);
+  }
+  for (int i = 0; i < nRanges; i++) {
+    (*ref->mutable_hasher()->mutable_range2rg())[i] = rangeToRgMap[i];
+  }
+  for (int16_t i = 0; i < nRg; i++) {
+    (*ref->mutable_hasher()->mutable_r2u())[rgIds[i]] = rgUrls[i];
+  }
+}
+
 }  // namespace univplan

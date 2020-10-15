@@ -54,9 +54,11 @@ enum UNIVPLANFORMATTYPE {
 //
 
 message UnivPlanTable {
-	required int64					    tableId = 1;
-	required UNIVPLANFORMATTYPE	format = 2;
-	required string					    location = 3;
-	required bytes					    tableOptionsInJson = 4;
-	repeated UnivPlanColumn 		columns = 5;
+	required int64                 tableId = 1;
+	required UNIVPLANFORMATTYPE    format = 2;
+	required string                location = 3;
+	required bytes                 tableOptionsInJson = 4;
+	repeated UnivPlanColumn        columns = 5;
+	// for magma insert
+	optional string                targetName = 6;
 }

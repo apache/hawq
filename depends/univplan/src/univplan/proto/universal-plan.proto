@@ -299,9 +299,18 @@ message UnivPlanUnique {
   repeated int32               uniqColIdxs = 2;
 }
 
+message UnivPlanMagmaHashInfo {
+  // hash info
+  repeated uint64     hashKeys = 1;
+  map<int32, uint32>  range2rg = 2;
+  map<uint32, string>      r2u = 3;
+}
+
 message UnivPlanInsert {
   required UnivPlanPlanNode    super = 1;
   required uint32 relId = 2;
+  // for magma insert hash
+  optional UnivPlanMagmaHashInfo hasher = 3;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

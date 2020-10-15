@@ -35,6 +35,7 @@
 #include "univplan/common/plannode-util.h"
 #include "univplan/common/stagize.h"
 #include "univplan/common/var-util.h"
+#include "univplan/univplanbuilder/univplanbuilder-connector.h"
 #include "univplan/univplanbuilder/univplanbuilder-expr-tree.h"
 #include "univplan/univplanbuilder/univplanbuilder-plan.h"
 #include "univplan/univplanbuilder/univplanbuilder-table.h"
@@ -93,7 +94,8 @@ void univPlanRangeTblEntryAddTable(UnivPlanC *up, uint64_t tid,
                                    const char *optStrInJson, uint32_t columnNum,
                                    const char **columnName,
                                    int32_t *columnDataType,
-                                   int64_t *columnDataTypeMod) {
+                                   int64_t *columnDataTypeMod,
+                                   const char *targetName) {
   univplan::UnivPlanBuilderPlan *bld = up->upb->getPlanBuilderPlan();
   univplan::UnivPlanBuilderRangeTblEntry::uptr rte =
       bld->addRangeTblEntryAndGetBuilder();
@@ -113,6 +115,7 @@ void univPlanRangeTblEntryAddTable(UnivPlanC *up, uint64_t tid,
       break;
     case FormatType::UnivPlanMagmaFormat:
       fmtType = univplan::MAGMA_FORMAT;
+      table->setTargetName(targetName);
       break;
     default:
       LOG_ERROR(ERRCODE_INTERNAL_ERROR,
@@ -671,6 +674,15 @@ int32_t univPlanInsertNewInstance(UnivPlanC *up, int32_t pid) {
 void univPlanInsertSetRelId(UnivPlanC *up, uint32_t relId) {
   dynamic_cast<univplan::UnivPlanBuilderInsert *>(up->curNode.get())
       ->setInsertRelId(relId);
+}
+
+void univPlanInsertSetHasher(UnivPlanC *up, int32_t nDistKeyIndex,
+                             int16_t *distKeyIndex, int32_t nRanges,
+                             uint32_t *rangeToRgMap, int16_t nRg,
+                             uint16_t *rgIds, const char **rgUrls) {
+  dynamic_cast<univplan::UnivPlanBuilderInsert *>(up->curNode.get())
+      ->setInsertHasher(nDistKeyIndex, distKeyIndex, nRanges, rangeToRgMap, nRg,
+                        rgIds, rgUrls);
 }
 
 void univPlanAddToPlanNode(UnivPlanC *up, bool isLeft) {

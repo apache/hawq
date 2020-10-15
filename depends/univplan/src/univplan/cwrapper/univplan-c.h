@@ -70,7 +70,8 @@ void univPlanRangeTblEntryAddTable(UnivPlanC *up, uint64_t tid,
                                    const char *optStrInJson, uint32_t columnNum,
                                    const char **columnName,
                                    int32_t *columnDataType,
-                                   int64_t *columnDataTypeMod);
+                                   int64_t *columnDataTypeMod,
+                                   const char *targetName);
 void univPlanRangeTblEntryAddDummy(UnivPlanC *up);
 
 // construct interconnect info
@@ -239,6 +240,11 @@ void univPlanUniqueSetNumGroupsAndUniqColIdxs(UnivPlanC *up, int64_t numCols,
 // construct Insert
 int32_t univPlanInsertNewInstance(UnivPlanC *up, int32_t pid);
 void univPlanInsertSetRelId(UnivPlanC *up, uint32_t relId);
+// set magma table hasher when insert
+void univPlanInsertSetHasher(UnivPlanC *up, int32_t nDistKeyIndex,
+                             int16_t *distKeyIndex, int32_t nRanges,
+                             uint32_t *rangeToRgMap, int16_t nRg,
+                             uint16_t *rgIds, const char **rgUrls);
 
 void univPlanAddToPlanNode(UnivPlanC *up, bool isLeft);
 

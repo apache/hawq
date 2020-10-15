@@ -201,6 +201,11 @@ class Format {
   void setUserCommand(std::string command) { userCommand = command; }
   virtual void setCancelled() {}
 
+  virtual void setupHasher(
+      const dbcommon::TupleDesc &td, const std::vector<uint64_t> &hashKeys,
+      const std::unordered_map<uint16_t, uint32_t> &r2rg,
+      const std::unordered_map<uint16_t, std::string> &r2u) {}
+
   static std::unique_ptr<Format> createFormat(
       univplan::UNIVPLANFORMATTYPE type);
   static std::unique_ptr<Format> createFormat(univplan::UNIVPLANFORMATTYPE type,

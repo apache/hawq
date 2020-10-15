@@ -38,6 +38,10 @@ class UnivPlanBuilderInsert : public UnivPlanBuilderNode {
 
   void setInsertRelId(uint32_t id);
 
+  void setInsertHasher(int32_t nDistKeyIndex, int16_t *distKeyIndex,
+                       int32_t nRanges, uint32_t *rangeToRgMap, int16_t nRg,
+                       uint16_t *rgIds, const char **rgUrls);
+
  private:
   UnivPlanInsert *ref;
   std::unique_ptr<UnivPlanInsert> planNode;
