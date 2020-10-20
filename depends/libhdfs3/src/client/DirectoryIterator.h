@@ -45,6 +45,7 @@ private:
 
 private:
     bool needLocations;
+    bool hasMore;
     Hdfs::Internal::FileSystemImpl * filesystem;
     size_t next;
     std::string path;

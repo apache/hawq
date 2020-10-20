@@ -28,17 +28,17 @@
 namespace Hdfs {
 
 DirectoryIterator::DirectoryIterator() :
-    needLocations(false), filesystem(NULL), next(0) {
+    needLocations(false), hasMore(true), filesystem(NULL), next(0) {
 }
 
 DirectoryIterator::DirectoryIterator(Hdfs::Internal::FileSystemImpl * const fs,
                                      std::string path, bool needLocations) :
-    needLocations(needLocations), filesystem(fs), next(0), path(path) {
+    needLocations(needLocations), hasMore(true), filesystem(fs), next(0), path(path) {
 }
 
 DirectoryIterator::DirectoryIterator(const DirectoryIterator & it) :
-    needLocations(it.needLocations), filesystem(it.filesystem), next(it.next), path(it.path), startAfter(
-        it.startAfter), lists(it.lists) {
+    needLocations(it.needLocations), hasMore(it.hasMore), filesystem(it.filesystem),
+    next(it.next), path(it.path), startAfter(it.startAfter), lists(it.lists) {
 }
 
 DirectoryIterator & DirectoryIterator::operator =(const DirectoryIterator & it) {
@@ -47,6 +47,7 @@ DirectoryIterator & DirectoryIterator::operator =(const DirectoryIterator & it) 
     }
 
     needLocations = it.needLocations;
+    hasMore = it.hasMore;
     filesystem = it.filesystem;
     next = it.next;
     path = it.path;
@@ -56,36 +57,33 @@ DirectoryIterator & DirectoryIterator::operator =(const DirectoryIterator & it) 
 }
 
 bool DirectoryIterator::getListing() {
-    bool more;
-
-    if (NULL == filesystem) {
+    if (NULL == filesystem || !hasMore) {
         return false;
     }
 
     next = 0;
     lists.clear();
-    more = filesystem->getListing(path, startAfter, needLocations, lists);
 
-    if (!lists.empty()) {
+    hasMore = filesystem->getListing(path, startAfter, needLocations, lists);
+
+    if (hasMore && !lists.empty()) {
         startAfter = lists.back().getPath();
     }
 
-    return more || !lists.empty();
+    return !lists.empty();
 }
 
 bool DirectoryIterator::hasNext() {
-    if (next >= lists.size()) {
-        return getListing();
+    if (next < lists.size()) {
+        return true;
     }
 
-    return true;
+    return getListing();
 }
 
 Hdfs::FileStatus DirectoryIterator::getNext() {
-    if (next >= lists.size()) {
-        if (!getListing()) {
-            THROW(HdfsIOException, "End of the dir flow");
-        }
+    if (!hasNext()) {
+        THROW(HdfsIOException, "End of the dir flow");
     }
 
     return lists[next++];
