@@ -89,12 +89,12 @@ TEST(TestJoinTupleBuffer, TestInnerJoin) {
           tmp.second->toString());
       EXPECT_EQ(6, num);
     }
-    EXPECT_DOUBLE_EQ(DEFAULT_SIZE_PER_HASHKEY_BLK +
-                         DEFAULT_SIZE_PER_HASHJOIN_BLK +
-                         DEFAULT_NUMBER_TUPLES_PER_BATCH *
-                             (4 + DEFAULT_RESERVED_SIZE_OF_STRING) +
-                         DEFAULT_SIZE_PER_HASH_CHAIN_BLK * 2,
-                     hashtable.getMemUsed());
+    EXPECT_GE(DEFAULT_SIZE_PER_HASHKEY_BLK + DEFAULT_SIZE_PER_HASHJOIN_BLK +
+                  DEFAULT_NUMBER_TUPLES_PER_BATCH *
+                      (4 + DEFAULT_RESERVED_SIZE_OF_STRING) +
+                  DEFAULT_SIZE_PER_HASH_CHAIN_BLK * 2,
+              hashtable.getMemUsed());
+
   }
 
   {

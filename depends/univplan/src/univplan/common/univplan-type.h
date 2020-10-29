@@ -41,6 +41,7 @@ class UnivPlanScanFileSplitList {
   UnivPlanScanFileSplitList() : splitsTb_(nullptr) {}
   explicit UnivPlanScanFileSplitList(dbcommon::TupleBatch *tb)
       : splitsTb_(tb) {}
+  virtual ~UnivPlanScanFileSplitList() {}
 
   void setSplitsTb(dbcommon::TupleBatch *tb) { splitsTb_ = tb; }
   uint32_t splits_size() const {
@@ -123,6 +124,8 @@ class UnivPlanScanFileSplitList {
 class UnivPlanScanFileSplitListTb : public UnivPlanScanFileSplitList {
  public:
   UnivPlanScanFileSplitListTb() : UnivPlanScanFileSplitList(nullptr) {}
+  virtual ~UnivPlanScanFileSplitListTb() {}
+
   explicit UnivPlanScanFileSplitListTb(dbcommon::TupleBatch::uptr tb)
       : UnivPlanScanFileSplitList(tb.get()) {
     splitsTbInst_ = std::move(tb);

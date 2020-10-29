@@ -140,7 +140,12 @@ class BlockMemBuf {
     currentMemBlkBorder_ = nullptr;
   }
 
-  double getMemUsed() { return MEMBLKSIZE * memBlkList_.size(); }
+  double getMemUsed() {
+    return memBlkList_.empty()
+               ? 0
+               : (MEMBLKSIZE * (memBlkList_.size() - 1) +
+                  (currentMemBlkPtr_ - memBlkList_.back().get()));
+  }
 
  private:
   void allocNewMemBlk() {

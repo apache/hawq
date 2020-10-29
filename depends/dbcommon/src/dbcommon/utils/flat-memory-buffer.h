@@ -189,7 +189,7 @@ class FlatMemBuf {
 
   static const uint64_t BlkSize = MEMBLKSIZE / sizeof(TYPE);
 
-  double getMemUsed() { return MEMBLKSIZE * memBlkList.size(); }
+  double getMemUsed() { return sizeof(TYPE) * size(); }
 
  private:
   // the maximum number of the elements that contained in a memory block

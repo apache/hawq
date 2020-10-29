@@ -77,6 +77,7 @@ std::string FormatErrorString(const char *fmt, ...)
 #define LOG_INFO(...) COMPACT_LOG_INFO(__VA_ARGS__)
 #define LOG_WARNING(...) COMPACT_LOG_WARNING(__VA_ARGS__)
 #define LOG_ERROR(errCode, ...) COMPACT_LOG_ERROR(errCode, __VA_ARGS__)
+#define LOG_BACKSTRACE(...) COMPACT_LOG_BACKSTRACE(__VA_ARGS__)
 #define LOG_NOT_RETRY_ERROR(errCode, ...) \
   COMPACT_LOG_NOT_RETRY_ERROR(errCode, __VA_ARGS__)
 #define LOG_FATAL(errCode, ...) COMPACT_LOG_FATAL(errCode, __VA_ARGS__)
@@ -98,6 +99,14 @@ std::string FormatErrorString(const char *fmt, ...)
         << __msg << "\n"                                                     \
         << dbcommon::PrintStack(0, STACK_DEPTH);                             \
     throw dbcommon::TransactionAbortException(__msg, errCode, true);         \
+  } while (0)
+
+#define COMPACT_LOG_BACKSTRACE(...)                               \
+  do {                                                            \
+    std::string __msg = dbcommon::FormatErrorString(__VA_ARGS__); \
+    COMPACT_GOOGLE_LOG_ERROR.stream()                             \
+        << dbcommon::PrintStack(0, STACK_DEPTH)                   \
+        << dbcommon::getThreadIdentifier() << __msg;              \
   } while (0)
 
 #define COMPACT_LOG_NOT_RETRY_ERROR(errCode, ...)                            \

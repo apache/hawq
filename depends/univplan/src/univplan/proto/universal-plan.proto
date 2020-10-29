@@ -419,6 +419,6 @@ message UnivPlanPlan {
   repeated UnivPlanTokenEntry tokenMap = 10;
   optional bytes snapshot = 11;
   map<string, string> guc = 12;
-  map<string, string> commonValue = 13;
+  map<string, bytes> commonValue = 13;
   optional UNIVPLANCMDTYPE cmdType = 14 [default = CMD_SELECT];
 }

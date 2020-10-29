@@ -178,7 +178,7 @@ TEST_F(TestHashTable, TestResize) {
     batch->incNumOfRows(DEFAULT_NUMBER_TUPLES_PER_BATCH);
     std::vector<uint64_t> ret = hashTable->insert(batch.get());
     EXPECT_EQ(ans, ret);
-    EXPECT_LE(
+    EXPECT_GE(
         DEFAULT_SIZE_PER_HASHKEY_BLK + DEFAULT_SIZE_PER_HASH_CHAIN_BLK * 2,
         hashTable->getMemUsed());
   }
@@ -198,7 +198,7 @@ TEST_F(TestHashTable, TestResize) {
     EXPECT_EQ(ans, ret);
     ret = hashTable->insert(batch.get());
     EXPECT_EQ(ans, ret);
-    EXPECT_LE(
+    EXPECT_GE(
         DEFAULT_SIZE_PER_HASHKEY_BLK + DEFAULT_SIZE_PER_HASH_CHAIN_BLK * 2,
         hashTable->getMemUsed());
   }
