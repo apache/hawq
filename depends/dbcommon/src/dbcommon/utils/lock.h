@@ -22,32 +22,33 @@
 
 #include <cassert>
 #include <condition_variable>  // NOLINT
-#include <deque>
+#include <list>
 #include <mutex>  // NOLINT
 #include <set>
 #include <string>
 #include <thread>  // NOLINT
 #include <unordered_map>
+#include <utility>
 
 namespace dbcommon {
 enum LockMode { EXCLUSIVELOCK, SHAREDLOCK };
 
 class LockState {
  public:
-  bool hasExclusive;
-  uint32_t sharedCount;
-  std::deque<std::thread::id> waiters;  // thread id
-  std::set<std::thread::id> holders;  // one thread only can has one shared lock
-  std::mutex stateMutex;
-  std::condition_variable stateCondition;
+   bool hasExclusive;
+   // <threadId, bool>, when true means this thread wait to acquire exclusive
+   // lock and acquire shared lock when false
+   std::list<std::pair<std::thread::id, bool>> waiters;
+   std::set<std::thread::id> holders;  // one thread only can has one shared lock
+   std::mutex stateMutex;
+   std::condition_variable stateCondition;
 
-  LockState &operator=(const LockState &L) {
-    hasExclusive = L.hasExclusive;
-    sharedCount = L.sharedCount;
-    waiters = L.waiters;
-    holders = L.holders;
-    return *this;
-  }
+   LockState &operator=(const LockState &L) {
+     hasExclusive = L.hasExclusive;
+     waiters = L.waiters;
+     holders = L.holders;
+     return *this;
+   }
 };
 
 // LockManager lm;
@@ -87,6 +88,10 @@ class Lock {
 
   void setLockState(LockState *state) { lockState = state; }
   void setLockManager(LockManager *mgr) { lockMgr = mgr; }
+
+ private:
+  bool tryAcquire(LockMode mode);
+  void wakeUp();
 
  private:
   const std::string &lockName;
