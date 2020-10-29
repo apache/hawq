@@ -32,7 +32,7 @@ TEST_F(AggFuncTest, has_no_group_by_count_star) {
     std::vector<int64_t> initAggGrpVals = {3};
     std::unique_ptr<AggGroupValues> grpValsBase =
         generateAggGroupValues<int64_t>(initAggGrpVals, false, false);
-    std::vector<uint64_t> hashGroups = {0, 1};
+    std::vector<uint64_t> hashGroups = {0, 0};
 
     params[0] = CreateDatum<AggGroupValues *>(grpValsBase.get());
     params[2] = CreateDatum<const std::vector<uint64_t> *>(&hashGroups);
@@ -482,14 +482,14 @@ void AggFuncTest::testMinMaxHasNoGroupBy(func_type testFunc, bool testMin) {
     std::unique_ptr<Vector> vec;
     {  // without vec but with scalar
       std::unique_ptr<Scalar> scalar = generateScalar<T>(TK, 1);
-      std::vector<uint64_t> hashGroups = {0, 0, 1, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0, 0, 0};
       grpVals = generateAggGroupValues<T>(initGrpVals, false, true);
       callFuncScalar(testFunc, grpVals.get(), &hashGroups, true, scalar.get());
       checkAcc<T>({1}, grpVals.get());
     }
     {
       LOG_INFO("Testing with seleletList");
-      std::vector<uint64_t> hashGroups = {0, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0};
       SelectList sel = {0, 3, 4};
       grpVals = generateAggGroupValues<T>(initGrpVals, false, true);
       LOG_INFO("Testing has nulls");
@@ -520,7 +520,7 @@ void AggFuncTest::testMinMaxHasNoGroupBy(func_type testFunc, bool testMin) {
     {
       LOG_INFO("Testing without seleletList");
       grpVals = generateAggGroupValues<T>(initGrpVals, false, true);
-      std::vector<uint64_t> hashGroups = {0, 0, 1, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0, 0, 0};
 
       LOG_INFO("Testing has nulls");
       vec = VectorUtility::generateSelectVector<T>(TK, vals, &nulls, nullptr);
@@ -592,14 +592,14 @@ void AggFuncTest::testMinMaxHasNoGroupBy<std::string, STRINGID>(
     {  // without vec but with scalar
       LOG_INFO("Testing scalar");
       std::unique_ptr<Scalar> scalar = generateScalar<T>("1");
-      std::vector<uint64_t> hashGroups = {0, 0, 1, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0, 0, 0};
       grpVals = generateAggGroupValues<T>(initGrpVals, false, true);
       callFuncScalar(testFunc, grpVals.get(), &hashGroups, true, scalar.get());
       checkAccOnString({"1"}, grpVals.get());
     }
     {
       LOG_INFO("Testing with seleletList");
-      std::vector<uint64_t> hashGroups = {0, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0};
       SelectList sel = {0, 3, 4};
       grpVals = generateAggGroupValues<T>(initGrpVals, false, true);
       LOG_INFO("Testing has nulls");
@@ -633,7 +633,7 @@ void AggFuncTest::testMinMaxHasNoGroupBy<std::string, STRINGID>(
     {
       LOG_INFO("Testing without seleletList");
       grpVals = generateAggGroupValues<T>(initGrpVals, false, true);
-      std::vector<uint64_t> hashGroups = {0, 0, 1, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0, 0, 0};
 
       LOG_INFO("Testing has nulls");
       vec = VectorUtility::generateSelectVector<T>(STRINGID, vals, &nulls,
@@ -685,14 +685,14 @@ void AggFuncTest::testMinMaxHasNoGroupBy<Timestamp, TIMESTAMPID>(
       Timestamp tsScalar;
       std::unique_ptr<Scalar> scalar =
           generateScalar<T>("2018-01-19 19:52:00", &tsScalar);
-      std::vector<uint64_t> hashGroups = {0, 0, 1, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0, 0, 0};
       grpVals = generateAggGroupValues<T>(initGrpValStrs, initGrpVals, true);
       callFuncScalar(testFunc, grpVals.get(), &hashGroups, true, scalar.get());
       checkAccOnTimestamp({{1516391520, 0}}, grpVals.get());
     }
     {
       LOG_INFO("Testing with selectList");
-      std::vector<uint64_t> hashGroups = {0, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0};
       SelectList sel = {0, 3, 4};
       grpVals = generateAggGroupValues<T>(initGrpValStrs, initGrpVals, true);
       LOG_INFO("Testing has nulls");
@@ -726,7 +726,7 @@ void AggFuncTest::testMinMaxHasNoGroupBy<Timestamp, TIMESTAMPID>(
     {
       LOG_INFO("Testing without selectList");
       grpVals = generateAggGroupValues<T>(initGrpValStrs, initGrpVals, true);
-      std::vector<uint64_t> hashGroups = {0, 0, 1, 1, 1};
+      std::vector<uint64_t> hashGroups = {0, 0, 0, 0, 0};
 
       LOG_INFO("Testing has nulls");
       vec = VectorUtility::generateSelectTimestampVector(

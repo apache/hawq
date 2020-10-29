@@ -107,9 +107,9 @@ class AggFuncTest : public ::testing::Test {
   std::unique_ptr<AggGroupValues> generateAggGroupValues(
       const std::vector<std::string> &vect, bool isAvg, bool isNotCountStar) {
     std::unique_ptr<AggGroupValues> ret(new AggStringGroupValues);
+    ret->resize(vect.size());
     auto grps = reinterpret_cast<AggStringGroupValues *>(ret.get());
     auto accessor = grps->getAccessor<AggStringGroupValues ::Accessor>();
-    ret->resize(vect.size());
     for (int i = 0; i < vect.size(); i++) {
       auto val = accessor.at(i);
       if (!isNotCountStar)
@@ -125,9 +125,9 @@ class AggFuncTest : public ::testing::Test {
       std::vector<Timestamp> &vect,             // NOLINT
       bool isNotCountStar) {
     std::unique_ptr<AggGroupValues> ret(new AggTimestampGroupValues);
+    ret->resize(vect.size());
     auto grps = reinterpret_cast<AggTimestampGroupValues *>(ret.get());
     auto accessor = grps->getAccessor<AggTimestampGroupValues::Accessor>();
-    ret->resize(vect.size());
     for (int i = 0; i < vect.size(); i++) {
       Datum d = CreateDatum(vectStr[i].c_str(), &vect[i], TIMESTAMPID);
       auto val = accessor.at(i);
@@ -165,6 +165,7 @@ class AggFuncTest : public ::testing::Test {
       auto grpVals = reinterpret_cast<AggGroupValues *>(grpValsBase);
       auto accessor = grpVals->getAccessor<AggGroupValues::Accessor>();
       DecimalType t;
+      EXPECT_EQ(expected.size(), grpVals->size());
       for (int64_t i = 0; i < expected.size(); i++) {
         EXPECT_EQ(expected[i],
                   std::stod(t.toString(accessor.at(i)->accVal.value)));
@@ -174,6 +175,7 @@ class AggFuncTest : public ::testing::Test {
 
     auto grpVals = reinterpret_cast<AggPrimitiveGroupValues *>(grpValsBase);
     auto accessor = grpVals->getAccessor<AggPrimitiveGroupValues::Accessor>();
+    EXPECT_EQ(expected.size(), grpVals->size());
     for (int64_t i = 0; i < expected.size(); i++) {
       EXPECT_EQ(expected[i], DatumGetValue<T>(accessor.at(i)->accVal.value));
     }
@@ -208,6 +210,7 @@ class AggFuncTest : public ::testing::Test {
       using AggGroupValues = AggDecimalGroupValues;
       auto grpVals = reinterpret_cast<AggGroupValues *>(grpValsBase);
       auto accessor = grpVals->getAccessor<AggGroupValues::Accessor>();
+      EXPECT_EQ(expected.size(), grpVals->size());
       for (int64_t i = 0; i < expected.size(); i++) {
         if (expected[i].count)
           EXPECT_EQ(expected[i].sum,
@@ -218,6 +221,7 @@ class AggFuncTest : public ::testing::Test {
     }
     auto grpVals = reinterpret_cast<AggPrimitiveGroupValues *>(grpValsBase);
     auto accessor = grpVals->getAccessor<AggPrimitiveGroupValues::Accessor>();
+    EXPECT_EQ(expected.size(), grpVals->size());
     for (int64_t i = 0; i < expected.size(); i++) {
       EXPECT_EQ(expected[i].sum, accessor.at(i)->avgVal.sum);
       EXPECT_EQ(expected[i].count, accessor.at(i)->avgVal.count);

@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "dbcommon/utils/cutils.h"
+#include "dbcommon/utils/int-util.h"
 #include "dbcommon/utils/macro.h"
 
 namespace dbcommon {
@@ -75,27 +76,58 @@ class FlatMemBuf {
     static_assert((MEMBLKSIZE & (MEMBLKSIZE - 1)) == 0, "");
     static_assert(((sizeof(TYPE) & (sizeof(TYPE) - 1)) == 0),
                   "supposed sizeof(TYPE) to be power of two");
-    reserve(BlkSize);
-    memBlkPtr0 = memBlkPtrListVec[0];
   }
 
-  force_inline void reserve(uint64_t size) {
-    while ((size + BlkSize - 1) / BlkSize > memBlkList.size()) {
-      // Exactly, each MemBlkOwner contains extra spare memory beyond the
-      // specified MEMBLKSIZE, in order to align memory address into the
-      // multiple of the cache line size, which helps to reduce cache miss when
-      // size_ is small.
-      // For example, the number of the groups in TPCH-Q1 is 4 and
-      // sizeof(AggGroupValue) is 16. There is only 64 byte memory keeping being
-      // accessed, which fits into one cache line perfectly.
-      MemBlkOwner tmpOwner(MemBlkOwner(
-          {(cnmalloc(MEMBLKSIZE + DEFAULT_CACHE_LINE_SIZE - 1)), cnfree}));
-      char *tmpPtr =
-          alignedAddressInto<DEFAULT_CACHE_LINE_SIZE>(tmpOwner.get());
-      assert(((uint64_t)tmpPtr & (DEFAULT_CACHE_LINE_SIZE - 1)) == 0);
-      memBlkPtrListVec.push_back(tmpPtr);
+  void reserve(uint64_t size) {
+    if (sizeof(TYPE) * size <= getMemUsed()) return;
+
+    auto filledBlockCount = sizeof(TYPE) * size / MEMBLKSIZE;
+    auto remainedMemSize = nextPowerOfTwo(sizeof(TYPE) * size % MEMBLKSIZE);
+    if (!memBlkList.empty() && filledBlockCount) {
+      if (filledBlockCount >= memBlkList.size() && lastBlkSize_ != MEMBLKSIZE) {
+        // enlarge previous block
+        auto blk = std::move(memBlkList.back());
+        memBlkPtrListVec.pop_back();
+        memBlkList.pop_back();
+        auto newBlk = allocate(blk.release(), MEMBLKSIZE);
+        memBlkPtrListVec.push_back(newBlk.first);
+        memBlkPtrList = &memBlkPtrListVec[0];
+        memBlkList.push_back(std::move(newBlk.second));
+        lastBlkSize_ = MEMBLKSIZE;
+      }
+    }
+    while (memBlkList.size() < filledBlockCount) {
+      auto newBlk = allocate(nullptr, MEMBLKSIZE);
+      memBlkPtrListVec.push_back(newBlk.first);
       memBlkPtrList = &memBlkPtrListVec[0];
-      memBlkList.push_back(std::move(tmpOwner));
+      memBlkList.push_back(std::move(newBlk.second));
+    }
+    assert(memBlkPtrListVec.size() == memBlkList.size());
+    assert(memBlkList.size() >= filledBlockCount);
+    if (memBlkList.size() == (filledBlockCount + (remainedMemSize ? 1 : 0))) {
+      if (remainedMemSize && remainedMemSize < MEMBLKSIZE) {
+        // enlarge previous block
+        auto blk = std::move(memBlkList.back());
+        memBlkPtrListVec.pop_back();
+        memBlkList.pop_back();
+        auto newBlk = allocate(blk.release(), remainedMemSize);
+        memBlkPtrListVec.push_back(newBlk.first);
+        memBlkPtrList = &memBlkPtrListVec[0];
+        memBlkList.push_back(std::move(newBlk.second));
+        lastBlkSize_ = remainedMemSize;
+      }
+    } else {
+      // allocate new block
+      assert(remainedMemSize);
+      auto newBlk = allocate(nullptr, remainedMemSize);
+      memBlkPtrListVec.push_back(newBlk.first);
+      memBlkPtrList = &memBlkPtrListVec[0];
+      memBlkList.push_back(std::move(newBlk.second));
+      lastBlkSize_ = remainedMemSize;
+    }
+
+    if (!memBlkPtrListVec.empty()) {
+      memBlkPtr0 = memBlkPtrListVec[0];
     }
   }
 
@@ -189,18 +221,48 @@ class FlatMemBuf {
 
   static const uint64_t BlkSize = MEMBLKSIZE / sizeof(TYPE);
 
-  double getMemUsed() { return sizeof(TYPE) * size(); }
+  double getMemUsed() {
+    double ret = 0;
+    ret += memBlkList.size() > 1 ? MEMBLKSIZE * (memBlkList.size() - 1) : 0;
+    ret += lastBlkSize_;
+    assert(ret >= sizeof(TYPE) * size());
+    return ret;
+  }
+
+  void reset() {
+    lastBlkSize_ = 0;
+    memBlkList.clear();
+    memBlkPtrListVec.clear();
+    memBlkPtrList = nullptr;
+    memBlkPtr0 = nullptr;
+    size_ = 0;
+  }
 
  private:
+  std::pair<char *, MemBlkOwner> allocate(char *ptr, size_t size) {
+    // Exactly, each MemBlkOwner contains extra spare memory beyond the
+    // specified MEMBLKSIZE, in order to align memory address into the
+    // multiple of the cache line size, which helps to reduce cache miss when
+    // size_ is small.
+    // For example, the number of the groups in TPCH-Q1 is 4 and
+    // sizeof(AggGroupValue) is 16. There is only 64 byte memory keeping being
+    // accessed, which fits into one cache line perfectly.
+    // TODO(chiyang): add back the alignment of cache line size
+    MemBlkOwner tmpOwner(MemBlkOwner({(cnrealloc(ptr, size)), cnfree}));
+    char *tmpPtr = tmpOwner.get();
+    return std::make_pair(tmpPtr, std::move(tmpOwner));
+  }
+
   // the maximum number of the elements that contained in a memory block
   static const uint64_t Mask = BlkSize - 1;
   static const uint64_t ShiftLen = 64 - __builtin_clzll(Mask);
 
+  uint64_t lastBlkSize_ = 0;
   std::vector<MemBlkOwner> memBlkList;
   std::vector<char *> memBlkPtrListVec;
   char **memBlkPtrList = nullptr;
   char *memBlkPtr0 = nullptr;  // performance: for small scale
-  uint64_t size_ = 0;
+  uint64_t size_ = 0;          // number of stored unit type
 };
 
 }  // namespace dbcommon

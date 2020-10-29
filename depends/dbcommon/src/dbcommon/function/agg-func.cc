@@ -92,7 +92,6 @@ Datum count_star_impl(Datum *params, uint64_t size) {
   const uint64_t *__restrict__ hashGroups =
       DatumGetValue<const std::vector<uint64_t> *>(params[2])->data();
   bool hasGroupBy = DatumGetValue<bool>(params[3]);
-  Vector *vec = DatumGetValue<Vector *>(params[4]);
 
   Accessor accessor = grpVals.getAccessor<Accessor>();
 

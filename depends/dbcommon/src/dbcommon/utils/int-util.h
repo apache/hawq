@@ -29,8 +29,8 @@ inline bool isPowerOfTwo(uint64_t x) {
   return ((x != 0) && ((x & (~x + 1)) == x));
 }
 
-inline uint64_t nextPowerOfTwo(uint64_t __n) {
-  return uint64_t(1) << (64 - __builtin_clzll(__n - 1));
+inline uint64_t nextPowerOfTwo(uint64_t n) {
+  return n ? uint64_t(1) << (64 - __builtin_clzll(n - 1)) : 0;
 }
 
 // Encodes an unsigned variable-length integer using the MSB algorithm.
