@@ -101,6 +101,7 @@ class FlatMemBuf {
       memBlkPtrListVec.push_back(newBlk.first);
       memBlkPtrList = &memBlkPtrListVec[0];
       memBlkList.push_back(std::move(newBlk.second));
+      lastBlkSize_ = MEMBLKSIZE;
     }
     assert(memBlkPtrListVec.size() == memBlkList.size());
     assert(memBlkList.size() >= filledBlockCount);
