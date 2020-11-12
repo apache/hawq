@@ -49,8 +49,12 @@ bool Lock::timeoutAcquire(LockMode mode, int32_t timeout) {
     LOG_DEBUG("Timeout(%dms) to acquire lock: %s, threadId = %p", timeout,
               lockName.c_str(), threadId);
     for (auto waitThread = lockState->waiters.begin();
-         waitThread != lockState->waiters.end(); waitThread++)
-      if (waitThread->first == threadId) lockState->waiters.erase(waitThread);
+        waitThread != lockState->waiters.end();) {
+     if (waitThread->first == threadId)
+       waitThread = lockState->waiters.erase(waitThread);
+     else
+       waitThread++;
+   }
     return false;
   }
 }
