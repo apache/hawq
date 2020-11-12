@@ -377,7 +377,7 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({STRING_RPAD, "string_rpad", STRINGID, {STRINGID, INTID, STRINGID}, string_rpad, false});
   FuncEntryArray.push_back({STRING_LPAD_NOFILL, "string_lpad_nofill", STRINGID, {STRINGID, INTID}, string_lpad_nofill, false});
   FuncEntryArray.push_back({STRING_RPAD_NOFILL, "string_rpad_nofill", STRINGID, {STRINGID, INTID}, string_rpad_nofill, false});
-
+  FuncEntryArray.push_back({STRING_TRANSLATE, "string_translate", STRINGID, {STRINGID, STRINGID, STRINGID}, string_translate, false});
 
   FuncEntryArray.push_back({BINARY_OCTET_LENGTH, "binary_octet_length", INTID, {BINARYID}, binary_octet_length, false});
 

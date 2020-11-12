@@ -46,6 +46,7 @@ Datum string_initcap(Datum *params, uint64_t size);
 Datum string_ascii(Datum *params, uint64_t size);
 Datum string_repeat(Datum *params, uint64_t size);
 Datum string_chr(Datum *params, uint64_t size);
+Datum string_translate(Datum *params, uint64_t size);
 
 Datum string_bpchar(Datum *params, uint64_t size);
 Datum string_varchar(Datum *params, uint64_t size);

@@ -351,16 +351,30 @@ class utf8ptr {
     return *this;
   }
 
-  utf8ptr &operator+=(const int &len) {
-    int times = len;
+  utf8ptr &operator+=(const int32_t &len) {
+    int32_t times = len;
     while (times--) p_ += utf8_mblen(p_);
     return *this;
   }
 
+  utf8ptr &operator=(const char *p) {
+    if (p_ != p) p_ = p;
+    return *this;
+  }
+
+  bool operator==(const utf8ptr &tmp) {
+    int32_t len = utf8_mblen(p_);
+    const char *tmp_ = p_;
+    const char *cmp_ = tmp.p_;
+    while (len && *tmp_++ == *cmp_++) len--;
+    if (len) return false;
+    return true;
+  }
+
   char *get() { return const_cast<char *>(p_); }
 
-  int characterLength(const char *p) {
-    int len = 0;
+  int32_t characterLength(const char *p) {
+    int32_t len = 0;
     const char *tmp = p_;
     while (tmp != p) {
       tmp += utf8_mblen(tmp);
@@ -369,11 +383,11 @@ class utf8ptr {
     return len;
   }
 
-  int characterLength(const int &len) {
-    int ret = 0, lenth = len;
+  int32_t characterLength(const int32_t &len) {
+    int32_t ret = 0, lenth = len;
     const char *tmp = p_;
     while (lenth > 0) {
-      int tLen = utf8_mblen(tmp);
+      int32_t tLen = utf8_mblen(tmp);
       lenth -= tLen;
       tmp += tLen;
       ret++;
@@ -381,12 +395,12 @@ class utf8ptr {
     return ret;
   }
 
-  int byteLength(const int &len) {
-    int ret = 0;
-    int times = len;
+  int32_t byteLength(const int32_t &len) {
+    int32_t ret = 0;
+    int32_t times = len;
     const char *tmp = p_;
     while (times--) {
-      int tLen = utf8_mblen(tmp);
+      int32_t tLen = utf8_mblen(tmp);
       tmp += tLen;
       ret += tLen;
     }
@@ -459,7 +473,7 @@ int32_t kmpPos(const char *str, const char *subStr, uint64_t len,
   int32_t *__restrict__ next = reinterpret_cast<int32_t *>(kmpPosBuf->data());
 
   next[0] = -1;
-  int i = 0, j = -1;
+  int32_t i = 0, j = -1;
   while (i < subLen - 1) {
     if (j == -1 || subStr[i] == subStr[j])
       next[++i] = ++j;
@@ -469,7 +483,7 @@ int32_t kmpPos(const char *str, const char *subStr, uint64_t len,
 
   i = 0;
   j = 0;
-  int lLen = len, sLen = subLen;
+  int32_t lLen = len, sLen = subLen;
   while (i < lLen && j < sLen) {
     if (j == -1 || subStr[j] == str[i]) {
       i++;
@@ -488,10 +502,10 @@ int32_t naivePos(const char *str, const char *subStr, uint64_t len,
                  uint64_t subLen) {
   if (len < subLen) return 0;
 
-  int times = len - subLen;
-  for (int i = 0; i <= times; i++) {
+  int32_t times = len - subLen;
+  for (int32_t i = 0; i <= times; i++) {
     bool flag = true;
-    for (int j = 0; j < subLen; j++)
+    for (int32_t j = 0; j < subLen; j++)
       if (str[i + j] != subStr[j]) {
         flag = false;
         break;
@@ -502,9 +516,10 @@ int32_t naivePos(const char *str, const char *subStr, uint64_t len,
 }
 
 Datum string_position(Datum *params, uint64_t size) {
+  const uint32_t KMP_LIMIT = 30;
   auto subpos = [](ByteBuffer &buf, text src, text sub) -> int32_t {
     int32_t byteLen = 0;
-    if (sub.length < 15) {
+    if (sub.length < KMP_LIMIT) {
       byteLen = naivePos(src.val, sub.val, src.length, sub.length);
     } else {
       dbcommon::ByteBuffer kmpPosBuf(true);
@@ -522,7 +537,7 @@ Datum string_initcap(Datum *params, uint64_t size) {
     char *ret = const_cast<char *>(buf.tail() - str.length);
 
     char last = ' ';
-    int times = str.length;
+    int32_t times = str.length;
     while (times--) {
       if (((unsigned int)((last | 0x20) - 'a') >= 26u &&
            (unsigned int)(last - '0') >= 10u) &&
@@ -591,7 +606,7 @@ Datum string_substring_nolen(Datum *params, uint64_t size) {
     utf8ptr utfStrPtr(str.val);
     utfStrPtr += pos;
     char *strBegin = utfStrPtr.get();
-    int len = str.val + str.length - strBegin;
+    int32_t len = str.val + str.length - strBegin;
     if (len < 0) len = 0;
     buf.resize(buf.size() + len);
     char *ret = const_cast<char *>(buf.tail() - len);
@@ -604,7 +619,7 @@ Datum string_substring_nolen(Datum *params, uint64_t size) {
 inline int32_t myAscii(const unsigned char *data) {
   int32_t retval = 0;
   if (*data > 0x7F) {
-    int tsize = 0;
+    int32_t tsize = 0;
     if (*data >= 0xF0) {
       retval = *data & 0x07;
       tsize = 3;
@@ -674,14 +689,14 @@ enum direction { left = 0, right, both };
 template <direction dir>
 Datum string_trim_blank(Datum *params, uint64_t size) {
   auto trim = [](ByteBuffer &buf, text str) {
-    int l = 0, r = str.length - 1;
+    int32_t l = 0, r = str.length - 1;
     if (dir == direction::left || dir == direction::both) {
       while (l <= r && str.val[l] == ' ') l++;
     }
     if (dir == direction::right || dir == direction::both) {
       while (l <= r && str.val[r] == ' ') r--;
     }
-    int len = r - l + 1;
+    int32_t len = r - l + 1;
     if (len < 0) len = 0;
     buf.resize(buf.size() + len);
     char *ret = const_cast<char *>(buf.tail() - len);
@@ -695,7 +710,7 @@ Datum string_trim_blank(Datum *params, uint64_t size) {
 template <direction dir>
 Datum string_trim_chars(Datum *params, uint64_t size) {
   auto trim = [](ByteBuffer &buf, text str, text chr) {
-    int l = 0, r = str.length - 1;
+    int32_t l = 0, r = str.length - 1;
     if (dir == direction::left || dir == direction::both) {
       std::string s(const_cast<char *>(chr.val), chr.length);
       while (l <= r && s.find(str.val[l]) != std::string::npos) l++;
@@ -704,7 +719,7 @@ Datum string_trim_chars(Datum *params, uint64_t size) {
       std::string s(const_cast<char *>(chr.val), chr.length);
       while (l <= r && s.find(str.val[r]) != std::string::npos) r--;
     }
-    int len = r - l + 1;
+    int32_t len = r - l + 1;
     if (len < 0) len = 0;
     buf.resize(buf.size() + len);
     char *ret = const_cast<char *>(buf.tail() - len);
@@ -767,7 +782,7 @@ Datum string_repeat(Datum *params, uint64_t size) {
 
 Datum string_chr(Datum *params, uint64_t size) {
   auto chr = [](ByteBuffer &buf, int32_t val) {
-    int len = 0;
+    int32_t len = 0;
     char wch[4];
     if (val > 0x7F) {
       if (val > 0x001fffff) {
@@ -872,7 +887,7 @@ Datum string_pad_blank(Datum *params, uint64_t size) {
     }
 
     int32_t writeLen = str.length < retByteLen ? str.length : retByteLen;
-    for (int i = 0; i < writeLen; i++) *ret++ = str.val[i];
+    for (int32_t i = 0; i < writeLen; i++) *ret++ = str.val[i];
 
     if (dir == direction::right) {
       int32_t remainder = retByteLen - str.length;
@@ -904,7 +919,7 @@ Datum string_pad_chars(Datum *params, uint64_t size) {
     if (strCharLen >= len) {
       retByteLen = utfStrPtr.byteLength(len);
     } else {
-      int rem = len - strCharLen;
+      int32_t rem = len - strCharLen;
       while (rem >= filCharLen) {
         retByteLen += fil.length;
         rem -= filCharLen;
@@ -922,10 +937,10 @@ Datum string_pad_chars(Datum *params, uint64_t size) {
       } else {
         while (remainder > 0) {
           if (remainder >= filCharLen) {
-            for (int i = 0; i < fil.length; i++) *ret++ = fil.val[i];
+            for (int32_t i = 0; i < fil.length; i++) *ret++ = fil.val[i];
           } else {
             int32_t fillLen = utfFilPtr.byteLength(remainder);
-            for (int i = 0; i < fillLen; i++) *ret++ = fil.val[i];
+            for (int32_t i = 0; i < fil.length; i++) *ret++ = str.val[i];
           }
           remainder -= filCharLen;
         }
@@ -933,7 +948,7 @@ Datum string_pad_chars(Datum *params, uint64_t size) {
     }
 
     int32_t writeLen = str.length < retByteLen ? str.length : retByteLen;
-    for (int i = 0; i < writeLen; i++) *ret++ = str.val[i];
+    for (int32_t i = 0; i < writeLen; i++) *ret++ = str.val[i];
 
     if (dir == direction::right) {
       int32_t remainder = len - strCharLen;
@@ -943,10 +958,10 @@ Datum string_pad_chars(Datum *params, uint64_t size) {
       } else {
         while (remainder > 0) {
           if (remainder >= filCharLen) {
-            for (int i = 0; i < fil.length; i++) *ret++ = fil.val[i];
+            for (int32_t i = 0; i < fil.length; i++) *ret++ = fil.val[i];
           } else {
             int32_t fillLen = utfFilPtr.byteLength(remainder);
-            for (int i = 0; i < fillLen; i++) *ret++ = fil.val[i];
+            for (int32_t i = 0; i < fillLen; i++) *ret++ = fil.val[i];
           }
           remainder -= filCharLen;
         }
@@ -964,6 +979,58 @@ Datum string_lpad(Datum *params, uint64_t size) {
 
 Datum string_rpad(Datum *params, uint64_t size) {
   return string_pad_chars<direction::right>(params, size);
+}
+
+Datum string_translate(Datum *params, uint64_t size) {
+  auto translate = [](ByteBuffer &buf, text str, text from, text to) {
+    utf8ptr utfStrPtr(str.val);
+    utf8ptr utfFromPtr(from.val);
+    utf8ptr utfToPtr(to.val);
+    int32_t strCharLen = utfStrPtr.characterLength(str.val + str.length);
+    int32_t fromCharLen = utfFromPtr.characterLength(from.val + from.length);
+    int32_t toCharLen = utfToPtr.characterLength(to.val + to.length);
+    int32_t retByteLen = 0;
+    int32_t worstLen = strCharLen * 4;
+
+    // if (worstLen / 4 != strCharLen) {
+    //   it won't appear one number which has int32_t length;
+    //   LOG_ERROR(ERRCODE_PROGRAM_LIMIT_EXCEEDED,
+    //   "requested length too large");
+    // }
+
+    buf.resize(buf.size() + worstLen);
+    char *ret = const_cast<char *>(buf.tail() - worstLen);
+
+    auto writeByte = [&](utf8ptr src) {
+      char *tmp = src.get();
+      int32_t len = utf8_mblen(tmp);
+      retByteLen += len;
+      for (int32_t k = 0; k < len; k++) *ret++ = *tmp++;
+    };
+
+    for (int32_t i = 0; i < strCharLen; i++) {
+      int32_t j = 0;
+      utfFromPtr = from.val;
+      utfToPtr = to.val;
+      for (; j < fromCharLen; j++) {
+        if (utfStrPtr == utfFromPtr) {
+          if (j < toCharLen) {
+            utfToPtr += j;
+            writeByte(utfToPtr);
+          }
+          break;
+        }
+        ++utfFromPtr;
+      }
+      if (j == fromCharLen) {
+        writeByte(utfStrPtr);
+      }
+      ++utfStrPtr;
+    }
+    buf.resize(buf.size() - (worstLen - retByteLen));
+    return text(nullptr, retByteLen);
+  };
+  return three_params_bind<text, text, text, text>(params, size, translate);
 }
 
 }  // namespace dbcommon
