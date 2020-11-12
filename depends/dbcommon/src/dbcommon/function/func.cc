@@ -327,6 +327,7 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({DECIMAL_TO_TEXT, "decimal_to_text", STRINGID, {DECIMALNEWID}, decimal_to_text});
   FuncEntryArray.push_back({TEXT_TO_CHAR, "text_to_char", TINYINTID, {STRINGID}, text_to_char});
   FuncEntryArray.push_back({INT_TO_CHAR, "int4_to_char", TINYINTID, {INTID}, int4_to_char});
+  FuncEntryArray.push_back({DOUBLE_TO_TIMESTAMP, "double_to_timestamp", TIMESTAMPTZID, {DOUBLEID}, double_to_timestamp});
 
   FuncEntryArray.push_back({CHAR_TO_STRING, "char_to_string", STRINGID, {CHARID},char_to_string, false});
   FuncEntryArray.push_back({DATE_TO_TIMESTAMP, "date_to_timestamp", TIMESTAMPID, {DATEID}, date_to_timestamp, false});

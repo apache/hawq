@@ -21,6 +21,7 @@
 
 #include <iomanip>
 #include <string>
+#include <tuple>
 #include <typeinfo>
 
 #include "dbcommon/common/vector-transformer.h"
@@ -224,6 +225,43 @@ Datum float4_to_text(Datum *params, uint64_t size) {
 }
 Datum float8_to_text(Datum *params, uint64_t size) {
   return floattype_to_text<double>(params, size);
+}
+inline std::tuple<int64_t, int64_t> double_to_time(double epoch) {
+  int64_t second, nanosecond;
+  second = (int64_t)epoch;
+  nanosecond = (int64_t)((epoch - second) / 1e-6) * 1000;
+  TimezoneUtil::setGMTOffset("PRC");
+  return std::make_tuple(second, nanosecond);
+}
+Datum double_to_timestamp(Datum *params, uint64_t size) {
+  assert(size == 2);
+  Object *para = params[1];
+  if (dynamic_cast<Vector *>(para)) {
+    Vector *retVector = params[0];
+    Vector *srcVector = params[1];
+
+    FixedSizeTypeVectorRawData<double> src(srcVector);
+    retVector->resize(src.plainSize, src.sel, src.nulls);
+    TimestampVectorRawData ret(retVector);
+
+    auto totimestamp = [&](uint64_t plainIdx) {
+      std::tie(ret.seconds[plainIdx], ret.nanoseconds[plainIdx]) =
+          double_to_time(src.values[plainIdx]);
+    };
+    dbcommon::transformVector(ret.plainSize, ret.sel, ret.nulls, totimestamp);
+  } else {
+    Scalar *retScalar = params[0];
+    Scalar *srcScalar = params[1];
+    if (srcScalar->isnull) {
+      retScalar->isnull = true;
+    } else {
+      retScalar->isnull = false;
+      double src = srcScalar->value;
+      Timestamp *ret = retScalar->allocateValue<Timestamp>();
+      std::tie(ret->second, ret->nanosecond) = double_to_time(src);
+    }
+  }
+  return params[0];
 }
 
 }  // namespace dbcommon

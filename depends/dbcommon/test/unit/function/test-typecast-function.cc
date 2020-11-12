@@ -291,5 +291,13 @@ INSTANTIATE_TEST_CASE_P(
                       TestFunctionEntry{FuncKind::BIGINT_TO_BOOLEAN,
                                         "Vector: t t t f NULL",
                                         {"Vector: 1 3 -2 0 NULL"}}));
+// TEST(TestFunction, double_to_timestamp) {}
+INSTANTIATE_TEST_CASE_P(
+    double_to_timestamp, TestFunction,
+    ::testing::Values(TestFunctionEntry{
+        FuncKind::DOUBLE_TO_TIMESTAMP,
+        "Vector{delimiter=,}: 1927-12-31 23:54:08+08,1973-11-30 "
+        "05:33:09+08,NULL",
+        {"Vector{delimiter=,}: -1325491552,NULL"}}));
 
 }  // namespace dbcommon

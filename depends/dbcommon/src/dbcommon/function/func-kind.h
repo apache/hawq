@@ -194,6 +194,7 @@ generate_func_kind(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   DECIMAL_TO_TEXT,
   TEXT_TO_CHAR,
   INT_TO_CHAR,
+  DOUBLE_TO_TIMESTAMP,
 
   // date/time related functions
   DATE_TO_TIMESTAMP,

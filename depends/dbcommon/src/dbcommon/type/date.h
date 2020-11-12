@@ -37,6 +37,8 @@
 #define POSTGRES_EPOCH_JDATE 2451545      /* == date2j(2000, 1, 1) */
 #define ORC_TIMESTAMP_EPOCH_JDATE 2457024 /* == date2j(2015, 1, 1) */
 #define AD_EPOCH_JDATE 719162             /* == date2j(0001, 1, 1) */
+#define TIMEZONE_ADJUST \
+  -1325491552 /* == date_part('epoch','1927-12-31 23:54:08')*/
 
 const int64_t SECONDS_PER_HOUR = 60 * 60;
 const int64_t SECONDS_PER_DAY = SECONDS_PER_HOUR * 24;
@@ -774,6 +776,9 @@ class TimestamptzType : public TimestampType {
 
   static std::string timezoneToString(int64_t offset) {
     int timezone = offset / SECONDS_PER_HOUR;
+    int time = offset - timezone * SECONDS_PER_HOUR;
+    int t_minute = time / 60;
+    int t_second = time % 60;
     std::string result = "";
     if (timezone < 0) {
       result += "-";
@@ -782,6 +787,14 @@ class TimestamptzType : public TimestampType {
     }
     if (timezone < 10) result += "0";
     result += std::to_string(std::abs(timezone));
+    if (time) {
+      result += ":";
+      if (t_minute > 0 && t_minute < 10) result += "0";
+      result += std::to_string(std::abs(t_minute));
+      result += ":";
+      if (t_second > 0 && t_second < 10) result += "0";
+      result += std::to_string(std::abs(t_second));
+    }
     return result;
   }
 
@@ -840,6 +853,10 @@ class TimestamptzType : public TimestampType {
 
     int32_t timezoneOffset = TimezoneUtil::getGMTOffset(second);
     second += timezoneOffset;
+    if (second < timezoneOffset + TIMEZONE_ADJUST) {
+      timezoneOffset += 352;
+      second += 352;
+    }
     int32_t days = (int32_t)(second / SECONDS_PER_DAY);
     int64_t seconds = second % SECONDS_PER_DAY * 1000000;
     if (seconds < 0) {

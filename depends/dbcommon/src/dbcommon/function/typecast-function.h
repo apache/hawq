@@ -34,6 +34,7 @@ Datum float8_to_text(Datum *params, uint64_t size);
 Datum text_to_char(Datum *params, uint64_t size);
 Datum int4_to_char(Datum *params, uint64_t size);
 Datum decimal_to_text(Datum *params, uint64_t size);
+Datum double_to_timestamp(Datum *params, uint64_t size);
 
 }  // namespace dbcommon
 
