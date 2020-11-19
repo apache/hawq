@@ -223,10 +223,14 @@ class FlatMemBuf {
   static const uint64_t BlkSize = MEMBLKSIZE / sizeof(TYPE);
 
   double getMemUsed() {
+    assert(getMemAllocated() >= sizeof(TYPE) * size());
+    return sizeof(TYPE) * size();
+  }
+
+  double getMemAllocated() {
     double ret = 0;
     ret += memBlkList.size() > 1 ? MEMBLKSIZE * (memBlkList.size() - 1) : 0;
     ret += lastBlkSize_;
-    assert(ret >= sizeof(TYPE) * size());
     return ret;
   }
 

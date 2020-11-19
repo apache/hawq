@@ -27,15 +27,18 @@ TEST(TestFlatMemBuf, TestResize) {
   using Type = double;
   FlatMemBuf<Type, 256> buf;
 
-  ASSERT_EQ(0, buf.getMemUsed());
+  ASSERT_EQ(0, buf.getMemAllocated());
 
   buf.resize(5);
-  EXPECT_EQ(nextPowerOfTwo(sizeof(Type) * 5), buf.getMemUsed());
+  EXPECT_EQ(nextPowerOfTwo(sizeof(Type) * 5), buf.getMemAllocated());
   *buf.ptrAt(3) = 233;
   EXPECT_EQ(233, *buf.ptrAt(3));
 
   buf.resize(9);
-  EXPECT_EQ(nextPowerOfTwo(sizeof(Type) * 9), buf.getMemUsed());
+  EXPECT_EQ(nextPowerOfTwo(sizeof(Type) * 9), buf.getMemAllocated());
+
+  buf.resize(20);
+  EXPECT_EQ(256, buf.getMemAllocated());
 
   buf.resize(buf.BlkSize + 7);
   EXPECT_EQ(256 + nextPowerOfTwo(sizeof(Type) * 7), buf.getMemUsed());
@@ -43,13 +46,13 @@ TEST(TestFlatMemBuf, TestResize) {
   EXPECT_EQ(666, *buf.ptrAt(buf.BlkSize));
 
   buf.resize(buf.BlkSize * 13);
-  EXPECT_EQ(256 * 13, buf.getMemUsed());
+  EXPECT_EQ(256 * 13, buf.getMemAllocated());
 
   EXPECT_EQ(233, *buf.ptrAt(3));
   EXPECT_EQ(666, *buf.ptrAt(buf.BlkSize));
 
   buf.resize(2);
-  EXPECT_EQ(256 * 13, buf.getMemUsed());
+  EXPECT_EQ(256 * 13, buf.getMemAllocated());
 }
 
 }  // namespace dbcommon
