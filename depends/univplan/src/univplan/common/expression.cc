@@ -122,7 +122,7 @@ dbcommon::Datum VarExprState::calc(ExprContext *context) {
 }
 
 ConstExprState::ConstExprState(const univplan::UnivPlanConst *val)
-    : scalar(dbcommon::Datum()) {
+: scalar(dbcommon::Datum(static_cast<int64_t>(0))) {
   retType = univplan::PlanNodeUtil::typeKindMapping(val->type());
   retTypeMod = val->typemod();
   if (val->isnull()) {
