@@ -52,7 +52,7 @@ std::unique_ptr<TupleBatch> JoinHashKeys::retrieveHashkeys(
   }
   batch->setNumOfRows(hashCells.size());
   for (auto colIdx = 0; colIdx < inputTupleDesc_.getNumOfColumns(); colIdx++) {
-    if (batch->getColumn(colIdx)->getNumOfRows() == 0)
+    if (batch->getColumn(colIdx)->empty())
       batch->setColumn(colIdx, std::unique_ptr<Vector>(nullptr), true);
   }
 

@@ -78,6 +78,33 @@ class BoolBuffer {
     }
   }
 
+  // update the external data address and size (in #bools)
+  // @param d The external data
+  // @param dataSize The size of of the external data (in #bools).
+  // @return void
+  // note: it do not change the buffer size at all, you should
+  //       assure enough memory space before call this method
+  void updateBitData(size_t idx, const char *data, size_t numBools) {
+    assert(buffer_.getOwnData());
+    assert(size() >= idx + numBools);
+    size_t bitBytes = numBools / CHAR_BIT;
+    // when this numBits > 1, reserve only can alloc 8 bytes,
+    // so buffer overflow
+    uint64_t *nulls = reinterpret_cast<uint64_t *>(buffer_.data() + idx);
+    for (size_t i = 0; i < bitBytes; ++i) {
+      nulls[i] = bit_to_bytes[static_cast<uint8_t>(data[i])];
+    }
+
+    uint32_t pos = idx + bitBytes * CHAR_BIT;
+    bool *pNulls = reinterpret_cast<bool *>(buffer_.data() + pos);
+    size_t left = numBools - bitBytes * CHAR_BIT;
+    uint8_t lastByte = static_cast<uint8_t>(data[bitBytes]);
+    assert(left < CHAR_BIT);
+    for (size_t i = 0; i < left; ++i) {
+      pNulls[i] = (lastByte >> i) & 0x1;
+    }
+  }
+
   const char *getBitData() const {
     if (!bitBuffer_.getOwnData()) bitBuffer_.reset(true);
     bitBuffer_.resize(bitDataSizeInBytes());

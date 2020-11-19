@@ -66,6 +66,9 @@ class TupleBatch {
     return selected_ ? selected_->size() : this->numOfRowsPlain;
   }
 
+  // Returns whether the TupleBatch is empty (i.e. whether its size is 0).
+  bool empty() const { return getNumOfRows() == 0; }
+
   uint32_t getNumOfRowsPlain() const { return this->numOfRowsPlain; }
 
   uint16_t getRgId() const { return this->rgId; }

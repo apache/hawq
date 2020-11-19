@@ -562,7 +562,7 @@ size_t TupleBatch::serialize(std::string *output, size_t reserved) {
   int colNum = getNumOfColumns();
   int sysColNum = getNumOfSysColumns();
 
-  if (getNumOfRows() == 0)
+  if (this->empty())
     LOG_ERROR(ERRCODE_INTERNAL_ERROR,
               "Should not serialize an empty tuple batch");
 
@@ -620,7 +620,7 @@ void TupleBatch::deserialize(const std::string &data, int32_t startPos,
     std::unique_ptr<NodeDeserializer> deserializer(new NodeDeserializer(data));
     deserializer->setCursor(cursor);
 
-    if (this->getNumOfRows() == 0) {
+    if (this->empty()){
       rgId = deserializer->read<uint16_t>();
       numOfRowsPlain = deserializer->read<uint32_t>();
       colNum = deserializer->read<uint32_t>();
@@ -691,7 +691,7 @@ void TupleBatch::deserialize(const std::string &data) {
     std::unique_ptr<NodeDeserializer> deserializer(new NodeDeserializer(data));
     deserializer->setCursor(cursor);
 
-    if (this->getNumOfRows() == 0) {
+    if (this->empty()){
       rgId = deserializer->read<uint16_t>();
       numOfRowsPlain = deserializer->read<uint32_t>();
       colNum = deserializer->read<uint32_t>();

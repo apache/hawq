@@ -195,6 +195,9 @@ class Vector : public Object {
   // @return The number of rows/elements in the vector
   virtual uint64_t getNumOfRowsPlain() const = 0;
 
+  // Returns whether the Vector is empty (i.e. whether its size is 0).
+  bool empty() const { return getNumOfRows() == 0; }
+
   // Whether all elements are selected.
   // @return A bool value indicating whether all elements are selected
   bool allSelected() const {

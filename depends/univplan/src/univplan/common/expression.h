@@ -93,6 +93,8 @@ class ExprContext {
     return 1;
   }
 
+  bool empty() { return getNumOfRows() == 0; }
+
   dbcommon::SelectList *getSelectList() {
     if (innerBatch && innerBatch->getSelected())
       return innerBatch->getSelected();
