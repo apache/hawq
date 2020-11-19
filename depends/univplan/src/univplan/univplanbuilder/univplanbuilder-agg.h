@@ -40,6 +40,7 @@ class UnivPlanBuilderAgg : public UnivPlanBuilderNode {
 
   void setNumGroups(int64_t n);
   void setGroupColIndexes(const std::vector<int32_t> &nArray);
+  void setAggStrategy(AggStrategy aggStrategy);
 
  private:
   UnivPlanAgg *ref;

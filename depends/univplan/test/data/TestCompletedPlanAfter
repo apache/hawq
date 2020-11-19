@@ -343,6 +343,7 @@ childStages {
                   numGroups: 1000
                   groupColIndexes: 1
                   groupColIndexes: 3
+                  aggStrategy: AGG_HASHED
                 }
               }
               planRows: 110
@@ -677,6 +678,7 @@ childStages {
               numGroups: 1000
               groupColIndexes: 1
               groupColIndexes: 3
+              aggStrategy: AGG_HASHED
             }
           }
         }

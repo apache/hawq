@@ -47,6 +47,7 @@ TEST(TestBasicUnivPlan, TestBasicUnivPlan) {
   aggb = dynamic_cast<univplan::UnivPlanBuilderAgg *>(aggb1.get());
 
   aggb->setNumGroups(0);
+  aggb->setAggStrategy(AggStrategy::AGG_SORTED);
   aggb->uid = 1;
   aggb->pid = -1;
 
@@ -54,6 +55,7 @@ TEST(TestBasicUnivPlan, TestBasicUnivPlan) {
       univplan::PlanNodeUtil::createPlanBuilderNode(univplan::UNIVPLAN_AGG);
   aggb = dynamic_cast<univplan::UnivPlanBuilderAgg *>(aggb2.get());
   aggb->setNumGroups(0);
+  aggb->setAggStrategy(AggStrategy::AGG_SORTED);
   aggb->uid = 2;
   aggb->pid = 1;
 
@@ -61,6 +63,7 @@ TEST(TestBasicUnivPlan, TestBasicUnivPlan) {
       univplan::PlanNodeUtil::createPlanBuilderNode(univplan::UNIVPLAN_AGG);
   aggb = dynamic_cast<univplan::UnivPlanBuilderAgg *>(aggb3.get());
   aggb->setNumGroups(0);
+  aggb->setAggStrategy(AggStrategy::AGG_SORTED);
   aggb->uid = 3;
   aggb->pid = 1;
 

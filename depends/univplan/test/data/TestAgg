@@ -233,6 +233,7 @@ plan {
                       numGroups: 1000
                       groupColIndexes: 1
                       groupColIndexes: 3
+                      aggStrategy: AGG_HASHED
                     }
                   }
                 }
@@ -252,6 +253,7 @@ plan {
           numGroups: 1000
           groupColIndexes: 1
           groupColIndexes: 3
+          aggStrategy: AGG_HASHED
         }
       }
     }

@@ -454,6 +454,7 @@ int32_t UnivPlanProtoUtility::constructAgg(int32_t pid, int8_t aggstage) {
   grpColIdx[0] = 1;
   grpColIdx[1] = 3;
   univPlanAggSetNumGroupsAndGroupColIndexes(univplan, 1000, numCols, grpColIdx);
+  univPlanAggSetAggstrategy(univplan, UNIVPLAN_AGG_HASHED);
   free(grpColIdx);
 
   univPlanAddToPlanNode(univplan, true);

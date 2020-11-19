@@ -364,6 +364,12 @@ void univPlanSeqScanAddTaskWithFileSplits(bool isMagma, UnivPlanC *up,
   task->generate();
 }
 
+void univPlanAggSetAggstrategy(UnivPlanC *up, UnivPlanAggStrategy aggStrategy) {
+  univplan::UnivPlanBuilderAgg *agg =
+      reinterpret_cast<univplan::UnivPlanBuilderAgg *>(up->curNode.get());
+  agg->setAggStrategy(static_cast<univplan::AggStrategy>(aggStrategy));
+}
+
 int32_t univPlanAggNewInstance(UnivPlanC *up, int32_t pid) {
   up->curNode =
       univplan::PlanNodeUtil::createPlanBuilderNode(univplan::UNIVPLAN_AGG);

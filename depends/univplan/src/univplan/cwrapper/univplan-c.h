@@ -158,6 +158,12 @@ int32_t univPlanAggNewInstance(UnivPlanC *up, int32_t pid);
 void univPlanAggSetNumGroupsAndGroupColIndexes(UnivPlanC *up, int64_t numGroups,
                                                int64_t numCols,
                                                const int32_t *grpColIdx);
+typedef enum UnivPlanAggStrategy {
+  UNIVPLAN_AGG_PLAIN,  /* simple agg across all input rows */
+  UNIVPLAN_AGG_SORTED, /* grouped agg, input must be sorted */
+  UNIVPLAN_AGG_HASHED  /* grouped agg, use internal hashtable */
+} UnivPlanAggStrategy;
+void univPlanAggSetAggstrategy(UnivPlanC *up, UnivPlanAggStrategy aggStrategy);
 
 // construct Sort
 int32_t univPlanSortNewInstance(UnivPlanC *up, int32_t pid);

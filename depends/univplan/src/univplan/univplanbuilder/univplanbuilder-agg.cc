@@ -53,5 +53,8 @@ void UnivPlanBuilderAgg::setGroupColIndexes(
     ref->add_groupcolindexes(nArray[i]);
   }
 }
+void UnivPlanBuilderAgg::setAggStrategy(AggStrategy aggStrategy) {
+  ref->set_aggstrategy(aggStrategy);
+}
 
 }  // namespace univplan
