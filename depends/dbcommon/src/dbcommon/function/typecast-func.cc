@@ -321,10 +321,14 @@ Datum TypeCast::castDecimalToFloatType(Datum *params, uint64_t size) {
 template <typename TP>
 inline DecimalVar floatToDecimal(TP in) {
   int64_t scale = 0;
+  int64_t intval = abs(in);
+  int64_t intscale = 0;
+  while (intval > 0) {
+    intval /= 10;
+    ++intscale;
+  }
   while (true) {
-    if (scale >= 13) {
-      break;
-    }
+    if (intscale + scale >= 15) break;
     if (abs(in - static_cast<int64_t>(in)) > 1e-8) {
       in *= 10.0;
       ++scale;
@@ -333,6 +337,11 @@ inline DecimalVar floatToDecimal(TP in) {
     }
   }
   Int128 int128 = static_cast<int64_t>(in);
+  TP afterOne = abs(in - static_cast<int64_t>(in)) * 10.0;
+  TP afterTwo = abs(afterOne - static_cast<int64_t>(afterOne)) * 10.0;
+  if (afterTwo >= 5) afterOne += 1;
+  if ((afterOne >= 5 && static_cast<int64_t>(in) % 10 >= 5) || afterOne > 5)
+    in > 0 ? int128 += Int128(1) : int128 -= Int128(1);
   return DecimalVar(int128.getHighBits(), int128.getLowBits(), scale);
 }
 
