@@ -203,6 +203,11 @@ void Decimal128ColumnWriter::writeVector(dbcommon::Vector *vector) {
     }
   }
 
+  if (vector->hasNullValue()) {
+    buf = vector->getNullBuffer()->getReverseBools();
+    notNull = const_cast<char *>(buf->data());
+  }
+
   ColumnWriter::writeVector(vector);
   std::vector<int64_t> scales(numValues, static_cast<int64_t>(scale));
 
