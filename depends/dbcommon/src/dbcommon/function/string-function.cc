@@ -27,6 +27,22 @@
 
 namespace dbcommon {
 
+inline void bpcharTrim(Datum *params, uint64_t size) {
+  for (uint64_t i = 1; i < size; i++) {
+    Object *para = DatumGetValue<Object *>(params[i]);
+    if (dynamic_cast<Scalar *>(para)) {
+      Scalar *temp = params[i];
+      if (temp->isnull) continue;
+
+      char *str = temp->value;
+      int32_t lenth = temp->length;
+      while (--lenth >= 0)
+        if (str[lenth] != ' ') break;
+      temp->length = lenth + 1;
+    }
+  }
+}
+
 template <bool expetedMatch>
 Datum string_like_proto(Datum *params, uint64_t size) {
   assert(size == 3);
@@ -425,6 +441,7 @@ Datum string_char_length(Datum *params, uint64_t size) {
 }
 
 Datum bpchar_char_length(Datum *params, uint64_t size) {
+  bpcharTrim(params, size);
   return string_char_length(params, size);
 }
 

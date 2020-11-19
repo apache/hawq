@@ -372,7 +372,7 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({STRING_BTRIM_CHARS, "string_btrim_chars", STRINGID, {STRINGID, STRINGID}, string_btrim_chars});
   FuncEntryArray.push_back({STRING_REPEAT, "string_repeat", STRINGID, {STRINGID, INTID}, string_repeat, false});
   FuncEntryArray.push_back({STRING_CHR, "string_chr", STRINGID, {INTID}, string_chr, false});
-  FuncEntryArray.push_back({STRING_BPCHAR, "string_bpchar", STRINGID, {STRINGID, INTID, BOOLEANID}, string_bpchar, false});
+  FuncEntryArray.push_back({STRING_BPCHAR, "string_bpchar", CHARID, {CHARID, INTID, BOOLEANID}, string_bpchar, false});
   FuncEntryArray.push_back({STRING_LPAD, "string_lpad", STRINGID, {STRINGID, INTID, STRINGID}, string_lpad, false});
   FuncEntryArray.push_back({STRING_RPAD, "string_rpad", STRINGID, {STRINGID, INTID, STRINGID}, string_rpad, false});
   FuncEntryArray.push_back({STRING_LPAD_NOFILL, "string_lpad_nofill", STRINGID, {STRINGID, INTID}, string_lpad_nofill, false});

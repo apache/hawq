@@ -19,13 +19,12 @@
 
 #include <iostream>
 
-#include "gtest/gtest.h"
-
 #include "dbcommon/function/string-binary-function.h"
 #include "dbcommon/log/debug-logger.h"
 #include "dbcommon/testutil/function-utils.h"
 #include "dbcommon/testutil/scalar-utils.h"
 #include "dbcommon/testutil/vector-utils.h"
+#include "gtest/gtest.h"
 
 namespace dbcommon {
 
@@ -48,11 +47,40 @@ TEST(TestFunction, string_char_length) {
   }
 }
 
+TEST(TestFunction, bpchar_char_length) {
+  FunctionUtility fu(FuncKind::BPCHAR_CHAR_LENGTH);
+  auto ret = fu.generatePara<0, Vector>("NULL");
+
+  auto expect = fu.generatePara<0, Vector>("3 8 5 NULL 3 2 4");
+  auto strs =
+      fu.generatePara<1, Vector>("cat black的今天 sheep NULL fry is good");
+  std::vector<Datum> params{ret, strs};
+  fu.test(params.data(), params.size(), expect);
+
+  {
+    auto expect = fu.generatePara<0, Vector>("10 7 8 0");
+    auto strs =
+        fu.generatePara<1, Vector>("i am a stu, nic to,meet you,   ", ',');
+    std::vector<Datum> params{ret, strs};
+    fu.test(params.data(), params.size(), expect);
+  }
+}
+
 TEST(TestFunction, string_octet_length) {
   FunctionUtility fu(FuncKind::STRING_OCTET_LENGTH);
   auto ret = fu.generatePara<0, Vector>("NULL");
 
   auto expect = fu.generatePara<0, Vector>("3 5 5 NULL 3 2 4");
+  auto strs = fu.generatePara<1, Vector>("cat black sheep NULL fry is good");
+  std::vector<Datum> params{ret, strs};
+  fu.test(params.data(), params.size(), expect);
+}
+
+TEST(TestFunction, bpchar_octet_length) {
+  FunctionUtility fu(FuncKind::BPCHAR_OCTET_LENGTH);
+  auto ret = fu.generatePara<0, Vector>("NULL");
+
+  auto expect = fu.generatePara<0, Vector>("23 23 23 NULL 23 23 23");
   auto strs = fu.generatePara<1, Vector>("cat black sheep NULL fry is good");
   std::vector<Datum> params{ret, strs};
   fu.test(params.data(), params.size(), expect);
@@ -67,7 +95,30 @@ TEST(TestFunction, string_like) {
 
   {
     LOG_TESTING("non-ANSI pattern");
+    SelectList expect{7, 9};
+    auto pattern = fu.generatePara<2, Scalar>("_ee%");
+    std::vector<Datum> params{CreateDatum(&ret), strs, pattern};
+    fu.test(params.data(), params.size(), CreateDatum(&expect));
+  }
 
+  {
+    LOG_TESTING("ANSI pattern");
+    SelectList expect{4, 7};
+    auto pattern = fu.generatePara<2, Scalar>("%r%");
+    std::vector<Datum> params{CreateDatum(&ret), strs, pattern};
+    fu.test(params.data(), params.size(), CreateDatum(&expect));
+  }
+}
+
+TEST(TestFunction, bpchar_like) {
+  FunctionUtility fu(FuncKind::BPCHAR_LIKE);
+  SelectList ret;
+
+  auto strs = fu.generatePara<1, Vector>(
+      "cat NULL sheep NULL fry is good peer flee 你ee");
+
+  {
+    LOG_TESTING("non-ANSI pattern");
     SelectList expect{7, 9};
     auto pattern = fu.generatePara<2, Scalar>("_ee%");
     std::vector<Datum> params{CreateDatum(&ret), strs, pattern};
@@ -94,6 +145,30 @@ TEST(TestFunction, string_not_like) {
     LOG_TESTING("non-ANSI pattern");
 
     auto pattern = fu.generatePara<2, Scalar>("_ry");
+    SelectList expect{0, 2, 5, 6, 7, 8, 9};
+    std::vector<Datum> params{CreateDatum(&ret), strs, pattern};
+    fu.test(params.data(), params.size(), CreateDatum(&expect));
+  }
+
+  {
+    LOG_TESTING("ANSI pattern");
+    auto pattern = fu.generatePara<2, Scalar>("%ee%");
+    SelectList expect{0, 4, 5, 6, 10};
+    std::vector<Datum> params{CreateDatum(&ret), strs, pattern};
+    fu.test(params.data(), params.size(), CreateDatum(&expect));
+  }
+}
+
+TEST(TestFunction, bpchar_not_like) {
+  FunctionUtility fu(FuncKind::BPCHAR_NOT_LIKE);
+  SelectList ret;
+
+  auto strs = fu.generatePara<1, Vector>(
+      "cat NULL sheep NULL fry is good peer flee 你ee try");
+
+  {
+    LOG_TESTING("non-ANSI pattern");
+    auto pattern = fu.generatePara<2, Scalar>("_ry                    ");
     SelectList expect{0, 2, 5, 6, 7, 8, 9};
     std::vector<Datum> params{CreateDatum(&ret), strs, pattern};
     fu.test(params.data(), params.size(), CreateDatum(&expect));
@@ -532,6 +607,17 @@ TEST(TestFunction, string_position) {
     auto rhs = vuString.generateVector(
         "abc,xxx,,NULL,abb,abc,a b c,abcabcabcabcabcabcabd", ',');
     auto position = vuInteger.generateVector("1 NULL 1 NULL 0 0 2 4");
+
+    std::vector<Datum> params{CreateDatum(ret.get()), CreateDatum(rhs.get()),
+                              CreateDatum(lhs.get())};
+    fu.test(params.data(), params.size(), CreateDatum(position.get()));
+  }
+
+  {
+    LOG_TESTING("Vector in Vector with KMP input");
+    auto lhs = vuString.generateVector("abcdeabcdeabcdeabcdeabcdeabcde");
+    auto rhs = vuString.generateVector("xabcdeabcdeabcdeabcdeabcdeabcde");
+    auto position = vuInteger.generateVector("2");
 
     std::vector<Datum> params{CreateDatum(ret.get()), CreateDatum(rhs.get()),
                               CreateDatum(lhs.get())};
@@ -1335,10 +1421,14 @@ INSTANTIATE_TEST_CASE_P(
 INSTANTIATE_TEST_CASE_P(
     string_bpchar, TestFunction,
     ::testing::Values(
+        TestFunctionEntry{
+            FuncKind::STRING_BPCHAR,
+            "Vector: abcdefghijklmnopqrstuvw",
+            {"Vector: abcdefghijklmnopqrstuvwxyz", "Vector: 27", "Vector: t"}},
         TestFunctionEntry{FuncKind::STRING_BPCHAR,
                           "Vector{delimiter=,}: a ,ab,NULL",
-                          {"Vector{delimiter=,}: a,ab ,NULL", "Vector: 6 6 6",
-                           "Vector: t t t"}},
+                          {"Vector{delimiter=,}: a,ab ,NULL",
+                           "Vector: 27 27 27", "Vector: t t t"}},
         TestFunctionEntry{FuncKind::STRING_BPCHAR,
                           "Error",
                           {"Vector: abc", "Vector: 6", "Vector: f"},
@@ -1346,11 +1436,11 @@ INSTANTIATE_TEST_CASE_P(
         TestFunctionEntry{FuncKind::STRING_BPCHAR,
                           "Vector{delimiter=,}: 中 ,中国,a中国,NULL",
                           {"Vector{delimiter=,}: 中,中国 ,a中国B,NULL",
-                           "Vector: 6 6 7 6", "Vector: t t t t"}},
-        TestFunctionEntry{
-            FuncKind::STRING_BPCHAR,
-            "Vector{delimiter=,}: a ,ab,NULL",
-            {"Vector{delimiter=,}: a,ab ,NULL", "Vector: 6 6 6", "Scalar: t"}},
+                           "Vector: 27 27 27 27", "Vector: t t t t"}},
+        TestFunctionEntry{FuncKind::STRING_BPCHAR,
+                          "Vector{delimiter=,}: a ,ab,NULL",
+                          {"Vector{delimiter=,}: a,ab ,NULL",
+                           "Vector: 27 27 27", "Scalar: t"}},
         TestFunctionEntry{
             FuncKind::STRING_BPCHAR,
             "Vector: NULL NULL NULL",
@@ -1362,7 +1452,7 @@ INSTANTIATE_TEST_CASE_P(
         TestFunctionEntry{
             FuncKind::STRING_BPCHAR,
             "Vector{delimiter=,}: a ,ab,NULL",
-            {"Vector{delimiter=,}: a,ab ,NULL", "Scalar: 6", "Vector: t t t"}},
+            {"Vector{delimiter=,}: a,ab ,NULL", "Scalar: 27", "Vector: t t t"}},
         TestFunctionEntry{
             FuncKind::STRING_BPCHAR,
             "Vector: NULL NULL NULL",
@@ -1374,7 +1464,7 @@ INSTANTIATE_TEST_CASE_P(
         TestFunctionEntry{
             FuncKind::STRING_BPCHAR,
             "Vector{delimiter=,}: a ,ab,NULL",
-            {"Vector{delimiter=,}: a,ab ,NULL", "Scalar: 6", "Scalar: t"}},
+            {"Vector{delimiter=,}: a,ab ,NULL", "Scalar: 27", "Scalar: t"}},
         TestFunctionEntry{FuncKind::STRING_BPCHAR,
                           "Vector: NULL NULL NULL",
                           {"Vector: a ab NULL", "Scalar: NULL", "Scalar: t"}},
@@ -1382,9 +1472,11 @@ INSTANTIATE_TEST_CASE_P(
                           "Error",
                           {"Vector: abc", "Scalar: 6", "Scalar: f"},
                           ERRCODE_STRING_DATA_RIGHT_TRUNCATION},
-        TestFunctionEntry{FuncKind::STRING_BPCHAR,
-                          "Vector: ab abc NULL",
-                          {"Scalar: abc", "Vector: 6 7 8", "Vector: t t NULL"}},
+        TestFunctionEntry{
+            FuncKind::STRING_BPCHAR,
+            "Vector: abc abc NULL",
+            {"Scalar: abc", "Vector: 27 27 27", "Vector: t t NULL"}},
+
         TestFunctionEntry{
             FuncKind::STRING_BPCHAR,
             "Vector: NULL NULL NULL",
@@ -1394,8 +1486,8 @@ INSTANTIATE_TEST_CASE_P(
                           {"Scalar: abc", "Vector: 6", "Vector: f"},
                           ERRCODE_STRING_DATA_RIGHT_TRUNCATION},
         TestFunctionEntry{FuncKind::STRING_BPCHAR,
-                          "Vector: ab abc NULL",
-                          {"Scalar: abc", "Vector: 6 7 NULL", "Scalar: t"}},
+                            "Vector: abc abc NULL",
+                            {"Scalar: abc", "Vector: 27 27 NULL", "Scalar: t"}},
         TestFunctionEntry{FuncKind::STRING_BPCHAR,
                           "Vector: NULL NULL NULL",
                           {"Scalar: abc", "Vector: 6 7 NULL", "Scalar: NULL"}},
@@ -1404,8 +1496,8 @@ INSTANTIATE_TEST_CASE_P(
                           {"Scalar: abc", "Vector: 6", "Scalar: f"},
                           ERRCODE_STRING_DATA_RIGHT_TRUNCATION},
         TestFunctionEntry{FuncKind::STRING_BPCHAR,
-                          "Vector: ab ab NULL",
-                          {"Scalar: abc", "Scalar: 6", "Vector: t t NULL"}},
+                            "Vector: abc abc NULL",
+                            {"Scalar: abc", "Scalar: 27", "Vector: t t NULL"}},
         TestFunctionEntry{FuncKind::STRING_BPCHAR,
                           "Vector: NULL NULL NULL",
                           {"Scalar: NULL", "Scalar: 6", "Vector: t t NULL"}},
