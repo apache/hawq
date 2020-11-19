@@ -281,6 +281,9 @@ class TupleBatch {
 
   void replaceDecimalVector();
 
+  static void initApTupleBatch(const dbcommon::TupleDesc &desc,
+                               dbcommon::TupleBatch *tbOut);
+
  private:
   inline uint32_t calculateSizeOfMaskBits(uint32_t colSize,
                                           uint32_t sysColSize) {

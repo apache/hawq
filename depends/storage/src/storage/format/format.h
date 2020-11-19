@@ -167,7 +167,7 @@ class Format {
 
   // Update a tuple batch
   // @param tb The tuple batch to be updated
-  virtual void doUpdate(std::unique_ptr<dbcommon::TupleBatch> tb) = 0;
+  virtual int doUpdate(std::unique_ptr<dbcommon::TupleBatch> tb) = 0;
 
   // End update
   virtual void endUpdate() = 0;

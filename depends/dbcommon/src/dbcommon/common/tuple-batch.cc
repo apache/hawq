@@ -857,4 +857,47 @@ void TupleBatch::replaceDecimalVector() {
   }
 }
 
+void TupleBatch::initApTupleBatch(const dbcommon::TupleDesc &desc,
+                                  dbcommon::TupleBatch *tbOut) {
+  assert(0 == tbOut->getNumOfColumns());
+  // add user vectors
+  size_t attNum = desc.getNumOfColumns();
+  for (size_t i = 0; i < attNum; i++) {
+    dbcommon::TypeKind colType = desc.getColumnType(i);
+    bool ownData = (dbcommon::TypeKind::FLOATID != colType) &&
+                   (dbcommon::TypeKind::DOUBLEID != colType);
+    std::unique_ptr<Vector> vect = Vector::BuildVector(
+        desc.getColumnType(i), ownData, desc.getColumnTypeModifier(i));
+    std::unique_ptr<Vector> child;
+    switch (colType) {
+      case dbcommon::SMALLINTARRAYID:
+        child = std::unique_ptr<dbcommon::Vector>(
+            new dbcommon::SmallIntVector(ownData));
+        vect->addChildVector(std::move(child));
+        break;
+      case dbcommon::INTARRAYID:
+        child =
+            std::unique_ptr<dbcommon::Vector>(new dbcommon::IntVector(ownData));
+        vect->addChildVector(std::move(child));
+        break;
+      case dbcommon::BIGINTARRAYID:
+        child = std::unique_ptr<Vector>(new dbcommon::BigIntVector(ownData));
+        vect->addChildVector(std::move(child));
+        break;
+      case dbcommon::FLOATARRAYID:
+        child = std::unique_ptr<Vector>(new dbcommon::FloatVector(ownData));
+        vect->addChildVector(std::move(child));
+        break;
+      case dbcommon::DOUBLEARRAYID:
+        child = std::unique_ptr<Vector>(new dbcommon::DoubleVector(ownData));
+        vect->addChildVector(std::move(child));
+        break;
+      default:
+        break;
+    }
+    vect->setParentTupleBatch(tbOut);
+    tbOut->addColumn(std::move(vect));
+  }
+}
+
 }  // namespace dbcommon.

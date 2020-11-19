@@ -48,7 +48,7 @@ void ORCFormat::beginUpdate(const std::string &targetName,
   LOG_ERROR(ERRCODE_FEATURE_NOT_SUPPORTED, "UPDATE is not implemented yet");
 }
 
-void ORCFormat::doUpdate(std::unique_ptr<dbcommon::TupleBatch> tb) {
+int ORCFormat::doUpdate(std::unique_ptr<dbcommon::TupleBatch> tb) {
   LOG_ERROR(ERRCODE_FEATURE_NOT_SUPPORTED, "UPDATE is not implemented yet");
 }
 

@@ -90,7 +90,7 @@ class ORCFormat : public Format {
 
   void beginUpdate(const std::string &targetName,
                    const dbcommon::TupleDesc &td) override;
-  void doUpdate(std::unique_ptr<dbcommon::TupleBatch> tb) override;
+  int doUpdate(std::unique_ptr<dbcommon::TupleBatch> tb) override;
   void endUpdate() override;
 
   void beginDelete(const std::string &targetName,

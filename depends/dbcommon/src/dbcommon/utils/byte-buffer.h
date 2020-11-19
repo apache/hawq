@@ -155,7 +155,9 @@ class ByteBuffer {
   // @param sz The new size
   // @return void
   void resize(uint64_t sz) {
-    assert(ownData_);
+    if (!ownData_) {
+      return;
+    }
 
     if (size_ < sz) reserve(sz);
 
