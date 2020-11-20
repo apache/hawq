@@ -148,6 +148,332 @@ Datum text_to_Float(Datum *params, uint64_t size) {
   return one_param_bind<TP, text>(params, size, textToFloat);
 }
 
+DecimalVar stringToDecimal(const char *srcbufferPtr, int64_t strLength) {
+  auto sendErroLog = [](const char *&srcbufferFrontPtrtemp,
+                        int64_t &strLength) {
+    LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+              "invalid input syntax for type %s: \"%*.*s\"",
+              pgTypeName<DecimalVar>(), static_cast<int32_t>(strLength),
+              static_cast<int32_t>(strLength), srcbufferFrontPtrtemp);
+  };
+
+  const char *srcbufferBackPtrtemp = srcbufferPtr + strLength;
+  const char *srcbufferFrontPtrtemp = srcbufferPtr;
+  if ((*srcbufferPtr < '0' || *srcbufferPtr > '9') && *srcbufferPtr != '-' &&
+      *srcbufferPtr != '.') {
+    sendErroLog(srcbufferFrontPtrtemp, strLength);
+  }
+  bool isNegative = (*srcbufferPtr == '-');
+  if (isNegative) {
+    ++srcbufferPtr;
+  }
+
+  const char *pdot = nullptr;
+  const char *pe = nullptr;
+  for (const char *ptemp = srcbufferPtr; ptemp < srcbufferBackPtrtemp;
+       ++ptemp) {
+    if (*ptemp == '.') {
+      pdot = ptemp;
+    }
+    if (*ptemp == 'e' || *ptemp == 'E') {
+      pe = ptemp;
+    }
+  }
+
+  if (pe == srcbufferPtr || (pe < pdot && pe && pdot) ||
+      (pe && *(pe + 1) != '+' && *(pe + 1) != '-')) {
+    sendErroLog(srcbufferFrontPtrtemp, strLength);
+  }
+  for (const char *ptemp = srcbufferPtr; ptemp < srcbufferBackPtrtemp;
+       ++ptemp) {
+    if ((*ptemp < '0' || *ptemp > '9') && ptemp != pdot && ptemp != pe &&
+        ptemp != pe + 1) {
+      sendErroLog(srcbufferFrontPtrtemp, strLength);
+    }
+  }
+  Int128 intVal(0);
+  const char *ptempend = pdot ? pdot : (pe ? pe : srcbufferBackPtrtemp);
+  const char *ptempend1 =
+      ptempend - srcbufferPtr < 20 ? ptempend : srcbufferPtr + 19;
+  uint64_t int64val = 0;
+  for (const char *ptemp = srcbufferPtr; ptemp < ptempend1; ++ptemp) {
+    int64val = int64val * 10 + *ptemp - '0';
+  }
+  intVal = Int128(0, int64val);
+  if (ptempend1 < ptempend) {
+    for (const char *ptemp = ptempend1; ptemp < ptempend; ++ptemp) {
+      intVal *= Int128(10);
+      intVal += Int128(*ptemp - '0');
+    }
+  }
+  int64_t dotNum = 0;
+  if (pdot) {
+    const char *pend = pe ? pe : srcbufferBackPtrtemp;
+    if (ptempend - srcbufferPtr < 20) {
+      int64_t rest = 20 - (ptempend - srcbufferPtr);
+      const char *ptempend2 =
+          pend - (pdot + 1) < rest ? pend : pdot + 1 + rest - 1;
+      for (const char *ptemp = pdot + 1; ptemp < ptempend2; ++ptemp) {
+        int64val = int64val * 10 + *ptemp - '0';
+      }
+      intVal = Int128(0, int64val);
+      if (ptempend2 < pend) {
+        for (const char *ptemp = ptempend2; ptemp < pend; ++ptemp) {
+          intVal *= Int128(10);
+          intVal += Int128(*ptemp - '0');
+        }
+      }
+    } else {
+      for (const char *ptemp = pdot + 1; ptemp < pend; ++ptemp) {
+        intVal *= Int128(10);
+        intVal += Int128(*ptemp - '0');
+      }
+    }
+    dotNum = (pend - 1) - pdot;
+  }
+  if (isNegative) {
+    intVal.negate();
+  }
+  int64_t exval = 0;
+  if (pe) {
+    uint64_t isExNegative = *(pe + 1) == '-';
+    for (const char *ptemp = pe + 2; ptemp < srcbufferBackPtrtemp; ++ptemp) {
+      exval = exval * 10 + (*ptemp - '0');
+    }
+    exval = isExNegative ? -exval : exval;
+  }
+  int64_t scale = dotNum - exval;
+  DecimalVar resVal =
+      DecimalVar(intVal.getHighBits(), intVal.getLowBits(), scale);
+  return scale < 0 ? resVal.cast(0) : resVal;
+}
+
+Datum textToDecimal(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  Object *para = params[1];
+
+  auto strToDecimal = [](ByteBuffer &buf, Text in) -> DecimalVar {
+    int64_t strLength = in.length;
+    const char *srcbufferPtr = in.val;
+    return stringToDecimal(srcbufferPtr, strLength);
+  };
+  return one_param_bind<DecimalVar, Text>(params, size, strToDecimal);
+}
+
+Datum toNumber(Datum *params, uint64_t size) {
+  assert(size == 3 && "invalid input");
+
+  auto strToDecimal = [](ByteBuffer &buf, Text inStr,
+                         Text inMod) -> DecimalVar {
+// In all cases, Text 's length is determined by its length rather than '\0'.
+#define NEXTCHAR(ptr, end)              \
+  while (ptr < end && (++ptr) != end) { \
+    if (*ptr != ' ') break;             \
+  }
+#define LASTCHAR(ptr)       \
+  while (*(--ptr) == ' ') { \
+  }
+    int64_t strLength = inStr.length;
+    const char *strFrontPtr = inStr.val;
+    const char *strBackPtr = strFrontPtr + strLength;
+    int64_t modLength = inMod.length;
+    const char *modFrontPtr = inMod.val;
+    const char *modBackPtr = modFrontPtr + modLength;
+
+    int32_t numOfS = 0;
+    int32_t numOfMI = 0;
+    int32_t numOfDot = 0;
+    int32_t numOfPR = 0;
+    int32_t numOfPL = 0;
+    int32_t dotNeg = 0;
+    int32_t prNeg = 0;
+    int32_t precision = 0;
+    bool afterDot = false;
+    Int128 intVal = 0;
+    uint64_t int64Val = 0;
+    int64_t scale = 0;
+    int64_t num = 0;
+    const char *ptempMod = modFrontPtr;
+    const char *ptempNum = strFrontPtr;
+    while (ptempMod < modBackPtr) {
+      if (*ptempMod == 'E' || *ptempMod == 'e') {
+        LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+                  "\"E\" is not supported for function \"to_char\"");
+      }
+      if (*ptempMod == 's' || *ptempMod == 'S') {
+        ++numOfS;
+        if (numOfS > 1) {
+          LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+                    "cannot use \"S\" twice for function \"to_char\"");
+        }
+        if (numOfS + numOfMI > 1) {
+          LOG_ERROR(
+              ERRCODE_INVALID_TEXT_REPRESENTATION,
+              "cannot use \"S\" and \"MI\" together for function \"to_char\"");
+        }
+        if (numOfPL) {
+          LOG_ERROR(
+              ERRCODE_INVALID_TEXT_REPRESENTATION,
+              "cannot use \"S\" and \"PL\" together for function \"to_char\"");
+        }
+        if (numOfPR) {
+          LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+                    "cannot use \"S\" and \"PR\"/\"PL\"/\"MI\"/\"SG\" together "
+                    "for function \"to_char\"");
+        }
+        NEXTCHAR(ptempMod, modBackPtr);
+        continue;
+      }
+      if (*ptempMod == 'f' || *ptempMod == 'F') {
+        NEXTCHAR(ptempMod, modBackPtr);
+        if (ptempMod < modBackPtr && (*ptempMod == 'm' || *ptempMod == 'M')) {
+          NEXTCHAR(ptempMod, modBackPtr);
+          continue;
+        }
+        NEXTCHAR(ptempNum, strBackPtr);
+        continue;
+      } else if (*ptempMod == 't' || *ptempMod == 'T') {
+        NEXTCHAR(ptempMod, modBackPtr);
+        if (ptempMod < modBackPtr && (*ptempMod == 'h' || *ptempMod == 'H')) {
+          NEXTCHAR(ptempMod, modBackPtr);
+          continue;
+        }
+        NEXTCHAR(ptempNum, strBackPtr);
+        continue;
+      }
+
+      if (*ptempMod == 'm' || *ptempMod == 'M') {
+        NEXTCHAR(ptempMod, modBackPtr);
+        if (ptempMod < modBackPtr) {
+          if (*ptempMod == 'i' || *ptempMod == 'I') {
+            ++numOfMI;
+            if (numOfS && numOfMI) {
+              LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+                        "cannot use \"S\" and \"MI\" together for function "
+                        "\"to_char\"");
+            }
+            NEXTCHAR(ptempMod, modBackPtr);
+            if (numOfMI > 1) NEXTCHAR(ptempNum, strBackPtr);
+            continue;
+          }
+        }
+        NEXTCHAR(ptempNum, strBackPtr);
+        continue;
+      }
+      if (*ptempMod == 'd' || *ptempMod == 'D' || *ptempMod == '.') {
+        ++numOfDot;
+        if (numOfDot > 1) {
+          LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+                    "multiple decimal points for function \"to_char\"");
+        }
+        if (ptempNum < strBackPtr && *ptempNum != '.') {
+          std::string tmpNum;
+          for (const char *tmp = strFrontPtr; tmp < strBackPtr; ++tmp) {
+            if (*tmp == '.') break;
+            if (*tmp > '0' && *tmp < '9') tmpNum.push_back(*tmp);
+          }
+          LOG_ERROR(
+              ERRCODE_INVALID_TEXT_REPRESENTATION,
+              "A field with precision %d, scale 0 must round to an absolute "
+              "value less than 10^%d. Rounded overflowing value: %s",
+              precision, precision, tmpNum.c_str());
+        } else {
+          afterDot = true;
+          NEXTCHAR(ptempNum, strBackPtr);
+          NEXTCHAR(ptempMod, modBackPtr);
+          continue;
+        }
+      }
+      if (*ptempMod == 'r' || *ptempMod == 'R') {
+        NEXTCHAR(ptempMod, modBackPtr);
+        if (ptempMod < modBackPtr) {
+          if (*ptempMod == 'n' || *ptempMod == 'N') {
+            LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+                      "\"RN\" not supported with function \"to_number\"");
+          }
+        }
+        NEXTCHAR(ptempNum, strBackPtr);
+        continue;
+      }
+      if (*ptempMod == 'p' || *ptempMod == 'P') {
+        NEXTCHAR(ptempMod, modBackPtr);
+        if (ptempMod < modBackPtr) {
+          if (*ptempMod == 'l' || *ptempMod == 'L') {
+            ++numOfPL;
+            if (numOfS)
+              LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+                        "cannot use \"S\" and \"PL\" together for function "
+                        "\"to_char\"");
+            NEXTCHAR(ptempMod, modBackPtr);
+            NEXTCHAR(ptempNum, strBackPtr);
+            continue;
+          }
+          if (*ptempMod == 'r' || *ptempMod == 'R') {
+            ++numOfPR;
+            if (numOfS)
+              LOG_ERROR(ERRCODE_INVALID_TEXT_REPRESENTATION,
+                        "cannot use \"PR\" and \"S\"/\"PL\"/\"MI\"/\"SG\" "
+                        "together for function \"to_char\"");
+            NEXTCHAR(ptempMod, modBackPtr);
+            if (ptempMod < modBackPtr && (*ptempMod == '0' || *ptempMod == '9'))
+              LOG_ERROR(
+                  ERRCODE_INVALID_TEXT_REPRESENTATION,
+                  "\"%d\" must be ahead of \"PR\" for function \"to_char\"",
+                  *ptempMod - '0');
+            NEXTCHAR(ptempNum, strBackPtr);
+            continue;
+          }
+        }
+        NEXTCHAR(ptempMod, modBackPtr);
+        NEXTCHAR(ptempNum, strBackPtr);
+        continue;
+      }
+
+      if (*ptempMod != '0' && *ptempMod != '9') {
+        NEXTCHAR(ptempMod, modBackPtr);
+        NEXTCHAR(ptempNum, strBackPtr);
+      } else {
+        if (ptempNum >= strBackPtr) {
+          NEXTCHAR(ptempMod, modBackPtr);
+          continue;
+        }
+        if (*ptempNum == '.') {
+          afterDot = true;
+          for (; ptempMod < modBackPtr; ++ptempMod) {
+            if (*ptempMod == 'D' || *ptempMod == 'd' || *ptempMod == '.') {
+              NEXTCHAR(ptempMod, modBackPtr);
+              break;
+            }
+          }
+          NEXTCHAR(ptempNum, strBackPtr);
+          if (ptempNum < strBackPtr && *ptempNum == '-') dotNeg = 1;
+        } else if (*ptempNum < '0' || *ptempNum > '9') {
+          NEXTCHAR(ptempNum, strBackPtr);
+        } else {
+          if (afterDot) ++scale;
+          num++;
+          if (num < 20) {
+            int64Val = int64Val * 10 + *ptempNum - '0';
+            intVal = Int128(0, int64Val);
+          } else {
+            intVal *= Int128(10);
+            intVal += Int128(*ptempNum - '0');
+          }
+          if (!afterDot) ++precision;
+          NEXTCHAR(ptempNum, strBackPtr);
+          NEXTCHAR(ptempMod, modBackPtr);
+        }
+      }
+    }
+
+    if (((dotNeg || *(strBackPtr - 1) == '-') && (numOfS || numOfMI)) ||
+        *strFrontPtr == '-' || (*strFrontPtr == '<' && numOfPR))
+      intVal.negate();
+    return DecimalVar(intVal.getHighBits(), intVal.getLowBits(), scale);
+  };
+  return two_params_bind<DecimalVar, Text, Text>(params, size, strToDecimal);
+}
+
 template <typename TP>
 Datum text_to_Integer(Datum *params, uint64_t size) {
   assert(size == 2 && "invalid input");

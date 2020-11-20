@@ -306,4 +306,31 @@ INSTANTIATE_TEST_CASE_P(
         "05:33:09+08,NULL",
         {"Vector{delimiter=,}: -1325491552,NULL"}}));
 
+INSTANTIATE_TEST_CASE_P(
+    to_number, TestFunction,
+    ::testing::Values(
+        TestFunctionEntry{
+            FuncKind::TO_NUMBER,
+            "Vector: -34338492 -34338492.654878 -0.00001 -5.01 -5.01 0.01 0.0 "
+            "0 "
+            "-0.01 -564646.654564 -0.01 NULL",
+            {"Vector: -34,338,492 -34,338,492.654,878 0.00001- 5.01- 5.01- .01 "
+             ".0 "
+             "0 .01- <564646.654564> .-01 NULL",
+             "Vector: 99G999G999 99G999G999D999G999 9.999999S FM9.999999S "
+             "FM9.999999MI FM9.99 99999999.99999999 99.99 TH99.99S "
+             "999999.999999PR "
+             "S99.99 NULL"}},
+        TestFunctionEntry{FuncKind::TO_NUMBER,
+                          "Error",
+                          {"Vector: -34,338,492 -34,338,492.654,878 0.00001- "
+                           "5.01- 5.01- .01 .0 "
+                           "0 .01- <564646.654564> 111.11",
+                           "Vector: 99G999G99Ss9 99G999G999D.999G999 "
+                           "MIMI9.999999S FM9.99999PR9S "
+                           "FM9.999999PLS FM9.99SPL 99999999.99999999PRS "
+                           "99.9PR0 99.99SPR 999999.999999RN "
+                           "99.99"},
+                          ERRCODE_INVALID_TEXT_REPRESENTATION}));
+
 }  // namespace dbcommon

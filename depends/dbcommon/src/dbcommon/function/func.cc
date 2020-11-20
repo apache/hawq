@@ -462,6 +462,8 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({TEXT_TO_BIGINT, "text_bigint", BIGINTID, {STRINGID}, text_to_int8});
   FuncEntryArray.push_back({TEXT_TO_FLOAT, "text_float", FLOATID, {STRINGID}, text_to_float4});
   FuncEntryArray.push_back({TEXT_TO_DOUBLE, "text_double", DOUBLEID, {STRINGID}, text_to_float8});
+  FuncEntryArray.push_back{TEXT_TO_DECIMAL, "text_decimal", DECIMALNEWID, {STRINGID}, textToDecimal});
+  FuncEntryArray.push_back({TO_NUMBER, "to_number", DECIMALNEWID, {STRINGID, STRINGID}, toNumber});
 
   FuncEntryArray.push_back({BOOLEAN_TO_SMALLINT, "boolean_smallint", SMALLINTID, {BOOLEANID}, bool_to_int2});
   FuncEntryArray.push_back({BOOLEAN_TO_INT, "boolean_int", INTID, {BOOLEANID}, bool_to_int4});
