@@ -210,6 +210,12 @@ INSTANTIATE_TEST_CASE_P(
         "Vector: -214741777777.101 2147.6 214741.101 -3456 NULL",
         {"Vector: -214741777777.10110 2147.600 214741.1010 -3456 NULL"}}));
 
+INSTANTIATE_TEST_CASE_P(bool_to_text, TestFunction,
+                        ::testing::Values(TestFunctionEntry{
+                            FuncKind::BOOL_TO_TEXT,
+                            "Vector: true false NULL",
+                            {"Vector: t f NULL"}}));
+
 INSTANTIATE_TEST_CASE_P(text_to_char, TestFunction,
                         ::testing::Values(TestFunctionEntry{
                             FuncKind::TEXT_TO_CHAR,

@@ -198,6 +198,32 @@ Datum text_to_char(Datum *params, uint64_t size) {
   return one_param_bind<int8_t, text>(params, size, textToChar);
 }
 
+Datum bool_to_text(Datum *params, uint64_t size) {
+  auto boolToText = [](ByteBuffer &buf, bool src) -> text {
+    int32_t len;
+    if (src) {
+      len = 4;
+      buf.resize(buf.size() + len);
+      char *ret = const_cast<char *>(buf.tail() - len);
+      *ret++ = 't';
+      *ret++ = 'r';
+      *ret++ = 'u';
+      *ret++ = 'e';
+    } else {
+      len = 5;
+      buf.resize(buf.size() + len);
+      char *ret = const_cast<char *>(buf.tail() - len);
+      *ret++ = 'f';
+      *ret++ = 'a';
+      *ret++ = 'l';
+      *ret++ = 's';
+      *ret++ = 'e';
+    }
+    return text(nullptr, len);
+  };
+  return one_param_bind<text, bool>(params, size, boolToText);
+}
+
 Datum int4_to_char(Datum *params, uint64_t size) {
   auto intToChar = [](ByteBuffer &buf, int32_t src) -> int8_t {
     int8_t ret;

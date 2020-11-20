@@ -325,6 +325,7 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({FLOAT_TO_TEXT, "float_to_text", STRINGID, {FLOATID}, float4_to_text});
   FuncEntryArray.push_back({DOUBLE_TO_TEXT, "double_to_text", STRINGID, {DOUBLEID}, float8_to_text});
   FuncEntryArray.push_back({DECIMAL_TO_TEXT, "decimal_to_text", STRINGID, {DECIMALNEWID}, decimal_to_text});
+  FuncEntryArray.push_back({BOOL_TO_TEXT, "bool_to_text", STRINGID, {BOOLEANID}, bool_to_text});
   FuncEntryArray.push_back({TEXT_TO_CHAR, "text_to_char", TINYINTID, {STRINGID}, text_to_char});
   FuncEntryArray.push_back({INT_TO_CHAR, "int4_to_char", TINYINTID, {INTID}, int4_to_char});
   FuncEntryArray.push_back({DOUBLE_TO_TIMESTAMP, "double_to_timestamp", TIMESTAMPTZID, {DOUBLEID}, double_to_timestamp});
