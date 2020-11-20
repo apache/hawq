@@ -104,4 +104,12 @@ INSTANTIATE_TEST_CASE_P(
                            "e33 1.23eq2 1.2i3e2 1.23e2i2"},
                           ERRCODE_INVALID_TEXT_REPRESENTATION}));
 
+INSTANTIATE_TEST_CASE_P(
+    interval_to_text, TestFunction,
+    ::testing::Values(TestFunctionEntry{
+        FuncKind::INTERVAL_TO_TEXT,
+        "Vector{delimiter=x}: 4 years 2 months 560 days 00:00:30x-4 year -2 "
+        "month +560 days 00:00:00.003xNULL",
+        {"Vector: 50:560:30000000 -50:560:3000 NULL"}}));
+
 }  // namespace dbcommon

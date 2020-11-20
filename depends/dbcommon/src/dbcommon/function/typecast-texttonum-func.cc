@@ -38,6 +38,7 @@
 #include "dbcommon/type/type-util.h"
 #include "dbcommon/utils/macro.h"
 #include "dbcommon/utils/string-util.h"
+#include "dbcommon/utils/timezone-util.h"
 
 namespace dbcommon {
 
@@ -561,6 +562,130 @@ Datum text_to_float4(Datum *params, uint64_t size) {
 }
 Datum text_to_float8(Datum *params, uint64_t size) {
   return text_to_Float<double>(params, size);
+}
+
+Datum intervalToText(Datum *params, uint64_t size) {
+  auto inttotext = [](char *&ptr, uint32_t val) {
+    if (val == 0) {
+      *(ptr++) = '0';
+      return;
+    }
+    char str[] = "0123456789";
+    uint32_t tempval = val;
+    std::vector<char> tempvec;
+    while (tempval >= 10) {
+      tempval /= 10;
+      ++ptr;
+    }
+    char *ptemp = ptr++;
+    while (val > 0) {
+      *(ptemp--) = str[val % 10];
+      val /= 10;
+    }
+  };
+
+  auto intervalCastText = [&inttotext](ByteBuffer &buf,
+                                       IntervalVar in) -> text {
+    int32_t iyear, imonth, iday;
+    iyear = in.month / MONTHS_PER_YEAR;
+    imonth = in.month % MONTHS_PER_YEAR;
+    iday = in.day;
+
+    int32_t ihour, iminute, isecond, imsecond;
+    ihour = in.timeOffset / USECS_PER_HOUR;
+    in.timeOffset -= ihour * USECS_PER_HOUR;
+    iminute = in.timeOffset / USECS_PER_MINUTE;
+    in.timeOffset -= iminute * USECS_PER_MINUTE;
+    isecond = in.timeOffset / USECS_PER_SEC;
+    imsecond = in.timeOffset - (isecond * USECS_PER_SEC);
+
+    uint32_t lenBefore = buf.size();
+    buf.resize(lenBefore + 128);
+    char *pStart = buf.data() + lenBefore;
+    char *ptemp = buf.data() + lenBefore;
+    bool isBeforeNeg = false;
+    bool isFirst = false;
+    if (iyear) {
+      if (iyear < 0)
+        *(ptemp++) = '-';
+      else if (isBeforeNeg)
+        *(ptemp++) = '+';
+      isBeforeNeg = (iyear < 0);
+      isFirst = true;
+      inttotext(ptemp, abs(iyear));
+      *(ptemp++) = ' ';
+      memcpy(ptemp, "year", 4);
+      ptemp += 4;
+      if (iyear > 1) *(ptemp++) = 's';
+    }
+    if (imonth) {
+      if (isFirst) *(ptemp++) = ' ';
+      isFirst = true;
+      if (imonth < 0)
+        *(ptemp++) = '-';
+      else if (isBeforeNeg)
+        *(ptemp++) = '+';
+      isBeforeNeg = (imonth < 0);
+      inttotext(ptemp, abs(imonth));
+      *(ptemp++) = ' ';
+      memcpy(ptemp, "month", 5);
+      ptemp += 5;
+      if (imonth > 1) *(ptemp++) = 's';
+    }
+    if (iday) {
+      if (isFirst) *(ptemp++) = ' ';
+      isFirst = true;
+      if (iday < 0)
+        *(ptemp++) = '-';
+      else if (isBeforeNeg)
+        *(ptemp++) = '+';
+      isBeforeNeg = (iday < 0);
+      inttotext(ptemp, abs(iday));
+      *(ptemp++) = ' ';
+      memcpy(ptemp, "day", 3);
+      ptemp += 3;
+      if (abs(iday) > 1) *(ptemp++) = 's';
+    }
+    if (ihour || iminute || isecond || imsecond) {
+      if (isFirst) *(ptemp++) = ' ';
+      isFirst = true;
+      if (ihour < 0 || iminute < 0 || isecond < 0 || imsecond < 0)
+        *(ptemp++) = '-';
+      else if (isBeforeNeg)
+        *(ptemp++) = '+';
+      ihour = abs(ihour);
+      iminute = abs(iminute);
+      isecond = abs(isecond);
+      imsecond = abs(imsecond);
+      if (ihour < 10) *(ptemp++) = '0';
+      inttotext(ptemp, ihour);
+      *(ptemp++) = ':';
+      if (iminute < 10) *(ptemp++) = '0';
+      inttotext(ptemp, iminute);
+      *(ptemp++) = ':';
+      if (isecond < 10) *(ptemp++) = '0';
+      inttotext(ptemp, isecond);
+
+      if (imsecond) {
+        int64_t power_of_ten = 100000;
+        *(ptemp++) = '.';
+        while (imsecond / power_of_ten == 0) {
+          *(ptemp++) = '0';
+          power_of_ten /= 10;
+        }
+        while (imsecond % 10 == 0) {
+          imsecond /= 10;
+        }
+        inttotext(ptemp, imsecond);
+      }
+    }
+    int32_t curLen = ptemp - pStart;
+    buf.resize(lenBefore + curLen);
+
+    return text(nullptr, curLen);
+  };
+
+  return one_param_bind<text, IntervalVar>(params, size, intervalCastText);
 }
 
 }  // namespace dbcommon

@@ -33,6 +33,7 @@ Datum text_to_float4(Datum *params, uint64_t size);
 Datum text_to_float8(Datum *params, uint64_t size);
 Datum textToDecimal(Datum *params, uint64_t size);
 Datum toNumber(Datum *params, uint64_t size);
+Datum intervalToText(Datum *params, uint64_t size);
 
 }  // namespace dbcommon
 
