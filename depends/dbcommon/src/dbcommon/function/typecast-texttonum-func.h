@@ -31,9 +31,21 @@ Datum text_to_int4(Datum *params, uint64_t size);
 Datum text_to_int8(Datum *params, uint64_t size);
 Datum text_to_float4(Datum *params, uint64_t size);
 Datum text_to_float8(Datum *params, uint64_t size);
+Datum int2ToBytea(Datum *params, uint64_t size);
+Datum int4ToBytea(Datum *params, uint64_t size);
+Datum int8ToBytea(Datum *params, uint64_t size);
+Datum float4ToBytea(Datum *params, uint64_t size);
+Datum float8ToBytea(Datum *params, uint64_t size);
+Datum textToBytea(Datum *params, uint64_t size);
+Datum dateToBytea(Datum *params, uint64_t size);
+Datum timeToBytea(Datum *params, uint64_t size);
+Datum timestampToBytea(Datum *params, uint64_t size);
+Datum intervalToBytea(Datum *params, uint64_t size);
+Datum decimalToBytea(Datum *params, uint64_t size);
 Datum textToDecimal(Datum *params, uint64_t size);
 Datum toNumber(Datum *params, uint64_t size);
 Datum intervalToText(Datum *params, uint64_t size);
+Datum charToBytea(Datum *params, uint64_t size);
 
 }  // namespace dbcommon
 

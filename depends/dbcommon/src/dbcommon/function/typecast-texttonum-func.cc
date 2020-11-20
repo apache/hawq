@@ -19,12 +19,14 @@
 
 #include "dbcommon/function/typecast-texttonum-func.h"
 
+#include <arpa/inet.h>
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stack>
 #include <string>
 #include <typeinfo>
+#include <vector>
 
 #include "dbcommon/common/vector-transformer.h"
 #include "dbcommon/common/vector.h"
@@ -34,8 +36,10 @@
 #include "dbcommon/function/arithmetic-function.h"
 #include "dbcommon/function/decimal-function.h"
 #include "dbcommon/function/function.h"
+#include "dbcommon/nodes/datum.h"
 #include "dbcommon/type/decimal.h"
 #include "dbcommon/type/type-util.h"
+#include "dbcommon/utils/int-util.h"
 #include "dbcommon/utils/macro.h"
 #include "dbcommon/utils/string-util.h"
 #include "dbcommon/utils/timezone-util.h"
@@ -564,6 +568,320 @@ Datum text_to_float8(Datum *params, uint64_t size) {
   return text_to_Float<double>(params, size);
 }
 
+template <typename TP>
+struct Hton {
+  typedef int32_t returnType;
+  int32_t operator()(TP in) { return 0; }
+};
+
+template <>
+struct Hton<uint16_t> {
+  typedef uint16_t returnType;
+  uint16_t operator()(uint16_t in) {
+    uint16_t n16 = htons(static_cast<uint16_t>(in));
+    return n16;
+  }
+};
+
+template <>
+struct Hton<uint32_t> {
+  typedef uint32_t returnType;
+  uint32_t operator()(uint32_t in) {
+    uint32_t n32 = htonl(static_cast<uint32_t>(in));
+    return n32;
+  }
+};
+
+template <typename TP>
+inline uint32_t serializeInt(ByteBuffer *pbuf, TP in) {
+  uint32_t lenBefore = pbuf->size();
+  uint32_t lenAdd = sizeof(TP);
+  pbuf->resize(lenBefore + lenAdd);
+  typename Hton<TP>::returnType n = Hton<TP>()(in);
+  memcpy(pbuf->data() + lenBefore, reinterpret_cast<char *>(&n), lenAdd);
+  return lenAdd;
+}
+
+template <>
+inline uint32_t serializeInt(ByteBuffer *pbuf, uint64_t in) {
+  uint32_t n32;
+  uint32_t lenAdd = 0;
+  n32 = static_cast<uint32_t>(in >> 32);
+  lenAdd += serializeInt(pbuf, n32);
+  n32 = static_cast<uint32_t>(in);
+  lenAdd += serializeInt(pbuf, n32);
+  return lenAdd;
+}
+
+Datum charToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, int8_t in) -> text {
+    uint32_t lenBefore = buf.size();
+    uint32_t lenAdd = sizeof(int8_t);
+    buf.resize(lenBefore + lenAdd);
+    memcpy(buf.data() + lenBefore, reinterpret_cast<char *>(&in), lenAdd);
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, int8_t>(params, size, numToBytea);
+}
+
+Datum int2ToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, int16_t in) -> text {
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, static_cast<uint16_t>(in));
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, int16_t>(params, size, numToBytea);
+}
+
+Datum int4ToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, int32_t in) -> text {
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, static_cast<uint32_t>(in));
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, int32_t>(params, size, numToBytea);
+}
+
+Datum int8ToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, int64_t in) -> text {
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, static_cast<uint64_t>(in));
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, int64_t>(params, size, numToBytea);
+}
+
+Datum float4ToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, float in) -> text {
+    union {
+      float f;
+      uint32_t i;
+    } swap;
+    swap.f = in;
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, swap.i);
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, float>(params, size, numToBytea);
+}
+
+Datum float8ToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, double in) -> text {
+    union {
+      double f;
+      uint64_t i;
+    } swap;
+    swap.f = in;
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, swap.i);
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, double>(params, size, numToBytea);
+}
+
+Datum textToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto textCastBytea = [](ByteBuffer &buf, text in) -> text {
+    uint32_t lenBefore = buf.size();
+    buf.resize(lenBefore + in.length);
+    memcpy(buf.data() + lenBefore, in.val, in.length);
+    return text(nullptr, in.length);
+  };
+  return one_param_bind<text, text>(params, size, textCastBytea);
+}
+
+Datum dateToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, int32_t in) -> text {
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, static_cast<uint32_t>(in - 10957));
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, int32_t>(params, size, numToBytea);
+}
+
+Datum timeToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, int64_t in) -> text {
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, static_cast<uint64_t>(in));
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, int64_t>(params, size, numToBytea);
+}
+
+Datum timestampToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, Timestamp in) -> text {
+    int64_t second =
+        in.second * 1000000 + in.nanosecond / 1000 - 10957 * 24 * 3600000000;
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, static_cast<uint64_t>(second));
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, Timestamp>(params, size, numToBytea);
+}
+
+Datum intervalToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, IntervalVar in) -> text {
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, static_cast<uint64_t>(in.timeOffset));
+    lenAdd += serializeInt(&buf, static_cast<uint32_t>(in.day));
+    lenAdd += serializeInt(&buf, static_cast<uint32_t>(in.month));
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, IntervalVar>(params, size, numToBytea);
+}
+
+Datum decimalToBytea(Datum *params, uint64_t size) {
+  auto decimalToText = [](std::string &buf, DecimalVar val) -> uint64_t {
+    uint64_t len = 0, scale = 0;
+    __uint128_t unsigned_val;
+    __int128_t srcVal = val.highbits;
+    srcVal = (srcVal << 64) + val.lowbits;
+
+    uint64_t low_min = 0;
+    int64_t high_min = INT64_MIN;
+    __int128_t MIN = INT64_MIN;
+    MIN = (MIN << 64) + low_min;
+
+    bool isNegative = srcVal < 0;
+    if (isNegative) {
+      if (srcVal == MIN) {
+        unsigned_val = -(srcVal + 1);
+        unsigned_val++;
+      } else {
+        unsigned_val = -srcVal;
+      }
+    } else {
+      unsigned_val = srcVal;
+    }
+    auto numOfDigit = getNumOfDigit<__uint128_t>(unsigned_val);
+    if (srcVal == 0) {
+      numOfDigit = 1 + val.scale;
+    }
+    if (val.scale == 0) {
+      len += (numOfDigit + isNegative);
+    } else {
+      len += (numOfDigit + 1 + isNegative);
+    }
+    buf.clear();
+    buf.resize(len);
+    char *ret = const_cast<char *>(buf.data() + len);
+    do {
+      auto old = unsigned_val;
+      unsigned_val = unsigned_val / 10;
+      *--ret = old - unsigned_val * 10 + '0';
+      scale++;
+    } while (unsigned_val > 0 && scale != val.scale);
+
+    if (val.scale != 0) {
+      *--ret = '.';
+      do {
+        auto old = unsigned_val;
+        unsigned_val = unsigned_val / 10;
+        *--ret = old - unsigned_val * 10 + '0';
+      } while (unsigned_val > 0);
+    }
+    if (isNegative) {
+      *--ret = '-';
+    }
+    return len;
+  };
+
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [&decimalToText](ByteBuffer &buf, DecimalVar in) -> text {
+    struct oldDes {
+      int32_t ndigits; /* # of digits in digits[] - can be 0! */
+      int32_t weight;  /* weight of first digit */
+      int32_t sign;    /* NUMERIC_POS, NUMERIC_NEG, or NUMERIC_NAN */
+      int32_t dscale;  /* display scale */
+    } oldVar;
+    //    std::string decimalStr =
+    //        DecimalType::toString(in.highbits, in.lowbits, in.scale);
+    std::string decimalStr;
+    uint64_t strLength = decimalToText(decimalStr, in);
+    const char *frontPtr = decimalStr.data();
+    const char *endPtr = frontPtr + strLength;
+    const char *dotPtr = nullptr;
+    if (*frontPtr == '-') {
+      oldVar.sign = 0x4000;
+      ++frontPtr;
+    } else {
+      oldVar.sign = 0x0000;
+    }
+    for (const char *ptemp = frontPtr; *ptemp != '\0'; ++ptemp) {
+      if (*ptemp == '.') {
+        dotPtr = ptemp;
+        break;
+      }
+    }
+    std::vector<int16_t> numVec(0);
+    numVec.reserve(50);
+    const char *pendTmp = dotPtr ? dotPtr : endPtr;
+    const char *ptemp = frontPtr;
+    int32_t rest = (pendTmp - ptemp) % 4;
+    if (rest == 3) {
+      int16_t val =
+          (ptemp[0] - '0') * 100 + (ptemp[1] - '0') * 10 + (ptemp[2] - '0');
+      numVec.push_back(val);
+      ptemp += 3;
+    } else if (rest == 2) {
+      int16_t val = (ptemp[0] - '0') * 10 + (ptemp[1] - '0');
+      numVec.push_back(val);
+      ptemp += 2;
+    } else if (rest == 1) {
+      int16_t val = ptemp[0] - '0';
+      numVec.push_back(val);
+      ptemp += 1;
+    }
+    for (; pendTmp - ptemp >= 4; ptemp += 4) {
+      int16_t val = (ptemp[0] - '0') * 1000 + (ptemp[1] - '0') * 100 +
+                    (ptemp[2] - '0') * 10 + (ptemp[3] - '0');
+      numVec.push_back(val);
+    }
+    oldVar.weight = numVec.size() - 1;
+    oldVar.dscale = 0;
+    if (dotPtr) {
+      oldVar.dscale = endPtr - dotPtr - 1;
+      for (ptemp = dotPtr + 1; endPtr - ptemp >= 4; ptemp += 4) {
+        int16_t val = (ptemp[0] - '0') * 1000 + (ptemp[1] - '0') * 100 +
+                      (ptemp[2] - '0') * 10 + (ptemp[3] - '0');
+        numVec.push_back(val);
+      }
+      rest = endPtr - ptemp;
+      if (rest == 3) {
+        int16_t val = (ptemp[0] - '0') * 1000 + (ptemp[1] - '0') * 100 +
+                      (ptemp[2] - '0') * 10;
+        numVec.push_back(val);
+      } else if (rest == 2) {
+        int16_t val = (ptemp[0] - '0') * 1000 + (ptemp[1] - '0') * 100;
+        numVec.push_back(val);
+      } else if (rest == 1) {
+        int16_t val = (ptemp[0] - '0') * 1000;
+        numVec.push_back(val);
+      }
+    }
+    oldVar.ndigits = numVec.size();
+    uint32_t lenAdd = 0;
+    lenAdd += serializeInt(&buf, static_cast<uint16_t>(oldVar.ndigits));
+    lenAdd += serializeInt(&buf, static_cast<uint16_t>(oldVar.weight));
+    lenAdd += serializeInt(&buf, static_cast<uint16_t>(oldVar.sign));
+    lenAdd += serializeInt(&buf, static_cast<uint16_t>(oldVar.dscale));
+    for (int16_t i = 0; i < oldVar.ndigits; ++i)
+      lenAdd += serializeInt(&buf, static_cast<uint16_t>(numVec[i]));
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, DecimalVar>(params, size, numToBytea);
+}
+
 Datum intervalToText(Datum *params, uint64_t size) {
   auto inttotext = [](char *&ptr, uint32_t val) {
     if (val == 0) {
@@ -687,5 +1005,18 @@ Datum intervalToText(Datum *params, uint64_t size) {
 
   return one_param_bind<text, IntervalVar>(params, size, intervalCastText);
 }
+
+Datum charToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto numToBytea = [](ByteBuffer &buf, int8_t in) -> text {
+    uint32_t lenBefore = buf.size();
+    uint32_t lenAdd = sizeof(int8_t);
+    buf.resize(lenBefore + lenAdd);
+    memcpy(buf.data() + lenBefore, reinterpret_cast<char *>(&in), lenAdd);
+    return text(nullptr, lenAdd);
+  };
+  return one_param_bind<text, int8_t>(params, size, numToBytea);
+}
+
 
 }  // namespace dbcommon

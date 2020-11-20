@@ -325,6 +325,7 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({FLOAT_TO_TEXT, "float_to_text", STRINGID, {FLOATID}, float4_to_text});
   FuncEntryArray.push_back({DOUBLE_TO_TEXT, "double_to_text", STRINGID, {DOUBLEID}, float8_to_text});
   FuncEntryArray.push_back({DECIMAL_TO_TEXT, "decimal_to_text", STRINGID, {DECIMALNEWID}, decimal_to_text});
+  FuncEntryArray.push_back({DATE_TO_TEXT, "date_to_text", STRINGID, {DATEID}, date_to_text});
   FuncEntryArray.push_back({BOOL_TO_TEXT, "bool_to_text", STRINGID, {BOOLEANID}, bool_to_text});
   FuncEntryArray.push_back({TEXT_TO_CHAR, "text_to_char", TINYINTID, {STRINGID}, text_to_char});
   FuncEntryArray.push_back({INT_TO_CHAR, "int4_to_char", TINYINTID, {INTID}, int4_to_char});
@@ -462,9 +463,6 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({TEXT_TO_BIGINT, "text_bigint", BIGINTID, {STRINGID}, text_to_int8});
   FuncEntryArray.push_back({TEXT_TO_FLOAT, "text_float", FLOATID, {STRINGID}, text_to_float4});
   FuncEntryArray.push_back({TEXT_TO_DOUBLE, "text_double", DOUBLEID, {STRINGID}, text_to_float8});
-  FuncEntryArray.push_back{TEXT_TO_DECIMAL, "text_decimal", DECIMALNEWID, {STRINGID}, textToDecimal});
-  FuncEntryArray.push_back({TO_NUMBER, "to_number", DECIMALNEWID, {STRINGID, STRINGID}, toNumber});
-  FuncEntryArray.push_back({INTERVAL_TO_TEXT, "interval_text", STRINGID, {INTERVALID}, intervalToText});
 
   FuncEntryArray.push_back({BOOLEAN_TO_SMALLINT, "boolean_smallint", SMALLINTID, {BOOLEANID}, bool_to_int2});
   FuncEntryArray.push_back({BOOLEAN_TO_INT, "boolean_int", INTID, {BOOLEANID}, bool_to_int4});
@@ -472,21 +470,36 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({SMALLINT_TO_BOOLEAN, "smallint_boolean", BOOLEANID, {SMALLINTID}, int2_to_bool});
   FuncEntryArray.push_back({INT_TO_BOOLEAN, "int_boolean", BOOLEANID, {INTID}, int4_to_bool});
   FuncEntryArray.push_back({BIGINT_TO_BOOLEAN, "bigint_boolean", BOOLEANID, {BIGINTID}, int8_to_bool});
-  // clang-format on
+  FuncEntryArray.push_back({CHAR_TO_BYTEA, "char_bytea", BINARYID, {TINYINTID}, charToBytea});
+  FuncEntryArray.push_back({SMALLINT_TO_BYTEA, "smallint_bytea", BINARYID, {SMALLINTID}, int2ToBytea});
+  FuncEntryArray.push_back({INT_TO_BYTEA, "int_bytea", BINARYID, {INTID}, int4ToBytea});
+  FuncEntryArray.push_back({BIGINT_TO_BYTEA, "bigint_bytea", BINARYID, {BIGINTID}, int8ToBytea});
+  FuncEntryArray.push_back({FLOAT_TO_BYTEA, "float_bytea", BINARYID, {FLOATID}, float4ToBytea});
+  FuncEntryArray.push_back({DOUBLE_TO_BYTEA, "double_bytea", BINARYID, {DOUBLEID}, float8ToBytea});
+  FuncEntryArray.push_back({TEXT_TO_BYTEA, "text_bytea", BINARYID, {STRINGID}, textToBytea});
+  FuncEntryArray.push_back({DATE_TO_BYTEA, "date_bytea", BINARYID, {DATEID}, dateToBytea});
+  FuncEntryArray.push_back({TIME_TO_BYTEA, "time_bytea", BINARYID, {TIMEID}, timeToBytea});
+  FuncEntryArray.push_back({TIMESTAMP_TO_BYTEA, "timestamp_bytea", BINARYID, {TIMESTAMPID}, timestampToBytea});
+  FuncEntryArray.push_back({TIMESTAMPTZ_TO_BYTEA, "timestamptz_bytea", BINARYID, {TIMESTAMPTZID}, timestampToBytea});
+  FuncEntryArray.push_back({INTERVAL_TO_BYTEA, "interval_bytea", BINARYID, {INTERVALID}, intervalToBytea});
+  FuncEntryArray.push_back({DECIMAL_TO_BYTEA, "decimal_bytea", BINARYID, {DECIMALNEWID}, decimalToBytea});
+  FuncEntryArray.push_back({TEXT_TO_DECIMAL, "text_decimal", DECIMALNEWID, {STRINGID}, textToDecimal});
+  FuncEntryArray.push_back({TO_NUMBER, "to_number", DECIMALNEWID, {STRINGID, STRINGID}, toNumber});
+  FuncEntryArray.push_back({INTERVAL_TO_TEXT, "interval_text", STRINGID, {INTERVALID}, intervalToText});
+// clang-format on
 
-  std::sort(FuncEntryArray.begin(), FuncEntryArray.end(),
-            [](const FuncEntry &a, const FuncEntry &b) {
-              return a.funcId < b.funcId;
-            });
+std::sort(
+    FuncEntryArray.begin(), FuncEntryArray.end(),
+    [](const FuncEntry &a, const FuncEntry &b) { return a.funcId < b.funcId; });
 
-  //
-  // Check if the function table is continuous
-  //
-  for (uint64_t i = 0; i < FuncEntryArray.size(); ++i) {
-    if (i != FuncEntryArray[i].funcId) {
-      assert(false && "function table is not ordered");
-      std::terminate();
-    }
+//
+// Check if the function table is continuous
+//
+for (uint64_t i = 0; i < FuncEntryArray.size(); ++i) {
+  if (i != FuncEntryArray[i].funcId) {
+    assert(false && "function table is not ordered");
+    std::terminate();
+  }
   }
 
   //

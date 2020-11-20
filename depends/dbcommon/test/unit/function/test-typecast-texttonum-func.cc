@@ -105,6 +105,96 @@ INSTANTIATE_TEST_CASE_P(
                           ERRCODE_INVALID_TEXT_REPRESENTATION}));
 
 INSTANTIATE_TEST_CASE_P(
+    num_to_bytea, TestFunction,
+    ::testing::Values(
+        TestFunctionEntry{
+            FuncKind::CHAR_TO_BYTEA, "Vector: \\003 NULL", {"Vector: 3 NULL"}},
+        TestFunctionEntry{FuncKind::SMALLINT_TO_BYTEA,
+                          "Vector: \\000{ NULL",
+                          {"Vector: 123 NULL"}},
+        TestFunctionEntry{FuncKind::INT_TO_BYTEA,
+                          "Vector: \\000\\000\\000{ NULL",
+                          {"Vector: 123 NULL"}},
+        TestFunctionEntry{FuncKind::BIGINT_TO_BYTEA,
+                          "Vector: \\000\\000\\000\\000\\000\\000\\000{ NULL",
+                          {"Vector: 123 NULL"}},
+        TestFunctionEntry{FuncKind::FLOAT_TO_BYTEA,
+                          "Vector: B\\366>\\372 NULL",
+                          {"Vector: 123.123 NULL"}},
+        TestFunctionEntry{FuncKind::DOUBLE_TO_BYTEA,
+                          "Vector: @^\\307\\337;dZ\\035 NULL",
+                          {"Vector: 123.123 NULL"}},
+        TestFunctionEntry{FuncKind::TEXT_TO_BYTEA,
+                          "Vector: 123hub7.;8knjn NULL",
+                          {"Vector: 123hub7.;8knjn NULL"}},
+        TestFunctionEntry{FuncKind::DATE_TO_BYTEA,
+                          "Vector: \\000\\000\\032\\034 NULL",
+                          {"Vector: 2018-04-20 NULL"}},
+        TestFunctionEntry{FuncKind::TIME_TO_BYTEA,
+                          "Vector: \\000\\000\\000\\011u\\013\\345P NULL",
+                          {"Vector: 11:16:58.419536 NULL"}},
+        TestFunctionEntry{FuncKind::TIMESTAMP_TO_BYTEA,
+                          "Vector: \\000\\002'\\203\\207Y\\245P NULL",
+                          {"Vector: 2019-03-20 11:16:58.419536 NULL"}},
+        TestFunctionEntry{FuncKind::TIMESTAMPTZ_TO_BYTEA,
+                          "Vector: \\000\\002'|\\322\\274\\205P NULL",
+                          {"Vector: 2019-03-20 11:16:58.419536+08 NULL"}},
+        TestFunctionEntry{FuncKind::INTERVAL_TO_BYTEA,
+                          "Vector: "
+                          "\\000\\000\\000\\000\\000\\000\\000."
+                          "\\000\\000\\000\\000\\000\\000\\000\\000 NULL",
+                          {"Vector: 00:00:46 NULL"}},
+        TestFunctionEntry{
+            FuncKind::DECIMAL_TO_BYTEA,
+            "Vector: "
+            "\\000\\006\\000\\002@\\000\\000\\011\\000\\001\\011)"
+            "\\032\\205\\004\\322\\026.#( "
+            "\\000\\002\\000\\000\\000\\000\\000\\003\\000{\\004\\316 "
+            "\\000\\002\\000\\000\\000\\000\\000\\002\\000\\014\\004\\260 NULL",
+            {"Vector: -123456789.123456789 123.123 12.12 NULL"}}));
+
+INSTANTIATE_TEST_CASE_P(
+    text_to_Decimal, TestFunction,
+    ::testing::Values(
+        TestFunctionEntry{
+            FuncKind::TEXT_TO_DECIMAL,
+            "Vector: 922337203685.4775807 -9223372036854.775808 "
+            "1234.56 -0.00123456 1234.56 -0.00123456 NULL",
+            {"Vector: 922337203685.4775807 -9223372036854.775808 "
+             "1.23456e+3 -1.23456e-3 1.23456E+3 -1.23456E-3 NULL"}},
+        TestFunctionEntry{FuncKind::TEXT_TO_DECIMAL,
+                          "Error",
+                          {"Vector: -922337203i854775809 9223372036854l75808 "
+                           "e33 1.23e2 1.2i3e2 1.23e2i2"},
+                          ERRCODE_INVALID_TEXT_REPRESENTATION}));
+
+INSTANTIATE_TEST_CASE_P(
+    to_number, TestFunction,
+    ::testing::Values(
+        TestFunctionEntry{
+            FuncKind::TO_NUMBER,
+            "Vector: -34338492 -34338492.654878 -0.00001 -5.01 -5.01 0.01 0.0 "
+            "0 "
+            "-0.01 -564646.654564 -0.01 NULL",
+            {"Vector: -34,338,492 -34,338,492.654,878 0.00001- 5.01- 5.01- .01 "
+             ".0 "
+             "0 .01- <564646.654564> .-01 NULL",
+             "Vector: 99G999G999 99G999G999D999G999 9.999999S FM9.999999S "
+             "FM9.999999MI FM9.99 99999999.99999999 99.99 TH99.99S "
+             "999999.999999PR "
+             "S99.99 NULL"}},
+        TestFunctionEntry{FuncKind::TO_NUMBER,
+                          "Error",
+                          {"Vector: -34,338,492 -34,338,492.654,878 0.00001- "
+                           "5.01- 5.01- .01 .0 "
+                           "0 .01- <564646.654564> 111.11",
+                           "Vector: 99G999G99Ss9 99G999G999D.999G999 "
+                           "MIMI9.999999S FM9.99999PR9S "
+                           "FM9.999999PLS FM9.99SPL 99999999.99999999PRS "
+                           "99.9PR0 99.99SPR 999999.999999RN "
+                           "99.99"},
+                          ERRCODE_INVALID_TEXT_REPRESENTATION}));
+INSTANTIATE_TEST_CASE_P(
     interval_to_text, TestFunction,
     ::testing::Values(TestFunctionEntry{
         FuncKind::INTERVAL_TO_TEXT,
