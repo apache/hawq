@@ -93,13 +93,12 @@ void DecimalVector::append(const char *v, uint64_t valueLen, bool null) {
 }
 
 void DecimalVector::append(const Datum &datum, bool null) {
-  dbcommon::DecimalVar *val = DatumGetValue<DecimalVar *>(datum);
-  if (val) {
+  if (!null) {
+    dbcommon::DecimalVar *val = DatumGetValue<DecimalVar *>(datum);
     values.append(val->lowbits);
     auxiliaryValues.append(val->highbits);
     scaleValues.append(val->scale);
   } else {
-    assert(null == true);
     values.append(uint64_t(0));
     auxiliaryValues.append(int64_t(0));
     scaleValues.append(int64_t(0));
@@ -108,11 +107,15 @@ void DecimalVector::append(const Datum &datum, bool null) {
 }
 
 void DecimalVector::append(const Scalar *scalar) {
-  dbcommon::DecimalVar *val = DatumGetValue<DecimalVar *>(scalar->value);
-  if (val) {
+  if (!scalar->isnull) {
+    dbcommon::DecimalVar *val = DatumGetValue<DecimalVar *>(scalar->value);
     values.append(val->lowbits);
     auxiliaryValues.append(val->highbits);
     scaleValues.append(val->scale);
+  } else {
+    values.append(uint64_t(0));
+    auxiliaryValues.append(int64_t(0));
+    scaleValues.append(int64_t(0));
   }
   appendNull(scalar->isnull);
 }
