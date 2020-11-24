@@ -51,7 +51,7 @@ void UnivPlanBuilderExtGSScan::from(const UnivPlanPlanNodePoly &node) {
 
 void UnivPlanBuilderExtGSScan::setScanRelId(uint32_t id) { ref->set_relid(id); }
 
-void UnivPlanBuilderExtGSScan::setScanIndex(bool index = false) {
+void UnivPlanBuilderExtGSScan::setIsIndexScan(bool index = false) {
   ref->set_indexscan(index);
 }
 
@@ -59,7 +59,7 @@ void UnivPlanBuilderExtGSScan::setIndexScanType(ExternalScanType type) {
   ref->set_type(univplan::ExternalScanType(type));
 }
 
-void UnivPlanBuilderExtGSScan::setDirectionType(
+void UnivPlanBuilderExtGSScan::setIndexScanDirection(
     ExternalScanDirection direction) {
   ref->set_direction(univplan::ExternalScanDirection(direction));
 }

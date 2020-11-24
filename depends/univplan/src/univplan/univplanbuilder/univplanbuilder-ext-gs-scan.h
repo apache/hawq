@@ -46,9 +46,9 @@ class UnivPlanBuilderExtGSScan : public UnivPlanBuilderNode {
   void setFilterExpr(UnivPlanBuilderExprTree::uptr expr);
   std::unique_ptr<UnivPlanBuilderScanTask> addScanTaskAndGetBuilder();
   // set magma index info
-  void setScanIndex(bool index);
+  void setIsIndexScan(bool index);
   void setIndexScanType(ExternalScanType type);
-  void setDirectionType(ExternalScanDirection direction);
+  void setIndexScanDirection(ExternalScanDirection direction);
   void setIndexName(const char *indexName);
   void addIndexQual(UnivPlanBuilderExprTree::uptr exprTree);
 

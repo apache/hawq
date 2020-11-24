@@ -31,7 +31,6 @@
 #include "dbcommon/log/logger.h"
 #include "dbcommon/utils/comp/lz4-compressor.h"
 #include "dbcommon/utils/macro.h"
-
 #include "univplan/common/plannode-util.h"
 #include "univplan/common/stagize.h"
 #include "univplan/common/var-util.h"
@@ -288,7 +287,7 @@ void univPlanExtScanSetRelId(UnivPlanC *up, uint32_t relId) {
 
 void univPlanExtScanSetIndex(UnivPlanC *up, bool index) {
   dynamic_cast<univplan::UnivPlanBuilderExtGSScan *>(up->curNode.get())
-      ->setScanIndex(index);
+      ->setIsIndexScan(index);
 }
 
 void univPlanExtScanSetScanType(UnivPlanC *up, int type) {
@@ -298,7 +297,7 @@ void univPlanExtScanSetScanType(UnivPlanC *up, int type) {
 
 void univPlanExtScanDirection(UnivPlanC *up, int direction) {
   dynamic_cast<univplan::UnivPlanBuilderExtGSScan *>(up->curNode.get())
-      ->setDirectionType(univplan::ExternalScanDirection(direction));
+      ->setIndexScanDirection(univplan::ExternalScanDirection(direction));
 }
 
 void univPlanExtScanSetIndexName(UnivPlanC *up, const char *indexName) {
