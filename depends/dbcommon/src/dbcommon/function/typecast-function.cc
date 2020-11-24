@@ -37,6 +37,7 @@
 #include "dbcommon/utils/int-util.h"
 #include "dbcommon/utils/macro.h"
 #include "dbcommon/utils/string-util.h"
+#include "dbcommon/utils/timezone-util.h"
 
 namespace dbcommon {
 template <typename TP>
@@ -223,6 +224,178 @@ Datum bool_to_text(Datum *params, uint64_t size) {
   };
   return one_param_bind<text, bool>(params, size, boolToText);
 }
+Datum timestamptz_to_text(Datum *params, uint64_t size) {
+  auto timestamptzToText = [](ByteBuffer &buf, Timestamp src) -> text {
+    int64_t second = src.second;
+    int64_t nanosecond = src.nanosecond;
+    int64_t val =
+        (second - TIMESTAMP_EPOCH_JDATE) * 1000000 + nanosecond / 1000;
+    if (val == TIMESTAMP_INFINITY) {
+      buf.resize(buf.size() + 8);
+      char *ret = const_cast<char *>(buf.tail() - 8);
+      *ret++ = 'i';
+      *ret++ = 'n';
+      *ret++ = 'f';
+      *ret++ = 'i';
+      *ret++ = 'n';
+      *ret++ = 'i';
+      *ret++ = 't';
+      *ret++ = 'y';
+      return text(nullptr, 8);
+    } else if (val == TIMESTAMP_NEG_INFINITY) {
+      buf.resize(buf.size() + 9);
+      char *ret = const_cast<char *>(buf.tail() - 9);
+      *ret++ = '-';
+      *ret++ = 'i';
+      *ret++ = 'n';
+      *ret++ = 'f';
+      *ret++ = 'i';
+      *ret++ = 'n';
+      *ret++ = 'i';
+      *ret++ = 't';
+      *ret++ = 'y';
+      return text(nullptr, 9);
+    } else {
+      int32_t timezoneOffset = TimezoneUtil::getGMTOffset(second);
+      second += timezoneOffset;
+      if (second < timezoneOffset + TIMEZONE_ADJUST) {
+        timezoneOffset += 352;
+        second += 352;
+      }
+      int32_t days = (int32_t)(second / SECONDS_PER_DAY);
+      int64_t seconds = second % SECONDS_PER_DAY;
+      if (seconds < 0) {
+        days -= 1;
+        seconds += SECONDS_PER_DAY;
+      }
+      if (nanosecond < 0) {
+        seconds -= 1000000;
+        nanosecond += 1000000000;
+      }
+      char result[40];
+      int32_t length = 0, y, baseOfyear = 1000;
+      int32_t year, month, day;
+      bool is_bc = false;
+      int32_t second_real = seconds % 60;  // get seconds,minute,hour
+      seconds /= 60;
+      int32_t minute = seconds % 60;
+      int32_t hour = seconds / 60;
+      int32_t nano_length = 1;
+      uint32_t julian, quad, extra, unsigned_year;
+
+      /*The following constants are designed to remove the date difference
+        between hornet and hawq*/
+      julian = days + UNIX_EPOCH_JDATE;
+      julian += 32044;
+      quad = julian / 146097;
+      extra = (julian - quad * 146097) * 4 + 3;
+      julian += 60 + quad * 3 + extra / 146097;
+      quad = julian / 1461;
+      julian -= quad * 1461;
+      y = julian * 4 / 1461;
+      julian =
+          ((y != 0) ? ((julian + 305) % 365) : ((julian + 306) % 366)) + 123;
+      y += quad * 4;
+      year = y - 4800;  // cout year,month,day
+      quad = julian * 2141 / 65536;
+      day = julian - 7834 * quad / 256;
+      month = (quad + 10) % 12 + 1;
+
+      if (days + AD_EPOCH_JDATE < 0) {  // is the year before BC
+        unsigned_year = -year + 1;
+        year = -year + 1;
+        is_bc = true;
+      } else {
+        unsigned_year = year;
+        is_bc = false;
+      }
+
+      auto numOfDigit = getNumOfDigit<uint32_t>(unsigned_year);
+      if (numOfDigit > 4) {
+        while (numOfDigit > 4) {
+          baseOfyear *= 10;
+          numOfDigit--;
+        }
+      }
+      while (baseOfyear) {
+        result[length++] = year / baseOfyear + '0';
+        year = year - (year / baseOfyear) * baseOfyear;
+        baseOfyear = baseOfyear / 10;
+      }
+      result[length++] = '-';
+      result[length++] = month / 10 + '0';
+      result[length++] = month - (month / 10) * 10 + '0';
+      result[length++] = '-';
+      result[length++] = day / 10 + '0';
+      result[length++] = day - (day / 10) * 10 + '0';
+      result[length++] = ' ';
+
+      result[length++] = hour / 10 + '0';
+      result[length++] = hour - hour / 10 * 10 + '0';
+      result[length++] = ':';
+      result[length++] = minute / 10 + '0';
+      result[length++] = minute - minute / 10 * 10 + '0';
+      result[length++] = ':';
+      result[length++] = second_real / 10 + '0';
+      result[length++] = second_real - second_real / 10 * 10 + '0';
+
+      if (nanosecond > 0) {  // precision of second
+        result[length++] = '.';
+        while (nanosecond % 10 == 0) {
+          nanosecond /= 10;
+        }
+        uint64_t unsigned_pre = nanosecond;
+        int32_t numOfprecision = getNumOfDigit<uint64_t>(unsigned_pre);
+        int32_t base = 1;
+        while (--numOfprecision != 0) {
+          base *= 10;
+        }
+        while (base) {
+          result[length++] = unsigned_pre / base + '0';
+          unsigned_pre = unsigned_pre - (unsigned_pre / base) * base;
+          base = base / 10;
+        }
+      }
+
+      int32_t timezone = timezoneOffset / SECONDS_PER_HOUR;  // get timezone
+      int32_t time = timezoneOffset - timezone * SECONDS_PER_HOUR;
+      int32_t t_minute = time / 60;
+      int t_second = time % 60;
+      if (timezone < 0) {
+        result[length++] = '-';
+      } else {
+        result[length++] = '+';
+      }
+      timezone = std::abs(timezone);
+      result[length++] = timezone / 10 + '0';
+      result[length++] = timezone - timezone / 10 * 10 + '0';
+      if (time) {
+        t_minute = std::abs(t_minute);
+        t_second = std::abs(t_second);
+        result[length++] = ':';
+        result[length++] = t_minute / 10 + '0';
+        result[length++] = t_minute - t_minute / 10 * 10 + '0';
+        result[length++] = ':';
+        result[length++] = t_second / 10 + '0';
+        result[length++] = t_second - t_second / 10 * 10 + '0';
+      }
+      if (is_bc) {
+        result[length++] = ' ';
+        result[length++] = 'B';
+        result[length++] = 'C';
+      }
+      buf.resize(buf.size() + length);
+      char *ret = const_cast<char *>(buf.tail() - length);
+      for (int32_t i = 0; i < length; i++) {
+        *ret++ = result[i];
+      }
+      return text(nullptr, length);
+    }
+  };
+
+  return one_param_bind<text, Timestamp>(params, size, timestamptzToText);
+}
+
 
 Datum time_to_text(Datum *params, uint64_t size) {
   auto timeToText = [](ByteBuffer &buf, int64_t timeval) -> text {

@@ -223,6 +223,15 @@ INSTANTIATE_TEST_CASE_P(
         "Vector: 00:00:03.444454 00:57:24.454998 02:46:30.233232 NULL",
         {"Vector: 3444454 3444454998 9990233232 NULL"}}));
 
+INSTANTIATE_TEST_CASE_P(
+    timestamptz_to_text, TestFunction,
+    ::testing::Values(TestFunctionEntry{
+        FuncKind::TIMESTAMPTZ_TO_TEXT,
+        "Vector{delimiter=,}: 1960-09-10 "
+        "08:20:11.22423+08,0060-09-11 01:26:03+08:05:52,NULL",
+        {"Vector: 1960-09-10 09:20:11.22423+09 0060-09-10 "
+         "09:20:11-08 NULL"}}));
+
 INSTANTIATE_TEST_CASE_P(text_to_char, TestFunction,
                         ::testing::Values(TestFunctionEntry{
                             FuncKind::TEXT_TO_CHAR,

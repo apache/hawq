@@ -50,6 +50,7 @@ void FunctionUtility::test(Datum *params, uint64_t paramsSize, Datum expect,
   // Calculate number of input case and type of input param
   size_t numOfCase = 0;
   bool hasVectorInput = false;
+  TimezoneUtil::setGMTOffset("PRC");
   if (ERRCODE_SUCCESSFUL_COMPLETION != expectErrcode)
     ASSERT_EQ(Datum(0), expect);
 
