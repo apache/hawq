@@ -216,6 +216,13 @@ INSTANTIATE_TEST_CASE_P(bool_to_text, TestFunction,
                             "Vector: true false NULL",
                             {"Vector: t f NULL"}}));
 
+INSTANTIATE_TEST_CASE_P(
+    time_to_text, TestFunction,
+    ::testing::Values(TestFunctionEntry{
+        FuncKind::TIME_TO_TEXT,
+        "Vector: 00:00:03.444454 00:57:24.454998 02:46:30.233232 NULL",
+        {"Vector: 3444454 3444454998 9990233232 NULL"}}));
+
 INSTANTIATE_TEST_CASE_P(text_to_char, TestFunction,
                         ::testing::Values(TestFunctionEntry{
                             FuncKind::TEXT_TO_CHAR,

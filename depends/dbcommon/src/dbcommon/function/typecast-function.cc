@@ -224,6 +224,55 @@ Datum bool_to_text(Datum *params, uint64_t size) {
   return one_param_bind<text, bool>(params, size, boolToText);
 }
 
+Datum time_to_text(Datum *params, uint64_t size) {
+  auto timeToText = [](ByteBuffer &buf, int64_t timeval) -> text {
+    int64_t precision = timeval % 1000000;
+    timeval /= 1000000;
+    int64_t second = timeval % 60;
+    timeval /= 60;
+    int64_t minute = timeval % 60;
+    int64_t hour = timeval / 60;
+    int32_t len = 8, numOfprecision;
+    uint64_t unsigned_pre;
+
+    if (precision > 0) {
+      len++;
+      while (precision % 10 == 0) {
+        precision /= 10;
+      }
+      unsigned_pre = precision;
+      numOfprecision = getNumOfDigit<uint64_t>(unsigned_pre);
+      len += numOfprecision;
+    }
+    buf.resize(buf.size() + len);
+    char *ret = const_cast<char *>(buf.tail() - len);
+
+    *ret++ = hour / 10 + '0';
+    *ret++ = hour - hour / 10 * 10 + '0';
+    *ret++ = ':';
+    *ret++ = minute / 10 + '0';
+    *ret++ = minute - minute / 10 * 10 + '0';
+    *ret++ = ':';
+    *ret++ = second / 10 + '0';
+    *ret++ = second - second / 10 * 10 + '0';
+
+    if (precision > 0) {
+      *ret++ = '.';
+      int32_t base = 1;
+      while (--numOfprecision != 0) {
+        base *= 10;
+      }
+      while (base) {
+        *ret++ = unsigned_pre / base + '0';
+        unsigned_pre = unsigned_pre - (unsigned_pre / base) * base;
+        base = base / 10;
+      }
+    }
+    return text(nullptr, len);
+  };
+  return one_param_bind<text, int64_t>(params, size, timeToText);
+}
+
 Datum int4_to_char(Datum *params, uint64_t size) {
   auto intToChar = [](ByteBuffer &buf, int32_t src) -> int8_t {
     int8_t ret;
