@@ -97,16 +97,18 @@ void ORCFormatReader::startNewSplit() {
   if (batch == nullptr) {
     batch = orcReader->createRowBatch(this->nTuplesPerBatch);
     // do type check
-    const dbcommon::TupleDesc *td = opts.getTupleDesc();
-    orc::StructVectorBatch *structBatch =
-        dynamic_cast<orc::StructVectorBatch *>(batch.get());
-    std::vector<orc::ColumnVectorBatch *>::iterator it =
-        structBatch->fields.begin();
-    int32_t nCols = columnsToRead != nullptr ? columnsToRead->size()
-                                             : structBatch->fields.size();
-    for (auto colIdx = 0; colIdx < nCols; ++colIdx) {
-      if (columnsToRead && !columnsToRead->at(colIdx)) continue;
-      typeCheck(td->getColumnType(colIdx), td->getColumnName(colIdx), *it++);
+    if (batch) {
+      const dbcommon::TupleDesc *td = opts.getTupleDesc();
+      orc::StructVectorBatch *structBatch =
+          dynamic_cast<orc::StructVectorBatch *>(batch.get());
+      std::vector<orc::ColumnVectorBatch *>::iterator it =
+          structBatch->fields.begin();
+      int32_t nCols = columnsToRead != nullptr ? columnsToRead->size()
+                                               : structBatch->fields.size();
+      for (auto colIdx = 0; colIdx < nCols; ++colIdx) {
+        if (columnsToRead && !columnsToRead->at(colIdx)) continue;
+        typeCheck(td->getColumnType(colIdx), td->getColumnName(colIdx), *it++);
+      }
     }
   }
 }
