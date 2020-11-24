@@ -37,6 +37,7 @@ Datum int8ToBytea(Datum *params, uint64_t size);
 Datum float4ToBytea(Datum *params, uint64_t size);
 Datum float8ToBytea(Datum *params, uint64_t size);
 Datum textToBytea(Datum *params, uint64_t size);
+Datum boolToBytea(Datum *params, uint64_t size);
 Datum dateToBytea(Datum *params, uint64_t size);
 Datum timeToBytea(Datum *params, uint64_t size);
 Datum timestampToBytea(Datum *params, uint64_t size);

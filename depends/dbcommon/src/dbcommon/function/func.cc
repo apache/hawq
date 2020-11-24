@@ -476,6 +476,7 @@ call_function_table(ARITH_OP, INTERVAL_TYPE, INTERVAL_TYPE)
   FuncEntryArray.push_back({BIGINT_TO_BYTEA, "bigint_bytea", BINARYID, {BIGINTID}, int8ToBytea});
   FuncEntryArray.push_back({FLOAT_TO_BYTEA, "float_bytea", BINARYID, {FLOATID}, float4ToBytea});
   FuncEntryArray.push_back({DOUBLE_TO_BYTEA, "double_bytea", BINARYID, {DOUBLEID}, float8ToBytea});
+  FuncEntryArray.push_back({BOOL_TO_BYTEA, "bool_bytea", BINARYID, {BOOLEANID}, boolToBytea});
   FuncEntryArray.push_back({TEXT_TO_BYTEA, "text_bytea", BINARYID, {STRINGID}, textToBytea});
   FuncEntryArray.push_back({DATE_TO_BYTEA, "date_bytea", BINARYID, {DATEID}, dateToBytea});
   FuncEntryArray.push_back({TIME_TO_BYTEA, "time_bytea", BINARYID, {TIMEID}, timeToBytea});

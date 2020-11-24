@@ -696,6 +696,24 @@ Datum textToBytea(Datum *params, uint64_t size) {
   return one_param_bind<text, text>(params, size, textCastBytea);
 }
 
+Datum boolToBytea(Datum *params, uint64_t size) {
+  assert(size == 2 && "invalid input");
+  auto boolCastBytea = [](ByteBuffer &buf, bool in) -> text {
+    uint32_t lenAdd = 0;
+    uint8_t src;
+    if (in) {
+      src = 1;
+    } else {
+      src = 0;
+    }
+    int32_t lenbefore = buf.size();
+    buf.resize(lenbefore + 1);
+    memcpy(buf.data() + lenbefore, &src, 1);
+    return text(nullptr, 1);
+  };
+  return one_param_bind<text, bool>(params, size, boolCastBytea);
+}
+
 Datum dateToBytea(Datum *params, uint64_t size) {
   assert(size == 2 && "invalid input");
   auto numToBytea = [](ByteBuffer &buf, int32_t in) -> text {
@@ -888,7 +906,7 @@ Datum intervalToText(Datum *params, uint64_t size) {
       *(ptr++) = '0';
       return;
     }
-    char str[] = "0123456789";
+    const char *str = "0123456789";
     uint32_t tempval = val;
     std::vector<char> tempvec;
     while (tempval >= 10) {

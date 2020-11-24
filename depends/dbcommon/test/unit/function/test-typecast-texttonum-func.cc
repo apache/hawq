@@ -104,6 +104,12 @@ INSTANTIATE_TEST_CASE_P(
                            "e33 1.23eq2 1.2i3e2 1.23e2i2"},
                           ERRCODE_INVALID_TEXT_REPRESENTATION}));
 
+INSTANTIATE_TEST_CASE_P(bool_to_bytea, TestFunction,
+                        ::testing::Values(TestFunctionEntry{
+                            FuncKind::BOOL_TO_BYTEA,
+                            "Vector: \\001 \\000 NULL",
+                            {"Vector: t f NULL"}}));
+
 INSTANTIATE_TEST_CASE_P(
     num_to_bytea, TestFunction,
     ::testing::Values(
