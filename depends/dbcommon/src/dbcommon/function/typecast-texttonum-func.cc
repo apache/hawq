@@ -257,19 +257,19 @@ Datum textToDecimal(Datum *params, uint64_t size) {
   assert(size == 2 && "invalid input");
   Object *para = params[1];
 
-  auto strToDecimal = [](ByteBuffer &buf, Text in) -> DecimalVar {
+  auto strToDecimal = [](ByteBuffer &buf, text in) -> DecimalVar {
     int64_t strLength = in.length;
     const char *srcbufferPtr = in.val;
     return stringToDecimal(srcbufferPtr, strLength);
   };
-  return one_param_bind<DecimalVar, Text>(params, size, strToDecimal);
+  return one_param_bind<DecimalVar, text>(params, size, strToDecimal);
 }
 
 Datum toNumber(Datum *params, uint64_t size) {
   assert(size == 3 && "invalid input");
 
-  auto strToDecimal = [](ByteBuffer &buf, Text inStr,
-                         Text inMod) -> DecimalVar {
+  auto strToDecimal = [](ByteBuffer &buf, text inStr,
+                         text inMod) -> DecimalVar {
 // In all cases, Text 's length is determined by its length rather than '\0'.
 #define NEXTCHAR(ptr, end)              \
   while (ptr < end && (++ptr) != end) { \
@@ -476,7 +476,7 @@ Datum toNumber(Datum *params, uint64_t size) {
       intVal.negate();
     return DecimalVar(intVal.getHighBits(), intVal.getLowBits(), scale);
   };
-  return two_params_bind<DecimalVar, Text, Text>(params, size, strToDecimal);
+  return two_params_bind<DecimalVar, text, text>(params, size, strToDecimal);
 }
 
 template <typename TP>
@@ -1023,18 +1023,5 @@ Datum intervalToText(Datum *params, uint64_t size) {
 
   return one_param_bind<text, IntervalVar>(params, size, intervalCastText);
 }
-
-Datum charToBytea(Datum *params, uint64_t size) {
-  assert(size == 2 && "invalid input");
-  auto numToBytea = [](ByteBuffer &buf, int8_t in) -> text {
-    uint32_t lenBefore = buf.size();
-    uint32_t lenAdd = sizeof(int8_t);
-    buf.resize(lenBefore + lenAdd);
-    memcpy(buf.data() + lenBefore, reinterpret_cast<char *>(&in), lenAdd);
-    return text(nullptr, lenAdd);
-  };
-  return one_param_bind<text, int8_t>(params, size, numToBytea);
-}
-
 
 }  // namespace dbcommon

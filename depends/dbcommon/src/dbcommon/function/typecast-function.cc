@@ -185,45 +185,6 @@ Datum decimal_to_text(Datum *params, uint64_t size) {
   return one_param_bind<text, DecimalVar>(params, size, decimalToText);
 }
 
-Datum text_to_char(Datum *params, uint64_t size) {
-  auto textToChar = [](ByteBuffer &buf, text src) -> int8_t {
-    int8_t ret;
-    int32_t tmpLen = utf8_mblen(src.val);
-    if (tmpLen == 1) {
-      ret = src.val[0];
-    } else {
-      ret = '\0';
-    }
-    return ret;
-  };
-  return one_param_bind<int8_t, text>(params, size, textToChar);
-}
-
-Datum bool_to_text(Datum *params, uint64_t size) {
-  auto boolToText = [](ByteBuffer &buf, bool src) -> text {
-    int32_t len;
-    if (src) {
-      len = 4;
-      buf.resize(buf.size() + len);
-      char *ret = const_cast<char *>(buf.tail() - len);
-      *ret++ = 't';
-      *ret++ = 'r';
-      *ret++ = 'u';
-      *ret++ = 'e';
-    } else {
-      len = 5;
-      buf.resize(buf.size() + len);
-      char *ret = const_cast<char *>(buf.tail() - len);
-      *ret++ = 'f';
-      *ret++ = 'a';
-      *ret++ = 'l';
-      *ret++ = 's';
-      *ret++ = 'e';
-    }
-    return text(nullptr, len);
-  };
-  return one_param_bind<text, bool>(params, size, boolToText);
-}
 Datum timestamptz_to_text(Datum *params, uint64_t size) {
   auto timestamptzToText = [](ByteBuffer &buf, Timestamp src) -> text {
     int64_t second = src.second;
@@ -396,6 +357,45 @@ Datum timestamptz_to_text(Datum *params, uint64_t size) {
   return one_param_bind<text, Timestamp>(params, size, timestamptzToText);
 }
 
+Datum text_to_char(Datum *params, uint64_t size) {
+  auto textToChar = [](ByteBuffer &buf, text src) -> int8_t {
+    int8_t ret;
+    int32_t tmpLen = utf8_mblen(src.val);
+    if (tmpLen == 1) {
+      ret = src.val[0];
+    } else {
+      ret = '\0';
+    }
+    return ret;
+  };
+  return one_param_bind<int8_t, text>(params, size, textToChar);
+}
+
+Datum bool_to_text(Datum *params, uint64_t size) {
+  auto boolToText = [](ByteBuffer &buf, bool src) -> text {
+    int32_t len;
+    if (src) {
+      len = 4;
+      buf.resize(buf.size() + len);
+      char *ret = const_cast<char *>(buf.tail() - len);
+      *ret++ = 't';
+      *ret++ = 'r';
+      *ret++ = 'u';
+      *ret++ = 'e';
+    } else {
+      len = 5;
+      buf.resize(buf.size() + len);
+      char *ret = const_cast<char *>(buf.tail() - len);
+      *ret++ = 'f';
+      *ret++ = 'a';
+      *ret++ = 'l';
+      *ret++ = 's';
+      *ret++ = 'e';
+    }
+    return text(nullptr, len);
+  };
+  return one_param_bind<text, bool>(params, size, boolToText);
+}
 
 Datum time_to_text(Datum *params, uint64_t size) {
   auto timeToText = [](ByteBuffer &buf, int64_t timeval) -> text {
@@ -457,6 +457,69 @@ Datum int4_to_char(Datum *params, uint64_t size) {
     return ret;
   };
   return one_param_bind<int8_t, int32_t>(params, size, intToChar);
+}
+
+Datum date_to_text(Datum *params, uint64_t size) {
+  auto dateToText = [](ByteBuffer &buf, int32_t src) -> text {
+    int32_t year, month, day, y, base = 1000, len = 0;
+    uint32_t julian, quad, extra, unsigned_year;
+    bool isBC;
+
+    julian = src + UNIX_EPOCH_JDATE;
+    julian += 32044;
+    quad = julian / 146097;
+    extra = (julian - quad * 146097) * 4 + 3;
+    julian += 60 + quad * 3 + extra / 146097;
+    quad = julian / 1461;
+    julian -= quad * 1461;
+    y = julian * 4 / 1461;
+    julian = ((y != 0) ? ((julian + 305) % 365) : ((julian + 306) % 366)) + 123;
+    y += quad * 4;
+    year = y - 4800;
+    quad = julian * 2141 / 65536;
+    day = julian - 7834 * quad / 256;
+    month = (quad + 10) % 12 + 1;
+
+    if (src + AD_EPOCH_JDATE < 0) {
+      len += 3;
+      unsigned_year = -year + 1;
+      year = -year + 1;
+      isBC = true;
+    } else {
+      unsigned_year = year;
+      isBC = false;
+    }
+    auto numOfDigit = getNumOfDigit<uint32_t>(unsigned_year);
+    if (numOfDigit <= 4) {
+      len += 10;
+    } else {
+      len += numOfDigit + 6;
+      while (numOfDigit > 4) {
+        base *= 10;
+        numOfDigit--;
+      }
+    }
+    buf.resize(buf.size() + len);
+    char *ret = const_cast<char *>(buf.tail() - len);
+    while (base) {
+      *ret++ = year / base + '0';
+      year = year - (year / base) * base;
+      base = base / 10;
+    }
+    *ret++ = '-';
+    *ret++ = month / 10 + '0';
+    *ret++ = month - (month / 10) * 10 + '0';
+    *ret++ = '-';
+    *ret++ = day / 10 + '0';
+    *ret++ = day - (day / 10) * 10 + '0';
+    if (isBC) {
+      *ret++ = ' ';
+      *ret++ = 'B';
+      *ret++ = 'C';
+    }
+    return text(nullptr, len);
+  };
+  return one_param_bind<text, int32_t>(params, size, dateToText);
 }
 
 Datum int2_to_text(Datum *params, uint64_t size) {

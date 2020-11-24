@@ -229,10 +229,16 @@ message UnivPlanMergeJoin {
 // OTHER PLAN NODES BEGIN
 ///////////////////////////////////////////////////////////////////////////////
 
+enum AggStrategy {
+  AGG_PLAIN = 0;
+  AGG_SORTED = 1;
+  AGG_HASHED = 2;
+}
 message UnivPlanAgg {
   required UnivPlanPlanNode super = 1;
   required int64 numGroups = 2;
   repeated int32 groupColIndexes = 3;
+  required AggStrategy aggStrategy = 4;
 }
 
 message UnivPlanLimit {
