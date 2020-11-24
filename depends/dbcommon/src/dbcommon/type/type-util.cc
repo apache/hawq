@@ -115,6 +115,8 @@ void TypeUtil::setupTypeTable() {
        std::shared_ptr<TypeBase>(new StringArrayType())},
       {BPCHARARRAYID, "bpchararray", VAR_TYPE_LENGTH, false,
        std::shared_ptr<TypeBase>(new BpcharArrayType())},
+      {DECIMAL128ARRAYID, "decimal128array", VAR_TYPE_LENGTH, false,
+       std::shared_ptr<TypeBase>(new Decimal128ArrayType())},
       {ANYID, "any", VAR_TYPE_LENGTH, false, nullptr},
       {UNKNOWNID, "unknown", VAR_TYPE_LENGTH, false,
        std::shared_ptr<TypeBase>(new UnknownType())},

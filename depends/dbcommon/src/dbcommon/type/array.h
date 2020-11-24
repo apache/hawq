@@ -20,11 +20,10 @@
 #ifndef DBCOMMON_SRC_DBCOMMON_TYPE_ARRAY_H_
 #define DBCOMMON_SRC_DBCOMMON_TYPE_ARRAY_H_
 
-#include <climits>
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "dbcommon/log/logger.h"
 #include "dbcommon/type/typebase.h"
@@ -125,6 +124,16 @@ class StringArrayType : public ArrayType {
 class BpcharArrayType : public StringArrayType {
  public:
   BpcharArrayType() { typeKind = BPCHARARRAYID; }
+};
+
+class Decimal128ArrayType : public ArrayType {
+ public:
+  Decimal128ArrayType() { typeKind = DECIMAL128ARRAYID; }
+
+  TypeKind getBaseTypeKind() override { return DECIMALNEWID; }
+
+  std::unique_ptr<Vector> getScalarFromString(
+      const std::string &input) override;
 };
 
 }  // namespace dbcommon

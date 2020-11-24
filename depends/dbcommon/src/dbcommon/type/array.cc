@@ -22,6 +22,7 @@
 #include <utility>
 
 #include "dbcommon/common/vector/list-vector.h"
+#include "dbcommon/function/typecast-texttonum-func.h"
 
 namespace dbcommon {
 
@@ -193,6 +194,16 @@ std::unique_ptr<Vector> StringArrayType::getScalarFromString(
     ret->append(&val);
   }
   return ret;
+}
+
+std::unique_ptr<Vector> Decimal128ArrayType::getScalarFromString(
+    const std::string &input) {
+  auto ret = dbcommon::Vector::BuildVector(getBaseTypeKind(), true, -1);
+  StringArrayType stringArrayType;
+  auto strVec = stringArrayType.getScalarFromString(input);
+  std::vector<Datum> params{CreateDatum(ret.get()), CreateDatum(strVec.get())};
+  textToDecimal(params.data(), params.size());
+  return std::move(ret);
 }
 
 }  // namespace dbcommon

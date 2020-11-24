@@ -183,7 +183,9 @@ ConstExprState::ConstExprState(const univplan::UnivPlanConst *val)
              univplan::PlanNodeUtil::typeKindMapping(val->type()) ==
                  dbcommon::TypeKind::STRINGARRAYID ||
              univplan::PlanNodeUtil::typeKindMapping(val->type()) ==
-                 dbcommon::TypeKind::BPCHARARRAYID) {
+                 dbcommon::TypeKind::BPCHARARRAYID ||
+             univplan::PlanNodeUtil::typeKindMapping(val->type()) ==
+                 dbcommon::TypeKind::DECIMAL128ARRAYID) {
     auto typeEnt = reinterpret_cast<dbcommon::ArrayType *>(
         dbcommon::TypeUtil::instance()
             ->getTypeEntryById(
