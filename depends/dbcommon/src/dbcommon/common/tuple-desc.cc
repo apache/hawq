@@ -58,6 +58,14 @@ void TupleDesc::add(const std::string &field, dbcommon::TypeKind type,
   columnTypeModifiers.push_back(typeMod);
 }
 
+void TupleDesc::removeColumn(size_t idx) {
+  assert(idx < columnTypes.size());
+  columnNames.erase(columnNames.begin() + idx);
+  columnTypes.erase(columnTypes.begin() + idx);
+  columnNullables.erase(columnNullables.begin() + idx);
+  columnTypeModifiers.erase(columnTypeModifiers.begin() + idx);
+}
+
 std::vector<uint32_t> TupleDesc::getFixedLengths() const {
   std::vector<uint32_t> ret;
   for (auto i = 0; i < columnTypes.size(); i++) {

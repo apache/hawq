@@ -88,6 +88,7 @@ void ORCFormatReader::startNewSplit() {
     }
     inputStream = orc::readFile(fsManager->get(url.getNormalizedServiceName()),
                                 url.getPath());
+    if (batch) batch.reset(nullptr);
   }
   opts.range(splits->front()->splits_start(currentSplitIdx),
              splits->front()->splits_len(currentSplitIdx));
@@ -95,7 +96,111 @@ void ORCFormatReader::startNewSplit() {
 
   if (batch == nullptr) {
     batch = orcReader->createRowBatch(this->nTuplesPerBatch);
+    // do type check
+    const dbcommon::TupleDesc *td = opts.getTupleDesc();
+    orc::StructVectorBatch *structBatch =
+        dynamic_cast<orc::StructVectorBatch *>(batch.get());
+    std::vector<orc::ColumnVectorBatch *>::iterator it =
+        structBatch->fields.begin();
+    int32_t nCols = columnsToRead != nullptr ? columnsToRead->size()
+                                             : structBatch->fields.size();
+    for (auto colIdx = 0; colIdx < nCols; ++colIdx) {
+      if (columnsToRead && !columnsToRead->at(colIdx)) continue;
+      typeCheck(td->getColumnType(colIdx), td->getColumnName(colIdx), *it++);
+    }
   }
+}
+
+void ORCFormatReader::typeCheck(dbcommon::TypeKind colType,
+                                const std::string &colName,
+                                orc::ColumnVectorBatch *b) {
+  switch (colType) {
+    case dbcommon::TypeKind::TINYINTID:
+      if (b->getType() == orc::ORCTypeKind::BYTE) return;
+      break;
+    case dbcommon::TypeKind::SMALLINTID:
+      if (b->getType() == orc::ORCTypeKind::SHORT) return;
+      break;
+    case dbcommon::TypeKind::INTID:
+      if (b->getType() == orc::ORCTypeKind::INT) return;
+      break;
+    case dbcommon::TypeKind::BIGINTID:
+      if (b->getType() == orc::ORCTypeKind::LONG) return;
+      break;
+    case dbcommon::TypeKind::FLOATID:
+      if (b->getType() == orc::ORCTypeKind::FLOAT) return;
+      break;
+    case dbcommon::TypeKind::DOUBLEID:
+      if (b->getType() == orc::ORCTypeKind::DOUBLE) return;
+      break;
+    case dbcommon::TypeKind::STRINGID:
+      if (b->getType() == orc::ORCTypeKind::STRING) return;
+      break;
+    case dbcommon::TypeKind::VARCHARID:
+      if (b->getType() == orc::ORCTypeKind::VARCHAR) return;
+      break;
+    case dbcommon::TypeKind::CHARID:
+      if (b->getType() == orc::ORCTypeKind::CHAR) return;
+      break;
+    case dbcommon::TypeKind::BOOLEANID:
+      if (b->getType() == orc::ORCTypeKind::BOOLEAN) return;
+      break;
+    case dbcommon::TypeKind::DATEID:
+      if (b->getType() == orc::ORCTypeKind::DATE) return;
+      break;
+    case dbcommon::TypeKind::TIMEID:
+      if (b->getType() == orc::ORCTypeKind::TIME) return;
+      break;
+    case dbcommon::TypeKind::BINARYID:
+      if (b->getType() == orc::ORCTypeKind::BINARY) return;
+      break;
+    case dbcommon::TypeKind::TIMESTAMPID:
+    case dbcommon::TypeKind::TIMESTAMPTZID:
+      if (b->getType() == orc::ORCTypeKind::TIMESTAMP) return;
+      break;
+    case dbcommon::TypeKind::DECIMALID:
+    case dbcommon::TypeKind::DECIMALNEWID:
+      if (b->getType() == orc::ORCTypeKind::DECIMAL) return;
+      break;
+    case dbcommon::TypeKind::SMALLINTARRAYID:
+      if (dynamic_cast<orc::ListVectorBatch *>(b) &&
+          dynamic_cast<orc::ListVectorBatch *>(b)->elements->getType() ==
+              orc::ORCTypeKind::SHORT)
+        return;
+      break;
+    case dbcommon::TypeKind::INTARRAYID:
+      if (dynamic_cast<orc::ListVectorBatch *>(b) &&
+          dynamic_cast<orc::ListVectorBatch *>(b)->elements->getType() ==
+              orc::ORCTypeKind::INT)
+        return;
+      break;
+    case dbcommon::TypeKind::BIGINTARRAYID:
+      if (dynamic_cast<orc::ListVectorBatch *>(b) &&
+          dynamic_cast<orc::ListVectorBatch *>(b)->elements->getType() ==
+              orc::ORCTypeKind::LONG)
+        return;
+      break;
+    case dbcommon::TypeKind::FLOATARRAYID:
+      if (dynamic_cast<orc::ListVectorBatch *>(b) &&
+          dynamic_cast<orc::ListVectorBatch *>(b)->elements->getType() ==
+              orc::ORCTypeKind::FLOAT)
+        return;
+      break;
+    case dbcommon::TypeKind::DOUBLEARRAYID:
+      if (dynamic_cast<orc::ListVectorBatch *>(b) &&
+          dynamic_cast<orc::ListVectorBatch *>(b)->elements->getType() ==
+              orc::ORCTypeKind::DOUBLE)
+        return;
+      break;
+    case dbcommon::TypeKind::AVG_DOUBLE_TRANS_DATA_ID:
+    case dbcommon::TypeKind::AVG_DECIMAL_TRANS_DATA_ID:
+      return;
+    default:
+      break;
+  }
+  LOG_ERROR(ERRCODE_INTERNAL_ERROR,
+            "Fail to map %s with type %d to orc type %d", colName.c_str(),
+            colType, b->getType());
 }
 
 bool ORCFormatReader::hasSomethingToRead() {

@@ -232,18 +232,19 @@ class TupleBatchUtility {
   // (newline character) as NEWLINE
   // ("NULL") as NULL value
   static TupleBatch::uptr generateTupleBatch(const TupleDesc& desc,
-                                             const std::string& tbStr) {
+                                             const std::string& tbStr,
+                                             const char delimiter = ' ') {
     TupleBatch::uptr tupleBatch(new TupleBatch(desc, true));
     TupleBatchWriter& writers = tupleBatch->getTupleBatchWriter();
     std::vector<bool> hasnulls(desc.getNumOfColumns(), false);
     auto rows = StringUtil::split(tbStr, '\n');
     for (auto& row : rows) {
-      auto fields = StringUtil::split(row, ' ');
+      auto fields = StringUtil::split(row, delimiter);
       int colIdx = 0;
       for (auto i = 0; i < fields.size(); i++) {
         std::string field = fields[i];
         if (writers[colIdx]->getTypeKind() == TypeKind::TIMESTAMPID &&
-            field != "NULL") {
+            field != "NULL" && delimiter == ' ') {
           i++;
           field = field + " " + fields[i];
         }

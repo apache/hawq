@@ -54,6 +54,8 @@ class ORCFormatReader {
   void startNewSplit();
   dbcommon::TupleBatch::uptr createTupleBatch(orc::ColumnVectorBatch *batch);
   bool hasSomethingToRead();
+  void typeCheck(dbcommon::TypeKind colType, const std::string &colName,
+                 orc::ColumnVectorBatch *b);
 
  private:
   const univplan::UnivPlanScanFileSplitListList *splits = nullptr;

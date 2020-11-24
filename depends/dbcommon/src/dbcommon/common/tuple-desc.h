@@ -47,6 +47,8 @@ class TupleDesc {
   void add(const std::string &field, dbcommon::TypeKind type,
            int64_t typeMod = -1, bool nullable = true);
 
+  void removeColumn(size_t idx);
+
   std::vector<std::string> &getColumnNames() { return columnNames; }
 
   std::vector<dbcommon::TypeKind> &getColumnTypes() { return columnTypes; }
