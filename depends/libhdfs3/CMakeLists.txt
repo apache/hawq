@@ -3,6 +3,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 PROJECT(libhdfs3)
 
 SET(CMAKE_VERBOSE_MAKEFILE ON CACHE STRING "Verbose build." FORCE)
+SET(CMAKE_MACOSX_RPATH 1)
 
 IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
     MESSAGE(FATAL_ERROR "cannot build the project in the source directory! Out-of-source build is enforced!")
