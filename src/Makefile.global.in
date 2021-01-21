@@ -221,8 +221,6 @@ COLLATEINDEX	= @COLLATEINDEX@
 
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
-CPPFLAGS += -I$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/include
-CPPFLAGS += -I$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/include
 CPPFLAGS += -I/usr/local/hawq/include
 
 ifdef PGXS
@@ -237,7 +235,9 @@ endif # not PGXS
 CC = @CC@
 GCC = @GCC@
 SUN_STUDIO_CC = @SUN_STUDIO_CC@
-CFLAGS = @CFLAGS@
+CFLAGS = -I$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/include
+CFLAGS += -I$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/include
+CFLAGS += @CFLAGS@
 CFLAGS_SSE42 = @CFLAGS_SSE42@
 
 # Kind-of compilers
@@ -272,9 +272,9 @@ ifdef PGXS
 else
   LDFLAGS = -L$(top_builddir)/src/port
 endif
-LDFLAGS += @LDFLAGS@
 LDFLAGS += -L$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/lib
 LDFLAGS += -L$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/lib
+LDFLAGS += @LDFLAGS@
 
 LDFLAGS_EX = @LDFLAGS_EX@
 # LDFLAGS_SL might have already been assigned by calling makefile

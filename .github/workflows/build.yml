@@ -15,7 +15,7 @@
 
 name: Apache HAWQ
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   build-on-macOS:
@@ -44,6 +44,7 @@ jobs:
         install_name_tool -add_rpath $GITHUB_WORKSPACE/dependency-Darwin/package/lib/perl5/5.28.0/darwin-thread-multi-2level/CORE/ $GITHUB_WORKSPACE/dependency-Darwin/package/bin/perl
 
     - name: configure
+      timeout-minutes: 10
       run: |
         source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
         export CFLAGS="$CFLAGS -w"
@@ -55,16 +56,41 @@ jobs:
     - name: build hawq
       run: |
         source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
-        make -j$(nproc)
-        make -j$(nproc) install
+        make -j$(sysctl -n hw.ncpu)
+        make -j$(sysctl -n hw.ncpu) install
 
     - name: build feature-test
       run: |
         source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
-        make -j$(nproc) feature-test
+        make -j$(sysctl -n hw.ncpu) feature-test
 
     - name: test executable
       run: |
+        for file in $(find /tmp/hawq/bin -name '*' -type f); do
+          if [[ $(file $file | grep Mach-O) ]]; then
+            install_name_tool -add_rpath /tmp/hawq/lib $file;
+          fi
+        done
         source /tmp/hawq/greenplum_path.sh
         postgres -V
         src/test/feature/feature-test --gtest_list_tests
+
+    - name: install HDFS
+      run: |
+        export HOMEBREW_NO_INSTALL_CLEANUP=1
+        brew install hadoop
+
+    - name: initilize macOS
+      run: .github/workflows/scripts/init_macos.sh
+
+    - name: initilize HDFS
+      run: |
+        export HADOOP_HOME=/usr/local/opt/hadoop/libexec
+        .github/workflows/scripts/init_hdfs.sh
+
+    - name: initilize HAWQ
+      run: |
+        source /tmp/hawq/greenplum_path.sh
+        .github/workflows/scripts/init_hawq.sh
+        psql -d postgres -c 'create database hawq_feature_test_db;'
+        src/test/feature/feature-test --gtest_filter=TestDatabase.BasicTest
