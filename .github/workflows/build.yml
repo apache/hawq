@@ -94,3 +94,10 @@ jobs:
         .github/workflows/scripts/init_hawq.sh
         psql -d postgres -c 'create database hawq_feature_test_db;'
         src/test/feature/feature-test --gtest_filter=TestDatabase.BasicTest
+
+    - name: test HAWQ
+      run: |
+        source /tmp/hawq/greenplum_path.sh
+        source .github/workflows/scripts/gtest_filter_negative
+        export PGDATABASE=hawq_feature_test_db
+        src/test/feature/feature-test --gtest_filter=*-$GTEST_FILTER_NEGATIVE
