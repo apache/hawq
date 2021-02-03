@@ -361,13 +361,13 @@ fill_buffer(URL_FILE *file, int want)
 						e, curl_easy_strerror(e));
 		}
 
-		if (maxfd <= 0)
+		if (maxfd == -1)
 		{
-			curl->still_running = 0;
-			break;
+			/* fall through to curl_multi_perform directly */
+			pg_usleep(100);
+			nfds = 1;
 		}
-
-        if (-1 == (nfds = select(maxfd+1, &fdread, &fdwrite, &fdexcep, &timeout)))
+		else if (-1 == (nfds = select(maxfd+1, &fdread, &fdwrite, &fdexcep, &timeout)))
 		{
 			if (errno == EINTR || errno == EAGAIN)
 				continue;

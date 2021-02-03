@@ -14,7 +14,6 @@
 # limitations under the License.
 
 export GTEST_FILTER_NEGATIVE=\
-TestErrorTable.TestErrorTableAll:\
 TestCommonLib.TestHdfsConfig:\
 TestExtOrc.TestNormalPath:\
 TestExtOrc.BoolTypeTest:\

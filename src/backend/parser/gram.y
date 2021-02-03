@@ -4707,7 +4707,7 @@ CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_n
 
 OptWritable:	WRITABLE				{ $$ = TRUE; }
 				| READABLE				{ $$ = FALSE; }
-				| /*EMPTY*/				{ $$ = TRUE; }
+				| /*EMPTY*/				{ $$ = FALSE; }
 				;
 
 OptWeb:		WEB						{ $$ = TRUE; }
