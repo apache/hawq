@@ -20,6 +20,8 @@
 #ifndef DBCOMMON_SRC_DBCOMMON_FUNCTION_ARITHMETIC_FUNCTION_H_
 #define DBCOMMON_SRC_DBCOMMON_FUNCTION_ARITHMETIC_FUNCTION_H_
 
+#include <math.h>
+
 #include <cfloat>
 #include <cmath>
 #include <functional>

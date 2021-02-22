@@ -18,9 +18,14 @@ name: Apache HAWQ
 on: [push, pull_request]
 
 jobs:
-  build-on-macOS:
+  Build-and-Test:
 
-    runs-on: macOS-10.15
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.platform }}
 
     steps:
 
@@ -28,67 +33,79 @@ jobs:
 
     - name: lint check
       run: |
-        csrutil status
         ulimit -a
         mvn apache-rat:check
 
+    - name: initilize OS
+      run: |
+        case $(uname -s) in
+          Darwin) .github/workflows/scripts/init_macos.sh ;;
+          Linux)  .github/workflows/scripts/init_linux.sh ;;
+        esac
+
     - name: install thirdparty
       run: |
-        # download prebuilt libraries
-        curl -sL http://yum.oushu-tech.com/oushurepo/yumrepo/internal/linux/toolchain/dependency-Darwin.tar.xz | tar -xJ -C $GITHUB_WORKSPACE
-        for file in $(find $GITHUB_WORKSPACE/dependency-Darwin/package/bin -name '*' -type f) $(find $GITHUB_WORKSPACE/dependency-Darwin/package/lib -name '*.dylib' -type f); do
-          if [[ $(file $file | grep Mach-O) ]]; then
-            install_name_tool -add_rpath $GITHUB_WORKSPACE/dependency-Darwin/package/lib $file;
-          fi
-        done
-        install_name_tool -add_rpath $GITHUB_WORKSPACE/dependency-Darwin/package/lib/perl5/5.28.0/darwin-thread-multi-2level/CORE/ $GITHUB_WORKSPACE/dependency-Darwin/package/bin/perl
-        rm -rf $GITHUB_WORKSPACE/dependency-Darwin/package/include/hdfs
-        rm -rf $GITHUB_WORKSPACE/dependency-Darwin/package/lib/libhdfs3*
+        set -x
+        source .github/workflows/scripts/toolchain.sh
 
     - name: configure
       timeout-minutes: 10
       run: |
-        source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
+        source .github/workflows/scripts/toolchain.sh
         export CFLAGS="$CFLAGS -w"
-        export LDFLAGS="$LDFLAGS -Wl,-rpath,$GITHUB_WORKSPACE/dependency-Darwin/package/lib"
+        export LDFLAGS="$LDFLAGS -Wl,-rpath,$HAWQ_TOOLCHAIN_PATH/dependency/package/lib"
 
         ./configure --enable-debug --prefix=/tmp/hawq || cat config.log
         test -f config.status
 
     - name: build hawq
       run: |
-        source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
-        make -j$(sysctl -n hw.ncpu)
-        make -j$(sysctl -n hw.ncpu) install
+        source .github/workflows/scripts/toolchain.sh
+        make
+        make install
 
     - name: build feature-test
       run: |
-        source $GITHUB_WORKSPACE/dependency-Darwin/package/env.sh
-        make -j$(sysctl -n hw.ncpu) feature-test
+        source .github/workflows/scripts/toolchain.sh
+        make feature-test
 
-    - name: test executable
+    - name: package HAWQ on Linux
+      if: runner.os == 'Linux'
       run: |
-        for file in $(find /tmp/hawq/bin -name '*' -type f); do
+        source .github/workflows/scripts/toolchain.sh
+        cp -r $HAWQ_TOOLCHAIN_PATH/dependency/package/lib/* /tmp/hawq/lib
+
+    - name: package HAWQ on macOS
+      if: runner.os == 'macOS'
+      run: |
+        source .github/workflows/scripts/toolchain.sh
+        for file in $(find /tmp/hawq/bin /tmp/hawq/lib -name '*' -type f); do
           if [[ $(file $file | grep Mach-O) ]]; then
             install_name_tool -add_rpath /tmp/hawq/lib $file;
           fi
         done
+        cp -r $HAWQ_TOOLCHAIN_PATH/dependency/package/lib/* /tmp/hawq/lib
+
+    - name: test executable
+      run: |
         source /tmp/hawq/greenplum_path.sh
         postgres -V
         src/test/feature/feature-test --gtest_list_tests
 
     - name: install HDFS
       run: |
-        export HOMEBREW_NO_INSTALL_CLEANUP=1
-        brew install hadoop
-
-    - name: initilize macOS
-      run: .github/workflows/scripts/init_macos.sh
+        wget -nv https://archive.apache.org/dist/hadoop/common/hadoop-3.3.0/hadoop-3.3.0.tar.gz
+        sudo install -o $USER -d /usr/local/hadoop-3.3.0
+        sudo ln -snf hadoop-3.3.0 /usr/local/hadoop
+        sudo tee /usr/local/bin/hdfs <<<'exec /usr/local/hadoop/bin/hdfs $@'
+        sudo chmod a+x /usr/local/bin/hdfs
+        tar xf hadoop-3.3.0.tar.gz -C /usr/local/
 
     - name: initilize HDFS
       run: |
-        export HADOOP_HOME=/usr/local/opt/hadoop/libexec
+        export HADOOP_HOME=/usr/local/hadoop/
         .github/workflows/scripts/init_hdfs.sh
+        sudo -u $USER hdfs dfs -ls /
 
     - name: initilize HAWQ
       run: |

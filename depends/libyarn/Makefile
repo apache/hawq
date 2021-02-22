@@ -66,7 +66,7 @@ pre-config:
 	mkdir -p build; \
 	cd build; \
 	if [ ! -f libyarn_build_timestamp ]; then \
-		$(abs_top_srcdir)/$(subdir)/bootstrap --prefix=$(prefix) $(PRE_CFG_ARG) && touch libyarn_build_timestamp; \
+		$(abs_top_srcdir)/$(subdir)/bootstrap --prefix=$(prefix) --dependency=$(prefix) $(PRE_CFG_ARG) && touch libyarn_build_timestamp; \
 	fi
 
 else
