@@ -397,6 +397,7 @@ class SQLUtility {
   std::unique_ptr<hawq::test::PSQL> conn;
   std::string databaseName;
   std::string schemaName;
+  std::string savedGUCValue;
 
 };  // class SQLUtility
 

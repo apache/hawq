@@ -176,7 +176,7 @@ void SQLUtility::exec(const string &sql) {
 void SQLUtility::execIgnore(const string &sql) { conn->runSQLCommand(sql); }
 
 string SQLUtility::execute(const string &sql, bool check) {
-  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
+  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + savedGUCValue + sql);
   EXPECT_NE(conn.get(), nullptr);
   if (check) {
     EXPECT_EQ(0, conn->getLastStatus()) << sql << " " << conn->getLastResult();
@@ -186,7 +186,7 @@ string SQLUtility::execute(const string &sql, bool check) {
 }
 
 bool SQLUtility::executeSql(const std::string &sql) {
-  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + sql);
+  conn->runSQLCommand("SET SEARCH_PATH=" + schemaName + ";" + savedGUCValue + sql);
   EXPECT_NE(conn.get(), nullptr);
   return !conn->getLastStatus();
 }
@@ -767,7 +767,7 @@ string SQLUtility::getTestRootPath() {
 
 void SQLUtility::setGUCValue(const std::string &guc, const std::string &value) {
   string sql = "set " + guc + " = " + value;
-  execute(sql, true);
+  savedGUCValue += sql + ';';
 }
 
 std::string SQLUtility::getGUCValue(const std::string &guc) {

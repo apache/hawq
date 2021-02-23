@@ -188,6 +188,7 @@ TEST_F(TestCreateTable, TestCreateTable1) {
 TEST_F(TestCreateTable, TestCreateTableInherits) {
   hawq::test::SQLUtility util;
   // prepare
+  util.setGUCValue("default_hash_table_bucket_number", "6");
   util.execute("DROP TABLE IF EXISTS t1_1_6, t1_1_5, t1_1_4, t1_1_3, "
 		                            "t1_1_2, t1_1_1, t1_1_w, t1_1, t1 CASCADE");
 
@@ -238,6 +239,7 @@ TEST_F(TestCreateTable, TestCreateTableInherits) {
 TEST_F(TestCreateTable, TestCreateTableDistribution1) {
   hawq::test::SQLUtility util;
   // prepare
+  util.setGUCValue("default_hash_table_bucket_number", "6");
   util.execute("DROP TABLE IF EXISTS t1_3_4, t1_3_3, t1_3_2, t1_3_1, t1_3_w, t1_3 CASCADE");
   util.execute("DROP TABLE IF EXISTS t1_2_4, t1_2_3, t1_2_2, t1_2_1, t1_2_w, t1_2 CASCADE");
   util.execute("DROP TABLE IF EXISTS t1 CASCADE");
@@ -307,6 +309,7 @@ TEST_F(TestCreateTable, TestCreateTableDistribution1) {
 TEST_F(TestCreateTable, TestCreateTableDistribution2) {
   hawq::test::SQLUtility util;
   // prepare
+  util.setGUCValue("default_hash_table_bucket_number", "6");
   util.execute("DROP TABLE IF EXISTS t2_2, t2_2_w, t2_2_1, t2_2_2, t2_2_3, t2_2_4 CASCADE");
   util.execute("DROP TABLE IF EXISTS t2_3, t2_3_w, t2_3_1, t2_3_2, t2_3_3, t2_3_4 CASCADE");
   util.execute("DROP TABLE IF EXISTS t2_1_1, t2_1, t2 CASCADE");
@@ -428,6 +431,7 @@ TEST_F(TestCreateTable, TestCreateTableDistribution3) {
 TEST_F(TestCreateTable, TestCreateTableDistribution4) {
   hawq::test::SQLUtility util;
   // prepare
+  util.setGUCValue("default_hash_table_bucket_number", "6");
   util.execute("DROP TABLE IF EXISTS t4");
 
   // test
