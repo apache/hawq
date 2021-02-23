@@ -316,6 +316,9 @@ void HdfsConfig::getNamenodes(std::vector<string> &namenodes,
     auto lines = hawq::test::split(result, '\n');
     for (size_t i = 0; i < lines.size(); i++) {
         string valueLine = lines[i];
+        if (valueLine.find("ssh:") != string::npos ||
+            valueLine.find("Warning:") != string::npos)
+          continue;
         auto namenodeInfo = hawq::test::split(valueLine, ':');
         if (namenodeInfo.size() == 2) {
             namenodes.push_back(hawq::test::trim(namenodeInfo[0]));
