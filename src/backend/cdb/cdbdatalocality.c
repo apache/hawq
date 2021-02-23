@@ -1183,7 +1183,7 @@ static void double_check_hdfs_metadata_logic_length(BlockLocation * locations,in
 		hdfs_file_len += locations[i].length;
 	}
 	if(logic_len > hdfs_file_len) {
-		elog(ERROR, "hdfs file length does not equal to metadata logic length!");
+		elog(ERROR, "hdfs file length does not equal to metadata logic length! (%ld != %ld)", hdfs_file_len, logic_len);
 	}
 }
 

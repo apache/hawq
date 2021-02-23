@@ -220,8 +220,9 @@ COLLATEINDEX	= @COLLATEINDEX@
 # Compilers
 
 CPP = @CPP@
-CPPFLAGS = @CPPFLAGS@
-CPPFLAGS += -I/usr/local/hawq/include
+CPPFLAGS = -I$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/include
+CPPFLAGS += -I$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/include
+CPPFLAGS += @CPPFLAGS@
 
 ifdef PGXS
 override CPPFLAGS := -I$(includedir_server) -I$(includedir_internal) $(CPPFLAGS)

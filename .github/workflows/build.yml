@@ -42,6 +42,8 @@ jobs:
           fi
         done
         install_name_tool -add_rpath $GITHUB_WORKSPACE/dependency-Darwin/package/lib/perl5/5.28.0/darwin-thread-multi-2level/CORE/ $GITHUB_WORKSPACE/dependency-Darwin/package/bin/perl
+        rm -rf $GITHUB_WORKSPACE/dependency-Darwin/package/include/hdfs
+        rm -rf $GITHUB_WORKSPACE/dependency-Darwin/package/lib/libhdfs3*
 
     - name: configure
       timeout-minutes: 10
