@@ -55,7 +55,7 @@ jobs:
         export CFLAGS="$CFLAGS -w"
         export LDFLAGS="$LDFLAGS -Wl,-rpath,$HAWQ_TOOLCHAIN_PATH/dependency/package/lib"
 
-        ./configure --enable-debug --prefix=/tmp/hawq || cat config.log
+        ./configure --enable-coverage --enable-debug --prefix=/tmp/hawq || cat config.log
         test -f config.status
 
     - name: build hawq
