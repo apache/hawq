@@ -113,6 +113,10 @@ jobs:
         .github/workflows/scripts/init_hawq.sh
         psql -d postgres -c 'create database hawq_feature_test_db;'
         src/test/feature/feature-test --gtest_filter=TestDatabase.BasicTest
+        hawq stop cluster -a
+        lcov --directory --capture --output-file CodeCoverage.info
+        export CODECOV_TOKEN='8bd80825-400c-4272-a10c-b469050d3b8e'
+        bash <(curl -s https://codecov.io/bash)
 
     - name: test HAWQ
       run: |
