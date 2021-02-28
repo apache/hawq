@@ -116,7 +116,7 @@ jobs:
 
         hawq stop cluster -a
         source .github/workflows/scripts/toolchain.sh
-        lcov --directory --capture --output-file CodeCoverage.info
+        lcov --directory . --capture --output-file CodeCoverage.info
         export CODECOV_TOKEN='8bd80825-400c-4272-a10c-b469050d3b8e'
         bash <(curl -s https://codecov.io/bash)
 
