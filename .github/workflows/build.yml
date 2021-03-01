@@ -116,6 +116,7 @@ jobs:
 
         hawq stop cluster -a
         source .github/workflows/scripts/toolchain.sh
+        rm -f $HAWQ_TOOLCHAIN_PATH/dependency/package/bin/gcov
         lcov --directory . --capture --output-file coverage.info
         lcov --list coverage.info
         export CODECOV_TOKEN='8bd80825-400c-4272-a10c-b469050d3b8e'
