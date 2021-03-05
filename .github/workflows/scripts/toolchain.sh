@@ -19,6 +19,18 @@ export HAWQ_TOOLCHAIN_PATH=$(cd "$( dirname "${BASH_SOURCE[0]-$0}" )" && pwd)/do
 # https://github.com/apache/hawq/releases/tag/thirdparty
 REPO=https://github.com/apache/hawq/releases/download/thirdparty/
 
+# ISA and OS checking
+arch=$(uname -m)
+case $arch in
+  x86_64) ;;
+  *) echo "Not supported on ISA $arch"; return 1; ;;
+esac
+os=$(uname -s)
+case $os in
+  Darwin) ;;
+  Linux)  ;;
+  *) echo "Not supported on OS $os"; return 1; ;;
+esac
 
 
 ###
@@ -32,13 +44,15 @@ if [[ $(uname -s) == Darwin ]]; then
 
     for file in $(find $HAWQ_TOOLCHAIN_PATH/dependency/package/bin -name '*' -type f) $(find $HAWQ_TOOLCHAIN_PATH/dependency/package/lib -name '*.dylib' -type f); do
       if [[ $(file $file | grep Mach-O) ]]; then
-        install_name_tool -add_rpath $HAWQ_TOOLCHAIN_PATH/dependency/package/lib $file || true
+        install_name_tool -add_rpath $HAWQ_TOOLCHAIN_PATH/dependency/package/lib $file 2>/dev/null || true
       fi
     done
     install_name_tool -add_rpath $HAWQ_TOOLCHAIN_PATH/dependency/package/lib/perl5/5.28.0/darwin-thread-multi-2level/CORE/ $HAWQ_TOOLCHAIN_PATH/dependency/package/bin/perl
   fi
 
   export MAKEFLAGS=-j$(sysctl -n hw.ncpu)
+  export CFLAGS="$CFLAGS -w"
+  export LDFLAGS="$LDFLAGS -Wl,-rpath,$HAWQ_TOOLCHAIN_PATH/dependency/package/lib"
 fi
 
 

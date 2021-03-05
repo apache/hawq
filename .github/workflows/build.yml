@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, macos-latest]
+        platform: [ubuntu-18.04, macos-latest]
 
     runs-on: ${{ matrix.platform }}
 
@@ -52,10 +52,8 @@ jobs:
       timeout-minutes: 10
       run: |
         source .github/workflows/scripts/toolchain.sh
-        export CFLAGS="$CFLAGS -w"
-        export LDFLAGS="$LDFLAGS -Wl,-rpath,$HAWQ_TOOLCHAIN_PATH/dependency/package/lib"
 
-        ./configure --enable-debug --prefix=/tmp/hawq || cat config.log
+        ./configure --prefix=/tmp/hawq || cat config.log
         test -f config.status
 
     - name: build hawq
