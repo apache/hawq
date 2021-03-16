@@ -118,3 +118,18 @@ jobs:
         source .github/workflows/scripts/gtest_filter_negative
         export PGDATABASE=hawq_feature_test_db
         src/test/feature/feature-test --gtest_filter=*-$GTEST_FILTER_NEGATIVE
+
+    - name: test scripts's idempotence
+      run: |
+        case $(uname -s) in
+          Darwin) .github/workflows/scripts/init_macos.sh ;;
+          Linux)  .github/workflows/scripts/init_linux.sh ;;
+        esac
+
+        export HADOOP_HOME=/usr/local/hadoop/
+        .github/workflows/scripts/init_hdfs.sh
+
+        source /tmp/hawq/greenplum_path.sh
+        .github/workflows/scripts/init_hawq.sh
+        psql -d postgres -c 'create database hawq_feature_test_db;'
+        src/test/feature/feature-test --gtest_filter=TestDatabase.BasicTest

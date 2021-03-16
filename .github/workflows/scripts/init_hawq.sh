@@ -17,6 +17,12 @@ set -e
 
 
 
+# Check
+if [[ -z $GPHOME ]]; then
+  echo "Please source HAWQ's greenplum_path.sh"
+  exit 1
+fi
+
 # Configure
 tee $GPHOME/etc/hawq-site.xml << EOF_hawq_site
 <configuration>
@@ -56,9 +62,12 @@ tee $GPHOME/etc/hawq-site.xml << EOF_hawq_site
 </configuration>
 EOF_hawq_site
 
-# Initialize
-rm -rf /opt/dependency*
+# Clean
+pkill -9 postgres || true
+hdfs dfs -rm -f -r hdfs://localhost:8020/hawq_default
 rm -rf /tmp/db_data/hawq-data-directory
+
+# Initialize
 install -d /tmp/db_data/hawq-data-directory/masterdd
 install -d /tmp/db_data/hawq-data-directory/segmentdd
 hawq init cluster -a

@@ -17,6 +17,16 @@ set -e
 
 
 
+# Check
+if ! command -v java; then
+  echo "Please check java in PATH"
+  exit 1
+fi
+if [[ -z $HADOOP_HOME ]]; then
+  echo "Please export HADOOP_HOME"
+  exit 1
+fi
+
 # Configure
 tee $HADOOP_HOME/etc/hadoop/core-site.xml << EOF_core_site
 <configuration>
@@ -38,6 +48,14 @@ tee $HADOOP_HOME/etc/hadoop/hdfs-site.xml << EOF_hdfs_site
     </property>
 </configuration>
 EOF_hdfs_site
+
+tee -a $HADOOP_HOME/etc/hadoop/hadoop-env.sh << EOF_hadoop_env
+export JAVA_HOME=$(java -XshowSettings:properties -version 2>&1 | sed -nE 's|.*java.home = (.*)|\1|p')
+EOF_hadoop_env
+
+# Clean
+$HADOOP_HOME/sbin/stop-dfs.sh
+rm -rf /tmp/db_data/hdfs/name /tmp/db_data/hdfs/data
 
 # Initialize
 install -d /tmp/db_data/hdfs/name

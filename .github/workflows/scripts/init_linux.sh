@@ -29,6 +29,7 @@ Host *
    StrictHostKeyChecking no
    UserKnownHostsFile=/dev/null
 EOF_ssh_config
+chmod 600 ~/.ssh/config
 
 ssh -v localhost whoami
 

@@ -99,6 +99,8 @@ fi
 
 
 ###
+find . $HAWQ_TOOLCHAIN_PATH/../../../../ -name CMakeCache.txt -delete
+find . $HAWQ_TOOLCHAIN_PATH/../../../../ -name '*build_timestamp' -delete
 rm -rf $HAWQ_TOOLCHAIN_PATH/dependency/package/include/hdfs
 rm -rf $HAWQ_TOOLCHAIN_PATH/dependency/package/lib/libhdfs3*
 source $HAWQ_TOOLCHAIN_PATH/dependency/package/env.sh

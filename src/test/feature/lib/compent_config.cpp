@@ -204,6 +204,8 @@ void CompentConfig::runCommandAndGetNodesPorts(
       string valueLine = lines[i];
       if (valueLine.find("ssh:") != string::npos)
         continue;
+      if (valueLine.find("sudo:") != string::npos)
+        continue;
       if (valueLine.find("WARNING") != string::npos)
         continue;
       auto datanodeInfo = hawq::test::split(valueLine, ':');

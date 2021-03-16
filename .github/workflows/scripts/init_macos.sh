@@ -18,9 +18,12 @@ set -e
 
 
 # Setup passphraseless ssh
-sudo systemsetup -setremotelogin on
-ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa
+sudo systemsetup -setremotelogin on &>/dev/null || true
+/bin/launchctl load -w /System/Library/LaunchDaemons/ssh.plist &>/dev/null || true
+
+test -f ~/.ssh/id_rsa || ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa
 cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+chmod go-w ~
 chmod 0700 ~/.ssh
 chmod 0600 ~/.ssh/authorized_keys
 
@@ -29,6 +32,7 @@ Host *
    StrictHostKeyChecking no
    UserKnownHostsFile=/dev/null
 EOF_ssh_config
+chmod 600 ~/.ssh/config
 
 ssh -v localhost whoami
 
@@ -43,7 +47,7 @@ kern.maxfiles=65535
 kern.maxfilesperproc=65536
 kern.corefile=/cores/core.%N.%P
 EOF_sysctl
-</etc/sysctl.conf xargs sudo sysctl
+</etc/sysctl.conf xargs sudo sysctl || true
 
 # Add data folder
 sudo install -o $USER -d /tmp/db_data/
