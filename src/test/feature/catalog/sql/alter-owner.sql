@@ -20,9 +20,20 @@ select
 
 alter database u1 owner to u1;
 alter schema u1 owner to u1;
+alter schema u1 rename to u2;
 
-reset session authorization;
+-- test permission
+create role u2;
+ALTER SCHEMA pg_toast OWNER to u2; -- system schema
+GRANT ALL ON SCHEMA u2 to u2;
+RESET SESSION AUTHORIZATION;
+SET SESSION AUTHORIZATION u2;
+CREATE TABLE u2.grant_test(a int) DISTRIBUTED BY (a);
+ALTER SCHEMA u2 RENAME to myschema;  -- not the schema owner
+
+RESET SESSION AUTHORIZATION;
 drop database u1;
-drop schema u1;
+drop schema u2 CASCADE;
 drop role u1;
+drop role u2;
 drop role super;

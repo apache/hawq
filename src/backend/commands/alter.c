@@ -106,11 +106,6 @@ ExecRenameStmt(RenameStmt *stmt)
 			break;
 
 		case OBJECT_SCHEMA:
-			if (!gp_called_by_pgdump)
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support rename schema statement yet") ));
-			}
 			RenameSchema(stmt->subname, stmt->newname);
 			break;
 
@@ -304,9 +299,6 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 			break;
 
 		case OBJECT_SCHEMA:
-			if (!gp_called_by_pgdump)
-							ereport(ERROR,
-									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter schema owner statement yet") ));
 			AlterSchemaOwner(strVal(linitial(stmt->object)), newowner);
 			break;
 
