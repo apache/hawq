@@ -450,8 +450,8 @@ GpPolicyRemove(Oid tbloid)
  */
 void
 checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
-			 			  bool isprimary, bool has_exprs, bool has_pkey,
-						  bool has_ukey)
+					      bool isprimary, bool has_exprs, bool is_pkey,
+						  bool is_ukey)
 {
 	Bitmapset *polbm = NULL;
 	Bitmapset *indbm = NULL;
@@ -492,6 +492,24 @@ checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
 	Assert(bms_membership(polbm) != BMS_EMPTY_SET);
 	Assert(bms_membership(indbm) != BMS_EMPTY_SET);
 
+	/*
+	 * NOTE: Do not change the policy according to PRIMARY KEY/UNIQUE index
+	 * definitions. We always assume that the distributed policy was explicitly
+	 * set. Because we can't get accurate cdbRelSize(rel) for magma format table.
+	 */
+	if (!bms_is_subset(polbm, indbm))
+	{
+	  if ( is_pkey || is_ukey || has_exprs) {
+	    ereport(ERROR,
+	        (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+	        errmsg("%s must contain all columns in the "
+	            "distribution key of relation \"%s\"",
+	            isprimary ? "PRIMARY KEY" : "UNIQUE index",
+	        RelationGetRelationName(rel)),
+	        errOmitLocation(true)));
+	  }
+	}
+
 	/* 
 	 * If the existing policy is not a subset, we must either error out or
 	 * update the distribution policy. It might be tempting to say that even
@@ -503,6 +521,7 @@ checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
 	 * What is really needed is a new field in gp_distribution_policy telling us
 	 * if the policy has been explicitly set.
 	 */
+	/*
 	if (!bms_is_subset(polbm, indbm))
 	{
        	if (cdbRelSize(rel) != 0 || has_pkey || has_ukey || has_exprs)
@@ -517,7 +536,7 @@ checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
 		}
 		else
 		{
-			/* update policy since table is not populated yet. See MPP-101 */
+			// update policy since table is not populated yet. See MPP-101
 			GpPolicy *policy = palloc(sizeof(GpPolicy) + 
 									  (sizeof(AttrNumber) * nidxatts));
 			policy->ptype = POLICYTYPE_PARTITIONED;
@@ -534,5 +553,5 @@ checkPolicyForUniqueIndex(Relation rel, AttrNumber *indattr, int nidxatts,
 				elog(NOTICE, "updating distribution policy to match new unique index");
 		}
 	}
+	*/
 }
-

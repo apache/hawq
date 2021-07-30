@@ -290,12 +290,14 @@ static void set_plan_references_output_asserts(PlannerGlobal *glob, Plan *plan)
 			List *colNames = NULL;
 			RangeTblEntry *rte = rt_fetch(var->varno, glob->finalrtable);
 			Assert(rte && "Invalid RTE");
-			Assert(rte->rtekind != RTE_VOID && "Var points to a void RTE!");
-			
-			/* Make sure attnum refers to a column in the relation */
-			expandRTE(rte, var->varno, 0, -1, true, &colNames, NULL);
-			
-			AssertImply(var->varattno >= 0, var->varattno <= list_length(colNames) + list_length(rte->pseudocols)); /* Only asserting on non-system attributes */
+			// for partition pruning case, result node with one-time filter false may still exist
+			if (rte->rtekind != RTE_VOID)
+			{
+			  /* Make sure attnum refers to a column in the relation */
+			  expandRTE(rte, var->varno, 0, -1, true, &colNames, NULL);
+			  AssertImply(var->varattno >= 0,
+			              var->varattno <= list_length(colNames) + list_length(rte->pseudocols)); /* Only asserting on non-system attributes */
+			}
 		}
 		
 	}
@@ -410,9 +412,11 @@ set_plan_references(PlannerGlobal *glob, Plan *plan, List *rtable)
 				
 		/** Need to fix up some of the references in the newly created newrte */
 		fix_scan_expr(glob, (Node *) newrte->funcexpr, rtoffset);
-		fix_scan_expr(glob, (Node *) newrte->joinaliasvars, rtoffset);
 		fix_scan_expr(glob, (Node *) newrte->values_lists, rtoffset);
 		
+		/* zap unneeded sub-structure, should zap more which already in pg 8.3 */
+		newrte->joinaliasvars = NIL;
+
 		glob->finalrtable = lappend(glob->finalrtable, newrte);
 		
 		/*
@@ -507,6 +511,28 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 			fix_scan_list(glob, splan->plan.qual, rtoffset);
 		}
 			break;
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
+		{
+			ExternalScan *splan = (ExternalScan *) plan;
+
+			if (cdb_expr_requires_full_eval((Node *)plan->targetlist))
+				return  cdb_insert_result_node(glob, plan, rtoffset);
+			splan->scan.scanrelid += rtoffset;
+#ifdef USE_ASSERT_CHECKING
+			RangeTblEntry *rte = rt_fetch(splan->scan.scanrelid, glob->finalrtable);
+			char relstorage = get_rel_relstorage(rte->relid);
+			Assert(!relstorage_is_ao(relstorage));
+#endif
+			splan->scan.plan.targetlist =
+			fix_scan_list(glob, splan->scan.plan.targetlist, rtoffset);
+			splan->scan.plan.qual =
+			fix_scan_list(glob, splan->scan.plan.qual, rtoffset);
+			splan->indexqualorig =
+			fix_scan_list(glob, splan->indexqualorig, rtoffset);
+		}
+			break;
+
 		case T_IndexScan:
 		{
 			IndexScan  *splan = (IndexScan *) plan;
@@ -519,8 +545,7 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 #ifdef USE_ASSERT_CHECKING
 			RangeTblEntry *rte = rt_fetch(splan->scan.scanrelid, glob->finalrtable);
 			char relstorage = get_rel_relstorage(rte->relid);
-			Assert(relstorage != RELSTORAGE_AOROWS &&
-				   relstorage != RELSTORAGE_PARQUET);
+			Assert(!relstorage_is_ao(relstorage));
 #endif
 
 			splan->scan.plan.targetlist =
@@ -559,8 +584,7 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 #ifdef USE_ASSERT_CHECKING
 			RangeTblEntry *rte = rt_fetch(splan->scan.scanrelid, glob->finalrtable);
 			char relstorage = get_rel_relstorage(rte->relid);
-			Assert(relstorage != RELSTORAGE_AOROWS &&
-				   relstorage != RELSTORAGE_PARQUET);
+			Assert(!relstorage_is_ao(relstorage));
 #endif
 			splan->scan.plan.targetlist =
 			fix_scan_list(glob, splan->scan.plan.targetlist, rtoffset);

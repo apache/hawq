@@ -94,7 +94,9 @@ preprocess_targetlist(PlannerInfo *root, List *tlist)
 	 * of the attributes. We also need to fill in any missing attributes. -ay
 	 * 10/94
 	 */
-	if (command_type == CMD_INSERT || command_type == CMD_UPDATE)
+	if (command_type == CMD_INSERT ||
+	    command_type == CMD_UPDATE ||
+	    command_type == CMD_DELETE)
 		tlist = expand_targetlist(tlist, command_type,
 								  result_relation, range_table);
 
@@ -148,9 +150,16 @@ preprocess_targetlist(PlannerInfo *root, List *tlist)
 		 * For an UPDATE, expand_targetlist already created a fresh tlist. For
 		 * DELETE, better do a listCopy so that we don't destructively modify
 		 * the original tlist (is this really necessary?).
+		 *
+		 * To support DELETE in magma, now, expand_targetlist also creates
+		 * a fresh tlist for DELETE. The values of primary key in tlist will be
+		 * used to identify the tuple to be deleted accordingly. Thus, no listCopy
+		 * is needed for DELETE anymore.
 		 */
+		/*
 		if (command_type == CMD_DELETE)
 			tlist = list_copy(tlist);
+		*/
 
 		tlist = lappend(tlist, tleCtid);
 		tlist = lappend(tlist, tleSegid);
@@ -337,6 +346,13 @@ expand_targetlist(List *tlist, int command_type,
 			 * generate a NULL for dropped columns (we want to drop any old
 			 * values).
 			 *
+			 * For DELETE, generate a Var reference to the existing value of
+			 * the attribute, so that: 1) for heap tuple, it uses (ctid,
+			 * gp_segment_id) to identify the tuple to be deleted; 2) for tuple
+			 * in external table, i.e., magma, it uses values of primary
+			 * keys to identify the tuple to be deleted. But generate a NULL
+			 * for dropped columns (we want to drop any old values).
+			 *
 			 * When generating a NULL constant for a dropped column, we label
 			 * it INT4 (any other guaranteed-to-exist datatype would do as
 			 * well). We can't label it with the dropped column's datatype
@@ -381,6 +397,7 @@ expand_targetlist(List *tlist, int command_type,
 					}
 					break;
 				case CMD_UPDATE:
+				case CMD_DELETE:
 					if (!att_tup->attisdropped)
 					{
 						new_expr = (Node *) makeVar(result_relation,

@@ -51,6 +51,9 @@
 #include <zlib.h>
 #endif
 
+#include <lz4.h>
+#include <lz4hc.h>
+
 char *WriteBackCatalogs = NULL;
 int32 WriteBackCatalogLen = 0;
 
@@ -145,7 +148,6 @@ deserializeNode(const char *strNode, int size)
 	Assert(sNode != NULL);
 	
 	node = readNodeFromBinaryString(sNode, uncompressed_len);
-
 	pfree(sNode);
 	}
 	END_MEMORY_ACCOUNT();
@@ -161,33 +163,36 @@ deserializeNode(const char *strNode, int size)
 static char *
 compress_string(const char *src, int uncompressed_size, int *size)
 {
-	int level = 3;
-	unsigned long compressed_size;
-	int status;
-
-	Bytef * result;
-
-	Assert(size!=NULL);
-	
-	if (src == NULL)
-	{
-		*size = 0;
-		return NULL;
-	}
-	
-	compressed_size = gp_compressBound(uncompressed_size);  /* worst case */
-	
-	result = palloc(compressed_size + sizeof(int));
-	memcpy(result, &uncompressed_size, sizeof(int)); 		/* save the original length */
-	
-	status = compress2(result+sizeof(int), &compressed_size, (Bytef *)src, uncompressed_size, level);
-	if (status != Z_OK)
-		elog(ERROR,"Compression failed: %s (errno=%d) uncompressed len %d, compressed %d",
-			 zError(status), status, uncompressed_size, (int)compressed_size);
-		
-	*size = compressed_size + sizeof(int);
-	elog(DEBUG2,"Compressed from %d to %d ", uncompressed_size, *size);
-
+//	int level = 3;
+//	unsigned long compressed_size;
+//	int status;
+//
+//	Bytef * result;
+//
+//	Assert(size!=NULL);
+//
+//	if (src == NULL)
+//	{
+//		*size = 0;
+//		return NULL;
+//	}
+//
+//	compressed_size = gp_compressBound(uncompressed_size);  /* worst case */
+//
+//	result = palloc(compressed_size + sizeof(int));
+//	memcpy(result, &uncompressed_size, sizeof(int)); 		/* save the original length */
+//
+//	status = compress2(result+sizeof(int), &compressed_size, (Bytef *)src, uncompressed_size, level);
+//	if (status != Z_OK)
+//		elog(ERROR,"Compression failed: %s (errno=%d) uncompressed len %d, compressed %d",
+//			 zError(status), status, uncompressed_size, (int)compressed_size);
+//
+//	*size = compressed_size + sizeof(int);
+//	elog(DEBUG2,"Compressed from %d to %d ", uncompressed_size, *size);
+  int compressed_size = LZ4_compressBound(uncompressed_size);
+  char *result = palloc(compressed_size + sizeof(int));
+  memcpy(result, &uncompressed_size, sizeof(int));  // save original size
+  *size = sizeof(int) + LZ4_compress_default(src, result + sizeof(int), uncompressed_size, compressed_size);
 	return (char *)result;
 }
 
@@ -197,25 +202,27 @@ compress_string(const char *src, int uncompressed_size, int *size)
 static char *
 uncompress_string(const char *src, int size, int *uncompressed_len)
 {
-	Bytef * result;
-	unsigned long resultlen;
-	int status;
-	*uncompressed_len = 0;
-	
-	if (src==NULL)
-		return NULL;
-		
-	Assert(size >= sizeof(int));
-		
-	memcpy(uncompressed_len,src, sizeof(int));
-	
-	resultlen = *uncompressed_len;
-	result = palloc(resultlen);
-		
-	status = uncompress(result, &resultlen, (Bytef *)(src+sizeof(int)), size-sizeof(int));
-	if (status != Z_OK)
-		elog(ERROR,"Uncompress failed: %s (errno=%d compressed len %d, uncompressed %d)",
-			 zError(status), status, size, *uncompressed_len);
-		
+//	Bytef * result;
+//	unsigned long resultlen;
+//	int status;
+//	*uncompressed_len = 0;
+//
+//	if (src==NULL)
+//		return NULL;
+//
+//	Assert(size >= sizeof(int));
+//
+//	memcpy(uncompressed_len,src, sizeof(int));
+//
+//	resultlen = *uncompressed_len;
+//	result = palloc(resultlen);
+//
+//	status = uncompress(result, &resultlen, (Bytef *)(src+sizeof(int)), size-sizeof(int));
+//	if (status != Z_OK)
+//		elog(ERROR,"Uncompress failed: %s (errno=%d compressed len %d, uncompressed %d)",
+//			 zError(status), status, size, *uncompressed_len);
+  memcpy(uncompressed_len, src, sizeof(int));
+  char *result = palloc(*uncompressed_len);
+  LZ4_decompress_safe(src + sizeof(int), result, size - sizeof(int), *uncompressed_len);
 	return (char *)result;
 }

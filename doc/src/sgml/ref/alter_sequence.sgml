@@ -28,7 +28,6 @@ ALTER SEQUENCE <replaceable class="parameter">name</replaceable> [ INCREMENT [ B
     [ MINVALUE <replaceable class="parameter">minvalue</replaceable> | NO MINVALUE ] [ MAXVALUE <replaceable class="parameter">maxvalue</replaceable> | NO MAXVALUE ]
     [ RESTART [ WITH ] <replaceable class="parameter">start</replaceable> ] [ CACHE <replaceable class="parameter">cache</replaceable> ] [ [ NO ] CYCLE ]
     [ OWNED BY { <replaceable class="parameter">table</replaceable>.<replaceable class="parameter">column</replaceable> | NONE } ]
-ALTER SEQUENCE <replaceable class="parameter">name</replaceable> SET SCHEMA <replaceable class="parameter">new_schema</replaceable>
   </synopsis>
  </refsynopsisdiv>
 
@@ -39,12 +38,6 @@ ALTER SEQUENCE <replaceable class="parameter">name</replaceable> SET SCHEMA <rep
    <command>ALTER SEQUENCE</command> changes the parameters of an existing
    sequence generator.  Any parameters not specifically set in the
    <command>ALTER SEQUENCE</command> command retain their prior settings.
-  </para>
-
-  <para>
-   You must own the sequence to use <command>ALTER SEQUENCE</>.
-   To change a sequence's schema, you must also have <literal>CREATE</>
-   privilege on the new schema.
   </para>
  </refsect1>
 
@@ -181,15 +174,6 @@ ALTER SEQUENCE <replaceable class="parameter">name</replaceable> SET SCHEMA <rep
      </para>
     </listitem>
    </varlistentry>
-
-     <varlistentry>
-      <term><replaceable class="parameter">new_schema</replaceable></term>
-      <listitem>
-       <para>
-        The new schema for the sequence.
-       </para>
-      </listitem>
-     </varlistentry>
     </variablelist>
    </para>
   </refsect1>

@@ -1112,3 +1112,47 @@ custom_fmtopts_string(const char *src)
 		free(srcdup_start);
 		return result;
 }
+
+char *findStrKey(const char *src, const char *tar) {
+  if ((!tar || (tar && *tar == '\0')) || !src || (src && *src == '\0'))
+    return NULL;
+  const char *srctmp = src;
+  const char *tartmp = tar;
+
+  while (*srctmp != '\0') {
+    if (*srctmp == *tar) {
+      const char *srctmptmp = srctmp;
+      while (*tartmp != '\0') {
+        ++srctmp;
+        ++tartmp;
+        if (*srctmp == *tartmp) {
+          if (*(tartmp + 1) == '\0')
+            return srctmp + 1;
+          else
+            continue;
+        } else {
+          tartmp = tar;
+          srctmp = srctmptmp;
+          break;
+        }
+      }
+    }
+    srctmp++;
+  }
+}
+
+char *getValByKey(char **result, const char *src, const char *tar) {
+  const char *valPos = findStrKey(src, tar);
+  const char *pos1 = NULL, *pos2 = NULL;
+
+  if (!valPos) return valPos;
+
+  while (*valPos != '\'') valPos++;
+  pos1 = ++valPos;
+  while (*valPos != '\'') valPos++;
+  pos2 = valPos;
+  *result = (char *)malloc(pos2 - pos1 + 1);
+  memcpy(*result, pos1, pos2 - pos1);
+  (*result)[pos2 - pos1] = '\0';
+  return *result;
+}

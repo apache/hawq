@@ -35,14 +35,14 @@ override CPPFLAGS+= -I$(top_srcdir)/src/backend/libpq \
 THRIFTLIB = -lthrift
 LIBS := $(LIBS) $(THRIFTLIB)
 
-CPLUSPLUSLIB = -lstdc++
-LIBS := $(LIBS) $(CPLUSPLUSLIB)
+#CPLUSPLUSLIB = -lstdc++
+#LIBS := $(LIBS) $(CPLUSPLUSLIB)
 
 #GLIBLIB = -lgobject-2.0 -lglib-2.0
 #LIBS := $(LIBS) $(GLIBLIB)
 
 
-MOCK_LIBS := -ldl -lpthread -lesmtp $(filter-out -lpgport -lesmtp -ledit, $(LIBS))
+MOCK_LIBS := -ldl -lesmtp $(filter-out -lpgport -lesmtp -ledit, $(LIBS))
  
 
 # We are unable to mock them up at the moment.  Real objects should contain them.

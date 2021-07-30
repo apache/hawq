@@ -1405,13 +1405,17 @@ internal_flush(void)
 			{
 				last_reported_send_errno = errno;
 				
-				HOLD_INTERRUPTS();
+				// we can only ereport in main thread
+				if (pthread_equal(main_tid, pthread_self())) {
+				  HOLD_INTERRUPTS();
 
-				/* we can use ereport here, for the protection of send mutex */
-				ereport(COMMERROR,
-						(errcode_for_socket_access(),
-						 errmsg("could not send data to client: %m")));
-				RESUME_INTERRUPTS();
+				  /* we can use ereport here, for the protection of send mutex */
+				  ereport(COMMERROR,
+				          (errcode_for_socket_access(),
+				              errmsg("could not send data to client: %m")));
+
+				  RESUME_INTERRUPTS();
+				}
 			}
 
 			/*

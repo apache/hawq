@@ -514,8 +514,6 @@ public:
      * @param a partial listing starting after startAfter
      * @param dl append the returned directories.
      *
-     * @return true if there are more remaining entries.
-     *
      * @throw AccessControlException permission denied
      * @throw FileNotFoundException file <code>src</code> is not found
      * @throw UnresolvedLinkException If <code>src</code> contains a symlink

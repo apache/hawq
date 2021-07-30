@@ -27,17 +27,27 @@
 #include "postgres.h"
 #include "fmgr.h"
 
+#include "access/attnum.h"
 #include "access/fileam.h"
+#include "access/orcam.h"
 #include "access/plugstorage.h"
+#include "access/xact.h"
+#include "catalog/pg_constraint.h"
 #include "catalog/pg_exttable.h"
 #include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbdatalocality.h"
 #include "cdb/cdbparquetam.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbvars.h"
 #include "commands/trigger.h"
 #include "executor/execdebug.h"
 #include "executor/execDML.h"
+#include "executor/tuptable.h"
+#include "nodes/pg_list.h"
+#include "utils/acl.h"
+#include "utils/hsearch.h"
 #include "utils/lsyscache.h"
+#include "utils/rel.h"
 
 /*
  * reconstructTupleValues
@@ -178,7 +188,8 @@ ExecInsert(TupleTableSlot *slot,
 	bool		rel_is_heap = false;
 	bool 		rel_is_aorows = false;
 	bool		rel_is_external = false;
-    bool		rel_is_parquet = false;
+  bool		rel_is_parquet = false;
+  bool    rel_is_orc = false;
 
 	/*
 	 * get information on the (current) result relation
@@ -271,6 +282,16 @@ ExecInsert(TupleTableSlot *slot,
 				oldResultRelInfo->ri_parquetInsertDesc = NULL;
 
 			}
+			else if (RelationIsOrc(oldRelation))
+			{
+			  OrcInsertDescData *oldInsertDesc = oldResultRelInfo->ri_orcInsertDesc;
+        Assert(NULL != oldInsertDesc);
+
+        oldInsertDesc->sendback = sendback;
+
+        orcEndInsert(oldInsertDesc);
+        oldResultRelInfo->ri_orcInsertDesc = NULL;
+			}
 			else
 			{
 				Assert(false && "Unreachable");
@@ -281,8 +302,7 @@ ExecInsert(TupleTableSlot *slot,
 
 			estate->es_last_inserted_part = InvalidOid;
 		}
-
-  }
+	}
 	else
 	{
 		resultRelInfo = estate->es_result_relation_info;
@@ -295,7 +315,8 @@ ExecInsert(TupleTableSlot *slot,
 	rel_is_heap = RelationIsHeap(resultRelationDesc);
 	rel_is_aorows = RelationIsAoRows(resultRelationDesc);
 	rel_is_external = RelationIsExternal(resultRelationDesc);
-    rel_is_parquet = RelationIsParquet(resultRelationDesc);
+  rel_is_parquet = RelationIsParquet(resultRelationDesc);
+  rel_is_orc = RelationIsOrc(resultRelationDesc);
 
 	/* Validate that insert is not part of an non-allowed update operation. */
 	if (isUpdate && (rel_is_aorows || rel_is_parquet))
@@ -315,13 +336,13 @@ ExecInsert(TupleTableSlot *slot,
 	{
 		tuple = ExecFetchSlotMemTuple(partslot, false);
 	}
-	else if (rel_is_parquet || rel_is_external)
+	else if (rel_is_parquet || rel_is_orc || rel_is_external)
 	{
 		tuple = NULL;
 	}
 
 	Assert( partslot != NULL );
-	Assert( rel_is_parquet || rel_is_external || (tuple != NULL));
+	Assert( rel_is_parquet || rel_is_orc || rel_is_external || (tuple != NULL));
 
 	/* Execute triggers in Planner-generated plans */
 	if (planGen == PLANGEN_PLANNER)
@@ -406,10 +427,10 @@ ExecInsert(TupleTableSlot *slot,
 					GetExtTableEntry(RelationGetRelid(resultRelationDesc));
 
 			/* Get formatter type and name for the external table */
-			ExternalTableType formatterType = ExternalTableType_Invalid;
+			int formatterType = ExternalTableType_Invalid;
 			char *formatterName = NULL;
 
-			getExternalTableTypeInStr(extEntry->fmtcode, extEntry->fmtopts,
+			getExternalTableTypeStr(extEntry->fmtcode, extEntry->fmtopts,
 			                        &formatterType, &formatterName);
 
 			pfree(extEntry);
@@ -435,7 +456,6 @@ ExecInsert(TupleTableSlot *slot,
 					FmgrInfo insertInitFunc;
 					fmgr_info(procOid, &insertInitFunc);
 
-
 					ResultRelSegFileInfo *segfileinfo = NULL;
 					ResultRelInfoSetSegFileInfo(resultRelInfo,
 							estate->es_result_segfileinfos);
@@ -444,12 +464,13 @@ ExecInsert(TupleTableSlot *slot,
 
 					resultRelInfo->ri_extInsertDesc =
 
-					InvokePlugStorageFormatInsertInit(&insertInitFunc,
-													 resultRelationDesc,
-													 formatterType,
-													 formatterName,
-													 estate->es_plannedstmt,
-													 segfileinfo->segno);
+							InvokePlugStorageFormatInsertInit(&insertInitFunc,
+															 resultRelationDesc,
+															 formatterType,
+															 formatterName,
+															 estate->es_plannedstmt,
+															 segfileinfo->segno,
+															 PlugStorageGetTransactionSnapshot());
 				}
 				else
 				{
@@ -509,32 +530,43 @@ ExecInsert(TupleTableSlot *slot,
 		}
 
 		newId = parquet_insert(resultRelInfo->ri_parquetInsertDesc, partslot);
-	}
-	else
-	{
-		Insist(rel_is_heap);
+    } else if (rel_is_orc) {
+      if (resultRelInfo->ri_orcInsertDesc == NULL) {
+        ResultRelSegFileInfo *segfileinfo = NULL;
+        ResultRelInfoSetSegFileInfo(resultRelInfo,
+                                    estate->es_result_segfileinfos);
+        segfileinfo = (ResultRelSegFileInfo *)list_nth(
+            resultRelInfo->ri_aosegfileinfos, GetQEIndex());
+        resultRelInfo->ri_orcInsertDesc =
+            orcBeginInsert(resultRelationDesc, segfileinfo);
 
-		newId = heap_insert(resultRelationDesc,
-							tuple,
-							estate->es_snapshot->curcid,
-							true, true, GetCurrentTransactionId());
-	}
+        estate->es_last_inserted_part = resultRelationDesc->rd_id;
+      }
 
-	IncrAppended();
+      newId = orcInsert(resultRelInfo->ri_orcInsertDesc, partslot);
+    } else {
+      Insist(rel_is_heap);
+
+      newId = heap_insert(resultRelationDesc, tuple,
+                          estate->es_snapshot->curcid, true, true,
+                          GetCurrentTransactionId());
+    }
+
+  IncrAppended();
 	(estate->es_processed)++;
 	(resultRelInfo->ri_aoprocessed)++;
 	estate->es_lastoid = newId;
 
 	partslot->tts_tableOid = RelationGetRelid(resultRelationDesc);
 
-	if (rel_is_aorows || rel_is_parquet || rel_is_external)
+	if (rel_is_aorows || rel_is_parquet || rel_is_orc || rel_is_external)
 	{
 
 		/* NOTE: Current version does not support index upon parquet table. */
 		/*
 		 * insert index entries for AO Row-Store tuple
 		 */
-		if (resultRelInfo->ri_NumIndices > 0 && !rel_is_parquet)
+		if (resultRelInfo->ri_NumIndices > 0 && !rel_is_parquet && !rel_is_orc)
 			ExecInsertIndexTuples(partslot, (ItemPointer)&aoTupleId, estate, false);
 	}
 	else
@@ -572,6 +604,7 @@ ExecInsert(TupleTableSlot *slot,
  */
 void
 ExecDelete(ItemPointer tupleid,
+		   Datum segmentid,
 		   TupleTableSlot *planSlot,
 		   DestReceiver *dest,
 		   EState *estate,
@@ -628,6 +661,11 @@ ExecDelete(ItemPointer tupleid,
 				return;
 		}
 	}
+
+	bool isHeapTable = RelationIsHeap(resultRelationDesc);
+	bool isExternalTable = RelationIsExternal(resultRelationDesc);
+	bool isNativeOrc = RelationIsOrc(resultRelationDesc);
+
 	/*
 	 * delete the tuple
 	 *
@@ -637,13 +675,89 @@ ExecDelete(ItemPointer tupleid,
 	 * referential integrity updates in serializable transactions.
 	 */
 ldelete:;
-	result = heap_delete(resultRelationDesc, tupleid,
-						 &update_ctid, &update_xmax,
-						 estate->es_snapshot->curcid,
-						 estate->es_crosscheck_snapshot,
-						 true /* wait for commit */ );
+	if (isHeapTable)
+	{
+		result = heap_delete(resultRelationDesc, tupleid,
+		                     &update_ctid, &update_xmax,
+		                     estate->es_snapshot->curcid,
+		                     estate->es_crosscheck_snapshot,
+		                     true /* wait for commit */ );
+	}
+	else if (isExternalTable)
+	{
+	    Assert(estate->es_ext_del_oid_desc != NULL);
 
-	switch (result)
+	    ExternalInsertDescHashEntry *extDelDescEntry = NULL;
+	    bool found = false;
+	    extDelDescEntry = hash_search(estate->es_ext_del_oid_desc,
+	                                  (void *) (&(RelationGetRelid(resultRelationDesc))),
+	                                  HASH_ENTER,
+	                                  &found);
+
+	    if (!found)
+	    {
+	        Assert(extDelDescEntry != NULL);
+	        /*
+	         * Step 1: prepare ExternalInsertDescData which will be shared
+	         * during begindelete, delete, and enddelete, if necessary
+	         */
+	        ExtTableEntry *extEntry =
+	                GetExtTableEntry(RelationGetRelid(resultRelationDesc));
+
+	        /* Get formatter type and name for the external table */
+	        int formatterType = ExternalTableType_Invalid;
+	        char *formatterName = NULL;
+
+	        getExternalTableTypeStr(extEntry->fmtcode, extEntry->fmtopts,
+	                                &formatterType, &formatterName);
+	        pfree(extEntry);
+
+	        Oid procOid = LookupMagmaFunction(formatterName, "begindelete");
+	        FmgrInfo procInfo;
+	        if (OidIsValid(procOid))
+	        {
+	            fmgr_info(procOid, &procInfo);
+
+	            /* Step 2: begin delete tuple */
+	            extDelDescEntry->ext_ins_desc =
+	                    InvokeMagmaBeginDelete(&procInfo,
+	                                           resultRelationDesc,
+	                                           estate->es_plannedstmt,
+	                                           PlugStorageGetTransactionSnapshot());
+		    }
+	        else
+	        {
+	            elog(ERROR, "magma_begindelete function was not found for pluggable storage");
+	        }
+	    }
+
+	    /* Step 3: delete tuple */
+	    ExternalInsertDesc extDelDesc = extDelDescEntry->ext_ins_desc;
+	    extDelDesc->ext_rangeId = GetRangeIdFromCtidAndSegmentid(segmentid);
+	    extDelDesc->ext_rowId = GetRowIdFromCtidAndSegmentid(tupleid, segmentid);
+	    InvokeMagmaDelete(extDelDesc->ext_ps_delete_funcs.deletes,
+	                      extDelDesc,
+	                      planSlot);
+
+	    result = HeapTupleMayBeUpdated;
+  } else if (isNativeOrc) {
+    if (resultRelInfo->ri_orcDeleteDesc == NULL) {
+      List *splits =
+          GetFileSplitsOfSegment(estate->es_plannedstmt->scantable_splits,
+                                 resultRelationDesc->rd_id, GetQEIndex());
+      resultRelInfo->ri_orcDeleteDesc = orcBeginDelete(
+          resultRelationDesc, splits, estate->es_plannedstmt->relFileNodeInfo,
+          false,
+          isDirectDispatch(estate->es_plannedstmt->planTree));
+    }
+    resultRelInfo->ri_orcDeleteDesc->rowId = (Datum)(ItemPointerGetRowIdFromFakeCtid(tupleid));
+    orcDelete(resultRelInfo->ri_orcDeleteDesc);
+    result = HeapTupleMayBeUpdated;
+  } else {
+    Insist(0);
+  }
+
+  switch (result)
 	{
 		case HeapTupleSelfUpdated:
 			/* already deleted by self; nothing to do */
@@ -706,7 +820,7 @@ ldelete:;
 			return;
 	}
 
-	if (!isUpdate)
+	if (!isUpdate && !isNativeOrc)
 	{
 		IncrDeleted();
 		(estate->es_processed)++;
@@ -743,6 +857,7 @@ ldelete:;
 void
 ExecUpdate(TupleTableSlot *slot,
 		   ItemPointer tupleid,
+		   Datum segmentid,
 		   TupleTableSlot *planSlot,
 		   DestReceiver *dest,
 		   EState *estate)
@@ -860,11 +975,17 @@ lreplace:;
 	if (resultRelationDesc->rd_att->constr)
 		ExecConstraints(resultRelInfo, slot, estate);
 
+	bool isExternalTable = false;
+	bool isNativeOrc = false;
 	if (!GpPersistent_IsPersistentRelation(resultRelationDesc->rd_id))
 	{
 		/*
 		 * Normal UPDATE path.
 		 */
+
+		bool isHeapTable = RelationIsHeap(resultRelationDesc);
+		isExternalTable = RelationIsExternal(resultRelationDesc);
+		isNativeOrc = RelationIsOrc(resultRelationDesc);
 
 		/*
 		 * replace the heap tuple
@@ -874,12 +995,91 @@ lreplace:;
 		 * serialize error if not.	This is a special-case behavior needed for
 		 * referential integrity updates in serializable transactions.
 		 */
-		result = heap_update(resultRelationDesc, tupleid, tuple,
-							 &update_ctid, &update_xmax,
-							 estate->es_snapshot->curcid,
-							 estate->es_crosscheck_snapshot,
-							 true /* wait for commit */ );
-		switch (result)
+		if (isHeapTable)
+		{
+			result = heap_update(resultRelationDesc, tupleid, tuple,
+			                     &update_ctid, &update_xmax,
+			                     estate->es_snapshot->curcid,
+			                     estate->es_crosscheck_snapshot,
+			                     true /* wait for commit */ );
+		}
+		else if (isExternalTable)
+		{
+		    Assert(estate->es_ext_upd_oid_desc != NULL);
+
+		    ExternalInsertDescHashEntry *extUpdDescEntry = NULL;
+		    bool found = false;
+		    extUpdDescEntry = (ExternalInsertDescHashEntry *)hash_search(estate->es_ext_upd_oid_desc,
+		                                                                 (void *) (&(RelationGetRelid(resultRelationDesc))),
+		                                                                 HASH_ENTER,
+		                                                                 &found);
+
+		    if (!found)
+		    {
+		        Assert(extUpdDescEntry != NULL);
+		        /*
+		         * Step 1: prepare ExternalInsertDescData which will be shared
+		         * during beginupdate, update, and endupdate, if necessary
+		         */
+		        ExtTableEntry *extEntry =
+		                GetExtTableEntry(RelationGetRelid(resultRelationDesc));
+
+		        /* Get formatter type and name for the external table */
+		        int formatterType = ExternalTableType_Invalid;
+		        char *formatterName = NULL;
+
+		        getExternalTableTypeStr(extEntry->fmtcode, extEntry->fmtopts,
+		                                &formatterType, &formatterName);
+		        pfree(extEntry);
+
+		        Oid procOid = LookupMagmaFunction(formatterName, "beginupdate");
+		        FmgrInfo procInfo;
+		        if (OidIsValid(procOid))
+		        {
+		            fmgr_info(procOid, &procInfo);
+
+		            /* Step 2: begin delete tuple */
+		            extUpdDescEntry->ext_ins_desc =
+		                    InvokeMagmaBeginUpdate(&procInfo,
+		                                           resultRelationDesc,
+		                                           estate->es_plannedstmt,
+		                                           PlugStorageGetTransactionSnapshot());
+		            elog(LOG, "exec update begin update: %d", extUpdDescEntry->ext_ins_oid);
+		        }
+		        else
+		        {
+		            elog(ERROR, "magma_beginupdate function was not found for pluggable storage");
+		        }
+		    }
+
+		    /* Step 3: update tuple */
+		    ExternalInsertDesc extUpdDesc = extUpdDescEntry->ext_ins_desc;
+		    extUpdDesc->ext_rangeId = GetRangeIdFromCtidAndSegmentid(segmentid);
+		    extUpdDesc->ext_rowId = GetRowIdFromCtidAndSegmentid(tupleid, segmentid);
+		    estate->es_processed += InvokeMagmaUpdate(extUpdDesc->ext_ps_update_funcs.updates,
+		                      extUpdDesc,
+		                      planSlot);
+			result = HeapTupleMayBeUpdated;
+    } else if (isNativeOrc) {
+      if (resultRelInfo->ri_orcUpdateDesc == NULL) {
+        List *splits =
+            GetFileSplitsOfSegment(estate->es_plannedstmt->scantable_splits,
+                                   resultRelationDesc->rd_id, GetQEIndex());
+        resultRelInfo->ri_orcUpdateDesc = orcBeginUpdate(
+            resultRelationDesc, splits, estate->es_plannedstmt->relFileNodeInfo,
+            false,
+            isDirectDispatch(estate->es_plannedstmt->planTree));
+      }
+      resultRelInfo->ri_orcUpdateDesc->rowId =
+          (Datum)(ItemPointerGetRowIdFromFakeCtid(tupleid));
+      resultRelInfo->ri_orcUpdateDesc->slot = planSlot;
+      orcUpdate(resultRelInfo->ri_orcUpdateDesc);
+      result = HeapTupleMayBeUpdated;
+    } else {
+      Insist(0);
+    }
+
+    switch (result)
 		{
 			case HeapTupleSelfUpdated:
 				/* already deleted by self; nothing to do */
@@ -934,7 +1134,8 @@ lreplace:;
 	}
 
 	IncrReplaced();
-	(estate->es_processed)++;
+	if (!isExternalTable && !isNativeOrc)
+	 (estate->es_processed)++;
 
 	/*
 	 * Note: instead of having to update the old index tuples associated with
@@ -955,5 +1156,291 @@ lreplace:;
 	/* AFTER ROW UPDATE Triggers */
 	ExecARUpdateTriggers(estate, resultRelInfo, tupleid, tuple);
 
+}
+
+extern Oid
+LookupMagmaFunction(char *formatter, char *func)
+{
+	List*	funcname	= NIL;
+	Oid		procOid		= InvalidOid;
+	Oid		argList[1];
+	Oid		returnOid;
+
+	elog(DEBUG3, "find magma function for %s_%s", formatter, func);
+
+	char *new_func_name = (char *)palloc0(strlen(formatter)+strlen(func) + 2);
+	sprintf(new_func_name, "%s_%s", formatter, func);
+	funcname = lappend(funcname, makeString(new_func_name));
+
+	returnOid = VOIDOID;
+	procOid = LookupFuncName(funcname, 0, argList, true);
+
+	pfree(new_func_name);
+	list_free_deep(funcname);
+
+	return procOid;
+}
+
+extern ExternalInsertDesc
+InvokeMagmaBeginDelete(FmgrInfo *func,
+                       Relation relation,
+                       PlannedStmt *plannedstmt,
+                       MagmaSnapshot *snapshot)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_relation = relation;
+	psdata.ps_magma_splits =
+	    GetFileSplitsOfSegmentMagma(plannedstmt->scantable_splits, relation->rd_id);
+	/*
+	psdata.ps_magma_splits =
+	    GetFileSplitsOfSegment(plannedstmt->scantable_splits, relation->rd_id, GetQEIndex());
+	*/
+
+	GetMagmaSchemaByRelid(plannedstmt->scantable_splits, relation->rd_id,
+	                      &(psdata.ps_magma_serializeSchema),
+	                      &(psdata.ps_magma_serializeSchemaLen));
+    psdata.ps_snapshot.currentTransaction.txnId = 0;
+    psdata.ps_snapshot.currentTransaction.txnStatus = 0;
+    psdata.ps_snapshot.txnActions.txnActions = NULL;
+    psdata.ps_snapshot.txnActions.txnActionSize = 0;
+    psdata.ps_snapshot.txnActions.txnActionStartOffset = 0;
+
+    if (snapshot != NULL)
+    {
+        // save current transaction in snapshot
+        psdata.ps_snapshot.currentTransaction.txnId =
+            snapshot->currentTransaction.txnId;
+        psdata.ps_snapshot.currentTransaction.txnStatus =
+            snapshot->currentTransaction.txnStatus;
+        psdata.ps_snapshot.cmdIdInTransaction = snapshot->cmdIdInTransaction;
+
+        // allocate txnActions
+        psdata.ps_snapshot.txnActions.txnActionStartOffset =
+            snapshot->txnActions.txnActionStartOffset;
+        psdata.ps_snapshot.txnActions.txnActions = (MagmaTxnAction *)palloc0(
+            sizeof(MagmaTxnAction) * snapshot->txnActions.txnActionSize);
+
+        // save txnActionsp
+        psdata.ps_snapshot.txnActions.txnActionSize =
+            snapshot->txnActions.txnActionSize;
+        for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i) {
+          psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+              snapshot->txnActions.txnActions[i].txnId;
+          psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+              snapshot->txnActions.txnActions[i].txnStatus;
+        }
+    }
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// Free snapshot memory
+	pfree(psdata.ps_snapshot.txnActions.txnActions);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return psdata.ps_ext_delete_desc;
+}
+
+extern void
+InvokeMagmaDelete(FmgrInfo *func,
+                        ExternalInsertDesc extDelDesc,
+                        TupleTableSlot *tupTableSlot)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_ext_delete_desc = extDelDesc;
+	psdata.ps_tuple_table_slot = tupTableSlot;
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return;
+}
+
+extern void
+InvokeMagmaEndDelete(FmgrInfo *func,
+                           ExternalInsertDesc extDelDesc)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_ext_delete_desc = extDelDesc;
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return;
+}
+
+extern ExternalInsertDesc
+InvokeMagmaBeginUpdate(FmgrInfo *func,
+                       Relation relation,
+                       PlannedStmt *plannedstmt,
+                       MagmaSnapshot *snapshot)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_relation = relation;
+	psdata.ps_magma_splits =
+	    GetFileSplitsOfSegmentMagma(plannedstmt->scantable_splits, relation->rd_id);
+	/*
+	psdata.ps_magma_splits =
+	    GetFileSplitsOfSegment(plannedstmt->scantable_splits, relation->rd_id, GetQEIndex());
+	*/
+	GetMagmaSchemaByRelid(plannedstmt->scantable_splits, relation->rd_id,
+	                      &(psdata.ps_magma_serializeSchema),
+	                      &(psdata.ps_magma_serializeSchemaLen));
+
+    psdata.ps_snapshot.currentTransaction.txnId = 0;
+    psdata.ps_snapshot.currentTransaction.txnStatus = 0;
+    psdata.ps_snapshot.txnActions.txnActions = NULL;
+    psdata.ps_snapshot.txnActions.txnActionSize = 0;
+    psdata.ps_snapshot.txnActions.txnActionStartOffset = 0;
+    if (snapshot != NULL)
+    {
+        // save current transaction in snapshot
+        psdata.ps_snapshot.currentTransaction.txnId =
+            snapshot->currentTransaction.txnId;
+        psdata.ps_snapshot.currentTransaction.txnStatus =
+            snapshot->currentTransaction.txnStatus;
+        psdata.ps_snapshot.cmdIdInTransaction = snapshot->cmdIdInTransaction;
+
+        // allocate txnActions
+        psdata.ps_snapshot.txnActions.txnActionStartOffset =
+            snapshot->txnActions.txnActionStartOffset;
+        psdata.ps_snapshot.txnActions.txnActions = (MagmaTxnAction *)palloc0(
+            sizeof(MagmaTxnAction) * snapshot->txnActions.txnActionSize);
+
+        // save txnActionsp
+        psdata.ps_snapshot.txnActions.txnActionSize =
+            snapshot->txnActions.txnActionSize;
+        for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i) {
+          psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+              snapshot->txnActions.txnActions[i].txnId;
+          psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+              snapshot->txnActions.txnActions[i].txnStatus;
+        }
+    }
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// Free snapshot memory
+	pfree(psdata.ps_snapshot.txnActions.txnActions);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return psdata.ps_ext_update_desc;
+}
+
+extern int
+InvokeMagmaUpdate(FmgrInfo *func,
+                        ExternalInsertDesc extUpdDesc,
+                        TupleTableSlot *tupTableSlot)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_ext_update_desc = extUpdDesc;
+	psdata.ps_tuple_table_slot = tupTableSlot;
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return psdata.ps_update_count;
+}
+
+extern int
+InvokeMagmaEndUpdate(FmgrInfo *func,
+                           ExternalInsertDesc extUpdDesc)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_ext_update_desc = extUpdDesc;
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return psdata.ps_update_count;
 }
 

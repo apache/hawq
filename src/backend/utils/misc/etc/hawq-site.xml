@@ -50,6 +50,13 @@ under the License.
 		<description>URL for accessing HDFS.</description>
 	</property>
 
+
+	<property>
+		<name>magma_nodes_url</name>
+		<value>localhost:6666</value>
+		<description>urls for accessing magma.</description>
+	</property>
+	
 	<property>
 		<name>hawq_master_directory</name>
 		<value>~/hawq-data-directory/masterdd</value>
@@ -169,4 +176,14 @@ under the License.
         </description>
     </property>
     <!-- HAWQ ACL parameters ends here-->
+    <property>
+        <name>hawq_init_with_hdfs</name>
+        <value>true</value>
+        <description>choose whether initing hawq cluster with hdfs</description>
+    </property>
+    <property>
+        <name>default_table_format</name>
+        <value>appendonly</value>
+        <description>default table format when creating table </description>
+    </property>
 </configuration>

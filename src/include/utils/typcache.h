@@ -81,6 +81,8 @@ extern TupleDesc lookup_rowtype_tupdesc_noerror(Oid type_id, int32 typmod,
 
 extern TupleDesc lookup_rowtype_tupdesc_copy(Oid type_id, int32 typmod);
 
+extern int lookup_rowtype_attrs(Oid type_id, int32 typmod, List **attrs);
+
 extern void assign_record_type_typmod(TupleDesc tupDesc);
 
 extern void flush_rowtype_cache(Oid type_id);

@@ -1,3 +1,4 @@
 fmgroids.h
 fmgrtab.c
 probes.h
+hawq_funcoid_mapping.h

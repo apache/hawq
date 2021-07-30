@@ -36,6 +36,7 @@
 
 #include "access/genam.h"
 #include "access/heapam.h"
+#include "access/fileam.h"
 #include "access/reloptions.h"
 #include "access/transam.h"
 #include "access/xact.h"
@@ -73,6 +74,7 @@
 #include "utils/relcache.h"
 #include "utils/syscache.h"
 
+#include "cdb/cdbdatalocality.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbdispatchresult.h"
 #include "cdb/cdbsrlz.h"
@@ -213,10 +215,12 @@ DefineIndex(Oid relationId,
 	relationId = RelationGetRelid(rel);
 	namespaceId = RelationGetNamespace(rel);
 
+	/*
 	if(RelationIsExternal(rel))
 		ereport(ERROR,
 				(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot create indexes on external tables.")));
+	*/
 		
 	/* Note: during bootstrap may see uncataloged relation */
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
@@ -259,7 +263,7 @@ DefineIndex(Oid relationId,
 	 *
 	 * Note: This code duplicates code in tablecmds.c
 	 */
-	if (tableSpaceName)
+	if (tableSpaceName && !dataStoredInMagmaByOid(relationId))
 	{
 		tablespaceId = get_tablespace_oid(tableSpaceName);
 		if (!OidIsValid(tablespaceId))
@@ -274,8 +278,11 @@ DefineIndex(Oid relationId,
 	{
 		tablespaceId = GetDefaultTablespace();
 
-		/* Need the real tablespace id for dispatch */
-		if (!OidIsValid(tablespaceId)) 
+		/*
+		 * Need the real tablespace id for dispatch,
+		 * Index should not be created on shared storage.
+		 */
+		if (!OidIsValid(tablespaceId) || (get_database_dts(MyDatabaseId) != MyDatabaseTableSpace))
 			tablespaceId = MyDatabaseTableSpace;
 		else
 			CheckCrossAccessTablespace(tablespaceId);
@@ -388,6 +395,11 @@ DefineIndex(Oid relationId,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("GIN indexes are not supported")));
 
+	if (RelationIsMagmaTable2(relationId) && accessMethodId == GIST_AM_OID)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("GIST indexes are not supported")));
+
 	if (unique && !accessMethodForm->amcanunique)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
@@ -399,7 +411,7 @@ DefineIndex(Oid relationId,
 				 errmsg("access method \"%s\" does not support multicolumn indexes",
 						accessMethodName)));
 
-    if  (unique && (RelationIsAoRows(rel) || RelationIsParquet(rel)))
+    if  (unique && RelationIsAo(rel))
         ereport(ERROR,
                 (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
                  errmsg("append-only tables do not support unique indexes")));
@@ -568,8 +580,8 @@ DefineIndex(Oid relationId,
 									  indexInfo->ii_NumIndexAttrs,
 									  primary,
 									  list_length(indexInfo->ii_Expressions),
-									  relationHasPrimaryKey(rel),
-									  relationHasUniqueIndex(rel));
+									  primary,
+									  unique);
 		
 		/* We don't have to worry about constraints on parts.  Already checked. */
 		if ( isconstraint && rel_is_partitioned(relationId) )
@@ -727,9 +739,24 @@ DefineIndex(Oid relationId,
 							   errOmitLocation(true)));
         }
         else
-		{
-        		dispatch_statement_node((Node *)stmt, NULL, NULL, NULL);
-		}
+		    {
+          char *formatOpt = caql_getcstring(
+                  NULL,
+                  cql("SELECT fmtopts FROM pg_exttable WHERE reloid = :1",
+                  ObjectIdGetDatum(relationId)));
+          if (!formatOpt) {
+            ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+                    errmsg("Cannot support DefineIndex")));
+          }
+          else {
+            char *formatName = getExtTblFormatterTypeInFmtOptsStr(formatOpt);
+            if (!formatName ||
+                (!(pg_strncasecmp(formatName, "magma", strlen("magma")) == 0))) {
+              ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+                      errmsg("Cannot support DefineIndex")));
+            }
+          }
+		    }
 	}
 
 	/* save lockrelid for below, then close rel */
@@ -903,6 +930,58 @@ CheckPredicate(Expr *predicate)
 				   errOmitLocation(true)));
 }
 
+extern void
+ComputeConstraintAttrs(IndexInfo *indexInfo,
+                       List *attList,	/* list of IndexElem's */
+                       Oid relId)
+{
+	ListCell   *rest;
+	int			attn = 0;
+
+	/*
+	 * process attributeList
+	 */
+	foreach(rest, attList)
+	{
+		IndexElem  *attribute = (IndexElem *) lfirst(rest);
+		Oid			atttype;
+
+		if (attribute->name != NULL)
+		{
+			/* Simple index attribute */
+			HeapTuple	atttuple;
+			Form_pg_attribute attform;
+			cqContext	*pcqCtx;
+
+			Assert(attribute->expr == NULL);
+
+			pcqCtx = caql_getattname_scan(NULL, relId, attribute->name);
+			atttuple = caql_get_current(pcqCtx);
+
+			if (!HeapTupleIsValid(atttuple))
+			{
+				ereport(ERROR,
+				        (errcode(ERRCODE_UNDEFINED_COLUMN),
+				         errmsg("column \"%s\" does not exist",
+				         attribute->name)));
+			}
+			attform = (Form_pg_attribute) GETSTRUCT(atttuple);
+			indexInfo->ii_KeyAttrNumbers[attn] = attform->attnum;
+			indexInfo->ii_NumIndexAttrs += 1;
+			atttype = attform->atttypid;
+
+			caql_endscan(pcqCtx);
+		}
+		else
+		{
+			ereport(ERROR,
+			        (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+			         errmsg("expression for primary key constraint definition is not supported")));
+		}
+
+		attn++;
+	}
+}
 
 static void
 ComputeIndexAttrs(IndexInfo *indexInfo,
@@ -953,7 +1032,16 @@ ComputeIndexAttrs(IndexInfo *indexInfo,
 			attform = (Form_pg_attribute) GETSTRUCT(atttuple);
 			indexInfo->ii_KeyAttrNumbers[attn] = attform->attnum;
 			atttype = attform->atttypid;
-
+			// disable decimal column for magma index
+			if (RelationIsMagmaTable2(relId))
+			{
+				if (atttype == NUMERICOID)
+				{
+					ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_SUPPORTED),
+							errmsg("magma index doesn't support numeric column \"%s\"",
+							       attribute->name)));
+				}
+			}
 			caql_endscan(pcqCtx);
 		}
 		else if (attribute->expr && IsA(attribute->expr, Var))

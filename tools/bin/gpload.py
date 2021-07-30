@@ -2170,8 +2170,8 @@ class gpload:
             self.log(self.INFO, "did not find an external table to reuse. creating %s" % self.extTableName)
         
         
-        # construct a CREATE EXTERNAL TABLE statement and execute it
-        sql = "create external table %s" % self.extTableName
+        # construct a CREATE READABLE EXTERNAL TABLE statement and execute it
+        sql = "create readable external table %s" % self.extTableName
         sql += "(%s)" % ','.join(map(lambda a:'%s %s' % (a[0], a[1]), from_cols))
 
         sql += "location(%s) "%locationStr

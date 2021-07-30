@@ -25,12 +25,16 @@
  *
  *-------------------------------------------------------------------------
  */
+#include "access/filesplit.h"
 #include "access/plugstorage.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_exttable.h"
+#include "cdb/cdbdatalocality.h"
 #include "nodes/value.h"
 #include "parser/parse_func.h"
+
+char *database = NULL; /* for magma format DML database */
 
 /*
  * getExternalTableTypeList
@@ -42,22 +46,22 @@
  *    with customer protocol (HDFS) are all 'b' in pg_exttable catalog
  *    table. It needs to visit the format options to get the table type.
  */
-void getExternalTableTypeInList(const char formatType,
+void getExternalTableTypeList(const char formatType,
                               List *formatOptions,
                               int *formatterType,
                               char **formatterName)
 {
-	if (fmttype_is_text(formatType))
+	if (formatType == 't')
 	{
 		*formatterType = ExternalTableType_TEXT;
 		*formatterName = NULL;
 	}
-	else if (fmttype_is_csv(formatType))
+	else if (formatType == 'c')
 	{
 		*formatterType = ExternalTableType_CSV;
 		*formatterName = NULL;
 	}
-	else if (fmttype_is_custom(formatType))
+	else if (formatType == 'b')
 	{
 		Assert(formatOptions);
 
@@ -88,22 +92,22 @@ void getExternalTableTypeInList(const char formatType,
  * getExternalTableTypeStr
  *
  */
-void getExternalTableTypeInStr(const char formatType,
+void getExternalTableTypeStr(const char formatType,
                              char *formatOptions,
 							 int *formatterType,
                              char **formatterName)
 {
-	if (fmttype_is_text(formatType))
+	if (formatType == 't')
 	{
 		*formatterType = ExternalTableType_TEXT;
 		*formatterName = NULL;
 	}
-	else if (fmttype_is_csv(formatType))
+	else if (formatType == 'c')
 	{
 		*formatterType = ExternalTableType_CSV;
 		*formatterName = NULL;
 	}
-	else if (fmttype_is_custom(formatType))
+	else if (formatType == 'b')
 	{
 		Assert(formatOptions);
 
@@ -143,7 +147,7 @@ void checkPlugStorageFormatOption(char **opt,
 {
 	Assert(opt);
 
-	/* check if need to check option */
+	// check if need to check option
 	if (!needopt)
 	{
 		ereport(ERROR,
@@ -152,7 +156,7 @@ void checkPlugStorageFormatOption(char **opt,
 		        errOmitLocation(true)));
 	}
 
-	/* check if option is redundant */
+	// check if option is redundant
 	if (*opt)
 	{
 		ereport(ERROR,
@@ -163,11 +167,11 @@ void checkPlugStorageFormatOption(char **opt,
 
 	*opt = val;
 
-	/* check if value for option is valid */
+	// check if value for option is valid
 	bool valid = false;
 	for (int i = 0; i < nvalidvals; i++)
 	{
-		if (strncasecmp(*opt, validvals[i], strlen(validvals[i])) == 0)
+		if (strcasecmp(*opt, validvals[i]) == 0)
 		{
 			valid = true;
 		}
@@ -216,14 +220,16 @@ void InvokePlugStorageValidationFormatInterfaces(Oid procOid,
 	psvdata.type        = T_PlugStorageValidatorData;
 	psvdata.format_name = formatName;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         &psvfunc,
-	                         0,
-	                         (Node *)(&psvdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,   // FunctionCallInfoData
+	                         &psvfunc, // FmgrInfo
+	                         0,        // nArgs
+	                         (Node *)(&psvdata), // Call Context
+	                         NULL);              // ResultSetInfo
 
+	// Invoke validator. if this function returns - validation passed
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "validator function %u returned NULL",
@@ -234,6 +240,7 @@ void InvokePlugStorageValidationFormatInterfaces(Oid procOid,
 void InvokePlugStorageValidationFormatOptions(Oid procOid,
                                               List *formatOptions,
                                               char *formatStr,
+                                              TupleDesc tupDesc,
                                               bool isWritable)
 {
 
@@ -247,15 +254,18 @@ void InvokePlugStorageValidationFormatOptions(Oid procOid,
 	psvdata.format_opts = formatOptions;
 	psvdata.format_str  = formatStr;
 	psvdata.is_writable = isWritable;
+	psvdata.tuple_desc = tupDesc;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         &psvfunc,
-	                         0,
-	                         (Node *)(&psvdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,   // FunctionCallInfoData
+	                         &psvfunc, // FmgrInfo
+	                         0,        // nArgs
+	                         (Node *)(&psvdata), // Call Context
+	                         NULL);              // ResultSetInfo
 
+	// Invoke validator. if this function returns - validation passed
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "validator function %u returned NULL",
@@ -276,14 +286,16 @@ void InvokePlugStorageValidationFormatEncodings(Oid procOid,
 	psvdata.type			= T_PlugStorageValidatorData;
 	psvdata.encoding_name	= encodingName;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         &psvfunc,
-	                         0,
-	                         (Node *)(&psvdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,   // FunctionCallInfoData
+	                         &psvfunc, // FmgrInfo
+	                         0,        // nArgs
+	                         (Node *)(&psvdata), // Call Context
+	                         NULL);              // ResultSetInfo
 
+	// Invoke validator. if this function returns - validation passed
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "validator function %u returned NULL",
@@ -303,14 +315,16 @@ void InvokePlugStorageValidationFormatDataTypes(Oid procOid,
 	psvdata.type       = T_PlugStorageValidatorData;
 	psvdata.tuple_desc = tupDesc;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         &psvfunc,
-	                         0,
-	                         (Node *)(&psvdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,   // FunctionCallInfoData
+	                         &psvfunc, // FmgrInfo
+	                         0,        // nArgs
+	                         (Node *)(&psvdata), // Call Context
+	                         NULL);              // ResultSetInfo
 
+	// Invoke validator. if this function returns - validation passed
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "validator function %u returned NULL",
@@ -319,30 +333,86 @@ void InvokePlugStorageValidationFormatDataTypes(Oid procOid,
 }
 
 FileScanDesc InvokePlugStorageFormatBeginScan(FmgrInfo *func,
+                                              PlannedStmt* plannedstmt,
                                               ExternalScan *extScan,
                                               ScanState *scanState,
+                                              char *serializeSchema,
+                                              int serializeSchemaLen,
                                               Relation relation,
                                               int formatterType,
-                                              char *formatterName)
+                                              char *formatterName,
+                                              MagmaSnapshot *snapshot)
 {
 	PlugStorageData psdata;
 	FunctionCallInfoData fcinfo;
 
-	psdata.type              = T_PlugStorageData;
-	psdata.ps_ext_scan       = extScan;
-	psdata.ps_scan_state     = scanState;
-	psdata.ps_relation       = relation;
+	psdata.type = T_PlugStorageData;
+	psdata.ps_ext_scan = extScan;
+	psdata.ps_scan_state = scanState;
+	psdata.ps_relation = relation;
 	psdata.ps_formatter_type = formatterType;
 	psdata.ps_formatter_name = formatterName;
+	psdata.ps_hive_url = extScan->hiveUrl ? pstrdup(extScan->hiveUrl) : NULL;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
+	if (strncmp(formatterName, "magma", strlen("magma")) == 0)
+	{
+		Insist(snapshot != NULL);
 
+		// save range schema
+		psdata.ps_magma_splits =
+		    GetFileSplitsOfSegmentMagma(plannedstmt->scantable_splits, relation->rd_id);
+		psdata.ps_magma_serializeSchema = serializeSchema;
+		psdata.ps_magma_serializeSchemaLen = serializeSchemaLen;
+
+		// save current transaction in snapshot
+		psdata.ps_snapshot.currentTransaction.txnId =
+		    snapshot->currentTransaction.txnId;
+		psdata.ps_snapshot.currentTransaction.txnStatus =
+		    snapshot->currentTransaction.txnStatus;;
+
+		psdata.ps_snapshot.cmdIdInTransaction = snapshot->cmdIdInTransaction;
+
+		// allocate txnActions
+		psdata.ps_snapshot.txnActions.txnActionStartOffset =
+		    snapshot->txnActions.txnActionStartOffset;
+		psdata.ps_snapshot.txnActions.txnActions =
+		    (MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->txnActions
+		                              .txnActionSize);
+
+		// save txnActionsp
+		psdata.ps_snapshot.txnActions.txnActionSize = snapshot->txnActions
+		    .txnActionSize;
+		for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+		{
+		    psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+		        snapshot->txnActions.txnActions[i].txnId;
+		    psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+		        snapshot->txnActions.txnActions[i].txnStatus;
+		}
+
+    if (plannedstmt->commandType == CMD_SELECT ||
+        plannedstmt->commandType == CMD_INSERT)
+      psdata.ps_magma_skip_tid = true;
+    else
+      psdata.ps_magma_skip_tid = false;
+    }
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// free memory for magma snapshot
+	if (strncmp(formatterName, "magma", strlen("magma")) == 0)
+	{
+	    pfree(psdata.ps_snapshot.txnActions.txnActions);
+	}
+
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",
@@ -365,14 +435,16 @@ ExternalSelectDesc InvokePlugStorageFormatGetNextInit(FmgrInfo *func,
 	psdata.ps_plan_state     = planState;
 	psdata.ps_ext_scan_state = extScanState;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
 
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",
@@ -387,7 +459,7 @@ ExternalSelectDesc InvokePlugStorageFormatGetNextInit(FmgrInfo *func,
 bool InvokePlugStorageFormatGetNext(FmgrInfo *func,
                                     FileScanDesc fileScanDesc,
                                     ScanDirection scanDirection,
-                                    ExternalSelectDesc extSelectDesc,
+									ExternalSelectDesc extSelectDesc,
                                     ScanState *scanState,
                                     TupleTableSlot *tupTableSlot)
 {
@@ -401,14 +473,16 @@ bool InvokePlugStorageFormatGetNext(FmgrInfo *func,
 	psdata.ps_scan_state       = scanState;
 	psdata.ps_tuple_table_slot = tupTableSlot;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
 
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",
@@ -429,14 +503,16 @@ void InvokePlugStorageFormatReScan(FmgrInfo *func,
 	psdata.type              = T_PlugStorageData;
 	psdata.ps_file_scan_desc = fileScanDesc;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
 
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",
@@ -453,14 +529,16 @@ void InvokePlugStorageFormatEndScan(FmgrInfo *func,
 	psdata.type              = T_PlugStorageData;
 	psdata.ps_file_scan_desc = fileScanDesc;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
 
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",
@@ -469,22 +547,26 @@ void InvokePlugStorageFormatEndScan(FmgrInfo *func,
 }
 
 void InvokePlugStorageFormatStopScan(FmgrInfo *func,
-                                     FileScanDesc fileScanDesc)
+                                     FileScanDesc fileScanDesc,
+                                     TupleTableSlot *tupTableSlot)
 {
 	PlugStorageData psdata;
 	FunctionCallInfoData fcinfo;
 
 	psdata.type              = T_PlugStorageData;
 	psdata.ps_file_scan_desc = fileScanDesc;
+	psdata.ps_tuple_table_slot = tupTableSlot;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
 
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",
@@ -493,11 +575,12 @@ void InvokePlugStorageFormatStopScan(FmgrInfo *func,
 }
 
 ExternalInsertDesc InvokePlugStorageFormatInsertInit(FmgrInfo *func,
-		                                             Relation relation,
+                                                     Relation relation,
                                                      int formatterType,
                                                      char *formatterName,
-													PlannedStmt *plannedstmt,
-													int segno )
+                                                     PlannedStmt *plannedstmt,
+                                                     int segno,
+                                                     MagmaSnapshot *snapshot)
 {
 	PlugStorageData psdata;
 	FunctionCallInfoData fcinfo;
@@ -508,8 +591,52 @@ ExternalInsertDesc InvokePlugStorageFormatInsertInit(FmgrInfo *func,
 	psdata.ps_formatter_name = formatterName;
 	psdata.ps_segno = segno;
 
+	if (strncmp(formatterName, "magma", strlen("magma")) == 0)
+	{
+		Insist(snapshot != NULL);
 
-	psdata.ps_scan_state = palloc0(sizeof(ScanState));
+		// save range schema
+		GetMagmaSchemaByRelid(plannedstmt->scantable_splits, relation->rd_id,
+		                      &(psdata.ps_magma_serializeSchema),
+		                      &(psdata.ps_magma_serializeSchemaLen));
+
+		// save file split
+		psdata.ps_magma_splits =
+		    GetFileSplitsOfSegmentMagma(plannedstmt->scantable_splits, relation->rd_id);
+		/*
+		psdata.ps_magma_splits =
+		    GetFileSplitsOfSegment(plannedstmt->scantable_splits, relation->rd_id, GetQEIndex());
+		*/
+
+		// save current transaction in snapshot
+		psdata.ps_snapshot.currentTransaction.txnId =
+		    snapshot->currentTransaction.txnId;
+		psdata.ps_snapshot.currentTransaction.txnStatus =
+		    snapshot->currentTransaction.txnStatus;
+		psdata.ps_snapshot.cmdIdInTransaction = snapshot->cmdIdInTransaction;
+
+		// allocate txnActions
+		psdata.ps_snapshot.txnActions.txnActionStartOffset =
+		    snapshot->txnActions.txnActionStartOffset;
+		psdata.ps_snapshot.txnActions.txnActions =
+		    (MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->txnActions
+		                              .txnActionSize);
+
+		// save txnActions
+		psdata.ps_snapshot.txnActions.txnActionSize = snapshot->txnActions
+		    .txnActionSize;
+		for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+		{
+		    psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+		        snapshot->txnActions.txnActions[i].txnId;
+		    psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+		        snapshot->txnActions.txnActions[i].txnStatus;
+		}
+	}
+
+	if (dataStoredInHive(relation)) {
+		psdata.ps_hive_url = pstrdup(plannedstmt->hiveUrl);
+	}
 
 	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
 	                         func,    // FmgrInfo
@@ -520,6 +647,11 @@ ExternalInsertDesc InvokePlugStorageFormatInsertInit(FmgrInfo *func,
 	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// free memory for magma snapshot
+	if (strncmp(formatterName, "magma", strlen("magma")) == 0)
+	{
+	    pfree(psdata.ps_snapshot.txnActions.txnActions);
+	}
 
 	// We do not expect a null result
 	if (fcinfo.isnull)
@@ -527,10 +659,7 @@ ExternalInsertDesc InvokePlugStorageFormatInsertInit(FmgrInfo *func,
 		elog(ERROR, "function %u returned NULL",
 		            fcinfo.flinfo->fn_oid);
 	}
-
 	ExternalInsertDesc extInsertDesc = psdata.ps_ext_insert_desc;
-
-	pfree(psdata.ps_scan_state);
 	return extInsertDesc;
 }
 
@@ -545,14 +674,16 @@ Oid InvokePlugStorageFormatInsert(FmgrInfo *func,
 	psdata.ps_ext_insert_desc  = extInsertDesc;
 	psdata.ps_tuple_table_slot = tupTableSlot;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata),  // Call Context
+	                         NULL);              // ResultSetInfo
 
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",
@@ -573,14 +704,44 @@ void InvokePlugStorageFormatInsertFinish(FmgrInfo *func,
 	psdata.type                = T_PlugStorageData;
 	psdata.ps_ext_insert_desc  = extInsertDesc;
 
-	InitFunctionCallInfoData(fcinfo,
-	                         func,
-	                         0,
-	                         (Node *)(&psdata),
-	                         NULL);
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
 
+	// Invoke function
 	FunctionCallInvoke(&fcinfo);
 
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL",
+		            fcinfo.flinfo->fn_oid);
+	}
+}
+
+void InvokePlugStorageFormatTransaction(PlugStorageTransaction txn, List* magmaTableFullNames)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+	FmgrInfo *func;
+
+	psdata.type                = T_PlugStorageData;
+	psdata.ps_transaction      = txn;
+	psdata.magma_talbe_full_names = magmaTableFullNames;
+	func                       = &(txn->pst_transaction_fmgr_info);
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// We do not expect a null result
 	if (fcinfo.isnull)
 	{
 		elog(ERROR, "function %u returned NULL",

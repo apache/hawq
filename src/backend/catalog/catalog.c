@@ -40,7 +40,6 @@
 #include "catalog/pg_tidycat.h"
 
 #include "catalog/gp_configuration.h"
-#include "catalog/gp_configuration.h"
 #include "catalog/gp_segment_config.h"
 #include "catalog/gp_san_config.h"
 #include "catalog/gp_verification_history.h"
@@ -96,8 +95,13 @@ void GetFilespacePathForTablespace(
 	char *ret_path;
 
 	Assert(tablespaceOid != GLOBALTABLESPACE_OID);
-	Assert(tablespaceOid != DEFAULTTABLESPACE_OID);
 	
+	/*
+	 * use pg_default as magma default tablespace, magma server will not actually
+	 * put data in this tablespace.
+	 */
+	//	Assert(tablespaceOid != DEFAULTTABLESPACE_OID);
+
 	if (Gp_role != GP_ROLE_EXECUTE || IsBootstrapProcessingMode())
 	{
 		/* Lookup filespace location from the persistent object layer. */
@@ -143,9 +147,9 @@ void GetFilespacePathForTablespace(
 			 tablespaceGetFilespaces);
 	}
 	
-
-	Assert(ret_path != NULL);
-
+	/* there is not filespace path to dispatch when using local filesystem as magma default tablespace
+		Assert(ret_path != NULL);
+	 */
 	*filespacePath = ret_path;
 }
 

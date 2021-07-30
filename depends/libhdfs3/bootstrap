@@ -29,13 +29,13 @@ source_dir=`cd "\`dirname \"$0\"\`";pwd`
 binary_dir=`pwd`
 
 # Choose the default install prefix.
-default_prefix="/usr/local/hawq"
+default_prefix=${source_dir}/dist
 
 # Choose the default dependency install prefix
 default_dependency=${DEPENDENCY_INSTALL_PREFIX}
 
 if [ x"${default_dependency}" = x"" ]; then
-    default_dependency=${default_prefix}
+    default_dependency="/opt/dependency"
 fi
 
 # Display bootstrap usage

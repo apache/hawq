@@ -80,7 +80,6 @@ CATALOG(pg_opclass,2616)
 	bool		opcdefault;		/* T if opclass is default for opcintype */
 	Oid			opckeytype;		/* type of data in index, or InvalidOid */
 } FormData_pg_opclass;
-
 /* ----------------
  *		Form_pg_opclass corresponds to a pointer to a tuple with
  *		the format of pg_opclass relation.
@@ -268,4 +267,8 @@ DATA(insert OID = 3046 (	3013	money_ops		PGNSP PGUID  790 t 0 ));
 DATA(insert OID = 3047 (	3013	reltime_ops		PGNSP PGUID  703 t 0 ));
 DATA(insert OID = 3048 (	3013	tinterval_ops	PGNSP PGUID  704 t 0 ));
 
+DATA(insert OID = 4033 ( 403   jsonb_ops     PGNSP PGUID  3802 t 0 ));
+DATA(insert OID = 4034 ( 405   jsonb_ops     PGNSP PGUID  3802 t 0 ));
+DATA(insert OID = 4036 ( 2742  jsonb_ops     PGNSP PGUID  3802 t 25 ));
+DATA(insert OID = 4037 ( 2742  jsonb_hash_ops    PGNSP PGUID  3802 f 23 ));
 #endif   /* PG_OPCLASS_H */

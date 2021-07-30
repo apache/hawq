@@ -27,6 +27,9 @@
 #ifndef EXECDML_H
 #define EXECDML_H
 
+#include "access/fileam.h"
+#include "magma/cwrapper/magma-client-c.h"
+
 /*
  * For a partitioned insert target only:
  * This type represents an entry in the per-part hash table stored at
@@ -40,6 +43,36 @@ typedef struct ResultPartHashEntry
 	int offset; /* Index ResultRelInfo in es_result_partitions */
 } ResultPartHashEntry;
 
+extern Oid
+LookupMagmaFunction(char *formatter, char *func);
+
+extern ExternalInsertDesc
+InvokeMagmaBeginDelete(FmgrInfo *func, Relation relation,
+		PlannedStmt *plannedstmt, MagmaSnapshot *snapshot);
+
+extern void
+InvokeMagmaDelete(FmgrInfo *func,
+                  ExternalInsertDesc extDelDesc,
+                  TupleTableSlot *tupTableSlot);
+
+extern void
+InvokeMagmaEndDelete(FmgrInfo *func,
+                     ExternalInsertDesc extDelDesc);
+
+extern ExternalInsertDesc
+InvokeMagmaBeginUpdate(FmgrInfo *func,
+                       Relation relation,
+					   PlannedStmt *plannedstmt,
+                       MagmaSnapshot *snapshot);
+
+extern int
+InvokeMagmaUpdate(FmgrInfo *func,
+                  ExternalInsertDesc extUpdDesc,
+                  TupleTableSlot *tupTableSlot);
+
+extern int
+InvokeMagmaEndUpdate(FmgrInfo *func,
+                     ExternalInsertDesc extUpdDesc);
 
 extern void
 reconstructTupleValues(AttrMap *map,
@@ -59,6 +92,7 @@ ExecInsert(TupleTableSlot *slot,
 
 extern void
 ExecDelete(ItemPointer tupleid,
+		   Datum segmentid,
 		   TupleTableSlot *planSlot,
 		   DestReceiver *dest,
 		   EState *estate,
@@ -68,9 +102,26 @@ ExecDelete(ItemPointer tupleid,
 extern void
 ExecUpdate(TupleTableSlot *slot,
 		   ItemPointer tupleid,
+		   Datum segmentid,
 		   TupleTableSlot *planSlot,
 		   DestReceiver *dest,
 		   EState *estate);
+
+static inline Datum GetRowIdFromCtidAndSegmentid(ItemPointer tupleid, Datum segmentid)
+{
+	/* in magma case, 64 bits rowId is composed of high 16 bits coming from high 16 bits of segmentid
+	 * and low 48 bits coming from ctid. */
+	return  (((Datum) DatumGetUInt16(segmentid) << 16) & 0xFFFF000000000000)
+			| ((Datum) (tupleid->ip_blkid.bi_hi) << 32)
+			| ((Datum) (tupleid->ip_blkid.bi_lo) << 16)
+			| ((Datum) (tupleid->ip_posid));
+}
+
+static inline Datum GetRangeIdFromCtidAndSegmentid(Datum segmentid)
+{
+  /* in magma case, 16 bits rangeId is high 16 bits of segmentid */
+  return UInt16GetDatum((uint16) (DatumGetUInt32(segmentid) >> 16));
+}
 
 
 #endif   /* EXECDML_H */

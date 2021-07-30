@@ -13,8 +13,10 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. BSD Advertising Clause omitted per the July 22, 1999 licensing change
- *    ftp://ftp.cs.berkeley.edu/pub/4bsd/README.Impt.License.Change
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the University of
+ *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -132,7 +134,6 @@ typedef unsigned int u_int;
 typedef unsigned char u_char;
 #define ARG_MAX (256 * 1024)
 #define lstat(path, sb) stat((path), (sb))
-extern size_t strlcpy(char *dst, const char *src, size_t siz);
 #else
 typedef u_short Char;
 #endif
@@ -855,11 +856,10 @@ g_opendir(str, pglob)
 	register Char *str;
 	glob_t *pglob;
 {
-	char buf[MAXPATHLEN];
+	char buf[MAXPATHLEN] = ".";
 
-	if (!*str)
-		strlcpy(buf, ".", sizeof buf);
-	else {
+	if (*str)
+	{
 		if (g_Ctoc(str, buf, sizeof(buf)))
 			return(NULL);
 	}
@@ -876,12 +876,33 @@ g_lstat(fn, sb, pglob)
 	struct stat *sb;
 	glob_t *pglob;
 {
+#ifdef WIN32
+	/*
+	 * Behavior of stat() is not stable across C Runtime versions.
+	 * If linked to system basic msvcrt.dll it calls FindFirstFile().
+	 * If linked with normal CRT comes with Visual Studio or Redistribute
+	 * packages, it calls CreateFile(). CreateFile() is problematic here,
+	 * if path is a pipe, it will open the pipe once then close, causing
+	 * the other side to connect to the wrong pipe. Skip stat() if the
+	 * name is pipe and pretend there is one.
+	 */
+	if (wcsstr(fn, L"\\\\.\\pipe") == fn)
+	{
+		memset(sb, 0, sizeof(struct stat));
+		sb->st_dev = -1;
+		sb->st_rdev = -1;
+		sb->st_nlink = 1;
+		sb->st_mode = _S_IFIFO;
+		return 0;
+	}
+#endif
 	char buf[MAXPATHLEN];
 
 	if (g_Ctoc(fn, buf, sizeof(buf)))
 		return(-1);
 	if (pglob->gl_flags & GLOB_ALTDIRFUNC)
 		return((*pglob->gl_lstat)(buf, sb));
+
 	return(lstat(buf, sb));
 }
 
@@ -891,6 +912,26 @@ g_stat(fn, sb, pglob)
 	struct stat *sb;
 	glob_t *pglob;
 {
+#ifdef WIN32
+	/*
+	 * Behavior of stat() is not stable across C Runtime versions.
+	 * If linked to system basic msvcrt.dll it calls FindFirstFile().
+	 * If linked with normal CRT comes with Visual Studio or Redistribute
+	 * packages, it calls CreateFile(). CreateFile() is problematic here,
+	 * if path is a pipe, it will open the pipe once then close, causing
+	 * the other side to connect to the wrong pipe. Skip stat() if the
+	 * name is pipe and pretend there is one.
+	 */
+	if (wcsstr(fn, L"\\\\.\\pipe") == fn)
+	{
+		memset(sb, 0, sizeof(struct stat));
+		sb->st_dev = -1;
+		sb->st_rdev = -1;
+		sb->st_nlink = 1;
+		sb->st_mode = _S_IFIFO;
+		return 0;
+	}
+#endif
 	char buf[MAXPATHLEN];
 
 	if (g_Ctoc(fn, buf, sizeof(buf)))

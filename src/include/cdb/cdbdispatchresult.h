@@ -180,6 +180,13 @@ cdbdisp_dumpDispatchResult(CdbDispatchResult       *dispatchResult,
                            bool                     verbose,
                            struct StringInfoData   *buf);
 
+void cdbdisp_serializeDispatchResult(CdbDispatchResult *dispatchResult,
+                                     int qeIndex,
+                                     struct PQExpBufferData *buf);
+void cdbdisp_deserializeDispatchResult(CdbDispatchResult *dispatchResult,
+                                       int *qeIndex,
+                                       struct PQExpBufferData *buf);
+
 /*--------------------------------------------------------------------*/
 
 /*
@@ -276,12 +283,17 @@ cdbdisp_sumCmdTuples(CdbDispatchResults *results, int sliceIndex);
 void
 cdbdisp_handleModifiedCatalogOnSegments(CdbDispatchResults *results,
 		void (*handler)(QueryContextDispatchingSendBack sendback));
+
+extern void cdbdisp_handleModifiedCatalogOnSegmentsForUD(
+    CdbDispatchResults *results, List **relFileNodeInfo,
+    void (*handler1)(QueryContextDispatchingSendBack sendback, List **l1,
+                     List **l2),
+    void (*handler2)(List *l));
+
 extern void
 cdbdisp_iterate_results_sendback(struct pg_result **results, int numresults,
 			void (*handler)(QueryContextDispatchingSendBack sendback));
 
-HTAB *
-cdbdisp_sumAoPartTupCount(PartitionNode *parts, CdbDispatchResults *results);
 HTAB *process_aotupcounts(PartitionNode *parts, HTAB *ht, 
 						  void *aotupcounts,
 						  int naotupcounts);

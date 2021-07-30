@@ -191,7 +191,7 @@ Need to restructure the catalog to eliminate bloat.
 
 Apache HAWQ
 
-Address bug reports and comments to: dev@hawq.apache.org
+Address bug reports and comments to: dev@hawq.incubator.apache.org
 
 =cut
 # SLZY_POD_HDR_END
@@ -3514,7 +3514,6 @@ sub more_header
 #include "catalog/pg_window.h"
 #include "catalog/pg_tidycat.h"
 
-#include "catalog/gp_configuration.h"
 #include "catalog/gp_configuration.h"
 #include "catalog/gp_segment_config.h"
 #include "catalog/gp_san_config.h"

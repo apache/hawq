@@ -29,10 +29,11 @@
 
 #include "access/genam.h"
 #include "access/aomd.h"
-#include "access/extprotocol.h"
 #include "access/heapam.h"
 #include "access/filesplit.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
+#include "access/pxfutils.h"
 #include "access/xact.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
@@ -41,6 +42,7 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_extprotocol.h"
 #include "cdb/cdbdatalocality.h"
+#include "cdb/cdbhash.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbpartition.h"
@@ -66,9 +68,21 @@
 #include "postgres.h"
 #include "resourcemanager/utils/hashtable.h"
 
+#include "c.h"
+#include "miscadmin.h"
+#include "commands/dbcommands.h"
+#include "utils/lsyscache.h"
+#include "storage/cwrapper/hive-file-system-c.h"
+#include "access/plugstorage.h"
+
+
 /* We need to build a mapping from host name to host index */
 
 extern bool		optimizer; /* Enable the optimizer */
+
+static MemoryContext MagmaGlobalMemoryContext = NULL;
+#define MAX_MAGMA_RANGE_VSEG_MAP_NUM 20
+#define MAX_INT32	(2147483600)
 
 typedef struct segmentFilenoPair {
 	int segmentid;
@@ -86,16 +100,12 @@ typedef struct HostnameIndexEntry {
 /*
  * structure containing all relation range table entries.
  */
-typedef struct range_table_collector_context {
-	List *range_tables; /* tables without result relation(insert into etc) */
-	List *full_range_tables; /* every table include result relation  */
-} range_table_collector_context;
-
 typedef struct collect_scan_rangetable_context {
 	plan_tree_base_prefix base;
 	List *range_tables; // range table for scan only
 	List *full_range_tables;  // full range table
 } collect_scan_rangetable_context;
+
 /*
  * structure containing information about how much a
  * host holds.
@@ -127,6 +137,8 @@ typedef struct Prefer_Host {
  * structure for file portion.
  */
 typedef struct File_Split {
+	uint32_t range_id;
+	uint32_t replicaGroup_id;
 	int64 offset;
 	int64 length;
 	int64 logiceof;
@@ -139,6 +151,8 @@ typedef enum DATALOCALITY_RELATION_TYPE {
 	DATALOCALITY_APPENDONLY,
 	DATALOCALITY_PARQUET,
 	DATALOCALITY_HDFS,
+	DATALOCALITY_HIVE,
+	DATALOCALITY_MAGMA,
 	DATALOCALITY_UNKNOWN
 } DATALOCALITY_RELATION_TYPE;
 
@@ -148,6 +162,8 @@ typedef enum DATALOCALITY_RELATION_TYPE {
 typedef struct Detailed_File_Split {
 	Oid rel_oid;
 	int segno; // file name suffix
+	uint32_t range_id;
+	uint32_t replicaGroup_id;
 	int index;
 	int host;
 	int64 logiceof;
@@ -207,6 +223,9 @@ typedef struct Relation_Data {
 	List *files;
 	Oid partition_parent_relid;
 	int64 block_count;
+	char *serializeSchema;
+	int serializeSchemaLen;
+	MagmaTableFullName* magmaTableFullName;
 } Relation_Data;
 
 /*
@@ -303,7 +322,6 @@ typedef struct hostname_volume_stat_context {
  * for each query.
  */
 typedef struct split_to_segment_mapping_context {
-	range_table_collector_context rtc_context;
 	collect_scan_rangetable_context srtc_context;
 	data_dist_stat_context dds_context;
 	collect_hdfs_split_location_context chsl_context;
@@ -330,14 +348,44 @@ typedef struct split_to_segment_mapping_context {
 
 	int64 total_metadata_logic_len;
 
-	int metadata_cache_time_us;
-	int alloc_resource_time_us;
-	int cal_datalocality_time_us;
+    int metadata_cache_time_us;
+    int alloc_resource_time_us;
+    int cal_datalocality_time_us;
+    bool isMagmaTableExist;
+    bool isTargetNoMagma;
+    int magmaRangeNum;
+    char *hiveUrl;
 } split_to_segment_mapping_context;
+
+/* global map for range and replica_group of magma tables */
+HTAB *magma_range_vseg_maps = NULL;
+typedef struct range_vseg_map_data
+{
+  int vseg_num;
+	int *range_vseg_map;
+	int range_num;
+} range_vseg_map_data;
 
 typedef struct vseg_list{
 	List* vsegList;
 }vseg_list;
+
+#define HOSTIP_MAX_LENGTH (64)
+
+#define PORT_STRING_SIZE 16
+
+typedef struct HostnameIpKey {
+  char hostip[HOSTIP_MAX_LENGTH];
+} HostnameIpKey;
+
+static MemoryContext HostNameGlobalMemoryContext = NULL;
+
+HTAB *magma_ip_hostname_map = NULL;
+
+typedef struct HostnameIpEntry {
+  HostnameIpKey key;
+  char hostname[HOSTNAME_MAX_LENGTH];
+} HostnameIpEntry;
 
 static MemoryContext DataLocalityMemoryContext = NULL;
 
@@ -349,24 +397,19 @@ static void init_split_assignment_result(Split_Assignment_Result *result,
 static void init_datalocality_context(PlannedStmt *plannedstmt,
 		split_to_segment_mapping_context *context);
 
-static bool range_table_collector_walker(Node *node,
-		range_table_collector_context *context);
-
-static void collect_range_tables(Query *query,
-		range_table_collector_context *context);
-
 static bool collect_scan_rangetable(Node *node,
 		collect_scan_rangetable_context *cxt);
 
+static void convert_range_tables_to_oids(List **range_tables,
+                                         MemoryContext my_memorycontext);
 
-static void convert_range_tables_to_oids_and_check_table_functions(List **range_tables, bool* isUDFExists,
-		MemoryContext my_memorycontext);
+static void check_magma_table_exsit(List *full_range_tables, bool *isMagmaTableExist);
 
 static void check_keep_hash_and_external_table(
 		split_to_segment_mapping_context *collector_context, Query *query,
 		GpPolicy *intoPolicy);
 
-static int64 get_block_locations_and_claculte_table_size(
+static int64 get_block_locations_and_calculate_table_size(
 		split_to_segment_mapping_context *collector_context);
 
 static bool dataStoredInHdfs(Relation rel);
@@ -390,9 +433,20 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 		Relation_Data *rel_data, int* hitblocks,
 		int* allblocks, GpPolicy *targetPolicy);
 
-static void ExternalGetHdfsFileDataLocation(Relation relation,
-		split_to_segment_mapping_context *context, int64 splitsize,
-		Relation_Data *rel_data, int* allblocks);
+static void ExternalGetHdfsFileDataLocation(
+    Relation relation, split_to_segment_mapping_context *context,
+    int64 splitsize, Relation_Data *rel_data, int *allblocks,
+    GpPolicy *targetPolicy);
+
+static void ExternalGetHiveFileDataLocation(Relation relation,
+    split_to_segment_mapping_context *context, int64 splitsize,
+    Relation_Data *rel_data, int* allblocks);
+
+static void ExternalGetMagmaRangeDataLocation(
+                const char* dbname, const char* schemaname,
+                const char* tablename,
+                split_to_segment_mapping_context *context, int64 rangesize,
+		Relation_Data *rel_data, bool useClientCacheDirectly, int* allranges);
 
 Oid LookupCustomProtocolBlockLocationFunc(char *protoname);
 
@@ -402,6 +456,9 @@ static BlockLocation *fetch_hdfs_data_block_location(char *filepath, int64 len,
 static void free_hdfs_data_block_location(BlockLocation *locations,
 		int block_num);
 
+static void free_magma_data_range_locations(BlockLocation *locations,
+                                                  int range_num);
+
 static Block_Host_Index * update_data_dist_stat(
 		split_to_segment_mapping_context *context, BlockLocation *locations,
 		int block_num);
@@ -410,6 +467,11 @@ static HostDataVolumeInfo *search_host_in_stat_context(
 		split_to_segment_mapping_context *context, char *hostname);
 
 static bool IsBuildInFunction(Oid funcOid);
+
+static void allocate_hash_relation_for_magma_file(Relation_Data* rel_data,
+		Assignment_Log_Context* log_context, TargetSegmentIDMap* idMap,
+		Relation_Assignment_Context* assignment_context,
+		split_to_segment_mapping_context *context, bool parentIsHashExist, bool parentIsHash);
 
 static bool allocate_hash_relation(Relation_Data* rel_data,
 		Assignment_Log_Context *log_context, TargetSegmentIDMap* idMap,
@@ -479,6 +541,15 @@ static void change_hash_virtual_segments_order(QueryResource ** resourcePtr,
 		Relation_Data *rel_data, Relation_Assignment_Context *assignment_context,
 		TargetSegmentIDMap* idMap_ptr);
 
+static void change_hash_virtual_segments_order_magma_file(QueryResource ** resourcePtr,
+		Relation_Data *rel_data,
+		Relation_Assignment_Context *assignment_context_ptr,
+		TargetSegmentIDMap* idMap_ptr);
+
+static void change_hash_virtual_segments_order_orc_file(QueryResource ** resourcePtr,
+		Relation_Data *rel_data, Relation_Assignment_Context *assignment_context,
+		TargetSegmentIDMap* idMap_ptr);
+
 static bool is_relation_hash(GpPolicy *targetPolicy);
 
 static void allocation_preparation(List *hosts, TargetSegmentIDMap* idMap,
@@ -495,6 +566,11 @@ static int64 set_maximum_segment_volume_parameter(Relation_Data *rel_data,
 static void InvokeHDFSProtocolBlockLocation(Oid    procOid,
                                             List  *locs,
                                             List **blockLocations);
+
+static void InvokeHIVEProtocolBlockLocation(Oid    procOid,
+                                            List  *locs,
+                                            List **blockLocations);
+
 /*
  * Setup /cleanup the memory context for this run
  * of data locality algorithm.
@@ -537,8 +613,6 @@ static void init_datalocality_context(PlannedStmt *plannedstmt,
 	context->datalocality_memorycontext = DataLocalityMemoryContext;
 
 	context->chsl_context.relations = NIL;
-	context->rtc_context.range_tables = NIL;
-	context->rtc_context.full_range_tables = plannedstmt->rtable;
 	context->srtc_context.range_tables = NIL;
 	context->srtc_context.full_range_tables = plannedstmt->rtable;
 	context->srtc_context.base.node = (Node *)plannedstmt;
@@ -552,6 +626,7 @@ static void init_datalocality_context(PlannedStmt *plannedstmt,
 	context->randomRelSize = 0;
 	context->hashRelSize = 0;
 	context->minimum_segment_num = 1;
+	context->hiveUrl = NULL;
 	/*
 	 * initialize the data distribution
 	 * static context.
@@ -576,8 +651,8 @@ static void init_datalocality_context(PlannedStmt *plannedstmt,
 		ctl.keysize = sizeof(HostnameIndexKey);
 		ctl.entrysize = sizeof(HostnameIndexEntry);
 		ctl.hcxt = context->datalocality_memorycontext;
-		context->hostname_map = hash_create("Hostname Index Map Hash", 16, &ctl,
-		HASH_ELEM);
+		/* hostname_map shouldn't use topmemctx */
+		context->hostname_map = hash_create("Hostname Index Map Hash", 16, &ctl, HASH_CONTEXT | HASH_ELEM);
 	}
 
 	context->keep_hash = false;
@@ -596,67 +671,14 @@ static void init_datalocality_context(PlannedStmt *plannedstmt,
 	return;
 }
 
-/*
- * range_table_collector_walker: the routine to collect all range table relations.
- */
-static bool range_table_collector_walker(Node *node,
-		range_table_collector_context *context) {
-	if (node == NULL) {
-		return false;
-	}
-
-	if (IsA(node, Query)) {
-		return query_tree_walker((Query *) node, range_table_collector_walker,
-				(void *) context,
-				QTW_EXAMINE_RTES);
-	}
-
-	if (IsA(node, RangeTblEntry)) {
-		if (((RangeTblEntry *) node)->rtekind == RTE_RELATION) {
-			context->range_tables = lappend(context->range_tables, node);
-		}
-
-		return false;
-	}
-
-	return expression_tree_walker(node, range_table_collector_walker,
-			(void *) context);
-}
-
-/*
- * collect_range_tables: collect all range table relations, and store
- * them into the range_table_collector_context.
- */
-static void collect_range_tables(Query *query,
-		range_table_collector_context *context) {
-
-	query_tree_walker(query, range_table_collector_walker, (void *) context,
-	QTW_EXAMINE_RTES);
-	if (query->resultRelation > 0) {
-		RangeTblEntry* resultRte = rt_fetch(query->resultRelation, query->rtable);
-		ListCell *lc;
-		List *new_range_tables = NIL;
-		bool isFound = false;
-		foreach(lc, context->range_tables)
-		{
-			RangeTblEntry *entry = (RangeTblEntry *) lfirst(lc);
-			if (resultRte->relid == entry->relid && !isFound) {
-				isFound = true;
-			} else {
-				new_range_tables = lappend(new_range_tables, entry);
-			}
-		}
-		context->range_tables = new_range_tables;
-	}
-	return;
-}
-
 bool collect_scan_rangetable(Node *node,
 		collect_scan_rangetable_context *cxt) {
 	if (NULL == node) return false;
 
 	switch (nodeTag(node)) {
 	case T_ExternalScan:
+	case T_MagmaIndexScan:
+	case T_MagmaIndexOnlyScan:
 	case T_AppendOnlyScan:
 	case T_ParquetScan: {
 		RangeTblEntry  *rte = rt_fetch(((Scan *)node)->scanrelid,
@@ -669,6 +691,7 @@ bool collect_scan_rangetable(Node *node,
 
 	return plan_tree_walker(node, collect_scan_rangetable, cxt);
 }
+
 /*
  *
  */
@@ -704,46 +727,38 @@ static bool IsBuildInFunction(Oid foid) {
 /*
  *
  */
-static void convert_range_tables_to_oids_and_check_table_functions(List **range_tables, bool* isTableFunctionExists,
-		MemoryContext my_memorycontext) {
-	List *new_range_tables = NIL;
-	ListCell *old_lc;
-	MemoryContext old_memorycontext;
+static void convert_range_tables_to_oids(List **range_tables,
+                                         MemoryContext my_memorycontext) {
+  MemoryContext old_memorycontext;
+  old_memorycontext = MemoryContextSwitchTo(my_memorycontext);
 
-	old_memorycontext = MemoryContextSwitchTo(my_memorycontext);
-	foreach(old_lc, *range_tables)
+  List *new_range_tables = NIL;
+  ListCell *old_lc;
+  foreach (old_lc, *range_tables) {
+    RangeTblEntry *entry = (RangeTblEntry *)lfirst(old_lc);
+    if (entry->rtekind != RTE_RELATION || rel_is_partitioned(entry->relid))
+      continue;
+    new_range_tables = list_append_unique_oid(new_range_tables, entry->relid);
+  }
+
+  MemoryContextSwitchTo(old_memorycontext);
+
+  *range_tables = new_range_tables;
+}
+
+/*
+ * check if magma table exists in this query.
+ */
+static void check_magma_table_exsit(List *full_range_tables, bool *isMagmaTableExist){
+	ListCell *range_table;
+	foreach(range_table, full_range_tables)
 	{
-		RangeTblEntry *entry = (RangeTblEntry *) lfirst(old_lc);
-		if (entry->rtekind != RTE_RELATION) {
-			continue;
-		}
-		Oid rel_oid = entry->relid;
-		List *children = NIL;
-		ListCell *child;
-
-		children = find_all_inheritors(rel_oid);
-		foreach(child, children)
-		{
-			Oid myrelid = lfirst_oid(child);
-			ListCell *new_lc;
-			bool found = false;
-			foreach(new_lc, new_range_tables)
-			{
-				Oid relid = lfirst_oid(new_lc);
-				if (myrelid == relid) {
-					found = true;
-					break;
-				}
-			}
-			if (!found) {
-				new_range_tables = lappend_oid(new_range_tables, myrelid);
-			}
+		Oid myrelid = lfirst_oid(range_table);
+		if(dataStoredInMagmaByOid(myrelid)){
+			*isMagmaTableExist=true;
+			return;
 		}
 	}
-	MemoryContextSwitchTo(old_memorycontext);
-
-	*range_tables = new_range_tables;
-
 	return;
 }
 
@@ -757,18 +772,47 @@ static void check_keep_hash_and_external_table(
 
 	MemoryContextSwitchTo(context->datalocality_memorycontext);
 
+	char *formatterName = NULL;
+	int formatterType = ExternalTableType_Invalid;
+	context->isTargetNoMagma = false;
+
 	if (query->resultRelation != 0) /* This is a insert command */
 	{
-		GpPolicy *targetPolicy = NULL;
 		RangeTblEntry *rte = rt_fetch(query->resultRelation, query->rtable);
+		context->isTargetNoMagma = !dataStoredInMagmaByOid(rte->relid);
+		if (rte->rtekind == RTE_RELATION &&
+			get_relation_storage_type(rte->relid) == RELSTORAGE_EXTERNAL) {
+		   /* Get pg_exttable information for the external table */
+		   ExtTableEntry *extEntry = GetExtTableEntry(rte->relid);
+
+		   getExternalTableTypeStr(extEntry->fmtcode, extEntry->fmtopts,
+		                        &formatterType, &formatterName);
+		   pfree(extEntry);
+		}
+
+		GpPolicy *targetPolicy = NULL;
 		Assert(rte->rtekind == RTE_RELATION);
 		targetPolicy = GpPolicyFetch(CurrentMemoryContext, rte->relid);
 		if (targetPolicy->nattrs > 0) /* distributed by table */
 		{
 			context->keep_hash = true;
-			context->resultRelationHashSegNum = targetPolicy->bucketnum;
-		}
-		pfree(targetPolicy);
+
+			if (formatterName != NULL &&
+				(strncasecmp(formatterName, "magmatp", strlen("magmatp")) == 0 ||
+			     strncasecmp(formatterName, "magmaap", strlen("magmaap")) == 0))
+			{
+				context->resultRelationHashSegNum =
+					default_magma_hash_table_nvseg_per_seg * slaveHostNumber;
+			}
+			else
+			{
+				context->resultRelationHashSegNum = targetPolicy->bucketnum;
+			}
+		} else if (formatterType == ExternalTableType_TEXT ||
+               formatterType == ExternalTableType_CSV) {
+      context->minimum_segment_num = targetPolicy->bucketnum;
+    }
+    pfree(targetPolicy);
 	}
 	/*
 	 * This is a CREATE TABLE AS statement
@@ -776,11 +820,27 @@ static void check_keep_hash_and_external_table(
 	 */
 	if ((intoPolicy != NULL) && (intoPolicy->nattrs > 0))
 	{
+		context->isTargetNoMagma = true;
 		context->keep_hash = true;
-		context->resultRelationHashSegNum = intoPolicy->bucketnum;
+		if (formatterName != NULL &&
+			(strncasecmp(formatterName, "magmatp", strlen("magmatp")) == 0 ||
+			 strncasecmp(formatterName, "magmaap", strlen("magmaap")) == 0))
+		{
+			context->resultRelationHashSegNum =
+			default_magma_hash_table_nvseg_per_seg * slaveHostNumber;
+		}
+		else
+		{
+			context->resultRelationHashSegNum = intoPolicy->bucketnum;
+		}
 	}
 
-	foreach(lc, context->rtc_context.range_tables)
+	if (formatterName != NULL)
+	{
+		pfree(formatterName);
+	}
+
+	foreach(lc, context->srtc_context.range_tables)
 	{
 		GpPolicy *targetPolicy = NULL;
 		Relation rel = NULL;
@@ -802,15 +862,20 @@ static void check_keep_hash_and_external_table(
 					Uri* uri = ParseExternalTableUri(first_uri_str);
 					if (uri && uri->protocol == URI_CUSTOM && is_pxf_protocol(uri)) {
 						isPxf = true;
-					}
-					else if (uri && (is_hdfs_protocol(uri))) {
+					} else if (uri && (is_hdfs_protocol(uri) || is_magma_protocol(uri))) {
 						relation_close(rel, AccessShareLock);
 						if (targetPolicy->nattrs > 0)
 						{
 							/*select the maximum hash bucket number as hashSegNum of query*/
-							if (context->hashSegNum < targetPolicy->bucketnum)
+							int bucketnumTmp = targetPolicy->bucketnum;
+							if (is_magma_protocol(uri))
 							{
-								context->hashSegNum = targetPolicy->bucketnum;
+								bucketnumTmp =
+									default_magma_hash_table_nvseg_per_seg * slaveHostNumber;
+							}
+							if (context->hashSegNum < bucketnumTmp)
+							{
+								context->hashSegNum = bucketnumTmp;
 								context->keep_hash = true;
 							}
 						}
@@ -879,10 +944,10 @@ get_virtual_segments(QueryResource *resource) {
 }
 
 /*
- * get_block_locations_and_claculte_table_size: the HDFS block information
+ * get_block_locations_and_calculate_table_size: the HDFS block information
  * corresponding to the required relations, and calculate relation size
  */
-int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_context *context) {
+int64 get_block_locations_and_calculate_table_size(split_to_segment_mapping_context *context) {
 	uint64_t allRelationFetchBegintime = 0;
 	uint64_t allRelationFetchLeavetime = 0;
 	int totalFileCount = 0;
@@ -891,66 +956,55 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 	allRelationFetchBegintime = gettime_microsec();
 	ListCell *lc;
 	int64 total_size = 0;
-	Snapshot saveActiveSnapshot = ActiveSnapshot;
+  bool udOper =
+      (((PlannedStmt *)context->srtc_context.base.node)->commandType ==
+           CMD_UPDATE ||
+       ((PlannedStmt *)context->srtc_context.base.node)->commandType ==
+           CMD_DELETE);
 
-	MemoryContextSwitchTo(context->datalocality_memorycontext);
+  MemoryContextSwitchTo(context->datalocality_memorycontext);
 
-	if (ActiveSnapshot == NULL)
+	Snapshot savedActiveSnapshot = ActiveSnapshot;
+  if (udOper)
+    ActiveSnapshot = SnapshotNow;
+  else {
+    if (ActiveSnapshot == NULL) ActiveSnapshot = GetTransactionSnapshot();
+    ActiveSnapshot = CopySnapshot(ActiveSnapshot);
+    ActiveSnapshot->curcid = GetCurrentCommandId();
+  }
+
+  List* magmaTableFullNames = NIL;
+  List* magmaNonResultRelations = NIL;
+	foreach(lc, context->srtc_context.range_tables)
 	{
-		ActiveSnapshot = GetTransactionSnapshot();
-	}
-	ActiveSnapshot = CopySnapshot(ActiveSnapshot);
-	ActiveSnapshot->curcid = GetCurrentCommandId();
-
-	foreach(lc, context->rtc_context.full_range_tables)
-	{
-		Oid rel_oid = lfirst_oid(lc);
+	  Oid rel_oid = lfirst_oid(lc);
 		Relation rel = relation_open(rel_oid, AccessShareLock);
 
 		/*
 		 * We only consider the data stored in HDFS.
 		 */
 		bool isDataStoredInHdfs = dataStoredInHdfs(rel);
-		if (isDataStoredInHdfs ) {
+		bool isdataStoredInMagma = dataStoredInMagma(rel);
+		bool isDataStoredInHive = dataStoredInHive(rel);
+		if (isDataStoredInHdfs || isdataStoredInMagma || isDataStoredInHive) {
+		  if (isDataStoredInHive) {
+		    fetchUrlStoredInHive(rel_oid, &(context->hiveUrl));
+		  }
 			GpPolicy *targetPolicy = GpPolicyFetch(CurrentMemoryContext, rel_oid);
 			Relation_Data *rel_data = (Relation_Data *) palloc(sizeof(Relation_Data));
 			rel_data->relid = rel_oid;
 			rel_data->files = NIL;
 			rel_data->partition_parent_relid = 0;
 			rel_data->block_count = 0;
-			bool isResultRelation = true;
-			ListCell *nonResultlc;
-			foreach(nonResultlc, context->rtc_context.range_tables)
-			{
-				Oid nonResultRel_oid = lfirst_oid(nonResultlc);
-				if (rel_oid == nonResultRel_oid) {
-					isResultRelation = false;
-				}
-			}
+			rel_data->serializeSchema = NULL;
+			rel_data->serializeSchemaLen = 0;
+			rel_data->magmaTableFullName = NULL;
 
-			if (!isResultRelation) {
-				// skip the relation not in scan nodes
-				// for partition table scan optimization;
-				ListCell *rtc;
-				bool found = false;
-				foreach(rtc, context->srtc_context.range_tables) {
-					RangeTblEntry *rte = lfirst(rtc);
-					if (rel_oid == rte->relid) {
-						found = true;
-						break;
-					}
-				}
-				if (!found) {
-					relation_close(rel, AccessShareLock);
-					continue;
-				}
-			}
-
-			if (RelationIsAoRows(rel) || RelationIsParquet(rel)) {
+			if (RelationIsAo(rel)) {
 				/*
 				 * Get pg_appendonly information for this table.
 				 */
-				AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, SnapshotNow);
+				AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel_oid, ActiveSnapshot);
 				/*
 				 * Based on the pg_appendonly information, calculate the data
 				 * location information associated with this relation.
@@ -961,6 +1015,7 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 							aoEntry->splitsize, rel_data, &hitblocks,
 							&allblocks, targetPolicy);
 				} else {
+				  // for orc table, we just reuse the parquet logic here
 					rel_data->type = DATALOCALITY_PARQUET;
 					ParquetGetSegFileDataLocation(rel, aoEntry, ActiveSnapshot, context,
 							context->split_size, rel_data, &hitblocks,
@@ -971,20 +1026,40 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 					// we can't use metadata cache, so hitblocks will always be 0
 					rel_data->type = DATALOCALITY_HDFS;
 					ExternalGetHdfsFileDataLocation(rel, context, context->split_size,
+					                                rel_data, &allblocks,targetPolicy);
+				} else if (isDataStoredInHive) {
+					// we can't use metadata cache, so hitblocks will always be 0
+					rel_data->type = DATALOCALITY_HIVE;
+					ExternalGetHiveFileDataLocation(rel, context, context->split_size,
 					                                rel_data, &allblocks);
+				} else if (isdataStoredInMagma) {
+          MagmaTableFullName* mtfn = palloc0(sizeof(MagmaTableFullName));
+          mtfn->databaseName = get_database_name(MyDatabaseId);
+          mtfn->schemaName = get_namespace_name(rel->rd_rel->relnamespace);
+          mtfn->tableName = palloc0(sizeof(rel->rd_rel->relname.data));
+          memcpy(mtfn->tableName, &(rel->rd_rel->relname.data), sizeof(rel->rd_rel->relname.data));
+          relation_close(rel, AccessShareLock);
+          magmaTableFullNames = lappend(magmaTableFullNames, mtfn);
+
+          rel_data->magmaTableFullName = mtfn;
+          rel_data->type = DATALOCALITY_MAGMA;
+          context->chsl_context.relations = lappend(context->chsl_context.relations,
+                                                    rel_data);
+          magmaNonResultRelations = lappend(magmaNonResultRelations, rel_data);
+          pfree(targetPolicy);
+          continue;
 				}
 			}
 
-			if (!isResultRelation) {
-				total_size += rel_data->total_size;
-				totalFileCount += list_length(rel_data->files);
-				//for hash relation
-				if (targetPolicy->nattrs > 0) {
-					context->hashRelSize += rel_data->total_size;
-				} else {
-					context->randomRelSize += rel_data->total_size;
-				}
-			}
+      total_size += rel_data->total_size;
+      totalFileCount += list_length(rel_data->files);
+      //for hash relation
+      if (targetPolicy->nattrs > 0) {
+        context->hashRelSize += rel_data->total_size;
+      } else {
+        context->randomRelSize += rel_data->total_size;
+      }
+
 			context->chsl_context.relations = lappend(context->chsl_context.relations,
 					rel_data);
 			pfree(targetPolicy);
@@ -993,9 +1068,40 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 		relation_close(rel, AccessShareLock);
 	}
 
-	MemoryContextSwitchTo(context->old_memorycontext);
+  bool useClientCacheDirectly = false;
+  if (context->isMagmaTableExist) {
+          // start transaction in magma for SELECT/INSERT/UPDATE/DELETE/ANALYZE
+          if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+          {
+                  PlugStorageBeginTransaction(magmaTableFullNames);
+                  useClientCacheDirectly = true;
+          }
+          Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+  }
 
-	ActiveSnapshot = saveActiveSnapshot;
+  foreach(lc, magmaNonResultRelations) {
+          Relation_Data *rel_data = lfirst(lc);
+          ExternalGetMagmaRangeDataLocation(rel_data->magmaTableFullName->databaseName,
+                                rel_data->magmaTableFullName->schemaName,
+                                rel_data->magmaTableFullName->tableName,
+                                context, context->split_size,
+                                rel_data, useClientCacheDirectly, &allblocks);
+          total_size += rel_data->total_size;
+          totalFileCount += list_length(rel_data->files);
+          context->hashRelSize += rel_data->total_size;
+  }
+
+  foreach (lc, magmaTableFullNames) {
+          MagmaTableFullName* mtfn = lfirst(lc);
+          pfree(mtfn->databaseName);
+          pfree(mtfn->schemaName);
+          pfree(mtfn->tableName);
+  }
+  list_free_deep(magmaTableFullNames);
+
+	ActiveSnapshot = savedActiveSnapshot;
+
+	MemoryContextSwitchTo(context->old_memorycontext);
 
 	allRelationFetchLeavetime = gettime_microsec();
 	int eclaspeTime = allRelationFetchLeavetime - allRelationFetchBegintime;
@@ -1015,7 +1121,7 @@ int64 get_block_locations_and_claculte_table_size(split_to_segment_mapping_conte
 }
 
 bool dataStoredInHdfs(Relation rel) {
-	if (RelationIsAoRows(rel) || RelationIsParquet(rel)) {
+	if (RelationIsAo(rel)) {
 		return true;
 	} else if (RelationIsExternal(rel)) {
 		ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
@@ -1033,6 +1139,224 @@ bool dataStoredInHdfs(Relation rel) {
 	}
 	return false;
 }
+
+bool dataStoredInHive(Relation rel)
+{
+	if (RelationIsExternal(rel)) {
+		ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
+		bool isHiveProtocol = false;
+		if (!extEnrty->command && extEnrty->locations) {
+			char* first_uri_str = (char *) strVal(lfirst(list_head(extEnrty->locations)));
+			if (first_uri_str) {
+				Uri* uri = ParseExternalTableUri(first_uri_str);
+				if (uri && is_hive_protocol(uri)) {
+					isHiveProtocol = true;
+				}
+			}
+		}
+		return isHiveProtocol;
+	}
+	return false;
+}
+
+bool dataStoredInMagma(Relation rel)
+{
+	if (RelationIsExternal(rel)) {
+		ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
+		bool isMagmaProtocol = false;
+		if (!extEnrty->command && extEnrty->locations) {
+			char* first_uri_str = (char *) strVal(lfirst(list_head(extEnrty->locations)));
+			if (first_uri_str) {
+				Uri* uri = ParseExternalTableUri(first_uri_str);
+				if (uri && is_magma_protocol(uri)) {
+					isMagmaProtocol = true;
+				}
+			}
+		}
+		return isMagmaProtocol;
+	}
+	return false;
+}
+
+/*
+ * fetchDistributionPolicy
+ *
+ * fetch distribution policy for table
+ * rg is a collection of multiple ranges
+ * range is like hdfs blocklocation in magma
+ * splits is same as range in hawq
+ */
+void fetchDistributionPolicy(Oid relid, int32 *n_dist_keys, int16 **dist_keys)
+{
+  Relation dist_policy_rel = heap_open(GpPolicyRelationId, AccessShareLock);
+  TupleDesc dist_policy_des = RelationGetDescr(dist_policy_rel);
+
+  HeapTuple tuple;
+  ScanKeyData scan_key;
+  SysScanDesc scan_des;
+
+  ScanKeyInit(&scan_key, Anum_gp_policy_localoid, BTEqualStrategyNumber,
+              F_OIDEQ, ObjectIdGetDatum(relid));
+  scan_des = systable_beginscan(dist_policy_rel, InvalidOid, FALSE, SnapshotNow,
+                                1, &scan_key);
+  tuple = systable_getnext(scan_des);
+  if (HeapTupleIsValid(tuple)) {
+    bool isnull;
+    Datum dist_policy;
+    dist_policy =
+        fastgetattr(tuple, Anum_gp_policy_attrnums, dist_policy_des, &isnull);
+    Assert(isnull == false);
+
+    ArrayType *array_type;
+    array_type = DatumGetArrayTypeP(dist_policy);
+    Assert(ARR_NDIM(array_type) == 1);
+    Assert(ARR_ELEMTYPE(array_type) == INT2OID);
+    Assert(ARR_LBOUND(array_type)[0] == 1);
+    *n_dist_keys = ARR_DIMS(array_type)[0];
+    *dist_keys = (int16 *)ARR_DATA_PTR(array_type);
+    Assert(*n_dist_keys >= 0);
+
+    systable_endscan(scan_des);
+    heap_close(dist_policy_rel, AccessShareLock);
+  } else {
+    systable_endscan(scan_des);
+    heap_close(dist_policy_rel, AccessShareLock);
+    elog(ERROR,
+         "fetchDistributionPolicy: get no table in gp_distribution_policy");
+  }
+}
+
+/*
+ * every rg in magma may be has more than one range, according to the splits
+ * info in hawq, established a range to rg correspondence
+ */
+List *magma_build_range_to_rg_map(List *splits, uint32 *range_to_rg_map)
+{
+  assert(splits != NULL);
+
+  List *rg = NIL;
+  ListCell *lc_split;
+  foreach (lc_split, splits) {
+    List *split = (List *)lfirst(lc_split);
+    ListCell *lc_range;
+    foreach (lc_range, split) {
+      FileSplit origFS = (FileSplit)lfirst(lc_range);
+      /* move the range room id from the highest 16 bits of range_id to
+       * low 16 bits of replicaGroup_id */
+      range_to_rg_map[origFS->range_id] = origFS->replicaGroup_id;
+      /* not find the rgid in the list, add it */
+      if (list_find_int(rg, origFS->replicaGroup_id) == -1) {
+        rg = lappend_int(rg, origFS->replicaGroup_id);
+        elog(DEBUG3, "executor get rg and its url: [%d] = [%s]",
+             origFS->replicaGroup_id, origFS->ext_file_uri_string);
+      }
+      elog(DEBUG3, "executor get range to rg map entry: range[%d] = %d",
+           origFS->range_id, origFS->replicaGroup_id);
+    }
+  }
+  /* sanity check to make sure all range is in the map */
+  elog(DEBUG3, "executor get rg with url size: %d", list_length(rg));
+  return rg;
+}
+
+/*
+ * used to establish the corresponding relationship between rg and url
+ * url is the address of one rg, client can use this url connect to rg
+ */
+void magma_build_rg_to_url_map(List *splits, List *rg, uint16 *rgIds,
+                               char **rgUrls)
+{
+  int rgSize = list_length(rg);
+  int16_t map[rgSize];
+  memset(map, 0, sizeof(map));
+  int16_t index = 0;
+  ListCell *lc_split1;
+  foreach (lc_split1, splits) {
+    List *split = (List *)lfirst(lc_split1);
+    ListCell *lc_range;
+    foreach (lc_range, split) {
+      if (index >= rgSize) {
+        break;
+      }
+      FileSplit origFS = (FileSplit)lfirst(lc_range);
+      int pos = list_find_int(rg, origFS->replicaGroup_id);
+      if (pos == -1) {
+        elog(ERROR, "executor cannot find rgid [%d] and it should be in list",
+             origFS->replicaGroup_id);
+      } else {
+        if (map[pos] > 0) {
+          elog(DEBUG3, "continue with pos %d, map[pos]: %d", pos, map[pos]);
+          continue;
+        }
+        map[pos]++;
+        rgIds[index] = origFS->replicaGroup_id;
+        rgUrls[index] = pstrdup(origFS->ext_file_uri_string);
+        elog(DEBUG3, "executor add rg and its url: rgid[%d] = [%s]",
+             rgIds[index], rgUrls[index]);
+        index++;
+      }
+    }
+    if (index >= rgSize) {
+      break;
+    }
+  }
+  assert(rgSize == index);
+}
+
+/*determine whether the relation is a magma table by Oid*/
+bool dataStoredInMagmaByOid(Oid relid)
+{
+	if (get_relation_storage_type(relid) == RELSTORAGE_EXTERNAL) {
+		ExtTableEntry* extEnrty = GetExtTableEntry(relid);
+		bool isMagmaProtocol = false;
+		if (!extEnrty->command && extEnrty->locations) {
+			char* first_uri_str = (char *) strVal(lfirst(list_head(extEnrty->locations)));
+			if (first_uri_str) {
+				Uri* uri = ParseExternalTableUri(first_uri_str);
+				if (uri && is_magma_protocol(uri)) {
+					isMagmaProtocol = true;
+				}
+			}
+		}
+		return isMagmaProtocol;
+	}
+	return false;
+}
+
+/* fetch table url if relation is hive format */
+void fetchUrlStoredInHive(Oid relid, char **hiveUrl) {
+  if (get_relation_storage_type(relid) == RELSTORAGE_EXTERNAL) {
+    ExtTableEntry *extEnrty = GetExtTableEntry(relid);
+    if (!extEnrty->command && extEnrty->locations) {
+      char *first_uri_str =
+          (char *)strVal(lfirst(list_head(extEnrty->locations)));
+      if (first_uri_str) {
+        Uri *uri = ParseExternalTableUri(first_uri_str);
+        if (uri && is_hive_protocol(uri)) {
+          /* get hdfs path by dbname and tblname. */
+          uint32_t pathLen = strlen(uri->path);
+          char dbname[pathLen];
+          memset(dbname, 0, pathLen);
+          char tblname[pathLen];
+          memset(tblname, 0, pathLen);
+          sscanf(uri->path, "/%[^/]/%s", dbname, tblname);
+          statusHiveC status;
+          getHiveDataDirectoryC(uri->hostname, uri->port, dbname, tblname,
+                                hiveUrl, &status);
+          if (status.errorCode != ERRCODE_SUCCESSFUL_COMPLETION) {
+            FreeExternalTableUri(uri);
+            elog(ERROR,
+                 "hiveprotocol_validate : "
+                 "failed to get table info, %s ",
+                 status.errorMessage);
+          }
+          FreeExternalTableUri(uri);
+        }
+      }
+    }
+  }
+}
+
 /*
  * search_host_in_stat_context: search a host name in the statistic
  * context; if not found, create a new one.
@@ -1044,9 +1368,25 @@ search_host_in_stat_context(split_to_segment_mapping_context *context,
 	HostnameIndexEntry *entry;
 	bool found;
 
+	if (strncmp(hostname,"127.0.0.1", strlen(hostname)) == 0) {
+		strncpy(hostname, "localhost", sizeof("localhost"));
+	}
+	int a,b,c,d = 0;
+	if (4==sscanf(hostname,"%d.%d.%d.%d",&a,&b,&c,&d)) {
+		if (0<=a && a<=255
+				&& 0<=b && b<=255
+				&& 0<=c && c<=255
+				&& 0<=d && d<=255) {
+		  char *ipaddr = pstrdup(hostname);
+		  char *hostnameNew = search_hostname_by_ipaddr(ipaddr);
+			pfree(ipaddr);
+		  MemSet(&(key.hostname), 0, HOSTNAME_MAX_LENGTH);
+		  strncpy(key.hostname, hostnameNew, HOSTNAME_MAX_LENGTH - 1);
+		}
+	} else {
 	MemSet(&(key.hostname), 0, HOSTNAME_MAX_LENGTH);
 	strncpy(key.hostname, hostname, HOSTNAME_MAX_LENGTH - 1);
-
+	}
 	entry = (HostnameIndexEntry *) hash_search(context->hostname_map,
 			(void *) &key, HASH_ENTER, &found);
 
@@ -1066,7 +1406,18 @@ search_host_in_stat_context(split_to_segment_mapping_context *context,
 		context->dds_context.volInfos[entry->index].datavolume = 0;
 		context->dds_context.volInfos[entry->index].occur_count = 0;
 	}
-
+	if(context->dds_context.size > slaveHostNumber) {
+		for (int i = 0; i < context->dds_context.size ; i++) {
+			elog(DEBUG3,"the %d th hostname is %s,", i,
+			context->dds_context.volInfos[i].hashEntry->key.hostname);
+		}
+		/* the hostname principle maybe different for Resource Manager, hdfs and magma,
+		 * this will cause the same host be recognised as different host, need to be fixed in future.
+		 * elog(ERROR,"the host number calculated in datalocality is larger than "
+				"the host exits. Maybe the same host has different expression,"
+				"please check.");
+		*/
+	}
 	return context->dds_context.volInfos + entry->index;
 }
 
@@ -1115,6 +1466,26 @@ fetch_hdfs_data_block_location(char *filepath, int64 len, int *block_num,
 								errmsg("cannot fetch block locations"),
 								errdetail("%s", HdfsGetLastError())));
 	}
+
+  if (locations != NULL) {
+    /* we replace host names by ip addresses */
+    for (int k = 0; k < *block_num; k++) {
+      /*initialize rangeId and RGID for ao table*/
+      locations[k].rangeId = -1;
+      locations[k].replicaGroupId = -1;
+      for (int j = 0; j < locations[k].numOfNodes; j++) {
+        char *colon = strchr(locations[k].names[j], ':');
+        if (colon != NULL) {
+          pfree(locations[k].hosts[j]);
+          int l = colon - locations[k].names[j];
+          locations[k].hosts[j] = palloc0(l + 1);
+          memcpy(locations[k].hosts[j], locations[k].names[j], l);
+          locations[k].hosts[j][l] = '\0'; /* dup setting to terminate */
+        }
+      }
+    }
+  }
+
 	return locations;
 }
 
@@ -1132,6 +1503,31 @@ static void free_hdfs_data_block_location(BlockLocation *locations,
 
 	return;
 }
+
+static void free_magma_data_range_locations(BlockLocation *locations,
+                                                  int range_num) {
+	Insist(locations != NULL);
+	Insist(range_num >= 0);
+
+	for (int i = 0; i < range_num; ++i)
+	{
+		if (locations[i].hosts)
+		{
+			pfree(locations[i].hosts);
+		}
+
+		if (locations[i].names)
+		{
+			pfree(locations[i].names);
+		}
+
+		if (locations[i].topologyPaths)
+		{
+			pfree(locations[i].topologyPaths);
+		}
+	}
+}
+
 
 /*
  * update_data_dist_stat: update the data distribution
@@ -1153,7 +1549,7 @@ update_data_dist_stat(split_to_segment_mapping_context *context,
 				sizeof(Host_Index) * hostIDs[i].replica_num);
 
 		for (j = 0; j < locations[i].numOfNodes; j++) {
-			char *hostname = pstrdup(locations[i].hosts[j]); /* locations[i].hosts[j]; */
+			char *hostname = pstrdup(locations[i].hosts[j]);
 			HostDataVolumeInfo *info = search_host_in_stat_context(context, hostname);
 			info->datavolume += locations[i].length;
 			hostIDs[i].hostIndextoSort[j].index = info->hashEntry->index;
@@ -1183,7 +1579,7 @@ static void double_check_hdfs_metadata_logic_length(BlockLocation * locations,in
 		hdfs_file_len += locations[i].length;
 	}
 	if(logic_len > hdfs_file_len) {
-		elog(ERROR, "hdfs file length does not equal to metadata logic length! (%ld != %ld)", hdfs_file_len, logic_len);
+		elog(ERROR, "hdfs file length does not equal to metadata logic length!");
 	}
 }
 
@@ -1341,6 +1737,8 @@ static void AOGetSegFileDataLocation(Relation relation,
 				File_Split *split = (File_Split *) palloc(sizeof(File_Split));
 				file = (Relation_File *) palloc0(sizeof(Relation_File));
 				file->segno = segno;
+				split->range_id = -1;
+				split->replicaGroup_id = -1;
 				split->offset = 0;
 				split->length = logic_len;
 				split->host = -1;
@@ -1429,6 +1827,8 @@ static void AOGetSegFileDataLocation(Relation relation,
 						File_Split *split = (File_Split *) palloc(sizeof(File_Split));
 						split->offset = 0;
 						split->length = logic_len;
+						split->range_id = -1;
+						split->replicaGroup_id = -1;
 						split->ext_file_uri = NULL;
 						file->split_num = 1;
 						file->splits = split;
@@ -1446,6 +1846,8 @@ static void AOGetSegFileDataLocation(Relation relation,
 							splits[realSplitNum].host = -1;
 							splits[realSplitNum].is_local_read = true;
 							splits[realSplitNum].offset = offset;
+							splits[realSplitNum].range_id = -1;
+							splits[realSplitNum].replicaGroup_id = -1;
 							splits[realSplitNum].ext_file_uri = NULL;
 							splits[realSplitNum].length =
 									file->locations[realSplitNum].length;
@@ -1484,6 +1886,8 @@ static void AOGetSegFileDataLocation(Relation relation,
 				File_Split *split = (File_Split *) palloc(sizeof(File_Split));
 				file = (Relation_File *) palloc0(sizeof(Relation_File));
 				file->segno = segno;
+				split->range_id = -1;
+				split->replicaGroup_id = -1;
 				split->offset = 0;
 				split->length = logic_len;
 				split->host = -1;
@@ -1625,10 +2029,13 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 				for (realSplitNum = 0; realSplitNum < split_num; realSplitNum++) {
 					splits[realSplitNum].host = -1;
 					splits[realSplitNum].is_local_read = true;
+					splits[realSplitNum].range_id = -1;
+					splits[realSplitNum].replicaGroup_id = -1;
 					splits[realSplitNum].offset = offset;
 					splits[realSplitNum].length = file->locations[realSplitNum].length;
 					splits[realSplitNum].logiceof = logic_len;
 					splits[realSplitNum].ext_file_uri = NULL;
+
 					if (logic_len - offset <= splits[realSplitNum].length) {
 						splits[realSplitNum].length = logic_len - offset;
 						realSplitNum++;
@@ -1653,6 +2060,8 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 			file = (Relation_File *) palloc0(sizeof(Relation_File));
 			file->segno = segno;
 			split->offset = 0;
+			split->range_id = -1;
+			split->replicaGroup_id = -1;
 			split->length = logic_len;
 			split->logiceof = logic_len;
 			split->host = -1;
@@ -1731,13 +2140,12 @@ static void InvokeHDFSProtocolBlockLocation(Oid    procOid,
 	if (bls != NULL)
 	{
 		ListCell *c;
-		int i = 0 ,j = 0;
 		foreach(c, bls->files)
 		{
 			blocklocation_file *blf = (blocklocation_file *)(lfirst(c));
 			elog(DEBUG3, "DEBUG LOCATION for %s with %d blocks",
 					     blf->file_uri, blf->block_num);
-			for ( i = 0 ; i < blf->block_num ; ++i )
+			for ( int i = 0 ; i < blf->block_num ; ++i )
 			{
 				BlockLocation *pbl = &(blf->locations[i]);
 				elog(DEBUG3, "DEBUG LOCATION for block %d : %d, "
@@ -1745,7 +2153,7 @@ static void InvokeHDFSProtocolBlockLocation(Oid    procOid,
 						     i,
 						     pbl->corrupt, pbl->length, pbl->offset,
 							 pbl->numOfNodes);
-				for ( j = 0 ; j < pbl->numOfNodes ; ++j )
+				for ( int j = 0 ; j < pbl->numOfNodes ; ++j )
 				{
 					elog(DEBUG3, "DEBUG LOCATION for block %d : %s, %s, %s",
 							     i,
@@ -1769,6 +2177,168 @@ static void InvokeHDFSProtocolBlockLocation(Oid    procOid,
 			*blockLocations = lappend(*blockLocations, v);
 		}
 	}
+	pfree(validator_data);
+	pfree(validator_udf);
+}
+
+static void InvokeHIVEProtocolBlockLocation(Oid    procOid,
+                                            List  *locs,
+                                            List **blockLocations)
+{
+  ExtProtocolValidatorData   *validator_data;
+  FmgrInfo           *validator_udf;
+  FunctionCallInfoData    fcinfo;
+
+  validator_data = (ExtProtocolValidatorData *)
+           palloc0 (sizeof(ExtProtocolValidatorData));
+  validator_udf = palloc(sizeof(FmgrInfo));
+  fmgr_info(procOid, validator_udf);
+
+  validator_data->type    = T_ExtProtocolValidatorData;
+  validator_data->url_list  = locs;
+  validator_data->format_opts = NULL;
+  validator_data->errmsg    = NULL;
+  validator_data->direction   = EXT_VALIDATE_READ;
+  validator_data->action    = EXT_VALID_ACT_GETBLKLOC;
+
+  InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,
+               /* FmgrInfo */ validator_udf,
+               /* nArgs */ 0,
+               /* Call Context */ (Node *) validator_data,
+               /* ResultSetInfo */ NULL);
+
+  /* invoke validator. if this function returns - validation passed */
+  FunctionCallInvoke(&fcinfo);
+
+  ExtProtocolBlockLocationData *bls =
+    (ExtProtocolBlockLocationData *)(fcinfo.resultinfo);
+  /* debug output block location. */
+  if (bls != NULL)
+  {
+    ListCell *c;
+    foreach(c, bls->files)
+    {
+      blocklocation_file *blf = (blocklocation_file *)(lfirst(c));
+      elog(DEBUG3, "DEBUG LOCATION for %s with %d blocks",
+               blf->file_uri, blf->block_num);
+      for ( int i = 0 ; i < blf->block_num ; ++i )
+      {
+        BlockLocation *pbl = &(blf->locations[i]);
+        elog(DEBUG3, "DEBUG LOCATION for block %d : %d, "
+                 INT64_FORMAT ", " INT64_FORMAT ", %d",
+                 i,
+                 pbl->corrupt, pbl->length, pbl->offset,
+               pbl->numOfNodes);
+        for ( int j = 0 ; j < pbl->numOfNodes ; ++j )
+        {
+          elog(DEBUG3, "DEBUG LOCATION for block %d : %s, %s, %s",
+                   i,
+                   pbl->hosts[j], pbl->names[j],
+                 pbl->topologyPaths[j]);
+        }
+      }
+    }
+  }
+
+  elog(DEBUG3, "after invoking get block location API");
+
+  /* get location data from fcinfo.resultinfo. */
+  if (bls != NULL)
+  {
+    Assert(bls->type == T_ExtProtocolBlockLocationData);
+    while(list_length(bls->files) > 0)
+    {
+      void *v = lfirst(list_head(bls->files));
+      bls->files = list_delete_first(bls->files);
+      *blockLocations = lappend(*blockLocations, v);
+    }
+  }
+  pfree(validator_data);
+  pfree(validator_udf);
+}
+
+void InvokeMagmaProtocolBlockLocation(ExtTableEntry *ext_entry,
+                                             Oid procOid,
+                                             char *dbname,
+                                             char *schemaname,
+                                             char *tablename,
+                                             MagmaSnapshot *snapshot,
+                                             bool useClientCacheDirectly,
+                                             ExtProtocolBlockLocationData **bldata)
+{
+	ExtProtocolValidatorData   *validator_data;
+	FmgrInfo				   *validator_udf;
+	FunctionCallInfoData		fcinfo;
+
+	validator_data = (ExtProtocolValidatorData *)
+					 palloc0(sizeof(ExtProtocolValidatorData));
+	validator_udf = palloc(sizeof(FmgrInfo));
+	fmgr_info(procOid, validator_udf);
+
+	validator_data->useClientCacheDirectly = useClientCacheDirectly;
+
+	validator_data->type = T_ExtProtocolValidatorData;
+	validator_data->dbname = dbname;
+	validator_data->schemaname = schemaname;
+	validator_data->tablename = tablename;
+
+    validator_data->snapshot.currentTransaction.txnId = 0;
+    validator_data->snapshot.currentTransaction.txnStatus = 0;
+    validator_data->snapshot.txnActions.txnActionStartOffset = 0;
+    validator_data->snapshot.txnActions.txnActions = NULL;
+    validator_data->snapshot.txnActions.txnActionSize = 0;
+    if (snapshot != NULL)
+    {
+        // save current transaction in snapshot
+        validator_data->snapshot.currentTransaction.txnId =
+                snapshot->currentTransaction.txnId;
+        validator_data->snapshot.currentTransaction.txnStatus =
+                snapshot->currentTransaction.txnStatus;
+
+        validator_data->snapshot.cmdIdInTransaction = GetCurrentCommandId();
+
+        // allocate txnActions
+        validator_data->snapshot.txnActions.txnActionStartOffset =
+            snapshot->txnActions.txnActionStartOffset;
+        validator_data->snapshot.txnActions.txnActions =
+            (MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->txnActions
+                                      .txnActionSize);
+
+        // save txnActionsp
+        validator_data->snapshot.txnActions.txnActionSize = snapshot->txnActions
+            .txnActionSize;
+        for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+        {
+            validator_data->snapshot.txnActions.txnActions[i].txnId =
+                snapshot->txnActions.txnActions[i].txnId;
+            validator_data->snapshot.txnActions.txnActions[i].txnStatus =
+                snapshot->txnActions.txnActions[i].txnStatus;
+        }
+    }
+
+	validator_data->format_opts = lappend(validator_data->format_opts, makeString(ext_entry->fmtopts));
+	validator_data->url_list = ext_entry->locations;
+
+	InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,
+							 /* FmgrInfo */ validator_udf,
+							 /* nArgs */ 0,
+							 /* Call Context */ (Node *) validator_data,
+							 /* ResultSetInfo */ NULL);
+
+	/* invoke validator. if this function returns - validation passed */
+	FunctionCallInvoke(&fcinfo);
+
+	*bldata = (ExtProtocolBlockLocationData *) (fcinfo.resultinfo);
+
+	/* get location data from fcinfo.resultinfo. */
+	if (*bldata != NULL)
+	{
+		Assert((*bldata)->type == T_ExtProtocolBlockLocationData);
+	}
+
+	// Free snapshot memory
+	pfree(validator_data->snapshot.txnActions.txnActions);
+
 	pfree(validator_data);
 	pfree(validator_udf);
 }
@@ -1812,61 +2382,268 @@ LookupCustomProtocolBlockLocationFunc(char *protoname)
 	return procOid;
 }
 
+void InvokeMagmaProtocolDatabaseSize(Oid procOid,
+                                     const char *dbname,
+                                     MagmaSnapshot *snapshot,
+                                     ExtProtocolDatabaseSizeData **dbsdata)
+{
+  ExtProtocolValidatorData   *validator_data;
+  FmgrInfo           *validator_udf;
+  FunctionCallInfoData    fcinfo;
+
+  validator_data = (ExtProtocolValidatorData *)
+           palloc0(sizeof(ExtProtocolValidatorData));
+  validator_udf = palloc(sizeof(FmgrInfo));
+  fmgr_info(procOid, validator_udf);
+
+  validator_data->type = T_ExtProtocolValidatorData;
+  validator_data->dbname = dbname;
+  validator_data->schemaname = NULL;
+  validator_data->tablename = NULL;
+
+    validator_data->snapshot.currentTransaction.txnId = 0;
+    validator_data->snapshot.currentTransaction.txnStatus = 0;
+    validator_data->snapshot.txnActions.txnActionStartOffset = 0;
+    validator_data->snapshot.txnActions.txnActions = NULL;
+    validator_data->snapshot.txnActions.txnActionSize = 0;
+    if (snapshot != NULL)
+    {
+      // save current transaction in snapshot
+      validator_data->snapshot.currentTransaction.txnId =
+              snapshot->currentTransaction.txnId;
+      validator_data->snapshot.currentTransaction.txnStatus =
+              snapshot->currentTransaction.txnStatus;
+
+      validator_data->snapshot.cmdIdInTransaction = GetCurrentCommandId();
+
+      // allocate txnActions
+      validator_data->snapshot.txnActions.txnActionStartOffset =
+          snapshot->txnActions.txnActionStartOffset;
+      validator_data->snapshot.txnActions.txnActions =
+          (MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->txnActions
+                                    .txnActionSize);
+
+      // save txnActionsp
+      validator_data->snapshot.txnActions.txnActionSize = snapshot->txnActions
+          .txnActionSize;
+      for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+      {
+          validator_data->snapshot.txnActions.txnActions[i].txnId =
+              snapshot->txnActions.txnActions[i].txnId;
+          validator_data->snapshot.txnActions.txnActions[i].txnStatus =
+              snapshot->txnActions.txnActions[i].txnStatus;
+      }
+  }
+
+  validator_data->format_opts = NIL;
+  validator_data->url_list = NIL;
+
+  InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,
+               /* FmgrInfo */ validator_udf,
+               /* nArgs */ 0,
+               /* Call Context */ (Node *) validator_data,
+               /* ResultSetInfo */ NULL);
+
+  /* invoke validator. if this function returns - validation passed */
+  FunctionCallInvoke(&fcinfo);
+
+  *dbsdata = (ExtProtocolDatabaseSizeData *) (fcinfo.resultinfo);
+
+  /* get location data from fcinfo.resultinfo. */
+  if (*dbsdata != NULL)
+  {
+    Assert((*dbsdata)->type == T_ExtProtocolDatabaseSizeData);
+  }
+
+  // Free snapshot memory
+  pfree(validator_data->snapshot.txnActions.txnActions);
+
+  pfree(validator_data);
+  pfree(validator_udf);
+}
+
+void InvokeMagmaProtocolTableSize(ExtTableEntry *ext_entry,
+                                             Oid procOid,
+                                             char *dbname,
+                                             char *schemaname,
+                                             char *tablename,
+                                             MagmaSnapshot *snapshot,
+                                             ExtProtocolTableSizeData **tsdata)
+{
+  ExtProtocolValidatorData   *validator_data;
+  FmgrInfo           *validator_udf;
+  FunctionCallInfoData    fcinfo;
+
+  validator_data = (ExtProtocolValidatorData *)
+           palloc0(sizeof(ExtProtocolValidatorData));
+  validator_udf = palloc(sizeof(FmgrInfo));
+  fmgr_info(procOid, validator_udf);
+
+  validator_data->type = T_ExtProtocolValidatorData;
+  validator_data->dbname = dbname;
+  validator_data->schemaname = schemaname;
+  validator_data->tablename = tablename;
+
+    validator_data->snapshot.currentTransaction.txnId = 0;
+    validator_data->snapshot.currentTransaction.txnStatus = 0;
+    validator_data->snapshot.txnActions.txnActionStartOffset = 0;
+    validator_data->snapshot.txnActions.txnActions = NULL;
+    validator_data->snapshot.txnActions.txnActionSize = 0;
+    if (snapshot != NULL)
+    {
+      // save current transaction in snapshot
+      validator_data->snapshot.currentTransaction.txnId =
+              snapshot->currentTransaction.txnId;
+      validator_data->snapshot.currentTransaction.txnStatus =
+              snapshot->currentTransaction.txnStatus;
+      validator_data->snapshot.cmdIdInTransaction = GetCurrentCommandId();
+
+      // allocate txnActions
+      validator_data->snapshot.txnActions.txnActionStartOffset =
+          snapshot->txnActions.txnActionStartOffset;
+      validator_data->snapshot.txnActions.txnActions =
+          (MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->txnActions
+                                    .txnActionSize);
+
+      // save txnActionsp
+      validator_data->snapshot.txnActions.txnActionSize = snapshot->txnActions
+          .txnActionSize;
+      for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+      {
+          validator_data->snapshot.txnActions.txnActions[i].txnId =
+              snapshot->txnActions.txnActions[i].txnId;
+          validator_data->snapshot.txnActions.txnActions[i].txnStatus =
+              snapshot->txnActions.txnActions[i].txnStatus;
+      }
+  }
+
+  validator_data->format_opts = lappend(validator_data->format_opts, makeString(ext_entry->fmtopts));
+  validator_data->url_list = ext_entry->locations;;
+
+  InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,
+               /* FmgrInfo */ validator_udf,
+               /* nArgs */ 0,
+               /* Call Context */ (Node *) validator_data,
+               /* ResultSetInfo */ NULL);
+
+  /* invoke validator. if this function returns - validation passed */
+  FunctionCallInvoke(&fcinfo);
+
+  *tsdata = (ExtProtocolDatabaseSizeData *) (fcinfo.resultinfo);
+
+  /* get location data from fcinfo.resultinfo. */
+  if (*tsdata != NULL)
+  {
+    Assert((*tsdata)->type == T_ExtProtocolTableSizeData);
+  }
+
+  // Free snapshot memory
+  pfree(validator_data->snapshot.txnActions.txnActions);
+
+  pfree(validator_data);
+  pfree(validator_udf);
+}
+
+Oid
+LookupCustomProtocolTableSizeFunc(char *protoname)
+{
+  List* funcname  = NIL;
+  Oid   procOid   = InvalidOid;
+  Oid   argList[1];
+  Oid   returnOid;
+
+  char*   new_func_name = (char *)palloc0(strlen(protoname) + 13);
+  sprintf(new_func_name, "%s_tablesize", protoname);
+  funcname = lappend(funcname, makeString(new_func_name));
+  returnOid = VOIDOID;
+  procOid = LookupFuncName(funcname, 0, argList, true);
+
+  if (!OidIsValid(procOid))
+    ereport(ERROR, (errcode(ERRCODE_UNDEFINED_FUNCTION),
+            errmsg("protocol function %s was not found.",
+                new_func_name),
+            errhint("Create it with CREATE FUNCTION."),
+            errOmitLocation(true)));
+
+  /* check return type matches */
+  if (get_func_rettype(procOid) != returnOid)
+    ereport(ERROR, (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+            errmsg("protocol function %s has an incorrect return type",
+                new_func_name),
+            errOmitLocation(true)));
+
+  /* check allowed volatility */
+  if (func_volatile(procOid) != PROVOLATILE_STABLE)
+    ereport(ERROR, (errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
+            errmsg("protocol function %s is not declared STABLE.",
+            new_func_name),
+            errOmitLocation(true)));
+  pfree(new_func_name);
+
+  return procOid;
+}
+
+Oid
+LookupCustomProtocolDatabaseSizeFunc(char *protoname)
+{
+  List* funcname  = NIL;
+  Oid   procOid   = InvalidOid;
+  Oid   argList[1];
+  Oid   returnOid;
+
+  char*   new_func_name = (char *)palloc0(strlen(protoname) + 16);
+  sprintf(new_func_name, "%s_databasesize", protoname);
+  funcname = lappend(funcname, makeString(new_func_name));
+  returnOid = VOIDOID;
+  procOid = LookupFuncName(funcname, 0, argList, true);
+
+  if (!OidIsValid(procOid))
+    ereport(ERROR, (errcode(ERRCODE_UNDEFINED_FUNCTION),
+            errmsg("protocol function %s was not found.",
+                new_func_name),
+            errhint("Create it with CREATE FUNCTION."),
+            errOmitLocation(true)));
+
+  /* check return type matches */
+  if (get_func_rettype(procOid) != returnOid)
+    ereport(ERROR, (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+            errmsg("protocol function %s has an incorrect return type",
+                new_func_name),
+            errOmitLocation(true)));
+
+  /* check allowed volatility */
+  if (func_volatile(procOid) != PROVOLATILE_STABLE)
+    ereport(ERROR, (errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
+            errmsg("protocol function %s is not declared STABLE.",
+            new_func_name),
+            errOmitLocation(true)));
+  pfree(new_func_name);
+
+  return procOid;
+}
+
 static void ExternalGetHdfsFileDataLocation(
 				Relation relation,
 				split_to_segment_mapping_context *context,
 				int64 splitsize,
 				Relation_Data *rel_data,
-				int* allblocks) {
-	ExtTableEntry *ext_entry = GetExtTableEntry(rel_data->relid);
-	Assert(ext_entry->locations != NIL);
-	int64 total_size = 0;
-	int segno = 1;
+				int* allblocks,GpPolicy *targetPolicy) {
+	rel_data->serializeSchema = NULL;
+	rel_data->serializeSchemaLen = 0;
+	Oid	procOid = LookupCustomProtocolBlockLocationFunc("hdfs");
+	Assert(OidIsValid(procOid));
 
-	/*
-	 * Step 1. get external HDFS location from URI.
-	 */
-	char* first_uri_str = (char *) strVal(lfirst(list_head(ext_entry->locations)));
-	/* We must have at least one location. */
-	Assert(first_uri_str != NULL);
-	Uri* uri = ParseExternalTableUri(first_uri_str);
-	bool isHdfs = false;
-	if (uri != NULL && is_hdfs_protocol(uri)) {
-		isHdfs = true;
-	}
-	Assert(isHdfs);  /* Currently, we accept HDFS only. */
-
-    /*
-     * Step 2. Get function to call for getting location information. This work
-     * is done by validator function registered for this external protocol.
-     */
-	Oid procOid = InvalidOid;
-	if (isHdfs) {
-		procOid = LookupCustomProtocolBlockLocationFunc("hdfs");
-	}
-	else
-	{
-		Assert(false);
-	}
-
-	/*
-	 * Step 3. Call validator to get location data.
-	 */
-
-	/* Prepare function call parameter by passing into location string. This is
-	 * only called at dispatcher side. */
 	List *bls = NULL; /* Block locations */
-	if (OidIsValid(procOid) && Gp_role == GP_ROLE_DISPATCH)
-	{
-		InvokeHDFSProtocolBlockLocation(procOid, ext_entry->locations, &bls);
-	}
+	ExtTableEntry *ext_entry = GetExtTableEntry(rel_data->relid);
+  InvokeHDFSProtocolBlockLocation(procOid, ext_entry->locations, &bls);
 
-	/*
-	 * Step 4. Build data location info for optimization after this call.
-	 */
+	bool isRelationHash = is_relation_hash(targetPolicy);
 
 	/* Go through each files */
 	ListCell *cbl = NULL;
+	int *hashRelationSegnoIndex = NULL;
+	int64 total_size = 0;
+	int segno = 1;
 	foreach(cbl, bls)
 	{
 		blocklocation_file *f = (blocklocation_file *)lfirst(cbl);
@@ -1878,8 +2655,6 @@ static void ExternalGetHdfsFileDataLocation(
 			// calculate length for one specific file
 			for (int j = 0; j < block_num; ++j) {
 				logic_len += locations[j].length;
-		//		locations[j].lowerBoundInc = NULL;
-		//		locations[j].upperBoundExc = NULL;
 			}
 			total_size += logic_len;
 
@@ -1887,10 +2662,267 @@ static void ExternalGetHdfsFileDataLocation(
 					locations, block_num);
 
 			Relation_File *file = (Relation_File *) palloc(sizeof(Relation_File));
-			if (atoi(strrchr(f->file_uri, '/') + 1) > 0)
-			  file->segno = atoi(strrchr(f->file_uri, '/') + 1);
-			else
-			  file->segno = segno++;
+      if (!context->keep_hash || !isRelationHash) {
+        file->segno = segno++;
+        file->block_num = block_num;
+        file->locations = locations;
+        file->hostIDs = host_index;
+        file->logic_len = logic_len;
+
+        // do the split logic
+        int realSplitNum = 0;
+        int split_num = file->block_num;
+        int64 offset = 0;
+        File_Split *splits = (File_Split *)palloc(
+            sizeof(File_Split) * split_num);
+        while (realSplitNum < split_num) {
+          splits[realSplitNum].host = -1;
+          splits[realSplitNum].range_id =
+              file->locations[realSplitNum].rangeId;
+          splits[realSplitNum].replicaGroup_id =
+              file->locations[realSplitNum].replicaGroupId;
+          splits[realSplitNum].is_local_read = true;
+          splits[realSplitNum].offset = offset;
+          splits[realSplitNum].length =
+              file->locations[realSplitNum].length;
+          splits[realSplitNum].logiceof = logic_len;
+          splits[realSplitNum].ext_file_uri =
+              pstrdup(f->file_uri);
+
+          if (logic_len - offset <=
+              splits[realSplitNum].length) {
+            splits[realSplitNum].length = logic_len - offset;
+            ++realSplitNum;
+            break;
+          }
+          offset += splits[realSplitNum].length;
+          ++realSplitNum;
+        }
+        file->split_num = realSplitNum;
+        file->splits = splits;
+        context->total_split_count += realSplitNum;
+      } else {
+        // if (hashRelationSegnoIndex == NULL)
+        //  hashRelationSegnoIndex = palloc0(sizeof(int) * list_length(bls));
+        File_Split *split = (File_Split *)palloc(sizeof(File_Split));
+        int idx = atoi(strrchr(f->file_uri, '/') + 1);
+        // file->segno =
+        //    hashRelationSegnoIndex[idx - 1] * targetPolicy->bucketnum + idx;
+        // hashRelationSegnoIndex[idx - 1] += 1;
+        file->segno = idx;
+        split->offset = 0;
+        split->range_id = -1;
+        split->replicaGroup_id = -1;
+        split->length = logic_len;
+        split->logiceof = logic_len;
+        split->host = -1;
+        split->is_local_read = true;
+        split->ext_file_uri = pstrdup(f->file_uri);
+        file->split_num = 1;
+        file->splits = split;
+        file->logic_len = logic_len;
+        file->block_num = block_num;
+        file->locations = locations;
+        file->hostIDs = host_index;
+        context->total_split_count += block_num;
+      }
+
+      rel_data->files = lappend(rel_data->files, file);
+		}
+	}
+	context->total_metadata_logic_len += total_size;
+	rel_data->total_size = total_size;
+}
+
+static void ExternalGetHiveFileDataLocation(
+        Relation relation,
+        split_to_segment_mapping_context *context,
+        int64 splitsize,
+        Relation_Data *rel_data,
+        int* allblocks) {
+  ExtTableEntry *ext_entry = GetExtTableEntry(rel_data->relid);
+  rel_data->serializeSchema = NULL;
+  rel_data->serializeSchemaLen = 0;
+  Assert(ext_entry->locations != NIL);
+  int64 total_size = 0;
+  int segno = 1;
+
+  /*
+   * Step 1. get external HIVE location from URI.
+   */
+  char* first_uri_str = (char *) strVal(lfirst(list_head(ext_entry->locations)));
+  /* We must have at least one location. */
+  Assert(first_uri_str != NULL);
+  Uri* uri = ParseExternalTableUri(first_uri_str);
+  bool isHive = false;
+  if (uri != NULL && is_hive_protocol(uri)) {
+    isHive = true;
+  }
+  Assert(isHive);  /* Currently, we accept HIVE only. */
+
+  /*
+   * Step 2. Get function to call for getting location information. This work
+   * is done by validator function registered for this external protocol.
+   */
+  Oid procOid = InvalidOid;
+  procOid = LookupCustomProtocolBlockLocationFunc("hive");
+
+  /*
+   * Step 3. Call validator to get location data.
+   */
+
+  /* Prepare function call parameter by passing into location string. This is
+   * only called at dispatcher side. */
+  List *bls = NULL; /* Block locations */
+  if (OidIsValid(procOid) && Gp_role == GP_ROLE_DISPATCH) {
+    List* locations = NIL;
+    locations = lappend(locations, makeString(pstrdup(context->hiveUrl)));
+    InvokeHIVEProtocolBlockLocation(procOid, locations, &bls);
+  }
+
+  /*
+   * Step 4. Build data location info for optimization after this call.
+   */
+
+  /* Go through each files */
+  ListCell *cbl = NULL;
+  foreach (cbl, bls) {
+    blocklocation_file *f = (blocklocation_file *)lfirst(cbl);
+    BlockLocation *locations = f->locations;
+    int block_num = f->block_num;
+    int64 logic_len = 0;
+    *allblocks += block_num;
+    if ((locations != NULL) && (block_num > 0)) {
+      // calculate length for one specific file
+      for (int j = 0; j < block_num; ++j) {
+        logic_len += locations[j].length;
+      }
+      total_size += logic_len;
+
+      Block_Host_Index *host_index =
+          update_data_dist_stat(context, locations, block_num);
+
+      Relation_File *file = (Relation_File *)palloc(sizeof(Relation_File));
+      file->segno = segno++;
+      file->block_num = block_num;
+      file->locations = locations;
+      file->hostIDs = host_index;
+      file->logic_len = logic_len;
+
+      // do the split logic
+      int realSplitNum = 0;
+      int split_num = file->block_num;
+      int64 offset = 0;
+      File_Split *splits = (File_Split *)palloc(sizeof(File_Split) * split_num);
+      while (realSplitNum < split_num) {
+        splits[realSplitNum].host = -1;
+        splits[realSplitNum].is_local_read = true;
+        splits[realSplitNum].offset = offset;
+        splits[realSplitNum].length = file->locations[realSplitNum].length;
+        splits[realSplitNum].logiceof = logic_len;
+        splits[realSplitNum].ext_file_uri = pstrdup(f->file_uri);
+
+        if (logic_len - offset <= splits[realSplitNum].length) {
+          splits[realSplitNum].length = logic_len - offset;
+          ++realSplitNum;
+          break;
+        }
+        offset += splits[realSplitNum].length;
+        ++realSplitNum;
+      }
+      file->split_num = realSplitNum;
+      file->splits = splits;
+      context->total_split_count += realSplitNum;
+
+      rel_data->files = lappend(rel_data->files, file);
+    }
+  }
+  context->total_metadata_logic_len += total_size;
+  rel_data->total_size = total_size;
+}
+
+static void ExternalGetMagmaRangeDataLocation(
+                const char* dbname,
+		const char* schemaname,
+		const char* tablename,
+		split_to_segment_mapping_context *context,
+		int64 rangesize,
+		Relation_Data *rel_data,
+		bool useClientCacheDirectly,
+		int *allranges)
+{
+	/*
+	 * Step 1. make sure URI is magma
+	 */
+	ExtTableEntry *ext_entry = GetExtTableEntry(rel_data->relid);
+	Assert(ext_entry->locations != NIL);
+
+	char* first_uri_str = (char *) strVal(lfirst(list_head(ext_entry->locations)));
+	Assert(first_uri_str != NULL);
+
+	Uri* uri = ParseExternalTableUri(first_uri_str);
+	Assert(uri && is_magma_protocol(uri));
+
+	int64 total_size = 0;
+	int segno = 1;
+
+    /*
+     * Step 2. Get function to call for location information. This is done by
+     * block location function registered for magma protocol.
+     */
+	Oid procOid = InvalidOid;
+	procOid = LookupCustomProtocolBlockLocationFunc("magma");
+
+	/*
+	 * Step 3. Call block location function to get location data. This is
+	 * only called at dispatcher side.
+	 */
+
+	ExtProtocolBlockLocationData *bldata = NULL;
+	if (Gp_role == GP_ROLE_DISPATCH)
+	{
+		if (OidIsValid(procOid))
+		{
+			// get range location from magma now
+			Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+			InvokeMagmaProtocolBlockLocation(ext_entry, procOid, dbname, schemaname,
+			                                 tablename, PlugStorageGetTransactionSnapshot(),
+			                                 useClientCacheDirectly,
+			                                 &bldata);
+		}
+		else
+		{
+			elog(ERROR, "failed to find data locality function for magma");
+		}
+	}
+
+	/*
+	 * Step 4. build file splits
+	 */
+	rel_data->serializeSchema = pnstrdup(bldata->serializeSchema,
+			bldata->serializeSchemaLen);
+	rel_data->serializeSchemaLen = bldata->serializeSchemaLen;
+	context->magmaRangeNum = bldata->files->length;
+	ListCell *cbl = NULL;
+	foreach(cbl, bldata->files)
+	{
+		blocklocation_file *f = (blocklocation_file *)lfirst(cbl);
+		BlockLocation *locations = f->locations;
+		int block_num = f->block_num;
+		int64 logic_len = 0;
+		*allranges += block_num;
+		if ((locations != NULL) && (block_num > 0)) {
+			// calculate length for one specific file
+			for (int j = 0; j < block_num; ++j) {
+				logic_len += locations[j].length;
+			}
+			total_size += logic_len;
+
+			Block_Host_Index * host_index = update_data_dist_stat(context,
+					locations, block_num);
+
+			Relation_File *file = (Relation_File *) palloc(sizeof(Relation_File));
+			file->segno = segno++;
 			file->block_num = block_num;
 			file->locations = locations;
 			file->hostIDs = host_index;
@@ -1900,14 +2932,18 @@ static void ExternalGetHdfsFileDataLocation(
 			int realSplitNum = 0;
 			int split_num = file->block_num;
 			int64 offset = 0;
+			char *p = NULL;
 			File_Split *splits = (File_Split *) palloc(sizeof(File_Split) * split_num);
 			while (realSplitNum < split_num) {
 					splits[realSplitNum].host = -1;
 					splits[realSplitNum].is_local_read = true;
+					splits[realSplitNum].range_id = file->locations[realSplitNum].rangeId;
+					splits[realSplitNum].replicaGroup_id = file->locations[realSplitNum].replicaGroupId;
 					splits[realSplitNum].offset = offset;
 					splits[realSplitNum].length = file->locations[realSplitNum].length;
 					splits[realSplitNum].logiceof = logic_len;
-					splits[realSplitNum].ext_file_uri = pstrdup(f->file_uri);
+					p = file->locations[realSplitNum].topologyPaths[0];
+					splits[realSplitNum].ext_file_uri = p ? pstrdup(p) : (char *) NULL;
 
 					if (logic_len - offset <= splits[realSplitNum].length) {
 							splits[realSplitNum].length = logic_len - offset;
@@ -1924,9 +2960,14 @@ static void ExternalGetHdfsFileDataLocation(
 			rel_data->files = lappend(rel_data->files, file);
 		}
 	}
+
+	/*
+	 * Step 5. calculate total size
+	 */
 	context->total_metadata_logic_len += total_size;
 	rel_data->total_size = total_size;
 }
+
 /*
  * step 1 search segments with local read and segment is not full after being assigned the block
  * step 2 search segments with local read and segment is not full before being assigned the block
@@ -2189,7 +3230,8 @@ static void assign_split_to_host(Host_Assignment_Result *result,
 	last_split = result->splits + result->count - 1;
 	if ((last_split->rel_oid == split->rel_oid)
 			&& (last_split->segno == split->segno)
-			&& (last_split->offset + last_split->length == split->offset)) {
+			&& (last_split->offset + last_split->length == split->offset)
+			&& (split->range_id == -1)) {
 		last_split->length += split->length;
 		return;
 	}
@@ -2282,6 +3324,9 @@ post_process_assign_result(Split_Assignment_Result *assign_result) {
 			if (split->length <= 0) {
 				empty_seg = true;
 			}
+
+			fileSplit->range_id = split->range_id;
+			fileSplit->replicaGroup_id = split->replicaGroup_id;
 			fileSplit->offsets = split->offset;
 			fileSplit->lengths = split->length;
 			p = split->ext_file_uri_string;
@@ -2290,9 +3335,9 @@ post_process_assign_result(Split_Assignment_Result *assign_result) {
 			j += 1;
 
 			if (empty_seg) {
-        if (fileSplit->ext_file_uri_string) {
-          pfree(fileSplit->ext_file_uri_string);
-        }
+				if (fileSplit->ext_file_uri_string) {
+					pfree(fileSplit->ext_file_uri_string);
+				}
 				pfree(fileSplit);
 			} else {
 				per_seg_splits = list_nth_cell((List *) (last_mapnode->splits), i);
@@ -2524,12 +3569,15 @@ static void change_hash_virtual_segments_order(QueryResource ** resourcePtr,
 		// assign files to the virtual segments with max local read. one file group to one virtual segment
 		// file group is files with the same module value to virtual_segment_num
 		ListCell* lc;
+
+		// when it is magma table, the file count may be not mutiple of virtual_segment_num,
+		// need to skip the assignment of file which not exist.
 		for (i = 0; i < assignment_context.virtual_segment_num; i++) {
 			int largestFileIndex = i;
 			int maxLogicLen = -1;
 			for (int j = 0; j < filesPerSegment; j++) {
-				if (rel_file_vector[i + j * assignment_context.virtual_segment_num]->logic_len
-						> maxLogicLen) {
+				if ((i + j * assignment_context.virtual_segment_num < fileCount) &&
+						(rel_file_vector[i + j * assignment_context.virtual_segment_num]->logic_len > maxLogicLen)) {
 					largestFileIndex = i + j * assignment_context.virtual_segment_num;
 					maxLogicLen =
 							rel_file_vector[i + j * assignment_context.virtual_segment_num]->logic_len;
@@ -2563,7 +3611,7 @@ static void change_hash_virtual_segments_order(QueryResource ** resourcePtr,
 				if (numOfLocalRead[j] > localMax && vs2fileno[j] == -1) {
 					// assign file group to the same host(container) index.
 					for (int k = 0; k < filesPerSegment; k++) {
-						rel_file_vector[i + k * assignment_context.virtual_segment_num]->segmentid = j;
+							rel_file_vector[i + k * assignment_context.virtual_segment_num]->segmentid = j;
 					}
 					localMax = numOfLocalRead[j];
 				}
@@ -2594,7 +3642,6 @@ static void change_hash_virtual_segments_order(QueryResource ** resourcePtr,
 			Segment *info = (Segment *) lfirst(lc);
 			segmentsVector[p++] = info;
 		}
-		(*resourcePtr)->segments = NIL;
 		TargetSegmentIDMap tmpidMap;
 		tmpidMap.target_segment_num = idMap.target_segment_num;
 		tmpidMap.global_IDs = (int *) palloc(
@@ -2613,8 +3660,10 @@ static void change_hash_virtual_segments_order(QueryResource ** resourcePtr,
 
 		for (p = 0; p < segmentCount; p++) {
 			segmentsVector[sfPairVector[p].segmentid]->segindex = p;
-			(*resourcePtr)->segments = lappend((*resourcePtr)->segments,
-					segmentsVector[sfPairVector[p].segmentid]);
+			/* Adjust the segment order shouldn't apply extra memory yourself
+			 * because it's not easy to find the right place to free the memory from topMemctx
+			 */
+			list_nth_replace((*resourcePtr)->segments, p, segmentsVector[sfPairVector[p].segmentid]);
 			(*idMap_ptr).global_IDs[p] =
 					tmpidMap.global_IDs[sfPairVector[p].segmentid];
 			strncpy((*idMap_ptr).hostname[p],
@@ -2634,6 +3683,425 @@ static void change_hash_virtual_segments_order(QueryResource ** resourcePtr,
 
 		MemoryContextSwitchTo(old);
 		pfree(vs2fileno);
+		pfree(rel_file_vector);
+		pfree(numOfLocalRead);
+	}
+}
+
+static void change_hash_virtual_segments_order_magma_file(QueryResource ** resourcePtr,
+    Relation_Data *rel_data,
+    Relation_Assignment_Context *assignment_context_ptr,
+    TargetSegmentIDMap* idMap_ptr) {
+
+  assert(rel_data->type == DATALOCALITY_MAGMA);
+  ListCell *lc_file;
+
+  if (debug_print_split_alloc_result) {
+    elog(LOG, "change virtual segments order");
+  }
+  Relation_Assignment_Context assignment_context = *assignment_context_ptr;
+  //ListCell *lc_file;
+  int fileCount = list_length(rel_data->files);
+
+  TargetSegmentIDMap idMap = *idMap_ptr;
+
+  // empty table may have zero filecount
+  if (fileCount > 0) {
+    Relation_File** rel_file_vector = (Relation_File**) palloc(
+        sizeof(Relation_File*) * fileCount);
+    int i = 0;
+    foreach(lc_file, rel_data->files)
+    {
+      rel_file_vector[i++] = (Relation_File *) lfirst(lc_file);
+    }
+    qsort(rel_file_vector, fileCount, sizeof(Relation_File*),
+        compare_file_segno);
+    // fileCount = assignment_context.virtual_segment_num * const value
+    // when there is parallel insert, const value can be greater than 1
+
+    if (fileCount != assignment_context.virtual_segment_num) {
+      int* numOfLocalRead = (int *) palloc(sizeof(int) * assignment_context.virtual_segment_num);
+      int* numOfFile2Vseg = (int *) palloc(sizeof(int) * assignment_context.virtual_segment_num);
+      for (int j = 0; j < assignment_context.virtual_segment_num; j++) {
+        numOfFile2Vseg[j] = 0;
+      }
+      // assign files to the virtual segments with max local read. one file group to one virtual segment
+      // file group is files with the same module value to virtual_segment_num
+      ListCell* lc;
+
+      // when it is magma table, the file count may be not mutiple of virtual_segment_num,
+      // need to skip the assignment of file which not exist.
+      for (i = 0; i < fileCount; i++) {
+        for (int j = 0; j < assignment_context.virtual_segment_num; j++) {
+          numOfLocalRead[j] = 0;
+        }
+
+        for (int k=0;k<rel_file_vector[i]->block_num;k++){
+          Block_Host_Index *hostID = rel_file_vector[i]->hostIDs + k;
+          for (int l = 0; l < hostID->replica_num; l++) {
+            uint32_t key = hostID->hostIndex[l];
+            PAIR pair = getHASHTABLENode(assignment_context_ptr->vseg_to_splits_map,TYPCONVERT(void *,key));
+            if( pair == NULL)
+            {
+              continue;
+            }
+            List* val = (List*)(pair->Value);
+            foreach(lc, val)
+            {
+              int j = lfirst_int(lc);
+              numOfLocalRead[j] += 1;
+            }
+          }
+        }
+
+        // assign file to the vseg with max datalocality and least file to process
+        int localMax = -1;
+        List *MaxLocalVseg = NIL;
+        for (int j = 0; j < assignment_context.virtual_segment_num; j++) {
+          if (numOfLocalRead[j] > localMax) {
+            localMax = numOfLocalRead[j];
+          }
+        }
+        int *vsegNo;
+        for (int j = 0; j < assignment_context.virtual_segment_num; j++) {
+          if (numOfLocalRead[j] == localMax) {
+            vsegNo = palloc(sizeof(int));
+            *vsegNo = j;
+            MaxLocalVseg = lappend(MaxLocalVseg, (void *)vsegNo);
+          }
+        }
+        ListCell *vseg;
+        int LeastFileNum = MAX_INT32;
+        int LeastFileNumVsegIndex = -1;
+        foreach(vseg, MaxLocalVseg) {
+          int *v = (int *) lfirst(vseg);
+          if (numOfFile2Vseg[*v] < LeastFileNum) {
+            LeastFileNumVsegIndex = *v;
+            LeastFileNum = numOfFile2Vseg[*v];
+          }
+        }
+        rel_file_vector[i]->segmentid = LeastFileNumVsegIndex;
+        numOfFile2Vseg[LeastFileNumVsegIndex] += 1;
+
+        // after assign file to each vseg,
+        if (debug_print_split_alloc_result) {
+          elog(LOG, "hash file segno %d 's max locality is %d",rel_file_vector[i]->segno,rel_file_vector[i]->segmentid);
+        }
+      }
+      pfree(numOfLocalRead);
+      pfree(numOfFile2Vseg);
+    } else {
+      (*resourcePtr)->vsegChangedMagma = true;
+      int* numOfLocalRead = (int *) palloc(sizeof(int) * assignment_context.virtual_segment_num);
+      int *vs2fileno = (int *) palloc(
+          sizeof(int) * assignment_context.virtual_segment_num);
+      for (int i = 0; i < assignment_context.virtual_segment_num; i++) {
+        vs2fileno[i] = -1;
+      }
+
+      for (i = 0; i < assignment_context.virtual_segment_num; i++) {
+
+        for (int j = 0; j < assignment_context.virtual_segment_num; j++) {
+          numOfLocalRead[j] = 0;
+        }
+
+        ListCell *lc = NULL;
+        for(int k=0;k<rel_file_vector[i]->block_num;k++){
+          Block_Host_Index *hostID = rel_file_vector[i]->hostIDs + k;
+          for (int l = 0; l < hostID->replica_num; l++) {
+            uint32_t key = hostID->hostIndex[l];
+            PAIR pair = getHASHTABLENode(assignment_context_ptr->vseg_to_splits_map,TYPCONVERT(void *,key));
+            if( pair == NULL)
+            {
+              continue;
+            }
+            List* val = (List*)(pair->Value);
+            foreach(lc, val)
+            {
+              int j = lfirst_int(lc);
+              if (vs2fileno[j] == -1) {
+                numOfLocalRead[j] = numOfLocalRead[j] + 1;
+              }
+            }
+          }
+        }
+        int localMax = -1;
+        for (int j = 0; j < assignment_context.virtual_segment_num; j++) {
+          if (numOfLocalRead[j] > localMax && vs2fileno[j] == -1) {
+            // assign file group to the same host(container) index.
+            rel_file_vector[i]->segmentid = j;
+            localMax = numOfLocalRead[j];
+          }
+        }
+        if (debug_print_split_alloc_result) {
+          elog(LOG, "hash file segno %d 's max locality is %d",rel_file_vector[i]->segno,rel_file_vector[i]->segmentid);
+        }
+        vs2fileno[rel_file_vector[i]->segmentid] = rel_file_vector[i]->segno;
+      }
+      int segmentCount = assignment_context.virtual_segment_num;
+
+      MemoryContext old = MemoryContextSwitchTo(TopMemoryContext);
+
+      for (i = 0; i < fileCount; i++) {
+          vs2fileno[rel_file_vector[i]->segmentid] = rel_file_vector[i]->segno;
+      }
+      segmentFilenoPair* sfPairVector = (segmentFilenoPair *) palloc(
+          sizeof(segmentFilenoPair) * segmentCount);
+      int p = 0;
+      for (p = 0; p < segmentCount; p++) {
+        sfPairVector[p].segmentid = p;
+        sfPairVector[p].fileno = vs2fileno[p];
+      }
+      qsort(sfPairVector, segmentCount, sizeof(segmentFilenoPair),
+          compare_container_segment);
+      Segment** segmentsVector = (Segment **) palloc(
+          sizeof(Segment*) * segmentCount);
+      p = 0;
+      ListCell* lc;
+      foreach (lc, (*resourcePtr)->segments)
+      {
+        Segment *info = (Segment *) lfirst(lc);
+        segmentsVector[p++] = info;
+      }
+      TargetSegmentIDMap tmpidMap;
+      tmpidMap.target_segment_num = idMap.target_segment_num;
+      tmpidMap.global_IDs = (int *) palloc(
+          sizeof(int) * tmpidMap.target_segment_num);
+      tmpidMap.hostname = (char **) palloc(
+          sizeof(char*) * tmpidMap.target_segment_num);
+      for (int l = 0; l < tmpidMap.target_segment_num; l++) {
+        tmpidMap.hostname[l] = (char *) palloc(
+            sizeof(char) * HOSTNAME_MAX_LENGTH);
+      }
+
+      for (int l = 0; l < tmpidMap.target_segment_num; l++) {
+        tmpidMap.global_IDs[l] = idMap.global_IDs[l];
+        strncpy(tmpidMap.hostname[l], idMap.hostname[l], HOSTNAME_MAX_LENGTH - 1);
+      }
+
+      for (p = 0; p < segmentCount; p++) {
+        segmentsVector[sfPairVector[p].segmentid]->segindex = p;
+        /* Adjust the segment order shouldn't apply extra memory yourself
+         * because it's not easy to find the right place to free the memory from topMemctx
+         */
+        list_nth_replace((*resourcePtr)->segments, p, segmentsVector[sfPairVector[p].segmentid]);
+        (*idMap_ptr).global_IDs[p] =
+            tmpidMap.global_IDs[sfPairVector[p].segmentid];
+        strncpy((*idMap_ptr).hostname[p],
+            tmpidMap.hostname[sfPairVector[p].segmentid],
+            HOSTNAME_MAX_LENGTH-1);
+        if (debug_print_split_alloc_result) {
+          elog(LOG, "virtual segment No%d 's name is %s.",p, (*idMap_ptr).hostname[p]);
+        }
+      }
+      pfree(tmpidMap.global_IDs);
+      for (int l = 0; l < tmpidMap.target_segment_num; l++) {
+        pfree(tmpidMap.hostname[l]);
+      }
+      pfree(tmpidMap.hostname);
+      pfree(sfPairVector);
+      pfree(segmentsVector);
+      MemoryContextSwitchTo(old);
+      pfree(numOfLocalRead);
+      pfree(vs2fileno);
+    }
+    pfree(rel_file_vector);
+  }
+}
+
+static void change_hash_virtual_segments_order_orc_file(QueryResource ** resourcePtr,
+		Relation_Data *rel_data,
+		Relation_Assignment_Context *assignment_context_ptr,
+		TargetSegmentIDMap* idMap_ptr) {
+
+	// first we check if datalocality is one without changing vseg order
+	ListCell *lc_file;
+	bool datalocalityEqualsOne = true;
+	foreach(lc_file, rel_data->files)
+	{
+		Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
+		for (int i = 0; i < rel_file->split_num; i++) {
+			int targethost = (rel_file->segno - 1)
+					% ((*assignment_context_ptr).virtual_segment_num);
+			for (int p = 0; p < rel_file->block_num; p++) {
+				bool islocal = false;
+				Block_Host_Index *hostID = rel_file->hostIDs + p;
+				for (int l = 0; l < hostID->replica_num; l++) {
+					if (hostID->hostIndex[l] == (*idMap_ptr).global_IDs[targethost]) {
+						islocal = true;
+						break;
+					}
+				}
+				if (!islocal) {
+					datalocalityEqualsOne = false;
+				}
+			}
+		}
+	}
+	if(datalocalityEqualsOne){
+		if (debug_print_split_alloc_result) {
+			elog(LOG, "didn't change virtual segments order");
+		}
+		return;
+	}
+
+	if (debug_print_split_alloc_result) {
+		elog(LOG, "change virtual segments order");
+	}
+	TargetSegmentIDMap idMap = *idMap_ptr;
+	Relation_Assignment_Context assignment_context = *assignment_context_ptr;
+	//ListCell *lc_file;
+	int fileCount = list_length(rel_data->files);
+
+	// empty table may have zero filecount
+	if (fileCount > 0) {
+		int *vs2fileno = (int *) palloc0(
+				sizeof(int) * assignment_context.virtual_segment_num);
+		for (int i = 0; i < assignment_context.virtual_segment_num; i++) {
+			vs2fileno[i] = -1;
+		}
+		Relation_File** rel_file_vector = (Relation_File**) palloc0(
+				sizeof(Relation_File*) * fileCount);
+		int i = 0;
+		foreach(lc_file, rel_data->files)
+		{
+			rel_file_vector[i++] = (Relation_File *) lfirst(lc_file);
+		}
+		qsort(rel_file_vector, fileCount, sizeof(Relation_File*),
+				compare_file_segno);
+
+		int segmentCount = assignment_context.virtual_segment_num;
+		int activeSegCount = 0;
+		bool *segmentHasFiles = (bool *) palloc0(sizeof(bool) * segmentCount);
+		int *filesPerSegment = (int *) palloc0(sizeof(int) * segmentCount);
+
+		for (i = 0; i < rel_data->files->length; i++)
+		{
+			if (!segmentHasFiles[rel_file_vector[i]->segno - 1])
+			{
+				activeSegCount++;
+				segmentHasFiles[rel_file_vector[i]->segno - 1] = true;
+			}
+			filesPerSegment[activeSegCount - 1]++;
+		}
+
+		int* numOfLocalRead = (int *) palloc0(sizeof(int) * segmentCount);
+		// assign files to the virtual segments with max local read. one file group to one virtual segment
+		// file group is files with the same module value to virtual_segment_num
+		ListCell* lc;
+		int fileNo = 0;
+		for (i = 0; i < activeSegCount; i++) {
+			int largestFileIndex = i;
+			int maxLogicLen = -1;
+			for (int j = 0; j < filesPerSegment[i]; j++)
+			{
+				if (rel_file_vector[fileNo + j]->logic_len > maxLogicLen)
+				{
+					largestFileIndex = fileNo + j;
+					maxLogicLen = rel_file_vector[fileNo + j]->logic_len;
+				}
+			}
+			for (int j = 0; j < activeSegCount; j++) {
+				numOfLocalRead[j] = 0;
+			}
+
+			for(int k=0;k<rel_file_vector[largestFileIndex]->block_num;k++){
+				Block_Host_Index *hostID = rel_file_vector[largestFileIndex]->hostIDs + k;
+				for (int l = 0; l < hostID->replica_num; l++) {
+					uint32_t key = hostID->hostIndex[l];
+					PAIR pair = getHASHTABLENode(assignment_context_ptr->vseg_to_splits_map,TYPCONVERT(void *,key));
+					if( pair == NULL)
+					{
+						continue;
+					}
+					List* val = (List*)(pair->Value);
+					foreach(lc, val)
+					{
+						int j = lfirst_int(lc);
+						if (vs2fileno[j] == -1) {
+							numOfLocalRead[j] = numOfLocalRead[j] + 1;
+						}
+					}
+				}
+			}
+			int localMax = -1;
+			for (int j = 0; j < activeSegCount; j++) {
+				if (numOfLocalRead[j] > localMax && vs2fileno[j] == -1) {
+					// assign file group to the same host(container) index.
+					for (int k = 0; k < filesPerSegment[i]; k++) {
+						rel_file_vector[fileNo + k]->segmentid = j;
+					}
+					localMax = numOfLocalRead[j];
+				}
+			}
+			if (debug_print_split_alloc_result) {
+				elog(LOG, "hash file segno %d 's max locality is %d",rel_file_vector[i]->segno,rel_file_vector[i]->segmentid);
+			}
+			vs2fileno[rel_file_vector[i]->segmentid] = rel_file_vector[i]->segno;
+			fileNo += filesPerSegment[i];
+		}
+		MemoryContext old = MemoryContextSwitchTo(TopMemoryContext);
+
+		segmentFilenoPair* sfPairVector = (segmentFilenoPair *) palloc0(
+				sizeof(segmentFilenoPair) * segmentCount);
+		int p = 0;
+		for (p = 0; p < segmentCount; p++) {
+			sfPairVector[p].segmentid = p;
+			sfPairVector[p].fileno = vs2fileno[p];
+		}
+		qsort(sfPairVector, segmentCount, sizeof(segmentFilenoPair),
+				compare_container_segment);
+		Segment** segmentsVector = (Segment **) palloc0(
+				sizeof(Segment*) * segmentCount);
+		p = 0;
+		foreach (lc, (*resourcePtr)->segments)
+		{
+			Segment *info = (Segment *) lfirst(lc);
+			segmentsVector[p++] = info;
+		}
+		TargetSegmentIDMap tmpidMap;
+		tmpidMap.target_segment_num = idMap.target_segment_num;
+		tmpidMap.global_IDs = (int *) palloc0(
+				sizeof(int) * tmpidMap.target_segment_num);
+		tmpidMap.hostname = (char **) palloc0(
+				sizeof(char*) * tmpidMap.target_segment_num);
+		for (int l = 0; l < tmpidMap.target_segment_num; l++) {
+			tmpidMap.hostname[l] = (char *) palloc0(
+					sizeof(char) * HOSTNAME_MAX_LENGTH);
+		}
+
+		for (int l = 0; l < tmpidMap.target_segment_num; l++) {
+			tmpidMap.global_IDs[l] = idMap.global_IDs[l];
+			strncpy(tmpidMap.hostname[l], idMap.hostname[l], HOSTNAME_MAX_LENGTH - 1);
+		}
+
+		for (p = 0; p < segmentCount; p++) {
+			segmentsVector[sfPairVector[p].segmentid]->segindex = p;
+			/* Adjust the segment order shouldn't apply extra memory yourself
+			 * because it's not easy to find the right place to free the memory from topMemctx
+			 */
+			list_nth_replace((*resourcePtr)->segments, p, segmentsVector[sfPairVector[p].segmentid]);
+			(*idMap_ptr).global_IDs[p] =
+					tmpidMap.global_IDs[sfPairVector[p].segmentid];
+			strncpy((*idMap_ptr).hostname[p],
+					tmpidMap.hostname[sfPairVector[p].segmentid],
+					HOSTNAME_MAX_LENGTH-1);
+			if (debug_print_split_alloc_result) {
+				elog(LOG, "virtual segment No%d 's name is %s.",p, (*idMap_ptr).hostname[p]);
+			}
+		}
+		pfree(tmpidMap.global_IDs);
+		for (int l = 0; l < tmpidMap.target_segment_num; l++) {
+			pfree(tmpidMap.hostname[l]);
+		}
+		pfree(tmpidMap.hostname);
+		pfree(sfPairVector);
+		pfree(segmentsVector);
+
+		MemoryContextSwitchTo(old);
+		pfree(vs2fileno);
+		pfree(segmentHasFiles);
+		pfree(filesPerSegment);
 		pfree(rel_file_vector);
 		pfree(numOfLocalRead);
 	}
@@ -2904,34 +4372,47 @@ static bool allocate_hash_relation(Relation_Data* rel_data,
 	uint64_t before_allocate_hash = gettime_microsec();
 	foreach(lc_file, rel_data->files)
 	{
-			fileCount++;
-			Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
-			for (int i = 0; i < rel_file->split_num; i++) {
-				int64 split_size = rel_file->splits[i].length;
-				int targethost = (rel_file->segno - 1) % (assignment_context->virtual_segment_num);
-				/*calculate keephash datalocality*/
-				/*for keep hash one file corresponds to one split*/
-				for (int p = 0; p < rel_file->block_num; p++) {
-					bool islocal = false;
-					Block_Host_Index *hostID = rel_file->hostIDs + p;
-					for (int l = 0; l < hostID->replica_num; l++) {
-						if (debug_print_split_alloc_result) {
-							elog(LOG, "file id is %d; vd id is %d",hostID->hostIndex[l],idMap->global_IDs[targethost]);
-						}
-						if (hostID->hostIndex[l] == idMap->global_IDs[targethost]) {
-							log_context->localDataSizePerRelation +=
-									rel_file->locations[p].length;
-							islocal = true;
-							break;
-						}
-					}
-					if (debug_print_split_alloc_result && !islocal) {
-						elog(LOG, "non local relation %u, file: %d, block: %d",myrelid,rel_file->segno,p);
-					}
+		fileCount++;
+		Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
+		int split_num = rel_file->split_num;
+		/*calculate keephash datalocality*/
+		/*for keep hash one file corresponds to one split*/
+		for (int i = 0; i < rel_file->block_num; i++) {
+			/*
+			 * traverse each block, calculate total data size of relation and data
+			 * size which are processed locally.
+			 */
+			int64 split_size = rel_file->locations[i].length;
+			int targethost = (rel_file->segno - 1) % (assignment_context->virtual_segment_num);
+			bool islocal = false;
+			Block_Host_Index *hostID = rel_file->hostIDs + i;
+			for (int l = 0; l < hostID->replica_num; l++) {
+				/*
+				 * traverse each replica of one block. If there is one replica processed by
+				 * virtual segment which is on the same host with it, the block is processed locally.
+				 */
+				if (debug_print_split_alloc_result) {
+					elog(LOG, "file id is %d; vd id is %d",hostID->hostIndex[l],idMap->global_IDs[targethost]);
 				}
-				log_context->totalDataSizePerRelation += split_size;
+				if (hostID->hostIndex[l] == idMap->global_IDs[targethost]) {
+					/*
+					 * for hash relation, blocks are assigned to virtual segment which
+					 * index (targethost) is calculated by segno and virtual segment number.
+					 */
+					log_context->localDataSizePerRelation +=
+							rel_file->locations[i].length;
+					islocal = true;
+					break;
+				}
 			}
+			if (debug_print_split_alloc_result && !islocal) {
+				elog(LOG, "non local relation %u, file: %d, block: %d",myrelid,rel_file->segno,i);
+			}
+			log_context->totalDataSizePerRelation += split_size;
+		}
 	}
+	/* ao table merged all the splits to one in hash distribution, magma table don't merge because
+	 range is correspond to hash value and the range and RG map is stored in each split*/
 	uint64_t after_allocate_hash = gettime_microsec();
 	int time_allocate_hash_firstfor = after_allocate_hash - before_allocate_hash;
 
@@ -2984,6 +4465,109 @@ static bool allocate_hash_relation(Relation_Data* rel_data,
 		fprintf(fp, "The time of allocate hash relation is : %d us.\n", time_allocate_second_for);
 	}
 	return false;
+}
+static void allocate_hash_relation_for_magma_file(Relation_Data* rel_data,
+		Assignment_Log_Context* log_context, TargetSegmentIDMap* idMap,
+		Relation_Assignment_Context* assignment_context,
+		split_to_segment_mapping_context *context, bool parentIsHashExist, bool parentIsHash) {
+	/*allocation unit in hash relation is file, we assign all the blocks of one file to one virtual segments*/
+	ListCell *lc_file;
+	int fileCount = 0;
+	Oid myrelid = rel_data->relid;
+	double relationDatalocality=1.0;
+
+	assert(rel_data->type == DATALOCALITY_MAGMA);
+	uint64_t before_allocate_hash = gettime_microsec();
+	int numoflocal = 0;
+	fileCount = rel_data->files ? rel_data->files->length : 0;
+	elog(DEBUG3,"before caculate datalocality, the localDataSizePerRelation is %d,"
+			"total is %d", log_context->localDataSizePerRelation, log_context->totalDataSizePerRelation);
+	foreach(lc_file, rel_data->files)
+	{
+		Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
+
+		int targethost = fileCount == idMap->target_segment_num ? (rel_file->segno - 1) : rel_file->segmentid;
+		elog(DEBUG3,"the block number of this file %d is %d", rel_file->segno, rel_file->block_num);
+		/*calculate keephash datalocality*/
+
+		/*for keep hash one file corresponds to one split*/
+		for (int p = 0; p < rel_file->block_num; p++)
+		{
+			bool islocal = false;
+			Block_Host_Index *hostID = rel_file->hostIDs + p;
+			for (int l = 0; l < hostID->replica_num; l++)
+			{
+				if (debug_print_split_alloc_result)
+				{
+					elog(LOG, "file id is %d; vd id is %d",hostID->hostIndex[l],
+							idMap->global_IDs[targethost]);
+				}
+				if (hostID->hostIndex[l] == idMap->global_IDs[targethost])
+				{
+					log_context->localDataSizePerRelation +=
+							rel_file->locations[p].length;
+					numoflocal++;
+					islocal = true;
+					break;
+				}
+			}
+			if (debug_print_split_alloc_result && !islocal)
+			{
+				elog(LOG, "non local relation %u, file: %d, block: %d",myrelid,
+						rel_file->segno,p);
+			}
+			log_context->totalDataSizePerRelation += rel_file->locations[p].length;
+		}
+	}
+	/* ao table merged all the splits to one in hash distribution, magma table don't merge because
+	 range is correspond to hash value and the range and RG map is stored in each split*/
+	uint64_t after_allocate_hash = gettime_microsec();
+	int time_allocate_hash_firstfor = after_allocate_hash - before_allocate_hash;
+
+	elog(LOG,"after caculate datalocality, the localDataSizePerRelation is %d,"
+				"total is %d,the relationDatalocality is %d, num of local block is %d",
+				log_context->localDataSizePerRelation, log_context->totalDataSizePerRelation,
+				log_context->totalDataSizePerRelation == 0 ? 0 :
+				    (log_context->localDataSizePerRelation / log_context->totalDataSizePerRelation),
+				numoflocal);
+	if(log_context->totalDataSizePerRelation > 0)
+	{
+			relationDatalocality = log_context->localDataSizePerRelation / log_context->totalDataSizePerRelation;
+	}
+	// the datalocality ratio in magma table must be One.
+	/*if (relationDatalocality != 1.0) {
+		elog(ERROR,"datalocality of magma table %d is %f , not equal to One.",
+				rel_data->relid, relationDatalocality);
+	};*/
+	double hash2RandomDatalocalityThreshold= 0.9;
+	/*for partition hash table, whether to convert random table to hash
+	 * is determined by the datalocality of the first partition*/
+	foreach(lc_file, rel_data->files)
+	{
+		Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
+		for (int i = 0; i < rel_file->split_num; i++) {
+			int64 split_size = rel_file->splits[i].length;
+			Assert(rel_file->segno > 0);
+			int targethost = fileCount == idMap->target_segment_num ? (rel_file->segno - 1) : rel_file->segmentid;
+			rel_file->splits[i].host = targethost;
+			assignment_context->totalvols[targethost] += split_size;
+			assignment_context->split_num[targethost]++;
+			assignment_context->continue_split_num[targethost]++;
+			if (debug_print_split_alloc_result) {
+				elog(LOG, "file %d assigned to host %s",rel_file->segno,
+				idMap->hostname[targethost]);
+			}
+
+		}
+		assignment_context->total_split_num += rel_file->split_num;
+	}
+	uint64_t after_assigned_time = gettime_microsec();
+	int time_allocate_second_for = after_assigned_time - before_allocate_hash;
+	if( debug_fake_datalocality ){
+		fprintf(fp, "The time of allocate hash relation first for is : %d us.\n", time_allocate_hash_firstfor);
+		fprintf(fp, "The time of allocate hash relation is : %d us.\n", time_allocate_second_for);
+	}
+	return;
 }
 
 static void allocate_random_relation(Relation_Data* rel_data,
@@ -3268,7 +4852,7 @@ static void allocate_random_relation(Relation_Data* rel_data,
 						}
 						rel_file->splits[r].host = assignedVSeg;
 						if (debug_print_split_alloc_result) {
-							elog(LOG, "local2 split %d offset "INT64_FORMAT" of file %d is assigned to host %d",r,rel_file->splits[r].offset, rel_file->segno,assignedVSeg);
+//							elog(LOG, "local2 split %d offset "INT64_FORMAT" of file %d is assigned to host %d",r,rel_file->splits[r].offset, rel_file->segno,assignedVSeg);
 						}
 						log_context->localDataSizePerRelation += rel_file->splits[r].length;
 						assignment_context->split_num[assignedVSeg]++;
@@ -3523,9 +5107,9 @@ static void allocate_random_relation(Relation_Data* rel_data,
 			if (totalMinvsSizePenalty > assignment_context->totalvols_with_penalty[j]) {
 				totalMinvsSizePenalty = assignment_context->totalvols_with_penalty[j];
 			}
-			elog(LOG, "size with penalty of vs%d is "INT64_FORMAT"",j, assignment_context->vols[j]);
-			elog(LOG, "total size of vs%d is "INT64_FORMAT"",j, assignment_context->totalvols[j]);
-			elog(LOG, "total size with penalty of vs%d is "INT64_FORMAT"",j, assignment_context->totalvols_with_penalty[j]);
+//			elog(LOG, "size with penalty of vs%d is "INT64_FORMAT"",j, assignment_context->vols[j]);
+//			elog(LOG, "total size of vs%d is "INT64_FORMAT"",j, assignment_context->totalvols[j]);
+//			elog(LOG, "total size with penalty of vs%d is "INT64_FORMAT"",j, assignment_context->totalvols_with_penalty[j]);
 		}
 		elog(LOG, "avg,max,min volume of segments are"
 		" %f,"INT64_FORMAT","INT64_FORMAT" for relation %u.",
@@ -3836,8 +5420,12 @@ static void caculate_per_relation_data_locality_result(Relation_Data* rel_data,
 			(double) log_context->localDataSizePerRelation;
 	if (debug_print_split_alloc_result) {
 		elog(
-				LOG, "datalocality relation:%u relation ratio: %f with %d virtual segments",
-				rel_data->relid,datalocalityRatioPerRelation,assignment_context->virtual_segment_num);
+				LOG, "datalocality relation:%u relation ratio: %f with "
+				INT64_FORMAT" local, "INT64_FORMAT" total, %d virtual segments",
+				rel_data->relid,datalocalityRatioPerRelation,
+				log_context->localDataSizePerRelation,
+				log_context->totalDataSizePerRelation,
+				assignment_context->virtual_segment_num);
 	}
 	if (debug_fake_datalocality) {
 		fprintf(fp, "datalocality relation %u ratio is:%f \n", rel_data->relid,
@@ -3853,6 +5441,7 @@ static void combine_all_splits(Detailed_File_Split **splits,
 		Relation_Assignment_Context* assignment_context, TargetSegmentIDMap* idMap,
 		Assignment_Log_Context* log_context,
 		split_to_segment_mapping_context* context) {
+
 	ListCell *lc;
 	*splits = (Detailed_File_Split *) palloc(
 			sizeof(Detailed_File_Split) * assignment_context->total_split_num);
@@ -3877,8 +5466,8 @@ static void combine_all_splits(Detailed_File_Split **splits,
 			Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
 
 			for (int i = 0; i < rel_file->split_num; i++) {
+				char *p = NULL;
 				/* fake data locality */
-			  char *p = NULL;
 				if (debug_fake_datalocality) {
 					bool isLocalRead = false;
 					int localCount = 0;
@@ -3947,16 +5536,19 @@ static void combine_all_splits(Detailed_File_Split **splits,
 				if ((*splits)[total_split_index].host == -1) {
 					(*splits)[total_split_index].host = 0;
 				}
+				(*splits)[total_split_index].range_id = rel_file->splits[i].range_id;
+				(*splits)[total_split_index].replicaGroup_id = rel_file->splits[i].replicaGroup_id;
 				(*splits)[total_split_index].offset = rel_file->splits[i].offset;
 				(*splits)[total_split_index].length = rel_file->splits[i].length;
 				(*splits)[total_split_index].logiceof = rel_file->logic_len;
-        p = rel_file->splits[i].ext_file_uri;
-        (*splits)[total_split_index].ext_file_uri_string = p ? pstrdup(p) : (char *) NULL;
+				p = rel_file->splits[i].ext_file_uri;
+				(*splits)[total_split_index].ext_file_uri_string = p ? pstrdup(p) : (char *) NULL;
 				total_split_index++;
 				splitTotalLength += rel_file->splits[i].length;
 			}
 		}
 	}
+
 	if(context->total_metadata_logic_len != splitTotalLength){
 		elog(ERROR, "total split length does not equal to metadata total logic length!");
 	}
@@ -3985,7 +5577,6 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 
 	/*before assign splits to virtual segments, we index virtual segments in different hosts to different hash value*/
 	allocation_preparation(virtual_segments, &idMap, &assignment_context, context);
-
 
 	log_context.totalDataSize = 0.0;
 	log_context.datalocalityRatio = 0.0;
@@ -4118,52 +5709,64 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		 * in this case, we set isRelationHash=false when relation is random.
 		 */
 		Oid myrelid = rel_data->relid;
+		bool isMagmaHashTable = rel_data->type == DATALOCALITY_MAGMA;
+
 		GpPolicy *targetPolicy = NULL;
 		targetPolicy = GpPolicyFetch(CurrentMemoryContext, myrelid);
 		bool isRelationHash = is_relation_hash(targetPolicy);
 
 		int fileCountInRelation = list_length(rel_data->files);
 		bool FileCountBucketNumMismatch = false;
+		bool isDataStoredInHdfs = false;
 		if (targetPolicy->bucketnum > 0) {
-			Relation rel = heap_open(rel_data->relid, NoLock);
-			targetPolicy->bucketnum == 0 ? false : true;
-			if (!RelationIsExternal(rel))
-			{
-				FileCountBucketNumMismatch = fileCountInRelation %
-						targetPolicy->bucketnum == 0 ? false : true;
-			}
-			else
-			{
-				ListCell *lc_file;
-				int maxsegno = 0;
-				foreach(lc_file, rel_data->files)
-				{
-					Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
-					if (rel_file->segno > maxsegno)
-						maxsegno = rel_file->segno;
-				}
-				FileCountBucketNumMismatch =
-				maxsegno > targetPolicy->bucketnum ? true : false;
-			}
-			heap_close(rel, NoLock);
+		  Relation rel = heap_open(rel_data->relid, NoLock);
+		  if (!RelationIsExternal(rel)) {
+		    FileCountBucketNumMismatch = fileCountInRelation %
+		      targetPolicy->bucketnum == 0 ? false : true;
+      } else {
+        // TODO(Zongtian): no mismatch in magma table
+        ListCell *lc_file;
+        int maxsegno = 0;
+        isDataStoredInHdfs = dataStoredInHdfs(rel);
+        foreach (lc_file, rel_data->files) {
+          Relation_File *rel_file =
+              (Relation_File *)lfirst(lc_file);
+          if (rel_file->segno > maxsegno)
+            maxsegno = rel_file->segno;
+        }
+        FileCountBucketNumMismatch =
+            maxsegno > targetPolicy->bucketnum ? true : false;
+      }
+      heap_close(rel, NoLock);
 		}
 		if (isRelationHash && FileCountBucketNumMismatch && !allow_file_count_bucket_num_mismatch) {
-			elog(ERROR, "file count %d in catalog is not in proportion to the bucket "
-				"number %d of hash table with oid=%u, some data may be lost, if you "
-				"still want to continue the query by considering the table as random, set GUC "
-				"allow_file_count_bucket_num_mismatch to on and try again.",
-				fileCountInRelation, targetPolicy->bucketnum, myrelid);
+		  elog(ERROR, "file count %d in catalog is not in proportion to the bucket "
+		      "number %d of hash table with oid=%u, some data may be lost, if you "
+		      "still want to continue the query by considering the table as random, set GUC "
+		      "allow_file_count_bucket_num_mismatch to on and try again.",
+		      fileCountInRelation, targetPolicy->bucketnum, myrelid);
 		}
 		/* change the virtual segment order when keep hash.
 		 * order of idMap should also be changed.
 		 * if file count of the table is not equal to or multiple of
 		 * bucket number, we should process it as random table.
 		 */
+		/*each magma table need to change the vseg order, if the orc
+		 * hash table conflict with magma, turn it to random*/
+
 		if (isRelationHash && context->keep_hash
-				&& assignment_context.virtual_segment_num == targetPolicy->bucketnum
-				&& !vSegOrderChanged && !FileCountBucketNumMismatch) {
-			change_hash_virtual_segments_order(resourcePtr, rel_data,
-					&assignment_context, &idMap);
+				&& (assignment_context.virtual_segment_num == targetPolicy->bucketnum || isMagmaHashTable)
+				&& (!vSegOrderChanged || isMagmaHashTable)  && (!((*resourcePtr)->vsegChangedMagma)) && !FileCountBucketNumMismatch) {
+			if (isDataStoredInHdfs) {
+				change_hash_virtual_segments_order_orc_file(resourcePtr,
+						rel_data, &assignment_context, &idMap);
+			} else if (isMagmaHashTable){
+				change_hash_virtual_segments_order_magma_file(resourcePtr,
+						rel_data, &assignment_context, &idMap);
+			} else{
+				change_hash_virtual_segments_order(resourcePtr, rel_data,
+						&assignment_context, &idMap);
+			}
 			for (int p = 0; p < idMap.target_segment_num; p++) {
 				if (debug_fake_datalocality) {
 					fprintf(fp, "After resort virtual segment No%d: %s\n", p,
@@ -4191,8 +5794,29 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 		   * if file count of the table is not equal to or multiple of
 		   * bucket number, we should process it as random table.
 		   */
+		  bool keepRelationHash =false;
+		  if (!isMagmaHashTable) {
+		    /* when magma table exist, use bucket number, virtual segment number and range number to
+		     * determine whether no magma table should keep as hash table. Otherwise, use bucket number
+		     * and virtual segment number to determine.
+		     * TODO(zongtian): should set no magma table to hash when bucket number equals range number.*/
+			  if (context->isMagmaTableExist) {
+				  if (assignment_context.virtual_segment_num== targetPolicy->bucketnum &&
+						  targetPolicy->bucketnum == context->magmaRangeNum) {
+					  keepRelationHash = true;
+				  } else {
+					  keepRelationHash = false;
+				  }
+			  } else {
+				  if (assignment_context.virtual_segment_num== targetPolicy->bucketnum) {
+					  keepRelationHash = true;
+				  } else {
+					  keepRelationHash = false;
+				  }
+			  }
+		  }
 			if (context->keep_hash
-			    && assignment_context.virtual_segment_num== targetPolicy->bucketnum
+			    && (keepRelationHash || isMagmaHashTable)
 			    && !FileCountBucketNumMismatch) {
 				ListCell* parlc;
 				bool parentIsHashExist=false;
@@ -4209,8 +5833,15 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 					}
 				}
 				bool needToChangeHash2Random = false;
-				needToChangeHash2Random = allocate_hash_relation(rel_data,
-											&log_context, &idMap, &assignment_context, context, parentIsHashExist,parentIsHash);
+				if (isMagmaHashTable) {
+					allocate_hash_relation_for_magma_file(rel_data,
+							&log_context, &idMap, &assignment_context, context,
+							parentIsHashExist, parentIsHash);
+				} else {
+					needToChangeHash2Random = allocate_hash_relation(rel_data,
+							&log_context, &idMap, &assignment_context, context,
+							parentIsHashExist, parentIsHash);
+				}
 				if (!parentIsHashExist) {
 					/*for partition table, whether to convert from hash to random is determined by the first partition.
 					 * it doesn't need by planner, so it doesn't need to be in global memory context*/
@@ -4224,10 +5855,20 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 				cur_memorycontext = MemoryContextSwitchTo(context->old_memorycontext);
 				CurrentRelType* relType = (CurrentRelType *) palloc(sizeof(CurrentRelType));
 				relType->relid = rel_data->relid;
+				relType->range_num = 0;
+				if (dataStoredInMagmaByOid(relType->relid)){
+				  relType->range_num = rel_data->files->length;
+				}
 				if (needToChangeHash2Random) {
 					relType->isHash = false;
 				} else {
 					relType->isHash = true;
+				}
+				/* if this is insert command, target table is not magma table and virtual segment number is
+				 * different with range number, turn magma table to random. */
+				if (dataStoredInMagmaByOid(relType->relid) && context->isTargetNoMagma
+				    && assignment_context.virtual_segment_num != relType->range_num) {
+				  relType->isHash = false;
 				}
 				result->relsType = lappend(result->relsType, relType);
 				MemoryContextSwitchTo(cur_memorycontext);
@@ -4262,12 +5903,6 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 	print_datalocality_overall_log_information(result,virtual_segments, relationCount,
 			&log_context, &assignment_context, context);
 
-
-
-	if (relationCount > 0) {
-		pfree(rel_data_vector);
-	}
-
 	/* go through all splits again. combine all splits to Detailed_File_Split structure*/
 	Detailed_File_Split *splits =NULL;
 	combine_all_splits(&splits, &assignment_context, &idMap, &log_context,
@@ -4300,6 +5935,30 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 
 	alloc_result = post_process_assign_result(&split_assign_result);
 
+	/* set range and replica_group map for every magma relation */
+	set_magma_range_vseg_map(alloc_result, virtual_segments->length);
+
+	ListCell *relmap, *rel;
+	foreach (relmap, alloc_result)
+	{
+		SegFileSplitMapNode *splits_map = (SegFileSplitMapNode*)lfirst(relmap);
+		for (int relIndex = 0; relIndex < relationCount; relIndex++)
+		{
+			Relation_Data *rel_data = rel_data_vector[relIndex];
+			if (rel_data->relid == splits_map->relid && rel_data->serializeSchema != NULL)
+			{
+				splits_map->serializeSchema = pnstrdup(rel_data->serializeSchema,
+				                                       rel_data->serializeSchemaLen);
+				splits_map->serializeSchemaLen = rel_data->serializeSchemaLen;
+				continue;
+			}
+		}
+	}
+
+	if (relationCount > 0) {
+		pfree(rel_data_vector);
+	}
+
 	uint64_t run_datalocality = 0;
 	run_datalocality = gettime_microsec();
 	int dl_overall_time = run_datalocality - before_run_allocation;
@@ -4329,7 +5988,8 @@ static void cleanup_allocation_algorithm(
 	{
 		Relation_Data *rel_data = (Relation_Data *) lfirst(lc);
 		if ((rel_data->type == DATALOCALITY_APPENDONLY)
-				|| (rel_data->type == DATALOCALITY_PARQUET)) {
+				|| (rel_data->type == DATALOCALITY_PARQUET)
+				|| (rel_data->type == DATALOCALITY_HDFS)) {
 			ListCell *lc_file;
 			foreach(lc_file, rel_data->files)
 			{
@@ -4337,6 +5997,17 @@ static void cleanup_allocation_algorithm(
 				if (rel_file->locations != NULL) {
 					free_hdfs_data_block_location(rel_file->locations,
 							rel_file->block_num);
+				}
+			}
+		}
+		else if (rel_data->type == DATALOCALITY_MAGMA) {
+			ListCell *lc_file;
+			foreach(lc_file, rel_data->files)
+			{
+				Relation_File *rel_file = (Relation_File *) lfirst(lc_file);
+				if (rel_file->locations != NULL) {
+					free_magma_data_range_locations(rel_file->locations,
+					                                      rel_file->block_num);
 				}
 			}
 		}
@@ -4407,6 +6078,8 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 	int sliceNum = plannedstmt->nMotionNodes + plannedstmt->nInitPlans + 1;
 	split_to_segment_mapping_context context;
 	context.chsl_context.relations = NIL;
+	context.isMagmaTableExist = false;
+	context.magmaRangeNum = -1;
 
 	int planner_segments = 0; /*virtual segments number for explain statement */
 
@@ -4416,7 +6089,8 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 	result->relsType = NIL;
 	result->planner_segments = 0;
 	result->datalocalityInfo = makeStringInfo();
-    result->datalocalityTime = 0;
+	result->datalocalityTime = 0;
+	result->hiveUrl = NULL;
 
 	/* fake data locality */
 	if (debug_fake_datalocality) {
@@ -4441,8 +6115,6 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 
 		init_datalocality_context(plannedstmt, &context);
 
-		collect_range_tables(query, &(context.rtc_context));
-
 		collect_scan_rangetable(planTree, &(context.srtc_context));
 
 		bool isTableFunctionExists = false;
@@ -4461,15 +6133,15 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 
 		find_udf(query, &udf_context);
 		isTableFunctionExists = udf_context.udf_exist;
-		/*convert range table list to oid list and check whether table function exists
-		 *we keep a full range table list and a range table list without result relation separately
+
+		convert_range_tables_to_oids(
+		    &(context.srtc_context.range_tables),
+				context.datalocality_memorycontext);
+
+		/*
+		 * check whether magma table exsit in this query
 		 */
-		convert_range_tables_to_oids_and_check_table_functions(
-				&(context.rtc_context.full_range_tables), &isTableFunctionExists,
-				context.datalocality_memorycontext);
-		convert_range_tables_to_oids_and_check_table_functions(
-				&(context.rtc_context.range_tables), &isTableFunctionExists,
-				context.datalocality_memorycontext);
+		check_magma_table_exsit(context.srtc_context.range_tables, &(context.isMagmaTableExist));
 
 		/* set expected virtual segment number for hash table and external table*/
 		/* calculate hashSegNum, externTableSegNum, resultRelationHashSegNum */
@@ -4483,11 +6155,10 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 		}
 
 		/* get block location and calculate relation size*/
-		get_block_locations_and_claculte_table_size(&context);
-		if(context.chsl_context.relations){
-			Relation_Data* tmp = (Relation_Data*) lfirst(context.chsl_context.relations->tail);
+		get_block_locations_and_calculate_table_size(&context);
+		if(context.hiveUrl){
+		  result->hiveUrl = pstrdup(context.hiveUrl);
 		}
-
 		/*use inherit resource*/
 		if (resourceLife == QRL_INHERIT) {
 
@@ -4502,7 +6173,8 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 
 			if (resource != NULL) {
 				if ((context.keep_hash)
-						&& (list_length(resource->segments) != context.hashSegNum)) {
+						&& (list_length(resource->segments) != context.hashSegNum)
+						&& !context.isMagmaTableExist) {
 					context.keep_hash = false;
 				}
 			}
@@ -4754,6 +6426,8 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 
 		/* data locality allocation algorithm*/
 		alloc_result = run_allocation_algorithm(result, virtual_segments, &resource, &context);
+		fetch_magma_result_splits_from_plan(&alloc_result, plannedstmt, VirtualSegmentNumber);
+		set_magma_range_vseg_map(alloc_result, VirtualSegmentNumber);
 
 		result->resource = resource;
 		result->alloc_results = alloc_result;
@@ -4773,3 +6447,366 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 
 	return result;
 }
+
+/* set up the range to rg map for magma table by relid */
+void set_magma_range_vseg_map(List *SegFileSplitMaps, int nvseg)
+{
+  Assert(nvseg > 0);
+  if (SegFileSplitMaps == NIL) {
+    // no need to set range vseg map when there isn't magma table
+    return;
+  }
+
+  if (magma_range_vseg_maps == NULL) {
+    HASHCTL ctl;
+    ctl.keysize = sizeof(int);
+    ctl.entrysize = sizeof(range_vseg_map_data);
+    ctl.hcxt = TopMemoryContext;
+    magma_range_vseg_maps =
+        hash_create("Range and Vseg Map Hash",
+                    MAX_MAGMA_RANGE_VSEG_MAP_NUM, &ctl, HASH_ELEM);
+  }
+
+  ListCell *relCell;
+  bool found;
+  foreach (relCell, SegFileSplitMaps) {
+    SegFileSplitMapNode *splits_map = (SegFileSplitMapNode *)lfirst(relCell);
+
+    if (!dataStoredInMagmaByOid(splits_map->relid)) {
+      continue;
+    }
+
+    range_vseg_map_data *entry = (range_vseg_map_data *)hash_search(
+        magma_range_vseg_maps, &nvseg, HASH_ENTER, &found);
+    Assert(entry != NULL);
+    if (found) {
+      pfree(entry->range_vseg_map);
+    }
+
+    entry->range_num = 0;
+    ListCell *fileCell = NULL;
+    foreach (fileCell, splits_map->splits) {
+      List *file = (List *)lfirst(fileCell);
+      entry->range_num += file ? file->length : 0;
+    }
+    entry->range_vseg_map = (int *)MemoryContextAlloc(
+        TopMemoryContext, entry->range_num * sizeof(int));
+
+    int i = 0;
+    foreach (fileCell, splits_map->splits) {
+      List *file = (List *)lfirst(fileCell);
+
+      ListCell *splitCell = NULL;
+      foreach (splitCell, file) {
+        FileSplit origFS = (FileSplit)lfirst(splitCell);
+        entry->range_vseg_map[(origFS->range_id) & 0xFFFF] = i;
+      }
+      i++;
+    }
+    return;
+  }
+  /* for query without magma table, set a dummy map */
+  range_vseg_map_data *entry = (range_vseg_map_data *)hash_search(
+      magma_range_vseg_maps, &nvseg, HASH_ENTER, &found);
+  if (!found) {
+    entry->range_vseg_map = (int *)MemoryContextAlloc(
+        TopMemoryContext, nvseg * sizeof(int));
+    for (int i = 0 ; i < nvseg; i++) {
+      entry->range_vseg_map[i] = i;
+    }
+    entry->range_num = nvseg;
+  }
+  return;
+}
+
+/* find the range and vseg map for magma table by relid */
+void get_magma_range_vseg_map(int **map, int *nmap, int nvseg) {
+  bool found;
+  if (magma_range_vseg_maps == NULL) {
+    HASHCTL ctl;
+    ctl.keysize = sizeof(int);
+    ctl.entrysize = sizeof(range_vseg_map_data);
+    ctl.hcxt = TopMemoryContext;
+    magma_range_vseg_maps =
+        hash_create("Range and Vseg Map Hash",
+                    MAX_MAGMA_RANGE_VSEG_MAP_NUM, &ctl, HASH_ELEM);
+  }
+  range_vseg_map_data *entry = (range_vseg_map_data *)hash_search(
+      magma_range_vseg_maps, &nvseg, HASH_FIND, &found);
+  // XXX(hzt): direct dispatch calculate motion before allocate virtual segment, workaround here.
+  if (!found) {
+    entry = (range_vseg_map_data *)hash_search(magma_range_vseg_maps, &nvseg,
+                                               HASH_ENTER, &found);
+    entry->range_num = nvseg;
+    entry->range_vseg_map = (int *)MemoryContextAlloc(
+        TopMemoryContext, entry->range_num * sizeof(int));
+    int i;
+    for (i = 0; i < nvseg; i++) {
+      entry->range_vseg_map[i] = i;
+    }
+    entry = (range_vseg_map_data *)hash_search(magma_range_vseg_maps, &nvseg,
+                                               HASH_FIND, &found);
+  }
+  *map = found ? entry->range_vseg_map : NULL;
+  *nmap = found ? entry->range_num : 0;
+}
+
+/*get magma filesplits for insert*/
+List* get_magma_scansplits(List *all_relids)
+{
+  List *alloc_result = NIL;
+  List *virtual_segments = NIL;
+  split_to_segment_mapping_context context;
+  PlannedStmt plannedstmt;
+  QueryResource* resource = GetActiveQueryResource();
+  SplitAllocResult *result = NULL;
+  result = (SplitAllocResult *) palloc(sizeof(SplitAllocResult));
+  PG_TRY();
+  {
+    init_datalocality_memory_context();
+    init_datalocality_context(&plannedstmt, &context);
+    context.srtc_context.range_tables = all_relids;
+    result->resource = NULL;
+    result->alloc_results = NIL;
+    result->relsType = NIL;
+    result->planner_segments = 0;
+    result->datalocalityInfo = makeStringInfo();
+    result->datalocalityTime = 0;
+    get_block_locations_and_calculate_table_size(&context);
+    virtual_segments = get_virtual_segments(resource);
+    alloc_result = run_allocation_algorithm(result, virtual_segments,
+                                            &resource, &context);
+  }
+PG_CATCH();
+{
+  cleanup_allocation_algorithm(&context);
+  pfree(result);
+  PG_RE_THROW();
+}
+PG_END_TRY();
+cleanup_allocation_algorithm(&context);
+pfree(result);
+return alloc_result;
+}
+
+void fetch_magma_result_splits_from_plan(List **alloc_result, PlannedStmt* plannedstmt, int vsegNum) {
+  List *magma_oids = NIL;
+  ListCell *lc_resIndex = NULL;
+  foreach(lc_resIndex, plannedstmt->resultRelations) {
+    int OidIndex = lfirst_int(lc_resIndex) - 1;
+    RangeTblEntry *rte = list_nth(plannedstmt->rtable, OidIndex);
+    Oid relOid = rte->relid;
+    if (rel_is_partitioned(relOid)) {
+      List *all_oids = NIL;
+      all_oids = find_all_inheritors(relOid);
+      ListCell *lc_oid = NULL;
+      foreach (lc_oid, all_oids) {
+        Oid rel_oid = lfirst_oid(lc_oid);
+        if (dataStoredInMagmaByOid(rel_oid)) {
+          magma_oids = lappend_oid(magma_oids, rel_oid);
+        }
+      }
+    } else if (dataStoredInMagmaByOid(relOid)) {
+      magma_oids = lappend_oid(magma_oids, relOid);
+    }
+  }
+
+  ListCell *relmap = NULL;
+  foreach (relmap, *alloc_result) {
+    SegFileSplitMapNode *splits_map =
+        (SegFileSplitMapNode *)lfirst(relmap);
+    Oid relOid = splits_map->relid;
+    if (list_member_oid(magma_oids, relOid)) {
+      magma_oids = list_delete_oid(magma_oids, relOid);
+    }
+  }
+
+  // build scansplits for magma result relation
+  if (magma_oids) {
+    build_magma_scansplits_for_result_relations(alloc_result, magma_oids,
+                                                vsegNum);
+  }
+}
+/*get magma filesplits for insert*/
+void build_magma_scansplits_for_result_relations(List **alloc_result, List *relOids, int vsegNum)
+{
+  bool found = false;
+  List *scansplits = NIL;
+  Oid procOid = InvalidOid;
+  procOid = LookupCustomProtocolBlockLocationFunc("magma");
+
+  if (!OidIsValid(procOid)) {
+    elog(ERROR, "failed to find data locality function for magma");
+  }
+
+  QueryResource* resource = GetActiveQueryResource();
+
+  if (magma_range_vseg_maps == NULL) {
+    HASHCTL ctl;
+    ctl.keysize = sizeof(int);
+    ctl.entrysize = sizeof(range_vseg_map_data);
+    ctl.hcxt = TopMemoryContext;
+    magma_range_vseg_maps =
+        hash_create("Range and Vseg Map Hash",
+                    MAX_MAGMA_RANGE_VSEG_MAP_NUM, &ctl, HASH_ELEM);
+  }
+
+  bool map_found = false;
+  int range_num = 0;
+  int *range_vseg_map = NULL;
+  ListCell *relCell = NULL;
+  foreach (relCell, *alloc_result) {
+    SegFileSplitMapNode *splits_map = (SegFileSplitMapNode *)lfirst(relCell);
+
+    if (!dataStoredInMagmaByOid(splits_map->relid)) {
+      continue;
+    }
+
+    ListCell *fileCell = NULL;
+    foreach (fileCell, splits_map->splits) {
+      List *file = (List *)lfirst(fileCell);
+      range_num += file ? file->length : 0;
+    }
+    range_vseg_map = (int *)MemoryContextAlloc(
+        TopMemoryContext, range_num * sizeof(int));
+
+    int i = 0;
+    foreach (fileCell, splits_map->splits) {
+      List *file = (List *)lfirst(fileCell);
+
+      ListCell *splitCell = NULL;
+      foreach (splitCell, file) {
+        FileSplit origFS = (FileSplit)lfirst(splitCell);
+        range_vseg_map[(origFS->range_id) & 0xFFFF] = i;
+      }
+      i++;
+    }
+    map_found = true;
+    break;
+  }
+
+  ListCell *lc = NULL;
+  foreach(lc, relOids) {
+    Oid relid = lfirst_oid(lc);
+    Relation relation = relation_open(relid, AccessShareLock);
+    ExtTableEntry *ext_entry = GetExtTableEntry(relid);
+    char *dbname = get_database_name(MyDatabaseId);
+    char *schemaname = get_namespace_name(relation->rd_rel->relnamespace);
+    char *tablename = NameStr(relation->rd_rel->relname);
+    relation_close(relation, AccessShareLock);
+    // get range location from magma now
+    // start transaction in magma for SELECT/INSERT/UPDATE/DELETE/ANALYZE
+    if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+    {
+      PlugStorageBeginTransaction(NULL);
+    }
+    Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+
+    ExtProtocolBlockLocationData *bldata = NULL;
+    InvokeMagmaProtocolBlockLocation(
+        ext_entry, procOid, dbname, schemaname, tablename,
+        PlugStorageGetTransactionSnapshot(), false, &bldata);
+
+    pfree(dbname);
+    pfree(schemaname);
+
+    FileSplit fileSplit = makeNode(FileSplitNode);
+    SegFileSplitMapNode *splits_map = makeNode(SegFileSplitMapNode);
+    splits_map->relid = relid;
+    splits_map->serializeSchema = pnstrdup(bldata->serializeSchema, bldata->serializeSchemaLen);
+    splits_map->serializeSchemaLen = bldata->serializeSchemaLen;
+    splits_map->splits = NIL;
+
+    for (int i = 0; i < vsegNum; i++) {
+      splits_map->splits = lappend(splits_map->splits, NIL);
+    }
+
+    int segno = 1;
+    ListCell *blc = NULL;
+    ListCell *per_seg_splits = NULL;
+    foreach(blc, bldata->files)
+    {
+      blocklocation_file *f = (blocklocation_file *)lfirst(blc);
+      BlockLocation *locations = f->locations;
+      int splitnum = f->block_num;
+
+      for (int i = 0; i < splitnum; i++) {
+        FileSplit fileSplit = makeNode(FileSplitNode);
+        fileSplit->segno = segno++;
+        fileSplit->lengths = locations[i].length;
+        char *p = locations[i].topologyPaths[0];
+        fileSplit->ext_file_uri_string = p ? pstrdup(p) : (char *) NULL;
+        fileSplit->range_id = locations[i].rangeId;
+        fileSplit->replicaGroup_id = locations[i].replicaGroupId;
+        fileSplit->offsets = 0;
+        fileSplit->logiceof = 0;
+        int vsegIndex = map_found ? (range_vseg_map[fileSplit->range_id]) : (fileSplit->range_id % vsegNum);
+        per_seg_splits = list_nth_cell((List *) (splits_map->splits), vsegIndex);
+        lfirst(per_seg_splits) = lappend((List *) lfirst(per_seg_splits),
+            fileSplit);
+      }
+    }
+    *alloc_result = lappend(*alloc_result, splits_map);
+  }
+  return;
+}
+
+static void init_host_ip_memory_context(void) {
+  if (HostNameGlobalMemoryContext == NULL) {
+    HostNameGlobalMemoryContext = AllocSetContextCreate(
+        TopMemoryContext, "HostNameGlobalMemoryContext",
+        ALLOCSET_DEFAULT_MINSIZE, ALLOCSET_DEFAULT_INITSIZE,
+        ALLOCSET_DEFAULT_MAXSIZE);
+  } else {
+    MemoryContextResetAndDeleteChildren(HostNameGlobalMemoryContext);
+  }
+}
+
+static void getHostNameByIp(const char *ipaddr, char *hostname) {
+  struct sockaddr_in sa; /* input */
+  socklen_t len;         /* input */
+
+  memset(&sa, 0, sizeof(struct sockaddr_in));
+
+  /* For IPv4*/
+  sa.sin_family = AF_INET;
+  sa.sin_addr.s_addr = inet_addr(ipaddr);
+  len = sizeof(struct sockaddr_in);
+
+  if (getnameinfo((struct sockaddr *)&sa, len, hostname, HOSTNAME_MAX_LENGTH,
+                  NULL, 0, NI_NAMEREQD)) {
+    elog(LOG, "could not resolve hostname\n");
+  }
+}
+
+char *search_hostname_by_ipaddr(const char *ipaddr) {
+  if (magma_ip_hostname_map == NULL) {
+    init_host_ip_memory_context();
+
+    HASHCTL ctl;
+
+    ctl.keysize = sizeof(HostnameIpKey);
+    ctl.entrysize = sizeof(HostnameIpEntry);
+    ctl.hcxt = HostNameGlobalMemoryContext;
+    magma_ip_hostname_map =
+        hash_create("Hostname Ip Map Hash", 16, &ctl, HASH_ELEM);
+  }
+
+  HostnameIpKey key;
+  HostnameIpEntry *entry = NULL;
+  bool found = false;
+
+  MemSet(key.hostip, 0, HOSTIP_MAX_LENGTH);
+  strncpy(key.hostip, ipaddr, HOSTIP_MAX_LENGTH - 1);
+
+  entry = (HostnameIpEntry *)hash_search(magma_ip_hostname_map, &key,
+                                         HASH_ENTER, &found);
+  Assert(entry != NULL);
+
+  if (!found) {
+    MemSet(entry->hostname, 0, HOSTNAME_MAX_LENGTH);
+    getHostNameByIp(ipaddr, entry->hostname);
+  }
+  return entry->hostname;
+}
+

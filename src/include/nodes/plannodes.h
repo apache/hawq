@@ -37,6 +37,7 @@
 #include "access/sdir.h"
 #include "nodes/bitmapset.h"
 #include "nodes/primnodes.h"
+#include "resourcemanager/resourceenforcer/resourceenforcer_queue.h"
 #include "storage/itemptr.h"
 
 #include "cdb/cdbquerycontextdispatching.h"
@@ -145,6 +146,8 @@ typedef struct PlannedStmt
 
 		List *into_aosegnos;		/* AO file 'seg' numbers for into relation to use */
 
+		List *relFileNodeInfo; // native orc refFileNode for update/delete
+
 		/*
 		 * Relation oids and partitioning metadata for all partitions
 		 * that are involved in a query.
@@ -203,7 +206,9 @@ typedef struct PlannedStmt
 		MemoryAccount *memoryAccount;
 
 		StringInfo datalocalityInfo;
-        double     datalocalityTime;
+		double     datalocalityTime;
+		char *hiveUrl;
+		NodeTag		originNodeType;
 } PlannedStmt;
 
 
@@ -339,9 +344,6 @@ typedef struct Plan
 
 	/* MemoryAccount to use for recording the memory usage of different plan nodes. */
 	MemoryAccount* memoryAccount;
-
-	/* if the plan can be vectorized */
-	bool vectorized;
 } Plan;
 
 /* ----------------
@@ -716,6 +718,32 @@ typedef struct ValuesScan
 * file name for segment I.
 * ----------------
 */
+typedef enum ExternalScanType
+{
+	NormalExternalScan,
+	ExternalIndexScan,
+	ExternalIndexOnlyScan,
+	ExternalBitmapScan
+} ExternalScanType;
+
+typedef enum BitmapConnectType
+{
+	BitMapOr,
+	BitMapAnd
+} BitmapConnectType;
+
+typedef struct MagmaIndexQual
+{
+	char		*indexname;
+	List		*indexqual;
+} MagmaIndexQual;
+
+typedef struct MagmaBitmapQual
+{
+	queue		*connqueue;  // BitmapConnectType
+	queue		*qualqueue;  // MagmaIndexQual
+} MagmaBitmapQual;
+
 typedef struct ExternalScan
 {
 	Scan		scan;
@@ -731,7 +759,21 @@ typedef struct ExternalScan
 	int			encoding;		/* encoding of external table data    */
 	uint32      scancounter;	/* counter incr per scan node created */
 
+	// Index info
+	char		*indexname;
+	List		*indexqualorig;	/* the same in original form */
+	ScanDirection indexorderdir;	/* forward or backward or don't care */
+	// BitmapIndex info
+	MagmaBitmapQual *bitmapqual;
+
+	char *hiveUrl;
+
 } ExternalScan;
+
+/* external index scan */
+typedef ExternalScan MagmaIndexScan;
+typedef ExternalScan MagmaIndexOnlyScan;
+typedef ExternalScan MagmaBitmapScan;
 
 /* ----------------
  * AppendOnly Scan node

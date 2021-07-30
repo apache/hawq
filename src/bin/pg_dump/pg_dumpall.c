@@ -774,7 +774,7 @@ dumpRoles(PGconn *conn)
 	/*
 	 * Query to select role info get resqueue if version support it get
 	 * external table auth on gpfdist, gpfdists and http if version support it get
-	 * external table auth on gphdfs if version support it note: rolconfig is
+	 * external table auth on hdfs if version support it note: rolconfig is
 	 * dumped later
 	 */
 	printfPQExpBuffer(buf,
@@ -905,11 +905,11 @@ dumpRoles(PGconn *conn)
 			{
 				if (!PQgetisnull(res, i, i_rolcreaterexthdfs) &&
 					strcmp(PQgetvalue(res, i, i_rolcreaterexthdfs), "t") == 0)
-					appendPQExpBuffer(buf, " CREATEEXTTABLE (protocol='gphdfs', type='readable')");
+					appendPQExpBuffer(buf, " CREATEEXTTABLE (protocol='hdfs', type='readable')");
 
 				if (!PQgetisnull(res, i, i_rolcreatewexthdfs) &&
 					strcmp(PQgetvalue(res, i, i_rolcreatewexthdfs), "t") == 0)
-					appendPQExpBuffer(buf, " CREATEEXTTABLE (protocol='gphdfs', type='writable')");
+					appendPQExpBuffer(buf, " CREATEEXTTABLE (protocol='hdfs', type='writable')");
 			}
 		}
 

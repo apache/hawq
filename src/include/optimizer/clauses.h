@@ -77,6 +77,7 @@ extern bool contain_subplans(Node *clause);
 
 extern bool contain_mutable_functions(Node *clause);
 extern bool contain_volatile_functions(Node *clause);
+extern bool check_volatile_functions(Node *node, void *context);
 extern bool contain_window_functions(Node *clause);
 extern bool contain_nonstrict_functions(Node *clause);
 extern Relids find_nonnullable_rels(Node *clause);

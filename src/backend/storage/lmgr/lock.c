@@ -1356,7 +1356,7 @@ WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner)
 			LOCK_PRINT("WaitOnLock: aborting on lock",
 					   locallock->lock, locallock->tag.mode);
 			LWLockRelease(LockHashPartitionLock(locallock->hashcode));
-
+			locallock->lock->waitMask &= LOCKBIT_OFF(locallock->tag.mode);
 			/*
 			 * Now that we aren't holding the partition lock, we can give an
 			 * error report including details about the detected deadlock.

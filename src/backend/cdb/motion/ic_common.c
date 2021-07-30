@@ -336,8 +336,10 @@ CleanUpMotionLayerIPC(void)
 	if (gp_log_interconnect >= GPVARS_VERBOSITY_DEBUG)
     	elog(DEBUG3, "Cleaning Up Motion Layer IPC...");
 
-	CleanupMotionTCP();
-	CleanupMotionUDP();
+	if (Gp_interconnect_type == INTERCONNECT_TYPE_TCP)
+		CleanupMotionTCP();
+	if (Gp_interconnect_type == INTERCONNECT_TYPE_UDP)
+		CleanupMotionUDP();
 
 	/* close down the Interconnect listener socket. */
     if (TCP_listenerFd >= 0)

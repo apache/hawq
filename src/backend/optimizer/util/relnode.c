@@ -79,7 +79,7 @@ build_simple_rel(PlannerInfo *root, int relid, RelOptKind reloptkind)
 
 	/* Fetch RTE for relation */
 	Assert(relid > 0 && relid <= list_length(root->parse->rtable));
-	rte = rt_fetch(relid, root->parse->rtable);
+	rte = root->simple_rte_array[relid];
 
 	/* Rel should not exist already */
 	Assert(relid < root->simple_rel_array_size);

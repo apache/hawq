@@ -47,13 +47,17 @@
 #include "access/aosegfiles.h"
 #include "access/appendonlywriter.h"
 #include "access/xact.h"
+#include "access/orcam.h"
+#include "access/orcsegfiles.h"
 #include "access/plugstorage.h"
+#include "access/read_cache.h"
 #include "catalog/gp_policy.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_type.h"
 #include "catalog/catalog.h"
 #include "catalog/pg_exttable.h"
 #include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbdatalocality.h"
 #include "cdb/cdbparquetam.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbdisp.h"
@@ -89,6 +93,7 @@
 #include "cdb/cdbvarblock.h"
 #include "cdb/cdbbufferedappend.h"
 #include "commands/vacuum.h"
+#include "commands/dbcommands.h"
 #include "utils/lsyscache.h"
 #include "nodes/makefuncs.h"
 #include "postmaster/autovacuum.h"
@@ -99,6 +104,7 @@
  */
 extern int64 calculate_relation_size(Relation rel);
 
+extern Oid MyDatabaseId;
 /* DestReceiver for COPY (SELECT) TO */
 typedef struct
 {
@@ -119,6 +125,8 @@ static void CopyAttributeOutCSV(CopyState cstate, char *string,
 static bool DetectLineEnd(CopyState cstate, size_t bytesread  __attribute__((unused)));
 static void CopyReadAttributesTextNoDelim(CopyState cstate, bool *nulls,
 										  int num_phys_attrs, int attnum);
+static void CopyReadAttributesTextDelimMultiBytes(CopyState cstate, bool *nulls,
+											int *attr_offsets, int num_phys_attrs, Form_pg_attribute *attr);
 
 /* Low-level communications functions */
 static void SendCopyBegin(CopyState cstate);
@@ -146,6 +154,8 @@ static void CopyInitPartitioningState(EState *estate);
 static void CopyInitDataParser(CopyState cstate);
 static bool CopyCheckIsLastLine(CopyState cstate);
 static int calculate_virtual_segment_number(List* candidateRelations);
+
+static bool checkMultibytesDelimFound(const char *ptr, const char *delim);
 
 /* ==========================================================================
  * The follwing macros aid in major refactoring of data processing code (in
@@ -712,30 +722,28 @@ void ValidateControlChars(bool copy, bool load, bool csv_mode, char *delim,
 						int num_columns)
 {
 	bool	delim_off = (pg_strcasecmp(delim, "off") == 0);
+	bool	delim_multibyte = (!delim_off && (strlen(delim) >1));
 
 	/*
 	 * DELIMITER
 	 *
-	 * Only single-byte delimiter strings are supported. In addition, if the
-	 * server encoding is a multibyte character encoding we only allow the
-	 * delimiter to be an ASCII character (like postgresql. For more info
+	 * if server encoding is a multibyte character encoding we only allow
+	 * delimiter to be valid encoded characters (like postgresql. For more info
 	 * on this see discussion and comments in MPP-3756).
 	 */
-	if (pg_database_encoding_max_length() == 1)
-	{
-		/* single byte encoding such as ascii, latinx and other */
-		if (strlen(delim) != 1 && !delim_off)
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					errmsg("delimiter must be a single byte character, or \'off\'")));
-	}
-	else
+	if (pg_database_encoding_max_length() != 1)
 	{
 		/* multi byte encoding such as utf8 */
-		if ((strlen(delim) != 1 || IS_HIGHBIT_SET(delim[0])) && !delim_off )
+		if (!delim_multibyte && IS_HIGHBIT_SET(delim[0]) && !delim_off )
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					errmsg("delimiter must be a single ASCII character, or \'off\'")));
+					errmsg("delimiter must be ASCII characters, or \'off\'")));
+		/* it is supposed that delimiter is stored in the description of the table according to the database encdoing*/
+		if (delim_multibyte && !pg_verifymbstr(delim, strlen(delim), true)) {
+					ereport(ERROR,
+									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+									errmsg("delimiter must be ASCII characters, or \'off\'")));
+		}
 	}
 
 	if (strchr(delim, '\r') != NULL ||
@@ -755,10 +763,15 @@ void ValidateControlChars(bool copy, bool load, bool csv_mode, char *delim,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				errmsg("delimiter cannot be backslash")));
 
-	if (strchr(null_print, delim[0]) != NULL && !delim_off)
+	if (!delim_multibyte && strchr(null_print, delim[0]) != NULL && !delim_off)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 		errmsg("delimiter must not appear in the NULL specification")));
+
+	if (delim_multibyte && pg_strcasecmp(null_print, delim) == 0)
+		ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+		errmsg("delimiter must not be the same as NULL string")));
 
 	/*
 	 * Disallow unsafe delimiter characters in non-CSV mode.  We can't allow
@@ -1007,6 +1020,8 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("conflicting or redundant options")));
 			cstate->delim = strVal(defel->arg);
+			if (strlen(cstate->delim) > 1)
+				cstate->delimiter_multibytes = true;
 		}
 		else if (strcmp(defel->defname, "null") == 0)
 		{
@@ -1270,6 +1285,16 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		/* Open and lock the relation, using the appropriate lock type. */
 		cstate->rel = heap_openrv(stmt->relation, lockmode);
 
+		/* Start transaction for magma table */
+		if ((Gp_role == GP_ROLE_DISPATCH) && dataStoredInMagma(cstate->rel))
+		{
+			if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+			{
+				PlugStorageBeginTransaction(NULL);
+			}
+			Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+		}
+
 		/* save relation oid for auto-stats call later */
 		relationOid = RelationGetRelid(cstate->rel);
 
@@ -1378,6 +1403,8 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		 *
 		 * ExecutorStart computes a result tupdesc for us
 		 */
+		cstate->queryDesc->originNodeType = stmt->type;
+
 		ExecutorStart(cstate->queryDesc, 0);
 
 		tupDesc = cstate->queryDesc->tupDesc;
@@ -1563,6 +1590,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			int min_target_segment_num = 0;
 			int max_target_segment_num = 0;
 			QueryResource *savedResource = NULL;
+			bool isMagmaHashTable = false;
 
 			target_policy = GpPolicyFetch(CurrentMemoryContext, relid);
 			Assert(target_policy);
@@ -1570,7 +1598,11 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			 * For hash table we use table bucket number to request vsegs
 			 * For random table, we use a fixed GUC value to request vsegs.
 			 */
-			if(target_policy->nattrs > 0){
+			isMagmaHashTable = dataStoredInMagmaByOid(relid);
+			if (isMagmaHashTable) {
+				min_target_segment_num = default_magma_hash_table_nvseg_per_seg * slaveHostNumber;
+				max_target_segment_num = default_magma_hash_table_nvseg_per_seg * slaveHostNumber;
+			}else if (target_policy->nattrs > 0){
 				min_target_segment_num = target_policy->bucketnum;
 				max_target_segment_num = target_policy->bucketnum;
 			}
@@ -1592,22 +1624,31 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			}
 
 			cstate->ao_segnos = assignPerRelSegno(all_relids, list_length(cstate->resource->segments));
+			if (isMagmaHashTable)
+				cstate->splits = get_magma_scansplits(all_relids);
 
 			ListCell *cell;
 			foreach(cell, all_relids)
 			{
 				Oid relid =  lfirst_oid(cell);
-				CreateAppendOnlyParquetSegFileOnMaster(relid, cstate->ao_segnos);
+				CreateAoSegFileOnMaster(relid, cstate->ao_segnos);
 			}
 
-			/* allocate segno for error table */
+      if (isMagmaHashTable) {
+        foreach (cell, all_relids) {
+          Oid relid = lfirst_oid(cell);
+          ReadCacheHashEntryReviseOnCommit(relid, false);
+        }
+      }
+
+      /* allocate segno for error table */
 			if (stmt->sreh && cstate->cdbsreh->errtbl)
 			{
 				Oid		relid = RelationGetRelid(cstate->cdbsreh->errtbl);
 				Assert(!rel_is_partitioned(relid));
 				err_segnos = SetSegnoForWrite(NIL, relid,  list_length(cstate->resource->segments), false, true, true);
 				if (Gp_role == GP_ROLE_DISPATCH)
-					CreateAppendOnlyParquetSegFileForRelationOnMaster(
+				  CreateAoSegFileForRelationOnMaster(
 							cstate->cdbsreh->errtbl,
 							err_segnos);
 			}
@@ -1634,6 +1675,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 				Assert(Gp_role == GP_ROLE_EXECUTE);
 				cstate->ao_segnos = stmt->ao_segnos;
 				cstate->ao_segfileinfos = stmt->ao_segfileinfos;
+				cstate->splits = stmt->scantable_splits;
 			}
 			else
 			{
@@ -1641,7 +1683,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 				 * utility mode (or dispatch mode for no policy table).
 				 * create a one entry map for our one and only relation
 				 */
-				if (RelationIsAoRows(cstate->rel) || RelationIsParquet(cstate->rel))
+				if (RelationIsAo(cstate->rel))
 				{
 					SegfileMapNode *n = makeNode(SegfileMapNode);
 					n->relid = RelationGetRelid(cstate->rel);
@@ -1679,7 +1721,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		if (stmt->scantable_splits)
 		{
 			Assert(Gp_role == GP_ROLE_EXECUTE);
-			if (RelationIsAoRows(cstate->rel) || RelationIsParquet(cstate->rel))
+			if (RelationIsAo(cstate->rel))
 			{
 				cstate->splits = stmt->scantable_splits;
 			}
@@ -1689,6 +1731,9 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			}
 		}
 		cstate->resource = NULL;
+		if (cstate->rel && RelationIsExternal(cstate->rel) && stmt->planTree) {
+			cstate->planstmt = (PlannedStmt*)(linitial(stmt->planTree));
+		}
 		DoCopyTo(cstate);
 	}
 
@@ -1779,6 +1824,7 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 	int vsegNumber = 1;
 	int64 totalDataSize = 0;
 	bool isHashRelationExist = false;
+	bool isMagmaTable = false;
 	int maxHashBucketNumber = 0;
 	int maxSegno = 0;
 	foreach (le1, candidateOids)
@@ -1796,6 +1842,11 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 			}
 			if (targetPolicy->nattrs > 0) {
 				isHashRelationExist = true;
+				// copy support magma table
+				if (dataStoredInMagmaByOid(candidateOid)) {
+					maxHashBucketNumber = default_magma_hash_table_nvseg_per_seg * slaveHostNumber;
+					isMagmaTable = true;
+				}
 				if(maxHashBucketNumber < targetPolicy->bucketnum){
 					maxHashBucketNumber = targetPolicy->bucketnum;
 				}
@@ -1817,9 +1868,15 @@ static int calculate_virtual_segment_number(List* candidateOids) {
           }
           pfree(fstotal);
         }
-      }
-      else if(RelationIsParquet(rel))
-      {
+      } else if (RelationIsOrc(rel)) {
+        FileSegTotals *fstotal = getOrcSegFileStats(rel, SnapshotNow);
+        if (fstotal) {
+          if (maxSegno < fstotal->totalfilesegs) {
+            maxSegno = fstotal->totalfilesegs;
+          }
+          pfree(fstotal);
+        }
+      } else if (RelationIsParquet(rel)) {
         ParquetFileSegTotals *fstotal = GetParquetSegFilesTotals(rel, SnapshotNow);
         if(fstotal){
           if (maxSegno < fstotal->totalfilesegs) {
@@ -1828,7 +1885,7 @@ static int calculate_virtual_segment_number(List* candidateOids) {
           pfree(fstotal);
         }
       }
-		}
+                }
 		relation_close(rel, AccessShareLock);
 	}
 
@@ -1841,7 +1898,8 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 	}
 	Assert(vsegNumber > 0);
 	/*vsegNumber should be less than GetUtilPartitionNum*/
-	if(vsegNumber > GetQueryVsegNum()){
+	/* hawq_rm_nvseg_perquery_perseg_limit no effect on magma table */
+	if(vsegNumber > GetQueryVsegNum() && !isMagmaTable){
 		vsegNumber = GetQueryVsegNum();
 	}
 	// if vsegnum bigger than maxsegno, which will lead to idle QE
@@ -1889,12 +1947,14 @@ DoCopyTo(CopyState cstate)
 		}
 		else if (RelationIsExternal(cstate->rel))
 		{
+			/* copy to can support orc and magma */
+			if (!RelationIsMagmaTable2(cstate->rel->rd_id) && !RelationIsORCTable(cstate->rel->rd_id))
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("cannot copy from external relation \"%s\"",
 								RelationGetRelationName(cstate->rel)),
-						 errhint("Try the COPY (SELECT ...) TO variant."),
-								 errOmitLocation(true)));
+								errhint("Try the COPY (SELECT ...) TO variant."),
+								errOmitLocation(true)));
 		}
 	}
 
@@ -2088,7 +2148,7 @@ CopyToDispatch(CopyState cstate)
 
 	PG_TRY();
 	{
-		cdbCopyStart(cdbCopy, cdbcopy_cmd.data, RelationGetRelid(cstate->rel), InvalidOid, NIL);
+		cdbCopyStart(cdbCopy, cdbcopy_cmd.data, cstate->rel, InvalidOid, NIL);
 	}
 	PG_CATCH();
 	{
@@ -2134,7 +2194,7 @@ CopyToDispatch(CopyState cstate)
 				char	   *colname;
 
 				if (hdr_delim)
-					CopySendChar(cstate, cstate->delim[0]);
+					CopySendString(cstate, cstate->delim);
 				hdr_delim = true;
 
 				colname = NameStr(attr[attnum - 1]->attname);
@@ -2307,7 +2367,7 @@ CopyTo(CopyState cstate)
 				char	   *colname;
 
 				if (hdr_delim)
-					CopySendChar(cstate, cstate->delim[0]);
+					CopySendString(cstate, cstate->delim);
 				hdr_delim = true;
 
 				colname = NameStr(attr[attnum - 1]->attname);
@@ -2406,6 +2466,39 @@ CopyTo(CopyState cstate)
 
 				appendonly_endscan(aoscandesc);
 			}
+			else if (RelationIsOrc(rel))
+			{
+        if (tupDesc->tdhasoid)
+        {
+          elog(ERROR, "OIDS=TRUE is not allowed on tables that use column-oriented storage. Use OIDS=FALSE");
+        }
+
+        bool *proj = palloc(sizeof(bool) * tupDesc->natts);
+        for(int i=0; i<tupDesc->natts; ++i)
+          proj[i] = true;
+
+        List *fileSplits = GetFileSplitsOfSegment(cstate->splits, rel->rd_id, GetQEIndex());
+        OrcScanDescData *scanDesc = orcBeginRead(rel, ActiveSnapshot, NULL, fileSplits, proj, NULL);
+        TupleTableSlot  *slot = MakeSingleTupleTableSlot(tupDesc);
+        for(;;)
+        {
+          orcReadNext(scanDesc, slot);
+          if (TupIsNull(slot))
+              break;
+
+          /* Extract all the values of the  tuple */
+          slot_getallattrs(slot);
+          values = slot_get_values(slot);
+          nulls = slot_get_isnull(slot);
+
+          /* Format and send the data */
+          CopyOneRowTo(cstate, InvalidOid, values, nulls);
+        }
+
+        ExecDropSingleTupleTableSlot(slot);
+
+        orcEndRead(scanDesc);
+			}
 			else if(RelationIsParquet(rel))
 			{
 				ParquetScanDesc scan = NULL;
@@ -2445,6 +2538,120 @@ CopyTo(CopyState cstate)
 				ExecDropSingleTupleTableSlot(slot);
 
 				parquet_endscan(scan);
+			}
+			/* deal with external table */
+			else if (RelationIsExternal(cstate->rel))
+			{
+				ExternalScan *node = cstate->planstmt->planTree->lefttree;
+				int  formatterType = ExternalTableType_Invalid;
+				char *formatterName = NULL;
+				char *serializeSchema = NULL;
+				int  serializeSchemaLen = 0;
+				FileScanDesc currentScanDesc = NULL;
+				ExternalScanState externalstate;
+				ExternalSelectDesc externalSelectDesc = NULL;
+				TupleTableSlot	*slot = MakeSingleTupleTableSlot(tupDesc);
+
+				getExternalTableTypeList(node->fmtType, node->fmtOpts, &formatterType, &formatterName);
+
+				externalstate.ss.splits = GetFileSplitsOfSegment(
+						cstate->planstmt->scantable_splits, rel->rd_id, GetQEIndex());
+				if (formatterType == ExternalTableType_Invalid)
+				{
+					elog(ERROR, "invalid formatter type for external table: %s", __func__);
+				}
+
+				// begin scan
+				Oid	procOid = LookupPlugStorageValidatorFunc(formatterName, "beginscan");
+				if (OidIsValid(procOid))
+				{
+					FmgrInfo beginScanFunc;
+					fmgr_info(procOid, &beginScanFunc);
+					if (pg_strncasecmp(formatterName, "magma", sizeof("magma") - 1) == 0) {
+						GetMagmaSchemaByRelid(cstate->planstmt->scantable_splits, rel->rd_id,
+																	&serializeSchema, &serializeSchemaLen);
+					}
+					currentScanDesc = InvokePlugStorageFormatBeginScan(
+							&beginScanFunc, cstate->planstmt, node, &(externalstate.ss),
+							serializeSchema, serializeSchemaLen, rel,
+							formatterType, formatterName, PlugStorageGetTransactionSnapshot());
+				}
+				else
+				{
+					elog(ERROR, "%s_beginscan function was not found", formatterName);
+				}
+				bool *proj = NULL;
+
+				int nvp = tupDesc->natts;
+				int i;
+
+				if (tupDesc->tdhasoid)
+				{
+					elog(ERROR, "OIDS=TRUE is not allowed on tables that use column-oriented storage. Use OIDS=FALSE");
+				}
+
+				proj = palloc(sizeof(bool) * nvp);
+				for(i=0; i<nvp; ++i)
+					proj[i] = true;
+
+				// get data from storage, send to qd
+				for(;;)
+				{
+					FmgrInfo *getnextInitFunc = currentScanDesc->fs_ps_scan_funcs.getnext_init;
+					Assert(currentScanDesc->fs_formatter_name);
+
+					if (getnextInitFunc)
+					{
+						const char *formatter_name = "orc";
+						if (*(int *)(currentScanDesc->fs_formatter_name) != *(int *)formatter_name)
+						{
+							externalSelectDesc = InvokePlugStorageFormatGetNextInit(getnextInitFunc, NULL, NULL);
+						}
+					}
+					else
+					{
+						elog(ERROR, "%s_getnext_init function was not found",
+								 currentScanDesc->fs_formatter_name);
+					}
+
+					FmgrInfo *getnextFunc = currentScanDesc->fs_ps_scan_funcs.getnext;
+
+					if (getnextFunc)
+					{
+						bool returnTuple = InvokePlugStorageFormatGetNext(
+								getnextFunc, currentScanDesc, ForwardScanDirection, externalSelectDesc,
+								NULL, slot);
+					}
+					else
+					{
+						elog(ERROR, "%s_getnext function was not found",
+								 currentScanDesc->fs_formatter_name);
+					}
+
+					if (TupIsNull(slot))
+					    break;
+
+					slot_getallattrs(slot);
+					values = slot_get_values(slot);
+					nulls = slot_get_isnull(slot);
+
+					CopyOneRowTo(cstate, InvalidOid, values, nulls);
+				}
+
+				ExecDropSingleTupleTableSlot(slot);
+
+				// endScan
+				FmgrInfo *endScanFunc = currentScanDesc->fs_ps_scan_funcs.endscan;
+
+				if (endScanFunc)
+				{
+					InvokePlugStorageFormatEndScan(endScanFunc, currentScanDesc);
+				}
+				else
+				{
+					elog(ERROR, "%s_endscan function was not found",
+							 currentScanDesc->fs_formatter_name);
+				}
 			}
 			else
 			{
@@ -2509,7 +2716,7 @@ CopyOneRowTo(CopyState cstate, Oid tupleOid, Datum *values, bool *isnulls)
 		Datum		value = values[attnum-1];
 
 		if (need_delim)
-			CopySendChar(cstate, cstate->delim[0]);
+			CopySendString(cstate, cstate->delim);
 
 		need_delim = true;
 
@@ -3135,8 +3342,9 @@ CopyFromDispatch(CopyState cstate, List *err_segnos)
 	    if (cstate->cdbsreh && cstate->cdbsreh->errtbl)
 	        relerror = RelationGetRelid(cstate->cdbsreh->errtbl);
 
+	    cdbCopy->scantable_splits = cstate->splits;
 		cdbCopyStart(cdbCopy, cdbcopy_cmd.data,
-				RelationGetRelid(cstate->rel), relerror,
+				cstate->rel, relerror,
 				err_segnos);
 	}
 	PG_CATCH();
@@ -3462,13 +3670,13 @@ CopyFromDispatch(CopyState cstate, List *err_segnos)
 
 							if (isnull)
 							{
-								appendStringInfo(&cstate->line_buf, "%c%s", cstate->delim[0], cstate->null_print);
+								appendStringInfo(&cstate->line_buf, "%s%s", cstate->delim, cstate->null_print);
 							}
 							else
 							{
 								nulls[defmap[i]] = false;
 
-								appendStringInfo(&cstate->line_buf, "%c", cstate->delim[0]); /* write the delimiter */
+								appendStringInfo(&cstate->line_buf, "%s", cstate->delim); /* write the delimiter */
 
 								string = DatumGetCString(FunctionCall3(&out_functions[defmap[i]],
 																	   values[defmap[i]],
@@ -3653,7 +3861,11 @@ CopyFromDispatch(CopyState cstate, List *err_segnos)
 				if (part_p_nattrs == 0)
 					cdbhashnokey(part_hash);
 
-				target_seg = cdbhashreduce(part_hash);	/* hash result segment */
+				// target_seg = cdbhashreduce(part_hash);	/* hash result segment */
+				int *map = NULL;
+				int nmap = 0;
+				get_magma_range_vseg_map(&map, &nmap, part_hash->numsegs);
+				target_seg = magichashreduce(part_hash, map, nmap);
 
 
 				/*
@@ -4291,14 +4503,24 @@ CopyFrom(CopyState cstate)
 						parquet_insert_init(resultRelInfo->ri_RelationDesc,
 										 segfileinfo);
 				}
+				else if (relstorage == RELSTORAGE_ORC &&
+				    resultRelInfo->ri_orcInsertDesc == NULL)
+				{
+				  ResultRelSegFileInfo *segfileinfo = NULL;
+          ResultRelInfoSetSegFileInfo(resultRelInfo, cstate->ao_segfileinfos);
+          segfileinfo = (ResultRelSegFileInfo *)list_nth(resultRelInfo->ri_aosegfileinfos, GetQEIndex());
+          resultRelInfo->ri_orcInsertDesc =
+              orcBeginInsert(resultRelInfo->ri_RelationDesc,
+                             segfileinfo);
+				}
 				else if (relstorage == RELSTORAGE_EXTERNAL &&
 						 resultRelInfo->ri_extInsertDesc == NULL)
 				{
 					Relation relation = resultRelInfo->ri_RelationDesc;
 					ExtTableEntry *extEntry = GetExtTableEntry(RelationGetRelid(relation));
-					ExternalTableType formatterType = ExternalTableType_Invalid;
+					int formatterType = ExternalTableType_Invalid;
 					char *formatterName = NULL;
-					getExternalTableTypeInStr(extEntry->fmtcode, extEntry->fmtopts,
+					getExternalTableTypeStr(extEntry->fmtcode, extEntry->fmtopts,
 					                        &formatterType, &formatterName);
 
 					if (formatterType == ExternalTableType_Invalid)
@@ -4308,9 +4530,8 @@ CopyFrom(CopyState cstate)
 					else if (formatterType != ExternalTableType_PLUG)
 					{
 						resultRelInfo->ri_extInsertDesc =
-								resultRelInfo->ri_extInsertDesc =
-										external_insert_init(resultRelInfo->ri_RelationDesc,
-											                      0, formatterType, formatterName, NULL);
+								external_insert_init(resultRelInfo->ri_RelationDesc,
+							                         0, formatterType, formatterName, NULL);
 					}
 					else
 					{
@@ -4326,21 +4547,22 @@ CopyFrom(CopyState cstate)
 
 							ResultRelSegFileInfo *segfileinfo = NULL;
 							ResultRelInfoSetSegFileInfo(resultRelInfo,
-												cstate->ao_segfileinfos);
+									cstate->ao_segfileinfos);
 							segfileinfo = (ResultRelSegFileInfo *) list_nth(
-												resultRelInfo->ri_aosegfileinfos,
-												GetQEIndex());
+									resultRelInfo->ri_aosegfileinfos,
+									GetQEIndex());
 
 							PlannedStmt* plannedstmt = palloc(sizeof(PlannedStmt));
 							memset(plannedstmt,0,sizeof(PlannedStmt));
 							plannedstmt->scantable_splits = cstate->splits;
 							resultRelInfo->ri_extInsertDesc =
-									InvokePlugStorageFormatInsertInit(insertInitFunc,
-						                                      resultRelInfo->ri_RelationDesc,
-														                 formatterType,
-														                 formatterName,
-																		  NULL,
-														                  segfileinfo->segno);
+							        InvokePlugStorageFormatInsertInit(insertInitFunc,
+							                                          resultRelInfo->ri_RelationDesc,
+							                                          formatterType,
+							                                          formatterName,
+							                                          plannedstmt,
+							                                          segfileinfo->segno,
+							                                          PlugStorageGetTransactionSnapshot());
 
 							pfree(insertInitFunc);
 							pfree(plannedstmt);
@@ -4369,6 +4591,7 @@ CopyFrom(CopyState cstate)
 						MemTupleSetOid(tuple, resultRelInfo->ri_aoInsertDesc->mt_bind, loaded_oid);
 				}
 				else if ((relstorage == RELSTORAGE_PARQUET) ||
+				         (relstorage == RELSTORAGE_ORC) ||
 				         ((relstorage == RELSTORAGE_EXTERNAL) &&
 				          (resultRelInfo->ri_extInsertDesc->ext_formatter_type ==
 				           ExternalTableType_PLUG)))
@@ -4402,7 +4625,8 @@ CopyFrom(CopyState cstate)
 				{
 					HeapTuple	newtuple;
 
-					if(relstorage == RELSTORAGE_PARQUET)
+					if(relstorage == RELSTORAGE_PARQUET ||
+					    relstorage == RELSTORAGE_ORC)
 					{
 						Assert(!tuple);
 						elog(ERROR, "triggers are not supported on tables that use column-oriented storage");
@@ -4425,6 +4649,7 @@ CopyFrom(CopyState cstate)
 					char relstorage = RelinfoGetStorage(resultRelInfo);
 
 					if ((relstorage == RELSTORAGE_PARQUET) ||
+					    (relstorage == RELSTORAGE_ORC) ||
 					    ((relstorage == RELSTORAGE_EXTERNAL) &&
 		                  (resultRelInfo->ri_extInsertDesc->ext_formatter_type ==
 					      ExternalTableType_PLUG)))
@@ -4467,6 +4692,11 @@ CopyFrom(CopyState cstate)
 
 						if (resultRelInfo->ri_NumIndices > 0)
 							ExecInsertIndexTuples(slot, (ItemPointer)&aoTupleId, estate, false);
+					}
+					else if (relstorage == RELSTORAGE_ORC)
+					{
+					  orcInsertValues(resultRelInfo->ri_orcInsertDesc,
+					                  values, nulls, slot->tts_tupleDescriptor);
 					}
 					else if (relstorage == RELSTORAGE_EXTERNAL)
 					{
@@ -4584,9 +4814,9 @@ CopyFrom(CopyState cstate)
 	resultRelInfo = estate->es_result_relations;
 	for (i = 0; i < estate->es_num_result_relations; i++)
 	{
-		if (resultRelInfo->ri_aoInsertDesc)
-			++aocount;
-		if (resultRelInfo->ri_parquetInsertDesc)
+		if (resultRelInfo->ri_aoInsertDesc ||
+		    resultRelInfo->ri_parquetInsertDesc ||
+		    resultRelInfo->ri_orcInsertDesc)
 			++aocount;
 		resultRelInfo++;
 	}
@@ -4620,6 +4850,14 @@ CopyFrom(CopyState cstate)
 
 			parquet_insert_finish(resultRelInfo->ri_parquetInsertDesc);
 		}
+
+		if (resultRelInfo->ri_orcInsertDesc)
+    {
+      sendback = CreateQueryContextDispatchingSendBack(1);
+      resultRelInfo->ri_orcInsertDesc->sendback = sendback;
+      sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+      orcEndInsert(resultRelInfo->ri_orcInsertDesc);
+    }
 
 		if (resultRelInfo->ri_extInsertDesc)
 		{
@@ -5341,6 +5579,11 @@ CopyReadAttributesText(CopyState cstate, bool * __restrict nulls,
 	/* init variables for attribute scan */
 	RESET_ATTRBUF;
 
+	if (cstate->delimiter_multibytes) {
+		CopyReadAttributesTextDelimMultiBytes(cstate, nulls, attr_offsets, num_phys_attrs, attr);
+		return;
+	}
+
 	/* cursor is now > 0 if we copy WITH OIDS */
 	scan_start = cstate->line_buf.data + cstate->line_buf.cursor;
 	chunk_start = cstate->line_buf.cursor;
@@ -5360,11 +5603,10 @@ CopyReadAttributesText(CopyState cstate, bool * __restrict nulls,
 
 	/* have a single column only and no delim specified? take the fast track */
 	if (cstate->delimiter_off)
-    {
-		CopyReadAttributesTextNoDelim(cstate, nulls, num_phys_attrs,
-											 attnum);
-        return;
-    }
+	{
+		CopyReadAttributesTextNoDelim(cstate, nulls, num_phys_attrs, attnum);
+		return;
+	}
 
 	/*
 	 * Scan through the line buffer to read all attributes data
@@ -5826,6 +6068,13 @@ CopyReadAttributesCSV(CopyState cstate, bool *nulls, int *attr_offsets,
 		/* unquoted field delimiter  */
 		if (!in_quote && c == delimc && !cstate->delimiter_off)
 		{
+			if (cstate->delimiter_multibytes) {
+				int delim_len = strlen(cstate->delim);
+				for (int i = 0; i < delim_len-1; ++i)
+					if (cstate->line_buf.data[cstate->line_buf.cursor+i] != cstate->delim[i+1])
+						goto delim_not_matched;
+				cstate->line_buf.cursor += delim_len -1;
+			}
 			/* check whether raw input matched null marker */
 			input_len = end_cursor - start_cursor;
 
@@ -5882,6 +6131,7 @@ CopyReadAttributesCSV(CopyState cstate, bool *nulls, int *attr_offsets,
 			continue;
 		}
 
+delim_not_matched:
 		/* start of quoted field (or part of field) */
 		if (!in_quote && c == quotec)
 		{
@@ -5958,6 +6208,294 @@ CopyReadAttributesTextNoDelim(CopyState cstate, bool *nulls, int num_phys_attrs,
 		nulls[attnum - 1] = false;
 
 	appendBinaryStringInfo(&cstate->attribute_buf, cstate->line_buf.data, len);
+}
+
+static void
+CopyReadAttributesTextDelimMultiBytes(CopyState cstate, bool *nulls,
+											int *attr_offsets, int num_phys_attrs, Form_pg_attribute *attr)
+{
+	int			attnum;			/* attribute number being parsed */
+	int			m = 0;			/* attribute index being parsed */
+	int			attribute = 1;
+	ListCell *cur = list_head(cstate->attnumlist);
+	int			start_cursor = cstate->line_buf.cursor;
+	int			end_cursor = start_cursor;
+	int			input_len = 0;
+	char		delimc = cstate->delim[0];
+	char		escapec = cstate->escape[0];
+	bool		saw_high_bit = false;
+	char		c;
+
+	if(num_phys_attrs > 0)
+	{
+		attnum = lfirst_int(cur);
+		m = attnum - 1;
+	}
+
+	while(true) {
+		end_cursor = cstate->line_buf.cursor;
+
+		// finished processing attributes in line
+		if (cstate->line_buf.cursor >= cstate->line_buf.len - 1) {
+			input_len = end_cursor - start_cursor;
+
+			if (cstate->eol_type == EOL_CRLF)
+			{
+				/* ignore the leftover CR */
+				--input_len;
+				cstate->attribute_buf.data[cstate->attribute_buf.cursor - 1] = '\0';
+			}
+
+			/* check whether raw input matched null marker */
+			if(num_phys_attrs > 0)
+			{
+				if (input_len == cstate->null_print_len &&
+					strncmp(&cstate->line_buf.data[start_cursor], cstate->null_print, input_len) == 0)
+					nulls[m] = true;
+				else
+					nulls[m] = false;
+			}
+
+			/* if zero column table and data is trying to get in */
+			if(num_phys_attrs == 0 && input_len > 0)
+				ereport(ERROR,
+						(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
+						 errmsg("extra data after last expected column"),
+						 errOmitLocation(true)));
+
+			if(cur == NULL)
+				ereport(ERROR,
+						(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
+						 errmsg("extra data after last expected column"),
+						 errOmitLocation(true)));
+
+			/*
+			 * line is done, but do we have more attributes to process?
+			 *
+			 * normally, remaining attributes that have no data means ERROR,
+			 * however, with FILL MISSING FIELDS remaining attributes become
+			 * NULL. since attrs are null by default we leave unchanged and
+			 * avoid throwing an error, with the exception of empty data lines
+			 * for multiple attributes, which we intentionally don't support.
+			 */
+			if (lnext(cur) != NULL)
+			{
+				if (!cstate->fill_missing)
+					ereport(ERROR,
+							(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
+							 errmsg("missing data for column \"%s\"",
+									NameStr(attr[m + 1]->attname)),
+							 errOmitLocation(true)));
+
+				else if (attribute == 1 && input_len == 0)
+					ereport(ERROR,
+							(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
+							 errmsg("missing data for column \"%s\", found empty data line",
+									NameStr(attr[m + 1]->attname)),
+							 errOmitLocation(true)));
+			}
+			break;
+		}
+
+		c = cstate->line_buf.data[cstate->line_buf.cursor++];
+
+		if (c == delimc) {
+			int delim_len = strlen(cstate->delim);
+			for (int i = 0; i < delim_len-1; ++i)
+				if (cstate->line_buf.data[cstate->line_buf.cursor+i] != cstate->delim[i+1])
+					goto delim_not_matched;
+			cstate->line_buf.cursor += delim_len -1;
+
+			// check whether raw input matched null marker
+			input_len = end_cursor - start_cursor;
+			if (cur == NULL)
+				ereport(ERROR,
+						(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
+						 errmsg("extra data after last expected column"),
+						 errOmitLocation(true)));
+
+			if(num_phys_attrs > 0)
+			{
+				if (input_len == cstate->null_print_len &&
+				strncmp(&cstate->line_buf.data[start_cursor], cstate->null_print, input_len) == 0)
+					nulls[m] = true;
+				else
+					nulls[m] = false;
+			}
+
+			/* terminate attr string with '\0' */
+			appendStringInfoCharMacro(&cstate->attribute_buf, '\0');
+			cstate->attribute_buf.cursor++;
+
+			/* setup next attribute scan */
+			cur = lnext(cur);
+
+			if (cur == NULL)
+				ereport(ERROR,
+						(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
+						 errmsg("extra data after last expected column"),
+						 errOmitLocation(true)));
+
+			if(num_phys_attrs > 0)
+			{
+				attnum = lfirst_int(cur);
+				m = attnum - 1;
+				attr_offsets[m] = cstate->attribute_buf.cursor;
+			}
+
+			start_cursor = cstate->line_buf.cursor;
+
+			/*
+			 * for the dispatcher - stop parsing once we have
+			 * all the hash field values. We don't need the rest.
+			 */
+			if (Gp_role == GP_ROLE_DISPATCH)
+			{
+				if (attribute == cstate->last_hash_field)
+					break;
+			}
+
+			++attribute;
+			continue;
+		} else if (c == escapec && !cstate->escape_off) {
+			int oct_val;		/* byte value for octal escapes */
+			int hex_val;
+			char newc;
+			char nextc = cstate->line_buf.data[cstate->line_buf.cursor];
+			int skip = 1;
+			switch (nextc)
+			{
+				case '0':
+				case '1':
+				case '2':
+				case '3':
+				case '4':
+				case '5':
+				case '6':
+				case '7':
+					/* handle \013 */
+					oct_val = OCTVALUE(nextc);
+					nextc = cstate->line_buf.data[cstate->line_buf.cursor + 1];
+
+					/*
+					 * (no need for out bad access check since line if
+					 * buffered)
+					 */
+					if (ISOCTAL(nextc))
+					{
+						++skip;
+						oct_val = (oct_val << 3) + OCTVALUE(nextc);
+						nextc = cstate->line_buf.data[cstate->line_buf.cursor + 2];
+						if (ISOCTAL(nextc))
+						{
+							++skip;
+							oct_val = (oct_val << 3) + OCTVALUE(nextc);
+						}
+					}
+					newc = oct_val & 0377;	/* the escaped byte value */
+					if (IS_HIGHBIT_SET(newc))
+						saw_high_bit = true;
+					break;
+				case 'x':
+					/* Handle \x3F */
+					hex_val = 0; /* init */
+					nextc = cstate->line_buf.data[cstate->line_buf.cursor + 1];
+
+					if (isxdigit((unsigned char)nextc))
+					{
+						skip++;
+						hex_val = GetDecimalFromHex(nextc);
+						nextc = cstate->line_buf.data[cstate->line_buf.cursor + 2];
+
+						if (isxdigit((unsigned char)nextc))
+						{
+							skip++;
+							hex_val = (hex_val << 4) + GetDecimalFromHex(nextc);
+						}
+						newc = hex_val & 0xff;
+						if (IS_HIGHBIT_SET(newc))
+							saw_high_bit = true;
+					}
+					else
+					{
+						newc = 'x';
+					}
+					break;
+
+				case 'b':
+					newc = '\b';
+					break;
+				case 'f':
+					newc = '\f';
+					break;
+				case 'n':
+					newc = '\n';
+					break;
+				case 'r':
+					newc = '\r';
+					break;
+				case 't':
+					newc = '\t';
+					break;
+				case 'v':
+					newc = '\v';
+					break;
+				default:
+					if (nextc == escapec)
+						newc = escapec;
+					else
+					{
+						/* no escape sequence found. it's a lone escape */
+
+						bool next_is_eol = ((nextc == '\n' && cstate->eol_type == EOL_LF) ||
+												(nextc == '\r' && (cstate->eol_type == EOL_CR ||
+																 cstate->eol_type == EOL_CRLF)));
+
+						if(!next_is_eol)
+						{
+							/* take next char literally */
+							newc = nextc;
+						}
+						else
+						{
+							/* there isn't a next char (end of data in line). we keep the
+							 * backslash as a literal character. We don't skip over the EOL,
+							 * since we don't support escaping it anymore (unlike PG).
+							 */
+							newc = escapec;
+							skip--;
+						}
+					}
+
+					break;
+			}
+			appendStringInfoCharMacro(&cstate->attribute_buf, newc);
+			cstate->attribute_buf.cursor++;
+			cstate->line_buf.cursor += skip;
+			continue;
+		}
+
+delim_not_matched:
+		appendStringInfoCharMacro(&cstate->attribute_buf, c);
+		cstate->attribute_buf.cursor++;
+	}
+
+	/*
+	 * MPP-6816
+	 * If any attribute has a de-escaped octal or hex sequence with a
+	 * high bit set, we check that the changed attribute text is still
+	 * valid WRT encoding. We run the check on all attributes since
+	 * such octal sequences are so rare in client data that it wouldn't
+	 * affect performance at all anyway.
+	 */
+	if(saw_high_bit)
+	{
+		for (attribute = 0; attribute < num_phys_attrs; ++attribute)
+		{
+			char *fld = cstate->attribute_buf.data + attr_offsets[attribute];
+			pg_verifymbstr(fld, strlen(fld), false);
+		}
+	}
 }
 
 /*
@@ -6097,23 +6635,38 @@ CopyAttributeOutText(CopyState cstate, char *string)
 						break;
 					default:
 						/* If it's the delimiter, must backslash it */
-						if (c == delimc)
-							break;
+						if (c == delimc) {
+							if (!cstate->delimiter_multibytes || !checkMultibytesDelimFound(ptr, cstate->delim))
+								break;
+						}
 						/* All ASCII control chars are length 1 */
 						ptr++;
 						continue;		/* fall to end of loop */
 				}
+
 				/* if we get here, we need to convert the control char */
 				DUMPSOFAR();
 				CopySendChar(cstate, escapec);
 				CopySendChar(cstate, c);
 				start = ++ptr;	/* do not include char in next run */
+				if (cstate->delimiter_multibytes && c == delimc
+						&& checkMultibytesDelimFound(ptr-1, cstate->delim)) {
+					CopySendString(cstate, cstate->delim + 1);
+					start += strlen(cstate->delim) -1;
+					ptr += strlen(cstate->delim) -1;
+				}
 			}
 			else if (c == escapec || c == delimc)
 			{
 				DUMPSOFAR();
-				CopySendChar(cstate, escapec);
 				start = ptr++;	/* we include char in next run */
+				if (!cstate->delimiter_multibytes || c == escapec) {
+					CopySendChar(cstate, escapec);
+				} else if (cstate->delimiter_multibytes && c == delimc
+						&& checkMultibytesDelimFound(ptr-1, cstate->delim)) {
+					CopySendChar(cstate, escapec);
+					ptr += strlen(cstate->delim) -1;
+				}
 			}
 			else if (IS_HIGHBIT_SET(c))
 				ptr += pg_encoding_mblen(cstate->client_encoding, ptr);
@@ -6157,8 +6710,10 @@ CopyAttributeOutText(CopyState cstate, char *string)
 						break;
 					default:
 						/* If it's the delimiter, must backslash it */
-						if (c == delimc)
-							break;
+						if (c == delimc){
+							if (!cstate->delimiter_multibytes || !checkMultibytesDelimFound(ptr, cstate->delim))
+								break;
+						}
 						/* All ASCII control chars are length 1 */
 						ptr++;
 						continue;		/* fall to end of loop */
@@ -6168,12 +6723,24 @@ CopyAttributeOutText(CopyState cstate, char *string)
 				CopySendChar(cstate, escapec);
 				CopySendChar(cstate, c);
 				start = ++ptr;	/* do not include char in next run */
+				if (cstate->delimiter_multibytes && c == delimc
+						&& checkMultibytesDelimFound(ptr-1, cstate->delim)) {
+					CopySendString(cstate, cstate->delim + 1);
+					start += strlen(cstate->delim) -1;
+					ptr += strlen(cstate->delim) -1;
+				}
 			}
 			else if (c == escapec || c == delimc)
 			{
 				DUMPSOFAR();
-				CopySendChar(cstate, escapec);
 				start = ptr++;	/* we include char in next run */
+				if (!cstate->delimiter_multibytes || c == escapec) {
+					CopySendChar(cstate, escapec);
+				} else if (cstate->delimiter_multibytes && c == delimc
+						&& checkMultibytesDelimFound(ptr-1, cstate->delim)) {
+					CopySendChar(cstate, escapec);
+					ptr += strlen(cstate->delim) -1;
+				}
 			}
 			else
 				ptr++;
@@ -6242,6 +6809,9 @@ CopyAttributeOutCSV(CopyState cstate, char *string,
 				if (c == delimc || c == quotec || c == '\n' || c == '\r')
 				{
 					use_quote = true;
+					if (cstate->delimiter_multibytes && c == delimc
+							&& !checkMultibytesDelimFound(tptr, cstate->delim))
+						use_quote =  false;
 					break;
 				}
 				if (IS_HIGHBIT_SET(c) && cstate->encoding_embeds_ascii)
@@ -6282,6 +6852,14 @@ CopyAttributeOutCSV(CopyState cstate, char *string,
 		/* If it doesn't need quoting, we can just dump it as-is */
 		CopySendString(cstate, ptr);
 	}
+}
+
+bool checkMultibytesDelimFound(const char *ptr, const char *delim) {
+	int delim_len = strlen(delim);
+	for (int i = 0; i < delim_len; ++i)
+		if (*(ptr+i) == '\0' || *(ptr+i) != delim[i])
+			return false;
+	return true;
 }
 
 /*

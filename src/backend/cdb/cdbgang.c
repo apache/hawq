@@ -251,6 +251,7 @@ getCdbProcessesForQD(int isPrimary)
 		proc->listenerPort = (Gp_listener_port >> 16) & 0x0ffff;
 	else
 		proc->listenerPort = (Gp_listener_port & 0x0ffff);
+	proc->myListenerPort = (my_listener_port & 0x0ffff);
 	proc->pid = MyProcPid;
 	proc->contentid = MASTER_CONTENT_ID;
 

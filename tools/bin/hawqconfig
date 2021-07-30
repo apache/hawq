@@ -23,6 +23,7 @@ try:
     from gppylib.db import dbconn
     from pygresql.pg import DatabaseError
     from gppylib.gplog import setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
+    from gppylib.gpsqlUtil import GpsqlUtil
 except ImportError, e:
     sys.exit('ERROR: Cannot import modules.  Please check that you '
                  'have sourced greenplum_path.sh.  Detail: ' + str(e))
@@ -130,17 +131,21 @@ def list_properties(hawq_site):
 def show_guc(hawq_site, property_name):
     property_value = 'None'
     try:
-        dburl = dbconn.DbURL(port=hawq_site.hawq_dict['hawq_master_address_port'], dbname='template1')
-        conn = dbconn.connect(dburl, True)
         query = "show %s;" % property_name
-        rows = dbconn.execSQL(conn, query)
+
+        _sqlUtil = GpsqlUtil()
+        rows = _sqlUtil.performQuery(query)
+
         if rows:
             for row in rows:
-                property_value = row[0]
+                property_value = row[property_name]
         else:
-            print "No such GUC exist"
+            print("No such GUC exist")
             sys.exit(1)
-        conn.close()
+
+        print("GUC\t\t: %s" % property_name)
+        print("Value\t\t: %s" % property_value)
+        return None
     except DatabaseError, ex:
         if re.search("unrecognized configuration parameter", ex.__str__()):
             print "Failed to retrieve GUC information, guc %s does not exist" % property_name
@@ -149,10 +154,6 @@ def show_guc(hawq_site, property_name):
         else:
             print "Failed to retrieve GUC information: %s" % ex.__str__()
         sys.exit(1)
-
-    print "GUC\t\t: %s" % property_name
-    print "Value\t\t: %s" % property_value
-    return None
 
 
 def show_property(hawq_site, property_name):

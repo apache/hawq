@@ -22,31 +22,18 @@ MAINTAINER Richard Guo <riguo@pivotal.io>
 # install all software we need
 RUN yum install -y epel-release && \
  yum makecache && \
- yum install -y man glog-devel jsoncpp-devel json gflags-devel lz4-devel passwd sudo tar which git mlocate links make bzip2 net-tools \
- autoconf automake libtool m4 gcc gcc-c++ gdb flex gperf maven indent \
+ yum install -y man passwd sudo tar which git mlocate links make bzip2 net-tools \
+ autoconf automake libtool m4 gcc gcc-c++ gdb bison flex cmake gperf maven indent \
  libuuid-devel krb5-devel libgsasl-devel expat-devel libxml2-devel \
  perl-ExtUtils-Embed pam-devel python-devel libcurl-devel snappy-devel \
  thrift-devel libyaml-devel libevent-devel bzip2-devel openssl-devel \
- openldap-devel readline-devel net-snmp-devel apr-devel \
+ openldap-devel protobuf-devel readline-devel net-snmp-devel apr-devel \
  libesmtp-devel python-pip json-c-devel \
- java-1.7.0-openjdk-devel lcov cmake3 \
- wget rpm-build \
- https://forensics.cert.org/centos/cert/7/x86_64//libiconv-1.15-1.el7.x86_64.rpm \
- https://forensics.cert.org/centos/cert/7/x86_64//libiconv-devel-1.15-1.el7.x86_64.rpm \
- openssh-clients openssh-server perl-JSON unzip && \
+ java-1.7.0-openjdk-devel lcov cmake \
+ openssh-clients openssh-server perl-JSON && \
  yum clean all
 
-RUN ln -s /usr/bin/cmake3 /usr/bin/cmake
-
-RUN rpm -ivh --nodeps   https://rpmfind.net/linux/centos/6.10/os/x86_64/Packages/bison-2.4.1-5.el6.x86_64.rpm
-
-RUN cd ~ && git clone https://github.com/protocolbuffers/protobuf.git && \
-	cd protobuf && git submodule update --init --recursive && \
-	./autogen.sh && ./configure && make && \
-	make check && make install && ldconfig && cd -
-
 RUN pip --retries=50 --timeout=300 install pycrypto
-RUN pip --retries=50 --timeout=300 install cogapp
 
 # OS requirement
 RUN echo "kernel.sem = 250 512000 100 2048" >> /etc/sysctl.conf
@@ -68,8 +55,7 @@ RUN sed -i -e 's|Defaults    requiretty|#Defaults    requiretty|' /etc/sudoers
 # setup JAVA_HOME for all users
 RUN echo "#!/bin/sh" > /etc/profile.d/java.sh && \
  echo "export JAVA_HOME=/etc/alternatives/java_sdk" >> /etc/profile.d/java.sh && \
- chmod a+x /etc/profile.d/java.sh && \
- ln -s /usr/lib/jvm/java-1.7.0-openjdk-1.7.0.221-2.6.18.0.el7_6.x86_64/jre/lib/amd64/server/libjvm.so /usr/local/lib/libjvm.so
+ chmod a+x /etc/profile.d/java.sh
 
 # set USER env
 RUN echo "#!/bin/bash" > /etc/profile.d/user.sh && \
@@ -87,6 +73,3 @@ RUN ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa && \
  chmod 0600 ~/.ssh/authorized_keys
 
 WORKDIR /data
-
-ENTRYPOINT ["bash", "/data/hawq-docker/apache-hawq/entrypoint.sh"]
-

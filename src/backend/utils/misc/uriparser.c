@@ -29,7 +29,7 @@
 
 #include <ctype.h>
 #include <arpa/inet.h>	 /* inet_ntoa() */ 
-
+#include <string.h>
 /*
  * ParseExternalTableUri
  * 
@@ -53,12 +53,22 @@ ParseExternalTableUri(const char *uri_str)
 	/*
 	 * parse protocol
 	 */
-	if (IS_FILE_URI(uri_str))
+	if (IS_MAGMA_URI(uri_str))
+	{
+		uri->protocol = URI_MAGMA;
+		protocol_len = strlen(PROTOCOL_MAGMA);
+	}
+	else if (IS_HIVE_URI(uri_str))
+	{
+		uri->protocol = URI_HIVE;
+		protocol_len = strlen(PROTOCOL_HIVE);
+	}
+	else if (IS_FILE_URI(uri_str))
 	{
 		uri->protocol = URI_FILE;
 		protocol_len = strlen(PROTOCOL_FILE);
 	}
-	else if (pg_strncasecmp(uri_str, PROTOCOL_FTP, strlen(PROTOCOL_FTP)) == 0)
+	else if (IS_FTP_URI(uri_str))
 	{
 		uri->protocol = URI_FTP;
 		protocol_len = strlen(PROTOCOL_FTP);
@@ -80,10 +90,9 @@ ParseExternalTableUri(const char *uri_str)
 	}
 	else if (IS_HDFS_URI(uri_str))
 	{
-			uri->protocol = URI_HDFS;
-			protocol_len = strlen(PROTOCOL_HDFS);
+		uri->protocol = URI_HDFS;
+		protocol_len = strlen(PROTOCOL_HDFS);
 	}
-
 	else /* not recognized. treat it as a custom protocol */
 	{
 		char *post_protocol = strstr(uri_str, "://");
@@ -115,11 +124,13 @@ ParseExternalTableUri(const char *uri_str)
 	}
 
 	/* make sure there is more to the uri string */
-	if (strlen(uri_str) <= protocol_len)
+	if (strlen(uri_str) < protocol_len)
+	{
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-		errmsg("invalid URI \'%s\' : missing host name and path", uri_str),
-		errOmitLocation(true)));
+		        (errcode(ERRCODE_SYNTAX_ERROR),
+		         errmsg("invalid URI \'%s\' : missing host name and path", uri_str),
+		         errOmitLocation(true)));
+	}
 
 	/*
 	 * parse host name
@@ -130,7 +141,7 @@ ParseExternalTableUri(const char *uri_str)
 	{
 		/* the default is "localhost" */
 		const char *lh = "localhost";
-		
+
 		len = strlen(lh);
 
 		uri->hostname = (char *) palloc(len + 1);
@@ -143,16 +154,21 @@ ParseExternalTableUri(const char *uri_str)
 	{
 		end = strchr(start, '/');
 
-		if (end == NULL)
+		if ((end == NULL) && (!IS_MAGMA_URI(uri_str)))
 		{
 			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("invalid URI \'%s\' : missing host name or path", uri_str),
-					 errOmitLocation(true)));
+			        (errcode(ERRCODE_SYNTAX_ERROR),
+			         errmsg("invalid URI \'%s\' : missing host name or path", uri_str),
+			         errOmitLocation(true)));
 		}
 		else
 		{
 			char   *colon, *p;
+
+			if ((end == NULL) && IS_MAGMA_URI(uri_str))
+			{
+				end = uri_str + strlen(uri_str);
+			}
 
 			len = end - start;
 
@@ -162,19 +178,19 @@ ParseExternalTableUri(const char *uri_str)
 			uri->hostname = (char *) palloc(len + 1);
 			strncpy(uri->hostname, start, len);
 			uri->hostname[len] = '\0';
-			
+
 			/*
-			 * MPP-13617, if we have an ipv6 address in the URI hostname 
-			 * (e.g. [2620:0:170:610::11]:8080/path/data.txt ) then we 
+			 * MPP-13617, if we have an ipv6 address in the URI hostname
+			 * (e.g. [2620:0:170:610::11]:8080/path/data.txt ) then we
 			 * we start our search for the :port after the closing ].
 			 */
 			p = strchr(uri->hostname, ']');
-			if (p) 
+			if (p)
 			{
 				colon = strchr(p, ':');
 
 				/*
-				 * Eliminate the [ ] from the hostname.  
+				 * Eliminate the [ ] from the hostname.
 				 * note we don't change the uri->hostname pointer because we pfree() it later
 				 */
 				*p = '\0';
@@ -191,10 +207,10 @@ ParseExternalTableUri(const char *uri_str)
 			/*
 			 * port
 			 */
-			if (colon) 
+			if (colon)
 			{
 				int portlen = 0;
-				
+
 				uri->port = atoi(colon + 1);
 				portlen = strlen(colon);
 				
@@ -221,18 +237,32 @@ ParseExternalTableUri(const char *uri_str)
 	 */
 	start = end;
 
-	len = strlen(start);
+	len = start ? strlen(start) : 0;
 
 	/* make sure there is more to the uri string */
 	if (len <= 1)
-		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("invalid URI \'%s\' : missing path", uri_str),
-				 errOmitLocation(true)));
-
-	uri->path = (char *) palloc(len + 1);
-	strcpy(uri->path, start);
-	uri->path[len] = '\0';
+	{
+		if (IS_MAGMA_URI(uri_str))
+		{
+			uri->path = NULL;
+		}
+		else
+		{
+			ereport(ERROR,
+			        (errcode(ERRCODE_SYNTAX_ERROR),
+			         errmsg("invalid URI \'%s\' : missing path", uri_str),
+			         errOmitLocation(true)));
+		}
+	}
+	else
+	{
+		uri->path = (char *) palloc(len + 1);
+		if (len > 0)
+		{
+			strcpy(uri->path, start);
+		}
+		uri->path[len] = '\0';
+	}
 
 	return uri;
 }

@@ -66,7 +66,14 @@ typedef struct QueryResource {
 	int					*segment_vcore_agg;
 	int         *segment_vcore_writer;
 	TimestampTz			master_start_time;
+	bool                vsegChangedMagma;
 } QueryResource;
+
+typedef struct CommonPlan {
+	const char *str;
+	int len;
+} CommonPlan;
+struct MyNewExecutorTupState;
 
 /*
  *
@@ -123,7 +130,14 @@ typedef struct QueryDesc
 
 	struct QueryResource	*resource;
 	struct QueryResource *savedResource;
+
+	struct CommonPlan *newPlan;
+	bool newPlanForceAuto;
+	struct MyNewExecutorTupState *newExecutorState;
+
 	int						planner_segments;
+
+	NodeTag        originNodeType; /* node type that belonged to */
 } QueryDesc;
 
 /* in pquery.c */

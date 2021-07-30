@@ -35,6 +35,7 @@
 #include "catalog/pg_proc.h"
 #include "access/genam.h"
 #include "catalog/catquery.h"
+#include "access/fileam.h"
 #include "access/heapam.h"
 #include "catalog/dependency.h"
 #include "catalog/indexing.h"
@@ -46,7 +47,8 @@
 #include "utils/fmgroids.h"
 #include "utils/uri.h"
 
-
+#define MAGMA "magma"
+#define ORC "orc"
 /*
  * InsertExtTableEntry
  * 
@@ -105,7 +107,7 @@ InsertExtTableEntry(Oid 	tbloid,
 	}
 	else
 	{
-		/* LOCATION type table - store uri locations. command is NULL */
+		/* LOCATION or MAGMA type table - store uri locations. command is NULL */
 
 		values[Anum_pg_exttable_location - 1] = locationUris;
 		values[Anum_pg_exttable_command - 1] = 0;
@@ -257,7 +259,8 @@ GetExtTableEntry(Oid relid)
 	
 	Insist(!isNull);
 	extentry->fmtcode = DatumGetChar(fmtcode);
-	Insist(extentry->fmtcode == 'c' || extentry->fmtcode == 't' || extentry->fmtcode == 'b');
+	Insist(extentry->fmtcode == 'c' || extentry->fmtcode == 't' || extentry->fmtcode == 'b'
+			|| extentry->fmtcode == 'p' || extentry->fmtcode == 'o');
 
 	/* get the format options string */
 	fmtopts = heap_getattr(tuple, 
@@ -331,6 +334,181 @@ GetExtTableEntry(Oid relid)
 }
 
 /*
+ * Get the catalog entry for a exttable relation tuple.
+ */
+ExtTableEntry *
+GetExtTableEntryFromTuple(
+	Relation		pg_exttable_rel,
+	TupleDesc	pg_exttable_dsc,
+	HeapTuple	tuple,
+	Oid			*relationId)
+{
+	Datum		relid,
+				locations,
+				fmtcode,
+				fmtopts,
+				command,
+				rejectlimit,
+				rejectlimittype,
+				fmterrtbl,
+				encoding,
+				iswritable;
+
+	bool		isNull;
+	bool		locationNull = false;
+
+	ExtTableEntry *extentry;
+
+	extentry = (ExtTableEntry *) palloc0(sizeof(ExtTableEntry));
+
+	/* get the relid */
+	relid = heap_getattr(tuple,
+							 Anum_pg_exttable_reloid,
+							 pg_exttable_dsc,
+							 &isNull);
+
+	if(isNull)
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				 errmsg("got invalid relid value: NULL")));
+
+	/* get the location list */
+	locations = heap_getattr(tuple,
+							 Anum_pg_exttable_location, 
+							 pg_exttable_dsc,
+							 &isNull);
+
+	if (isNull)
+	{
+		Insist(false); /* location list is always populated (url or ON X) */
+	}
+	else
+	{
+		Datum	   *elems;
+		int			nelems;
+		int			i;
+		char*		loc_str = NULL;
+
+		deconstruct_array(DatumGetArrayTypeP(locations),
+						  TEXTOID, -1, false, 'i',
+						  &elems, NULL, &nelems);
+
+		for (i = 0; i < nelems; i++)
+		{
+			loc_str = DatumGetCString(DirectFunctionCall1(textout, elems[i]));
+
+			/* append to a list of Value nodes, size nelems */
+			extentry->locations = lappend(extentry->locations, makeString(pstrdup(loc_str)));
+		}
+
+		if(loc_str && (IS_FILE_URI(loc_str) || IS_GPFDIST_URI(loc_str) || IS_GPFDISTS_URI(loc_str)))
+			extentry->isweb = false;
+		else
+			extentry->isweb = true;
+
+	}
+
+	/* get the execute command */
+	command = heap_getattr(tuple,
+						   Anum_pg_exttable_command,
+						   pg_exttable_dsc,
+						   &isNull);
+
+	if(isNull)
+	{
+		if(locationNull)
+			ereport(ERROR,
+					(errcode(ERRCODE_UNDEFINED_OBJECT),
+					 errmsg("got invalid pg_exttable tuple. location and command are both NULL")));	
+
+		extentry->command = NULL;
+	}
+	else
+	{
+		extentry->command = DatumGetCString(DirectFunctionCall1(textout, command));
+	}
+
+
+	/* get the format code */
+	fmtcode = heap_getattr(tuple,
+						   Anum_pg_exttable_fmttype,
+						   pg_exttable_dsc,
+						   &isNull);
+
+	Insist(!isNull);
+	extentry->fmtcode = DatumGetChar(fmtcode);
+	Insist(extentry->fmtcode == 'c' || extentry->fmtcode == 't' || extentry->fmtcode == 'b'
+			|| extentry->fmtcode == 'p' || extentry->fmtcode == 'o');
+
+	/* get the format options string */
+	fmtopts = heap_getattr(tuple,
+						   Anum_pg_exttable_fmtopts,
+						   pg_exttable_dsc,
+						   &isNull);
+
+	Insist(!isNull);
+	extentry->fmtopts = DatumGetCString(DirectFunctionCall1(textout, fmtopts));
+
+
+
+	/* get the reject limit */
+	rejectlimit = heap_getattr(tuple,
+							   Anum_pg_exttable_rejectlimit,
+							   pg_exttable_dsc,
+							   &isNull);
+
+	if(!isNull)
+		extentry->rejectlimit = DatumGetInt32(rejectlimit);
+	else
+		extentry->rejectlimit = -1; /* mark that no SREH requested */
+
+	/* get the reject limit type */
+	rejectlimittype = heap_getattr(tuple,
+								   Anum_pg_exttable_rejectlimittype,
+								   pg_exttable_dsc,
+								   &isNull);
+
+	extentry->rejectlimittype = DatumGetChar(rejectlimittype);
+	if(!isNull)
+		Insist(extentry->rejectlimittype == 'r' || extentry->rejectlimittype == 'p');
+	else
+		extentry->rejectlimittype = -1;
+
+	/* get the error table oid */
+	fmterrtbl = heap_getattr(tuple,
+							 Anum_pg_exttable_fmterrtbl,
+							 pg_exttable_dsc,
+							 &isNull);
+
+	if(isNull)
+		extentry->fmterrtbl = InvalidOid;
+	else
+		extentry->fmterrtbl = DatumGetObjectId(fmterrtbl);
+
+	/* get the table encoding */
+	encoding = heap_getattr(tuple,
+							Anum_pg_exttable_encoding,
+							pg_exttable_dsc,
+							&isNull);
+
+	Insist(!isNull);
+	extentry->encoding = DatumGetInt32(encoding);
+	Insist(PG_VALID_ENCODING(extentry->encoding));
+
+	/* get the table encoding */
+	iswritable = heap_getattr(tuple,
+							  Anum_pg_exttable_writable,
+							  pg_exttable_dsc,
+							  &isNull);
+	Insist(!isNull);
+	extentry->iswritable = DatumGetBool(iswritable);
+
+    *relationId = DatumGetObjectId(relid);
+
+	return extentry;
+}
+
+/*
  * RemoveExtTableEntry
  * 
  * Remove an external table entry from pg_exttable. Caller's 
@@ -366,4 +544,71 @@ RemoveExtTableEntry(Oid relid)
 	/* Finish up scan and close exttable catalog. */
 
 	heap_close(pg_exttable_rel, NoLock);
+}
+
+bool RelationIsPluggableStorage(Oid relid) {
+	bool result;
+	ExtTableEntry *extEntry = GetExtTableEntry(relid);
+	result = fmttype_is_custom(extEntry->fmtcode);
+	pfree(extEntry);
+	return result;
+}
+
+bool RelationIsMagmaTable(Oid relid) {
+	bool result;
+	ExtTableEntry *extEntry = GetExtTableEntry(relid);
+	List *entry_locations = extEntry->locations;
+	Assert(entry_locations);
+	ListCell *entry_location = list_head(entry_locations);
+	char *url = ((Value*)lfirst(entry_location))->val.str;
+	result = IS_MAGMA_URI(url);
+	pfree(extEntry);
+	return result;
+}
+
+bool RelationIsORCTable(Oid relid) {
+	char *formatOpt = caql_getcstring(
+	    NULL,
+	    cql("SELECT fmtopts FROM pg_exttable WHERE reloid = :1",
+	    ObjectIdGetDatum(relid)));
+	if (formatOpt) {
+		char *formatName = getExtTblFormatterTypeInFmtOptsStr(formatOpt);
+		if (formatName) {
+			if (pg_strncasecmp(formatName, ORC, sizeof(ORC)-1) == 0) {
+				pfree(formatName);
+				return true;
+			} else {
+				pfree(formatName);
+				return false;
+			}
+		} else {
+			return false;
+		}
+	} else {
+		return false;
+	}
+
+}
+
+bool RelationIsMagmaTable2(Oid relid) {
+	char *formatOpt = caql_getcstring(
+	    NULL,
+	    cql("SELECT fmtopts FROM pg_exttable WHERE reloid = :1",
+	    ObjectIdGetDatum(relid)));
+	if (formatOpt) {
+		char *formatName = getExtTblFormatterTypeInFmtOptsStr(formatOpt);
+		if (formatName) {
+			if (pg_strncasecmp(formatName, MAGMA, sizeof(MAGMA)-1) == 0) {
+				pfree(formatName);
+				return true;
+			} else {
+				pfree(formatName);
+				return false;
+			}
+		} else {
+			return false;
+		}
+	} else {
+		return false;
+	}
 }

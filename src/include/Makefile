@@ -12,7 +12,6 @@ subdir = src/include
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
-override CPPFLAGS := -I$(prefix)/include $(CPPFLAGS)
 
 all: pg_config.h pg_config_os.h check_oids check_keywords
 
@@ -41,6 +40,7 @@ install: all installdirs
 	$(INSTALL_DATA) pg_config.h    '$(DESTDIR)$(includedir_server)'
 	$(INSTALL_DATA) pg_config_os.h '$(DESTDIR)$(includedir_server)'
 	$(INSTALL_DATA) utils/fmgroids.h '$(DESTDIR)$(includedir_server)/utils'
+	$(INSTALL_DATA) utils/hawq_funcoid_mapping.h '$(DESTDIR)$(includedir_server)/utils'
 # We don't use INSTALL_DATA for performance reasons --- there are a lot of files
 	cp $(srcdir)/*.h '$(DESTDIR)$(includedir_server)'/ || exit; \
 	chmod $(INSTALL_DATA_MODE) '$(DESTDIR)$(includedir_server)'/*.h  || exit; \
@@ -79,7 +79,7 @@ check_keywords:
 	(cd $(abs_top_srcdir)/src/include/parser/ && PYTHONPATH=$(python_libdir) ${PYTHON} tidygram.py)
 
 clean:
-	rm -f utils/fmgroids.h parser/parse.h parser/gram.h utils/probes.h
+	rm -f utils/fmgroids.h parser/parse.h parser/gram.h utils/probes.h utils/hawq_funcoid_mapping.h
 
 distclean maintainer-clean: clean
 	rm -f pg_config.h dynloader.h pg_config_os.h stamp-h

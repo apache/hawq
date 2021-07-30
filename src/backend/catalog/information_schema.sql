@@ -1872,6 +1872,33 @@ CREATE VIEW table_privileges AS
 
 GRANT SELECT ON table_privileges TO PUBLIC;
 
+CREATE VIEW schema_privileges as
+SELECT nspname AS schema_name,
+coalesce(nullif(role.name,''), 'PUBLIC') AS grantee,
+substring(
+CASE WHEN position('U' in split_part(split_part((','||array_to_string(nspacl,',')), ','||role.name||'=',2 ) ,'/',1)) > 0 THEN ',USAGE' ELSE '' END
+|| CASE WHEN position('C' in split_part(split_part((','||array_to_string(nspacl,',')), ','||role.name||'=',2 ) ,'/',1)) > 0 THEN ',CREATE' ELSE '' END
+, 2,10000) AS privilege_type
+FROM pg_namespace pn, (SELECT pg_roles.rolname AS name
+FROM pg_roles UNION ALL SELECT '' AS name) AS role
+WHERE (','||array_to_string(nspacl,',')) LIKE '%,'||role.name||'=%'
+AND nspowner > 1;
+
+GRANT SELECT ON schema_privileges TO PUBLIC;
+
+CREATE VIEW database_privileges as
+SELECT datname AS database_name,
+coalesce(nullif(role.name,''), 'PUBLIC') AS grantee,
+substring(
+CASE WHEN position('C' in split_part(split_part((','||array_to_string(datacl,',')), ','||role.name||'=',2 ) ,'/',1)) > 0 THEN ',CREATE' ELSE '' END
+|| CASE WHEN position('T' in split_part(split_part((','||array_to_string(datacl,',')), ','||role.name||'=',2 ) ,'/',1)) > 0 THEN ',TEMPORARY' ELSE '' END
+|| CASE WHEN position('c' in split_part(split_part((','||array_to_string(datacl,',')), ','||role.name||'=',2 ) ,'/',1)) > 0 THEN ',CONNECT' ELSE '' END
+, 2,10000) AS privilege_type
+FROM pg_database pd, (SELECT pg_roles.rolname AS name
+FROM pg_roles UNION ALL SELECT '' AS name) AS role
+WHERE (','||array_to_string(datacl,',')) LIKE '%,'||role.name||'=%';
+
+GRANT SELECT ON database_privileges TO PUBLIC;
 
 /*
  * 5.61

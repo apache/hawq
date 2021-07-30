@@ -32,6 +32,7 @@
 
 #include "access/appendonlywriter.h"
 #include "access/appendonlytid.h"	  /* AOTupleId_MaxRowNum  */
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "access/heapam.h"			  /* heap_open            */
 #include "access/transam.h"			  /* InvalidTransactionId */
@@ -351,6 +352,10 @@ AORelCreateHashEntry(Oid relid)
 		allfsinfo = NULL;
 		allfsinfoParquet = GetAllParquetFileSegInfo(aorel, aoEntry, SnapshotNow, &total_segfiles);
 	}
+	else if (RelationIsOrc(aorel)) {
+	  allfsinfo = getAllOrcFileSegInfo(aoEntry, SnapshotNow, &total_segfiles);
+	  allfsinfoParquet = NULL;
+	}
 	else /* AO */
 	{
 		allfsinfo = GetAllFileSegInfo(aorel, aoEntry, SnapshotNow, &total_segfiles);
@@ -525,11 +530,11 @@ AORelRemoveHashEntry(Oid relid, bool checkIsStale)
 							  HASH_FIND,
 							  &found);
 
+  if (found == false)
+    return false;
+
 	if(checkIsStale)
 		Insist(NULL!=aoentry && aoentry->staleTid==GetTopTransactionId());
-
-	if (found == false)
-		return false;
 
 	/* Release all segment file statuses used by this relation. */
 	next = aoentry->head_rel_segfile.next;
@@ -1198,26 +1203,26 @@ List *SetSegnoForExternalWrite(List *existing_segnos, Oid relid, int segment_num
     bool has_same_txn_status = false;
     AOSegfileStatus **maxSegno4Segment = NULL;
 
-     switch(Gp_role)
+    switch(Gp_role)
     {
         case GP_ROLE_EXECUTE:
 
-             Assert(existing_segnos != NIL);
+            Assert(existing_segnos != NIL);
             Assert(list_length(existing_segnos) == segment_num);
             return existing_segnos;
 
-         case GP_ROLE_UTILITY:
+        case GP_ROLE_UTILITY:
 
-             Assert(existing_segnos == NIL);
+            Assert(existing_segnos == NIL);
             Assert(segment_num == 1);
             return list_make1_int(RESERVED_SEGNO);
 
-         case GP_ROLE_DISPATCH:
+        case GP_ROLE_DISPATCH:
 
-             Assert(existing_segnos == NIL);
+            Assert(existing_segnos == NIL);
             Assert(segment_num > 0);
 
-             if (forNewRel)
+            if (forNewRel)
             {
                 int i;
                 for (i = 1; i <= segment_num; i++)
@@ -1227,29 +1232,28 @@ List *SetSegnoForExternalWrite(List *existing_segnos, Oid relid, int segment_num
                 return existing_segnos;
             }
 
-             if (Debug_appendonly_print_segfile_choice)
+            if (Debug_appendonly_print_segfile_choice)
             {
                 ereport(LOG, (errmsg("SetSegnoForWrite: Choosing a segno for external "
                                 "relation \"%s\" (%d) ",
                                 get_rel_name(relid), relid)));
             }
 
-             for (int i = 0; i < segment_num; i++)
+            for (int i = 0; i < segment_num; i++)
             {
                 existing_segnos = lappend_int(existing_segnos,  i);
             }
             Assert(list_length(existing_segnos) == segment_num);
 
-             return existing_segnos;
+            return existing_segnos;
 
-             /* fix this for dispatch agent. for now it's broken anyway. */
+            /* fix this for dispatch agent. for now it's broken anyway. */
         default:
             Assert(false);
             return NIL;
     }
 
- }
-
+}
 
 /*
  * assignPerRelSegno
@@ -1273,7 +1277,7 @@ List *assignPerRelSegno(List *all_relids, int segment_num)
 		Oid cur_relid = lfirst_oid(cell);
         Relation rel = heap_open(cur_relid, RowExclusiveLock);
 
-		if (RelationIsAoRows(rel) || RelationIsParquet(rel))
+		if (RelationIsAo(rel))
 		{
 			SegfileMapNode *n;
 
@@ -1321,112 +1325,6 @@ List *assignPerRelSegno(List *all_relids, int segment_num)
 
 	return mapping;
 }
-
-
-
-/*
- * UpdateMasterAosegTotals
- *
- * Update the aoseg table on the master node with the updated row count of
- * the whole distributed relation. We use this information later on to keep
- * track of file 'segments' and their EOF's and decide which segno to use in
- * future writes into the table.
- */
-void UpdateMasterAosegTotals(Relation parentrel, int segno, uint64 tupcount)
-{
-	AORelHashEntry	aoHashEntry = NULL;
-	AppendOnlyEntry *aoEntry = NULL;
-	AOSegfileStatus *segfilestatus = NULL;
-
-	Assert(Gp_role == GP_ROLE_DISPATCH);
-	Assert(segno >= 0);
-
-	if (Debug_appendonly_print_segfile_choice)
-	{
-		ereport(LOG,(errmsg("UpdateMasterAosegTotals: Updating aoseg entry for append-only relation %d "
-							"with " INT64_FORMAT " new tuples for segno %d",
-							RelationGetRelid(parentrel), (int64)tupcount, segno)));
-	}
-
-	if((int64) tupcount < 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("int64 out of range (" INT64_FORMAT ")", (int64) tupcount)));
-
-	aoEntry = GetAppendOnlyEntry(RelationGetRelid(parentrel), SnapshotNow);
-	Assert(aoEntry != NULL);
-
-	// CONSIDER: We should probably get this lock even sooner.
-	LockRelationAppendOnlySegmentFile(
-									&parentrel->rd_node,
-									segno,
-									AccessExclusiveLock,
-									/* dontWait */ false);
-
-	if(RelationIsAoRows(parentrel))
-	{
-		FileSegInfo		*fsinfo;
-
-		/* get the information for the file segment we inserted into */
-
-		/*
-		 * Since we have an exclusive lock on the segment-file entry, we can use SnapshotNow.
-		 */
-        fsinfo = GetFileSegInfo(parentrel, aoEntry, SnapshotNow, segno);
-		if (fsinfo == NULL)
-		{
-			InsertInitialSegnoEntry(aoEntry, segno);
-		}
-		else
-		{
-			pfree(fsinfo);
-		}
-
-		/*
-		 * Update the master AO segment info table with correct tuple count total
-		 */
-        UpdateFileSegInfo(parentrel, aoEntry, segno, 0, 0, tupcount, 0);
-	}
-    else
-    {
-    		Assert(RelationIsParquet(parentrel));
-
-    		ParquetFileSegInfo		*fsinfo;
-
-		/* get the information for the file segment we inserted into */
-
-		/*
-		 * Since we have an exclusive lock on the segment-file entry, we can use SnapshotNow.
-		 */
-		fsinfo = GetParquetFileSegInfo(parentrel, aoEntry, SnapshotNow, segno);
-		if (fsinfo == NULL)
-		{
-			InsertInitialParquetSegnoEntry(aoEntry, segno);
-		}
-		else
-		{
-			pfree(fsinfo);
-		}
-
-		/*
-		 * Update the master Parquet segment info table with correct tuple count total
-		 */
-		UpdateParquetFileSegInfo(parentrel, aoEntry, segno, 0, 0, tupcount);
-    }
-
-	/*
-	 * Now, update num of tups added in the hash table. This pending count will
-	 * get added to the total count when the transaction actually commits.
-	 * (or will get discarded if it aborts). We don't need to do the same
-	 * trick for the aoseg table since MVCC protects us there in case we abort.
-	 */
-	aoHashEntry = AORelGetHashEntry(RelationGetRelid(parentrel));
-	segfilestatus = AORelLookupSegfileStatus(segno, aoHashEntry);
-	segfilestatus->tupsadded += tupcount;
-
-	pfree(aoEntry);
-}
-
 
 /*
  * Pre-commit processing for append only tables.
@@ -1890,7 +1788,7 @@ struct SegFileMap
 
 /*  Get segment file length info from catalog.
  *  The length is maintained by hawq, which is different from hdfs file length,
- *  because hdfs file may contain some garbag data which is generated by rollbacking the insert transaction
+ *  because hdfs file may contain some garbage data which is generated by rollbacking the insert transaction
  */
     static struct SegFileMap *
 GetSegmentFileLengthMapping(Relation rel, Oid segrelid, int segno, int *totalsegs)
@@ -1922,30 +1820,42 @@ GetSegmentFileLengthMapping(Relation rel, Oid segrelid, int segno, int *totalseg
 
             pfree(fsinfo);
         }
-    }
-    else
-    {
-        Assert(RelationIsParquet(rel));
-        ParquetFileSegInfo **fsinfo;
+    } else if (RelationIsOrc(rel)) {
+      FileSegInfo **fsinfo;
 
-        fsinfo = GetAllParquetFileSegInfoWithSegno(rel, &aoEntry, SnapshotNow, segno, totalsegs);
+      fsinfo = getAllOrcFileSegInfoWithSegNo(&aoEntry, SnapshotNow, segno,
+                                             totalsegs);
+      if (fsinfo == NULL) {
+        return NULL;
+      } else {
+        retval = palloc0(sizeof(struct SegFileMap) * *totalsegs);
 
-        if (fsinfo == NULL)
-        {
-            return NULL;
+        for (i = 0; i < *totalsegs; ++i) {
+          retval[i].eof = fsinfo[i]->eof;
+          retval[i].ok = false;
         }
-        else
-        {
-            retval = palloc0(sizeof(struct SegFileMap) * *totalsegs);
 
-            for (i = 0; i < *totalsegs; ++i)
-            {
-                retval[i].eof = fsinfo[i]->eof;
-                retval[i].ok = false;
-            }
+        pfree(fsinfo);
+      }
+    } else {
+      Assert(RelationIsParquet(rel));
+      ParquetFileSegInfo **fsinfo;
 
-            pfree(fsinfo);
+      fsinfo = GetAllParquetFileSegInfoWithSegno(rel, &aoEntry, SnapshotNow,
+                                                 segno, totalsegs);
+
+      if (fsinfo == NULL) {
+        return NULL;
+      } else {
+        retval = palloc0(sizeof(struct SegFileMap) * *totalsegs);
+
+        for (i = 0; i < *totalsegs; ++i) {
+          retval[i].eof = fsinfo[i]->eof;
+          retval[i].ok = false;
         }
+
+        pfree(fsinfo);
+      }
     }
 
     for (i = 0; i < *totalsegs; ++i)
@@ -2116,7 +2026,7 @@ TestCurrentTspSupportTruncateInternal(Oid tsp, const char *tspPathPrefix)
 
     errno = 0;
     rc = PathFileTruncate(path);
-    Insist(rc < 0 && "Truncate a non exist file shuld always fail");
+    Insist(rc < 0 && "Truncate a non exist file should always fail");
 
     TspSupportTruncateMap.tsps[TspSupportTruncateMap.size] = tsp;
     TspSupportTruncateMap.values[TspSupportTruncateMap.size] = !(errno == ENOTSUP);

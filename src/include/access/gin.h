@@ -31,11 +31,34 @@
 #define GIN_CONSISTENT_PROC			   4
 #define GINNProcs					   4
 
+/*
+ * searchMode settings for extractQueryFn.
+ */
+#define GIN_SEARCH_MODE_DEFAULT     0
+#define GIN_SEARCH_MODE_INCLUDE_EMPTY 1
+#define GIN_SEARCH_MODE_ALL       2
+#define GIN_SEARCH_MODE_EVERYTHING    3   /* for internal use only */
+
 typedef XLogRecPtr GinNSN;
 
+typedef char GinTernaryValue;
 /*
  * Page opaque data in a inverted index page.
  */
+
+
+/* ginlogic.c */
+enum GinLogicValueEnum
+{
+  GIN_FALSE = 0,      /* item is not present / does not match */
+  GIN_TRUE = 1,     /* item is present / matches */
+  GIN_MAYBE = 2     /* don't know if item is present / don't know if
+               * matches */
+};
+#define DatumGetGinTernaryValue(X) ((GinTernaryValue)(X))
+#define GinTernaryValueGetDatum(X) ((Datum)(X))
+#define PG_RETURN_GIN_TERNARY_VALUE(x) return GinTernaryValueGetDatum(x)
+
 typedef struct GinPageOpaqueData
 {
 	uint16		flags;

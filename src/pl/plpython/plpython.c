@@ -6,6 +6,12 @@
  *********************************************************************
  */
 
+#ifdef __APPLE__
+#undef Py_UNICODE_WIDE
+#else
+#define Py_UNICODE_WIDE
+#endif
+
 #if defined(_MSC_VER) && defined(_DEBUG)
 /* Python uses #pragma to bring in a non-default libpython on VC++ if
  * _DEBUG is defined */

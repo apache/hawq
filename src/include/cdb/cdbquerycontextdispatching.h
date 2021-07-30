@@ -49,30 +49,32 @@
 #include "utils/rel.h"
 #include "utils/relcache.h"
 #include "libpq/pqformat.h"
+#include "magma/cwrapper/magma-client-c.h"
 
 struct Plan;
 
-extern int
-QueryContextDispatchingSizeMemoryLimit;
+extern int QueryContextDispatchingSizeMemoryLimit;
 
 struct QueryContextInfo
 {
-    NodeTag 	type;
+	NodeTag type;
 
-    bool 		useFile;
+	bool useFile;
 
-    char 	   *sharedPath;     /* path on shared storage */
-    File 		file;           /* opened file on shared storage */
+	char *sharedPath; /* path on shared storage */
+	File file; /* opened file on shared storage */
 
-    char 	   *buffer;
-    int 		size;
-    int 		cursor;
+	char *buffer;
+	int size;
+	int cursor;
 
-    HTAB	   *htab;			/* a hash table used to dedup */
+	HTAB *htab; /* a hash table used to dedup */
 
-    List	   *errTblOid;		/* already handled error table oid in the statement */
+	List *errTblOid; /* already handled error table oid in the statement */
 
-    bool  finalized;   /* whether this query context info is closed */
+	bool finalized; /* whether this query context info is closed */
+
+	List *udfNamespaceOid;  // record udf namespace info
 };
 
 typedef struct QueryContextInfo QueryContextInfo;
@@ -82,7 +84,7 @@ typedef struct QueryContextInfo QueryContextInfo;
  */
 struct QueryContextDispatchingSendBackData
 {
-	Oid	relid;
+	Oid relid;
 	int32 segno;
 	int32 contentid;
 	int64 varblock;
@@ -93,11 +95,18 @@ struct QueryContextDispatchingSendBackData
 };
 typedef struct QueryContextDispatchingSendBackData * QueryContextDispatchingSendBack;
 
+extern char* default_table_format; /*in guc.c*/
+
 extern QueryContextDispatchingSendBack
 CreateQueryContextDispatchingSendBack(int nfile);
 
 extern void
 UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback);
+
+extern void UpdateCatalogModifiedOnSegmentsForUD(
+    QueryContextDispatchingSendBack sendback, List **relFileNodeInfo,
+    List **indexList);
+extern void UpdateCatalogIndexForUD(List *indexList);
 
 extern StringInfo
 PreSendbackChangedCatalog(int aocount);
@@ -115,6 +124,8 @@ DropQueryContextDispatchingSendBack(QueryContextDispatchingSendBack sendback);
 extern QueryContextInfo *
 CreateQueryContextInfo(void);
 
+bool
+ReadData(QueryContextInfo *cxt, char *buffer, int size, bool errorOnEof);
 /* for read */
 extern void
 InitQueryContextInfoFromFile(QueryContextInfo *cxt);
@@ -130,7 +141,7 @@ AtEOXact_QueryContext(void);
 
 extern void
 RebuildQueryContext(QueryContextInfo *cxt, HTAB **currentFilesystemCredentials,
-        MemoryContext *currentFilesystemCredentialsMemoryContext);
+		MemoryContext *currentFilesystemCredentialsMemoryContext);
 
 extern void
 AddAuxInfoToQueryContextInfo(QueryContextInfo *cxt);
@@ -140,21 +151,21 @@ AddEmptyTableFlagToContextInfo(QueryContextInfo *cxt, Oid relid);
 
 extern void
 AddTupleToContextInfo(QueryContextInfo *cxt, Oid relid, const char *relname,
-        HeapTuple tuple, int32 contentid);
+		HeapTuple tuple, int32 contentid);
 
 extern void
-AddTupleWithToastsToContextInfo(QueryContextInfo *cxt, Oid relid, const char *relname,
-        HeapTuple tuple, int32 contentid);
+AddTupleWithToastsToContextInfo(QueryContextInfo *cxt, Oid relid,
+		const char *relname, HeapTuple tuple, int32 contentid);
 
 extern void
 AddTablespaceLocationToContextInfo(QueryContextInfo *cxt, Oid tspoid,
-        const char *fmt);
+		const char *fmt);
 void
 AddPgAosegFileToContextInfo(QueryContextInfo *cxt, Relation rel, Oid relaoseg,
-        int numOfTuples, const char *buffer, int size);
+		int numOfTuples, const char *buffer, int size);
 void
 AddAoFastSequenceToContextInfo(QueryContextInfo *cxt, Relation rel,
-        Oid fastsequence, int numOfTuples, const char *buffer, int size);
+		Oid fastsequence, int numOfTuples, const char *buffer, int size);
 
 extern void
 prepareDispatchedCatalogTargets(QueryContextInfo *cxt, List *targets);
@@ -163,21 +174,30 @@ extern void
 prepareDispatchedCatalogPlan(QueryContextInfo *cxt, struct Plan *plan);
 
 extern void
+prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid);
+
+extern void
 prepareDispatchedCatalog(QueryContextInfo *cxt, List *rtable);
 
 extern void
 prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
-        bool forInsert, List *segnoMaps);
+		bool forInsert, List *segnoMaps, bool expandPartiton);
 
 extern void
 prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid tablespace);
+
+extern void
+prepareDispatchedCatalogDatabase(QueryContextInfo *cxt, char *dbname);
+
+extern void
+prepareDispatchedPlugStorageSnaphost(QueryContextInfo *cxt, MagmaSnapshot *snapshot);
 
 extern void
 prepareDispatchedCatalogTablespace(QueryContextInfo *cxt, Oid tablespace);
 
 extern void
 prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid oid,
-        bool forInsert, List *segnos);
+		bool forInsert, List *segnos);
 
 extern HTAB *
 createPrepareDispatchedCatalogRelationDisctinctHashTable(void);
@@ -186,6 +206,7 @@ extern List *
 fetchSegFileInfos(Oid relid, List *segnos);
 
 extern List *
-GetResultRelSegFileInfos(Oid relid, List *segnomaps, List *existing_seginfomaps);
+GetResultRelSegFileInfos(Oid relid, List *segnomaps,
+		List *existing_seginfomaps);
 
 #endif /* _CDB_CDBQUERYCONTEXTDISPATCHING_H_ */

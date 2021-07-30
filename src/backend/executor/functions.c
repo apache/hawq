@@ -529,15 +529,40 @@ postquel_getnext(execution_state *es, SQLFunctionCachePtr fcache)
 			 * ExecutorRun is guaranteed to return NULL.)
 			 */
 			if (LAST_POSTQUEL_COMMAND(es) &&
-				es->qd->operation == CMD_SELECT &&
-				es->qd->plannedstmt->intoClause == NULL)
+					es->qd->operation == CMD_SELECT &&
+					es->qd->plannedstmt->intoClause == NULL)
 				count = 1L;
 			else
 				count = 0L;
 
-			result = ExecutorRun(es->qd, ForwardScanDirection, count);
-		}
-	}
+			if (es->qd->newPlan) {
+				if (count == 0L) {
+					result = NULL;
+					exec_mpp_query_new(
+							es->qd->newPlan->str, es->qd->newPlan->len,
+							currentSliceId, false, NULL, NULL);
+				} else {
+					es->qd->newExecutorState =
+							makeMyNewExecutorTupState(es->qd->tupDesc);
+
+					beginMyNewExecutor(es->qd->newPlan->str,
+														 es->qd->newPlan->len,
+														 currentSliceId, NULL);
+					execMyNewExecutor(es->qd->newExecutorState);
+					if (es->qd->newExecutorState->hasTuple) {
+						result = es->qd->newExecutorState->slot;
+						stopMyNewExecutor();
+					}
+					else {
+						result = NULL;
+					}
+				}
+			} else {
+				result =
+						ExecutorRun(es->qd, ForwardScanDirection, count);
+			}
+    }
+  }
 	PG_CATCH();
 	{
 		/* Restore global vars and propagate error */
@@ -577,6 +602,7 @@ postquel_end(execution_state *es)
 		    savedSegNum = list_length(es->qd->resource->segments);
 		  }
 			ExecutorEnd(es->qd);
+			if (es->qd->newExecutorState) endMyNewExecutor(&es->qd->newExecutorState);
 
 			/* MPP-14001: Running auto_stats */
 			if (Gp_role == GP_ROLE_DISPATCH)

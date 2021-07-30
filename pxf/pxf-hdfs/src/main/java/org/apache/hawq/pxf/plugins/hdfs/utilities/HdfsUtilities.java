@@ -19,9 +19,9 @@ package org.apache.hawq.pxf.plugins.hdfs.utilities;
  * under the License.
  */
 
+
 import org.apache.hawq.pxf.api.io.DataType;
 import org.apache.hawq.pxf.api.OneField;
-import org.apache.hawq.pxf.api.utilities.FragmentMetadata;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.Utilities;
 import org.apache.avro.Schema;
@@ -30,6 +30,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.mapred.FsInput;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -40,9 +41,6 @@ import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hawq.pxf.plugins.hdfs.ParquetUserData;
-import org.apache.parquet.schema.MessageType;
-import org.apache.parquet.schema.MessageTypeParser;
 
 import java.io.*;
 import java.util.List;
@@ -153,31 +151,18 @@ public class HdfsUtilities {
      * @param fsp file split to be serialized
      * @return byte serialization of fsp
      * @throws IOException if I/O errors occur while writing to the underlying
-     *                     stream
+     *             stream
      */
     public static byte[] prepareFragmentMetadata(FileSplit fsp)
             throws IOException {
-
-        return prepareFragmentMetadata(fsp.getStart(), fsp.getLength(), fsp.getLocations());
-
-    }
-
-    public static byte[] prepareFragmentMetadata(long start, long length, String[] locations)
-            throws IOException {
-
-        ByteArrayOutputStream byteArrayStream = writeBaseFragmentInfo(start, length, locations);
+        ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
+        ObjectOutputStream objectStream = new ObjectOutputStream(
+                byteArrayStream);
+        objectStream.writeLong(fsp.getStart());
+        objectStream.writeLong(fsp.getLength());
+        objectStream.writeObject(fsp.getLocations());
 
         return byteArrayStream.toByteArray();
-
-    }
-
-    private static ByteArrayOutputStream writeBaseFragmentInfo(long start, long length, String[] locations) throws IOException {
-        ByteArrayOutputStream byteArrayStream = new ByteArrayOutputStream();
-        ObjectOutputStream objectStream = new ObjectOutputStream(byteArrayStream);
-        objectStream.writeLong(start);
-        objectStream.writeLong(length);
-        objectStream.writeObject(locations);
-        return byteArrayStream;
     }
 
     /**
@@ -186,11 +171,29 @@ public class HdfsUtilities {
      * @param inputData request input data
      * @return FileSplit with fragment metadata
      */
-    public static FileSplit parseFileSplit(InputData inputData) {
+    public static FileSplit parseFragmentMetadata(InputData inputData) {
         try {
-            FragmentMetadata fragmentMetadata = Utilities.parseFragmentMetadata(inputData);
+            byte[] serializedLocation = inputData.getFragmentMetadata();
+            if (serializedLocation == null) {
+                throw new IllegalArgumentException(
+                        "Missing fragment location information");
+            }
 
-            FileSplit fileSplit = new FileSplit(new Path(inputData.getDataSource()), fragmentMetadata.getStart(), fragmentMetadata.getEnd(), fragmentMetadata.getHosts());
+            ByteArrayInputStream bytesStream = new ByteArrayInputStream(
+                    serializedLocation);
+            ObjectInputStream objectStream = new ObjectInputStream(bytesStream);
+
+            long start = objectStream.readLong();
+            long end = objectStream.readLong();
+
+            String[] hosts = (String[]) objectStream.readObject();
+
+            FileSplit fileSplit = new FileSplit(new Path(
+                    inputData.getDataSource()), start, end, hosts);
+
+            LOG.debug("parsed file split: path " + inputData.getDataSource()
+                    + ", start " + start + ", end " + end + ", hosts "
+                    + ArrayUtils.toString(hosts));
 
             return fileSplit;
 
@@ -233,7 +236,7 @@ public class HdfsUtilities {
     public static String toString(List<OneField> complexRecord, String delimiter) {
         StringBuilder buff = new StringBuilder();
         String delim = ""; // first iteration has no delimiter
-        if (complexRecord == null)
+        if(complexRecord == null)
             return "";
         for (OneField complex : complexRecord) {
             if (complex.type == DataType.BYTEA.getOID()) {
@@ -246,15 +249,5 @@ public class HdfsUtilities {
             delim = delimiter;
         }
         return buff.toString();
-    }
-
-    public static byte[] makeParquetUserData(MessageType schema) throws IOException {
-        ParquetUserData userData = new ParquetUserData(schema);
-        return userData.toString().getBytes();
-    }
-
-    public static ParquetUserData parseParquetUserData(InputData input) {
-        MessageType schema = MessageTypeParser.parseMessageType(new String(input.getFragmentUserData()));
-        return new ParquetUserData(schema);
     }
 }

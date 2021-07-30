@@ -20,6 +20,8 @@
 #define PG_NAMESPACE_H
 
 #include "catalog/genbki.h"
+#include "nodes/pg_list.h"
+#include "utils/relcache.h"
 
 /* ----------------------------------------------------------------
  *		pg_namespace definition.
@@ -94,14 +96,49 @@ typedef FormData_pg_namespace *Form_pg_namespace;
  *		compiler constants for pg_namespace
  * ----------------
  */
-#define Natts_pg_namespace          4
+#define Natts_pg_namespace          5
 #define Anum_pg_namespace_nspname   1
 #define Anum_pg_namespace_nspowner  2
 #define Anum_pg_namespace_nspacl    3
 #define Anum_pg_namespace_nspdboid  4
+#define Anum_pg_namespace_oid       -2
 
 
 /* TIDYCAT_END_CODEGEN */
+
+/*
+ * gp_exttable values for FormData_pg_attribute.
+ *
+ * [Similar examples are Schema_pg_type, Schema_pg_proc, Schema_pg_attribute, etc, in
+ *  pg_attribute.h]
+ */
+#define Schema_pg_namespace \
+{ NamespaceRelationId, {"nspname"},		 							19, -1,	64, 1, 0, -1, -1, false, 'p', 'i', true, false, false, true, 0 }, \
+{ NamespaceRelationId, {"nspowner"},									26, -1, 4, 2, 0, -1, -1, true, 'p', 'i', true, false, false, true, 0 }, \
+{ NamespaceRelationId, {"nspacl"},									1034, -1, -1, 3, 1, -1, -1, false, 'x', 'i', false, false, false, true, 0 }, \
+{ NamespaceRelationId, {"nspdboid"},									26, -1, 4, 4, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0 }, \
+{ NamespaceRelationId, {"oid"},										26, 0, 4, -2, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0 }
+
+/*
+ * pg_namespace table values for FormData_pg_namespace.
+ */
+#define Class_pg_namespace \
+  {"pg_namespace"}, PG_CATALOG_NAMESPACE, 10276, BOOTSTRAP_SUPERUSERID, 0, \
+               NamespaceRelationId, DEFAULTTABLESPACE_OID, \
+               25, 10000, 0, 0, 0, 0, true, false, RELKIND_RELATION, RELSTORAGE_HEAP, Natts_pg_namespace, \
+               0, 0, 0, 0, 0, true, false, false, false, FirstNormalTransactionId, {0}, {{{'\0','\0','\0','\0'},{'\0'}}}
+
+/*
+ * Descriptor of a single AO relation.
+ * For now very similar to the catalog row itself but may change in time.
+ */
+typedef struct NameSpaceEntry
+{
+	char*	nspname;
+	Oid		nspowner;
+	List*	nspacl;
+	Oid		nspdboid;
+} NameSpaceEntry;
 
 /* ----------------
  * initial contents of pg_namespace
@@ -137,5 +174,12 @@ DESCR("Reserved schema for Append Only segment list and eof tables");
  * prototypes for functions in pg_namespace.c
  */
 extern Oid NamespaceCreate(const char *nspName, Oid ownerId, Oid forceOid);
+
+extern NameSpaceEntry *
+GetNameSpaceEntryFromTuple(
+	Relation		pg_namespace_rel,
+	TupleDesc	pg_namespace_dsc,
+	HeapTuple	tuple,
+	Oid			*relationId);
 
 #endif   /* PG_NAMESPACE_H */

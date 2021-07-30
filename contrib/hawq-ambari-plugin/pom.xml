@@ -20,9 +20,9 @@
 
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.hawq</groupId>
-  <artifactId>hawq-ambari-plugin</artifactId>
-  <version>2.4.0.0</version>
-  <name>hawq-ambari-plugin</name>
+  <artifactId>oushu-database-ambari-plugin</artifactId>
+  <version>4.0.0.0</version>
+  <name>oushu-database-ambari-plugin</name>
   <url>http://maven.apache.org</url>
 
   <properties>

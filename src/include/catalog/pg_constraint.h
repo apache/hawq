@@ -229,4 +229,8 @@ extern void get_constraint_relation_oids(Oid constraint_oid, Oid *conrelid, Oid 
 extern bool ConstraintGetPrimaryKeyOf(Oid relid, AttrNumber attno, 
 					Oid *pkrelid, AttrNumber *pkattno);
 
+extern void ConstraintGetPrimaryKeys(Oid relid,
+                                     int *pknatts,
+                                     AttrNumber **pkattno);
+
 #endif   /* PG_CONSTRAINT_H */

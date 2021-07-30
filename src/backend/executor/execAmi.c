@@ -140,6 +140,8 @@ ExecReScan(PlanState *node, ExprContext *exprCtxt)
 			break;
 			
 		case T_ExternalScanState:
+		case T_MagmaIndexScanState:
+		case T_MagmaIndexOnlyScanState:
 			ExecExternalReScan((ExternalScanState *) node, exprCtxt);
 			break;			
 
@@ -625,9 +627,11 @@ ExecEagerFree(PlanState *node)
 			break;
 			
 		case T_ExternalScanState:
+		case T_MagmaIndexScanState:
+		case T_MagmaIndexOnlyScanState:
 			ExecEagerFreeExternalScan((ExternalScanState *)node);
 			break;
-			
+
 		case T_IndexScanState:
 			ExecEagerFreeIndexScan((IndexScanState *)node);
 			break;

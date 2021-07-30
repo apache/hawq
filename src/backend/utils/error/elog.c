@@ -102,6 +102,8 @@
 
 #include "miscadmin.h"
 
+#include "utils/portal.h"
+#include "utils/timestamp.h"
 /*
  * dlfcn.h on OSX only has dladdr visible if _DARWIN_C_SOURCE is defined.
  */
@@ -557,6 +559,14 @@ errfinish(int dummy __attribute__((unused)),...)
      */
     if (elevel == ERROR)
     {
+        if (Gp_role == GP_ROLE_DISPATCH && enable_pg_stat_activity_history && is_qtype_sql)
+        {
+          char *errorInfo = edata->message;
+          pgStatActivityHistory_send(MyProc->databaseId, MyProc->roleId, MyProc->pid,
+                              MyProc->mppSessionId, sql_creation_time,
+                              timestamptz_to_str(GetCurrentTimestamp()), MyProcPort, application_name,
+                              sql_cpu, sql_memory, -1, errorInfo, sql_text);
+        }
         /*
          * GP: While doing local error try/catch, do not reset all these
          * important variables!

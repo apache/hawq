@@ -2305,7 +2305,6 @@ char *getRoleName(Oid role_id)
 						NULL,
 						cql("SELECT rolname FROM pg_authid  WHERE oid = :1 ",
 							ObjectIdGetDatum(role_id)));
-
 	if (role_name == NULL)
 		elog(ERROR, "oid [%u] not found in table pg_authid", role_id);
 	return role_name;
@@ -2477,6 +2476,17 @@ char *getNamespaceNameFromOid(Oid object_oid)
 	pfree(database_name);
 	caql_endscan(pCtx);
 	return tname.data;
+}
+
+/* get index name by index oid */
+char *getIndexNameByOid(Oid object_oid)
+{
+	Assert(OidIsValid(object_oid));
+	return caql_getcstring(
+				NULL,
+				cql("SELECT relname FROM pg_class "
+					" WHERE oid = :1",
+				ObjectIdGetDatum(object_oid)));
 }
 
 char *getNamespaceNameByOid(Oid object_oid)

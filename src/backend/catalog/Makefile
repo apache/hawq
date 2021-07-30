@@ -29,7 +29,6 @@ include $(top_srcdir)/src/backend/common.mk
 
 cdb_init.sql: cdb_schema.sql filesystem.sql
 	cat $(call vpathsearch,cdb_schema.sql) $(call vpathsearch,cdb_external_extensions.sql) $(call vpathsearch,filesystem.sql) > cdb_init.sql
-
 ifeq ($(with_orc), yes)
 	cat $(srcdir)/../../../contrib/orc/orc_init.sql >> cdb_init.sql
 endif
@@ -143,12 +142,17 @@ install-data: $(BKIFILES) installdirs
 	$(INSTALL_DATA) $(call vpathsearch,cdb_init.sql) '$(DESTDIR)$(datadir)/cdb_init.sql'
 	$(INSTALL_DATA) $(call vpathsearch,cdb_external_extensions.sql) '$(DESTDIR)$(datadir)/cdb_external_extensions.sql'
 	$(INSTALL_DATA) $(call vpathsearch,filesystem.sql) '$(DESTDIR)$(datadir)/filesystem.sql'
-	
+	$(INSTALL_DATA) $(srcdir)/../utils/adt/array_distance_install.sql '$(DESTDIR)$(datadir)/array_distance_install.sql'
+	$(INSTALL_DATA) $(srcdir)/../utils/adt/array_distance_uninstall.sql '$(DESTDIR)$(datadir)/array_distance_uninstall.sql'
+
 ifeq ($(with_orc), yes)
 	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/orc_install.sql '$(DESTDIR)$(datadir)/orc_install.sql'
+	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/hive_install.sql '$(DESTDIR)$(datadir)/hive_install.sql'
 	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/orc_uninstall.sql '$(DESTDIR)$(datadir)/orc_uninstall.sql'
+	$(INSTALL_SCRIPT) $(srcdir)/../../../contrib/oushu/orc_debug_metadata.py '$(DESTDIR)$(bindir)/orc_debug_metadata.py'
+	$(INSTALL_SCRIPT) $(srcdir)/../../../contrib/oushu/orc_debug_statistics.py '$(DESTDIR)$(bindir)/orc_debug_statistics.py'
+	$(INSTALL_DATA) $(srcdir)/../../../contrib/oushu/load_orc_debug_udf.sql '$(DESTDIR)$(datadir)/load_orc_debug_udf.sql'
 endif
-
 	$(INSTALL_DATA) $(srcdir)/sql_features.txt '$(DESTDIR)$(datadir)/sql_features.txt'
 	$(INSTALL_DATA) $(call vpathsearch,gp_toolkit.sql) '$(DESTDIR)$(datadir)/gp_toolkit.sql'
 

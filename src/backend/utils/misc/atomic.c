@@ -64,7 +64,7 @@ int32 compare_and_swap_32(uint32 *dest, uint32 old, uint32 new)
 		:"%eax","%ecx","%edx"
 		);
 
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) || defined(__clang__) || defined(__GNUC__)
 	res = __sync_bool_compare_and_swap(dest, old, new);
 
 #elif defined(__sparc__)
@@ -91,7 +91,7 @@ int32 compare_and_swap_64(uint64 *dest, uint64 old, uint64 new)
 
 	volatile int32 res = 0;
 	
-#if defined(__x86_64__)
+#if defined(__x86_64__) ||defined(__clang__) || defined(__GNUC__)
 	res = __sync_bool_compare_and_swap(dest, old, new);
 
 #elif defined(__sparc__)
@@ -151,7 +151,7 @@ int32 compare_and_swap_ulong(unsigned long *dest,
  */
 int32 gp_lock_test_and_set(volatile int32 *ptr, int32 val)
 {
-#if defined(__x86_64__) || defined(__i386)
+#if defined(__x86_64__) || defined(__i386) || defined(__clang__) || defined(__GNUC__)
 
 	int32 oldValue = __sync_lock_test_and_set(ptr, val);
 	return oldValue;
@@ -169,7 +169,7 @@ int32 gp_atomic_add_32(volatile int32 *ptr, int32 inc)
 {
 	volatile int32 newValue = 0;
 	
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__clang__) || defined(__GNUC__)
 	int32 oldValue = __sync_fetch_and_add(ptr, inc);
 	newValue = oldValue + inc;
 
@@ -203,7 +203,7 @@ int64 gp_atomic_add_int64(int64 *ptr, int64 inc)
 
 	volatile int64 newValue = 0;
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__clang__) || defined(__GNUC__)
 	int64 oldValue = __sync_fetch_and_add(ptr, inc);
 	newValue = oldValue + inc;
 
@@ -261,7 +261,7 @@ uint64 gp_atomic_add_uint64(uint64 *ptr, int64 inc)
 	volatile uint64 newValue = 0;
 	uint64 uInc = (uint64) inc;
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__clang__) || defined(__GNUC__)
 	uint64 oldValue = __sync_fetch_and_add(ptr, uInc);
 	newValue = oldValue + uInc;
 #elif defined(__i386)

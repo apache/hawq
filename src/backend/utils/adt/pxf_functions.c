@@ -83,6 +83,10 @@ static void pxf_item_fields_enum_end(void)
 
 Datum pxf_get_item_fields(PG_FUNCTION_ARGS)
 {
+	ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					errmsg("the pxf protocol for external tables is deprecated"),
+					errOmitLocation(true)));
 	MemoryContext oldcontext;
 	FuncCallContext *funcctx;
 	HeapTuple tuple;

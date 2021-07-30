@@ -349,4 +349,9 @@ extern void WaitInterconnectQuitUDP(void);
 
 extern void adjustMasterRouting(Slice *recvSlice);
 
+extern void InitNewInterconnect();
+extern void CleanUpNewInterconnect();
+
+extern void ResetRpcClientInstance();
+
 #endif   /* ML_IPC_H */

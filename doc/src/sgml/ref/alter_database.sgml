@@ -28,10 +28,6 @@ where <replaceable class="PARAMETER">option</replaceable> can be:
 
 ALTER DATABASE <replaceable class="PARAMETER">name</replaceable> SET <replaceable>parameter</replaceable> { TO | = } { <replaceable>value</replaceable> | DEFAULT }
 ALTER DATABASE <replaceable class="PARAMETER">name</replaceable> RESET <replaceable>parameter</replaceable>
-
-ALTER DATABASE <replaceable class="PARAMETER">name</replaceable> RENAME TO <replaceable>newname</replaceable>
-
-ALTER DATABASE <replaceable class="PARAMETER">name</replaceable> OWNER TO <replaceable>new_owner</replaceable>
 </synopsis>
  </refsynopsisdiv>
 
@@ -59,23 +55,6 @@ ALTER DATABASE <replaceable class="PARAMETER">name</replaceable> OWNER TO <repla
    owner or a superuser can change the session defaults for a
    database.  Certain variables cannot be set this way, or can only be
    set by a superuser.
-  </para>
-
-  <para>
-   The fourth form changes the name of the database.  Only the database
-   owner or a superuser can rename a database; non-superuser owners must
-   also have the
-   <literal>CREATEDB</literal> privilege.  The current database cannot
-   be renamed.  (Connect to a different database if you need to do
-   that.)
-  </para>
-
-  <para>
-   The fifth form changes the owner of the database.
-   To alter the owner, you must own the database and also be a direct or
-   indirect member of the new owning role, and you must have the
-   <literal>CREATEDB</literal> privilege.
-   (Note that superusers have all these privileges automatically.)
   </para>
  </refsect1>
 
@@ -123,25 +102,6 @@ ALTER DATABASE <replaceable class="PARAMETER">name</replaceable> OWNER TO <repla
        </para>
       </listitem>
      </varlistentry>
-
-   <varlistentry>
-    <term><replaceable>newname</replaceable></term>
-    <listitem>
-     <para>
-      The new name of the database.
-     </para>
-    </listitem>
-   </varlistentry>
-
-   <varlistentry>
-    <term><replaceable class="parameter">new_owner</replaceable></term>
-    <listitem>
-     <para>
-      The new owner of the database.
-     </para>
-    </listitem>
-   </varlistentry>
-  </variablelist>
  </refsect1>
 
  <refsect1>
@@ -153,16 +113,6 @@ ALTER DATABASE <replaceable class="PARAMETER">name</replaceable> OWNER TO <repla
    <xref linkend="sql-alteruser" endterm="sql-alteruser-title">.
    User-specific settings override database-specific
    ones if there is a conflict.
-  </para>
-
-  <para>
-   Currently RENAME TO is supported only when called by pgdump utility.
-  </para>
-  <para>
-   User can not use "hcatalog" as a name for database, because it's reserved for HCatalog integration feature.
-  </para>
-  <para>
-   User can not rename "hcatalog" database, because it's reserved for HCatalog integration feature.
   </para>
  </refsect1>
 

@@ -763,6 +763,50 @@ contain_mutable_functions_walker(Node *node, void *context)
 								  context);
 }
 
+bool check_volatile_functions(Node *node, void *context) {
+  if (node == NULL) return false;
+  if (IsA(node, FuncExpr)) {
+    FuncExpr *expr = (FuncExpr *)node;
+
+    if (func_volatile(expr->funcid) == PROVOLATILE_VOLATILE) return true;
+    /* else fall through to check args */
+  }
+  if (IsA(node, OpExpr)) {
+    OpExpr *expr = (OpExpr *)node;
+
+    if (op_volatile(expr->opno) == PROVOLATILE_VOLATILE) return true;
+    /* else fall through to check args */
+  }
+  if (IsA(node, DistinctExpr)) {
+    DistinctExpr *expr = (DistinctExpr *)node;
+
+    if (op_volatile(expr->opno) == PROVOLATILE_VOLATILE) return true;
+    /* else fall through to check args */
+  }
+  if (IsA(node, ScalarArrayOpExpr)) {
+    ScalarArrayOpExpr *expr = (ScalarArrayOpExpr *)node;
+
+    if (op_volatile(expr->opno) == PROVOLATILE_VOLATILE) return true;
+    /* else fall through to check args */
+  }
+  if (IsA(node, NullIfExpr)) {
+    NullIfExpr *expr = (NullIfExpr *)node;
+
+    if (op_volatile(expr->opno) == PROVOLATILE_VOLATILE) return true;
+    /* else fall through to check args */
+  }
+  if (IsA(node, RowCompareExpr)) {
+    /* RowCompare probably can't have volatile ops, but check anyway */
+    RowCompareExpr *rcexpr = (RowCompareExpr *)node;
+    ListCell *opid;
+
+    foreach (opid, rcexpr->opnos) {
+      if (op_volatile(lfirst_oid(opid)) == PROVOLATILE_VOLATILE) return true;
+    }
+    /* else fall through to check args */
+  }
+  return plan_tree_walker(node, check_volatile_functions, context);
+}
 
 /*****************************************************************************
  *		Check clauses for volatile functions
@@ -2847,7 +2891,9 @@ simplify_function(Oid funcid, Oid result_type, List *args,
 	if (!HeapTupleIsValid(func_tuple))
 		elog(ERROR, "cache lookup failed for function %u", funcid);
 
-	if (is_in_planning_phase())
+	// The first planning doesn't own resource while udf calculation
+	// needs resource, only allow built-in function calculation here
+	if (is_in_planning_phase() && funcid >= FirstNormalObjectId)
 	{
 		newexpr = NULL;
 	}

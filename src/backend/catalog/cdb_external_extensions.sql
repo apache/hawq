@@ -59,3 +59,37 @@ CREATE OR REPLACE FUNCTION hdfs_blocklocation() RETURNS void
 AS '$libdir/exthdfs.so', 'hdfsprotocol_blocklocation'
 LANGUAGE C STABLE;
 
+------------------------------------------------------------------
+-- external HIVE
+------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION hive_validate() RETURNS void
+AS '$libdir/exthive.so', 'hiveprotocol_validate'
+LANGUAGE C STABLE;
+
+CREATE OR REPLACE FUNCTION hive_blocklocation() RETURNS void
+AS '$libdir/exthive.so', 'hiveprotocol_blocklocation'
+LANGUAGE C STABLE;
+
+------------------------------------------------------------------
+-- csv Formatters
+------------------------------------------------------------------
+  
+CREATE OR REPLACE FUNCTION csv_in() RETURNS record 
+AS '$libdir/extfmtcsv.so', 'extfmtcsv_in'
+LANGUAGE C STABLE;
+
+CREATE OR REPLACE FUNCTION csv_out(record) RETURNS bytea 
+AS '$libdir/extfmtcsv.so', 'extfmtcsv_out'
+LANGUAGE C STABLE;
+
+------------------------------------------------------------------
+-- text Formatters
+------------------------------------------------------------------
+  
+CREATE OR REPLACE FUNCTION text_in() RETURNS record 
+AS '$libdir/extfmtcsv.so', 'extfmttext_in'
+LANGUAGE C STABLE;
+
+CREATE OR REPLACE FUNCTION text_out(record) RETURNS bytea 
+AS '$libdir/extfmtcsv.so', 'extfmttext_out'
+LANGUAGE C STABLE;

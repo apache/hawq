@@ -616,15 +616,17 @@ bool handleRMSEGRequestIMAlive(void **arg)
 				SMBUFF_CONTENT(&machinereport));
 	destroySelfMaintainBuffer(&machinereport);
 
-	/* Get hostname and ip address from the connection's sockaddr */
 	char*    		fts_client_ip     = NULL;
 	uint32_t 		fts_client_ip_len = 0;
+	/*
 	struct hostent* fts_client_host   = NULL;
+        char            fts_client_host_str[16];
 	struct in_addr 	fts_client_addr;
-
+	*/
 	Assert(conntrack->CommBuffer != NULL);
 	fts_client_ip = conntrack->CommBuffer->ClientAddrDotStr;
 	fts_client_ip_len = strlen(fts_client_ip);
+	/*
 	inet_aton(fts_client_ip, &fts_client_addr);
 	fts_client_host = gethostbyaddr(&fts_client_addr, 4, AF_INET);
 	if (fts_client_host == NULL)
@@ -632,6 +634,7 @@ bool handleRMSEGRequestIMAlive(void **arg)
 		elog(WARNING, "failed to reverse DNS lookup for ip %s.", fts_client_ip);
 		return true;
 	}
+	*/
 
 	/* Get the received machine id instance start address. */
 	SegInfo fts_client_seginfo = (SegInfo)(SMBUFF_CONTENT(&(conntrack->MessageBuff)) +
@@ -719,11 +722,39 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	/* fill in hostname */
 	newseginfoptr = SMBUFF_HEAD(SegInfo, &(newseginfo));
 	newseginfoptr->HostNameOffset = getSMBContentSize(&newseginfo);
-	appendSMBStr(&newseginfo,fts_client_host->h_name);
+	/*
+	if (fts_client_host != NULL) 
+	{
+		appendSMBStr(&newseginfo, fts_client_host->h_name);
+	}
+	else
+	{
+		appendSMBStr(&newseginfo, fts_client_host_str);
+	}
+	*/
+	appendSelfMaintainBuffer(&newseginfo, fts_client_ip, fts_client_ip_len);
+	appendSelfMaintainBuffer(&newseginfo, "", 1);
+
+	/*
+	appendSMBStr(&newseginfo, fts_client_host_str);
+	*/
+
 	appendSelfMaintainBufferTill64bitAligned(&newseginfo);
 
 	newseginfoptr = SMBUFF_HEAD(SegInfo, &(newseginfo));
-	newseginfoptr->HostNameLen = strlen(fts_client_host->h_name);
+
+	/*
+	if (fts_client_host != NULL)
+	{
+		newseginfoptr->HostNameLen = strlen(fts_client_host->h_name);
+	}
+	else
+	{
+		newseginfoptr->HostNameLen = strlen(fts_client_host_str);
+	}
+	*/
+	newseginfoptr->HostNameLen = fts_client_ip_len;
+
 	appendSelfMaintainBufferTill64bitAligned(&newseginfo);
 
 	/* fill in failed temporary directory string */
@@ -750,9 +781,13 @@ bool handleRMSEGRequestIMAlive(void **arg)
 	newseginfoptr->GRMRackNameLen = 0;
 	newseginfoptr->GRMRackNameOffset = 0;
 
+	/*
 	elog(RMLOG, "resource manager received IMAlive message, "
 				"this segment's hostname: %s\n",
-				fts_client_host->h_name);
+				fts_client_host != NULL ? 
+				fts_client_host->h_name :
+				fts_client_host_str);
+	*/
 
 	/* build segment status information instance and add to resource pool */
 	SegStat newsegstat = (SegStat)

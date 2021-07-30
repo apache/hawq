@@ -23,9 +23,6 @@
 #include "storage/bufpage.h"
 #include "utils/tqual.h"
 
-/* forward declaration from nodes/execnodes.h */
-typedef struct ScanState ScanState;
-
 typedef struct HeapScanDescData
 {
 	/* scan parameters */
@@ -99,6 +96,7 @@ typedef IndexScanDescData *IndexScanDesc;
 /*
  * used for scan of external relations
  */
+struct ScanState;
 typedef struct FileScanDescData
 {
 	/* scan parameters */
@@ -133,14 +131,16 @@ typedef struct FileScanDescData
 	FormatterData *fs_formatter;
 	
 	/* formatter type and name */
-	int fs_formatter_type;
-	char *fs_formatter_name;
+	int		 fs_formatter_type;
+	char	*fs_formatter_name;
+	char  *fs_serializeSchema;
+	int    fs_serializeSchemaLen;
 
 	/* current scan information for pluggable format */
-	PlugStorageScanFuncs fs_ps_scan_funcs;   /* scan functions */
-	void *fs_ps_user_data;                   /* user data */
-	ScanState *fs_ps_scan_state;             /* support rescan */
-	Plan *fs_ps_plan;                        /* support rescan */
+	 PlugStorageScanFuncs fs_ps_scan_funcs;   /* scan functions */
+	 void *fs_ps_user_data;                   /* user data */
+	 struct ScanState *fs_ps_scan_state;      /* support rescan */
+	 Plan *fs_ps_plan;                        /* support rescan */
 
 }	FileScanDescData;
 

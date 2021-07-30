@@ -491,6 +491,10 @@ PlannerConfig *DefaultPlannerConfig(void)
 	c1->enable_seqscan = enable_seqscan;
 	c1->enable_indexscan = enable_indexscan;
 	c1->enable_bitmapscan = enable_bitmapscan;
+	c1->enable_magma_indexscan = enable_magma_indexscan;
+	c1->enable_magma_bitmapscan = enable_magma_bitmapscan;
+	c1->enable_magma_seqscan = enable_magma_seqscan;
+	c1->enable_magma_indexonlyscan = enable_magma_indexonlyscan;
 	c1->enable_tidscan = enable_tidscan;
 	c1->enable_sort = enable_sort;
 	c1->enable_hashagg = enable_hashagg;

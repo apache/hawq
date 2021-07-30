@@ -149,32 +149,18 @@ refnameRangeTblEntry(ParseState *pstate,
 	Assert(NULL != schemaname);
 
 	Oid dboidCurrent = GetCatalogId(NULL /*catalogname*/);
-	int slevelsUpHcatalog = 0;
 	int slevelsUpCurrent = 0;
 	
 	int *pslevelsUpCurrent = NULL;
-	int *pslevelsUpHcatalog = NULL;
 	
 	if (NULL != sublevels_up)
-	{
 		pslevelsUpCurrent = &slevelsUpCurrent;
-		pslevelsUpHcatalog = &slevelsUpHcatalog;
-	}
 	
 	RangeTblEntry *rteCurrent = refnameRangeTblEntryHelperSchemaQualified(pstate, dboidCurrent, schemaname, refname, pslevelsUpCurrent);
-	RangeTblEntry *rteHcatalog = refnameRangeTblEntryHelperSchemaQualified(pstate, HcatalogDbOid, schemaname, refname, pslevelsUpHcatalog);
 	
-	if (NULL == rteCurrent && NULL == rteHcatalog)
-	{
+	if (NULL == rteCurrent)
 		return NULL;
-	}
-	if (NULL != rteCurrent && NULL != rteHcatalog)
-	{
-		ereport(ERROR,
-					(errcode(ERRCODE_AMBIGUOUS_ALIAS),
-					 errmsg("table reference \"%s.%s\" is ambiguous",
-							schemaname, refname)));
-	}
+
 	if (NULL != rteCurrent)
 	{
 		if (NULL != sublevels_up)
@@ -183,13 +169,6 @@ refnameRangeTblEntry(ParseState *pstate,
 		}
 		return rteCurrent;
 	}
-	
-	Assert(NULL != rteHcatalog);	
-	if (NULL != sublevels_up)
-	{
-		*sublevels_up = *pslevelsUpHcatalog;
-	}
-	return rteHcatalog;
 }
 
 /*
@@ -928,8 +907,8 @@ addRangeTableEntry(ParseState *pstate,
 	rte->alias = alias;
 	rte->rtekind = RTE_RELATION;
 
-	/* external tables don't allow inheritance */
-	if(RelationIsExternal(rel))
+	/* external tables except for pluggable storage don't allow inheritance */
+	if(RelationIsExternal(rel) && !RelationIsPluggableStorage(rte->relid))
 		inh = false;
 
 	/*

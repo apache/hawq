@@ -41,7 +41,9 @@ extern bool workermgr_submit_job(struct WorkerMgrState *state,
 								WorkerMgrTaskCallback func);
 extern void	workermgr_wait_job(struct WorkerMgrState *state);
 extern void	workermgr_cancel_job(struct WorkerMgrState *state);
+extern void workermgr_terminate_job(struct WorkerMgrState *state);
 extern bool workermgr_should_query_stop(struct WorkerMgrState *state);
+extern bool workermgr_should_query_terminate(struct WorkerMgrState *state);
 extern void workermgr_set_state_cancel(struct WorkerMgrState *state);
 
 #endif	/* WORKERMGR_H */

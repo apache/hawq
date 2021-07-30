@@ -391,7 +391,16 @@ DATA(insert OID = 142 (	xml	   PGNSP PGUID -1 f b t \054 0	0 xml_in xml_out xml_
 DESCR("XML content");
 #define XMLOID 142
 DATA(insert OID = 143 (	_xml	   PGNSP PGUID -1 f b t \054 0	142 array_in array_out array_recv array_send - i x f 0 -1 0 _null_ _null_ ));
+/* OIDS 100 - 199 */
+DATA(insert OID = 193 ( json		   PGNSP PGUID -1 f b t \054 0 0 json_in json_out json_recv json_send - i x f 0 -1 0 _null_ _null_ ));
+#define JSONOID 193
+DATA(insert OID = 199 ( _json	   PGNSP PGUID -1 f b t \054 0 193 array_in array_out array_recv array_send - i x f 0 -1 0 _null_ _null_ ));
 
+/* jsonb */
+DATA(insert OID = 3802 ( jsonb      PGNSP PGUID -1 f b t \054 0 0 jsonb_in jsonb_out jsonb_recv jsonb_send  - i x f 0 -1 0 _null_ _null_ ));
+DESCR("Binary JSON");
+#define JSONBOID 3802
+DATA(insert OID = 3807 ( _jsonb     PGNSP PGUID -1 f b t \054 0 3802 array_in array_out array_recv array_send - i x f 0 -1 0 _null_ _null_ ));
 /*  OIDS 200 - 299  */
 
 DATA(insert OID = 210 (	smgr	   PGNSP PGUID 2 t b t \054 0	0 smgrin smgrout - - - s p f 0 -1 0 _null_ _null_ ));

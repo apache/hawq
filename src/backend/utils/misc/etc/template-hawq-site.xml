@@ -161,4 +161,15 @@ under the License.
 		</description>
 	</property>
 	<!-- HAWQ resource enforcement parameters end here. -->
+	<property>
+		<name>hawq_init_with_hdfs</name>
+		<value>true</value>
+		<description>init hawq cluster with hdfs</description>
+	</property>
+	<property>
+		<name>default_table_format</name>
+		<value>appendonly</value>
+		<description>set default table format as appendonly or magmatp when creating table.</description>
+	</property>
+
 </configuration>

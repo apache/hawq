@@ -41,6 +41,7 @@
 #include "cdb/workermgr.h"
 #include "cdb/executormgr.h"
 #include "postmaster/identity.h"
+#include "postmaster/primary_mirror_mode.h"
 #include "cdb/cdbdisp.h"	/* TODO: should remove */
 #include "cdb/cdbgang.h"	/* SliceTable & Gang */
 #include "cdb/cdbvars.h"	/* gp_max_plan_size */
@@ -57,9 +58,11 @@
 #include "cdb/cdbdispatchresult.h"	/* cdbdisp_makeDispatchResults */
 #include "lib/stringinfo.h"			/* StringInfoData */
 #include "tcop/pquery.h"			/* PortalGetResource */
-
 #include "resourcemanager/communication/rmcomm_QD2RM.h"
 #include "storage/ipc.h"
+#include "commands/variable.h"
+
+#include "univplan/cwrapper/univplan-c.h"
 
 /* Define and structure */
 typedef struct DispatchTask
@@ -127,6 +130,7 @@ typedef struct DispatchData
 	/* Resource that we can use. */
 	bool				resource_is_mine;
 	QueryResource		*resource;
+	CommonPlan *newPlan;
 	bool				dispatch_to_all_cached_executors;	/* sync all of executors */
 
 	/* Readonly for worker manager */
@@ -489,7 +493,7 @@ initialize_dispatch_data(QueryResource *resource, bool dispatch_to_all_cached_ex
  */
 void
 prepare_dispatch_query_desc(DispatchData *data,
-							struct QueryDesc *queryDesc)
+							struct QueryDesc *queryDesc, bool newPlanner)
 {
 	char	*splan,
 			*sparams;
@@ -592,13 +596,20 @@ prepare_dispatch_query_desc(DispatchData *data,
 	 * slice tree (corresponding to an initPlan or the main plan), so the
 	 * parameters are fixed and we can include them in the prefix.
 	 */
-	splan = serializeNode((Node *) queryDesc->plannedstmt, &splan_len, &splan_len_uncompressed);
-
+	if (newPlanner) {
+	  // new excutor does not need old plan serialized
+	  struct Plan *tmpPlan = queryDesc->plannedstmt->planTree;
+	  queryDesc->plannedstmt->planTree = NULL;
+	  splan = serializeNode((Node *) queryDesc->plannedstmt, &splan_len, &splan_len_uncompressed);
+	  queryDesc->plannedstmt->planTree = tmpPlan;
+	} else {
+	  splan = serializeNode((Node *) queryDesc->plannedstmt, &splan_len, &splan_len_uncompressed);
+	}
 	/* compute the total uncompressed size of the query plan for all slices */
 	int num_slices = queryDesc->plannedstmt->planTree->nMotionNodes + 1;
 	uint64 plan_size_in_kb = ((uint64)splan_len_uncompressed * (uint64)num_slices) / (uint64)1024;
 	
-	elog(DEBUG1, "Query plan size to dispatch: " UINT64_FORMAT "KB", plan_size_in_kb);
+	// elog(DEBUG1, "Query plan size to dispatch: " UINT64_FORMAT "KB", plan_size_in_kb);
 
 	if (0 < gp_max_plan_size && plan_size_in_kb > gp_max_plan_size)
 	{
@@ -688,7 +699,6 @@ prepare_dispatch_query_desc(DispatchData *data,
 	Assert(sliceTbl->slices != NIL);
 
 	data->sliceTable = sliceTbl;
-
 	dispatcher_split_logical_tasks_for_query_desc(data);
 }
 
@@ -1050,7 +1060,8 @@ dispatcher_serialize_state(DispatchData *data)
 				CdbProcess		*proc = makeNode(CdbProcess);//list_nth(plan_slice->primaryProcesses, get_task_id_in_slice(slice, task));
 
 				/* Update the real executors information for interconnect. */
-				executormgr_get_executor_connection_info(executor, &proc->listenerAddr, &proc->listenerPort, &proc->pid);
+				executormgr_get_executor_connection_info(executor, &proc->listenerAddr, &proc->listenerPort,
+																			&proc->myListenerPort, &proc->pid);
 				proc->contentid = task->id.id_in_slice;
 				plan_slice->primaryProcesses = lappend(plan_slice->primaryProcesses, proc);
 			}
@@ -1092,6 +1103,119 @@ dispatcher_serialize_query_resource(DispatchData *data)
 		  pfree(queryResource->segment_vcore_writer);
 		}
 	}
+}
+
+static void dispatcher_serialize_common_plan(DispatchData *data, CommonPlanContext *ctx) {
+  PlannedStmt *stmt = data->queryDesc ? data->queryDesc->plannedstmt : NULL;
+  if (stmt) {
+    univPlanSetDoInstrument(
+        ctx->univplan, data->queryDesc->estate->es_sliceTable->doInstrument);
+    univPlanSetNCrossLevelParams(ctx->univplan, stmt->nCrossLevelParams);
+    univPlanSetCmdType(ctx->univplan, (UnivPlanCCmdType)stmt->commandType);
+
+    // add interconnect info
+    for (int i = 0;
+         i < data->queryDesc->estate->es_sliceTable->nInitPlans +
+                 data->queryDesc->estate->es_sliceTable->nMotions + 1;
+         ++i) {
+      Slice *slice =
+          list_nth(data->queryDesc->estate->es_sliceTable->slices, i);
+
+      // if parent slice supports direct dispatch, should dispatch listener id
+      // set default value -1
+      int execId = -1;
+      if (slice->parentIndex != -1) {
+        Slice *parentSlice = list_nth(data->queryDesc->estate->es_sliceTable->slices, slice->parentIndex);
+        if (parentSlice->directDispatch.isDirectDispatch) {
+          List *contentIds = parentSlice->directDispatch.contentIds;
+          Assert(list_length(contentIds) == 1);
+          execId = linitial_int(contentIds);
+        }
+      }
+
+      ListCell *lc;
+      uint32_t listenerNum;
+      if (!slice->primaryProcesses)
+        listenerNum = 0;
+      else
+        listenerNum = slice->primaryProcesses->length;
+      char **addr = palloc(listenerNum * sizeof(char *));
+      int32 *port = palloc(listenerNum * sizeof(int32));
+      int index = 0;
+      foreach (lc, slice->primaryProcesses) {
+        CdbProcess *proc = (CdbProcess *)lfirst(lc);
+        if (proc->listenerAddr)
+          addr[index] = pstrdup(proc->listenerAddr);
+        else
+          addr[index] = data->resource->master->hostip;
+        port[index] = proc->myListenerPort;
+        ++index;
+      }
+      univPlanReceiverAddListeners(ctx->univplan, listenerNum, execId, addr, port);
+      pfree(port);
+    }
+    univPlanFixVarType(ctx->univplan);
+
+    char numberStrBuf[20];
+
+    univPlanAddGuc(ctx->univplan, "work_file_dir", rm_seg_tmp_dirs);
+    univPlanAddGuc(ctx->univplan, "runtime_filter_mode",
+                   new_executor_runtime_filter_mode);
+    univPlanAddGuc(ctx->univplan, "enable_partitioned_hashagg",
+                   new_executor_enable_partitioned_hashagg_mode);
+    univPlanAddGuc(ctx->univplan, "enable_partitioned_hashjoin",
+                   new_executor_enable_partitioned_hashjoin_mode);
+    univPlanAddGuc(ctx->univplan, "enable_external_sort",
+                   new_executor_enable_external_sort_mode);
+    univPlanAddGuc(ctx->univplan, "new_scheduler", "off");
+    univPlanAddGuc(ctx->univplan, "filter_pushdown", orc_enable_filter_pushdown);
+    univPlanAddGuc(ctx->univplan, "magma_enable_shm", magma_enable_shm);
+    sprintf(numberStrBuf, "%d", magma_shm_limit_per_block * 1024);
+    univPlanAddGuc(ctx->univplan, "magma_shm_limit_per_block", numberStrBuf);
+
+    char *timezone_str = show_timezone();
+    univPlanAddGuc(ctx->univplan, "timezone_string", timezone_str);
+
+    sprintf(numberStrBuf, "%d",
+            new_executor_partitioned_hash_recursive_depth_limit);
+    univPlanAddGuc(ctx->univplan, "partitioned_hash_recursive_depth_limit",
+                   numberStrBuf);
+
+    univPlanAddGuc(ctx->univplan, "new_interconnect_type",
+                   show_new_interconnect_type());
+
+    univPlanStagize(ctx->univplan);
+
+    if (client_min_messages == DEBUG1) {
+      elog(DEBUG1, "common plan:\n%s",
+           univPlanGetJsonFormatedPlan(ctx->univplan));
+    }
+
+    // serialize and compress
+    int len;
+    const char *val = univPlanSerialize(ctx->univplan, &len, true);
+    data->pQueryParms->serializedCommonPlan = (char *)palloc(len);
+    memcpy(data->pQueryParms->serializedCommonPlan, val, len);
+    data->pQueryParms->serializedCommonPlanLen = len;
+
+    // prepare common plan for QD execute
+    data->newPlan = (CommonPlan *)palloc(sizeof(CommonPlan));
+    data->newPlan->len = len;
+    data->newPlan->str = (char *)palloc(len);
+    memcpy(data->newPlan->str, val, len);
+    univPlanFreeInstance(&ctx->univplan);
+
+    data->queryDesc->newPlan = data->newPlan;
+
+    int numSlicesToDispatch =
+        data->queryDesc->plannedstmt->planTree->nMotionNodes;
+    uint64 planSizeInKb =
+        ((uint64)len * (uint64)numSlicesToDispatch) / (uint64)1024;
+    elog(LOG,
+         "Dispatch new plan instead of old plan, size to "
+         "dispatch: " UINT64_FORMAT "KB",
+         planSizeInKb);
+  }
 }
 
 /*
@@ -1241,7 +1365,7 @@ dispatcher_update_statistics(DispatchData *data)
  *	plan to each executor.
  */
 void
-dispatch_run(DispatchData *data)
+dispatch_run(DispatchData *data, CommonPlanContext *ctx, bool newPlanner)
 {
   if (Debug_print_execution_detail) {
     instr_time  time;
@@ -1277,6 +1401,8 @@ dispatch_run(DispatchData *data)
 
 	dispatcher_serialize_state(data);
 	dispatcher_serialize_query_resource(data);
+	if (newPlanner)
+	  dispatcher_serialize_common_plan(data, ctx);
 	dispatcher_set_state_run(data);
 	dispmgt_dispatch_and_run(data->worker_mgr_state, data->query_executor_team);
 
@@ -1299,7 +1425,7 @@ error:
  *	Wait the workermgr return and setup error informaton returned from executors.
  */
 void
-dispatch_wait(DispatchData *data)
+dispatch_wait(DispatchData *data, bool forcedStop)
 {
   if (Debug_print_execution_detail) {
     instr_time  time;
@@ -1312,7 +1438,14 @@ dispatch_wait(DispatchData *data)
 		dispatcher_is_state_done(data))
 		return;
 
-	workermgr_wait_job(data->worker_mgr_state);
+	if (!forcedStop)
+	{
+		workermgr_wait_job(data->worker_mgr_state);
+	}
+	else
+	{
+		workermgr_terminate_job(data->worker_mgr_state);
+	}
 	CHECK_FOR_INTERRUPTS();
 
 	/* Check executors state before return. */
@@ -1420,7 +1553,6 @@ dispatch_cleanup(DispatchData *data)
 			Assert(false);
 			return;	/* should not hit */
 		}
-
 	}
 	
 	dispatch_end_env(data);
@@ -1515,8 +1647,10 @@ dispatch_statement(DispatchStatement *stmt, QueryResource *resource, DispatchDat
 
 	PG_TRY();
 	{
-		dispatch_run((DispatchData *) data);
-		dispatch_wait((DispatchData *) data);
+	  CommonPlanContext ctx;
+	  bool newPlanner = can_convert_common_plan(data->queryDesc, &ctx);
+		dispatch_run((DispatchData *) data, &ctx, newPlanner);
+		dispatch_wait((DispatchData *) data, false);
 		if (dispatcher_is_state_ok(data) && result)
 		{
 			int		segment_num = data->segment_num + data->segment_num_on_entrydb;
@@ -1537,7 +1671,7 @@ dispatch_statement(DispatchStatement *stmt, QueryResource *resource, DispatchDat
 	}
 	PG_CATCH();
 	{
-		dispatch_wait((DispatchData *) data);
+		dispatch_wait((DispatchData *) data, false);
 		dispatch_cleanup((DispatchData *) data);
 		PG_RE_THROW();
 	}
@@ -1797,6 +1931,20 @@ dispatch_throw_error(DispatchData *data)
 	initStringInfo(&buf);
 	cdbdisp_dumpDispatchResults(data->results, &buf, false);
 
+	/* If buf is null, try to find meaningful error info from resultArray */
+	if (buf.len == 0)
+	{
+		int resultSize = data->results->resultCount;
+		for (int i = 0; i < resultSize; ++i)
+		{
+			if (data->results->resultArray[i].error_message)
+			{
+				cdbdisp_dumpDispatchResult(&(data->results->resultArray[i]),
+				                           false, &buf);
+				break;
+			}
+		}
+	}
 	/* Too bad, our gang got an error. */
 	PG_TRY();
 	{
@@ -1881,6 +2029,8 @@ bool dispatch_validate_conn(pgsocket sock)
   if (ret > 0) /* data waiting on socket */
   {
     if (buf == 'E') /* waiting data indicates error */
+      return false;
+    else if (buf == 'X') /* waiting data indicates finished connection */
       return false;
     else
       return true;

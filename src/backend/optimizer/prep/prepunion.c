@@ -1325,38 +1325,35 @@ adjust_appendrel_attrs_mutator(Node *node, AppendRelInfoContext *ctx)
 		return (Node *) newinfo;
 	}
 
-	/**
-	 * We may have to create a copy of the subplan
-	 */
-	if (IsA(node, SubPlan))
-	{
-		SubPlan *sp = (SubPlan *) node;
-		SubPlan *newsp = copyObject(sp);
-		if (!sp->is_initplan)
-		{
-			PlannerInfo *root = (PlannerInfo *) ctx->base.node;
-			Plan *newsubplan = (Plan *) copyObject(planner_subplan_get_plan(root, sp));
-			List *newrtable = (List *) copyObject(planner_subplan_get_rtable(root, sp));
-
-			/*
-			 * Add the subplan and its rtable to the global lists.
-			 */
-			root->glob->subplans = lappend(root->glob->subplans, newsubplan);
-			root->glob->subrtables = lappend(root->glob->subrtables, newrtable);
-			newsp->plan_id = list_length(root->glob->subplans);
-		}
-		return (Node *) newsp;
-	}
-
 	/*
 	 * NOTE: we do not need to recurse into sublinks, because they should
 	 * already have been converted to subplans before we see them.
 	 */
 	Assert(!IsA(node, SubLink));
 	Assert(!IsA(node, Query));
+	node = expression_tree_mutator(node, adjust_appendrel_attrs_mutator,
+	                               (void *) ctx);
+	/**
+	 * We may have to create a copy of the subplan
+	 */
+	if (IsA(node, SubPlan))
+	{
+		SubPlan *sp = (SubPlan *) node;
+		if (!sp->is_initplan)
+		{
+			PlannerInfo *root = (PlannerInfo *) ctx->base.node;
+			Plan *newsubplan = (Plan *) copyObject(planner_subplan_get_plan(root, sp));
+			List *newrtable = (List *) copyObject(planner_subplan_get_rtable(root, sp));
+			/*
+			 * Add the subplan and its rtable to the global lists.
+			 */
+			root->glob->subplans = lappend(root->glob->subplans, newsubplan);
+			root->glob->subrtables = lappend(root->glob->subrtables, newrtable);
+			sp->plan_id = list_length(root->glob->subplans);
+		}
+	}
 
-	return expression_tree_mutator(node, adjust_appendrel_attrs_mutator,
-								   (void *) ctx);
+	return node;
 }
 
 /*
@@ -1403,8 +1400,8 @@ adjust_appendrel_attr_needed(PlannerInfo *root,
 	Index		child_relid = appinfo->child_relid;
 	int			parent_attr;
 	ListCell   *lm;
-    RangeTblEntry  *parent_rte = rt_fetch(parent_relid, root->parse->rtable);
-    RangeTblEntry  *child_rte = rt_fetch(child_relid, root->parse->rtable);
+    RangeTblEntry  *parent_rte = root->simple_rte_array[parent_relid];
+    RangeTblEntry  *child_rte = root->simple_rte_array[child_relid];
     ListCell       *parent_cell;
     ListCell       *child_cell;
 

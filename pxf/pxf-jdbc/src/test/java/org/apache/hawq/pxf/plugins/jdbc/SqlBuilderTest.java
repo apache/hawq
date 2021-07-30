@@ -59,53 +59,44 @@ public class SqlBuilderTest {
     public void testIdFilter() throws Exception {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
-        // id = 1
-        when(inputData.getFilterString()).thenReturn("a0c20s1d1o5");
+        when(inputData.getFilterString()).thenReturn("a0c20s1d1o5");//id=1
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        StringBuilder sb = new StringBuilder();
-        builder.buildWhereSQL(DB_PRODUCT, sb);
-        assertEquals(" WHERE id = 1", sb.toString());
+        assertEquals("1=1 AND id=1", builder.buildWhereSQL(DB_PRODUCT));
     }
 
     @Test
     public void testDateAndAmtFilter() throws Exception {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
-        // cdate > '2008-02-01' and cdate < '2008-12-01' and amt > 1200
+        // cdate>'2008-02-01' and cdate<'2008-12-01' and amt > 1200
         when(inputData.getFilterString()).thenReturn("a1c25s10d2008-02-01o2a1c25s10d2008-12-01o1l0a2c20s4d1200o2l0");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        StringBuilder sb = new StringBuilder();
-        builder.buildWhereSQL(DB_PRODUCT, sb);
-        assertEquals(" WHERE cdate > DATE('2008-02-01') AND cdate < DATE('2008-12-01') AND amt > 1200"
-                , sb.toString());
+        assertEquals("1=1 AND cdate>DATE('2008-02-01') AND cdate<DATE('2008-12-01') AND amt>1200"
+                , builder.buildWhereSQL(DB_PRODUCT));
     }
 
     @Test
     public void testUnsupportedOperationFilter() throws Exception {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
-        // IN 'bad'
-        when(inputData.getFilterString()).thenReturn("a3c25s3dbado10");
+        // grade like 'bad'
+        when(inputData.getFilterString()).thenReturn("a3c25s3dbado7");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        StringBuilder sb = new StringBuilder();
-        builder.buildWhereSQL(DB_PRODUCT, sb);
-        assertEquals("", sb.toString());
+        assertEquals(null, builder.buildWhereSQL(DB_PRODUCT));
     }
 
     @Test
     public void testUnsupportedLogicalFilter() throws Exception {
         prepareConstruction();
         when(inputData.hasFilter()).thenReturn(true);
-        // cdate > '2008-02-01' or amt < 1200
+        // cdate>'2008-02-01' or amt < 1200
         when(inputData.getFilterString()).thenReturn("a1c25s10d2008-02-01o2a2c20s4d1200o2l1");
 
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        StringBuilder sb = new StringBuilder();
-        builder.buildWhereSQL(DB_PRODUCT, sb);
-        assertEquals("", sb.toString());
+        assertEquals(null, builder.buildWhereSQL(DB_PRODUCT));
     }
 
     @Test
@@ -119,11 +110,11 @@ public class SqlBuilderTest {
         List<Fragment> fragments = fragment.getFragments();
         assertEquals(6, fragments.size());
 
-        // Partition: cdate >= 2008-01-01 and cdate < 2008-03-01
+        //partition-1 : cdate>=2008-01-01 and cdate<2008-03-01
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
-        StringBuilder sb = new StringBuilder(ORIGINAL_SQL);
-        JdbcPartitionFragmenter.buildFragmenterSql(inputData, DB_PRODUCT, sb);
-        assertEquals(ORIGINAL_SQL + " WHERE cdate >= DATE('2008-01-01') AND cdate < DATE('2008-03-01')", sb.toString());
+        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT, ORIGINAL_SQL);
+        assertEquals(ORIGINAL_SQL + " WHERE 1=1  AND " +
+                "cdate >= DATE('2008-01-01') AND cdate < DATE('2008-03-01')", fragmentSql);
     }
 
     @Test
@@ -134,19 +125,19 @@ public class SqlBuilderTest {
         when(inputData.getUserProperty("PARTITION_BY")).thenReturn("grade:enum");
         when(inputData.getUserProperty("RANGE")).thenReturn("excellent:good:general:bad");
 
-        StringBuilder sb = new StringBuilder(ORIGINAL_SQL);
         WhereSQLBuilder builder = new WhereSQLBuilder(inputData);
-        builder.buildWhereSQL(DB_PRODUCT, sb);
-        assertEquals(ORIGINAL_SQL + " WHERE id > 5", sb.toString());
+        String whereSql = builder.buildWhereSQL(DB_PRODUCT);
+        assertEquals("1=1 AND id>5", whereSql);
 
         JdbcPartitionFragmenter fragment = new JdbcPartitionFragmenter(inputData);
         List<Fragment> fragments = fragment.getFragments();
 
-        // Partition: id > 5 and grade = 'excellent'
+        //partition-1 : id>5 and grade='excellent'
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
 
-        JdbcPartitionFragmenter.buildFragmenterSql(inputData, DB_PRODUCT, sb);
-        assertEquals(ORIGINAL_SQL + " WHERE id > 5 AND grade = 'excellent'", sb.toString());
+        String filterSql = ORIGINAL_SQL + " WHERE " + whereSql;
+        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT, filterSql);
+        assertEquals(filterSql + " AND grade='excellent'", fragmentSql);
     }
 
     @Test
@@ -159,9 +150,8 @@ public class SqlBuilderTest {
 
         when(inputData.getFragmentMetadata()).thenReturn(fragments.get(0).getMetadata());
 
-        StringBuilder sb = new StringBuilder(ORIGINAL_SQL);
-        JdbcPartitionFragmenter.buildFragmenterSql(inputData, DB_PRODUCT, sb);
-        assertEquals(ORIGINAL_SQL, sb.toString());
+        String fragmentSql = fragment.buildFragmenterSql(DB_PRODUCT, ORIGINAL_SQL);
+        assertEquals(ORIGINAL_SQL, fragmentSql);
     }
 
 

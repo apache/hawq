@@ -779,6 +779,79 @@ ConstraintGetPrimaryKeyOf(Oid relid, AttrNumber attno, Oid *pkrelid, AttrNumber 
 	return found;
 }
 
+/**
+ * This method retrieves the primary key of given relation oid. It looks at
+ * the pg_constraint system table to determine the answer.
+ *
+ * Input:
+ * 	relid - relation whose attribute we are examining
+ *
+ * Output:
+ *  *pknatts - number of attributes of the primary key
+ *  *pkattno - oid of attributes of the primary key
+ */
+void ConstraintGetPrimaryKeys(Oid relid, int *pknatts, AttrNumber **pkattno)
+{
+	bool		found;
+	Relation	conDesc;
+	HeapTuple	tup;
+	cqContext  *pcqCtx;
+	cqContext	cqc;
+
+	conDesc = heap_open(ConstraintRelationId, AccessShareLock);
+
+	pcqCtx = caql_beginscan(
+			caql_addrel(cqclr(&cqc), conDesc),
+			cql("SELECT * FROM pg_constraint "
+				"WHERE conrelid = :1",
+				ObjectIdGetDatum(relid)));
+
+	found = false;
+	while (HeapTupleIsValid(tup = caql_getnext(pcqCtx)))
+	{
+		Form_pg_constraint con = (Form_pg_constraint) GETSTRUCT(tup);
+
+		if (con->conrelid == relid && con->contype == CONSTRAINT_PRIMARY)
+		{
+			found = true;
+
+			Datum val;
+			bool valisnull;
+			Datum *valarray;
+			int valarray_length, i;
+
+			/* first ensure that this is the right key */
+			val = heap_getattr(tup, Anum_pg_constraint_conkey,
+							   RelationGetDescr(conDesc), &valisnull);
+
+			if (valisnull)
+				break;// the primary key can be empty in magma table
+
+			deconstruct_array(DatumGetArrayTypeP(val),
+							  INT2OID, 2, true, 's',
+							  &valarray, NULL, &valarray_length);
+
+			*pkattno = (AttrNumber *)palloc(sizeof(AttrNumber) * valarray_length);
+			*pknatts = valarray_length;
+			for (i = 0; i < valarray_length; ++i)
+			{
+				(*pkattno)[i] = (AttrNumber)DatumGetInt16(valarray[i]);
+			}
+
+			break;
+		}
+	}
+
+	caql_endscan(pcqCtx);
+	heap_close(conDesc, AccessShareLock);
+
+	if (!found)
+	{
+		*pknatts = -1;
+		*pkattno = NULL;
+	}
+}
+
 /*
  * get_constraint_relation_oids
  *      Find the IDs of the relations to which a constraint refers.

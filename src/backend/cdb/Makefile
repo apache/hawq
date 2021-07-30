@@ -85,10 +85,14 @@ OBJS = cdbanalyze.o \
 	   cdbdatalocality.o \
 	   dispatcher.o \
 	   dispatcher_mgt.o \
+	   scheduler.o \
 	   workermgr.o \
 	   executormgr.o \
 	   poolmgr.o \
-	   partitionselection.o
+	   partitionselection.o \
+	   dispatcher_mgr.o \
+	   executormgr_new.o \
+	   dispatcher_new.o
 
 ifeq ($(PORTNAME),cygwin)
 .LIBPATTERNS := $(filter-out %.so,$(.LIBPATTERNS))
@@ -97,5 +101,8 @@ endif
 
 
 ALLOBJS = $(OBJS) $(SUBDIROBJS)
+
+dispatcher_new.o : $(DEPENDENCY_PATH)/include/univplan/cwrapper/univplan-c.h
+dispatcher.o : $(DEPENDENCY_PATH)/include/univplan/cwrapper/univplan-c.h
 
 include $(top_srcdir)/src/backend/common.mk

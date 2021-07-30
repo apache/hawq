@@ -34,7 +34,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/typcache.h"
-
+#include "catalog/namespace.h"
 
 static const char *const raise_skip_msg = "RAISE";
 
@@ -177,7 +177,8 @@ static void plpgsql_create_econtext(PLpgSQL_execstate *estate);
 static void free_var(PLpgSQL_var *var);
 static void exec_check_cache_plan(PLpgSQL_expr *expr);
 static void exec_free_plan(PLpgSQL_expr *expr);
-
+static void invalidatePlan(ListCell *s);
+static void matchAndInvalidateAfterPlan(ListCell *sAfter, Oid relOid);
 
 /* ----------
  * plpgsql_exec_function	Called by the call handler for
@@ -1164,9 +1165,14 @@ exec_stmts(PLpgSQL_execstate *estate, List *stmts)
 		return PLPGSQL_RC_OK;
 	}
 
+	foreach(s, stmts){
+    invalidatePlan(s);
+	}
+
 	foreach(s, stmts)
 	{
 		PLpgSQL_stmt *stmt = (PLpgSQL_stmt *) lfirst(s);
+		invalidatePlan(s);
 		int			rc = exec_stmt(estate, stmt);
 
 		if (rc != PLPGSQL_RC_OK)
@@ -1175,7 +1181,60 @@ exec_stmts(PLpgSQL_execstate *estate, List *stmts)
 
 	return PLPGSQL_RC_OK;
 }
+static void invalidatePlan(ListCell *s) {
+  PLpgSQL_stmt *stmt = (PLpgSQL_stmt *) lfirst(s);
+  if(stmt->cmd_type == PLPGSQL_STMT_EXECSQL) {
+    PLpgSQL_stmt_execsql *exestmt = (PLpgSQL_stmt_execsql *)stmt;
+    if(!exestmt->sqlstmt->plan) return;
+    ListCell *query_list_list_item;
+    foreach(query_list_list_item, ((SPIPlanPtr)exestmt->sqlstmt->plan)->qtlist)
+    {
+      List     *query_list = lfirst(query_list_list_item);
+      ListCell   *query_list_item;
+      foreach(query_list_item, query_list)
+      {
+        Query    *queryTree = (Query *) lfirst(query_list_item);
+        if(queryTree->commandType == CMD_UTILITY && nodeTag(queryTree->utilityStmt) == T_DropStmt){
+          DropStmt *dropStmt = (DropStmt *)queryTree->utilityStmt;
+          ListCell   *arg;
+          foreach(arg, dropStmt->objects){
+            if (dropStmt->removeType == OBJECT_TABLE || dropStmt->removeType == OBJECT_EXTTABLE){
+              List *names = (List *) lfirst(arg);
+              RangeVar *rel = makeRangeVarFromNameList(names);
+              Oid relOid = RangeVarGetRelid(rel, true, false);
+              ListCell *sAfter;
+              for_each_cell(sAfter, s){
+                matchAndInvalidateAfterPlan(sAfter, relOid);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
 
+static void matchAndInvalidateAfterPlan(ListCell *sAfter, Oid relOid) {
+  PLpgSQL_stmt *stmt = (PLpgSQL_stmt *) lfirst(sAfter);
+  if(stmt->cmd_type == PLPGSQL_STMT_EXECSQL){
+    PLpgSQL_stmt_execsql *exestmt = (PLpgSQL_stmt_execsql *)stmt;
+    if(!exestmt->sqlstmt->plan) return;
+    bool match = false;
+    ListCell *query_list_list_item;
+    foreach(query_list_list_item, ((SPIPlanPtr)exestmt->sqlstmt->plan)->qtlist){
+      List     *query_list = lfirst(query_list_list_item);
+      ListCell   *query_list_item;
+      foreach(query_list_item, query_list){
+        Query    *queryTree = (Query *) lfirst(query_list_item);
+        if(queryTree->commandType == CMD_INSERT
+            || queryTree->commandType == CMD_SELECT
+            || queryTree->commandType == CMD_UPDATE){
+          exestmt->sqlstmt->plan = NULL;
+        }
+      }
+    }
+  }
+}
 
 /* ----------
  * exec_stmt			Distribute one statement to the statements

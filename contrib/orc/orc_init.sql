@@ -46,7 +46,6 @@ CREATE OR REPLACE FUNCTION pg_catalog.orc_stopscan() RETURNS void
 AS '$libdir/orc.so', 'orc_stopscan'
 LANGUAGE C STABLE;
 
-
 CREATE OR REPLACE FUNCTION pg_catalog.orc_insert_init() RETURNS bytea
 AS '$libdir/orc.so', 'orc_insert_init'
 LANGUAGE C STABLE;

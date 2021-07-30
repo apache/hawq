@@ -1,21 +1,9 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
+///////////////////////////////////////////////////////////////////////////////
+// Copyright 2016, Oushu Inc.
+// All rights reserved.
+//
+// Author:
+///////////////////////////////////////////////////////////////////////////////
 
 #include "utils/cloudrest.h"
 
@@ -346,24 +334,29 @@ void init_cloud_curl() {
 		elog(ERROR, "initialize global curl context failed.");
 	}
 	curl_context_cloud.hasInited = true;
+	MemoryContext old;
+	old = MemoryContextSwitchTo(TopMemoryContext);
 	curl_context_cloud.response.buffer = palloc0(CURL_RES_BUFFER_SIZE);
+	MemoryContextSwitchTo(old);
 	curl_context_cloud.response.buffer_size = CURL_RES_BUFFER_SIZE;
 	elog(DEBUG3, "initialize global curl context for privileges check.");
 	on_proc_exit(finalize_cloud_curl, 0);
 }
 
 void finalize_cloud_curl() {
-	if (curl_context_cloud.response.buffer != NULL) {
-		pfree(curl_context_cloud.response.buffer);
+	if (curl_context_cloud.hasInited) {
+		if (curl_context_cloud.response.buffer != NULL) {
+			pfree(curl_context_cloud.response.buffer);
+		}
+		/* cleanup curl stuff */
+		if (curl_context_cloud.curl_handle) {
+			curl_easy_cleanup(curl_context_cloud.curl_handle);
+		}
+		/* we're done with libcurl, so clean it up */
+		curl_global_cleanup();
+		curl_context_cloud.hasInited = false;
+		elog(DEBUG3, "finalize the global struct for curl handle context.");
 	}
-	/* cleanup curl stuff */
-	if (curl_context_cloud.curl_handle) {
-		curl_easy_cleanup(curl_context_cloud.curl_handle);
-	}
-	/* we're done with libcurl, so clean it up */
-	curl_global_cleanup();
-	curl_context_cloud.hasInited = false;
-	elog(DEBUG3, "finalize the global struct for curl handle context.");
 }
 
 int check_authentication_from_cloud(char *username, char *password,

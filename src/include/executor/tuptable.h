@@ -133,8 +133,6 @@ typedef struct TupleTableSlot
 	Datum 	*PRIVATE_tts_values;		/* virtual tuple values */
 	bool 	*PRIVATE_tts_isnull;		/* virtual tuple nulls */
 
-	Datum 	PRIVATE_tb;             /* Vectorized Execution TupleBatch */
-
 	TupleDesc	tts_tupleDescriptor;	/* slot's tuple descriptor */
 	MemTupleBinding *tts_mt_bind;		/* mem tuple's binding */ 
 	MemoryContext 	tts_mcxt;		/* slot itself is in this context */
@@ -142,6 +140,7 @@ typedef struct TupleTableSlot
 
     /* System attributes */
     Oid         tts_tableOid;
+    uint32      tts_rangeid;
 } TupleTableSlot;
 
 static inline bool TupIsNull(TupleTableSlot *slot)
@@ -304,7 +303,6 @@ static inline ItemPointer slot_get_ctid(TupleTableSlot *slot)
 		Assert(ItemPointerIsValid(&(slot->PRIVATE_tts_heaptuple->t_self)));
 		return &(slot->PRIVATE_tts_heaptuple->t_self);
 	}
-	
 	return &(slot->PRIVATE_tts_synthetic_ctid);
 }
 

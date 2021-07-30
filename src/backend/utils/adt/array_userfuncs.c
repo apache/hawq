@@ -777,3 +777,277 @@ void accumToArray(int rank, int *rshape, int *rdata, int *ashape, int *adata)
 	while ( d >= 0 );
 }
 
+Datum
+euclidean_metric_float4array(PG_FUNCTION_ARGS)
+{
+	ArrayType  *v1,
+			   *v2;
+	float     distance = 0.0;
+	int        num1, num2, i;
+	float      *value1,
+			   *value2;
+
+	/* Concatenating a null array is a no-op, just return the other input */
+	if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+	{
+		PG_RETURN_NULL();
+	}
+
+	v1 = PG_GETARG_ARRAYTYPE_P(0);
+	v2 = PG_GETARG_ARRAYTYPE_P(1);
+
+	int	ndims1 = ARR_NDIM(v1);
+	int	ndims2 = ARR_NDIM(v2);
+	if (ndims1 != 1 && ndims2 != 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("cannot add incompatible arrays"),
+				 errdetail("Arrays of %d and %d dimensions should be 1. ",
+						   ndims1, ndims2)));
+	}
+	if (ARR_NULLBITMAP(v1) || ARR_NULLBITMAP(v2))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("cannot add incompatible arrays"),
+				 errdetail("Cannot work with arrays containing NULLs. ")));
+	}
+
+	num1 = (ARR_SIZE(v1) - ARR_DATA_OFFSET(v1)) / sizeof(float);
+	num2 = (ARR_SIZE(v2) - ARR_DATA_OFFSET(v2)) / sizeof(float);
+
+	int	num = num1;
+	if (num2 < num)
+		num = num2;
+
+	value1 = (float *)ARR_DATA_PTR(v1);
+	value2 = (float *)ARR_DATA_PTR(v2);
+
+	Oid element_type1 = ARR_ELEMTYPE(v1);
+	Oid element_type2 = ARR_ELEMTYPE(v2);
+	/* OK, use it */
+	for (i = 0; i < num; i++)
+	{
+		distance += (value1[i] - value2[i]) * (value1[i] - value2[i]);
+	}
+	for (i = num; i < num1; i++)
+	{
+		distance += value1[i] * value1[i];
+	}
+	for (i = num; i < num2; i++)
+	{
+		distance += value2[i] * value2[i];
+	}
+
+	PG_RETURN_FLOAT4(sqrt(distance));
+}
+
+Datum
+euclidean_metric_float8array(PG_FUNCTION_ARGS)
+{
+	ArrayType  *v1,
+			   *v2;
+	double     distance = 0.0;
+	int        num1, num2, i;
+	double     *value1,
+			   *value2;
+
+	/* Concatenating a null array is a no-op, just return the other input */
+	if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+	{
+		PG_RETURN_NULL();
+	}
+
+	v1 = PG_GETARG_ARRAYTYPE_P(0);
+	v2 = PG_GETARG_ARRAYTYPE_P(1);
+
+	int	ndims1 = ARR_NDIM(v1);
+	int	ndims2 = ARR_NDIM(v2);
+	if (ndims1 != 1 && ndims2 != 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("cannot add incompatible arrays"),
+				 errdetail("Arrays of %d and %d dimensions should be 1. ",
+						   ndims1, ndims2)));
+	}
+	if (ARR_NULLBITMAP(v1) || ARR_NULLBITMAP(v2))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("cannot add incompatible arrays"),
+				 errdetail("Cannot work with arrays containing NULLs. ")));
+	}
+
+	num1 = (ARR_SIZE(v1) - ARR_DATA_OFFSET(v1)) / sizeof(double);
+	num2 = (ARR_SIZE(v2) - ARR_DATA_OFFSET(v2)) / sizeof(double);
+
+	int	num = num1;
+	if (num2 < num)
+		num = num2;
+
+	value1 = (double *)ARR_DATA_PTR(v1);
+	value2 = (double *)ARR_DATA_PTR(v2);
+
+	Oid element_type1 = ARR_ELEMTYPE(v1);
+	Oid element_type2 = ARR_ELEMTYPE(v2);
+	/* OK, use it */
+	for (i = 0; i < num; i++)
+	{
+		distance += (value1[i] - value2[i]) * (value1[i] - value2[i]);
+	}
+	for (i = num; i < num1; i++)
+	{
+		distance += value1[i] * value1[i];
+	}
+	for (i = num; i < num2; i++)
+	{
+		distance += value2[i] * value2[i];
+	}
+
+	PG_RETURN_FLOAT8(sqrt(distance));
+}
+
+Datum
+cosine_distance_float4array(PG_FUNCTION_ARGS)
+{
+	ArrayType	*v1,
+				*v2;
+	double		distance = 0.0,
+				length1 = 0.0,
+				length2 = 0.0;
+	int			num1, num2, i;
+	float		*value1,
+				*value2;
+
+	/* Concatenating a null array is a no-op, just return the other input */
+	if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+	{
+		PG_RETURN_NULL();
+	}
+
+	v1 = PG_GETARG_ARRAYTYPE_P(0);
+	v2 = PG_GETARG_ARRAYTYPE_P(1);
+
+	int	ndims1 = ARR_NDIM(v1);
+	int	ndims2 = ARR_NDIM(v2);
+	if (ndims1 != 1 && ndims2 != 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("cannot add incompatible arrays"),
+				 errdetail("Arrays of %d and %d dimensions should be 1. ",
+						   ndims1, ndims2)));
+	}
+	if (ARR_NULLBITMAP(v1) || ARR_NULLBITMAP(v2))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("cannot add incompatible arrays"),
+				 errdetail("Cannot work with arrays containing NULLs. ")));
+	}
+
+	num1 = (ARR_SIZE(v1) - ARR_DATA_OFFSET(v1)) / sizeof(float);
+	num2 = (ARR_SIZE(v2) - ARR_DATA_OFFSET(v2)) / sizeof(float);
+
+	int	num = num1;
+	if (num2 < num)
+		num = num2;
+
+	value1 = (float *)ARR_DATA_PTR(v1);
+	value2 = (float *)ARR_DATA_PTR(v2);
+
+	Oid element_type1 = ARR_ELEMTYPE(v1);
+	Oid element_type2 = ARR_ELEMTYPE(v2);
+	/* OK, use it */
+	for (i = 0; i < num; i++)
+	{
+		length1 += value1[i] * value1[i];
+		length2 += value2[i] * value2[i];
+		distance += value1[i] * value2[i];
+	}
+	for (i = num; i < num1; i++)
+	{
+		length1 += value1[i] * value1[i];
+	}
+	for (i = num; i < num2; i++)
+	{
+		length2 += value2[i] * value2[i];
+	}
+	distance = distance / sqrt(length1) / sqrt(length2);
+
+	PG_RETURN_FLOAT8(distance);
+}
+
+Datum
+cosine_distance_float8array(PG_FUNCTION_ARGS)
+{
+	ArrayType	*v1,
+				*v2;
+	double		distance = 0.0,
+				length1 = 0.0,
+				length2 = 0.0;
+	int			num1, num2, i;
+	double		*value1,
+				*value2;
+
+	/* Concatenating a null array is a no-op, just return the other input */
+	if (PG_ARGISNULL(0) || PG_ARGISNULL(1))
+	{
+		PG_RETURN_NULL();
+	}
+
+	v1 = PG_GETARG_ARRAYTYPE_P(0);
+	v2 = PG_GETARG_ARRAYTYPE_P(1);
+
+	int	ndims1 = ARR_NDIM(v1);
+	int	ndims2 = ARR_NDIM(v2);
+	if (ndims1 != 1 && ndims2 != 1)
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("cannot add incompatible arrays"),
+				 errdetail("Arrays of %d and %d dimensions should be 1. ",
+						   ndims1, ndims2)));
+	}
+	if (ARR_NULLBITMAP(v1) || ARR_NULLBITMAP(v2))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_ARRAY_SUBSCRIPT_ERROR),
+				 errmsg("cannot add incompatible arrays"),
+				 errdetail("Cannot work with arrays containing NULLs. ")));
+	}
+
+
+	num1 = (ARR_SIZE(v1) - ARR_DATA_OFFSET(v1)) / sizeof(double);
+	num2 = (ARR_SIZE(v2) - ARR_DATA_OFFSET(v2)) / sizeof(double);
+
+	int	num = num1;
+	if (num2 < num)
+		num = num2;
+
+	value1 = (double *)ARR_DATA_PTR(v1);
+	value2 = (double *)ARR_DATA_PTR(v2);
+
+	Oid element_type1 = ARR_ELEMTYPE(v1);
+	Oid element_type2 = ARR_ELEMTYPE(v2);
+	/* OK, use it */
+	for (i = 0; i < num; i++)
+	{
+		length1 += value1[i] * value1[i];
+		length2 += value2[i] * value2[i];
+		distance += value1[i] * value2[i];
+	}
+	for (i = num; i < num1; i++)
+	{
+		length1 += value1[i] * value1[i];
+	}
+	for (i = num; i < num2; i++)
+	{
+		length2 += value2[i] * value2[i];
+	}
+	distance = distance / sqrt(length1) / sqrt(length2);
+
+	PG_RETURN_FLOAT8(distance);
+}

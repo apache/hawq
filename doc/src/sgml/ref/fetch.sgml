@@ -30,7 +30,6 @@ FETCH [ <replaceable class="PARAMETER">direction</replaceable> { FROM | IN } ] <
 where <replaceable class="PARAMETER">direction</replaceable> can be empty or one of:
 
     NEXT
-    PRIOR
     FIRST
     LAST
     ABSOLUTE <replaceable class="PARAMETER">count</replaceable>
@@ -40,9 +39,6 @@ where <replaceable class="PARAMETER">direction</replaceable> can be empty or one
     FORWARD
     FORWARD <replaceable class="PARAMETER">count</replaceable>
     FORWARD ALL
-    BACKWARD
-    BACKWARD <replaceable class="PARAMETER">count</replaceable>
-    BACKWARD ALL
 </synopsis>
  </refsynopsisdiv>
 
@@ -67,7 +63,7 @@ where <replaceable class="PARAMETER">direction</replaceable> can be empty or one
   </para>
 
   <para>
-   The forms <literal>NEXT</>, <literal>PRIOR</>, <literal>FIRST</>,
+   The forms <literal>NEXT</>, <literal>FIRST</>,
    <literal>LAST</>, <literal>ABSOLUTE</>, <literal>RELATIVE</> fetch
    a single row after moving the cursor appropriately.  If there is no
    such row, an empty result is returned, and the cursor is left
@@ -76,17 +72,15 @@ where <replaceable class="PARAMETER">direction</replaceable> can be empty or one
   </para>
 
   <para>
-   The forms using <literal>FORWARD</> and <literal>BACKWARD</>
-   retrieve the indicated number of rows moving in the forward or
-   backward direction, leaving the cursor positioned on the
+   The forms using <literal>FORWARD</> retrieve the indicated number of 
+   rows moving in the forward direction, leaving the cursor positioned on the
    last-returned row (or after/before all rows, if the <replaceable
    class="PARAMETER">count</replaceable> exceeds the number of rows
    available).
   </para>
 
   <para>
-   <literal>RELATIVE 0</>, <literal>FORWARD 0</>, and
-   <literal>BACKWARD 0</> all request fetching the current row without
+   <literal>RELATIVE 0</>, <literal>FORWARD 0</> all request fetching the current row without
    moving the cursor, that is, re-fetching the most recently fetched
    row.  This will succeed unless the cursor is positioned before the
    first row or after the last row; in which case, no row is returned.
@@ -112,15 +106,6 @@ where <replaceable class="PARAMETER">direction</replaceable> can be empty or one
          <para>
           Fetch the next row. This is the default if <replaceable
           class="PARAMETER">direction</replaceable> is omitted.
-         </para>
-        </listitem>
-       </varlistentry>
-
-       <varlistentry>
-        <term><literal>PRIOR</literal></term>
-        <listitem>
-         <para>
-          Fetch the prior row.
          </para>
         </listitem>
        </varlistentry>
@@ -222,36 +207,6 @@ where <replaceable class="PARAMETER">direction</replaceable> can be empty or one
         <listitem>
          <para>
           Fetch all remaining rows.
-         </para>
-        </listitem>
-       </varlistentry>
-
-       <varlistentry>
-        <term><literal>BACKWARD</literal></term>
-        <listitem>
-         <para>
-          Fetch the prior row (same as <literal>PRIOR</literal>).
-         </para>
-        </listitem>
-       </varlistentry>
-
-       <varlistentry>
-        <term><literal>BACKWARD <replaceable class="PARAMETER">count</replaceable></literal></term>
-        <listitem>
-         <para>
-          Fetch the prior <replaceable
-          class="PARAMETER">count</replaceable> rows (scanning
-          backwards).  <literal>BACKWARD 0</literal> re-fetches the
-          current row.
-         </para>
-        </listitem>
-       </varlistentry>
-
-       <varlistentry>
-        <term><literal>BACKWARD ALL</literal></term>
-        <listitem>
-         <para>
-          Fetch all prior rows (scanning backwards).
          </para>
         </listitem>
        </varlistentry>

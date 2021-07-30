@@ -240,11 +240,9 @@ static void PersistentBuild_PopulateGpRelationNode(
 			indexFound = true;
 		}
 
-		relStorageMgr = (
-				 (dbInfoRel->relstorage == RELSTORAGE_AOROWS ||
-				  dbInfoRel->relstorage == RELSTORAGE_PARQUET) ?
+		relStorageMgr = relstorage_is_ao(dbInfoRel->relstorage) ?
 								PersistentFileSysRelStorageMgr_AppendOnly :
-								PersistentFileSysRelStorageMgr_BufferPool);
+								PersistentFileSysRelStorageMgr_BufferPool;
 
 		/*
 		 * The gp_relation_node mapping table is empty, so use the physical files as
@@ -590,6 +588,7 @@ PersistentBuild_BuildDb(
 							defaultTablespace,
                              collectGpRelationNodeInfo,
                              collectAppendOnlyCatalogSegmentInfo,
+                             /* collectExtTableInfo */ false,
 							/* scanFileSystem */ true);
 
 	for (t = 0; t < info->tablespacesCount; t++)
@@ -801,9 +800,6 @@ gp_persistent_build_all(PG_FUNCTION_ARGS)
 		
 		dbOid = HeapTupleGetOid(tuple);
 
-		if (dbOid == HcatalogDbOid)
-			continue;
-
 		if (dbOid == TemplateDbOid)
 		{
 			if (Debug_persistent_print)
@@ -879,11 +875,9 @@ gp_relfile_insert_for_register(PG_FUNCTION_ARGS)
 	relFileNode.dbNode = database;
 	relFileNode.relNode = relfilenode;
 
-	relStorageMgr = (
-			 (relstorage == RELSTORAGE_AOROWS ||
-			  relstorage == RELSTORAGE_PARQUET) ?
+	relStorageMgr = relstorage_is_ao(relstorage) ?
 			 PersistentFileSysRelStorageMgr_AppendOnly :
-			 PersistentFileSysRelStorageMgr_BufferPool);
+			 PersistentFileSysRelStorageMgr_BufferPool;
 
 	gp_before_persistence_work = true;
 
@@ -1047,9 +1041,6 @@ PersistentBuild_TruncateAllGpRelationNode(void)
 		dbOid = HeapTupleGetOid(tuple);
 		dattablespace = form_pg_database->dattablespace;
 
-		if (dbOid == HcatalogDbOid)
-			continue;
-
 		if (Debug_persistent_print)
 			elog(Persistent_DebugPrintLevel(), 
 				 "PersistentBuild_TruncateAllGpRelationNode: dbOid %u, '%s'",
@@ -1178,6 +1169,7 @@ PersistentBuild_SetRelationBufpoolKind(
 							defaultTablespace,
 							/* collectGpRelationNodeInfo */ true,
 							/* collectAppendOnlyCatalogSegmentInfo */ false,
+							/* collectExtTableInfo */ false,
 							/* scanFileSystem */ false);
 
 	for (r = 0; r < info->dbInfoRelArrayCount; r++)

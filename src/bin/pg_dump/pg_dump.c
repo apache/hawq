@@ -1574,9 +1574,39 @@ getTableData(TableInfo *tblinfo, int numTables, bool oids)
 		if (tblinfo[i].relkind == RELKIND_VIEW)
 			continue;
 		/* START MPP ADDITION */
-		/* Skip EXTERNAL TABLEs */
 		if (tblinfo[i].relstorage == RELSTORAGE_EXTERNAL)
-			continue;
+		{
+			PQExpBuffer query = createPQExpBuffer();
+			resetPQExpBuffer(query);
+			appendPQExpBuffer(query, "select fmttype,"
+					"fmtopts from pg_catalog.pg_exttable where reloid = '%u'::oid ",
+					tblinfo[i].dobj.catId.oid);
+			PGresult *res = PQexec(g_conn, query->data);
+			check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
+			char *fmttype = PQgetvalue(res, 0, 0);
+			char *fmtopts = PQgetvalue(res, 0, 1);
+			/* category 'internal' and category 'external' */
+			if ((strcmp(fmttype, "b") == 0))
+			{
+				char *tabfmt = NULL;
+				getValByKey(&tabfmt, (const char *)fmtopts, "category");
+				/* category 'external' can't dump data */
+				if(strcmp(tabfmt, "external") == 0) {
+					destroyPQExpBuffer(query);
+					free(tabfmt);
+					continue;
+				}
+				/* category 'internal' can dump data */
+				free(tabfmt);
+				destroyPQExpBuffer(query);
+			}
+			else
+			{
+				/* other external table type shouldn't dump data */
+				destroyPQExpBuffer(query);
+				continue;
+			}
+		}
 		/* Skip FOREIGN TABLEs */
 		if (tblinfo[i].relstorage == RELSTORAGE_FOREIGN)
 			continue;
@@ -7561,6 +7591,83 @@ dumpTable(Archive *fout, TableInfo *tbinfo)
 	}
 }
 
+void appendPartitionQuery(PQExpBuffer q, Archive *g_fout, TableInfo *tbinfo) {
+  bool isTemplatesSupported = g_fout->remoteVersion >= 80214;
+  PQExpBuffer query = createPQExpBuffer();
+  PGresult *res;
+  /* MPP-6297: dump by tablename */
+  if (isTemplatesSupported) /* use 4.x version of function */
+    appendPQExpBuffer(query,
+                      "SELECT "
+                      "pg_get_partition_def('%u'::pg_catalog.oid, true, true) ",
+                      tbinfo->dobj.catId.oid);
+  else /* use 3.x version of function */
+    appendPQExpBuffer(query,
+                      "SELECT "
+                      "pg_get_partition_def('%u'::pg_catalog.oid, true) ",
+                      tbinfo->dobj.catId.oid);
+
+   res = PQexec(g_conn, query->data);
+  check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
+
+   if (PQntuples(res) != 1) {
+    if (PQntuples(res) < 1)
+      write_msg(NULL,
+                "query to obtain definition of table \"%s\" returned no data\n",
+                tbinfo->dobj.name);
+    else
+      write_msg(NULL,
+                "query to obtain definition of table \"%s\" returned more than "
+                "one definition\n",
+                tbinfo->dobj.name);
+    exit_nicely();
+  }
+  if (!PQgetisnull(res, 0, 0))
+    appendPQExpBuffer(q, " %s", PQgetvalue(res, 0, 0));
+
+   PQclear(res);
+
+   /*
+   * MPP-6095: dump ALTER TABLE statements for subpartition
+   * templates
+   */
+  if (isTemplatesSupported) {
+    resetPQExpBuffer(query);
+
+     appendPQExpBuffer(
+        query,
+        "SELECT "
+        "pg_get_partition_template_def('%u'::pg_catalog.oid, true, true) ",
+        tbinfo->dobj.catId.oid);
+
+     res = PQexec(g_conn, query->data);
+    check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
+
+     if (PQntuples(res) != 1) {
+      if (PQntuples(res) < 1)
+        write_msg(
+            NULL,
+            "query to obtain definition of table \"%s\" returned no data\n",
+            tbinfo->dobj.name);
+      else
+        write_msg(NULL,
+                  "query to obtain definition of table \"%s\" returned more "
+                  "than one definition\n",
+                  tbinfo->dobj.name);
+      exit_nicely();
+    }
+
+     /*
+     * MPP-9537: terminate (with semicolon) the previous
+     * statement, and dump the template definitions
+     */
+    if (!PQgetisnull(res, 0, 0) && PQgetlength(res, 0, 0))
+      appendPQExpBuffer(q, ";\n %s", PQgetvalue(res, 0, 0));
+
+     PQclear(res);
+  }
+}
+
 /*
  * dumpTableSchema
  *	  write the declaration (not data) of one user-defined table or view
@@ -7651,6 +7758,9 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		char	   *customfmt = NULL;
 		bool		isweb = false;
 		bool		iswritable = false;
+		bool		isreadable = false;
+		bool		isexternal = false;
+		bool		ismagma = false;
 
 		reltypename = "EXTERNAL TABLE";
 
@@ -7734,17 +7844,77 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		extencoding = PQgetvalue(res, 0, 8);
 		writable = PQgetvalue(res, 0, 9);
 
+		/* web table */
 		if ((command && strlen(command) > 0) ||
 			(strncmp(locations + 1, "http", strlen("http")) == 0))
+		{
+			isexternal = true;
 			isweb = true;
-
-		if (writable && writable[0] == 't')
-			iswritable = true;
-
-		appendPQExpBuffer(q, "CREATE %sEXTERNAL %sTABLE %s (",
-						  (iswritable ? "WRITABLE " : ""),
-						  (isweb ? "WEB " : ""),
-						  fmtId(tbinfo->dobj.name));
+			if (writable && writable[0] == 't')
+				iswritable = true;
+			else
+				isreadable = true;
+			appendPQExpBuffer(
+					q, "CREATE%s EXTERNAL WEB TABLE %s (",
+					(iswritable ? " WRITABLE" : " READABLE"),
+					fmtId(tbinfo->dobj.name));
+		}
+		/* gpfdist table */
+		else if (strncmp(locations + 1, "gpfdist", strlen("gpfdist")) == 0)
+		{
+			isexternal = true;
+			if (writable && writable[0] == 't')
+				iswritable = true;
+			else
+				isreadable = true;
+			appendPQExpBuffer(
+					q, "CREATE%s EXTERNAL TABLE %s (",
+					(iswritable ? " WRITABLE" : " READABLE"),
+					fmtId(tbinfo->dobj.name));
+		}
+		else  /* formatter table */
+		{
+			/* deal with "category 'internal'" and "category 'external'" */
+			if (strcmp(fmttype, "b") == 0)
+			{
+				getValByKey(&tabfmt, (const char *)fmtopts, "category");
+				if(strcmp(tabfmt, "external") == 0) {
+					isexternal = true;
+				}
+				free(tabfmt);
+				/* category 'external' table */
+				if (isexternal)
+				{
+					if (writable && writable[0] == 't')
+						iswritable = true;
+					else
+						isreadable = true;
+					appendPQExpBuffer(
+							q, "CREATE%s EXTERNAL TABLE %s (",
+							(iswritable ? " WRITABLE" : " READABLE"),
+							fmtId(tbinfo->dobj.name));
+				}
+				else  /* category 'internal' table */
+				{
+					char *formatName = NULL;
+					getValByKey(&formatName, (const char *)fmtopts, "formatter");
+					if (formatName) {
+						if (strncmp(formatName, "magma", sizeof("magma") - 1) == 0)
+						{
+							ismagma = true;
+							/* magma table alter querys shouldn't allow external */
+							reltypename = "TABLE";
+							free(formatName);
+						}
+					}
+					appendPQExpBuffer(q, "CREATE TABLE %s (", fmtId(tbinfo->dobj.name));
+				}
+			}
+			else
+			{
+				write_msg(NULL, "unknown table type of table:" "\"%s\" \n", tbinfo->dobj.name);
+			}
+		}
 
 		actual_atts = 0;
 		for (j = 0; j < tbinfo->numatts; j++)
@@ -7785,44 +7955,41 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 			free(tmpstring);
 			tmpstring = NULL;
 
-			/* add ON clause (unless WRITABLE table, which doesn't allow ON) */
-			if (!iswritable)
-			{
-				if (strncmp(on_clause, "HOST:", strlen("HOST:")) == 0)
-					appendPQExpBuffer(q, "ON HOST '%s' ", on_clause + strlen("HOST:"));
-				else if (strncmp(on_clause, "PER_HOST", strlen("PER_HOST")) == 0)
-					appendPQExpBuffer(q, "ON HOST ");
-				else if (strncmp(on_clause, "MASTER_ONLY", strlen("MASTER_ONLY")) == 0)
-					appendPQExpBuffer(q, "ON MASTER ");
-				else if (strncmp(on_clause, "SEGMENT_ID:", strlen("SEGMENT_ID:")) == 0)
-					appendPQExpBuffer(q, "ON SEGMENT %s ", on_clause + strlen("SEGMENT_ID:"));
-				else if (strncmp(on_clause, "TOTAL_SEGS:", strlen("TOTAL_SEGS:")) == 0)
-					appendPQExpBuffer(q, "ON %s ", on_clause + strlen("TOTAL_SEGS:"));
-				else if (strncmp(on_clause, "ALL_SEGMENTS", strlen("ALL_SEGMENTS")) == 0)
-					appendPQExpBuffer(q, "ON ALL ");
-				else
-					write_msg(NULL, "illegal ON clause catalog information \"%s\""
-							  "for command '%s'\n", on_clause, command);
-			}
+			/* both WRITABLE and READABLE allow ON */
+			if (strncmp(on_clause, "HOST:", strlen("HOST:")) == 0)
+				appendPQExpBuffer(q, "ON HOST '%s' ", on_clause + strlen("HOST:"));
+			else if (strncmp(on_clause, "PER_HOST", strlen("PER_HOST")) == 0)
+				appendPQExpBuffer(q, "ON HOST ");
+			else if (strncmp(on_clause, "MASTER_ONLY", strlen("MASTER_ONLY")) == 0)
+				appendPQExpBuffer(q, "ON MASTER ");
+			else if (strncmp(on_clause, "SEGMENT_ID:", strlen("SEGMENT_ID:")) == 0)
+				appendPQExpBuffer(q, "ON SEGMENT %s ", on_clause + strlen("SEGMENT_ID:"));
+			else if (strncmp(on_clause, "TOTAL_SEGS:", strlen("TOTAL_SEGS:")) == 0)
+				appendPQExpBuffer(q, "ON %s ", on_clause + strlen("TOTAL_SEGS:"));
+			else if (strncmp(on_clause, "ALL_SEGMENTS", strlen("ALL_SEGMENTS")) == 0)
+				appendPQExpBuffer(q, "ON ALL ");
+			else
+				write_msg(NULL, "illegal ON clause catalog information \"%s\""
+						  "for command '%s'\n", on_clause, command);
 			appendPQExpBuffer(q, "\n ");
 		}
 		else
 		{
 			/* add LOCATION clause */
-			locations[strlen(locations) - 1] = '\0';
-			locations++;
-			location = nextToken(&locations, ",");
-			appendPQExpBuffer(q, " LOCATION (\n    '%s'", location);
-			for (; (location = nextToken(&locations, ",")) != NULL;)
-			{
-				appendPQExpBuffer(q, ",\n    '%s'", location);
+			if (isexternal) {
+				/* add LOCATION clause */
+				locations[strlen(locations) - 1] = '\0';
+				locations++;
+				location = nextToken(&locations, ",");
+				appendPQExpBuffer(q, " LOCATION (\n    '%s'", location);
+				for (; (location = nextToken(&locations, ",")) != NULL;) {
+					appendPQExpBuffer(q, ",\n    '%s'", location);
+				}
+				appendPQExpBuffer(q, "\n) ");
 			}
-			appendPQExpBuffer(q, "\n) ");
 		}
 
-		/* add FORMAT clause */
 		tmpstring = escape_fmtopts_string((const char *) fmtopts);
-
 		switch (fmttype[0])
 		{
 			case 't':
@@ -7835,24 +8002,37 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 				 * a1 = 'val1',...,an = 'valn'
 				 *
 				 */
-				tabfmt = "custom";
 				customfmt = custom_fmtopts_string(tmpstring);
+				getValByKey(&tabfmt, (const char *)fmtopts, "formatter");
 				break;
 			default:
 				tabfmt = "csv";
 		}
-		appendPQExpBuffer(q, "FORMAT '%s' (%s)\n",
-						  tabfmt,
-						  customfmt ? customfmt : tmpstring);
+		/* external table need fmtopts info */
+		if (isexternal && fmttype[0] != 'b')
+			appendPQExpBuffer(q, "FORMAT '%s' (%s)\n", tabfmt, customfmt ? customfmt : tmpstring);
+		else
+			appendPQExpBuffer(q, "FORMAT '%s'", tabfmt);
+
+		/* free memory */
+		if (fmttype[0] == 'b') {
+			free(tabfmt);
+			tabfmt = NULL;
+		}
 		free(tmpstring);
 		tmpstring = NULL;
+
 		if (customfmt)
 		{
 			free(customfmt);
 			customfmt = NULL;
 		}
 
-		if (g_fout->remoteVersion >= 80205)
+		if (gp_partitioning_available) {
+			appendPartitionQuery(q, g_fout, tbinfo);
+		}
+
+		if (g_fout->remoteVersion >= 80205 && isexternal)
 		{
 			/* add ENCODING clause */
 			appendPQExpBuffer(q, "ENCODING '%s'", extencoding);
@@ -7889,7 +8069,7 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		}
 
 		/* DISTRIBUTED BY clause (if WRITABLE table) */
-		if (iswritable)
+		if (iswritable&&!gp_partitioning_available)
 			addDistributedBy(q, tbinfo, actual_atts);
 
 		appendPQExpBuffer(q, ";\n");
@@ -8095,84 +8275,10 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		 * If GP partitioning is supported add the partitioning constraints to
 		 * the table definition.
 		 */
-		if (gp_partitioning_available)
-		{
-			bool		isTemplatesSupported = g_fout->remoteVersion >= 80214;
-
-			/* does support GP partitioning. */
-			resetPQExpBuffer(query);
-			/* MPP-6297: dump by tablename */
-			if (isTemplatesSupported)
-				/* use 4.x version of function */
-				appendPQExpBuffer(query, "SELECT "
-				   "pg_get_partition_def('%u'::pg_catalog.oid, true, true) ",
-								  tbinfo->dobj.catId.oid);
-			else	/* use 3.x version of function */
-				appendPQExpBuffer(query, "SELECT "
-						 "pg_get_partition_def('%u'::pg_catalog.oid, true) ",
-								  tbinfo->dobj.catId.oid);
-
-			res = PQexec(g_conn, query->data);
-			check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
-
-			if (PQntuples(res) != 1)
-			{
-				if (PQntuples(res) < 1)
-					write_msg(NULL, "query to obtain definition of table \"%s\" returned no data\n",
-							  tbinfo->dobj.name);
-				else
-					write_msg(NULL, "query to obtain definition of table \"%s\" returned more than one definition\n",
-							  tbinfo->dobj.name);
-				exit_nicely();
-			}
-			if (!PQgetisnull(res, 0, 0))
-				appendPQExpBuffer(q, " %s", PQgetvalue(res, 0, 0));
-
-			PQclear(res);
-
-			/*
-			 * MPP-6095: dump ALTER TABLE statements for subpartition
-			 * templates
-			 */
-			if (isTemplatesSupported)
-			{
-				resetPQExpBuffer(query);
-
-				appendPQExpBuffer(
-								  query, "SELECT "
-								  "pg_get_partition_template_def('%u'::pg_catalog.oid, true, true) ",
-								  tbinfo->dobj.catId.oid);
-
-				res = PQexec(g_conn, query->data);
-				check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
-
-				if (PQntuples(res) != 1)
-				{
-					if (PQntuples(res) < 1)
-						write_msg(
-								  NULL,
-								  "query to obtain definition of table \"%s\" returned no data\n",
-								  tbinfo->dobj.name);
-					else
-						write_msg(
-								  NULL,
-								  "query to obtain definition of table \"%s\" returned more than one definition\n",
-								  tbinfo->dobj.name);
-					exit_nicely();
-				}
-
-				/*
-				 * MPP-9537: terminate (with semicolon) the previous
-				 * statement, and dump the template definitions
-				 */
-				if (!PQgetisnull(res, 0, 0) &&
-					PQgetlength(res, 0, 0))
-					appendPQExpBuffer(q, ";\n %s", PQgetvalue(res, 0, 0));
-
-				PQclear(res);
-			}
-
-		}
+    if (gp_partitioning_available)
+    {
+      appendPartitionQuery(q, g_fout, tbinfo);
+    }
 
 		/* END MPP ADDITION */
 

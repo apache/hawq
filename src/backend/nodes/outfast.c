@@ -122,6 +122,11 @@
 		appendBinaryStringInfo(str, (const char *)&slen, sizeof(int)); \
 		if (slen>0) appendBinaryStringInfo(str, node->fldname, strlen(node->fldname));}
 
+/* Write a character-string with length (possibly contain NULLs) field */
+#define WRITE_NSTRING_FIELD(fldname, fldlen) \
+	{ appendBinaryStringInfo(str, (const char *)&(node->fldlen), sizeof(int)); \
+		if (node->fldlen > 0) appendBinaryStringInfo(str, node->fldname, node->fldlen);}
+
 /* Write a Node field */
 #define WRITE_NODE_FIELD(fldname) \
 	(_outNode(str, node->fldname))
@@ -376,7 +381,6 @@ _outPlanInfo(StringInfo str, Plan *node)
 	{
 		WRITE_UINT64_FIELD(operatorMemKB);
 	}
-	WRITE_BOOL_FIELD(vectorized);
 }
 
 /*
@@ -456,6 +460,7 @@ _outPlannedStmt(StringInfo str, PlannedStmt *node)
 	WRITE_NODE_FIELD(result_segfileinfos);
 	WRITE_NODE_FIELD(scantable_splits);
 	WRITE_NODE_FIELD(into_aosegnos);
+	WRITE_NODE_FIELD(relFileNodeInfo);
 	WRITE_NODE_FIELD(queryPartOids);
 	WRITE_NODE_FIELD(queryPartsMetadata);
 	WRITE_NODE_FIELD(numSelectorsPerScanId);
@@ -474,7 +479,10 @@ _outPlannedStmt(StringInfo str, PlannedStmt *node)
 
 	WRITE_NODE_FIELD(contextdisp);
 
-	WRITE_NODE_FIELD(resource);
+	/* Don't serialize resource */
+
+	WRITE_STRING_FIELD(hiveUrl);
+	WRITE_ENUM_FIELD(originNodeType, NodeTag);
 }
 
 static void
@@ -599,12 +607,55 @@ _outParquetScan(StringInfo str, ParquetScan *node)
 }
 
 static void
+_outMagmaIndexScan(StringInfo str, MagmaIndexScan *node)
+{
+	WRITE_NODE_TYPE("MAGMAINDEXSCAN");
+	_outScanInfo(str, (Scan *) node);
+	WRITE_STRING_FIELD(indexname);
+	WRITE_LIST_FIELD(indexqualorig);
+	WRITE_ENUM_FIELD(indexorderdir, ScanDirection);
+	if (print_variable_fields) {
+	WRITE_NODE_FIELD(uriList);
+	WRITE_NODE_FIELD(fmtOpts);
+	WRITE_CHAR_FIELD(fmtType);
+	WRITE_INT_FIELD(rejLimit);
+	WRITE_BOOL_FIELD(rejLimitInRows);
+	WRITE_OID_FIELD(fmterrtbl);
+	WRITE_NODE_FIELD(errAosegnos);
+	WRITE_NODE_FIELD(err_aosegfileinfos);
+	WRITE_INT_FIELD(encoding);
+	WRITE_INT_FIELD(scancounter);
+	}
+}
+
+static void
+_outMagmaIndexOnlyScan(StringInfo str, MagmaIndexOnlyScan *node)
+{
+	WRITE_NODE_TYPE("MAGMAINDEXONLYSCAN");
+	_outScanInfo(str, (Scan *) node);
+	WRITE_NODE_FIELD(uriList);
+	WRITE_NODE_FIELD(fmtOpts);
+	WRITE_CHAR_FIELD(fmtType);
+	WRITE_INT_FIELD(rejLimit);
+	WRITE_BOOL_FIELD(rejLimitInRows);
+	WRITE_OID_FIELD(fmterrtbl);
+	WRITE_STRING_FIELD(indexname);
+	WRITE_LIST_FIELD(indexqualorig);
+	WRITE_ENUM_FIELD(indexorderdir, ScanDirection);
+	WRITE_NODE_FIELD(errAosegnos);
+	WRITE_NODE_FIELD(err_aosegfileinfos);
+	WRITE_INT_FIELD(encoding);
+	WRITE_INT_FIELD(scancounter);
+}
+
+static void
 _outExternalScan(StringInfo str, ExternalScan *node)
 {
 	WRITE_NODE_TYPE("EXTERNALSCAN");
 
 	_outScanInfo(str, (Scan *) node);
 
+	if (print_variable_fields) {
 	WRITE_NODE_FIELD(uriList);
 	WRITE_NODE_FIELD(fmtOpts);
 	WRITE_CHAR_FIELD(fmtType);
@@ -616,6 +667,8 @@ _outExternalScan(StringInfo str, ExternalScan *node)
 	WRITE_NODE_FIELD(err_aosegfileinfos);
 	WRITE_INT_FIELD(encoding);
 	WRITE_INT_FIELD(scancounter);
+	WRITE_STRING_FIELD(hiveUrl);
+	}
 }
 
 static void
@@ -2201,6 +2254,8 @@ _outFileSplitNode(StringInfo str, FileSplitNode *node)
 	WRITE_NODE_TYPE("FILESPLITNODE");
 
 	WRITE_INT_FIELD(segno);
+	WRITE_INT_FIELD(range_id);
+	WRITE_INT_FIELD(replicaGroup_id);
 	WRITE_INT64_FIELD(logiceof);
 	WRITE_INT64_FIELD(offsets);
 	WRITE_INT64_FIELD(lengths);
@@ -2214,6 +2269,9 @@ _outSegFileSplitMapNode(StringInfo str, SegFileSplitMapNode *node)
 
 	WRITE_OID_FIELD(relid);
 	WRITE_NODE_FIELD(splits);
+	WRITE_INT_FIELD(serializeSchemaLen);
+	WRITE_NSTRING_FIELD(serializeSchema, serializeSchemaLen);
+
 }
 
 static void
@@ -2252,7 +2310,6 @@ _outCreateExternalStmt(StringInfo str, CreateExternalStmt *node)
 	WRITE_STRING_FIELD(parentPath);
 	WRITE_NODE_FIELD(sreh);
 	WRITE_NODE_FIELD(encoding);
-
 }
 
 static void
@@ -2420,6 +2477,8 @@ _outAlterTableStmt(StringInfo str, AlterTableStmt *node)
 		WRITE_OID_FIELD(oidInfo[m].aoblkdirIndexOid);
 		WRITE_OID_FIELD(oidInfo[m].aoblkdirComptypeOid);
 	}
+
+	WRITE_BOOL_FIELD(greenWay);
 }
 
 static void
@@ -2454,7 +2513,7 @@ _outAlterPartitionCmd(StringInfo str, AlterPartitionCmd *node)
 	WRITE_NODE_FIELD(arg2);
 	WRITE_NODE_FIELD(scantable_splits);
 	WRITE_NODE_FIELD(newpart_aosegnos);
-
+	WRITE_STRING_FIELD(format);
 }
 
 static void
@@ -2949,6 +3008,8 @@ _outSingleRowErrorDesc(StringInfo str, SingleRowErrorDesc *node)
 	WRITE_BOOL_FIELD(is_keep);
 	WRITE_BOOL_FIELD(is_limit_in_rows);
 	WRITE_BOOL_FIELD(reusing_existing_errtable);
+	WRITE_BOOL_FIELD(is_hdfs_protocol_text);
+	WRITE_STRING_FIELD(hdfsLoc);
 }
 
 static void
@@ -2967,6 +3028,7 @@ _outCopyStmt(StringInfo str, CopyStmt *node)
 	WRITE_NODE_FIELD(err_aosegnos);
 	WRITE_NODE_FIELD(err_aosegfileinfos);
 	WRITE_NODE_FIELD(scantable_splits);
+	WRITE_NODE_FIELD(planTree);
 }
 
 
@@ -3991,6 +4053,12 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_IndexScan:
 				_outIndexScan(str, obj);
+				break;
+			case T_MagmaIndexScan:
+				_outMagmaIndexScan(str, obj);
+				break;
+			case T_MagmaIndexOnlyScan:
+				_outMagmaIndexOnlyScan(str, obj);
 				break;
 			case T_DynamicIndexScan:
 				_outDynamicIndexScan(str, obj);

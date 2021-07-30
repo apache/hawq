@@ -32,6 +32,7 @@
 
 
 struct SegmentIdentity;
+struct StringInfoData;
 struct ProcessIdentity;
 
 typedef struct SegmentFunctionList
@@ -47,6 +48,8 @@ typedef struct ProcessFunctionList
 } ProcessFunctionList;
 
 #define SEGMENT_IDENTITY_NAME_LENGTH	256
+
+#define SEGMENT_IDENTITY_SER_LENGTH 17
 
 typedef struct ProcessIdentity
 {
@@ -71,7 +74,9 @@ extern int slaveHostNumber;
 extern void SetSegmentIdentity(const char *name);
 extern bool IsOnMaster(void);
 extern const char *SerializeProcessIdentity(struct ProcessIdentity *id, int *msg_len);
-extern bool SetupProcessIdentity(const char *str);
+extern void newSerializeProcessIdentity(struct ProcessIdentity *id,
+                                        struct StringInfoData *str);
+extern bool SetupProcessIdentity(const char *str, bool newDisp);
 extern void SetupDispatcherIdentity(int segmentNum);
 
 extern bool AmIMaster(void);
@@ -92,6 +97,7 @@ extern int GetRelOpt_bucket_num_fromOptions(List *options, int default_val);
 extern int GetRelOpt_bucket_num_fromRel(Relation relation, int default_val);
 extern int GetRelOpt_bucket_num_fromRangeVar(const RangeVar* rel_rv, int default_val);
 extern int GetDefaultPartitionNum(void);
+extern int GetDefaultMagmaBucketNum(void);
 extern int GetHashDistPartitionNum(void);
 extern int GetExternalTablePartitionNum(void);
 

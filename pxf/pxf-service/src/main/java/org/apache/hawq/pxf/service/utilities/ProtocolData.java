@@ -8,9 +8,9 @@ package org.apache.hawq.pxf.service.utilities;
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
+ * 
  *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -31,7 +31,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hawq.pxf.api.OutputFormat;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
-import org.apache.hawq.pxf.api.utilities.EnumAggregationType;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.api.utilities.ProfilesConf;
 
@@ -52,15 +51,13 @@ public class ProtocolData extends InputData {
     protected int port;
     protected String host;
     protected String token;
-    protected String user;
     // statistics parameters
     protected int statsMaxFragments;
     protected float statsSampleRatio;
 
     /**
-     * Constructs a ProtocolData.
-     * Parses X-GP-* system configuration variables and
-     * X-GP-OPTIONS-* user configuration variables
+     * Constructs a ProtocolData. Parses X-GP-* configuration variables.
+     *
      * @param paramsMap contains all query-specific parameters from Hawq
      */
     public ProtocolData(Map<String, String> paramsMap) {
@@ -84,29 +81,25 @@ public class ProtocolData extends InputData {
         parseTupleDescription();
 
         /*
-         * accessor - will throw exception if outputFormat is
+         * accessor - will throw exception from getPropery() if outputFormat is
          * BINARY and the user did not supply accessor=... or profile=...
-         * resolver - will throw exception if outputFormat is
+         * resolver - will throw exception from getPropery() if outputFormat is
          * BINARY and the user did not supply resolver=... or profile=...
          */
-        profile = getUserProperty("PROFILE");
+        profile = getOptionalProperty("PROFILE");
         if (profile != null) {
             setProfilePlugins();
         }
-        accessor = getUserProperty("ACCESSOR");
-        if(accessor == null) {
-            protocolViolation("ACCESSOR");
-        }
-        resolver = getUserProperty("RESOLVER");
-        if(resolver == null) {
-            protocolViolation("RESOLVER");
-        }
-
-        fragmenter = getUserProperty("FRAGMENTER");
-        metadata = getUserProperty("METADATA");
+        accessor = getProperty("ACCESSOR");
+        resolver = getProperty("RESOLVER");
+        fragmenter = getOptionalProperty("FRAGMENTER");
+        metadata = getOptionalProperty("METADATA");
         dataSource = getProperty("DATA-DIR");
 
-        parseSecurityProperties();
+        /* Kerberos token information */
+        if (UserGroupInformation.isSecurityEnabled()) {
+            token = getProperty("TOKEN");
+        }
 
         parseFragmentMetadata();
         parseUserData();
@@ -122,18 +115,6 @@ public class ProtocolData extends InputData {
 
         // Store alignment for global use as a system property
         System.setProperty("greenplum.alignment", getProperty("ALIGNMENT"));
-
-        //Get aggregation operation
-        String aggTypeOperationName = getOptionalProperty("AGG-TYPE");
-
-        this.setAggType(EnumAggregationType.getAggregationType(aggTypeOperationName));
-
-        //Get fragment index
-        String fragmentIndexStr = getOptionalProperty("FRAGMENT-INDEX");
-
-        if (fragmentIndexStr != null) {
-            this.setFragmentIndex(Integer.parseInt(fragmentIndexStr));
-        }
     }
 
     /**
@@ -163,7 +144,6 @@ public class ProtocolData extends InputData {
         this.remoteLogin = copy.remoteLogin;
         this.remoteSecret = copy.remoteSecret;
         this.token = copy.token;
-        this.user = copy.user;
         this.statsMaxFragments = copy.statsMaxFragments;
         this.statsSampleRatio = copy.statsSampleRatio;
     }
@@ -178,9 +158,12 @@ public class ProtocolData extends InputData {
         requestParametersMap = paramsMap;
         profile = profileString;
         setProfilePlugins();
-        metadata = getUserProperty("METADATA");
+        metadata = getProperty("METADATA");
 
-        parseSecurityProperties();
+        /* Kerberos token information */
+        if (UserGroupInformation.isSecurityEnabled()) {
+            token = getProperty("TOKEN");
+        }
     }
 
     /**
@@ -211,7 +194,7 @@ public class ProtocolData extends InputData {
         if (!duplicates.isEmpty()) {
             throw new IllegalArgumentException("Profile '" + profile
                     + "' already defines: "
-                    + String.valueOf(duplicates).replace("X-GP-OPTIONS-", ""));
+                    + String.valueOf(duplicates).replace("X-GP-", ""));
         }
     }
 
@@ -294,7 +277,7 @@ public class ProtocolData extends InputData {
 
     /**
      * Returns the current output format, either {@link OutputFormat#TEXT} or
-     * {@link OutputFormat#GPDBWritable}.
+     * {@link OutputFormat#BINARY}.
      *
      * @return output format
      */
@@ -318,15 +301,6 @@ public class ProtocolData extends InputData {
      */
     public int serverPort() {
         return port;
-    }
-
-    /**
-     * Returns identity of the end-user making the request.
-     *
-     * @return userid
-     */
-    public String getUser() {
-        return user;
     }
 
     /**
@@ -361,27 +335,13 @@ public class ProtocolData extends InputData {
         return statsSampleRatio;
     }
 
-    private void parseSecurityProperties() {
-        // obtain identity of the end-user -- mandatory only when impersonation is enabled
-        if (SecureLogin.isUserImpersonationEnabled()) {
-            this.user = getProperty("USER");
-        } else {
-            this.user = getOptionalProperty("USER");
-        }
-
-        /* Kerberos token information */
-        if (UserGroupInformation.isSecurityEnabled()) {
-            this.token = getOptionalProperty("TOKEN");
-        }
-    }
-
     /**
      * Sets the thread safe parameter. Default value - true.
      */
     private void parseThreadSafe() {
 
         threadSafe = true;
-        String threadSafeStr = getUserProperty("THREAD-SAFE");
+        String threadSafeStr = getOptionalProperty("THREAD-SAFE");
         if (threadSafeStr != null) {
             threadSafe = parseBooleanValue(threadSafeStr);
         }
@@ -410,7 +370,6 @@ public class ProtocolData extends InputData {
         List<Integer> columnProjList = new ArrayList<Integer>();
         if(columnProjStr != null) {
             int columnProj = Integer.parseInt(columnProjStr);
-            numAttrsProjected = columnProj;
             if(columnProj > 0) {
                 String columnProjIndexStr = getProperty("ATTRS-PROJ-IDX");
                 String columnProjIdx[] = columnProjIndexStr.split(",");
@@ -518,7 +477,7 @@ public class ProtocolData extends InputData {
 
     private void parseStatsParameters() {
 
-        String maxFrags = getUserProperty("STATS-MAX-FRAGMENTS");
+        String maxFrags = getOptionalProperty("STATS-MAX-FRAGMENTS");
         if (!StringUtils.isEmpty(maxFrags)) {
             statsMaxFragments = Integer.parseInt(maxFrags);
             if (statsMaxFragments <= 0) {

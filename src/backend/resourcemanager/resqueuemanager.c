@@ -531,7 +531,7 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 				/*
 				 *--------------------------------------------------------------
 				 * Check the value. We accept only :
-				 * 128mb, 256mb, 512mb, 1gb, 2gb, 4gb, 8gb, 16gb
+				 * 128mb, 256mb, 512mb, 1gb, 2gb, 4gb, 8gb, 16gb, 32gb, 64gb
 				 *--------------------------------------------------------------
 				 */
 				if ( res == FUNC_RETURN_OK )
@@ -547,12 +547,14 @@ int parseResourceQueueAttributes( List 			 	*attributes,
 						 !(queue->SegResourceQuotaMemoryMB == (1<<11)) &&
 						 !(queue->SegResourceQuotaMemoryMB == (1<<12)) &&
 						 !(queue->SegResourceQuotaMemoryMB == (1<<13)) &&
-						 !(queue->SegResourceQuotaMemoryMB == (1<<14)) )
+						 !(queue->SegResourceQuotaMemoryMB == (1<<14)) &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<15)) &&
+						 !(queue->SegResourceQuotaMemoryMB == (1<<16)))
 					{
 						res = RESQUEMGR_WRONG_RES_QUOTA_EXP;
 						snprintf(errorbuf, errorbufsize,
 								 "%s value %s is not valid, only 128mb, 256mb, "
-								 "512mb, 1gb, 2gb, 4gb, 8gb, 16gb are "
+								 "512mb, 1gb, 2gb, 4gb, 8gb, 16gb 32gb 64gb are "
 								 "valid.",
 								 loadcatalog ?
 									 RSQTBLAttrNames[RSQ_TBL_ATTR_VSEG_RESOURCE_QUOTA] :

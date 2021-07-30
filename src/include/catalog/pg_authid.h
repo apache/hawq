@@ -48,8 +48,8 @@
    rolcreaterextgpfd boolean, -- allowed to create readable gpfdist tbl? 
    rolcreaterexthttp boolean, -- allowed to create readable http tbl? 
    rolcreatewextgpfd boolean, -- allowed to create writable gpfdist tbl? 
-   rolcreaterexthdfs boolean, -- allowed to create readable gphdfs tbl?
-   rolcreatewexthdfs boolean -- allowed to create writable gphdfs tbl?
+   rolcreaterexthdfs boolean, -- allowed to create readable hdfs tbl?
+   rolcreatewexthdfs boolean -- allowed to create writable hdfs tbl?
    );
 
    CREATE UNIQUE INDEX on pg_authid(rolname) with (indexid=2676, syscacheid=AUTHNAME, syscache_nbuckets=128);
@@ -119,8 +119,12 @@ CATALOG(pg_authid,1260) BKI_SHARED_RELATION
 	bool		rolcreaterextgpfd;	/* allowed to create readable gpfdist tbl?  */
 	bool		rolcreaterexthttp;	/* allowed to create readable http tbl?  */
 	bool		rolcreatewextgpfd;	/* allowed to create writable gpfdist tbl?  */
-	bool		rolcreaterexthdfs;	/* allowed to create readable gphdfs tbl? */
-	bool		rolcreatewexthdfs;	/* allowed to create writable gphdfs tbl? */
+	bool		rolcreaterexthdfs;	/* allowed to create readable hdfs tbl? */
+	bool		rolcreatewexthdfs;	/* allowed to create writable hdfs tbl? */
+	bool		rolcreaterexthive;	/* allowed to create readable hive tbl? */
+	bool		rolcreatewexthive;	/* allowed to create writable hive tbl? */
+	bool		rolcreaterextmagma;	/* allowed to create readable magma tbl? */
+	bool		rolcreatewextmagma;	/* allowed to create writable magma tbl? */
 } FormData_pg_authid;
 
 #undef timestamptz
@@ -138,7 +142,7 @@ typedef FormData_pg_authid *Form_pg_authid;
  *		compiler constants for pg_authid
  * ----------------
  */
-#define Natts_pg_authid						17
+#define Natts_pg_authid						21
 #define Anum_pg_authid_rolname				1
 #define Anum_pg_authid_rolsuper				2
 #define Anum_pg_authid_rolinherit			3
@@ -156,6 +160,10 @@ typedef FormData_pg_authid *Form_pg_authid;
 #define Anum_pg_authid_rolcreatewextgpfd	15
 #define Anum_pg_authid_rolcreaterexthdfs	16
 #define Anum_pg_authid_rolcreatewexthdfs	17
+#define Anum_pg_authid_rolcreaterexthive	18
+#define Anum_pg_authid_rolcreatewexthive	19
+#define Anum_pg_authid_rolcreaterextmagma	20
+#define Anum_pg_authid_rolcreatewextmagma	21
 
 
 /* TIDYCAT_END_CODEGEN */
@@ -169,7 +177,7 @@ typedef FormData_pg_authid *Form_pg_authid;
  * MPP-7845: add default queue DEFAULTRESQUEUE_OID 6055
  * ----------------
  */
-DATA(insert OID = 10 ( "POSTGRES" t t t t t t -1 _null_ _null_ _null_ 6055 t t t t t));
+DATA(insert OID = 10 ( "POSTGRES" t t t t t t -1 _null_ _null_ _null_ 6055 t t t t t t t t t));
 
 #define BOOTSTRAP_SUPERUSERID 10
 

@@ -28,6 +28,7 @@
 
 #include "catalog/genbki.h"
 #include "nodes/pg_list.h"
+#include "utils/relcache.h"
 
 /*
  * pg_exttable definition.
@@ -122,6 +123,33 @@ typedef FormData_pg_exttable *Form_pg_exttable;
 
 /* TIDYCAT_END_CODEGEN */
 
+/*
+ * gp_exttable values for FormData_pg_attribute.
+ *
+ * [Similar examples are Schema_pg_type, Schema_pg_proc, Schema_pg_attribute, etc, in
+ *  pg_attribute.h]
+ */
+#define Schema_pg_exttable \
+{ ExtTableRelationId, {"reloid"},		 							26, -1,	4, 1, 0, -1, -1, true, 'p', 'i', true, false, false, true, 0 }, \
+{ ExtTableRelationId, {"location"}, 									1009, -1, -1, 2, 1, -1, -1, false, 'x', 'i', false, false, false, true, 0 }, \
+{ ExtTableRelationId, {"fmttype"},									18, -1, 1, 3, 0, -1, -1, true, 'p', 'c', false, false, false, true, 0 }, \
+{ ExtTableRelationId, {"fmtopts"},									25, -1, -1, 4, 0, -1, -1, false, 'x', 'i', false, false, false, true, 0 }, \
+{ ExtTableRelationId, {"command"},									25, -1, -1, 5, 0, -1, -1, false, 'x', 'i', false, false, false, true, 0 }, \
+{ ExtTableRelationId, {"rejectlimit"},								23, -1, 4, 6, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0 }, \
+{ ExtTableRelationId, {"rejectlimittype"},							18, -1, 1, 7, 0, -1, -1, true, 'p', 'c', false, false, false, true, 0 }, \
+{ ExtTableRelationId, {"fmterrtbl"},									26, -1, 4, 8, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0 }, \
+{ ExtTableRelationId, {"encoding"},									23, -1, 4, 9, 0, -1, -1, true, 'p', 'i', false, false, false, true, 0 }, \
+{ ExtTableRelationId, {"writable"},									16, -1, 1, 10, 0, -1, -1, true, 'p', 'c', false, false, false, true, 0 }
+
+/*
+ * pg_exttable table values for FormData_pg_exttable.
+ */
+#define Class_pg_exttable \
+  {"pg_exttable"}, PG_CATALOG_NAMESPACE, 10290, BOOTSTRAP_SUPERUSERID, 0, \
+               ExtTableRelationId, DEFAULTTABLESPACE_OID, \
+               25, 10000, 0, 0, 0, 0, true, false, RELKIND_RELATION, RELSTORAGE_HEAP, Natts_pg_exttable, \
+               0, 0, 0, 0, 0, false, false, false, false, FirstNormalTransactionId, {0}, {{{'\0','\0','\0','\0'},{'\0'}}}
+
 
 /*
  * Descriptor of a single AO relation.
@@ -161,22 +189,39 @@ InsertExtTableEntry(Oid 	tbloid,
 extern ExtTableEntry*
 GetExtTableEntry(Oid relid);
 
+extern ExtTableEntry *
+GetExtTableEntryFromTuple(
+	Relation		pg_exttable_rel,
+	TupleDesc	pg_exttable_dsc,
+	HeapTuple	tuple,
+	Oid			*relationId);
+
 extern void
 RemoveExtTableEntry(Oid relid);
 
 #define CustomFormatType    'b'
 #define TextFormatType      't'
 #define CsvFormatType       'c'
+#define ParquetFormatType   'p'
 #define OrcFormatType       'o'
 #define NonCustomFormatType 'n'
+
 
 /* PXF formats*/
 #define GpdbWritableFormatName "GPDBWritable"
 #define TextFormatName "TEXT"
 
-#define fmttype_is_custom(c) (c == CustomFormatType)
-#define fmttype_is_text(c)   (c == TextFormatType)
-#define fmttype_is_csv(c)    (c == CsvFormatType)
+#define fmttype_is_custom(c)  (c == CustomFormatType)
+#define fmttype_is_text(c)    (c == TextFormatType)
+#define fmttype_is_csv(c)     (c == CsvFormatType)
+#define fmttype_is_parquet(c) (c == ParquetFormatType)
 #define fmttype_is_orc(c)     (c == OrcFormatType)
+
+extern bool RelationIsPluggableStorage(Oid relid);
+extern bool RelationIsMagmaTable(Oid relid);
+
+/* RelationIsMagmaTable maybe throw exception, so add RelationIsMagmaTable2 */
+extern bool RelationIsMagmaTable2(Oid relid);
+extern bool RelationIsORCTable(Oid relid);
 
 #endif /* PG_EXTTABLE_H */

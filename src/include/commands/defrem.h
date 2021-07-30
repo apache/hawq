@@ -14,6 +14,7 @@
 #ifndef DEFREM_H
 #define DEFREM_H
 
+#include "catalog/index.h"
 #include "nodes/parsenodes.h"
 
 struct HTAB;  /* utils/hsearch.h */
@@ -48,6 +49,9 @@ extern char *ChooseRelationName(const char *name1, const char *name2,
 								const char *label, Oid namespaceName, 
 								struct HTAB *cache);
 extern Oid	GetDefaultOpClass(Oid type_id, Oid am_id);
+extern void ComputeConstraintAttrs(struct IndexInfo *indexInfo,
+                                   List *attList,   /* list of IndexElem's */
+                                   Oid relId);
 
 /* commands/functioncmds.c */
 extern void CreateFunction(CreateFunctionStmt *stmt);

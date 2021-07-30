@@ -23,6 +23,10 @@
 #include "miscadmin.h"
 #include "storage/backendid.h"
 
+#include "executor/cwrapper/executor-c.h"
+#include "executor/cwrapper/cached-result.h"
+#include "magma/cwrapper/magma-client-c.h"
+#include "scheduler/cwrapper/scheduler-c.h"
 
 ProtocolVersion FrontendProtocol = PG_PROTOCOL_LATEST;
 
@@ -155,3 +159,13 @@ int hawq_re_memory_overcommit_max = 8192;
 #endif
 double hawq_re_memory_quota_allocation_ratio = 0.5;
 int gp_vmem_protect_gang_cache_limit = 500;
+
+uint32_t sql_memory;
+double sql_cpu;
+const char *sql_creation_time;
+const char *sql_text;
+bool is_qtype_sql = false;
+
+ExecutorC	*MyNewExecutor;
+SchedulerC *MyScheduler = NULL;
+CachedResultC *MyCachedResult = NULL;

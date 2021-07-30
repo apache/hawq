@@ -42,6 +42,7 @@
 #include "commands/variable.h"			/* show_session_authorization */
 #include "commands/dbcommands.h" 		/* get_database_name */
 #include "commands/portalcmds.h"
+#include "tcop/pquery.h"
 #include "miscadmin.h"
 #include "nodes/execnodes.h"            /* EState */
 #include "utils/builtins.h"
@@ -56,7 +57,7 @@
 #include "cdb/cdbfilesystemcredential.h"
 #include "cdb/ml_ipc.h"
 #include "cdb/dispatcher.h"
-
+#include "cdb/dispatcher_new.h"
 
 /*
  * Estimate of the maximum number of open portals a user would have,
@@ -119,7 +120,6 @@ do { \
 } while(0)
 
 static MemoryContext PortalMemory = NULL;
-
 
 /* ----------------------------------------------------------------
  *				   public portal interface functions
@@ -390,7 +390,6 @@ void
 PortalDrop(Portal portal, bool isTopCommit)
 {
 	AssertArg(PortalIsValid(portal));
-
 	/* Not sure if this case can validly happen or not... */
 	if (PortalGetStatus(portal) == PORTAL_ACTIVE) 
 		elog(ERROR, "cannot drop active or queued portal");
@@ -995,17 +994,17 @@ CdbShutdownPortals(void)
 		EState	*es;
 
 		if (portal->queryDesc == NULL ||
-			portal->queryDesc->estate == NULL ||
-			portal->queryDesc->estate->dispatch_data)
+		    portal->queryDesc->estate == NULL ||
+		    (portal->queryDesc->estate->dispatch_data == NULL
+		        && portal->queryDesc->estate->mainDispatchData == NULL))
 			continue;
 
-		es = portal->queryDesc->estate;
-
-		/* active portal, shut it down */
-		if (es->dispatch_data)
-		{
-			dispatch_wait(es->dispatch_data);   /* cancel any QEs still running */
-		}
+		/* Shutdown active portal */
+		portal->queryDesc->estate->terminateOnGoing = true;
+		if (portal->queryDesc->estate->dispatch_data)
+		  dispatch_wait(portal->queryDesc->estate->dispatch_data, true);
+		if (portal->queryDesc->estate->mainDispatchData)
+		  mainDispatchWait(portal->queryDesc->estate->mainDispatchData, true);
 	}
 }
 

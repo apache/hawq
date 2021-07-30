@@ -144,7 +144,7 @@ typedef struct CopyStateData
 	char	   *null_print;		/* NULL marker string (server encoding!) */
 	int			null_print_len; /* length of same */
 	char	   *null_print_client;		/* same converted to client encoding */
-	char	   *delim;			/* column delimiter (must be 1 byte) */
+	char	   *delim;			/* column delimiter (1 byte or multibytes) */
 	char	   *quote;			/* CSV quote char (must be 1 byte) */
 	char	   *escape;			/* CSV escape char (must be 1 byte) */
 	bool	   *force_quote_flags;		/* per-column CSV FQ flags */
@@ -207,6 +207,7 @@ typedef struct CopyStateData
 	char		eol_ch[2];		/* The byte values of the 1 or 2 eol bytes */
 	bool		escape_off;		/* treat backslashes as non-special? */
 	bool		delimiter_off;  /* no delimiter. 1-column external tabs only */
+	bool		delimiter_multibytes;
 	int			last_hash_field;
 	bool		line_done;		/* finished processing the whole line or
 								 * stopped in the middle */
@@ -244,6 +245,7 @@ typedef struct CopyStateData
 	List *splits;				/* table scan splits for this segment */
 	/* end Greenplum Database specific variables */
 	struct QueryResource *resource;
+	PlannedStmt *planstmt;  /* ext table copy to */
 } CopyStateData;
 
 typedef CopyStateData *CopyState;

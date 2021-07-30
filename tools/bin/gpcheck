@@ -30,6 +30,11 @@ try:
     from pygresql.pgdb import DatabaseError
     from pygresql import pg
     import stat
+    from gppylib.gpsqlUtil import GpsqlUtil
+    import yaml
+    import xml
+    import time
+    import calendar
 
 except ImportError, e:    
     sys.exit('Cannot import modules.  Please check that you have sourced greenplum_path.sh.  Detail: ' + str(e))
@@ -87,6 +92,7 @@ class GpCheckConfig:
 
         self.diskusage_mounts = []
         self.diskusage_usagemax = 90 # max disk usage percentage
+        self.disk_space_total = 1000.0
 
         self.hdfs_expected = { # default value for HDFS configuration
                 "dfs.mem.namenode.heap": 8192,
@@ -106,6 +112,16 @@ class GpCheckConfig:
         self.hawq_kerberos_expected = {}
         self.hawq_yarn_expected = {}
 
+        self.default_hash_table_bucket_number = 8
+        self.hawq_rm_nvseg_perquery_limit = 512
+        self.hawq_rm_nvseg_perquery_perseg_limit = 8
+        self.magma_shm_limit_per_block = 1
+
+        self.disk_write_min_bandwidth = 200.0
+        self.disk_read_min_bandwidth = 700.0
+        self.stream_min_bandwidth = 10000.0
+        self.network_min_bandwidth = 1000.0
+
 
     def readConfigFile(self, config_file):
         parsed_list = self.parser.read(config_file)
@@ -123,7 +139,7 @@ class GpCheckConfig:
         if self.parser.has_option(section, "mount.points"):
             for p in self.parser.get(section, "mount.points").split(","):
                 self.mount_points.add(p.strip())
-        
+
         section = 'linux.sysctl'
         for opt in self.parser.options(section):
             if re.match('sysctl\.', opt):
@@ -151,6 +167,11 @@ class GpCheckConfig:
             except Exception, e:
                 raise GpCheckError("Bad config entry value '%s' for 'diskusage.monitor.usagemax': %s" %
                         (self.diskusage_usagemax, e))
+        if self.parser.has_option(section, "disk.space.total.GB"):
+            try:
+                self.disk_space_total = float(self.parser.get(section, "disk.space.total.GB"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'linux.diskusage': %s" % (str(e)))
 
         if not self.parser.has_section('hdfs.base'):
             if not self.parser.has_section("hdfs"):
@@ -222,6 +243,50 @@ class GpCheckConfig:
             for opt in self.parser.options(section):
                 self.hawq_yarn_expected[opt] = self.parser.get(section, opt)
 
+        section = "hawq.guc"
+        if self.parser.has_option(section, "default.hash.table.bucket.number"):
+            try:
+                self.default_hash_table_bucket_number = int(self.parser.get(section, "default.hash.table.bucket.number"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'hawq.guc': %s" % (str(e)))
+        if self.parser.has_option(section, "hawq.rm.nvseg.perquery.limit"):
+            try:
+                self.hawq_rm_nvseg_perquery_limit = int(self.parser.get(section, "hawq.rm.nvseg.perquery.limit"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'hawq.guc': %s" % (str(e)))
+        if self.parser.has_option(section, "hawq.rm.nvseg.perquery.perseg.limit"):
+            try:
+                self.hawq_rm_nvseg_perquery_perseg_limit = int(self.parser.get(section, "hawq.rm.nvseg.perquery.perseg.limit"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'hawq.guc': %s" % (str(e)))
+        if self.parser.has_option(section, "magma.shm.limit.per.block"):
+            try:
+                self.magma_shm_limit_per_block = int(self.parser.get(section, "magma.shm.limit.per.block"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'hawq.guc': %s" % (str(e)))
+
+        section = "hardware.performance"
+        if self.parser.has_option(section, "disk.write.min.bandwidth.MBs"):
+            try:
+                self.disk_write_min_bandwidth = float(self.parser.get(section, "disk.write.min.bandwidth.MBs"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'hardware.performance': %s" % (str(e)))
+        if self.parser.has_option(section, "disk.read.min.bandwidth.MBs"):
+            try:
+                self.disk_read_min_bandwidth = float(self.parser.get(section, "disk.read.min.bandwidth.MBs"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'hardware.performance': %s" % (str(e)))
+        if self.parser.has_option(section, "stream.min.bandwidth.MBs"):
+            try:
+                self.stream_min_bandwidth = float(self.parser.get(section, "stream.min.bandwidth.MBs"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'hardware.performance': %s" % (str(e)))
+        if self.parser.has_option(section, "network.min.bandwidth.MBs"):
+            try:
+                self.network_min_bandwidth = float(self.parser.get(section, "network.min.bandwidth.MBs"))
+            except expression as e:
+                raise GpCheckError("Fail to read section 'hardware.performance': %s" % (str(e)))
+
 ###### Global Variables #############
 logger = get_default_logger()
 EXECNAME = os.path.split(__file__)[-1]
@@ -238,7 +303,7 @@ pool = WorkerPool()
 tmpdir = None
 found_errors = 0
 
-HAWQ_GUC_MEMORY    = "hawq_re_memory_overcommit_max"
+HAWQ_GUC_MEMORY = "hawq_re_memory_overcommit_max"
 
 
 def checkPlatform():
@@ -284,6 +349,12 @@ def parseargs():
     parser.add_option('-c', '--config', type='string') # optional: gpcheck config file path
     parser.add_option('-f', '--file',  type='string')  # host file, for testing a list of hosts
     parser.add_option('-h', '--host',  type='string')  # test a single host
+
+    # Adding new options: postSetup postUpgrade weeklyExam
+    parser.add_option('--postSetup', action='store_true')
+    parser.add_option('--postUpgrade', action='store_true')
+    parser.add_option('--weeklyExamine', action='store_true')
+    parser.add_option('-t', '--table', type='string') # optional: table to analyze
 
     (options, args) = parser.parse_args()
     if len(args) > 0:
@@ -398,7 +469,6 @@ def getHDFSNamenodeHost():
             namenode_host = i.results.stdout.strip()
         logger.info("detect namenode hostname to be %s" % namenode_host)
     return namenode_host
-
 
 def createHostList():
     if options.verbose:
@@ -561,19 +631,22 @@ def readDataFiles():
 
 
 def readHAWQConfiguration():
+    '''
+    This function is used to check hawq_re_memory_overcommit_max parameter.
+
+    Sets the maximum quota of memory overcommit (in MB) per physical segment for resource enforcement. 
+
+    This parameter sets the memory quota that can be overcommited beyond the memory quota dynamically assigned by the resource manager.
+    '''
     if options.verbose:
         logger.info("trying to collect HAWQ configuration...")
 
-    dbname = os.environ.get('PGDATABASE', 'template1')
     try:
-        db = pg.connect(dbname=dbname)
-    except pg.InternalError, ex:
-        checkFailed(None, "utility cannot perform HAWQ CPU and Memory check because failed to connect to HAWQ")
-        return
-
-    # read segment configurations
-    gpcheck_info.hawq_segment_configuration = db.query("select * from gp_segment_configuration").dictresult()
-    db.close()
+        _sqlUtil = GpsqlUtil()
+        gpcheck_info.hawq_segment_configuration = _sqlUtil.performQuery("select * from gp_segment_configuration;")
+    except expression as identifier:
+        logger.error("utility cannot perform HAWQ CPU and Memory check because failed to connect to HAWQ")
+        logger.error(str(e))
 
     # read Memory GUC using hawqconfig
     command = "hawqconfig -s %s" % HAWQ_GUC_MEMORY
@@ -601,7 +674,7 @@ def testConnectEmc(host):
 
     if host.data.connectemc.output != expected:
         checkFailed(host.hostname, "Connect EMC is not running on master (try /etc/init.d/connectemc status)")
-    
+
 
 
 def testSolarisEtcSystem(host):
@@ -651,7 +724,7 @@ def testSolarisEtcProject(host):
             continue
 
         checkFailed(host.hostname, "/etc/project is missing expected line '%s'" % line)
-        
+
 
 def testSolarisEtcUserAttr(host):
 
@@ -666,7 +739,7 @@ def testSolarisEtcUserAttr(host):
             continue
 
         checkFailed(host.hostname, "/etc/user_attr is missing expected line '%s'" % line)
- 
+
 
 def testHAWQGUC(host):
     if not gpcheck_info.hawq_collected_ok:
@@ -717,7 +790,7 @@ def testHAWQGUC(host):
         if guc_vmemsize_master != expect_vmemsize_per_segment:
             checkFailed(host.hostname, "HAWQ segment's %s GUC value on this host is %s, expected %s" % (
                 HAWQ_GUC_MEMORY, guc_vmemsize_master, expect_vmemsize_per_segment))
-        
+
 
 def testDiskCapacity(host):
     if options.verbose:
@@ -1236,7 +1309,6 @@ def readZip():
 
     logger.info("trying to read zip file '%s' [success]" % options.zipin)
 
-
 def doZip(fname):
     logger.info("dump gpcheck data into a zip file '%s.tar.gz'..." % fname)
 
@@ -1294,6 +1366,591 @@ def doPrint():
         for guc_name, guc_val in gpcheck_info.hawq_gucs.items():
             print "GUC          : %s\nMaster  value: %s\nSegment value: %s\n" % (guc_name, guc_val[0], guc_val[1])
 
+def checkHostsFile():
+    '''
+    This function will check /etc/hosts file, and if it contains IPv6, it will be commented out
+    '''
+    rtn_output = subprocess.check_output("cat /etc/hosts", shell=True)
+    hostsContent = rtn_output.decode("utf8", "ignore")
+
+    newHostsContent = ""
+    # Trying to find if /etc/hosts contains ::1
+    for hostName in hostsContent.splitlines():
+        hostName = hostName.replace('\n', '')
+        if hostName.find("::") > -1 and hostName.find("#") < 0:
+            newHostsContent += "# " + hostName + "\n"
+        else:
+            newHostsContent += hostName + "\n"
+
+    return newHostsContent
+
+def local_run(cmd):
+    '''Execute each shell command on local machine.'''
+    for elem in cmd:
+        result = subprocess.Popen(elem, shell=True).wait()
+        check_return_code(result)
+
+def checkHardwarePerf():
+    """
+    This function is used to check hardware performance of each node, which include disk IO, memory and network
+    """
+    global options
+    hawq_home = os.getenv('GPHOME')
+    if not hawq_home:
+        print("HAWQ home directory is not defined, please check GPHOME settings.")
+        sys.exit(1)
+    source_hawq_env = ". %s/greenplum_path.sh" % hawq_home
+    cmd = ""
+    arguments = "-f %s -r dsN -D -S 8589934592 -d /tmp" % (options.file)
+    cmd = "%s; gpcheckperf %s" % (source_hawq_env, arguments)
+    rtn_output = subprocess.check_output(cmd, shell=True)
+    rtnContent = rtn_output.decode("utf8", "ignore")
+
+    # Display test result
+    print(rtn_output)
+
+    expected_disk_write_min_bandwidth = gpcheck_config.disk_write_min_bandwidth
+    expected_disk_read_min_bandwidth = gpcheck_config.disk_read_min_bandwidth
+    expected_stream_min_bandwidth = gpcheck_config.stream_min_bandwidth
+    expected_network_min_bandwidth = gpcheck_config.network_min_bandwidth
+
+    # Retrieve test result
+    hostname_real_disk_write_min_bandwidth = ""
+    real_disk_write_min_bandwidth = 0.0
+
+    hostname_real_disk_read_min_bandwidth = ""
+    real_disk_read_min_bandwidth = 0.0
+
+    hostname_real_stream_min_bandwidth = ""
+    real_stream_min_bandwidth = 0.0
+
+    real_network_min_bandwidth = 0.0
+    rtnContent = rtnContent.splitlines()
+    for rowItem in rtnContent:
+        if "disk write min bandwidth" in rowItem:
+            value_hostnane = rowItem.split(": ")[1]
+            hostname_real_disk_write_min_bandwidth = value_hostnane.split(" ")[1].strip()
+            real_disk_write_min_bandwidth = (float)(value_hostnane.split(" ")[0].strip())
+        elif "disk read min bandwidth" in rowItem:
+            value_hostnane = rowItem.split(": ")[1]
+            hostname_real_disk_read_min_bandwidth = value_hostnane.split(" ")[1].strip()
+            real_disk_read_min_bandwidth = (float)(value_hostnane.split(" ")[0].strip())
+        elif "stream min bandwidth" in rowItem:
+            value_hostnane = rowItem.split(": ")[1]
+            hostname_real_stream_min_bandwidth = value_hostnane.split(" ")[1].strip()
+            real_stream_min_bandwidth = (float)(value_hostnane.split(" ")[0].strip())
+        elif "min = " in rowItem:
+            value_unit = rowItem.split("= ")[1]
+            real_network_min_bandwidth = (float)(value_unit.split(" ")[0].strip())
+        elif "[Warning] single host only - abandon netperf test" in rowItem:
+            real_network_min_bandwidth = -1.0
+
+    if real_disk_write_min_bandwidth >= expected_disk_write_min_bandwidth:
+        logger.info("Pass: Disk write test")
+    else:
+        logger.error("Fail: Disk min write bandwidth %.2f (MB/s) is lower than expected value %.2f (MB/s). Node: %s." % (real_disk_write_min_bandwidth, expected_disk_write_min_bandwidth, hostname_real_disk_write_min_bandwidth)) 
+
+    if real_disk_read_min_bandwidth >= expected_disk_read_min_bandwidth:
+        logger.info("Pass: Disk read test")
+    else:
+        logger.error("Fail: Disk min read bandwidth %.2f (MB/s) is lower than expected value %.2f (MB/s). Node: %s." % (real_disk_read_min_bandwidth, expected_disk_read_min_bandwidth, hostname_real_disk_read_min_bandwidth))
+
+    if real_stream_min_bandwidth >= expected_stream_min_bandwidth:
+        logger.info("Pass: Stream test")
+    else:
+        logger.error("Fail: Stream min bandwidth %.2f (MB/s) is lower than expected value %.2f (MB/s). Node %s." % (real_stream_min_bandwidth, expected_stream_min_bandwidth, hostname_real_stream_min_bandwidth))
+
+    if real_network_min_bandwidth < 0:
+        logger.info("Warning: Single host only - abandon netperf test")
+    elif real_network_min_bandwidth >= expected_network_min_bandwidth:
+        logger.info("Pass: Network test")
+    else:
+        logger.error("Fail: Min network bandwidth %.2f (MB/s) is lower than expected value %.2f (MB/s)." % (real_network_min_bandwidth, expected_network_min_bandwidth))
+
+def retrieve_DB_Version():
+    '''
+    This function is used to retrieve database version and RPM version.
+    '''
+    _sqlUtil = GpsqlUtil()
+    db_version = _sqlUtil.performQuery("select version();")
+
+    rtn_output = subprocess.check_output("sudo rpm -qa | grep hawq", shell=True)
+    rpm_version = rtn_output.decode("utf8", "ignore")
+    rpm_version = rpm_version.splitlines()[0].replace("\n", "")
+
+    logger.info("Database Version is %s" % db_version[0]["version"])
+    logger.info("RPM Version is %s" % rpm_version)
+
+def retrieve_DB_process():
+    '''
+    This function is used to retrieve database process info.
+    '''
+    _sqlUtil = GpsqlUtil()
+    db_process = _sqlUtil.performQuery("SELECT * FROM gp_segment_configuration;")
+
+    if db_process is not None:
+        logger.info("Database Process Information:")
+        for listElem in db_process:
+            if listElem["status"].lower() == "u":
+                logger.info("Database node: %s is up." % listElem["hostname"])
+            else:
+                logger.error("Database node: %s is NOT up." % listElem["hostname"])
+    else:
+        logger.error("Fail to retrieve database process information.")
+
+def check_DB_basic_function():
+    '''
+    This function will perform create table, insert data into table, select data from table 
+
+    and drop table operations to test if database is functioning correctly.
+    '''
+    _sqlUtil = GpsqlUtil()
+
+    table_name = "hawqTest_" + str(calendar.timegm(time.gmtime()))
+    rowCount = 100000
+    try:
+        # Create table
+        createTable = _sqlUtil.performQuery("CREATE TABLE %s (id INT);" % table_name, 0)
+        if createTable != "FAIL":
+            logger.info("Pass: Create table is successful.")
+    except Exception as e:
+        logger.error("Fail to create table: %s" % (str(e)))
+        return None
+
+    try:
+        # Insert data into database
+        insertData = _sqlUtil.performQuery("INSERT INTO %s SELECT generate_series(1, %s);" % (table_name, str(rowCount)), 0)
+        rtnData = _sqlUtil.performQuery("SELECT count(*) FROM %s;" % (table_name))
+        if rtnData[0]["count"] == rowCount:
+            logger.info("Pass: Insert data into table is successful.")
+            logger.info("Pass: Select data from table is successful.")
+        else:
+            logger.error("Fail to insert data into table.")
+    except Exception as e:
+        logger.error("Fail to insert data into table.")
+        dropTable = _sqlUtil.performQuery("DROP TABLE %s;" % table_name)
+        return None
+
+    try:
+        # Drop table
+        dropTable = _sqlUtil.performQuery("DROP TABLE %s;" % table_name, 0)
+        if dropTable != "FAIL":
+            logger.info("Pass: Drop table is successful.")
+    except Exception as e:
+        logger.error("Fail to drop table %s. Please perform drop table operation manually." % table_name)
+        return None
+
+def check_GUC_configuration():
+    '''
+    This function will perform GUC configuration check:
+
+    default_hash_table_bucket_number; hawq_rm_nvseg_perquery_limit; 
+
+    hawq_rm_nvseg_perquery_perseg_limit;
+
+    magma_shm_limit_per_block
+    '''
+    expected_default_hash_table_bucket_number = gpcheck_config.default_hash_table_bucket_number
+    expected_hawq_rm_nvseg_perquery_limit = gpcheck_config.hawq_rm_nvseg_perquery_limit
+    expected_hawq_rm_nvseg_perquery_perseg_limit = gpcheck_config.hawq_rm_nvseg_perquery_perseg_limit
+    expected_magma_shm_limit_per_block = gpcheck_config.magma_shm_limit_per_block
+
+    # Connect to DB to retrieve GUC config values
+    _sqlUtil = GpsqlUtil()
+
+    actual_default_hash_table_bucket_number = None
+    actual_hawq_rm_nvseg_perquery_limit = None
+    actual_hawq_rm_nvseg_perquery_perseg_limit =None
+    actual_magma_shm_limit_per_block = None
+
+    try:
+        querySQL = "show default_hash_table_bucket_number;"
+        actual_default_hash_table_bucket_number = _sqlUtil.performQuery(querySQL)
+        actual_default_hash_table_bucket_number = actual_default_hash_table_bucket_number[0]["default_hash_table_bucket_number"]
+        if expected_default_hash_table_bucket_number > int(actual_default_hash_table_bucket_number):
+            logger.error("Fail: Default hash table bucket number %s is less than expected value %s." % (actual_default_hash_table_bucket_number, expected_default_hash_table_bucket_number))
+        else:
+            logger.info("Pass: Default hash table bucket number %s is NOT less than expected value %s." % (actual_default_hash_table_bucket_number, expected_default_hash_table_bucket_number))
+
+        querySQL = "show hawq_rm_nvseg_perquery_limit;"
+        actual_hawq_rm_nvseg_perquery_limit = _sqlUtil.performQuery(querySQL)
+        actual_hawq_rm_nvseg_perquery_limit = actual_hawq_rm_nvseg_perquery_limit[0]["hawq_rm_nvseg_perquery_limit"]
+        if expected_hawq_rm_nvseg_perquery_limit > int(actual_hawq_rm_nvseg_perquery_limit):
+            logger.error("Fail: Hawq rm nvseg perquery limit %s is less than expected value %s." % (actual_hawq_rm_nvseg_perquery_limit, expected_hawq_rm_nvseg_perquery_limit))
+        else:
+            logger.info("Pass: Hawq rm nvseg perquery limit %s is NOT less than expected value %s." % (actual_hawq_rm_nvseg_perquery_limit, expected_hawq_rm_nvseg_perquery_limit))
+
+        querySQL = "show hawq_rm_nvseg_perquery_perseg_limit;"
+        actual_hawq_rm_nvseg_perquery_perseg_limit = _sqlUtil.performQuery(querySQL)
+        actual_hawq_rm_nvseg_perquery_perseg_limit = actual_hawq_rm_nvseg_perquery_perseg_limit[0]["hawq_rm_nvseg_perquery_perseg_limit"]
+        if expected_hawq_rm_nvseg_perquery_perseg_limit > int(actual_hawq_rm_nvseg_perquery_perseg_limit):
+            logger.error("Fail: Hawq rm nvseg perquery perseg limit %s is less than expected value %s." % (actual_hawq_rm_nvseg_perquery_perseg_limit, expected_hawq_rm_nvseg_perquery_perseg_limit))
+        else:
+            logger.info("Pass: Hawq rm nvseg perquery perseg limit %s is NOT less than expected value %s." % (actual_hawq_rm_nvseg_perquery_perseg_limit, expected_hawq_rm_nvseg_perquery_perseg_limit))
+
+        querySQL = "show magma_shm_limit_per_block;"
+        actual_magma_shm_limit_per_block = _sqlUtil.performQuery(querySQL)
+        actual_magma_shm_limit_per_block = actual_magma_shm_limit_per_block[0]["magma_shm_limit_per_block"].replace("MB", "")
+        if expected_magma_shm_limit_per_block > int(actual_magma_shm_limit_per_block):
+            logger.error("Fail: Magma shm limit per block %sMB is less than expected value %sMB." % (actual_magma_shm_limit_per_block, expected_magma_shm_limit_per_block))
+        else:
+            logger.info("Pass: Magma shm limit per block %sMB is NOT less than expected value %sMB." % (actual_magma_shm_limit_per_block, expected_magma_shm_limit_per_block))
+    except Exception as e:
+        logger.error("Fail to execute %s." % (querySQL))
+        logger.error("Error Message: %s" % (str(e)))
+
+def checkDiskUsage():
+    '''
+    This function is used to check disk total usage data of each node,
+
+    and compare total disk space and available ratio with expected value in gpconfig.yml file
+    '''
+    global options
+
+    rtn_output = subprocess.check_output("cat %s" % (options.file), shell=True)
+    hostsContent = rtn_output.decode("utf8", "ignore")
+
+    expected_disk_space_total = (float)(gpcheck_config.disk_space_total)
+    expected_disk_space_available = (float)(gpcheck_config.diskusage_usagemax)
+
+    # Check disk status of each host
+    for elem in hostsContent.splitlines():
+        hostName = elem.replace("\n", "")
+        hostName = hostName.replace(" ", "")
+        if hostName != "":
+            cmd = []
+            print("---------- Node Name: %s" % (hostName))
+            cmd.append("ssh %s df -h --total | grep Filesystem; df -h --total | grep total" % (hostName))
+            local_run(cmd)
+            rtn_output = subprocess.check_output("ssh %s df -h -P --total -BG  | grep total" % (hostName), shell=True)
+            rtnContent = rtn_output.decode("utf8", "ignore")
+            rtnVal = ' '.join(rtnContent.splitlines()[0].split())
+            rtnVal = rtnVal.split(" ")
+            totalDiskSpace = (float)(rtnVal[1].replace("G", ""))
+            diskAvailableSpace = (float)(rtnVal[3].replace("G", ""))
+            diskAvaiableRatio = (diskAvailableSpace / totalDiskSpace) * 100.0
+
+            # Compare real value with expected value
+            if expected_disk_space_total > totalDiskSpace:
+                logger.error("Fail: Disk total space %.1fGB is less than expected value %.1fGB." % (totalDiskSpace, expected_disk_space_total))
+            else:
+                logger.info("Pass: Disk total space %.1fGB is NOT less than expected value %.1fGB." % (totalDiskSpace, expected_disk_space_total))
+
+            if expected_disk_space_available > diskAvaiableRatio:
+                logger.error("Fail: Disk available space ratio %.1f%% is less than expected value %.1f%%." % (diskAvaiableRatio, expected_disk_space_available))
+            else:
+                logger.info("Pass: Disk available space ratio %.1f%% is NOT less than expected value %.1f%%." % (diskAvaiableRatio, expected_disk_space_available))
+
+def checkMasterStandbySync():
+    '''
+    This function is used to check if master and standby are synchronized
+    '''
+    _sqlUtil = GpsqlUtil()
+    gp_master_mirroring = _sqlUtil.performQuery("select * from gp_master_mirroring;")
+    gp_master_mirroring_rtn = gp_master_mirroring[0]["summary_state"].lower()
+
+    # Check if there is standby node
+    gp_segment_configuration = _sqlUtil.performQuery("select * from gp_segment_configuration where role = 's';")
+    standby_flag = False
+    if len(gp_segment_configuration) > 0:
+        standby_flag = True
+
+    if standby_flag:
+        if gp_master_mirroring_rtn == "synchronized":
+            logger.info("Pass: Master and Standby are synchronized.")
+        elif gp_master_mirroring_rtn == "not configured":
+            logger.info("Fail: Standby is NOT found.")
+        else:
+            logger.error("Fail: Master and Standby are NOT synchronized.")
+    else:
+        if gp_master_mirroring_rtn == "synchronized":
+            logger.info("Fail: Unexpected accident is occurring. Please check gp_segment_configuration and gp_master_mirroring tables.")
+        elif gp_master_mirroring_rtn == "not configured":
+            logger.info("Pass: Standby are NOT configured.")
+        else:
+            logger.error("Fail: Unexpected accident is occurring. Please check gp_segment_configuration and gp_master_mirroring tables.")
+
+def checkTableAnalyzeStatus():
+    '''
+    This function is used to check if all tables are analyzed within three days
+    '''
+    _sqlUtil = GpsqlUtil()
+    analyzeInfo = _sqlUtil.performQuery("SELECT classid, objid, staactionname, stasysid, stausename, stasubtype, statime FROM pg_stat_last_operation pslo, pg_class pc WHERE pc.oid = pslo.objid and (now()-statime)>3;")
+    if len(analyzeInfo) > 0:
+        logger.error("Fail: There are %d tables which are NOT analyzed within three days. Please check pg_stat_last_operation and pg_class tables to get details." % (len(analyzeInfo)))
+    else:
+        logger.info("Pass: All tables are analyzed within three days.")
+
+def check_kerberos_enablement():
+    '''
+    Read /usr/local/hawq/etc/hdfs-client.xml and /usr/local/hawq/etc/yarn-client.xml to check if kerberos is enabled.
+    '''
+    # Open hdfs-client.xml and get data
+    hdfs_client_Msg = subprocess.check_output("cat /usr/local/hawq/etc/hdfs-client.xml", shell=True)
+    root = xml.etree.ElementTree.fromstring(hdfs_client_Msg)
+
+    # Check if kerberos in hdfs-client.xml is enabled
+    flag = True
+    for elem in root.findall("property"):
+        elemValue = elem.find('name').text
+        if elemValue.lower() == "kerberos":
+            flag = False
+            break
+    if flag:
+        logger.error("Kerberos in hdfs-client.xml is NOT enabled.")
+    else:
+        logger.info("Kerberos in hdfs-client.xml is enabled.")
+
+    # Open yarn-client.xml and get data
+    yarn_client_Msg = subprocess.check_output("cat /usr/local/hawq/etc/yarn-client.xml", shell=True)
+    root = xml.etree.ElementTree.fromstring(yarn_client_Msg)
+
+    # Check if kerberos in yarn-client.xml is enabled
+    flag = True
+    for elem in root.findall("property"):
+        elemValue = elem.find('name').text
+        if elemValue.lower() == "kerberos":
+            flag = False
+            break
+    if flag:
+        logger.error("Kerberos in yarn-client.xml is NOT enabled.")
+    else:
+        logger.info("Kerberos in yarn-client.xml is enabled.")
+
+def check_active_namenode():
+    '''
+    This function will read /usr/local/hawq/etc/hdfs-client.xml to check if first namenode is active namenode
+    '''
+    hdfs_client_Msg = subprocess.check_output("cat /usr/local/hawq/etc/hdfs-client.xml", shell=True)
+    root = xml.etree.ElementTree.fromstring(hdfs_client_Msg)
+
+    # Check Active Namenode in hdfs-client.xml
+    flag = True
+    firstNamenode = ""
+    nameservices = ""
+    for elem in root.findall("property"):
+        if elem.find("name").text == "dfs.nameservices":
+            nameservices = elem.find("value").text
+            break
+
+    for elem in root.findall("property"):
+        if elem.find("name").text == "dfs.ha.namenodes." + nameservices:
+            firstNamenode = elem.find("value").text.split(",")[0]
+            flag = False
+            break
+    if flag:
+        logger.error("Warning: Fail to retrieve namenode in hdfs-client.xml. Please check your HFDS configure in hdfs-client.xml.")
+        return None
+
+    try:
+        # Check if first namenode is active
+        subprocess.Popen("su - hdfs", shell=True).wait()
+        command = "hdfs haadmin -getServiceState " + firstNamenode
+        check_active_namenode_Msg = subprocess.check_output(command, shell=True)
+
+        if check_active_namenode_Msg == "active":
+            logger.info("Pass: First namenode %s is active name node." % (firstNamenode))
+        elif check_active_namenode_Msg == "standby":
+            logger.error("Fail: First namenode %s is NOT active name node." % (firstNamenode))
+        else:
+            logger.error("Fail: Fail to detect active name node.")
+    except Exception as e:
+        logger.error("Fail: HDFS Error: %s" % (str(e)))
+    finally:
+        # if current user is not root, switch back to root user
+        current_user = subprocess.check_output("whoami", shell=True)
+        if current_user != "root":
+            subprocess.Popen("exit", shell=True).wait()
+
+def check_hdfs_local_read():
+    '''
+    Read /usr/local/hawq/etc/hdfs-client.xml and /etc/hadoop/conf/hdfs-site.xml files and find <name>dfs.domain.socket.path</name>.
+
+    If their socket file path are same, and permission is 666, it means hawq user can write them.
+    '''
+    # Check <name>dfs.domain.socket.path</name> in hdfs-client.xml
+    hdfs_client_Msg = subprocess.check_output("cat /usr/local/hawq/etc/hdfs-client.xml", shell=True)
+    root = xml.etree.ElementTree.fromstring(hdfs_client_Msg)
+
+    flag = True
+    socket_hdfs_client = ""
+    for elem in root.findall("property"):
+        elemValue = elem.find('name').text
+        if elemValue.lower() == "dfs.domain.socket.path":
+            socket_hdfs_client = elem.find("value").text
+            flag = False
+            break
+    if flag:
+        logger.error("Fail: Can Not find dfs.domain.socket.path in hdfs-client.xml.")
+        return None
+
+    # Check <name>dfs.domain.socket.path</name> in hdfs-site.xml
+    hdfs_client_Msg = subprocess.check_output("cat /etc/hadoop/conf/hdfs-site.xml", shell=True)
+    root = xml.etree.ElementTree.fromstring(hdfs_client_Msg)
+
+    flag = True
+    socket_hdfs_site = ""
+    for elem in root.findall("property"):
+        elemValue = elem.find('name').text
+        if elemValue.lower() == "dfs.domain.socket.path":
+            socket_hdfs_site = elem.find("value").text
+            flag = False
+            break
+    if flag:
+        logger.error("Fail: Can Not find dfs.domain.socket.path in hdfs-site.xml.")
+        return None
+
+    # Check file path
+    if socket_hdfs_client == socket_hdfs_site:
+        try:
+            file_permission_Msg = subprocess.check_output("ls -l %s" % (socket_hdfs_site), shell=True)
+            file_permission1 = file_permission_Msg[1:4]
+            file_permission2 = file_permission_Msg[4:7]
+            file_permission3 = file_permission_Msg[7:10]
+            if file_permission1.find("-") < 0 or file_permission1.find("-") > 1:
+                if file_permission2.find("-") < 0 or file_permission2.find("-") > 1:
+                    if file_permission3.find("-") < 0 or file_permission3.find("-") > 1:
+                        logger.info("Pass: HDFS local read is configured correctly.")
+                    else:
+                        logger.error("Fail: HDFS local read is NOT configured correctly.")
+                else:
+                    logger.error("Fail: HDFS local read is NOT configured correctly.")
+            else:
+                logger.error("Fail: HDFS local read is NOT configured correctly.")
+        except Exception as e:
+            logger.error("Fail: HDFS local read is NOT configured correctly. \n Error Message is: %s" % (e))
+    else:
+        logger.error("Fail: socket file path in %s and %s are different." % (socket_hdfs_client, socket_hdfs_site))
+
+def check_return_code(result, logger = None,  error_msg = None, info_msg = None, exit_true = False):
+    '''Check shell command exit code.'''
+    if result != 0:
+        if error_msg and logger:
+            logger.error(error_msg)
+    else:
+        if info_msg and logger:
+            logger.info(info_msg)
+        if exit_true:
+            sys.exit(0)
+    return result
+
+def overwrite_etc_hosts(filecontent = "", hostfile = ""):
+    '''
+    This function is used to overwrite /etc/hosts file and scp to all nodes in cluster
+    '''
+    cmd =[]
+    hawq_home = os.getenv('GPHOME')
+    if not hawq_home:
+        print("HAWQ home directory is not defined, please check GPHOME settings.")
+        sys.exit(1)
+    source_hawq_env = ". %s/greenplum_path.sh" % hawq_home
+    cmd.append(source_hawq_env)
+
+    argument = "echo \'" + filecontent + "\' > /etc/hosts"
+    cmd.append(argument)
+    argument = "gpscp -f %s /etc/hosts =:/etc/hosts" % (hostfile)
+    cmd.append(argument)
+
+    local_run(cmd)
+
+def enable_coredump(hostfile = ""):
+    '''
+    This function is used to enable core dump on each node
+    '''
+    cmd =[]
+    hawq_home = os.getenv('GPHOME')
+    if not hawq_home:
+        print("HAWQ home directory is not defined, please check GPHOME settings.")
+        sys.exit(1)
+    source_hawq_env = ". %s/greenplum_path.sh" % hawq_home
+    cmd.append(source_hawq_env)
+
+    argument = "gpssh -f %s ulimit -c unlimited" % (hostfile)
+    cmd.append(argument)
+
+    local_run(cmd)
+
+def install_ntp(hostfile = ""):
+    '''
+    This function is used to install and enable ntp on each node
+    '''
+    cmd =[]
+    hawq_home = os.getenv('GPHOME')
+    if not hawq_home:
+        print("HAWQ home directory is not defined, please check GPHOME settings.")
+        sys.exit(1)
+    source_hawq_env = ". %s/greenplum_path.sh" % hawq_home
+    cmd.append(source_hawq_env)
+
+    argument = "gpssh -f %s -e 'yum install -y ntp'" % (hostfile)
+    cmd.append(argument)
+    argument = "gpssh -f %s -e 'systemctl enable ntpd'" % (hostfile)
+    cmd.append(argument)
+    argument = "gpssh -f %s -e 'systemctl start ntpd'" % (hostfile)
+    cmd.append(argument)
+
+    local_run(cmd)
+
+def disable_firewall(hostfile = ""):
+    '''
+    This function is used to disable firewall on each node
+    '''
+    cmd =[]
+    hawq_home = os.getenv('GPHOME')
+    if not hawq_home:
+        print("HAWQ home directory is not defined, please check GPHOME settings.")
+        sys.exit(1)
+    source_hawq_env = ". %s/greenplum_path.sh" % hawq_home
+    cmd.append(source_hawq_env)
+
+    argument = "gpssh -f %s -e 'systemctl stop iptables'" % (hostfile)
+    cmd.append(argument)
+    argument = "gpssh -f %s -e 'systemctl disable iptables'" % (hostfile)
+    cmd.append(argument)
+    argument = "gpssh -f %s -e 'systemctl stop firewalld'" % (hostfile)
+    cmd.append(argument)
+    argument = "gpssh -f %s -e 'systemctl disable firewalld'" % (hostfile)
+    cmd.append(argument)
+
+    local_run(cmd)
+
+def disable_selinux(hostfile = ""):
+    '''
+    This function is used to disable selinux on each node
+    '''
+    cmd =[]
+    hawq_home = os.getenv('GPHOME')
+    if not hawq_home:
+        print("HAWQ home directory is not defined, please check GPHOME settings.")
+        sys.exit(1)
+    source_hawq_env = ". %s/greenplum_path.sh" % hawq_home
+    cmd.append(source_hawq_env)
+
+    argument = "gpssh -f %s -e 'sed -i \"s/^SELINUX\=enforcing/SELINUX\=disabled/g\" /etc/selinux/config'" % (hostfile)
+    cmd.append(argument)
+    argument = "gpssh -f %s -e 'setenforce 0'" % (hostfile)
+    cmd.append(argument)
+
+    local_run(cmd)
+
+function_dispatcher = {} # Include all hawq check --postSetup --postUpgrade and --weeklyExamine functions
+function_dispatcher.update({"overwrite_etc_hosts" : overwrite_etc_hosts})
+function_dispatcher.update({"enable_coredump" : enable_coredump})
+function_dispatcher.update({"install_ntp" : install_ntp})
+function_dispatcher.update({"disable_firewall" : disable_firewall})
+function_dispatcher.update({"disable_selinux" : disable_selinux})
+function_dispatcher.update({"checkHardwarePerf" : checkHardwarePerf})
+function_dispatcher.update({"Check config in /etc/sysctl.conf && /etc/security/limits.conf" : runTests})
+function_dispatcher.update({"retrieve_DB_Version" : retrieve_DB_Version})
+function_dispatcher.update({"retrieve_DB_process" : retrieve_DB_process})
+function_dispatcher.update({"check_DB_basic_function" : check_DB_basic_function})
+function_dispatcher.update({"check_GUC_configuration" : check_GUC_configuration})
+function_dispatcher.update({"check_kerberos_enablement" : check_kerberos_enablement})
+function_dispatcher.update({"check_active_namenode" : check_active_namenode})
+function_dispatcher.update({"check_hdfs_local_read" : check_hdfs_local_read})
+function_dispatcher.update({"checkDiskUsage" : checkDiskUsage})
+function_dispatcher.update({"checkMasterStandbySync" : checkMasterStandbySync})
+function_dispatcher.update({"checkTableAnalyzeStatus" : checkTableAnalyzeStatus})
 
 if __name__ == '__main__':
 
@@ -1334,7 +1991,142 @@ if __name__ == '__main__':
                 readHAWQConfiguration()
 
             # Phase 2: generate output
-            if options.stdout:
+            if options.postSetup:
+                cmd = []
+                counter = 1
+
+                logger.info("-------------- Execute post-setup check --------------\n")
+
+                # Step 1: Comment out ::1 localhost in /etc/hosts
+                logger.info("-------------- Step %d: Comment out ::1 localhost in /etc/hosts" % counter)
+                file_content = checkHostsFile()
+                function_dispatcher["overwrite_etc_hosts"](file_content, options.file)
+                counter += 1
+                print("")
+
+                # Step 2: Check hardware performance
+                logger.info("-------------- Step %d: Check hardware performance (This step will take a little bit more time to perform)" % counter)
+                function_dispatcher["checkHardwarePerf"]()
+                counter += 1
+                print("")
+
+                # Step 3: Enable core dump
+                logger.info("-------------- Step %d: Enable core dump" % counter)
+                function_dispatcher["enable_coredump"](options.file)
+                counter += 1
+                print("")
+
+                # Step 4: Install NTP
+                logger.info("-------------- Step %d: Install NTP" % counter)
+                function_dispatcher["install_ntp"](options.file)
+                counter += 1
+                print("")
+
+                # Step 5: Disable Firewall
+                logger.info("-------------- Step %d: Disable Firewall" % counter)
+                function_dispatcher["disable_firewall"](options.file)
+                counter += 1
+                print("")
+
+                # Step 6: Disable Selinux
+                logger.info("-------------- Step %d: Disable Selinux" % counter)
+                function_dispatcher["disable_selinux"](options.file)
+                counter += 1
+                print("")
+
+                # Step 7: Check configuration in /etc/sysctl.conf and /etc/security/limits.conf
+                logger.info("-------------- Step %d: Check configuration in /etc/sysctl.conf and /etc/security/limits.conf" % counter)
+                function_dispatcher["Check config in /etc/sysctl.conf && /etc/security/limits.conf"]()
+                counter += 1
+                print("")
+
+                # Step 8: Retrieve Database Version
+                logger.info("-------------- Step %d: Retrieve Database Version" % counter)
+                function_dispatcher["retrieve_DB_Version"]()
+                counter += 1
+                print("")
+
+                # Step 9: Retrieve Database Process
+                logger.info("-------------- Step %d: Retrieve Database Process" % counter)
+                function_dispatcher["retrieve_DB_process"]()
+                counter += 1
+                print("")
+
+                # Step 10: Check Database Basic Functions
+                logger.info("-------------- Step %d: Check Database Basic Functions" % counter)
+                function_dispatcher["check_DB_basic_function"]()
+                counter += 1
+                print("")
+
+                # Step 11: Check GUC Configuration
+                logger.info("-------------- Step %d: Check GUC Configuration" % counter)
+                function_dispatcher["check_GUC_configuration"]()
+                counter += 1
+                print("")
+
+                # Step 12: Check Kerberos Enablement
+                logger.info("-------------- Step %d: Check Kerberos Enablement" % counter)
+                function_dispatcher["check_kerberos_enablement"]()
+                counter += 1
+                print("")
+
+                # Step 13: Check Active Namenode
+                logger.info("-------------- Step %d: Check Active Namenode" % counter)
+                function_dispatcher["check_active_namenode"]()
+                counter += 1
+                print("")
+
+                # Step 14: Check HDFS Local Read
+                logger.info("-------------- Step %d: Check HDFS Local Read" % counter)
+                function_dispatcher["check_hdfs_local_read"]()
+                counter += 1
+                print("")
+            elif options.postUpgrade:
+                counter = 1
+
+                logger.info("-------------- Execute post-upgrade check --------------\n")
+
+                # Step 1: Retrieve Database Process
+                logger.info("-------------- Step %d: Retrieve Database Process" % counter)
+                function_dispatcher["retrieve_DB_process"]()
+                counter += 1
+                print("")
+
+                # Step 2: Retrieve Database Version
+                logger.info("-------------- Step %d: Retrieve Database Version" % counter)
+                function_dispatcher["retrieve_DB_Version"]()
+                counter += 1
+                print("")
+
+                # Step 10: Check Database Basic Functions
+                logger.info("-------------- Step %d: Check Database Basic Functions" % counter)
+                function_dispatcher["check_DB_basic_function"]()
+                counter += 1
+                print("")
+            elif options.weeklyExamine:
+                cmd = []
+                counter = 1
+
+                logger.info("-------------- Execute weekly-examine check --------------\n")
+
+                # Step 1: Check Disk Usage
+                logger.info("-------------- Step %d: Check Disk Usage" % counter)
+                function_dispatcher["checkDiskUsage"]()
+                counter += 1
+                print("")
+
+                # Step 2: Check if Master and Standby are synchronized
+                logger.info("-------------- Step %d: Check if Master and Standby are synchronized" % counter)
+                function_dispatcher["checkMasterStandbySync"]()
+                counter += 1
+                print("")
+
+                # Step 3: Check if the specified table is analyzed within three days
+                logger.info("-------------- Step %d: Check if the specified table is analyzed within three days" % counter)
+                function_dispatcher["checkTableAnalyzeStatus"]()
+                counter += 1
+                print("")
+            elif options.stdout:
                 doPrint()
             elif options.zipout:
                 doZip("./gpcheck_%s" % time.time())

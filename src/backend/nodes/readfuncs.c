@@ -507,6 +507,8 @@ _readSingleRowErrorDesc(void)
 	READ_BOOL_FIELD(is_keep);
 	READ_BOOL_FIELD(is_limit_in_rows);
 	READ_BOOL_FIELD(reusing_existing_errtable);
+	READ_BOOL_FIELD(is_hdfs_protocol_text);
+	READ_STRING_FIELD(hdfsLoc);
 
 	READ_DONE();
 }
@@ -1053,6 +1055,7 @@ _readAlterTableStmt(void)
 			READ_OID_FIELD(oidInfo[m].aoblkdirComptypeOid);
 		}
 	}
+	READ_BOOL_FIELD(greenWay);
 
 	READ_DONE();
 }
@@ -1093,7 +1096,7 @@ _readAlterPartitionCmd(void)
 	READ_NODE_FIELD(arg2);
 	READ_NODE_FIELD(scantable_splits);
 	READ_NODE_FIELD(newpart_aosegnos);
-
+	READ_STRING_FIELD(format);
 	READ_DONE();
 }
 

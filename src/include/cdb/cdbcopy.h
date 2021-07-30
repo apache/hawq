@@ -72,6 +72,7 @@ typedef struct CdbCopy
 	PartitionNode *partitions;
 	List		  *ao_segnos;
 	HTAB		  *aotupcounts; /* hash of ao relation id to processed tuple count */
+	List	      *scantable_splits;
 } CdbCopy;
 
 
@@ -79,7 +80,7 @@ typedef struct CdbCopy
 /* global function declarations */
 CdbCopy    *makeCdbCopy(bool copy_in, QueryResource *resource);
 int			cdbCopyGetDbCount(int total_segs, int seg);
-void		cdbCopyStart(CdbCopy *cdbCopy, char *copyCmd, Oid relid, Oid relerror, List *err_aosegnos);
+void		cdbCopyStart(CdbCopy *cdbCopy, char *copyCmd, Relation rel, Oid relerror, List *err_aosegnos);
 void		cdbCopySendData(CdbCopy *c, int target_seg, const char *buffer, int nbytes);
 void		cdbCopySendDataSingle(CdbCopy *c, int target_seg, const char *buffer, int nbytes);
 bool		cdbCopyGetData(CdbCopy *c, bool cancel, uint64 *rows_processed);

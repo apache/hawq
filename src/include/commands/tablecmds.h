@@ -14,14 +14,18 @@
 #ifndef TABLECMDS_H
 #define TABLECMDS_H
 
+#include <json-c/json.h>
 #include "access/attnum.h"
 #include "catalog/gp_policy.h"
+#include "catalog/pg_exttable.h"
+#include "catalog/index.h"
 #include "executor/executor.h"
 #include "executor/tuptable.h"
 #include "nodes/execnodes.h"
 #include "nodes/parsenodes.h"
 #include "nodes/relation.h"
 #include "parser/parse_node.h"
+#include "magma/cwrapper/magma-client-c.h"
 
 /* Struct describing one new constraint to check in ALTER Phase 3 scan.
  *
@@ -52,9 +56,14 @@ typedef struct AttrMapContext{
 
 extern const char *synthetic_sql;
 
-extern Oid DefineRelation(CreateStmt *stmt, char relkind, char relstorage, const char *formattername);
+extern Oid DefineRelation(CreateStmt *stmt,
+                          char relkind,
+                          char relstorage,
+                          const char *formattername);
 
 extern void	DefineExternalRelation(CreateExternalStmt *stmt);
+
+extern void RecognizeExternalRelationFormatterOptions(CreateExternalStmt *createExtStmt);
 
 extern void DefineForeignRelation(CreateForeignStmt *createForeignStmt);
 
@@ -89,8 +98,41 @@ extern void CheckTableNotInUse(Relation rel, const char *stmt);
 
 extern void ExecuteTruncate(TruncateStmt *stmt);
 
+extern Oid LookupMagmaFunc(char *formatter,
+                           char *func);
 
+/* Interfaces for mgma index ddl */
+extern void InvokeMagmaCreateIndex(FmgrInfo *func,
+                                   char *dbname,
+                                   char *schemaname,
+                                   char *tablename,
+                                   MagmaIndexInfo *index,
+                                   MagmaSnapshot *snapshot);
 
+extern void InvokeMagmaDropIndex(FmgrInfo *func,
+                                 char *dbname,
+                                 char *schemaname,
+                                 char *tablename,
+                                 char *indexname,
+                                 MagmaSnapshot *snapshot);
+
+extern void InvokeMagmaReindexIndex(FmgrInfo *func,
+                                    char *dbname,
+                                    char *schemaname,
+                                    char *tablename,
+                                    char *indexname,
+                                    MagmaSnapshot *snapshot);
+
+extern void InvokeMagmaDropTable(FmgrInfo *func,
+                                 ExtTableEntry *exttable,
+                                 char *dbname,
+                                 char *schemaname,
+                                 char *tablename,
+								 MagmaSnapshot *snapshot);
+
+extern char *get_current_schema_name(void);
+
+extern int renameHdfsPath(Oid relid, PartitionNode *pNode, const char *oldrelname, const char *newrelname);
 extern void renameatt(Oid myrelid,
 		  const char *oldattname,
 		  const char *newattname,
@@ -140,4 +182,7 @@ extern List *make_dist_clause(Relation rel);
 extern Oid transformFkeyCheckAttrs(Relation pkrel,
 								   int numattrs, int16 *attnums,
 								   Oid *opclasses);
+
+extern void buildExternalTableFormatOptionStringInJson(const char *fmtOptsStr,
+                                                       char **fmtOptsJson);
 #endif   /* TABLECMDS_H */

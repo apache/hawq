@@ -39,10 +39,12 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "fmgr.h"
 
 #include <unistd.h>
 
 #include "access/genam.h"
+#include "access/fileam.h"
 #include "access/heapam.h"
 #include "access/relscan.h"
 #include "access/sysattr.h"
@@ -57,11 +59,13 @@
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_constraint.h"
+#include "catalog/pg_exttable.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_type.h"
+#include "commands/dbcommands.h"
 #include "commands/tablecmds.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
@@ -70,6 +74,7 @@
 #include "parser/parse_expr.h"
 #include "storage/procarray.h"
 #include "storage/smgr.h"
+#include "utils/acl.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/inval.h"
@@ -83,6 +88,7 @@
 #include "cdb/cdbanalyze.h"
 #include "cdb/cdboidsync.h"
 #include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbdatalocality.h"
 
 #include "cdb/cdbmirroredfilesysobj.h"
 
@@ -950,6 +956,56 @@ index_create(Oid heapRelationId,
 		index_build(heapRelation, indexRelation, indexInfo, isprimary);
 	}
 
+	/* create index for magma table */
+	if (dataStoredInMagmaByOid(heapRelationId))
+	{
+		// 1. create catalog in magma
+		Oid procOid = LookupMagmaFunc("magma", "createindex");
+		FmgrInfo procInfo;
+		if (OidIsValid(procOid))
+		{
+			fmgr_info(procOid, &procInfo);
+		}
+		else
+		{
+			elog(ERROR, "magma_createindex function was not found for pluggable storage");
+		}
+
+		// 2. start transaction in magma for CREATE INDEX
+		if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+		{
+			PlugStorageBeginTransaction(NULL);
+		}
+		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+
+		// 3. call InvokeMagmaCreateIndex
+		// get database name for the relation
+		char *database_name = get_database_name(MyDatabaseId);
+
+		// get schema name for the relation
+		char *schemaname =
+			getNamespaceNameByOid(RelationGetNamespace(heapRelation));
+
+		// get table name for the relation
+		char *tablename = RelationGetRelationName(heapRelation);
+
+		// get index info
+		MagmaIndexInfo idxinfo;
+		idxinfo.indexName = indexRelationName;
+		idxinfo.indexType = DEFAULT_INDEX_TYPE;
+		idxinfo.primary = isprimary;
+		idxinfo.unique = indexInfo->ii_Unique;
+		idxinfo.indkey = buildint2vector(NULL, indexInfo->ii_NumIndexAttrs);
+		for (i = 0; i < indexInfo->ii_NumIndexAttrs; i++)
+			idxinfo.indkey->values[i] = indexInfo->ii_KeyAttrNumbers[i];
+
+		InvokeMagmaCreateIndex(
+				&procInfo, database_name, schemaname,
+				tablename, &idxinfo,
+				PlugStorageGetTransactionSnapshot());
+		// free memory
+		pfree(idxinfo.indkey);
+	}
 	/*
 	 * Close the heap and index; but we keep the locks that we acquired above
 	 * until end of transaction unless we're dealing with a child of a partition
@@ -967,6 +1023,125 @@ index_create(Oid heapRelationId,
 	}
 
 	return indexRelationId;
+}
+
+void
+ext_constraint_create(Oid extRelationId,
+                      struct IndexInfo *constraintInfo,
+                      bool isPrimary,
+                      bool allowSystemTableMods)
+{
+	Relation extRelation;
+	Relation constrRelation;
+	bool isSharedRelation;
+	Oid namespaceId;
+	char *constraintName = NULL;
+	int i;
+
+	extRelation = heap_open(extRelationId, AccessShareLock);
+
+	/*
+	 * The constraint will be in the same namespace as its parent table, and
+	 * it is shared across databases if and only if the parent is.
+	 */
+	namespaceId = RelationGetNamespace(extRelation);
+	isSharedRelation = extRelation->rd_rel->relisshared;
+
+	if (!allowSystemTableMods &&
+		IsSystemRelation(extRelation) &&
+		IsNormalProcessingMode())
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("user-defined constraint on system catalog tables are not supported")));
+	}
+
+	/*
+	 * We cannot allow creating constraint for a shared relation after
+	 * initdb (because there's no way to make the entry in other databases' pg_class),
+	 * except during upgrade.
+	 */
+	if (isSharedRelation && !(IsBootstrapProcessingMode() || gp_upgrade_mode))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
+				 errmsg("shared constraint cannot be created after initdb")));
+	}
+
+	/*
+	 * Advance the command counter so that we can see the newly-entered
+	 * catalog tuples for the table.
+	 *
+	 * CommandCounterIncrement();
+	 */
+
+	/*
+	 * Register constraint for the primary key in pg_constraint
+	 *
+	 * During bootstrap we don't make a constraint.
+	 */
+	if (!IsBootstrapProcessingMode())
+	{
+		const char *pk_suffix = "_pkey";
+		char constraintType;
+		int len_table_name = strlen(RelationGetRelationName(extRelation));
+		int len_pk_suffix = strlen(pk_suffix);
+
+		constraintName = palloc0(len_table_name+len_pk_suffix+1);
+		strncpy(constraintName, RelationGetRelationName(extRelation), len_table_name);
+		strncpy(constraintName+len_table_name, pk_suffix, len_pk_suffix);
+		constraintName[len_table_name+len_pk_suffix] = '\0';
+
+		/*
+		const char *constraintName = ChooseRelationName(RelationGetRelationName(extRelation),
+		                                                NULL,
+		                                                "pkey",
+		                                                namespaceId,
+		                                                NULL);
+		*/
+
+
+		/* For now only support PRIMARY KEY constraint */
+		if (isPrimary)
+		{
+			constraintType = CONSTRAINT_PRIMARY;
+		}
+		else
+		{
+			elog(ERROR, "constraint must be PRIMARY KEY");
+			constraintType = 0;		/* keep compiler quiet */
+		}
+
+		/* Shouldn't have any expressions */
+		if (constraintInfo->ii_Expressions)
+		{
+			elog(ERROR, "constraint can't have expressions");
+		}
+
+		Oid constrOid = InvalidOid;
+		constrOid = CreateConstraintEntry(constraintName,
+		                                  constrOid,
+		                                  namespaceId,
+		                                  constraintType,
+		                                  false,		/* isDeferrable */
+		                                  false,		/* isDeferred */
+		                                  extRelationId,
+		                                  constraintInfo->ii_KeyAttrNumbers,
+		                                  constraintInfo->ii_NumIndexAttrs,
+		                                  InvalidOid,	/* no domain */
+		                                  InvalidOid,	/* no foreign key */
+		                                  NULL,
+		                                  0,
+		                                  ' ',
+		                                  ' ',
+		                                  ' ',
+		                                  InvalidOid,	/* no associated index */
+		                                  NULL,		/* no check constraint */
+		                                  NULL,
+		                                  NULL);
+	}
+
+	heap_close(extRelation, AccessShareLock);
 }
 
 /*
@@ -1018,7 +1193,6 @@ index_drop(Oid indexId)
 	DeleteGpRelfileNodeTuple(
 					userIndexRelation,
 					/* segmentFileNum */ 0);
-	
 
 	/*
 	 * Close and flush the index's relcache entry, to ensure relcache doesn't
@@ -1083,6 +1257,48 @@ index_drop(Oid indexId)
 	 * ensure other backends update their relcache lists of indexes.
 	 */
 	CacheInvalidateRelcache(userHeapRelation);
+
+	/* drop index for magma table */
+	if (dataStoredInMagmaByOid(heapId))
+	{
+		// 1. create catalog in magma
+		Oid	procOid = LookupMagmaFunc("magma", "dropindex");
+		FmgrInfo procInfo;
+		if (OidIsValid(procOid))
+		{
+			fmgr_info(procOid, &procInfo);
+		}
+		else
+		{
+			elog(ERROR, "magma_dropindex function was not found for pluggable storage");
+		}
+
+		// 2. start transaction in magma for DROP INDEX
+		if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+		{
+			PlugStorageBeginTransaction(NULL);
+		}
+		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+
+		// 3. call InvokeMagmaDropIndex
+		// get database name for the relation
+		char *database_name = get_database_name(MyDatabaseId);
+
+		// get schema name for the relation
+		char *schemaname = getNamespaceNameByOid(
+			RelationGetNamespace(userHeapRelation));
+
+		// get table name for the relation
+		char *tablename = RelationGetRelationName(userHeapRelation);
+
+		// get index name
+		char *indexName = getIndexNameByOid(indexId);
+
+		InvokeMagmaDropIndex(
+				&procInfo, database_name, schemaname,
+				tablename, indexName,
+				PlugStorageGetTransactionSnapshot());
+	}
 
 	/*
 	 * Close owning rel, but keep lock
@@ -1243,7 +1459,16 @@ static void
 index_update_stats(Relation rel, bool hasindex, bool isprimary,
 				   Oid reltoastidxid, double reltuples)
 {
-	BlockNumber relpages = RelationGetNumberOfBlocks(rel);
+	BlockNumber relpages;
+	/*
+	 * because magma table data are not organized in blocks,
+	 * and we can't get any info from catalog about this segdb's
+	 * totalbytes and totaltuples of the table,
+	 * this relpages are only needed by QE,
+	 * when this is a magma table, just ignore this info.
+	 */
+	if (!((RelationIsExternal(rel) && RelationIsMagmaTable(rel->rd_id))))
+		relpages = RelationGetNumberOfBlocks(rel);
 	Oid			relid = RelationGetRelid(rel);
 	Relation	pg_class;
 	HeapTuple	tuple;
@@ -2262,7 +2487,6 @@ validate_index_heapscan(Relation heapRelation,
 	indexInfo->ii_PredicateState = NIL;
 }
 
-
 /*
  * IndexGetRelation: given an index's relation OID, get the OID of the
  * relation it is an index on.	Uses the system cache.
@@ -2409,6 +2633,12 @@ reindex_index(Oid indexId, Oid newrelfilenode, List **extra_oids)
 	heapId = IndexGetRelation(indexId);
 	heapRelation = heap_open(heapId, ShareLock);
 
+	if (RelationIsMagmaTable2(heapId))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("Reindex is not supported for magma")));
+	}
 	namespaceId = RelationGetNamespace(heapRelation);
 
 	/*
@@ -2590,6 +2820,47 @@ reindex_index(Oid indexId, Oid newrelfilenode, List **extra_oids)
 					);
 	}
 
+	/* reindex index for magma table */
+	if (dataStoredInMagmaByOid(heapId))
+	{
+		// 1. create catalog in magma
+		Oid procOid = LookupMagmaFunc("magma", "reindex_index");
+		FmgrInfo procInfo;
+		if (OidIsValid(procOid))
+		{
+			fmgr_info(procOid, &procInfo);
+		}
+		else
+		{
+			elog(ERROR, "magma_reindex_index function was not found for pluggable storage");
+		}
+
+		// 2. start transaction in magma for REINDEX INDEX
+		if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+		{
+			PlugStorageBeginTransaction(NULL);
+		}
+		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+
+		// 3. call InvokeMagmaReindexIndex
+		// get database name for the relation
+		char *database_name = get_database_name(MyDatabaseId);
+
+		// get schema name for the relation
+		char *schemaname = getNamespaceNameByOid(
+			RelationGetNamespace(heapRelation));
+
+		// get table name for the relation
+		char *tablename = RelationGetRelationName(heapRelation);
+
+		// get index name
+		char *indexName = getIndexNameByOid(indexId);
+
+		InvokeMagmaReindexIndex(
+				&procInfo, database_name, schemaname,
+				tablename, indexName,
+				PlugStorageGetTransactionSnapshot());
+	}
 
 	/* Close rels, but keep locks */
 	index_close(iRel, NoLock);
@@ -2630,7 +2901,7 @@ reindex_relation(Oid relid, bool toast_too, bool aoseg_too, bool aoblkdir_too,
 	 */
 	rel = heap_open(relid, ShareLock);
 
-	relIsAO = (RelationIsAoRows(rel) || RelationIsParquet(rel));
+	relIsAO = RelationIsAo(rel);
 
 	toast_relid = rel->rd_rel->reltoastrelid;
 

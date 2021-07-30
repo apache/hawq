@@ -228,7 +228,26 @@ examine_parameter_list(List *parameters, Oid languageOid,
 		{
 			/* input only modes */
 			case FUNC_PARAM_VARIADIC:	/* GPDB: not yet supported */
+	      /* validate variadic parameter type */
+	      switch (toid)
+	      {
+	        case ANYARRAYOID:
+	        case ANYOID:
+	          /* okay */
+	          break;
+	        default:
+	          if (!OidIsValid(get_element_type(toid)))
+	            ereport(ERROR,
+	                (errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
+	                 errmsg("VARIADIC parameter must be an array")));
+	          break;
+	      }
 			case FUNC_PARAM_IN:
+	      /* only OUT parameters can follow a VARIADIC parameter */
+	      if (varCount > 0)
+	        ereport(ERROR,
+	            (errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
+	             errmsg("VARIADIC parameter must be the last input parameter")));
 				inTypes[inCount++] = toid;
 
 				/* Keep track of the number of anytable arguments */
@@ -684,6 +703,7 @@ validate_describe_callback(List *describeQualName,
 						   ArrayType *parameterModes)
 {
 	int					 nargs			  = 1;
+	int          nvargs        = 1;
 	Oid					 inputTypeOids[1] = {INTERNALOID};
 	Oid					*actualInputTypeOids;
 	Oid					 describeReturnTypeOid;
@@ -753,11 +773,13 @@ validate_describe_callback(List *describeQualName,
 							   NIL,   /* argument expressions */
 							   nargs,
 							   inputTypeOids,
+							   false,
 							   &describeFuncOid,
 							   &describeReturnTypeOid,
 							   &describeReturnsSet,
 							   &describeIsStrict,
 							   &describeIsOrdered,
+							   &nvargs,
 							   &actualInputTypeOids);
 
 	if (fdResult != FUNCDETAIL_NORMAL || !OidIsValid(describeFuncOid))

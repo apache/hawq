@@ -778,6 +778,8 @@ AdjustVarnoWalker(Node *node, AdjustVarnoContext *ctx)
 		case T_AppendOnlyScan:
 		case T_ParquetScan:
 		case T_ExternalScan:
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
 		case T_IndexScan:
 		case T_BitmapIndexScan:
 		case T_BitmapHeapScan:

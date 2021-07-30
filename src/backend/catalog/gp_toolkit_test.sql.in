@@ -47,6 +47,7 @@ select * from %%JETPACK_PREFIX_AUX%%number_of_segments;
 
 select count(*) from %%JETPACK_PREFIX_AUX%%log_segment_ext;
 select count(*) from %%JETPACK_PREFIX_AUX%%log_master_ext;
+select count(*) from %%JETPACK_PREFIX_AUX%%pg_stat_activity_history;
 select count(*) from %%JETPACK_PREFIX%%log_system;
 select count(*) from %%JETPACK_PREFIX%%log_database;
 select count(*) from %%JETPACK_PREFIX%%log_master_concise;

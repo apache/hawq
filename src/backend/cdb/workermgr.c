@@ -56,6 +56,7 @@ typedef struct WorkerMgrThread {
 typedef struct WorkerMgrState {
 	/* Control flags */
 	volatile bool	cancel;
+	volatile bool	terminate;
 
 	int					threads_num;
 	WorkerMgrThread		threads[0];
@@ -159,6 +160,15 @@ workermgr_cancel_job(WorkerMgrState *state)
 }
 
 void
+workermgr_terminate_job(WorkerMgrState *state)
+{
+	/* Terminate process adds additional boolean mark to cancel job. */
+	state->terminate = true;
+	workermgr_cancel_job(state);
+	CHECK_FOR_INTERRUPTS();
+}
+
+void
 workermgr_wait_job(WorkerMgrState *state)
 {
 	state->cancel = false;
@@ -202,6 +212,12 @@ workermgr_should_query_stop(WorkerMgrState *state)
 		return true;
 
 	return false;
+}
+
+bool
+workermgr_should_query_terminate(struct WorkerMgrState *state)
+{
+	return state->terminate;
 }
 
 /*

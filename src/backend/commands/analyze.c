@@ -52,6 +52,7 @@
 #include "access/transam.h"
 #include "access/tuptoaster.h"
 #include "access/aosegfiles.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "access/hash.h"
 #include "access/xact.h"
@@ -61,6 +62,7 @@
 #include "catalog/catalog.h"
 #include "catalog/pg_exttable.h"
 #include "cdb/cdbappendonlyam.h"
+#include "cdb/cdbdatalocality.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbheap.h"
 #include "cdb/cdbhash.h"
@@ -75,9 +77,11 @@
 #include "parser/parse_relation.h"
 #include "postmaster/identity.h"
 #include "pgstat.h"
+#include "access/plugstorage.h"
 #include "utils/acl.h"
 #include "utils/datum.h"
 #include "utils/faultinjector.h"
+#include "utils/guc.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/syscache.h"
@@ -101,7 +105,13 @@
 #include "nodes/nodes.h"
 #include "nodes/parsenodes.h"
 
+
 #include "commands/analyzeutils.h"
+
+#include "cdb/cdbfilesystemcredential.h"
+
+#include "storage/cwrapper/hdfs-file-system-c.h"
+#include "storage/cwrapper/hive-file-system-c.h"
 
 /**
  * Statistics related parameters.
@@ -160,14 +170,20 @@ static List	*buildExplicitAttributeNames(Oid relationOid, VacuumStmt *stmt);
 static void gp_statistics_estimate_reltuples_relpages_heap(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, float4 *reltuples, float4 *relpages);
+static void gp_statistics_estimate_reltuples_relpages_orc(Relation rel, float4 *reltuples, float4 *relpages);
 static void gp_statistics_estimate_reltuples_relpages_external(Relation rel, float4 *relTuples, float4 *relPages);
 static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples, float4 *relPages, bool rootonly);
 static void analyzeEstimateIndexpages(Oid relationOid, Oid indexOid, float4 *indexPages);
-
+static void analyzeEstimateMagmaIndexpages(Oid relationOid, Relation rel, float4 reltuples,
+                                           float4 *indexPages, float4 relPages, int2vector *indKeyVector);
+/* Extern stuff */
 static void getExternalRelTuples(Oid relationOid, float4 *relTuples);
-static void getExternalRelPages(Oid relationOid, float4 *relPages , Relation rel);
+static void getExternalRelPages(Oid relationOid, float4 *relPages , Relation rel, float4 relTuples);
 static float4 getExtrelPagesHDFS(Uri *uri);
-static bool isExternalHDFSProtocol(Oid relOid);
+static float4 getExtrelPagesHIVE(Uri *uri);
+// get the magma relpages
+static float4 getExtrelPagesMAGMA(Oid extRelationOid , float4 relTuples, Relation rel);
+static bool isExternalHDFSORMAGMAProtocol(Oid relOid);
 
 /* Attribute-type related functions */
 static bool isOrderedAndHashable(Oid relationOid, const char *attributeName);
@@ -235,9 +251,6 @@ static void updateAttributeStatisticsInCatalog(Oid relationOid, const char *attr
 		AttributeStatistics *stats);
 static void updateReltuplesRelpagesInCatalog(Oid relationOid, float4 relTuples, float4 relPages);
 
-/**
- * Extern stuff.
- */
 
 extern List 		*find_all_inheritors(Oid parentrel);
 extern BlockNumber RelationGuessNumberOfBlocks(double totalbytes);
@@ -455,16 +468,16 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 							"Please run ANALYZE on the root partition table.",
 							get_rel_name(relationOid))));
 		}
-		else if (!isExternalHDFSProtocol(relationOid))
+		else if (!isExternalHDFSORMAGMAProtocol(relationOid))
 		{
-					/*
-					 * Support analyze for external table.
-					 * For now, HDFS protocol external table is supported.
-					 */
+			/*
+			 * Support analyze for external table.
+			 * For now, HDFS protocol external table is supported.
+			 */
 			ereport(WARNING,
-					 (errmsg("skipping \"%s\" --- cannot analyze external table with non-HDFS or non-MAGMA protocol. "
-					         "Please run ANALYZE on external table with HDFS or MAGMA protocol.",
-					         get_rel_name(relationOid))));
+			        (errmsg("skipping \"%s\" --- cannot analyze external table with non-HDFS, non-HIVE or non-MAGMA protocol. "
+			                "Please run ANALYZE on external table with HDFS or MAGMA protocol.",
+			                get_rel_name(relationOid))));
 		}
 		else
 		{
@@ -533,7 +546,7 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 
 		candidateOid = lfirst_oid(le1);
 		candidateRelation =
-		        try_relation_open(candidateOid, ShareUpdateExclusiveLock, false);
+		        try_relation_open(candidateOid, ShareUpdateExclusiveLock, false, true);
 
 		if (candidateRelation)
 		{
@@ -882,6 +895,10 @@ static int calculate_virtual_segment_number(List* candidateOids) {
 			}
 			if (targetPolicy->nattrs > 0) {
 				isHashRelationExist = true;
+				if (dataStoredInMagmaByOid(candidateOid)) {
+					maxHashBucketNumber = default_magma_hash_table_nvseg_per_seg * slaveHostNumber;
+				}
+
 				if(maxHashBucketNumber < targetPolicy->bucketnum){
 					maxHashBucketNumber = targetPolicy->bucketnum;
 				}
@@ -1013,10 +1030,15 @@ static List* analyzableRelations(bool rootonly, List **fullRelOids)
 	while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx)))
 	{
 		Oid candidateOid = HeapTupleGetOid(tuple);
-		bool isExternalHDFS = isExternalHDFSProtocol(candidateOid);
+		bool isExternalHDFSORMAGMA = isExternalHDFSORMAGMAProtocol(candidateOid);
+
+		/*
+		 * Support analyze for external table.
+		 * For now, HDFS protocol external table is supported.
+		 */
 		if (analyzePermitted(candidateOid) &&
-				    candidateOid != StatisticRelationId &&
-				    isExternalHDFS)
+		    candidateOid != StatisticRelationId &&
+		    isExternalHDFSORMAGMA)
 		{
 			*fullRelOids = lappend_oid(*fullRelOids, candidateOid);
 		}
@@ -1025,8 +1047,8 @@ static List* analyzableRelations(bool rootonly, List **fullRelOids)
 			continue;
 		}
 		if (analyzePermitted(candidateOid) &&
-				    candidateOid != StatisticRelationId &&
-				    isExternalHDFS)
+		    candidateOid != StatisticRelationId &&
+		    isExternalHDFSORMAGMA)
 		{
 			lRelOids = lappend_oid(lRelOids, candidateOid);
 		}
@@ -1118,41 +1140,44 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	pfree(location.data);
 	
 	elog(elevel, "ANALYZE estimated reltuples=%f, relpages=%f for table %s", estimatedRelTuples, estimatedRelPages, RelationGetRelationName(relation));
-	
+
 	/* Step 2: update the pg_class entry. */
 	updateReltuplesRelpagesInCatalog(relationOid, estimatedRelTuples, estimatedRelPages);
 	
 	/* Find relpages of each index and update these as well */
 	indexOidList = RelationGetIndexList(relation);
-	foreach (lc, indexOidList)
+	if (!RelationIsMagmaTable2(relationOid))
 	{
-		float4 estimatedIndexTuples = estimatedRelTuples;
-		float4 estimatedIndexPages = 0;
+		foreach (lc, indexOidList)
+		{
+			float4 estimatedIndexTuples = estimatedRelTuples;
+			float4 estimatedIndexPages = 0;
 
-		Oid	indexOid = lfirst_oid(lc);
-		Assert(indexOid != InvalidOid);
+			Oid	indexOid = lfirst_oid(lc);
+			Assert(indexOid != InvalidOid);
+
+			if (estimatedRelTuples < 1.0)
+			{
+				/**
+				 * If there are no rows in the relation, no point trying to estimate
+				 * number of pages in the index.
+				 */
+				elog(elevel, "ANALYZE skipping index %s since relation %s has no rows.", get_rel_name(indexOid), get_rel_name(relationOid));
+			}
+			else
+			{
+				/**
+				 * NOTE: we don't attempt to estimate the number of tuples in an index.
+				 * We will assume it to be equal to the estimated number of tuples in the relation.
+				 * This does not hold for partial indexes. The number of tuples matching will be
+				 * derived in selfuncs.c using the base table statistics.
+				 */
+				analyzeEstimateIndexpages(relationOid, indexOid, &estimatedIndexPages);
+				elog(elevel, "ANALYZE estimated reltuples=%f, relpages=%f for index %s", estimatedIndexTuples, estimatedIndexPages, get_rel_name(indexOid));
+			}
 		
-		if (estimatedRelTuples < 1.0)
-		{
-			/**
-			 * If there are no rows in the relation, no point trying to estimate
-			 * number of pages in the index.
-			 */
-			elog(elevel, "ANALYZE skipping index %s since relation %s has no rows.", get_rel_name(indexOid), get_rel_name(relationOid));
+			updateReltuplesRelpagesInCatalog(indexOid, estimatedIndexTuples, estimatedIndexPages);
 		}
-		else 
-		{
-			/**
-			 * NOTE: we don't attempt to estimate the number of tuples in an index.
-			 * We will assume it to be equal to the estimated number of tuples in the relation.
-			 * This does not hold for partial indexes. The number of tuples matching will be
-			 * derived in selfuncs.c using the base table statistics.
-			 */
-			analyzeEstimateIndexpages(relationOid, indexOid, &estimatedIndexPages);
-			elog(elevel, "ANALYZE estimated reltuples=%f, relpages=%f for index %s", estimatedIndexTuples, estimatedIndexPages, get_rel_name(indexOid));
-		}
-		
-		updateReltuplesRelpagesInCatalog(indexOid, estimatedIndexTuples, estimatedIndexPages);
 	}
 	
 	/* report results to the stats collector, too */
@@ -1179,7 +1204,8 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 	 * The stats at mid-level will be used by the new query optimizer when querying mid-level partitions
 	 * directly. The merge of stats has to be triggered from the root level.
 	 */
-	if (rel_part_status(relationOid) == PART_STATUS_INTERIOR)
+	if (rel_part_status(relationOid) == PART_STATUS_INTERIOR ||
+	    rel_part_status(relationOid) == PART_STATUS_ROOT)
 	{
 		foreach (le, lAttributeNames)
 		{
@@ -1275,7 +1301,52 @@ static void analyzeRelation(Relation relation, List *lAttributeNames, bool rooto
 			analyzeComputeAttributeStatistics(relationOid, lAttributeName, estimatedRelTuples, relationOid, estimatedRelTuples, false /*mergeStats*/, &stats);
 		updateAttributeStatisticsInCatalog(relationOid, lAttributeName, &stats);
 	}
-	
+
+	/*
+	 * analyzeComputeAttributeStatistics will update the row average width
+	 * in table, magma table can according this value to estimate the real
+	 * index relpages
+	 */
+	if (RelationIsMagmaTable2(relationOid))
+	{
+		// If have index, update index tuples/pages in catalog
+		foreach (lc, indexOidList)
+		{
+			float4 estimatedIndexTuples = estimatedRelTuples;
+			float4 estimatedIndexPages = 0;
+
+			Oid	indexOid = lfirst_oid(lc);
+			Assert(indexOid != InvalidOid);
+
+			// get index info
+			HeapTuple	tuple;
+			Form_pg_index index;
+			cqContext  *pcqCtx;
+			pcqCtx = caql_beginscan(NULL,
+					cql("SELECT * FROM pg_index "
+						" WHERE indexrelid = :1 ",
+						ObjectIdGetDatum(indexOid)));
+			tuple = caql_getnext(pcqCtx);
+			if (!HeapTupleIsValid(tuple))
+				elog(ERROR, "cache lookup failed for index %u", indexOid);
+			index = (Form_pg_index) GETSTRUCT(tuple);
+			Assert(index->indexrelid == indexOid);
+			caql_endscan(pcqCtx);
+
+			if (estimatedRelTuples < 1.0)
+			{
+				elog(elevel, "ANALYZE skipping magma index %s since relation %s has no rows.", get_rel_name(indexOid), get_rel_name(relationOid));
+			}
+			else
+			{
+				analyzeEstimateMagmaIndexpages(relationOid, relation, estimatedIndexTuples,
+					                             &estimatedIndexPages, estimatedRelPages, &(index->indkey));
+				elog(elevel, "ANALYZE estimated reltuples=%f, relpages=%f for magma index %s", estimatedIndexTuples, estimatedIndexPages, get_rel_name(indexOid));
+			}
+			updateReltuplesRelpagesInCatalog(indexOid, estimatedIndexTuples, estimatedIndexPages);
+		}
+	}
+
 	/**
 	 * Step 5: Cleanup. Drop the sample table.
 	 */
@@ -1562,33 +1633,68 @@ static Oid buildSampleTable(Oid relationOid,
 	tableName = get_rel_name(relationOid); /* must be pfreed */
 
 	initStringInfo(&str);
-
-	appendStringInfo(&str, "create table %s.%s as (select ", 
-			quote_identifier(sampleSchemaName), quote_identifier(sampleTableName)); 
-	
-	nAttributes = list_length(lAttributeNames);
-
-	foreach_with_count(le, lAttributeNames, i)
+/* the magma file system should be seperated from hadoop file system, so when the table analyzed is a magma
+ * table ,the sample table should be in same format, the better way is to implement it in create table as statement,
+ * change it in future. For now, there will be some unnecessary columns, drop them when Alter Table Drop Column is
+ * supported for magma table*/
+	if (dataStoredInMagmaByOid(relationOid))
 	{
-		appendStringInfo(&str, "Ta.%s", quote_identifier((const char *) lfirst(le)));
-		if (i < nAttributes - 1)
+		char *formatterName = NULL;
+
+		ExtTableEntry *extEntry = GetExtTableEntry(relationOid);
+
+		/* Get formatter type and name for the external table */
+		int formatterType = ExternalTableType_Invalid;
+
+		getExternalTableTypeStr(extEntry->fmtcode, extEntry->fmtopts,
+				&formatterType, &formatterName);
+
+		pfree(extEntry);
+
+		appendStringInfo(&str, "create table %s.%s (like %s.%s) format '%s';",
+				quote_identifier(sampleSchemaName), quote_identifier(sampleTableName),
+				quote_identifier(schemaName),quote_identifier(tableName),quote_identifier(formatterName));
+		spiExecuteWithCallback(str.data, false /*readonly*/, 0 /*tcount */,
+			                        spiCallback_getProcessedAsFloat4, sampleTableRelTuples);
+		pfree(str.data);
+
+		initStringInfo(&str);
+		appendStringInfo(&str, "insert into %s.%s select * from %s.%s where random() < %.38f limit %lu;",
+				quote_identifier(sampleSchemaName), quote_identifier(sampleTableName),
+				quote_identifier(schemaName),quote_identifier(tableName),randomThreshold, (unsigned long) requestedSampleSize);
+		spiExecuteWithCallback(str.data, false /*readonly*/, 0 /*tcount */,
+			                        spiCallback_getProcessedAsFloat4, sampleTableRelTuples);
+
+	} else {
+		appendStringInfo(&str, "create table %s.%s as (select ",
+				quote_identifier(sampleSchemaName),
+				quote_identifier(sampleTableName));
+
+		nAttributes = list_length(lAttributeNames);
+
+		foreach_with_count(le, lAttributeNames, i)
 		{
-			appendStringInfo(&str, ", ");
+			appendStringInfo(&str, "Ta.%s",
+					quote_identifier((const char *) lfirst(le)));
+			if (i < nAttributes - 1)
+			{
+				appendStringInfo(&str, ", ");
+			}
+			else
+			{
+				appendStringInfo(&str, " ");
+			}
 		}
-		else
-		{
-			appendStringInfo(&str, " ");			
-		}
+
+		/* if table is partitioned, we create a sample over all parts */
+		appendStringInfo(&str,
+				"from %s.%s as Ta where random() < %.38f limit %lu) distributed randomly",
+				quote_identifier(schemaName), quote_identifier(tableName),
+				randomThreshold, (unsigned long) requestedSampleSize);
+
+		spiExecuteWithCallback(str.data, false /*readonly*/, 0 /*tcount */,
+				spiCallback_getProcessedAsFloat4, sampleTableRelTuples);
 	}
-	
-	/* if table is partitioned, we create a sample over all parts */
-	appendStringInfo(&str, "from %s.%s as Ta where random() < %.38f limit %lu) distributed randomly", 
-			quote_identifier(schemaName), 
-			quote_identifier(tableName), randomThreshold, (unsigned long) requestedSampleSize);
-
-	spiExecuteWithCallback(str.data, false /*readonly*/, 0 /*tcount */, 
-	                        spiCallback_getProcessedAsFloat4, sampleTableRelTuples);
-
 	pfree(str.data);
 		
 	elog(elevel, "Created sample table %s.%s with nrows=%.0f", 
@@ -1647,6 +1753,49 @@ void dropSampleTable(Oid sampleTableOid, bool isExternal)
 }
 
 /**
+ * This method determines the number of pages corresponding to an magma index.
+ * Input:
+ * 	relationOid - relation being analyzed
+ * 	rel - relation info
+ * 	reltuples - index reltuples
+ * Output:
+ * 	indexPages - number of pages in the index
+ */
+static void analyzeEstimateMagmaIndexpages(Oid relationOid, Relation rel,
+                                           float4 reltuples, float4 *indexPages,
+                                           float4 relPages, int2vector *indKeyVector)
+{
+	float4 relpages = 0.0;
+	float4 totalBytes = 0.0;
+	float rowSize = 0.0;
+	TupleDesc tup = rel->rd_att;
+	int colNum = tup->natts;
+	if (indKeyVector) {
+		int atts = indKeyVector->dim1;
+		int cnt = 0;
+		for (int i = 0; i < colNum; ++i)
+		{
+			if (atts == cnt) break;
+			FormData_pg_attribute *att = tup->attrs[i];
+			for (int j = 0; j < atts; ++j) {
+				if ((indKeyVector->values[j]) == att->attnum) {
+					rowSize += get_attavgwidth(relationOid, att->attnum);
+					cnt++;
+					break;
+				}
+			}
+		}
+		relpages = (rowSize *  reltuples) / default_magma_block_size + 1;
+		// accoring to test experience, index repages shouldn't more than half of relPages
+		if (relpages >= relPages / 2) relpages = relPages / 2;
+	}	else {
+		relpages = relPages / 2;
+	}
+	*indexPages = relpages + 1;  // relpages should no less than 1
+}
+
+
+/**
  * This method determines the number of pages corresponding to an index.
  * Input:
  * 	relationOid - relation being analyzed
@@ -1658,7 +1807,7 @@ static void analyzeEstimateIndexpages(Oid relationOid, Oid indexOid, float4 *ind
 {
 	*indexPages = 0;			
 		
-	Relation rel = try_relation_open(indexOid, AccessShareLock, false);
+	Relation rel = try_relation_open(indexOid, AccessShareLock, false, false);
 
 	if (rel != NULL)
 	{
@@ -1695,7 +1844,7 @@ static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples,
 	 * For mid-level parititions, we aggregate the reltuples and relpages from all leaf children beneath.
 	 */
 	if (rel_part_status(relationOid) == PART_STATUS_INTERIOR ||
-			(rel_is_partitioned(relationOid) && (optimizer_analyze_root_partition || rootonly)))
+			(rel_is_partitioned(relationOid) && (optimizer_analyze_root_partition && !rootonly)))
 	{
 		allRelOids = rel_get_leaf_children_relids(relationOid);
 	}
@@ -1711,7 +1860,7 @@ static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples,
 	foreach (lc, allRelOids)
 	{
 		Oid singleOid = lfirst_oid(lc);
-		Relation rel = try_relation_open(singleOid, AccessShareLock, false);
+		Relation rel = try_relation_open(singleOid, AccessShareLock, false, false);
 
 		if (rel != NULL ) {
 			Assert(rel->rd_rel->relkind == RELKIND_RELATION);
@@ -1728,11 +1877,16 @@ static void analyzeEstimateReltuplesRelpages(Oid relationOid, float4 *relTuples,
 				gp_statistics_estimate_reltuples_relpages_ao_rows(rel, &partRelTuples,
 						&partRelPages);
 			}
-			else if (RelationIsParquet(rel)){
+			else if (RelationIsParquet(rel))
+			{
 				gp_statistics_estimate_reltuples_relpages_parquet(rel, &partRelTuples,
 						&partRelPages);
 			}
-			else if( RelationIsExternal(rel))
+			else if (RelationIsOrc(rel)) {
+			  gp_statistics_estimate_reltuples_relpages_orc(rel, &partRelTuples,
+			                                                &partRelPages);
+			}
+			else if (RelationIsExternal(rel))
 			{
 				gp_statistics_estimate_reltuples_relpages_external(rel, &partRelTuples,
 						&partRelPages);
@@ -1904,8 +2058,10 @@ static bool hasMaxDefined(Oid relationOid, const char *attributeName)
 										&attribute->atttypid, true);
 	if (!OidIsValid(maxAggregateFunction))
 		result = false;
-	
+
 	caql_endscan(pcqCtx);
+	// varchar can cal max, but max funcs don't have varchar's func
+	if (attribute->atttypid == VARCHAROID) result = true;
 	return result;
 }
 
@@ -2787,7 +2943,7 @@ static void analyzeComputeAttributeStatistics(Oid relationOid,
 		computeMCV = false;
 		computeHist = false;
 	}
-	
+
 	if (!hasMaxDefined(relationOid, attributeName))
 	{
 		computeHist = false;
@@ -3267,36 +3423,65 @@ static void gp_statistics_estimate_reltuples_relpages_ao_rows(Relation rel, floa
  * 	reltuples - estimated number of tuples in relation.
  * 	relpages  - exact number of pages.
  */
-
 static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, float4 *reltuples, float4 *relpages)
 {
-	ParquetFileSegTotals	*fstotal;
+  ParquetFileSegTotals  *fstotal;
 
-	/**
-	 * Ensure that the right kind of relation with the right type of storage is passed to us.
-	 */
-	Assert(rel->rd_rel->relkind == RELKIND_RELATION);
-	Assert(RelationIsParquet(rel));
+  /**
+   * Ensure that the right kind of relation with the right type of storage is passed to us.
+   */
+  Assert(rel->rd_rel->relkind == RELKIND_RELATION);
+  Assert(RelationIsParquet(rel));
 
-	Assert(Gp_role == GP_ROLE_DISPATCH);
+  Assert(Gp_role == GP_ROLE_DISPATCH);
 
-	*relpages = 0.0;
-	*reltuples = 0.0;
+  *relpages = 0.0;
+  *reltuples = 0.0;
 
-	fstotal = GetParquetSegFilesTotals(rel, SnapshotNow);
-	Assert(fstotal);
-	/**
-	 * The planner doesn't understand AO's blocks, so need this method to try to fudge up a number for
-	 * the planner.
-	 */
-	*relpages += RelationGuessNumberOfBlocks((double) fstotal->totalbytes);
-	/**
-	 * The number of tuples in AO table is known accurately. Therefore, we just utilize this value.
-	 */
-	*reltuples += (double) fstotal->totaltuples;
+  fstotal = GetParquetSegFilesTotals(rel, SnapshotNow);
+  Assert(fstotal);
+  /**
+   * The planner doesn't understand AO's blocks, so need this method to try to fudge up a number for
+   * the planner.
+   */
+  *relpages += RelationGuessNumberOfBlocks((double) fstotal->totalbytes);
+  /**
+   * The number of tuples in AO table is known accurately. Therefore, we just utilize this value.
+   */
+  *reltuples += (double) fstotal->totaltuples;
 
-	pfree(fstotal);
-	return;
+  pfree(fstotal);
+  return;
+}
+
+static void gp_statistics_estimate_reltuples_relpages_orc(Relation rel, float4 *reltuples, float4 *relpages)
+{
+  FileSegTotals *fstotal;
+
+  /**
+   * Ensure that the right kind of relation with the right type of storage is passed to us.
+   */
+  Assert(rel->rd_rel->relkind == RELKIND_RELATION);
+  Assert(RelationIsOrc(rel));
+
+  Assert(Gp_role == GP_ROLE_DISPATCH);
+
+  *relpages = 0.0;
+  *reltuples = 0.0;
+
+  fstotal = getOrcSegFileStats(rel, SnapshotNow);
+  Assert(fstotal);
+  /**
+   * The planner doesn't understand AO's blocks, so need this method to try to fudge up a number for
+   * the planner.
+   */
+  *relpages += RelationGuessNumberOfBlocks((double) fstotal->totalbytes);
+  /**
+   * The number of tuples in AO table is known accurately. Therefore, we just utilize this value.
+   */
+  *reltuples += (double) fstotal->totaltuples;
+
+  pfree(fstotal);
 }
 
 /**
@@ -3313,7 +3498,7 @@ static void gp_statistics_estimate_reltuples_relpages_parquet(Relation rel, floa
 static void gp_statistics_estimate_reltuples_relpages_external(Relation rel, float4 *relTuples, float4 *relPages){
 	Oid extRelationOid = RelationGetRelid(rel);
 	getExternalRelTuples(extRelationOid, relTuples);
-	getExternalRelPages(extRelationOid, relPages, rel);
+	getExternalRelPages(extRelationOid, relPages, rel, *relTuples);
 }
 
 /**
@@ -3339,8 +3524,8 @@ static void getExternalRelTuples(Oid extRelationOid, float4 *relTuples){
 
 	spiExecuteWithCallback(str.data, false /*readonly*/, 0 /*tcount */,
 								spiCallback_getSingleResultRowColumnAsFloat4, relTuples);
-	pfree(tableName);
-	pfree(schemaName);
+	pfree((void *) tableName);
+	pfree((void *) schemaName);
 	pfree(str.data);
 }
 
@@ -3355,7 +3540,8 @@ static void getExternalRelTuples(Oid extRelationOid, float4 *relTuples){
  * Output:
  * 	relTuples - exact number of pages in relation.
  */
-static void getExternalRelPages(Oid extRelationOid, float4 *relPages , Relation rel){
+static void getExternalRelPages(Oid extRelationOid, float4 *relPages , Relation rel,
+                                float4 relTuples) {
 
 	ExtTableEntry* entry = GetExtTableEntry(extRelationOid);
 	List* extLocations = entry->locations;
@@ -3371,6 +3557,12 @@ static void getExternalRelPages(Oid extRelationOid, float4 *relPages , Relation 
 		switch (uri->protocol){
 			case URI_HDFS:
 				*relPages += getExtrelPagesHDFS(uri);
+				break;
+			case URI_HIVE:
+				*relPages += getExtrelPagesHIVE(uri);
+				break;
+			case URI_MAGMA:
+				*relPages += getExtrelPagesMAGMA(extRelationOid, relTuples, rel);
 				break;
 
 			/*
@@ -3400,6 +3592,10 @@ static void getExternalRelPages(Oid extRelationOid, float4 *relPages , Relation 
 				*relPages = 1.0;
 				elog(NOTICE,"In external table ANALYZE command are not supported in GPFDISTS location so far.");
                 break;
+			case URI_HBASE:
+				*relPages = 1.0;
+				elog(NOTICE,"In external table ANALYZE command are not supported in HBASE location so far.");
+                break;
 			default:
 				*relPages = 1.0;
                 elog(NOTICE,"should not go here");
@@ -3410,10 +3606,7 @@ static void getExternalRelPages(Oid extRelationOid, float4 *relPages , Relation 
 
 		/* free resourse */
 		pfree(url);
-		if(uri->customprotocol != NULL){ pfree(uri->customprotocol);}
-		pfree(uri->hostname);
-		if(uri->path!=NULL){pfree(uri->path);}
-		FreeExternalTableUri(uri);
+	  FreeExternalTableUri(uri);
 	}
 	/* pfree entry->location*/
 	list_free_deep(extLocations);
@@ -3433,47 +3626,68 @@ static void getExternalRelPages(Oid extRelationOid, float4 *relPages , Relation 
  *
  */
 static float4 getExtrelPagesHDFS(Uri *uri){
-	int numOfBlock = 0;
-	int nsize = 0;
 	float4 relpages = 0.0;
-	hdfsFS fs = hdfsConnect(uri->hostname, uri->port);
-
-	//hdfsFileInfo *fiarray = hdfsGetPathInfo(fs, uri->path);
-	hdfsFileInfo *fiarray = hdfsListDirectory(fs, uri->path,&nsize);
+	if (enable_secure_filesystem)
+	{
+		char *ccname = NULL;
+		/*
+		 * refresh kerberos ticket
+		 */
+		if (!login())
+		{
+			errno = EACCES;
+		}
+		ccname = pstrdup(krb5_ccname);
+		SetCcname(ccname);
+	}
+	FscHdfsFileSystemC *fs = FscHdfsNewFileSystem(uri->hostname, uri->port);
 	if (fs == NULL)
 	{
+		elog(ERROR, "GetExternalTotalBytesHDFS : "
+		"failed to create HDFS instance to connect to %s:%d",
+		uri->hostname, uri->port);
+	}
+
+	FscHdfsFileInfoArrayC *fiarray = FscHdfsDirPath(fs, uri->path);
+	if (FscHdfsHasErrorRaised(fs))
+	{
+		Assert(fiarray == NULL);
+		CatchedError *ce = FscHdfsGetFileSystemError(fs);
 		elog(ERROR, "hdfsprotocol_blocklocation : "
-					"failed to get files of path %s",
-					uri->path);
+					"failed to get files of path %s. %s (%d)",
+					uri->path,
+					ce->errMessage, ce->errCode);
 	}
 
 	/* Call block location api to get data location for each file */
-	for (int i = 0 ; i < nsize ; i++)
+	for (int i = 0 ; true ; i++)
 	{
-//		FscHdfsFileInfoC *fi = FscHdfsGetFileInfoFromArray(fiarray, i);
-		hdfsFileInfo *fi = &fiarray[i];
+		FscHdfsFileInfoC *fi = FscHdfsGetFileInfoFromArray(fiarray, i);
+
 		/* break condition of this for loop */
 		if (fi == NULL) {break;}
 
 		/* Build file name full path. */
-		const char *fname = fi->mName;
-		char *fullpath = palloc0(
+		const char *fname = FscHdfsGetFileInfoName(fi);
+		char *fullpath = palloc0(strlen(uri->path) +  /* path  */
+								 1 +                  /* slash */
 								 strlen(fname) +      /* name  */
 								 1);                  /* \0    */
 		sprintf(fullpath, "%s/%s", uri->path, fname);
 
 		/* Get file full length. */
-	//	int64_t len = FscHdfsGetFileInfoLength(fi);
-		int64_t len = fi->mSize;
+		int64_t len = FscHdfsGetFileInfoLength(fi);
+
 		if (len == 0) {
 			pfree(fullpath);
 			continue;
 		}
 
 		/* Get block location data for this file */
-		BlockLocation *bla = hdfsGetFileBlockLocations(fs, fullpath, 0, len,&numOfBlock);
-		if (bla == NULL)
+		FscHdfsFileBlockLocationArrayC *bla = FscHdfsGetPathFileBlockLocation(fs, fullpath, 0, len);
+		if (FscHdfsHasErrorRaised(fs))
 		{
+			Assert(bla == NULL);
 			elog(ERROR, "hdfsprotocol_blocklocation : "
 						"failed to get block location of path %s. "
 						"It is reported generally due to HDFS service errors or "
@@ -3481,23 +3695,214 @@ static float4 getExtrelPagesHDFS(Uri *uri){
 						fullpath);
 		}
 
-		relpages += numOfBlock;
+		relpages += FscHdfsGetFileBlockLocationArraySize(bla);
 
 
 		/* We don't need it any longer */
 		pfree(fullpath);
 
 		/* Clean up block location instances created by the lib. */
-		hdfsFreeFileBlockLocations(&bla,numOfBlock);
+		FscHdfsFreeFileBlockLocationArrayC(&bla);
 	}
 
 	/* Clean up file info array created by the lib for this location. */
-//	FscHdfsFreeFileInfoArrayC(&fiarray);
-	hdfsFreeFileInfo(fiarray,nsize);
-	hdfsDisconnect(fs);
+	FscHdfsFreeFileInfoArrayC(&fiarray);
+	FscHdfsFreeFileSystemC(&fs);
+
 	return relpages;
 }
 
+static float4 getExtrelPagesHIVE(Uri *uri){
+	float4 relpages = 0.0;
+	if (enable_secure_filesystem)
+	{
+		char *ccname = NULL;
+		/*
+		 * refresh kerberos ticket
+		 */
+		if (!login())
+		{
+			errno = EACCES;
+		}
+		ccname = pstrdup(krb5_ccname);
+		SetCcname(ccname);
+	}
+
+	/*get hdfs path of hive table by dbname and tablename*/
+	uint32_t pathLen = strlen(uri->path);
+	char dbname[pathLen];
+	memset(dbname, 0, pathLen);
+	char tblname[pathLen];
+  memset(tblname, 0, pathLen);
+	statusHiveC status;
+
+	if(sscanf(uri->path,"/%[^/]/%s",dbname,tblname) != 2){
+		elog(ERROR,"incorrect url format, it should be /databasename/tablename");
+	}
+	char* hiveUrl = NULL;
+	getHiveDataDirectoryC(uri->hostname, uri->port, dbname, tblname, &hiveUrl, &status);
+	/*check whether the url is right and the table exist*/
+	if (status.errorCode != ERRCODE_SUCCESSFUL_COMPLETION)
+	{
+		elog(ERROR, "hiveprotocol_validate : "
+						"failed to get table info, %s ",
+						status.errorMessage);
+	}
+  Uri *hiveUri = ParseExternalTableUri(hiveUrl);
+
+	FscHdfsFileSystemC *fs = FscHdfsNewFileSystem(hiveUri->hostname, hiveUri->port);
+	if (fs == NULL)
+	{
+		elog(ERROR, "GetExternalTotalBytesHDFS : "
+		"failed to create HDFS instance to connect to %s:%d",
+		uri->hostname, uri->port);
+	}
+
+	FscHdfsFileInfoArrayC *fiarray = FscHdfsDirPath(fs, hiveUri->path);
+	if (FscHdfsHasErrorRaised(fs))
+	{
+		Assert(fiarray == NULL);
+		CatchedError *ce = FscHdfsGetFileSystemError(fs);
+		elog(ERROR, "hdfsprotocol_blocklocation : "
+					"failed to get files of path %s. %s (%d)",
+					hiveUri->path,
+					ce->errMessage, ce->errCode);
+	}
+
+	/* Call block location api to get data location for each file */
+	for (int i = 0 ; true ; i++)
+	{
+		FscHdfsFileInfoC *fi = FscHdfsGetFileInfoFromArray(fiarray, i);
+
+		/* break condition of this for loop */
+		if (fi == NULL) {break;}
+
+		/* Build file name full path. */
+		const char *fname = FscHdfsGetFileInfoName(fi);
+		char *fullpath = palloc0(strlen(hiveUri->path) +  /* path  */
+								 1 +                  /* slash */
+								 strlen(fname) +      /* name  */
+								 1);                  /* \0    */
+		sprintf(fullpath, "%s/%s", hiveUri->path, fname);
+
+		/* Get file full length. */
+		int64_t len = FscHdfsGetFileInfoLength(fi);
+
+		if (len == 0) {
+			pfree(fullpath);
+			continue;
+		}
+
+		/* Get block location data for this file */
+		FscHdfsFileBlockLocationArrayC *bla = FscHdfsGetPathFileBlockLocation(fs, fullpath, 0, len);
+		if (FscHdfsHasErrorRaised(fs))
+		{
+			Assert(bla == NULL);
+			elog(ERROR, "hdfsprotocol_blocklocation : "
+						"failed to get block location of path %s. "
+						"It is reported generally due to HDFS service errors or "
+						"another session's ongoing writing.",
+						fullpath);
+		}
+
+		relpages += FscHdfsGetFileBlockLocationArraySize(bla);
+
+
+		/* We don't need it any longer */
+		pfree(fullpath);
+
+		/* Clean up block location instances created by the lib. */
+		FscHdfsFreeFileBlockLocationArrayC(&bla);
+	}
+
+	/* Clean up file info array created by the lib for this location. */
+	FscHdfsFreeFileInfoArrayC(&fiarray);
+	FscHdfsFreeFileSystemC(&fs);
+  FreeExternalTableUri(hiveUri);
+  return relpages;
+}
+
+static float4 getExtrelPagesMAGMA(Oid extRelationOid , float4 relTuples, Relation rel) {
+	float4 relpages = 0.0;
+	float4 totalBytes = 0.0;
+	totalBytes = calculate_relation_size(rel);
+	// If get the totalBytes from rpc interfaces less than 0, use traditional method
+	if (totalBytes <= 0)
+	{
+		float rowSize = 0.0;
+		TupleDesc tup = rel->rd_att;
+		int colNum = tup->natts;
+		for (int i = 0; i < colNum; ++i)
+		{
+			FormData_pg_attribute *att = tup->attrs[i];
+			rowSize += get_attavgwidth(extRelationOid, att->attnum);
+		}
+		relpages = (rowSize *  relTuples) / default_magma_block_size + 1;
+	}
+	else
+	{
+		relpages = totalBytes / default_magma_block_size + 1;
+	}
+	return relpages;
+}
+
+/*
+ * Get total bytes of external table with Magma protocol
+ */
+
+int64 GetExternalTotalBytesMAGMA(Relation relation){
+  Oid extRelationOid = RelationGetRelid(relation);
+  ExtTableEntry *ext_entry = GetExtTableEntry(extRelationOid);
+  Oid procOid = LookupCustomProtocolTableSizeFunc("magma");
+
+  ExtProtocolTableSizeData *ts = NULL;
+  if ( (procOid) != InvalidOid)
+  {
+    char *dbname = get_database_name(MyDatabaseId);
+    char *tablename = NameStr(relation->rd_rel->relname);
+    char *schemaname = get_namespace_name(relation->rd_rel->relnamespace);
+
+    Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+    InvokeMagmaProtocolTableSize(ext_entry, procOid, dbname, schemaname, tablename,
+                                 PlugStorageGetTransactionSnapshot(), &ts);
+
+    pfree(dbname);
+    pfree(schemaname);
+  }
+  else
+  {
+    elog(ERROR, "failed to find data locality function for magma");
+  }
+
+  return ts->tablesize;
+}
+
+/*
+ * Get total bytes of Magma tables in specific database
+ */
+
+int64 GetDatabaseTotalBytesMAGMA(Oid dbOid){
+	Oid procOid = LookupCustomProtocolDatabaseSizeFunc("magma");
+
+	ExtProtocolDatabaseSizeData *dbs = NULL;
+	if ( (procOid) != InvalidOid)
+	{
+		char *dbname = get_database_name(dbOid);
+
+		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+		InvokeMagmaProtocolDatabaseSize(procOid, dbname,
+		                                PlugStorageGetTransactionSnapshot(),
+		                                &dbs);
+
+		pfree(dbname);
+	}
+	else
+	{
+		elog(ERROR, "failed to find data locality function for magma");
+	}
+
+	return dbs->dbsize;
+}
 
 /*
  * Get total bytes of external table with HDFS protocol
@@ -3505,22 +3910,44 @@ static float4 getExtrelPagesHDFS(Uri *uri){
 uint64 GetExternalTotalBytesHDFS(Uri *uri)
 {
 	uint64 totalBytes = 0;
-	int nsize = 0;
 
-	hdfsFS fs = hdfsConnect(uri->hostname, uri->port);
-
-	hdfsFileInfo *fiarray = hdfsListDirectory(fs, uri->path,&nsize);
-	if (fiarray == NULL)
+	if (enable_secure_filesystem)
 	{
+		char *ccname = NULL;
+		/*
+		 * refresh kerberos ticket
+		 */
+		if (!login())
+		{
+			errno = EACCES;
+		}
+		ccname = pstrdup(krb5_ccname);
+		SetCcname(ccname);
+	}
+
+	FscHdfsFileSystemC *fs = FscHdfsNewFileSystem(uri->hostname, uri->port);
+
+	if (fs == NULL)
+	{
+		elog(ERROR, "GetExternalTotalBytesHDFS : "
+		"failed to create HDFS instance to connect to %s:%d",
+		uri->hostname, uri->port);
+	}
+
+	FscHdfsFileInfoArrayC *fiarray = FscHdfsDirPath(fs, uri->path);
+	if (FscHdfsHasErrorRaised(fs))
+	{
+		Assert(fiarray == NULL);
+		CatchedError *ce = FscHdfsGetFileSystemError(fs);
 		elog(ERROR, "hdfsprotocol_blocklocation : "
-		            "failed to get files of path %s.",
-		            uri->path);
+		            "failed to get files of path %s. %s (%d)",
+		            uri->path, ce->errMessage, ce->errCode);
 	}
 
 	/* Call block location api to get data location for each file */
-	for (int i = 0 ; i < nsize ; i++)
+	for (int i = 0 ; true ; i++)
 	{
-		hdfsFileInfo *fi = &fiarray[i];
+		FscHdfsFileInfoC *fi = FscHdfsGetFileInfoFromArray(fiarray, i);
 
 		/* Break condition of this for loop */
 		if (fi == NULL)
@@ -3529,13 +3956,103 @@ uint64 GetExternalTotalBytesHDFS(Uri *uri)
 		}
 
 		/* Get file full length. */
-		totalBytes += fi->mSize;
+		totalBytes += FscHdfsGetFileInfoLength(fi);
 
 	}
 
 	/* Clean up file info array created by the lib for this location. */
-	hdfsFreeFileInfo(fiarray,nsize);
-		hdfsDisconnect(fs);
+	FscHdfsFreeFileInfoArrayC(&fiarray);
+	FscHdfsFreeFileSystemC(&fs);
+
+	return totalBytes;
+}
+
+/*
+ * Get total bytes of external table with HDFS protocol
+ */
+uint64 GetExternalTotalBytesHIVE(Uri *uri)
+{
+	uint64 totalBytes = 0;
+
+	if (enable_secure_filesystem)
+	{
+		char *ccname = NULL;
+		/*
+		 * refresh kerberos ticket
+		 */
+		if (!login())
+		{
+			errno = EACCES;
+		}
+		ccname = pstrdup(krb5_ccname);
+		SetCcname(ccname);
+	}
+
+	/*get hdfs path of hive table by dbname and tablename*/
+  uint32_t pathLen = strlen(uri->path);
+  char dbname[pathLen];
+  memset(dbname, 0, pathLen);
+  char tblname[pathLen];
+  memset(tblname, 0, pathLen);
+
+	char* host = uri->hostname;
+	int port = uri->port;
+	statusHiveC status;
+
+	if(sscanf(uri->path,"/%[^/]/%s",dbname,tblname) != 2){
+		elog(ERROR,"incorrect url format, it should be /databasename/tablename");
+	}
+
+	char *hiveUrl = NULL;
+	getHiveDataDirectoryC(host, port, dbname, tblname, &hiveUrl, &status);
+	/*check whether the url is right and the table exist*/
+	if (status.errorCode != ERRCODE_SUCCESSFUL_COMPLETION)
+	{
+		elog(ERROR, "hiveprotocol_validate : "
+						"failed to get table info, %s ",
+						status.errorMessage);
+	}
+
+	Uri *hiveUri = ParseExternalTableUri(hiveUrl);
+	FscHdfsFileSystemC *fs = FscHdfsNewFileSystem(hiveUri->hostname, hiveUri->port);
+
+	if (fs == NULL)
+	{
+		elog(ERROR, "GetExternalTotalBytesHIVE : "
+		"failed to create HDFS instance to connect to %s:%d",
+		hiveUri->hostname, hiveUri->port);
+	}
+
+	FscHdfsFileInfoArrayC *fiarray = FscHdfsDirPath(fs, hiveUri->path);
+	if (FscHdfsHasErrorRaised(fs))
+	{
+		Assert(fiarray == NULL);
+		CatchedError *ce = FscHdfsGetFileSystemError(fs);
+		elog(ERROR, "hdfsprotocol_blocklocation : "
+		            "failed to get files of path %s. %s (%d)",
+		            hiveUri->path, ce->errMessage, ce->errCode);
+	}
+
+	/* Call block location api to get data location for each file */
+	for (int i = 0 ; true ; i++)
+	{
+		FscHdfsFileInfoC *fi = FscHdfsGetFileInfoFromArray(fiarray, i);
+
+		/* Break condition of this for loop */
+		if (fi == NULL)
+		{
+			break;
+		}
+
+		/* Get file full length. */
+		totalBytes += FscHdfsGetFileInfoLength(fi);
+
+	}
+
+	/* Clean up file info array created by the lib for this location. */
+	FreeExternalTableUri(hiveUri);
+	FscHdfsFreeFileInfoArrayC(&fiarray);
+	FscHdfsFreeFileSystemC(&fs);
 
 	return totalBytes;
 }
@@ -3566,6 +4083,21 @@ uint64 GetExternalTotalBytes(Relation rel)
 		case URI_HDFS:
 			totalBytes += GetExternalTotalBytesHDFS(uri);
 			break;
+		case URI_HIVE:
+			totalBytes += GetExternalTotalBytesHIVE(uri);
+			break;
+		case URI_MAGMA:
+		{
+			/* start transaction for magma table */
+      if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+      {
+        PlugStorageBeginTransaction(NULL);
+      }
+			Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+
+			totalBytes += GetExternalTotalBytesMAGMA(rel);
+			break;
+		}
 		/*
 		 * Support analyze for external table.
 		 * For now, HDFS protocol external table is supported.
@@ -3600,6 +4132,11 @@ uint64 GetExternalTotalBytes(Relation rel)
 			elog(ERROR,"In external table ANALYZE command are not supported in GPFDISTS location so far.");
 			break;
 
+		case URI_HBASE:
+			totalBytes += 0;
+			elog(ERROR,"In external table ANALYZE command are not supported in HBASE location so far.");
+			break;
+
 		default:
 			totalBytes += 0;
 			elog(ERROR,"should not go here");
@@ -3610,18 +4147,7 @@ uint64 GetExternalTotalBytes(Relation rel)
 
 		/* free resourse */
 		pfree(url);
-		if (uri->customprotocol != NULL)
-		{
-			pfree(uri->customprotocol);
-		}
-		pfree(uri->hostname);
-
-		if (uri->path != NULL)
-		{
-			pfree(uri->path);
-		}
 		FreeExternalTableUri(uri);
-
 	}
 	/* pfree entry->location*/
 	list_free_deep(extLocations);
@@ -3642,11 +4168,11 @@ uint64 GetExternalTotalBytes(Relation rel)
 /*
  * Check if a relation is external table with HDFS protocol
  */
-static bool isExternalHDFSProtocol(Oid relOid)
+static bool isExternalHDFSORMAGMAProtocol(Oid relOid)
 {
 	bool ret = true;
 
-	Relation rel = try_relation_open(relOid, AccessShareLock, false);
+	Relation rel = try_relation_open(relOid, AccessShareLock, false, false);
 	if (rel != NULL)
 	{
 		if ((rel->rd_rel->relkind == RELKIND_RELATION) &&
@@ -3659,8 +4185,8 @@ static bool isExternalHDFSProtocol(Oid relOid)
 			{
 				char *url = ((Value*)lfirst(cell))->val.str;
 				Assert(url != NULL);
-			//	if (!IS_HDFS_URI(url))
-				if (!IS_HDFS_URI(url))
+
+				if (!IS_HDFS_URI(url) && !IS_MAGMA_URI(url) && !IS_HIVE_URI(url))
 				{
 					ret = false;
 					break;

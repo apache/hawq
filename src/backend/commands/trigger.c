@@ -1469,8 +1469,9 @@ ExecARInsertTriggers(EState *estate, ResultRelInfo *relinfo,
 
 	if (trigdesc && trigdesc->n_after_row[TRIGGER_EVENT_INSERT] > 0)
 	{
-		if(RelationIsParquet(relinfo->ri_RelationDesc))
-			elog(ERROR, "Trigger is not supported on Parquet yet");
+		if(RelationIsParquet(relinfo->ri_RelationDesc)
+		    || RelationIsOrc(relinfo->ri_RelationDesc))
+			elog(ERROR, "Trigger is not supported yet");
 
 		AfterTriggerSaveEvent(relinfo, TRIGGER_EVENT_INSERT,
 								true, NULL, trigtuple);
@@ -3239,11 +3240,11 @@ AfterTriggerSetState(ConstraintsSetStmt *stmt)
 									 !IsSubTransaction());
 		}
 	}
-	
-	if (Gp_role == GP_ROLE_DISPATCH)
-	{
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
-	}
+
+  if (Gp_role == GP_ROLE_DISPATCH) {
+    ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+                    errmsg("Cannot support AfterTriggerSetState")));
+  }
 }
 
 /* ----------

@@ -554,6 +554,65 @@ pg_client_to_server(const char *s, int len)
 }
 
 /*
+ * convert any encoding to server encoding.
+ */
+char *
+pg_any_to_server(const char *s, int len, int encoding)
+{
+  Assert(DatabaseEncoding);
+  Assert(ClientEncoding);
+
+  if (len <= 0)
+    return (char *) s;
+
+  if (encoding == DatabaseEncoding->encoding ||
+    encoding == PG_SQL_ASCII)
+  {
+    /*
+     * No conversion is needed, but we must still validate the data.
+     */
+    (void) pg_verify_mbstr(DatabaseEncoding->encoding, s, len, false);
+    return (char *) s;
+  }
+
+  if (DatabaseEncoding->encoding == PG_SQL_ASCII)
+  {
+    /*
+     * No conversion is possible, but we must still validate the data,
+     * because the client-side code might have done string escaping using
+     * the selected client_encoding.  If the client encoding is ASCII-safe
+     * then we just do a straight validation under that encoding.  For an
+     * ASCII-unsafe encoding we have a problem: we dare not pass such data
+     * to the parser but we have no way to convert it.  We compromise by
+     * rejecting the data if it contains any non-ASCII characters.
+     */
+    if (PG_VALID_BE_ENCODING(encoding))
+      (void) pg_verify_mbstr(encoding, s, len, false);
+    else
+    {
+      int     i;
+
+      for (i = 0; i < len; i++)
+      {
+        if (s[i] == '\0' || IS_HIGHBIT_SET(s[i]))
+          ereport(ERROR,
+              (errcode(ERRCODE_CHARACTER_NOT_IN_REPERTOIRE),
+           errmsg("invalid byte value for encoding \"%s\": 0x%02x",
+              pg_enc2name_tbl[PG_SQL_ASCII].name,
+              (unsigned char) s[i])));
+      }
+    }
+    return (char *) s;
+  }
+
+  if (ClientEncoding->encoding == encoding)
+    return perform_default_encoding_conversion(s, len, true, -1, NULL);
+  else
+    return (char *) pg_do_encoding_conversion(
+       (unsigned char *) s, len, encoding, DatabaseEncoding->encoding);
+}
+
+/*
  * convert server encoding to client encoding.
  */
 char *

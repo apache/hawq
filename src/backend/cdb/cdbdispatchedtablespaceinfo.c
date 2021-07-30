@@ -114,8 +114,9 @@ DispatchedFilespace_GetPathForTablespace(Oid tablespace, char **filespacePath, b
 	if (IsBuiltinTablespace(tablespace))
 	{
 		/*
-		 * Optimize out the common cases.
+		 * Optimize out the common cases. Magma table stored in pg_default.
 		 */
+		*found = true;
 		return;
 	}
 

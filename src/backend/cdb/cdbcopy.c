@@ -111,16 +111,18 @@ makeCdbCopy(bool is_copy_in, QueryResource *resource)
  * may pg_throw via elog/ereport.
  */
 void
-cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror, List *err_aosegnos)
+cdbCopyStart(CdbCopy *c, char *copyCmd, Relation rel, Oid relerror, List *err_aosegnos)
 {
 	int seg;
 	MemoryContext oldcontext;
 	List	   *parsetree_list;
 	Node	   *parsetree = NULL;
 	List	   *querytree_list;
+	List	   *plan_list = NULL;
 	char	   *serializedQuerytree;
 	int			serializedQuerytree_len;
 	Query	   *q = makeNode(Query);
+	Oid relid = RelationGetRelid(rel);
 	
 	/* clean err message */
 	c->err_msg.len = 0;
@@ -179,6 +181,43 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror, List *err_aoseg
 	 */
 	q = (Query *)linitial(querytree_list);
 	
+	/*
+	 * generate plan for external table copy to
+	 */
+	CopyStmt *stmt = ((CopyStmt*)(q->utilityStmt));
+	if (!stmt->is_from) {
+		Oid relid = RangeVarGetRelid(stmt->relation);
+		Relation rel = relation_open(relid, NoLock);
+		// only external table need scan plan
+		if (RelationIsExternal(rel)) {
+			// generate the select query
+			char *queryString = (char*)palloc(strlen(copyCmd));
+			queryString[0] = '\0';
+			strcat(queryString, "select ");
+			ListCell *item;
+			int cnt = 0;
+			foreach(item, stmt->attlist)
+			{
+				cnt++;
+				strcat(queryString, strVal(lfirst(item)));
+				if (cnt < list_length(stmt->attlist)) {
+					strcat(queryString, ",");
+				} else {
+					strcat(queryString, " from ");
+				}
+			}
+			strcat(queryString, stmt->relation->relname);
+			strcat(queryString, ";");
+			elog(DEBUG1, "cdbCopy generate queryString:%s", queryString);
+			// parse->analyze->plan
+			List *parsetree_list = pg_parse_query(queryString);
+			Node *parsetree = (Node *) linitial(parsetree_list);
+			List *querytree_list = pg_analyze_and_rewrite(parsetree, queryString, NULL, 0);
+			List *plan_list = pg_plan_queries(querytree_list, NULL, true, QRL_ONCE);
+			((CopyStmt *)q->utilityStmt)->planTree = plan_list;
+		}
+		relation_close(rel, NoLock);
+	}
 	
 	Assert(IsA(q,Query));
 	Assert(q->commandType == CMD_UTILITY);
@@ -201,13 +240,19 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror, List *err_aoseg
 
     q->contextdisp = CreateQueryContextInfo();
 
+  TupleDesc tupDesc = RelationGetDescr(rel);
+  Form_pg_attribute *attr = tupDesc->attrs;
 	if (c->copy_in)
 	{
 		List *result_segfileinfos = NIL;
 		List *err_segfileinfos = NIL;
 
 		prepareDispatchedCatalogRelation(q->contextdisp, relid, TRUE,
-				c->ao_segnos);
+				c->ao_segnos, TRUE);
+		for (int attnum = 1; attnum <= tupDesc->natts; ++attnum) {
+			if (attr[attnum - 1]->attisdropped) continue;
+			prepareDispatchedCatalogType(q->contextdisp, attr[attnum - 1]->atttypid);
+		}
 		result_segfileinfos = GetResultRelSegFileInfos(relid, c->ao_segnos, result_segfileinfos);
 
 		if (OidIsValid(relerror))
@@ -218,11 +263,16 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror, List *err_aoseg
 
 		((CopyStmt *)q->utilityStmt)->ao_segfileinfos = result_segfileinfos;
 		((CopyStmt *)q->utilityStmt)->err_aosegfileinfos = err_segfileinfos;
+		((CopyStmt *)q->utilityStmt)->scantable_splits = c->scantable_splits;
 	}
 	else
 	{
 		List *scantable_splits = NIL;
-		prepareDispatchedCatalogRelation(q->contextdisp, relid, FALSE, NULL);
+		prepareDispatchedCatalogRelation(q->contextdisp, relid, FALSE, NULL, TRUE);
+		for (int attnum = 1; attnum <= tupDesc->natts; ++attnum) {
+			if (attr[attnum - 1]->attisdropped) continue;
+			prepareDispatchedCatalogType(q->contextdisp, attr[attnum - 1]->atttypid);
+		}
 		scantable_splits = AssignAOSegFileSplitToSegment(relid, NIL,
 														c->partition_num,
 														scantable_splits);

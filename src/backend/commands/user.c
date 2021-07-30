@@ -101,7 +101,9 @@ static void TransformExttabAuthClause(DefElem *defel,
 static void SetCreateExtTableForRole(List* allow, 
 			List* disallow, bool* createrextgpfd,
 			bool* createrexthttp, bool* createwextgpfd,
-			bool* createrexthdfs, bool* createwexthdfs);
+			bool* createrexthdfs, bool* createwexthdfs,
+			bool* createrexthive, bool* createwexthive,
+			bool* createrextmagma, bool* createwextmagma);
 
 static char *daysofweek[] = {"Sunday", "Monday", "Tuesday", "Wednesday",
 							 "Thursday", "Friday", "Saturday"};
@@ -203,8 +205,12 @@ CreateRole(CreateRoleStmt *stmt)
 	bool		createrextgpfd = false; /* Can create readable gpfdist exttab? */
 	bool		createrexthttp = false; /* Can create readable http exttab? */
 	bool		createwextgpfd = false; /* Can create writable gpfdist exttab? */
-	bool		createrexthdfs = false; /* Can create readable gphdfs exttab? */
-	bool		createwexthdfs = false; /* Can create writable gphdfs exttab? */
+	bool		createrexthdfs = false; /* Can create readable hdfs exttab? */
+	bool		createwexthdfs = false; /* Can create writable hdfs exttab? */
+	bool		createrexthive = false; /* Can create readable hive exttab? */
+	bool		createwexthive = false; /* Can create writable hive exttab? */
+	bool		createrextmagma = false; /* Can create readable magma exttab? */
+	bool		createwextmagma = false; /* Can create writable magma exttab? */
 	int			connlimit = -1; /* maximum connections allowed */
 	List	   *addroleto = NIL;	/* roles to make this a member of */
 	List	   *rolemembers = NIL;		/* roles to be members of this role */
@@ -526,14 +532,20 @@ CreateRole(CreateRoleStmt *stmt)
 	if (exttabcreate || exttabnocreate)
 		SetCreateExtTableForRole(exttabcreate, exttabnocreate, &createrextgpfd,
 								 &createrexthttp, &createwextgpfd,
-								 &createrexthdfs, &createwexthdfs);
+								 &createrexthdfs, &createwexthdfs,
+								 &createrexthive, &createwexthive,
+								 &createrextmagma, &createwextmagma);
 
 	new_record[Anum_pg_authid_rolcreaterextgpfd - 1] = BoolGetDatum(createrextgpfd);
 	new_record[Anum_pg_authid_rolcreaterexthttp - 1] = BoolGetDatum(createrexthttp);
 	new_record[Anum_pg_authid_rolcreatewextgpfd - 1] = BoolGetDatum(createwextgpfd);
 	new_record[Anum_pg_authid_rolcreaterexthdfs - 1] = BoolGetDatum(createrexthdfs);
 	new_record[Anum_pg_authid_rolcreatewexthdfs - 1] = BoolGetDatum(createwexthdfs);
-	
+	new_record[Anum_pg_authid_rolcreaterexthive - 1] = BoolGetDatum(createrexthive);
+	new_record[Anum_pg_authid_rolcreatewexthive - 1] = BoolGetDatum(createwexthive);
+	new_record[Anum_pg_authid_rolcreaterextmagma - 1] = BoolGetDatum(createrextmagma);
+	new_record[Anum_pg_authid_rolcreatewextmagma - 1] = BoolGetDatum(createwextmagma);
+
 	if (password)
 	{
 		if (!encrypt_password || isHashedPasswd(password))
@@ -586,6 +598,14 @@ CreateRole(CreateRoleStmt *stmt)
 				new_record[Anum_pg_authid_rolcreaterexthdfs - 1] =
 						BoolGetDatum(false);
 				new_record[Anum_pg_authid_rolcreatewexthdfs - 1] =
+						BoolGetDatum(false);
+				new_record[Anum_pg_authid_rolcreaterexthive - 1] =
+						BoolGetDatum(false);
+				new_record[Anum_pg_authid_rolcreatewexthive - 1] =
+						BoolGetDatum(false);
+				new_record[Anum_pg_authid_rolcreaterextmagma - 1] =
+						BoolGetDatum(false);
+				new_record[Anum_pg_authid_rolcreatewextmagma - 1] =
 						BoolGetDatum(false);
 			}
 			else
@@ -819,10 +839,14 @@ AlterRole(AlterRoleStmt *stmt)
 	char		*alter_subtype = "";	/* metadata tracking: kind of
 										   redundant to say "role" */
 	bool		 createrextgpfd;
-	bool 		 createrexthttp;
+	bool		 createrexthttp;
 	bool		 createwextgpfd;
-	bool 		 createrexthdfs;
+	bool		 createrexthdfs;
 	bool		 createwexthdfs;
+	bool		 createrexthive;
+	bool		 createwexthive;
+	bool		 createrextmagma;
+	bool		 createwextmagma;
 	List		*addintervals = NIL;    /* list of time intervals for which login should be denied */
 	List		*dropintervals = NIL;    /* list of time intervals for which matching rules should be dropped */
 
@@ -1251,6 +1275,10 @@ AlterRole(AlterRoleStmt *stmt)
 		Datum 	dcreatewextgpfd;
 		Datum 	dcreaterexthdfs;
 		Datum 	dcreatewexthdfs;
+		Datum 	dcreaterexthive;
+		Datum 	dcreatewexthive;
+		Datum 	dcreaterextmagma;
+		Datum 	dcreatewextmagma;
 
 		/* 
 		 * get bool values from catalog. we don't ever expect a NULL value, but just
@@ -1266,10 +1294,20 @@ AlterRole(AlterRoleStmt *stmt)
 		createrexthdfs = (isnull ? false : DatumGetBool(dcreaterexthdfs));
 		dcreatewexthdfs = heap_getattr(tuple, Anum_pg_authid_rolcreatewexthdfs, pg_authid_dsc, &isnull);
 		createwexthdfs = (isnull ? false : DatumGetBool(dcreatewexthdfs));
-		
+		dcreaterexthive = heap_getattr(tuple, Anum_pg_authid_rolcreaterexthive, pg_authid_dsc, &isnull);
+		createrexthive = (isnull ? false : DatumGetBool(dcreaterexthive));
+		dcreatewexthive = heap_getattr(tuple, Anum_pg_authid_rolcreatewexthive, pg_authid_dsc, &isnull);
+		createwexthive = (isnull ? false : DatumGetBool(dcreatewexthive));
+		dcreaterextmagma = heap_getattr(tuple, Anum_pg_authid_rolcreaterextmagma, pg_authid_dsc, &isnull);
+		createrextmagma = (isnull ? false : DatumGetBool(dcreaterextmagma));
+		dcreatewextmagma = heap_getattr(tuple, Anum_pg_authid_rolcreatewextmagma, pg_authid_dsc, &isnull);
+		createwextmagma = (isnull ? false : DatumGetBool(dcreatewextmagma));
+
 		SetCreateExtTableForRole(exttabcreate, exttabnocreate, &createrextgpfd,
 								 &createrexthttp, &createwextgpfd,
-								 &createrexthdfs, &createwexthdfs);
+								 &createrexthdfs, &createwexthdfs,
+								 &createrexthive, &createwexthive,
+								 &createrextmagma, &createwextmagma);
 
 		new_record[Anum_pg_authid_rolcreaterextgpfd - 1] = BoolGetDatum(createrextgpfd);
 		new_record_repl[Anum_pg_authid_rolcreaterextgpfd - 1] = true;
@@ -1281,6 +1319,14 @@ AlterRole(AlterRoleStmt *stmt)
 		new_record_repl[Anum_pg_authid_rolcreaterexthdfs - 1] = true;
 		new_record[Anum_pg_authid_rolcreatewexthdfs - 1] = BoolGetDatum(createwexthdfs);
 		new_record_repl[Anum_pg_authid_rolcreatewexthdfs - 1] = true;
+		new_record[Anum_pg_authid_rolcreaterexthive - 1] = BoolGetDatum(createrexthive);
+		new_record_repl[Anum_pg_authid_rolcreaterexthive - 1] = true;
+		new_record[Anum_pg_authid_rolcreatewexthive - 1] = BoolGetDatum(createwexthive);
+		new_record_repl[Anum_pg_authid_rolcreatewexthive - 1] = true;
+		new_record[Anum_pg_authid_rolcreaterextmagma - 1] = BoolGetDatum(createrextmagma);
+		new_record_repl[Anum_pg_authid_rolcreaterextmagma - 1] = true;
+		new_record[Anum_pg_authid_rolcreatewextmagma - 1] = BoolGetDatum(createwextmagma);
+		new_record_repl[Anum_pg_authid_rolcreatewextmagma - 1] = true;
 	}
 
 	/* resource queue */
@@ -2378,17 +2424,12 @@ static void CheckValueBelongsToKey(char *key, char *val, const char **keys, cons
 	}
 	else /* keys[1] */
 	{
-		if (strcasecmp(val, "gphdfs") == 0 && Gp_role == GP_ROLE_DISPATCH)
-			ereport(WARNING,
-					(errmsg("GRANT/REVOKE on gphdfs is deprecated"),
-					 errhint("Issue the GRANT or REVOKE on the protocol itself"),
-					 errOmitLocation(true)));
-
 		if(strcasecmp(val, "gpfdist") != 0 && 
 		   strcasecmp(val, "gpfdists") != 0 &&
 		   strcasecmp(val, "http") != 0 &&
-		   strcasecmp(val, "gphdfs") != 0&&
-		   strcasecmp(val, "hdfs") != 0)
+		   strcasecmp(val, "hdfs") != 0 &&
+		   strcasecmp(val, "hive") != 0 &&
+		   strcasecmp(val, "magma") != 0)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("invalid %s value \"%s\"", key, val)));
@@ -2417,10 +2458,10 @@ static void TransformExttabAuthClause(DefElem *defel, extAuthPair *extauth)
 	genericPair *genpair = (genericPair *) palloc0 (4 * sizeof(char *));
 	
 	const int	numkeys = 2;
-	const int	numvals = 6;
+	const int	numvals = 8;
 	const char *keys[] = { "type", "protocol"};	 /* order matters for validation. don't change! */
-	const char *vals[] = { /* types     */ "readable", "writable", 
-						   /* protocols */ "gpfdist", "gpfdists" , "http", "gphdfs", "hdfs"};
+	const char *vals[] = { /* types     */ "readable", "writable",
+						   /* protocols */ "gpfdist", "gpfdists" , "http", "hdfs", "hive", "magma"};
 
 	if(list_length(l) > 2)
 		ereport(ERROR,
@@ -2523,7 +2564,11 @@ static void SetCreateExtTableForRole(List* allow,
 									 bool* createrexthttp, 
 									 bool* createwextgpfd,
 									 bool* createrexthdfs,
-									 bool* createwexthdfs)
+									 bool* createwexthdfs,
+									 bool* createrexthive,
+									 bool* createwexthive,
+									 bool* createrextmagma,
+									 bool* createwextmagma)
 {
 	ListCell*	lc;
 	bool		createrextgpfd_specified = false;
@@ -2531,7 +2576,11 @@ static void SetCreateExtTableForRole(List* allow,
 	bool		createrexthttp_specified = false;
 	bool		createrexthdfs_specified = false;
 	bool		createwexthdfs_specified = false;
-	
+	bool		createrexthive_specified = false;
+	bool		createwexthive_specified = false;
+	bool		createrextmagma_specified = false;
+	bool		createwextmagma_specified = false;
+
 	if(list_length(allow) > 0)
 	{
 		/* examine key value pairs */
@@ -2554,7 +2603,7 @@ static void SetCreateExtTableForRole(List* allow,
 					createwextgpfd_specified = true;
 				}
 			}
-			else if(strcasecmp(extauth->protocol, "gphdfs") == 0)
+			else if(strcasecmp(extauth->protocol, "hdfs") == 0)
 			{
 				if(strcasecmp(extauth->type, "readable") == 0)
 				{
@@ -2567,17 +2616,30 @@ static void SetCreateExtTableForRole(List* allow,
 					createwexthdfs_specified = true;
 				}
 			}
-			else if(strcasecmp(extauth->protocol, "hdfs") == 0)
+			else if(strcasecmp(extauth->protocol, "hive") == 0)
 			{
 				if(strcasecmp(extauth->type, "readable") == 0)
 				{
-					*createrexthdfs = true;
-					createrexthdfs_specified = true;
+					*createrexthive = true;
+					createrexthive_specified = true;
 				}
 				else
 				{
-					*createwexthdfs = true;
-					createwexthdfs_specified = true;
+					*createwexthive = true;
+					createwexthive_specified = true;
+				}
+			}
+			else if(strcasecmp(extauth->protocol, "magma") == 0)
+			{
+				if(strcasecmp(extauth->type, "readable") == 0)
+				{
+					*createrextmagma = true;
+					createrextmagma_specified = true;
+				}
+				else
+				{
+					*createwextmagma = true;
+					createwextmagma_specified = true;
 				}
 			}
 			else /* http */
@@ -2631,7 +2693,7 @@ static void SetCreateExtTableForRole(List* allow,
 					*createwextgpfd = false;
 				}
 			}
-			else if(strcasecmp(extauth->protocol, "gphdfs") == 0)
+			else if(strcasecmp(extauth->protocol, "hdfs") == 0)
 			{
 				if(strcasecmp(extauth->type, "readable") == 0)
 				{
@@ -2648,21 +2710,38 @@ static void SetCreateExtTableForRole(List* allow,
 					*createwexthdfs = false;
 				}
 			}
-			else if(strcasecmp(extauth->protocol, "hdfs") == 0)
+			else if(strcasecmp(extauth->protocol, "hive") == 0)
 			{
-				if(strcasecmp(extauth->type, "readable") == 0)
+				if (strcasecmp(extauth->type, "readable") == 0)
 				{
-					if(createrexthdfs_specified)
+					if (createrexthive_specified)
 						conflict = true;
 
-					*createrexthdfs = false;
+					*createrexthive = false;
 				}
 				else
 				{
-					if(createwexthdfs_specified)
+					if (createwexthive_specified)
 						conflict = true;
 
-					*createwexthdfs = false;
+					*createwexthive = false;
+				}
+			}
+			else if(strcasecmp(extauth->protocol, "magma") == 0)
+			{
+				if (strcasecmp(extauth->type, "readable") == 0)
+				{
+					if (createrextmagma_specified)
+						conflict = true;
+
+					*createrextmagma = false;
+				}
+				else
+				{
+					if (createwextmagma_specified)
+						conflict = true;
+
+					*createwextmagma = false;
 				}
 			}
 			else /* http */
@@ -3051,6 +3130,10 @@ CreateNoPrivligeRole(char *rolename)
 	bool		createwextgpfd = false; /* Can create writable gpfdist exttab? */
 	bool		createrexthdfs = false; /* Can create readable hdfs exttab? */
 	bool		createwexthdfs = false; /* Can create writable hdfs exttab? */
+	bool		createrexthive = false; /* Can create readable hive exttab? */
+	bool		createwexthive = false; /* Can create writable hive exttab? */
+	bool		createrextmagma = false; /* Can create readable magma exttab? */
+	bool		createwextmagma = false; /* Can create writable magma exttab? */
 	int			connlimit = -1; /* maximum connections allowed */
 	List	   *addroleto = NIL;	/* roles to make this a member of */
 	List	   *rolemembers = NIL;		/* roles to be members of this role */
@@ -3136,13 +3219,19 @@ CreateNoPrivligeRole(char *rolename)
 	if (exttabcreate || exttabnocreate)
 		SetCreateExtTableForRole(exttabcreate, exttabnocreate, &createrextgpfd,
 								 &createrexthttp, &createwextgpfd,
-								 &createrexthdfs, &createwexthdfs);
+								 &createrexthdfs, &createwexthdfs,
+								 &createrexthive, &createwexthive,
+								 &createrextmagma, &createwextmagma);
 
 	new_record[Anum_pg_authid_rolcreaterextgpfd - 1] = BoolGetDatum(createrextgpfd);
 	new_record[Anum_pg_authid_rolcreaterexthttp - 1] = BoolGetDatum(createrexthttp);
 	new_record[Anum_pg_authid_rolcreatewextgpfd - 1] = BoolGetDatum(createwextgpfd);
 	new_record[Anum_pg_authid_rolcreaterexthdfs - 1] = BoolGetDatum(createrexthdfs);
 	new_record[Anum_pg_authid_rolcreatewexthdfs - 1] = BoolGetDatum(createwexthdfs);
+	new_record[Anum_pg_authid_rolcreaterexthive - 1] = BoolGetDatum(createrexthive);
+	new_record[Anum_pg_authid_rolcreatewexthive - 1] = BoolGetDatum(createwexthive);
+	new_record[Anum_pg_authid_rolcreaterextmagma - 1] = BoolGetDatum(createrextmagma);
+	new_record[Anum_pg_authid_rolcreatewextmagma - 1] = BoolGetDatum(createwextmagma);
 
 	if (password)
 	{

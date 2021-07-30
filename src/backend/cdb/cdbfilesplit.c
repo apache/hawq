@@ -31,6 +31,7 @@
 #include "access/htup.h"
 #include "access/genam.h"
 #include "access/aosegfiles.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "catalog/pg_appendonly.h"
 #include "catalog/gp_policy.h"
@@ -70,8 +71,7 @@ AssignSingleAOSegFileSplitToSegment(Oid relid, List *segment_infos, int target_s
 	/*
 	 * Here we only consider append only tables
 	 */
-	if ((storageChar != RELSTORAGE_AOROWS) &&
-		(storageChar != RELSTORAGE_PARQUET))
+	if (!relstorage_is_ao(storageChar))
 	{
 		result->splits = NIL;
 		return result;
@@ -90,10 +90,12 @@ AssignSingleAOSegFileSplitToSegment(Oid relid, List *segment_infos, int target_s
 	{
 		splits = AOGetAllSegFileSplits(aoEntry, SnapshotSelf);
 	}
-	else
+	else if (RELSTORAGE_PARQUET == storageChar)
 	{
-		Assert(RELSTORAGE_PARQUET == storageChar);
 		splits = ParquetGetAllSegFileSplits(aoEntry, SnapshotSelf);
+	} else {
+	  Assert(RELSTORAGE_ORC == storageChar);
+	  splits = orcGetAllSegFileSplits(aoEntry, SnapshotSelf);
 	}
 
 	/*
@@ -345,3 +347,58 @@ GetFileSplitsOfSegment(List *splitToSegmentMaps, Oid relid, int segment_index)
 
 	return NIL;
 }
+
+List *
+GetFileSplitsOfSegmentMagma(List *splitToSegmentMaps, Oid relid)
+{
+    if ((splitToSegmentMaps == NIL) || (list_length(splitToSegmentMaps) == 0))
+    {
+        return NIL;
+    }
+    else
+    {
+        ListCell *lc;
+        foreach(lc, splitToSegmentMaps)
+        {
+            SegFileSplitMap map = (SegFileSplitMapNode *)lfirst(lc);
+            if (map->relid == relid)
+            {
+                return map->splits;
+            }
+        }
+    }
+
+    return NIL;
+}
+
+void
+GetMagmaSchemaByRelid(List *splitToSegmentMaps, Oid relid,
+                      char **serializeSchema, int *serializeSchemaLen)
+{
+	if ((splitToSegmentMaps == NIL) || (list_length(splitToSegmentMaps) == 0))
+	{
+	    *serializeSchema = NULL;
+	    *serializeSchemaLen = 0;
+	    return;
+	}
+	else
+	{
+		ListCell *lc;
+		foreach(lc, splitToSegmentMaps)
+		{
+			SegFileSplitMap map = (SegFileSplitMapNode *) lfirst(lc);
+			if (map->relid == relid)
+			{
+			    *serializeSchema = map->serializeSchema;
+			    *serializeSchemaLen = map->serializeSchemaLen;
+				return;
+
+			}
+		}
+	}
+
+	*serializeSchema = NULL;
+	*serializeSchemaLen = 0;
+	return;
+}
+

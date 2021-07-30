@@ -67,6 +67,8 @@ typedef struct CdbHash
 
 typedef void (*datumHashFunction)(void *clientData, void *buf, size_t len);
 
+#define JUMP_HASH_MAP_LENGTH 32768  // 32 * 1024
+
 extern void hashDatum(Datum datum, Oid type, datumHashFunction hashFn, void *clientData);
 extern void hashNullDatum(datumHashFunction hashFn, void *clientData);
 
@@ -101,6 +103,14 @@ extern void cdbhashnokey(CdbHash *h);
  * Reduce the hash to a segment number.
  */
 extern unsigned int cdbhashreduce(CdbHash *h);
+
+/*
+ * Reduce the rangId to a segment number.
+ */
+extern unsigned int magichashreduce(CdbHash *h, int *map, int nmap);
+
+extern void InitJumpHashMap();
+extern int *get_jump_hash_map(int bucketNum);
 
 /*
  * Return true if Oid is hashable internally in Greenplum Database.

@@ -20,11 +20,13 @@
 
 #include "access/heapam.h"
 #include "access/appendonlywriter.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_database.h"
+#include "catalog/pg_exttable.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/dbcommands.h"
 #include "commands/tablespace.h"
@@ -43,6 +45,8 @@
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbdispatchedtablespaceinfo.h"
 #include "cdb/cdbpersistenttablespace.h"
+
+#include "parser/analyze.h"
 
 extern int64
 calculate_relation_size(Relation rel);
@@ -179,10 +183,6 @@ calculate_database_size(Oid dbOid)
 
 	Assert(Gp_role != GP_ROLE_EXECUTE);
 
-    /* Do not error out because it would break some existing client calls*/
-	if (dbOid == HcatalogDbOid)
-		return -1;
-
 	/* User must have connect privilege for target database */
 	aclresult = pg_database_aclcheck(dbOid, GetUserId(), ACL_CONNECT);
 	if (aclresult != ACLCHECK_OK)
@@ -216,6 +216,18 @@ calculate_database_size(Oid dbOid)
 	}
 	heap_endscan(scandesc);
 	heap_close(rel, AccessShareLock);
+
+  if (hawq_init_with_magma)
+  {
+    /* start transaction for magma table */
+    if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+    {
+      PlugStorageBeginTransaction(NULL);
+    }
+    Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+
+    totalsize += GetDatabaseTotalBytesMAGMA(dbOid);
+  }
 
   /* Complain if we found no trace of the DB at all */
   if (totalsize == 0)
@@ -400,40 +412,50 @@ calculate_relation_size(Relation rel)
 
 	relationpath = relpath(rel->rd_node);
 
-    if(RelationIsHeap(rel))
-    {
-        /* Ordinary relation, including heap and index.
-         * They take form of relationpath, or relationpath.%d
-         * There will be no holes, therefore, we can stop we
-         * we reach the first non-exist file.
-         */
-        for(i=0; ; ++i)
-        {
-            if (i==0)
-                snprintf(pathname, MAXPGPATH, "%s", relationpath); 
-            else
-                snprintf(pathname, MAXPGPATH, "%s.%d", relationpath, i);
+	if (RelationIsHeap(rel))
+	{
+		/* Ordinary relation, including heap and index.
+		 * They take form of relationpath, or relationpath.%d
+		 * There will be no holes, therefore, we can stop we
+		 * we reach the first non-exist file.
+		 */
+		for (i = 0;; ++i)
+		{
+			if (i == 0)
+				snprintf(pathname, MAXPGPATH, "%s", relationpath);
+			else
+				snprintf(pathname, MAXPGPATH, "%s.%d", relationpath, i);
 
-            if (stat(pathname, &fst) >= 0)
-                totalsize += fst.st_size;
-            else
-            {
-                if (errno == ENOENT)
-                    break;
-                else
-                    ereport(ERROR, (errcode_for_file_access(), 
-                                    errmsg("could not stat file %s: %m", pathname)
-                                ));
-            }
-        }
-    }
+			if (stat(pathname, &fst) >= 0)
+				totalsize += fst.st_size;
+			else
+			{
+				if (errno == ENOENT)
+					break;
+				else
+					ereport(ERROR,
+							(errcode_for_file_access(), errmsg("could not stat file %s: %m", pathname) ));
+			}
+		}
+	}
 	else if (RelationIsAoRows(rel))
 		totalsize = GetAOTotalBytes(rel, SnapshotNow);
 	else if (RelationIsParquet(rel))
 		totalsize = GetParquetTotalBytes(rel, SnapshotNow);
-           
-    /* RELSTORAGE_VIRTUAL has no space usage */
-    return totalsize;
+	else if (RelationIsOrc(rel))
+	  totalsize = getOrcTotalBytes(rel, SnapshotNow);
+	else if (RelationIsExternal(rel))
+	{
+		ExtTableEntry* extEnrty = GetExtTableEntry(rel->rd_id);
+		/* command external table should be skipped*/
+		if (!extEnrty->command)
+		{
+			totalsize = GetExternalTotalBytes(rel);
+		}
+	}
+
+	/* RELSTORAGE_VIRTUAL has no space usage */
+	return totalsize;
 }
 
 
@@ -451,7 +473,7 @@ pg_relation_size_oid(PG_FUNCTION_ARGS)
 						errmsg("pg_relation_size: cannot be executed in segment")));
 	}
 
-	rel = try_relation_open(relOid, AccessShareLock, false);
+	rel = try_relation_open(relOid, AccessShareLock, false, false);
 		
 	/*
 	 * While we scan pg_class with an MVCC snapshot,
@@ -526,7 +548,7 @@ calculate_total_relation_size(Oid Relid)
 	heapRel = relation_open(Relid, AccessShareLock);
 	toastOid = heapRel->rd_rel->reltoastrelid;
 
-	if (RelationIsAoRows(heapRel) || RelationIsParquet(heapRel))
+	if (RelationIsAo(heapRel))
 		aoEntry = GetAppendOnlyEntry(Relid, SnapshotNow);
 	
 	/* Get the heap size */

@@ -723,9 +723,6 @@ with_zlib
 with_system_tzdata
 with_libhdfs3
 with_libyarn
-with_dbcommon
-with_univplan
-with_storage
 with_openssl
 with_bonjour
 with_ldap
@@ -733,18 +730,18 @@ with_pam
 krb_srvtab
 with_krb5
 with_gssapi
-with_pgcrypto
 with_orc
+with_pgcrypto
 with_r
 with_java
 with_python
 with_perl
 with_tcl
+with_magma_sanitize
 enable_thread_safety
 enable_rps
 enable_orca
 enable_email
-enable_gphdfs
 enable_snmp
 autodepend
 TAS
@@ -770,6 +767,7 @@ GENHTML
 LCOV
 GCOV
 enable_profiling
+enable_avx
 enable_debug
 enable_rpath
 enable_shared
@@ -840,6 +838,7 @@ enable_shared
 enable_rpath
 enable_spinlocks
 enable_debug
+enable_avx
 enable_profiling
 enable_coverage
 enable_dtrace
@@ -851,12 +850,12 @@ enable_debugbreak
 enable_debugntuplestore
 enable_testutils
 enable_snmp
-enable_gphdfs
 enable_email
 enable_orca
 enable_rps
 enable_thread_safety
 enable_thread_safety_force
+with_magma_sanitize
 with_tcl
 with_tclconfig
 with_perl
@@ -875,9 +874,6 @@ with_openssl
 with_readline
 with_libyarn
 with_libhdfs3
-with_dbcommon
-with_univplan
-with_storage
 with_libedit_preferred
 with_system_tzdata
 with_zlib
@@ -1523,6 +1519,7 @@ disable 64-bit integer date/time support
   --disable-rpath         do not embed shared library search path in executables
   --disable-spinlocks     do not use spinlocks
   --enable-debug          build with debugging symbols (-g)
+  --enable-avx            build with vector instruction optimization (-mavx -mavx2)
   --enable-profiling      build with profiling enabled
   --enable-coverage       build with coverage testing instrumentation
   --enable-dtrace         build with DTrace support
@@ -1533,7 +1530,6 @@ disable 64-bit integer date/time support
   --enable-ntuplestore      enable debug_ntuplestore (for debugging)
   --enable-testutils        enable testing utilities
   --enable-snmp        enable snmp for MIB and alerts via TRAP/INFORM
-  --enable-gphdfs        enables GPHDFS support
   --enable-email        enable email alerts
   --enable-orca        enable Pivotal Query Optimizer
   --enable-rps         enable hawq ranger plugin
@@ -1552,6 +1548,7 @@ Optional Packages:
   --with-libraries=DIRS   look for additional libraries in DIRS
   --with-libs=DIRS        alternative spelling of --with-libraries
   --with-pgport=PORTNUM   change default port number [5432]
+  --with-magma_sanitize   build with sanitize check
   --with-tcl              build Tcl modules (PL/Tcl)
   --with-tclconfig=DIR    tclConfig.sh is in DIR
   --with-perl             build Perl modules (PL/Perl)
@@ -1559,6 +1556,7 @@ Optional Packages:
   --with-java             build Java modules (PL/Java)
   --with-r                build R modules (PL/R)
   --with-pgcrypto         build with pgcrypto
+  --with-orc         build with orc format
   --with-gssapi           build with GSSAPI support
   --with-krb5             build with Kerberos 5 support
   --with-krb-srvnam=NAME  default service principal name in Kerberos [postgres]
@@ -1569,9 +1567,6 @@ Optional Packages:
   --without-readline      do not use GNU Readline nor BSD Libedit for editing
   --without-libyarn       do not build libyarn
   --without-libhdfs3      do not build libhdfs3
-  --without-dbcommon      do not build dbcommon
-  --without-univplan      do not build univplan
-  --without-storage       do not build storage
   --without-libedit-preferred  Don't prefer BSD Libedit over GNU Readline
   --with-system-tzdata=DIR  use system time zone data in DIR
   --without-zlib          do not use Zlib
@@ -3457,6 +3452,35 @@ fi
 
 
 #
+# --enable-avx adds vector instruction optimization (-mavx -mavx2) to compiler flags
+#
+
+pgac_args="$pgac_args enable_avx"
+
+# Check whether --enable-avx was given.
+if test "${enable_avx+set}" = set; then :
+  enableval=$enable_avx;
+  case $enableval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --enable-avx option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  enable_avx=yes
+
+fi
+
+
+
+
+#
 # --enable-profiling enables gcc profiling
 #
 
@@ -3496,6 +3520,11 @@ if test "${enable_coverage+set}" = set; then :
   enableval=$enable_coverage;
   case $enableval in
     yes)
+
+$as_echo "#define ENABLE_COVERAGE 1" >>confdefs.h
+
+      ;;
+    no)
       for ac_prog in gcov
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
@@ -3632,9 +3661,6 @@ if test -z "$GENHTML"; then
   as_fn_error $? "genhtml not found" "$LINENO" 5
 fi
       ;;
-    no)
-      :
-      ;;
     *)
       as_fn_error $? "no argument expected for --enable-coverage option" "$LINENO" 5
       ;;
@@ -3642,7 +3668,141 @@ fi
 
 else
   enable_coverage=no
+for ac_prog in gcov
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_GCOV+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$GCOV"; then
+  ac_cv_prog_GCOV="$GCOV" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_GCOV="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
 
+fi
+fi
+GCOV=$ac_cv_prog_GCOV
+if test -n "$GCOV"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GCOV" >&5
+$as_echo "$GCOV" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$GCOV" && break
+done
+
+if test -z "$GCOV"; then
+  as_fn_error $? "gcov not found" "$LINENO" 5
+fi
+for ac_prog in lcov
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_LCOV+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$LCOV"; then
+  ac_cv_prog_LCOV="$LCOV" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_LCOV="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+LCOV=$ac_cv_prog_LCOV
+if test -n "$LCOV"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LCOV" >&5
+$as_echo "$LCOV" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$LCOV" && break
+done
+
+if test -z "$LCOV"; then
+  as_fn_error $? "lcov not found" "$LINENO" 5
+fi
+for ac_prog in genhtml
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_GENHTML+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$GENHTML"; then
+  ac_cv_prog_GENHTML="$GENHTML" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_GENHTML="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+GENHTML=$ac_cv_prog_GENHTML
+if test -n "$GENHTML"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GENHTML" >&5
+$as_echo "$GENHTML" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$GENHTML" && break
+done
+
+if test -z "$GENHTML"; then
+  as_fn_error $? "genhtml not found" "$LINENO" 5
+fi
 fi
 
 
@@ -4936,6 +5096,12 @@ $as_echo "#define PROFILE_PID_DIR 1" >>confdefs.h
   fi
 fi
 
+# disable avx if --enable-avx=no
+if test "$enable_avx" = no; then
+    CFLAGS="$CFLAGS -mno-avx -mno-avx2"
+    CXXFLAGS="$CXXFLAGS -mno-avx -mno-avx2"
+fi
+
 # We already have this in Makefile.win32, but configure needs it too
 if test "$PORTNAME" = "win32"; then
   CPPFLAGS="$CPPFLAGS -I$srcdir/src/include/port/win32 -DEXEC_BACKEND"
@@ -5141,7 +5307,7 @@ else
     HQ_VERSION="devel"
 fi
 
-GP_VERSION='4.2.0 build 1'
+GP_VERSION='4.2.0'
 GP_VERSION_IN="src/include/catalog/gp_version.in"
 GP_VERSION_HEADER="src/include/catalog/gp_version.h"
 if grep '\$\$' $GP_VERSION_IN > /dev/null 2>&1 ; then
@@ -5156,7 +5322,7 @@ else
 fi
 
 cat >>confdefs.h <<_ACEOF
-#define PG_VERSION_STR "PostgreSQL $PACKAGE_VERSION (Greenplum Database $GP_VERSION) (HAWQ $HQ_VERSION) on $host, compiled by $cc_string"
+#define PG_VERSION_STR "PostgreSQL $PACKAGE_VERSION (Apache HAWQ 3.0.0.0) (Greenplum Database $GP_VERSION) on $host, compiled by $cc_string"
 _ACEOF
 
 
@@ -5421,39 +5587,6 @@ $as_echo "checking whether to build with snmp... $enable_snmp" >&6; }
 
 
 #
-# --enable-gphdfs enables GPHDFS support
-#
-
-pgac_args="$pgac_args enable_gphdfs"
-
-# Check whether --enable-gphdfs was given.
-if test "${enable_gphdfs+set}" = set; then :
-  enableval=$enable_gphdfs;
-  case $enableval in
-    yes)
-
-$as_echo "#define USE_GPHDFS 1" >>confdefs.h
-
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --enable-gphdfs option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  enable_gphdfs=no
-
-fi
-
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: checking whether to build with gphdfs...$enable_gphdfs" >&5
-$as_echo "checking whether to build with gphdfs...$enable_gphdfs" >&6; }
-
-
-#
 # --enable-email enables email alerts
 #
 
@@ -5613,6 +5746,40 @@ $as_echo "#define ENABLE_THREAD_SAFETY 1" >>confdefs.h
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $enable_thread_safety" >&5
 $as_echo "$enable_thread_safety" >&6; }
+
+
+#
+# Optionally build Magma Sanitize modules
+#
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with Magma Sanitize" >&5
+$as_echo_n "checking whether to build with Magma Sanitize... " >&6; }
+
+pgac_args="$pgac_args with_magma_sanitize"
+
+
+# Check whether --with-magma_sanitize was given.
+if test "${with_magma_sanitize+set}" = set; then :
+  withval=$with_magma_sanitize;
+  case $withval in
+    yes)
+      :
+      ;;
+    no)
+      :
+      ;;
+    *)
+      as_fn_error $? "no argument expected for --with-magma_sanitize option" "$LINENO" 5
+      ;;
+  esac
+
+else
+  with_magma_sanitize=no
+
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_magma_sanitize" >&5
+$as_echo "$with_magma_sanitize" >&6; }
 
 
 #
@@ -5846,7 +6013,7 @@ $as_echo "$with_pgcrypto" >&6; }
 
 
 #
-# Optionally build with orc in pluggable storage framework.
+# Optionally build with orc format in pluggable storage framework.
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build orc modules" >&5
 $as_echo_n "checking whether to build orc modules... " >&6; }
@@ -5870,7 +6037,7 @@ if test "${with_orc+set}" = set; then :
   esac
 
 else
-  with_orc=no
+  with_orc=yes
 
 fi
 
@@ -5878,8 +6045,9 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_orc" >&5
 $as_echo "$with_orc" >&6; }
 
-
 #
+
+
 # GSSAPI
 #
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether to build with GSSAPI support" >&5
@@ -6059,7 +6227,9 @@ $as_echo "#define USE_LDAP 1" >>confdefs.h
   esac
 
 else
-  with_ldap=no
+  with_ldap=yes
+
+$as_echo "#define USE_LDAP 1" >>confdefs.h
 
 fi
 
@@ -6239,95 +6409,6 @@ else
 
 fi
 
-
-
-
-#
-# dbcommon
-#
-
-pgac_args="$pgac_args with_dbcommon"
-
-
-# Check whether --with-dbcommon was given.
-if test "${with_dbcommon+set}" = set; then :
-  withval=$with_dbcommon;
-  case $withval in
-    yes)
-      :
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-dbcommon option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_dbcommon=yes
-
-fi
-
-
-
-
-#
-# univplan
-#
-
-pgac_args="$pgac_args with_univplan"
-
-
-# Check whether --with-univplan was given.
-if test "${with_univplan+set}" = set; then :
-  withval=$with_univplan;
-  case $withval in
-    yes)
-      :
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-univplan option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_univplan=yes
-
-fi
-
-
-
-
-#
-# storage
-#
-
-pgac_args="$pgac_args with_storage"
-
-
-# Check whether --with-storage was given.
-if test "${with_storage+set}" = set; then :
-  withval=$with_storage;
-  case $withval in
-    yes)
-      :
-      ;;
-    no)
-      :
-      ;;
-    *)
-      as_fn_error $? "no argument expected for --with-storage option" "$LINENO" 5
-      ;;
-  esac
-
-else
-  with_storage=yes
-
-fi
 
 
 
@@ -7569,14 +7650,14 @@ if test "$BISON"; then
   pgac_bison_version=`$BISON --version 2>/dev/null | sed q`
   { $as_echo "$as_me:${as_lineno-$LINENO}: using $pgac_bison_version" >&5
 $as_echo "$as_me: using $pgac_bison_version" >&6;}
-  if echo "$pgac_bison_version" | $AWK '{ if ($4 < 1.875 && $4 > 2.9) exit 0; else exit 1;}'
+  if echo "$pgac_bison_version" | $AWK '{ if ($4 < 1.875) exit 0; else exit 1;}'
   then
     { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING:
-*** The installed version of Bison, $BISON, is too old or too new to use with HAWQ.
-*** Bison version between 1.875 and 2.9 is required, but this is $pgac_bison_version." >&5
+*** The installed version of Bison, $BISON, is too old to use with PostgreSQL.
+*** Bison version 1.875 or later is required, but this is $pgac_bison_version." >&5
 $as_echo "$as_me: WARNING:
-*** The installed version of Bison, $BISON, is too old or too new to use with HAWQ.
-*** Bison version between 1.875 and 2.9 is required, but this is $pgac_bison_version." >&2;}
+*** The installed version of Bison, $BISON, is too old to use with PostgreSQL.
+*** Bison version 1.875 or later is required, but this is $pgac_bison_version." >&2;}
     BISON=""
   fi
 fi
@@ -8349,6 +8430,8 @@ $as_echo_n "checking CATALINA_HOME... " >&6; }
 
         if test -x "${CATALINA_HOME}/bin/catalina.sh"; then
     TOMCAT="${CATALINA_HOME}"
+  elif test -x "/usr/local/hawq/tomcat/bin/catalina.sh"; then
+    TOMCAT="/usr/local/hawq/tomcat/"
   elif test -x "/usr/local/Cellar/tomcat@6/6.0.45/libexec/bin/catalina.sh"; then
     TOMCAT="/usr/local/Cellar/tomcat@6/6.0.45/libexec/"
   elif test -x "/usr/lib/bigtop-tomcat/bin/catalina.sh"; then
@@ -9307,6 +9390,7 @@ failure.  It is possible the compiler isn't looking in the proper directory.
 Use --without-zlib to disable zlib support." "$LINENO" 5
 fi
 
+LIBS="-lz -llz4 $LIBS"
 fi
 
 if test "$with_r" = yes; then
@@ -10676,7 +10760,7 @@ See \`config.log' for more details" "$LINENO" 5; }
 fi
 
 ac_ext=cpp
-ac_cpp='$CXXCPP $CPPFLAGS'
+ac_cpp='$CXXCPP $CPPFLAGS -w'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
@@ -10691,7 +10775,7 @@ if test "x$ac_cv_header_thrift_protocol_TBinaryProtocol_h" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "thrift is required" "$LINENO" 5
+  : #as_fn_error $? "thrift is required" "$LINENO" 5
 fi
 
 done
@@ -10707,8 +10791,8 @@ if test "x$ac_cv_header_boost_chrono_hpp" = xyes; then :
 _ACEOF
 
 else
-  as_fn_error $? "boost is required.
-Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
+  : #as_fn_error $? "boost is required.
+#Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
 done
@@ -11732,6 +11816,80 @@ if test "$ac_res" != no; then :
 
 else
   as_fn_error $? "library 'json-c' is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
+fi
+
+
+# uuid
+for ac_header in uuid/uuid.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "uuid/uuid.h" "ac_cv_header_uuid_uuid_h" "$ac_includes_default"
+if test "x$ac_cv_header_uuid_uuid_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_UUID_UUID_H 1
+_ACEOF
+
+else
+  as_fn_error $? "header file <uuid/uuid.h> is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
+fi
+
+done
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing uuid" >&5
+$as_echo_n "checking for library containing uuid... " >&6; }
+if ${ac_cv_search_uuid+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char uuid ();
+int
+main ()
+{
+return uuid ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' ; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_uuid=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_uuid+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_uuid+:} false; then :
+
+else
+  ac_cv_search_uuid=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_uuid" >&5
+$as_echo "$ac_cv_search_uuid" >&6; }
+ac_res=$ac_cv_search_uuid
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  as_fn_error $? "library 'uuid' is required.
 Check config.log for details. It is possible the compiler isn't looking in the proper directory." "$LINENO" 5
 fi
 
@@ -15198,7 +15356,6 @@ fi
 fi
 
 
-
 if test x"$HAVE_LONG_LONG_INT_64" = xyes ; then
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -16935,7 +17092,11 @@ $as_echo "done" >&6; }
 fi
 
 
-ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global depends/dbcommon/Makefile.global depends/univplan/Makefile.global depends/storage/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global ranger-plugin/Makefile.global"
+ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk src/pl/pljava/src/java/Makefile.global"
+
+ac_config_files="$ac_config_files src/Makefile.global"
+
+ac_config_files="$ac_config_files ranger-plugin/Makefile.global"
 
 
 ac_config_links="$ac_config_links src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION} src/backend/port/pg_shmem.c:${SHMEM_IMPLEMENTATION} src/include/dynloader.h:src/backend/port/dynloader/${template}.h src/include/pg_config_os.h:src/include/port/${template}.h src/Makefile.port:src/makefiles/Makefile.${template}"
@@ -16946,12 +17107,9 @@ ac_config_commands="$ac_config_commands check_win32_symlinks"
 
 fi
 
-# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn & dbcommon & univplan & storage
+# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn
 rm -f depends/libhdfs3/build/libhdfs3_build_timestamp
 rm -f depends/libyarn/build/libyarn_build_timestamp
-rm -f depends/dbcommon/build/dbcommon_build_timestamp
-rm -f depends/univplan/build/univplan_build_timestamp
-rm -f depends/storage/build/storage_build_timestamp
 rm -f depends/thirdparty/gporca_build_timestamp
 rm -f depends/thirdparty/gpos_build_timestamp
 rm -f depends/thirdparty/gp-xerces_build_timestamp
@@ -17666,14 +17824,8 @@ do
     "src/backend/port/tas.s") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/tas.s:src/backend/port/tas/${tas_file}" ;;
     "GNUmakefile") CONFIG_FILES="$CONFIG_FILES GNUmakefile" ;;
     "src/VERSIONS.mk") CONFIG_FILES="$CONFIG_FILES src/VERSIONS.mk" ;;
-    "depends/thirdparty/googletest/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/thirdparty/googletest/Makefile.global" ;;
-    "depends/libhdfs3/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libhdfs3/Makefile.global" ;;
-    "depends/libyarn/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libyarn/Makefile.global" ;;
-    "depends/dbcommon/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/dbcommon/Makefile.global" ;;
-    "depends/univplan/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/univplan/Makefile.global" ;;
-    "depends/storage/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/storage/Makefile.global" ;;
-    "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;
     "src/pl/pljava/src/java/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/pl/pljava/src/java/Makefile.global" ;;
+    "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;
     "ranger-plugin/Makefile.global") CONFIG_FILES="$CONFIG_FILES ranger-plugin/Makefile.global" ;;
     "src/backend/port/dynloader.c") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c" ;;
     "src/backend/port/pg_sema.c") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/pg_sema.c:${SEMA_IMPLEMENTATION}" ;;

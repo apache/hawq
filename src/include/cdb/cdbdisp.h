@@ -60,6 +60,10 @@ typedef struct DispatchCommandQueryParms
 	char		*serializedQueryResource;
 	int			serializedQueryResourcelen;
 	
+  // common plan in google protobuf
+	char		*serializedCommonPlan;
+	int			serializedCommonPlanLen;
+
 	/*
 	 * serialized DTX context string
 	 */

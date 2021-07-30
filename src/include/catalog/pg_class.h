@@ -240,7 +240,8 @@ DESCR("");
  */
 #define		  RELSTORAGE_HEAP	'h'
 #define		  RELSTORAGE_AOROWS	'a'
-#define 	  RELSTORAGE_PARQUET	'p'
+#define     RELSTORAGE_PARQUET	'p'
+#define     RELSTORAGE_ORC  'o'
 #define		  RELSTORAGE_VIRTUAL	'v'
 #define		  RELSTORAGE_EXTERNAL 'x'
 #define		  RELSTORAGE_FOREIGN 'f'
@@ -250,9 +251,9 @@ static inline bool relstorage_is_buffer_pool(char c)
 	return (c == RELSTORAGE_HEAP);
 }
 
-static inline bool relstorage_is_ao(char c)
-{
-	return (c == RELSTORAGE_AOROWS || c == RELSTORAGE_PARQUET);
+static inline bool relstorage_is_ao(char c) {
+  return (c == RELSTORAGE_AOROWS || c == RELSTORAGE_PARQUET ||
+          c == RELSTORAGE_ORC);
 }
 
 static inline bool relstorage_is_aoparquet(char c)

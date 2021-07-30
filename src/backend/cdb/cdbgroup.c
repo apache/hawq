@@ -3981,10 +3981,17 @@ add_second_stage_agg(PlannerInfo *root,
 		pfree(root->simple_rel_array);
 	root->simple_rel_array_size = list_length(parse->rtable) + 1;
 	root->simple_rel_array = (RelOptInfo **)
-		palloc0(root->simple_rel_array_size * sizeof(RelOptInfo *));
-	build_simple_rel(root, 1, RELOPT_BASEREL);
+  palloc0(root->simple_rel_array_size * sizeof(RelOptInfo *));
+  if (root->simple_rte_array) pfree(root->simple_rte_array);
+  root->simple_rte_array = (RangeTblEntry **)palloc0(
+      sizeof(RangeTblEntry *) * root->simple_rel_array_size);
+  ListCell *l;
+  int i = 1;
+  foreach (l, root->parse->rtable)
+    root->simple_rte_array[i++] = lfirst(l);
+  build_simple_rel(root, 1, RELOPT_BASEREL);
 
-	return agg_node;
+  return agg_node;
 }
 
 
@@ -5124,9 +5131,8 @@ rebuild_simple_rel_and_rte(PlannerInfo *root)
 	i = 1;
 	foreach (l, root->parse->rtable)
 	{
-		(void) build_simple_rel(root, i, RELOPT_BASEREL);
-		root->simple_rte_array[i] = lfirst(l);
-		i++;
+	  root->simple_rte_array[i] = lfirst(l);
+		(void) build_simple_rel(root, i++, RELOPT_BASEREL);
 	}
 }
 

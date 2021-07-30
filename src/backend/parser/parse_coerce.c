@@ -202,6 +202,7 @@ coerce_type(ParseState *pstate, Node *node,
 		Const	   *newcon = makeNode(Const);
 		Oid			baseTypeId;
 		int32		baseTypeMod;
+		int32		inputTypeMod;
 		Type		targetType;
 
 		/*
@@ -212,12 +213,18 @@ coerce_type(ParseState *pstate, Node *node,
 		 * what we want here.  The needed check will be applied properly
 		 * inside coerce_to_domain().
 		 */
-		baseTypeMod = -1;
+		baseTypeMod = targetTypeMod;
 		baseTypeId = getBaseTypeAndTypmod(targetTypeId, &baseTypeMod);
+
+		if (baseTypeId == INTERVALOID)
+			inputTypeMod = baseTypeMod;
+		else
+			inputTypeMod = -1;
 
 		targetType = typeidType(baseTypeId);
 
 		newcon->consttype = baseTypeId;
+		newcon->consttypmod = inputTypeMod;
 		newcon->constlen = typeLen(targetType);
 		newcon->constbyval = typeByVal(targetType);
 		newcon->constisnull = con->constisnull;
@@ -234,9 +241,9 @@ coerce_type(ParseState *pstate, Node *node,
 		if (!con->constisnull)
 			newcon->constvalue = stringTypeDatum(targetType,
 											DatumGetCString(con->constvalue),
-												 -1);
+												 inputTypeMod);
 		else
-			newcon->constvalue = stringTypeDatum(targetType, NULL, -1);
+			newcon->constvalue = stringTypeDatum(targetType, NULL, inputTypeMod);
 
 		result = (Node *) newcon;
 

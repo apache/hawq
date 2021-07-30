@@ -27,6 +27,8 @@ include $(top_builddir)/src/Makefile.global
 
 all:
 	${MAKE} -C gpnetbench $@
+	${MAKE} -C tpch $@
+	${MAKE} -C tpcds $@
 
 install :
 	${MAKE} -C bin $@
@@ -34,10 +36,14 @@ install :
 	${MAKE} -C doc $@
 	${MAKE} set_scripts_version
 	${MAKE} -C gpnetbench $@
+	${MAKE} -C tpch $@
+	${MAKE} -C tpcds $@
 
 clean distclean:
 	${MAKE} -C bin $@
 	${MAKE} -C gpnetbench $@
+	${MAKE} -C tpch $@
+	${MAKE} -C tpcds $@
 
 #---------------------------------------------------------------------
 # Set Version

@@ -23,9 +23,9 @@
 #include "catalog/pg_type.h"
 #include "parser/parse_type.h"
 #include "utils/builtins.h"
+#include "utils/lsyscache.h"
 #include "utils/resowner.h"
 #include "utils/syscache.h"
-
 
 /*
  * CreateTemplateTupleDesc
@@ -621,6 +621,61 @@ BuildDescForRelation(List *schema)
 	}
 
 	return desc;
+}
+
+
+/*
+ * BuildSchemaFromDesc
+ *
+ * Given a TupleDesc, build a relation schema (list of ColumnDef nodes).
+ *
+ */
+List *
+BuildSchemaFromDesc(TupleDesc desc)
+{
+  List * schema = NIL;
+  int attno = 0;
+  for (attno = 0; attno < desc->natts; attno++)
+  {
+    ColumnDef *cd = makeNode(ColumnDef);
+    TypeName *tname = NULL;
+    Form_pg_attribute att = desc->attrs[attno];
+
+    cd->is_local = att->attislocal;
+    Type typ = typeidType(att->atttypid);
+    Oid typnamespace = ((Form_pg_type) GETSTRUCT(typ))->typnamespace;
+    char *nspname = get_namespace_name(typnamespace);
+    int arno;
+    char *typstr;
+    int4 ndims = att->attndims;
+    tname = makeNode(TypeName);
+    if (!PointerIsValid(nspname))
+      elog(ERROR, "could not lookup namespace %d", typnamespace);
+    cd->colname = pstrdup(NameStr(att->attname));
+    typstr = typeTypeName(typ);
+    tname->names = list_make2(makeString(nspname),
+                  makeString(typstr));
+    ReleaseType(typ);
+    tname->typmod = att->atttypmod;
+
+    /*
+     * If this is a built in array type, like _int4, then reduce
+     * the array dimensions by 1. This is an annoying postgres
+     * hack which I wish would go away.
+     */
+    if (typstr && typstr[0] == '_' && ndims > 0)
+      ndims--;
+
+    for (arno = 0; arno < ndims; arno++)
+      /* bound of -1 are fine because this has no effect on data */
+      tname->arrayBounds = lappend(tname->arrayBounds,
+                     makeInteger(-1));
+
+    tname->location = -1;
+    cd->typname = tname;
+    schema = lappend(schema, cd);
+  }
+  return schema;
 }
 
 /*

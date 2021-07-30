@@ -100,9 +100,6 @@ fileset = {
     'quicklz1.h':	 [],
     'quicklz3.h':	 [],
     'json-c/json.h':     [],
-    'emmintrin.h':       [],
-    'cdb/cdbhash.h':     [],
-    'cdb/cdbgang.h':     [],
 }
 
 
@@ -121,6 +118,7 @@ for inc_dir in inc_dirs:
                 if m:
                     fileset[fname].append(m.group(1))
 
+thirdparty_path = os.environ.get('DEPENDENCY_PATH','/opt/dependency/package/') + '/include/'
 
 # For all files, check to see if the list of includes is in the list
 missing = False
@@ -147,6 +145,10 @@ for f in keys:
         (d,s) = os.path.split(f)
         if fileset.get(os.path.join(d,i)):
             continue
+
+	# 4. It might be a thirdparty include
+	if os.path.exists(os.path.join(thirdparty_path, i)):
+	    continue
 
         # But if it's not one of those then it's probably a file that we have
         # omitted

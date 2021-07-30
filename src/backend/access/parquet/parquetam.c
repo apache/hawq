@@ -53,7 +53,7 @@ static void initscan(ParquetScanDesc scan);
 static bool SetNextFileSegForRead(ParquetScanDesc scan);
 
 /*get next row group to read*/
-bool getNextRowGroup(ParquetScanDesc scan);
+static bool getNextRowGroup(ParquetScanDesc scan);
 
 /*close current scanning file segments*/
 static void CloseScannedFileSeg(ParquetScanDesc scan);
@@ -328,7 +328,7 @@ void parquet_getnext(ParquetScanDesc scan, ScanDirection direction,
 /*
  * You can think of this scan routine as get next "executor" Parquet rowGroup.
  */
-bool getNextRowGroup(ParquetScanDesc scan)
+static bool getNextRowGroup(ParquetScanDesc scan)
 {
 	if (scan->pqs_need_new_split)
 	{

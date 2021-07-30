@@ -20,41 +20,41 @@ PostgreSQL documentation
 
  <refsynopsisdiv>
 <synopsis>
-GRANT { { SELECT | INSERT | UPDATE | DELETE | REFERENCES | TRIGGER }
+GRANT { { SELECT | INSERT | UPDATE | DELETE | REFERENCES }
     [,...] | ALL [ PRIVILEGES ] }
     ON [ TABLE ] <replaceable class="PARAMETER">tablename</replaceable> [, ...]
-    TO { <replaceable class="PARAMETER">username</replaceable> | GROUP <replaceable class="PARAMETER">groupname</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
+    TO { <replaceable class="PARAMETER">rolename</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
 
 GRANT { { USAGE | SELECT | UPDATE }
     [,...] | ALL [ PRIVILEGES ] }
     ON SEQUENCE <replaceable class="PARAMETER">sequencename</replaceable> [, ...]
-    TO { <replaceable class="PARAMETER">username</replaceable> | GROUP <replaceable class="PARAMETER">groupname</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
+    TO { <replaceable class="PARAMETER">rolename</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
 
 GRANT { { CREATE | CONNECT | TEMPORARY | TEMP } [,...] | ALL [ PRIVILEGES ] }
     ON DATABASE <replaceable>dbname</replaceable> [, ...]
-    TO { <replaceable class="PARAMETER">username</replaceable> | GROUP <replaceable class="PARAMETER">groupname</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
+    TO { <replaceable class="PARAMETER">rolename</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
 
 GRANT { EXECUTE | ALL [ PRIVILEGES ] }
     ON FUNCTION <replaceable>funcname</replaceable> ( [ [ <replaceable class="parameter">argmode</replaceable> ] [ <replaceable class="parameter">argname</replaceable> ] <replaceable class="parameter">argtype</replaceable> [, ...] ] ) [, ...]
-    TO { <replaceable class="PARAMETER">username</replaceable> | GROUP <replaceable class="PARAMETER">groupname</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
+    TO { <replaceable class="PARAMETER">rolename</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
 
 GRANT { USAGE | ALL [ PRIVILEGES ] }
     ON LANGUAGE <replaceable>langname</replaceable> [, ...]
-    TO { <replaceable class="PARAMETER">username</replaceable> | GROUP <replaceable class="PARAMETER">groupname</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
+    TO { <replaceable class="PARAMETER">rolename</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
 
 GRANT { { CREATE | USAGE } [,...] | ALL [ PRIVILEGES ] }
     ON SCHEMA <replaceable>schemaname</replaceable> [, ...]
-    TO { <replaceable class="PARAMETER">username</replaceable> | GROUP <replaceable class="PARAMETER">groupname</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
+    TO { <replaceable class="PARAMETER">rolename</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
 
 GRANT { CREATE | ALL [ PRIVILEGES ] }
     ON TABLESPACE <replaceable>tablespacename</replaceable> [, ...]
-    TO { <replaceable class="PARAMETER">username</replaceable> | GROUP <replaceable class="PARAMETER">groupname</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
+    TO { <replaceable class="PARAMETER">rolename</replaceable> | PUBLIC } [, ...] [ WITH GRANT OPTION ]
 
-GRANT <replaceable class="PARAMETER">role</replaceable> [, ...] TO <replaceable class="PARAMETER">username</replaceable> [, ...] [ WITH ADMIN OPTION ]
+GRANT <replaceable class="PARAMETER">parent_role</replaceable> [, ...] TO <replaceable class="PARAMETER">member_role</replaceable> [, ...] [ WITH ADMIN OPTION ]
 
 GRANT { SELECT | INSERT | ALL [PRIVILEGES] } 
-    ON PROTOCOL <replaceable>protocolname</replaceable> 
-    TO <replaceable class="PARAMETER">username</replaceable>
+    ON PROTOCOL <replaceable>protocolname</replaceable> 
+    TO <replaceable class="PARAMETER">rolename</replaceable>
 
 </synopsis>
  </refsynopsisdiv>
@@ -204,16 +204,6 @@ GRANT { SELECT | INSERT | ALL [PRIVILEGES] }
        To create a foreign key constraint, it is
        necessary to have this privilege on both the referencing and
        referenced tables.
-      </para>
-     </listitem>
-    </varlistentry>
-
-    <varlistentry>
-     <term>TRIGGER</term>
-     <listitem>
-      <para>
-       Allows the creation of a trigger on the specified table.  (See the
-       <xref linkend="sql-createtrigger" endterm="sql-createtrigger-title"> statement.)
       </para>
      </listitem>
     </varlistentry>

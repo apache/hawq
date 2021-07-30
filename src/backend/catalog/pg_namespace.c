@@ -20,6 +20,8 @@
 #include "catalog/indexing.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_database.h"
+#include "utils/acl.h"
+#include "utils/array.h"
 #include "utils/builtins.h"
 #include "utils/rel.h"
 #include "utils/syscache.h"
@@ -98,3 +100,99 @@ NamespaceCreate(const char *nspName, Oid ownerId, Oid forceOid)
 	return nspoid;
 }
 
+/*
+ * Get the catalog entry for an namespace relation tuple.
+ */
+NameSpaceEntry *
+GetNameSpaceEntryFromTuple(
+	Relation		pg_namespace_rel,
+	TupleDesc	pg_namespace_dsc,
+	HeapTuple	tuple,
+	Oid			*namespaceId)
+{
+	Datum		nspid,
+				nspname,
+				nspowner,
+				nspacl,
+				nspdboid;
+
+	bool		isNull;
+
+	NameSpaceEntry *nspentry;
+
+	nspentry = (NameSpaceEntry *) palloc0(sizeof(NameSpaceEntry));
+
+	nspid = heap_getattr(tuple,
+							 Anum_pg_namespace_oid,
+							 pg_namespace_dsc,
+							 &isNull);
+
+	if(isNull)
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				 errmsg("got invalid relid value: NULL")));
+
+	/* get the nspname */
+	nspname = heap_getattr(tuple,
+							 Anum_pg_namespace_nspname,
+							 pg_namespace_dsc,
+							 &isNull);
+
+	if(isNull)
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				 errmsg("got invalid relid value: NULL")));
+	nspentry->nspname = DatumGetCString(nspname);
+
+	/* get the nspowner */
+	nspowner = heap_getattr(tuple,
+							 Anum_pg_namespace_nspowner,
+							 pg_namespace_dsc,
+							 &isNull);
+	if(isNull)
+		ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT),
+				 errmsg("got invalid relid value: NULL")));
+	nspentry->nspowner = DatumGetObjectId(nspowner);
+
+	/* get the nspacl */
+	nspacl = heap_getattr(tuple,
+						   Anum_pg_namespace_nspacl,
+						   pg_namespace_dsc,
+						   &isNull);
+
+	if (!isNull)
+	{
+		Datum	   *elems;
+		int			nelems;
+		int			i;
+		char*		acl_str = NULL;
+
+		deconstruct_array(DatumGetArrayTypeP(nspacl),
+						  ACLITEMOID, sizeof(AclItem), false, 'i',
+						  &elems, NULL, &nelems);
+
+		for (i = 0; i < nelems; i++)
+		{
+			acl_str = DatumGetCString(DirectFunctionCall1(aclitemout, elems[i]));
+
+			/* append to a list of Value nodes, size nelems */
+			nspentry->nspacl = lappend(nspentry->nspacl, makeString(pstrdup(acl_str)));
+		}
+	} else {
+		nspentry->nspacl = NULL;
+	}
+
+
+	/* get the nspdboid */
+	nspdboid = heap_getattr(tuple,
+						   Anum_pg_namespace_nspdboid,
+						   pg_namespace_dsc,
+						   &isNull);
+	nspentry->nspdboid = DatumGetObjectId(nspdboid);
+
+
+    *namespaceId = DatumGetObjectId(nspid);
+
+	return nspentry;
+}

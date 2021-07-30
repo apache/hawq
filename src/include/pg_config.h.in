@@ -39,6 +39,9 @@
 /* Define to the default TCP port number as a string constant. */
 #undef DEF_PGPORT_STR
 
+/* Define to 1 to build with coverage enabled. (--enable-coverage) */
+#undef ENABLE_COVERAGE
+
 /* Define to 1 to enable DTrace support. (--enable-dtrace) */
 #undef ENABLE_DTRACE
 
@@ -220,9 +223,6 @@
 /* Define to 1 if you have the <gssapi.h> header file. */
 #undef HAVE_GSSAPI_H
 
-/* Define to 1 if you have the <hdfs/hdfs.h> header file. */
-#undef HAVE_HDFS_HDFS_H
-
 /* Define to 1 if you have the <history.h> header file. */
 #undef HAVE_HISTORY_H
 
@@ -263,7 +263,7 @@
 #undef HAVE_ISINF
 
 /* Define to 1 if you have the <json-c/json.h> header file. */
-#undef HAVE_JSON_JSON_H
+#undef HAVE_JSON_C_JSON_H
 
 /* Define to 1 if you have the <kernel/image.h> header file. */
 #undef HAVE_KERNEL_IMAGE_H
@@ -336,9 +336,6 @@
 
 /* Define to 1 if you have the `wldap32' library (-lwldap32). */
 #undef HAVE_LIBWLDAP32
-
-/* Define to 1 if you have the <libyarn/LibYarnClientC.h> header file. */
-#undef HAVE_LIBYARN_LIBYARNCLIENTC_H
 
 /* Define to 1 if you have the `z' library (-lz). */
 #undef HAVE_LIBZ
@@ -668,6 +665,9 @@
 /* Define to 1 if you have the <utime.h> header file. */
 #undef HAVE_UTIME_H
 
+/* Define to 1 if you have the <uuid/uuid.h> header file. */
+#undef HAVE_UUID_UUID_H
+
 /* Define to 1 if you have the `vsnprintf' function. */
 #undef HAVE_VSNPRINTF
 
@@ -686,14 +686,14 @@
 /* Define to 1 if you have the <winldap.h> header file. */
 #undef HAVE_WINLDAP_H
 
+/* Define to 1 if you have the <yaml.h> header file. */
+#undef HAVE_YAML_H
+
 /* Define to 1 if you have __cpuid. */
 #undef HAVE__CPUID
 
 /* Define to 1 if you have __get_cpuid. */
 #undef HAVE__GET_CPUID
-
-/* Define to 1 if you have the <yaml.h> header file. */
-#undef HAVE_YAML_H
 
 /* HAWQ major version as a string */
 #undef HQ_MAJORVERSION
@@ -805,9 +805,6 @@
 /* Define to 1 to build with plan forcing capabilities. (--enable-forceplan)
    */
 #undef USE_FORCE_PLAN
-
-/* Define to 1 to build with gphdfs capabilities. (--enable-gphdfs) */
-#undef USE_GPHDFS
 
 /* Define to 1 if you want 64-bit integer timestamp and interval support.
    (--enable-integer-datetimes) */

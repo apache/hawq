@@ -2242,7 +2242,14 @@ static Plan *plan_sequential_window_query(PlannerInfo *root, WindowContext *cont
 	root->simple_rel_array_size = list_length(root->parse->rtable) + 1;
 	root->simple_rel_array = (RelOptInfo **)
 		palloc0(root->simple_rel_array_size * sizeof(RelOptInfo *));
-	add_base_rels_to_query(root, (Node *)root->parse->jointree);
+  if (root->simple_rte_array) pfree(root->simple_rte_array);
+  root->simple_rte_array = (RangeTblEntry **)palloc0(
+      sizeof(RangeTblEntry *) * root->simple_rel_array_size);
+  int i = 1;
+  ListCell *l;
+  foreach (l, root->parse->rtable)
+    root->simple_rte_array[i++] = lfirst(l);
+  add_base_rels_to_query(root, (Node *)root->parse->jointree);
 
 	/* XXX I don't think the quals are used later so no need to translate. 
 	 *     They would either be empty or represent a join on the last

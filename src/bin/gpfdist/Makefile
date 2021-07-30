@@ -20,15 +20,14 @@ subdir = src/bin/gpfdist
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
-#LIBS := -levent -lyaml -lz -lbz2 -lssl -lcrypto
-LIBS := $(LDFLAGS) -levent -lyaml -lz -lbz2 -lssl -lcrypto
+LIBS := -levent -lyaml -lz -lbz2 -lssl -lcrypto
 ifeq ($(BUILD_TYPE), gcov)
 LIBS   := -lgcov $(LIBS)
 CFLAGS := -fprofile-arcs -ftest-coverage $(CFLAGS)
 endif
 
 code_dir     = $(CURDIR)/src/gpfdist/
-GPFDISTFILES = fstream.c gfile.c gpfdist.c transform.c
+GPFDISTFILES = fstream.c gfile.c gpfdist.c transform.c gpfdist_helper.c
 OBJS         = $(subst .c,.o,$(GPFDISTFILES))
 
 SHELL=bash
@@ -42,6 +41,13 @@ GPFXDIST=-DGPFXDIST
 INCLUDES := $$($(APR_CFG) --includes) -I$(code_dir) -I$(CURDIR)/../../../src/include $(INCLUDES)
 CFLAGS   := $$($(APR_CFG) --cflags) -Wall $(GPFXDIST) $(CFLAGS)
 LIBS     := $$($(APR_CFG) --link-ld --libs) $(LIBS)
+
+# workaround for 'brew link openssl --force' error on MacOS 10.12
+UNAME = $(shell uname)
+ifeq (Darwin, $(UNAME))
+	INCLUDES := $(INCLUDES) -I/usr/local/opt/openssl/include
+	LIBS := $(LIBS) -L/usr/local/opt/openssl/lib
+endif
 
 sol10_sparc_32_CPPFLAGS = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 sol9_sparc_32_CPPFLAGS  = -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
@@ -60,11 +66,11 @@ mkgpfdist: mkdir
 	#perl -p -i -e 's,^prefix=.*$$,prefix="$(APR_DIR)",' $(APR_CFG)
 
 	for file in $(GPFDISTFILES); do \
-	    ( $(CC) $(INCLUDES) $(CFLAGS) $(LIBS) -c $(code_dir)$${file}); \
+	    ( $(CC) $(CFLAGS) $(INCLUDES) $(LIBS) -c $(code_dir)$${file}); \
 	    if [[ $$? -ne 0 ]]; then exit 1; fi \
 	done
 	# link
-	$(CC) $(CFLAGS) -o $(code_dir)gpfdist $(OBJS)  $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(code_dir)gpfdist $(OBJS)  $(LIBS)
 
 	mkdir -p build/bin
 	mv -f src/gpfdist/gpfdist build/bin/
@@ -72,7 +78,7 @@ mkgpfdist: mkdir
 mkdir:
 	@mkdir -p build/bin
 
-clean: 
+clean distclean: 
 	rm -rf build
 	find . -name '*.o' -exec rm -f {} \;
 

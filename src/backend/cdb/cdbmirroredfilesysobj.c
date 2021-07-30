@@ -37,27 +37,28 @@
 #include <signal.h>
 
 #include "cdb/cdbmirroredfilesysobj.h"
-#include "storage/smgr.h"
+
+#include "catalog/catalog.h"
+#include "catalog/gp_persistent.h"
 #include "catalog/pg_tablespace.h"
 #include "catalog/pg_database.h"
-#include "catalog/gp_persistent.h"
-#include "cdb/cdbpersistentdatabase.h"
-#include "cdb/cdbpersistenttablespace.h"
-#include "cdb/cdbpersistentfilespace.h"
-#include "cdb/cdbpersistentrelation.h"
-#include "cdb/cdbutil.h"
-#include "storage/lwlock.h"
-#include "miscadmin.h"
-#include "postmaster/primary_mirror_mode.h"
 #include "cdb/cdbfilerep.h"
-#include "catalog/catalog.h"
-#include "cdb/cdbpersistentfilesysobj.h"
-#include "utils/guc.h"
 #include "cdb/cdbmirroredappendonly.h"
+#include "cdb/cdbpersistentdatabase.h"
+#include "cdb/cdbpersistentfilespace.h"
+#include "cdb/cdbpersistentfilesysobj.h"
+#include "cdb/cdbpersistentrelation.h"
+#include "cdb/cdbpersistenttablespace.h"
+#include "cdb/cdbutil.h"
+#include "cdb/cdbvars.h"
 #include "commands/filespace.h"
 #include "commands/tablespace.h"
-
-#include "cdb/cdbvars.h"
+#include "miscadmin.h"
+#include "postmaster/primary_mirror_mode.h"
+#include "storage/lwlock.h"
+#include "storage/smgr.h"
+#include "utils/acl.h"
+#include "utils/guc.h"
 
 void MirroredFileSysObj_TransactionCreateFilespaceDir(
 	Oid					filespaceOid,
@@ -281,6 +282,30 @@ void MirroredFileSysObj_ScheduleDropDbDir(
 					persistentSerialNum,
 					sharedStorage);
 
+}
+
+void scheduleDropDbExtDir(char *dbname)
+{
+	char *path = NULL;
+	char *fileSpacePath = NULL;
+	Oid dtsoid = get_database_dts(MyDatabaseId);
+
+	/* Path needed to be removed are only in pg_default or hdfs path,
+	 * Other local path is forbidden to be stored data on */
+	if (IsBuiltinTablespace(dtsoid)) {
+		return;
+	}
+
+	GetFilespacePathForTablespace(dtsoid, &fileSpacePath);
+	char *tblspace = getTablespaceNameFromOid(dtsoid);
+
+	int len = strlen(fileSpacePath) + strlen(tblspace) + strlen(dbname) + 3;
+	path = palloc0(sizeof(char) * len);
+
+	sprintf(path, "%s/%s/%s", fileSpacePath, tblspace, dbname);
+
+	RemovePath(path, 1);
+	pfree(path);
 }
 
 void MirroredFileSysObj_DropDbDir(

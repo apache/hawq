@@ -100,6 +100,9 @@ extern void fmgr_info_cxt(Oid functionId, FmgrInfo *finfo,
 extern void fmgr_info_copy(FmgrInfo *dstinfo, FmgrInfo *srcinfo,
 			   MemoryContext destcxt);
 
+extern bool get_fn_expr_arg_stable(FmgrInfo *flinfo, int argnum);
+extern bool get_call_expr_arg_stable(fmNodePtr expr, int argnum);
+
 /*
  * This macro initializes all the fields of a FunctionCallInfoData except
  * for the arg[] and argnull[] arrays.	Performance testing has shown that
@@ -627,6 +630,8 @@ extern PGFunction lookup_external_function(void *filehandle, char *funcname);
 extern void load_file(const char *filename, bool restricted);
 extern void **find_rendezvous_variable(const char *varName);
 
+/* AggCheckCallContext can return one of the following codes, or 0: */
+#define AGG_CONTEXT_AGGREGATE 1   /* regular aggregate */
 
 #endif   /* FMGR_H */
 

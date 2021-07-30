@@ -18,7 +18,6 @@
  */
 
 #include <pthread.h>
-#include <vector>
 
 #include "rpc/RpcAuth.h"
 #include "common/XmlConfig.h"
@@ -45,10 +44,10 @@ ApplicationMaster::ApplicationMaster(string &schedHost, string &schedPort,
     rmConfInfos = RMInfo::getHARMInfo(*conf, YARN_RESOURCEMANAGER_SCHEDULER_HA);
 
     /* build a list of candidate RMs without duplicate */
-    for (std::vector<RMInfo>::iterator it = rmConfInfos.begin();
+    for (vector<RMInfo>::iterator it = rmConfInfos.begin();
             it != rmConfInfos.end(); it++) {
         bool found = false;
-        for (std::vector<RMInfo>::iterator it2 = rmInfos.begin();
+        for (vector<RMInfo>::iterator it2 = rmInfos.begin();
                 it2 != rmInfos.end(); it2++) {
             if (it2->getHost() == it->getHost()
                     && it2->getPort() == it->getPort()) {

@@ -28,6 +28,7 @@
 #include "postgres.h"
 #include "miscadmin.h"
 #include "optimizer/clauses.h"
+#include "optimizer/cost.h"
 #include "optimizer/pathnode.h"
 #include "nodes/primnodes.h"
 #include "nodes/parsenodes.h"
@@ -184,6 +185,7 @@ cdbparallelize(PlannerInfo *root,
 						   && plan->initPlan == NULL )
 	{
 		Assert(plan->dispatch != DISPATCH_PARALLEL);
+		plan->dispatch = DISPATCH_SEQUENTIAL;
 		return plan;
 	}
 
@@ -493,10 +495,13 @@ static Node* ParallelizeCorrelatedSubPlanMutator(Node *node, ParallelizeCorrelat
 		}
 	}
 	
-	if (IsA(node, SeqScan)
+	if ((IsA(node, SeqScan)
 		|| IsA(node, AppendOnlyScan)
 		|| IsA(node, ParquetScan)
-		|| IsA(node, ShareInputScan))
+		|| IsA(node, ShareInputScan)
+		|| IsA(node, MagmaIndexScan)
+		|| IsA(node, MagmaIndexOnlyScan)
+		|| IsA(node, ExternalScan)) && planner_segment_count() != 1)
 	{
 		Plan *scanPlan = (Plan *) node;
 		/**
@@ -1398,6 +1403,8 @@ motion_sanity_walker(Node *node, sanity_result_t *result)
 		case T_Append:
 		case T_SeqScan:
 		case T_ExternalScan:
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
 		case T_AppendOnlyScan:
 		case T_ParquetScan:
 		case T_IndexScan:

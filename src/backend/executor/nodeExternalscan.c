@@ -40,7 +40,9 @@
 #include "access/filesplit.h"
 #include "access/heapam.h"
 #include "access/plugstorage.h"
+#include "access/xact.h"
 #include "cdb/cdbvars.h"
+#include "cdb/cdbdatalocality.h"
 #include "executor/execdebug.h"
 #include "executor/nodeExternalscan.h"
 #include "utils/lsyscache.h"
@@ -159,8 +161,8 @@ ExternalNext(ExternalScanState *node)
 	    /*
 	     * CDB: Label each row with a synthetic ctid if needed for subquery dedup.
 	     */
-	    if (node->cdb_want_ctid &&
-	        !TupIsNull(slot))
+
+	    if (node->cdb_want_ctid && !TupIsNull(slot))
 	    {
 	    	slot_set_ctid_from_fake(slot, &node->cdb_fake_ctid);
 	    }
@@ -240,6 +242,32 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 	externalstate->ss.ps.qual = (List *)
 		ExecInitExpr((Expr *) node->scan.plan.qual,
 					 (PlanState *) externalstate);
+	if (nodeTag(node) == T_ExternalScan)
+	{
+		externalstate->type = NormalExternalScan;
+	}
+	else
+	{
+		switch (nodeTag(node))
+		{
+			case T_MagmaIndexScan:
+				externalstate->type = ExternalIndexScan;
+				break;
+			case T_MagmaIndexOnlyScan:
+				externalstate->type = ExternalIndexOnlyScan;
+				break;
+			default:
+				elog(ERROR, "unknown external node type.");
+				break;
+		}
+		/* add for magma index */
+		externalstate->indexname = node->indexname;
+		externalstate->indexorderdir = node->indexorderdir;
+		/* index qual */
+		externalstate->indexqual = (List *)
+			ExecInitExpr((Expr *) node->indexqualorig,
+						 (PlanState *)externalstate);
+	}
 
 	/* Check if targetlist or qual contains a var node referencing the ctid column */
 	externalstate->cdb_want_ctid = contain_ctid_var_reference(&node->scan);
@@ -268,13 +296,20 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 		segfileinfo = NULL;
 	}
 
-	externalstate->ss.splits = GetFileSplitsOfSegment(estate->es_plannedstmt->scantable_splits,
-	                                                  currentRelation->rd_id,
-	                                                  GetQEIndex());
+	externalstate->ss.splits = GetFileSplitsOfSegment(
+								   estate->es_plannedstmt->scantable_splits,
+								   currentRelation->rd_id,
+								   GetQEIndex());
+	if (dataStoredInHive(currentRelation)) {
+    node->hiveUrl = pstrdup((estate->es_plannedstmt->hiveUrl));
+	}
+
+	char *serializeSchema = NULL;
+	int serializeSchemaLen = 0;
 
 	int   formatterType = ExternalTableType_Invalid;
 	char *formatterName = NULL;
-	getExternalTableTypeInList(node->fmtType, node->fmtOpts,
+	getExternalTableTypeList(node->fmtType, node->fmtOpts,
 	                         &formatterType, &formatterName);
 
 	if (formatterType == ExternalTableType_Invalid)
@@ -298,12 +333,29 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 			FmgrInfo beginScanFunc;
 			fmgr_info(procOid, &beginScanFunc);
 
-			currentScanDesc = InvokePlugStorageFormatBeginScan(&beginScanFunc,
-			                                                   node,
-			                                                   &(externalstate->ss),
-			                                                   currentRelation,
-			                                                   formatterType,
-			                                                   formatterName);
+      if (pg_strncasecmp(formatterName, "magma",
+                         strlen("magma")) == 0) {
+        GetMagmaSchemaByRelid(
+            estate->es_plannedstmt->scantable_splits,
+            currentRelation->rd_id, &serializeSchema,
+            &serializeSchemaLen);
+        if (externalstate->cdb_want_ctid &&
+            estate->es_plannedstmt->commandType !=
+                CMD_SELECT &&
+            estate->es_plannedstmt->commandType != CMD_INSERT)
+          externalstate->cdb_want_ctid = false;
+      }
+
+      currentScanDesc = InvokePlugStorageFormatBeginScan(&beginScanFunc,
+                                       estate->es_plannedstmt,
+                                       node,
+                                       &(externalstate->ss),
+                                       serializeSchema,
+                                       serializeSchemaLen,
+                                       currentRelation,
+                                       formatterType,
+                                       formatterName,
+                                       PlugStorageGetTransactionSnapshot());
 		}
 		else
 		{
@@ -399,16 +451,12 @@ ExecEndExternalScan(ExternalScanState *node)
 void
 ExecStopExternalScan(ExternalScanState *node)
 {
-	FileScanDesc fileScanDesc;
-
-	/*
-	 * get information from node
-	 */
-	fileScanDesc = node->ess_ScanDesc;
-
 	/*
 	 * stop the file scan
 	 */
+	FileScanDesc fileScanDesc = node->ess_ScanDesc;
+	TupleTableSlot *slot = node->ss.ss_ScanTupleSlot;
+
 	if (fileScanDesc->fs_formatter_type == ExternalTableType_Invalid)
 	{
 		elog(ERROR, "invalid formatter type for external table: %s", __func__);
@@ -423,7 +471,7 @@ ExecStopExternalScan(ExternalScanState *node)
 
 		if (stopScanFunc)
 		{
-			InvokePlugStorageFormatStopScan(stopScanFunc, fileScanDesc);
+			InvokePlugStorageFormatStopScan(stopScanFunc, fileScanDesc, slot);
 		}
 		else
 		{
@@ -497,7 +545,8 @@ ExecExternalReScan(ExternalScanState *node, ExprContext *exprCtxt)
 void
 initGpmonPktForExternalScan(Plan *planNode, gpmon_packet_t *gpmon_pkt, EState *estate)
 {
-	Assert(planNode != NULL && gpmon_pkt != NULL && IsA(planNode, ExternalScan));
+	Assert(planNode != NULL && gpmon_pkt != NULL && (IsA(planNode, ExternalScan) || IsA(planNode, MagmaIndexScan)
+			|| IsA(planNode, MagmaIndexOnlyScan)));
 
 	{
 		RangeTblEntry *rte = rt_fetch(((ExternalScan *)planNode)->scan.scanrelid,

@@ -76,7 +76,11 @@ typedef enum
 	RUN_AS_SERVICE_COMMAND
 } CtlCommand;
 
-#define DEFAULT_WAIT	60
+#ifdef ENABLE_COVERAGE
+#define DEFAULT_WAIT	6000
+#else
+#define DEFAULT_WAIT  60
+#endif
 
 static bool do_wait = false;
 static bool wait_set = false;

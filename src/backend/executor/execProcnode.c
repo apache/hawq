@@ -147,7 +147,6 @@
 #include "utils/debugbreak.h"
 #include "pg_trace.h"
 
-VectorExecMthd vmthd = {};
 #ifdef CDB_TRACE_EXECUTOR
 #include "nodes/print.h"
 static void ExecCdbTraceNode(PlanState *node, bool entry, TupleTableSlot *result);
@@ -271,22 +270,6 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 		}
 	}
 
-
-	/*
-    * If the plan node can be vectorized and vectorized is enable, enter the
-    * vectorized execution operators.
-    */
-	if(vmthd.vectorized_executor_enable
-	   && vmthd.ExecInitNode_Hook
-	   && node->vectorized
-	   && (result = vmthd.ExecInitNode_Hook(node,estate,eflags,isAlienPlanNode,&curMemoryAccount)))
-	{
-
-		SAVE_EXECUTOR_MEMORY_ACCOUNT(result, curMemoryAccount);
-		return result;
-	}
-
-
 	switch (nodeTag(node))
 	{
 			/*
@@ -378,6 +361,8 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 			break;
 
 		case T_ExternalScan:
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
 			curMemoryAccount = CREATE_EXECUTOR_MEMORY_ACCOUNT(isAlienPlanNode, node, ExternalScan);
 
 			START_MEMORY_ACCOUNT(curMemoryAccount);
@@ -766,13 +751,10 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 	if (estate->es_instrument && result != NULL) {
 		result->instrument = InstrAlloc(1);
 	}
-
 	if (result != NULL)
 	{
 		SAVE_EXECUTOR_MEMORY_ACCOUNT(result, curMemoryAccount);
 	}
-
-
 	return result;
 }
 
@@ -817,7 +799,7 @@ ExecSliceDependencyNode(PlanState *node)
 	ExecSliceDependencyNode(outerPlanState(node));
 	ExecSliceDependencyNode(innerPlanState(node));
 }
-
+    
 /* ----------------------------------------------------------------
  *		ExecProcNode
  *
@@ -873,7 +855,10 @@ ExecProcNode(PlanState *node)
 		&&Exec_Jmp_SplitUpdate,
 		&&Exec_Jmp_RowTrigger,
 		&&Exec_Jmp_AssertOp,
-		&&Exec_Jmp_PartitionSelector
+		&&Exec_Jmp_PartitionSelector,
+		&&Exec_Jmp_MagmaIndexScan,
+		&&Exec_Jmp_MagmaIndexOnlyScan,
+		&&Exec_Jmp_MagmaBitmapScan,
 	};
 
 	COMPILE_ASSERT((T_Plan_End - T_Plan_Start) == (T_PlanState_End - T_PlanState_Start));
@@ -905,13 +890,6 @@ ExecProcNode(PlanState *node)
 		CheckSendPlanStateGpmonPkt(node);
 
 	Assert(nodeTag(node) >= T_PlanState_Start && nodeTag(node) < T_PlanState_End);
-
-	if(vmthd.vectorized_executor_enable
-	   && node->plan->vectorized
-	   && vmthd.ExecProcNode_Hook
-	   && vmthd.ExecProcNode_Hook(node,&result))
-		goto Exec_Jmp_Done;
-
 	goto *ExecJmpTbl[nodeTag(node) - T_PlanState_Start];
 
 Exec_Jmp_Result:
@@ -1055,6 +1033,18 @@ Exec_Jmp_AssertOp:
 
 Exec_Jmp_PartitionSelector:
 	result = ExecPartitionSelector((PartitionSelectorState *) node);
+	goto Exec_Jmp_Done;
+
+Exec_Jmp_MagmaIndexScan:
+	result = ExecExternalScan((ExternalScanState *) node);
+	goto Exec_Jmp_Done;
+
+Exec_Jmp_MagmaIndexOnlyScan:
+	result = ExecExternalScan((ExternalScanState *) node);
+	goto Exec_Jmp_Done;
+
+Exec_Jmp_MagmaBitmapScan:
+	/* Todo: should to create magmabitmapscannode */
 	goto Exec_Jmp_Done;
 
 Exec_Jmp_Done:
@@ -1365,6 +1355,8 @@ ExecCountSlotsNode(Plan *node)
 			return ExecCountSlotsDynamicTableScan((DynamicTableScan *) node);
 
 		case T_ExternalScan:
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
 			return ExecCountSlotsExternalScan((ExternalScan *) node);
 
 		case T_IndexScan:
@@ -1593,17 +1585,6 @@ ExecEndNode(PlanState *node)
         node->cdbexplainbuf = NULL;
     }
 
-	if(vmthd.vectorized_executor_enable
-	   && node->vectorized
-	   && vmthd.ExecEndNode_Hook
-	   && vmthd.ExecEndNode_Hook(node))
-	{
-		estate->currentSliceIdInPlan = origSliceIdInPlan;
-		estate->currentExecutingSliceId = origExecutingSliceId;
-
-		return ;
-	}
-
     switch (nodeTag(node))
 	{
 			/*
@@ -1655,6 +1636,8 @@ ExecEndNode(PlanState *node)
 			break;
 
 		case T_ExternalScanState:
+		case T_MagmaIndexScanState:
+		case T_MagmaIndexOnlyScanState:
 			ExecEndExternalScan((ExternalScanState *) node);
 			break;
 

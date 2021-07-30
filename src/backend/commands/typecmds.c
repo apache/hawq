@@ -42,10 +42,10 @@
 #include "catalog/pg_compression.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_depend.h"
-#include "catalog/pg_exttable.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_type_encoding.h"
+#include "catalog/pg_exttable.h"
 #include "commands/defrem.h"
 #include "commands/tablecmds.h"
 #include "commands/typecmds.h"
@@ -951,7 +951,8 @@ DefineDomain(CreateDomainStmt *stmt)
 
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	              errmsg("Cannot support DefineDomain")));
 	}
 }
 
@@ -1307,7 +1308,8 @@ DefineCompositeType(const RangeVar *typevar, List *coldeflist, Oid relOid, Oid c
 	 * finally create the relation...
 	 */
 	return  DefineRelation(createStmt, RELKIND_COMPOSITE_TYPE,
-		                       RELSTORAGE_VIRTUAL, NonCustomFormatType);
+	                       RELSTORAGE_VIRTUAL, NULL);
+
 	/*
 	 * DefineRelation already dispatches this.
 	 *

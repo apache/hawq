@@ -515,7 +515,7 @@ SysLoggerMain(int argc, char *argv[])
 						/* Add a '\0' terminator */
 						*msgEnd = '\0';
 
-						elog(LOG, "3rd party error log:\n%s%c", (char *)chunk, lastChar);
+						elog(LOG, "\n%s%c", (char *)chunk, lastChar);
 
 						/* remember to free this chunk */
 						chunk->hdr.pid = 0;
@@ -530,7 +530,7 @@ SysLoggerMain(int argc, char *argv[])
 						 * write the message.
 						 */
 						if (msgEnd != (char *)chunk)
-							elog(LOG, "3rd party error log:\n%s", (char *)chunk);
+							elog(LOG, "\n%s", (char *)chunk);
 						else
 						{
 							/* A 3rd party error starts with bytes '0', ignore this bytes. */

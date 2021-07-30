@@ -297,6 +297,13 @@ RemoveSchema_internal(const char *schemaName, DropBehavior behavior,
 
 	performDeletion(&object, behavior);
 
+	/**
+	 * Delete the schema folder if exist for external table.
+	 * Since there may exist external tables in the schema, the schema folder
+	 * should be deleted after external tables are deleted.
+	 */
+	postRemoveSchema(schemaName);
+
 	/* MPP-6929: metadata tracking */
 	if (!is_internal && Gp_role == GP_ROLE_DISPATCH)
 		MetaTrackDropObject(NamespaceRelationId, namespaceId);

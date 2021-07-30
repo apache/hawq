@@ -905,6 +905,7 @@ _equalAlterTableStmt(AlterTableStmt *a, AlterTableStmt *b)
 	COMPARE_NODE_FIELD(relation);
 	COMPARE_NODE_FIELD(cmds);
 	COMPARE_SCALAR_FIELD(relkind);
+	COMPARE_SCALAR_FIELD(greenWay);
 	
 	/* No need to compare AT workspace fields.  */
 
@@ -942,6 +943,7 @@ _equalAlterPartitionCmd(AlterPartitionCmd *a, AlterPartitionCmd *b)
 	COMPARE_NODE_FIELD(arg2);
 	COMPARE_NODE_FIELD(scantable_splits);
 	COMPARE_NODE_FIELD(newpart_aosegnos);
+	COMPARE_STRING_FIELD(format);
 	return true;
 }
 
@@ -2020,6 +2022,7 @@ _equalFuncCall(FuncCall *a, FuncCall *b)
     COMPARE_NODE_FIELD(agg_order);
 	COMPARE_SCALAR_FIELD(agg_star);
 	COMPARE_SCALAR_FIELD(agg_distinct);
+	COMPARE_SCALAR_FIELD(func_variadic);
 	COMPARE_NODE_FIELD(over);
 	COMPARE_SCALAR_FIELD(location);
 	COMPARE_NODE_FIELD(agg_filter);

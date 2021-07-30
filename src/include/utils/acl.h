@@ -335,6 +335,7 @@ extern char *getForeignServerNameFromOid(Oid object_oid);
 extern char *getExtprotocolNameFromOid(Oid object_oid);
 extern List *getActionName(AclMode mask);
 extern char *getRoleName(Oid role_id);
+extern char *getIndexNameByOid(Oid object_oid);
 
 extern void aclcheck_error(AclResult aclerr, AclObjectKind objectkind,
 			   const char *objectname);

@@ -36,6 +36,7 @@
 #include <math.h>
 
 #include "catalog/pg_operator.h"
+#include "catalog/catquery.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
 #include "optimizer/clauses.h"              /* contain_mutable_functions() */
@@ -49,6 +50,7 @@
 #include "utils/memutils.h"
 #include "utils/selfuncs.h"
 #include "utils/syscache.h"
+#include "utils/hawq_type_mapping.h"
 
 #include "cdb/cdbpath.h"        /* cdb_join_motion() etc */
 
@@ -241,6 +243,8 @@ pathnode_walk_kids(Path            *path,
     {
             case T_SeqScan:
             case T_ExternalScan:
+            case T_MagmaIndexScan:
+            case T_MagmaIndexOnlyScan:
             case T_AppendOnlyScan:
             case T_ParquetScan:
             case T_IndexScan:
@@ -1241,7 +1245,11 @@ create_index_path(PlannerInfo *root,
 		indexscandir = NoMovementScanDirection;
 	}
 
-	pathnode->path.pathtype = T_IndexScan;
+	if (index->rel->ext == RELSTORAGE_EXTERNAL)
+		pathnode->path.pathtype = index->indexonly ?
+				T_MagmaIndexOnlyScan : T_MagmaIndexScan;
+	else
+		pathnode->path.pathtype = T_IndexScan;
 	pathnode->path.parent = rel;
 	pathnode->path.pathkeys = pathkeys;
 
@@ -1323,7 +1331,11 @@ create_bitmap_heap_path(PlannerInfo *root,
 {
 	BitmapHeapPath *pathnode = makeNode(BitmapHeapPath);
 
-	pathnode->path.pathtype = T_BitmapHeapScan;
+	if (rel->ext == RELSTORAGE_EXTERNAL)
+			pathnode->path.pathtype = T_MagmaBitmapScan;
+	else
+			pathnode->path.pathtype = T_BitmapHeapScan;
+
 	pathnode->path.parent = rel;
 	pathnode->path.pathkeys = NIL;		/* always unordered */
 

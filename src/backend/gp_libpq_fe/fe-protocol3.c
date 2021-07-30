@@ -190,24 +190,21 @@ pqParseInput3(PGconn *conn)
 			if (pqGetInt(&(conn->motion_listener), 4, conn))
 				return;
 
+			if (pqGetInt(&(conn->my_listener), 4, conn))
+				return;
+
 			if (pqGetInt64(&(conn->mop_high_watermark), conn))
 				return;
-
-			if (pqGetInt(&version_len, 4, conn))
-				return;
-
-			if (conn->qe_version != NULL && version_len > 0)
-			{
-				free(conn->qe_version);
-				conn->qe_version = NULL;
-			}
-			conn->qe_version = malloc(version_len);
-
-			if (conn->qe_version == NULL)
-				return;
-
-			if (pqGetnchar(conn->qe_version, version_len, conn))
-				return;
+		}
+		else if (id == 'V') {
+		  if (conn->asyncStatus == PGASYNC_READY) return;
+		  if (!enlargePQExpBuffer(&conn->dispBuffer, msgLength))
+		    return;
+		  if (pqGetnchar(conn->dispBuffer.data, msgLength, conn))
+		    return;
+		  conn->dispBuffer.len = msgLength;
+		  if (conn->asyncStatus != PGASYNC_IDLE)
+		    conn->asyncStatus = PGASYNC_READY;
 		}
 		else if (conn->asyncStatus != PGASYNC_BUSY)
 		{

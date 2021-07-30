@@ -383,7 +383,39 @@ plan_tree_mutator(Node *node,
 				return (Node *) newidxscan;
 			}
 			break;
-			
+		
+		case T_MagmaIndexScan:
+		{
+			MagmaIndexScan  *idxscan = (MagmaIndexScan *) node;
+			MagmaIndexScan  *newidxscan;
+
+			FLATCOPY(newidxscan, idxscan, MagmaIndexScan);
+			SCANMUTATE(newidxscan, idxscan);
+			MUTATE(newidxscan->indexqualorig, idxscan->indexqualorig, List *);
+			MUTATE(newidxscan->uriList, idxscan->uriList, List *);
+			MUTATE(newidxscan->fmtOpts, idxscan->fmtOpts, List *);
+			// MUTATE(newidxscan->indexname, idxscan->indexname, char*);
+			newidxscan->fmtType = idxscan->fmtType;
+			return (Node *) newidxscan;
+		}
+		break;
+
+		case T_MagmaIndexOnlyScan:
+		{
+			MagmaIndexOnlyScan  *idxscan = (MagmaIndexOnlyScan *) node;
+			MagmaIndexOnlyScan  *newidxscan;
+
+			FLATCOPY(newidxscan, idxscan, MagmaIndexOnlyScan);
+			SCANMUTATE(newidxscan, idxscan);
+			MUTATE(newidxscan->indexqualorig, idxscan->indexqualorig, List *);
+			MUTATE(newidxscan->uriList, idxscan->uriList, List *);
+			MUTATE(newidxscan->fmtOpts, idxscan->fmtOpts, List *);
+			// MUTATE(newidxscan->indexname, idxscan->indexname, char*);
+			newidxscan->fmtType = idxscan->fmtType;
+			return (Node *) newidxscan;
+		}
+		break;
+
 		case T_BitmapIndexScan:
 			{
 				BitmapIndexScan  *idxscan = (BitmapIndexScan *) node;

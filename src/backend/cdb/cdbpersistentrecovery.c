@@ -491,10 +491,28 @@ PersistentRecovery_ShouldHandlePass1XLogRec(
 		RelFileNode *xlogRelFileNode;
 
 		xlogRelFileNode = &relationChangeInfoArray[0].relFileNode;
-		
-		if(RelFileNode_IsEmpty(xlogRelFileNode))
+		if(RelFileNode_IsEmpty(xlogRelFileNode)) {
+			// redo log creating filespace has empty RelFileNode
+			bool createFilespace = false;
+			uint8 info = record->xl_info & ~XLR_INFO_MASK;
+			switch (info) {
+				case MMXLOG_CREATE_DIR:
+				case MMXLOG_REMOVE_DIR:
+				case MMXLOG_REMOVE_FILE:
+				case MMXLOG_CREATE_FILE:
+				{
+					xl_mm_fs_obj *xlrec = (xl_mm_fs_obj *)XLogRecGetData(record);
+					if(xlrec->shared && xlrec->filespace != InvalidOid) {
+						createFilespace = true;
+					} // it is hdfs
+					break;
+				}
+				default:{};
+			}
+			if (!createFilespace) {
 			elog(ERROR, "Invalid RelFileNode (0,0,0)");
-		
+			}
+		}
 		if (GpPersistent_IsPersistentRelation(xlogRelFileNode->relNode) 
 			&& (xlogRelFileNode->relNode != GpGlobalSequenceRelationId))
 			/* MPP-17181: since the fix for MPP-17181 will always sync

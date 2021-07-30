@@ -115,6 +115,9 @@ typedef enum NodeTag
 	T_RowTrigger,
 	T_AssertOp,
 	T_PartitionSelector,
+	T_MagmaIndexScan,
+	T_MagmaIndexOnlyScan,
+	T_MagmaBitmapScan,
 	T_Plan_End,
 	/* this one isn't a subclass of Plan: */
 	T_PlanInvalItem,
@@ -172,6 +175,9 @@ typedef enum NodeTag
 	T_RowTriggerState,
 	T_AssertOpState,
 	T_PartitionSelectorState,
+	T_MagmaIndexScanState,
+	T_MagmaIndexOnlyScanState,
+	T_MagmaBitmapScanState,
 	T_PlanState_End,
 
 	/*
@@ -293,6 +299,9 @@ typedef enum NodeTag
 	T_ResultPath,
 	T_MaterialPath,
 	T_UniquePath,
+	T_MagmaIndexPath,
+	T_MagmaIndexOnlyScanPath,
+	T_MagmaBitmapScanPath,
 	T_CtePath,
 	T_PathKeyItem,
 	T_RestrictInfo,
@@ -505,19 +514,24 @@ typedef enum NodeTag
 	 * purposes (usually because they are involved in APIs where we want to
 	 * pass multiple object types through the same pointer).
 	 */
-	T_TriggerData = 900,		/* in commands/trigger.h */
-	T_ReturnSetInfo,			/* in nodes/execnodes.h */
-	T_HashBitmap,               /* in nodes/tidbitmap.h */
-	T_StreamBitmap,             /* in nodes/tidbitmap.h */
-	T_FormatterData,            /* in access/formatter.h */
-	T_ExtProtocolData,          /* in access/extprotocol.h */
-	T_ExtProtocolValidatorData, /* in access/extprotocol.h */
-	T_PlugStorageData,          /* in access/plugstorage.h */
-	T_PlugStorageValidatorData, /* in access/plugstorage.h */
-	T_FileSystemFunctionData,   /* in storage/filesystem.h */
-	T_PartitionConstraints,     /* in executor/nodePartitionSelector.h */
-	T_SelectedParts,            /* in executor/nodePartitionSelector.h */
+	T_TriggerData = 900,		    /* in commands/trigger.h */
+	T_ReturnSetInfo,			    /* in nodes/execnodes.h */
+	T_HashBitmap,                   /* in nodes/tidbitmap.h */
+	T_StreamBitmap,                 /* in nodes/tidbitmap.h */
+	T_FormatterData,                /* in access/formatter.h */
+	T_ExtProtocolData,              /* in access/extprotocol.h */
+	T_ExtProtocolValidatorData,     /* in access/extprotocol.h */
+	T_ExtProtocolRenameData,
+	T_PlugStorageData,              /* in access/plugstorage.h */
+	T_PlugStorageTransactionData,   /* in access/plugstorage.h */
+	T_PlugStorageValidatorData,     /* in access/plugstorage.h */
+	T_FileSystemFunctionData,       /* in storage/filesystem.h */
+	T_PartitionConstraints,         /* in executor/nodePartitionSelector.h */
+	T_SelectedParts,                /* in executor/nodePartitionSelector.h */
 	T_ExtProtocolBlockLocationData, /* in access/extprotocol.h */
+	T_ExtProtocolTableSizeData,     /* in access/extprotocol.h */
+	T_ExtProtocolDatabaseSizeData,  /* in access/extprotocol.h */
+	T_ExtProtocolMagmaStatusData,   /* in access/extprotocol.h */
 
 	/* CDB: tags for random other stuff */
 	T_CdbExplain_StatHdr = 950,             /* in cdb/cdbexplain.c */

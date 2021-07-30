@@ -210,7 +210,8 @@ cluster(ClusterStmt *stmt)
 
 		if (Gp_role == GP_ROLE_DISPATCH)
 		{
-			dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+		  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+		                  errmsg("Cannot support cluster")));
 		}
 	}
 	else
@@ -271,7 +272,8 @@ cluster(ClusterStmt *stmt)
 				stmt->relation = makeNode(RangeVar);
 				stmt->relation->schemaname = get_namespace_name(get_rel_namespace(rvtc->tableOid));
 				stmt->relation->relname = get_rel_name(rvtc->tableOid);
-				dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+				ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+				                      errmsg("Cannot support cluster")));
 			}
 			CommitTransactionCommand();
 		}
@@ -320,7 +322,7 @@ cluster_rel(RelToCluster *rvtc, bool recheck, ClusterStmt *stmt, bool printError
 	 * case, since cluster() already did it.)  The index lock is taken inside
 	 * check_index_is_clusterable.
 	 */
-	OldHeap = try_relation_open(rvtc->tableOid, AccessExclusiveLock, false);
+	OldHeap = try_relation_open(rvtc->tableOid, AccessExclusiveLock, false, false);
 
 	/* If the table has gone away, we can skip processing it */
 	if (!OldHeap)
@@ -331,7 +333,7 @@ cluster_rel(RelToCluster *rvtc, bool recheck, ClusterStmt *stmt, bool printError
 	 * We don't support cluster on an AO table. We print out
 	 * a warning/error to the user, and simply return.
 	 */
-	if (RelationIsAoRows(OldHeap) || RelationIsParquet(OldHeap))
+	if (RelationIsAo(OldHeap))
 	{
 		int elevel = WARNING;
 		
@@ -830,7 +832,8 @@ make_new_heap(Oid OIDOldHeap, const char *NewName, Oid NewTableSpace,
 										  allowSystemTableModsDDL,
 										  comptypeOid,
 						 				  /* persistentTid */ NULL,
-						 				  /* persistentSerialNum */ NULL);
+						 				  /* persistentSerialNum */ NULL,
+						 				  /* formmatername */ NULL);
 
 	pfree(targetPolicy);
 
@@ -1087,10 +1090,8 @@ swap_relation_files(Oid r1, Oid r2, bool swap_stats)
 		elog(ERROR, "cache lookup failed for relation %u", r2);
 	relform2 = (Form_pg_class) GETSTRUCT(reltup2);
 	
-	isAO1 = (relform1->relstorage == RELSTORAGE_AOROWS ||
-			 relform1->relstorage == RELSTORAGE_PARQUET);
-	isAO2 = (relform2->relstorage == RELSTORAGE_AOROWS ||
-			 relform2->relstorage == RELSTORAGE_PARQUET);
+	isAO1 = relstorage_is_ao(relform1->relstorage);
+	isAO2 = relstorage_is_ao(relform2->relstorage);
 
 	if (Debug_persistent_print)
 		elog(Persistent_DebugPrintLevel(), 

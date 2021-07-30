@@ -39,6 +39,7 @@
 
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
+#include "catalog/pg_exttable.h"
 #include "executor/executor.h"
 #include "executor/execHHashagg.h"
 #include "executor/nodeAgg.h"
@@ -144,7 +145,6 @@ typedef struct
 	Index last_sgr;
 } register_ordered_aggs_context;
 
-
 static Node *register_ordered_aggs_mutator(Node *node, 
 										   register_ordered_aggs_context *context);
 static void register_AggOrder(AggOrder *aggorder, 
@@ -166,7 +166,6 @@ static void sort_canonical_gs_list(List *gs, int *p_nsets, Bitmapset ***p_sets);
 
 static Plan *pushdown_preliminary_limit(Plan *plan, Node *limitCount, int64 count_est, Node *limitOffset, int64 offset_est);
 bool is_dummy_plan(Plan *plan);
-
 
 bool is_in_planning_phase(void)
 {
@@ -313,12 +312,13 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
   Query *my_parse = copyObject(parse);
 
   /* If this is a parallel plan. request resource and allocate split again*/
-  if (plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
+  if (my_parse->commandType != CMD_UTILITY && plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
   {
     /*
      * Now, we want to allocate resource.
      */
     allocResult = calculate_planner_segment_num(plannedstmt, my_parse, plannedstmt->resource->life, -1);
+
     Assert(allocResult);
 
     ppResult->saResult = *allocResult;
@@ -434,222 +434,255 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
  *
  *****************************************************************************/
 
-PlannedStmt *
-planner(Query *parse, int cursorOptions, ParamListInfo boundParams, QueryResourceLife resourceLife) {
-    PlannedStmt *result = NULL;
-    instr_time starttime, endtime;
-    ResourceNegotiatorResult *ppResult = (ResourceNegotiatorResult *) palloc(sizeof(ResourceNegotiatorResult));
-    SplitAllocResult initResult = { NULL, NIL, 0, NIL, NULL };
-    ppResult->saResult = initResult;
-    ppResult->stmt = NULL;
-    static int plannerLevel = 0;
-    bool resourceNegotiateDone = false;
-    QueryResource *savedQueryResource = GetActiveQueryResource();
-    SetActiveRelType(NIL);
+PlannedStmt * 
+planner(Query *parse, int cursorOptions,
+		ParamListInfo boundParams, QueryResourceLife resourceLife)
+{
+	PlannedStmt *result = NULL;
+	instr_time	starttime, endtime;
+	ResourceNegotiatorResult *ppResult = (ResourceNegotiatorResult *) palloc(sizeof(ResourceNegotiatorResult));
+	SplitAllocResult initResult = {NULL, NIL, 0, NIL, NULL};
+	ppResult->saResult = initResult;
+	ppResult->saResult.hiveUrl = NULL;
+	ppResult->stmt = NULL;
+	static int plannerLevel = 0;
+	bool resourceNegotiateDone = false;
+	QueryResource *savedQueryResource = GetActiveQueryResource();
+	SetActiveRelType(NIL);
 
-    bool isDispatchParallel = false;
-    /*
-     * Before doing the true query optimization, we first run a resource_negotiator to give
-     * us some sense of the complexity of the query, and allocate the appropriate
-     * resource to run this query. After gaining the resource, we can perform the
-     * actual optimization.
-     */
-    increase_planning_depth();
+	bool isDispatchParallel = false;
+	/*
+	 * Before doing the true query optimization, we first run a resource_negotiator to give
+	 * us some sense of the complexity of the query, and allocate the appropriate
+	 * resource to run this query. After gaining the resource, we can perform the
+	 * actual optimization.
+	 */
+	increase_planning_depth();
 
-    plannerLevel++;
-    if (!resourceNegotiateDone) {
-        PG_TRY();
-        {
-            START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Resource_Negotiator));
-            {
-                resource_negotiator(parse, cursorOptions, boundParams,resourceLife, &ppResult);
+	plannerLevel++;
+	if (!resourceNegotiateDone)
+	{
+	  PG_TRY();
+	  {
+      START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Resource_Negotiator));
+      {
+        resource_negotiator(parse, cursorOptions, boundParams, resourceLife, &ppResult);
 
-                decrease_planning_depth();
+		decrease_planning_depth();
 
-                if (ppResult->stmt && ppResult->stmt->planTree) {
-                    isDispatchParallel = ppResult->stmt->planTree->dispatch == DISPATCH_PARALLEL;
-                }
-            }
-            END_MEMORY_ACCOUNT();
-        }PG_CATCH();
-        {
-            decrease_planning_depth();
+		if(ppResult->stmt && ppResult->stmt->planTree)
+		{
+			isDispatchParallel = ppResult->stmt->planTree->dispatch == DISPATCH_PARALLEL;
+		}
+      }
+      END_MEMORY_ACCOUNT();
+	  }
+	  PG_CATCH();
+	  {
+		decrease_planning_depth();
 
-            if ((ppResult != NULL)) {
-                pfree(ppResult);
-                ppResult = NULL;
-            }
-            plannerLevel = 0;
-            PG_RE_THROW();
-        }PG_END_TRY();
-    }
-    SetActiveRelType(NIL);
-    if (plannerLevel >= 1) {
-        resourceNegotiateDone = true;
-        gp_segments_for_planner = ppResult->saResult.planner_segments;
-        if (ppResult->saResult.resource) {
-            SetActiveQueryResource(ppResult->saResult.resource);
-            SetActiveRelType(ppResult->saResult.relsType);
-        }
-    }
+		if ((ppResult != NULL))
+		{
+		  pfree(ppResult);
+		  ppResult = NULL;
+		}
+	    plannerLevel = 0;
+	    PG_RE_THROW();
+	  }
+	  PG_END_TRY();
+	}
+	SetActiveRelType(NIL);
+	if (plannerLevel >= 1)
+	{
+	  resourceNegotiateDone = true;
+	  gp_segments_for_planner = ppResult->saResult.planner_segments;
+	  if (ppResult->saResult.resource)
+	  {
+	    SetActiveQueryResource(ppResult->saResult.resource);
+	    SetActiveRelType(ppResult->saResult.relsType);
+	  }
+	}
 
-    int optimizer_segments_saved_value = optimizer_segments;
+	int optimizer_segments_saved_value = optimizer_segments;
 
-    PG_TRY();
+	PG_TRY();
+	{
+    if (resourceNegotiateDone)
     {
-        if (resourceNegotiateDone) {
 #ifdef USE_ORCA
-            /**
-             * If the new optimizer is enabled, try that first. If it does not return a plan,
-             * then fall back to the planner.
-             * TODO: caragg 11/08/2013: Enable ORCA when running in utility mode (MPP-21841)
-             */
-            if (optimizer && AmIMaster() && (GP_ROLE_UTILITY != Gp_role) && isDispatchParallel)
-            {
-                if (gp_log_optimization_time)
-                {
-                    INSTR_TIME_SET_CURRENT(starttime);
-                }
-                START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Optimizer));
-                {
-                    if (optimizer_segments == 0) // value not set by user
-                    {
-                        optimizer_segments = gp_segments_for_planner;
-                    }
+		/**
+		* If the new optimizer is enabled, try that first. If it does not return a plan,
+		* then fall back to the planner.
+		* TODO: caragg 11/08/2013: Enable ORCA when running in utility mode (MPP-21841)
+		*/
+    	if (optimizer && AmIMaster() && (GP_ROLE_UTILITY != Gp_role) && isDispatchParallel)
+		{
+			if (gp_log_optimization_time)
+			{
+				INSTR_TIME_SET_CURRENT(starttime);
+			}
+			START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Optimizer));
+			{
+				if (optimizer_segments == 0) // value not set by user
+				{
+					optimizer_segments = gp_segments_for_planner;
+				}
 
-                    result = optimize_query(parse, boundParams);
-                    if (ppResult->stmt && ppResult->stmt->intoPolicy && result && result->intoPolicy)
-                    {
-                        result->intoPolicy->bucketnum = ppResult->stmt->intoPolicy->bucketnum;
-                    }
-                    optimizer_segments = optimizer_segments_saved_value;
-                }
-                END_MEMORY_ACCOUNT();
+				result = optimize_query(parse, boundParams);
+				if (ppResult->stmt && ppResult->stmt->intoPolicy
+						&& result && result->intoPolicy)
+				{
+					result->intoPolicy->bucketnum =
+							ppResult->stmt->intoPolicy->bucketnum;
+				}
+				optimizer_segments = optimizer_segments_saved_value;
+			}
+			END_MEMORY_ACCOUNT();
 
-                if (gp_log_optimization_time)
-                {
-                    INSTR_TIME_SET_CURRENT(endtime);
-                    INSTR_TIME_SUBTRACT(endtime, starttime);
-                    elog(LOG, "Optimizer Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
-                }
-            }
+			if (gp_log_optimization_time)
+			{
+				INSTR_TIME_SET_CURRENT(endtime);
+				INSTR_TIME_SUBTRACT(endtime, starttime);
+				elog(LOG, "Optimizer Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
+			}
+		}
 #endif
 
-            if (!result) {
-                if (gp_log_optimization_time) {
-                    INSTR_TIME_SET_CURRENT(starttime);
-                }
-                START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Planner));
-                {
-                    if (NULL != planner_hook) {
-                        result = (*planner_hook)(parse, cursorOptions, boundParams, resourceLife);
-                    } else {
-                        result = standard_planner(parse, cursorOptions, boundParams);
-                    }
-
-                    if (gp_log_optimization_time) {
-                        INSTR_TIME_SET_CURRENT(endtime);
-                        INSTR_TIME_SUBTRACT(endtime, starttime);
-                        elog(LOG, "Planner Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
-                    }
-                }
-                END_MEMORY_ACCOUNT();
-            }
-        } else {
-            result = ppResult->stmt;
+      if (!result)
+      {
+        if (gp_log_optimization_time)
+        {
+          INSTR_TIME_SET_CURRENT(starttime);
         }
-    }PG_CATCH();
+        START_MEMORY_ACCOUNT(MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_Planner));
+        {
+          if (NULL != planner_hook)
+          {
+            result = (*planner_hook) (parse, cursorOptions, boundParams, resourceLife);
+          }
+          else
+          {
+            result = standard_planner(parse, cursorOptions, boundParams);
+          }
+
+          if (gp_log_optimization_time)
+          {
+            INSTR_TIME_SET_CURRENT(endtime);
+            INSTR_TIME_SUBTRACT(endtime, starttime);
+            elog(LOG, "Planner Time: %.3f ms", INSTR_TIME_GET_MILLISEC(endtime));
+          }
+        }
+        END_MEMORY_ACCOUNT();
+      }
+    }
+    else
     {
-        /*
-         * some cleanup work here.
-         */
-        plannerLevel = 0;
-        optimizer_segments = optimizer_segments_saved_value;
-        if (savedQueryResource) {
-            gp_segments_for_planner = list_length(savedQueryResource->segments);
-        } else {
-            gp_segments_for_planner = 0;
-        }
-        SetActiveQueryResource(savedQueryResource);
-        if ((ppResult != NULL)) {
-            pfree(ppResult);
-            ppResult = NULL;
-        }
-        PG_RE_THROW();
-    }PG_END_TRY();
-
-    if (plannerLevel >= 1) {
-        if (savedQueryResource) {
-            gp_segments_for_planner = list_length(savedQueryResource->segments);
-        } else {
-            gp_segments_for_planner = 0;
-        }
-        SetActiveQueryResource(savedQueryResource);
-
-        result->resource = ppResult->saResult.resource;
-        result->scantable_splits = ppResult->saResult.alloc_results;
-        result->planner_segments = ppResult->saResult.planner_segments;
-        result->datalocalityInfo = ppResult->saResult.datalocalityInfo;
-        result->datalocalityTime = ppResult->saResult.datalocalityTime;
+      result = ppResult->stmt;
     }
-    plannerLevel--;
-    if ((ppResult != NULL)) {
-        pfree(ppResult);
-        ppResult = NULL;
-    }
+	}
+	PG_CATCH();
+	{
+	  /*
+	   * some cleanup work here.
+	   */
+	  plannerLevel = 0;
+  	  optimizer_segments = optimizer_segments_saved_value;
+	  if (savedQueryResource)
+	  {
+	    gp_segments_for_planner = list_length(savedQueryResource->segments);
+	  }
+	  else
+	  {
+	    gp_segments_for_planner = 0;
+	  }
+	  SetActiveQueryResource(savedQueryResource);
+	  if ((ppResult != NULL))
+	  {
+		  pfree(ppResult);
+		  ppResult = NULL;
+	  }
+	  PG_RE_THROW();
+	}
+	PG_END_TRY();
 
-    return result;
+	if (plannerLevel >= 1)
+	{
+		if (savedQueryResource)
+		{
+			gp_segments_for_planner = list_length(savedQueryResource->segments);
+		}
+		else
+		{
+			gp_segments_for_planner = 0;
+		}
+		SetActiveQueryResource(savedQueryResource);
+
+		result->resource = ppResult->saResult.resource;
+		result->scantable_splits = ppResult->saResult.alloc_results;
+		result->planner_segments = ppResult->saResult.planner_segments;
+		result->datalocalityInfo = ppResult->saResult.datalocalityInfo;
+		result->datalocalityTime = ppResult->saResult.datalocalityTime;
+		result->hiveUrl = ppResult->saResult.hiveUrl;
+	}
+	plannerLevel--;
+	if ((ppResult != NULL))
+	{
+		pfree(ppResult);
+		ppResult = NULL;
+	}
+
+	return result;
 }
 
 
 /*
  * The new framework for HAWQ 2.0 query optimizer
  */
-static void resource_negotiator(Query *parse, int cursorOptions,
-        ParamListInfo boundParams, QueryResourceLife resourceLife,
-        ResourceNegotiatorResult** result) {
-    PlannedStmt *plannedstmt = NULL;
-    do {
-        udf_collector_context udf_context;
-        udf_context.udf_exist = false;
-        SplitAllocResult *allocResult = NULL;
-        Query *my_parse = copyObject(parse);
-        ParamListInfo my_boundParams = copyParamList(boundParams);
+static void
+resource_negotiator(Query *parse, int cursorOptions, ParamListInfo boundParams,
+              QueryResourceLife resourceLife, ResourceNegotiatorResult** result)
+{
+  PlannedStmt *plannedstmt = NULL;
+  do
+  {
+  		udf_collector_context udf_context;
+  		udf_context.udf_exist = false;
+    SplitAllocResult *allocResult = NULL;
+    Query *my_parse = copyObject(parse);
+    ParamListInfo my_boundParams = copyParamList(boundParams);
 
-        plannedstmt = standard_planner(my_parse, cursorOptions, my_boundParams);
-        (*result)->stmt = plannedstmt;
+    plannedstmt = standard_planner(my_parse, cursorOptions, my_boundParams);
+    (*result)->stmt = plannedstmt;
 
-        /* If this is a parallel plan. */
-        if (plannedstmt->planTree->dispatch == DISPATCH_PARALLEL) {
-            /*
-             * Now, we want to allocate resource.
-             */
-            allocResult = calculate_planner_segment_num(plannedstmt, my_parse, resourceLife, -1);
+    /* If this is a parallel plan. */
+    if (plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
+    {
+      /*
+       * Now, we want to allocate resource.
+       */
+      allocResult = calculate_planner_segment_num(plannedstmt, my_parse, resourceLife, -1);
 
-            Assert(allocResult);
+      Assert(allocResult);
 
-            (*result)->saResult = *allocResult;
-            pfree(allocResult);
-        } else {
-            find_udf(my_parse, &udf_context);
-            if (udf_context.udf_exist) {
-                if (resourceLife == QRL_ONCE) {
-                    int64 mincost = min_cost_for_each_query;
-                    mincost <<= 20;
-                    int avgSliceNum = 3;
-                    (*result)->saResult.resource = AllocateResource(QRL_ONCE,
-                            avgSliceNum, mincost,
-                            GetUserDefinedFunctionVsegNum(),
-                            GetUserDefinedFunctionVsegNum(), NULL, 0);
-                } else if (resourceLife == QRL_INHERIT) {
-                    (*result)->saResult.resource = AllocateResource(
-                            resourceLife, 0, 0, 0, 0, NULL, 0);
-                } else {
-                    /* Do not allocate resource for query with resourceLife = QRL_NONE */
-                }
-            }
-        }
-    } while (0);
+      (*result)->saResult = *allocResult;
+      pfree(allocResult);
+    }else{
+    		find_udf(my_parse, &udf_context);
+    		if (udf_context.udf_exist) {
+    		  if (resourceLife == QRL_ONCE) {
+    				int64 mincost = min_cost_for_each_query;
+    				mincost <<= 20;
+    				int avgSliceNum = 3;
+    				(*result)->saResult.resource = AllocateResource(QRL_ONCE, avgSliceNum, mincost,
+    						GetUserDefinedFunctionVsegNum(),GetUserDefinedFunctionVsegNum(),NULL, 0);
+    			} else if (resourceLife == QRL_INHERIT) {
+    				(*result)->saResult.resource = AllocateResource(resourceLife, 0, 0, 0, 0, NULL, 0);
+    			} else {
+    				/* Do not allocate resource for query with resourceLife = QRL_NONE */
+    			}
+    		}
+    }
+  } while (0);
 }
 
 static PlannedStmt *
@@ -728,7 +761,6 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	}
 	else
 	{
-
 		/* Default assumption is we need all the tuples */
 		tuple_fraction = 0.0;
 	}
@@ -814,12 +846,6 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 
 	top_plan = zap_trivial_result(root, top_plan);
 
-	/* check if the plan tree can be vectorized */
-	if(vmthd.vectorized_executor_enable && vmthd.CheckPlanVectorized_Hook)
-		top_plan =  vmthd.CheckPlanVectorized_Hook(root, top_plan);
-
-
-	
 	/* build the PlannedStmt result */
 	result = makeNode(PlannedStmt);
 	
@@ -843,9 +869,11 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	result->nMotionNodes = top_plan->nMotionNodes;
 	result->nInitPlans = top_plan->nInitPlans;
 	result->intoPolicy = GpPolicyCopy(CurrentMemoryContext, parse->intoPolicy);
+	result->relFileNodeInfo = NIL;
 	result->queryPartOids = NIL;
 	result->queryPartsMetadata = NIL;
 	result->numSelectorsPerScanId = NIL;
+	result->hiveUrl = NULL;
 	
 	Assert(result->utilityStmt == NULL || IsA(result->utilityStmt, DeclareCursorStmt));
 	
@@ -1394,6 +1422,12 @@ inheritance_planner(PlannerInfo *root)
 	CdbLocusType append_locustype = CdbLocusType_Null;
 	bool locus_ok = TRUE;
 
+	root->simple_rte_array = (RangeTblEntry **)palloc0(
+      sizeof(RangeTblEntry *) * (list_length(parse->rtable) + 1));
+	int i = 1;
+	foreach (l, parse->rtable)
+	    root->simple_rte_array[i++] = lfirst(l);
+
 	foreach(l, root->append_rel_list)
 	{
 		AppendRelInfo *appinfo = (AppendRelInfo *) lfirst(l);
@@ -1430,8 +1464,11 @@ inheritance_planner(PlannerInfo *root)
 		 * MPP-1544: perform this check before testing for loci compatibility
 		 * we might have inserted a dummy table with incorrect locus
 		 */
-		if (is_dummy_plan(subplan))
+		if (is_dummy_plan(subplan) ||
+		    subroot.simple_rte_array[appinfo->child_relid]->rtekind == RTE_VOID) {
+		  root->simple_rte_array[appinfo->child_relid]->rtekind = RTE_VOID;
 			continue;
+		}
 		
 		/* MPP needs target loci to match. */
 		if ( Gp_role == GP_ROLE_DISPATCH )
@@ -1488,6 +1525,11 @@ inheritance_planner(PlannerInfo *root)
 		 * We need to keep track of this.
 		 */
 		parse->rtable = subroot.parse->rtable;
+		// rebuild simple_rte_array due to parse->rtable is changed
+		int i1 = 1;
+		ListCell   *l1;
+		foreach (l1, parse->rtable)
+		  root->simple_rte_array[i1++] = lfirst(l1);
 
 		subplans = lappend(subplans, subplan);
 
@@ -1502,6 +1544,9 @@ inheritance_planner(PlannerInfo *root)
 										 subroot.returningLists);
 		}
 	}
+
+	pfree(root->simple_rte_array);
+	root->simple_rte_array = NULL;
 
 	/**
 	 * If due to constraint exclusions all the result relations have been removed,
@@ -2496,12 +2541,18 @@ grouping_planner(PlannerInfo *root, double tuple_fraction)
 		root->returningLists = NIL;
 
 	/* Compute result-relations list if needed */
-	if (parse->resultRelation)
-		root->resultRelations = list_make1_int(parse->resultRelation);
-	else
-		root->resultRelations = NIL;
-		
-	/*
+  if (parse->resultRelation) {
+    root->resultRelations = list_make1_int(parse->resultRelation);
+    if (root->simple_rte_array &&
+        root->simple_rte_array[parse->resultRelation]->rtekind ==
+            RTE_VOID)
+      root->simple_rte_array[parse->resultRelation]->rtekind =
+          RTE_RELATION;
+  } else {
+    root->resultRelations = NIL;
+  }
+
+        /*
 	 * Return the actual output ordering in query_pathkeys for possible use by
 	 * an outer query level.
 	 */

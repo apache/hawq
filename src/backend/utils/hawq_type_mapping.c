@@ -31,9 +31,6 @@ int32_t map_hawq_type_to_common_plan(int32_t hawqTypeID) {
     case HAWQ_TYPE_BOOL:
       return BOOLEANID;
 
-    case HAWQ_TYPE_CHAR:
-      return TINYINTID;
-
     case HAWQ_TYPE_INT2:
       return SMALLINTID;
 
@@ -65,6 +62,12 @@ int32_t map_hawq_type_to_common_plan(int32_t hawqTypeID) {
     case HAWQ_TYPE_NAME:
     case HAWQ_TYPE_TEXT:
       return STRINGID;
+
+    case HAWQ_TYPE_JSON:
+      return JSONID;
+
+    case HAWQ_TYPE_JSONB:
+      return JSONBID;
 
     case HAWQ_TYPE_TIME:
       return TIMEID;
@@ -113,6 +116,9 @@ int32_t map_hawq_type_to_common_plan(int32_t hawqTypeID) {
     case HAWQ_TYPE_NUMERIC_ARRAY:
       return DECIMAL128ARRAYID;
 
+    case HAWQ_TYPE_DATE_ARRAY:
+      return DATEARRAYID;
+
     case HAWQ_TYPE_UNKNOWN:
       return STRINGID;
 
@@ -156,7 +162,10 @@ bool checkUnsupportedDataType(int32_t hawqTypeID, int32_t dateStyle) {
     case HAWQ_TYPE_TEXT_ARRAY:
     case HAWQ_TYPE_BPCHAR_ARRAY:
     case HAWQ_TYPE_NUMERIC_ARRAY:
+    case HAWQ_TYPE_DATE_ARRAY:
     case HAWQ_TYPE_NUMERIC:
+    case HAWQ_TYPE_JSON:
+    case HAWQ_TYPE_JSONB:
     case HAWQ_TYPE_UNKNOWN:
       return false;
     case HAWQ_TYPE_TIMESTAMPTZ:
@@ -183,7 +192,6 @@ bool checkORCUnsupportedDataType(int32_t hawqTypeID) {
     case HAWQ_TYPE_TID:
     case HAWQ_TYPE_FLOAT4:
     case HAWQ_TYPE_FLOAT8:
-    case HAWQ_TYPE_CHAR:
     case HAWQ_TYPE_TEXT:
     case HAWQ_TYPE_BYTE:
     case HAWQ_TYPE_BPCHAR:

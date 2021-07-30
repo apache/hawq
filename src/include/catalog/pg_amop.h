@@ -1365,4 +1365,31 @@ DATA(insert (	2904	0 3 f 3325 ));
 DATA(insert (	2904	0 4 f 3330 ));
 DATA(insert (	2904	0 5 f 3328 ));
 
+/*
+ * btree jsonb_ops
+ */
+DATA(insert ( 4033 0 1 f 3242 ));
+DATA(insert ( 4033 0 2 f 3244 ));
+DATA(insert ( 4033 0 3 f 5515 ));
+DATA(insert ( 4033 0 4 f 3245 ));
+DATA(insert ( 4033 0 5 f 3243 ));
+
+/*
+ * hash jsonb ops
+ */
+DATA(insert ( 4034 0 1 f 5515 ));
+
+/*
+ * GIN jsonb ops
+ */
+DATA(insert ( 4036 0 7 f 3246 ));
+DATA(insert ( 4036 25 9 f 3247));
+DATA(insert ( 4036 1009 10 f 3248 ));
+DATA(insert ( 4036 1009 11 f 3249 ));
+
+/*
+ * GIN jsonb hash ops
+ */
+DATA(insert ( 4037 0 7 f 3246 ));
+
 #endif   /* PG_AMOP_H */

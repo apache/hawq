@@ -57,6 +57,7 @@
 #include "rewrite/rewriteManip.h"
 #include "utils/lsyscache.h"
 
+#include "cdb/cdbdatalocality.h"
 #include "cdb/cdbllize.h"                   /* repartitionPlan */
 #include "cdb/cdbmutate.h"                  /* cdbmutate_warn_ctid_without_segid */
 #include "cdb/cdbpath.h"                    /* cdbpath_rows() */
@@ -226,7 +227,7 @@ set_base_rel_pathlists(PlannerInfo *root)
 static void
 set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti)
 {
-	RangeTblEntry *rte = rt_fetch(rti, root->parse->rtable);
+	RangeTblEntry *rte = root->simple_rte_array[rti];
 
 	if (rte->inh)
 	{
@@ -277,27 +278,13 @@ set_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, Index rti)
 static void
 set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 {
-    List       *pathlist = NIL;
-    List       *indexpathlist = NIL;
-    List       *bitmappathlist = NIL;
-    List       *tidpathlist = NIL;
-    Path       *seqpath = NULL;
-    ListCell   *cell;
+  List       *pathlist = NIL;
+  List       *indexpathlist = NIL;
+  List       *bitmappathlist = NIL;
+  List       *tidpathlist = NIL;
+  Path       *seqpath = NULL;
+  ListCell   *cell;
 	char		relstorage;
-
-	/* Mark rel with estimated output rows, width, etc */
-	set_baserel_size_estimates(root, rel);
-
-	/* Test any partial indexes of rel for applicability */
-	check_partial_indexes(root, rel);
-
-	/*
-	 * Check to see if we can extract any restriction conditions from join
-	 * quals that are OR-of-AND structures.  If so, add them to the rel's
-	 * restriction list, and recompute the size estimates.
-	 */
-	if (create_or_index_quals(root, rel))
-		set_baserel_size_estimates(root, rel);
 
 	/*
 	 * If we can prove we don't need to scan the rel via constraint exclusion,
@@ -306,23 +293,39 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	 */
 	if (relation_excluded_by_constraints(root, rel, rte))
 	{
-		/* Reset output-rows estimate to 0 */
-		rel->rows = 0;
+    /* Reset output-rows estimate to 0 */
+    rel->rows = 0;
 
-        /* Obviously won't produce more than one row. */
-        rel->onerow = true;
+    /* Obviously won't produce more than one row. */
+    rel->onerow = true;
 
-		add_path(root, rel, (Path *) create_append_path(root, rel, NIL));
+    add_path(root, rel, (Path *) create_append_path(root, rel, NIL));
 
-		/* Select cheapest path (pretty easy in this case...) */
-		set_cheapest(root, rel);
+    /* Select cheapest path (pretty easy in this case...) */
+    set_cheapest(root, rel);
 
-		return;
-	}
+    rte->rtekind = RTE_VOID;
 
-    /* CDB: Attach subquery duplicate suppression info. */
-    if (root->in_info_list)
-        rel->dedup_info = cdb_make_rel_dedup_info(root, rel);
+    return;
+  }
+
+  /* Mark rel with estimated output rows, width, etc */
+  set_baserel_size_estimates(root, rel);
+
+  /* Test any partial indexes of rel for applicability */
+  check_partial_indexes(root, rel);
+
+  /*
+   * Check to see if we can extract any restriction conditions from join
+   * quals that are OR-of-AND structures.  If so, add them to the rel's
+   * restriction list, and recompute the size estimates.
+   */
+  if (create_or_index_quals(root, rel))
+    set_baserel_size_estimates(root, rel);
+
+  /* CDB: Attach subquery duplicate suppression info. */
+  if (root->in_info_list)
+    rel->dedup_info = cdb_make_rel_dedup_info(root, rel);
 
 	/*
 	 * Generate paths and add them to the rel's pathlist.
@@ -337,21 +340,27 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	 */
 
 	relstorage = get_rel_relstorage(rte->relid);
+	rel->ext = relstorage;
 	
 	/* early exit for external and append only relations */
 	switch (relstorage)
 	{
 		case RELSTORAGE_EXTERNAL:
-			/*
-			 * If the relation is external, create an external path for
-			 * it and select it (only external path is considered for
-			 * an external base rel).
-			 */
-			add_path(root, rel, (Path *) create_external_path(root, rel));			
-			set_cheapest(root, rel);
-			return;
+			/* if this is not a magma table, just create external scan path */
+			if (!dataStoredInMagmaByOid(rte->relid))
+			{
+				add_path(root, rel, (Path *) create_external_path(root, rel));
+				set_cheapest(root, rel);
+				return;
+			}
+			/* if this is a magma table, consider index path */
+			seqpath = (Path *) create_external_path(root, rel);
+			if (root->config->enable_magma_seqscan)
+				pathlist = lappend(pathlist, seqpath);
+			break;
 
 		case RELSTORAGE_AOROWS:
+		case RELSTORAGE_ORC:
 			seqpath = (Path *) create_appendonly_path(root, rel);
 			break;
 
@@ -373,12 +382,45 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	}
 
 	/* Consider sequential scan. */
-    if (root->config->enable_seqscan)
+    if ((root->config->enable_seqscan) && (relstorage != RELSTORAGE_EXTERNAL))
         pathlist = lappend(pathlist, seqpath);
 
 	/* Consider index and bitmap scans */
 	create_index_paths(root, rel, relstorage, 
 					   &indexpathlist, &bitmappathlist);
+
+	/* deal with magma index scan */
+	if (relstorage == RELSTORAGE_EXTERNAL)
+	{
+		if (indexpathlist && ((root->config->enable_magma_indexscan)
+				|| (root->config->enable_magma_indexonlyscan)))
+		{
+			ListCell   *l;
+			foreach(l, indexpathlist)
+			{
+				IndexPath  *ipath = (IndexPath *) lfirst(l);
+				if ((root->config->enable_magma_indexscan) &&
+						(!ipath->indexonly))
+				{
+					pathlist = lappend(pathlist, ipath);
+				}
+				else if ((root->config->enable_magma_indexonlyscan) &&
+						(ipath->indexonly))
+				{
+					pathlist = lappend(pathlist, ipath);
+				}
+			}
+		}
+		if (bitmappathlist && root->config->enable_magma_bitmapscan)
+			pathlist = list_concat(pathlist, bitmappathlist);
+		/* Add them, now that we know whether the quals specify a unique key. */
+		foreach(cell, pathlist)
+			add_path(root, rel, (Path *)lfirst(cell));
+
+		/* Now find the cheapest of the paths for this rel */
+		set_cheapest(root, rel);
+		return;
+	}
 
 	/* 
 	 * Random access to Append-Only is slow because AO doesn't use the buffer pool and
@@ -387,8 +429,7 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	 * optimize fetches in TID order by keeping the last decompressed block between fetch
 	 * calls.
 	 */
-	if (relstorage == RELSTORAGE_AOROWS ||
-		relstorage == RELSTORAGE_PARQUET)
+	if (relstorage_is_ao(relstorage))
 		indexpathlist = NIL;
 
     if (indexpathlist && root->config->enable_indexscan)
@@ -399,9 +440,8 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	/* Consider TID scans */
     create_tidscan_paths(root, rel, &tidpathlist);
     
-    /* AO and CO tables do not currently support TidScans. Disable TidScan path for such tables */
-	if (relstorage == RELSTORAGE_AOROWS ||
-		relstorage == RELSTORAGE_PARQUET)
+    /* AO tables do not currently support TidScans. Disable TidScan path for such tables */
+	if (relstorage_is_ao(relstorage))
 		tidpathlist = NIL;
     
     if (tidpathlist && root->config->enable_tidscan)
@@ -533,6 +573,11 @@ set_append_rel_pathlist(PlannerInfo *root, RelOptInfo *rel,
 		 * and will vanish from our list.
 		 */
 		set_rel_pathlist(root, childrel, childRTindex);
+
+    /* CDB: No path might be found if user set enable_xxx = off */
+    if (!childrel ||
+        !childrel->cheapest_total_path)
+        cdb_no_path_for_query();    /* raise error - no return */
 
 		childpath = childrel->cheapest_total_path;
 		if (IsA(childpath, AppendPath))
@@ -789,25 +834,53 @@ void set_cte_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	List *pathkeys = NULL;
 	PlannerInfo *subroot = NULL;
 
-	/* If sharing is not allowed, we create a new subplan for this CTE. */
-	if (!root->config->gp_cte_sharing)
+  /*
+   * If there is exactly one reference to this CTE in the query, or plan
+   * sharing is disabled, create a new subplan for this CTE. It will
+   * become simple subquery scan.
+   *
+   * NOTE: The check for "exactly one reference" is a bit fuzzy. The
+   * references are counted in parse analysis phase, and it's possible
+   * that we duplicate a reference during query planning. So the check
+   * for number of references must be treated merely as a hint. If it
+   * turns out that there are in fact multiple references to the same
+   * CTE, even though we thought that there is only one, we might choose
+   * a sub-optimal plan because we missed the opportunity to share the
+   * subplan. That's acceptable for now.
+   *
+   * subquery tree will be modified if any qual is pushed down.
+   * There's risk that it'd be confusing if the tree is used
+   * later. At the moment InitPlan case uses the tree, but it
+   * is called earlier than this pass always, so we don't avoid it.
+   *
+   * Also, we might want to think extracting "common"
+   * qual expressions between multiple references, but
+   * so far we don't support it.
+   */
+	if (!root->config->gp_cte_sharing || (cte->cterefcount) == 1)
 	{
 		PlannerConfig *config = CopyPlannerConfig(root->config);
 
-		/**
-		 * Copy query node since subquery_planner may trash it and we need it intact
-		 * in case we need to create another plan for the CTE
+
+		/*
+		 * Having multiple SharedScans can lead to deadlocks. For now,
+		 * disallow sharing of ctes at lower levels.
+		 */
+		config->gp_cte_sharing = false;
+
+		/*
+		 * Copy query node since subquery_planner may trash it, and we need
+		 * it intact in case we need to create another plan for the CTE
 		 */
 		Query		  *subquery = (Query *) copyObject(cte->ctequery);
 
 		/**
-		 * Push down quals
+		 * Push down quals, like we do in set_subquery_pathlist()
 		 */
 		subquery = push_down_restrict(root, rel, rte, rel->relid, subquery);
 
 		subplan = subquery_planner(cteroot->glob, subquery, cteroot,
 								   tuple_fraction, &subroot, config);
-		cteplaninfo->numNonSharedPlans++;
 
 		subrtable = subroot->parse->rtable;
 		pathkeys = subroot->query_pathkeys;
@@ -817,80 +890,49 @@ void set_cte_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 		 * this plan.
 		 */
 	}
-	
-	/*
-	 * If we never generate a subplan for this CTE, generate one here.
-	 * This subplan will not be used by InitPlans, so that they can be
-	 * shared if this CTE is referenced multiple times (excluding in InitPlans).
-	 * We also generate all shared plans here.
-	 */
-	else if (cteplaninfo->subplans == NULL)
+	else
 	{
 		PlannerConfig *config = CopyPlannerConfig(root->config);
 
-		/**
-		 * Having multiple SharedScans can lead to deadlocks. For now,
-		 * disallow sharing of ctes at lower levels.
-		 */
-		config->gp_cte_sharing = false;
-		/**
-		 * Copy query node since subquery_planner may trash it and we need it intact
-		 * in case we need to create another plan for the CTE
+		/*
+		 * If we haven't created a subplan for this CTE yet, do it now.
+		 * This subplan will not be used by InitPlans, so that they can be
+		 * shared if this CTE is referenced multiple times (excluding in
+		 * InitPlans).
 		 */
 
-		Query		  *subquery = (Query *) copyObject(cte->ctequery);
-
-		if ((cte->cterefcount - cteplaninfo->numNonSharedPlans) == 1)
+		if (cteplaninfo->shared_plan == NULL)
 		{
-			/*
-			 * If this CTE is referenced only once,
-			 * it will become simple subquery scan.
-			 * In that case, we can push down quals in the same way
-			 * as set_subqeury_pathlist().
-			 *
-			 * subquery tree will be modified if any qual is pushed down.
-			 * There's risk that it'd be confusing if the tree is used
-			 * later. At the moment InitPlan case uses the tree, but it
-			 * is called earlier than this pass always, so we don't avoid it.
-			 *
-			 * Also, we might want to think extracting "common"
-			 * qual expressions between multiple references, but
-			 * so far we don't support it.
-			 */
-			subquery = push_down_restrict(root, rel, rte, rel->relid, subquery);
+		  PlannerConfig *config = CopyPlannerConfig(root->config);
+
+		  /*
+		   * Copy query node since subquery_planner may trash it and we need it intact
+		   * in case we need to create another plan for the CTE
+		   */
+		  Query *subquery = (Query *)copyObject(cte->ctequery);
+
+		  /*
+		   * Having multiple SharedScans can lead to deadlocks. For now,
+		   * disallow sharing of ctes at lower levels.
+		   */
+		  config->gp_cte_sharing = false;
+		  subplan = subquery_planner(cteroot->glob, subquery, cteroot,
+		                             tuple_fraction, &subroot, config);
+
+		  cteplaninfo->shared_plan = prepare_plan_for_sharing(cteroot, subplan);
+		  cteplaninfo->subrtable = subroot->parse->rtable;
+		  cteplaninfo->pathkeys = subroot->query_pathkeys;
 		}
-		subplan = subquery_planner(cteroot->glob, subquery, cteroot,
-								   tuple_fraction, &subroot, config);
 
-		List *subplans = share_plan(cteroot, subplan,
-									cte->cterefcount);
-		
-		cteplaninfo->subplans = subplans;
-		cteplaninfo->subrtable = subroot->parse->rtable;
-		cteplaninfo->pathkeys = subroot->query_pathkeys;
-		cteplaninfo->nextPlanId = 0;
-		
-		subplan = list_nth(cteplaninfo->subplans, cteplaninfo->nextPlanId);
-		cteplaninfo->nextPlanId++;
-
-		subrtable = subroot->parse->rtable;
-		pathkeys = subroot->query_pathkeys;
-	}
-
-	/*
-	 * The subplan has been generated in advance (see the above). We simply find
-	 * the subplan in the list stored in cteplaninfo.
-	 */
-	else
-	{
-		Assert(root->config->gp_cte_sharing && cteplaninfo->subplans != NULL);
-		Assert(cteplaninfo->nextPlanId < list_length(cteplaninfo->subplans));
-		subplan = list_nth(cteplaninfo->subplans, cteplaninfo->nextPlanId);
+		/*
+		 * Create another ShareInputScan to reference the already-created
+		 * subplan.
+		 */
+		subplan = share_prepared_plan(cteroot, cteplaninfo->shared_plan);
 		subrtable = cteplaninfo->subrtable;
 		pathkeys = cteplaninfo->pathkeys;
-		cteplaninfo->nextPlanId++;
 	}
-		
+
 	rel->subplan = subplan;
 	rel->subrtable = subrtable;
 

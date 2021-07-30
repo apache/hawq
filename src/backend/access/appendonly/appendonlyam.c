@@ -107,13 +107,6 @@ typedef enum AoExecutorBlockKind
 	MaxAoExecutorBlockKind /* must always be last */
 } AoExecutorBlockKind;
 
-MemTuple
-appendonlygettup(AppendOnlyScanDesc scan,
-				 ScanDirection dir __attribute__((unused)),
-				 int nkeys,
-				 ScanKey key,
-				 TupleTableSlot *slot);
-
 static void
 AppendOnlyExecutionReadBlock_SetSegmentFileNum(
 	AppendOnlyExecutorReadBlock		*executorReadBlock,
@@ -1221,7 +1214,7 @@ LABEL_START_GETNEXTBLOCK:
  * the scankeys.
  * ----------------
  */
-MemTuple
+static MemTuple
 appendonlygettup(AppendOnlyScanDesc scan,
 				 ScanDirection dir __attribute__((unused)),
 				 int nkeys,

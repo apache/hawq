@@ -138,6 +138,7 @@
 #include "libpq/pqformat.h"
 #include "miscadmin.h"
 #include "pgstat.h"
+#include "pg_stat_activity_history_process.h"
 #include "postmaster/autovacuum.h"
 #include "postmaster/fork_process.h"
 #include "postmaster/pgarch.h"
@@ -152,6 +153,7 @@
 #include "postmaster/ddaserver.h"
 #include "postmaster/syslogger.h"
 #include "postmaster/perfmon_segmentinfo.h"
+#include "postmaster/identity.h"
 #include "storage/fd.h"
 #include "storage/ipc.h"
 #include "storage/pg_shmem.h"
@@ -293,6 +295,7 @@ static pid_t StartupPID = 0,
 			AutoVacPID = 0,
 			PgArchPID = 0,
 			PgStatPID = 0,
+			PgStatActivityHistroyPID = 0,
 			SysLoggerPID = 0;
 
 #define StartupPidsAllZero() (StartupPID == 0 || StartupPass2PID == 0 || StartupPass3PID == 0 || StartupPass4PID == 0)
@@ -1480,6 +1483,13 @@ StartMasterOrPrimaryPostmasterProcesses(void)
          * Initialize the autovacuum subsystem (again, no process start yet)
          */
 	    autovac_init();
+
+      /*
+       * Initialize the pgstatactivityhistory subsystem (again, no process start yet)
+       */
+	    if (AmIMaster())
+	        pgstatactivityhistory_init();
+
 	    gHaveCalledOnetimeInitFunctions = true;
 	}
 
@@ -2257,7 +2267,17 @@ ServerLoop(void)
 				if (Debug_print_server_processes)
 					elog(LOG,"restarted 'statistics collector process' as pid %ld",
 						 (long)PgStatPID);
+			}
 
+			/* We start a process to write query information in pg_stat_activity_history */
+			if (PgStatActivityHistroyPID == 0 && AmIMaster() &&
+				StartupPidsAllZero() && pmState > PM_STARTUP_PASS4 &&
+				!FatalError && Shutdown == NoShutdown && !SyncMaster)
+			{
+				PgStatActivityHistroyPID = pgstatactivityhistory_start();
+				if (Debug_print_server_processes)
+					elog(LOG,"restarted 'pg_stat_activity_history process' as pid %ld",
+						 (long)PgStatActivityHistroyPID);
 			}
 
 			/* MPP: If we have lost one of our servers, try to start a new one */
@@ -3661,6 +3681,16 @@ static bool CommenceNormalOperations(void)
 				didServiceProcessWork = true;
 			}
 		}
+		if (PgStatActivityHistroyPID == 0 && AmIMaster())
+		{
+			PgStatActivityHistroyPID = pgstatactivityhistory_start();
+			if (Debug_print_server_processes)
+			{
+				elog(LOG,"on startup successful: started 'pg_stat_activity_history process' as pid %ld",
+					 (long)PgStatActivityHistroyPID);
+				didServiceProcessWork = true;
+			}
+		}
 
 		for (s = 0; s < MaxPMSubType; s++)
 		{
@@ -4015,6 +4045,15 @@ static void do_reaper()
 				didServiceProcessWork = true;
 			}
 
+			if (PgStatActivityHistroyPID == 0 && AmIMaster())
+			{
+				PgStatActivityHistroyPID = pgstatactivityhistory_start();
+				if (Debug_print_server_processes)
+					elog(LOG,"on startup successful: started 'pg_stat_activity_history process' as pid %ld",
+						 (long)PgStatActivityHistroyPID);
+				didServiceProcessWork = true;
+			}
+
 			/*
 			 * Startup succeeded, commence normal operations
 			 */
@@ -4206,6 +4245,30 @@ static void do_reaper()
 			continue;
 		}
 
+		/*
+		 * Was it the pg_stat_activity_history process?  If so, just try to start a new
+		 * one; no need to force reset of the rest of the system.  (If fail,
+		 * we'll try again in future cycles of the main loop.)
+		 */
+		if (pid == PgStatActivityHistroyPID && AmIMaster())
+		{
+			PgStatActivityHistroyPID = 0;
+			if (!EXIT_STATUS_0(exitstatus))
+				LogChildExit(LOG, _("pg_stat_activity_history process"),
+							 pid, exitstatus);
+			if (pmState == PM_RUN)
+			{
+				PgStatActivityHistroyPID = pgstatactivityhistory_start();
+				if (Debug_print_server_processes)
+				{
+					elog(LOG,"restarted 'pg_stat_activity_history process' as pid %ld",
+						 (long)PgStatActivityHistroyPID);
+					didServiceProcessWork = true;
+				}
+			}
+			continue;
+		}
+
 		/* Was it the system logger?  If so, try to start a new one */
 		if (pid == SysLoggerPID)
 		{
@@ -4369,6 +4432,8 @@ GetServerProcessTitle(int pid)
 		return "autovacuum process";
 	else if (pid == PgStatPID)
 		return "statistics collector process";
+	else if (pid == PgStatActivityHistroyPID)
+		return "pg_stat_activity_history process";
 	else if (pid == PgArchPID)
 		return "archiver process";
 	else if (pid == SysLoggerPID)
@@ -4669,6 +4734,22 @@ HandleChildCrash(int pid, int exitstatus, const char *procname)
 								 (int) PgStatPID)));
 		signal_child(PgStatPID, SIGQUIT);
 		allow_immediate_pgstat_restart();
+	}
+
+	/*
+	 * Force a power-cycle of the pg_stat_activity_history process too.  (This isn't absolutely
+	 * necessary, but it seems like a good idea for robustness, and it
+	 * simplifies the state-machine logic in the case where a shutdown request
+	 * arrives during crash processing.)
+	 */
+	if (PgStatActivityHistroyPID != 0 && !FatalError)
+	{
+		ereport((Debug_print_server_processes ? LOG : DEBUG2),
+				(errmsg_internal("sending %s to process %d",
+								 "SIGQUIT",
+								 (int) PgStatActivityHistroyPID)));
+		signal_child(PgStatActivityHistroyPID, SIGQUIT);
+		allow_immediate_pgStatActivityHistory_restart();
 	}
 
 	/* We do NOT restart the syslogger */

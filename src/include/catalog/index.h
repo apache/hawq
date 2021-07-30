@@ -75,6 +75,16 @@ typedef struct IndexInfoOpaque
 	Oid        blkdirComptypeOid; /* complex type Oid for block directry relation */
 } IndexInfoOpaque;
 
+/* Use for magma index info */
+typedef struct MagmaIndexInfo
+{
+	char *indexName;
+	int2vector *indkey;  // index on these columns
+	char *indexType;  // index type, default is btree
+	bool unique;
+	bool primary;
+} MagmaIndexInfo;
+
 /* Typedef for callback function for IndexBuildScan */
 typedef void (*IndexBuildCallback) (Relation index,
 									ItemPointer tupleId,
@@ -99,6 +109,11 @@ extern Oid index_create(Oid heapRelationId,
 			 bool skip_build,
 			 bool concurrent,
 			 const char *altConName);
+
+extern void ext_constraint_create(Oid extRelationId,
+                                  struct IndexInfo *constraintInfo,
+                                  bool isPrimary,
+                                  bool allowSystemTableMods);
 
 extern void index_drop(Oid indexId);
 

@@ -31,11 +31,15 @@
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/pxfuriparser.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
+#include "access/plugstorage.h"
 #include "access/tuptoaster.h"
+#include "access/xact.h"
 #include "catalog/aoseg.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
+#include "catalog/index.h"
 #include "catalog/pg_amop.h"
 #include "catalog/pg_amproc.h"
 #include "catalog/pg_aggregate.h"
@@ -53,7 +57,9 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_tablespace.h"
+#include "catalog/pg_database.h"
 #include "catalog/toasting.h"
+#include "cdb/cdbdatalocality.h"
 #include "cdb/cdbdispatchedtablespaceinfo.h"
 #include "cdb/cdbfilesystemcredential.h"
 #include "cdb/cdbpartition.h"
@@ -102,7 +108,8 @@ int QueryContextDispatchingSizeMemoryLimit = 100 * 1024; /* KB */
 
 enum QueryContextDispatchingItemType
 {
-    MasterXid, TablespaceLocation, TupleType, EmptyTable, FileSystemCredential, Namespace
+    MasterXid, TablespaceLocation, TupleType, EmptyTable,
+    FileSystemCredentials, Namespace, Database, PlugStorageSnapshot
 };
 typedef enum QueryContextDispatchingItemType QueryContextDispatchingItemType;
 
@@ -110,6 +117,7 @@ enum QueryContextDispatchingObjType
 {
 	RelationType,
 	TablespaceType,
+	DistributionPolicyType,
 	NamespaceType,
 	ProcType,
 	AggType,
@@ -148,9 +156,6 @@ static void
 prepareDispatchedCatalogOpClassForType(QueryContextInfo *ctx, Oid typeOid);
 
 static void
-prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid);
-
-static void
 prepareDispatchedCatalogOperator(QueryContextInfo *ctx, Oid opOid);
 
 static void
@@ -163,7 +168,7 @@ static void
 prepareDispatchedCatalogFunctionExpr(QueryContextInfo *cxt, Expr *expr);
 
 static void
-prepareDispatchedCatalogForAoParquet(QueryContextInfo *cxt, Oid relid,
+prepareDispatchedCatalogForAo(QueryContextInfo *cxt, Oid relid,
 								        bool forInsert, List *segnos);
 static void
 prepareAllDispatchedCatalogTablespace(QueryContextInfo *ctx);
@@ -205,6 +210,10 @@ GetQueryContextDipsatchingFileLocation(char **buffer)
 
     if (NULL == path)
     {
+    	/* table space of current database do not have to be distributed when default
+    	 * filespace is pg_default which is for magma tablespace*/
+    	if (get_database_dts(MyDatabaseId) == DEFAULTTABLESPACE_OID)
+    		return;
         elog(ERROR, "cannot get distributed table space location for current database,"
                 " table space oid is %u",
                 tablespace);
@@ -241,6 +250,8 @@ CreateQueryContextInfo(void)
     AddAuxInfoToQueryContextInfo(retval);
 
     retval->finalized = false;
+
+    retval->udfNamespaceOid = NIL;
 
     return retval;
 }
@@ -310,7 +321,7 @@ FinalizeQueryContextInfo(QueryContextInfo *cxt)
 
         if (credential && size > 0)
         {
-			pq_sendint(&buffer, (int) FileSystemCredential, sizeof(char));
+			pq_sendint(&buffer, (int) FileSystemCredentials, sizeof(char));
 			pq_sendint(&buffer, size, sizeof(int));
 
 			WriteData(cxt, buffer.data, buffer.len);
@@ -346,6 +357,9 @@ DropQueryContextInfo(QueryContextInfo *cxt)
 
     if (cxt->errTblOid)
     	list_free(cxt->errTblOid);
+
+    if (cxt->udfNamespaceOid)
+      list_free(cxt->udfNamespaceOid);
 
     pfree(cxt);
 }
@@ -437,7 +451,7 @@ ReadFully(File file, const char *path, char *buffer, int size,
  *
  * report error if reach end of file and errorOnEof is true.
  */
-static bool
+bool
 ReadData(QueryContextInfo *cxt, char *buffer, int size,
         bool errorOnEof)
 {
@@ -596,7 +610,7 @@ RebuildMasterTransactionId(QueryContextInfo *cxt)
     SetMasterTransactionId(masterXid);
 }
 
-static void
+ void
 RebuildFilesystemCredentials(QueryContextInfo *cxt, HTAB ** currentFilesystemCredentials,
         MemoryContext *currentFilesystemCredentialsMemoryContext)
 {
@@ -799,6 +813,73 @@ RebuildNamespace(QueryContextInfo *cxt)
 	MemoryContextSwitchTo(oldContext);
 }
 
+void
+RebuildDatabase(QueryContextInfo *cxt)
+{
+	MemoryContext oldContext;
+	int len;
+	char buffer[4], *binary;
+	oldContext = MemoryContextSwitchTo(MessageContext);
+	ReadData(cxt, buffer, sizeof(buffer), TRUE);
+
+	len = (int) ntohl(*(uint32 *) buffer);
+	binary = palloc(len);
+	if(ReadData(cxt, binary, len, TRUE))
+	{
+		database = pstrdup(binary);
+	} else {
+		pfree(binary);
+		MemoryContextSwitchTo(oldContext);
+		elog(ERROR, "Couldn't rebuild database");
+	}
+	pfree(binary);
+	MemoryContextSwitchTo(oldContext);
+}
+
+void
+RebuildPlugStorageSnapshot(QueryContextInfo *cxt)
+{
+	MemoryContext oldContext;
+	oldContext = MemoryContextSwitchTo(MessageContext);
+    MagmaSnapshot snapshot;
+        ReadData(cxt, &(snapshot.cmdIdInTransaction), sizeof(uint32_t), TRUE);
+	ReadData(cxt, &(snapshot.currentTransaction), sizeof(MagmaTxnAction), TRUE);
+	ReadData(cxt, &(snapshot.txnActions.txnActionStartOffset), sizeof(uint64_t), TRUE);
+	ReadData(cxt, &(snapshot.txnActions.txnActionSize), sizeof(uint32_t), TRUE);
+	snapshot.txnActions.txnActions =
+	    (MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot.txnActions
+	                              .txnActionSize);
+
+	if (snapshot.txnActions.txnActionSize > 0)
+	{
+	    ReadData(cxt, snapshot.txnActions.txnActions,
+	             sizeof(MagmaTxnAction) * snapshot.txnActions.txnActionSize, TRUE);
+	}
+  /*
+	elog(LOG, "SNAPSHOT DEBUG: GET LOCAL (%llu, %u, %llu, %u, %c, %u)",
+	     snapshot.currentTransaction.startts.logicaltime,
+	     snapshot.currentTransaction.startts.logicalcount,
+	     snapshot.currentTransaction.endts.logicaltime,
+	     snapshot.currentTransaction.endts.logicalcount,
+	     snapshot.currentTransaction.status,
+	     snapshot.visibleMapSize);
+  */
+	PlugStorageSetTransactionSnapshot(&snapshot);
+
+	pfree(snapshot.txnActions.txnActions);
+
+	MagmaSnapshot *s = PlugStorageGetTransactionSnapshot();
+
+	elog(LOG, "SNAPSHOT DEBUG: GET TOP (%llu, %u, %llu, %u, %d)",
+	     s->currentTransaction.txnId,
+	     s->currentTransaction.txnStatus,
+	     s->txnActions.txnActionStartOffset,
+	     s->txnActions.txnActionSize,
+	     s->cmdIdInTransaction);
+
+	MemoryContextSwitchTo(oldContext);
+}
+
 /*
  * rebuild execute context
  */
@@ -827,12 +908,18 @@ RebuildQueryContext(QueryContextInfo *cxt, HTAB **currentFilesystemCredentials,
         case EmptyTable:
             RebuildEmptyTable(cxt);
             break;
-        case FileSystemCredential:
+        case FileSystemCredentials:
         	RebuildFilesystemCredentials(cxt, currentFilesystemCredentials,
         	        currentFilesystemCredentialsMemoryContext);
         	break;
         case Namespace:
             RebuildNamespace(cxt);
+            break;
+        case Database:
+            RebuildDatabase(cxt);
+            break;
+        case PlugStorageSnapshot:
+            RebuildPlugStorageSnapshot(cxt);
             break;
         default:
             ereport(ERROR,
@@ -1107,6 +1194,76 @@ prepareDispatchedCatalogNamespace(QueryContextInfo *cxt, Oid namespace)
     ReleaseSysCache(tuple);
 }
 
+/*
+ * collect pg_database tuples for oid.
+ * add them to in-memory heap table for dispatcher
+ */
+void
+prepareDispatchedCatalogDatabase(QueryContextInfo *cxt, char *database)
+{
+    Assert(cxt != NULL);
+    Assert(!cxt->finalized);
+    Assert(database != NULL);
+
+    StringInfoData header;
+    initStringInfo(&header);
+
+    int len = strlen(database);
+
+    pq_sendint(&header, Database, sizeof(char));
+    pq_sendint(&header, len + 1, sizeof(int32));
+
+    WriteData(cxt, header.data, header.len);
+    WriteData(cxt, database, len + 1);
+
+    pfree(header.data);
+}
+
+/*
+ * collect pluggable storage snapshot information.
+ * add them to in-memory heap table for dispatcher
+ */
+void
+prepareDispatchedPlugStorageSnapshot(QueryContextInfo *cxt, MagmaSnapshot *snapshot)
+{
+    Assert(cxt != NULL);
+    Assert(!cxt->finalized);
+
+    if (snapshot == NULL)
+    {
+        return;
+    }
+
+    StringInfoData header;
+    initStringInfo(&header);
+
+    /*
+     * always reset command id in transaction before dispatching as this counter
+     * varies along with command execution
+     */
+    snapshot->cmdIdInTransaction = GetCurrentCommandId();
+
+    elog(LOG, "SNAPSHOT DEBUG: PUT (%llu, %u, %llu, %u, %d)",
+         snapshot->currentTransaction.txnId,
+         snapshot->currentTransaction.txnStatus,
+         snapshot->txnActions.txnActionStartOffset,
+         snapshot->txnActions.txnActionSize,
+	 snapshot->cmdIdInTransaction);
+
+    pq_sendint(&header, PlugStorageSnapshot, sizeof(char));
+    WriteData(cxt, header.data, header.len);
+    WriteData(cxt, &(snapshot->cmdIdInTransaction), sizeof(uint32_t));
+    WriteData(cxt, &(snapshot->currentTransaction), sizeof(MagmaTxnAction));
+    WriteData(cxt, &(snapshot->txnActions.txnActionStartOffset), sizeof(uint64_t));
+    WriteData(cxt, &(snapshot->txnActions.txnActionSize), sizeof(uint32_t));
+    if (snapshot->txnActions.txnActionSize > 0)
+    {
+        WriteData(cxt, snapshot->txnActions.txnActions,
+            sizeof(MagmaTxnAction) * snapshot->txnActions.txnActionSize);
+    }
+    pfree(header.data);
+}
+
 static void
 prepareDispatchedCatalogFileSystemCredential(const char *path)
 {
@@ -1116,6 +1273,32 @@ prepareDispatchedCatalogFileSystemCredential(const char *path)
 	Insist(Gp_role != GP_ROLE_EXECUTE);
 
 	add_filesystem_credential(path);
+}
+
+/*
+ * collect gp_distribution_policy tuples for oid.
+ * add them to in-memory heap table for dispatcher
+ */
+void
+prepareDispatchedCatalogDistributionPolicy(QueryContextInfo *ctx, Oid relid)
+{
+    // dispatch nothing for build-in table
+    if (relid == InvalidOid || relid < FirstNormalObjectId)
+        return;
+
+    if (alreadyAddedForDispatching(ctx->htab, relid, DistributionPolicyType))
+    {
+        return;
+    }
+
+    HeapTuple tuple = caql_getfirst(
+        NULL,
+        cql("SELECT * FROM gp_distribution_policy "
+          " WHERE localoid = :1 ",
+          ObjectIdGetDatum(relid)));
+    if (HeapTupleIsValid(tuple))
+      AddTupleToContextInfo(ctx, GpPolicyRelationId, "gp_distribution_policy",
+                            tuple, MASTER_CONTENT_ID);
 }
 
 /*
@@ -1261,52 +1444,38 @@ prepareDispatchedCatalogAttribute(QueryContextInfo *cxt,
 /*
  * collect relation's defalut values for dispatching
  */
-static void
-prepareDispatchedCatalogAttributeDefault(QueryContextInfo *cxt,
-        Oid reloid)
-{
-    Relation rel;
-    Datum value;
-    HeapTuple attrdeftuple;
+static void prepareDispatchedCatalogAttributeDefault(QueryContextInfo *cxt,
+                                                     Oid reloid) {
+  Relation rel = heap_open(AttrDefaultRelationId, AccessShareLock);
+  cqContext *pcqCtx = caql_beginscan(NULL, cql("SELECT * FROM pg_attrdef "
+                                               " WHERE adrelid = :1 ",
+                                               ObjectIdGetDatum(reloid)));
+  Datum value;
+  HeapTuple tuple;
+  while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx))) {
+    /*
+     * check for sequence
+     */
+    Expr *expr = NULL;
+    bool isNull;
 
-    ScanKeyData skey;
-    SysScanDesc scandesc;
+    value = fastgetattr(tuple, Anum_pg_attrdef_adbin, RelationGetDescr(rel),
+                        &isNull);
 
-    rel = heap_open(AttrDefaultRelationId, AccessShareLock);
+    Assert(FALSE == isNull);
 
-    ScanKeyInit(&skey, Anum_pg_attrdef_adrelid, BTEqualStrategyNumber, F_OIDEQ,
-            ObjectIdGetDatum(reloid));
-    scandesc = systable_beginscan(rel, InvalidOid, FALSE, SnapshotNow, 1,
-            &skey);
-    attrdeftuple = systable_getnext(scandesc);
-    while (HeapTupleIsValid(attrdeftuple))
-    {
-        /*
-         * check for sequence
-         */
-        Expr *expr = NULL;
-        bool isNull;
-
-        value = fastgetattr(attrdeftuple, Anum_pg_attrdef_adbin,
-                RelationGetDescr(rel), &isNull);
-
-        Assert(FALSE == isNull);
-
-        expr = stringToNode(TextDatumGetCString(value));
-        if (expr)
-        {
-            prepareDispatchedCatalogFunctionExpr(cxt, expr);
-            pfree(expr);
-        }
-
-        AddTupleWithToastsToContextInfo(cxt, AttrDefaultRelationId, "pg_attrdef",
-                attrdeftuple, MASTER_CONTENT_ID);
-        attrdeftuple = systable_getnext(scandesc);
+    expr = stringToNode(TextDatumGetCString(value));
+    if (expr) {
+      prepareDispatchedCatalogFunctionExpr(cxt, expr);
+      pfree(expr);
     }
-    systable_endscan(scandesc);
 
-    heap_close(rel, AccessShareLock);
+    AddTupleWithToastsToContextInfo(cxt, AttrDefaultRelationId, "pg_attrdef",
+                                    tuple, MASTER_CONTENT_ID);
+  }
 
+  caql_endscan(pcqCtx);
+  heap_close(rel, AccessShareLock);
 }
 
 /*
@@ -1379,33 +1548,18 @@ prepareDispatchedCatalogTypeByRelation(QueryContextInfo *cxt,
 /*
  * collect pg_constraint for metadata dispatching
  */
-static void
-prepareDispatchedCatalogConstraint(QueryContextInfo *cxt,
-        Oid relid)
-{
-    Relation rel;
+static void prepareDispatchedCatalogConstraint(QueryContextInfo *cxt,
+                                               Oid relid) {
+  cqContext *pcqCtx = caql_beginscan(NULL, cql("SELECT * FROM pg_constraint "
+                                               " WHERE conrelid = :1 ",
+                                               ObjectIdGetDatum(relid)));
+  HeapTuple tuple;
+  while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx))) {
+    AddTupleWithToastsToContextInfo(cxt, ConstraintRelationId, "pg_constraint",
+                                    tuple, MASTER_CONTENT_ID);
+  }
 
-    ScanKeyData skey;
-    SysScanDesc scandesc;
-
-    HeapTuple constuple;
-
-    rel = heap_open(ConstraintRelationId, AccessShareLock);
-
-    ScanKeyInit(&skey, Anum_pg_constraint_conrelid, BTEqualStrategyNumber,
-            F_OIDEQ, ObjectIdGetDatum(relid));
-    scandesc = systable_beginscan(rel, InvalidOid, FALSE, SnapshotNow, 1,
-            &skey);
-    constuple = systable_getnext(scandesc);
-    while (constuple)
-    {
-        AddTupleWithToastsToContextInfo(cxt, ConstraintRelationId, "pg_constraint",
-                constuple, MASTER_CONTENT_ID);
-        constuple = systable_getnext(scandesc);
-    }
-    systable_endscan(scandesc);
-
-    heap_close(rel, AccessShareLock);
+  caql_endscan(pcqCtx);
 }
 
 /*
@@ -1518,19 +1672,52 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
             NULL);
 
 	/* The dfs tablespace oid must be dispatched. */
-	if (DatumGetObjectId(tablespace) == InvalidOid && relstorage_is_ao(relstorage))
+//  if (DatumGetObjectId(tablespace) == InvalidOid && (relstorage_is_ao(relstorage) || (relstorage_is_external(relstorage))))
+  if (DatumGetObjectId(tablespace) == InvalidOid)
 		prepareDispatchedCatalogTablespace(cxt, get_database_dts(MyDatabaseId));
 	else
 		prepareDispatchedCatalogTablespace(cxt, DatumGetObjectId(tablespace));
+
+	if (Gp_role != GP_ROLE_EXECUTE && enable_secure_filesystem &&
+	    relstorage_is_external(relstorage) && relkind == RELKIND_RELATION)
+	{
+		char *formatterName = NULL;
+		ExtTableEntry *ete = GetExtTableEntry(relid);
+		int formatterType = ExternalTableType_Invalid;
+
+		getExternalTableTypeStr(ete->fmtcode, ete->fmtopts, &formatterType,
+				&formatterName);
+		if (formatterName
+				&& !(pg_strncasecmp(formatterName, "text", strlen("text"))
+						&& pg_strncasecmp(formatterName, "csv", strlen("csv"))
+						&& pg_strncasecmp(formatterName, "orc", strlen("orc"))))
+		{
+			Value *v;
+			char *uri_str = NULL;
+			v = list_nth(ete->locations, 0);
+			uri_str = pstrdup(v->val.str);
+			add_filesystem_credential(uri_str);
+		}
+		pfree(ete);
+		if (formatterName)
+			pfree(formatterName);
+	}
+	/* The pluggable storage snapshot must be dispatched */
+	prepareDispatchedPlugStorageSnapshot(cxt, PlugStorageGetTransactionSnapshot());
+
+	/* The distribution policy for table */
+	prepareDispatchedCatalogDistributionPolicy(cxt, relid);
 
 	switch (DatumGetChar(relstorage))
 	{
 	case RELSTORAGE_AOROWS:
 	case RELSTORAGE_PARQUET:
-		prepareDispatchedCatalogForAoParquet(cxt, relid, forInsert, segnos);
+	case RELSTORAGE_ORC:
+		prepareDispatchedCatalogForAo(cxt, relid, forInsert, segnos);
 		break;
 	case RELSTORAGE_EXTERNAL:
 	    prepareDispatchedCatalogExternalTable(cxt, relid);
+	    prepareDispatchedCatalogDatabase(cxt, get_database_name(MyDatabaseId));
 	    break;
 	case RELSTORAGE_VIRTUAL:
 	    break;
@@ -1549,6 +1736,8 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
 	}
 
     ReleaseSysCache(classtuple);
+
+  elog(DEBUG1, "end of prepareDispatchedCatalogSingleRelation");
 }
 
 static Oid
@@ -1681,7 +1870,7 @@ prepareDispatchedCatalogGpAppendOnly(QueryContextInfo *cxt,
  * add them to in-memory heap table for dispatcher.
  */
 static void
-prepareDispatchedCatalogForAoParquet(QueryContextInfo *cxt, Oid relid,
+prepareDispatchedCatalogForAo(QueryContextInfo *cxt, Oid relid,
         bool forInsert, List *segnos)
 {
 
@@ -1693,7 +1882,7 @@ prepareDispatchedCatalogForAoParquet(QueryContextInfo *cxt, Oid relid,
 
     rel = heap_open(relid, AccessShareLock);
 
-    Assert((RelationIsAoRows(rel) || RelationIsParquet(rel)));
+    Assert(RelationIsAo(rel));
 
     /*
      * add tuple in pg_appendonly
@@ -1793,6 +1982,42 @@ prepareDispatchedCatalogExternalTable(QueryContextInfo *cxt,
     heap_close(pg_exttable_rel, RowExclusiveLock);
 
     heap_close(rel, AccessShareLock);
+}
+
+static void prepareDispatchedUdfInSameNamespace(QueryContextInfo *cxt,
+                                                Oid funcid) {
+  cqContext *pcqCtx;
+  HeapTuple procTuple;
+  Oid namespaceId;
+
+  // find namespace oid
+  pcqCtx = caql_beginscan(NULL, cql("select * from pg_proc where oid = :1",
+                                    ObjectIdGetDatum(funcid)));
+  procTuple = caql_getnext(pcqCtx);
+  if (!HeapTupleIsValid(procTuple))
+    elog(ERROR, "cache lookup failed for proc %u", funcid);
+  bool isNull = false;
+  Datum datum = caql_getattr(pcqCtx, Anum_pg_proc_pronamespace, &isNull);
+  namespaceId = DatumGetObjectId(datum);
+  caql_endscan(pcqCtx);
+
+  if (cxt->udfNamespaceOid &&
+      list_find_oid(cxt->udfNamespaceOid, namespaceId) != -1)
+    return;
+  cxt->udfNamespaceOid = lappend_oid(cxt->udfNamespaceOid, namespaceId);
+
+  // dispatch all udf in the same namespace
+  pcqCtx = caql_beginscan(
+      NULL,
+      cql("select * from pg_proc where pronamespace = :1 and oid > :2",
+          ObjectIdGetDatum(namespaceId), Int64GetDatum(FirstNormalObjectId)));
+  while (HeapTupleIsValid(procTuple = caql_getnext(pcqCtx))) {
+    Oid procOid = HeapTupleGetOid(procTuple);
+    if (alreadyAddedForDispatching(cxt->htab, procOid, ProcType)) continue;
+    AddTupleToContextInfo(cxt, ProcedureRelationId, "pg_proc", procTuple,
+                          MASTER_CONTENT_ID);
+  }
+  caql_endscan(pcqCtx);
 }
 
 static bool collect_func_walker(Node *node, QueryContextInfo *context)
@@ -1906,6 +2131,10 @@ static bool collect_func_walker(Node *node, QueryContextInfo *context)
 
 				/* build the dispacth for the function itself */
 				prepareDispatchedCatalogFunction(context, func->funcid);
+
+				// dispatch all udf in the same namespace
+				if (pg_strcasecmp(dispatch_udf_mode_str, "ON") == 0)
+					prepareDispatchedUdfInSameNamespace(context, func->funcid);
 			}
 			/* Treat pg_database_size specially */
 			else if (PgDatabaseSizeOidProcId == func->funcid || PgDatabaseSizeNameProcId == func->funcid)
@@ -2046,6 +2275,41 @@ prepareDispatchedCatalogAuthUser(QueryContextInfo *cxt, Oid userOid)
 	caql_endscan(pcqCtx);
 }
 
+static void prepareDispatchedUdfInGuc(QueryContextInfo *cxt, const char *str) {
+  char separator = ',';
+  if (str) {
+    char *pos = str;
+    char *start = str;
+    while (true) {
+      if ((*pos == separator || *pos == '\0')) {
+        if (pos > start) {
+          char *proName = palloc(sizeof(char) * (pos - start + 1));
+          strncpy(proName, start, pos - start);
+          proName[pos - start] = '\0';
+          HeapTuple procTuple;
+          cqContext *pcqCtx;
+          pcqCtx = caql_beginscan(NULL, cql("SELECT * FROM pg_proc "
+                                            "WHERE proname = :1 ",
+                                            CStringGetDatum(proName)));
+          while (HeapTupleIsValid(procTuple = caql_getnext(pcqCtx))) {
+            Oid procOid = HeapTupleGetOid(procTuple);
+            if (procOid < FirstNormalObjectId) continue;
+            if (alreadyAddedForDispatching(cxt->htab, procOid, ProcType))
+              continue;
+
+            AddTupleToContextInfo(cxt, ProcedureRelationId, "pg_proc",
+                                  procTuple, MASTER_CONTENT_ID);
+          }
+          caql_endscan(pcqCtx);
+        }
+        if (*pos == '\0') break;
+        start = pos + 1;
+      }
+      ++pos;
+    }
+  }
+}
+
 /*
  * recursively scan the expression chain and collect function information
  */
@@ -2152,7 +2416,7 @@ prepareDispatchedCatalogLanguage(QueryContextInfo *ctx, Oid langOid)
 	caql_endscan(pcqCtx);			
 }
 
-static void
+void
 prepareDispatchedCatalogType(QueryContextInfo *ctx, Oid typeOid)
 {
 	HeapTuple typetuple;
@@ -2572,12 +2836,12 @@ findSegnofromMap(Oid relid, List *segnoMaps)
  */
 void
 prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
-        bool forInsert, List *segnoMaps)
+        bool forInsert, List *segnoMaps, bool expandPartiton)
 {
     List *children = NIL;
     ListCell *child;
 
-    if (rel_is_partitioned(relid))
+    if (expandPartiton && rel_is_partitioned(relid))
     {
         children = find_all_inheritors(relid);
         foreach(child, children)
@@ -2585,10 +2849,13 @@ prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
             Oid myrelid = lfirst_oid(child);
             if (forInsert)
             {
-				List *mysegnos = findSegnofromMap(myrelid, segnoMaps);
-                Assert(mysegnos != NIL);
-                prepareDispatchedCatalogSingleRelation(cxt, myrelid, TRUE,
-                        mysegnos);
+            	List *mysegnos = findSegnofromMap(myrelid, segnoMaps);
+                if(mysegnos != NIL)
+                	prepareDispatchedCatalogSingleRelation(cxt, myrelid, TRUE,
+                        	mysegnos);
+                else
+                	prepareDispatchedCatalogSingleRelation(cxt, myrelid, TRUE,
+                	                        0);
 
             }
             else
@@ -2600,7 +2867,10 @@ prepareDispatchedCatalogRelation(QueryContextInfo *cxt, Oid relid,
     }
     else
     {
-        if (forInsert && NULL != segnoMaps)
+       /*
+        * magma table does not have segnoMaps.
+        */
+        if (forInsert && NULL != segnoMaps && !dataStoredInMagmaByOid(relid))
         {
             List *mysegnos = findSegnofromMap(relid, segnoMaps);
 
@@ -2642,16 +2912,18 @@ prepareDispatchedCatalogTargets(QueryContextInfo *cxt, List *targets)
 void
 prepareDispatchedCatalogPlan(QueryContextInfo *cxt, Plan *plan)
 {
-    if (!plan)
-        return;
+  if (!plan) return;
 
-    Assert(NULL != cxt);
+  Assert(NULL != cxt);
 	/*
 	Add session user pg_authid tuple to the context
 	*/
 	prepareDispatchedCatalogAuthUser(cxt, GetSessionUserId());
 
-    collect_func_walker((Node *)plan, cxt);
+  collect_func_walker((Node *)plan, cxt);
+
+  // dispatch udf in guc dispatch_udf specified
+  prepareDispatchedUdfInGuc(cxt, dispatch_udf_str);
 }
 
 /*
@@ -2807,14 +3079,102 @@ UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback)
 		Insist(sendback->numfiles == 1);
 		UpdateParquetFileSegInfo(rel, aoEntry, sendback->segno,
 				sendback->eof[0], sendback->uncompressed_eof[0], sendback->insertCount);
-	}
+  } else if (RelationIsOrc(rel)) {
+    Insist(sendback->numfiles == 1);
+    updateOrcFileSegInfo(rel, aoEntry, sendback->segno, sendback->eof[0],
+                         sendback->uncompressed_eof[0], sendback->insertCount,
+                         true);
+  }
 
-	heap_close(rel, AccessShareLock);
+	pfree(aoEntry);
+  heap_close(rel, AccessShareLock);
 
 	/*
 	 * make the change available
 	 */
 	CommandCounterIncrement();
+}
+
+void UpdateCatalogModifiedOnSegmentsForUD(
+    QueryContextDispatchingSendBack sendback, List **relFileNodeInfo,
+    List **indexList) {
+  Assert(NULL != sendback);
+
+  AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(sendback->relid, SnapshotNow);
+  Assert(aoEntry != NULL);
+
+  Relation rel = heap_open(sendback->relid, AccessShareLock);
+
+  if (!RelationIsOrc(rel)) {
+    heap_close(rel, AccessShareLock);
+    return;
+  }
+
+  Insist(sendback->numfiles == 1);
+
+  heap_close(rel, AccessShareLock);
+
+  Oid relFileNode = InvalidOid;
+  ListCell *curCell = NULL;
+  ListCell *prevCell = NULL;
+  foreach (curCell, *relFileNodeInfo) {
+    if (lfirst_oid(curCell) == RelationGetRelid(rel)) {
+      ListCell *nextCell = curCell->next;
+      relFileNode = lfirst_oid(nextCell);
+      *relFileNodeInfo = list_delete_cell(*relFileNodeInfo, curCell, prevCell);
+      *relFileNodeInfo = list_delete_cell(*relFileNodeInfo, nextCell, prevCell);
+      break;
+    }
+    curCell = curCell->next;
+    prevCell = curCell;
+  }
+
+  if (relFileNode != InvalidOid) {
+    // lock relation for catalog change
+    LockRelation(rel, AccessExclusiveLock);
+
+    Relation pg_class = heap_open(RelationRelationId, RowExclusiveLock);
+    cqContext cqc;
+    cqContext *pcqCtx = caql_addrel(cqclr(&cqc), pg_class);
+    HeapTuple tuple =
+        caql_getfirst(pcqCtx, cql("SELECT * FROM pg_class "
+                                  " WHERE oid = :1 "
+                                  " FOR UPDATE ",
+                                  ObjectIdGetDatum(RelationGetRelid(rel))));
+    if (!HeapTupleIsValid(tuple))
+      elog(ERROR, "could not find tuple for relation %u",
+           RelationGetRelid(rel));
+    Form_pg_class rd_rel = (Form_pg_class)GETSTRUCT(tuple);
+    rd_rel->relfilenode = relFileNode;
+    caql_update_current(pcqCtx, tuple);
+    heap_freetuple(tuple);
+    heap_close(pg_class, RowExclusiveLock);
+
+    if (sendback->varblock != ORC_DIRECT_DISPATCH) {
+      Relation rel = relation_open(aoEntry->segrelid, AccessExclusiveLock);
+      setNewRelfilenode(rel);
+      heap_close(rel, AccessExclusiveLock);
+      *indexList = lappend_oid(*indexList, aoEntry->segidxid);
+    }
+  }
+  if (sendback->varblock != ORC_DIRECT_DISPATCH)
+    insertOrcSegnoEntry(aoEntry, sendback->segno, sendback->insertCount,
+                        sendback->eof[0], sendback->uncompressed_eof[0]);
+  else
+    updateOrcFileSegInfo(rel, aoEntry, sendback->segno, sendback->eof[0],
+                         sendback->uncompressed_eof[0], sendback->insertCount,
+                         false);
+
+  pfree(aoEntry);
+}
+
+void UpdateCatalogIndexForUD(List *indexList) {
+  ListCell *cell;
+  foreach (cell, indexList) {
+    List *extraOids = NIL;
+    reindex_index(lfirst_oid(cell), InvalidOid, &extraOids);
+  }
+  CommandCounterIncrement();
 }
 
 StringInfo
@@ -2976,6 +3336,10 @@ fetchSegFileInfos(Oid relid, List *segnos)
 			 */
 			aoEntry = GetAppendOnlyEntry(relid, SnapshotNow);
 			ParquetFetchSegFileInfo(aoEntry, result, SnapshotNow);
+		}
+		else if (RELSTORAGE_ORC == storageChar) {
+		  aoEntry = GetAppendOnlyEntry(relid, SnapshotNow);
+		  fetchOrcSegFileInfo(aoEntry, result, SnapshotNow);
 		}
 		else
 		{

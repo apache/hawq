@@ -1232,8 +1232,7 @@ vacuum_rel(Relation onerel, VacuumStmt *vacstmt, LOCKMODE lmode, List *updated_s
 	 * Remember the relation's TOAST and AO segments relations for later
 	 */
 	toast_relid = onerel->rd_rel->reltoastrelid;
-	if (RelationIsAoRows(onerel) ||
-		RelationIsParquet(onerel))
+	if (RelationIsAo(onerel))
 		GetAppendOnlyEntryAuxOids(RelationGetRelid(onerel), SnapshotNow,
 								  &aoseg_relid, NULL,
 								  &aoblkdir_relid, NULL);
@@ -1370,6 +1369,10 @@ full_vacuum_rel(Relation onerel, VacuumStmt *vacstmt, List *updated_stats)
 	else if (RelationIsParquet(onerel))
 	{
 		vacuum_parquet_rel(onerel, vacrelstats, true);
+	}
+	else if (RelationIsOrc(onerel))
+	{
+	  vacuum_orc_rel(onerel, vacrelstats, true);
 	}
 	else
 	{
@@ -3866,7 +3869,7 @@ open_relation_and_check_permission(VacuumStmt *vacstmt,
 	 * There's a race condition here: the rel may have gone away since the
 	 * last time we saw it.  If so, we don't need to vacuum it.
 	 */
-	onerel = try_relation_open(relid, lmode, false);
+	onerel = try_relation_open(relid, lmode, false, false);
 
 	if (!onerel)
 		return NULL;

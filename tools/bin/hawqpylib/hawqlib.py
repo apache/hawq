@@ -25,16 +25,16 @@ from xml.etree.ElementTree import ElementTree
 from pygresql.pg import DatabaseError
 import shutil
 from gppylib.db import dbconn
-from gppylib.commands.base import WorkerPool, REMOTE
+from gppylib.commands.base import WorkerPool, REMOTE, SSH_CONNECTTIMEOUT, SSH_CONNECTIONATTEMPTS
 from gppylib.commands.unix import Echo
 import re
 
 
 class HawqCommands(object):
-    def __init__(self, function_list=None, name='HAWQ', action_name = 'execute', logger = None):
+    def __init__(self, function_list=None, name='HAWQ', action_name='execute', logger=None):
         self.function_list = function_list
-        self.name = name 
-        self.action_name = action_name 
+        self.name = name
+        self.action_name = action_name
         self.return_flag = 0
         self.thread_list = []
         if logger:
@@ -66,7 +66,7 @@ class HawqCommands(object):
 
         for thread_instance in self.thread_list:
             thread_instance.start()
-            #print threading.enumerate()
+            # print threading.enumerate()
 
         for thread_instance in self.thread_list:
             thread_instance.join()
@@ -76,7 +76,7 @@ class HawqCommands(object):
 
 
 class threads_with_return(object):
-    def __init__(self, function_list=None, name='HAWQ', action_name = 'execute', logger = None, return_values = None):
+    def __init__(self, function_list=None, name='HAWQ', action_name='execute', logger=None, return_values=None):
         self.function_list = function_list
         self.name = name
         self.action_name = action_name
@@ -109,7 +109,7 @@ class threads_with_return(object):
 
         for thread_instance in self.thread_list:
             thread_instance.start()
-            #print threading.enumerate()
+            # print threading.enumerate()
 
         for thread_instance in self.thread_list:
             thread_instance.join()
@@ -151,9 +151,9 @@ def get_xml_values(xmlfile):
 
 
 class HawqXMLParser:
-    def __init__(self, GPHOME):
+    def __init__(self, GPHOME, xml_file='hawq-site.xml'):
         self.GPHOME = GPHOME
-        self.xml_file = "%s/etc/hawq-site.xml" % GPHOME
+        self.xml_file = "%s/etc/%s" % (GPHOME, xml_file)
         self.hawq_dict = {}
         self.propertyValue = ""
 
@@ -199,15 +199,21 @@ class HawqXMLParser:
         return xmldoc
 
 
-def check_hostname_equal(remote_host, user = ""):
+def check_hostname_equal(remote_host, user=""):
+    if not is_node_alive(remote_host, user):
+        return False
     cmd = "hostname"
-    result_local, local_hostname, stderr_remote  = local_ssh_output(cmd)
+    result_local, local_hostname, stderr_remote = local_ssh_output(cmd)
     result_remote, remote_hostname, stderr_remote = remote_ssh_output(cmd, remote_host, user)
     if result_remote != 0:
-        print "Execute command '%s' failed with return code %d on %s." % (cmd, result_remote, remote_host)
-        print "Either ssh connection fails or command exits with error. Details:"
-        print stderr_remote
-        print "For ssh connection issue, please make sure passwordless ssh is enabled or check remote host."
+        print
+        "Execute command '%s' failed with return code %d on %s." % (cmd, result_remote, remote_host)
+        print
+        "Either ssh connection fails or command exits with error. Details:"
+        print
+        stderr_remote
+        print
+        "For ssh connection issue, please make sure passwordless ssh is enabled or check remote host."
         sys.exit(result_remote)
 
     if local_hostname.strip() == remote_hostname.strip():
@@ -216,8 +222,7 @@ def check_hostname_equal(remote_host, user = ""):
         return False
 
 
-def check_hawq_running(host, data_directory, port, user = '', logger = None):
-
+def check_hawq_running(host, data_directory, port, user='', logger=None):
     hawq_running = True
     hawq_pid_file_path = data_directory + '/postmaster.pid'
 
@@ -226,7 +231,7 @@ def check_hawq_running(host, data_directory, port, user = '', logger = None):
             if logger:
                 logger.warning("Have a postmaster.pid file but no hawq process running")
 
-            lockfile="/tmp/.s.PGSQL.%s" % port
+            lockfile = "/tmp/.s.PGSQL.%s" % port
             if logger:
                 logger.info("Clearing hawq instance lock files and pid file")
             cmd = "rm -rf %s %s" % (lockfile, hawq_pid_file_path)
@@ -248,9 +253,37 @@ def check_hawq_running(host, data_directory, port, user = '', logger = None):
     return host, hawq_running
 
 
-def local_ssh(cmd, logger = None, warning = False):
-    result = subprocess.Popen(cmd, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout,stderr = result.communicate()
+def check_magma_running(host, log_directory, port, user='', logger=None):
+    magma_running = True
+    magma_pid_file_path = log_directory + '/magma.pid'
+
+    pid_file_exist = check_file_exist(magma_pid_file_path, host, logger)
+    if pid_file_exist:
+        if not check_magma_process_running(log_directory, user, host, logger):
+            if logger:
+                logger.warning("magma.pid file exists but no magma process is running")
+                logger.info("Clearing magma instance pid file")
+            cmd = "rm -f %s " % (magma_pid_file_path)
+            remote_ssh(cmd, host, user)
+            magma_running = False
+        else:
+            magma_running = True
+    else:
+        if check_magma_process_running(log_directory, user, host, logger):
+            if logger:
+                logger.warning("magma.pid file does not exist but magma process is running.")
+            magma_running = True
+        else:
+            if logger:
+                logger.warning("Magma process is not running on %s, skip" % host)
+            magma_running = False
+
+    return host, magma_running
+
+
+def local_ssh(cmd, logger=None, warning=False):
+    result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = result.communicate()
     if logger:
         if stdout != '':
             logger.info(stdout.strip())
@@ -259,53 +292,51 @@ def local_ssh(cmd, logger = None, warning = False):
                 logger.error(stderr.strip())
             else:
                 logger.warn(stderr.strip())
-
-    if result.returncode == 1 or result.returncode == 2:
-	logger.warn("warning: Command can be found but cannot be executed correctly ")
-
     return result.returncode
 
 
 def local_ssh_output(cmd):
-    result = subprocess.Popen(cmd, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-    stdout,stderr = result.communicate()
+    result = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = result.communicate()
 
     return (result.returncode, str(stdout.strip()), str(stderr.strip()))
 
 
 def remote_ssh(cmd, host, user):
-
+    timeout = " -o ConnectTimeout=%s -o ConnectionAttempts=%s " % (SSH_CONNECTTIMEOUT, SSH_CONNECTIONATTEMPTS)
     if user == "":
-        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s \"%s\"" % (host, cmd)
+        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s %s \"%s\"" % (timeout, host, cmd)
     else:
-        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s@%s \"%s\"" % (user, host, cmd)
+        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s %s@%s \"%s\"" % (timeout, user, host, cmd)
     try:
         result = subprocess.Popen(remote_cmd_str, shell=True).wait()
     except subprocess.CalledProcessError:
-        print "Execute shell command on %s failed" % host
+        print
+        "Execute shell command on %s failed" % host
         pass
 
     return result
 
 
 def remote_ssh_output(cmd, host, user):
-
+    timeout = " -o ConnectTimeout=%s -o ConnectionAttempts=%s " % (SSH_CONNECTTIMEOUT, SSH_CONNECTIONATTEMPTS)
     if user == "":
-        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s \"%s\"" % (host, cmd)
+        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s %s \"%s\"" % (timeout, host, cmd)
     else:
-        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s@%s \"%s\"" % (user, host, cmd)
+        remote_cmd_str = "ssh -o StrictHostKeyChecking=no %s %s@%s \"%s\"" % (timeout, user, host, cmd)
 
     try:
-        result = subprocess.Popen(remote_cmd_str, shell=True, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        stdout,stderr = result.communicate()
+        result = subprocess.Popen(remote_cmd_str, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = result.communicate()
     except:
-        print "Execute shell command on %s failed" % host
+        print
+        "Execute shell command on %s failed" % host
         pass
 
     return (result.returncode, str(stdout.strip()), str(stderr.strip()))
 
 
-def is_node_alive(host, user = '', logger = None):
+def is_node_alive(host, user='', logger=None):
     result = remote_ssh('true', host, user)
     if result != 0:
         if logger:
@@ -315,7 +346,7 @@ def is_node_alive(host, user = '', logger = None):
         return True
 
 
-def check_return_code(result, logger = None,  error_msg = None, info_msg = None, exit_true = False):
+def check_return_code(result, logger=None, error_msg=None, info_msg=None, exit_true=False):
     '''Check shell command exit code.'''
     if result != 0:
         if error_msg and logger:
@@ -329,8 +360,8 @@ def check_return_code(result, logger = None,  error_msg = None, info_msg = None,
     return result
 
 
-def check_postgres_running(data_directory, user, host = 'localhost', logger = None):
-    cmd='ps -ef | grep postgres | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
+def check_postgres_running(data_directory, user, host='localhost', logger=None):
+    cmd = 'ps -ef | grep postgres | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
     result = remote_ssh(cmd, host, user)
     if result == 0:
         return True
@@ -340,8 +371,21 @@ def check_postgres_running(data_directory, user, host = 'localhost', logger = No
         return False
 
 
-def check_syncmaster_running(data_directory, user, host = 'localhost', logger = None):
-    cmd='ps -ef | grep gpsyncmaster | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
+def check_magma_process_running(data_directory, user, host='localhost', logger=None):
+    cmd = 'ps -ef | grep magma_server | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
+    result = remote_ssh(cmd, host, user)
+    if result == 0:
+        if logger:
+            logger.debug("magma process is running on %s" % host)
+        return True
+    else:
+        if logger:
+            logger.debug("magma process is not running on %s" % host)
+        return False
+
+
+def check_syncmaster_running(data_directory, user, host='localhost', logger=None):
+    cmd = 'ps -ef | grep gpsyncmaster | grep %s | grep -v grep > /dev/null || exit 1;' % data_directory
     result = remote_ssh(cmd, host, user)
     if result == 0:
         return True
@@ -351,7 +395,7 @@ def check_syncmaster_running(data_directory, user, host = 'localhost', logger = 
         return False
 
 
-def check_file_exist(file_path, host = 'localhost', logger = None):
+def check_file_exist(file_path, host='localhost', logger=None):
     cmd = "if [ -f %s ]; then exit 0; else exit 1;fi" % file_path
     result = remote_ssh(cmd, host, '')
     if result == 0:
@@ -385,7 +429,7 @@ def check_directory_exist(directory_path, host, user):
     return host, file_exist
 
 
-def create_cluster_directory(directory_path, hostlist, user = '', logger = None):
+def create_cluster_directory(directory_path, hostlist, user='', logger=None):
     if user == "":
         user = os.getenv('USER')
 
@@ -394,9 +438,9 @@ def create_cluster_directory(directory_path, hostlist, user = '', logger = None)
     work_list = []
     q = Queue.Queue()
     for host in hostlist:
-        work_list.append({"func":check_directory_exist,"args":(directory_path, host, user)})
+        work_list.append({"func": check_directory_exist, "args": (directory_path, host, user)})
 
-    dir_creator = threads_with_return(name = 'HAWQ', action_name = 'create', logger = logger, return_values = q)
+    dir_creator = threads_with_return(name='HAWQ', action_name='create', logger=logger, return_values=q)
     dir_creator.get_function_list(work_list)
     dir_creator.start()
 
@@ -410,13 +454,13 @@ def create_cluster_directory(directory_path, hostlist, user = '', logger = None)
     return create_success_host, create_failed_host
 
 
-def parse_hosts_file(GPHOME):
-    host_file = "%s/etc/slaves" % GPHOME
+def parse_hosts_file(GPHOME, nodes_file = 'slaves'):
+    host_file = "%s/etc/%s" % (GPHOME,nodes_file)
     host_list = list()
     with open(host_file) as f:
         hosts = f.readlines()
     for host in hosts:
-        host = host.split("#",1)[0].strip()
+        host = host.split("#", 1)[0].strip()
         if host:
             host_list.append(host)
     return host_list
@@ -440,13 +484,19 @@ def update_xml_property(xmlfile, property_name, property_value):
             line = f.readline()
             if not line:
                 break
-            m = re.match('.*<configuration>.*', line)
+            m = re.match('.*<configuration  xmlns.*', line)
             if m:
-                line_1 = line.split('<configuration>')[0] + '<configuration>\n'
+                line_1 = line.split('<configuration')[0] + '<configuration>\n'
                 f_tmp.write(line_1)
                 break
             else:
-                f_tmp.write(line)
+                m = re.match('.*<configuration>.*', line)
+                if m:
+                    line_1 = line.split('<configuration>')[0] + '<configuration>\n'
+                    f_tmp.write(line_1)
+                    break
+                else:
+                    f_tmp.write(line)
 
     count_num = 0
 
@@ -489,7 +539,7 @@ def update_xml_property(xmlfile, property_name, property_value):
     shutil.move(xmlfile_swap, xmlfile)
 
 
-def remove_property_xml(property_name, xmlfile, quiet = False):
+def remove_property_xml(property_name, xmlfile, quiet=False):
     file_path, filename = os.path.split(xmlfile)
     xmlfile_backup = os.path.join(file_path, '.bak.' + filename)
     xmlfile_swap = os.path.join(file_path, '.swp.' + filename)
@@ -507,13 +557,19 @@ def remove_property_xml(property_name, xmlfile, quiet = False):
             line = f.readline()
             if not line:
                 break
-            m = re.match('.*<configuration>.*', line)
+            m = re.match('.*<configuration  xmlns.*', line)
             if m:
-                line_1 = line.split('<configuration>')[0] + '<configuration>\n'
+                line_1 = line.split('<configuration')[0] + '<configuration>\n'
                 f_tmp.write(line_1)
                 break
             else:
-                f_tmp.write(line)
+                m = re.match('.*<configuration>.*', line)
+                if m:
+                    line_1 = line.split('<configuration>')[0] + '<configuration>\n'
+                    f_tmp.write(line_1)
+                    break
+                else:
+                    f_tmp.write(line)
 
     for node in xmldoc.getElementsByTagName('property'):
 
@@ -531,7 +587,8 @@ def remove_property_xml(property_name, xmlfile, quiet = False):
 
         if name == property_name:
             if not quiet:
-                print "Remove property %s" % property_name
+                print
+                "Remove property %s" % property_name
         else:
             f_tmp.write("        <property>\n")
             f_tmp.write("                <name>%s</name>\n" % name)
@@ -553,9 +610,11 @@ def sync_hawq_site(GPHOME, host_list):
             # Print "Sync hawq-site.xml to %s." % node
             os.system("scp %s/etc/hawq-site.xml %s:%s/etc/hawq-site.xml > /dev/null 2>&1" % (GPHOME, node, GPHOME))
         except:
-            print ""
+            print
+            ""
             sys.exit("sync to node %s failed." % node)
     return None
+
 
 def get_hawq_hostname_all(master_port):
     try:
@@ -565,7 +624,8 @@ def get_hawq_hostname_all(master_port):
         rows = dbconn.execSQL(conn, query)
         conn.close()
     except DatabaseError, ex:
-        print "Failed to connect to database, this script can only be run when the database is up."
+        print
+        "Failed to connect to database, this script can only be run when the database is up."
         sys.exit(1)
 
     seg_host_list = {}
@@ -586,8 +646,10 @@ def get_hawq_hostname_all(master_port):
         elif row[0] == 'p':
             seg_host_list[row[3]] = row[1]
 
-    hawq_host_array = {'master': {master_host: master_status}, 'standby': {standby_host: standby_status}, 'segment': seg_host_list} 
+    hawq_host_array = {'master': {master_host: master_status}, 'standby': {standby_host: standby_status},
+                       'segment': seg_host_list}
     return hawq_host_array
+
 
 def get_host_status(hostlist):
     """

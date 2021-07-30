@@ -25,6 +25,9 @@ OBJS = createplan.o \
 	   setrefs.o \
 	   subselect.o \
 	   planpartition.o \
-	   transform.o
+	   transform.o \
+	   newPlanner.o
+
+newPlanner.o : ../../../backend/utils/hawq_funcoid_mapping.h $(DEPENDENCY_PATH)/include/univplan/cwrapper/univplan-c.h
 
 include $(top_srcdir)/src/backend/common.mk

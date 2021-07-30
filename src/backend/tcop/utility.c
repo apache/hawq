@@ -74,12 +74,16 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbsharedstorageop.h"
 #include "cdb/dispatcher.h"
+#include "cdb/executormgr_new.h"
 
 #include "resourcemanager/resqueuecommand.h"
 #include "catalog/pg_exttable.h"
 /*
  * Error-checking support for DROP commands
  */
+
+#define FORMAT_MAGMA_TP_STR "magmatp"
+#define FORMAT_MAGMA_AP_STR "magmaap"
 
 struct msgstrings
 {
@@ -286,7 +290,7 @@ CheckDropRelStorage(RangeVar *rel, ObjectType removeType)
 		char *url = ((Value*)lfirst(entry_location))->val.str;
 		char *category = getExtTblCategoryInFmtOptsStr(entry->fmtopts);
 
-		if ((IS_HDFS_URI(url)) &&
+		if ((IS_MAGMA_URI(url) || IS_HDFS_URI(url)) &&
 		    (category != NULL && pg_strncasecmp(category, "internal", strlen("internal")) == 0))
 		{
 			is_internal = true;
@@ -299,9 +303,9 @@ CheckDropRelStorage(RangeVar *rel, ObjectType removeType)
 	}
 
 	if ((removeType == OBJECT_EXTTABLE && (classform->relstorage != RELSTORAGE_EXTERNAL || is_internal)) ||
-		    (removeType == OBJECT_FOREIGNTABLE && classform->relstorage != RELSTORAGE_FOREIGN) ||
-		    (removeType == OBJECT_TABLE && (classform->relstorage == RELSTORAGE_EXTERNAL && (!is_internal) ||
-											classform->relstorage == RELSTORAGE_FOREIGN)))
+	    (removeType == OBJECT_FOREIGNTABLE && classform->relstorage != RELSTORAGE_FOREIGN) ||
+	    (removeType == OBJECT_TABLE && (classform->relstorage == RELSTORAGE_EXTERNAL && (!is_internal) ||
+										classform->relstorage == RELSTORAGE_FOREIGN)))
 	{
 		/* we have a mismatch. format an error string and shoot */
 		
@@ -631,14 +635,10 @@ ProcessDropStatement(DropStmt *stmt)
 				break;
 
 			case OBJECT_INDEX:
-				ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop index statement yet") ));
-
 				rel = makeRangeVarFromNameList(names);
 				if (CheckDropPermissions(rel, RELKIND_INDEX,
 										 stmt->missing_ok))
 					RemoveIndex(rel, stmt->behavior);
-
 				break;
 
 			case OBJECT_TYPE:
@@ -940,8 +940,8 @@ ProcessUtility(Node *parsetree,
 				Assert (gp_upgrade_mode || Gp_role != GP_ROLE_EXECUTE);
 
 
-				relOid = DefineRelation((CreateStmt *) parsetree, relKind,
-								                        relStorage, NonCustomFormatType);
+				relOid = DefineRelation((CreateStmt *) parsetree, relKind, relStorage,
+				                        NULL);
 
 				/*
 				 * Let AlterTableCreateToastTable decide if this one needs a
@@ -1127,11 +1127,46 @@ ProcessUtility(Node *parsetree,
 			 * schema
 			 */
 		case T_RenameStmt:
-			ExecRenameStmt((RenameStmt *) parsetree);
+			{
+				if ( ((RenameStmt *) parsetree)->renameType == OBJECT_TABLE )
+				{
+					Oid relid = RangeVarGetRelid(((RenameStmt *) parsetree)->relation, false, false/*allowHcatalog*/);
+
+					Assert(OidIsValid(relid));
+					char *formatOpt = caql_getcstring(
+					        NULL,
+					        cql("SELECT fmtopts FROM pg_exttable WHERE reloid = :1",
+					        ObjectIdGetDatum(relid)));
+					if (formatOpt)
+					{
+						char *formatName = getExtTblFormatterTypeInFmtOptsStr(formatOpt);
+
+						if (formatName && pg_strncasecmp(formatName, "magma", strlen("magma")) == 0)
+						{
+							ereport(ERROR,
+									(errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("cannot support rename 'magma' table yet")));
+						}
+					}
+				}
+				ExecRenameStmt((RenameStmt *) parsetree);
+			}
 			break;
 
 		case T_AlterObjectSchemaStmt:
-			ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree);
+			{
+				// disable alter schema for magma
+				if ( ((AlterObjectSchemaStmt *) parsetree)->objectType == OBJECT_TABLE)
+				{
+					Oid relid = RangeVarGetRelid(((AlterObjectSchemaStmt *) parsetree)->relation, false, false/*allowHcatalog*/);
+					Assert(OidIsValid(relid));
+					if (dataStoredInMagmaByOid(relid))
+					{
+						ereport(ERROR,
+						        (errcode(ERRCODE_FEATURE_NOT_SUPPORTED), errmsg("cannot support alter schema for 'magma' table yet")));
+					}
+				}
+				ExecAlterObjectSchemaStmt((AlterObjectSchemaStmt *) parsetree);
+			}
 			break;
 
 		case T_AlterOwnerStmt:
@@ -1249,10 +1284,12 @@ ProcessUtility(Node *parsetree,
 						DefineType(stmt->defnames, stmt->definition, stmt->newOid, stmt->shadowOid);
 						break;
 					case OBJECT_EXTPROTOCOL:
+						/*
 						if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY))) {
 							ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create protocol statement yet") ));
 						}
+						*/
 						Assert(stmt->args == NIL);
 						DefineExtProtocol(stmt->defnames, stmt->definition, stmt->newOid, stmt->trusted);
 						break;						
@@ -1293,11 +1330,6 @@ ProcessUtility(Node *parsetree,
 
 		case T_IndexStmt:		/* CREATE INDEX */
 			{
-				if (!gp_upgrade_mode)
-				{
-					ereport(ERROR,
-									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
-				}
 				IndexStmt  *stmt = (IndexStmt *) parsetree;
 				Oid			relid;
 				LOCKMODE	lockmode;
@@ -1317,6 +1349,80 @@ ProcessUtility(Node *parsetree,
 				lockmode = stmt->concurrent ? ShareUpdateExclusiveLock
 						: ShareLock;
 				relid = RangeVarGetRelid(stmt->relation, false, false/*allowHcatalog*/);
+
+				/* Only create index for external table with magma */
+				Assert(OidIsValid(relid));
+				char *formatOpt = caql_getcstring(
+				        NULL,
+				        cql("SELECT fmtopts FROM pg_exttable WHERE reloid = :1",
+				        ObjectIdGetDatum(relid)));
+
+				if (!formatOpt)
+				{
+				  if (stmt->magma) {}
+				  else if (!gp_upgrade_mode)
+					{
+						ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
+					}
+				}
+				else
+				{
+					char *formatName = getExtTblFormatterTypeInFmtOptsStr(formatOpt);
+					if (!formatName)
+					{
+						if (!gp_upgrade_mode)
+						{
+							ereport(ERROR,
+											(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
+						}
+					}
+					/* in order to support magmatp/magmaap */
+					else if ((pg_strncasecmp(formatName, FORMAT_MAGMA_TP_STR,
+																	 sizeof(FORMAT_MAGMA_TP_STR)-1) == 0) ||
+							(pg_strncasecmp(formatName, FORMAT_MAGMA_AP_STR,
+															sizeof(FORMAT_MAGMA_AP_STR)-1) == 0))
+					{
+						if (stmt->options) {
+							ereport(ERROR,
+											(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+													errmsg("magma Index cannot support create index with clause")));
+						}
+						if (stmt->whereClause) {
+							ereport(ERROR,
+											(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+													errmsg("magma Index cannot support create index where predicate")));
+						}
+						if (stmt->tableSpace) {
+							ereport(ERROR,
+											(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+													errmsg("magma Index cannot support create index with tableSpace")));
+						}
+						ListCell   *cell;
+						foreach(cell, stmt->indexParams)
+						{
+							IndexElem *elem = (IndexElem *) lfirst(cell);
+							if (elem->expr || elem->opclass)
+							{
+								ereport(ERROR,
+												(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+														errmsg("magma Index cannot support create index with expr or opclass")));
+							}
+						}
+						pfree(formatName);
+						// break;
+					}
+					else
+					{
+						pfree(formatName);
+						if (!gp_upgrade_mode)
+						{
+							ereport(ERROR,
+							        (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
+						}
+					}
+				}
+
 				LockRelationOid(relid, lockmode);
 				CheckRelationOwnership(relid, true);
 
@@ -1351,7 +1457,8 @@ ProcessUtility(Node *parsetree,
 			DefineQueryRewrite((RuleStmt *) parsetree);
 			if (Gp_role == GP_ROLE_DISPATCH)
 			{
-				dispatch_statement_node((Node *) parsetree, NULL, NULL, NULL);
+			  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+			          errmsg("Cannot support RuleStmt")));
 			}
 			break;
 
@@ -1468,23 +1575,6 @@ ProcessUtility(Node *parsetree,
 			{
 				ereport(ERROR,
 								(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support load statement yet") ));
-
-				LoadStmt   *stmt = (LoadStmt *) parsetree;
-
-				closeAllVfds(); /* probably not necessary... */
-				/* Allowed names are restricted if you're not superuser */
-				load_file(stmt->filename, !superuser());
-
-				if (Gp_role == GP_ROLE_DISPATCH)
-				{
-					StringInfoData buffer;
-
-					initStringInfo(&buffer);
-
-					appendStringInfo(&buffer, "LOAD '%s'", stmt->filename);
-
-					dispatch_statement_string(buffer.data, NULL, 0, NULL, NULL, true);
-				}
 			}
 			break;
 
@@ -1560,10 +1650,11 @@ ProcessUtility(Node *parsetree,
 			{
 				VariableResetStmt *n = (VariableResetStmt *) parsetree;
 
-				ResetPGVariable(n->name);
+				bool shouldDispatch = ResetPGVariable(n->name);
 
-				if (Gp_role == GP_ROLE_DISPATCH)
+				if (shouldDispatch && Gp_role == GP_ROLE_DISPATCH)
 				{
+				  executormgr_cleanCachedExecutor();
 					/*
 					 * RESET must be dispatched different, because it can't
 					 * be in a user transaction
@@ -1591,7 +1682,8 @@ ProcessUtility(Node *parsetree,
 				if (Gp_role == GP_ROLE_DISPATCH)
 				{
 					((CreateTrigStmt *) parsetree)->trigOid = trigOid;
-					dispatch_statement_node((Node *) parsetree, NULL, NULL, NULL);
+					ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+					                errmsg("Cannot support CreateTrigStmt")));
 				}
 			}
 			break;
@@ -1625,7 +1717,8 @@ ProcessUtility(Node *parsetree,
 				}
 				if (Gp_role == GP_ROLE_DISPATCH)
 				{
-					dispatch_statement_node((Node *) parsetree, NULL, NULL, NULL);
+				  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+				      errmsg("Cannot support DropPropertyStmt")));
 				}
 			}
 			break;
@@ -1678,9 +1771,6 @@ ProcessUtility(Node *parsetree,
 			break;
 
 		case T_AlterRoleSetStmt:
-			ereport(ERROR,
-							(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter role set statement yet") ));
-
 			AlterRoleSet((AlterRoleSetStmt *) parsetree);
 			break;
 
@@ -1698,12 +1788,14 @@ ProcessUtility(Node *parsetree,
 
 		case T_LockStmt:
 			/* if guc variable not set, or bootstrap mode, or utility mode connection, throw exception*/
+		  /*
 			if (!(IsBootstrapProcessingMode() || (Gp_role == GP_ROLE_UTILITY)
 					|| gp_called_by_pgdump))
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support lock statement yet") ));
 			}
+			*/
 			LockTableCommand((LockStmt *) parsetree);
 			break;
 
@@ -2050,11 +2142,11 @@ CreateCommandTag(Node *parsetree)
 			break;
 
 		case T_CreateExternalStmt:
-		{
-			CreateExternalStmt *stmt = (CreateExternalStmt *) parsetree;
+			{
+				CreateExternalStmt *stmt = (CreateExternalStmt *) parsetree;
 
-			tag = (stmt->isexternal) ? "CREATE EXTERNAL TABLE" : "CREATE TABLE";
-		}
+				tag = (stmt->isexternal) ? "CREATE EXTERNAL TABLE" : "CREATE TABLE";
+			}
 			break;
 
 		case T_CreateForeignStmt:

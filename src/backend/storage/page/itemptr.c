@@ -14,6 +14,7 @@
  */
 #include "postgres.h"
 
+#include "inttypes.h"
 #include "storage/itemptr.h"
 
 
@@ -94,3 +95,31 @@ ItemPointerToString2(ItemPointer tid)
 	return ItemPointerToBuffer(itemPointerBuffer2, tid);
 }
 
+uint32 ItemPointerGetRowIdFromFakeCtid(ItemPointer pointer) {
+  if (pointer->ip_blkid.bi_hi != GetQEIndex()) {
+    ereport(
+        ERROR,
+        (errcode(ERRCODE_INTERNAL_ERROR),
+         errmsg("Unexpected tuple received in seg%d, which comes from seg%d",
+                GetQEIndex(), pointer->ip_blkid.bi_hi)));
+  }
+  return ((uint32)(pointer->ip_blkid.bi_lo) << 16) + (pointer)->ip_posid;
+}
+
+void ItemPointerSetRowIdToFakeCtid(ItemPointer pointer, uint64 rowId) {
+  int segId = GetQEIndex();
+  if (segId > UINT16_MAX) {
+    ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR),
+                    errmsg("Unexpected seg %d, exceeding seg limit of %d",
+                           segId, UINT16_MAX)));
+  }
+  if (rowId > UINT32_MAX) {
+    ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR),
+                    errmsg("Unexpected row %" PRIu64
+                           ", exceeding row limit of %" PRIu64,
+                           rowId, UINT32_MAX)));
+  }
+  pointer->ip_blkid.bi_hi = segId;
+  pointer->ip_blkid.bi_lo = rowId >> 16;
+  pointer->ip_posid = rowId;
+}

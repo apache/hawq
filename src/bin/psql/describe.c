@@ -70,7 +70,7 @@ static bool isGPDB(void)
 			return false;
 
 		ver = PQgetvalue(res, 0, 0);
-		if (strstr(ver,"Greenplum") != NULL)
+		if (strstr(ver,"OushuDB") != NULL)
 		{
 			PQclear(res);
 			talking_to_gpdb = gpdb_yes;
@@ -1516,8 +1516,8 @@ describeOneTableDetails(const char *schemaname,
 			if(tableinfo.relstorage == 'a')
 				printfPQExpBuffer(&title, _("Append-Only Table \"%s.%s\""),
 								  schemaname, relationname);
-			else if(tableinfo.relstorage == 'c')
-				printfPQExpBuffer(&title, _("Append-Only Columnar Table \"%s.%s\""),
+			else if(tableinfo.relstorage == 'o')
+				printfPQExpBuffer(&title, _("Orc Table \"%s.%s\""),
 								  schemaname, relationname);
 			else if(tableinfo.relstorage == 'p')
 				printfPQExpBuffer(&title, _("Parquet Table \"%s.%s\""),
@@ -1881,6 +1881,16 @@ describeOneTableDetails(const char *schemaname,
 					format = "csv";
 				}
 				break;
+				case 'o':
+				{
+					format = "orc";
+				}
+				break;
+				case 'p':
+				{
+					format = "parquet";
+				}
+				break;
 				case 'b':
 				{
 					format = "custom";
@@ -1938,13 +1948,13 @@ describeOneTableDetails(const char *schemaname,
 				printTableAddFooter(&cont, tmpbuf.data);
 			}
 
-			/* Single row error handling */
+			// Single row error handling
 			if(rejlim && strlen(rejlim) > 0)
 			{
 				/* reject limit and type */
 				printfPQExpBuffer(&tmpbuf, _("Segment reject limit: %s %s"),
-								  rejlim,
-								  (rejlimtype[0] == 'p' ? "percent" : "rows"));
+									rejlim,
+									(rejlimtype[0] == 'p' ? "percent" : "rows"));
 				printTableAddFooter(&cont, tmpbuf.data);
 
 				if(errtblname && strlen(errtblname) > 0)
@@ -1954,15 +1964,203 @@ describeOneTableDetails(const char *schemaname,
 				}
 			}
 
-			if(writable[0] == 't')
+			// print table (and column) check constraints
+			int tuples = 0;
+			if (tableinfo.checks)
+			{
+				printfPQExpBuffer(&buf,
+									"SELECT r.conname, "
+									"pg_catalog.pg_get_constraintdef(r.oid, true)\n"
+									"FROM pg_catalog.pg_constraint r\n"
+						 "WHERE r.conrelid = '%s' AND r.contype = 'c'\nORDER BY 1",
+									oid);
+				result = PSQLexec(buf.data, false);
+				if (!result)
+					goto error_return;
+				else
+					tuples = PQntuples(result);
+
+				if (tuples > 0)
+				{
+					printTableAddFooter(&cont, _("Check constraints:"));
+					for (i = 0; i < tuples; i++)
+					{
+						/* untranslated contraint name and def */
+						printfPQExpBuffer(&buf, "    \"%s\" %s",
+											PQgetvalue(result, i, 0),
+											PQgetvalue(result, i, 1));
+
+						printTableAddFooter(&cont, buf.data);
+					}
+				}
+				PQclear(result);
+			}
+
+			// print inherited tables
+			printfPQExpBuffer(&buf, "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid=i.inhparent AND i.inhrelid = '%s' ORDER BY inhseqno", oid);
+
+			result = PSQLexec(buf.data, false);
+			if (!result)
+				goto error_return;
+			else
+				tuples = PQntuples(result);
+
+			for (i = 0; i < tuples; i++)
+			{
+				const char *s = _("Inherits");
+
+				if (i == 0)
+					printfPQExpBuffer(&buf, "%s: %s", s, PQgetvalue(result, i, 0));
+				else
+					printfPQExpBuffer(&buf, "%*s  %s", (int) strlen(s), "", PQgetvalue(result, i, 0));
+				if (i < tuples - 1)
+					appendPQExpBuffer(&buf, ",");
+
+				printTableAddFooter(&cont, buf.data);
+			}
+			PQclear(result);
+
+			// print child tables
+			if (pset.sversion >= 80300)
+				printfPQExpBuffer(&buf, "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid=i.inhrelid AND i.inhparent = '%s' ORDER BY c.oid::pg_catalog.regclass::pg_catalog.text;", oid);
+			else
+				printfPQExpBuffer(&buf, "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid=i.inhrelid AND i.inhparent = '%s' ORDER BY c.relname;", oid);
+
+			result = PSQLexec(buf.data, false);
+			if (!result)
+				goto error_return;
+			else
+				tuples = PQntuples(result);
+
+			if (!verbose)
+			{
+				/* print the number of child tables, if any */
+				if (tuples > 0)
+				{
+					printfPQExpBuffer(&buf, _("Number of child tables: %d (Use \\d+ to list them.)"), tuples);
+					printTableAddFooter(&cont, buf.data);
+				}
+			}
+			else
+			{
+				/* display the list of child tables */
+				const char *ct = _("Child tables");
+
+				for (i = 0; i < tuples; i++)
+				{
+					if (i == 0)
+						printfPQExpBuffer(&buf, "%s: %s",
+											ct, PQgetvalue(result, i, 0));
+					else
+						printfPQExpBuffer(&buf, "%*s  %s",
+											(int) strlen(ct), "",
+											PQgetvalue(result, i, 0));
+					if (i < tuples - 1)
+						appendPQExpBuffer(&buf, ",");
+
+					printTableAddFooter(&cont, buf.data);
+				}
+			}
+
+			// show distribute policy
+			if(writable[0] == 't') {
+				resetPQExpBuffer(&tmpbuf);
 				if(add_distributed_by_footer(oid, &tmpbuf, buf))
 					goto error_return;
+				printTableAddFooter(&cont, tmpbuf.data);
+			}
+
+			/* print 'partition by' clause */
+			if (tuples > 0)
+			{
+				resetPQExpBuffer(&tmpbuf);
+				add_partition_by_footer(oid, &tmpbuf, &buf);
+				printTableAddFooter(&cont, tmpbuf.data);
+			}
 
 			add_tablespace_footer(&cont, tableinfo.relkind, tableinfo.tablespace, true);
 		}
 
 		PQclear(result);
 
+		/* print indexes */
+		int tuples = 0;
+		if (tableinfo.hasindex)
+		{
+			printfPQExpBuffer(&buf,
+												"SELECT c2.relname, i.indisprimary, i.indisunique, i.indisclustered, ");
+			appendPQExpBuffer(&buf, "i.indisvalid, ");
+			appendPQExpBuffer(&buf, "pg_catalog.pg_get_indexdef(i.indexrelid, 0, true),\n  ");
+			appendPQExpBuffer(&buf,
+												"null AS constraintdef, null AS contype, "
+												"false AS condeferrable, false AS condeferred");
+			appendPQExpBuffer(&buf, ", c2.reltablespace");
+			appendPQExpBuffer(&buf,
+												"\nFROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i\n");
+			appendPQExpBuffer(&buf,
+												"WHERE c.oid = '%s' AND c.oid = i.indrelid AND i.indexrelid = c2.oid\n"
+												"ORDER BY i.indisprimary DESC, i.indisunique DESC, c2.relname",
+												oid);
+			result = PSQLexec(buf.data, false);
+			if (!result)
+				goto error_return;
+			else
+				tuples = PQntuples(result);
+
+			if (tuples > 0)
+			{
+				printTableAddFooter(&cont, _("Indexes:"));
+				for (i = 0; i < tuples; i++)
+				{
+					/* untranslated index name */
+					printfPQExpBuffer(&buf, "    \"%s\"", PQgetvalue(result, i, 0));
+					/* If exclusion constraint, print the constraintdef */
+					if (strcmp(PQgetvalue(result, i, 7), "x") == 0)
+					{
+						appendPQExpBuffer(&buf, " %s", PQgetvalue(result, i, 6));
+					}
+					else
+					{
+						const char *indexdef;
+						const char *usingpos;
+
+						/* Label as primary key or unique (but not both) */
+						if (strcmp(PQgetvalue(result, i, 1), "t") == 0)
+							appendPQExpBuffer(&buf, " PRIMARY KEY,");
+						else if (strcmp(PQgetvalue(result, i, 2), "t") == 0)
+							appendPQExpBuffer(&buf, " UNIQUE,");
+
+						/* Everything after "USING" is echoed verbatim */
+						indexdef = PQgetvalue(result, i, 5);
+						usingpos = strstr(indexdef, " USING ");
+						if (usingpos)
+							indexdef = usingpos + 7;
+						appendPQExpBuffer(&buf, " %s", indexdef);
+
+						/* Need these for deferrable PK/UNIQUE indexes */
+						if (strcmp(PQgetvalue(result, i, 8), "t") == 0)
+							appendPQExpBuffer(&buf, " DEFERRABLE");
+
+						if (strcmp(PQgetvalue(result, i, 9), "t") == 0)
+							appendPQExpBuffer(&buf, " INITIALLY DEFERRED");
+					}
+
+					/* Add these for all cases */
+					if (strcmp(PQgetvalue(result, i, 3), "t") == 0)
+						appendPQExpBuffer(&buf, " CLUSTER");
+
+					if (strcmp(PQgetvalue(result, i, 4), "t") != 0)
+						appendPQExpBuffer(&buf, " INVALID");
+
+					printTableAddFooter(&cont, buf.data);
+
+					/* Print tablespace of the index on the same line */
+					add_tablespace_footer(&cont, 'i',
+																	atooid(PQgetvalue(result, i, 10)), false);
+				}
+			}
+			PQclear(result);
+		}
 	}
 	else if (view_def)
 	{
@@ -3112,8 +3310,8 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
 	if (isGPDB())   /* GPDB? */
 		appendPQExpBuffer(&buf,
 				  ", CASE c.relstorage WHEN 'h' THEN '%s' WHEN 'x' THEN '%s' WHEN 'a' "
-				  "THEN '%s' WHEN 'v' THEN '%s' WHEN 'c' THEN '%s' WHEN 'p' THEN '%s' WHEN 'f' THEN '%s' END as \"%s\"\n",
-				  gettext_noop("heap"), gettext_noop("external"), gettext_noop("append only"), gettext_noop("none"), gettext_noop("append only columnar"), gettext_noop("parquet"), gettext_noop("foreign"), gettext_noop("Storage"));
+				  "THEN '%s' WHEN 'v' THEN '%s' WHEN 'o' THEN '%s' WHEN 'p' THEN '%s' WHEN 'f' THEN '%s' END as \"%s\"\n",
+				  gettext_noop("heap"), gettext_noop("external"), gettext_noop("append only"), gettext_noop("none"), gettext_noop("orc"), gettext_noop("parquet"), gettext_noop("foreign"), gettext_noop("Storage"));
 
 	if (showIndexes)
 		appendPQExpBuffer(&buf,
@@ -3160,7 +3358,7 @@ listTables(const char *tabtypes, const char *pattern, bool verbose, bool showSys
     {
 	appendPQExpBuffer(&buf, "AND c.relstorage IN (");
 	if (showTables || showIndexes || showSeq || (showSystem && showTables))
-		appendPQExpBuffer(&buf, "'h', 'a', 'c', 'p',");
+		appendPQExpBuffer(&buf, "'h', 'a', 'o', 'p',");
 	if (showExternal)
 		appendPQExpBuffer(&buf, "'x',");
 	if (showForeign)

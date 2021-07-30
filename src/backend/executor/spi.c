@@ -34,6 +34,7 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbsrlz.h"
 #include "cdb/cdbdisp.h"
+#include "cdb/cdbutil.h"
 #include "miscadmin.h"
 #include "commands/dbcommands.h"	/* get_database_name() */
 #include "postmaster/postmaster.h"		/* PostPortNumber */
@@ -48,6 +49,8 @@
 #include "executor/nodeFunctionscan.h"
 #include "nodes/stack.h"
 #include "cdb/cdbdatalocality.h"
+#include "cdb/cdbgang.h"
+#include "optimizer/newPlanner.h"
 #include "optimizer/planner.h"
 
 extern char *savedSeqServerHost;
@@ -772,6 +775,8 @@ void Explain_udf_plan(QueryDesc *qdesc)
 
 	if (qdesc->estate->dispatch_data)
 		dispatcher_print_statistics(buf, qdesc->estate->dispatch_data);
+	else if (qdesc->estate->scheduler_data)
+		scheduler_print_stats(qdesc->estate->scheduler_data, buf);
 	appendStringInfo(buf, "Data locality statistics:\n");
 	if (qdesc->plannedstmt->datalocalityInfo ==NULL){
 		appendStringInfo(buf, "  no data locality information in this query\n");
@@ -783,6 +788,7 @@ void Explain_udf_plan(QueryDesc *qdesc)
 	// free memory
 	MemoryContextDelete(explaincxt);
 }
+
 
 HeapTuple
 SPI_copytuple(HeapTuple tuple)
@@ -1318,6 +1324,7 @@ SPI_cursor_open(const char *name, SPIPlanPtr plan,
 		int option = CURSOR_OPT_NO_SCROLL;
 		
 		if ( new_stmt && new_stmt->planTree &&
+			queryTree->commandType != CMD_UTILITY &&
 			ExecSupportsBackwardScan(new_stmt->planTree) )
 			option = CURSOR_OPT_SCROLL;
 
@@ -1340,6 +1347,9 @@ SPI_cursor_open(const char *name, SPIPlanPtr plan,
 		CommandCounterIncrement();
 		snapshot = GetTransactionSnapshot();
 	}
+
+	// disable read cache mechanism
+	resetReadCache(false);
 
 	/*
 	 * Start portal execution.
@@ -1704,9 +1714,6 @@ spi_printtup(TupleTableSlot * slot, DestReceiver *self)
 static void
 _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
 {
-	struct timeval t_start, t_end;
-	gettimeofday(&t_start, NULL);
-
 	List	   *raw_parsetree_list;
 	List	   *query_list_list;
 	List	   *plan_list;
@@ -1834,13 +1841,6 @@ _SPI_prepare_plan(const char *src, SPIPlanPtr plan)
 	 * Pop the error context stack
 	 */
 	error_context_stack = spierrcontext.previous;
-
-	if (Debug_udf_plan)
-	{
-		gettimeofday(&t_end, NULL);
-		double duration = (1000000 * (t_end.tv_sec - t_start.tv_sec) + t_end.tv_usec - t_start.tv_usec) / 1000;
-		elog(LOG, "UDF query:%s; _SPI_prepare_plan time:%lfms", plan->query, duration);
-	}
 }
 
 /*
@@ -1860,7 +1860,8 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
 				  bool read_only, bool fire_triggers, long tcount)
 {
 	struct timeval t_start, t_end;
-	gettimeofday(&t_start, NULL);
+	if (Debug_udf_plan)
+	  gettimeofday(&t_start, NULL);
 
 	volatile int my_res = 0;
 	volatile uint64 my_processed = 0;
@@ -1950,35 +1951,37 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
 			foreach(query_list_item, query_list)
 			{
 				Query	   *queryTree = (Query *) lfirst(query_list_item);
-				PlannedStmt *originalStmt;
+				PlannedStmt *originalStmt = NULL;
+				PlannedStmt *stmt = NULL;
 				QueryDesc  *qdesc;
 				DestReceiver *dest;
-
-				originalStmt = (PlannedStmt*)lfirst(plan_list_item);
-				plan_list_item = lnext(plan_list_item);
 
 				/*
 				 * Get copy of the queryTree and the plan since this may be modified further down.
 				 */
 				queryTree = copyObject(queryTree);
 
-				if ((queryTree->commandType == CMD_SELECT) ||
-				    (queryTree->commandType == CMD_INSERT))
-				{
-					originalStmt = refineCachedPlan(originalStmt, queryTree, 0 ,NULL);
-				}
+        if (IsA(lfirst(plan_list_item), PlannedStmt)) {
+          originalStmt =
+              refineCachedPlan(lfirst(plan_list_item),
+                               queryTree, 0, NULL);
+          stmt = copyObject(originalStmt);
+          if (Debug_udf_plan &&
+              originalStmt->datalocalityInfo) {
+            stmt->datalocalityTime =
+                originalStmt->datalocalityTime;
+            stmt->datalocalityInfo = makeStringInfo();
+            stmt->datalocalityInfo->cursor =
+                originalStmt->datalocalityInfo->cursor;
+            appendStringInfoString(
+                stmt->datalocalityInfo,
+                originalStmt->datalocalityInfo->data);
+          }
+        }
 
-				PlannedStmt *stmt = copyObject(originalStmt);
-				if (Debug_udf_plan && originalStmt->datalocalityInfo)
-				{
-					stmt->datalocalityTime = originalStmt->datalocalityTime;
-					stmt->datalocalityInfo = makeStringInfo();
-					stmt->datalocalityInfo->cursor = originalStmt->datalocalityInfo->cursor;
-					appendStringInfoString(stmt->datalocalityInfo,
-					                       originalStmt->datalocalityInfo->data);
-				}
+        plan_list_item = lnext(plan_list_item);
 
-				_SPI_current->processed = 0;
+        _SPI_current->processed = 0;
 				_SPI_current->lastoid = InvalidOid;
 				_SPI_current->tuptable = NULL;
 
@@ -2220,6 +2223,7 @@ _SPI_pquery(QueryDesc * queryDesc, bool fire_triggers, long tcount)
 	int			operation = queryDesc->operation;
 	int			res;
 	int savedSegNum = -1;
+
 	switch (operation)
 	{
 		case CMD_SELECT:
@@ -2329,6 +2333,8 @@ _SPI_pquery(QueryDesc * queryDesc, bool fire_triggers, long tcount)
 
 	bool orig_gp_enable_gpperfmon = gp_enable_gpperfmon;
 
+	char * savedNewExecutorMode = new_executor_mode;
+
 	PG_TRY();
 	{
 		/*
@@ -2340,11 +2346,49 @@ _SPI_pquery(QueryDesc * queryDesc, bool fire_triggers, long tcount)
 			gp_enable_gpperfmon = false;
 		}
 
+		if (pg_strcasecmp(new_executor_mode, new_executor_mode_on) ==0)
+			queryDesc->newPlanForceAuto = true;
+
+		new_executor_mode = "off";
+
 		ExecutorStart(queryDesc, 0);
 
-		ExecutorRun(queryDesc, ForwardScanDirection, tcount);
+		new_executor_mode = savedNewExecutorMode;
 
-		// print udf plan to pglog
+		queryDesc->newPlanForceAuto = false;
+		if (queryDesc->newPlan) {
+      Slice *currentSlice = getCurrentSlice(
+          queryDesc->estate, LocallyExecutingSliceIndex(queryDesc->estate));
+      if (currentSlice)
+      {
+        if (sliceRunsOnQD(currentSlice))
+        {
+          queryDesc->newExecutorState = makeMyNewExecutorTupState(
+              queryDesc->tupDesc);
+          beginMyNewExecutor(queryDesc->newPlan->str,
+                             queryDesc->newPlan->len, currentSliceId,
+                             queryDesc->planstate);
+          (*queryDesc->dest->rStartup)(queryDesc->dest,
+              queryDesc->operation, queryDesc->tupDesc);
+          while (true) {
+            execMyNewExecutor(queryDesc->newExecutorState);
+            if (!queryDesc->newExecutorState->hasTuple) break;
+            ++queryDesc->estate->es_processed;
+            (*queryDesc->dest->receiveSlot)(queryDesc->newExecutorState->slot,
+                queryDesc->dest);
+            if (queryDesc->estate->es_processed == tcount) {
+              // stopMyNewExecutor();
+              break;
+            }
+          }
+          (*queryDesc->dest->rShutdown)(queryDesc->dest);
+        }
+      }
+    } else {
+			ExecutorRun(queryDesc, ForwardScanDirection, tcount);
+		}
+
+		// print ufd plan to pglog
 		if (Debug_udf_plan)
 		{
 			Explain_udf_plan(queryDesc);
@@ -2370,6 +2414,7 @@ _SPI_pquery(QueryDesc * queryDesc, bool fire_triggers, long tcount)
 	    savedSegNum = list_length(queryDesc->resource->segments);
 	  }
 		ExecutorEnd(queryDesc);
+		if (queryDesc->newExecutorState) endMyNewExecutor(&queryDesc->newExecutorState);
 
 		gp_enable_gpperfmon = orig_gp_enable_gpperfmon;
 
@@ -2385,6 +2430,7 @@ _SPI_pquery(QueryDesc * queryDesc, bool fire_triggers, long tcount)
 	PG_CATCH();
 	{
 		gp_enable_gpperfmon = orig_gp_enable_gpperfmon;
+		new_executor_mode = savedNewExecutorMode;
 		PG_RE_THROW();
 	}
 	PG_END_TRY();
@@ -2603,6 +2649,17 @@ _SPI_copy_plan(SPIPlanPtr plan, int location)
 					                       ((PlannedStmt*)lfirst(lc))->datalocalityInfo->data);
 				}
 				ps->qdContext = plancxt;
+				if (ps->resource) {
+					List *prevSegList = ps->resource->segments;
+					ps->resource->segments = NULL;
+					ListCell *lc = NULL;
+					foreach (lc, prevSegList) {
+						Segment *seg = (Segment *)lfirst(lc);
+						ps->resource->segments =
+								lappend(ps->resource->segments,
+												CopySegment(seg, plancxt));
+					}
+				}
 			}
 			newplan->ptlist = lappend(newplan->ptlist, node);
 		}

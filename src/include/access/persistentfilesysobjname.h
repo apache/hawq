@@ -210,6 +210,7 @@ typedef enum PersistentFileSysRelStorageMgr
 	PersistentFileSysRelStorageMgr_None = 0,
 	PersistentFileSysRelStorageMgr_BufferPool = 1,
 	PersistentFileSysRelStorageMgr_AppendOnly = 2,
+	PersistentFileSysRelStorageMgr_External = 3,
 	MaxPersistentFileSysRelStorageMgr /* must always be last */
 } PersistentFileSysRelStorageMgr;
 

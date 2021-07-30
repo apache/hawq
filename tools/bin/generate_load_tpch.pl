@@ -21,11 +21,11 @@
 #Comment : Takes the scale factor, number of primary segments, master port number and database name as input and load the tpch data in parallel by streaming the output of dbgen using external tables. Expects the dbgen program and dists.dss file to be present in the $GPHOME/bin directory on all the segment hosts.
 #Usage   : sample usage > perl load_tpch.pl -scale <size of data to be loaded. scale of 1 means 1GB, 1000 means 1TB> -num <total number of primary
 #segments in the cluster    > -port <master port number> -db <name of the database in which the tpch tables will be created> -isao <is appendonly
-#table: TRUE/FALSE, default TRUE    > -ispartition <is partitioned table: TRUE/FALSE, default FALSE> -orientation <row oriented or column oriented:
-#ROW/COLUMN, default ROW> -compresstype <compress type: ZLIB|QUICKLZ|RLE_TYPE|NONE, default NONE> -level <compression level: 0-9, default 0>
-#-israndom <distribution policy: TRUE/FALSE>
+#table: TRUE/FALSE, default TRUE    > -ispartition <is partitioned table: TRUE/FALSE, default FALSE> -orientation <row oriented or parquet oriented:
+#ROW/PARQUET, default ROW> -compresstype <compress type: ZLIB|GZIP|SNAPPY|NONE, default NONE> -level <compression level: 0-9, default 0, unnecessary when compresstype is SNAPPY>
+#-israndom <distribution policy: TRUE/FALSE> -rowgroupsize <size of row group, default 8388608, should be the same with DB default value> -pagesize <size of page, default 1048576, should be the same with DB default value>
 #
-#Example : ./generate_load_tpch.pl -scale 1 -num 2 -port 5432 -db postgres -isao TRUE -ispartition FALSE -orientation row -compresstype NONE -level 0 -israndom true 
+#Example : ./generate_load_tpch.pl -scale 1 -num 2 -port 5432 -db postgres -isao TRUE -ispartition FALSE -orientation row -compresstype NONE -level 0 -israndom true -rowgroupsize 8388608 -pagesize 1048576 
 ###################################################
 
 #use strict;
@@ -64,11 +64,15 @@ if (uc($isao) eq "TRUE")
 {
     if (uc($orientation) eq uc("parquet"))
     {
-        $with_content = "appendonly=true, orientation=$orientation, pagesize=$pagesize, rowgroupsize=$rowgroupsize, compresstype=$compresstype, compresslevel=$level";
+        $with_content = "appendonly=true, orientation=$orientation, pagesize=$pagesize, rowgroupsize=$rowgroupsize, compresstype=$compresstype";
     }
     else
     {
-        $with_content = "appendonly=true, orientation=$orientation, compresstype=$compresstype, compresslevel=$level";
+        $with_content = "appendonly=true, orientation=$orientation, compresstype=$compresstype";
+    }
+    if (uc($compresstype) ne uc("snappy"))
+    {
+        $with_content = "$with_content, compresslevel=$level"
     }
 }
 
@@ -77,7 +81,7 @@ chomp($ddl_dml_file);
 
 unless (defined($scale) && defined($num_primary_segs) && defined($port) && defined($dbname))
 {
-    print "\nUsage: $0 -scale <size of data to be loaded. scale of 1 means 1GB, 1000 means 1TB> -num <total number of primary segments in the cluster> -port <master port number> -db <name of the database in which the tpch tables will be created> -isao <is appendonly table: TRUE/FALSE, default TRUE> -ispartition <is partitioned table: TRUE/FALSE, default FALSE> -orientation <row oriented or column oriented: ROW/COLUMN, default ROW> -compresstype <compress type: ZLIB|QUICKLZ|RLE_TYPE|NONE, default NONE> -level <compression level: 0-9, default 0> \n\n";
+    print "\nUsage: $0 -scale <size of data to be loaded. scale of 1 means 1GB, 1000 means 1TB> -num <total number of primary segments in the cluster> -port <master port number> -db <name of the database in which the tpch tables will be created> -isao <is appendonly table: TRUE/FALSE, default TRUE> -ispartition <is partitioned table: TRUE/FALSE, default FALSE> -orientation <row oriented or parquet oriented: ROW/PARQUET, default ROW> -compresstype <compress type: ZLIB|QUICKLZ|RLE_TYPE|NONE, default NONE> -level <compression level: 0-9, default 0> -rowgroupsize <size of row group, default 8388608, should be the same with DB default value> -pagesize <size of page, default 1048576, should be the same with DB default value>\n\n";
 
     print "The program expects database <dbname> to be present. Also, it expects dbgen program and dists.dss file to be present in GPHOME/bin directory. \n\n";
     exit;
@@ -114,7 +118,7 @@ print OUT "CREATE TABLE NATION  ( N_NATIONKEY  INTEGER NOT NULL,
                             N_REGIONKEY  INTEGER NOT NULL,
                             N_COMMENT    VARCHAR(152))";
 if( lc($israndom) eq "true"){
-	print OUT "distributed randomly";                           
+	print OUT " distributed randomly";                           
 }                            
 print OUT ";\n";
 
@@ -122,7 +126,7 @@ print OUT "CREATE TABLE REGION  ( R_REGIONKEY  INTEGER NOT NULL,
                             R_NAME       CHAR(25) NOT NULL,
                             R_COMMENT    VARCHAR(152))";
 if( lc($israndom) eq "true"){
-	print OUT "distributed randomly";                          
+	print OUT " distributed randomly";                          
 }                            
 print OUT ";\n";
 
@@ -136,7 +140,7 @@ print OUT "CREATE TABLE PART  ( P_PARTKEY     INTEGER NOT NULL,
                           P_RETAILPRICE DECIMAL(15,2) NOT NULL,
                           P_COMMENT     VARCHAR(23) NOT NULL )";
 if( lc($israndom) eq "true"){
-	print OUT "distributed randomly";                          
+	print OUT " distributed randomly";                          
 }                            
 print OUT ";\n";
 
@@ -148,7 +152,7 @@ print OUT "CREATE TABLE SUPPLIER ( S_SUPPKEY     INTEGER NOT NULL,
                              S_ACCTBAL     DECIMAL(15,2) NOT NULL,
                              S_COMMENT     VARCHAR(101) NOT NULL)";
 if( lc($israndom) eq "true"){
-	print OUT "distributed randomly";                          
+	print OUT " distributed randomly";                          
 }                            
 print OUT ";\n";
 
@@ -158,7 +162,7 @@ print OUT "CREATE TABLE PARTSUPP ( PS_PARTKEY     INTEGER NOT NULL,
                              PS_SUPPLYCOST  DECIMAL(15,2)  NOT NULL,
                              PS_COMMENT     VARCHAR(199) NOT NULL )";
 if( lc($israndom) eq "true"){
-	print OUT "distributed randomly";                          
+	print OUT " distributed randomly";                          
 }                            
 print OUT ";\n";
 
@@ -171,7 +175,7 @@ print OUT "CREATE TABLE CUSTOMER ( C_CUSTKEY     INTEGER NOT NULL,
                              C_MKTSEGMENT  CHAR(10) NOT NULL,
                              C_COMMENT     VARCHAR(117) NOT NULL)";
 if( lc($israndom) eq "true"){
-	print OUT "distributed randomly";                          
+	print OUT " distributed randomly";                          
 }                            
 print OUT ";\n";
 
@@ -188,7 +192,7 @@ print OUT "CREATE TABLE orders (
 ) WITH ($with_content)";
 
 if( lc($israndom) eq "true"){
-	print OUT "distributed randomly ";                           
+	print OUT " distributed randomly ";                           
 }                            
 
 if( lc($ispartition) eq "true"){
@@ -345,7 +349,7 @@ print OUT "CREATE TABLE LINEITEM ( L_ORDERKEY    INT8 NOT NULL,
 print OUT "WITH ($with_content)";
 
 if( lc($israndom) eq "true"){
-	print OUT "distributed randomly ";                           
+	print OUT " distributed randomly ";                           
 }                            
 
 if (lc($ispartition) eq "true"){

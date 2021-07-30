@@ -1,0 +1,47 @@
+#!/bin/bash
+# ln -sf ../../pre-push .git/hooks/pre-push
+
+remote="$1"
+url="$2"
+read local_ref local_sha remote_ref remote_sha
+
+DOWNLOAD_PROJECT="DownloadCode"
+COMPILE_PROJECT="CompileMasterReleaseRPM"
+TEST_PROJECT="MasterSingleNodeRelease"
+JENKINS_SERVER="http://zhenglin.taozl:zhenglin.taozl@ciserver10000.oushu-tech.com:10000/job/"
+BUILD_STATUS_QUERY="/lastBuild/api/json"
+protected_branch='oushu-master'
+
+CONSOLE_RED='\033[31m'
+CONSOLE_GREEN='\033[32m'
+CONSOLE_YELLOW='\033[33m'
+CONSOLE_CLEAR='\033[m'
+
+function check_build() {
+    PROJECT=$1
+    JOB_STATUS_JSON=`curl --silent --show-error ${JENKINS_SERVER}${PROJECT}${BUILD_STATUS_QUERY}`
+    RESULT=`echo "${JOB_STATUS_JSON}" | sed -n 's/.*"building":\([\"A-Za-z]*\),.*/\1/p'`
+    if [ "${RESULT}" = "true" ]; then
+        printf "${CONSOLE_RED}${PROJECT} is still running, hold to push${CONSOLE_CLEAR}\n"
+        exit 1
+    fi
+    RESULT=`echo "${JOB_STATUS_JSON}" | sed -n 's/.*"result":\([\"A-Za-z]*\),.*/\1/p'`
+    if [ "${RESULT}" != "\"SUCCESS\"" ]; then
+        printf "${CONSOLE_RED}${PROJECT} not succeed, hold to push${CONSOLE_CLEAR}\n"
+        exit 1
+    fi
+    printf "${CONSOLE_GREEN} Checking ${CONSOLE_YELLOW}${PROJECT}${CONSOLE_GREEN} succeeds. ${CONSOLE_CLEAR}\n"
+}
+
+if [[ $remote_ref =~ $protected_branch ]]; then
+    printf "${CONSOLE_YELLOW} Checking CI status... ${CONSOLE_CLEAR}\n"
+    check_build ${DOWNLOAD_PROJECT}
+    check_build ${COMPILE_PROJECT}
+    check_build ${TEST_PROJECT}
+    check_build CompileMasterDebugRPM
+    check_build MasterSingleNodeDebug
+    check_build MagmaDebugTest
+    check_build MagmaSingleNodeParallel
+    check_build MagmaApSingleNodeParallel
+fi
+exit 0
